@@ -56,8 +56,12 @@ const current = Effect.fn("ProjectHttpApi.current")(function* () {
   return Instance.project
 })
 
-const ProjectLive = HttpApiBuilder.group(Api, "project", (handlers) =>
-  handlers.handle("list", list).handle("current", current),
+const ProjectLive = HttpApiBuilder.group(
+  Api,
+  "project",
+  Effect.fn("ProjectHttpApi.handlers")(function* (handlers) {
+    return handlers.handle("list", list).handle("current", current)
+  }),
 )
 
 const web = lazy(() =>
