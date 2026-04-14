@@ -38,12 +38,19 @@ const Api = HttpApi.make("provider")
     }),
   )
 
-const auth = Effect.fn("ProviderHttpApi.auth")(function* () {
-  const svc = yield* ProviderAuth.Service
-  return yield* svc.methods()
-})
+const ProviderLive = HttpApiBuilder.group(
+  Api,
+  "provider",
+  Effect.fn("ProviderHttpApi.handlers")(function* (handlers) {
+    const svc = yield* ProviderAuth.Service
 
-const ProviderLive = HttpApiBuilder.group(Api, "provider", (handlers) => handlers.handle("auth", auth))
+    const auth = Effect.fn("ProviderHttpApi.auth")(function* () {
+      return yield* svc.methods()
+    })
+
+    return handlers.handle("auth", auth)
+  }),
+).pipe(Layer.provide(ProviderAuth.defaultLayer))
 
 const web = lazy(() =>
   HttpRouter.toWebHandler(
