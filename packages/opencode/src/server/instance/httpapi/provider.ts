@@ -2,7 +2,7 @@ import { AppLayer } from "@/effect/app-runtime"
 import { memoMap } from "@/effect/run-service"
 import { ProviderAuth } from "@/provider/auth"
 import { lazy } from "@/util/lazy"
-import { Effect, Layer, Schema } from "effect"
+import { Effect, Layer } from "effect"
 import { HttpRouter, HttpServer } from "effect/unstable/http"
 import { HttpApi, HttpApiBuilder, HttpApiEndpoint, HttpApiGroup, OpenApi } from "effect/unstable/httpapi"
 import type { Handler } from "hono"
@@ -40,7 +40,7 @@ const Api = HttpApi.make("provider")
 
 const auth = Effect.fn("ProviderHttpApi.auth")(function* () {
   const svc = yield* ProviderAuth.Service
-  return Schema.decodeUnknownSync(ProviderAuth.Methods)(yield* svc.methods())
+  return yield* svc.methods()
 })
 
 const ProviderLive = HttpApiBuilder.group(Api, "provider", (handlers) => handlers.handle("auth", auth))

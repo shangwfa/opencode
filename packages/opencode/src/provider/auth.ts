@@ -99,7 +99,7 @@ export namespace ProviderAuth {
   type Hook = NonNullable<Hooks["auth"]>
 
   export interface Interface {
-    readonly methods: () => Effect.Effect<Record<ProviderID, Method[]>>
+    readonly methods: () => Effect.Effect<Record<ProviderID, ReadonlyArray<Method>>>
     readonly authorize: (input: {
       providerID: ProviderID
       method: number
@@ -138,9 +138,9 @@ export namespace ProviderAuth {
 
       const methods = Effect.fn("ProviderAuth.methods")(function* () {
         const hooks = (yield* InstanceState.get(state)).hooks
-        return Record.map(hooks, (item) =>
-          item.methods.map(
-            (method): Method => ({
+        return Schema.decodeUnknownSync(Methods)(
+          Record.map(hooks, (item) =>
+            item.methods.map((method) => ({
               type: method.type,
               label: method.label,
               prompts: method.prompts?.map((prompt) => {
@@ -161,7 +161,7 @@ export namespace ProviderAuth {
                   when: prompt.when,
                 }
               }),
-            }),
+            })),
           ),
         )
       })
