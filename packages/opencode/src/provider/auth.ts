@@ -12,7 +12,7 @@ import z from "zod"
 export namespace ProviderAuth {
   export class When extends Schema.Class<When>("ProviderAuthWhen")({
     key: Schema.String,
-    op: Schema.Union([Schema.Literal("eq"), Schema.Literal("neq")]),
+    op: Schema.Literals(["eq", "neq"]),
     value: Schema.String,
   }) {
     static readonly zod = zod(this)
@@ -52,7 +52,7 @@ export namespace ProviderAuth {
   export type Prompt = Schema.Schema.Type<typeof Prompt>
 
   export class Method extends Schema.Class<Method>("ProviderAuthMethod")({
-    type: Schema.Union([Schema.Literal("oauth"), Schema.Literal("api")]),
+    type: Schema.Literals(["oauth", "api"]),
     label: Schema.String,
     prompts: Schema.optional(Schema.Array(Prompt)),
   }) {
@@ -61,7 +61,7 @@ export namespace ProviderAuth {
 
   export class Authorization extends Schema.Class<Authorization>("ProviderAuthAuthorization")({
     url: Schema.String,
-    method: Schema.Union([Schema.Literal("auto"), Schema.Literal("code")]),
+    method: Schema.Literals(["auto", "code"]),
     instructions: Schema.String,
   }) {
     static readonly zod = zod(this)
