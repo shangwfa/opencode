@@ -309,7 +309,7 @@ describe.skipIf(!enabled)("PostgreSQL integration", () => {
         .from(ProjectTable)
         .where(eq(ProjectTable.id, pid as any))
       expect(rows).toHaveLength(1)
-      expect(rows[0].id).toBe(pid)
+      expect(rows[0].id).toBe(pid as any)
       expect(rows[0].worktree).toBe("/tmp/drizzle")
       expect(rows[0].sandboxes).toEqual([])
 

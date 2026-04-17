@@ -11,7 +11,7 @@ const dir = path.join(os.tmpdir(), "opencode-test-data-" + process.pid)
 await fs.mkdir(dir, { recursive: true })
 afterAll(async () => {
   const { Database } = await import("../src/storage/db")
-  Database.close()
+  await Database.close()
   const busy = (error: unknown) =>
     typeof error === "object" && error !== null && "code" in error && error.code === "EBUSY"
   const rm = async (left: number): Promise<void> => {
@@ -74,8 +74,11 @@ delete process.env["SAMBANOVA_API_KEY"]
 delete process.env["OPENCODE_SERVER_PASSWORD"]
 delete process.env["OPENCODE_SERVER_USERNAME"]
 
-// Use in-memory sqlite
-process.env["OPENCODE_DB"] = ":memory:"
+// Use in-memory sqlite by default. When OPENCODE_DATABASE_URL is set
+// (PG mode), skip this so the PG connection string takes precedence.
+if (!process.env["OPENCODE_DATABASE_URL"]) {
+  process.env["OPENCODE_DB"] = ":memory:"
+}
 
 // Now safe to import from src/
 const { Log } = await import("../src/util/log")

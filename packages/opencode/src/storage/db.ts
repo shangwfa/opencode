@@ -129,9 +129,14 @@ export namespace Database {
     if (dialect === "pg") {
       const url = Flag.OPENCODE_DATABASE_URL!
       log.info("opening pg database", { url: url.replace(/:[^:@]*@/, ":***@") })
-      const { init: initPg } = require("../storage/db.pg") as typeof import("../storage/db.pg")
-      const { db, client } = initPg(url)
+      const pg = require("../storage/db.pg") as typeof import("../storage/db.pg")
+      const { db, client } = pg.init(url)
       pgClose = () => client.end()
+
+      // Install .run()/.get()/.all() shims so business code written
+      // against the SQLite query API works on PG too.
+      const { ProjectTable } = require("../project/project.pg") as typeof import("../project/project.pg")
+      pg.install(db, ProjectTable)
 
       // Store migrations for async init
       const dir = path.join(import.meta.dirname, "../../migration-pg")
