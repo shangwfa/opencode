@@ -175,6 +175,7 @@ async function createToolContext(agent: Agent.Info) {
     callID: PartID.ascending(),
     agent: agent.name,
     abort: new AbortController().signal,
+    sandbox: null,
     messages: [],
     metadata: () => Effect.void,
     ask(req: Omit<Permission.Request, "id" | "sessionID" | "tool">) {

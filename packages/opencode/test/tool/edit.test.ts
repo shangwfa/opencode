@@ -24,6 +24,7 @@ const ctx = {
   messages: [],
   metadata: () => Effect.void,
   ask: () => Effect.void,
+  sandbox: null,
 }
 
 afterEach(async () => {

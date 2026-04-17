@@ -7,6 +7,8 @@ import { AppFileSystem } from "@opencode-ai/shared/filesystem"
 import { Ripgrep } from "../file/ripgrep"
 import { assertExternalDirectoryEffect } from "./external-directory"
 import DESCRIPTION from "./glob.txt"
+import { toSandboxPath, toHostPath } from "./sandbox-path"
+import { SandboxProvider } from "./sandbox-provider"
 import { Tool } from "./tool"
 
 export const GlobTool = Tool.define(
@@ -14,6 +16,7 @@ export const GlobTool = Tool.define(
   Effect.gen(function* () {
     const rg = yield* Ripgrep.Service
     const fs = yield* AppFileSystem.Service
+    const sandboxProvider = yield* SandboxProvider.Service
 
     return {
       description: DESCRIPTION,
@@ -47,6 +50,49 @@ export const GlobTool = Tool.define(
           }
           yield* assertExternalDirectoryEffect(ctx, search, { kind: "directory" })
 
+          // ── Sandbox mode ──
+          if (ctx.sandbox !== null) {
+            const sandboxSearchPath = toSandboxPath(search, ins.directory)
+
+            const escapedPattern = params.pattern.replace(/'/g, "'\\''")
+            const cmd = `rg --files --glob '${escapedPattern}' --sortr modified '${sandboxSearchPath}' 2>/dev/null | head -101`
+            const result = yield* sandboxProvider.runInSession(ctx.sessionID, cmd, { timeoutSeconds: 30 })
+
+            const stdout = result.logs.stdout.map((l: { text: string }) => l.text).join("\n").trim()
+            const lines = stdout ? stdout.split("\n").filter((line: string) => line.length > 0) : []
+
+            const limit = 100
+            let truncated = false
+            const files = lines.map((line: string) => toHostPath(line.trim(), ins.directory))
+
+            if (files.length > limit) {
+              truncated = true
+              files.length = limit
+            }
+
+            const output = []
+            if (files.length === 0) output.push("No files found")
+            if (files.length > 0) {
+              output.push(...files)
+              if (truncated) {
+                output.push("")
+                output.push(
+                  `(Results are truncated: showing first ${limit} results. Consider using a more specific path or pattern.)`,
+                )
+              }
+            }
+
+            return {
+              title: path.relative(ins.worktree, search),
+              metadata: {
+                count: files.length,
+                truncated,
+              },
+              output: output.join("\n"),
+            }
+          }
+
+          // ── Local mode ──
           const limit = 100
           let truncated = false
           const files = yield* rg.files({ cwd: search, glob: [params.pattern], signal: ctx.abort }).pipe(

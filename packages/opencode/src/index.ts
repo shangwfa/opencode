@@ -37,6 +37,7 @@ import { errorMessage } from "./util/error"
 import { PluginCommand } from "./cli/cmd/plug"
 import { Heap } from "./cli/heap"
 import { drizzle } from "drizzle-orm/bun-sqlite"
+import { AppRuntime } from "./effect/app-runtime"
 
 process.on("unhandledRejection", (e) => {
   Log.Default.error("rejection", {
@@ -48,6 +49,16 @@ process.on("uncaughtException", (e) => {
   Log.Default.error("exception", {
     e: errorMessage(e),
   })
+})
+
+process.on("SIGTERM", async () => {
+  await AppRuntime.dispose().catch(() => {})
+  process.exit(0)
+})
+
+process.on("SIGINT", async () => {
+  await AppRuntime.dispose().catch(() => {})
+  process.exit(0)
 })
 
 const args = hideBin(process.argv)

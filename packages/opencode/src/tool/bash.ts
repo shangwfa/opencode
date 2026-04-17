@@ -19,6 +19,9 @@ import { Plugin } from "@/plugin"
 import { Effect, Stream } from "effect"
 import { ChildProcess } from "effect/unstable/process"
 import { ChildProcessSpawner } from "effect/unstable/process/ChildProcessSpawner"
+import { toSandboxPath, toSandboxCwd, SANDBOX_WORKDIR } from "./sandbox-path"
+import { SandboxProvider } from "./sandbox-provider"
+import type { Sandbox } from "@alibaba-group/opensandbox"
 
 const MAX_METADATA_LENGTH = 30_000
 const DEFAULT_TIMEOUT = Flag.OPENCODE_EXPERIMENTAL_BASH_DEFAULT_TIMEOUT_MS || 2 * 60 * 1000
@@ -296,6 +299,7 @@ export const BashTool = Tool.define(
     const spawner = yield* ChildProcessSpawner
     const fs = yield* AppFileSystem.Service
     const plugin = yield* Plugin.Service
+    const sandboxProvider = yield* SandboxProvider.Service
 
     const cygpath = Effect.fn("BashTool.cygpath")(function* (shell: string, text: string) {
       const lines = yield* spawner
@@ -366,6 +370,73 @@ export const BashTool = Tool.define(
       return {
         ...process.env,
         ...extra.env,
+      }
+    })
+
+    const runSandbox = Effect.fn("BashTool.runSandbox")(function* (
+      input: {
+        command: string
+        cwd: string
+        timeout: number
+        description: string
+      },
+      ctx: Tool.Context,
+    ) {
+      let output = ""
+      let expired = false
+
+      yield* ctx.metadata({
+        metadata: {
+          output: "",
+          description: input.description,
+        },
+      })
+
+      const fullCommand = `cd ${input.cwd} && ${input.command}`
+      const result = yield* sandboxProvider.runInSession(
+        ctx.sessionID,
+        fullCommand,
+        { timeoutSeconds: Math.ceil((input.timeout + 1000) / 1000) },
+        {
+          onStdout: (msg) => {
+            output += msg.text
+            ctx.metadata({
+              metadata: { output: preview(output), description: input.description },
+            })
+          },
+          onStderr: (msg) => {
+            output += msg.text
+            ctx.metadata({
+              metadata: { output: preview(output), description: input.description },
+            })
+          },
+        },
+        ctx.abort,
+      )
+
+      const exitCode = result.exitCode ?? null
+      if (exitCode === null) {
+        expired = true
+      }
+
+      const meta: string[] = []
+      if (expired) {
+        meta.push(
+          `bash tool terminated command after exceeding timeout ${input.timeout} ms.`,
+        )
+      }
+      if (meta.length > 0) {
+        output += "\n\n<bash_metadata>\n" + meta.join("\n") + "\n</bash_metadata>"
+      }
+
+      return {
+        title: input.description,
+        metadata: {
+          output: preview(output),
+          exit: exitCode,
+          description: input.description,
+        },
+        output,
       }
     })
 
@@ -478,17 +549,33 @@ export const BashTool = Tool.define(
           parameters: Parameters,
           execute: (params: z.infer<typeof Parameters>, ctx: Tool.Context) =>
             Effect.gen(function* () {
-              const cwd = params.workdir
+              const sandboxMode = ctx.sandbox !== null
+              const localCwd = params.workdir
                 ? yield* resolvePath(params.workdir, Instance.directory, shell)
                 : Instance.directory
+
               if (params.timeout !== undefined && params.timeout < 0) {
                 throw new Error(`Invalid timeout value: ${params.timeout}. Timeout must be a positive number.`)
               }
               const timeout = params.timeout ?? DEFAULT_TIMEOUT
+
+              if (sandboxMode) {
+                const sandboxCwd = toSandboxCwd(params.workdir, Instance.directory)
+                return yield* runSandbox(
+                  {
+                    command: params.command,
+                    cwd: sandboxCwd,
+                    timeout,
+                    description: params.description,
+                  },
+                  ctx,
+                ).pipe(Effect.orDie)
+              }
+
               const ps = PS.has(name)
               const root = yield* parse(params.command, ps)
-              const scan = yield* collect(root, cwd, ps, shell)
-              if (!Instance.containsPath(cwd)) scan.dirs.add(cwd)
+              const scan = yield* collect(root, localCwd, ps, shell)
+              if (!Instance.containsPath(localCwd)) scan.dirs.add(localCwd)
               yield* ask(ctx, scan)
 
               return yield* run(
@@ -496,8 +583,8 @@ export const BashTool = Tool.define(
                   shell,
                   name,
                   command: params.command,
-                  cwd,
-                  env: yield* shellEnv(ctx, cwd),
+                  cwd: localCwd,
+                  env: yield* shellEnv(ctx, localCwd),
                   timeout,
                   description: params.description,
                 },

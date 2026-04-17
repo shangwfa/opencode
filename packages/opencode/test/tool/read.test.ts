@@ -14,6 +14,7 @@ import { ReadTool } from "../../src/tool/read"
 import { Truncate } from "../../src/tool/truncate"
 import { Tool } from "../../src/tool/tool"
 import { Filesystem } from "../../src/util/filesystem"
+import { NoopSandboxProvider } from "../../src/tool/sandbox-provider"
 import { provideInstance, tmpdirScoped } from "../fixture/fixture"
 import { testEffect } from "../lib/effect"
 
@@ -32,6 +33,7 @@ const ctx = {
   messages: [],
   metadata: () => Effect.void,
   ask: () => Effect.void,
+  sandbox: null,
 }
 
 const it = testEffect(
@@ -43,6 +45,7 @@ const it = testEffect(
     Instruction.defaultLayer,
     LSP.defaultLayer,
     Truncate.defaultLayer,
+    NoopSandboxProvider.layer,
   ),
 )
 
