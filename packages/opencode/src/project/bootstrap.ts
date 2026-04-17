@@ -31,7 +31,7 @@ export const InstanceBootstrap = Effect.gen(function* () {
   yield* Bus.Service.use((svc) =>
     svc.subscribeCallback(Command.Event.Executed, async (payload) => {
       if (payload.properties.name === Command.Default.INIT) {
-        Project.setInitialized(Instance.project.id)
+        await Project.setInitialized(Instance.project.id)
       }
     }),
   )

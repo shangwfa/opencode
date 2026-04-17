@@ -186,11 +186,13 @@ describe("session.prompt missing file", () => {
 
             if (msg.info.role !== "user") throw new Error("expected user message")
 
-            const stored = MessageV2.get({
-              sessionID: session.id,
-              messageID: msg.info.id,
-            })
-            const text = stored.parts.filter((part) => part.type === "text").map((part) => part.text)
+            const stored = yield* Effect.promise(() =>
+              MessageV2.get({
+                sessionID: session.id,
+                messageID: msg.info.id,
+              }),
+            )
+            const text = stored.parts.filter((part: any) => part.type === "text").map((part: any) => part.text)
 
             expect(text[0]?.startsWith("Called the Read tool with the following input:")).toBe(true)
             expect(text[1]?.includes("Read tool failed to read")).toBe(true)
@@ -236,9 +238,11 @@ describe("session.prompt special characters", () => {
               parts,
               noReply: true,
             })
-            const stored = MessageV2.get({ sessionID: session.id, messageID: message.info.id })
-            const textParts = stored.parts.filter((part) => part.type === "text")
-            const hasContent = textParts.some((part) => part.text.includes("special content"))
+            const stored = yield* Effect.promise(() =>
+              MessageV2.get({ sessionID: session.id, messageID: message.info.id }),
+            )
+            const textParts = stored.parts.filter((part: any) => part.type === "text")
+            const hasContent = textParts.some((part: any) => part.text.includes("special content"))
             expect(hasContent).toBe(true)
 
             yield* sessions.remove(session.id)

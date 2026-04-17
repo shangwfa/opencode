@@ -36,7 +36,7 @@ describe("session.list", () => {
           fn: async () => svc.create({}),
         })
 
-        const sessions = [...svc.list({ directory: tmp.path })]
+        const sessions = await Array.fromAsync(svc.list({ directory: tmp.path }))
         const ids = sessions.map((s) => s.id)
 
         expect(ids).toContain(first.id)
@@ -53,7 +53,7 @@ describe("session.list", () => {
         const root = await svc.create({ title: "root-session" })
         const child = await svc.create({ title: "child-session", parentID: root.id })
 
-        const sessions = [...svc.list({ roots: true })]
+        const sessions = await Array.fromAsync(svc.list({ roots: true }))
         const ids = sessions.map((s) => s.id)
 
         expect(ids).toContain(root.id)
@@ -70,7 +70,7 @@ describe("session.list", () => {
         const session = await svc.create({ title: "new-session" })
         const futureStart = Date.now() + 86400000
 
-        const sessions = [...svc.list({ start: futureStart })]
+        const sessions = await Array.fromAsync(svc.list({ start: futureStart }))
         expect(sessions.length).toBe(0)
       },
     })
@@ -84,7 +84,7 @@ describe("session.list", () => {
         await svc.create({ title: "unique-search-term-abc" })
         await svc.create({ title: "other-session-xyz" })
 
-        const sessions = [...svc.list({ search: "unique-search" })]
+        const sessions = await Array.fromAsync(svc.list({ search: "unique-search" }))
         const titles = sessions.map((s) => s.title)
 
         expect(titles).toContain("unique-search-term-abc")
@@ -102,7 +102,7 @@ describe("session.list", () => {
         await svc.create({ title: "session-2" })
         await svc.create({ title: "session-3" })
 
-        const sessions = [...svc.list({ limit: 2 })]
+        const sessions = await Array.fromAsync(svc.list({ limit: 2 }))
         expect(sessions.length).toBe(2)
       },
     })

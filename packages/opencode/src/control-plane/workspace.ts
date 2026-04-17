@@ -96,8 +96,9 @@ export namespace Workspace {
       projectID: input.projectID,
     }
 
-    Database.use((db) => {
-      db.insert(WorkspaceTable)
+    await Database.use(async (db) => {
+      await db
+        .insert(WorkspaceTable)
         .values({
           id: info.id,
           type: info.type,
@@ -135,14 +136,14 @@ export namespace Workspace {
       const target = await adaptor.target(space)
 
       // Need to switch the workspace of the session
-      SyncEvent.run(Session.Event.Updated, {
+      await SyncEvent.run(Session.Event.Updated, {
         sessionID: input.sessionID,
         info: {
           workspaceID: input.workspaceID,
         },
       })
 
-      const rows = Database.use((db) =>
+      const rows = await Database.use((db) =>
         db
           .select({
             id: EventTable.id,
@@ -199,7 +200,7 @@ export namespace Workspace {
           target: target.type === "remote" ? String(route(target.url, "/sync/replay")) : target.directory,
         })
         if (target.type === "local") {
-          SyncEvent.replayAll(events)
+          await SyncEvent.replayAll(events)
           log.info("session restore batch replayed locally", {
             workspaceID: input.workspaceID,
             sessionID: input.sessionID,
@@ -275,18 +276,18 @@ export namespace Workspace {
     }
   })
 
-  export function list(project: Project.Info) {
-    const rows = Database.use((db) =>
+  export async function list(project: Project.Info) {
+    const rows = await Database.use((db) =>
       db.select().from(WorkspaceTable).where(eq(WorkspaceTable.project_id, project.id)).all(),
     )
-    const spaces = rows.map(fromRow).sort((a, b) => a.id.localeCompare(b.id))
+    const spaces = rows.map(fromRow).sort((a: Info, b: Info) => a.id.localeCompare(b.id))
 
     for (const space of spaces) startSync(space)
     return spaces
   }
 
   export const get = fn(WorkspaceID.zod, async (id) => {
-    const row = Database.use((db) => db.select().from(WorkspaceTable).where(eq(WorkspaceTable.id, id)).get())
+    const row = await Database.use((db) => db.select().from(WorkspaceTable).where(eq(WorkspaceTable.id, id)).get())
     if (!row) return
     const space = fromRow(row)
     startSync(space)
@@ -294,14 +295,14 @@ export namespace Workspace {
   })
 
   export const remove = fn(WorkspaceID.zod, async (id) => {
-    const sessions = Database.use((db) =>
+    const sessions = await Database.use((db) =>
       db.select({ id: SessionTable.id }).from(SessionTable).where(eq(SessionTable.workspace_id, id)).all(),
     )
     for (const session of sessions) {
       await AppRuntime.runPromise(Session.Service.use((svc) => svc.remove(session.id)))
     }
 
-    const row = Database.use((db) => db.select().from(WorkspaceTable).where(eq(WorkspaceTable.id, id)).get())
+    const row = await Database.use((db) => db.select().from(WorkspaceTable).where(eq(WorkspaceTable.id, id)).get())
 
     if (row) {
       stopSync(id)
@@ -313,7 +314,7 @@ export namespace Workspace {
       } catch (err) {
         log.error("adaptor not available when removing workspace", { type: row.type })
       }
-      Database.use((db) => db.delete(WorkspaceTable).where(eq(WorkspaceTable.id, id)).run())
+      await Database.use((db) => db.delete(WorkspaceTable).where(eq(WorkspaceTable.id, id)).run())
       return info
     }
   })
@@ -383,13 +384,13 @@ export namespace Workspace {
       log.info("global sync connected", { workspace: space.name })
       setStatus(space.id, "connected")
 
-      await parseSSE(res.body, signal, (evt: any) => {
+      await parseSSE(res.body, signal, async (evt: any) => {
         try {
           if (!("payload" in evt)) return
 
           if (evt.payload.type === "sync") {
             // This name -> type is temporary
-            SyncEvent.replay({ ...evt.payload, type: evt.payload.name } as SyncEvent.SerializedEvent)
+            await SyncEvent.replay({ ...evt.payload, type: evt.payload.name } as SyncEvent.SerializedEvent)
           }
 
           GlobalBus.emit("event", {

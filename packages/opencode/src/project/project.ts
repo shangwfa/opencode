@@ -131,7 +131,7 @@ export namespace Project {
       )
 
       const db = <T>(fn: (d: Parameters<typeof Database.use>[0] extends (trx: infer D) => any ? D : never) => T) =>
-        Effect.sync(() => Database.use(fn))
+        Effect.promise(() => Database.use(fn))
 
       const emitUpdated = (data: Info) =>
         Effect.sync(() =>
@@ -429,7 +429,7 @@ export namespace Project {
       const removeSandbox = Effect.fn("Project.removeSandbox")(function* (id: ProjectID, directory: string) {
         const row = yield* db((d) => d.select().from(ProjectTable).where(eq(ProjectTable.id, id)).get())
         if (!row) throw new Error(`Project not found: ${id}`)
-        const sboxes = row.sandboxes.filter((s) => s !== directory)
+        const sboxes = row.sandboxes.filter((s: string) => s !== directory)
         const result = yield* db((d) =>
           d
             .update(ProjectTable)
@@ -463,24 +463,19 @@ export namespace Project {
     Layer.provide(NodePath.layer),
   )
 
-  export function list() {
-    return Database.use((db) =>
-      db
-        .select()
-        .from(ProjectTable)
-        .all()
-        .map((row) => fromRow(row)),
-    )
+  export async function list() {
+    const rows = await Database.use((db) => db.select().from(ProjectTable).all())
+    return rows.map(fromRow)
   }
 
-  export function get(id: ProjectID): Info | undefined {
-    const row = Database.use((db) => db.select().from(ProjectTable).where(eq(ProjectTable.id, id)).get())
+  export async function get(id: ProjectID): Promise<Info | undefined> {
+    const row = await Database.use((db) => db.select().from(ProjectTable).where(eq(ProjectTable.id, id)).get())
     if (!row) return undefined
     return fromRow(row)
   }
 
-  export function setInitialized(id: ProjectID) {
-    Database.use((db) =>
+  export async function setInitialized(id: ProjectID) {
+    await Database.use((db) =>
       db.update(ProjectTable).set({ time_initialized: Date.now() }).where(eq(ProjectTable.id, id)).run(),
     )
   }

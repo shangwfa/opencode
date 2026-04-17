@@ -32,7 +32,7 @@ export namespace SyncEvent {
 
   export type SerializedEvent<Def extends Definition = Definition> = Event<Def> & { type: string }
 
-  type ProjectorFunc = (db: Database.TxOrDb, data: unknown) => void
+  type ProjectorFunc = (db: Database.TxOrDb, data: unknown) => void | Promise<void>
 
   export const registry = new Map<string, Definition>()
   let projectors: Map<Definition, ProjectorFunc> | undefined
@@ -98,12 +98,12 @@ export namespace SyncEvent {
 
   export function project<Def extends Definition>(
     def: Def,
-    func: (db: Database.TxOrDb, data: Event<Def>["data"]) => void,
+    func: (db: Database.TxOrDb, data: Event<Def>["data"]) => void | Promise<void>,
   ): [Definition, ProjectorFunc] {
     return [def, func as ProjectorFunc]
   }
 
-  function process<Def extends Definition>(def: Def, event: Event<Def>, options: { publish: boolean }) {
+  async function process<Def extends Definition>(def: Def, event: Event<Def>, options: { publish: boolean }) {
     if (projectors == null) {
       throw new Error("No projectors available. Call `SyncEvent.init` to install projectors")
     }
@@ -115,11 +115,12 @@ export namespace SyncEvent {
 
     // idempotent: need to ignore any events already logged
 
-    Database.transaction((tx) => {
-      projector(tx, event.data)
+    await Database.transaction(async (tx) => {
+      await projector(tx, event.data)
 
       if (Flag.OPENCODE_EXPERIMENTAL_WORKSPACES) {
-        tx.insert(EventSequenceTable)
+        await tx
+          .insert(EventSequenceTable)
           .values({
             aggregate_id: event.aggregateID,
             seq: event.seq,
@@ -129,7 +130,8 @@ export namespace SyncEvent {
             set: { seq: event.seq },
           })
           .run()
-        tx.insert(EventTable)
+        await tx
+          .insert(EventTable)
           .values({
             id: event.id,
             seq: event.seq,
@@ -172,13 +174,13 @@ export namespace SyncEvent {
   //   and it validets all the sequence ids
   // * when loading events from db, apply zod validation to ensure shape
 
-  export function replay(event: SerializedEvent, options?: { publish: boolean }) {
+  export async function replay(event: SerializedEvent, options?: { publish: boolean }) {
     const def = registry.get(event.type)
     if (!def) {
       throw new Error(`Unknown event type: ${event.type}`)
     }
 
-    const row = Database.use((db) =>
+    const row = await Database.use((db) =>
       db
         .select({ seq: EventSequenceTable.seq })
         .from(EventSequenceTable)
@@ -196,10 +198,10 @@ export namespace SyncEvent {
       throw new Error(`Sequence mismatch for aggregate "${event.aggregateID}": expected ${expected}, got ${event.seq}`)
     }
 
-    process(def, event, { publish: !!options?.publish })
+    await process(def, event, { publish: !!options?.publish })
   }
 
-  export function replayAll(events: SerializedEvent[], options?: { publish: boolean }) {
+  export async function replayAll(events: SerializedEvent[], options?: { publish: boolean }) {
     const source = events[0]?.aggregateID
     if (!source) return
     if (events.some((item) => item.aggregateID !== source)) {
@@ -213,12 +215,16 @@ export namespace SyncEvent {
       }
     }
     for (const item of events) {
-      replay(item, options)
+      await replay(item, options)
     }
     return source
   }
 
-  export function run<Def extends Definition>(def: Def, data: Event<Def>["data"], options?: { publish?: boolean }) {
+  export async function run<Def extends Definition>(
+    def: Def,
+    data: Event<Def>["data"],
+    options?: { publish?: boolean },
+  ) {
     const agg = (data as Record<string, string>)[def.aggregate]
     // This should never happen: we've enforced it via typescript in
     // the definition
@@ -235,10 +241,10 @@ export namespace SyncEvent {
     // Note that this is an "immediate" transaction which is critical.
     // We need to make sure we can safely read and write with nothing
     // else changing the data from under us
-    Database.transaction(
-      (tx) => {
+    await Database.transaction(
+      async (tx) => {
         const id = EventID.ascending()
-        const row = tx
+        const row = await tx
           .select({ seq: EventSequenceTable.seq })
           .from(EventSequenceTable)
           .where(eq(EventSequenceTable.aggregate_id, agg))
@@ -246,7 +252,7 @@ export namespace SyncEvent {
         const seq = row?.seq != null ? row.seq + 1 : 0
 
         const event = { id, seq, aggregateID: agg, data }
-        process(def, event, { publish })
+        await process(def, event, { publish })
       },
       {
         behavior: "immediate",
@@ -254,10 +260,10 @@ export namespace SyncEvent {
     )
   }
 
-  export function remove(aggregateID: string) {
-    Database.transaction((tx) => {
-      tx.delete(EventSequenceTable).where(eq(EventSequenceTable.aggregate_id, aggregateID)).run()
-      tx.delete(EventTable).where(eq(EventTable.aggregate_id, aggregateID)).run()
+  export async function remove(aggregateID: string) {
+    await Database.transaction(async (tx) => {
+      await tx.delete(EventSequenceTable).where(eq(EventSequenceTable.aggregate_id, aggregateID)).run()
+      await tx.delete(EventTable).where(eq(EventTable.aggregate_id, aggregateID)).run()
     })
   }
 

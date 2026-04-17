@@ -60,7 +60,7 @@ export const SyncRoutes = lazy(() =>
           last: events.at(-1)?.seq,
           directory: body.directory,
         })
-        SyncEvent.replayAll(events)
+        await SyncEvent.replayAll(events)
 
         log.info("sync replay complete", {
           sessionID: source,
@@ -111,7 +111,9 @@ export const SyncRoutes = lazy(() =>
           exclude.length > 0
             ? not(or(...exclude.map(([id, seq]) => and(eq(EventTable.aggregate_id, id), lte(EventTable.seq, seq))))!)
             : undefined
-        const rows = Database.use((db) => db.select().from(EventTable).where(where).orderBy(asc(EventTable.seq)).all())
+        const rows = await Database.use((db) =>
+          db.select().from(EventTable).where(where).orderBy(asc(EventTable.seq)).all(),
+        )
         return c.json(rows)
       },
     ),

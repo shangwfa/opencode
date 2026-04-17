@@ -97,7 +97,9 @@ export const TaskTool = Tool.define(
           ],
         }))
 
-      const msg = yield* Effect.sync(() => MessageV2.get({ sessionID: ctx.sessionID, messageID: ctx.messageID }))
+      const msg: MessageV2.WithParts = yield* Effect.promise(() =>
+        MessageV2.get({ sessionID: ctx.sessionID, messageID: ctx.messageID }),
+      )
       if (msg.info.role !== "assistant") return yield* Effect.fail(new Error("Not an assistant message"))
 
       const model = next.model ?? {

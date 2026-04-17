@@ -45,13 +45,13 @@ export class AccountRepo extends Context.Service<AccountRepo, AccountRepo.Servic
       const decode = Schema.decodeUnknownSync(Info)
 
       const query = <A>(f: DbTransactionCallback<A>) =>
-        Effect.try({
+        Effect.tryPromise({
           try: () => Database.use(f),
           catch: (cause) => new AccountRepoError({ message: "Database operation failed", cause }),
         })
 
       const tx = <A>(f: DbTransactionCallback<A>) =>
-        Effect.try({
+        Effect.tryPromise({
           try: () => Database.transaction(f),
           catch: (cause) => new AccountRepoError({ message: "Database operation failed", cause }),
         })

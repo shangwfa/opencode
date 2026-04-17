@@ -1,7 +1,7 @@
 export async function parseSSE(
   body: ReadableStream<Uint8Array>,
   signal: AbortSignal,
-  onEvent: (event: unknown) => void,
+  onEvent: (event: unknown) => void | Promise<void>,
 ) {
   const reader = body.getReader()
   const decoder = new TextDecoder()
@@ -26,29 +26,29 @@ export async function parseSSE(
       const chunks = buf.split("\n\n")
       buf = chunks.pop() ?? ""
 
-      chunks.forEach((chunk) => {
+      for (const chunk of chunks) {
         const data: string[] = []
-        chunk.split("\n").forEach((line) => {
+        for (const line of chunk.split("\n")) {
           if (line.startsWith("data:")) {
             data.push(line.replace(/^data:\s*/, ""))
-            return
+            continue
           }
           if (line.startsWith("id:")) {
             last = line.replace(/^id:\s*/, "")
-            return
+            continue
           }
           if (line.startsWith("retry:")) {
             const parsed = Number.parseInt(line.replace(/^retry:\s*/, ""), 10)
             if (!Number.isNaN(parsed)) retry = parsed
           }
-        })
+        }
 
-        if (!data.length) return
+        if (!data.length) continue
         const raw = data.join("\n")
         try {
-          onEvent(JSON.parse(raw))
+          await onEvent(JSON.parse(raw))
         } catch {
-          onEvent({
+          await onEvent({
             type: "sse.message",
             properties: {
               data: raw,
@@ -57,7 +57,7 @@ export async function parseSSE(
             },
           })
         }
-      })
+      }
     }
   } finally {
     signal.removeEventListener("abort", abort)

@@ -10,8 +10,8 @@ import { Instance } from "../project/instance"
 import { type SessionID, MessageID, PartID } from "../session/schema"
 import EXIT_DESCRIPTION from "./plan-exit.txt"
 
-function getLastModel(sessionID: SessionID) {
-  for (const item of MessageV2.stream(sessionID)) {
+async function getLastModel(sessionID: SessionID) {
+  for await (const item of MessageV2.stream(sessionID)) {
     if (item.info.role === "user" && item.info.model) return item.info.model
   }
   return undefined
@@ -49,7 +49,7 @@ export const PlanExitTool = Tool.define(
 
           if (answers[0]?.[0] === "No") yield* new Question.RejectedError()
 
-          const model = getLastModel(ctx.sessionID) ?? (yield* provider.defaultModel())
+          const model = (yield* Effect.promise(() => getLastModel(ctx.sessionID))) ?? (yield* provider.defaultModel())
 
           const msg: MessageV2.User = {
             id: MessageID.ascending(),

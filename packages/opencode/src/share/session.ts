@@ -27,7 +27,7 @@ export namespace SessionShare {
         const conf = yield* cfg.get()
         if (conf.share === "disabled") throw new Error("Sharing is disabled in configuration")
         const result = yield* shareNext.create(sessionID)
-        yield* Effect.sync(() =>
+        yield* Effect.promise(() =>
           SyncEvent.run(Session.Event.Updated, { sessionID, info: { share: { url: result.url } } }),
         )
         return result
@@ -35,7 +35,7 @@ export namespace SessionShare {
 
       const unshare = Effect.fn("SessionShare.unshare")(function* (sessionID: SessionID) {
         yield* shareNext.remove(sessionID)
-        yield* Effect.sync(() => SyncEvent.run(Session.Event.Updated, { sessionID, info: { share: { url: null } } }))
+        yield* Effect.promise(() => SyncEvent.run(Session.Event.Updated, { sessionID, info: { share: { url: null } } }))
       })
 
       const create = Effect.fn("SessionShare.create")(function* (input?: Session.CreateInput) {

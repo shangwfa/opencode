@@ -159,7 +159,7 @@ export const ImportCommand = cmd({
         projectID: Instance.project.id,
       })
       const row = Session.toRow(info)
-      Database.use((db) =>
+      await Database.use((db) =>
         db
           .insert(SessionTable)
           .values(row)
@@ -170,7 +170,7 @@ export const ImportCommand = cmd({
       for (const msg of exportData.messages) {
         const msgInfo = MessageV2.Info.parse(msg.info)
         const { id, sessionID: _, ...msgData } = msgInfo
-        Database.use((db) =>
+        await Database.use((db) =>
           db
             .insert(MessageTable)
             .values({
@@ -186,7 +186,7 @@ export const ImportCommand = cmd({
         for (const part of msg.parts) {
           const partInfo = MessageV2.Part.parse(part)
           const { id: partId, sessionID: _s, messageID, ...partData } = partInfo
-          Database.use((db) =>
+          await Database.use((db) =>
             db
               .insert(PartTable)
               .values({

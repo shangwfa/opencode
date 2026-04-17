@@ -388,7 +388,7 @@ export namespace Session {
   type Patch = z.infer<typeof Event.Updated.schema>["info"]
 
   const db = <T>(fn: (d: Parameters<typeof Database.use>[0] extends (trx: infer D) => any ? D : never) => T) =>
-    Effect.sync(() => Database.use(fn))
+    Effect.promise(() => Database.use(fn))
 
   export const layer: Layer.Layer<Service, never, Bus.Service | Storage.Service> = Layer.effect(
     Service,
@@ -422,7 +422,7 @@ export namespace Session {
         }
         log.info("created", result)
 
-        yield* Effect.sync(() => SyncEvent.run(Event.Created, { sessionID: result.id, info: result }))
+        yield* Effect.promise(() => SyncEvent.run(Event.Created, { sessionID: result.id, info: result }))
 
         if (!Flag.OPENCODE_EXPERIMENTAL_WORKSPACES) {
           // This only exist for backwards compatibility. We should not be
@@ -470,9 +470,9 @@ export namespace Session {
             Effect.catchCause(() => Effect.succeed(false)),
           )
 
-          yield* Effect.sync(() => {
-            SyncEvent.run(Event.Deleted, { sessionID, info: session }, { publish: hasInstance })
-            SyncEvent.remove(sessionID)
+          yield* Effect.promise(async () => {
+            await SyncEvent.run(Event.Deleted, { sessionID, info: session }, { publish: hasInstance })
+            await SyncEvent.remove(sessionID)
           })
         } catch (e) {
           log.error(e)
@@ -481,13 +481,13 @@ export namespace Session {
 
       const updateMessage = <T extends MessageV2.Info>(msg: T): Effect.Effect<T> =>
         Effect.gen(function* () {
-          yield* Effect.sync(() => SyncEvent.run(MessageV2.Event.Updated, { sessionID: msg.sessionID, info: msg }))
+          yield* Effect.promise(() => SyncEvent.run(MessageV2.Event.Updated, { sessionID: msg.sessionID, info: msg }))
           return msg
         }).pipe(Effect.withSpan("Session.updateMessage"))
 
       const updatePart = <T extends MessageV2.Part>(part: T): Effect.Effect<T> =>
         Effect.gen(function* () {
-          yield* Effect.sync(() =>
+          yield* Effect.promise(() =>
             SyncEvent.run(MessageV2.Event.PartUpdated, {
               sessionID: part.sessionID,
               part: structuredClone(part),
@@ -498,18 +498,20 @@ export namespace Session {
         }).pipe(Effect.withSpan("Session.updatePart"))
 
       const getPart: Interface["getPart"] = Effect.fn("Session.getPart")(function* (input) {
-        const row = Database.use((db) =>
-          db
-            .select()
-            .from(PartTable)
-            .where(
-              and(
-                eq(PartTable.session_id, input.sessionID),
-                eq(PartTable.message_id, input.messageID),
-                eq(PartTable.id, input.partID),
-              ),
-            )
-            .get(),
+        const row = yield* Effect.promise(() =>
+          Database.use((db) =>
+            db
+              .select()
+              .from(PartTable)
+              .where(
+                and(
+                  eq(PartTable.session_id, input.sessionID),
+                  eq(PartTable.message_id, input.messageID),
+                  eq(PartTable.id, input.partID),
+                ),
+              )
+              .get(),
+          ),
         )
         if (!row) return
         return {
@@ -574,7 +576,7 @@ export namespace Session {
       })
 
       const patch = (sessionID: SessionID, info: Patch) =>
-        Effect.sync(() => SyncEvent.run(Event.Updated, { sessionID, info }))
+        Effect.promise(() => SyncEvent.run(Event.Updated, { sessionID, info }))
 
       const touch = Effect.fn("Session.touch")(function* (sessionID: SessionID) {
         yield* patch(sessionID, { time: { updated: Date.now() } })
@@ -622,16 +624,17 @@ export namespace Session {
 
       const messages = Effect.fn("Session.messages")(function* (input: { sessionID: SessionID; limit?: number }) {
         if (input.limit) {
-          return MessageV2.page({ sessionID: input.sessionID, limit: input.limit }).items
+          const limit = input.limit
+          return yield* Effect.promise(async () => (await MessageV2.page({ sessionID: input.sessionID, limit })).items)
         }
-        return Array.from(MessageV2.stream(input.sessionID)).reverse()
+        return yield* Effect.promise(async () => (await Array.fromAsync(MessageV2.stream(input.sessionID))).reverse())
       })
 
       const removeMessage = Effect.fn("Session.removeMessage")(function* (input: {
         sessionID: SessionID
         messageID: MessageID
       }) {
-        yield* Effect.sync(() =>
+        yield* Effect.promise(() =>
           SyncEvent.run(MessageV2.Event.Removed, {
             sessionID: input.sessionID,
             messageID: input.messageID,
@@ -645,7 +648,7 @@ export namespace Session {
         messageID: MessageID
         partID: PartID
       }) {
-        yield* Effect.sync(() =>
+        yield* Effect.promise(() =>
           SyncEvent.run(MessageV2.Event.PartRemoved, {
             sessionID: input.sessionID,
             messageID: input.messageID,
@@ -670,7 +673,8 @@ export namespace Session {
         sessionID: SessionID,
         predicate: (msg: MessageV2.WithParts) => boolean,
       ) {
-        for (const item of MessageV2.stream(sessionID)) {
+        const items = yield* Effect.promise(() => Array.fromAsync(MessageV2.stream(sessionID)))
+        for (const item of items) {
           if (predicate(item)) return Option.some(item)
         }
         return Option.none<MessageV2.WithParts>()
@@ -704,7 +708,7 @@ export namespace Session {
 
   export const defaultLayer = layer.pipe(Layer.provide(Bus.layer), Layer.provide(Storage.defaultLayer))
 
-  export function* list(input?: {
+  export async function* list(input?: {
     directory?: string
     workspaceID?: WorkspaceID
     roots?: boolean
@@ -733,7 +737,7 @@ export namespace Session {
 
     const limit = input?.limit ?? 100
 
-    const rows = Database.use((db) =>
+    const rows = await Database.use((db) =>
       db
         .select()
         .from(SessionTable)
@@ -747,7 +751,7 @@ export namespace Session {
     }
   }
 
-  export function* listGlobal(input?: {
+  export async function* listGlobal(input?: {
     directory?: string
     roots?: boolean
     start?: number
@@ -779,7 +783,7 @@ export namespace Session {
 
     const limit = input?.limit ?? 100
 
-    const rows = Database.use((db) => {
+    const rows = await Database.use((db) => {
       const query =
         conditions.length > 0
           ? db
@@ -790,11 +794,11 @@ export namespace Session {
       return query.orderBy(desc(SessionTable.time_updated), desc(SessionTable.id)).limit(limit).all()
     })
 
-    const ids = [...new Set(rows.map((row) => row.project_id))]
+    const ids: any[] = [...new Set(rows.map((row: any) => row.project_id))]
     const projects = new Map<string, ProjectInfo>()
 
     if (ids.length > 0) {
-      const items = Database.use((db) =>
+      const items = await Database.use((db) =>
         db
           .select({ id: ProjectTable.id, name: ProjectTable.name, worktree: ProjectTable.worktree })
           .from(ProjectTable)
