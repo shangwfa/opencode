@@ -17,6 +17,7 @@ const baseCtx: Omit<Tool.Context, "ask"> = {
   abort: AbortSignal.any([]),
   messages: [],
   metadata: () => Effect.void,
+  sandbox: null,
 }
 
 const glob = (p: string) =>

@@ -213,6 +213,7 @@ describe("tool.task", () => {
             messages: [],
             metadata: () => Effect.void,
             ask: () => Effect.void,
+            sandbox: null,
           },
         )
 
@@ -254,6 +255,7 @@ describe("tool.task", () => {
                 Effect.sync(() => {
                   calls.push(input)
                 }),
+              sandbox: null,
             },
           )
 
@@ -300,6 +302,7 @@ describe("tool.task", () => {
             messages: [],
             metadata: () => Effect.void,
             ask: () => Effect.void,
+            sandbox: null,
           },
         )
 
@@ -339,6 +342,7 @@ describe("tool.task", () => {
               messages: [],
               metadata: () => Effect.void,
               ask: () => Effect.void,
+              sandbox: null,
             },
           )
 

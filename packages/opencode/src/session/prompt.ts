@@ -20,6 +20,7 @@ import PROMPT_PLAN from "../session/prompt/plan.txt"
 import BUILD_SWITCH from "../session/prompt/build-switch.txt"
 import MAX_STEPS from "../session/prompt/max-steps.txt"
 import { ToolRegistry } from "../tool/registry"
+import { SandboxProvider } from "../tool/sandbox-provider"
 import { MCP } from "../mcp"
 import { LSP } from "../lsp"
 import { FileTime } from "../file/time"
@@ -367,6 +368,8 @@ NOTE: At any point in time through this workflow you should feel free to ask the
         const tools: Record<string, AITool> = {}
         const run = yield* runner()
         const promptOps = yield* ops()
+        const maybeSandboxProvider = Option.getOrUndefined(yield* Effect.serviceOption(SandboxProvider.Service))
+        const sandboxEnabled = Flag.OPENCODE_SANDBOX_ENABLED && maybeSandboxProvider !== undefined
 
         const context = (args: any, options: ToolExecutionOptions): Tool.Context => ({
           sessionID: input.session.id,
@@ -376,6 +379,9 @@ NOTE: At any point in time through this workflow you should feel free to ask the
           extra: { model: input.model, bypassAgentCheck: input.bypassAgentCheck, promptOps },
           agent: input.agent.name,
           messages: input.messages,
+          sandbox: sandboxEnabled
+            ? Effect.runPromise(maybeSandboxProvider!.getOrCreate(input.session.id)).catch(() => null) as Promise<any>
+            : null,
           metadata: (val) =>
             input.processor.updateToolCall(options.toolCallId, (match) => {
               if (!["running", "pending"].includes(match.state.status)) return match
@@ -602,6 +608,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
             sessionID,
             abort: taskAbort.signal,
             callID: part.callID,
+            sandbox: null,
             extra: { bypassAgentCheck: true, promptOps },
             messages: msgs,
             metadata: (val: { title?: string; metadata?: Record<string, any> }) =>
@@ -1058,6 +1065,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
                       abort: controller.signal,
                       agent: input.agent!,
                       messageID: info.id,
+                      sandbox: null,
                       extra: { bypassCwdCheck: true, ...extra },
                       messages: [],
                       metadata: () => Effect.void,

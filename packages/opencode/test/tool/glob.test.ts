@@ -8,6 +8,7 @@ import { Ripgrep } from "../../src/file/ripgrep"
 import { AppFileSystem } from "@opencode-ai/shared/filesystem"
 import { Truncate } from "../../src/tool/truncate"
 import { Agent } from "../../src/agent/agent"
+import { NoopSandboxProvider } from "../../src/tool/sandbox-provider"
 import { provideTmpdirInstance } from "../fixture/fixture"
 import { testEffect } from "../lib/effect"
 
@@ -18,6 +19,7 @@ const it = testEffect(
     Ripgrep.defaultLayer,
     Truncate.defaultLayer,
     Agent.defaultLayer,
+    NoopSandboxProvider.layer,
   ),
 )
 
@@ -30,6 +32,7 @@ const ctx = {
   messages: [],
   metadata: () => Effect.void,
   ask: () => Effect.void,
+  sandbox: null,
 }
 
 describe("tool.glob", () => {

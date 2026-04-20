@@ -5,6 +5,7 @@ import type { Permission } from "../permission"
 import type { SessionID, MessageID } from "../session/schema"
 import { Truncate } from "./truncate"
 import { Agent } from "@/agent/agent"
+import type { Sandbox } from "@alibaba-group/opensandbox"
 
 export namespace Tool {
   interface Metadata {
@@ -24,6 +25,12 @@ export namespace Tool {
     messages: MessageV2.WithParts[]
     metadata(input: { title?: string; metadata?: M }): Effect.Effect<void>
     ask(input: Omit<Permission.Request, "id" | "sessionID" | "tool">): Effect.Effect<void>
+    /**
+     * Sandbox instance for remote tool execution.
+     * - null: local mode (default), tools execute on the host
+     * - Promise<Sandbox>: sandbox mode, tools execute in a remote container
+     */
+    sandbox: Promise<Sandbox> | null
   }
 
   export interface ExecuteResult<M extends Metadata = Metadata> {

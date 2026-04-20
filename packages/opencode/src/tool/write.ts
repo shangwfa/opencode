@@ -14,6 +14,8 @@ import { AppFileSystem } from "@opencode-ai/shared/filesystem"
 import { Instance } from "../project/instance"
 import { trimDiff } from "./edit"
 import { assertExternalDirectoryEffect } from "./external-directory"
+import { toSandboxPath } from "./sandbox-path"
+import type { Sandbox } from "@alibaba-group/opensandbox"
 
 const MAX_PROJECT_DIAGNOSTICS_FILES = 5
 
@@ -39,6 +41,44 @@ export const WriteTool = Tool.define(
             : path.join(Instance.directory, params.filePath)
           yield* assertExternalDirectoryEffect(ctx, filepath)
 
+          // ── Sandbox mode ──
+          if (ctx.sandbox !== null) {
+            const sb = yield* Effect.tryPromise({ try: () => ctx.sandbox!, catch: (e) => new Error(String(e)) })
+            const sandboxPath = toSandboxPath(filepath, Instance.directory)
+
+            let contentOld = ""
+            const readResult = yield* Effect.tryPromise(() => sb.files.readFile(sandboxPath)).pipe(
+              Effect.catch(() => Effect.succeed("")),
+            )
+            contentOld = readResult
+
+            const diff = trimDiff(createTwoFilesPatch(filepath, filepath, contentOld, params.content))
+            yield* ctx.ask({
+              permission: "edit",
+              patterns: [path.relative(Instance.worktree, filepath)],
+              always: ["*"],
+              metadata: { filepath, diff },
+            })
+
+            yield* Effect.tryPromise({
+              try: () => sb.files.writeFiles([{ path: sandboxPath, data: params.content }]),
+              catch: (e) => new Error(`Sandbox write failed: ${String(e)}`),
+            })
+
+            yield* bus.publish(File.Event.Edited, { file: filepath })
+            yield* bus.publish(FileWatcher.Event.Updated, {
+              file: filepath,
+              event: contentOld ? "change" : "add",
+            })
+
+            return {
+              title: path.relative(Instance.worktree, filepath),
+              metadata: { diagnostics: {}, filepath, exists: !!contentOld },
+              output: "Wrote file successfully.",
+            }
+          }
+
+          // ── Local mode ──
           const exists = yield* fs.existsSafe(filepath)
           const contentOld = exists ? yield* fs.readFileString(filepath) : ""
           if (exists) yield* filetime.assert(ctx.sessionID, filepath)

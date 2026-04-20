@@ -9,6 +9,7 @@ import { Truncate } from "../../src/tool/truncate"
 import { Agent } from "../../src/agent/agent"
 import { Ripgrep } from "../../src/file/ripgrep"
 import { AppFileSystem } from "@opencode-ai/shared/filesystem"
+import { NoopSandboxProvider } from "../../src/tool/sandbox-provider"
 import { testEffect } from "../lib/effect"
 
 const it = testEffect(
@@ -18,6 +19,7 @@ const it = testEffect(
     Ripgrep.defaultLayer,
     Truncate.defaultLayer,
     Agent.defaultLayer,
+    NoopSandboxProvider.layer,
   ),
 )
 
@@ -30,6 +32,7 @@ const ctx = {
   messages: [],
   metadata: () => Effect.void,
   ask: () => Effect.void,
+  sandbox: null,
 }
 
 const root = path.join(__dirname, "../..")

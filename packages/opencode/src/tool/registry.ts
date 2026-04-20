@@ -46,6 +46,7 @@ import { Bus } from "../bus"
 import { Agent } from "../agent/agent"
 import { Skill } from "../skill"
 import { Permission } from "@/permission"
+import { SandboxProvider, NoopSandboxProvider } from "./sandbox-provider"
 
 export namespace ToolRegistry {
   const log = Log.create({ service: "tool.registry" })
@@ -94,6 +95,7 @@ export namespace ToolRegistry {
     | Ripgrep.Service
     | Format.Service
     | Truncate.Service
+    | SandboxProvider.Service
   > = Layer.effect(
     Service,
     Effect.gen(function* () {
@@ -340,6 +342,11 @@ export namespace ToolRegistry {
       Layer.provide(CrossSpawnSpawner.defaultLayer),
       Layer.provide(Ripgrep.defaultLayer),
       Layer.provide(Truncate.defaultLayer),
+      Layer.provide(
+        Flag.OPENCODE_SANDBOX_ENABLED
+          ? SandboxProvider.defaultLayer
+          : NoopSandboxProvider.layer,
+      ),
     ),
   )
 }

@@ -47,6 +47,8 @@ import { Pty } from "@/pty"
 import { Installation } from "@/installation"
 import { ShareNext } from "@/share/share-next"
 import { SessionShare } from "@/share/session"
+import { SandboxProvider, NoopSandboxProvider } from "@/tool/sandbox-provider"
+import { Flag } from "@/flag/flag"
 
 export const AppLayer = Layer.mergeAll(
   AppFileSystem.defaultLayer,
@@ -94,6 +96,7 @@ export const AppLayer = Layer.mergeAll(
   Installation.defaultLayer,
   ShareNext.defaultLayer,
   SessionShare.defaultLayer,
+  Flag.OPENCODE_SANDBOX_ENABLED ? SandboxProvider.defaultLayer : NoopSandboxProvider.layer,
 ).pipe(Layer.provideMerge(Observability.layer))
 
 const rt = ManagedRuntime.make(AppLayer, { memoMap })

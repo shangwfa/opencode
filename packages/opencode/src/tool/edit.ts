@@ -19,6 +19,7 @@ import { Filesystem } from "../util/filesystem"
 import { Instance } from "../project/instance"
 import { Snapshot } from "@/snapshot"
 import { assertExternalDirectoryEffect } from "./external-directory"
+import { toSandboxPath } from "./sandbox-path"
 import { AppFileSystem } from "@opencode-ai/shared/filesystem"
 
 function normalizeLineEndings(text: string): string {
@@ -68,6 +69,104 @@ export const EditTool = Tool.define(
             : path.join(Instance.directory, params.filePath)
           yield* assertExternalDirectoryEffect(ctx, filePath)
 
+          // ── Sandbox branch: file I/O goes to sandbox, matching stays local ──
+          if (ctx.sandbox !== null) {
+            const sb = yield* Effect.tryPromise({ try: () => ctx.sandbox!, catch: (e) => new Error(String(e)) }).pipe(Effect.orDie)
+            const sandboxPath = toSandboxPath(filePath, Instance.directory)
+
+            let contentOld = ""
+            let contentNew = ""
+
+            if (params.oldString === "") {
+              // Create new file in sandbox
+              contentNew = params.newString
+              const diff = trimDiff(createTwoFilesPatch(filePath, filePath, contentOld, contentNew))
+              yield* ctx.ask({
+                permission: "edit",
+                patterns: [path.relative(Instance.worktree, filePath)],
+                always: ["*"],
+                metadata: { filepath: filePath, diff },
+              })
+              yield* Effect.tryPromise({
+                try: () => sb.files.writeFiles([{ path: sandboxPath, data: params.newString }]),
+                catch: (e) => new Error(`Sandbox write failed: ${String(e)}`),
+              }).pipe(Effect.orDie)
+              yield* bus.publish(File.Event.Edited, { file: filePath })
+
+              const filediff: Snapshot.FileDiff = {
+                file: filePath,
+                patch: diff,
+                additions: 0,
+                deletions: 0,
+              }
+              for (const change of diffLines(contentOld, contentNew)) {
+                if (change.added) filediff.additions += change.count || 0
+                if (change.removed) filediff.deletions += change.count || 0
+              }
+
+              return {
+                title: `${path.relative(Instance.worktree, filePath)}`,
+                metadata: { diagnostics: {}, diff, filediff },
+                output: "Edit applied successfully.",
+              }
+            }
+
+            // Read from sandbox
+            contentOld = yield* Effect.tryPromise({
+              try: () => sb.files.readFile(sandboxPath) as Promise<string>,
+              catch: () => new Error(`File ${filePath} not found`),
+            }).pipe(Effect.orDie)
+
+            const ending = detectLineEnding(contentOld)
+            const old = convertToLineEnding(normalizeLineEndings(params.oldString), ending)
+            const next = convertToLineEnding(normalizeLineEndings(params.newString), ending)
+
+            // Matching / replacement runs entirely locally (all 9 replacers)
+            contentNew = replace(contentOld, old, next, params.replaceAll)
+
+            const diff = trimDiff(
+              createTwoFilesPatch(
+                filePath,
+                filePath,
+                normalizeLineEndings(contentOld),
+                normalizeLineEndings(contentNew),
+              ),
+            )
+
+            yield* ctx.ask({
+              permission: "edit",
+              patterns: [path.relative(Instance.worktree, filePath)],
+              always: ["*"],
+              metadata: { filepath: filePath, diff },
+            })
+
+            // Write back to sandbox
+            yield* Effect.tryPromise({
+              try: () => sb.files.writeFiles([{ path: sandboxPath, data: contentNew }]),
+              catch: (e) => new Error(`Sandbox write failed: ${String(e)}`),
+            }).pipe(Effect.orDie)
+
+            yield* bus.publish(File.Event.Edited, { file: filePath })
+
+            const filediff: Snapshot.FileDiff = {
+              file: filePath,
+              patch: diff,
+              additions: 0,
+              deletions: 0,
+            }
+            for (const change of diffLines(contentOld, contentNew)) {
+              if (change.added) filediff.additions += change.count || 0
+              if (change.removed) filediff.deletions += change.count || 0
+            }
+
+            return {
+              title: `${path.relative(Instance.worktree, filePath)}`,
+              metadata: { diagnostics: {}, diff, filediff },
+              output: "Edit applied successfully.",
+            }
+          }
+
+          // ── Local branch (original logic, unchanged) ──
           let diff = ""
           let contentOld = ""
           let contentNew = ""

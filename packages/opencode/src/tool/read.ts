@@ -12,6 +12,8 @@ import DESCRIPTION from "./read.txt"
 import { Instance } from "../project/instance"
 import { assertExternalDirectoryEffect } from "./external-directory"
 import { Instruction } from "../session/instruction"
+import { toSandboxPath } from "./sandbox-path"
+import { SandboxProvider } from "./sandbox-provider"
 
 const DEFAULT_READ_LIMIT = 2000
 const MAX_LINE_LENGTH = 2000
@@ -33,6 +35,7 @@ export const ReadTool = Tool.define(
     const lsp = yield* LSP.Service
     const time = yield* FileTime.Service
     const scope = yield* Scope.Scope
+    const sandboxProvider = yield* SandboxProvider.Service
 
     const miss = Effect.fn("ReadTool.miss")(function* (filepath: string) {
       const dir = path.dirname(filepath)
@@ -105,6 +108,117 @@ export const ReadTool = Tool.define(
         bypass: Boolean(ctx.extra?.["bypassCwdCheck"]),
         kind: stat?.type === "Directory" ? "directory" : "file",
       })
+
+      // ── Sandbox mode ──
+      if (ctx.sandbox !== null) {
+        const sb = yield* Effect.tryPromise({ try: () => ctx.sandbox!, catch: (e) => new Error(String(e)) })
+        const sandboxPath = toSandboxPath(filepath, Instance.directory)
+
+        yield* ctx.ask({
+          permission: "read",
+          patterns: [filepath],
+          always: ["*"],
+          metadata: {},
+        })
+
+        const dirCheck = yield* sandboxProvider.runInSession(
+          ctx.sessionID,
+          `test -d "${sandboxPath}" && echo "DIR" || echo "FILE"`,
+          { timeoutSeconds: 5 }
+        ).pipe(
+          Effect.catch(() => Effect.succeed({ logs: { stdout: [{ text: "FILE", timestamp: "" }], stderr: [] }, exitCode: 1 } as any)),
+        )
+        const isDirectory = dirCheck.logs.stdout
+          .map((l: { text: string }) => l.text)
+          .join("")
+          .trim()
+          .includes("DIR")
+
+        if (isDirectory) {
+          const lsResult = yield* sandboxProvider.runInSession(
+            ctx.sessionID,
+            `ls -1 "${sandboxPath}"`,
+            { timeoutSeconds: 10 }
+          ).pipe(
+            Effect.catch(() => Effect.succeed({ logs: { stdout: [], stderr: [] }, exitCode: 1 } as any)),
+          )
+          const items = lsResult.logs.stdout
+            .map((l: { text: string }) => l.text.trim())
+            .filter(Boolean)
+            .sort((a: string, b: string) => a.localeCompare(b))
+
+          const limit = params.limit ?? DEFAULT_READ_LIMIT
+          const offset = params.offset ?? 1
+          const start = offset - 1
+          const sliced = items.slice(start, start + limit)
+          const truncated = start + sliced.length < items.length
+
+          return {
+            title,
+            output: [
+              `<path>${filepath}</path>`,
+              `<type>directory</type>`,
+              `<entries>`,
+              sliced.join("\n"),
+              truncated
+                ? `\n(Showing ${sliced.length} of ${items.length} entries. Use 'offset' parameter to read beyond entry ${offset + sliced.length})`
+                : `\n(${items.length} entries)`,
+              `</entries>`,
+            ].join("\n"),
+            metadata: {
+              preview: sliced.slice(0, 20).join("\n"),
+              truncated,
+              loaded: [] as string[],
+            },
+          }
+        }
+
+        const content = yield* Effect.tryPromise({
+          try: () => sb.files.readFile(sandboxPath),
+          catch: () => {
+            throw new Error(`File not found in sandbox: ${filepath}`)
+          },
+        })
+
+        const allLines = content.split("\n")
+        const start = (params.offset ?? 1) - 1
+        const limit = params.limit ?? DEFAULT_READ_LIMIT
+        const selected = allLines.slice(start, start + limit)
+        const truncated = start + selected.length < allLines.length
+
+        const loaded = yield* instruction.resolve(ctx.messages, filepath, ctx.messageID)
+
+        let output = [`<path>${filepath}</path>`, `<type>file</type>`, "<content>\n"].join("\n")
+        output += selected
+          .map((line, i) => {
+            const truncatedLine =
+              line.length > MAX_LINE_LENGTH ? line.substring(0, MAX_LINE_LENGTH) + MAX_LINE_SUFFIX : line
+            return `${i + start + 1}: ${truncatedLine}`
+          })
+          .join("\n")
+
+        const last = start + selected.length
+        if (truncated) {
+          output += `\n\n(Showing lines ${start + 1}-${last} of ${allLines.length}. Use offset=${last + 1} to continue.)`
+        } else {
+          output += `\n\n(End of file - total ${allLines.length} lines)`
+        }
+        output += "\n</content>"
+
+        if (loaded.length > 0) {
+          output += `\n\n<system-reminder>\n${loaded.map((item) => item.content).join("\n\n")}\n</system-reminder>`
+        }
+
+        return {
+          title,
+          output,
+          metadata: {
+            preview: selected.slice(0, 20).join("\n"),
+            truncated,
+            loaded: loaded.map((item) => item.filepath),
+          },
+        }
+      }
 
       yield* ctx.ask({
         permission: "read",

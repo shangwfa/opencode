@@ -27,7 +27,8 @@ import { SessionID, MessageID, PartID } from "./schema"
 import type { Provider } from "@/provider/provider"
 import { Permission } from "@/permission"
 import { Global } from "@/global"
-import { Effect, Layer, Option, Context } from "effect"
+import { Effect, Layer, Option, Context, Cause } from "effect"
+import { SandboxProvider } from "../tool/sandbox-provider"
 
 export namespace Session {
   const log = Log.create({ service: "session" })
@@ -474,6 +475,16 @@ export namespace Session {
             await SyncEvent.run(Event.Deleted, { sessionID, info: session }, { publish: hasInstance })
             await SyncEvent.remove(sessionID)
           })
+
+          const maybeSandboxProvider = Option.getOrUndefined(yield* Effect.serviceOption(SandboxProvider.Service))
+          if (maybeSandboxProvider) {
+            yield* maybeSandboxProvider.destroy(sessionID).pipe(
+              Effect.catchCause((cause) => {
+                log.error("failed to destroy sandbox on session remove", { sessionID, cause: Cause.pretty(cause) })
+                return Effect.void
+              }),
+            )
+          }
         } catch (e) {
           log.error(e)
         }

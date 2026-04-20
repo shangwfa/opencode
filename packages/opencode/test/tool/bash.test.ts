@@ -14,6 +14,7 @@ import { SessionID, MessageID } from "../../src/session/schema"
 import * as CrossSpawnSpawner from "../../src/effect/cross-spawn-spawner"
 import { AppFileSystem } from "@opencode-ai/shared/filesystem"
 import { Plugin } from "../../src/plugin"
+import { NoopSandboxProvider } from "../../src/tool/sandbox-provider"
 
 const runtime = ManagedRuntime.make(
   Layer.mergeAll(
@@ -22,6 +23,7 @@ const runtime = ManagedRuntime.make(
     Plugin.defaultLayer,
     Truncate.defaultLayer,
     Agent.defaultLayer,
+    NoopSandboxProvider.layer,
   ),
 )
 
@@ -38,6 +40,7 @@ const ctx = {
   messages: [],
   metadata: () => Effect.void,
   ask: () => Effect.void,
+  sandbox: null,
 }
 
 Shell.acceptable.reset()
