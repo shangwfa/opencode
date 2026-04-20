@@ -371,6 +371,13 @@ NOTE: At any point in time through this workflow you should feel free to ask the
         const maybeSandboxProvider = Option.getOrUndefined(yield* Effect.serviceOption(SandboxProvider.Service))
         const sandboxEnabled = Flag.OPENCODE_SANDBOX_ENABLED && maybeSandboxProvider !== undefined
 
+        const sandboxPromise = sandboxEnabled
+          ? Effect.runPromise(maybeSandboxProvider!.getOrCreate(input.session.id)).catch((e) => {
+              log.error("sandbox getOrCreate failed, falling back to local", { sessionID: input.session.id, error: e instanceof Error ? e.message : String(e) })
+              return null
+            }) as Promise<any>
+          : null
+
         const context = (args: any, options: ToolExecutionOptions): Tool.Context => ({
           sessionID: input.session.id,
           abort: options.abortSignal!,
@@ -379,9 +386,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
           extra: { model: input.model, bypassAgentCheck: input.bypassAgentCheck, promptOps },
           agent: input.agent.name,
           messages: input.messages,
-          sandbox: sandboxEnabled
-            ? Effect.runPromise(maybeSandboxProvider!.getOrCreate(input.session.id)).catch(() => null) as Promise<any>
-            : null,
+          sandbox: sandboxPromise,
           metadata: (val) =>
             input.processor.updateToolCall(options.toolCallId, (match) => {
               if (!["running", "pending"].includes(match.state.status)) return match
@@ -396,15 +401,17 @@ NOTE: At any point in time through this workflow you should feel free to ask the
                 },
               }
             }),
-          ask: (req) =>
-            permission
-              .ask({
-                ...req,
-                sessionID: input.session.id,
-                tool: { messageID: input.processor.message.id, callID: options.toolCallId },
-                ruleset: Permission.merge(input.agent.permission, input.session.permission ?? []),
-              })
-              .pipe(Effect.orDie),
+          ask: sandboxEnabled
+            ? (_req: any) => Effect.void
+            : (req) =>
+              permission
+                .ask({
+                  ...req,
+                  sessionID: input.session.id,
+                  tool: { messageID: input.processor.message.id, callID: options.toolCallId },
+                  ruleset: Permission.merge(input.agent.permission, input.session.permission ?? []),
+                })
+                .pipe(Effect.orDie),
         })
 
         for (const item of yield* registry.tools({

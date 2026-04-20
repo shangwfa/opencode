@@ -25,7 +25,7 @@ const runtime = ManagedRuntime.make(
   ),
 )
 
-const TEST_IMAGE = process.env["OPENCODE_SANDBOX_IMAGE"] || "opensandbox/code-interpreter"
+const TEST_IMAGE = process.env["OPENCODE_SANDBOX_IMAGE"] || "opensandbox/code-interpreter-rg"
 const TEST_DOMAIN = process.env["OPENCODE_SANDBOX_DOMAIN"] || "localhost:8080"
 
 async function createTestSandbox(sessionID: string = "ses_test"): Promise<Sandbox> {

@@ -42,7 +42,10 @@ export function install(db: any, table: any) {
 
   try {
     walk(db.select().from(table))
-    walk(db.insert(table).values({ __shim: true }))
+    const ins = db.insert(table).values({ __shim: true })
+    walk(ins)
+    try { walk(ins.onConflictDoUpdate({ target: table.id, set: { __shim: true } })) } catch {}
+    try { walk(ins.onConflictDoNothing()) } catch {}
     walk(db.delete(table))
     try {
       walk(db.update(table).set({ __shim: true }))
