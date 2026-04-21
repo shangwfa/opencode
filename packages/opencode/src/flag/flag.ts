@@ -85,6 +85,7 @@ export namespace Flag {
   export const OPENCODE_SKIP_MIGRATIONS = truthy("OPENCODE_SKIP_MIGRATIONS")
   export const OPENCODE_STRICT_CONFIG_DEPS = truthy("OPENCODE_STRICT_CONFIG_DEPS")
 
+  export const OPENCODE_EVENT_BUS = process.env["OPENCODE_EVENT_BUS"] ?? "local"
   export const OPENCODE_SANDBOX_ENABLED = truthy("OPENCODE_SANDBOX_ENABLED")
   export const OPENCODE_SANDBOX_DOMAIN = process.env["OPENCODE_SANDBOX_DOMAIN"] ?? "localhost:8080"
   export const OPENCODE_SANDBOX_IMAGE = process.env["OPENCODE_SANDBOX_IMAGE"] ?? "ubuntu"

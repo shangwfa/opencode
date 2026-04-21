@@ -372,10 +372,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
         const sandboxEnabled = Flag.OPENCODE_SANDBOX_ENABLED && maybeSandboxProvider !== undefined
 
         const sandboxPromise = sandboxEnabled
-          ? Effect.runPromise(maybeSandboxProvider!.getOrCreate(input.session.id)).catch((e) => {
-              log.error("sandbox getOrCreate failed, falling back to local", { sessionID: input.session.id, error: e instanceof Error ? e.message : String(e) })
-              return null
-            }) as Promise<any>
+          ? Effect.runPromise(maybeSandboxProvider!.getOrCreate(input.session.id))
           : null
 
         const context = (args: any, options: ToolExecutionOptions): Tool.Context => ({

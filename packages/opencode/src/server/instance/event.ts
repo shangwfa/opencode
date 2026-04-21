@@ -4,18 +4,21 @@ import { describeRoute, resolver } from "hono-openapi"
 import { streamSSE } from "hono/streaming"
 import { Log } from "@/util/log"
 import { BusEvent } from "@/bus/bus-event"
-import { SyncEvent } from "@/sync"
 import { Bus } from "@/bus"
+import { PgNotify } from "@/bus/pg-notify"
+import { Flag } from "@/flag/flag"
 import { AsyncQueue } from "../../util/queue"
 
 const log = Log.create({ service: "server" })
+
+const DISPOSED_TYPE = "server.instance.disposed"
 
 export const EventRoutes = () =>
   new Hono().get(
     "/event",
     describeRoute({
       summary: "Subscribe to events",
-      description: "Get events",
+      description: "Get events. Use ?sessionID= to filter events for a specific session.",
       operationId: "event.subscribe",
       responses: {
         200: {
@@ -33,13 +36,16 @@ export const EventRoutes = () =>
       },
     }),
     async (c) => {
-      log.info("event connected")
+      const filterSessionID = c.req.query("sessionID")
+      const usePgBus = Flag.OPENCODE_EVENT_BUS === "pg"
+      log.info("event connected", { filterSessionID, bus: usePgBus ? "pg" : "local" })
       c.header("Cache-Control", "no-cache, no-transform")
       c.header("X-Accel-Buffering", "no")
       c.header("X-Content-Type-Options", "nosniff")
       return streamSSE(c, async (stream) => {
         const q = new AsyncQueue<string | null>()
         let done = false
+        let unsub = () => {}
 
         q.push(
           JSON.stringify({
@@ -48,7 +54,6 @@ export const EventRoutes = () =>
           }),
         )
 
-        // Send heartbeat every 10s to prevent stalled proxy streams.
         const heartbeat = setInterval(() => {
           q.push(
             JSON.stringify({
@@ -67,12 +72,37 @@ export const EventRoutes = () =>
           log.info("event disconnected")
         }
 
-        const unsub = Bus.subscribeAll((event) => {
-          q.push(JSON.stringify(event))
-          if (event.type === Bus.InstanceDisposed.type) {
-            stop()
-          }
-        })
+        const matches = (event: any) => {
+          if (!filterSessionID) return true
+          if (event.type === DISPOSED_TYPE) return true
+          return event.properties?.sessionID === filterSessionID
+        }
+
+        if (usePgBus) {
+          const unsubscribe = PgNotify.subscribe((event) => {
+            if (event.type === DISPOSED_TYPE) {
+              q.push(JSON.stringify(event))
+              stop()
+              return
+            }
+            if (matches(event)) {
+              q.push(JSON.stringify(event))
+            }
+          })
+          unsub = unsubscribe
+        } else {
+          const busUnsub = Bus.subscribeAll((event) => {
+            if (event.type === DISPOSED_TYPE) {
+              q.push(JSON.stringify(event))
+              stop()
+              return
+            }
+            if (matches(event)) {
+              q.push(JSON.stringify(event))
+            }
+          })
+          unsub = busUnsub
+        }
 
         stream.onAbort(stop)
 

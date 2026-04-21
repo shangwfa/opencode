@@ -1,9 +1,11 @@
 import z from "zod"
-import { Effect, Exit, Layer, PubSub, Scope, Context, Stream } from "effect"
+import { Effect, Exit, Layer, PubSub, Scope, Context, Stream, Deferred, Ref } from "effect"
 import { EffectBridge } from "@/effect/bridge"
 import { Log } from "../util/log"
 import { BusEvent } from "./bus-event"
 import { GlobalBus } from "./global"
+import { PgNotify } from "./pg-notify"
+import { Flag } from "../flag/flag"
 import { WorkspaceContext } from "@/control-plane/workspace-context"
 import { InstanceState } from "@/effect/instance-state"
 import { makeRuntime } from "@/effect/run-service"
@@ -54,7 +56,6 @@ export namespace Bus {
 
           yield* Effect.addFinalizer(() =>
             Effect.gen(function* () {
-              // Publish InstanceDisposed before shutting down so subscribers see it
               yield* PubSub.publish(wildcard, {
                 type: InstanceDisposed.type,
                 properties: { directory: ctx.directory },
@@ -70,14 +71,39 @@ export namespace Bus {
         }),
       )
 
+      // Race-free in-flight: same Ref+Deferred pattern as SandboxProvider.
+      const pendingRef = yield* Ref.make(new Map<string, Deferred.Deferred<PubSub.PubSub<Payload>, never>>())
+
       function getOrCreate<D extends BusEvent.Definition>(state: State, def: D) {
         return Effect.gen(function* () {
-          let ps = state.typed.get(def.type)
-          if (!ps) {
-            ps = yield* PubSub.unbounded<Payload>()
-            state.typed.set(def.type, ps)
+          // Fast-path: already created (no yield, no Ref overhead)
+          const cached = state.typed.get(def.type)
+          if (cached) return cached as unknown as PubSub.PubSub<Payload<D>>
+
+          const myToken = yield* Deferred.make<PubSub.PubSub<Payload>, never>()
+          // Atomic decision: re-check typed (another fiber may have completed
+          // between the fast-path and here), then check pending, then claim.
+          const result = yield* Ref.modify(pendingRef, (map) => {
+            const done = state.typed.get(def.type)
+            if (done) return [{ tag: "done" as const, ps: done }, map] as const
+            const existing = map.get(def.type)
+            if (existing) return [{ tag: "await" as const, deferred: existing }, map] as const
+            return [{ tag: "create" as const, deferred: myToken }, map.set(def.type, myToken)] as const
+          })
+
+          if (result.tag === "done") return result.ps as unknown as PubSub.PubSub<Payload<D>>
+          if (result.tag === "await") {
+            return (yield* Deferred.await(result.deferred)) as unknown as PubSub.PubSub<Payload<D>>
           }
-          return ps as unknown as PubSub.PubSub<Payload<D>>
+
+          return (yield* PubSub.unbounded<Payload>().pipe(
+            Effect.tap((ps) => Effect.sync(() => state.typed.set(def.type, ps))),
+            Effect.onExit((exit) =>
+              Ref.update(pendingRef, (m) => { m.delete(def.type); return m }).pipe(
+                Effect.andThen(Deferred.done(myToken, exit)),
+              ),
+            ),
+          )) as unknown as PubSub.PubSub<Payload<D>>
         })
       }
 
@@ -101,6 +127,10 @@ export namespace Bus {
             workspace,
             payload,
           })
+
+          if (Flag.OPENCODE_EVENT_BUS === "pg") {
+            yield* Effect.tryPromise(() => PgNotify.publish(payload)).pipe(Effect.ignore)
+          }
         })
       }
 
@@ -175,8 +205,6 @@ export namespace Bus {
 
   const { runPromise, runSync } = makeRuntime(Service, layer)
 
-  // runSync is safe here because the subscribe chain (InstanceState.get, PubSub.subscribe,
-  // Scope.make, Effect.forkScoped) is entirely synchronous. If any step becomes async, this will throw.
   export async function publish<D extends BusEvent.Definition>(def: D, properties: z.output<D["properties"]>) {
     return runPromise((svc) => svc.publish(def, properties))
   }

@@ -1,4 +1,4 @@
-import { Effect, Context, Layer, Cause } from "effect"
+import { Effect, Context, Layer, Cause, Deferred, Ref } from "effect"
 import { Sandbox, ConnectionConfig } from "@alibaba-group/opensandbox"
 import type { CommandExecution } from "@alibaba-group/opensandbox"
 import { Log } from "../util/log"
@@ -33,28 +33,10 @@ export namespace SandboxProvider {
   const log = Log.create({ service: "sandbox-provider" })
 
   export interface Interface {
-    /**
-     * Get an existing sandbox for the session, or lazily create one.
-     * If the existing sandbox is unhealthy, it will be destroyed and rebuilt.
-     */
     readonly getOrCreate: (sessionID: SessionID) => Effect.Effect<Sandbox>
-    /**
-     * Get an existing sandbox for the session, or null if none exists.
-     */
     readonly get: (sessionID: SessionID) => Effect.Effect<Sandbox | null>
-    /**
-     * Destroy the sandbox bound to the given session.
-     * Calls kill() then close() on the sandbox instance.
-     */
     readonly destroy: (sessionID: SessionID) => Effect.Effect<void>
-    /**
-     * Destroy all managed sandboxes. Intended for process shutdown.
-     */
     readonly destroyAll: () => Effect.Effect<void>
-    /**
-     * Run a command inside a reusable bash session for the given sandbox.
-     * Lazily creates the session on first use and reuses it across calls.
-     */
     readonly runInSession: (
       sessionID: SessionID,
       command: string,
@@ -70,9 +52,6 @@ export namespace SandboxProvider {
       },
       signal?: AbortSignal,
     ) => Effect.Effect<CommandExecution, Error, never>
-    /**
-     * Register an externally-created sandbox for a session (primarily for tests).
-     */
     readonly register: (sessionID: SessionID, sb: Sandbox) => Effect.Effect<void>
   }
 
@@ -84,6 +63,10 @@ export namespace SandboxProvider {
       const config = yield* SandboxConfig.Service
       const sandboxes = new Map<string, Sandbox>()
       const commandSessions = new Map<string, string>()
+      // Race-free in-flight: Ref.modify atomically decides which fiber is the
+      // "creator"; all others await via Deferred. Identity check on the token.
+      const createRef = yield* Ref.make(new Map<string, Deferred.Deferred<Sandbox, Error>>())
+      const sessionRef = yield* Ref.make(new Map<string, Deferred.Deferred<string, Error>>())
 
       const connectionConfig = new ConnectionConfig({
         domain: config.domain,
@@ -101,11 +84,9 @@ export namespace SandboxProvider {
               resource: config.resourceLimits,
             }),
           )
-          // Ensure the workspace directory exists inside the sandbox
           yield* Effect.tryPromise(() => sb.commands.run("mkdir -p /workspace")).pipe(
             Effect.catchCause(() => Effect.void),
           )
-          sandboxes.set(sessionID, sb)
           log.info("sandbox created", { sessionID, sandboxID: sb.id })
           return sb
         }).pipe(Effect.orDie, Effect.withSpan("SandboxProvider.createSandbox"))
@@ -119,7 +100,6 @@ export namespace SandboxProvider {
             yield* Effect.tryPromise(() => sb.commands.deleteSession(cmdSession)).pipe(
               Effect.catchCause(() => Effect.void),
             )
-            commandSessions.delete(sessionID)
           }
           yield* Effect.tryPromise(() => sb.kill()).pipe(
             Effect.catchCause(() => {
@@ -133,26 +113,66 @@ export namespace SandboxProvider {
               return Effect.void
             }),
           )
-          sandboxes.delete(sessionID)
           log.info("sandbox destroyed", { sessionID })
         }).pipe(Effect.withSpan("SandboxProvider.destroySandbox"))
       }
 
+      function claim<D, E>(ref: Ref.Ref<Map<string, Deferred.Deferred<D, E>>>, key: string, token: Deferred.Deferred<D, E>) {
+        return Ref.modify(ref, (map) => {
+          const existing = map.get(key)
+          if (existing) return [existing, map] as const
+          return [token, map.set(key, token)] as const
+        })
+      }
+
       const getOrCreate: Interface["getOrCreate"] = (sessionID) =>
         Effect.gen(function* () {
-          const existing = sandboxes.get(sessionID)
-          if (existing) {
-            const healthy = yield* Effect.tryPromise(() => existing.isHealthy()).pipe(
-              Effect.catch(() => Effect.succeed(false)),
-            )
-            if (healthy) {
-              return existing
-            }
-            log.warn("sandbox unhealthy, rebuilding", { sessionID })
-            yield* destroySandbox(existing, sessionID)
+          const myToken = yield* Deferred.make<Sandbox, Error>()
+          const winner = yield* claim(createRef, sessionID, myToken)
+
+          if (winner !== myToken) {
+            return yield* Deferred.await(winner).pipe(Effect.orDie)
           }
-          return yield* createSandbox(sessionID)
-        }).pipe(Effect.withSpan("SandboxProvider.getOrCreate"))
+
+          const existing = sandboxes.get(sessionID)
+          const work = existing
+            ? Effect.gen(function* () {
+                const healthy = yield* Effect.tryPromise(() => existing.isHealthy()).pipe(
+                  Effect.catch(() => Effect.succeed(false)),
+                )
+                if (healthy) return existing
+                log.warn("sandbox unhealthy, rebuilding", { sessionID })
+                yield* destroySandbox(existing, sessionID)
+                return yield* createSandbox(sessionID)
+              })
+            : createSandbox(sessionID)
+
+          return yield* work.pipe(
+            Effect.onExit((exit) =>
+              Ref.modify(createRef, (m) => {
+                const ours = m.get(sessionID) === myToken
+                m.delete(sessionID)
+                return [ours, m] as const
+              }).pipe(
+                Effect.andThen((ours) =>
+                  Effect.gen(function* () {
+                    if (ours) {
+                      if (exit._tag === "Success") sandboxes.set(sessionID, exit.value)
+                      yield* Deferred.done(myToken, exit)
+                      return
+                    }
+                    if (exit._tag === "Success") {
+                      log.warn("sandbox ownership lost, cleaning up", { sessionID })
+                      yield* destroySandbox(exit.value, sessionID).pipe(
+                        Effect.catchCause(() => Effect.void),
+                      )
+                    }
+                  }),
+                ),
+              ),
+            ),
+          )
+        }).pipe(Effect.orDie, Effect.withSpan("SandboxProvider.getOrCreate"))
 
       const get: Interface["get"] = (sessionID) =>
         Effect.sync(() => sandboxes.get(sessionID) ?? null)
@@ -160,6 +180,24 @@ export namespace SandboxProvider {
       const destroy: Interface["destroy"] = (sessionID) =>
         Effect.gen(function* () {
           const sb = sandboxes.get(sessionID)
+          sandboxes.delete(sessionID)
+          commandSessions.delete(sessionID)
+          const inFlight = yield* Ref.modify(createRef, (m) => {
+            const d = m.get(sessionID)
+            if (d) m.delete(sessionID)
+            return [d, m] as const
+          })
+          if (inFlight) {
+            yield* Deferred.fail(inFlight, new Error(`Sandbox destroyed while creating: ${sessionID}`))
+          }
+          const inFlightSession = yield* Ref.modify(sessionRef, (m) => {
+            const d = m.get(sessionID)
+            if (d) m.delete(sessionID)
+            return [d, m] as const
+          })
+          if (inFlightSession) {
+            yield* Deferred.fail(inFlightSession, new Error(`Command session destroyed while creating: ${sessionID}`))
+          }
           if (sb) {
             yield* destroySandbox(sb, sessionID)
           }
@@ -168,8 +206,26 @@ export namespace SandboxProvider {
       const destroyAll: Interface["destroyAll"] = () =>
         Effect.gen(function* () {
           log.info("destroying all sandboxes", { count: sandboxes.size })
+          const inFlightCreates = yield* Ref.modify(createRef, (m) => {
+            const entries = Array.from(m.entries())
+            m.clear()
+            return [entries, m] as const
+          })
+          for (const [, d] of inFlightCreates) {
+            yield* Deferred.fail(d, new Error("Sandbox destroyed during shutdown"))
+          }
+          const inFlightSessions = yield* Ref.modify(sessionRef, (m) => {
+            const entries = Array.from(m.entries())
+            m.clear()
+            return [entries, m] as const
+          })
+          for (const [, d] of inFlightSessions) {
+            yield* Deferred.fail(d, new Error("Command session destroyed during shutdown"))
+          }
           const entries = Array.from(sandboxes.entries())
           for (const [sessionID, sb] of entries) {
+            sandboxes.delete(sessionID)
+            commandSessions.delete(sessionID)
             yield* destroySandbox(sb, sessionID).pipe(
               Effect.catchCause((cause) => {
                 log.error("failed to destroy sandbox during shutdown", { sessionID, cause: Cause.pretty(cause) })
@@ -187,11 +243,33 @@ export namespace SandboxProvider {
           }
           let sessionId = commandSessions.get(sessionID)
           if (!sessionId) {
-            sessionId = yield* Effect.tryPromise({
-              try: () => sb.commands.createSession({ workingDirectory: "/workspace" }),
-              catch: (e) => new Error(`Failed to create command session: ${String(e)}`),
-            })
-            commandSessions.set(sessionID, sessionId)
+            const myToken = yield* Deferred.make<string, Error>()
+            const winner = yield* claim(sessionRef, sessionID, myToken)
+
+            if (winner !== myToken) {
+              sessionId = yield* Deferred.await(winner)
+            } else {
+              sessionId = yield* Effect.tryPromise({
+                try: () => sb.commands.createSession({ workingDirectory: "/workspace" }),
+                catch: (e) => new Error(`Failed to create command session: ${String(e)}`),
+              }).pipe(
+                Effect.onExit((exit) =>
+                  Ref.modify(sessionRef, (m) => {
+                    const ours = m.get(sessionID) === myToken
+                    m.delete(sessionID)
+                    return [ours, m] as const
+                  }).pipe(
+                    Effect.andThen((ours) => {
+                      if (ours) {
+                        if (exit._tag === "Success") commandSessions.set(sessionID, exit.value)
+                        return Deferred.done(myToken, exit)
+                      }
+                      return Effect.void
+                    }),
+                  ),
+                ),
+              )
+            }
           }
           return yield* Effect.tryPromise({
             try: () => sb.commands.runInSession(sessionId!, command, options, handlers, signal),

@@ -9,6 +9,8 @@ import { initProjectors } from "./projectors"
 import { Log } from "@/util/log"
 import { ControlPlaneRoutes } from "./control"
 import { UIRoutes } from "./ui"
+import { PgNotify } from "@/bus/pg-notify"
+import { Flag } from "@/flag/flag"
 
 // @ts-ignore This global is needed to prevent ai-sdk from logging warnings to stdout https://github.com/vercel/ai/blob/2dc67e0ef538307f21368db32d5a12345d98831b/packages/ai/src/logger/log-warnings.ts#L85
 globalThis.AI_SDK_LOG_WARNINGS = false
@@ -75,6 +77,10 @@ export namespace Server {
     const built = create(opts)
     const server = await built.runtime.listen(opts)
 
+    if (Flag.OPENCODE_EVENT_BUS === "pg") {
+      await PgNotify.start()
+    }
+
     const next = new URL("http://localhost")
     next.hostname = opts.hostname
     next.port = String(server.port)
@@ -100,6 +106,7 @@ export namespace Server {
       stop(close?: boolean) {
         closing ??= (async () => {
           if (mdns) MDNS.unpublish()
+          if (Flag.OPENCODE_EVENT_BUS === "pg") await PgNotify.stop()
           await server.stop(close)
         })()
         return closing

@@ -1,6 +1,7 @@
 import { type SQLiteBunDatabase } from "drizzle-orm/bun-sqlite"
 import { migrate as migrateSqlite } from "drizzle-orm/bun-sqlite/migrator"
 import { type SQLiteTransaction } from "drizzle-orm/sqlite-core"
+import { sql } from "drizzle-orm"
 export * from "drizzle-orm"
 import { LocalContext } from "../util/local-context"
 import { lazy } from "../util/lazy"
@@ -97,27 +98,32 @@ export namespace Database {
   // PG custom migration executor (since drizzle-orm/postgres-js/migrator
   // does not support inline migration arrays)
   async function migratePg(db: any, entries: Journal) {
-    await db.execute(/* sql */ `
-      CREATE TABLE IF NOT EXISTS __drizzle_migrations (
-        id SERIAL PRIMARY KEY,
-        hash TEXT NOT NULL UNIQUE,
-        created_at BIGINT
-      )
-    `)
-    for (const entry of entries) {
-      const hash = createHash("sha256").update(entry.sql).digest("hex")
-      const rows = await db.execute(/* sql */ `
-        SELECT 1 FROM __drizzle_migrations WHERE hash = '${hash}'
+    const lockId = 20191001
+    await db.execute(sql`SELECT pg_advisory_lock(${lockId})`)
+    try {
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS __drizzle_migrations (
+          id SERIAL PRIMARY KEY,
+          hash TEXT NOT NULL UNIQUE,
+          created_at BIGINT
+        )
       `)
-      if (rows.length > 0) continue
-      // Execute migration SQL — may contain multiple statements
-      const stmts = entry.sql.split(";").filter((s: string) => s.trim())
-      for (const stmt of stmts) {
-        await db.execute(stmt)
+      for (const entry of entries) {
+        const hash = createHash("sha256").update(entry.sql).digest("hex")
+        const rows = await db.execute(sql`SELECT 1 FROM __drizzle_migrations WHERE hash = ${hash}`)
+        if (rows.length > 0) continue
+        const stmts = entry.sql.split("--> statement-breakpoint").filter((s: string) => s.trim())
+        for (const stmt of stmts) {
+          await db.execute(sql.raw(stmt))
+        }
+        await db.execute(sql`INSERT INTO __drizzle_migrations (hash, created_at) VALUES (${hash}, ${entry.timestamp})`)
       }
-      await db.execute(/* sql */ `
-        INSERT INTO __drizzle_migrations (hash, created_at) VALUES ('${hash}', ${entry.timestamp})
-      `)
+    } finally {
+      try {
+        await db.execute(sql`SELECT pg_advisory_unlock(${lockId})`)
+      } catch {
+        // Connection may have dropped; advisory lock releases on disconnect
+      }
     }
   }
 
