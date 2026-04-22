@@ -294,6 +294,39 @@ export const InstanceRoutes = (upgrade: UpgradeWebSocket): Hono =>
         return c.body(null, 204)
       },
     )
+    .post(
+      "/skills/create",
+      describeRoute({
+        summary: "Create a skill inline",
+        description: "Create a skill directly from content without requiring filesystem.",
+        operationId: "skills.create",
+        responses: {
+          200: {
+            description: "Created skill",
+            content: { "application/json": { schema: resolver(Skill.Info) } },
+          },
+          ...errors(400),
+        },
+      }),
+      validator(
+        "json",
+        z.object({
+          name: z.string(),
+          description: z.string(),
+          content: z.string(),
+        }),
+      ),
+      async (c) => {
+        const body = c.req.valid("json")
+        const result = await AppRuntime.runPromise(
+          Effect.gen(function* () {
+            const skill = yield* Skill.Service
+            return yield* skill.create(body)
+          }),
+        )
+        return c.json(result)
+      },
+    )
     .get(
       "/lsp",
       describeRoute({

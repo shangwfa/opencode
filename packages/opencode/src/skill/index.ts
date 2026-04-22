@@ -62,6 +62,7 @@ export namespace Skill {
     readonly available: (agent?: Agent.Info) => Effect.Effect<Info[]>
     readonly load: (path: string) => Effect.Effect<Info[]>
     readonly loadFromURL: (url: string) => Effect.Effect<Info[]>
+    readonly create: (info: { name: string; description: string; content: string }) => Effect.Effect<Info>
     readonly unload: (name: string) => Effect.Effect<void>
   }
 
@@ -257,7 +258,19 @@ export namespace Skill {
         yield* Ref.update(ref, (s) => { delete s.skills[name]; return s })
       })
 
-      return Service.of({ get, all, dirs, available, load, loadFromURL, unload })
+      const create = Effect.fn("Skill.create")(function* (input: { name: string; description: string; content: string }) {
+        const ref = yield* InstanceState.get(istate)
+        const info: Info = {
+          name: input.name,
+          description: input.description,
+          location: `memory://${input.name}`,
+          content: input.content,
+        }
+        yield* Ref.update(ref, (s) => { s.skills[input.name] = info; return s })
+        return info
+      })
+
+      return Service.of({ get, all, dirs, available, load, loadFromURL, create, unload })
     }),
   )
 
