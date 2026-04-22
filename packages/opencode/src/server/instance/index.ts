@@ -25,6 +25,7 @@ import { ProviderRoutes } from "./provider"
 import { EventRoutes } from "./event"
 import { SyncRoutes } from "./sync"
 import { WorkspaceRouterMiddleware } from "./middleware"
+import { errors } from "../error"
 import { AppRuntime } from "@/effect/app-runtime"
 
 export const InstanceRoutes = (upgrade: UpgradeWebSocket): Hono =>
@@ -238,6 +239,59 @@ export const InstanceRoutes = (upgrade: UpgradeWebSocket): Hono =>
           }),
         )
         return c.json(skills)
+      },
+    )
+    .post(
+      "/skills/load",
+      describeRoute({
+        summary: "Load skills at runtime",
+        description: "Load skills from a local path or remote URL at runtime.",
+        operationId: "skills.load",
+        responses: {
+          200: {
+            description: "Loaded skills",
+            content: { "application/json": { schema: resolver(Skill.Info.array()) } },
+          },
+          ...errors(400),
+        },
+      }),
+      validator(
+        "json",
+        z.union([z.object({ path: z.string() }), z.object({ url: z.string() })]),
+      ),
+      async (c) => {
+        const body = c.req.valid("json")
+        const result = await AppRuntime.runPromise(
+          Effect.gen(function* () {
+            const skill = yield* Skill.Service
+            if ("path" in body) return yield* skill.load(body.path)
+            return yield* skill.loadFromURL(body.url)
+          }),
+        )
+        return c.json(result)
+      },
+    )
+    .post(
+      "/skills/unload",
+      describeRoute({
+        summary: "Unload a skill at runtime",
+        description: "Remove a previously loaded skill by name.",
+        operationId: "skills.unload",
+        responses: {
+          204: { description: "Skill unloaded" },
+          ...errors(400),
+        },
+      }),
+      validator("json", z.object({ name: z.string() })),
+      async (c) => {
+        const { name } = c.req.valid("json")
+        await AppRuntime.runPromise(
+          Effect.gen(function* () {
+            const skill = yield* Skill.Service
+            yield* skill.unload(name)
+          }),
+        )
+        return c.body(null, 204)
       },
     )
     .get(
