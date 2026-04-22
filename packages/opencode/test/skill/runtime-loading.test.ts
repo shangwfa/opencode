@@ -120,4 +120,184 @@ describe("skill runtime loading", () => {
       { git: true },
     ),
   )
+
+  it.live("load multiple skills from nested directories", () =>
+    provideTmpdirInstance(
+      (dir) =>
+        Effect.gen(function* () {
+          const sub1 = path.join(dir, "my-skills", "sub1")
+          const sub2 = path.join(dir, "my-skills", "sub2")
+          yield* Effect.promise(() => fs.mkdir(sub1, { recursive: true }))
+          yield* Effect.promise(() => fs.mkdir(sub2, { recursive: true }))
+          yield* Effect.promise(() =>
+            Bun.write(path.join(sub1, "SKILL.md"), skillMd("skill-one", "First nested skill")),
+          )
+          yield* Effect.promise(() =>
+            Bun.write(path.join(sub2, "SKILL.md"), skillMd("skill-two", "Second nested skill")),
+          )
+
+          const skill = yield* Skill.Service
+          const loaded = yield* skill.load(path.join(dir, "my-skills"))
+
+          expect(loaded.length).toBe(2)
+          const names = loaded.map((s) => s.name).sort()
+          expect(names).toEqual(["skill-one", "skill-two"])
+
+          const all = yield* skill.all()
+          const found1 = all.find((s) => s.name === "skill-one")
+          const found2 = all.find((s) => s.name === "skill-two")
+          expect(found1).toBeDefined()
+          expect(found2).toBeDefined()
+        }),
+      { git: true },
+    ),
+  )
+
+  it.live("load directory with malformed SKILL.md is skipped gracefully", () =>
+    provideTmpdirInstance(
+      (dir) =>
+        Effect.gen(function* () {
+          const badDir = path.join(dir, "bad-skill")
+          const goodDir = path.join(dir, "good-skill")
+          yield* Effect.promise(() => fs.mkdir(badDir, { recursive: true }))
+          yield* Effect.promise(() => fs.mkdir(goodDir, { recursive: true }))
+
+          // Malformed: missing required frontmatter
+          yield* Effect.promise(() =>
+            Bun.write(path.join(badDir, "SKILL.md"), "# No Frontmatter\n\nJust content."),
+          )
+          yield* Effect.promise(() =>
+            Bun.write(path.join(goodDir, "SKILL.md"), skillMd("good-one", "Valid skill")),
+          )
+
+          const skill = yield* Skill.Service
+          const loaded = yield* skill.load(dir)
+
+          // Should only load the good one
+          expect(loaded.length).toBe(1)
+          expect(loaded[0].name).toBe("good-one")
+
+          // Bad skill should not be in registry
+          const bad = yield* skill.get("bad-skill")
+          expect(bad).toBeUndefined()
+        }),
+      { git: true },
+    ),
+  )
+
+  it.live("all() returns loaded skills including runtime-loaded", () =>
+    provideTmpdirInstance(
+      (dir) =>
+        Effect.gen(function* () {
+          const skillDir = path.join(dir, "all-test-skill")
+          yield* Effect.promise(() => fs.mkdir(skillDir, { recursive: true }))
+          yield* Effect.promise(() =>
+            Bun.write(path.join(skillDir, "SKILL.md"), skillMd("all-skill", "For all() test")),
+          )
+
+          const skill = yield* Skill.Service
+
+          const before = yield* skill.all()
+          const beforeNames = before.map((s) => s.name)
+
+          yield* skill.load(skillDir)
+
+          const after = yield* skill.all()
+          const afterNames = after.map((s) => s.name)
+
+          expect(afterNames).toContain("all-skill")
+          expect(after.length).toBe(before.length + 1)
+        }),
+      { git: true },
+    ),
+  )
+
+  it.live("dirs() returns loaded skill directories", () =>
+    provideTmpdirInstance(
+      (dir) =>
+        Effect.gen(function* () {
+          const skillDir = path.join(dir, "dirs-test-skill")
+          yield* Effect.promise(() => fs.mkdir(skillDir, { recursive: true }))
+          yield* Effect.promise(() =>
+            Bun.write(path.join(skillDir, "SKILL.md"), skillMd("dirs-skill", "For dirs() test")),
+          )
+
+          const skill = yield* Skill.Service
+
+          const before = yield* skill.dirs()
+
+          yield* skill.load(skillDir)
+
+          const after = yield* skill.dirs()
+
+          expect(after.length).toBe(before.length + 1)
+          expect(after).toContain(skillDir)
+        }),
+      { git: true },
+    ),
+  )
+
+  it.live("load then unload then load again works", () =>
+    provideTmpdirInstance(
+      (dir) =>
+        Effect.gen(function* () {
+          const skillDir = path.join(dir, "cycle-skill")
+          yield* Effect.promise(() => fs.mkdir(skillDir, { recursive: true }))
+          yield* Effect.promise(() =>
+            Bun.write(path.join(skillDir, "SKILL.md"), skillMd("cycle-skill", "Cyclic skill")),
+          )
+
+          const skill = yield* Skill.Service
+
+          // Load
+          yield* skill.load(skillDir)
+          expect(yield* skill.get("cycle-skill")).toBeDefined()
+
+          // Unload
+          yield* skill.unload("cycle-skill")
+          expect(yield* skill.get("cycle-skill")).toBeUndefined()
+
+          // Load again
+          const reloaded = yield* skill.load(skillDir)
+          expect(reloaded.length).toBe(1)
+          expect(reloaded[0].name).toBe("cycle-skill")
+          expect(yield* skill.get("cycle-skill")).toBeDefined()
+        }),
+      { git: true },
+    ),
+  )
+
+  it.live("concurrent load of different skills is safe", () =>
+    provideTmpdirInstance(
+      (dir) =>
+        Effect.gen(function* () {
+          const dir1 = path.join(dir, "concurrent1")
+          const dir2 = path.join(dir, "concurrent2")
+          yield* Effect.promise(() => fs.mkdir(dir1, { recursive: true }))
+          yield* Effect.promise(() => fs.mkdir(dir2, { recursive: true }))
+          yield* Effect.promise(() =>
+            Bun.write(path.join(dir1, "SKILL.md"), skillMd("concurrent-a", "Skill A")),
+          )
+          yield* Effect.promise(() =>
+            Bun.write(path.join(dir2, "SKILL.md"), skillMd("concurrent-b", "Skill B")),
+          )
+
+          const skill = yield* Skill.Service
+
+          // Load both concurrently
+          const [loaded1, loaded2] = yield* Effect.all([
+            skill.load(dir1),
+            skill.load(dir2),
+          ])
+
+          expect(loaded1.length + loaded2.length).toBe(2)
+
+          const all = yield* skill.all()
+          const names = all.map((s) => s.name)
+          expect(names).toContain("concurrent-a")
+          expect(names).toContain("concurrent-b")
+        }),
+      { git: true },
+    ),
+  )
 })

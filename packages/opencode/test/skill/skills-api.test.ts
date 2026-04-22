@@ -158,4 +158,48 @@ description: Skill for available test.
       { git: true },
     ),
   )
+
+  it.live("load body rejects number path", () =>
+    Effect.gen(function* () {
+      const result = LoadBody.safeParse({ path: 123 })
+      expect(result.success).toBe(false)
+    }),
+  )
+
+  it.live("PromptInput skills rejects non-string items", () =>
+    Effect.gen(function* () {
+      const result = SessionPrompt.PromptInput.safeParse({
+        sessionID: "ses_123",
+        parts: [],
+        skills: [123],
+      })
+      expect(result.success).toBe(false)
+    }),
+  )
+
+  it.live("PromptInput skills accepts empty array", () =>
+    Effect.gen(function* () {
+      const result = SessionPrompt.PromptInput.safeParse({
+        sessionID: "ses_123",
+        parts: [],
+        skills: [],
+      })
+      expect(result.success).toBe(true)
+      if (result.success) {
+        expect(result.data.skills).toEqual([])
+      }
+    }),
+  )
+
+  it.live("load with both path and url prefers path", () =>
+    Effect.gen(function* () {
+      // Zod union matches first successful schema, so path wins
+      const result = LoadBody.safeParse({ path: "/some/path", url: "https://example.com/" })
+      expect(result.success).toBe(true)
+      if (result.success) {
+        expect("path" in result.data).toBe(true)
+        expect(result.data.path).toBe("/some/path")
+      }
+    }),
+  )
 })
