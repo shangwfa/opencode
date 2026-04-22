@@ -2,7 +2,7 @@ import os from "os"
 import path from "path"
 import { pathToFileURL } from "url"
 import z from "zod"
-import { Effect, Layer, Context } from "effect"
+import { Effect, Layer, Context, Ref } from "effect"
 import { NamedError } from "@opencode-ai/shared/util/error"
 import type { Agent } from "@/agent/agent"
 import { Bus } from "@/bus"
@@ -60,6 +60,9 @@ export namespace Skill {
     readonly all: () => Effect.Effect<Info[]>
     readonly dirs: () => Effect.Effect<string[]>
     readonly available: (agent?: Agent.Info) => Effect.Effect<Info[]>
+    readonly load: (path: string) => Effect.Effect<Info[]>
+    readonly loadFromURL: (url: string) => Effect.Effect<Info[]>
+    readonly unload: (name: string) => Effect.Effect<void>
   }
 
   const add = Effect.fnUntraced(function* (state: State, match: string, bus: Bus.Interface) {
@@ -195,37 +198,66 @@ export namespace Skill {
       const config = yield* Config.Service
       const bus = yield* Bus.Service
       const fsys = yield* AppFileSystem.Service
-      const state = yield* InstanceState.make(
+      const istate = yield* InstanceState.make(
         Effect.fn("Skill.state")(function* (ctx) {
           const s: State = { skills: {}, dirs: new Set() }
           yield* loadSkills(s, config, discovery, bus, fsys, ctx.directory, ctx.worktree)
-          return s
+          return yield* Ref.make(s)
         }),
       )
 
+      const state = () => Effect.flatMap(InstanceState.get(istate), Ref.get)
+
       const get = Effect.fn("Skill.get")(function* (name: string) {
-        const s = yield* InstanceState.get(state)
+        const s = yield* state()
         return s.skills[name]
       })
 
       const all = Effect.fn("Skill.all")(function* () {
-        const s = yield* InstanceState.get(state)
+        const s = yield* state()
         return Object.values(s.skills)
       })
 
       const dirs = Effect.fn("Skill.dirs")(function* () {
-        const s = yield* InstanceState.get(state)
+        const s = yield* state()
         return Array.from(s.dirs)
       })
 
       const available = Effect.fn("Skill.available")(function* (agent?: Agent.Info) {
-        const s = yield* InstanceState.get(state)
+        const s = yield* state()
         const list = Object.values(s.skills).toSorted((a, b) => a.name.localeCompare(b.name))
         if (!agent) return list
         return list.filter((skill) => Permission.evaluate("skill", skill.name, agent.permission).action !== "deny")
       })
 
-      return Service.of({ get, all, dirs, available })
+      const load = Effect.fn("Skill.load")(function* (dir: string) {
+        if (!(yield* fsys.isDir(dir))) return []
+        const ref = yield* InstanceState.get(istate)
+        const before = new Set(Object.keys((yield* Ref.get(ref)).skills))
+        yield* scan(yield* Ref.get(ref), bus, dir, SKILL_PATTERN)
+        const after = (yield* Ref.get(ref)).skills
+        return Object.values(after).filter((s) => !before.has(s.name))
+      })
+
+      const loadFromURL = Effect.fn("Skill.loadFromURL")(function* (url: string) {
+        const pulled = yield* discovery.pull(url)
+        if (pulled.length === 0) return []
+        const ref = yield* InstanceState.get(istate)
+        const before = new Set(Object.keys((yield* Ref.get(ref)).skills))
+        for (const dir of pulled) {
+          yield* Ref.update(ref, (s) => { s.dirs.add(dir); return s })
+          yield* scan(yield* Ref.get(ref), bus, dir, SKILL_PATTERN)
+        }
+        const after = (yield* Ref.get(ref)).skills
+        return Object.values(after).filter((s) => !before.has(s.name))
+      })
+
+      const unload = Effect.fn("Skill.unload")(function* (name: string) {
+        const ref = yield* InstanceState.get(istate)
+        yield* Ref.update(ref, (s) => { delete s.skills[name]; return s })
+      })
+
+      return Service.of({ get, all, dirs, available, load, loadFromURL, unload })
     }),
   )
 
