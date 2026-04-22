@@ -1309,7 +1309,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
           }
 
           if (input.noReply === true) return message
-          return yield* loop({ sessionID: input.sessionID })
+          return yield* loop({ sessionID: input.sessionID, skills: input.skills })
         },
       )
 
@@ -1321,8 +1321,8 @@ NOTE: At any point in time through this workflow you should feel free to ask the
         throw new Error("Impossible")
       })
 
-      const runLoop: (sessionID: SessionID) => Effect.Effect<MessageV2.WithParts> = Effect.fn("SessionPrompt.run")(
-        function* (sessionID: SessionID) {
+      const runLoop: (sessionID: SessionID, skills?: string[]) => Effect.Effect<MessageV2.WithParts> = Effect.fn("SessionPrompt.run")(
+        function* (sessionID: SessionID, skills?: string[]) {
           const ctx = yield* InstanceState.context
           const slog = elog.with({ sessionID })
           let structured: unknown | undefined
@@ -1491,13 +1491,13 @@ NOTE: At any point in time through this workflow you should feel free to ask the
 
               yield* plugin.trigger("experimental.chat.messages.transform", {}, { messages: msgs })
 
-              const [skills, env, instructions, modelMsgs] = yield* Effect.all([
-                sys.skills(agent),
+              const [skillsResult, env, instructions, modelMsgs] = yield* Effect.all([
+                sys.skills(agent, skills),
                 Effect.sync(() => sys.environment(model)),
                 instruction.system().pipe(Effect.orDie),
                 MessageV2.toModelMessagesEffect(msgs, model),
               ])
-              const system = [...env, ...(skills ? [skills] : []), ...instructions]
+              const system = [...env, ...(skillsResult ? [skillsResult] : []), ...instructions]
               const format = lastUser.format ?? { type: "text" as const }
               if (format.type === "json_schema") system.push(STRUCTURED_OUTPUT_SYSTEM_PROMPT)
               const result = yield* handle.process({
@@ -1556,7 +1556,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
       const loop: (input: z.infer<typeof LoopInput>) => Effect.Effect<MessageV2.WithParts> = Effect.fn(
         "SessionPrompt.loop",
       )(function* (input: z.infer<typeof LoopInput>) {
-        return yield* state.ensureRunning(input.sessionID, lastAssistant(input.sessionID), runLoop(input.sessionID))
+        return yield* state.ensureRunning(input.sessionID, lastAssistant(input.sessionID), runLoop(input.sessionID, input.skills))
       })
 
       const shell: (input: ShellInput) => Effect.Effect<MessageV2.WithParts> = Effect.fn("SessionPrompt.shell")(
@@ -1796,6 +1796,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
 
   export const LoopInput = z.object({
     sessionID: SessionID.zod,
+    skills: z.array(z.string()).optional(),
   })
 
   export const ShellInput = z.object({
