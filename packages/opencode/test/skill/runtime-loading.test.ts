@@ -300,4 +300,134 @@ describe("skill runtime loading", () => {
       { git: true },
     ),
   )
+
+  it.live("create returns skill with memory location", () =>
+    provideTmpdirInstance(
+      () =>
+        Effect.gen(function* () {
+          const skill = yield* Skill.Service
+          const info = yield* skill.create({
+            name: "inline-skill",
+            description: "Created inline",
+            content: "# Inline\nTest content.",
+          })
+
+          expect(info.name).toBe("inline-skill")
+          expect(info.description).toBe("Created inline")
+          expect(info.content).toBe("# Inline\nTest content.")
+          expect(info.location).toBe("memory://inline-skill")
+        }),
+      { git: true },
+    ),
+  )
+
+  it.live("create writes to registry and get finds it", () =>
+    provideTmpdirInstance(
+      () =>
+        Effect.gen(function* () {
+          const skill = yield* Skill.Service
+          yield* skill.create({
+            name: "findable-skill",
+            description: "Should be findable",
+            content: "Find me.",
+          })
+
+          const found = yield* skill.get("findable-skill")
+          expect(found).toBeDefined()
+          expect(found!.name).toBe("findable-skill")
+          expect(found!.location).toBe("memory://findable-skill")
+        }),
+      { git: true },
+    ),
+  )
+
+  it.live("create appears in all and available", () =>
+    provideTmpdirInstance(
+      () =>
+        Effect.gen(function* () {
+          const skill = yield* Skill.Service
+          yield* skill.create({
+            name: "listed-skill",
+            description: "Should be listed",
+            content: "List me.",
+          })
+
+          const all = yield* skill.all()
+          expect(all.find((s) => s.name === "listed-skill")).toBeDefined()
+
+          const available = yield* skill.available()
+          expect(available.find((s) => s.name === "listed-skill")).toBeDefined()
+        }),
+      { git: true },
+    ),
+  )
+
+  it.live("create overrides existing skill with same name", () =>
+    provideTmpdirInstance(
+      (dir) =>
+        Effect.gen(function* () {
+          const skillDir = path.join(dir, "override-skill")
+          yield* Effect.promise(() => fs.mkdir(skillDir, { recursive: true }))
+          yield* Effect.promise(() =>
+            Bun.write(path.join(skillDir, "SKILL.md"), skillMd("override-skill", "Original")),
+          )
+
+          const skill = yield* Skill.Service
+          yield* skill.load(skillDir)
+          expect((yield* skill.get("override-skill"))?.description).toBe("Original")
+
+          yield* skill.create({
+            name: "override-skill",
+            description: "Replaced",
+            content: "New content.",
+          })
+          const found = yield* skill.get("override-skill")
+          expect(found?.description).toBe("Replaced")
+          expect(found?.content).toBe("New content.")
+          expect(found?.location).toBe("memory://override-skill")
+        }),
+      { git: true },
+    ),
+  )
+
+  it.live("create then unload removes skill", () =>
+    provideTmpdirInstance(
+      () =>
+        Effect.gen(function* () {
+          const skill = yield* Skill.Service
+          yield* skill.create({
+            name: "temp-skill",
+            description: "Temporary",
+            content: "Gone soon.",
+          })
+          expect(yield* skill.get("temp-skill")).toBeDefined()
+
+          yield* skill.unload("temp-skill")
+          expect(yield* skill.get("temp-skill")).toBeUndefined()
+        }),
+      { git: true },
+    ),
+  )
+
+  it.live("concurrent create of different skills is safe", () =>
+    provideTmpdirInstance(
+      () =>
+        Effect.gen(function* () {
+          const skill = yield* Skill.Service
+          const [a, b] = yield* Effect.all([
+            skill.create({ name: "concurrent-c", description: "C", content: "c" }),
+            skill.create({ name: "concurrent-d", description: "D", content: "d" }),
+          ])
+
+          expect(a.name).toBe("concurrent-c")
+          expect(b.name).toBe("concurrent-d")
+
+          const all = yield* skill.all()
+          const names = all.map((s) => s.name)
+          expect(names).toContain("concurrent-c")
+          expect(names).toContain("concurrent-d")
+        }),
+      { git: true },
+    ),
+  )
 })

@@ -14,6 +14,11 @@ const it = testEffect(Layer.mergeAll(Skill.defaultLayer, node))
 // Replicate the REST endpoint zod schemas (they are inlined in server routes)
 const LoadBody = z.union([z.object({ path: z.string() }), z.object({ url: z.string() })])
 const UnloadBody = z.object({ name: z.string() })
+const CreateBody = z.object({
+  name: z.string(),
+  description: z.string(),
+  content: z.string(),
+})
 
 import { SessionPrompt } from "../../src/session/prompt"
 
@@ -49,6 +54,40 @@ describe("skills REST API validation", () => {
 
   test("unload body rejects empty", () => {
     const result = UnloadBody.safeParse({})
+    expect(result.success).toBe(false)
+  })
+
+  test("create body accepts valid input", () => {
+    const result = CreateBody.safeParse({
+      name: "test-skill",
+      description: "A test skill",
+      content: "# Test\nContent.",
+    })
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.name).toBe("test-skill")
+      expect(result.data.description).toBe("A test skill")
+      expect(result.data.content).toBe("# Test\nContent.")
+    }
+  })
+
+  test("create body rejects missing name", () => {
+    const result = CreateBody.safeParse({ description: "desc", content: "c" })
+    expect(result.success).toBe(false)
+  })
+
+  test("create body rejects missing description", () => {
+    const result = CreateBody.safeParse({ name: "n", content: "c" })
+    expect(result.success).toBe(false)
+  })
+
+  test("create body rejects missing content", () => {
+    const result = CreateBody.safeParse({ name: "n", description: "d" })
+    expect(result.success).toBe(false)
+  })
+
+  test("create body rejects empty object", () => {
+    const result = CreateBody.safeParse({})
     expect(result.success).toBe(false)
   })
 })
@@ -200,6 +239,39 @@ description: Skill for available test.
         expect("path" in result.data).toBe(true)
         expect(result.data.path).toBe("/some/path")
       }
+    }),
+  )
+
+  it.live("create roundtrip", () =>
+    provideTmpdirInstance(
+      () =>
+        Effect.gen(function* () {
+          const skill = yield* Skill.Service
+
+          const info = yield* skill.create({
+            name: "api-create-skill",
+            description: "Created via API",
+            content: "# API\nSkill content.",
+          })
+
+          expect(info.name).toBe("api-create-skill")
+          expect(info.location).toBe("memory://api-create-skill")
+
+          const found = yield* skill.get("api-create-skill")
+          expect(found).toBeDefined()
+          expect(found!.description).toBe("Created via API")
+
+          yield* skill.unload("api-create-skill")
+          expect(yield* skill.get("api-create-skill")).toBeUndefined()
+        }),
+      { git: true },
+    ),
+  )
+
+  it.live("create with invalid body (number name) fails validation", () =>
+    Effect.gen(function* () {
+      const result = CreateBody.safeParse({ name: 123, description: "d", content: "c" })
+      expect(result.success).toBe(false)
     }),
   )
 })
