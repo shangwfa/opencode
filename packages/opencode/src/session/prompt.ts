@@ -1743,6 +1743,10 @@ NOTE: At any point in time through this workflow you should feel free to ask the
     format: MessageV2.Format.optional(),
     system: z.string().optional(),
     variant: z.string().optional(),
+    skills: z
+      .array(z.string())
+      .optional()
+      .describe("Skill names to preload into the system prompt for this request"),
     parts: z.array(
       z.discriminatedUnion("type", [
         MessageV2.TextPart.omit({
