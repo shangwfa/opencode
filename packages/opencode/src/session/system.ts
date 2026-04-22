@@ -15,8 +15,11 @@ import type { Provider } from "@/provider/provider"
 import type { Agent } from "@/agent/agent"
 import { Permission } from "@/permission"
 import { Skill } from "@/skill"
+import { Log } from "@/util/log"
 
 export namespace SystemPrompt {
+  const log = Log.create({ service: "system-prompt" })
+
   export function provider(model: Provider.Model) {
     if (model.api.id.includes("gpt-4") || model.api.id.includes("o1") || model.api.id.includes("o3"))
       return [PROMPT_BEAST]
@@ -35,7 +38,7 @@ export namespace SystemPrompt {
 
   export interface Interface {
     readonly environment: (model: Provider.Model) => string[]
-    readonly skills: (agent: Agent.Info) => Effect.Effect<string | undefined>
+    readonly skills: (agent: Agent.Info, preload?: string[]) => Effect.Effect<string | undefined>
   }
 
   export class Service extends Context.Service<Service, Interface>()("@opencode/SystemPrompt") {}
@@ -63,18 +66,38 @@ export namespace SystemPrompt {
           ]
         },
 
-        skills: Effect.fn("SystemPrompt.skills")(function* (agent: Agent.Info) {
+        skills: Effect.fn("SystemPrompt.skills")(function* (agent: Agent.Info, preload?: string[]) {
           if (Permission.disabled(["skill"], agent.permission).has("skill")) return
 
           const list = yield* skill.available(agent)
 
-          return [
+          const parts: string[] = []
+
+          if (preload?.length) {
+            for (const name of preload) {
+              const info = yield* skill.get(name)
+              if (!info) {
+                log.warn("preload skill not found", { name })
+                continue
+              }
+              parts.push(
+                `<skill_content name="${info.name}">`,
+                `# Skill: ${info.name}`,
+                "",
+                info.content.trim(),
+                "",
+                "</skill_content>",
+              )
+            }
+          }
+
+          parts.push(
             "Skills provide specialized instructions and workflows for specific tasks.",
             "Use the skill tool to load a skill when a task matches its description.",
-            // the agents seem to ingest the information about skills a bit better if we present a more verbose
-            // version of them here and a less verbose version in tool description, rather than vice versa.
             Skill.fmt(list, { verbose: true }),
-          ].join("\n")
+          )
+
+          return parts.join("\n")
         }),
       })
     }),
