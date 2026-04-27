@@ -56,10 +56,10 @@ export namespace Skill {
   }
 
   export interface Interface {
-    readonly get: (name: string) => Effect.Effect<Info | undefined>
-    readonly all: () => Effect.Effect<Info[]>
+    readonly get: (name: string, userId?: string) => Effect.Effect<Info | undefined>
+    readonly all: (userId?: string) => Effect.Effect<Info[]>
     readonly dirs: () => Effect.Effect<string[]>
-    readonly available: (agent?: Agent.Info) => Effect.Effect<Info[]>
+    readonly available: (agent?: Agent.Info, userId?: string) => Effect.Effect<Info[]>
     readonly load: (path: string) => Effect.Effect<Info[]>
     readonly loadFromURL: (url: string) => Effect.Effect<Info[]>
     readonly create: (info: { name: string; description: string; content: string }) => Effect.Effect<Info>
@@ -201,7 +201,7 @@ export namespace Skill {
       const fsys = yield* AppFileSystem.Service
       const istate = yield* InstanceState.make(
         Effect.fn("Skill.state")(function* (ctx) {
-          const s: State = { skills: {}, dirs: new Set() }
+          const s: State = { skills: {}, dirs: new Set(), sessions: {} }
           yield* loadSkills(s, config, discovery, bus, fsys, ctx.directory, ctx.worktree)
           return yield* Ref.make(s)
         }),
@@ -209,14 +209,20 @@ export namespace Skill {
 
       const state = () => Effect.flatMap(InstanceState.get(istate), Ref.get)
 
-      const get = Effect.fn("Skill.get")(function* (name: string) {
+      const merged = (s: State, session?: string): Record<string, Info> => {
+        if (!session) return s.skills
+        const overlay = s.sessions[session] || {}
+        return { ...s.skills, ...overlay }
+      }
+
+      const get = Effect.fn("Skill.get")(function* (name: string, session?: string) {
         const s = yield* state()
-        return s.skills[name]
+        return merged(s, session)[name]
       })
 
-      const all = Effect.fn("Skill.all")(function* () {
+      const all = Effect.fn("Skill.all")(function* (session?: string) {
         const s = yield* state()
-        return Object.values(s.skills)
+        return Object.values(merged(s, session))
       })
 
       const dirs = Effect.fn("Skill.dirs")(function* () {
@@ -224,9 +230,9 @@ export namespace Skill {
         return Array.from(s.dirs)
       })
 
-      const available = Effect.fn("Skill.available")(function* (agent?: Agent.Info) {
+      const available = Effect.fn("Skill.available")(function* (agent?: Agent.Info, session?: string) {
         const s = yield* state()
-        const list = Object.values(s.skills).toSorted((a, b) => a.name.localeCompare(b.name))
+        const list = Object.values(merged(s, session)).toSorted((a, b) => a.name.localeCompare(b.name))
         if (!agent) return list
         return list.filter((skill) => Permission.evaluate("skill", skill.name, agent.permission).action !== "deny")
       })
@@ -270,7 +276,57 @@ export namespace Skill {
         return info
       })
 
-      return Service.of({ get, all, dirs, available, load, loadFromURL, create, unload })
+      const sessionLoad = Effect.fn("Skill.sessionLoad")(function* (session: string, dir: string) {
+        if (!(yield* fsys.isDir(dir))) return []
+        const ref = yield* InstanceState.get(istate)
+        const tmp: State = { skills: {}, dirs: new Set(), sessions: {} }
+        yield* scan(tmp, bus, dir, SKILL_PATTERN)
+        const loaded = Object.values(tmp.skills)
+        yield* Ref.update(ref, (s) => {
+          if (!s.sessions[session]) s.sessions[session] = {}
+          for (const skill of loaded) {
+            s.sessions[session][skill.name] = skill
+          }
+          return s
+        })
+        return loaded
+      })
+
+      const sessionUnload = Effect.fn("Skill.sessionUnload")(function* (session: string, name: string) {
+        const ref = yield* InstanceState.get(istate)
+        yield* Ref.update(ref, (s) => {
+          if (s.sessions[session]) {
+            delete s.sessions[session][name]
+            if (Object.keys(s.sessions[session]).length === 0) {
+              delete s.sessions[session]
+            }
+          }
+          return s
+        })
+      })
+
+      const sessionCreate = Effect.fn("Skill.sessionCreate")(function* (session: string, input: { name: string; description: string; content: string }) {
+        const ref = yield* InstanceState.get(istate)
+        const info: Info = {
+          name: input.name,
+          description: input.description,
+          location: `memory://${input.name}`,
+          content: input.content,
+        }
+        yield* Ref.update(ref, (s) => {
+          if (!s.sessions[session]) s.sessions[session] = {}
+          s.sessions[session][input.name] = info
+          return s
+        })
+        return info
+      })
+
+      const sessionClear = Effect.fn("Skill.sessionClear")(function* (session: string) {
+        const ref = yield* InstanceState.get(istate)
+        yield* Ref.update(ref, (s) => { delete s.sessions[session]; return s })
+      })
+
+      return Service.of({ get, all, dirs, available, load, loadFromURL, create, unload, sessionLoad, sessionUnload, sessionCreate, sessionClear })
     }),
   )
 

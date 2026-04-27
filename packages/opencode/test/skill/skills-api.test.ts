@@ -274,4 +274,76 @@ description: Skill for available test.
       expect(result.success).toBe(false)
     }),
   )
+
+  it.live("session create via service matches API behavior", () =>
+    provideTmpdirInstance(
+      () =>
+        Effect.gen(function* () {
+          const skill = yield* Skill.Service
+
+          const sessionSkill = yield* skill.sessionCreate("ses_api", {
+            name: "api-session-skill",
+            description: "API Test",
+            content: "API content",
+          })
+          expect(sessionSkill.name).toBe("api-session-skill")
+
+          const globalList = yield* skill.all()
+          expect(globalList.map((s) => s.name)).not.toContain("api-session-skill")
+
+          const sessionList = yield* skill.all("ses_api")
+          expect(sessionList.map((s) => s.name)).toContain("api-session-skill")
+        }),
+      { git: true },
+    ),
+  )
+
+  it.live("global skill visible in session list", () =>
+    provideTmpdirInstance(
+      () =>
+        Effect.gen(function* () {
+          const skill = yield* Skill.Service
+
+          yield* skill.create({
+            name: "global-for-session",
+            description: "Global",
+            content: "G",
+          })
+
+          const sessionList = yield* skill.all("ses_any")
+          expect(sessionList.map((s) => s.name)).toContain("global-for-session")
+        }),
+      { git: true },
+    ),
+  )
+
+  it.live("session unload only affects session overlay", () =>
+    provideTmpdirInstance(
+      () =>
+        Effect.gen(function* () {
+          const skill = yield* Skill.Service
+
+          yield* skill.create({
+            name: "shared-unload",
+            description: "Shared",
+            content: "S",
+          })
+
+          yield* skill.sessionCreate("ses_unload", {
+            name: "shared-unload",
+            description: "Session",
+            content: "Session",
+          })
+
+          yield* skill.sessionUnload("ses_unload", "shared-unload")
+
+          const sessionGet = yield* skill.get("shared-unload", "ses_unload")
+          expect(sessionGet).toBeDefined()
+          expect(sessionGet!.description).toBe("Shared")
+          const globalGet = yield* skill.get("shared-unload")
+          expect(globalGet).toBeDefined()
+        }),
+      { git: true },
+    ),
+  )
 })

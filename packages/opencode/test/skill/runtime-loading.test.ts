@@ -430,4 +430,161 @@ describe("skill runtime loading", () => {
       { git: true },
     ),
   )
+
+  it.live("sessionCreate creates skill only in session overlay", () =>
+    provideTmpdirInstance(
+      () =>
+        Effect.gen(function* () {
+          const skill = yield* Skill.Service
+          const created = yield* skill.sessionCreate("ses-A", {
+            name: "session-only",
+            description: "Only in session",
+            content: "Session content",
+          })
+          expect(created.name).toBe("session-only")
+
+          const globalGet = yield* skill.get("session-only")
+          expect(globalGet).toBeUndefined()
+
+          const sessionGet = yield* skill.get("session-only", "ses-A")
+          expect(sessionGet).toBeDefined()
+          expect(sessionGet!.name).toBe("session-only")
+        }),
+      { git: true },
+    ),
+  )
+
+  it.live("session skill shadows global skill with same name", () =>
+    provideTmpdirInstance(
+      () =>
+        Effect.gen(function* () {
+          const skill = yield* Skill.Service
+
+          const globalSkill = yield* skill.create({
+            name: "shared",
+            description: "Global version",
+            content: "Global content",
+          })
+          expect(globalSkill.description).toBe("Global version")
+
+          const sessionSkill = yield* skill.sessionCreate("ses-B", {
+            name: "shared",
+            description: "Session version",
+            content: "Session content",
+          })
+          expect(sessionSkill.description).toBe("Session version")
+
+          const globalGet = yield* skill.get("shared")
+          expect(globalGet).toBeDefined()
+          expect(globalGet!.description).toBe("Global version")
+
+          const sessionGet = yield* skill.get("shared", "ses-B")
+          expect(sessionGet).toBeDefined()
+          expect(sessionGet!.description).toBe("Session version")
+        }),
+      { git: true },
+    ),
+  )
+
+  it.live("sessionUnload removes only from session overlay", () =>
+    provideTmpdirInstance(
+      () =>
+        Effect.gen(function* () {
+          const skill = yield* Skill.Service
+          yield* skill.sessionCreate("ses-C", {
+            name: "unload-session",
+            description: "Will be unloaded",
+            content: "Content",
+          })
+
+          expect(yield* skill.get("unload-session", "ses-C")).toBeDefined()
+
+          yield* skill.sessionUnload("ses-C", "unload-session")
+
+          expect(yield* skill.get("unload-session", "ses-C")).toBeUndefined()
+        }),
+      { git: true },
+    ),
+  )
+
+  it.live("sessionClear removes all session skills", () =>
+    provideTmpdirInstance(
+      () =>
+        Effect.gen(function* () {
+          const skill = yield* Skill.Service
+          yield* skill.sessionCreate("ses-D", {
+            name: "skill-1",
+            description: "First",
+            content: "Content 1",
+          })
+          yield* skill.sessionCreate("ses-D", {
+            name: "skill-2",
+            description: "Second",
+            content: "Content 2",
+          })
+
+          expect(yield* skill.get("skill-1", "ses-D")).toBeDefined()
+          expect(yield* skill.get("skill-2", "ses-D")).toBeDefined()
+
+          yield* skill.sessionClear("ses-D")
+
+          expect(yield* skill.get("skill-1", "ses-D")).toBeUndefined()
+          expect(yield* skill.get("skill-2", "ses-D")).toBeUndefined()
+        }),
+      { git: true },
+    ),
+  )
+
+  it.live("sessions are isolated from each other", () =>
+    provideTmpdirInstance(
+      () =>
+        Effect.gen(function* () {
+          const skill = yield* Skill.Service
+          yield* skill.sessionCreate("ses-1", {
+            name: "skill-A",
+            description: "Only in ses-1",
+            content: "A",
+          })
+          yield* skill.sessionCreate("ses-2", {
+            name: "skill-B",
+            description: "Only in ses-2",
+            content: "B",
+          })
+
+          expect(yield* skill.get("skill-B", "ses-1")).toBeUndefined()
+          expect(yield* skill.get("skill-A", "ses-2")).toBeUndefined()
+          expect(yield* skill.get("skill-A", "ses-1")).toBeDefined()
+          expect(yield* skill.get("skill-B", "ses-2")).toBeDefined()
+        }),
+      { git: true },
+    ),
+  )
+
+  it.live("all returns session overlay merged with global", () =>
+    provideTmpdirInstance(
+      () =>
+        Effect.gen(function* () {
+          const skill = yield* Skill.Service
+          yield* skill.create({
+            name: "global-skill",
+            description: "Global",
+            content: "G",
+          })
+          yield* skill.sessionCreate("ses-merge", {
+            name: "session-skill",
+            description: "Session",
+            content: "S",
+          })
+
+          const globalAll = yield* skill.all()
+          expect(globalAll.map((s) => s.name)).toContain("global-skill")
+          expect(globalAll.map((s) => s.name)).not.toContain("session-skill")
+
+          const sessionAll = yield* skill.all("ses-merge")
+          expect(sessionAll.map((s) => s.name)).toContain("global-skill")
+          expect(sessionAll.map((s) => s.name)).toContain("session-skill")
+        }),
+      { git: true },
+    ),
+  )
 })
