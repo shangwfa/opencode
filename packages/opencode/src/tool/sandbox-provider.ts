@@ -1,4 +1,4 @@
-import { Effect, Context, Layer, Cause, Deferred, Ref } from "effect"
+import { Effect, Context, Layer, Cause, Deferred, Ref, Semaphore } from "effect"
 import { Sandbox, ConnectionConfig } from "@alibaba-group/opensandbox"
 import type { CommandExecution } from "@alibaba-group/opensandbox"
 import { Log } from "../util/log"
@@ -63,6 +63,7 @@ export namespace SandboxProvider {
       const config = yield* SandboxConfig.Service
       const sandboxes = new Map<string, Sandbox>()
       const commandSessions = new Map<string, string>()
+      const commandSemaphores = new Map<string, Semaphore.Semaphore>()
       // Race-free in-flight: Ref.modify atomically decides which fiber is the
       // "creator"; all others await via Deferred. Identity check on the token.
       const createRef = yield* Ref.make(new Map<string, Deferred.Deferred<Sandbox, Error>>())
@@ -182,6 +183,7 @@ export namespace SandboxProvider {
           const sb = sandboxes.get(sessionID)
           sandboxes.delete(sessionID)
           commandSessions.delete(sessionID)
+          commandSemaphores.delete(sessionID)
           const inFlight = yield* Ref.modify(createRef, (m) => {
             const d = m.get(sessionID)
             if (d) m.delete(sessionID)
@@ -226,6 +228,7 @@ export namespace SandboxProvider {
           for (const [sessionID, sb] of entries) {
             sandboxes.delete(sessionID)
             commandSessions.delete(sessionID)
+            commandSemaphores.delete(sessionID)
             yield* destroySandbox(sb, sessionID).pipe(
               Effect.catchCause((cause) => {
                 log.error("failed to destroy sandbox during shutdown", { sessionID, cause: Cause.pretty(cause) })
@@ -271,15 +274,23 @@ export namespace SandboxProvider {
               )
             }
           }
-          return yield* Effect.tryPromise({
-            try: () => sb.commands.runInSession(sessionId!, command, options, handlers, signal),
-            catch: (e) => new Error(`runInSession failed: ${String(e)}`),
-          })
+          let sem = commandSemaphores.get(sessionID)
+          if (!sem) {
+            sem = yield* Semaphore.make(1)
+            commandSemaphores.set(sessionID, sem)
+          }
+          return yield* sem.withPermit(
+            Effect.tryPromise({
+              try: () => sb.commands.runInSession(sessionId!, command, options, handlers, signal),
+              catch: (e) => new Error(`runInSession failed: ${String(e)}`),
+            }),
+          )
         }).pipe(Effect.withSpan("SandboxProvider.runInSession"))
 
       const register: Interface["register"] = (sessionID, sb) =>
         Effect.sync(() => {
           commandSessions.delete(sessionID)
+          commandSemaphores.delete(sessionID)
           sandboxes.set(sessionID, sb)
         })
 
