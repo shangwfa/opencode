@@ -232,10 +232,11 @@ export const InstanceRoutes = (upgrade: UpgradeWebSocket): Hono =>
         },
       }),
       async (c) => {
+        const session = c.req.query("session")
         const skills = await AppRuntime.runPromise(
           Effect.gen(function* () {
             const skill = yield* Skill.Service
-            return yield* skill.all()
+            return yield* skill.all(session)
           }),
         )
         return c.json(skills)
@@ -260,10 +261,15 @@ export const InstanceRoutes = (upgrade: UpgradeWebSocket): Hono =>
         z.union([z.object({ path: z.string() }), z.object({ url: z.string() })]),
       ),
       async (c) => {
+        const session = c.req.query("session")
         const body = c.req.valid("json")
         const result = await AppRuntime.runPromise(
           Effect.gen(function* () {
             const skill = yield* Skill.Service
+            if (session) {
+              if ("path" in body) return yield* skill.sessionLoad(session, body.path)
+              // URL loading for session not supported yet, fall through to global
+            }
             if ("path" in body) return yield* skill.load(body.path)
             return yield* skill.loadFromURL(body.url)
           }),
@@ -284,11 +290,13 @@ export const InstanceRoutes = (upgrade: UpgradeWebSocket): Hono =>
       }),
       validator("json", z.object({ name: z.string() })),
       async (c) => {
+        const session = c.req.query("session")
         const { name } = c.req.valid("json")
         await AppRuntime.runPromise(
           Effect.gen(function* () {
             const skill = yield* Skill.Service
-            yield* skill.unload(name)
+            if (session) yield* skill.sessionUnload(session, name)
+            else yield* skill.unload(name)
           }),
         )
         return c.body(null, 204)
@@ -317,10 +325,12 @@ export const InstanceRoutes = (upgrade: UpgradeWebSocket): Hono =>
         }),
       ),
       async (c) => {
+        const session = c.req.query("session")
         const body = c.req.valid("json")
         const result = await AppRuntime.runPromise(
           Effect.gen(function* () {
             const skill = yield* Skill.Service
+            if (session) return yield* skill.sessionCreate(session, body)
             return yield* skill.create(body)
           }),
         )

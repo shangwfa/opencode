@@ -38,7 +38,7 @@ export namespace SystemPrompt {
 
   export interface Interface {
     readonly environment: (model: Provider.Model) => string[]
-    readonly skills: (agent: Agent.Info, preload?: string[]) => Effect.Effect<string | undefined>
+    readonly skills: (agent: Agent.Info, preload?: string[], session?: string) => Effect.Effect<string | undefined>
   }
 
   export class Service extends Context.Service<Service, Interface>()("@opencode/SystemPrompt") {}
@@ -66,16 +66,16 @@ export namespace SystemPrompt {
           ]
         },
 
-        skills: Effect.fn("SystemPrompt.skills")(function* (agent: Agent.Info, preload?: string[]) {
+        skills: Effect.fn("SystemPrompt.skills")(function* (agent: Agent.Info, preload?: string[], session?: string) {
           if (Permission.disabled(["skill"], agent.permission).has("skill")) return
 
-          const list = yield* skill.available(agent)
+          const list = yield* skill.available(agent, session)
 
           const parts: string[] = []
 
           if (preload?.length) {
             for (const name of preload) {
-              const info = yield* skill.get(name)
+              const info = yield* skill.get(name, session)
               if (!info) {
                 log.warn("preload skill not found", { name })
                 continue

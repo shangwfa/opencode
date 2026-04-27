@@ -370,10 +370,14 @@ NOTE: At any point in time through this workflow you should feel free to ask the
         const promptOps = yield* ops()
         const maybeSandboxProvider = Option.getOrUndefined(yield* Effect.serviceOption(SandboxProvider.Service))
         const sandboxEnabled = Flag.OPENCODE_SANDBOX_ENABLED && maybeSandboxProvider !== undefined
-
-        const sandboxPromise = sandboxEnabled
-          ? Effect.runPromise(maybeSandboxProvider!.getOrCreate(input.session.id))
-          : null
+        let sandboxPromise: Promise<any> | null = null
+        function getSandbox() {
+          if (!sandboxEnabled) return null
+          if (!sandboxPromise) {
+            sandboxPromise = maybeSandboxProvider!.getOrCreate(input.session.id).pipe(Effect.runPromise)
+          }
+          return sandboxPromise
+        }
 
         const context = (args: any, options: ToolExecutionOptions): Tool.Context => ({
           sessionID: input.session.id,
@@ -383,7 +387,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
           extra: { model: input.model, bypassAgentCheck: input.bypassAgentCheck, promptOps },
           agent: input.agent.name,
           messages: input.messages,
-          sandbox: sandboxPromise,
+          sandbox: getSandbox(),
           metadata: (val) =>
             input.processor.updateToolCall(options.toolCallId, (match) => {
               if (!["running", "pending"].includes(match.state.status)) return match
@@ -1492,7 +1496,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
               yield* plugin.trigger("experimental.chat.messages.transform", {}, { messages: msgs })
 
               const [skillsResult, env, instructions, modelMsgs] = yield* Effect.all([
-                sys.skills(agent, skills),
+                sys.skills(agent, skills, sessionID),
                 Effect.sync(() => sys.environment(model)),
                 instruction.system().pipe(Effect.orDie),
                 MessageV2.toModelMessagesEffect(msgs, model),
