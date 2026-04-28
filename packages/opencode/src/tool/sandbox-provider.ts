@@ -1,6 +1,6 @@
 import { Effect, Context, Layer, Cause, Deferred, Ref, Semaphore } from "effect"
 import { Sandbox, ConnectionConfig } from "@alibaba-group/opensandbox"
-import type { CommandExecution } from "@alibaba-group/opensandbox"
+import type { CommandExecution, Volume } from "@alibaba-group/opensandbox"
 import { Log } from "../util/log"
 import { Flag } from "../flag/flag"
 import type { SessionID } from "../session/schema"
@@ -12,6 +12,9 @@ export namespace SandboxConfig {
     readonly image: string
     readonly timeoutSeconds: number
     readonly resourceLimits: Record<string, string>
+    readonly volumeType: "none" | "pvc" | "host"
+    readonly pvcClaimName: string
+    readonly idleKillMs: number
   }
 
   export class Service extends Context.Service<Service, Interface>()("@opencode/SandboxConfig") {}
@@ -22,11 +25,76 @@ export namespace SandboxConfig {
     image: Flag.OPENCODE_SANDBOX_IMAGE,
     timeoutSeconds: Flag.OPENCODE_SANDBOX_TIMEOUT,
     resourceLimits: { cpu: "1", memory: "2Gi" },
+    volumeType: Flag.OPENCODE_SANDBOX_VOLUME_TYPE,
+    pvcClaimName: Flag.OPENCODE_SANDBOX_PVC_CLAIM,
+    idleKillMs: Flag.OPENCODE_SANDBOX_IDLE_KILL_SEC * 1000,
   }
 
   export const layer = Layer.succeed(Service, Service.of(defaultConfig))
 
   export const defaultLayer = layer
+}
+
+type Entry =
+  | { state: "running"; sb: Sandbox; sandboxID: string; lastActive: number }
+  | { state: "killed"; sandboxID: string; lastActive: number }
+
+export function buildVolumes(sessionID: string, config: SandboxConfig.Interface): Volume[] {
+  if (config.volumeType === "none") return []
+
+  const prefix = `sessions/${sessionID}`
+
+  const mounts = [
+    { name: "workspace", mountPath: "/workspace", sub: `${prefix}/workspace` },
+    { name: "home", mountPath: "/home/sandbox", sub: `${prefix}/home` },
+    { name: "cache", mountPath: "/home/sandbox/.cache", sub: `${prefix}/cache` },
+    { name: "config", mountPath: "/home/sandbox/.config", sub: `${prefix}/config` },
+    { name: "local", mountPath: "/home/sandbox/.local", sub: `${prefix}/local` },
+    { name: "tmp", mountPath: "/home/sandbox/tmp", sub: `${prefix}/tmp` },
+  ]
+
+  return mounts.map((m) => {
+    const base: Volume = { name: m.name, mountPath: m.mountPath, subPath: m.sub }
+    if (config.volumeType === "pvc") {
+      base.pvc = { claimName: config.pvcClaimName }
+    } else {
+      base.host = { path: `/var/opencode/sessions/${sessionID}/${m.name}` }
+    }
+    return base
+  })
+}
+
+export function cleanupSessionVolume(sessionID: string, config: SandboxConfig.Interface, connectionConfig: ConnectionConfig): Effect.Effect<void> {
+  if (config.volumeType === "none") return Effect.void
+
+  return Effect.gen(function* () {
+    const log = Log.create({ service: "sandbox-cleanup" })
+    log.info("cleaning up session volume", { sessionID, volumeType: config.volumeType })
+
+    const prefix = `sessions/${sessionID}`
+    const cleanupMount = config.volumeType === "pvc"
+      ? { name: "cleanup-root", mountPath: "/cleanup", pvc: { claimName: config.pvcClaimName } }
+      : { name: "cleanup-root", mountPath: "/cleanup", host: { path: "/var/opencode/sessions" } }
+
+    const sb = yield* Effect.tryPromise(() =>
+      Sandbox.create({
+        connectionConfig,
+        image: config.image,
+        timeoutSeconds: null,
+        resource: config.resourceLimits,
+        volumes: [cleanupMount],
+      }),
+    ).pipe(Effect.orDie)
+
+    yield* Effect.tryPromise(() => sb.commands.run(`rm -rf /cleanup/${prefix}`)).pipe(
+      Effect.catchCause(() => Effect.void),
+    )
+
+    yield* Effect.tryPromise(() => sb.kill()).pipe(Effect.catchCause(() => Effect.void))
+    yield* Effect.tryPromise(() => sb.close()).pipe(Effect.catchCause(() => Effect.void))
+
+    log.info("session volume cleaned up", { sessionID })
+  }).pipe(Effect.withSpan("cleanupSessionVolume"))
 }
 
 export namespace SandboxProvider {
@@ -37,6 +105,7 @@ export namespace SandboxProvider {
     readonly get: (sessionID: SessionID) => Effect.Effect<Sandbox | null>
     readonly destroy: (sessionID: SessionID) => Effect.Effect<void>
     readonly destroyAll: () => Effect.Effect<void>
+    readonly cleanupSessionVolume: (sessionID: SessionID) => Effect.Effect<void>
     readonly runInSession: (
       sessionID: SessionID,
       command: string,
@@ -61,11 +130,9 @@ export namespace SandboxProvider {
     Service,
     Effect.gen(function* () {
       const config = yield* SandboxConfig.Service
-      const sandboxes = new Map<string, Sandbox>()
+      const entries = yield* Ref.make(new Map<string, Entry>())
       const commandSessions = new Map<string, string>()
       const commandSemaphores = new Map<string, Semaphore.Semaphore>()
-      // Race-free in-flight: Ref.modify atomically decides which fiber is the
-      // "creator"; all others await via Deferred. Identity check on the token.
       const createRef = yield* Ref.make(new Map<string, Deferred.Deferred<Sandbox, Error>>())
       const sessionRef = yield* Ref.make(new Map<string, Deferred.Deferred<string, Error>>())
 
@@ -74,21 +141,50 @@ export namespace SandboxProvider {
         protocol: config.protocol,
       })
 
+      const hasVolume = config.volumeType !== "none"
+
+      function touchLastActive(sessionID: string) {
+        return Ref.modify(entries, (m) => {
+          const e = m.get(sessionID)
+          if (!e) return [undefined, m] as const
+          const now = Date.now()
+          if (e.state === "running") {
+            m.set(sessionID, { ...e, lastActive: now })
+          }
+          return [undefined, m] as const
+        })
+      }
+
+      function setEntry(sessionID: string, entry: Entry) {
+        return Ref.modify(entries, (m) => [undefined, m.set(sessionID, entry)] as const)
+      }
+
+      function removeEntry(sessionID: string) {
+        return Ref.modify(entries, (m) => {
+          m.delete(sessionID)
+          return [undefined, m] as const
+        })
+      }
+
       function createSandbox(sessionID: SessionID) {
         return Effect.gen(function* () {
-          log.info("creating sandbox", { sessionID })
+          log.info("creating sandbox", { sessionID, volumeType: config.volumeType })
+          const volumes = buildVolumes(sessionID, config)
           const sb = yield* Effect.tryPromise(() =>
             Sandbox.create({
               connectionConfig,
               image: config.image,
-              timeoutSeconds: config.timeoutSeconds,
+              timeoutSeconds: hasVolume ? null : config.timeoutSeconds,
               resource: config.resourceLimits,
+              ...(volumes.length > 0 ? { volumes } : {}),
             }),
           )
-          yield* Effect.tryPromise(() => sb.commands.run("mkdir -p /workspace")).pipe(
-            Effect.catchCause(() => Effect.void),
-          )
-          log.info("sandbox created", { sessionID, sandboxID: sb.id })
+          if (!hasVolume) {
+            yield* Effect.tryPromise(() => sb.commands.run("mkdir -p /workspace")).pipe(
+              Effect.catchCause(() => Effect.void),
+            )
+          }
+          log.info("sandbox created", { sessionID, sandboxID: sb.id, volumes: volumes.length })
           return sb
         }).pipe(Effect.orDie, Effect.withSpan("SandboxProvider.createSandbox"))
       }
@@ -135,45 +231,72 @@ export namespace SandboxProvider {
             return yield* Deferred.await(winner).pipe(Effect.orDie)
           }
 
-          const existing = sandboxes.get(sessionID)
-          const work = existing
-            ? Effect.gen(function* () {
-                const healthy = yield* Effect.tryPromise(() => existing.isHealthy()).pipe(
-                  Effect.catch(() => Effect.succeed(false)),
-                )
-                if (healthy) return existing
-                log.warn("sandbox unhealthy, rebuilding", { sessionID })
-                yield* destroySandbox(existing, sessionID)
-                return yield* createSandbox(sessionID)
-              })
-            : createSandbox(sessionID)
+          const entry = yield* Ref.modify(entries, (m) => {
+            const e = m.get(sessionID)
+            return [e ?? null, m] as const
+          })
 
-          return yield* work.pipe(
-            Effect.onExit((exit) =>
-              Ref.modify(createRef, (m) => {
-                const ours = m.get(sessionID) === myToken
-                m.delete(sessionID)
-                return [ours, m] as const
-              }).pipe(
-                Effect.andThen((ours) =>
-                  Effect.gen(function* () {
-                    if (ours) {
-                      if (exit._tag === "Success") sandboxes.set(sessionID, exit.value)
-                      yield* Deferred.done(myToken, exit)
-                      return
-                    }
-                    if (exit._tag === "Success") {
-                      log.warn("sandbox ownership lost, cleaning up", { sessionID })
-                      yield* destroySandbox(exit.value, sessionID).pipe(
-                        Effect.catchCause(() => Effect.void),
-                      )
-                    }
-                  }),
-                ),
-              ),
+          const sb = yield* Effect.gen(function* () {
+            if (!entry) return yield* createSandbox(sessionID)
+
+            if (entry.state === "running") {
+              const healthy = yield* Effect.tryPromise(() => entry.sb.isHealthy()).pipe(
+                Effect.catch(() => Effect.succeed(false)),
+              )
+              if (healthy) {
+                if (hasVolume) {
+                  yield* Effect.tryPromise(() => entry.sb.renew(30 * 60)).pipe(
+                    Effect.catchCause(() => Effect.void),
+                  )
+                }
+                yield* touchLastActive(sessionID)
+                sandboxes.set(sessionID, entry.sb)
+                return entry.sb
+              }
+              log.warn("sandbox unhealthy, rebuilding", { sessionID })
+              yield* destroySandbox(entry.sb, sessionID)
+              const rebuilt = yield* createSandbox(sessionID)
+              sandboxes.set(sessionID, rebuilt)
+              commandSessions.delete(sessionID)
+              return rebuilt
+            }
+
+            if (entry.state === "killed") {
+              log.info("recreating killed sandbox", { sessionID, sandboxID: entry.sandboxID })
+              const recreated = yield* createSandbox(sessionID)
+              sandboxes.set(sessionID, recreated)
+              commandSessions.delete(sessionID)
+              return recreated
+            }
+
+            const fresh = yield* createSandbox(sessionID)
+            sandboxes.set(sessionID, fresh)
+            return fresh
+          }).pipe(
+            Effect.catchCause((cause) =>
+              Effect.gen(function* () {
+                yield* Ref.modify(createRef, (m) => { m.delete(sessionID); return [undefined, m] as const })
+                yield* Deferred.fail(myToken, new Error("Sandbox creation failed")).pipe(
+                  Effect.catchCause(() => Effect.void),
+                )
+                return yield* Effect.failCause(cause)
+              }),
             ),
           )
+
+          yield* Ref.modify(createRef, (m) => { m.delete(sessionID); return [undefined, m] as const })
+          yield* setEntry(sessionID, {
+            state: "running",
+            sb,
+            sandboxID: sb.id,
+            lastActive: Date.now(),
+          })
+          yield* Deferred.succeed(myToken, sb)
+
+          return sb
         }).pipe(Effect.orDie, Effect.withSpan("SandboxProvider.getOrCreate"))
+
+      const sandboxes = new Map<string, Sandbox>()
 
       const get: Interface["get"] = (sessionID) =>
         Effect.sync(() => sandboxes.get(sessionID) ?? null)
@@ -184,6 +307,7 @@ export namespace SandboxProvider {
           sandboxes.delete(sessionID)
           commandSessions.delete(sessionID)
           commandSemaphores.delete(sessionID)
+          yield* removeEntry(sessionID)
           const inFlight = yield* Ref.modify(createRef, (m) => {
             const d = m.get(sessionID)
             if (d) m.delete(sessionID)
@@ -203,43 +327,66 @@ export namespace SandboxProvider {
           if (sb) {
             yield* destroySandbox(sb, sessionID)
           }
+          if (hasVolume) {
+            yield* cleanupSessionVolume(sessionID, config, connectionConfig).pipe(
+              Effect.catchCause((cause) => {
+                log.error("PVC cleanup failed", { sessionID, cause: Cause.pretty(cause) })
+                return Effect.void
+              }),
+            )
+          }
         }).pipe(Effect.withSpan("SandboxProvider.destroy"))
 
       const destroyAll: Interface["destroyAll"] = () =>
         Effect.gen(function* () {
           log.info("destroying all sandboxes", { count: sandboxes.size })
           const inFlightCreates = yield* Ref.modify(createRef, (m) => {
-            const entries = Array.from(m.entries())
+            const e = Array.from(m.entries())
             m.clear()
-            return [entries, m] as const
+            return [e, m] as const
           })
           for (const [, d] of inFlightCreates) {
             yield* Deferred.fail(d, new Error("Sandbox destroyed during shutdown"))
           }
           const inFlightSessions = yield* Ref.modify(sessionRef, (m) => {
-            const entries = Array.from(m.entries())
+            const e = Array.from(m.entries())
             m.clear()
-            return [entries, m] as const
+            return [e, m] as const
           })
           for (const [, d] of inFlightSessions) {
             yield* Deferred.fail(d, new Error("Command session destroyed during shutdown"))
           }
-          const entries = Array.from(sandboxes.entries())
-          for (const [sessionID, sb] of entries) {
+          const all = yield* Ref.modify(entries, (m) => {
+            const e = Array.from(m.entries())
+            m.clear()
+            return [e, m] as const
+          })
+          for (const [sessionID, entry] of all) {
             sandboxes.delete(sessionID)
             commandSessions.delete(sessionID)
             commandSemaphores.delete(sessionID)
-            yield* destroySandbox(sb, sessionID).pipe(
-              Effect.catchCause((cause) => {
-                log.error("failed to destroy sandbox during shutdown", { sessionID, cause: Cause.pretty(cause) })
-                return Effect.void
-              }),
-            )
+            if (entry.state === "running") {
+              yield* destroySandbox(entry.sb, sessionID).pipe(
+                Effect.catchCause((cause) => {
+                  log.error("failed to destroy sandbox during shutdown", { sessionID, cause: Cause.pretty(cause) })
+                  return Effect.void
+                }),
+              )
+            }
+            if (hasVolume) {
+              yield* cleanupSessionVolume(sessionID, config, connectionConfig).pipe(
+                Effect.catchCause((cause) => {
+                  log.error("PVC cleanup during shutdown failed", { sessionID, cause: Cause.pretty(cause) })
+                  return Effect.void
+                }),
+              )
+            }
           }
         }).pipe(Effect.withSpan("SandboxProvider.destroyAll"))
 
       const runInSession: Interface["runInSession"] = (sessionID, command, options, handlers, signal) =>
         Effect.gen(function* () {
+          yield* touchLastActive(sessionID)
           const sb = sandboxes.get(sessionID)
           if (!sb) {
             return yield* Effect.fail(new Error(`Sandbox not found for session ${sessionID}`))
@@ -294,6 +441,39 @@ export namespace SandboxProvider {
           sandboxes.set(sessionID, sb)
         })
 
+      // idle timer: kill idle sandboxes when volumes are enabled
+      // (killed sandboxes can be recreated with same PVC, data persists)
+      if (hasVolume) {
+        yield* Effect.gen(function* () {
+          while (true) {
+            yield* Effect.sleep("30 seconds")
+            const now = Date.now()
+            const all = yield* Ref.modify(entries, (m) => {
+              return [Array.from(m.entries()) as [string, Entry][], m] as const
+            })
+            for (const [sessionID, entry] of all) {
+              if (entry.state === "running") {
+                const idle = now - entry.lastActive
+                if (idle > config.idleKillMs) {
+                  yield* Effect.gen(function* () {
+                    log.info("killing idle sandbox", { sessionID, idleMs: idle })
+                    yield* destroySandbox(entry.sb, sessionID)
+                    yield* setEntry(sessionID, {
+                      state: "killed",
+                      sandboxID: entry.sandboxID,
+                      lastActive: entry.lastActive,
+                    })
+                  }).pipe(Effect.catchCause(() => Effect.void))
+                }
+              }
+            }
+          }
+        }).pipe(
+          Effect.catchCause(() => Effect.void),
+          Effect.forkScoped,
+        )
+      }
+
       yield* Effect.addFinalizer(() =>
         destroyAll().pipe(
           Effect.catchCause((cause) => {
@@ -303,7 +483,7 @@ export namespace SandboxProvider {
         ),
       )
 
-      return Service.of({ getOrCreate, get, destroy, destroyAll, runInSession, register })
+      return Service.of({ getOrCreate, get, destroy, destroyAll, runInSession, register, cleanupSessionVolume: (sessionID) => cleanupSessionVolume(sessionID, config, connectionConfig) })
     }),
   )
 
@@ -320,6 +500,7 @@ export namespace NoopSandboxProvider {
       destroyAll: () => Effect.void,
       runInSession: () => Effect.fail(new Error("Sandbox is disabled")),
       register: () => Effect.void,
+      cleanupSessionVolume: () => Effect.void,
     }),
   )
 }

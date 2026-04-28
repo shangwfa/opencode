@@ -193,6 +193,7 @@ const fakeProvider = Layer.effect(
         }),
       runInSession,
       register: () => Effect.void,
+      cleanupSessionVolume: () => Effect.void,
     })
   }),
 )
