@@ -9,6 +9,8 @@ export namespace SandboxConfig {
   export interface Interface {
     readonly domain: string
     readonly protocol: "http" | "https"
+    readonly apiKey: string
+    readonly useServerProxy: boolean
     readonly image: string
     readonly timeoutSeconds: number
     readonly resourceLimits: Record<string, string>
@@ -22,6 +24,8 @@ export namespace SandboxConfig {
   export const defaultConfig: Interface = {
     domain: Flag.OPENCODE_SANDBOX_DOMAIN,
     protocol: "http" as const,
+    apiKey: Flag.OPENCODE_SANDBOX_API_KEY,
+    useServerProxy: Flag.OPENCODE_SANDBOX_USE_SERVER_PROXY,
     image: Flag.OPENCODE_SANDBOX_IMAGE,
     timeoutSeconds: Flag.OPENCODE_SANDBOX_TIMEOUT,
     resourceLimits: { cpu: "1", memory: "2Gi" },
@@ -139,6 +143,8 @@ export namespace SandboxProvider {
       const connectionConfig = new ConnectionConfig({
         domain: config.domain,
         protocol: config.protocol,
+        ...(config.apiKey ? { apiKey: config.apiKey } : {}),
+        useServerProxy: config.useServerProxy,
       })
 
       const hasVolume = config.volumeType !== "none"
@@ -170,15 +176,17 @@ export namespace SandboxProvider {
         return Effect.gen(function* () {
           log.info("creating sandbox", { sessionID, volumeType: config.volumeType })
           const volumes = buildVolumes(sessionID, config)
-          const sb = yield* Effect.tryPromise(() =>
-            Sandbox.create({
-              connectionConfig,
-              image: config.image,
-              timeoutSeconds: hasVolume ? null : config.timeoutSeconds,
-              resource: config.resourceLimits,
-              ...(volumes.length > 0 ? { volumes } : {}),
-            }),
-          )
+          const sb = yield* Effect.tryPromise({
+            try: () =>
+              Sandbox.create({
+                connectionConfig,
+                image: config.image,
+                timeoutSeconds: hasVolume ? null : config.timeoutSeconds,
+                resource: config.resourceLimits,
+                ...(volumes.length > 0 ? { volumes } : {}),
+              }),
+            catch: (e) => new Error(`Sandbox.create failed: ${e instanceof Error ? e.message : String(e)}`),
+          })
           if (!hasVolume) {
             yield* Effect.tryPromise(() => sb.commands.run("mkdir -p /workspace")).pipe(
               Effect.catchCause(() => Effect.void),

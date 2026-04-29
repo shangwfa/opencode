@@ -255,7 +255,7 @@ export namespace Database {
           // Map SQLite behavior to PG isolation level
           const config =
             options?.behavior === "immediate" || options?.behavior === "exclusive"
-              ? ({ isolationLevel: "repeatable read" } as const)
+              ? ({ isolationLevel: "read committed" } as const)
               : undefined
           if (config) {}
           result = await pgDb.transaction(async (tx: TxOrDb) => {

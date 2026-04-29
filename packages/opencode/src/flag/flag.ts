@@ -88,9 +88,11 @@ export namespace Flag {
   export const OPENCODE_EVENT_BUS = process.env["OPENCODE_EVENT_BUS"] ?? "local"
   export const OPENCODE_SANDBOX_ENABLED = truthy("OPENCODE_SANDBOX_ENABLED")
   export const OPENCODE_SANDBOX_DOMAIN = process.env["OPENCODE_SANDBOX_DOMAIN"] ?? "localhost:8080"
-  export const OPENCODE_SANDBOX_IMAGE = process.env["OPENCODE_SANDBOX_IMAGE"] ?? "ubuntu"
+  export const OPENCODE_SANDBOX_IMAGE = process.env["OPENCODE_SANDBOX_IMAGE"] ?? "registry.shadow-rpa.net/infra/xybot-sandbox-coder:latest"
   export const OPENCODE_SANDBOX_TIMEOUT = number("OPENCODE_SANDBOX_TIMEOUT") ?? 600
 
+  export const OPENCODE_SANDBOX_API_KEY = process.env["OPENCODE_SANDBOX_API_KEY"] ?? ""
+  export const OPENCODE_SANDBOX_USE_SERVER_PROXY = truthy("OPENCODE_SANDBOX_USE_SERVER_PROXY")
   export const OPENCODE_SANDBOX_VOLUME_TYPE = (process.env["OPENCODE_SANDBOX_VOLUME_TYPE"] ?? "none") as "none" | "pvc" | "host"
   export const OPENCODE_SANDBOX_PVC_CLAIM = process.env["OPENCODE_SANDBOX_PVC_CLAIM"] ?? "sandbox-test"
   export const OPENCODE_SANDBOX_IDLE_KILL_SEC = number("OPENCODE_SANDBOX_IDLE_KILL_SEC") ?? 3600

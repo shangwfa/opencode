@@ -3,6 +3,11 @@ import { Effect, Layer, Record, Result, Schema, Context } from "effect"
 import { zod } from "@/util/effect-zod"
 import { Global } from "../global"
 import { AppFileSystem } from "@opencode-ai/shared/filesystem"
+import { Database } from "../storage/db"
+import { AuthTable } from "./auth.pg"
+import { eq } from "drizzle-orm"
+
+const dialect = Database.dialect
 
 export const OAUTH_DUMMY_KEY = "opencode-oauth-dummy-key"
 
@@ -87,5 +92,55 @@ export namespace Auth {
     }),
   )
 
-  export const defaultLayer = layer.pipe(Layer.provide(AppFileSystem.defaultLayer))
+  export const pgLayer = Layer.effect(
+    Service,
+    Effect.gen(function* () {
+      const decode = Schema.decodeUnknownOption(Info)
+
+      const all = Effect.fn("Auth.all")(function* () {
+        const db = Database.Client()
+        const rows = yield* Effect.tryPromise({
+          try: () => db.select().from(AuthTable).all() as Promise<any[]>,
+          catch: (e) => new AuthError({ message: "Failed to read auth from pg", cause: e }),
+        })
+        const result: Record<string, any> = {}
+        for (const row of rows) {
+          const decoded = decode(row.data)
+          if (decoded._tag === "Some") result[row.provider_id] = decoded.value
+        }
+        return result as Record<string, Info>
+      })
+
+      const get = Effect.fn("Auth.get")(function* (providerID: string) {
+        return (yield* all())[providerID]
+      })
+
+      const set = Effect.fn("Auth.set")(function* (key: string, info: Info) {
+        const norm = key.replace(/\/+$/, "")
+        const db = Database.Client()
+        yield* Effect.tryPromise({
+          try: () =>
+            db
+              .insert(AuthTable)
+              .values({ provider_id: norm, type: (info as any).type, data: info })
+              .onConflictDoUpdate({ target: AuthTable.provider_id, set: { type: (info as any).type, data: info } })
+              .run(),
+          catch: (e) => new AuthError({ message: "Failed to write auth to pg", cause: e }),
+        })
+      })
+
+      const remove = Effect.fn("Auth.remove")(function* (key: string) {
+        const norm = key.replace(/\/+$/, "")
+        const db = Database.Client()
+        yield* Effect.tryPromise({
+          try: () => db.delete(AuthTable).where(eq(AuthTable.provider_id, norm)).run(),
+          catch: (e) => new AuthError({ message: "Failed to delete auth from pg", cause: e }),
+        })
+      })
+
+      return Service.of({ get, all, set, remove })
+    }),
+  )
+
+  export const defaultLayer = dialect === "pg" ? pgLayer : layer.pipe(Layer.provide(AppFileSystem.defaultLayer))
 }

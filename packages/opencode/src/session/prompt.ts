@@ -374,7 +374,15 @@ NOTE: At any point in time through this workflow you should feel free to ask the
         function getSandbox() {
           if (!sandboxEnabled) return null
           if (!sandboxPromise) {
-            sandboxPromise = maybeSandboxProvider!.getOrCreate(input.session.id).pipe(Effect.runPromise)
+            sandboxPromise = maybeSandboxProvider!.getOrCreate(input.session.id).pipe(
+              Effect.runPromise,
+            ).then((v) => {
+              log.info("sandbox ready", { sessionID: input.session.id, sandboxID: (v as any)?.id })
+              return v
+            }).catch((e) => {
+              log.error("sandbox create failed", { sessionID: input.session.id, error: e instanceof Error ? e.message : String(e) })
+              throw e
+            })
           }
           return sandboxPromise
         }

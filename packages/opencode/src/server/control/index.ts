@@ -8,6 +8,8 @@ import { describeRoute, resolver, validator, openAPIRouteHandler } from "hono-op
 import z from "zod"
 import { errors } from "../error"
 import { GlobalRoutes } from "../instance/global"
+import { Instance } from "@/project/instance"
+import { Database } from "@/storage/db"
 
 export function ControlPlaneRoutes(): Hono {
   const app = new Hono()
@@ -47,6 +49,7 @@ export function ControlPlaneRoutes(): Hono {
             yield* auth.set(providerID, info)
           }),
         )
+        if (Database.dialect === "pg") await Instance.disposeAll().catch(() => {})
         return c.json(true)
       },
     )
@@ -82,6 +85,7 @@ export function ControlPlaneRoutes(): Hono {
             yield* auth.remove(providerID)
           }),
         )
+        if (Database.dialect === "pg") await Instance.disposeAll().catch(() => {})
         return c.json(true)
       },
     )
