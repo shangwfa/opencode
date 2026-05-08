@@ -17,6 +17,7 @@ export namespace SandboxConfig {
     readonly volumeType: "none" | "pvc" | "host"
     readonly pvcClaimName: string
     readonly idleKillMs: number
+    readonly maxTtlSeconds: number
   }
 
   export class Service extends Context.Service<Service, Interface>()("@opencode/SandboxConfig") {}
@@ -32,6 +33,7 @@ export namespace SandboxConfig {
     volumeType: Flag.OPENCODE_SANDBOX_VOLUME_TYPE,
     pvcClaimName: Flag.OPENCODE_SANDBOX_PVC_CLAIM,
     idleKillMs: Flag.OPENCODE_SANDBOX_IDLE_KILL_SEC * 1000,
+    maxTtlSeconds: Flag.OPENCODE_SANDBOX_MAX_TTL_SEC,
   }
 
   export const layer = Layer.succeed(Service, Service.of(defaultConfig))
@@ -174,14 +176,15 @@ export namespace SandboxProvider {
 
       function createSandbox(sessionID: SessionID) {
         return Effect.gen(function* () {
-          log.info("creating sandbox", { sessionID, volumeType: config.volumeType })
+          const timeoutSeconds = hasVolume ? config.maxTtlSeconds : config.timeoutSeconds
+          log.info("creating sandbox", { sessionID, volumeType: config.volumeType, timeoutSeconds })
           const volumes = buildVolumes(sessionID, config)
           const sb = yield* Effect.tryPromise({
             try: () =>
               Sandbox.create({
                 connectionConfig,
                 image: config.image,
-                timeoutSeconds: hasVolume ? null : config.timeoutSeconds,
+                timeoutSeconds: hasVolume ? config.maxTtlSeconds : config.timeoutSeconds,
                 resource: config.resourceLimits,
                 ...(volumes.length > 0 ? { volumes } : {}),
               }),
@@ -252,11 +255,6 @@ export namespace SandboxProvider {
                 Effect.catch(() => Effect.succeed(false)),
               )
               if (healthy) {
-                if (hasVolume) {
-                  yield* Effect.tryPromise(() => entry.sb.renew(30 * 60)).pipe(
-                    Effect.catchCause(() => Effect.void),
-                  )
-                }
                 yield* touchLastActive(sessionID)
                 sandboxes.set(sessionID, entry.sb)
                 return entry.sb

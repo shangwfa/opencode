@@ -29,7 +29,7 @@
 
 ```bash
 # 在仓库根目录执行
-docker build -f Dockerfile.server -t opencode-server:latest .
+docker build -f docker/Dockerfile -t opencode-server:latest .
 ```
 
 ### 镜像信息
@@ -50,12 +50,13 @@ docker run -d \
   -p 4096:4096 \
   -e OPENSANDBOX_INSECURE_SERVER=YES \
   -e OPENCODE_DATABASE_URL=postgresql://user:pass@pg-host:5432/opencode \
+  -e OPENCODE_SANDBOX_ENABLED=true \
+  -e OPENCODE_SANDBOX_DOMAIN=sandbox-host:30040 \
   -e OPENCODE_SANDBOX_API_KEY=your-api-key \
-  -e OPENCODE_SANDBOX_ENDPOINT=http://sandbox-host:30040 \
   opencode-server:latest
 ```
 
-### 完整环境变量
+### 完整环境变量（含 PVC 持久化）
 
 ```bash
 docker run -d \
@@ -63,10 +64,16 @@ docker run -d \
   -p 4096:4096 \
   -e OPENSANDBOX_INSECURE_SERVER=YES \
   -e OPENCODE_DATABASE_URL=postgresql://user:pass@pg-host:5432/opencode \
+  -e OPENCODE_SANDBOX_ENABLED=true \
+  -e OPENCODE_SANDBOX_DOMAIN=sandbox-host:30040 \
   -e OPENCODE_SANDBOX_API_KEY=your-api-key \
-  -e OPENCODE_SANDBOX_ENDPOINT=http://sandbox-host:30040 \
   -e OPENCODE_SANDBOX_USE_SERVER_PROXY=true \
   -e OPENCODE_SANDBOX_IMAGE=registry.shadow-rpa.net/infra/xybot-sandbox-coder:latest \
+  -e OPENCODE_SANDBOX_TIMEOUT=600 \
+  -e OPENCODE_SANDBOX_VOLUME_TYPE=pvc \
+  -e OPENCODE_SANDBOX_PVC_CLAIM=sandbox-test \
+  -e OPENCODE_SANDBOX_IDLE_KILL_SEC=60 \
+  -e OPENCODE_SANDBOX_MAX_TTL_SEC=3600 \
   -e OPENCODE_SERVER_HOSTNAME=0.0.0.0 \
   -e OPENCODE_SERVER_PORT=4096 \
   -e OPENCODE_DISABLE_EMBEDDED_WEB_UI=1 \
@@ -76,16 +83,54 @@ docker run -d \
 
 ### 环境变量说明
 
+#### 基础配置
+
 | 变量 | 必填 | 默认值 | 说明 |
 |------|------|--------|------|
 | `OPENCODE_DATABASE_URL` | **是** | - | PostgreSQL 连接串 |
-| `OPENCODE_SANDBOX_API_KEY` | **是** | - | OpenSandbox API Key |
-| `OPENCODE_SANDBOX_ENDPOINT` | **是** | - | OpenSandbox K8s Runtime 地址 |
-| `OPENSANDBOX_INSECURE_SERVER` | 否 | - | 设为 `YES` 跳过 TLS 验证 |
-| `OPENCODE_SANDBOX_USE_SERVER_PROXY` | 否 | `false` | 必须设为 `true`，让 sandbox 通过 server 代理 |
-| `OPENCODE_SANDBOX_IMAGE` | 否 | - | Sandbox 容器镜像地址 |
 | `OPENCODE_SERVER_HOSTNAME` | 否 | `0.0.0.0` | 监听地址 |
 | `OPENCODE_SERVER_PORT` | 否 | `4096` | 监听端口 |
+
+#### Sandbox 配置
+
+| 变量 | 必填 | 默认值 | 说明 |
+|------|------|--------|------|
+| `OPENCODE_SANDBOX_ENABLED` | **是** | `false` | **必须设为 `true`** 才能启用远程 sandbox |
+| `OPENCODE_SANDBOX_DOMAIN` | **是** | `localhost:8080` | OpenSandbox K8s Runtime 地址（不含协议前缀） |
+| `OPENCODE_SANDBOX_API_KEY` | **是** | - | OpenSandbox API Key |
+| `OPENCODE_SANDBOX_USE_SERVER_PROXY` | 否 | `false` | 设为 `true` 让 sandbox 通过 server 代理 |
+| `OPENCODE_SANDBOX_IMAGE` | 否 | 内置默认 | Sandbox 容器镜像地址 |
+| `OPENCODE_SANDBOX_TIMEOUT` | 否 | `600` | 无 PVC 时 sandbox 空闲超时（秒），SDK 自动销毁 |
+| `OPENSANDBOX_INSECURE_SERVER` | 否 | - | 设为 `YES` 跳过 TLS 验证 |
+
+#### Sandbox PVC 持久化配置
+
+| 变量 | 必填 | 默认值 | 说明 |
+|------|------|--------|------|
+| `OPENCODE_SANDBOX_VOLUME_TYPE` | 否 | `none` | 存储类型：`none`（无持久化）/ `pvc`（K8s PVC）/ `host`（主机挂载） |
+| `OPENCODE_SANDBOX_PVC_CLAIM` | 否 | `sandbox-test` | PVC claim 名称（`VOLUME_TYPE=pvc` 时有效） |
+| `OPENCODE_SANDBOX_IDLE_KILL_SEC` | 否 | `3600` | sandbox 空闲多久后销毁（秒），PVC 数据保留 |
+| `OPENCODE_SANDBOX_MAX_TTL_SEC` | 否 | `3600` | sandbox 最大存活时间（秒），兜底强制销毁 |
+
+#### Sandbox 生命周期策略
+
+```
+┌──────────────────────────────────────────────┐
+│  PVC 模式：双层超时保护                        │
+│                                              │
+│  L1 Idle Kill (IDLE_KILL_SEC)                │
+│  ├─ 默认 60s 无命令执行 → 销毁 sandbox        │
+│  ├─ PVC 数据保留，下次请求自动重建             │
+│  └─ 定时器每 30s 检查一次                     │
+│                                              │
+│  L2 Max TTL (MAX_TTL_SEC)                    │
+│  ├─ 默认 3600s（1 小时），绝对上限             │
+│  └─ 即使持续有请求也会被强制销毁               │
+│                                              │
+│  非 PVC 模式：                                │
+│  └─ TIMEOUT（默认 600s）SDK 层自动回收         │
+└──────────────────────────────────────────────┘
+```
 
 ## 三、添加 LLM Provider
 
@@ -235,13 +280,22 @@ docker logs opencode-server
 # 2. 端口冲突 → 改 OPENCODE_SERVER_PORT
 ```
 
-### Sandbox 创建失败
+### Sandbox 不生效 / 创建失败
 
 ```bash
-# 检查 OpenSandbox 连通性
+# 1. 确认 OPENCODE_SANDBOX_ENABLED=true（最常见遗漏！）
+docker exec opencode-server env | grep OPENCODE_SANDBOX_ENABLED
+# 如果为空或 false → sandbox 不会启用
+
+# 2. 确认 DOMAIN 格式正确（不含 http:// 前缀）
+docker exec opencode-server env | grep OPENCODE_SANDBOX_DOMAIN
+# 正确：sandbox-host:30040
+# 错误：http://sandbox-host:30040
+
+# 3. 检查 OpenSandbox 连通性
 curl http://sandbox-host:30040/health
 
-# 确认环境变量
+# 4. 确认所有 sandbox 环境变量
 docker exec opencode-server env | grep OPENCODE_SANDBOX
 ```
 
@@ -274,7 +328,7 @@ mv /tmp/docker-config.json ~/.docker/config.json
 
 | 文件 | 说明 |
 |------|------|
-| `Dockerfile.server` | Docker 镜像定义 |
+| `docker/Dockerfile` | Docker 镜像定义 |
 | `.dockerignore` | 构建排除项 |
 | `packages/opencode/drizzle.pg.config.ts` | PG drizzle 配置（Drizzle Studio 用） |
 | `packages/opencode/src/auth/index.ts` | Auth 双层存储 |
