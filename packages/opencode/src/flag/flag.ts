@@ -81,10 +81,12 @@ export namespace Flag {
   export const OPENCODE_DISABLE_EMBEDDED_WEB_UI = truthy("OPENCODE_DISABLE_EMBEDDED_WEB_UI")
   export const OPENCODE_DB = process.env["OPENCODE_DB"]
   export const OPENCODE_DATABASE_URL = process.env["OPENCODE_DATABASE_URL"]
+  export const OPENCODE_AUTH_PROVIDER = (process.env["OPENCODE_AUTH_PROVIDER"] ?? "auto") as "auto" | "pg" | "file"
   export const OPENCODE_DISABLE_CHANNEL_DB = truthy("OPENCODE_DISABLE_CHANNEL_DB")
   export const OPENCODE_SKIP_MIGRATIONS = truthy("OPENCODE_SKIP_MIGRATIONS")
   export const OPENCODE_STRICT_CONFIG_DEPS = truthy("OPENCODE_STRICT_CONFIG_DEPS")
 
+  export const OPENCODE_DEFAULT_DIRECTORY = process.env["OPENCODE_DEFAULT_DIRECTORY"]
   export const OPENCODE_EVENT_BUS = process.env["OPENCODE_EVENT_BUS"] ?? "local"
   export const OPENCODE_SANDBOX_ENABLED = truthy("OPENCODE_SANDBOX_ENABLED")
   export const OPENCODE_SANDBOX_DOMAIN = process.env["OPENCODE_SANDBOX_DOMAIN"] ?? "localhost:8080"

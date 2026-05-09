@@ -5,6 +5,7 @@ import { Global } from "../global"
 import { AppFileSystem } from "@opencode-ai/shared/filesystem"
 import { Database } from "../storage/db"
 import { AuthTable } from "./auth.pg"
+import { Flag } from "../flag/flag"
 import { eq } from "drizzle-orm"
 
 const dialect = Database.dialect
@@ -142,5 +143,11 @@ export namespace Auth {
     }),
   )
 
-  export const defaultLayer = dialect === "pg" ? pgLayer : layer.pipe(Layer.provide(AppFileSystem.defaultLayer))
+  export const defaultLayer = (() => {
+    const provider = Flag.OPENCODE_AUTH_PROVIDER
+    if (provider === "pg") return pgLayer
+    if (provider === "file") return layer.pipe(Layer.provide(AppFileSystem.defaultLayer))
+    // auto: follow DATABASE_URL
+    return dialect === "pg" ? pgLayer : layer.pipe(Layer.provide(AppFileSystem.defaultLayer))
+  })()
 }

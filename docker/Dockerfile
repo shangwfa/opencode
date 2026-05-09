@@ -1,8 +1,9 @@
 FROM oven/bun:1.3.11-alpine AS base
 RUN apk add --no-cache git ripgrep
 
-FROM base AS deps
+FROM base AS builder
 WORKDIR /app
+
 COPY package.json bun.lock bunfig.toml ./
 COPY patches/ patches/
 COPY packages/opencode/package.json packages/opencode/
@@ -15,43 +16,44 @@ COPY packages/plugin/package.json packages/plugin/
 COPY packages/function/package.json packages/function/
 RUN bun install --ignore-scripts
 
+COPY packages/opencode packages/opencode
+COPY packages/sdk packages/sdk
+COPY packages/server packages/server
+COPY packages/plugin packages/plugin
+COPY packages/script packages/script
+COPY packages/shared packages/shared
+
+# Re-run install with source present to fix symlinks and run postinstall
+RUN bun install
+
 FROM base AS runtime
+WORKDIR /app
+
+COPY --from=builder /app/node_modules node_modules
+COPY --from=builder /app/packages packages
+COPY --from=builder /app/package.json /app/bun.lock /app/bunfig.toml ./
+COPY --from=builder /app/patches patches/
+
 WORKDIR /app/packages/opencode
 
-COPY --from=deps /app/node_modules /app/node_modules
-COPY --from=deps /app/packages/opencode/node_modules /app/packages/opencode/node_modules
-COPY --from=deps /app/packages/sdk/js/node_modules /app/packages/sdk/js/node_modules
-COPY --from=deps /app/packages/server/node_modules /app/packages/server/node_modules
-COPY --from=deps /app/packages/plugin/node_modules /app/packages/plugin/node_modules
-COPY --from=deps /app/packages/script/node_modules /app/packages/script/node_modules
-COPY --from=deps /app/packages/shared/node_modules /app/packages/shared/node_modules
+RUN adduser -D opencode && mkdir -p /workspace && chown opencode:opencode /workspace
 
-COPY packages/opencode/src packages/opencode/src
-COPY packages/opencode/package.json packages/opencode/package.json
-COPY packages/opencode/tsconfig.json packages/opencode/tsconfig.json
-COPY packages/opencode/drizzle.pg.config.ts packages/opencode/drizzle.pg.config.ts
-COPY packages/opencode/migration packages/opencode/migration
-COPY packages/opencode/migration-pg packages/opencode/migration-pg
-COPY packages/sdk /app/packages/sdk
-COPY packages/server /app/packages/server
-COPY packages/plugin /app/packages/plugin
-COPY packages/script /app/packages/script
-COPY packages/shared /app/packages/shared
-COPY package.json bun.lock bunfig.toml /app/
-COPY patches/ /app/patches/
-
-RUN adduser -D -H opencode
-
+ENV OPENCODE_DEFAULT_DIRECTORY=/workspace
 ENV OPENCODE_SERVER_HOSTNAME=0.0.0.0
 ENV OPENCODE_SERVER_PORT=4096
+ENV OPENCODE_AUTH_PROVIDER=pg
+ENV OPENCODE_SANDBOX_ENABLED=true
+ENV OPENCODE_SANDBOX_VOLUME_TYPE=pvc
+ENV OPENCODE_SANDBOX_PVC_CLAIM=sandbox-test
+ENV OPENCODE_SANDBOX_MAX_TTL_SEC=3600
 ENV OPENCODE_DISABLE_EMBEDDED_WEB_UI=1
 ENV OPENCODE_DISABLE_AUTOUPDATE=1
 
 EXPOSE 4096
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD wget -qO- http://localhost:${OPENCODE_SERVER_PORT:-4096}/ || exit 1
+  CMD wget -qO- http://0.0.0.0:${OPENCODE_SERVER_PORT:-4096}/global/health || exit 1
 
 USER opencode
 
-ENTRYPOINT ["bun", "run", "--bun", "src/index.ts", "serve"]
+ENTRYPOINT ["bun", "run", "src/index.ts", "serve"]

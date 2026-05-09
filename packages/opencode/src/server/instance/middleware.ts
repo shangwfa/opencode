@@ -4,6 +4,7 @@ import { getAdaptor } from "@/control-plane/adaptors"
 import { WorkspaceID } from "@/control-plane/schema"
 import { Workspace } from "@/control-plane/workspace"
 import { ServerProxy } from "../proxy"
+import { Flag } from "@/flag/flag"
 import { Filesystem } from "@/util/filesystem"
 import { Instance } from "@/project/instance"
 import { InstanceBootstrap } from "@/project/bootstrap"
@@ -52,7 +53,7 @@ export function WorkspaceRouterMiddleware(upgrade: UpgradeWebSocket): Middleware
   const log = Log.create({ service: "workspace-router" })
 
   return async (c, next) => {
-    const raw = c.req.query("directory") || c.req.header("x-opencode-directory") || process.cwd()
+    const raw = c.req.query("directory") || c.req.header("x-opencode-directory") || Flag.OPENCODE_DEFAULT_DIRECTORY || process.cwd()
     const directory = Filesystem.resolve(
       (() => {
         try {

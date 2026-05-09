@@ -44,40 +44,48 @@ docker build -f docker/Dockerfile -t opencode-server:latest .
 
 ### 最小启动命令
 
+> ⚠️ 以下为**最小可运行配置**，仅用于快速验证。生产部署请使用下方"完整环境变量"。
+
 ```bash
 docker run -d \
   --name opencode-server \
   -p 4096:4096 \
-  -e OPENSANDBOX_INSECURE_SERVER=YES \
   -e OPENCODE_DATABASE_URL=postgresql://user:pass@pg-host:5432/opencode \
   -e OPENCODE_SANDBOX_ENABLED=true \
   -e OPENCODE_SANDBOX_DOMAIN=sandbox-host:30040 \
   -e OPENCODE_SANDBOX_API_KEY=your-api-key \
+  -e OPENSANDBOX_INSECURE_SERVER=YES \
   opencode-server:latest
 ```
 
-### 完整环境变量（含 PVC 持久化）
+> **常见遗漏**：`OPENCODE_SANDBOX_ENABLED=true` 是启用远程 sandbox 的**必要条件**，不设则所有代码执行在容器本地运行。
+
+### 完整环境变量（含 PVC 持久化 + 认证）
 
 ```bash
 docker run -d \
   --name opencode-server \
   -p 4096:4096 \
-  -e OPENSANDBOX_INSECURE_SERVER=YES \
+  \
+  `# ── 基础配置 ──` \
   -e OPENCODE_DATABASE_URL=postgresql://user:pass@pg-host:5432/opencode \
-  -e OPENCODE_SANDBOX_ENABLED=true \
-  -e OPENCODE_SANDBOX_DOMAIN=sandbox-host:30040 \
+  -e OPENCODE_SERVER_HOSTNAME=0.0.0.0 \
+  -e OPENCODE_SERVER_PORT=4096 \
+  -e OPENCODE_SERVER_PASSWORD=your-secure-password `# 强烈建议设置，否则无认证` \
+  -e OPENCODE_DISABLE_EMBEDDED_WEB_UI=1 \
+  -e OPENCODE_DISABLE_AUTOUPDATE=1 \
+  \
+  `# ── Sandbox 配置 ──` \
+  -e OPENCODE_SANDBOX_ENABLED=true `# 必须设为 true` \
+  -e OPENCODE_SANDBOX_DOMAIN=sandbox-host:30040 `# 不含协议前缀` \
   -e OPENCODE_SANDBOX_API_KEY=your-api-key \
-  -e OPENCODE_SANDBOX_USE_SERVER_PROXY=true \
-  -e OPENCODE_SANDBOX_IMAGE=registry.shadow-rpa.net/infra/xybot-sandbox-coder:latest \
-  -e OPENCODE_SANDBOX_TIMEOUT=600 \
+  -e OPENSANDBOX_INSECURE_SERVER=YES \
+  \
+  `# ── PVC 持久化 ──` \
   -e OPENCODE_SANDBOX_VOLUME_TYPE=pvc \
   -e OPENCODE_SANDBOX_PVC_CLAIM=sandbox-test \
   -e OPENCODE_SANDBOX_IDLE_KILL_SEC=60 \
   -e OPENCODE_SANDBOX_MAX_TTL_SEC=3600 \
-  -e OPENCODE_SERVER_HOSTNAME=0.0.0.0 \
-  -e OPENCODE_SERVER_PORT=4096 \
-  -e OPENCODE_DISABLE_EMBEDDED_WEB_UI=1 \
-  -e OPENCODE_DISABLE_AUTOUPDATE=1 \
   opencode-server:latest
 ```
 
@@ -87,9 +95,14 @@ docker run -d \
 
 | 变量 | 必填 | 默认值 | 说明 |
 |------|------|--------|------|
-| `OPENCODE_DATABASE_URL` | **是** | - | PostgreSQL 连接串 |
-| `OPENCODE_SERVER_HOSTNAME` | 否 | `0.0.0.0` | 监听地址 |
+| `OPENCODE_DATABASE_URL` | **是** | - | PostgreSQL 连接串，设置后自动启用 PG 模式（session/message 全走 PG） |
+| `OPENCODE_AUTH_PROVIDER` | 否 | `auto` | Auth 存储模式：`auto`（跟随 DATABASE_URL）/ `pg`（强制 PG）/ `file`（强制本地文件） |
+| `OPENCODE_SERVER_HOSTNAME` | 否 | `127.0.0.1` | 监听地址，容器部署需设为 `0.0.0.0` |
 | `OPENCODE_SERVER_PORT` | 否 | `4096` | 监听端口 |
+| `OPENCODE_SERVER_PASSWORD` | 否 | - | HTTP Basic Auth 密码，**不设则无认证**（日志会警告） |
+| `OPENCODE_SERVER_USERNAME` | 否 | `opencode` | HTTP Basic Auth 用户名 |
+| `OPENCODE_DISABLE_EMBEDDED_WEB_UI` | 否 | `false` | 设为 `1` 禁用内嵌 Web UI |
+| `OPENCODE_DISABLE_AUTOUPDATE` | 否 | `false` | 设为 `1` 禁用自动更新（容器部署建议开启） |
 
 #### Sandbox 配置
 
@@ -111,6 +124,36 @@ docker run -d \
 | `OPENCODE_SANDBOX_PVC_CLAIM` | 否 | `sandbox-test` | PVC claim 名称（`VOLUME_TYPE=pvc` 时有效） |
 | `OPENCODE_SANDBOX_IDLE_KILL_SEC` | 否 | `3600` | sandbox 空闲多久后销毁（秒），PVC 数据保留 |
 | `OPENCODE_SANDBOX_MAX_TTL_SEC` | 否 | `3600` | sandbox 最大存活时间（秒），兜底强制销毁 |
+
+#### Auth 认证
+
+| 变量 | 必填 | 默认值 | 说明 |
+|------|------|--------|------|
+| `OPENCODE_AUTH_PROVIDER` | 否 | `auto` | Auth 存储模式 |
+
+- `auto`（默认）：跟随 `DATABASE_URL`——设了 PG 连接串则走 PG Auth，否则走文件 Auth
+- `pg`：强制 PG Auth，即使 `DATABASE_URL` 未设置也用 PG（需 `DATABASE_URL` 已配置）
+- `file`：强制文件 Auth，即使配了 PG 也存本地文件
+
+#### 工作目录
+
+| 变量 | 必填 | 默认值 | 说明 |
+|------|------|--------|------|
+| `OPENCODE_DEFAULT_DIRECTORY` | 否 | - | 覆盖 `process.cwd()` 作为默认工作目录。SaaS 容器化部署时建议设为 `/workspace`（空目录），避免容器内源码被 Agent 当作项目上下文 |
+
+优先级：`?directory=` 请求参数 → `x-opencode-directory` Header → `OPENCODE_DEFAULT_DIRECTORY` → `process.cwd()`
+
+#### SaaS 进阶配置
+
+| 变量 | 必填 | 默认值 | 说明 |
+|------|------|--------|------|
+| `OPENCODE_PERMISSION` | 否 | - | 权限模式：`ask`（每次确认）/ `auto-ask`（自动但受限）/ `trust`（完全信任） |
+| `OPENCODE_ENABLE_QUESTION_TOOL` | 否 | `false` | 设为 `true` 启用 question 工具（HTTP API 模式下建议开启） |
+| `OPENCODE_MODELS_URL` | 否 | - | 自定义 models.json URL，可用于管控可用模型列表 |
+| `OPENCODE_SKIP_MIGRATIONS` | 否 | `false` | 设为 `true` 跳过数据库迁移（已手动迁移时使用） |
+| `OPENCODE_EXPERIMENTAL_WORKSPACES` | 否 | `false` | 设为 `true` 启用多 workspace 支持 |
+| `OPENCODE_EXPERIMENTAL_BASH_DEFAULT_TIMEOUT_MS` | 否 | - | bash 命令默认超时（毫秒） |
+| `OPENCODE_EXPERIMENTAL_OUTPUT_TOKEN_MAX` | 否 | - | LLM 输出 token 上限 |
 
 #### Sandbox 生命周期策略
 
