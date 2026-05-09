@@ -14,7 +14,6 @@ COPY packages/script/package.json packages/script/
 COPY packages/server/package.json packages/server/
 COPY packages/plugin/package.json packages/plugin/
 COPY packages/function/package.json packages/function/
-# First install: fast dependency fetch (patches may fail on some platforms, second install will fix)
 RUN bun install --ignore-scripts || true
 
 COPY packages/opencode packages/opencode
@@ -24,7 +23,9 @@ COPY packages/plugin packages/plugin
 COPY packages/script packages/script
 COPY packages/shared packages/shared
 
-RUN bun install --ignore-scripts || true
+# Remove patches to avoid bun patch EINVAL on Linux x64
+RUN rm -rf patches && sed -i '/"patchedDependencies"/,/^  }/d' package.json
+RUN bun install --ignore-scripts
 RUN find /app -path "*/node-pty/prebuilds/*/spawn-helper" -exec chmod +x {} \;
 
 FROM base AS runtime
@@ -33,7 +34,6 @@ WORKDIR /app
 COPY --from=builder /app/node_modules node_modules
 COPY --from=builder /app/packages packages
 COPY --from=builder /app/package.json /app/bun.lock /app/bunfig.toml ./
-COPY --from=builder /app/patches patches/
 
 WORKDIR /app/packages/opencode
 
