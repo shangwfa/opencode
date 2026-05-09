@@ -14,7 +14,8 @@ COPY packages/script/package.json packages/script/
 COPY packages/server/package.json packages/server/
 COPY packages/plugin/package.json packages/plugin/
 COPY packages/function/package.json packages/function/
-RUN bun install --ignore-scripts
+# First install: fast dependency fetch (patches may fail on some platforms, second install will fix)
+RUN bun install --ignore-scripts || true
 
 COPY packages/opencode packages/opencode
 COPY packages/sdk packages/sdk
