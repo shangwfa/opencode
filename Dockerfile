@@ -24,9 +24,8 @@ COPY packages/plugin packages/plugin
 COPY packages/script packages/script
 COPY packages/shared packages/shared
 
-# Re-run install to fix symlinks (skip scripts to avoid babel dep issues in CI)
 RUN bun install --ignore-scripts || true
-RUN cd packages/opencode && bun run script/fix-node-pty.ts
+RUN find /app -path "*/node-pty/prebuilds/*/spawn-helper" -exec chmod +x {} \;
 
 FROM base AS runtime
 WORKDIR /app
