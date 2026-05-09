@@ -24,8 +24,9 @@ COPY packages/plugin packages/plugin
 COPY packages/script packages/script
 COPY packages/shared packages/shared
 
-# Re-run install with source present to fix symlinks and run postinstall
-RUN bun install
+# Re-run install to fix symlinks (skip scripts to avoid babel dep issues in CI)
+RUN bun install --ignore-scripts || true
+RUN cd packages/opencode && bun run script/fix-node-pty.ts
 
 FROM base AS runtime
 WORKDIR /app
