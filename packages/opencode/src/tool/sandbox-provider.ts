@@ -203,6 +203,7 @@ export namespace SandboxProvider {
       function destroySandbox(sb: Sandbox, sessionID: string) {
         return Effect.gen(function* () {
           log.info("destroying sandbox", { sessionID, sandboxID: sb.id })
+          sandboxes.delete(sessionID)
           const cmdSession = commandSessions.get(sessionID)
           if (cmdSession) {
             yield* Effect.tryPromise(() => sb.commands.deleteSession(cmdSession)).pipe(
