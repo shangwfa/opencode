@@ -370,21 +370,17 @@ NOTE: At any point in time through this workflow you should feel free to ask the
         const promptOps = yield* ops()
         const maybeSandboxProvider = Option.getOrUndefined(yield* Effect.serviceOption(SandboxProvider.Service))
         const sandboxEnabled = Flag.OPENCODE_SANDBOX_ENABLED && maybeSandboxProvider !== undefined
-        let sandboxPromise: Promise<any> | null = null
-        function getSandbox() {
-          if (!sandboxEnabled) return null
-          if (!sandboxPromise) {
-            sandboxPromise = maybeSandboxProvider!.getOrCreate(input.session.id).pipe(
-              Effect.runPromise,
-            ).then((v) => {
-              log.info("sandbox ready", { sessionID: input.session.id, sandboxID: (v as any)?.id })
-              return v
-            }).catch((e) => {
-              log.error("sandbox create failed", { sessionID: input.session.id, error: e instanceof Error ? e.message : String(e) })
-              throw e
-            })
-          }
-          return sandboxPromise
+        function getSandbox(): Promise<any> | null {
+          if (!sandboxEnabled || !maybeSandboxProvider) return null
+          return maybeSandboxProvider.getOrCreate(input.session.id).pipe(
+            Effect.runPromise,
+          ).then((v) => {
+            log.info("sandbox acquired", { sessionID: input.session.id, sandboxID: (v as any)?.id })
+            return v
+          }).catch((e) => {
+            log.error("sandbox acquire failed", { sessionID: input.session.id, error: e instanceof Error ? e.message : String(e) })
+            return null
+          })
         }
 
         const context = (args: any, options: ToolExecutionOptions): Tool.Context => ({
