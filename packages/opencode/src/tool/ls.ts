@@ -7,6 +7,8 @@ import { Ripgrep } from "../file/ripgrep"
 import { assertExternalDirectoryEffect } from "./external-directory"
 import DESCRIPTION from "./ls.txt"
 import { Tool } from "./tool"
+import { toSandboxPath, toHostPath } from "./sandbox-path"
+import { SandboxProvider } from "./sandbox-provider"
 
 export const IGNORE_PATTERNS = [
   "node_modules/",
@@ -41,6 +43,7 @@ export const ListTool = Tool.define(
   "list",
   Effect.gen(function* () {
     const rg = yield* Ripgrep.Service
+    const sandboxProvider = yield* SandboxProvider.Service
 
     return {
       description: DESCRIPTION,
@@ -66,6 +69,69 @@ export const ListTool = Tool.define(
             },
           })
 
+          // ── Sandbox mode ──
+          if (ctx.sandbox !== null) {
+            const sandboxSearchPath = toSandboxPath(search, ins.directory)
+            const ignoreGlobs = IGNORE_PATTERNS.map((item) => `!${item}*`).concat(params.ignore?.map((item) => `!${item}`) || [])
+            const globArgs = ignoreGlobs.map((g) => `--glob '${g}'`).join(" ")
+
+            const cmd = `rg --files ${globArgs} '${sandboxSearchPath}' 2>/dev/null | head -101`
+            const result = yield* sandboxProvider.runInSession(ctx.sessionID, cmd, { timeoutSeconds: 30 })
+
+            const stdout = result.logs.stdout.map((l: { text: string }) => l.text).join("\n").trim()
+            const lines = stdout ? stdout.split("\n").filter((line: string) => line.length > 0) : []
+
+            const truncated = lines.length > LIMIT
+            if (truncated) lines.length = LIMIT
+
+            const files = lines.map((line: string) => {
+              const hostPath = toHostPath(line.trim(), ins.directory)
+              return path.relative(search, hostPath)
+            })
+
+            const dirs = new Set<string>()
+            const map = new Map<string, string[]>()
+            for (const file of files) {
+              const dir = path.dirname(file)
+              const parts = dir === "." ? [] : dir.split("/")
+              for (let i = 0; i <= parts.length; i++) {
+                dirs.add(i === 0 ? "." : parts.slice(0, i).join("/"))
+              }
+              if (!map.has(dir)) map.set(dir, [])
+              map.get(dir)!.push(path.basename(file))
+            }
+
+            function render(dir: string, depth: number): string {
+              const indent = "  ".repeat(depth)
+              let output = ""
+              if (depth > 0) output += `${indent}${path.basename(dir)}/\n`
+
+              const child = "  ".repeat(depth + 1)
+              const dirs2 = Array.from(dirs)
+                .filter((item) => path.dirname(item) === dir && item !== dir)
+                .sort()
+              for (const item of dirs2) {
+                output += render(item, depth + 1)
+              }
+
+              const dirFiles = map.get(dir) || []
+              for (const file of dirFiles.sort()) {
+                output += `${child}${file}\n`
+              }
+              return output
+            }
+
+            return {
+              title: path.relative(ins.worktree, search),
+              metadata: {
+                count: files.length,
+                truncated,
+              },
+              output: `${search}/\n` + render(".", 0),
+            }
+          }
+
+          // ── Local mode ──
           const glob = IGNORE_PATTERNS.map((item) => `!${item}*`).concat(params.ignore?.map((item) => `!${item}`) || [])
           const files = yield* rg.files({ cwd: search, glob, signal: ctx.abort }).pipe(
             Stream.take(LIMIT + 1),
@@ -101,8 +167,8 @@ export const ListTool = Tool.define(
               output += render(item, depth + 1)
             }
 
-            const files = map.get(dir) || []
-            for (const file of files.sort()) {
+            const dirFiles = map.get(dir) || []
+            for (const file of dirFiles.sort()) {
               output += `${child}${file}\n`
             }
             return output

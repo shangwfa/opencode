@@ -97,22 +97,12 @@ export const ReadTool = Tool.define(
       }
       const title = path.relative(Instance.worktree, filepath)
 
-      const stat = yield* fs.stat(filepath).pipe(
-        Effect.catchIf(
-          (err) => "reason" in err && err.reason._tag === "NotFound",
-          () => Effect.succeed(undefined),
-        ),
-      )
-
-      yield* assertExternalDirectoryEffect(ctx, filepath, {
-        bypass: Boolean(ctx.extra?.["bypassCwdCheck"]),
-        kind: stat?.type === "Directory" ? "directory" : "file",
-      })
-
       // ── Sandbox mode ──
       if (ctx.sandbox !== null) {
         const sb = yield* Effect.tryPromise({ try: () => ctx.sandbox!, catch: (e) => new Error(String(e)) })
         const sandboxPath = toSandboxPath(filepath, Instance.directory)
+
+        yield* assertExternalDirectoryEffect(ctx, filepath)
 
         yield* ctx.ask({
           permission: "read",
@@ -223,11 +213,24 @@ export const ReadTool = Tool.define(
         }
       }
 
+      // ── Local mode ──
       yield* ctx.ask({
         permission: "read",
         patterns: [filepath],
         always: ["*"],
         metadata: {},
+      })
+
+      const stat = yield* fs.stat(filepath).pipe(
+        Effect.catchIf(
+          (err) => "reason" in err && err.reason._tag === "NotFound",
+          () => Effect.succeed(undefined),
+        ),
+      )
+
+      yield* assertExternalDirectoryEffect(ctx, filepath, {
+        bypass: Boolean(ctx.extra?.["bypassCwdCheck"]),
+        kind: stat?.type === "Directory" ? "directory" : "file",
       })
 
       if (!stat) return yield* miss(filepath)

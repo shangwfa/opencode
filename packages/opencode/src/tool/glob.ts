@@ -44,10 +44,6 @@ export const GlobTool = Tool.define(
 
           let search = params.path ?? ins.directory
           search = path.isAbsolute(search) ? search : path.resolve(ins.directory, search)
-          const info = yield* fs.stat(search).pipe(Effect.catch(() => Effect.succeed(undefined)))
-          if (info?.type === "File") {
-            throw new Error(`glob path must be a directory: ${search}`)
-          }
           yield* assertExternalDirectoryEffect(ctx, search, { kind: "directory" })
 
           // ── Sandbox mode ──
@@ -93,6 +89,11 @@ export const GlobTool = Tool.define(
           }
 
           // ── Local mode ──
+          const info = yield* fs.stat(search).pipe(Effect.catch(() => Effect.succeed(undefined)))
+          if (info?.type === "File") {
+            throw new Error(`glob path must be a directory: ${search}`)
+          }
+
           const limit = 100
           let truncated = false
           const files = yield* rg.files({ cwd: search, glob: [params.pattern], signal: ctx.abort }).pipe(

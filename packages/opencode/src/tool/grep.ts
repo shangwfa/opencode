@@ -54,12 +54,7 @@ export const GrepTool = Tool.define(
               ? (params.path ?? ins.directory)
               : path.join(ins.directory, params.path ?? "."),
           )
-          const info = yield* fs.stat(search).pipe(Effect.catch(() => Effect.succeed(undefined)))
-          const cwd = info?.type === "Directory" ? search : path.dirname(search)
-          const file = info?.type === "Directory" ? undefined : [path.relative(cwd, search)]
-          yield* assertExternalDirectoryEffect(ctx, search, {
-            kind: info?.type === "Directory" ? "directory" : "file",
-          })
+          yield* assertExternalDirectoryEffect(ctx, search)
 
           // ── Sandbox mode ──
           if (ctx.sandbox !== null) {
@@ -155,6 +150,13 @@ export const GrepTool = Tool.define(
           }
 
           // ── Local mode ──
+          const info = yield* fs.stat(search).pipe(Effect.catch(() => Effect.succeed(undefined)))
+          const cwd = info?.type === "Directory" ? search : path.dirname(search)
+          const file = info?.type === "Directory" ? undefined : [path.relative(cwd, search)]
+          yield* assertExternalDirectoryEffect(ctx, search, {
+            kind: info?.type === "Directory" ? "directory" : "file",
+          })
+
           const result = yield* rg.search({
             cwd,
             pattern: params.pattern,
