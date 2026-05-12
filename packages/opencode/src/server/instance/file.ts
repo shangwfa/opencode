@@ -1,6 +1,6 @@
 import { Hono } from "hono"
 import { describeRoute, validator, resolver } from "hono-openapi"
-import { Effect } from "effect"
+import { Effect, Duration } from "effect"
 import z from "zod"
 import { AppRuntime } from "../../effect/app-runtime"
 import { File } from "../../file"
@@ -8,6 +8,11 @@ import { Ripgrep } from "../../file/ripgrep"
 import { LSP } from "../../lsp"
 import { Instance } from "../../project/instance"
 import { lazy } from "../../util/lazy"
+import { Flag } from "../../flag/flag"
+import path from "path"
+import { SandboxProvider } from "../../tool/sandbox-provider"
+import { toSandboxPath } from "../../tool/sandbox-path"
+import type { SessionID } from "../../session/schema"
 
 export const FileRoutes = lazy(() =>
   new Hono()
@@ -136,13 +141,56 @@ export const FileRoutes = lazy(() =>
         "query",
         z.object({
           path: z.string(),
+          sessionID: z.string().optional(),
         }),
       ),
       async (c) => {
-        const path = c.req.valid("query").path
+        const filePath = c.req.valid("query").path
+        const sessionID = c.req.valid("query").sessionID as SessionID | undefined
+
+        if (Flag.OPENCODE_SANDBOX_ENABLED && sessionID) {
+          const result = await AppRuntime.runPromise(
+            Effect.gen(function* () {
+              const sp = yield* SandboxProvider.Service
+              const sb = yield* sp.getOrCreate(sessionID)
+              const sandboxPath = filePath ? toSandboxPath(
+                path.isAbsolute(filePath) ? filePath : path.join(Instance.directory, filePath),
+                Instance.directory,
+              ) : toSandboxPath(Instance.directory, Instance.directory)
+              const lsResult = yield* sp.runInSession(
+                sessionID,
+                `ls -1a --color=never "${sandboxPath}" | while read f; do if [ -d "${sandboxPath}/$f" ]; then echo "D $f"; else echo "F $f"; fi; done`,
+                { timeoutSeconds: 10 },
+              ).pipe(
+                Effect.catch(() => Effect.succeed({ logs: { stdout: [], stderr: [] }, exitCode: 1 } as any)),
+              )
+              const items = lsResult.logs.stdout
+                .map((l: { text: string }) => l.text.trim())
+                .filter((t: string) => t && !t.startsWith("total "))
+                .filter((t: string) => {
+                  const name = t.substring(2)
+                  return name !== "." && name !== ".."
+                })
+                .sort((a: string, b: string) => a.localeCompare(b))
+              return items.map((entry: string) => {
+                const isDir = entry.startsWith("D ")
+                const name = entry.substring(2)
+                return {
+                  name,
+                  path: filePath ? `${filePath}/${name}` : name,
+                  absolute: `${Instance.directory}/${filePath ? filePath + "/" : ""}${name}`,
+                  type: isDir ? "directory" as const : "file" as const,
+                  ignored: false,
+                }
+              })
+            }),
+          )
+          return c.json(result)
+        }
+
         const content = await AppRuntime.runPromise(
           Effect.gen(function* () {
-            return yield* File.Service.use((svc) => svc.list(path))
+            return yield* File.Service.use((svc) => svc.list(filePath))
           }),
         )
         return c.json(content)
@@ -169,13 +217,38 @@ export const FileRoutes = lazy(() =>
         "query",
         z.object({
           path: z.string(),
+          sessionID: z.string().optional(),
         }),
       ),
       async (c) => {
-        const path = c.req.valid("query").path
+        const filePath = c.req.valid("query").path
+        const sessionID = c.req.valid("query").sessionID as SessionID | undefined
+
+        if (Flag.OPENCODE_SANDBOX_ENABLED && sessionID) {
+          const result = await AppRuntime.runPromise(
+            Effect.gen(function* () {
+              const sp = yield* SandboxProvider.Service
+              const sb = yield* sp.getOrCreate(sessionID)
+              const full = path.isAbsolute(filePath) ? filePath : path.join(Instance.directory, filePath)
+              const sandboxPath = toSandboxPath(full, Instance.directory)
+              const content = yield* Effect.tryPromise({
+                try: () => sb.files.readFile(sandboxPath),
+                catch: () => "",
+              }).pipe(
+                Effect.timeoutOrElse({
+                  duration: Duration.seconds(15),
+                  orElse: () => Effect.succeed(""),
+                }),
+              )
+              return { type: "text" as const, content }
+            }),
+          )
+          return c.json(result)
+        }
+
         const content = await AppRuntime.runPromise(
           Effect.gen(function* () {
-            return yield* File.Service.use((svc) => svc.read(path))
+            return yield* File.Service.use((svc) => svc.read(filePath))
           }),
         )
         return c.json(content)

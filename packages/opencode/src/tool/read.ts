@@ -1,5 +1,5 @@
 import z from "zod"
-import { Effect, Scope } from "effect"
+import { Effect, Scope, Duration } from "effect"
 import { createReadStream } from "fs"
 import { open } from "fs/promises"
 import * as path from "path"
@@ -126,7 +126,7 @@ export const ReadTool = Tool.define(
           `test -d "${sandboxPath}" && echo "DIR" || echo "FILE"`,
           { timeoutSeconds: 5 }
         ).pipe(
-          Effect.catch(() => Effect.succeed({ logs: { stdout: [{ text: "FILE", timestamp: "" }], stderr: [] }, exitCode: 1 } as any)),
+          Effect.catch((e) => Effect.fail(new Error(`Failed to check path type in sandbox: ${String(e)}`))),
         )
         const isDirectory = dirCheck.logs.stdout
           .map((l: { text: string }) => l.text)
@@ -175,10 +175,13 @@ export const ReadTool = Tool.define(
 
         const content = yield* Effect.tryPromise({
           try: () => sb.files.readFile(sandboxPath),
-          catch: () => {
-            throw new Error(`File not found in sandbox: ${filepath}`)
-          },
-        })
+          catch: () => new Error(`File not found in sandbox: ${filepath}`),
+        }).pipe(
+          Effect.timeoutOrElse({
+            duration: Duration.seconds(30),
+            orElse: () => Effect.die(new Error(`Timeout reading file in sandbox: ${filepath}`)),
+          }),
+        )
 
         const allLines = content.split("\n")
         const start = (params.offset ?? 1) - 1
