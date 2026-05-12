@@ -62,7 +62,7 @@ export const WriteTool = Tool.define(
 
             yield* Effect.tryPromise({
               try: () => sb.files.writeFiles([{ path: sandboxPath, data: params.content }]),
-              catch: (e) => new Error(`Sandbox write failed: ${String(e)}`),
+              catch: (e) => new Error(`Failed to write file: ${params.filePath}`),
             })
 
             yield* bus.publish(File.Event.Edited, { file: filepath })

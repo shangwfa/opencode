@@ -69,78 +69,32 @@ export const ListTool = Tool.define(
             },
           })
 
-          // ── Sandbox mode ──
+          const glob = IGNORE_PATTERNS.map((item) => `!${item}*`).concat(params.ignore?.map((item) => `!${item}`) || [])
+
+          let files: string[]
+          let truncated: boolean
+
           if (ctx.sandbox !== null) {
             const sandboxSearchPath = toSandboxPath(search, ins.directory)
-            const ignoreGlobs = IGNORE_PATTERNS.map((item) => `!${item}*`).concat(params.ignore?.map((item) => `!${item}`) || [])
-            const globArgs = ignoreGlobs.map((g) => `--glob '${g}'`).join(" ")
-
-            const cmd = `rg --files ${globArgs} '${sandboxSearchPath}' 2>/dev/null | head -101`
+            const globArgs = glob.map((g) => `--glob '${g}'`).join(" ")
+            const cmd = `rg --files ${globArgs} '${sandboxSearchPath}' 2>/dev/null | head -${LIMIT + 1}`
             const result = yield* sandboxProvider.runInSession(ctx.sessionID, cmd, { timeoutSeconds: 30 })
-
             const stdout = result.logs.stdout.map((l: { text: string }) => l.text).join("\n").trim()
             const lines = stdout ? stdout.split("\n").filter((line: string) => line.length > 0) : []
-
-            const truncated = lines.length > LIMIT
-            if (truncated) lines.length = LIMIT
-
-            const files = lines.map((line: string) => {
-              const hostPath = toHostPath(line.trim(), ins.directory)
-              return path.relative(search, hostPath)
+            truncated = lines.length > LIMIT
+            files = lines.slice(0, LIMIT).map((line: string) => {
+              const host = toHostPath(line.trim(), ins.directory)
+              return path.relative(search, host)
             })
-
-            const dirs = new Set<string>()
-            const map = new Map<string, string[]>()
-            for (const file of files) {
-              const dir = path.dirname(file)
-              const parts = dir === "." ? [] : dir.split("/")
-              for (let i = 0; i <= parts.length; i++) {
-                dirs.add(i === 0 ? "." : parts.slice(0, i).join("/"))
-              }
-              if (!map.has(dir)) map.set(dir, [])
-              map.get(dir)!.push(path.basename(file))
-            }
-
-            function render(dir: string, depth: number): string {
-              const indent = "  ".repeat(depth)
-              let output = ""
-              if (depth > 0) output += `${indent}${path.basename(dir)}/\n`
-
-              const child = "  ".repeat(depth + 1)
-              const dirs2 = Array.from(dirs)
-                .filter((item) => path.dirname(item) === dir && item !== dir)
-                .sort()
-              for (const item of dirs2) {
-                output += render(item, depth + 1)
-              }
-
-              const dirFiles = map.get(dir) || []
-              for (const file of dirFiles.sort()) {
-                output += `${child}${file}\n`
-              }
-              return output
-            }
-
-            return {
-              title: path.relative(ins.worktree, search),
-              metadata: {
-                count: files.length,
-                truncated,
-              },
-              output: `${search}/\n` + render(".", 0),
-            }
+          } else {
+            files = yield* rg.files({ cwd: search, glob, signal: ctx.abort }).pipe(
+              Stream.take(LIMIT + 1),
+              Stream.runCollect,
+              Effect.map((chunk) => [...chunk]),
+            )
+            truncated = files.length > LIMIT
+            if (truncated) files.length = LIMIT
           }
-
-          // ── Local mode ──
-          const glob = IGNORE_PATTERNS.map((item) => `!${item}*`).concat(params.ignore?.map((item) => `!${item}`) || [])
-          const files = yield* rg.files({ cwd: search, glob, signal: ctx.abort }).pipe(
-            Stream.take(LIMIT + 1),
-            Stream.runCollect,
-            Effect.map((chunk) => [...chunk]),
-          )
-
-          const truncated = files.length > LIMIT
-          if (truncated) files.length = LIMIT
 
           const dirs = new Set<string>()
           const map = new Map<string, string[]>()
@@ -167,8 +121,8 @@ export const ListTool = Tool.define(
               output += render(item, depth + 1)
             }
 
-            const dirFiles = map.get(dir) || []
-            for (const file of dirFiles.sort()) {
+            const files = map.get(dir) || []
+            for (const file of files.sort()) {
               output += `${child}${file}\n`
             }
             return output

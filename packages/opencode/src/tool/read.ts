@@ -116,7 +116,7 @@ export const ReadTool = Tool.define(
           `test -d "${sandboxPath}" && echo "DIR" || echo "FILE"`,
           { timeoutSeconds: 5 }
         ).pipe(
-          Effect.catch((e) => Effect.fail(new Error(`Failed to check path type in sandbox: ${String(e)}`))),
+          Effect.catch((e) => Effect.fail(new Error(`Failed to check path type: ${String(e)}`))),
         )
         const isDirectory = dirCheck.logs.stdout
           .map((l: { text: string }) => l.text)
@@ -165,11 +165,11 @@ export const ReadTool = Tool.define(
 
         const content = yield* Effect.tryPromise({
           try: () => sb.files.readFile(sandboxPath),
-          catch: () => new Error(`File not found in sandbox: ${filepath}`),
+          catch: () => new Error(`File not found: ${filepath}`),
         }).pipe(
           Effect.timeoutOrElse({
             duration: Duration.seconds(30),
-            orElse: () => Effect.die(new Error(`Timeout reading file in sandbox: ${filepath}`)),
+            orElse: () => Effect.die(new Error(`Timeout reading file: ${filepath}`)),
           }),
         )
 

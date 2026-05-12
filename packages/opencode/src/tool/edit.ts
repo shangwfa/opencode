@@ -89,7 +89,7 @@ export const EditTool = Tool.define(
               })
               yield* Effect.tryPromise({
                 try: () => sb.files.writeFiles([{ path: sandboxPath, data: params.newString }]),
-                catch: (e) => new Error(`Sandbox write failed: ${String(e)}`),
+                catch: (e) => new Error(`Failed to write file: ${filePath}`),
               }).pipe(Effect.orDie)
               yield* bus.publish(File.Event.Edited, { file: filePath })
 
@@ -143,7 +143,7 @@ export const EditTool = Tool.define(
             // Write back to sandbox
             yield* Effect.tryPromise({
               try: () => sb.files.writeFiles([{ path: sandboxPath, data: contentNew }]),
-              catch: (e) => new Error(`Sandbox write failed: ${String(e)}`),
+              catch: (e) => new Error(`Failed to write file: ${filePath}`),
             }).pipe(Effect.orDie)
 
             yield* bus.publish(File.Event.Edited, { file: filePath })

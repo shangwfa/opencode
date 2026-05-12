@@ -393,7 +393,7 @@ export const BashTool = Tool.define(
       })
 
       const fullCommand = `cd ${input.cwd} && ${input.command}`
-      if (ctx.sandbox) yield* Effect.tryPromise({ try: () => ctx.sandbox!, catch: (e) => new Error(`sandbox init failed: ${e instanceof Error ? e.message : String(e)}`) })
+      if (ctx.sandbox) yield* Effect.tryPromise({ try: () => ctx.sandbox!, catch: (e) => new Error(`Initialization failed: ${e instanceof Error ? e.message : String(e)}`) })
       const result = yield* sandboxProvider.runInSession(
         ctx.sessionID,
         fullCommand,
