@@ -394,9 +394,9 @@ export namespace SandboxProvider {
       const runInSession: Interface["runInSession"] = (sessionID, command, options, handlers, signal) =>
         Effect.gen(function* () {
           yield* touchLastActive(sessionID)
-          const sb = sandboxes.get(sessionID)
+          let sb = sandboxes.get(sessionID)
           if (!sb) {
-            return yield* Effect.fail(new Error(`Sandbox not found for session ${sessionID}`))
+            sb = yield* getOrCreate(sessionID)
           }
           let sessionId = commandSessions.get(sessionID)
           if (!sessionId) {
