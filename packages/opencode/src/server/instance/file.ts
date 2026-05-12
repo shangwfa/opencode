@@ -146,7 +146,17 @@ export const FileRoutes = lazy(() =>
       ),
       async (c) => {
         const filePath = c.req.valid("query").path
-        const sessionID = c.req.valid("query").sessionID as SessionID | undefined
+        let sessionID = c.req.valid("query").sessionID as SessionID | undefined
+
+        if (Flag.OPENCODE_SANDBOX_ENABLED && !sessionID) {
+          try {
+            const ref = c.req.header("referer")
+            if (ref) {
+              const m = new URL(ref).pathname.match(/\/session\/([^/?]+)/)
+              if (m) sessionID = m[1] as SessionID
+            }
+          } catch {}
+        }
 
         if (Flag.OPENCODE_SANDBOX_ENABLED && sessionID) {
           const result = await AppRuntime.runPromise(
@@ -222,7 +232,17 @@ export const FileRoutes = lazy(() =>
       ),
       async (c) => {
         const filePath = c.req.valid("query").path
-        const sessionID = c.req.valid("query").sessionID as SessionID | undefined
+        let sessionID = c.req.valid("query").sessionID as SessionID | undefined
+
+        if (Flag.OPENCODE_SANDBOX_ENABLED && !sessionID) {
+          try {
+            const ref = c.req.header("referer")
+            if (ref) {
+              const m = new URL(ref).pathname.match(/\/session\/([^/?]+)/)
+              if (m) sessionID = m[1] as SessionID
+            }
+          } catch {}
+        }
 
         if (Flag.OPENCODE_SANDBOX_ENABLED && sessionID) {
           const result = await AppRuntime.runPromise(
