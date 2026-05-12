@@ -1,6 +1,7 @@
 import { Context, Effect, Layer } from "effect"
 
 import { Instance } from "../project/instance"
+import { Flag } from "../flag/flag"
 
 import PROMPT_ANTHROPIC from "./prompt/anthropic.txt"
 import PROMPT_DEFAULT from "./prompt/default.txt"
@@ -51,19 +52,24 @@ export namespace SystemPrompt {
       return Service.of({
         environment(model) {
           const project = Instance.project
-          return [
-            [
-              `You are powered by the model named ${model.api.id}. The exact model ID is ${model.providerID}/${model.api.id}`,
-              `Here is some useful information about the environment you are running in:`,
-              `<env>`,
-              `  Working directory: ${Instance.directory}`,
-              `  Workspace root folder: ${Instance.worktree}`,
-              `  Is directory a git repo: ${project.vcs === "git" ? "yes" : "no"}`,
-              `  Platform: ${process.platform}`,
-              `  Today's date: ${new Date().toDateString()}`,
-              `</env>`,
-            ].join("\n"),
+          const lines = [
+            `You are powered by the model named ${model.api.id}. The exact model ID is ${model.providerID}/${model.api.id}`,
+            `Here is some useful information about the environment you are running in:`,
+            `<env>`,
+            `  Working directory: ${Instance.directory}`,
+            `  Workspace root folder: ${Instance.worktree}`,
+            `  Is directory a git repo: ${project.vcs === "git" ? "yes" : "no"}`,
+            `  Platform: ${process.platform}`,
+            `  Today's date: ${new Date().toDateString()}`,
+            `</env>`,
           ]
+          if (Flag.OPENCODE_SANDBOX_ENABLED) {
+            lines.push(
+              ``,
+              `IMPORTANT: You are running in a sandboxed environment. ALL file operations (read, write, clone, download) MUST be performed inside the working directory (${Instance.directory}). Never use /tmp or any path outside the workspace.`,
+            )
+          }
+          return [lines.join("\n")]
         },
 
         skills: Effect.fn("SystemPrompt.skills")(function* (agent: Agent.Info, preload?: string[], session?: string) {
