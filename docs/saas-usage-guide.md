@@ -186,69 +186,226 @@ const text = msg.parts.find(p => p.type === "text")?.text
 }
 ```
 
-### 4.2 异步对话（长任务推荐）
+### 4.2 SSE 事件流（实时监听 AI 进度）
 
-**标准范式：异步发起 + session 级 SSE 订阅进度**
+#### 4.2.1 订阅方式
+
+```
+GET /event?sessionID={sid}    ← 只收该 session 的事件（推荐）
+GET /global/event             ← 收所有 session 的事件（运维/大盘）
+```
+
+返回 `text/event-stream`，标准 SSE 协议（`data:` 前缀 + `\n\n` 分隔）。
+
+#### 4.2.2 完整事件类型
+
+| 事件 type | properties 结构 | 说明 |
+|---|---|---|
+| `server.connected` | `{}` | SSE 连接建立，**第一个事件** |
+| `server.heartbeat` | `{}` | 10s 心跳保活，无业务含义 |
+| `message.updated` | `{ sessionID, info }` | 消息元信息变化（创建、token 累计、完成等） |
+| `message.part.updated` | `{ sessionID, part, time }` | **核心事件**：单个 part 增量（reasoning/text/tool） |
+| `session.updated` | `{ sessionID, info }` | session 元数据变化（title、summary、time 等） |
+| `session.status` | `{ sessionID, status: { type } }` | 状态机：`"busy"` → `"idle"` |
+| `session.idle` | `{ sessionID }` | 空闲状态（与 `session.status.idle` 同时发出） |
+| `session.diff` | `{ sessionID, diff: [...] }` | 工具操作引起的文件变更摘要 |
+| `session.error` | `{ sessionID, error }` | LLM 或工具调用异常 |
+| `server.instance.disposed` | `{}` | 实例被销毁，SSE 流结束 |
+
+#### 4.2.3 事件时序（实际测试结果）
+
+一次完整的「发消息 → AI 回复」事件序列：
+
+```
+1. server.connected                          ← SSE 连接建立
+2. message.updated   { role: "user" }        ← 用户消息创建
+3. message.part.updated { part: { type: "text", text: "..." } }
+4. session.updated                           ← session 元数据更新
+5. session.status    { status: { type: "busy" } }  ← AI 开始处理
+6. message.updated   { role: "assistant" }   ← assistant 消息创建
+  ┌ message.part.updated { part: { type: "reasoning", text: "..." } }  ← AI 思考（可选）
+  ├ message.part.updated { part: { type: "text", text: "部分文字..." } }  ← 流式输出
+  ├ message.part.updated { part: { type: "text", text: "更多文字..." } }
+  ├ message.part.updated { part: { type: "tool", tool: "bash", state: {...} } }  ← 工具调用
+  └ message.part.updated { part: { type: "text", text: "最终回答" } }
+7. session.diff      { diff: [...] }         ← 文件变更（有写操作时）
+8. session.status    { status: { type: "idle" } }  ← AI 处理完成
+9. session.idle                              ← 空闲确认
+10. message.updated  { finish: "stop" }      ← assistant 消息完成
+```
+
+#### 4.2.4 同步对话 + SSE 监听
+
+`POST /session/{sid}/message` 是同步接口（等 AI 回复完才返回），但你可以**同时**订阅 SSE 来获取流式进度：
 
 ```typescript
-// 1. 先订阅该 session 的事件流（关键：用 ?sessionID 过滤）
+// 1. 先建立 SSE 连接
 const sse = new EventSource(`/event?sessionID=${sid}`)
-sse.onmessage = e => {
+
+sse.onmessage = (e) => {
   const ev = JSON.parse(e.data)
+
   switch (ev.type) {
-    case "message.part.updated":
-      // 单个 part 的增量更新（reasoning 思考、tool 调用、text 输出）
-      console.log("part:", ev.properties.part.type, ev.properties.part.text || "")
+    case "server.connected":
+      console.log("SSE 已连接")
       break
+
+    case "message.part.updated": {
+      const { part } = ev.properties
+      switch (part.type) {
+        case "reasoning":
+          // AI 思考过程（部分模型支持）
+          process.stdout.write(`[思考] ${part.text}`)
+          break
+        case "text":
+          // AI 文本输出（流式，可能多次触发）
+          process.stdout.write(part.text)
+          break
+        case "tool":
+          // 工具调用状态更新
+          console.log(`[工具] ${part.tool} → ${part.state?.status}`)
+          if (part.state?.output) {
+            console.log(`  输出: ${part.state.output.slice(0, 200)}`)
+          }
+          break
+      }
+      break
+    }
+
     case "session.status":
-      // busy / idle，可用来判断对话结束
-      console.log("status:", ev.properties.status.type)
+      console.log(`状态: ${ev.properties.status.type}`)  // busy / idle
+      if (ev.properties.status.type === "idle") {
+        sse.close()  // AI 处理完成，关闭连接
+      }
       break
-    case "session.diff":
-      // 工具调用导致的文件变更
-      break
+
     case "session.error":
-      // AI 调用出错
-      console.error(ev.properties.error)
+      console.error("出错:", ev.properties.error.data?.message)
+      sse.close()
+      break
+
+    case "server.heartbeat":
+      // 10s 心跳，忽略即可
       break
   }
 }
 
-// 2. 发起异步任务
+sse.onerror = () => {
+  console.log("SSE 连接断开")
+  sse.close()
+}
+
+// 2. 发送同步消息（HTTP 请求会等到 AI 回复完才返回）
+//    SSE 在后台同时接收流式事件
+const res = await fetch(`/session/${sid}/message`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    parts: [{ type: "text", text: "介绍下你自己" }],
+    model: { providerID: "zhipuai", modelID: "glm-5.1" }
+  })
+})
+const msg = await res.json()
+sse.close()
+
+console.log("完整回复:", msg.parts.find(p => p.type === "text")?.text)
+```
+
+#### 4.2.5 异步对话 + SSE 监听（长任务推荐）
+
+`POST /session/{sid}/prompt_async` 立即返回 204，AI 在后台运行。**必须**搭配 SSE 获取结果：
+
+```typescript
+// 1. 先订阅 SSE
+const sse = new EventSource(`/event?sessionID=${sid}`)
+
+sse.onmessage = (e) => {
+  const ev = JSON.parse(e.data)
+  switch (ev.type) {
+    case "message.part.updated": {
+      const { part } = ev.properties
+      if (part.type === "text") process.stdout.write(part.text)
+      if (part.type === "tool") console.log(`\n[工具] ${part.tool}`)
+      break
+    }
+    case "session.status":
+      if (ev.properties.status.type === "idle") {
+        console.log("\n=== 任务完成 ===")
+        sse.close()
+      }
+      break
+    case "session.error":
+      console.error("错误:", ev.properties.error.data?.message)
+      sse.close()
+      break
+  }
+}
+
+// 2. 发起异步任务（立即返回 204）
 await fetch(`/session/${sid}/prompt_async`, {
   method: "POST",
   headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ parts: [...], model: {...} })
+  body: JSON.stringify({
+    parts: [{ type: "text", text: "分析 /workspace 下的代码结构" }],
+    model: { providerID: "zhipuai", modelID: "glm-5.1" }
+  })
 })
-// 立即返回 204，AI 在后台运行
-
-// 3. 任务结束后关闭 SSE
-// 通过监听 session.status.type === "idle" 或自定义超时
+// 函数返回了，但 SSE 还在接收事件
 ```
 
-**事件类型一览**：
+#### 4.2.6 错误事件结构
 
-| 事件 type | 说明 |
-|---|---|
-| `server.connected` | 订阅建立 |
-| `server.heartbeat` | 10s 心跳，保活 |
-| `message.updated` | 消息元信息更新（创建、token 累计等） |
-| `message.part.updated` | **单个 part 增量**（流式输出关键事件） |
-| `session.updated` | session 元数据变化（title、time 等） |
-| `session.status` | 状态机变化：`{type: "busy"}` / `{type: "idle"}` |
-| `session.diff` | 工具操作引起的文件变更摘要 |
-| `session.error` | LLM 或工具调用异常 |
-| `server.instance.disposed` | 实例被销毁，需重连 |
+当 LLM API 出错时，`session.error` 的 `properties.error` 结构：
 
-**全局事件流**：
+```json
+{
+  "name": "APIError",
+  "data": {
+    "message": "令牌已过期或验证不正确",
+    "statusCode": 401,
+    "isRetryable": false,
+    "metadata": {
+      "url": "https://open.bigmodel.cn/api/paas/v4/chat/completions"
+    },
+    "responseBody": "{\"error\":{\"code\":\"401\",\"message\":\"...\"}}"
+  }
+}
+```
 
-如果要监控所有 session（运维、多用户大盘），用：
+常见错误码：
+- `401`：API key 无效或过期 → 需要重新 `PUT /auth/:providerID`
+- `429`：限流 → `isRetryable: true`，稍后重试
+- `500`：上游服务异常 → 稍后重试
+
+#### 4.2.7 curl 测试 SSE
+
+```bash
+# 实时查看某个 session 的所有事件
+curl -sN "https://test-opencode.shadow-rpa.net/event?sessionID=ses_xxx"
+
+# 输出示例：
+# data: {"type":"server.connected","properties":{}}
+# data: {"type":"session.status","properties":{"sessionID":"ses_xxx","status":{"type":"busy"}}}
+# data: {"type":"message.part.updated","properties":{"sessionID":"ses_xxx","part":{"type":"text","text":"你好"}}}
+```
+
+`-N` 参数禁用缓冲，确保实时输出。
+
+#### 4.2.8 全局事件流
+
+监控所有 session（运维、多用户大盘）：
+
 ```typescript
 const sse = new EventSource(`/global/event`)
-// 会收到所有 session 的事件，事件结构里 properties.sessionID 区分
+sse.onmessage = (e) => {
+  const ev = JSON.parse(e.data)
+  // 所有事件都带 properties.sessionID，用来区分不同会话
+  console.log(`[${ev.properties.sessionID}] ${ev.type}`)
+}
 ```
 
-**轮询 fallback**（不支持 SSE 的场景）：
+#### 4.2.9 轮询 fallback（不支持 SSE 的场景）
+
 ```typescript
 // 定时拉消息历史
 const msgs = await fetch(`/session/${sid}/message`).then(r => r.json())
@@ -931,14 +1088,20 @@ class OpenCodeClient {
   ) {
     return new Promise<void>(async (resolve, reject) => {
       const close = this.subscribeSession(sid, ev => {
-        if (ev.type === "message.part.updated") onPart(ev.properties.part)
-        if (ev.type === "session.status" && ev.properties.status.type === "idle") {
-          close()
-          resolve()
-        }
-        if (ev.type === "session.error") {
-          close()
-          reject(new Error(JSON.stringify(ev.properties.error)))
+        switch (ev.type) {
+          case "message.part.updated":
+            onPart(ev.properties.part)
+            break
+          case "session.status":
+            if (ev.properties.status.type === "idle") {
+              close()
+              resolve()
+            }
+            break
+          case "session.error":
+            close()
+            reject(new Error(ev.properties.error.data?.message || JSON.stringify(ev.properties.error)))
+            break
         }
       })
       try {
