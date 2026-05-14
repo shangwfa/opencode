@@ -27,6 +27,7 @@ import { SyncRoutes } from "./sync"
 import { WorkspaceRouterMiddleware } from "./middleware"
 import { errors } from "../error"
 import { AppRuntime } from "@/effect/app-runtime"
+import { SandboxProvider } from "@/tool/sandbox-provider"
 
 export const InstanceRoutes = (upgrade: UpgradeWebSocket): Hono =>
   new Hono()
@@ -62,7 +63,31 @@ export const InstanceRoutes = (upgrade: UpgradeWebSocket): Hono =>
         },
       }),
       async (c) => {
+        await AppRuntime.runPromise(SandboxProvider.Service.use((svc) => svc.destroyAll()))
         await Instance.dispose()
+        return c.json(true)
+      },
+    )
+    .post(
+      "/session/:sessionID/kill-sandbox",
+      describeRoute({
+        summary: "Kill sandbox by session ID",
+        description: "Kill the sandbox runtime for a given session. This destroys the sandbox container but preserves any PVC data.",
+        operationId: "session.killSandbox",
+        responses: {
+          200: {
+            description: "Sandbox killed",
+            content: {
+              "application/json": {
+                schema: resolver(z.boolean()),
+              },
+            },
+          },
+        },
+      }),
+      async (c) => {
+        const sessionID = c.req.param("sessionID")
+        await AppRuntime.runPromise(SandboxProvider.Service.use((svc) => svc.destroy(sessionID)))
         return c.json(true)
       },
     )

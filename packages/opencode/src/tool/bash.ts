@@ -55,6 +55,12 @@ const SWITCHES = new Set(["-confirm", "-debug", "-force", "-nonewline", "-recurs
 const Parameters = z.object({
   command: z.string().describe("The command to execute"),
   timeout: z.number().describe("Optional timeout in milliseconds").optional(),
+  background: z
+    .boolean()
+    .describe(
+      "Set to true when this command starts a long-running service, dev server, HTTP server, file watcher, or background job that should remain available for follow-up commands.",
+    )
+    .optional(),
   workdir: z
     .string()
     .describe(
@@ -265,6 +271,10 @@ function cmd(shell: string, name: string, command: string, cwd: string, env: Nod
   })
 }
 
+function quote(text: string) {
+  return `'${text.replaceAll("'", "'\\''")}'`
+}
+
 const parser = lazy(async () => {
   const { Parser } = await import("web-tree-sitter")
   const { default: treeWasm } = await import("web-tree-sitter/tree-sitter.wasm" as string, {
@@ -379,6 +389,7 @@ export const BashTool = Tool.define(
         cwd: string
         timeout: number
         description: string
+        background?: boolean
       },
       ctx: Tool.Context,
     ) {
@@ -392,7 +403,10 @@ export const BashTool = Tool.define(
         },
       })
 
-      const fullCommand = `cd ${input.cwd} && ${input.command}`
+      const file = `/tmp/opencode-background-${ctx.callID ?? Date.now()}.log`
+      const fullCommand = input.background
+        ? `cd ${input.cwd} && ( sh -c ${quote(input.command)} </dev/null > ${quote(file)} 2>&1 & ) && echo "background log: ${file}"`
+        : `cd ${input.cwd} && ${input.command}`
       if (ctx.sandbox) yield* Effect.tryPromise({ try: () => ctx.sandbox!, catch: (e) => new Error(`Initialization failed: ${e instanceof Error ? e.message : String(e)}`) })
       const result = yield* sandboxProvider.runInSession(
         ctx.sessionID,
@@ -414,6 +428,8 @@ export const BashTool = Tool.define(
         },
         ctx.abort,
       )
+
+      if (input.background) yield* sandboxProvider.keepAlive(ctx.sessionID)
 
       const exitCode = result.exitCode ?? null
       if (exitCode === null) {
@@ -568,6 +584,7 @@ export const BashTool = Tool.define(
                     cwd: sandboxCwd,
                     timeout,
                     description: params.description,
+                    background: params.background,
                   },
                   ctx,
                 ).pipe(Effect.orDie)

@@ -3,19 +3,47 @@
 ## 一、总体架构
 
 ```
-                        ┌─────────────────────────────────┐
-                        │  opencode server (SandboxProvider)│
-                        │                                  │
-  用户发消息 ──────────►│  getOrCreate(sessionID)          │
-                        │    ├─ Running → renew + 直接返回  │
-                        │    ├─ Paused  → resume + renew    │
-                        │    ├─ Killed  → recreate + PVC    │
-                        │    └─ None    → create + PVC      │
-                        │                                  │
-  空闲 15min ──────────►│  idleTimer → pause()             │
-  空闲 60min ──────────►│  idleTimer → kill()              │
-  Session 结束 ────────►│  destroy → kill() + 删 PVC       │
-                        └─────────────────────────────────┘
+用户发消息
+    │
+    ▼
+ensureRunning(sessionID)          ← run-state.ts
+    │
+    ├─ busy? → throw BusyError
+    │
+    ├─ status → "busy"
+    │
+    ├─ 工具调用 → sandboxProvider.getOrCreate(sessionID)   ← sandbox-provider.ts
+    │               │
+    │               ├─ entry 存在且 running + healthy → 复用
+    │               ├─ entry 存在但 unhealthy → destroy → 重建
+    │               ├─ entry 是 killed → 重建（PVC 挂回，文件还在）
+    │               └─ entry 不存在 → 新建 Sandbox.create()
+    │
+    ├─ bash background:true → keepAlive(sessionID)
+    │                           leases.add(sessionID)
+    │
+    ▼
+AI 回复完成 → Runner.onIdle()
+    │
+    ├─ status → "idle"
+    │
+    ├─ isKeepAlive(sessionID)?
+    │     ├─ Yes → 跳过销毁，sandbox 保留
+    │     └─ No  → destroy(sessionID)
+    │               ├─ leases.delete(sessionID)
+    │               ├─ entries.delete(sessionID)
+    │               ├─ kill sandbox Pod (sb.kill + sb.close)
+    │               └─ PVC 数据保留不动
+    │
+    ▼
+手动销毁入口：
+    ├─ POST /session/:sessionID/kill-sandbox → destroy(sessionID)
+    └─ POST /instance/dispose → destroyAll() + Instance.dispose()
+
+核心存储（全部内存，per-instance）：
+  - entries: Map<sessionID, Entry>    — running | killed 状态
+  - sandboxes: Map<sessionID, Sandbox> — 远端沙箱引用
+  - leases: Set<sessionID>            — keepAlive 标记
 ```
 
 ## 二、状态机
@@ -399,3 +427,27 @@ Step 8: 集成测试                                       ~2h
 | PVC 数量上限 | 规模增长后引入 PVC 预分配池 |
 | resume 失败 | 回退到 kill + recreate |
 | 状态机复杂度 | 严格单元测试覆盖所有状态转换路径 |
+
+---
+
+## 已知问题
+
+### glob/grep 工具在沙箱内不可用
+
+**状态**：待修复，依赖沙箱基础镜像更新
+
+- **glob**：沙箱镜像未预装 `rg`（ripgrep），`rg --files` 命令执行失败返回空结果
+- **grep**：除 `rg` 缺失外，还有两个代码 bug：
+  - `grep.ts:61` — `ctx.sandbox` 误用 `Effect.tryPromise` 包装（sandbox 不是 Promise）
+  - `grep.ts:67` — sandbox 分支引用了未定义的 `file` 变量（该变量在 local mode 的 155 行才定义）
+- **临时规避**：用 bash 工具执行 `find`/`grep` 命令等效替代
+- **修复计划**：等基础沙箱镜像默认安装 `rg` 后，同时修复 grep.ts 的代码 bug
+
+### /instance/dispose 职责过重
+
+**状态**：待重构
+
+- 当前 `/instance/dispose` 既销毁所有沙箱又销毁实例（`Instance.dispose()`）
+- 接入方常见场景是"只释放沙箱资源"，但连带销毁了实例，下次请求需重新 boot
+- `destroyAll()` 被调用两次（路由 handler 显式调一次，Scope 退出 finalizer 又调一次）
+- **修复计划**：拆分为"只销毁沙箱"和"销毁实例"两个独立 API

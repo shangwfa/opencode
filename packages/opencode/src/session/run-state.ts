@@ -5,6 +5,7 @@ import { Session } from "."
 import { MessageV2 } from "./message-v2"
 import { SessionID } from "./schema"
 import { SessionStatus } from "./status"
+import { SandboxProvider } from "@/tool/sandbox-provider"
 
 export namespace SessionRunState {
   export interface Interface {
@@ -57,6 +58,11 @@ export namespace SessionRunState {
           onIdle: Effect.gen(function* () {
             data.runners.delete(sessionID)
             yield* status.set(sessionID, { type: "idle" })
+            const sandbox = yield* Effect.serviceOption(SandboxProvider.Service)
+            if (sandbox._tag === "Some") {
+              const keep = yield* sandbox.value.isKeepAlive(sessionID)
+              if (!keep) yield* sandbox.value.destroy(sessionID).pipe(Effect.catchCause(() => Effect.void))
+            }
           }),
           onBusy: status.set(sessionID, { type: "busy" }),
           onInterrupt,
