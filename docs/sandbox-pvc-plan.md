@@ -1,5 +1,9 @@
 # PVC 沙箱方案实现设计
 
+> **⚠️ 此文档为历史设计参考，与当前实现不完全一致**。
+> 实际实现采用**二态（running/killed）状态机**，删除了 `renew()` 调用和 paused 状态。
+> 当前实现的准确描述见 `saas-architecture.md` 第七章及 `tool/sandbox-provider.ts` 源码。
+
 ## 一、总体架构
 
 ```

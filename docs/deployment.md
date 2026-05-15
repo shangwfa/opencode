@@ -122,7 +122,7 @@ docker run -d \
 |------|------|--------|------|
 | `OPENCODE_SANDBOX_VOLUME_TYPE` | 否 | `none` | 存储类型：`none`（无持久化）/ `pvc`（K8s PVC）/ `host`（主机挂载） |
 | `OPENCODE_SANDBOX_PVC_CLAIM` | 否 | `sandbox-test` | PVC claim 名称（`VOLUME_TYPE=pvc` 时有效） |
-| `OPENCODE_SANDBOX_IDLE_KILL_SEC` | 否 | `3600` | sandbox 空闲多久后销毁（秒），PVC 数据保留 |
+| `OPENCODE_SANDBOX_IDLE_KILL_SEC` | 否 | `3600` | sandbox 空闲多久后销毁（秒），PVC 数据保留；测试可调小如 `60` |
 | `OPENCODE_SANDBOX_MAX_TTL_SEC` | 否 | `3600` | sandbox 最大存活时间（秒），兜底强制销毁 |
 
 #### Auth 认证
@@ -349,7 +349,7 @@ docker exec opencode-server env | grep OPENCODE_SANDBOX
 curl http://localhost:4096/auth
 
 # 重新添加
-curl -X PUT http://localhost:4098/auth/moonshotai-cn \
+curl -X PUT http://localhost:4096/auth/moonshotai-cn \
   -H 'Content-Type: application/json' \
   -d '{"type":"api","key":"sk-xxx"}'
 ```

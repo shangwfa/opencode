@@ -140,7 +140,8 @@ AI 会自动判断需要工具，调用沙箱执行命令并返回结果。
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| POST | `/instance/dispose` | **销毁沙箱**（PVC 保留，文件不丢） |
+| POST | `/session/:sessionID/kill-sandbox` | **按 session 销毁沙箱**（PVC 保留，文件不丢） |
+| POST | `/instance/dispose` | 销毁当前 instance 的所有沙箱（PVC 保留） |
 | POST | `/global/dispose` | 销毁所有实例 |
 
 ---
@@ -451,7 +452,7 @@ session 内消息历史自动注入，无需手动管理。
 // 1. 首次发消息会自动创建沙箱 Pod（~2-3 秒延迟）
 await sendMessage(sid, "ls /workspace")
 
-// 2. 沙箱空闲 30 秒后自动回收（OPENCODE_SANDBOX_IDLE_KILL_SEC=30）
+// 2. 沙箱空闲 3600 秒（1 小时）后自动回收（OPENCODE_SANDBOX_IDLE_KILL_SEC=3600，可在部署时调小）
 //    也可手动立即销毁
 await fetch("/instance/dispose", { method: "POST" })
 
@@ -464,7 +465,7 @@ await sendMessage(sid, "cat /workspace/app.py")
 
 | 配置项 | 默认值 | 含义 |
 |---|---|---|
-| `OPENCODE_SANDBOX_IDLE_KILL_SEC` | `30` 秒 | 空闲超过 N 秒后回收 |
+| `OPENCODE_SANDBOX_IDLE_KILL_SEC` | `3600` 秒 | 空闲超过 N 秒后回收 |
 | `OPENCODE_SANDBOX_MAX_TTL_SEC` | `3600` 秒 | 沙箱最长存活时间（K8s 层强制） |
 | 内部轮询间隔 | `30` 秒（硬编码） | 检查频率，最坏额外等待 30s |
 
@@ -485,13 +486,28 @@ async function oneShot(prompt: string) {
     const result = await client.chat(sid, prompt)
     return result
   } finally {
-    // 不管成功失败都释放
-    await client.disposeSandbox()
+    // 不管成功失败都释放（按 session 精确销毁）
+    await fetch(`${baseURL}/session/${sid}/kill-sandbox`, { method: "POST" })
   }
 }
 ```
 
 适用：API 接口、批处理任务、定时作业。
+
+#### 模式 1b：批量清理旧会话沙箱
+
+```typescript
+// 查询所有会话，关闭今天之前创建的沙箱
+const sessions = await fetch(`${baseURL}/session`).then(r => r.json())
+const cutoff = new Date()
+cutoff.setHours(0, 0, 0, 0)
+
+for (const s of sessions) {
+  if (new Date(s.time.created) < cutoff) {
+    await fetch(`${baseURL}/session/${s.id}/kill-sandbox`, { method: "POST" })
+  }
+}
+```
 
 #### 模式 2：会话上下文管理器
 
@@ -510,7 +526,7 @@ class ManagedSession {
 
   /** 任务结束调用，释放沙箱（保留 session 历史） */
   async release() {
-    await fetch(`${this.client.baseURL}/instance/dispose`, { method: "POST" })
+    await fetch(`${this.client.baseURL}/session/${this.sid}/kill-sandbox`, { method: "POST" })
   }
 
   /** 彻底删除 session + PVC 文件 */
@@ -571,13 +587,15 @@ async function processBatch(tasks: string[]) {
 
 | API | 范围 | 用途 |
 |---|---|---|
+| `POST /session/:id/kill-sandbox` | 指定 session 的沙箱 | 按 session 精确销毁（推荐） |
 | `POST /instance/dispose` | 当前 instance 的所有 session 沙箱 | 单个用户结束工作 |
 | `POST /global/dispose` | 所有 instance 全部销毁 | 运维清理、紧急回收 |
 | `DELETE /session/:id` | 删 session + 清 PVC subPath | 彻底删除（不可恢复） |
 
 #### 注意事项
 
-- **dispose ≠ delete**：dispose 只销毁沙箱 Pod，**session 历史和 PVC 文件都保留**
+- **dispose ≠ delete**：dispose / kill-sandbox 只销毁沙箱 Pod，**session 历史和 PVC 文件都保留**
+- **推荐使用 `kill-sandbox`**：按 session 精确销毁，不影响其他 session；`instance/dispose` 会销毁当前实例的所有沙箱
 - **dispose 后续作**：再次发消息会自动创建新沙箱挂回同一 PVC，**冷启动延迟 2-3 秒**
 - **频繁 dispose 会增加冷启动**：如果一个 session 高频对话，**不要每条消息都 dispose**
 - **idle 兜底**：即使忘记 dispose，30~60 秒后也会自动回收，**不会无限占用资源**
@@ -1060,7 +1078,13 @@ class OpenCodeClient {
     return r.json()
   }
 
-  async disposeSandbox() {
+  /** 销毁指定 session 的沙箱（推荐） */
+  async killSandbox(sid: string) {
+    await fetch(`${this.baseURL}/session/${sid}/kill-sandbox`, { method: "POST" })
+  }
+
+  /** 销毁当前 instance 的所有沙箱 */
+  async disposeAllSandboxes() {
     await fetch(`${this.baseURL}/instance/dispose`, { method: "POST" })
   }
 
