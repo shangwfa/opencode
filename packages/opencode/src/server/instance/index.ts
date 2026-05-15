@@ -28,6 +28,8 @@ import { WorkspaceRouterMiddleware } from "./middleware"
 import { errors } from "../error"
 import { AppRuntime } from "@/effect/app-runtime"
 import { SandboxProvider } from "@/tool/sandbox-provider"
+import { SessionID } from "@/session/schema"
+import { SandboxProxyRoutes, clear as clearProxyErrors } from "./sandbox-proxy"
 
 export const InstanceRoutes = (upgrade: UpgradeWebSocket): Hono =>
   new Hono()
@@ -45,6 +47,7 @@ export const InstanceRoutes = (upgrade: UpgradeWebSocket): Hono =>
     .route("/", EventRoutes())
     .route("/mcp", McpRoutes())
     .route("/tui", TuiRoutes())
+    .route("/", SandboxProxyRoutes(upgrade))
     .post(
       "/instance/dispose",
       describeRoute({
@@ -86,8 +89,9 @@ export const InstanceRoutes = (upgrade: UpgradeWebSocket): Hono =>
         },
       }),
       async (c) => {
-        const sessionID = c.req.param("sessionID")
+        const sessionID = c.req.param("sessionID") as SessionID
         await AppRuntime.runPromise(SandboxProvider.Service.use((svc) => svc.destroy(sessionID)))
+        clearProxyErrors(sessionID)
         return c.json(true)
       },
     )

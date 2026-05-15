@@ -104,6 +104,7 @@ export namespace SandboxProvider {
       signal?: AbortSignal,
     ) => Effect.Effect<CommandExecution, Error, never>
     readonly register: (sessionID: SessionID, sb: Sandbox) => Effect.Effect<void>
+    readonly getEndpoint: (sessionID: SessionID, port: number) => Effect.Effect<string>
 
   }
 
@@ -414,6 +415,17 @@ export namespace SandboxProvider {
           sandboxes.set(sessionID, sb)
         })
 
+      const getEndpoint: Interface["getEndpoint"] = (sessionID, port) =>
+        Effect.gen(function* () {
+          const sb = yield* getOrCreate(sessionID)
+          const url = yield* Effect.tryPromise({
+            try: () => sb.getEndpointUrl(port),
+            catch: (e) => new Error(`getEndpoint failed: ${String(e)}`),
+          })
+          log.info("sandbox endpoint resolved", { sessionID, port, url })
+          return url
+        }).pipe(Effect.withSpan("SandboxProvider.getEndpoint"))
+
 
       yield* Effect.addFinalizer(() =>
         destroyAll().pipe(
@@ -434,6 +446,7 @@ export namespace SandboxProvider {
         isKeepAlive,
         runInSession,
         register,
+        getEndpoint,
         cleanupSessionVolume: (sessionID) => cleanupSessionVolume(sessionID, config, connectionConfig),
       })
     }),
@@ -455,6 +468,7 @@ export namespace NoopSandboxProvider {
       isKeepAlive: () => Effect.succeed(false),
       runInSession: () => Effect.fail(new Error("Sandbox is disabled")),
       register: () => Effect.void,
+      getEndpoint: () => Effect.fail(new Error("Sandbox is disabled")),
       cleanupSessionVolume: () => Effect.void,
     }),
   )

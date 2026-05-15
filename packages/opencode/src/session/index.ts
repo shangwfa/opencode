@@ -251,6 +251,22 @@ export namespace Session {
         error: MessageV2.Assistant.shape.error,
       }),
     ),
+    ProxyError: BusEvent.define(
+      "session.proxy.error",
+      z.object({
+        sessionID: SessionID.zod,
+        port: z.number(),
+        errors: z.array(z.object({
+          type: z.enum(["runtime", "network", "compile"]),
+          message: z.string(),
+          url: z.string().optional(),
+          line: z.number().optional(),
+          col: z.number().optional(),
+          stack: z.string().optional(),
+          timestamp: z.number(),
+        })),
+      }),
+    ),
   }
 
   export function plan(input: { slug: string; time: { created: number } }) {
