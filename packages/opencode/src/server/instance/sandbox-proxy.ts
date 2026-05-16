@@ -1,7 +1,6 @@
 import { Hono } from "hono"
 import type { UpgradeWebSocket } from "hono/ws"
-import { describeRoute, resolver } from "hono-openapi"
-import z from "zod"
+import { describeRoute } from "hono-openapi"
 import { AppRuntime } from "@/effect/app-runtime"
 import { SandboxProvider } from "@/tool/sandbox-provider"
 import { SessionID } from "@/session/schema"
@@ -20,6 +19,9 @@ type ProxyError = {
 
 const errors = new Map<string, ProxyError[]>()
 const MAX_ERRORS = 100
+const MAX_SESSIONS = 500
+const reportTs = new Map<string, number>()
+const REPORT_INTERVAL = 1000 // ms，每个 key 最多 1 次/秒
 
 function push(sessionID: string, port: number, items: ProxyError[]) {
   const key = `${sessionID}:${port}`
@@ -27,6 +29,10 @@ function push(sessionID: string, port: number, items: ProxyError[]) {
   buf.push(...items)
   if (buf.length > MAX_ERRORS) buf.splice(0, buf.length - MAX_ERRORS)
   errors.set(key, buf)
+  if (errors.size > MAX_SESSIONS) {
+    const oldest = errors.keys().next().value
+    if (oldest) errors.delete(oldest)
+  }
 }
 
 function get(sessionID: string, port: number) {
@@ -37,24 +43,47 @@ export function clear(sessionID: string) {
   for (const key of errors.keys()) {
     if (key.startsWith(sessionID + ":")) errors.delete(key)
   }
+  for (const key of reportTs.keys()) {
+    if (key.startsWith(sessionID + ":")) reportTs.delete(key)
+  }
 }
 
 const INJECT_SCRIPT = (prefix: string) => `<script>;(function(){
-var _p="${prefix}";
-var _origWS=window.WebSocket;
-window.WebSocket=function(url,protocols){
-  if(typeof url==="string"&&url.charAt(0)==="/"){url=_p+url}
-  else if(typeof url==="string"&&url.indexOf(location.host)!==-1&&url.indexOf(_p)===-1){url=url.replace(location.host,location.host+_p)}
-  return protocols?new _origWS(url,protocols):new _origWS(url);
+var P="${prefix}";
+function f(u){return typeof u==="string"&&u.charAt(0)==="/"&&u.charAt(1)!=="/"&&!u.startsWith(P)?P+u:u}
+function fUrl(u){if(typeof u!=="string")return u;if(u.charAt(0)==="/"&&u.charAt(1)!=="/")return P+u;try{var x=new URL(u);if(x.host===location.host&&x.pathname.charAt(0)==="/"&&!x.pathname.startsWith(P))return x.origin+P+x.pathname+x.search+x.hash}catch(e){}return u}
+var _ws=window.WebSocket;
+window.WebSocket=function(u,pr){
+  if(typeof u==="string"){u=fUrl(u)}
+  return pr?new _ws(u,pr):new _ws(u);
 };
-window.WebSocket.prototype=_origWS.prototype;
-window.WebSocket.CONNECTING=_origWS.CONNECTING;
-window.WebSocket.OPEN=_origWS.OPEN;
-window.WebSocket.CLOSING=_origWS.CLOSING;
-window.WebSocket.CLOSED=_origWS.CLOSED;
-var _origErr=console.error;
+window.WebSocket.prototype=_ws.prototype;
+window.WebSocket.CONNECTING=_ws.CONNECTING;
+window.WebSocket.OPEN=_ws.OPEN;
+window.WebSocket.CLOSING=_ws.CLOSING;
+window.WebSocket.CLOSED=_ws.CLOSED;
+var _fetch=window.fetch;
+window.fetch=function(i,o){
+  if(typeof i==="string"){i=f(i)}
+  else if(i instanceof Request){var x=new URL(i.url);if(x.host===location.host&&x.pathname.charAt(0)==="/"&&!x.pathname.startsWith(P)){i=new Request(P+x.pathname+x.search+x.hash,i)}}
+  return _fetch.call(window,i,o);
+};
+var _es=window.EventSource;
+window.EventSource=function(u,o){return new _es(typeof u==="string"?f(u):u,o)};
+window.EventSource.prototype=_es.prototype;
+window.EventSource.CONNECTING=_es.CONNECTING;
+window.EventSource.OPEN=_es.OPEN;
+window.EventSource.CLOSED=_es.CLOSED;
+var _xo=XMLHttpRequest.prototype.open;
+XMLHttpRequest.prototype.open=function(m,u){if(typeof u==="string")arguments[1]=f(u);return _xo.apply(this,arguments)};
+function _patchSetter(proto,prop){var d=Object.getOwnPropertyDescriptor(proto,prop);if(!d||!d.set)return;Object.defineProperty(proto,prop,{set:function(u){return d.set.call(this,typeof u==="string"?f(u):u)},get:d.get,configurable:true})}
+_patchSetter(HTMLScriptElement.prototype,"src");
+_patchSetter(HTMLLinkElement.prototype,"href");
+_patchSetter(HTMLImageElement.prototype,"src");
+_patchSetter(HTMLMediaElement.prototype,"src");
+var _err=console.error;
 console.error=function(){
-  _origErr.apply(console,arguments);
+  _err.apply(console,arguments);
   try{__ocReport([{type:"runtime",message:Array.from(arguments).map(function(a){return typeof a==="string"?a:typeof a==="object"&&a&&a.message?a.message:String(a)}).join(" "),timestamp:Date.now()}])}catch(e){}
 };
 window.addEventListener("error",function(e){
@@ -65,7 +94,7 @@ window.addEventListener("unhandledrejection",function(e){
 });
 function __ocReport(errs){
   var img=new Image();
-  img.src=_p+"/__error_report?e="+encodeURIComponent(JSON.stringify(errs));
+  img.src=P+"/__error_report?e="+encodeURIComponent(JSON.stringify(errs));
 }
 })();</script>`
 
@@ -88,6 +117,15 @@ export const SandboxProxyRoutes = (upgrade: UpgradeWebSocket): Hono =>
         const port = parseInt(c.req.param("port"), 10)
         const raw = c.req.query("e")
         if (!raw || raw.length > 10240) return c.json({ ok: true })
+        const key = `${sessionID}:${port}`
+        const now = Date.now()
+        if ((reportTs.get(key) ?? 0) + REPORT_INTERVAL > now) return c.json({ ok: true })
+        // 校验沙箱存在，防止 fake session 撑大 errors Map
+        const sb = await AppRuntime.runPromise(
+          SandboxProvider.Service.use((svc) => svc.get(sessionID)),
+        ).catch(() => null)
+        if (!sb) return c.json({ ok: true })
+        reportTs.set(key, now)
         try {
           const parsed = JSON.parse(decodeURIComponent(raw))
           if (!Array.isArray(parsed)) return c.json({ ok: true })
@@ -113,12 +151,13 @@ export const SandboxProxyRoutes = (upgrade: UpgradeWebSocket): Hono =>
         const port = parseInt(c.req.param("port"), 10)
         if (isNaN(port) || port < 1 || port > 65535) return NOOP_WS
         const prefix = `/session/${sessionID}/proxy/${port}`
-        const wildcard = c.req.path.slice(prefix.length + 1) || ""
-        const subPath = "/" + wildcard
+        const subPath = "/" + (c.req.param("*") ?? "")
 
-        const endpoint = await AppRuntime.runPromise(
-          SandboxProvider.Service.use((svc) => svc.getEndpoint(sessionID, port)),
+        const sb = await AppRuntime.runPromise(
+          SandboxProvider.Service.use((svc) => svc.get(sessionID)),
         ).catch(() => null)
+        if (!sb) return { onOpen(_: any, ws: any) { ws.close(1011, "sandbox unreachable") }, onMessage() {}, onClose() {}, onError() {} }
+        const endpoint = await sb.getEndpointUrl(port).catch(() => null)
         if (!endpoint) return { onOpen(_: any, ws: any) { ws.close(1011, "sandbox unreachable") }, onMessage() {}, onClose() {}, onError() {} }
 
         const wsUrl = endpoint.replace(/^http/, "ws") + subPath + (c.req.url.includes("?") ? new URL(c.req.url).search : "")
@@ -181,21 +220,23 @@ export const SandboxProxyRoutes = (upgrade: UpgradeWebSocket): Hono =>
         if (isNaN(port) || port < 1 || port > 65535) return c.json({ error: "invalid port" }, 400)
 
         const prefix = `/session/${sessionID}/proxy/${port}`
-        const wildcard = c.req.path.slice(prefix.length + 1) || ""
-        const subPath = "/" + wildcard
+        const subPath = "/" + (c.req.param("*") ?? "")
 
-        const endpoint = await AppRuntime.runPromise(
-          SandboxProvider.Service.use((svc) => svc.getEndpoint(sessionID, port)),
+        const sb = await AppRuntime.runPromise(
+          SandboxProvider.Service.use((svc) => svc.get(sessionID)),
         ).catch(() => null)
+        if (!sb) return c.json({ error: "sandbox unreachable" }, 502)
+        const endpoint = await sb.getEndpointUrl(port).catch(() => null)
         if (!endpoint) return c.json({ error: "sandbox unreachable" }, 502)
 
-        const target = new URL(subPath === "/" ? "/" : subPath, endpoint)
+        const target = new URL(endpoint + subPath)
         target.search = new URL(c.req.url).search
 
         const headers = new Headers()
         c.req.raw.headers.forEach((v, k) => {
-          if (!["host", "connection"].includes(k.toLowerCase())) headers.set(k, v)
+          if (!["host", "connection", "accept-encoding"].includes(k.toLowerCase())) headers.set(k, v)
         })
+        headers.set("Accept-Encoding", "identity")
 
         let res: Response
         try {
@@ -223,35 +264,101 @@ export const SandboxProxyRoutes = (upgrade: UpgradeWebSocket): Hono =>
 
         const contentType = resHeaders.get("content-type") ?? ""
         const isHtml = contentType.includes("text/html")
-        const isJs = /(?:javascript|ecmascript|text\/jsx|text\/tsx)/.test(contentType) || /\.(?:m?js|mjsx|ts|tsx)(?:\?|$)/.test(target.pathname)
-        const skipRewrite = /\/(_next|_nuxt|assets|build|static)\/(static\/)?(chunks|js|css|media)\//.test(target.pathname)
 
-        if ((isHtml || (isJs && !skipRewrite)) && res.body) {
+        if (isHtml && res.body) {
           resHeaders.delete("content-encoding")
           resHeaders.delete("content-length")
           const text = await res.text()
           if (text.length > 5 * 1024 * 1024) {
             return new Response(text, { status: res.status, statusText: res.statusText, headers: resHeaders })
           }
-          const escaped = prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-          let rewritten = text.replace(
-            new RegExp(`(["'])((?!${escaped}|//)/[^"'>]*)(?=["'])`, "g"),
-            `$1${prefix}$2`,
+          const htmlSrcHref = new RegExp(
+            `((?:src|href)\\s*=\\s*["'])/(?!/)`,
+            "g",
           )
-          if (isHtml) {
-            rewritten = rewritten.replace(
-              /(<head[^>]*>)/i,
-              `$1<script data-oc-prefix="${prefix}"></script>${INJECT_SCRIPT(prefix)}`,
-            )
-            if (res.status >= 400) {
-              push(sessionID, port, [{
-                type: "network",
-                message: `HTTP ${res.status} ${res.statusText} for ${subPath}`,
-                url: subPath,
-                timestamp: Date.now(),
-              }])
-            }
+          let rewritten = text.replace(htmlSrcHref, `$1${prefix}/`)
+          // Rewrite import/from paths inside inline <script> blocks
+          rewritten = rewritten.replace(
+            /(<script[^>]*>)([\s\S]*?)(<\/script>)/gi,
+            (_, open, code, close) => {
+              // Skip scripts with src attribute (already handled by src rewrite above)
+              if (/\ssrc\s*=/i.test(open)) return open + code + close
+              let r = code.replace(
+                new RegExp(`((?:import|from)\\s*(?:["']))/(?!/)`, "g"),
+                `$1${prefix}/`,
+              )
+              // Rewrite JSON string paths in RSC flight data: "/_next/...", "/about", etc.
+              r = r.replace(
+                new RegExp(`(["'])/(?!/)(?!${prefix.slice(1)})`, "g"),
+                `$1${prefix}/`,
+              )
+              // Rewrite escaped JSON paths: \"/_next/...\", \"/about\"
+              r = r.replace(
+                new RegExp(`(\\\\["'])/(?!/)(?!${prefix.slice(1)})`, "g"),
+                `$1${prefix}/`,
+              )
+              return open + r + close
+            },
+          )
+          const inject = `<script data-oc-prefix="${prefix}"></script>${INJECT_SCRIPT(prefix)}`
+          if (/<head[\s>]/i.test(rewritten)) {
+            rewritten = rewritten.replace(/(<head[^>]*>)/i, `$1${inject}`)
+          } else if (/<body[\s>]/i.test(rewritten)) {
+            rewritten = rewritten.replace(/(<body[^>]*>)/i, `${inject}$1`)
+          } else {
+            rewritten = inject + rewritten
           }
+          if (res.status >= 400) {
+            push(sessionID, port, [{
+              type: "network",
+              message: `HTTP ${res.status} ${res.statusText} for ${subPath}`,
+              url: subPath,
+              timestamp: Date.now(),
+            }])
+          }
+          return new Response(rewritten, {
+            status: res.status,
+            statusText: res.statusText,
+            headers: resHeaders,
+          })
+        }
+
+        const isJs = /(?:javascript|ecmascript|text\/jsx|text\/tsx)/.test(contentType) || /\.(?:m?js|mjsx|ts|tsx)(?:\?|$)/.test(target.pathname)
+        if (isJs && res.body) {
+          resHeaders.delete("content-encoding")
+          resHeaders.delete("content-length")
+          const text = await res.text()
+          if (text.length > 5 * 1024 * 1024) {
+            return new Response(text, { status: res.status, statusText: res.statusText, headers: resHeaders })
+          }
+          let rewritten = text.replace(
+            new RegExp(`((?:import|from)\\s*(?:["']))/(?!/)`, "g"),
+            `$1${prefix}/`,
+          )
+          rewritten = rewritten.replace(
+            /__webpack_require__\.p\s*=\s*"\/(?!\/)/g,
+            `__webpack_require__.p="${prefix}/`,
+          )
+          rewritten = rewritten.replace(/\bBrowserRouter\b/g, "HashRouter")
+          return new Response(rewritten, {
+            status: res.status,
+            statusText: res.statusText,
+            headers: resHeaders,
+          })
+        }
+
+        const isCss = contentType.includes("text/css") || /\.css(?:\?|$)/.test(target.pathname)
+        if (isCss && res.body) {
+          resHeaders.delete("content-encoding")
+          resHeaders.delete("content-length")
+          const text = await res.text()
+          if (text.length > 5 * 1024 * 1024) {
+            return new Response(text, { status: res.status, statusText: res.statusText, headers: resHeaders })
+          }
+          const rewritten = text.replace(
+            /(url\s*\(\s*["']?)\//g,
+            `$1${prefix}/`,
+          )
           return new Response(rewritten, {
             status: res.status,
             statusText: res.statusText,

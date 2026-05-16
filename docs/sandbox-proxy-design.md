@@ -89,7 +89,7 @@
 
 ```
 1. 解析 sessionID + port
-2. SandboxProvider.getEndpoint(sessionID, port) → 获取沙箱 endpoint URL
+2. SandboxProvider.get(sessionID) → 只读取已存在沙箱（不触发创建），再调 sb.getEndpointUrl(port) 获取地址
 3. 构造目标 URL = endpoint + subPath + queryString
 4. 转发请求（剔除 host/connection header，redirect: "manual"）
 5. 根据响应 Content-Type 决定处理策略
@@ -477,15 +477,17 @@ const router = createRouter({
 | 类别 | 改进内容 |
 |---|---|
 | **DoS 防护** | `__error_report` 端点限制 query 大小 ≤ 10KB，单次最多 10 条错误，字段截断（message ≤ 2048, stack ≤ 4096） |
+| **速率限制** | `__error_report` 每个 `sessionID:port` key 最多 1 次/秒，超频请求直接忽略 |
 | **Schema 校验** | 错误上报做严格类型 map，非法 type 归为 `"runtime"`，非 array 输入直接忽略 |
 | **WebSocket 竞态** | 上游连接 OPEN 前缓冲客户端消息到 queue，onopen 时 flush |
 | **WebSocket 容错** | endpoint 获取失败时直接关闭 ws（1011），port 非法时返回空 handler |
 | **HTTP 容错** | `fetch()` 包裹 try/catch，网络异常返回 `502 sandbox unreachable` |
-| **skipRewrite 扩展** | 正则扩大到 `/_next/`, `/_nuxt/`, `/assets/`, `/build/`, `/static/` 的 `chunks/js/css/media` 子目录 |
 | **大文件跳过** | JS/HTML 响应超过 5MB 时跳过路径重写（避免内存暴增） |
-| **内存泄漏** | `clearErrors(sessionID)` 在 kill-sandbox 时清理该 session 的所有错误记录 |
+| **内存泄漏** | `errors` Map 最多保留 500 个 key（超限删最旧），`clear(sessionID)` 在 kill-sandbox 时清理该 session 所有记录（含 `reportTs`） |
+| **无 `<head>` 注入** | HTML 无 `<head>` 时 fallback：有 `<body>` 则注入到 `<body>` 前，否则前置到字符串头部；`<body>` 注入保留原始属性（`$1` 反向引用） |
+| **proxy 不触发沙箱创建** | proxy 路由改用 `svc.get(sessionID)` 只读取已存在的沙箱，沙箱不存在直接 502，不再通过 `getOrCreate` 隐式创建 |
 | **Location 绝对 URL** | 重定向的 Location 如果以 endpoint URL 开头，也做前缀替换 |
-| **未用导入** | 删除 `Ref` import |
+| **子路径提取** | 改用 `c.req.param("*")` 替代手动 `path.slice`，避免 off-by-one |
 
 ---
 
@@ -496,7 +498,7 @@ const router = createRouter({
 | `src/server/instance/sandbox-proxy.ts` | 代理核心模块（~330行） | HTTP 代理（HTML 三层重写 + JS import 重写）+ WS 代理 + 错误收集。导出 `SandboxProxyRoutes(upgrade)` + `clear(sessionID)` |
 | `src/server/instance/index.ts` | 路由注册入口 | `.route("/", SandboxProxyRoutes(upgrade))` 挂载，kill-sandbox 时调用 `clearProxyErrors` |
 | `src/session/index.ts` | `Session.Event.ProxyError` 事件定义 | Bus 事件 |
-| `src/tool/sandbox-provider.ts` | `getEndpoint(sessionID, port)` | 沙箱地址解析 |
+| `src/tool/sandbox-provider.ts` | `get(sessionID)` 只读取已存在沙箱，`getOrCreate` 仅在工具执行时调用 | proxy 路由不触发沙箱创建 |
 | `src/tool/bash.ts` | `background: true` 后台化 + keepAlive | 已有 |
 | `src/session/run-state.ts` | `onIdle` 检查 keepAlive | 已有 |
 
@@ -634,6 +636,67 @@ node -e "new Function('window','document','history','location','XMLHttpRequest',
 | 8 | 错误上报 | console.error / window.error → 检查 `__errors` 端点 |
 | 9 | proxy-errors 聚合 | GET `/proxy-errors` 返回错误列表 |
 | 10 | Next.js Turbopack | 完整测试 Next.js 16.x HMR |
+| 11 | 前端相对路径请求 | 见 14.5 |
+| 12 | 前端调外部完整 URL | 见 14.5 |
+| 13 | 前端调外部（非 localhost）完整 URL | 见 14.5 |
+| 14 | 无 `<head>` HTML 页面注入 | 访问无 `<head>` 的 HTML，`window.fetch.toString()` 包含拦截代码，`<body>` 标签属性保留 |
+| 15 | proxy 不触发沙箱创建 | 沙箱不存在时直接访问 proxy URL，返回 `502 sandbox unreachable`，不会创建新沙箱 |
+| 16 | `__error_report` 速率限制 | 1 秒内连续多次上报，只有第一次写入 `errors` Map，后续返回 `{ok:true}` 但不写入 |
+| 17 | `errors` Map 上限 | 模拟 500+ 个不同 session 上报，Map size 不超过 500 |
+
+### 14.5 前端请求路径测试案例
+
+在浏览器 DevTools Console 中打开 proxy 页面后执行，验证 INJECT_SCRIPT 对三种请求写法的处理行为。
+
+#### 案例一：相对路径请求（打到沙箱内同端口）
+
+```js
+// 页面在 /session/{SID}/proxy/5173/ 下
+// fetch('/api/data') 会被 INJECT_SCRIPT 改写，打到沙箱 5173 端口
+fetch('/api/data').catch(e => console.log('result:', e.message))
+
+// 验证：DevTools Network 可以看到请求路径变为：
+// /session/{SID}/proxy/5173/api/data
+// → proxy 转发到 sandbox:5173/api/data ✅
+```
+
+**适用场景**：沙箱内前端 + 后端同 dev server（Vite proxy、Next.js API routes 等）。
+
+#### 案例二：外部服务完整 URL（`https://` 跨域）
+
+```js
+// 完整 URL，host 与 location.host 不同，INJECT_SCRIPT 不改写
+fetch('https://api.example.com/data')
+  .then(r => r.json()).then(console.log).catch(e => console.log('result:', e.message))
+
+// 验证：DevTools Network 请求路径保持原样：
+// https://api.example.com/data → 直接打外部 ✅（不经过 sandbox proxy）
+```
+
+**适用场景**：前端调用第三方或独立部署的后端接口，URL 与沙箱无关。
+
+#### 案例三：同域完整 URL（`http://your-backend.com`）
+
+```js
+// 完整 URL，host 不等于 location.host，不改写
+fetch('http://your-backend.com/api/data')
+  .then(r => r.json()).then(console.log).catch(e => console.log('result:', e.message))
+
+// 验证：DevTools Network 请求路径保持原样：
+// http://your-backend.com/api/data → 直接打外部 ✅（不经过 sandbox proxy）
+```
+
+**适用场景**：前端在代码中写死了完整后端地址（如通过环境变量 `VITE_API_URL=http://your-backend.com` 注入）。
+
+#### 三种情况汇总
+
+| 写法 | INJECT_SCRIPT 行为 | 实际打到 |
+|---|---|---|
+| `fetch('/api/data')` | ✅ 改写为 `/session/{SID}/proxy/5173/api/data` | 沙箱 5173 端口 |
+| `fetch('https://api.example.com/data')` | ❌ 不改写 | 外部服务，直接透传 |
+| `fetch('http://your-backend.com/api/data')` | ❌ 不改写 | 外部服务，直接透传 |
+
+> **注意**：`fetch('http://localhost:3001/api')` 不在上述覆盖范围内（沙箱内跨端口场景），当前不支持，不考虑。
 
 ---
 
