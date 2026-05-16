@@ -61,7 +61,12 @@ export namespace SessionRunState {
             const sandbox = yield* Effect.serviceOption(SandboxProvider.Service)
             if (sandbox._tag === "Some") {
               const keep = yield* sandbox.value.isKeepAlive(sessionID)
-              if (!keep) yield* sandbox.value.destroy(sessionID).pipe(Effect.catchCause(() => Effect.void))
+              if (keep) {
+                // 清掉 keepAlive 标志，让下次 idle 时能正常回收
+                yield* sandbox.value.release(sessionID).pipe(Effect.catchCause(() => Effect.void))
+              } else {
+                yield* sandbox.value.destroy(sessionID).pipe(Effect.catchCause(() => Effect.void))
+              }
             }
           }),
           onBusy: status.set(sessionID, { type: "busy" }),

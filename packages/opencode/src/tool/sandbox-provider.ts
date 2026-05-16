@@ -529,11 +529,7 @@ export namespace SandboxProvider {
               Effect.catchCause(() => Effect.void),
             )
           }
-          const host = yield* Effect.tryPromise({
-            try: () => sb.getEndpointUrl(0).catch(() => `http://${config.domain}`),
-            catch: () => new Error("getEndpointUrl failed"),
-          }).pipe(Effect.orElseSucceed(() => `http://${config.domain}`))
-
+          const host = `http://${config.domain}`
           yield* dbUpsert({
             id: sb.id,
             session_id: sessionID,
@@ -701,7 +697,11 @@ export namespace SandboxProvider {
         Effect.gen(function* () {
           const sb = yield* getOrCreate(sessionID)
           const row = yield* dbGet(sessionID).pipe(Effect.orElseSucceed(() => null))
-          let cmdSessionID = row?.command_session_id ?? null
+
+          // command_session_id 必须属于当前沙箱（sandbox ID 一致才复用）
+          // 沙箱重建后 DB 里的 command_session_id 已被 createSandbox 置 null
+          // 但为防止竞态，再做一次 sandbox ID 校验
+          let cmdSessionID = (row?.id === sb.id ? row?.command_session_id : null) ?? null
 
           if (!cmdSessionID) {
             cmdSessionID = yield* Effect.tryPromise({
@@ -725,14 +725,10 @@ export namespace SandboxProvider {
       const register: Interface["register"] = (sessionID, sb) =>
         Effect.gen(function* () {
           commandSemaphores.delete(sessionID)
-          const host = yield* Effect.tryPromise({
-            try: () => sb.getEndpointUrl(0).catch(() => `http://${config.domain}`),
-            catch: () => new Error("getEndpointUrl failed"),
-          }).pipe(Effect.orElseSucceed(() => `http://${config.domain}`))
           yield* dbUpsert({
             id: sb.id,
             session_id: sessionID,
-            host,
+            host: `http://${config.domain}`,
             state: "running",
             keep_alive: false,
             command_session_id: null,
