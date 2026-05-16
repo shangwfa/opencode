@@ -696,30 +696,32 @@ export namespace SandboxProvider {
       const runInSession: Interface["runInSession"] = (sessionID, command, options, handlers, signal) =>
         Effect.gen(function* () {
           const sb = yield* getOrCreate(sessionID)
-          const row = yield* dbGet(sessionID).pipe(Effect.orElseSucceed(() => null))
 
-          // command_session_id 必须属于当前沙箱（sandbox ID 一致才复用）
-          // 沙箱重建后 DB 里的 command_session_id 已被 createSandbox 置 null
-          // 但为防止竞态，再做一次 sandbox ID 校验
-          let cmdSessionID = (row?.id === sb.id ? row?.command_session_id : null) ?? null
-
-          if (!cmdSessionID) {
-            cmdSessionID = yield* Effect.tryPromise({
-              try: () => sb.commands.createSession({ workingDirectory: "/workspace" }),
-              catch: (e) => new Error(`Failed to create command session: ${String(e)}`),
-            })
-            yield* dbSetCommandSession(sessionID, cmdSessionID).pipe(Effect.catchCause(() => Effect.void))
-          }
-
+          // Semaphore 提前初始化，保护 createSession + runInSession 全流程
+          // 防止并发请求同时发现 command_session_id=null 而重复创建 shell session
           let sem = commandSemaphores.get(sessionID)
           if (!sem) { sem = yield* Semaphore.make(1); commandSemaphores.set(sessionID, sem) }
 
-          return yield* sem.withPermit(
-            Effect.tryPromise({
+          return yield* sem.withPermit(Effect.gen(function* () {
+            const row = yield* dbGet(sessionID).pipe(Effect.orElseSucceed(() => null))
+
+            // command_session_id 必须属于当前沙箱（sandbox ID 一致才复用）
+            // 沙箱重建后 DB 里的 command_session_id 已被 createSandbox 置 null
+            let cmdSessionID = (row?.id === sb.id ? row?.command_session_id : null) ?? null
+
+            if (!cmdSessionID) {
+              cmdSessionID = yield* Effect.tryPromise({
+                try: () => sb.commands.createSession({ workingDirectory: "/workspace" }),
+                catch: (e) => new Error(`Failed to create command session: ${String(e)}`),
+              })
+              yield* dbSetCommandSession(sessionID, cmdSessionID).pipe(Effect.catchCause(() => Effect.void))
+            }
+
+            return yield* Effect.tryPromise({
               try: () => sb.commands.runInSession(cmdSessionID!, command, options, handlers, signal),
               catch: (e) => new Error(`runInSession failed: ${String(e)}`),
-            }),
-          )
+            })
+          }))
         }).pipe(Effect.withSpan("SandboxProvider.runInSession"))
 
       const register: Interface["register"] = (sessionID, sb) =>
