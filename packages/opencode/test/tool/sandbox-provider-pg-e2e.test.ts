@@ -350,3 +350,106 @@ describe("pgLayer - destroyAll：清理所有 running 沙箱", () => {
     expect(await dbGet(SID_B)).toBeNull()
   }, TIMEOUT)
 })
+
+describe("pgLayer - command_session_id：shell session 持久化", () => {
+  const SID = sid("ses_e2e_cmdsession")
+
+  afterEach(async () => {
+    await run(SandboxProvider.Service.use((svc) => svc.destroy(SID))).catch(() => {})
+    await dbCleanup(SID)
+  })
+
+  test("首次 runInSession → DB 写入 command_session_id", async () => {
+    await dbCleanup(SID)
+
+    const before = await dbGet(SID)
+    expect(before).toBeNull()
+
+    await run(SandboxProvider.Service.use((svc) =>
+      svc.runInSession(SID, "echo hello"),
+    ))
+
+    const row = await dbGet(SID)
+    expect(row).not.toBeNull()
+    expect(row!.command_session_id).not.toBeNull()
+    expect(typeof row!.command_session_id).toBe("string")
+    expect(row!.command_session_id!.length).toBeGreaterThan(0)
+  }, TIMEOUT)
+
+  test("第二次 runInSession → 复用同一 command_session_id，跨调用状态保留", async () => {
+    await dbCleanup(SID)
+
+    // 第一次：export 环境变量
+    await run(SandboxProvider.Service.use((svc) =>
+      svc.runInSession(SID, "export E2E_VAR=persistent_value"),
+    ))
+
+    const row1 = await dbGet(SID)
+    const cmdId1 = row1!.command_session_id
+
+    // 第二次：读取环境变量（验证状态保留）
+    const result = await run(SandboxProvider.Service.use((svc) =>
+      svc.runInSession(SID, "echo $E2E_VAR"),
+    ))
+    const out = result.logs.stdout.map((l: any) => l.text).join("").trim()
+    expect(out).toBe("persistent_value")
+
+    // DB 里 command_session_id 不变（复用了同一个 shell session）
+    const row2 = await dbGet(SID)
+    expect(row2!.command_session_id).toBe(cmdId1)
+  }, TIMEOUT)
+
+  test("沙箱重建后 command_session_id 重置，不复用旧 shell session", async () => {
+    await dbCleanup(SID)
+
+    // 第一次创建 + 建立 shell session
+    await run(SandboxProvider.Service.use((svc) =>
+      svc.runInSession(SID, "export REBUILD_VAR=before_rebuild"),
+    ))
+
+    const row1 = await dbGet(SID)
+    const cmdId1 = row1!.command_session_id
+    expect(cmdId1).not.toBeNull()
+
+    // 强制将 state 置为 killed，触发 getOrCreate 重建
+    await Database.Client()
+      .update(SandboxTable)
+      .set({ state: "killed", command_session_id: null })
+      .where(eq(SandboxTable.session_id, SID))
+      .run()
+
+    // 重建后执行命令，应建立新的 shell session
+    await run(SandboxProvider.Service.use((svc) =>
+      svc.runInSession(SID, "echo new_session"),
+    ))
+
+    const row2 = await dbGet(SID)
+    // sandbox ID 变了，command_session_id 也是新的
+    expect(row2!.id).not.toBe(row1!.id)
+    expect(row2!.command_session_id).not.toBeNull()
+    expect(row2!.command_session_id).not.toBe(cmdId1)
+
+    // 旧的环境变量不存在（新 shell session）
+    const result = await run(SandboxProvider.Service.use((svc) =>
+      svc.runInSession(SID, "echo ${REBUILD_VAR:-empty}"),
+    ))
+    const out = result.logs.stdout.map((l: any) => l.text).join("").trim()
+    expect(out).toBe("empty")
+  }, TIMEOUT)
+
+  test("destroy 后 DB 记录删除（command_session_id 随之清理）", async () => {
+    await dbCleanup(SID)
+
+    await run(SandboxProvider.Service.use((svc) =>
+      svc.runInSession(SID, "echo before_destroy"),
+    ))
+
+    const row = await dbGet(SID)
+    expect(row!.command_session_id).not.toBeNull()
+
+    await run(SandboxProvider.Service.use((svc) => svc.destroy(SID)))
+
+    // DB 记录已删除，command_session_id 随之消失
+    expect(await dbGet(SID)).toBeNull()
+  }, TIMEOUT)
+})
