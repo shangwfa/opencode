@@ -5,12 +5,15 @@ import type { SandboxConfig as SandboxConfigType } from "../../src/tool/sandbox-
 const baseConfig: SandboxConfigType.Interface = {
   domain: "localhost:8080",
   protocol: "http",
+  apiKey: "",
+  useServerProxy: false,
   image: "ubuntu",
   timeoutSeconds: 600,
   resourceLimits: { cpu: "1", memory: "2Gi" },
   volumeType: "none",
   pvcClaimName: "",
   idleKillMs: 3_600_000,
+  maxTtlSeconds: 3600,
 }
 
 describe("buildVolumes", () => {

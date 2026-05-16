@@ -61,9 +61,15 @@ function buildFakeLayer() {
   const configLayer = Layer.succeed(SandboxConfig.Service, SandboxConfig.Service.of({
     domain: "localhost:8080",
     protocol: "http" as const,
+    apiKey: "",
+    useServerProxy: false,
     image: "ubuntu",
     timeoutSeconds: 600,
     resourceLimits: { cpu: "1", memory: "2Gi" },
+    volumeType: "none" as const,
+    pvcClaimName: "",
+    idleKillMs: 30000,
+    maxTtlSeconds: 3600,
   }))
 
   const providerLayer = Layer.effect(
@@ -144,6 +150,11 @@ function buildFakeLayer() {
           commandSemaphores.delete(sessionID)
           sandboxes.set(sessionID, sb)
         }),
+        keepAlive: () => Effect.void,
+        release: () => Effect.void,
+        isKeepAlive: () => Effect.succeed(false),
+        getEndpoint: () => Effect.die(new Error("not implemented")),
+        cleanupSessionVolume: () => Effect.void,
       })
     }),
   )

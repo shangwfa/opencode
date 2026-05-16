@@ -42,6 +42,10 @@ function mockSandboxProvider(runInSessionFn: (sessionID: string, command: string
       destroyAll: () => Effect.void,
       runInSession: runInSessionFn,
       register: () => Effect.void,
+      keepAlive: () => Effect.void,
+      release: () => Effect.void,
+      isKeepAlive: () => Effect.succeed(false),
+      getEndpoint: () => Effect.die(new Error("not implemented")),
       cleanupSessionVolume: () => Effect.void,
     }),
   )

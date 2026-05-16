@@ -7,12 +7,15 @@ import { ConnectionConfig } from "@alibaba-group/opensandbox"
 const noneConfig: SandboxConfig.Interface = {
   domain: "localhost:8080",
   protocol: "http",
+  apiKey: "",
+  useServerProxy: false,
   image: "ubuntu",
   timeoutSeconds: 600,
   resourceLimits: { cpu: "1", memory: "2Gi" },
   volumeType: "none",
   pvcClaimName: "",
   idleKillMs: 3_600_000,
+  maxTtlSeconds: 3600,
 }
 
 const pvcConfig: SandboxConfig.Interface = {

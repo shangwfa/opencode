@@ -20,6 +20,10 @@ function mockProvider(runInSessionFn: (sessionID: string, command: string) => Ef
       destroyAll: () => Effect.void,
       runInSession: runInSessionFn,
       register: () => Effect.void,
+      keepAlive: () => Effect.void,
+      release: () => Effect.void,
+      isKeepAlive: () => Effect.succeed(false),
+      getEndpoint: () => Effect.die(new Error("not implemented")),
       cleanupSessionVolume: () => Effect.void,
     }),
   )
@@ -145,6 +149,10 @@ describe("file sandbox proxy - read file", () => {
         destroyAll: () => Effect.void,
         runInSession: () => Effect.succeed({ logs: { stdout: [], stderr: [] }, exitCode: 0 }),
         register: () => Effect.void,
+        keepAlive: () => Effect.void,
+        release: () => Effect.void,
+        isKeepAlive: () => Effect.succeed(false),
+        getEndpoint: () => Effect.die(new Error("not implemented")),
         cleanupSessionVolume: () => Effect.void,
       }),
     )

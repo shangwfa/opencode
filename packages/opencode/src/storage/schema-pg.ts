@@ -10,3 +10,4 @@ export {
 export { SessionShareTable } from "../share/share.pg"
 export { WorkspaceTable } from "../control-plane/workspace.pg"
 export { EventSequenceTable, EventTable } from "../sync/event.pg"
+export { SandboxTable } from "../tool/sandbox.pg"

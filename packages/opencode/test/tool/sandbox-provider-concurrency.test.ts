@@ -193,6 +193,10 @@ const fakeProvider = Layer.effect(
         }),
       runInSession,
       register: () => Effect.void,
+      keepAlive: () => Effect.void,
+      release: () => Effect.void,
+      isKeepAlive: () => Effect.succeed(false),
+      getEndpoint: () => Effect.die(new Error("not implemented")),
       cleanupSessionVolume: () => Effect.void,
     })
   }),
