@@ -595,6 +595,32 @@ bash.ts (background:true)
 
 > `OPENCODE_SANDBOX_IDLE_KILL_SEC=30` 在 opencode 代码中**未被实际使用**，回收由 `run-state.ts` `onIdle` 回调控制（session runner 空闲 + 无 keepAlive 时销毁）。
 
+#### PG 多 pod 状态一致性与后续优化
+
+PG 模式下，`sessionID → sandboxID → command_session_id` 的关系持久化在 `sandbox` 表中。为保证多 pod 下同一 session 不重复创建 sandbox 或 shell session，当前实现采用保守策略：
+
+| 操作 | 当前策略 |
+|---|---|
+| `getOrCreate` | 使用 `sessionID` 级 PG advisory lock 串行化创建/重连 |
+| `runInSession` | 使用同一 advisory lock 包住 `getOrCreate`、`command_session_id` 初始化、真实命令执行 |
+| `destroy` / `register` | 使用同一 advisory lock，避免和创建/命令执行并发 |
+| `command_session_id` 更新 | 使用 `session_id + sandbox id` 条件更新，避免旧 sandbox 覆盖新记录 |
+| `destroySandbox` 删除记录 | 使用 `session_id + sandbox id` 条件删除，避免旧 sandbox 误删新记录 |
+| PG layer finalizer | 只清理本 pod 内存状态，不再自动全局 `destroyAll()` |
+
+这个方案优先保证正确性，可以解决跨 pod 重复创建 sandbox、重复创建 `command_session_id`、旧 sandbox 写坏或误删新 DB 行等一致性问题。
+
+代价是：`runInSession` 执行长命令时会长时间持有一条专用 PG 连接，因为 session-level advisory lock 需要连接保持存活。例如 `npm install`、`bun test`、`sleep 600` 这类命令期间，同一 session 的其他 pod 操作会等待，并额外占用一条 PG 连接。
+
+后续如果 PG 连接数或长命令并发成为瓶颈，可以优化为：
+
+1. advisory lock 只覆盖 `getOrCreate + command_session_id` 初始化和 DB 写入。
+2. 真实命令执行阶段释放 PG lock，不再长时间占用 PG 连接。
+3. 额外引入 active command lease / refcount / pending destroy 状态，保证命令执行期间 `destroy` / `recreate` 不会直接 kill 或覆盖正在使用的 sandbox。
+4. lease 必须处理 abort、异常、pod crash 后的 TTL 清理；不能只简单缩小 lock 范围，否则会重新引入 destroy/recreate 与命令执行的竞态。
+
+当前结论：在没有实际 PG 连接瓶颈前，保留正确性优先的保守实现；后续按上述方案做锁粒度优化。
+
 #### 容器重启后注意事项
 
 Docker 容器重启后内存中的 sandbox Map 清空，需要：

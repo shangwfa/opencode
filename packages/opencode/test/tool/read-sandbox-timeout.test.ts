@@ -39,6 +39,7 @@ function mockSandboxProvider(runInSessionFn: (sessionID: string, command: string
       getOrCreate: () => Effect.succeed(null as any),
       get: () => Effect.succeed(null),
       destroy: () => Effect.void,
+      destroyById: () => Effect.void,
       destroyAll: () => Effect.void,
       runInSession: runInSessionFn,
       register: () => Effect.void,

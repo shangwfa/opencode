@@ -95,6 +95,29 @@ export const InstanceRoutes = (upgrade: UpgradeWebSocket): Hono =>
         return c.json(true)
       },
     )
+    .post(
+      "/sandbox/:sandboxID/kill",
+      describeRoute({
+        summary: "Kill sandbox by sandbox ID",
+        description: "Kill a specific sandbox runtime by its sandbox ID. Useful for cleaning up specific sandboxes directly without knowing the session ID.",
+        operationId: "sandbox.killById",
+        responses: {
+          200: {
+            description: "Sandbox killed",
+            content: {
+              "application/json": {
+                schema: resolver(z.boolean()),
+              },
+            },
+          },
+        },
+      }),
+      async (c) => {
+        const sandboxID = c.req.param("sandboxID")
+        await AppRuntime.runPromise(SandboxProvider.Service.use((svc) => svc.destroyById(sandboxID)))
+        return c.json(true)
+      },
+    )
     .get(
       "/path",
       describeRoute({

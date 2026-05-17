@@ -126,6 +126,16 @@ const fakeProvider = Layer.effect(
         if (sb) yield* destroySandbox(sb, sessionID)
       })
 
+    const destroyById = (_sandboxID: string) =>
+      Effect.gen(function* () {
+        for (const [sid, s] of sandboxes) {
+          if (s.id === _sandboxID) {
+            yield* destroy(sid)
+            return
+          }
+        }
+      })
+
     const runInSession = (sessionID: string) =>
       Effect.gen(function* () {
         const sb = sandboxes.get(sessionID)
@@ -166,6 +176,7 @@ const fakeProvider = Layer.effect(
       getOrCreate,
       get: (id: string) => Effect.sync(() => sandboxes.get(id) ?? null),
       destroy,
+      destroyById,
       destroyAll: () =>
         Effect.gen(function* () {
           const inFlightCreates = yield* Ref.modify(createRef, (m) => {

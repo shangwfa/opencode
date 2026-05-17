@@ -11,7 +11,7 @@ import { describe, expect, test, beforeEach, afterEach } from "bun:test"
 import { Effect, Layer } from "effect"
 import { Database } from "../../src/storage/db"
 import { SandboxTable } from "../../src/tool/sandbox.pg"
-import { eq } from "drizzle-orm"
+import { and, eq } from "drizzle-orm"
 
 // ── 直接测试 DB 层操作（不依赖 Sandbox SDK）────────────────────────────
 
@@ -146,6 +146,57 @@ describe("sandbox DB 层 - command_session_id", () => {
     await db.update(SandboxTable).set({ command_session_id: cmdID, time_updated: Date.now() }).where(eq(SandboxTable.session_id, SID)).run()
     const after = await dbGet(SID)
     expect(after!.command_session_id).toBe(cmdID)
+  })
+
+  test("带 sandbox id 条件更新，旧 sandbox 不能覆盖新 sandbox 的 command_session_id", async () => {
+    const oldId = "sb_old_cmd"
+    const newId = "sb_new_cmd"
+    await db.insert(SandboxTable).values(makeRow(SID, { id: newId })).run()
+
+    await db.update(SandboxTable)
+      .set({ command_session_id: "cmd_old", time_updated: Date.now() })
+      .where(and(eq(SandboxTable.session_id, SID), eq(SandboxTable.id, oldId)))
+      .run()
+
+    const got = await dbGet(SID)
+    expect(got!.id).toBe(newId)
+    expect(got!.command_session_id).toBeNull()
+  })
+})
+
+describe("sandbox DB 层 - sandbox id 版本保护", () => {
+  const SID = "ses_pg_test_version_guard"
+
+  beforeEach(async () => { await cleanupSession(SID) })
+  afterEach(async () => { await cleanupSession(SID) })
+
+  test("带 sandbox id 条件删除，旧 sandbox 不能删除新 sandbox 记录", async () => {
+    const oldId = "sb_old_delete"
+    const newId = "sb_new_delete"
+    await db.insert(SandboxTable).values(makeRow(SID, { id: newId })).run()
+
+    await db.delete(SandboxTable)
+      .where(and(eq(SandboxTable.session_id, SID), eq(SandboxTable.id, oldId)))
+      .run()
+
+    const got = await dbGet(SID)
+    expect(got).not.toBeNull()
+    expect(got!.id).toBe(newId)
+  })
+
+  test("带 sandbox id 条件置 killed，旧 sandbox 不能修改新 sandbox 状态", async () => {
+    const oldId = "sb_old_state"
+    const newId = "sb_new_state"
+    await db.insert(SandboxTable).values(makeRow(SID, { id: newId, state: "running" })).run()
+
+    await db.update(SandboxTable)
+      .set({ state: "killed", time_updated: Date.now() })
+      .where(and(eq(SandboxTable.session_id, SID), eq(SandboxTable.id, oldId)))
+      .run()
+
+    const got = await dbGet(SID)
+    expect(got!.id).toBe(newId)
+    expect(got!.state).toBe("running")
   })
 })
 

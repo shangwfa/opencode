@@ -128,6 +128,13 @@ function buildFakeLayer() {
           }
         })
 
+      const destroyById = (sandboxID: string) =>
+        Effect.gen(function* () {
+          for (const [sessionID, s] of sandboxes) {
+            if (s.id === sandboxID) return yield* destroy(sid(sessionID))
+          }
+        })
+
       const destroyAll = () =>
         Effect.gen(function* () {
           for (const [sessionID, sb] of sandboxes) {
@@ -143,6 +150,7 @@ function buildFakeLayer() {
         getOrCreate,
         get: (id) => Effect.sync(() => sandboxes.get(id) ?? null),
         destroy,
+        destroyById,
         destroyAll,
         runInSession,
         register: (sessionID, sb) => Effect.sync(() => {

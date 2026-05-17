@@ -61,6 +61,10 @@ const runtime = ManagedRuntime.make(
   SandboxProvider.pgLayer.pipe(Layer.provide(configLayer)),
 )
 
+function makeRuntime() {
+  return ManagedRuntime.make(SandboxProvider.pgLayer.pipe(Layer.provide(configLayer)))
+}
+
 const db = Database.Client()
 
 const sid = (s: string) => s as SessionID
@@ -76,6 +80,10 @@ async function dbCleanup(sessionID: string) {
 
 function run<A>(effect: Effect.Effect<A, any, SandboxProvider.Service>) {
   return runtime.runPromise(effect)
+}
+
+function runWith<A>(rt: ManagedRuntime.ManagedRuntime<SandboxProvider.Service, never>, effect: Effect.Effect<A, any, SandboxProvider.Service>) {
+  return rt.runPromise(effect)
 }
 
 // ── 测试套件 ──────────────────────────────────────────────────────────
@@ -451,5 +459,98 @@ describe("pgLayer - command_session_id：shell session 持久化", () => {
 
     // DB 记录已删除，command_session_id 随之消失
     expect(await dbGet(SID)).toBeNull()
+  }, TIMEOUT)
+})
+
+describe("pgLayer - 多 runtime / 多 pod 语义", () => {
+  const SID = sid("ses_e2e_multi_runtime")
+
+  afterEach(async () => {
+    await run(SandboxProvider.Service.use((svc) => svc.destroy(SID))).catch(() => {})
+    await dbCleanup(SID)
+  })
+
+  test("两个 runtime 并发 getOrCreate 同一 sessionID → 只保留并复用同一个 sandbox", async () => {
+    await dbCleanup(SID)
+    const a = makeRuntime()
+    const b = makeRuntime()
+
+    const [sb1, sb2] = await Promise.all([
+      runWith(a, SandboxProvider.Service.use((svc) => svc.getOrCreate(SID))),
+      runWith(b, SandboxProvider.Service.use((svc) => svc.getOrCreate(SID))),
+    ])
+
+    expect(sb1.id).toBe(sb2.id)
+
+    const row = await dbGet(SID)
+    expect(row).not.toBeNull()
+    expect(row!.id).toBe(sb1.id)
+    expect(row!.state).toBe("running")
+  }, TIMEOUT)
+
+  test("两个 runtime 复用同一个 command_session_id，shell 状态跨 runtime 保留", async () => {
+    await dbCleanup(SID)
+    const a = makeRuntime()
+    const b = makeRuntime()
+
+    await runWith(a, SandboxProvider.Service.use((svc) =>
+      svc.runInSession(SID, "export MULTI_RUNTIME_VAR=shared_state"),
+    ))
+    const row1 = await dbGet(SID)
+    expect(row1!.command_session_id).not.toBeNull()
+
+    const result = await runWith(b, SandboxProvider.Service.use((svc) =>
+      svc.runInSession(SID, "echo $MULTI_RUNTIME_VAR"),
+    ))
+    const out = result.logs.stdout.map((l: any) => l.text).join("").trim()
+    expect(out).toBe("shared_state")
+
+    const row2 = await dbGet(SID)
+    expect(row2!.id).toBe(row1!.id)
+    expect(row2!.command_session_id).toBe(row1!.command_session_id)
+  }, TIMEOUT)
+
+  test("runtime dispose 不会通过 pgLayer finalizer 全局 kill 已创建 sandbox", async () => {
+    await dbCleanup(SID)
+    const a = makeRuntime()
+
+    const sb = await runWith(a, SandboxProvider.Service.use((svc) => svc.getOrCreate(SID)))
+    await a.dispose()
+
+    const row = await dbGet(SID)
+    expect(row).not.toBeNull()
+    expect(row!.id).toBe(sb.id)
+    expect(row!.state).toBe("running")
+
+    const got = await run(SandboxProvider.Service.use((svc) => svc.get(SID)))
+    expect(got).not.toBeNull()
+    expect(got!.id).toBe(sb.id)
+  }, TIMEOUT)
+
+  test("并发 runInSession 首次创建 shell session 时只写入一个 command_session_id", async () => {
+    await dbCleanup(SID)
+    const a = makeRuntime()
+    const b = makeRuntime()
+
+    await Promise.all([
+      runWith(a, SandboxProvider.Service.use((svc) =>
+        svc.runInSession(SID, "export RACE_VAR=from_a"),
+      )),
+      runWith(b, SandboxProvider.Service.use((svc) =>
+        svc.runInSession(SID, "export RACE_VAR=from_b"),
+      )),
+    ])
+
+    const row = await dbGet(SID)
+    expect(row!.command_session_id).not.toBeNull()
+
+    const result = await run(SandboxProvider.Service.use((svc) =>
+      svc.runInSession(SID, "echo ${RACE_VAR:-missing}"),
+    ))
+    const out = result.logs.stdout.map((l: any) => l.text).join("").trim()
+    expect(["from_a", "from_b"]).toContain(out)
+
+    const after = await dbGet(SID)
+    expect(after!.command_session_id).toBe(row!.command_session_id)
   }, TIMEOUT)
 })
