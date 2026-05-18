@@ -16,6 +16,9 @@ import { ConfigMarkdown } from "../config/markdown"
 import { Glob } from "@opencode-ai/shared/util/glob"
 import { Log } from "../util/log"
 import { Discovery } from "./discovery"
+import { SessionSkill } from "./session-skill"
+import type { SessionID } from "../session/schema"
+import { Database } from "../storage/db"
 
 export namespace Skill {
   const log = Log.create({ service: "skill" })
@@ -23,12 +26,31 @@ export namespace Skill {
   const EXTERNAL_SKILL_PATTERN = "skills/**/SKILL.md"
   const OPENCODE_SKILL_PATTERN = "{skill,skills}/**/SKILL.md"
   const SKILL_PATTERN = "**/SKILL.md"
+  const RESOURCE_MAX = 256 * 1024
+  const BUNDLE_MAX = 1024 * 1024
+  const RESOURCE_COUNT_MAX = 64
+
+  export const Resource = z.object({
+    path: z.string(),
+    type: z.enum(["doc", "script", "template", "asset"]),
+    content: z.string(),
+  })
+  export type Resource = z.infer<typeof Resource>
+
+  export const CreateInput = z.object({
+    name: z.string(),
+    description: z.string(),
+    content: z.string(),
+    resources: Resource.array().optional(),
+  })
+  export type CreateInput = z.infer<typeof CreateInput>
 
   export const Info = z.object({
     name: z.string(),
     description: z.string(),
     location: z.string(),
     content: z.string(),
+    resources: Resource.array().default([]),
   })
   export type Info = z.infer<typeof Info>
 
@@ -53,17 +75,51 @@ export namespace Skill {
   type State = {
     skills: Record<string, Info>
     dirs: Set<string>
+    sessions: Record<string, Record<string, Info>>
   }
 
   export interface Interface {
-    readonly get: (name: string, userId?: string) => Effect.Effect<Info | undefined>
-    readonly all: (userId?: string) => Effect.Effect<Info[]>
+    readonly get: (name: string, session?: string) => Effect.Effect<Info | undefined>
+    readonly all: (session?: string) => Effect.Effect<Info[]>
     readonly dirs: () => Effect.Effect<string[]>
-    readonly available: (agent?: Agent.Info, userId?: string) => Effect.Effect<Info[]>
+    readonly available: (agent?: Agent.Info, session?: string) => Effect.Effect<Info[]>
     readonly load: (path: string) => Effect.Effect<Info[]>
     readonly loadFromURL: (url: string) => Effect.Effect<Info[]>
-    readonly create: (info: { name: string; description: string; content: string }) => Effect.Effect<Info>
+    readonly create: (info: CreateInput) => Effect.Effect<Info>
     readonly unload: (name: string) => Effect.Effect<void>
+    readonly sessionLoad: (session: string, dir: string) => Effect.Effect<Info[]>
+    readonly sessionList: (session: string) => Effect.Effect<Info[]>
+    readonly sessionUnload: (session: string, name: string) => Effect.Effect<void>
+    readonly sessionCreate: (session: string, input: CreateInput) => Effect.Effect<Info>
+    readonly sessionClear: (session: string) => Effect.Effect<void>
+  }
+
+  function check(info: CreateInput) {
+    const resources = info.resources ?? []
+    if (resources.length > RESOURCE_COUNT_MAX) return `Too many resources: ${resources.length}`
+    const total = Buffer.byteLength(info.content)
+      + resources.reduce((sum, item) => sum + Buffer.byteLength(item.content), 0)
+    if (total > BUNDLE_MAX) return `Skill bundle is too large: ${total} bytes`
+    for (const item of resources) {
+      if (!item.path || path.isAbsolute(item.path) || item.path.split("/").includes("..")) return `Invalid resource path: ${item.path}`
+      const size = Buffer.byteLength(item.content)
+      if (size > RESOURCE_MAX) return `Resource is too large: ${item.path}`
+    }
+  }
+
+  function normalize(info: CreateInput) {
+    const message = check(info)
+    if (message) throw new InvalidError({ path: info.name, message })
+    return { ...info, resources: info.resources ?? [] }
+  }
+
+  function kind(file: string): Resource["type"] {
+    if (file.startsWith("templates/")) return "template"
+    if (file.startsWith("references/")) return "doc"
+    const ext = path.extname(file)
+    if ([".md", ".mdx", ".txt"].includes(ext)) return "doc"
+    if ([".sh", ".bash", ".zsh", ".py", ".js", ".ts"].includes(ext)) return "script"
+    return "asset"
   }
 
   const add = Effect.fnUntraced(function* (state: State, match: string, bus: Bus.Interface) {
@@ -103,6 +159,7 @@ export namespace Skill {
       description: parsed.data.description,
       location: match,
       content: md.content,
+      resources: [],
     }
   })
 
@@ -199,6 +256,7 @@ export namespace Skill {
       const config = yield* Config.Service
       const bus = yield* Bus.Service
       const fsys = yield* AppFileSystem.Service
+      const sessionSkill = yield* SessionSkill.Service
       const istate = yield* InstanceState.make(
         Effect.fn("Skill.state")(function* (ctx) {
           const s: State = { skills: {}, dirs: new Set(), sessions: {} }
@@ -209,20 +267,32 @@ export namespace Skill {
 
       const state = () => Effect.flatMap(InstanceState.get(istate), Ref.get)
 
-      const merged = (s: State, session?: string): Record<string, Info> => {
+      const isPg = Database.dialect === "pg"
+
+      const merged = Effect.fn("Skill.merged")(function* (s: State, session?: string) {
         if (!session) return s.skills
-        const overlay = s.sessions[session] || {}
-        return { ...s.skills, ...overlay }
-      }
+        if (isPg) {
+          const rows = yield* sessionSkill.list(session as SessionID)
+          const overlay = Object.fromEntries(rows.map((row) => [row.name, {
+            name: row.name,
+            description: row.description,
+            location: `session://${session}/${row.name}`,
+            content: row.content,
+            resources: row.resources ?? [],
+          } satisfies Info]))
+          return { ...s.skills, ...overlay }
+        }
+        return { ...s.skills, ...(s.sessions[session] || {}) }
+      })
 
       const get = Effect.fn("Skill.get")(function* (name: string, session?: string) {
         const s = yield* state()
-        return merged(s, session)[name]
+        return (yield* merged(s, session))[name]
       })
 
       const all = Effect.fn("Skill.all")(function* (session?: string) {
         const s = yield* state()
-        return Object.values(merged(s, session))
+        return Object.values(yield* merged(s, session))
       })
 
       const dirs = Effect.fn("Skill.dirs")(function* () {
@@ -232,7 +302,7 @@ export namespace Skill {
 
       const available = Effect.fn("Skill.available")(function* (agent?: Agent.Info, session?: string) {
         const s = yield* state()
-        const list = Object.values(merged(s, session)).toSorted((a, b) => a.name.localeCompare(b.name))
+        const list = Object.values(yield* merged(s, session)).toSorted((a, b) => a.name.localeCompare(b.name))
         if (!agent) return list
         return list.filter((skill) => Permission.evaluate("skill", skill.name, agent.permission).action !== "deny")
       })
@@ -264,13 +334,15 @@ export namespace Skill {
         yield* Ref.update(ref, (s) => { delete s.skills[name]; return s })
       })
 
-      const create = Effect.fn("Skill.create")(function* (input: { name: string; description: string; content: string }) {
+      const create = Effect.fn("Skill.create")(function* (value: CreateInput) {
+        const input = normalize(value)
         const ref = yield* InstanceState.get(istate)
         const info: Info = {
           name: input.name,
           description: input.description,
           location: `memory://${input.name}`,
           content: input.content,
+          resources: input.resources,
         }
         yield* Ref.update(ref, (s) => { s.skills[input.name] = info; return s })
         return info
@@ -278,41 +350,111 @@ export namespace Skill {
 
       const sessionLoad = Effect.fn("Skill.sessionLoad")(function* (session: string, dir: string) {
         if (!(yield* fsys.isDir(dir))) return []
-        const ref = yield* InstanceState.get(istate)
         const tmp: State = { skills: {}, dirs: new Set(), sessions: {} }
         yield* scan(tmp, bus, dir, SKILL_PATTERN)
-        const loaded = Object.values(tmp.skills)
+        const loaded = yield* Effect.forEach(Object.values(tmp.skills), (skill) =>
+          Effect.gen(function* () {
+            if (skill.location.startsWith("session://") || skill.location.startsWith("memory://")) return skill
+            const root = path.dirname(skill.location)
+            const files = yield* fsys.glob("**/*", { cwd: root, absolute: true, include: "file", dot: true }).pipe(Effect.catch(Effect.die))
+            const resources = yield* Effect.forEach(
+              files
+                .filter((file) => path.basename(file) !== "SKILL.md")
+                .map((file) => path.relative(root, file).split(path.sep).join("/"))
+                .toSorted(),
+              (rel) =>
+                Effect.gen(function* () {
+                  return {
+                    path: rel,
+                    type: kind(rel),
+                    content: yield* fsys.readFileString(path.join(root, rel)).pipe(Effect.catch(Effect.die)),
+                  } satisfies Resource
+                }),
+            )
+            const next = normalize({
+              name: skill.name,
+              description: skill.description,
+              content: skill.content,
+              resources,
+            })
+            return { ...skill, resources: next.resources } satisfies Info
+          }),
+        )
+        if (isPg) {
+          return yield* Effect.forEach(loaded, (skill) =>
+            sessionSkill.upsert(session as SessionID, {
+              name: skill.name,
+              description: skill.description,
+              content: skill.content,
+              resources: skill.resources,
+            }).pipe(Effect.map((row) => ({
+              name: row.name,
+              description: row.description,
+              location: `session://${session}/${row.name}`,
+              content: row.content,
+              resources: row.resources ?? [],
+            }))),
+          )
+        }
+        const ref = yield* InstanceState.get(istate)
         yield* Ref.update(ref, (s) => {
           if (!s.sessions[session]) s.sessions[session] = {}
-          for (const skill of loaded) {
-            s.sessions[session][skill.name] = skill
-          }
+          for (const skill of loaded) s.sessions[session][skill.name] = skill
           return s
         })
         return loaded
       })
 
-      const sessionUnload = Effect.fn("Skill.sessionUnload")(function* (session: string, name: string) {
-        const ref = yield* InstanceState.get(istate)
-        yield* Ref.update(ref, (s) => {
-          if (s.sessions[session]) {
-            delete s.sessions[session][name]
-            if (Object.keys(s.sessions[session]).length === 0) {
-              delete s.sessions[session]
-            }
-          }
-          return s
-        })
+      const sessionList = Effect.fn("Skill.sessionList")(function* (session: string) {
+        if (isPg) {
+          const rows = yield* sessionSkill.list(session as SessionID)
+          return rows.map((row) => ({
+            name: row.name,
+            description: row.description,
+            location: `session://${session}/${row.name}`,
+            content: row.content,
+            resources: row.resources ?? [],
+          }))
+        }
+        const s = yield* state()
+        return Object.values(s.sessions[session] || {})
       })
 
-      const sessionCreate = Effect.fn("Skill.sessionCreate")(function* (session: string, input: { name: string; description: string; content: string }) {
-        const ref = yield* InstanceState.get(istate)
+      const sessionUnload = Effect.fn("Skill.sessionUnload")(function* (session: string, name: string) {
+        if (isPg) {
+          yield* sessionSkill.remove(session as SessionID, name)
+        } else {
+          const ref = yield* InstanceState.get(istate)
+          yield* Ref.update(ref, (s) => {
+            if (s.sessions[session]) {
+              delete s.sessions[session][name]
+              if (Object.keys(s.sessions[session]).length === 0) delete s.sessions[session]
+            }
+            return s
+          })
+        }
+      })
+
+      const sessionCreate = Effect.fn("Skill.sessionCreate")(function* (session: string, value: CreateInput) {
+        const input = normalize(value)
+        if (isPg) {
+          const row = yield* sessionSkill.upsert(session as SessionID, input)
+          return {
+            name: row.name,
+            description: row.description,
+            location: `session://${session}/${row.name}`,
+            content: row.content,
+            resources: row.resources ?? [],
+          }
+        }
         const info: Info = {
           name: input.name,
           description: input.description,
           location: `memory://${input.name}`,
           content: input.content,
+          resources: input.resources,
         }
+        const ref = yield* InstanceState.get(istate)
         yield* Ref.update(ref, (s) => {
           if (!s.sessions[session]) s.sessions[session] = {}
           s.sessions[session][input.name] = info
@@ -322,11 +464,15 @@ export namespace Skill {
       })
 
       const sessionClear = Effect.fn("Skill.sessionClear")(function* (session: string) {
-        const ref = yield* InstanceState.get(istate)
-        yield* Ref.update(ref, (s) => { delete s.sessions[session]; return s })
+        if (isPg) {
+          yield* sessionSkill.removeAll(session as SessionID)
+        } else {
+          const ref = yield* InstanceState.get(istate)
+          yield* Ref.update(ref, (s) => { delete s.sessions[session]; return s })
+        }
       })
 
-      return Service.of({ get, all, dirs, available, load, loadFromURL, create, unload, sessionLoad, sessionUnload, sessionCreate, sessionClear })
+      return Service.of({ get, all, dirs, available, load, loadFromURL, create, unload, sessionLoad, sessionList, sessionUnload, sessionCreate, sessionClear })
     }),
   )
 
@@ -335,6 +481,7 @@ export namespace Skill {
     Layer.provide(Config.defaultLayer),
     Layer.provide(Bus.layer),
     Layer.provide(AppFileSystem.defaultLayer),
+    Layer.provide(Database.dialect === "pg" ? SessionSkill.layer : SessionSkill.noopLayer),
   )
 
   export function fmt(list: Info[], opts: { verbose: boolean }) {
@@ -348,7 +495,7 @@ export namespace Skill {
             "  <skill>",
             `    <name>${skill.name}</name>`,
             `    <description>${skill.description}</description>`,
-            `    <location>${pathToFileURL(skill.location).href}</location>`,
+            `    <location>${skill.location.includes("://") ? skill.location : pathToFileURL(skill.location).href}</location>`,
             "  </skill>",
           ]),
         "</available_skills>",

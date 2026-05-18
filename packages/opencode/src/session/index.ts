@@ -29,6 +29,7 @@ import { Permission } from "@/permission"
 import { Global } from "@/global"
 import { Effect, Layer, Option, Context, Cause } from "effect"
 import { SandboxProvider } from "../tool/sandbox-provider"
+import { SessionSkill } from "../skill/session-skill"
 
 export namespace Session {
   const log = Log.create({ service: "session" })
@@ -501,6 +502,20 @@ export namespace Session {
               }),
             )
           }
+
+          yield* Effect.serviceOption(SessionSkill.Service).pipe(
+            Effect.flatMap((opt) =>
+              Option.match(opt, {
+                onNone: () => Effect.void,
+                onSome: (svc) => svc.removeAll(sessionID).pipe(
+                  Effect.catchCause((cause) => {
+                    log.error("failed to remove session skills", { sessionID, cause: Cause.pretty(cause) })
+                    return Effect.void
+                  }),
+                ),
+              }),
+            ),
+          )
         } catch (e) {
           log.error(e)
         }
@@ -733,7 +748,11 @@ export namespace Session {
     }),
   )
 
-  export const defaultLayer = layer.pipe(Layer.provide(Bus.layer), Layer.provide(Storage.defaultLayer))
+  export const defaultLayer = layer.pipe(
+    Layer.provide(Bus.layer),
+    Layer.provide(Storage.defaultLayer),
+    Layer.provide(Database.dialect === "pg" ? SessionSkill.layer : SessionSkill.noopLayer),
+  )
 
   export async function* list(input?: {
     directory?: string

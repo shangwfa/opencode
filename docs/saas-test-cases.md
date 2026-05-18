@@ -1223,6 +1223,268 @@ curl -s "$BASE/command" | python3 -m json.tool | head -80
 
 ---
 
+## 十五、Session Skills
+
+本节验证 SaaS API 中 session 维度的 skills：创建、读取、删除、复杂 bundle、resources 注入，以及从 SkillsMP 拉取真实 skill bundle 后执行。所有请求都打容器服务 `BASE=http://localhost:14096`。
+
+```bash
+BASE="http://localhost:14096"
+MODEL='{"providerID":"zhipuai","modelID":"glm-5.1"}'
+```
+
+### T15.1 简单 session skill 创建与触发
+
+```bash
+SID_SKILL=$(curl -s -X POST "$BASE/session" \
+  -H 'Content-Type: application/json' \
+  -d '{"title":"session-skill-simple-test"}' \
+  | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+
+curl -s -X POST "$BASE/session/$SID_SKILL/skills/create" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "name":"reviewer",
+    "description":"代码审查专家，专注发现 bug 和安全问题",
+    "content":"# Reviewer\n\n审查代码时输出：严重程度、问题描述、修复建议。必须明确说你正在使用 reviewer skill。"
+  }' | python3 -m json.tool
+
+curl -s --max-time 180 -X POST "$BASE/session/$SID_SKILL/message" \
+  -H 'Content-Type: application/json' \
+  -d "{
+    \"parts\":[{\"type\":\"text\",\"text\":\"请使用 reviewer skill 审查：\\n\\`\\`\\`python\\ndef div(a,b):\\n    return a / b\\n\\`\\`\\`\"}],
+    \"skills\":[\"reviewer\"],
+    \"model\":$MODEL
+  }" | python3 -c "import json,sys;d=json.load(sys.stdin);print(''.join(p.get('text','') for p in d.get('parts',[]) if p.get('type')=='text')[:1200])"
+```
+
+**期望**：skill 创建返回 `resources: []`；AI 回复中明确提到 `reviewer skill`，并按「严重程度、问题描述、修复建议」格式审查代码。
+
+### T15.2 复杂 session skill bundle 创建、读取与触发
+
+```bash
+SID_BUNDLE=$(curl -s -X POST "$BASE/session" \
+  -H 'Content-Type: application/json' \
+  -d '{"title":"session-skill-bundle-test"}' \
+  | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+
+curl -s -X POST "$BASE/session/$SID_BUNDLE/skills/create" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "name":"complex-reviewer",
+    "description":"使用 checklist 和模板审查 Python 数据库代码",
+    "content":"# Complex Reviewer\n\n你必须根据 resources 中的 checklist 和模板审查代码。回复必须明确引用 resources 的文件路径。",
+    "resources":[
+      {
+        "path":"references/security-checklist.md",
+        "type":"doc",
+        "content":"Checklist:\n- SQL injection: direct string interpolation into SQL is HIGH severity.\n- Resource leak: DB connection without context manager or close is HIGH severity.\n- Return concrete rows, not raw cursors."
+      },
+      {
+        "path":"templates/safe-query.py",
+        "type":"template",
+        "content":"query = \"SELECT * FROM users WHERE id = ?\"\nwith db.connect() as conn:\n    return conn.execute(query, (user_id,)).fetchone()"
+      }
+    ]
+  }' | python3 -m json.tool
+
+curl -s "$BASE/session/$SID_BUNDLE/skills" \
+  | python3 -c "import json,sys;d=json.load(sys.stdin);print([(s['name'], [r['path'] for r in s.get('resources',[])]) for s in d])"
+
+curl -s --max-time 180 -X POST "$BASE/session/$SID_BUNDLE/message" \
+  -H 'Content-Type: application/json' \
+  -d "{
+    \"parts\":[{\"type\":\"text\",\"text\":\"请使用 complex-reviewer skill 审查这段代码：\\n\\`\\`\\`python\\ndef get_user(user_id):\\n    query = f\\\"SELECT * FROM users WHERE id = {user_id}\\\"\\n    conn = db.connect()\\n    result = conn.execute(query)\\n    return result\\n\\`\\`\\`\"}],
+    \"skills\":[\"complex-reviewer\"],
+    \"model\":$MODEL
+  }" | python3 -c "import json,sys;d=json.load(sys.stdin);t=''.join(p.get('text','') for p in d.get('parts',[]) if p.get('type')=='text');print(t[:1800])"
+```
+
+**期望**：`GET /skills` 能读回 `references/security-checklist.md` 和 `templates/safe-query.py`；AI 回复中明确引用这两个资源路径，并识别 SQL 注入、连接泄漏、返回 raw cursor 等问题。
+
+### T15.3 删除与清空 session skills
+
+```bash
+SID_DEL=$(curl -s -X POST "$BASE/session" \
+  -H 'Content-Type: application/json' \
+  -d '{"title":"session-skill-delete-test"}' \
+  | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+
+for name in complex-reviewer reviewer; do
+  curl -s -X POST "$BASE/session/$SID_DEL/skills/create" \
+    -H 'Content-Type: application/json' \
+    -d "{\"name\":\"$name\",\"description\":\"$name\",\"content\":\"# $name\"}" > /dev/null
+done
+
+curl -s "$BASE/session/$SID_DEL/skills" | python3 -c "import json,sys;print([s['name'] for s in json.load(sys.stdin)])"
+curl -s -o /dev/null -w "delete_one_status=%{http_code}\n" -X DELETE "$BASE/session/$SID_DEL/skills/complex-reviewer"
+curl -s "$BASE/session/$SID_DEL/skills" | python3 -c "import json,sys;print([s['name'] for s in json.load(sys.stdin)])"
+curl -s -o /dev/null -w "clear_status=%{http_code}\n" -X DELETE "$BASE/session/$SID_DEL/skills"
+curl -s "$BASE/session/$SID_DEL/skills" | python3 -m json.tool
+```
+
+**期望**：初始列表含两个 skills；删除单个返回 `204` 后只剩 `reviewer`；清空返回 `204` 后列表为 `[]`。
+
+### T15.4 从目录加载 session skill bundle
+
+`/session/:sessionID/skills/load` 读取的是 opencode 服务容器内路径，不是远端 sandbox 内路径。测试时先在 `opencode-saas-test` 容器内准备 `/workspace/skills`。
+
+```bash
+docker exec opencode-saas-test sh -lc 'mkdir -p /workspace/skills/complex-reviewer/references /workspace/skills/complex-reviewer/templates && cat > /workspace/skills/complex-reviewer/SKILL.md <<'"'"'EOF'"'"'
+---
+name: loaded-reviewer
+description: 从目录加载的 Python DB 审查 skill
+---
+
+# Loaded Reviewer
+
+你必须使用 resources 中的 checklist 和模板审查代码，并引用资源路径。
+EOF
+cat > /workspace/skills/complex-reviewer/references/security-checklist.md <<'"'"'EOF'"'"'
+Checklist:
+- SQL injection from f-string SQL is HIGH severity.
+- Connection without with/close is HIGH severity.
+EOF
+cat > /workspace/skills/complex-reviewer/templates/safe-query.py <<'"'"'EOF'"'"'
+query = "SELECT * FROM users WHERE id = ?"
+with db.connect() as conn:
+    return conn.execute(query, (user_id,)).fetchone()
+EOF'
+
+SID_LOAD=$(curl -s -X POST "$BASE/session" \
+  -H 'Content-Type: application/json' \
+  -d '{"title":"session-skill-load-test"}' \
+  | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+
+curl -s -X POST "$BASE/session/$SID_LOAD/skills/load" \
+  -H 'Content-Type: application/json' \
+  -d '{"path":"/workspace/skills"}' \
+  | python3 -c "import json,sys;d=json.load(sys.stdin);print([(s['name'], [r['path'] for r in s.get('resources',[])]) for s in d])"
+
+curl -s --max-time 180 -X POST "$BASE/session/$SID_LOAD/message" \
+  -H 'Content-Type: application/json' \
+  -d "{
+    \"parts\":[{\"type\":\"text\",\"text\":\"请使用 loaded-reviewer skill 审查：\\n\\`\\`\\`python\\ndef get_user(user_id):\\n    query = f\\\"SELECT * FROM users WHERE id = {user_id}\\\"\\n    conn = db.connect()\\n    return conn.execute(query)\\n\\`\\`\\`\"}],
+    \"skills\":[\"loaded-reviewer\"],
+    \"model\":$MODEL
+  }" | python3 -c "import json,sys;d=json.load(sys.stdin);print(''.join(p.get('text','') for p in d.get('parts',[]) if p.get('type')=='text')[:1600])"
+```
+
+**期望**：加载结果含 `loaded-reviewer`，resources 包含 `references/security-checklist.md` 和 `templates/safe-query.py`；AI 回复中引用这两个资源路径。
+
+### T15.5 从 SkillsMP 默认排序提取 10 个真实 skill bundle 并执行
+
+SkillsMP API 没有无查询的列表接口，`/api/v1/skills` 返回 404。该用例使用最宽泛的 `q=skill`，不传 `category`，不传 `sortBy`，沿用 SkillsMP 默认排序。若第一页存在 GitHub 目录没有可拉取 `SKILL.md` 的条目，则继续取下一页补满 10 个。
+
+```bash
+python3 - <<'PY'
+import json, re, urllib.parse, urllib.request
+
+BASE='http://localhost:14096'
+UA={'User-Agent':'opencode-skill-bundle-test'}
+
+def get(url, timeout=60):
+    req=urllib.request.Request(url, headers=UA)
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return r.read().decode()
+def get_json(url, timeout=60): return json.loads(get(url, timeout))
+def api(method,path,data=None,timeout=300):
+    body=json.dumps(data).encode() if data is not None else None
+    req=urllib.request.Request(BASE+path,data=body,method=method,headers={'Content-Type':'application/json'})
+    with urllib.request.urlopen(req,timeout=timeout) as r:
+        text=r.read().decode(); return json.loads(text) if text else None
+def parse_github(url):
+    m=re.match(r'https://github.com/([^/]+)/([^/]+)(?:/tree/([^/]+)/(.*))?$', url)
+    if not m: raise ValueError(url)
+    return m.group(1),m.group(2),m.group(3) or 'main',urllib.parse.unquote(m.group(4) or '')
+def fm(text):
+    if not text.startswith('---'): return {},text
+    m=re.search(r'^---\s*\n(.*?)\n---\s*\n',text,re.S)
+    if not m: return {},text
+    raw=m.group(1); body=text[m.end():]; meta={}; lines=raw.splitlines(); i=0
+    while i<len(lines):
+        line=lines[i]
+        if ':' not in line: i+=1; continue
+        k,v=line.split(':',1); k=k.strip(); v=v.strip().strip('"').strip("'")
+        if v in ('|','>'):
+            block=[]; i+=1
+            while i<len(lines) and (lines[i].startswith(' ') or not lines[i].strip()): block.append(lines[i].strip()); i+=1
+            meta[k]=' '.join(x for x in block if x); continue
+        meta[k]=v; i+=1
+    return meta,body
+def kind(p):
+    if p.startswith('templates/'): return 'template'
+    if p.startswith(('references/','docs/','rules/')): return 'doc'
+    ext='.'+p.rsplit('.',1)[-1].lower() if '.' in p else ''
+    if ext in ['.md','.mdx','.txt']: return 'doc'
+    if ext in ['.sh','.bash','.zsh','.py','.js','.ts','.tsx','.jsx']: return 'script'
+    return 'asset'
+def extract(item, idx, seen):
+    owner,repo,branch,root=parse_github(item['githubUrl'])
+    tree=get_json(f'https://api.github.com/repos/{owner}/{repo}/git/trees/{branch}?recursive=1')['tree']
+    blobs=[x['path'] for x in tree if x.get('type')=='blob']
+    skill_path=(root.rstrip('/')+'/SKILL.md').lstrip('/') if root else 'SKILL.md'
+    if skill_path not in blobs:
+        c=[p for p in blobs if p.endswith('/SKILL.md') or p=='SKILL.md']
+        if not c: raise FileNotFoundError('SKILL.md')
+        skill_path=c[0]; root=skill_path[:-len('/SKILL.md')] if skill_path.endswith('/SKILL.md') else ''
+    else: root=root.rstrip('/')
+    files=[p for p in blobs if p==skill_path or (root and p.startswith(root+'/'))]
+    raw=f'https://raw.githubusercontent.com/{owner}/{repo}/{branch}/'
+    meta,body=fm(get(raw+urllib.parse.quote(skill_path,safe='/')))
+    name=meta.get('name') or item['name']
+    if name in seen: name=f'{name}-{idx}'
+    seen.add(name)
+    resources=[]; total=len(body.encode())
+    for file in sorted(files):
+        if file==skill_path: continue
+        rel=file[len(root)+1:] if root else file
+        if rel.startswith('.') or rel.endswith(('.png','.jpg','.jpeg','.gif','.webp','.pdf','.zip','.mp3','.mp4')): continue
+        content=get(raw+urllib.parse.quote(file,safe='/'))
+        size=len(content.encode())
+        if size>256*1024 or total+size>900*1024: continue
+        resources.append({'path':rel,'type':kind(rel),'content':content}); total+=size
+        if len(resources)>=64: break
+    desc=meta.get('description') or item.get('description') or name
+    return {'name':name,'description':desc[:1200],'content':body,'resources':resources,'githubUrl':item['githubUrl']}
+
+print('health', urllib.request.urlopen(BASE+'/', timeout=20).status)
+bundles=[]; seen=set(); page=1
+while len(bundles)<10 and page<=3:
+    data=get_json(f'https://skillsmp.com/api/v1/skills/search?q=skill&limit=10&page={page}')['data']['skills']
+    for item in data:
+        if len(bundles)>=10: break
+        try:
+            b=extract(item, len(bundles)+1, seen)
+            bundles.append(b)
+            print(f'extracted {len(bundles)} {b["name"]} resources={len(b["resources"])}')
+        except Exception as e:
+            print('skip', item.get('githubUrl'), type(e).__name__, str(e)[:100])
+    page+=1
+if len(bundles)<10: raise SystemExit(f'only {len(bundles)}')
+
+s=api('POST','/session',{'title':'skillsmp-default-10-bundle-test'}); sid=s['id']; print('SID',sid)
+for b in bundles:
+    c=api('POST',f'/session/{sid}/skills/create',{k:b[k] for k in ['name','description','content','resources']})
+    print('created',c['name'],'resources=',len(c.get('resources',[])))
+listed=api('GET',f'/session/{sid}/skills')
+print('listed_count',len(listed)); print('listed_names',', '.join(x['name'] for x in listed))
+names=[b['name'] for b in bundles]
+msg=api('POST',f'/session/{sid}/message',{
+ 'parts':[{'type':'text','text':'请验证当前从 SkillsMP 默认排序提取的 10 个 skills 是否可用。要求：按名称列出每个 skill；每个 skill 用一句话说明用途；如果有 resources，列出至少一个资源路径；最后总结这些 skills 覆盖的能力范围。'}],
+ 'skills':names,
+ 'model':{'providerID':'zhipuai','modelID':'glm-5.1'}
+})
+text='\n'.join(p.get('text','') for p in msg.get('parts',[]) if p.get('type')=='text')
+print(text[:5000])
+print('validation_names_mentioned',sum(1 for n in names if n in text),'/',len(names))
+print('validation_resource_path_mentioned',any(r['path'] in text for b in bundles for r in b['resources']))
+PY
+```
+
+**期望**：`listed_count 10`；`validation_names_mentioned 10 / 10`；`validation_resource_path_mentioned True`。实际已验证过的默认排序样例包含 `skill-eval-测评`、`SkillSentry`、`skill-evaluator`、`skill-stocktake`、`skill-architect`、`skills-jk-gha-pr-creation`、`skill-creator`、`skill-soulsaying`、`skill-retrospective`、`skill-optimizer`。
+
+---
+
 ## 验收状态表
 
 每条用例标记 ✅ / ❌ / ⚠️，附加发现的问题。
@@ -1277,6 +1539,11 @@ curl -s "$BASE/command" | python3 -m json.tool | head -80
 | T12.9 | | 多 session PVC 子目录隔离 |
 | T12.10 | | 不同 session 进程隔离 |
 | T12.12 | | proxy 访问不触发 keepAlive |
+| T15.1 | ✅ | 简单 session skill 创建并通过 `skills` 触发 |
+| T15.2 | ✅ | 复杂 session skill bundle resources 写入、读取、注入 |
+| T15.3 | ✅ | session skill 删除单个与清空 |
+| T15.4 | ✅ | 从服务端目录加载 `SKILL.md` bundle 与 resources |
+| T15.5 | ✅ | SkillsMP 默认排序 10 个真实 skill bundle 创建与预加载验证 |
 
 ### P1 SaaS 稳定性
 

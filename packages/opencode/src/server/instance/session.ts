@@ -18,6 +18,7 @@ import { AppRuntime } from "../../effect/app-runtime"
 import { Agent } from "../../agent/agent"
 import { Snapshot } from "@/snapshot"
 import { Command } from "../../command"
+import { Skill } from "../../skill"
 import { Log } from "../../util/log"
 import { Permission } from "@/permission"
 import { PermissionID } from "@/permission/schema"
@@ -100,6 +101,129 @@ export const SessionRoutes = lazy(() =>
           const svc = yield* SessionStatus.Service
           return Object.fromEntries(yield* svc.list())
         }),
+    )
+    .get(
+      "/:sessionID/skills",
+      describeRoute({
+        summary: "List session skills",
+        description: "Get skills attached to a specific OpenCode session.",
+        operationId: "session.skills",
+        responses: {
+          200: {
+            description: "Session skills",
+            content: { "application/json": { schema: resolver(Skill.Info.array()) } },
+          },
+          ...errors(400),
+        },
+      }),
+      validator("param", z.object({ sessionID: SessionID.zod })),
+      async (c) => {
+        const sessionID = c.req.valid("param").sessionID
+        return jsonRequest("SessionRoutes.skills", c, function* () {
+          const session = yield* Session.Service
+          yield* session.get(sessionID)
+          const skill = yield* Skill.Service
+          return yield* skill.sessionList(sessionID)
+        })
+      },
+    )
+    .post(
+      "/:sessionID/skills/create",
+      describeRoute({
+        summary: "Create session skill",
+        description: "Create or update an inline skill attached to a specific OpenCode session.",
+        operationId: "session.skills.create",
+        responses: {
+          200: {
+            description: "Created session skill",
+            content: { "application/json": { schema: resolver(Skill.Info) } },
+          },
+          ...errors(400),
+        },
+      }),
+      validator("param", z.object({ sessionID: SessionID.zod })),
+      validator("json", Skill.CreateInput),
+      async (c) => {
+        const sessionID = c.req.valid("param").sessionID
+        const body = c.req.valid("json")
+        return jsonRequest("SessionRoutes.skillsCreate", c, function* () {
+          const session = yield* Session.Service
+          yield* session.get(sessionID)
+          const skill = yield* Skill.Service
+          return yield* skill.sessionCreate(sessionID, body)
+        })
+      },
+    )
+    .post(
+      "/:sessionID/skills/load",
+      describeRoute({
+        summary: "Load session skills",
+        description: "Import skills from a local directory as snapshots attached to a specific OpenCode session.",
+        operationId: "session.skills.load",
+        responses: {
+          200: {
+            description: "Loaded session skills",
+            content: { "application/json": { schema: resolver(Skill.Info.array()) } },
+          },
+          ...errors(400),
+        },
+      }),
+      validator("param", z.object({ sessionID: SessionID.zod })),
+      validator("json", z.object({ path: z.string() })),
+      async (c) => {
+        const sessionID = c.req.valid("param").sessionID
+        const body = c.req.valid("json")
+        return jsonRequest("SessionRoutes.skillsLoad", c, function* () {
+          const session = yield* Session.Service
+          yield* session.get(sessionID)
+          const skill = yield* Skill.Service
+          return yield* skill.sessionLoad(sessionID, body.path)
+        })
+      },
+    )
+    .delete(
+      "/:sessionID/skills/:name",
+      describeRoute({
+        summary: "Unload session skill",
+        description: "Remove a skill from a specific OpenCode session.",
+        operationId: "session.skills.unload",
+        responses: { 204: { description: "Session skill unloaded" }, ...errors(400) },
+      }),
+      validator("param", z.object({ sessionID: SessionID.zod, name: z.string() })),
+      async (c) => {
+        const param = c.req.valid("param")
+        await AppRuntime.runPromise(
+          Effect.gen(function* () {
+            const session = yield* Session.Service
+            yield* session.get(param.sessionID)
+            const skill = yield* Skill.Service
+            yield* skill.sessionUnload(param.sessionID, param.name)
+          }),
+        )
+        return c.body(null, 204)
+      },
+    )
+    .delete(
+      "/:sessionID/skills",
+      describeRoute({
+        summary: "Clear session skills",
+        description: "Remove all skills attached to a specific OpenCode session.",
+        operationId: "session.skills.clear",
+        responses: { 204: { description: "Session skills cleared" }, ...errors(400) },
+      }),
+      validator("param", z.object({ sessionID: SessionID.zod })),
+      async (c) => {
+        const sessionID = c.req.valid("param").sessionID
+        await AppRuntime.runPromise(
+          Effect.gen(function* () {
+            const session = yield* Session.Service
+            yield* session.get(sessionID)
+            const skill = yield* Skill.Service
+            yield* skill.sessionClear(sessionID)
+          }),
+        )
+        return c.body(null, 204)
+      },
     )
     .get(
       "/:sessionID",

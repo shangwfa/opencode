@@ -136,7 +136,45 @@ AI 会自动判断需要工具，调用沙箱执行命令并返回结果。
 | GET | `/session/:sessionID/message/:messageID` | 单条消息详情 |
 | GET | `/session/:sessionID/diff` | 消息引起的文件变更 |
 
-### 3.5 实例/沙箱
+### 3.5 Session Skills
+
+Session Skill 是绑定到单个 session 的能力包，用于给某次任务注入专门的工作流、规则、参考文档或脚本模板。Skill 数据持久化在 PG 中，服务重启或多 pod 切换后仍可通过同一个 session 读取。
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/session/:sessionID/skills` | 列出该 session 已绑定的 skills |
+| POST | `/session/:sessionID/skills/create` | 创建或更新 session skill |
+| POST | `/session/:sessionID/skills/load` | 从服务端本地目录加载 `SKILL.md` skill bundle |
+| DELETE | `/session/:sessionID/skills/:name` | 删除指定 session skill |
+| DELETE | `/session/:sessionID/skills` | 清空该 session 的所有 skills |
+
+Skill 统一使用 bundle 模型：简单 skill 是 `resources: []` 的 bundle，复杂 skill 可以带文档、脚本和模板资源。
+
+```json
+{
+  "name": "complex-reviewer",
+  "description": "代码审查专家，使用内置 checklist 和模板检查数据库代码",
+  "content": "# Complex Reviewer\n\n请根据 resources 中的 checklist 和模板审查代码。",
+  "resources": [
+    {
+      "path": "references/security-checklist.md",
+      "type": "doc",
+      "content": "- SQL injection: direct string interpolation into SQL is HIGH severity."
+    },
+    {
+      "path": "templates/safe-query.py",
+      "type": "template",
+      "content": "query = \"SELECT * FROM users WHERE id = ?\"\nwith db.connect() as conn:\n    return conn.execute(query, (user_id,)).fetchone()"
+    }
+  ]
+}
+```
+
+`resources[].type` 可选值：`doc` / `script` / `template` / `asset`。
+
+资源限制：单个 resource 最大 256KB，单个 skill bundle 最大 1MB，单个 skill 最多 64 个 resources。`path` 必须是相对路径，不能是绝对路径，也不能包含 `..`。
+
+### 3.6 实例/沙箱
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
@@ -416,7 +454,140 @@ if (last.info.finish === "stop") {
 }
 ```
 
-### 4.3 工具调用（含沙箱）
+### 4.3 Session Skills（任务能力包）
+
+Session Skills 用于给某个 session 临时绑定专业能力。它适合以下场景：
+- 给单次任务注入审查规则、编码规范或 SOP
+- 给 AI 提供参考文档、脚本模板、命令片段
+- 同一个 SaaS 服务里不同 session 使用不同技能，不互相影响
+- 多 pod 部署时通过 PG 持久化，任意 pod 都能读到同一个 session 的 skills
+
+#### 4.3.1 创建简单 skill
+
+简单 skill 只需要 `name`、`description`、`content`，`resources` 可省略。
+
+```bash
+SID=$(curl -s -X POST https://test-opencode.shadow-rpa.net/session \
+  -H 'Content-Type: application/json' \
+  -d '{"title":"代码审查"}' | jq -r .id)
+
+curl -X POST https://test-opencode.shadow-rpa.net/session/$SID/skills/create \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "name": "reviewer",
+    "description": "代码审查专家，专注发现 bug 和安全问题",
+    "content": "# Reviewer\n\n审查代码时输出：严重程度、问题描述、修复建议。"
+  }'
+```
+
+#### 4.3.2 创建复杂 skill bundle
+
+复杂 skill 可以带 `resources`，用于放参考文档、脚本或模板。模型只有在请求里通过 `skills` 预加载时才会收到完整资源内容。
+
+```bash
+curl -X POST https://test-opencode.shadow-rpa.net/session/$SID/skills/create \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "name": "complex-reviewer",
+    "description": "使用 checklist 和模板审查 Python 数据库代码",
+    "content": "# Complex Reviewer\n\n你必须根据 resources 中的 checklist 和模板审查代码。",
+    "resources": [
+      {
+        "path": "references/security-checklist.md",
+        "type": "doc",
+        "content": "Checklist:\n- SQL injection: direct string interpolation into SQL is HIGH severity.\n- Resource leak: DB connection without context manager or close is HIGH severity.\n- Return concrete rows, not raw cursors."
+      },
+      {
+        "path": "templates/safe-query.py",
+        "type": "template",
+        "content": "query = \"SELECT * FROM users WHERE id = ?\"\nwith db.connect() as conn:\n    return conn.execute(query, (user_id,)).fetchone()"
+      }
+    ]
+  }'
+```
+
+#### 4.3.3 触发 skill 执行
+
+发消息时传 `skills` 数组。服务会把指定 skill 的 `content` 和 `resources` 注入 system prompt。
+
+```bash
+curl -X POST https://test-opencode.shadow-rpa.net/session/$SID/message \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "parts": [{
+      "type": "text",
+      "text": "请使用 complex-reviewer skill 审查这段代码：\n```python\ndef get_user(user_id):\n    query = f\"SELECT * FROM users WHERE id = {user_id}\"\n    conn = db.connect()\n    result = conn.execute(query)\n    return result\n```"
+    }],
+    "skills": ["complex-reviewer"],
+    "model": {"providerID":"zhipuai","modelID":"glm-5.1"}
+  }'
+```
+
+预期模型会引用 `references/security-checklist.md` 和 `templates/safe-query.py`，并按 skill 规则输出审查结果。
+
+#### 4.3.4 查看和删除 skills
+
+```bash
+# 列出 session skills
+curl https://test-opencode.shadow-rpa.net/session/$SID/skills
+
+# 删除单个 skill
+curl -X DELETE https://test-opencode.shadow-rpa.net/session/$SID/skills/complex-reviewer
+
+# 清空 session skills
+curl -X DELETE https://test-opencode.shadow-rpa.net/session/$SID/skills
+```
+
+#### 4.3.5 从目录加载 skill bundle
+
+`POST /session/:sessionID/skills/load` 会扫描服务端可访问目录下的 `SKILL.md`。每个 `SKILL.md` 所在目录会被当作一个 bundle 根目录，除 `SKILL.md` 外的文件会作为 resources 读取。
+
+目录示例：
+
+```text
+skills/complex-reviewer/
+├── SKILL.md
+├── references/security-checklist.md
+└── templates/safe-query.py
+```
+
+`SKILL.md`：
+
+```markdown
+---
+name: complex-reviewer
+description: 使用 checklist 和模板审查 Python 数据库代码
+---
+
+# Complex Reviewer
+
+你必须根据 resources 中的 checklist 和模板审查代码。
+```
+
+加载：
+
+```bash
+curl -X POST https://test-opencode.shadow-rpa.net/session/$SID/skills/load \
+  -H 'Content-Type: application/json' \
+  -d '{"path":"/workspace/skills"}'
+```
+
+资源类型推断规则：
+- `references/` 下文件默认是 `doc`
+- `templates/` 下文件默认是 `template`
+- `.md`、`.mdx`、`.txt` 是 `doc`
+- `.sh`、`.bash`、`.zsh`、`.py`、`.js`、`.ts` 是 `script`
+- 其他是 `asset`
+
+#### 4.3.6 使用注意
+
+- `resources` 不会出现在普通可用 skill 列表的 prompt 内容中，只有通过 `skills` 预加载时才注入。
+- `resources[].path` 必须是相对路径，禁止绝对路径和 `..`。
+- 单个 resource 最大 256KB，单个 bundle 最大 1MB，单个 skill 最多 64 个 resources。
+- 同名 session skill 会覆盖更新，不会创建重复项。
+- 删除 session 时，对应 session skills 会一起清理。
+
+### 4.4 工具调用（含沙箱）
 
 让 AI 操作沙箱里的文件 / 执行命令：
 
@@ -433,7 +604,7 @@ await sendMessage(sid, "使用 bash 运行 python /workspace/app.py")
 
 **最佳实践**：prompt 里**明确指定工具名**（`使用 bash 工具`、`使用 write 工具`），避免模型幻觉。
 
-### 4.4 多轮对话
+### 4.5 多轮对话
 
 ```typescript
 // 第一轮
@@ -446,7 +617,7 @@ await sendMessage(sid, "我叫什么？")
 
 session 内消息历史自动注入，无需手动管理。
 
-### 4.5 沙箱生命周期
+### 4.6 沙箱生命周期
 
 ```typescript
 // 1. 首次发消息会自动创建沙箱 Pod（~2-3 秒延迟）
@@ -473,7 +644,7 @@ await sendMessage(sid, "cat /workspace/app.py")
 
 ---
 
-### 4.5.1 主动 dispose 最佳实践
+### 4.6.1 主动 dispose 最佳实践
 
 依赖空闲回收会有 30~60 秒的资源浪费窗口。**高并发或对资源敏感**的场景，强烈推荐**任务结束后主动 dispose**。
 
@@ -600,7 +771,7 @@ async function processBatch(tasks: string[]) {
 - **频繁 dispose 会增加冷启动**：如果一个 session 高频对话，**不要每条消息都 dispose**
 - **idle 兜底**：即使忘记 dispose，30~60 秒后也会自动回收，**不会无限占用资源**
 
-### 4.6 文件上传到沙箱
+### 4.7 文件上传到沙箱
 
 **场景**：把客户端本地文件传到沙箱 `/workspace`，让 AI 处理。
 
@@ -667,7 +838,7 @@ await fetch(`/session/${sid}/message`, {
 
 ---
 
-### 4.7 文件从沙箱下载
+### 4.8 文件从沙箱下载
 
 同样**没有直接 API**，通过 AI 工具完成：
 
@@ -707,7 +878,7 @@ curl -X PUT --data-binary @/workspace/output.zip \
 
 ---
 
-### 4.8 会话恢复（UI 重新加载历史）
+### 4.9 会话恢复（UI 重新加载历史）
 
 刷新页面、用户重新登录后，恢复对话上下文：
 
@@ -741,7 +912,7 @@ await chat(sid, "继续刚才的话题")
 
 ---
 
-### 4.9 会话 Fork（分支对话）
+### 4.10 会话 Fork（分支对话）
 
 从某个会话的某个时间点分叉一个新会话——常用于"基于这个上下文换个方向试试"：
 
@@ -769,7 +940,7 @@ await chat(newSession.id, "换个思路：用 Python 重写")
 
 ---
 
-### 4.10 会话分享（生成只读链接）
+### 4.11 会话分享（生成只读链接）
 
 ```typescript
 const session = await fetch(`/session/${sid}/share`, {
@@ -789,7 +960,7 @@ console.log("分享链接:", session.share?.url)
 
 ---
 
-### 4.11 Agent 切换（build / plan / 子 agent）
+### 4.12 Agent 切换（build / plan / 子 agent）
 
 opencode 内置多个 agent，控制 AI 的能力边界：
 
@@ -862,9 +1033,9 @@ await chat(sid, "@general 帮我搜索整个项目里所有 TODO 注释，并整
 
 ---
 
-### 4.12 PVC 持久化机制（重要）
+### 4.13 PVC 持久化机制（重要）
 
-#### 4.12.1 工作原理
+#### 4.13.1 工作原理
 
 每个 session 在 PVC 上有**独立的子路径**（subPath），通过 K8s `subPath` 字段隔离：
 
@@ -889,7 +1060,7 @@ PVC: sandbox-test
 - ⚠️ **共享同一物理 PVC**（容量是共享的，需要监控总占用）
 - ⚠️ **删除 session 时**会同步清理对应 subPath（`cleanup-root` 任务）
 
-#### 4.12.2 持久化的目录
+#### 4.13.2 持久化的目录
 
 | 沙箱内路径 | 用途 |
 |---|---|
@@ -900,7 +1071,7 @@ PVC: sandbox-test
 | `/home/sandbox/.local` | 用户级安装的二进制（pip install --user 等） |
 | `/home/sandbox/tmp` | 临时文件 |
 
-#### 4.12.3 典型场景
+#### 4.13.3 典型场景
 
 **场景 1：长任务跨 dispose 续作**
 ```typescript
@@ -930,7 +1101,7 @@ await fetch(`/session/${sid}`, { method: "DELETE" })
 // → 触发 sandbox-cleanup，subPath 物理删除
 ```
 
-#### 4.12.4 容量管理建议
+#### 4.13.4 容量管理建议
 
 - **PVC 容量**：按预估 session 数 × 平均占用规划
   - 轻量对话：< 100MB/session
@@ -939,7 +1110,7 @@ await fetch(`/session/${sid}`, { method: "DELETE" })
 - **回收策略**：定期 DELETE 长期不活跃的 session
 - **监控**：通过 K8s `kubectl exec` 进 sandbox Pod 看 `df -h /workspace`
 
-#### 4.12.5 多租户隔离场景
+#### 4.13.5 多租户隔离场景
 
 **目前限制**：所有 session 共享一个 PVC。如果需要**多租户级别**隔离：
 
@@ -1169,7 +1340,7 @@ await client.chatStream(sid, "分析一下 /workspace 下的所有文件", part 
 | 部分模型（kimi-k2.6）要求 temperature=1 | 默认 0.5 会被 API 拒绝 | PATCH `/global/config` 配 agent.temperature=1 |
 | 沙箱冷启动 ~2-3 秒延迟 | 首次发消息变慢 | 业务层 loading 提示 |
 | LLM 工具幻觉 | 模型可能假装调用工具但实际没调 | prompt 明确指定工具名 |
-| 所有 session 共享一个 PVC | 容量共享 / 单租户场景下够用 | 多租户需按租户拆 PVC 或拆实例（见 4.12.5） |
+| 所有 session 共享一个 PVC | 容量共享 / 单租户场景下够用 | 多租户需按租户拆 PVC 或拆实例（见 4.13.5） |
 
 ### 7.2 最佳实践
 
@@ -1180,7 +1351,7 @@ await client.chatStream(sid, "分析一下 /workspace 下的所有文件", part 
 
 **会话管理**：
 - 长任务用 `prompt_async` + SSE 订阅
-- **任务结束调 `/instance/dispose`** 立即释放沙箱资源（推荐，见 4.5.1）
+- **任务结束调 `/instance/dispose`** 立即释放沙箱资源（推荐，见 4.6.1）
 - 一次性任务用 `try/finally` 模式保证 dispose
 - 不需要的 session 调 DELETE 清理（避免列表变大、释放 PVC 空间）
 - **不要每条消息都 dispose** —— 会增加冷启动开销

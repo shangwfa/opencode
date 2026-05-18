@@ -92,8 +92,20 @@ export namespace SystemPrompt {
                 "",
                 info.content.trim(),
                 "",
-                "</skill_content>",
               )
+              if (info.resources.length > 0) {
+                parts.push(
+                  "<resources>",
+                  ...info.resources.flatMap((resource) => [
+                    `  <resource path="${resource.path}" type="${resource.type}">`,
+                    resource.content.trim(),
+                    "  </resource>",
+                  ]),
+                  "</resources>",
+                  "",
+                )
+              }
+              parts.push("</skill_content>")
             }
           }
 

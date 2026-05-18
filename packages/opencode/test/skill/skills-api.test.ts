@@ -237,7 +237,7 @@ description: Skill for available test.
       expect(result.success).toBe(true)
       if (result.success) {
         expect("path" in result.data).toBe(true)
-        expect(result.data.path).toBe("/some/path")
+        if ("path" in result.data) expect(result.data.path).toBe("/some/path")
       }
     }),
   )
