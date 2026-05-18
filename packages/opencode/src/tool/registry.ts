@@ -69,6 +69,7 @@ export namespace ToolRegistry {
       providerID: ProviderID
       modelID: ModelID
       agent: Agent.Info
+      sessionID?: string
     }) => Effect.Effect<Tool.Def[]>
   }
 
@@ -238,9 +239,16 @@ export namespace ToolRegistry {
         return (yield* all()).map((tool) => tool.id)
       })
 
-      const describeSkill = Effect.fn("ToolRegistry.describeSkill")(function* (agent: Agent.Info) {
-        const list = yield* skill.available(agent)
-        if (list.length === 0) return "No skills are currently available."
+      const describeSkill = Effect.fn("ToolRegistry.describeSkill")(function* (agent: Agent.Info, sessionID?: string) {
+        const list = yield* skill.available(agent, sessionID)
+        if (list.length === 0) {
+          return [
+            "Load a specialized skill by name from the available_skills manifest in the system prompt.",
+            "Session-specific skills may be available even when this tool description does not list them.",
+            "Call this tool with the skill name before applying a skill's instructions.",
+            "To load selected bundled resources, pass their relative paths in the resources array.",
+          ].join("\n")
+        }
         return [
           "Load a specialized skill that provides domain-specific instructions and workflows.",
           "",
@@ -251,7 +259,7 @@ export namespace ToolRegistry {
           'Tool output includes a `<skill_content name="...">` block with the loaded content.',
           "",
           "The following skills provide specialized sets of instructions for particular tasks",
-          "Invoke this tool to load a skill when a task matches one of the available skills listed below:",
+          "Invoke this tool to load a skill when a task matches one of the available skills listed below or a session skill listed in the system prompt:",
           "",
           Skill.fmt(list, { verbose: false }),
         ].join("\n")
@@ -300,7 +308,7 @@ export namespace ToolRegistry {
               description: [
                 output.description,
                 tool.id === TaskTool.id ? yield* describeTask(input.agent) : undefined,
-                tool.id === SkillTool.id ? yield* describeSkill(input.agent) : undefined,
+                tool.id === SkillTool.id ? yield* describeSkill(input.agent, input.sessionID) : undefined,
               ]
                 .filter(Boolean)
                 .join("\n"),

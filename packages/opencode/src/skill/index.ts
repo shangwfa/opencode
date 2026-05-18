@@ -107,6 +107,12 @@ export namespace Skill {
     }
   }
 
+  const SKIP_DIRS = new Set(['.git', 'node_modules', '.DS_Store', '__pycache__', '.cache'])
+
+  function isSkipPath(rel: string) {
+    return rel.split('/').some((seg) => SKIP_DIRS.has(seg))
+  }
+
   function normalize(info: CreateInput) {
     const message = check(info)
     if (message) throw new InvalidError({ path: info.name, message })
@@ -121,6 +127,35 @@ export namespace Skill {
     if ([".sh", ".bash", ".zsh", ".py", ".js", ".ts"].includes(ext)) return "script"
     return "asset"
   }
+
+  const attachResources = (skills: Info[], fsys: AppFileSystem.Interface) =>
+    Effect.forEach(skills, (skill) =>
+      Effect.gen(function* () {
+        if (skill.location.startsWith("session://") || skill.location.startsWith("memory://")) return skill
+        if (skill.resources.length > 0) return skill
+        const root = path.dirname(skill.location)
+        const files = yield* fsys
+          .glob("**/*", { cwd: root, absolute: true, include: "file", dot: true })
+          .pipe(Effect.catch(Effect.die))
+        const candidates = files
+          .filter((file) => path.basename(file) !== "SKILL.md")
+          .map((file) => path.relative(root, file).split(path.sep).join("/"))
+          .filter((rel) => !isSkipPath(rel))
+          .toSorted()
+        const resources: Resource[] = []
+        for (const rel of candidates) {
+          const stat = yield* fsys.stat(path.join(root, rel)).pipe(Effect.option)
+          const size = stat._tag === "Some" ? Number((stat.value as any).size ?? 0) : 0
+          if (size > RESOURCE_MAX) continue
+          const content = yield* fsys.readFileString(path.join(root, rel)).pipe(Effect.catch(Effect.die))
+          resources.push({ path: rel, type: kind(rel), content })
+          const total = Buffer.byteLength(skill.content)
+            + resources.reduce((sum, r) => sum + Buffer.byteLength(r.content), 0)
+          if (total > BUNDLE_MAX || resources.length >= RESOURCE_COUNT_MAX) break
+        }
+        return { ...skill, resources } satisfies Info
+      }),
+    )
 
   const add = Effect.fnUntraced(function* (state: State, match: string, bus: Bus.Interface) {
     const md = yield* Effect.tryPromise({
@@ -312,8 +347,13 @@ export namespace Skill {
         const ref = yield* InstanceState.get(istate)
         const before = new Set(Object.keys((yield* Ref.get(ref)).skills))
         yield* scan(yield* Ref.get(ref), bus, dir, SKILL_PATTERN)
-        const after = (yield* Ref.get(ref)).skills
-        return Object.values(after).filter((s) => !before.has(s.name))
+        const raw = Object.values((yield* Ref.get(ref)).skills).filter((s) => !before.has(s.name))
+        const loaded = yield* attachResources(raw, fsys)
+        yield* Ref.update(ref, (s) => {
+          for (const skill of loaded) s.skills[skill.name] = skill
+          return s
+        })
+        return loaded
       })
 
       const loadFromURL = Effect.fn("Skill.loadFromURL")(function* (url: string) {
@@ -325,8 +365,13 @@ export namespace Skill {
           yield* Ref.update(ref, (s) => { s.dirs.add(dir); return s })
           yield* scan(yield* Ref.get(ref), bus, dir, SKILL_PATTERN)
         }
-        const after = (yield* Ref.get(ref)).skills
-        return Object.values(after).filter((s) => !before.has(s.name))
+        const raw = Object.values((yield* Ref.get(ref)).skills).filter((s) => !before.has(s.name))
+        const loaded = yield* attachResources(raw, fsys)
+        yield* Ref.update(ref, (s) => {
+          for (const skill of loaded) s.skills[skill.name] = skill
+          return s
+        })
+        return loaded
       })
 
       const unload = Effect.fn("Skill.unload")(function* (name: string) {
@@ -352,34 +397,7 @@ export namespace Skill {
         if (!(yield* fsys.isDir(dir))) return []
         const tmp: State = { skills: {}, dirs: new Set(), sessions: {} }
         yield* scan(tmp, bus, dir, SKILL_PATTERN)
-        const loaded = yield* Effect.forEach(Object.values(tmp.skills), (skill) =>
-          Effect.gen(function* () {
-            if (skill.location.startsWith("session://") || skill.location.startsWith("memory://")) return skill
-            const root = path.dirname(skill.location)
-            const files = yield* fsys.glob("**/*", { cwd: root, absolute: true, include: "file", dot: true }).pipe(Effect.catch(Effect.die))
-            const resources = yield* Effect.forEach(
-              files
-                .filter((file) => path.basename(file) !== "SKILL.md")
-                .map((file) => path.relative(root, file).split(path.sep).join("/"))
-                .toSorted(),
-              (rel) =>
-                Effect.gen(function* () {
-                  return {
-                    path: rel,
-                    type: kind(rel),
-                    content: yield* fsys.readFileString(path.join(root, rel)).pipe(Effect.catch(Effect.die)),
-                  } satisfies Resource
-                }),
-            )
-            const next = normalize({
-              name: skill.name,
-              description: skill.description,
-              content: skill.content,
-              resources,
-            })
-            return { ...skill, resources: next.resources } satisfies Info
-          }),
-        )
+        const loaded = yield* attachResources(Object.values(tmp.skills), fsys)
         if (isPg) {
           return yield* Effect.forEach(loaded, (skill) =>
             sessionSkill.upsert(session as SessionID, {

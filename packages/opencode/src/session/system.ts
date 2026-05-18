@@ -80,6 +80,7 @@ export namespace SystemPrompt {
           const parts: string[] = []
 
           if (preload?.length) {
+            parts.push("<preloaded_skills>")
             for (const name of preload) {
               const info = yield* skill.get(name, session)
               if (!info) {
@@ -87,31 +88,31 @@ export namespace SystemPrompt {
                 continue
               }
               parts.push(
-                `<skill_content name="${info.name}">`,
-                `# Skill: ${info.name}`,
-                "",
-                info.content.trim(),
-                "",
+                "  <skill>",
+                `    <name>${info.name}</name>`,
+                `    <description>${info.description}</description>`,
+                `    <location>${info.location}</location>`,
               )
               if (info.resources.length > 0) {
                 parts.push(
-                  "<resources>",
-                  ...info.resources.flatMap((resource) => [
-                    `  <resource path="${resource.path}" type="${resource.type}">`,
-                    resource.content.trim(),
-                    "  </resource>",
-                  ]),
-                  "</resources>",
-                  "",
+                  "    <resources>",
+                  ...info.resources.map((resource) =>
+                    `      <resource path="${resource.path}" type="${resource.type}" size="${Buffer.byteLength(resource.content)}" />`,
+                  ),
+                  "    </resources>",
                 )
               }
-              parts.push("</skill_content>")
+              parts.push("  </skill>")
             }
+            parts.push(
+              "</preloaded_skills>",
+              "These preloaded skills are manifests only. Before applying a preloaded skill, call the skill tool with its name to load the full instructions. If specific resource content is needed, call the skill tool with the resource paths.",
+            )
           }
 
           parts.push(
             "Skills provide specialized instructions and workflows for specific tasks.",
-            "Use the skill tool to load a skill when a task matches its description.",
+            "Use the skill tool to load a skill when a task matches its description. The available_skills list is only a manifest; do not assume the full instructions are loaded until the skill tool returns skill_content.",
             Skill.fmt(list, { verbose: true }),
           )
 

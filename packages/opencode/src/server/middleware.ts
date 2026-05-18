@@ -2,6 +2,7 @@ import { Provider } from "../provider/provider"
 import { NamedError } from "@opencode-ai/shared/util/error"
 import { NotFoundError } from "../storage/db"
 import { Session } from "../session"
+import { Skill } from "../skill"
 import type { ContentfulStatusCode } from "hono/utils/http-status"
 import type { ErrorHandler, MiddlewareHandler } from "hono"
 import { HTTPException } from "hono/http-exception"
@@ -23,6 +24,7 @@ export const ErrorMiddleware: ErrorHandler = (err, c) => {
     else if (err instanceof Provider.ModelNotFoundError) status = 400
     else if (err.name === "ProviderAuthValidationFailed") status = 400
     else if (err.name.startsWith("Worktree")) status = 400
+    else if (err instanceof Skill.InvalidError) status = 400
     else status = 500
     return c.json(err.toObject(), { status })
   }

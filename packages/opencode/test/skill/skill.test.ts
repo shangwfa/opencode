@@ -1,11 +1,17 @@
 import { describe, expect } from "bun:test"
 import { Effect, Layer } from "effect"
 import { Skill } from "../../src/skill"
+import { SkillTool } from "../../src/tool/skill"
+import { Ripgrep } from "../../src/file/ripgrep"
+import { Truncate } from "../../src/tool/truncate"
+import { Agent } from "../../src/agent/agent"
 import * as CrossSpawnSpawner from "../../src/effect/cross-spawn-spawner"
 import { provideInstance, provideTmpdirInstance, tmpdir } from "../fixture/fixture"
 import { testEffect } from "../lib/effect"
 import path from "path"
 import fs from "fs/promises"
+import type { Tool } from "../../src/tool/tool"
+import { SessionID, MessageID } from "../../src/session/schema"
 
 const node = CrossSpawnSpawner.defaultLayer
 
@@ -384,6 +390,63 @@ description: A skill in the .opencode/skills directory.
 
           const skill = yield* Skill.Service
           expect((yield* skill.dirs()).length).toBe(4)
+        }),
+      { git: true },
+    ),
+  )
+})
+
+describe("skill tool + file-based bundle", () => {
+  const bundleIt = testEffect(
+    Layer.mergeAll(Skill.defaultLayer, Ripgrep.defaultLayer, Truncate.defaultLayer, Agent.defaultLayer, node),
+  )
+
+  const baseCtx: Omit<Tool.Context, "ask"> = {
+    sessionID: SessionID.make("ses_test"),
+    messageID: MessageID.make(""),
+    callID: "",
+    agent: "build",
+    abort: AbortSignal.any([]),
+    messages: [],
+    metadata: () => Effect.void,
+    sandbox: null,
+  }
+
+  bundleIt.live("load fills resources for file-based skill; skill.get returns resources", () =>
+    provideTmpdirInstance(
+      (dir) =>
+        Effect.gen(function* () {
+          const skillDir = path.join(dir, "custom-skills", "file-bundle")
+          yield* Effect.promise(() =>
+            Promise.all([
+              Bun.write(
+                path.join(skillDir, "SKILL.md"),
+                `---
+name: file-bundle
+description: File-based bundle skill.
+---
+
+# File Bundle
+
+Use bundled resources.
+`,
+              ),
+              Bun.write(path.join(skillDir, "references", "guide.md"), "FILE_GUIDE_CONTENT"),
+              Bun.write(path.join(skillDir, "templates", "run.sh"), "FILE_SCRIPT_CONTENT"),
+            ]),
+          )
+
+          const skills = yield* Skill.Service
+          const loadResult = yield* skills.load(skillDir)
+          expect(loadResult.length).toBe(1)
+          expect(loadResult[0].resources.map((r) => r.path)).toEqual(["references/guide.md", "templates/run.sh"])
+          expect(loadResult[0].resources[0].content).toBe("FILE_GUIDE_CONTENT")
+
+          const info = yield* skills.get("file-bundle")
+          expect(info).toBeDefined()
+          expect(info!.resources.map((r) => r.path)).toEqual(["references/guide.md", "templates/run.sh"])
+          expect(info!.resources[0].content).toBe("FILE_GUIDE_CONTENT")
+          expect(info!.resources[1].content).toBe("FILE_SCRIPT_CONTENT")
         }),
       { git: true },
     ),

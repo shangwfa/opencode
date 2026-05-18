@@ -67,11 +67,12 @@ description: 代码审查专家，擅长发现潜在问题和优化建议
           const sys = yield* SystemPrompt.Service
           const systemPrompt = yield* sys.skills(agent, ["code-reviewer"])
 
-          // 验证系统提示包含技能内容
+          // 验证系统提示只包含轻量 manifest，完整内容由 skill tool 按需加载
           expect(systemPrompt).toBeDefined()
-          expect(systemPrompt).toContain('<skill_content name="code-reviewer">')
-          expect(systemPrompt).toContain("你是代码审查专家")
-          expect(systemPrompt).toContain("审查风格：直接、建设性、关注重点")
+          expect(systemPrompt).toContain("<preloaded_skills>")
+          expect(systemPrompt).toContain("<name>code-reviewer</name>")
+          expect(systemPrompt).not.toContain("你是代码审查专家")
+          expect(systemPrompt).not.toContain("审查风格：直接、建设性、关注重点")
 
           // ========== 步骤 5: 模拟任务执行 ==========
           // 在实际场景中，这个系统提示会发送给 LLM
@@ -82,11 +83,11 @@ function divide(a, b) {
 }
 `
 
-          // 验证系统提示包含足够的上下文来执行任务
+          // 验证系统提示包含足够信息引导模型调用 skill tool，而不是直接暴露完整内容
           const hasEnoughContext =
             systemPrompt!.includes("代码审查") &&
-            systemPrompt!.includes("潜在的错误") &&
-            systemPrompt!.includes("性能优化")
+            systemPrompt!.includes("Use the skill tool") &&
+            systemPrompt!.includes("<available_skills>")
 
           expect(hasEnoughContext).toBe(true)
 
@@ -147,8 +148,9 @@ description: 测试用例编写专家
           const sys = yield* SystemPrompt.Service
           const prompt = yield* sys.skills(agent, ["code-reviewer"])
 
-          expect(prompt).toContain('<skill_content name="code-reviewer">')
-          expect(prompt).not.toContain('<skill_content name="test-writer">')
+          expect(prompt).toContain("<preloaded_skills>")
+          expect(prompt).toContain("<name>code-reviewer</name>")
+          expect(prompt).not.toContain("审查代码...")
 
           // 但可用列表中仍然有 test-writer
           expect(prompt).toContain("test-writer")

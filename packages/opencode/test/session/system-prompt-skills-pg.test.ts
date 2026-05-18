@@ -70,7 +70,7 @@ describe.skipIf(!enabled)("PG system prompt preload session skill", () => {
     await Database.close().catch(() => undefined)
   })
 
-  it.live("preload session skill from PG DB", () =>
+  it.live("preload session skill manifest from PG DB", () =>
     provideTmpdirInstance(() =>
       Effect.gen(function* () {
         const sessionSvc = yield* Session.Service
@@ -92,13 +92,13 @@ describe.skipIf(!enabled)("PG system prompt preload session skill", () => {
         const result = yield* sys.skills(mockAgent, ["pg-preload-skill"], session.id)
 
         expect(result).toBeDefined()
-        expect(result).toContain('<skill_content name="pg-preload-skill">')
-        expect(result).toContain("Content from PG session skill.")
-        expect(result).toContain('<resource path="references/checklist.md" type="doc">')
-        expect(result).toContain("PG resource doc")
-        expect(result).toContain('<resource path="templates/run.sh" type="template">')
-        expect(result).toContain("echo resource")
-        expect(result).toContain("</skill_content>")
+        expect(result).toContain("<preloaded_skills>")
+        expect(result).toContain("<name>pg-preload-skill</name>")
+        expect(result).toContain('<resource path="references/checklist.md" type="doc"')
+        expect(result).toContain('<resource path="templates/run.sh" type="template"')
+        expect(result).not.toContain("Content from PG session skill.")
+        expect(result).not.toContain("PG resource doc")
+        expect(result).not.toContain("echo resource")
         expect(result).toContain("<available_skills>")
         expect(result).toContain("pg-preload-skill")
       }),
@@ -127,7 +127,7 @@ describe.skipIf(!enabled)("PG system prompt preload session skill", () => {
 
         const result = yield* sys.skills(mockAgent, ["shared"], session.id)
 
-        expect(result).toContain("Session content")
+        expect(result).toContain("Session version")
         expect(result).not.toContain("Global content")
       }),
     ),
@@ -194,12 +194,12 @@ describe.skipIf(!enabled)("PG system prompt preload session skill", () => {
         })
 
         const r1 = yield* sys.skills(mockAgent, ["s1-only", "s2-only"], s1.id)
-        expect(r1).toContain('<skill_content name="s1-only">')
-        expect(r1).not.toContain('<skill_content name="s2-only">')
+        expect(r1).toContain("<name>s1-only</name>")
+        expect(r1).not.toContain("<name>s2-only</name>")
 
         const r2 = yield* sys.skills(mockAgent, ["s1-only", "s2-only"], s2.id)
-        expect(r2).not.toContain('<skill_content name="s1-only">')
-        expect(r2).toContain('<skill_content name="s2-only">')
+        expect(r2).not.toContain("<name>s1-only</name>")
+        expect(r2).toContain("<name>s2-only</name>")
       }),
     ),
   )
@@ -246,9 +246,12 @@ Main bundle content.
         ])
 
         const result = yield* sys.skills(mockAgent, ["pg-bundle-skill"], session.id)
-        expect(result).toContain("Main bundle content.")
-        expect(result).toContain("Bundle guide")
-        expect(result).toContain("echo bundle")
+        expect(result).toContain("<name>pg-bundle-skill</name>")
+        expect(result).toContain('<resource path="references/guide.md" type="doc"')
+        expect(result).toContain('<resource path="templates/run.sh" type="template"')
+        expect(result).not.toContain("Main bundle content.")
+        expect(result).not.toContain("Bundle guide")
+        expect(result).not.toContain("echo bundle")
       }),
     ),
   )

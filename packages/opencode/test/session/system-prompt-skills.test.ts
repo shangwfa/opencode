@@ -68,7 +68,7 @@ This is test content.
     ),
   )
 
-  it.live("skills() with preload injects skill_content block", () =>
+  it.live("skills() with preload injects lightweight skill manifest", () =>
     provideTmpdirInstance(
       (dir) =>
         Effect.gen(function* () {
@@ -98,10 +98,10 @@ More content.
           const result = yield* sys.skills(mockAgentAllowAll, ["content-skill"])
 
           expect(result).toBeDefined()
-          expect(result).toContain('<skill_content name="content-skill">')
-          expect(result).toContain("# Skill: content-skill")
-          expect(result).toContain("Custom content here.")
-          expect(result).toContain("</skill_content>")
+          expect(result).toContain("<preloaded_skills>")
+          expect(result).toContain("<name>content-skill</name>")
+          expect(result).not.toContain("Custom content here.")
+          expect(result).not.toContain('<skill_content name="content-skill">')
           expect(result).toContain("<available_skills>") // Also has available list
         }),
       { git: true },
@@ -153,9 +153,10 @@ description: This skill exists.
           // Mixed: one exists, one doesn't
           const result = yield* sys.skills(mockAgentAllowAll, ["existing-skill", "missing-skill"])
 
-          expect(result).toContain('<skill_content name="existing-skill">')
+          expect(result).toContain("<preloaded_skills>")
+          expect(result).toContain("<name>existing-skill</name>")
           expect(result).not.toContain('<skill_content name="missing-skill">')
-          expect(result).toContain("# Skill: existing-skill")
+          expect(result).not.toContain("# Skill: existing-skill")
         }),
       { git: true },
     ),
