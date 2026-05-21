@@ -318,7 +318,8 @@ export namespace SessionProcessor {
                 return
               }
 
-              const agent = yield* agents.get(ctx.assistantMessage.agent)
+              const agent = yield* agents.sessionGet(ctx.assistantMessage.agent, ctx.assistantMessage.sessionID)
+              if (!agent) return
               yield* permission.ask({
                 permission: "doom_loop",
                 patterns: [value.toolName],

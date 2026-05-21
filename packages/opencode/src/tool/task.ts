@@ -9,6 +9,7 @@ import type { SessionPrompt } from "../session/prompt"
 import { Config } from "../config/config"
 import { Effect } from "effect"
 import { Log } from "@/util/log"
+import { Permission } from "../permission"
 
 export interface TaskPromptOps {
   cancel(sessionID: SessionID): void
@@ -53,18 +54,21 @@ export const TaskTool = Tool.define(
         })
       }
 
-      const next = yield* agent.get(params.subagent_type)
+      const next = yield* agent.sessionGet(params.subagent_type, ctx.sessionID)
       if (!next) {
         return yield* Effect.fail(new Error(`Unknown agent type: ${params.subagent_type} is not a valid agent type`))
       }
 
-      const canTask = next.permission.some((rule) => rule.permission === id)
-      const canTodo = next.permission.some((rule) => rule.permission === "todowrite")
+      const canTask = Permission.evaluate(id, "*", next.permission).action !== "deny"
+      const canTodo = Permission.evaluate("todowrite", "*", next.permission).action !== "deny"
 
       const taskID = params.task_id
       const session = taskID
         ? yield* sessions.get(SessionID.make(taskID)).pipe(Effect.catchCause(() => Effect.succeed(undefined)))
         : undefined
+      if (session && session.parentID !== ctx.sessionID) {
+        return yield* Effect.fail(new Error(`Task session ${taskID} does not belong to current session`))
+      }
       const nextSession =
         session ??
         (yield* sessions.create({

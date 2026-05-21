@@ -23,8 +23,21 @@ import { Effect, Context, Layer } from "effect"
 import { InstanceState } from "@/effect/instance-state"
 import * as Option from "effect/Option"
 import * as OtelTracer from "@effect/opentelemetry/Tracer"
+import { SessionAgent } from "./session-agent"
+import { Database } from "../storage/db"
+import type { SessionID } from "../session/schema"
+import { NamedError } from "@opencode-ai/shared/util/error"
 
 export namespace Agent {
+  const name = z.string().trim().min(1).max(64).regex(/^[A-Za-z][A-Za-z0-9_-]*$/)
+
+  export const InvalidError = NamedError.create(
+    "AgentInvalidError",
+    z.object({
+      message: z.string(),
+    }),
+  )
+
   export const Info = z
     .object({
       name: z.string(),
@@ -52,6 +65,27 @@ export namespace Agent {
     })
   export type Info = z.infer<typeof Info>
 
+  export const CreateInput = z.object({
+    name,
+    description: z.string().optional(),
+    mode: z.enum(["subagent", "primary", "all"]).default("all"),
+    prompt: z.string().optional(),
+    permission: Permission.Ruleset.zod.optional(),
+    model: z
+      .object({
+        modelID: ModelID.zod,
+        providerID: ProviderID.zod,
+      })
+      .optional(),
+    temperature: z.number().min(0).max(2).optional(),
+    topP: z.number().min(0).max(1).optional(),
+    steps: z.number().int().positive().optional(),
+    color: z.string().optional(),
+    variant: z.string().optional(),
+    options: z.record(z.string(), z.any()).optional(),
+  })
+  export type CreateInput = z.infer<typeof CreateInput>
+
   export interface Interface {
     readonly get: (agent: string) => Effect.Effect<Agent.Info>
     readonly list: () => Effect.Effect<Agent.Info[]>
@@ -64,11 +98,45 @@ export namespace Agent {
       whenToUse: string
       systemPrompt: string
     }>
+    readonly sessionGet: (agent: string, session?: SessionID) => Effect.Effect<Agent.Info | undefined>
+    readonly sessionList: (session: SessionID) => Effect.Effect<Agent.Info[]>
+    readonly sessionCreate: (session: SessionID, input: CreateInput) => Effect.Effect<Agent.Info>
+    readonly sessionUnload: (session: SessionID, name: string) => Effect.Effect<void>
+    readonly sessionClear: (session: SessionID) => Effect.Effect<void>
   }
 
-  type State = Omit<Interface, "generate">
+  type State = {
+    readonly get: (agent: string) => Effect.Effect<Agent.Info>
+    readonly list: () => Effect.Effect<Agent.Info[]>
+    readonly defaultAgent: () => Effect.Effect<string>
+  }
 
   export class Service extends Context.Service<Service, Interface>()("@opencode/Agent") {}
+
+  function rowToInfo(row: SessionAgent.Row): Info {
+    return {
+      name: row.name,
+      description: row.description ?? undefined,
+      mode: row.mode ?? "all",
+      prompt: row.prompt ?? undefined,
+      permission: row.permission ?? [],
+      model: row.model
+        ? { providerID: ProviderID.make(row.model.providerID), modelID: ModelID.make(row.model.modelID) }
+        : undefined,
+      temperature: row.temperature ?? undefined,
+      topP: row.top_p ?? undefined,
+      steps: row.steps ?? undefined,
+      color: row.color ?? undefined,
+      variant: row.variant ?? undefined,
+      options: row.options ?? {},
+    }
+  }
+
+  function mergeInfo(row: SessionAgent.Row, base?: Info): Info {
+    const info = rowToInfo(row)
+    if (!base) return info
+    return { ...info, native: base.native, hidden: base.hidden }
+  }
 
   export const layer = Layer.effect(
     Service,
@@ -78,6 +146,9 @@ export namespace Agent {
       const plugin = yield* Plugin.Service
       const skill = yield* Skill.Service
       const provider = yield* Provider.Service
+      const sessionAgent = yield* SessionAgent.Service
+
+      const isPg = Database.dialect === "pg"
 
       const state = yield* InstanceState.make<State>(
         Effect.fn("Agent.state")(function* (ctx) {
@@ -398,6 +469,42 @@ export namespace Agent {
 
           return yield* Effect.promise(() => generateObject(params).then((r) => r.object))
         }),
+        sessionGet: Effect.fn("Agent.sessionGet")(function* (agent: string, session?: SessionID) {
+          if (!session || !isPg) return yield* InstanceState.useEffect(state, (s) => s.get(agent))
+          const row = yield* sessionAgent.get(session, agent)
+          const base = yield* InstanceState.useEffect(state, (s) => s.get(agent))
+          if (row) return mergeInfo(row, base)
+          return base
+        }),
+        sessionList: Effect.fn("Agent.sessionList")(function* (session: SessionID) {
+          const base = yield* InstanceState.useEffect(state, (s) => s.list())
+          if (!isPg) return base
+          const rows = yield* sessionAgent.list(session)
+          const overlay = new Map(rows.map((r) => [r.name, rowToInfo(r)]))
+          return base
+            .map((a) => {
+              const o = overlay.get(a.name)
+              if (!o) return a
+              return { ...o, native: a.native, hidden: a.hidden }
+            })
+            .concat([...overlay.values()].filter((a) => !base.some((b) => b.name === a.name)))
+        }),
+        sessionCreate: Effect.fn("Agent.sessionCreate")(function* (session: SessionID, input: CreateInput) {
+          if (!isPg) throw new Error("Session agents are only available in SaaS mode")
+          if (input.name === "compaction" || input.name === "title" || input.name === "summary") {
+            throw new InvalidError({ message: `Cannot override internal agent: ${input.name}` })
+          }
+          const row = yield* sessionAgent.upsert(session, input)
+          return mergeInfo(row, yield* InstanceState.useEffect(state, (s) => s.get(input.name)))
+        }),
+        sessionUnload: Effect.fn("Agent.sessionUnload")(function* (session: SessionID, name: string) {
+          if (!isPg) throw new Error("Session agents are only available in SaaS mode")
+          yield* sessionAgent.remove(session, name)
+        }),
+        sessionClear: Effect.fn("Agent.sessionClear")(function* (session: SessionID) {
+          if (!isPg) throw new Error("Session agents are only available in SaaS mode")
+          yield* sessionAgent.removeAll(session)
+        }),
       })
     }),
   )
@@ -408,5 +515,6 @@ export namespace Agent {
     Layer.provide(Auth.defaultLayer),
     Layer.provide(Config.defaultLayer),
     Layer.provide(Skill.defaultLayer),
+    Layer.provide(Database.dialect === "pg" ? SessionAgent.layer : SessionAgent.noopLayer),
   )
 }

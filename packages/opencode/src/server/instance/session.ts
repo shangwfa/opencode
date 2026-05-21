@@ -226,6 +226,100 @@ export const SessionRoutes = lazy(() =>
       },
     )
     .get(
+      "/:sessionID/agents",
+      describeRoute({
+        summary: "List session agents",
+        description: "Get agents attached to a specific OpenCode session.",
+        operationId: "session.agents",
+        responses: {
+          200: {
+            description: "Session agents",
+            content: { "application/json": { schema: resolver(Agent.Info.array()) } },
+          },
+          ...errors(400, 404),
+        },
+      }),
+      validator("param", z.object({ sessionID: SessionID.zod })),
+      async (c) => {
+        const sessionID = c.req.valid("param").sessionID
+        return jsonRequest("SessionRoutes.agents", c, function* () {
+          const session = yield* Session.Service
+          yield* session.get(sessionID)
+          const agents = yield* Agent.Service
+          return yield* agents.sessionList(sessionID)
+        })
+      },
+    )
+    .post(
+      "/:sessionID/agents/create",
+      describeRoute({
+        summary: "Create session agent",
+        description: "Create or update an inline agent attached to a specific OpenCode session. Only available in SaaS mode.",
+        operationId: "session.agents.create",
+        responses: {
+          200: {
+            description: "Created session agent",
+            content: { "application/json": { schema: resolver(Agent.Info) } },
+          },
+          ...errors(400, 404),
+        },
+      }),
+      validator("param", z.object({ sessionID: SessionID.zod })),
+      validator("json", Agent.CreateInput),
+      async (c) => {
+        const sessionID = c.req.valid("param").sessionID
+        const body = c.req.valid("json")
+        return jsonRequest("SessionRoutes.agentsCreate", c, function* () {
+          const session = yield* Session.Service
+          yield* session.get(sessionID)
+          const agents = yield* Agent.Service
+          return yield* agents.sessionCreate(sessionID, body)
+        })
+      },
+    )
+    .delete(
+      "/:sessionID/agents/:name",
+      describeRoute({
+        summary: "Unload session agent",
+        description: "Remove an agent from a specific OpenCode session.",
+        operationId: "session.agents.unload",
+        responses: { 204: { description: "Session agent unloaded" }, ...errors(400, 404) },
+      }),
+      validator("param", z.object({ sessionID: SessionID.zod, name: z.string() })),
+      async (c) => {
+        const param = c.req.valid("param")
+        await jsonRequest("SessionRoutes.agentsUnload", c, function* () {
+          const session = yield* Session.Service
+          yield* session.get(param.sessionID)
+          const agents = yield* Agent.Service
+          yield* agents.sessionUnload(param.sessionID, param.name)
+          return null
+        })
+        return c.body(null, 204)
+      },
+    )
+    .delete(
+      "/:sessionID/agents",
+      describeRoute({
+        summary: "Clear session agents",
+        description: "Remove all agents attached to a specific OpenCode session.",
+        operationId: "session.agents.clear",
+        responses: { 204: { description: "Session agents cleared" }, ...errors(400, 404) },
+      }),
+      validator("param", z.object({ sessionID: SessionID.zod })),
+      async (c) => {
+        const sessionID = c.req.valid("param").sessionID
+        await jsonRequest("SessionRoutes.agentsClear", c, function* () {
+          const session = yield* Session.Service
+          yield* session.get(sessionID)
+          const agents = yield* Agent.Service
+          yield* agents.sessionClear(sessionID)
+          return null
+        })
+        return c.body(null, 204)
+      },
+    )
+    .get(
       "/:sessionID",
       describeRoute({
         summary: "Get session",

@@ -111,7 +111,7 @@ export namespace Tool {
             if (result.metadata.truncated !== undefined) {
               return result
             }
-            const agent = yield* agents.get(ctx.agent)
+            const agent = yield* agents.sessionGet(ctx.agent, ctx.sessionID)
             const truncated = yield* truncate.output(result.output, {}, agent)
             return {
               ...result,

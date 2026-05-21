@@ -105,13 +105,55 @@ AI 会自动判断需要工具，调用沙箱执行命令并返回结果。
 | GET | `/global/event` | **全局** SSE 事件流（所有 session 的事件） |
 | GET | `/event?sessionID=ses_xxx` | **指定 session** 的 SSE 事件流（推荐） |
 
-### 3.2 Auth
+### 3.2 Auth / Provider 凭据管理
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
 | PUT | `/auth/:providerID` | 设置凭据 `{type:"api",key:"..."}` |
 | DELETE | `/auth/:providerID` | 删除凭据 |
-| GET | `/provider` | 列出 provider 及连接状态 |
+| GET | `/provider` | 列出所有 provider 及连接状态 |
+
+#### 设置凭据
+
+```bash
+curl -X PUT https://test-opencode.shadow-rpa.net/auth/moonshotai-cn \
+  -H 'Content-Type: application/json' \
+  -d '{"type":"api","key":"sk-YOUR_KEY"}'
+# → true
+```
+
+凭据持久化到 PG（或 `auth.json`），服务重启不丢。
+
+#### 查询已连接的 Provider
+
+```bash
+# 方式 1：查看已连接的 provider ID 列表
+curl -s https://test-opencode.shadow-rpa.net/provider | jq '.connected'
+# → ["deepseek", "zhipuai", "moonshotai-cn", "opencode"]
+
+# 方式 2：查看所有 provider 及其模型
+curl -s https://test-opencode.shadow-rpa.net/provider | jq '.all[] | {id, models: [.models[].id]}'
+
+# 方式 3：查看某个 provider 的可用模型
+curl -s https://test-opencode.shadow-rpa.net/provider | jq '[.all[] | select(.id == "moonshotai-cn")] | .[0].models[].id'
+# → "kimi-k2-turbo-preview"
+# → "kimi-k2.6"
+# → "kimi-k2-thinking-turbo"
+# → ...
+```
+
+> **注意**：API key 出于安全原因不会通过任何接口返回。只能通过 `connected` 列表判断是否已配置 key。
+
+#### 查看支持的认证方式
+
+```bash
+curl -s https://test-opencode.shadow-rpa.net/provider/auth | jq '.["openai"]'
+# → [
+#     {"type":"oauth","label":"ChatGPT Pro/Plus (browser)"},
+#     {"type":"oauth","label":"ChatGPT Pro/Plus (headless)"},
+#     {"type":"api","label":"Manually enter API Key"}
+#   ]
+```
 
 ### 3.3 Session
 

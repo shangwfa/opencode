@@ -227,6 +227,43 @@ describe("tool.task", () => {
     ),
   )
 
+  it.live("execute rejects task_id from another parent session", () =>
+    provideTmpdirInstance(() =>
+      Effect.gen(function* () {
+        const sessions = yield* Session.Service
+        const { chat, assistant } = yield* seed()
+        const other = yield* sessions.create({ title: "Other parent" })
+        const child = yield* sessions.create({ parentID: other.id, title: "Foreign child" })
+        const tool = yield* TaskTool
+        const def = yield* tool.init()
+
+        const result = yield* Effect.exit(
+          def.execute(
+            {
+              description: "inspect bug",
+              prompt: "look into the cache key path",
+              subagent_type: "general",
+              task_id: child.id,
+            },
+            {
+              sessionID: chat.id,
+              messageID: assistant.id,
+              agent: "build",
+              abort: new AbortController().signal,
+              extra: { promptOps: stubOps() },
+              messages: [],
+              metadata: () => Effect.void,
+              ask: () => Effect.void,
+              sandbox: null,
+            },
+          ),
+        )
+
+        expect(result._tag).toBe("Failure")
+      }),
+    ),
+  )
+
   it.live("execute asks by default and skips checks when bypassed", () =>
     provideTmpdirInstance(() =>
       Effect.gen(function* () {
@@ -350,11 +387,6 @@ describe("tool.task", () => {
           expect(child.parentID).toBe(chat.id)
           expect(child.permission).toEqual([
             {
-              permission: "todowrite",
-              pattern: "*",
-              action: "deny",
-            },
-            {
               permission: "bash",
               pattern: "*",
               action: "allow",
@@ -366,7 +398,6 @@ describe("tool.task", () => {
             },
           ])
           expect(seen?.tools).toEqual({
-            todowrite: false,
             bash: false,
             read: false,
           })
@@ -383,6 +414,52 @@ describe("tool.task", () => {
           },
           experimental: {
             primary_tools: ["bash", "read"],
+          },
+        },
+      },
+    ),
+  )
+
+  it.live("execute respects denied task permission when shaping child session", () =>
+    provideTmpdirInstance(
+      () =>
+        Effect.gen(function* () {
+          const sessions = yield* Session.Service
+          const { chat, assistant } = yield* seed()
+          const tool = yield* TaskTool
+          const def = yield* tool.init()
+
+          const result = yield* def.execute(
+            {
+              description: "inspect bug",
+              prompt: "look into the cache key path",
+              subagent_type: "reviewer",
+            },
+            {
+              sessionID: chat.id,
+              messageID: assistant.id,
+              agent: "build",
+              abort: new AbortController().signal,
+              extra: { promptOps: stubOps() },
+              messages: [],
+              metadata: () => Effect.void,
+              ask: () => Effect.void,
+              sandbox: null,
+            },
+          )
+
+          const child = yield* sessions.get(result.metadata.sessionId)
+          expect(child.permission).toContainEqual({ permission: "task", pattern: "*", action: "deny" })
+        }),
+      {
+        config: {
+          agent: {
+            reviewer: {
+              mode: "subagent",
+              permission: {
+                task: "deny",
+              },
+            },
           },
         },
       },

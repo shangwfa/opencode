@@ -746,7 +746,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
         if (session.revert) {
           yield* revert.cleanup(session)
         }
-        const agent = yield* agents.get(input.agent)
+        const agent = yield* agents.sessionGet(input.agent, input.sessionID)
         if (!agent) {
           const available = (yield* agents.list()).filter((a) => !a.hidden).map((a) => a.name)
           const hint = available.length ? ` Available agents: ${available.join(", ")}` : ""
@@ -944,7 +944,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
 
       const createUserMessage = Effect.fn("SessionPrompt.createUserMessage")(function* (input: PromptInput) {
         const agentName = input.agent || (yield* agents.defaultAgent())
-        const ag = yield* agents.get(agentName)
+        const ag = yield* agents.sessionGet(agentName, input.sessionID)
         if (!ag) {
           const available = (yield* agents.list()).filter((a) => !a.hidden).map((a) => a.name)
           const hint = available.length ? ` Available agents: ${available.join(", ")}` : ""
@@ -1418,7 +1418,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
               continue
             }
 
-            const agent = yield* agents.get(lastUser.agent)
+            const agent = yield* agents.sessionGet(lastUser.agent, sessionID)
             if (!agent) {
               const available = (yield* agents.list()).filter((a) => !a.hidden).map((a) => a.name)
               const hint = available.length ? ` Available agents: ${available.join(", ")}` : ""
@@ -1627,7 +1627,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
         const taskModel = yield* Effect.gen(function* () {
           if (cmd.model) return Provider.parseModel(cmd.model)
           if (cmd.agent) {
-            const cmdAgent = yield* agents.get(cmd.agent)
+            const cmdAgent = yield* agents.sessionGet(cmd.agent, input.sessionID)
             if (cmdAgent?.model) return cmdAgent.model
           }
           if (input.model) return Provider.parseModel(input.model)
@@ -1636,7 +1636,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
 
         yield* getModel(taskModel.providerID, taskModel.modelID, input.sessionID)
 
-        const agent = yield* agents.get(agentName)
+        const agent = yield* agents.sessionGet(agentName, input.sessionID)
         if (!agent) {
           const available = (yield* agents.list()).filter((a) => !a.hidden).map((a) => a.name)
           const hint = available.length ? ` Available agents: ${available.join(", ")}` : ""
