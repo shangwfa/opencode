@@ -726,7 +726,121 @@ fetch('http://your-backend.com/api/data')
 
 ---
 
-## 十五、参考项目
+## 十五、沙箱直连访问方案
+
+### 15.1 背景
+
+经测试验证，`sb.getEndpointUrl(port)` 返回的沙箱 endpoint（如 `http://10.12.11.240:5173`）从宿主机可直接访问。因此可以新增一条直连路径，与现有 proxy 模式并存。
+
+### 15.2 验证结果
+
+测试脚本：`packages/opencode/test/sandbox-direct-access-test.ts`
+
+```bash
+cd packages/opencode
+OPENCODE_SANDBOX_DOMAIN=172.18.32.15:30040 OPENCODE_SANDBOX_API_KEY=xxx bun run test/sandbox-direct-access-test.ts
+```
+
+| 时间 | 沙箱 ID | Endpoint | 宿主机可达 |
+|---|---|---|---|
+| 2026-05-21 | `e4668c61-...` | `http://10.12.11.235:9999` | ✅ |
+| 2026-05-21 | `9835a76a-...` | `http://10.12.11.240:5173` | ✅ |
+
+endpoint 格式为 `{sandbox-pod-ip}:{port}`，属于 K8s 集群内网 `10.12.11.0/24` 网段。
+
+### 15.3 两种模式对比
+
+| | Proxy 模式（现有，保留） | 直连模式（新增） |
+|---|---|---|
+| **路径** | `/session/{sid}/proxy/{port}/` | `http://{sandbox-ip}:{port}/` |
+| **适用场景** | 公网用户，浏览器无法直达沙箱内网 | 内网/VPN 用户，浏览器可直达沙箱 |
+| **路径重写** | 需要（prefix 改写 + 13 个 API 拦截器注入） | 不需要（沙箱就是 origin） |
+| **WebSocket** | 需 proxy 转发 | 直连，天然正确 |
+| **错误收集** | img beacon 上报 | 需新增机制（或不需要） |
+| **SPA 路由** | 需配置 basename（已知限制） | 无 prefix 问题，天然正确 |
+| **延迟** | 多一跳（经 opencode 服务） | 直达，更低 |
+| **实现复杂度** | 高（~330 行 proxy 逻辑） | 低（只需返回 endpoint URL） |
+
+### 15.4 直连方案设计
+
+#### 新增 API
+
+```
+GET /session/:sessionID/endpoint/:port
+```
+
+返回：
+
+```json
+{
+  "mode": "direct",
+  "url": "http://10.12.11.240:5173",
+  "port": 5173,
+  "sandboxId": "9835a76a-...",
+  "fallback": "/session/{sid}/proxy/5173/"
+}
+```
+
+#### 前端选择逻辑
+
+```typescript
+async function openSandbox(sessionID: string, port: number) {
+  const { url, fallback } = await fetch(`/session/${sessionID}/endpoint/${port}`).then(r => r.json())
+
+  // 先尝试直连
+  try {
+    const res = await fetch(url, { method: "HEAD", signal: AbortSignal.timeout(3000) })
+    if (res.ok) { window.open(url); return }
+  } catch {}
+
+  // fallback 到 proxy
+  window.open(fallback)
+}
+```
+
+#### 服务端实现
+
+```typescript
+// sandbox-proxy.ts 或独立模块
+.get("/session/:sessionID/endpoint/:port", async (c) => {
+  const sessionID = c.req.param("sessionID") as SessionID
+  const port = parseInt(c.req.param("port"), 10)
+
+  const sb = await AppRuntime.runPromise(
+    SandboxProvider.Service.use((svc) => svc.get(sessionID)),
+  ).catch(() => null)
+  if (!sb) return c.json({ error: "sandbox unreachable" }, 502)
+
+  const url = await sb.getEndpointUrl(port).catch(() => null)
+  if (!url) return c.json({ error: "endpoint not found" }, 502)
+
+  return c.json({
+    mode: "direct",
+    url,
+    port,
+    fallback: `/session/${sessionID}/proxy/${port}/`,
+  })
+})
+```
+
+### 15.5 实现计划
+
+| 阶段 | 内容 | 状态 |
+|---|---|---|
+| Phase 1 | 新增 endpoint API + 前端直连按钮，优先直连 fallback proxy | 待实现 |
+| Phase 2 | 评估直连模式下是否需要错误收集，如需则实现轻量上报 | 待评估 |
+| Phase 3 | 前端自动探测直连可达性，缓存结果 | 待实现 |
+
+### 15.6 注意事项
+
+- **安全**：直连模式下沙箱 IP 暴露给浏览器，需确保沙箱网络策略（egress/ingress）合理
+- **生命周期**：沙箱销毁后 endpoint 失效，前端需处理连接中断
+- **兼容**：现有 proxy 模式完整保留，作为 fallback
+- **SPA 路由**：直连模式自动解决了 proxy 模式下 SPA 客户端路由需要 basename 的限制
+
+---
+
+## 十六、参考项目
 
 | 项目 | 架构 | 客户端拦截 API 数 | 与本方案差异 |
 |---|---|---|---|
