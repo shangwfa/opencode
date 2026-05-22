@@ -1,5 +1,6 @@
 FROM oven/bun:1.3.11-alpine AS base
-RUN apk add --no-cache git ripgrep
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories \
+    && apk add --no-cache git ripgrep
 
 FROM base AS builder
 WORKDIR /app
