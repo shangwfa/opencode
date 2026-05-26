@@ -1,7 +1,6 @@
-import { pgTable, text, bigint, jsonb, integer, index, primaryKey } from "drizzle-orm/pg-core"
+import { pgTable, text, bigint, jsonb, integer, real, index, primaryKey } from "drizzle-orm/pg-core"
 import { ProjectTable } from "../project/project.pg"
 import type { MessageV2 } from "./message-v2"
-import type { SessionEntry } from "../v2/session-entry"
 import type { Snapshot } from "../snapshot"
 import type { Permission } from "../permission"
 import type { ProjectID } from "../project/schema"
@@ -24,6 +23,7 @@ export const SessionTable = pgTable(
     parent_id: text().$type<SessionID>(),
     slug: text().notNull(),
     directory: text().notNull(),
+    path: text(),
     title: text().notNull(),
     version: text().notNull(),
     share_url: text(),
@@ -31,8 +31,20 @@ export const SessionTable = pgTable(
     summary_deletions: integer(),
     summary_files: integer(),
     summary_diffs: jsonb().$type<Snapshot.FileDiff[]>(),
+    cost: real().notNull().default(0),
+    tokens_input: integer().notNull().default(0),
+    tokens_output: integer().notNull().default(0),
+    tokens_reasoning: integer().notNull().default(0),
+    tokens_cache_read: integer().notNull().default(0),
+    tokens_cache_write: integer().notNull().default(0),
     revert: jsonb().$type<{ messageID: MessageID; partID?: PartID; snapshot?: string; diff?: string }>(),
     permission: jsonb().$type<Permission.Ruleset>(),
+    agent: text(),
+    model: jsonb().$type<{
+      id: string
+      providerID: string
+      variant?: string
+    }>(),
     ...Timestamps,
     time_compacting: bigint({ mode: "number" }),
     time_archived: bigint({ mode: "number" }),
@@ -98,14 +110,14 @@ export const TodoTable = pgTable(
 export const SessionEntryTable = pgTable(
   "session_entry",
   {
-    id: text().$type<SessionEntry.ID>().primaryKey(),
+    id: text().primaryKey(),
     session_id: text()
       .$type<SessionID>()
       .notNull()
       .references(() => SessionTable.id, { onDelete: "cascade" }),
-    type: text().$type<SessionEntry.Type>().notNull(),
+    type: text().notNull(),
     ...Timestamps,
-    data: jsonb().notNull().$type<Omit<SessionEntry.Entry, "type" | "id">>(),
+    data: jsonb().notNull(),
   },
   (table) => [
     index("session_entry_session_idx").on(table.session_id),

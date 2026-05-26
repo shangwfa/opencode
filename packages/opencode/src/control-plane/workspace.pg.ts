@@ -1,4 +1,4 @@
-import { pgTable, text, jsonb } from "drizzle-orm/pg-core"
+import { pgTable, text, jsonb, bigint } from "drizzle-orm/pg-core"
 import { ProjectTable } from "../project/project.pg"
 import type { ProjectID } from "../project/schema"
 import type { WorkspaceID } from "./schema"
@@ -14,4 +14,5 @@ export const WorkspaceTable = pgTable("workspace", {
     .$type<ProjectID>()
     .notNull()
     .references(() => ProjectTable.id, { onDelete: "cascade" }),
+  time_used: bigint({ mode: "number" }),
 })
