@@ -3,9 +3,9 @@ import { Sandbox, ConnectionConfig } from "@alibaba-group/opensandbox"
 import type { CommandExecution, Volume } from "@alibaba-group/opensandbox"
 import { and, eq, lt } from "drizzle-orm"
 import postgres from "postgres"
-import { Log } from "../util/log"
-import { Flag } from "../flag/flag"
-import { Database } from "../storage/db"
+import * as Log from "@opencode-ai/core/util/log"
+import { Flag } from "@/flag/flag"
+import * as PgInit from "../storage/db.pg"
 import { SandboxTable } from "./sandbox.pg"
 import type { SessionID } from "../session/schema"
 
@@ -389,14 +389,12 @@ export namespace SandboxProvider {
     }),
   )
 
-  // ─── PG / 多 pod 实现（状态全部持久化到 sandbox 表）────────────────
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   export const pgLayer = Layer.effect(
     Service,
     Effect.gen(function* () {
       const config = yield* SandboxConfig.Service
-      // pod 内仍保留 Semaphore，保证单 pod 内 bash 命令串行
       const commandSemaphores = new Map<string, Semaphore.Semaphore>()
-      // pod 内 Deferred 去重，防止同 pod 并发创建同一 session 的沙箱
       const createRef = yield* Ref.make(new Map<string, Deferred.Deferred<Sandbox, Error>>())
 
       const connectionConfig = new ConnectionConfig({
@@ -407,6 +405,10 @@ export namespace SandboxProvider {
       })
 
       const hasVolume = config.volumeType !== "none"
+
+      const { db } = PgInit.init(Flag.OPENCODE_DATABASE_URL!)
+      const pgDb: any = db
+      PgInit.install(pgDb, SandboxTable)
 
       type Row = {
         id: string
@@ -419,11 +421,9 @@ export namespace SandboxProvider {
         time_updated: number
       }
 
-      // ── DB 操作 ─────────────────────────────────────────────────────
-
       function dbGet(sessionID: string) {
         return Effect.tryPromise({
-          try: () => Database.Client()
+          try: () => pgDb
             .select()
             .from(SandboxTable)
             .where(eq(SandboxTable.session_id, sessionID))
@@ -435,7 +435,7 @@ export namespace SandboxProvider {
 
       function dbGetById(id: string) {
         return Effect.tryPromise({
-          try: () => Database.Client()
+          try: () => pgDb
             .select()
             .from(SandboxTable)
             .where(eq(SandboxTable.id, id))
@@ -447,7 +447,7 @@ export namespace SandboxProvider {
 
       function dbUpsert(row: typeof SandboxTable.$inferInsert) {
         return Effect.tryPromise({
-          try: () => Database.Client()
+          try: () => pgDb
             .insert(SandboxTable)
             .values(row)
             .onConflictDoUpdate({
@@ -468,7 +468,7 @@ export namespace SandboxProvider {
 
       function dbSetState(sessionID: string, state: "running" | "killed") {
         return Effect.tryPromise({
-          try: () => Database.Client()
+          try: () => pgDb
             .update(SandboxTable)
             .set({ state, time_updated: Date.now() })
             .where(eq(SandboxTable.session_id, sessionID))
@@ -479,7 +479,7 @@ export namespace SandboxProvider {
 
       function dbSetStateFor(sessionID: string, id: string, state: "running" | "killed") {
         return Effect.tryPromise({
-          try: () => Database.Client()
+          try: () => pgDb
             .update(SandboxTable)
             .set({ state, time_updated: Date.now() })
             .where(and(eq(SandboxTable.session_id, sessionID), eq(SandboxTable.id, id)))
@@ -490,7 +490,7 @@ export namespace SandboxProvider {
 
       function dbSetKeepAlive(sessionID: string, val: boolean) {
         return Effect.tryPromise({
-          try: () => Database.Client()
+          try: () => pgDb
             .update(SandboxTable)
             .set({ keep_alive: val, time_updated: Date.now() })
             .where(eq(SandboxTable.session_id, sessionID))
@@ -501,7 +501,7 @@ export namespace SandboxProvider {
 
       function dbSetCommandSession(sessionID: string, id: string, cmdSessionID: string) {
         return Effect.tryPromise({
-          try: () => Database.Client()
+          try: () => pgDb
             .update(SandboxTable)
             .set({ command_session_id: cmdSessionID, time_updated: Date.now() })
             .where(and(eq(SandboxTable.session_id, sessionID), eq(SandboxTable.id, id)))
@@ -512,7 +512,7 @@ export namespace SandboxProvider {
 
       function dbDelete(sessionID: string) {
         return Effect.tryPromise({
-          try: () => Database.Client()
+          try: () => pgDb
             .delete(SandboxTable)
             .where(eq(SandboxTable.session_id, sessionID))
             .run(),
@@ -522,7 +522,7 @@ export namespace SandboxProvider {
 
       function dbDeleteFor(sessionID: string, id: string) {
         return Effect.tryPromise({
-          try: () => Database.Client()
+          try: () => pgDb
             .delete(SandboxTable)
             .where(and(eq(SandboxTable.session_id, sessionID), eq(SandboxTable.id, id)))
             .run(),
@@ -532,7 +532,7 @@ export namespace SandboxProvider {
 
       function dbAll() {
         return Effect.tryPromise({
-          try: () => Database.Client()
+          try: () => pgDb
             .select()
             .from(SandboxTable)
             .where(eq(SandboxTable.state, "running"))
@@ -543,7 +543,7 @@ export namespace SandboxProvider {
 
       function lock<A, E>(sessionID: string, effect: Effect.Effect<A, E>) {
         return Effect.gen(function* () {
-          const client = postgres(Database.Path, { max: 1 })
+          const client = postgres(Flag.OPENCODE_DATABASE_URL!, { max: 1 })
           return yield* Effect.tryPromise({
             try: () => client`SELECT pg_advisory_lock(hashtext(${sessionID}))`,
             catch: (e) => new Error(`db.lock failed: ${String(e)}`),
@@ -881,7 +881,7 @@ export namespace SandboxProvider {
           Effect.gen(function* () {
             const threshold = Date.now() - zombieThresholdMs
             const rows = yield* Effect.tryPromise({
-              try: () => Database.Client()
+              try: () => pgDb
                 .select()
                 .from(SandboxTable)
                 .where(and(
@@ -928,7 +928,7 @@ export namespace SandboxProvider {
     }),
   )
 
-  export const defaultLayer = (Database.dialect === "pg" ? pgLayer : layer).pipe(
+  export const defaultLayer = (process.env["OPENCODE_DATABASE_URL"] ? pgLayer : layer).pipe(
     Layer.provide(SandboxConfig.defaultLayer),
   )
 }

@@ -478,7 +478,7 @@ export const layer: Layer.Layer<
       directory: string,
       input: { projectID: ProjectID; extra?: string },
     ) {
-      const row = yield* Effect.sync(() =>
+      const row = yield* Effect.promise(() =>
         Database.use((db) => db.select().from(ProjectTable).where(eq(ProjectTable.id, input.projectID)).get()),
       )
       const project = row ? Project.fromRow(row) : undefined

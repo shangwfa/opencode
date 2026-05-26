@@ -80,7 +80,7 @@ export class Service extends Context.Service<Service, Interface>()("@opencode/Sh
 export const use = serviceUse(Service)
 
 const db = <T>(fn: (d: Parameters<typeof Database.use>[0] extends (trx: infer D) => any ? D : never) => T) =>
-  Effect.sync(() => Database.use(fn))
+  Effect.promise(() => Database.use(fn))
 
 function api(resource: string): Api {
   return {

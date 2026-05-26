@@ -10,6 +10,8 @@ import { assertExternalDirectoryEffect } from "./external-directory"
 import { Instruction } from "../session/instruction"
 import { isPdfAttachment, sniffAttachmentMime } from "@/util/media"
 import { Reference } from "@/reference/reference"
+import { toSandboxPath } from "./sandbox-path"
+import { SandboxProvider } from "./sandbox-provider"
 
 const DEFAULT_READ_LIMIT = 2000
 const MAX_LINE_LENGTH = 2000
@@ -230,6 +232,65 @@ export const ReadTool = Tool.define(
         always: ["*"],
         metadata: {},
       })
+
+      if (ctx.sandbox !== null) {
+        const sandboxProviderOpt = yield* Effect.serviceOption(SandboxProvider.Service)
+        if (sandboxProviderOpt._tag === "Some") {
+          const sandboxProvider = sandboxProviderOpt.value
+          const sb: any = yield* Effect.tryPromise({ try: () => ctx.sandbox!, catch: (e) => new Error(`Failed to initialize: ${e instanceof Error ? e.message : String(e)}`) })
+        const sandboxPath = toSandboxPath(filepath, instance.directory)
+
+        const dirCheck = yield* sandboxProvider.runInSession(
+          ctx.sessionID,
+          `test -d "${sandboxPath}" && echo "DIR" || echo "FILE"`,
+          { timeoutSeconds: 5 },
+        ).pipe(Effect.catch(() => Effect.succeed({ logs: { stdout: [], stderr: [] }, exitCode: 1 } as any)))
+        const isDirectory = (dirCheck as any).logs?.stdout?.map((l: { text: string }) => l.text).join("").trim().includes("DIR")
+
+        if (isDirectory) {
+          const lsResult = yield* sandboxProvider.runInSession(
+            ctx.sessionID,
+            `ls -1 "${sandboxPath}"`,
+            { timeoutSeconds: 10 },
+          ).pipe(Effect.catch(() => Effect.succeed({ logs: { stdout: [], stderr: [] }, exitCode: 1 } as any)))
+          const items = ((lsResult as any).logs?.stdout ?? []).map((l: { text: string }) => l.text.trim()).filter(Boolean).sort()
+          const limit = params.limit ?? DEFAULT_READ_LIMIT
+          const offset = params.offset || 1
+          const start = offset - 1
+          const sliced = items.slice(start, start + limit)
+          const truncated = start + sliced.length < items.length
+          return {
+            title,
+            output: [`<path>${filepath}</path>`, `<type>directory</type>`, `<entries>`, sliced.join("\n"), truncated ? `\n(Showing ${sliced.length} of ${items.length} entries)` : `\n(${items.length} entries)`, `</entries>`].join("\n"),
+            metadata: { preview: sliced.slice(0, 20).join("\n"), truncated, loaded: [] as string[] },
+          }
+        }
+
+        const content = yield* Effect.tryPromise({
+          try: () => sb.files.readFile(sandboxPath),
+          catch: () => new Error(`File not found: ${filepath}`),
+        })
+        const allLines = (content as string).split("\n")
+        const start = (params.offset ?? 1) - 1
+        const limit = params.limit ?? DEFAULT_READ_LIMIT
+        const selected = allLines.slice(start, start + limit)
+        const truncated = start + selected.length < allLines.length
+        const loaded = yield* instruction.resolve(ctx.messages, filepath, ctx.messageID)
+
+        let output = [`<path>${filepath}</path>`, `<type>file</type>`, "<content>\n"].join("\n")
+        output += selected.map((line, i) => `${i + start + 1}: ${line.length > MAX_LINE_LENGTH ? line.substring(0, MAX_LINE_LENGTH) + MAX_LINE_SUFFIX : line}`).join("\n")
+        if (truncated) output += `\n\n(Showing lines ${start + 1}-${start + selected.length} of ${allLines.length}. Use offset=${start + selected.length + 1} to continue.)`
+        else output += `\n\n(End of file - total ${allLines.length} lines)`
+        output += "\n</content>"
+        if (loaded.length > 0) output += `\n\n<system-reminder>\n${loaded.map((item) => item.content).join("\n\n")}\n</system-reminder>`
+
+        return {
+          title,
+          output,
+          metadata: { preview: selected.slice(0, 20).join("\n"), truncated, loaded: loaded.map((item) => item.filepath) },
+        }
+        }
+      }
 
       if (!stat) return yield* miss(filepath)
 

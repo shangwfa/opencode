@@ -20,6 +20,7 @@ import path from "path"
 import { Plugin } from "@/plugin"
 import { Skill } from "../skill"
 import { SessionAgent } from "./session-agent"
+import { Flag } from "@opencode-ai/core/flag/flag"
 import { NamedError } from "@opencode-ai/core/util/error"
 import { Effect, Context, Layer, Schema } from "effect"
 import { InstanceState } from "@/effect/instance-state"
@@ -503,6 +504,8 @@ export const layer = Layer.effect(
       }),
       sessionList: Effect.fn("Agent.sessionList")(function* (session: SessionID) {
         const base = yield* InstanceState.useEffect(state, (s) => s.list())
+        const isPg = !!Flag.OPENCODE_DATABASE_URL
+        if (!isPg) return base
         const rows = yield* sessionAgent.list(session)
         if (rows.length === 0) return base
         const overlay = new Map(rows.map((r) => [r.name, rowToInfo(r)]))
@@ -515,19 +518,19 @@ export const layer = Layer.effect(
           .concat([...overlay.values()].filter((a) => !base.some((b) => b.name === a.name)))
       }),
       sessionCreate: Effect.fn("Agent.sessionCreate")(function* (session: SessionID, input: CreateInput) {
+        if (!Flag.OPENCODE_DATABASE_URL) throw new Error("Session agents are only available in SaaS mode")
         if (input.name === "compaction" || input.name === "title" || input.name === "summary") {
           throw new InvalidError({ message: `Cannot override internal agent: ${input.name}` })
         }
         const row = yield* sessionAgent.upsert(session, input)
-        const base = yield* InstanceState.useEffect(state, (s) => s.get(input.name)).pipe(
-          Effect.catch(() => Effect.succeed(undefined)),
-        )
-        return mergeInfo(row, base)
+        return mergeInfo(row, yield* InstanceState.useEffect(state, (s) => s.get(input.name)))
       }),
       sessionUnload: Effect.fn("Agent.sessionUnload")(function* (session: SessionID, name: string) {
+        if (!Flag.OPENCODE_DATABASE_URL) throw new Error("Session agents are only available in SaaS mode")
         yield* sessionAgent.remove(session, name)
       }),
       sessionClear: Effect.fn("Agent.sessionClear")(function* (session: SessionID) {
+        if (!Flag.OPENCODE_DATABASE_URL) throw new Error("Session agents are only available in SaaS mode")
         yield* sessionAgent.removeAll(session)
       }),
     })
@@ -541,7 +544,7 @@ export const defaultLayer = layer.pipe(
   Layer.provide(Config.defaultLayer),
   Layer.provide(Skill.defaultLayer),
   Layer.provide(RuntimeFlags.defaultLayer),
-  Layer.provide(SessionAgent.noopLayer),
+  Layer.provide(Flag.OPENCODE_DATABASE_URL ? SessionAgent.pgLayer : SessionAgent.noopLayer),
 )
 
 export * as Agent from "./agent"

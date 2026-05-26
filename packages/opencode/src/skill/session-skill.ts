@@ -66,12 +66,22 @@ export namespace SessionSkill {
     }),
   )
 
+  // PG returns jsonb as string and bigint as string; coerce them
+  function parseRow(r: any): Info {
+    return Info.parse({
+      ...r,
+      resources: typeof r.resources === "string" ? JSON.parse(r.resources) : r.resources,
+      time_created: Number(r.time_created),
+      time_updated: Number(r.time_updated),
+    })
+  }
+
   export const layer = Layer.effect(
     Service,
     Effect.gen(function* () {
       return Service.of({
         list: Effect.fn("SessionSkill.list")(function* (sessionID) {
-          return yield* db((d) =>
+          const rows = yield* db((d) =>
             d
               .select()
               .from(SessionSkillTable)
@@ -79,6 +89,7 @@ export namespace SessionSkill {
               .orderBy(asc(SessionSkillTable.name))
               .all(),
           )
+          return (rows as any[]).map(parseRow)
         }),
 
         get: Effect.fn("SessionSkill.get")(function* (sessionID, name) {
@@ -89,22 +100,23 @@ export namespace SessionSkill {
               .where(and(eq(SessionSkillTable.session_id, sessionID), eq(SessionSkillTable.name, name)))
               .get(),
           )
-          return row ?? undefined
+          if (!row) return undefined
+          return parseRow(row)
         }),
 
         upsert: Effect.fn("SessionSkill.upsert")(function* (sessionID, input) {
           const now = Date.now()
-          const row: Info = {
+          const row = {
             id: id(),
             session_id: sessionID,
             name: input.name,
             description: input.description,
             content: input.content,
-            resources: input.resources ?? [],
+            resources: [...(input.resources ?? [])] as any,
             time_created: now,
             time_updated: now,
           }
-          const rows = yield* db((d) =>
+          const rows = yield* db((d: any) =>
             d
               .insert(SessionSkillTable)
               .values(row)
@@ -113,13 +125,13 @@ export namespace SessionSkill {
                 set: {
                   description: input.description,
                   content: input.content,
-                  resources: input.resources ?? [],
+                  resources: [...(input.resources ?? [])] as any,
                   time_updated: now,
-                },
+                } as any,
               })
               .returning(),
           )
-          return rows[0] as Info
+          return parseRow((rows as any[])[0])
         }),
 
         remove: Effect.fn("SessionSkill.remove")(function* (sessionID, name) {

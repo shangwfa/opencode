@@ -14,18 +14,10 @@ CREATE TABLE IF NOT EXISTS "session_agents" (
   "variant" text,
   "options" jsonb NOT NULL DEFAULT '{}'::jsonb,
   "time_created" bigint NOT NULL,
-  "time_updated" bigint NOT NULL,
-  CONSTRAINT "session_agents_session_id_session_id_fk" FOREIGN KEY ("session_id") REFERENCES "session"("id") ON DELETE cascade
+  "time_updated" bigint NOT NULL
 );
 --> statement-breakpoint
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint WHERE conname = 'session_agents_session_id_session_id_fk'
-  ) THEN
-    ALTER TABLE "session_agents" ADD CONSTRAINT "session_agents_session_id_session_id_fk" FOREIGN KEY ("session_id") REFERENCES "session"("id") ON DELETE cascade;
-  END IF;
-END $$;
+ALTER TABLE "session_agents" DROP CONSTRAINT IF EXISTS "session_agents_session_id_session_id_fk";
 --> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "session_agents_session_idx" ON "session_agents" ("session_id");
 --> statement-breakpoint

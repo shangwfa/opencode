@@ -57,6 +57,8 @@ import { Workspace } from "@/control-plane/workspace"
 import { CorsConfig, isAllowedCorsOrigin, type CorsOptions } from "@/server/cors"
 import { serveUIEffect } from "@/server/shared/ui"
 import { ServerAuth } from "@/server/auth"
+import { SandboxProvider } from "@/tool/sandbox-provider"
+import { sandboxProxyRoute } from "@/server/sandbox-proxy"
 import { InstanceHttpApi, RootHttpApi } from "./api"
 import { PublicApi } from "./public"
 import { authorizationLayer, authorizationRouterMiddleware, v2AuthorizationLayer } from "./middleware/authorization"
@@ -184,7 +186,7 @@ type RouteRequirements =
 export function createRoutes(
   corsOptions?: CorsOptions,
 ): Layer.Layer<never, EffectConfig.ConfigError, RouteRequirements> {
-  return Layer.mergeAll(rootApiRoutes, eventApiRoutes, instanceRoutes, docRoute, uiRoute).pipe(
+  return Layer.mergeAll(rootApiRoutes, eventApiRoutes, instanceRoutes, sandboxProxyRoute, docRoute, uiRoute).pipe(
     Layer.provide([
       errorLayer,
       compressionLayer,
@@ -213,6 +215,7 @@ export function createRoutes(
       Question.defaultLayer,
       Ripgrep.defaultLayer,
       RuntimeFlags.defaultLayer,
+      SandboxProvider.defaultLayer,
       Session.defaultLayer,
       SessionCompaction.defaultLayer,
       SessionPrompt.defaultLayer,

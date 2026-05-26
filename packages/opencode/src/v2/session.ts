@@ -192,7 +192,9 @@ export const layer = Layer.effect(
         return {} as any
       }),
       get: Effect.fn("V2Session.get")(function* (sessionID) {
-        const row = Database.use((db) => db.select().from(SessionTable).where(eq(SessionTable.id, sessionID)).get())
+        const row = yield* Effect.promise(() =>
+          Database.use((db) => db.select().from(SessionTable).where(eq(SessionTable.id, sessionID)).get()),
+        )
         if (!row) return yield* new NotFoundError({ sessionID })
         return fromRow(row)
       }),
@@ -234,8 +236,10 @@ export const layer = Layer.effect(
             order === "asc" ? asc(SessionTable.id) : desc(SessionTable.id),
           )
 
-        const rows = input.limit === undefined ? query.all() : query.limit(input.limit).all()
-        return (direction === "previous" ? rows.toReversed() : rows).map((row) => fromRow(row))
+        const rows = yield* Effect.promise(async () =>
+          input.limit === undefined ? await query.all() : await query.limit(input.limit).all(),
+        )
+        return (direction === "previous" ? (rows as any[]).toReversed() : rows).map((row: any) => fromRow(row))
       }),
       messages: Effect.fn("V2Session.messages")(function* (input) {
         yield* result.get(input.sessionID)
@@ -265,43 +269,46 @@ export const layer = Layer.effect(
           ? and(eq(SessionMessageTable.session_id, input.sessionID), boundary)
           : eq(SessionMessageTable.session_id, input.sessionID)
 
-        const rows = Database.use((db) => {
-          const query = db
-            .select()
-            .from(SessionMessageTable)
-            .where(where)
-            .orderBy(
-              order === "asc" ? asc(SessionMessageTable.time_created) : desc(SessionMessageTable.time_created),
-              order === "asc" ? asc(SessionMessageTable.id) : desc(SessionMessageTable.id),
-            )
-          const rows = input.limit === undefined ? query.all() : query.limit(input.limit).all()
-          return direction === "previous" ? rows.toReversed() : rows
-        })
-        return yield* Effect.forEach(rows, (row) => decode(row))
+        const rows = yield* Effect.promise(() =>
+          Database.use(async (db) => {
+            const query = db
+              .select()
+              .from(SessionMessageTable)
+              .where(where)
+              .orderBy(
+                order === "asc" ? asc(SessionMessageTable.time_created) : desc(SessionMessageTable.time_created),
+                order === "asc" ? asc(SessionMessageTable.id) : desc(SessionMessageTable.id),
+              )
+            const rows = input.limit === undefined ? await query.all() : await query.limit(input.limit).all()
+            return direction === "previous" ? rows.toReversed() : rows
+          }),
+        )
+        return yield* Effect.forEach(rows as any[], (row: any) => decode(row))
       }),
       context: Effect.fn("V2Session.context")(function* (sessionID) {
         yield* result.get(sessionID)
-        const rows = Database.use((db) => {
-          const compaction = db
-            .select()
-            .from(SessionMessageTable)
-            .where(and(eq(SessionMessageTable.session_id, sessionID), eq(SessionMessageTable.type, "compaction")))
-            .orderBy(desc(SessionMessageTable.time_created), desc(SessionMessageTable.id))
-            .limit(1)
-            .get()
+        const rows = yield* Effect.promise(() =>
+          Database.use(async (db) => {
+            const compaction = await db
+              .select()
+              .from(SessionMessageTable)
+              .where(and(eq(SessionMessageTable.session_id, sessionID), eq(SessionMessageTable.type, "compaction")))
+              .orderBy(desc(SessionMessageTable.time_created), desc(SessionMessageTable.id))
+              .limit(1)
+              .get()
 
-          return db
-            .select()
-            .from(SessionMessageTable)
-            .where(
-              and(
-                eq(SessionMessageTable.session_id, sessionID),
-                compaction
-                  ? or(
-                      gt(SessionMessageTable.time_created, compaction.time_created),
-                      and(
-                        eq(SessionMessageTable.time_created, compaction.time_created),
-                        gte(SessionMessageTable.id, compaction.id),
+            return db
+              .select()
+              .from(SessionMessageTable)
+              .where(
+                and(
+                  eq(SessionMessageTable.session_id, sessionID),
+                  compaction
+                    ? or(
+                        gt(SessionMessageTable.time_created, compaction.time_created),
+                        and(
+                          eq(SessionMessageTable.time_created, compaction.time_created),
+                          gte(SessionMessageTable.id, compaction.id),
                       ),
                     )
                   : undefined,
@@ -309,8 +316,9 @@ export const layer = Layer.effect(
             )
             .orderBy(asc(SessionMessageTable.time_created), asc(SessionMessageTable.id))
             .all()
-        })
-        return yield* Effect.forEach(rows, (row) => decode(row))
+          }),
+        )
+        return yield* Effect.forEach(rows as any[], (row: any) => decode(row))
       }),
       prompt: Effect.fn("V2Session.prompt")(function* (input) {
         yield* result.get(input.sessionID)

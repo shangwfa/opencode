@@ -13,6 +13,9 @@ import { ConfigMarkdown } from "@/config/markdown"
 import { RuntimeFlags } from "@/effect/runtime-flags"
 import { Glob } from "@opencode-ai/core/util/glob"
 import * as Log from "@opencode-ai/core/util/log"
+import { SessionSkill } from "./session-skill"
+import { Flag } from "@opencode-ai/core/flag/flag"
+import type { SessionID } from "@/session/schema"
 import { Discovery } from "./discovery"
 import CUSTOMIZE_OPENCODE_SKILL_BODY from "./prompt/customize-opencode.md" with { type: "text" }
 import { isRecord } from "@/util/record"
@@ -274,6 +277,8 @@ export const layer = Layer.effect(
     const fsys = yield* AppFileSystem.Service
     const global = yield* Global.Service
     const flags = yield* RuntimeFlags.Service
+    const sessionSkill = yield* SessionSkill.Service
+    const isPg = !!Flag.OPENCODE_DATABASE_URL
     const discovered = yield* InstanceState.make(
       Effect.fn("Skill.discovery")(function* (ctx) {
         return yield* discoverSkills(
@@ -347,11 +352,36 @@ export const layer = Layer.effect(
     })
 
     const sessionList = Effect.fn("Skill.sessionList")(function* (session: string) {
+      if (isPg) {
+        const rows = yield* sessionSkill.list(session as SessionID)
+        return rows.map((row: any) => ({
+          name: row.name,
+          description: row.description,
+          location: `session://${session}/${row.name}`,
+          content: row.content,
+          resources: row.resources ?? [],
+        }))
+      }
       const s = yield* InstanceState.get(state)
       return Object.values(s.sessions[session] ?? {})
     })
 
     const sessionCreate = Effect.fn("Skill.sessionCreate")(function* (session: string, value: CreateInput) {
+      if (isPg) {
+        const row = yield* sessionSkill.upsert(session as SessionID, {
+          name: value.name,
+          description: value.description ?? "",
+          content: value.content,
+          resources: value.resources as any,
+        })
+        return {
+          name: row.name,
+          description: row.description,
+          location: `session://${session}/${row.name}`,
+          content: row.content,
+          resources: row.resources ?? [],
+        }
+      }
       const info: Info = {
         name: value.name,
         description: value.description,
@@ -383,6 +413,10 @@ export const layer = Layer.effect(
     })
 
     const sessionUnload = Effect.fn("Skill.sessionUnload")(function* (session: string, name: string) {
+      if (isPg) {
+        yield* sessionSkill.remove(session as SessionID, name)
+        return
+      }
       const s = yield* InstanceState.get(state)
       if (s.sessions[session]) {
         delete s.sessions[session][name]
@@ -391,6 +425,10 @@ export const layer = Layer.effect(
     })
 
     const sessionClear = Effect.fn("Skill.sessionClear")(function* (session: string) {
+      if (isPg) {
+        yield* sessionSkill.removeAll(session as SessionID)
+        return
+      }
       const s = yield* InstanceState.get(state)
       delete s.sessions[session]
     })
@@ -406,6 +444,7 @@ export const defaultLayer = layer.pipe(
   Layer.provide(AppFileSystem.defaultLayer),
   Layer.provide(Global.layer),
   Layer.provide(RuntimeFlags.defaultLayer),
+  Layer.provide(Flag.OPENCODE_DATABASE_URL ? SessionSkill.layer : SessionSkill.noopLayer),
 )
 
 export function fmt(list: Info[], opts: { verbose: boolean }) {

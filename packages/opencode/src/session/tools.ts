@@ -11,13 +11,15 @@ import { ModelID } from "@/provider/schema"
 import { Plugin } from "@/plugin"
 import type { TaskPromptOps } from "@/tool/task"
 import { type Tool as AITool, tool, jsonSchema, type ToolExecutionOptions, asSchema } from "ai"
-import { Effect } from "effect"
+import { Effect, Option } from "effect"
 import { MessageV2 } from "./message-v2"
 import * as Session from "./session"
 import { SessionProcessor } from "./processor"
-import { PartID } from "./schema"
+import { PartID, type SessionID } from "./schema"
 import * as Log from "@opencode-ai/core/util/log"
 import { EffectBridge } from "@/effect/bridge"
+import { SandboxProvider } from "@/tool/sandbox-provider"
+import { Flag } from "@/flag/flag"
 
 const log = Log.create({ service: "session.tools" })
 
@@ -39,6 +41,15 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
   const mcp = yield* MCP.Service
   const truncate = yield* Truncate.Service
 
+  const maybeSandboxProvider = Option.getOrUndefined(yield* Effect.serviceOption(SandboxProvider.Service))
+  const sandboxEnabled = Flag.OPENCODE_SANDBOX_ENABLED && maybeSandboxProvider !== undefined
+  function getSandbox(sessionID: SessionID): Promise<unknown> | null {
+    if (!sandboxEnabled || !maybeSandboxProvider) return null
+    return maybeSandboxProvider.getOrCreate(sessionID).pipe(
+      Effect.runPromise,
+    ).catch(() => null)
+  }
+
   const context = (args: Record<string, unknown>, options: ToolExecutionOptions): Tool.Context => ({
     sessionID: input.session.id,
     abort: options.abortSignal!,
@@ -47,6 +58,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
     extra: { model: input.model, bypassAgentCheck: input.bypassAgentCheck, promptOps: input.promptOps },
     agent: input.agent.name,
     messages: input.messages,
+    sandbox: getSandbox(input.session.id),
     metadata: (val) =>
       input.processor.updateToolCall(options.toolCallId, (match) => {
         if (!["running", "pending"].includes(match.state.status)) return match

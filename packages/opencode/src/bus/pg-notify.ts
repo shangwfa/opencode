@@ -1,5 +1,5 @@
-import { Log } from "@/util/log"
-import { Flag } from "@/flag/flag"
+import * as Log from "@opencode-ai/core/util/log"
+import { Flag } from "@opencode-ai/core/flag/flag"
 
 const log = Log.create({ service: "pg-notify" })
 
@@ -12,6 +12,9 @@ export namespace PgNotify {
   let abort: AbortController | null = null
 
   function getClient() {
+    // In PG mode, Database.Client() returns a PG drizzle instance
+    // whose .$client is the postgres.js tagged-template client
+    // which supports .listen() / .notify().
     const { Database } = require("../storage/db") as typeof import("../storage/db")
     return (Database.Client() as any).$client
   }

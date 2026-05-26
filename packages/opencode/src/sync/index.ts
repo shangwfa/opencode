@@ -47,7 +47,7 @@ export type Properties<Def extends Definition = Definition> = EffectSchema.Schem
 
 export type SerializedEvent<Def extends Definition = Definition> = Event<Def> & { type: string }
 
-type ProjectorFunc = (db: Database.TxOrDb, data: unknown, event: Event) => void
+type ProjectorFunc = (db: Database.TxOrDb, data: unknown, event: Event) => void | Promise<void>
 type ConvertEvent = (type: string, data: Event["data"]) => unknown | Promise<unknown>
 
 export interface Interface {
@@ -78,12 +78,14 @@ export const layer = Layer.effect(Service)(
         throw new Error(`Unknown event type: ${event.type}`)
       }
 
-      const row = Database.use((db) =>
-        db
-          .select({ seq: EventSequenceTable.seq, ownerID: EventSequenceTable.owner_id })
-          .from(EventSequenceTable)
-          .where(eq(EventSequenceTable.aggregate_id, event.aggregateID))
-          .get(),
+      const row = yield* Effect.promise(() =>
+        Database.use((db) =>
+          db
+            .select({ seq: EventSequenceTable.seq, ownerID: EventSequenceTable.owner_id })
+            .from(EventSequenceTable)
+            .where(eq(EventSequenceTable.aggregate_id, event.aggregateID))
+            .get(),
+        ),
       )
 
       const latest = row?.seq ?? -1
@@ -105,13 +107,15 @@ export const layer = Layer.effect(Service)(
       // full Effect context, so the forked publish + GlobalBus emit run with
       // the right state without a per-call attachWith.
       const bridge = yield* EffectBridge.make()
-      process(def, event, {
-        bus,
-        bridge,
-        publish,
-        ownerID: options?.ownerID,
-        experimentalWorkspaces: flags.experimentalWorkspaces,
-      })
+      yield* Effect.promise(() =>
+        process(def, event, {
+          bus,
+          bridge,
+          publish,
+          ownerID: options?.ownerID,
+          experimentalWorkspaces: flags.experimentalWorkspaces,
+        }),
+      )
     })
 
     const replayAll: Interface["replayAll"] = Effect.fn("SyncEvent.replayAll")(function* (events, options) {
@@ -151,34 +155,38 @@ export const layer = Layer.effect(Service)(
       // Note that this is an "immediate" transaction which is critical.
       // We need to make sure we can safely read and write with nothing
       // else changing the data from under us
-      Database.transaction(
-        (tx) => {
-          const id = EventID.ascending()
-          const row = tx
-            .select({ seq: EventSequenceTable.seq })
-            .from(EventSequenceTable)
-            .where(eq(EventSequenceTable.aggregate_id, agg))
-            .get()
-          const seq = row?.seq != null ? row.seq + 1 : 0
+      yield* Effect.promise(() =>
+        Database.transaction(
+          async (tx) => {
+            const id = EventID.ascending()
+            const row = await tx
+              .select({ seq: EventSequenceTable.seq })
+              .from(EventSequenceTable)
+              .where(eq(EventSequenceTable.aggregate_id, agg))
+              .get()
+            const seq = row?.seq != null ? row.seq + 1 : 0
 
-          const event = { id, seq, aggregateID: agg, data }
-          process(def, event, { bus, bridge, publish, experimentalWorkspaces: flags.experimentalWorkspaces })
-        },
-        {
-          behavior: "immediate",
-        },
+            const event = { id, seq, aggregateID: agg, data }
+            await process(def, event, { bus, bridge, publish, experimentalWorkspaces: flags.experimentalWorkspaces })
+          },
+          {
+            behavior: "immediate",
+          },
+        ),
       )
     })
 
     const remove: Interface["remove"] = Effect.fn("SyncEvent.remove")(function* (aggregateID) {
-      Database.transaction((tx) => {
-        tx.delete(EventSequenceTable).where(eq(EventSequenceTable.aggregate_id, aggregateID)).run()
-        tx.delete(EventTable).where(eq(EventTable.aggregate_id, aggregateID)).run()
-      })
+      yield* Effect.promise(() =>
+        Database.transaction(async (tx) => {
+          await tx.delete(EventSequenceTable).where(eq(EventSequenceTable.aggregate_id, aggregateID)).run()
+          await tx.delete(EventTable).where(eq(EventTable.aggregate_id, aggregateID)).run()
+        }),
+      )
     })
 
     const claim: Interface["claim"] = Effect.fn("SyncEvent.claim")((aggregateID, ownerID) =>
-      Effect.sync(() =>
+      Effect.promise(() =>
         Database.use((db) =>
           db
             .update(EventSequenceTable)
@@ -280,7 +288,7 @@ export function define<
 
 export function project<Def extends Definition>(
   def: Def,
-  func: (db: Database.TxOrDb, data: Event<Def>["data"], event: Event<Def>) => void,
+  func: (db: Database.TxOrDb, data: Event<Def>["data"], event: Event<Def>) => void | Promise<void>,
 ): [Definition, ProjectorFunc] {
   return [def, func as ProjectorFunc]
 }
@@ -290,7 +298,7 @@ function register(def: Definition) {
   registry.set(versionedType(def.type, def.version), def)
 }
 
-function process<Def extends Definition>(
+async function process<Def extends Definition>(
   def: Def,
   event: Event<Def>,
   options: {
@@ -311,11 +319,11 @@ function process<Def extends Definition>(
     return
   }
 
-  Database.transaction((tx) => {
-    projector(tx, event.data, event)
+  await Database.transaction(async (tx) => {
+    await projector(tx, event.data, event)
 
     if (options.experimentalWorkspaces) {
-      tx.insert(EventSequenceTable)
+      await tx.insert(EventSequenceTable)
         .values({
           aggregate_id: event.aggregateID,
           seq: event.seq,
@@ -326,7 +334,7 @@ function process<Def extends Definition>(
           set: { seq: event.seq },
         })
         .run()
-      tx.insert(EventTable)
+      await tx.insert(EventTable)
         .values({
           id: event.id,
           seq: event.seq,

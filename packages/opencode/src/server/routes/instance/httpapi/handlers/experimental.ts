@@ -127,8 +127,9 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
 
     const session = Effect.fn("ExperimentalHttpApi.session")(function* (ctx: { query: typeof SessionListQuery.Type }) {
       const limit = ctx.query.limit ?? 100
-      const sessions = Array.from(
-        Session.listGlobal({
+      const sessions = yield* Effect.promise(async () => {
+        const result: any[] = []
+        for await (const item of Session.listGlobal({
           directory: ctx.query.directory,
           roots: ctx.query.roots,
           start: ctx.query.start,
@@ -136,8 +137,11 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
           search: ctx.query.search,
           limit: limit + 1,
           archived: ctx.query.archived,
-        }),
-      )
+        })) {
+          result.push(item)
+        }
+        return result
+      })
       const list = sessions.length > limit ? sessions.slice(0, limit) : sessions
       return HttpServerResponse.jsonUnsafe(list, {
         headers:

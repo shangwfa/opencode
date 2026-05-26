@@ -14,6 +14,7 @@ import { InstanceState } from "@/effect/instance-state"
 import { trimDiff } from "./edit"
 import { assertExternalDirectoryEffect } from "./external-directory"
 import * as Bom from "@/util/bom"
+import { toSandboxPath } from "./sandbox-path"
 
 const MAX_PROJECT_DIAGNOSTICS_FILES = 5
 
@@ -42,6 +43,39 @@ export const WriteTool = Tool.define(
             ? params.filePath
             : path.join(instance.directory, params.filePath)
           yield* assertExternalDirectoryEffect(ctx, filepath)
+
+          if (ctx.sandbox !== null) {
+            const sb: any = yield* Effect.tryPromise({ try: () => ctx.sandbox!, catch: (e) => new Error(`Failed to initialize: ${e instanceof Error ? e.message : String(e)}`) })
+            const sandboxPath = toSandboxPath(filepath, instance.directory)
+
+            let contentOld = ""
+            const readResult = yield* Effect.tryPromise(() => sb.files.readFile(sandboxPath)).pipe(
+              Effect.catch(() => Effect.succeed("")),
+            )
+            contentOld = readResult as string
+
+            const diff = trimDiff(createTwoFilesPatch(filepath, filepath, contentOld, params.content))
+            yield* ctx.ask({
+              permission: "edit",
+              patterns: [path.relative(instance.worktree, filepath)],
+              always: ["*"],
+              metadata: { filepath, diff },
+            })
+
+            yield* Effect.tryPromise({
+              try: () => sb.files.writeFiles([{ path: sandboxPath, data: params.content }]),
+              catch: (e) => new Error(`Failed to write file: ${params.filePath}`),
+            })
+
+            yield* bus.publish(File.Event.Edited, { file: filepath })
+            yield* bus.publish(FileWatcher.Event.Updated, { file: filepath, event: contentOld ? "change" : "add" })
+
+            return {
+              title: path.relative(instance.worktree, filepath),
+              metadata: { diagnostics: {}, filepath, exists: !!contentOld },
+              output: "Wrote file successfully.",
+            }
+          }
 
           const exists = yield* fs.existsSafe(filepath)
           const source = exists ? yield* Bom.readFile(fs, filepath) : { bom: false, text: "" }

@@ -421,13 +421,13 @@ export const layer = Layer.effect(
                 : value.providerMetadata,
             }))
 
-            const parts = MessageV2.parts(ctx.assistantMessage.id)
+            const parts = yield* Effect.promise(() => MessageV2.parts(ctx.assistantMessage.id))
             const recentParts = parts.slice(-DOOM_LOOP_THRESHOLD)
 
             if (
               recentParts.length !== DOOM_LOOP_THRESHOLD ||
               !recentParts.every(
-                (part) =>
+                (part: any) =>
                   part.type === "tool" &&
                   part.tool === value.name &&
                   part.state.status !== "pending" &&

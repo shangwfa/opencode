@@ -2,7 +2,7 @@ import z from "zod"
 import { Effect, Context, Layer } from "effect"
 import { Database, eq, and } from "../storage/db"
 import { UserSkillTable } from "./skill.sql"
-import { Log } from "../util/log"
+import * as Log from "@opencode-ai/core/util/log"
 import { randomBytes } from "crypto"
 
 export namespace UserSkill {

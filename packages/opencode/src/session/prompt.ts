@@ -395,6 +395,7 @@ export const layer = Layer.effect(
                 ruleset: Permission.merge(taskAgent.permission, session.permission ?? []),
               })
               .pipe(Effect.orDie),
+          sandbox: null,
         })
         .pipe(
           Effect.catchCause((cause) => {
@@ -674,8 +675,10 @@ export const layer = Layer.effect(
     })
 
     const currentModel = Effect.fnUntraced(function* (sessionID: SessionID) {
-      const current = Database.use((db) =>
-        db.select({ model: SessionTable.model }).from(SessionTable).where(eq(SessionTable.id, sessionID)).get(),
+      const current = yield* Effect.promise(() =>
+        Database.use((db) =>
+          db.select({ model: SessionTable.model }).from(SessionTable).where(eq(SessionTable.id, sessionID)).get(),
+        ),
       )
       if (current?.model) {
         return {
@@ -702,12 +705,14 @@ export const layer = Layer.effect(
         throw error
       }
 
-      const current = Database.use((db) =>
-        db
-          .select({ agent: SessionTable.agent, model: SessionTable.model })
-          .from(SessionTable)
-          .where(eq(SessionTable.id, input.sessionID))
-          .get(),
+      const current = yield* Effect.promise(() =>
+        Database.use((db) =>
+          db
+            .select({ agent: SessionTable.agent, model: SessionTable.model })
+            .from(SessionTable)
+            .where(eq(SessionTable.id, input.sessionID))
+            .get(),
+        ),
       )
       const model = input.model ?? ag.model ?? (yield* currentModel(input.sessionID))
       const same = ag.model && model.providerID === ag.model.providerID && model.modelID === ag.model.modelID
@@ -888,6 +893,7 @@ export const layer = Layer.effect(
                     messages: [],
                     metadata: () => Effect.void,
                     ask: () => Effect.void,
+                    sandbox: null,
                   })
                   .pipe(Effect.onInterrupt(() => Effect.sync(() => controller.abort())))
               }

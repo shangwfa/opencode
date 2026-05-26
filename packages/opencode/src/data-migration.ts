@@ -24,6 +24,9 @@ export const layer = Layer.effect(
       {
         name: "session_usage_from_messages",
         run: Effect.gen(function* () {
+          // json_extract is SQLite-only syntax; skip this migration on PG
+          if (Database.dialect === "pg") return
+
           type Usage = {
             cost: number
             tokens: { input: number; output: number; reasoning: number; cache: { read: number; write: number } }
@@ -31,7 +34,7 @@ export const layer = Layer.effect(
 
           for (let cursor: SessionID | undefined, page = 1; ; page++) {
             const next = yield* Effect.gen(function* () {
-              const sessions = yield* Effect.sync(() =>
+              const sessions = yield* Effect.promise(() =>
                 Database.use((db) =>
                   db
                     .select({ id: SessionTable.id })
@@ -44,16 +47,16 @@ export const layer = Layer.effect(
               )
               if (sessions.length === 0) return
 
-              yield* Effect.sync(() =>
-                Database.transaction((db) => {
+              yield* Effect.promise(() =>
+                Database.transaction(async (db) => {
                   const usageBySession = new Map<SessionID, Usage>(
-                    sessions.map((session) => [
+                    sessions.map((session: any) => [
                       session.id,
                       { cost: 0, tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } } },
                     ]),
                   )
 
-                  for (const row of db
+                  for (const row of await db
                     .select({
                       session_id: MessageTable.session_id,
                       cost: sql<number>`coalesce(sum(coalesce(json_extract(${MessageTable.data}, '$.cost'), 0)), 0)`,
@@ -68,7 +71,7 @@ export const layer = Layer.effect(
                       and(
                         inArray(
                           MessageTable.session_id,
-                          sessions.map((session) => session.id),
+                          sessions.map((session: any) => session.id),
                         ),
                         sql`json_extract(${MessageTable.data}, '$.role') = 'assistant'`,
                       ),
@@ -86,7 +89,7 @@ export const layer = Layer.effect(
                   }
 
                   for (const [sessionID, value] of usageBySession) {
-                    db.update(SessionTable)
+                    await db.update(SessionTable)
                       .set({
                         cost: value.cost,
                         tokens_input: value.tokens.input,
@@ -122,27 +125,33 @@ export const layer = Layer.effect(
 
     yield* Effect.gen(function* () {
       if (migrations.length === 0) return
+      // data_migration table is SQLite-only; skip on PG
+      if (Database.dialect === "pg") return
 
       // Migrations run in a background fiber, so they must be resumable until
       // their completion row is written.
       for (const migration of migrations) {
-        const completed = Database.use((db) =>
-          db
-            .select({ name: DataMigrationTable.name })
-            .from(DataMigrationTable)
-            .where(eq(DataMigrationTable.name, migration.name))
-            .get(),
+        const completed = yield* Effect.promise(() =>
+          Database.use((db) =>
+            db
+              .select({ name: DataMigrationTable.name })
+              .from(DataMigrationTable)
+              .where(eq(DataMigrationTable.name, migration.name))
+              .get(),
+          ),
         )
         if (completed) continue
 
         log.info("running data migration", { name: migration.name })
         yield* migration.run.pipe(Effect.withSpan("DataMigration", { attributes: { name: migration.name } }))
-        Database.use((db) =>
-          db
-            .insert(DataMigrationTable)
-            .values({ name: migration.name, time_completed: Date.now() })
-            .onConflictDoNothing()
-            .run(),
+        yield* Effect.promise(() =>
+          Database.use((db) =>
+            db
+              .insert(DataMigrationTable)
+              .values({ name: migration.name, time_completed: Date.now() })
+              .onConflictDoNothing()
+              .run(),
+          ),
         )
       }
     }).pipe(

@@ -3,6 +3,9 @@ import { Effect, Layer, Record, Result, Schema, Context } from "effect"
 import { NonNegativeInt } from "@opencode-ai/core/schema"
 import { Global } from "@opencode-ai/core/global"
 import { AppFileSystem } from "@opencode-ai/core/filesystem"
+import { Flag } from "@/flag/flag"
+import * as PgInit from "../storage/db.pg"
+import { AuthTable } from "./auth.pg"
 
 export const OAUTH_DUMMY_KEY = "opencode-oauth-dummy-key"
 
@@ -91,6 +94,69 @@ export const layer = Layer.effect(
   }),
 )
 
-export const defaultLayer = layer.pipe(Layer.provide(AppFileSystem.defaultLayer))
+export const pgLayer = Layer.effect(
+  Service,
+  Effect.gen(function* () {
+    const { db: pgDb, client: pgClient } = PgInit.init(Flag.OPENCODE_DATABASE_URL!)
+    yield* Effect.tryPromise({
+      try: () =>
+        pgClient`CREATE TABLE IF NOT EXISTS auth (
+          provider_id TEXT PRIMARY KEY,
+          type TEXT NOT NULL,
+          data JSONB NOT NULL,
+          time_created BIGINT NOT NULL DEFAULT 0,
+          time_updated BIGINT NOT NULL DEFAULT 0
+        )`,
+      catch: (e) => new AuthError({ message: "Failed to create auth table", cause: e }),
+    }).pipe(Effect.orDie)
+    PgInit.install(pgDb, AuthTable)
+    const decode = Schema.decodeUnknownOption(Info)
+
+    const all = Effect.fn("Auth.all")(function* () {
+      const rows: any[] = yield* Effect.tryPromise({
+        try: () => pgDb.select().from(AuthTable),
+        catch: (e) => new AuthError({ message: "Failed to read auth from pg", cause: e }),
+      }).pipe(Effect.orDie)
+      const result: Record<string, any> = {}
+      for (const row of rows) {
+        const data = typeof row.data === "string" ? JSON.parse(row.data) : row.data
+        const decoded = decode(data)
+        if (decoded._tag === "Some") result[row.provider_id] = decoded.value
+      }
+      return result as Record<string, Info>
+    })
+
+    const get = Effect.fn("Auth.get")(function* (providerID: string) {
+      return (yield* all())[providerID]
+    })
+
+    const set = Effect.fn("Auth.set")(function* (key: string, info: Info) {
+      const norm = key.replace(/\/+$/, "")
+      const now = Math.floor(Date.now() / 1000)
+      yield* Effect.tryPromise({
+        try: async () => {
+          await pgClient`INSERT INTO auth (provider_id, type, data, time_created, time_updated)
+            VALUES (${norm}, ${(info as any).type}, ${JSON.stringify(info)}, ${now}, ${now})
+            ON CONFLICT (provider_id) DO UPDATE SET type = ${(info as any).type}, data = ${JSON.stringify(info)}, time_updated = ${now}`
+        },
+        catch: (e) => new AuthError({ message: "Failed to write auth to pg", cause: e }),
+      }).pipe(Effect.orDie)
+    })
+
+    const remove = Effect.fn("Auth.remove")(function* (key: string) {
+      const norm = key.replace(/\/+$/, "")
+      yield* Effect.tryPromise({
+        try: () => pgClient`DELETE FROM auth WHERE provider_id = ${norm}`,
+        catch: (e) => new AuthError({ message: "Failed to delete auth from pg", cause: e }),
+      }).pipe(Effect.orDie)
+    })
+
+    return Service.of({ get, all, set, remove })
+  }),
+)
+
+export const defaultLayer = process.env["OPENCODE_DATABASE_URL"]
+  ? pgLayer
+  : layer.pipe(Layer.provide(AppFileSystem.defaultLayer))
 
 export * as Auth from "."

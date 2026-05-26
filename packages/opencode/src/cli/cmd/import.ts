@@ -175,47 +175,53 @@ const runImport = Effect.fn("Cli.import.body")(function* (file: string, ctx: Ins
     path: path.relative(path.resolve(ctx.worktree), ctx.directory).replaceAll("\\", "/"),
   }) as Session.Info
   const row = Session.toRow(info)
-  Database.use((db) =>
-    db
-      .insert(SessionTable)
-      .values(row)
-      .onConflictDoUpdate({
-        target: SessionTable.id,
-        set: { project_id: row.project_id, directory: row.directory, path: row.path },
-      })
-      .run(),
+  yield* Effect.promise(() =>
+    Database.use((db) =>
+      db
+        .insert(SessionTable)
+        .values(row)
+        .onConflictDoUpdate({
+          target: SessionTable.id,
+          set: { project_id: row.project_id, directory: row.directory, path: row.path },
+        })
+        .run(),
+    ),
   )
 
   for (const msg of exportData.messages) {
     const msgInfo = decodeMessageInfo(msg.info) as MessageV2.Info
     const { id, sessionID: _, ...msgData } = msgInfo
-    Database.use((db) =>
-      db
-        .insert(MessageTable)
-        .values({
-          id,
-          session_id: row.id,
-          time_created: msgInfo.time?.created ?? Date.now(),
-          data: msgData,
-        })
-        .onConflictDoNothing()
-        .run(),
+    yield* Effect.promise(() =>
+      Database.use((db) =>
+        db
+          .insert(MessageTable)
+          .values({
+            id,
+            session_id: row.id,
+            time_created: msgInfo.time?.created ?? Date.now(),
+            data: msgData,
+          })
+          .onConflictDoNothing()
+          .run(),
+      ),
     )
 
     for (const part of msg.parts) {
       const partInfo = decodePart(part) as MessageV2.Part
       const { id: partId, sessionID: _s, messageID, ...partData } = partInfo
-      Database.use((db) =>
-        db
-          .insert(PartTable)
-          .values({
-            id: partId,
-            message_id: messageID,
-            session_id: row.id,
-            data: partData,
-          })
-          .onConflictDoNothing()
-          .run(),
+      yield* Effect.promise(() =>
+        Database.use((db) =>
+          db
+            .insert(PartTable)
+            .values({
+              id: partId,
+              message_id: messageID,
+              session_id: row.id,
+              data: partData,
+            })
+            .onConflictDoNothing()
+            .run(),
+        ),
       )
     }
   }

@@ -1,6 +1,6 @@
 import { Hono } from "hono"
 import type { UpgradeWebSocket } from "hono/ws"
-import { Log } from "@/util/log"
+import * as Log from "@opencode-ai/core/util/log"
 
 const hop = new Set([
   "connection",

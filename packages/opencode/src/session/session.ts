@@ -357,13 +357,31 @@ export const Event = {
       diff: Schema.Array(Snapshot.FileDiff),
     }),
   ),
-  Error: BusEvent.define(
+   Error: BusEvent.define(
     "session.error",
     Schema.Struct({
       sessionID: Schema.optional(SessionID),
       // Reuses MessageV2.Assistant.fields.error (already Schema.optional) so
       // the derived zod keeps the same discriminated-union shape on the bus.
       error: MessageV2.Assistant.fields.error,
+    }),
+  ),
+  ProxyError: BusEvent.define(
+    "session.proxy-error",
+    Schema.Struct({
+      sessionID: SessionID,
+      port: Schema.Finite,
+      errors: Schema.Array(
+        Schema.Struct({
+          type: Schema.Literals(["runtime", "network", "compile"]),
+          message: Schema.String,
+          url: Schema.optional(Schema.String),
+          line: Schema.optional(Schema.Finite),
+          col: Schema.optional(Schema.Finite),
+          stack: Schema.optional(Schema.String),
+          timestamp: Schema.Finite,
+        }),
+      ),
     }),
   ),
 }
@@ -505,7 +523,7 @@ export const use = serviceUse(Service)
 export type Patch = Types.DeepMutable<SyncEvent.Event<typeof Event.Updated>["data"]["info"]>
 
 const db = <T>(fn: (d: Parameters<typeof Database.use>[0] extends (trx: infer D) => any ? D : never) => T) =>
-  Effect.sync(() => Database.use(fn))
+  Effect.promise(() => Database.use(fn))
 
 export const layer: Layer.Layer<
   Service,
@@ -576,9 +594,13 @@ export const layer: Layer.Layer<
 
     const list = Effect.fn("Session.list")(function* (input?: ListInput) {
       const ctx = yield* InstanceState.context
-      return Array.from(
-        listByProject({ projectID: ctx.project.id, experimentalWorkspaces: flags.experimentalWorkspaces, ...input }),
-      )
+      return yield* Effect.promise(async () => {
+        const result: Info[] = []
+        for await (const item of listByProject({ projectID: ctx.project.id, experimentalWorkspaces: flags.experimentalWorkspaces, ...input })) {
+          result.push(item)
+        }
+        return result
+      })
     })
 
     const children = Effect.fn("Session.children")(function* (parentID: SessionID) {
@@ -632,18 +654,20 @@ export const layer: Layer.Layer<
       }).pipe(Effect.withSpan("Session.updatePart"))
 
     const getPart: Interface["getPart"] = Effect.fn("Session.getPart")(function* (input) {
-      const row = Database.use((db) =>
-        db
-          .select()
-          .from(PartTable)
-          .where(
-            and(
-              eq(PartTable.session_id, input.sessionID),
-              eq(PartTable.message_id, input.messageID),
-              eq(PartTable.id, input.partID),
-            ),
-          )
-          .get(),
+      const row = yield* Effect.promise(() =>
+        Database.use((db) =>
+          db
+            .select()
+            .from(PartTable)
+            .where(
+              and(
+                eq(PartTable.session_id, input.sessionID),
+                eq(PartTable.message_id, input.messageID),
+                eq(PartTable.id, input.partID),
+              ),
+            )
+            .get(),
+        ),
       )
       if (!row) return
       return {
@@ -888,7 +912,7 @@ const cancelBackgroundJobs = Effect.fn("Session.cancelBackgroundJobs")(function*
   )
 })
 
-function* listByProject(
+async function* listByProject(
   input: ListInput & {
     projectID: ProjectID
     experimentalWorkspaces: boolean
@@ -926,7 +950,7 @@ function* listByProject(
 
   const limit = input.limit ?? 100
 
-  const rows = Database.use((db) =>
+  const rows = await Database.use((db) =>
     db
       .select()
       .from(SessionTable)
@@ -940,7 +964,7 @@ function* listByProject(
   }
 }
 
-export function* listGlobal(input?: {
+export async function* listGlobal(input?: {
   directory?: string
   roots?: boolean
   start?: number
@@ -972,7 +996,7 @@ export function* listGlobal(input?: {
 
   const limit = input?.limit ?? 100
 
-  const rows = Database.use((db) => {
+  const rows = await Database.use(async (db) => {
     const query =
       conditions.length > 0
         ? db
@@ -983,15 +1007,15 @@ export function* listGlobal(input?: {
     return query.orderBy(desc(SessionTable.time_updated), desc(SessionTable.id)).limit(limit).all()
   })
 
-  const ids = [...new Set(rows.map((row) => row.project_id))]
+  const ids = [...new Set(rows.map((row: any) => row.project_id as ProjectID))]
   const projects = new Map<string, ProjectInfo>()
 
   if (ids.length > 0) {
-    const items = Database.use((db) =>
+    const items = await Database.use((db) =>
       db
         .select({ id: ProjectTable.id, name: ProjectTable.name, worktree: ProjectTable.worktree })
         .from(ProjectTable)
-        .where(inArray(ProjectTable.id, ids))
+        .where(inArray(ProjectTable.id as any, ids as string[]))
         .all(),
     )
     for (const item of items) {

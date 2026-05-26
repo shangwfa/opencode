@@ -202,5 +202,6 @@ const createToolContext = Effect.fn("Cli.debug.agent.createToolContext")(functio
         }
       })
     },
+    sandbox: null,
   }
 })

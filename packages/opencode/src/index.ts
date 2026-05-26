@@ -116,6 +116,11 @@ const cli = yargs(args)
       run_id: processMetadata.runID,
     })
 
+    await Database.initialize()
+
+    if (Database.dialect === "pg") {
+      // PG migrations handled by Database.initialize(); skip SQLite path
+    } else {
     const marker = path.join(Global.Path.data, "opencode.db")
     if (!(await Filesystem.exists(marker))) {
       const tty = process.stderr.isTTY
@@ -152,6 +157,7 @@ const cli = yargs(args)
       }
       process.stderr.write("Database migration complete." + EOL)
     }
+    } // end sqlite branch
   })
   .usage("")
   .completion("completion", "generate shell completion script")

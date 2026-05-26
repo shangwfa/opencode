@@ -22,6 +22,8 @@ import { ChildProcess } from "effect/unstable/process"
 import { ChildProcessSpawner } from "effect/unstable/process/ChildProcessSpawner"
 import { ShellPrompt, type Parameters } from "./shell/prompt"
 import { BashArity } from "@/permission/arity"
+import { toSandboxPath, toSandboxCwd, SANDBOX_WORKDIR } from "./sandbox-path"
+import { SandboxProvider } from "./sandbox-provider"
 
 export { Parameters } from "./shell/prompt"
 
@@ -421,6 +423,62 @@ export const ShellTool = Tool.define(
       }
     })
 
+    const runSandbox = Effect.fn("ShellTool.runSandbox")(function* (
+      sandboxProvider: SandboxProvider.Interface,
+      input: {
+        command: string
+        cwd: string
+        timeout: number
+        description: string
+        background?: boolean | undefined
+      },
+      ctx: Tool.Context,
+    ) {
+      let output = ""
+      let expired = false
+
+      yield* ctx.metadata({
+        metadata: { output: "", description: input.description },
+      })
+
+      const fullCommand = input.background
+        ? `cd ${input.cwd} && ( sh -c '${input.command.replace(/'/g, "'\\''")}' </dev/null > /tmp/opencode-bg-${ctx.callID ?? Date.now()}.log 2>&1 & ) && echo "started background"`
+        : `cd ${input.cwd} && ${input.command}`
+
+      const sb = yield* Effect.tryPromise({ try: () => ctx.sandbox!, catch: (e) => new Error(`Initialization failed: ${e instanceof Error ? e.message : String(e)}`) })
+      const result = yield* sandboxProvider.runInSession(
+        ctx.sessionID,
+        fullCommand,
+        { timeoutSeconds: Math.ceil((input.timeout + 5000) / 1000) },
+        {
+          onStdout: (msg: { text: string }) => {
+            output += msg.text
+            ctx.metadata({ metadata: { output: output.slice(-MAX_METADATA_LENGTH), description: input.description } })
+          },
+          onStderr: (msg: { text: string }) => {
+            output += msg.text
+            ctx.metadata({ metadata: { output: output.slice(-MAX_METADATA_LENGTH), description: input.description } })
+          },
+        },
+        ctx.abort,
+      )
+
+      if (input.background) yield* sandboxProvider.keepAlive(ctx.sessionID)
+
+      const exitCode = result.exitCode ?? null
+      if (exitCode === null) expired = true
+
+      const meta: string[] = []
+      if (expired) meta.push(`bash tool terminated command after exceeding timeout ${input.timeout} ms.`)
+      if (meta.length > 0) output += "\n\n<bash_metadata>\n" + meta.join("\n") + "\n</bash_metadata>"
+
+      return {
+        title: input.description,
+        metadata: { output: output.slice(-MAX_METADATA_LENGTH), exit: exitCode, description: input.description },
+        output,
+      }
+    })
+
     const run = Effect.fn("ShellTool.run")(function* (
       input: {
         shell: string
@@ -617,6 +675,25 @@ export const ShellTool = Tool.define(
                 throw new Error(`Invalid timeout value: ${params.timeout}. Timeout must be a positive number.`)
               }
               const timeout = params.timeout ?? defaultTimeoutMs
+
+              if (ctx.sandbox !== null) {
+                const sandboxProviderOpt = yield* Effect.serviceOption(SandboxProvider.Service)
+                if (sandboxProviderOpt._tag === "Some") {
+                  const sandboxProvider = sandboxProviderOpt.value
+                  const sandboxCwd = toSandboxCwd(params.workdir, instanceCtx.directory)
+                  return yield* runSandbox(
+                    sandboxProvider,
+                    {
+                      command: params.command,
+                      cwd: sandboxCwd,
+                      timeout,
+                      description: params.description,
+                    },
+                    ctx,
+                  ).pipe(Effect.orDie)
+                }
+              }
+
               const ps = Shell.ps(shell)
               yield* Effect.scoped(
                 Effect.gen(function* () {
