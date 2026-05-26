@@ -10,6 +10,8 @@ import { SessionSummary } from "@/session/summary"
 import { Todo } from "@/session/todo"
 import { MessageID, PartID, SessionID } from "@/session/schema"
 import { Snapshot } from "@/snapshot"
+import { Skill } from "@/skill"
+import { Agent } from "@/agent/agent"
 import { Schema, Struct } from "effect"
 import { HttpApi, HttpApiEndpoint, HttpApiError, HttpApiGroup, HttpApiSchema, OpenApi } from "effect/unstable/httpapi"
 import { Authorization } from "../middleware/authorization"
@@ -70,6 +72,11 @@ export const RevertPayload = Schema.Struct(Struct.omit(SessionRevert.RevertInput
 export const PermissionResponsePayload = Schema.Struct({
   response: Permission.Reply,
 })
+export const SkillCreatePayload = Skill.CreateInput
+export const SkillLoadPayload = Schema.Struct({
+  path: Schema.String,
+})
+export const AgentCreatePayload = Agent.CreateInput
 
 export const SessionPaths = {
   list: root,
@@ -98,6 +105,13 @@ export const SessionPaths = {
   deleteMessage: `${root}/:sessionID/message/:messageID`,
   deletePart: `${root}/:sessionID/message/:messageID/part/:partID`,
   updatePart: `${root}/:sessionID/message/:messageID/part/:partID`,
+  skills: `${root}/:sessionID/skills`,
+  skillsCreate: `${root}/:sessionID/skills/create`,
+  skillsLoad: `${root}/:sessionID/skills/load`,
+  skillsDelete: `${root}/:sessionID/skills/:name`,
+  agents: `${root}/:sessionID/agents`,
+  agentsCreate: `${root}/:sessionID/agents/create`,
+  agentsDelete: `${root}/:sessionID/agents/:name`,
 } as const
 
 export const SessionApi = HttpApi.make("session")
@@ -436,6 +450,108 @@ export const SessionApi = HttpApi.make("session")
           OpenApi.annotations({
             identifier: "part.update",
             description: "Update a part in a message.",
+          }),
+        ),
+        HttpApiEndpoint.get("skills", SessionPaths.skills, {
+          params: { sessionID: SessionID },
+          query: WorkspaceRoutingQuery,
+          success: described(Schema.Array(Skill.Info), "Session skills"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.skills",
+            summary: "List session skills",
+            description: "Get skills attached to a specific OpenCode session.",
+          }),
+        ),
+        HttpApiEndpoint.post("skillsCreate", SessionPaths.skillsCreate, {
+          params: { sessionID: SessionID },
+          query: WorkspaceRoutingQuery,
+          payload: SkillCreatePayload,
+          success: described(Skill.Info, "Created session skill"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.skills.create",
+            summary: "Create session skill",
+            description: "Create or update an inline skill attached to a specific OpenCode session.",
+          }),
+        ),
+        HttpApiEndpoint.post("skillsLoad", SessionPaths.skillsLoad, {
+          params: { sessionID: SessionID },
+          query: WorkspaceRoutingQuery,
+          payload: SkillLoadPayload,
+          success: described(Schema.Array(Skill.Info), "Loaded session skills"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.skills.load",
+            summary: "Load session skills",
+            description: "Import skills from a local directory as snapshots attached to a specific OpenCode session.",
+          }),
+        ),
+        HttpApiEndpoint.delete("skillsDelete", SessionPaths.skillsDelete, {
+          params: { sessionID: SessionID, name: Schema.String },
+          query: WorkspaceRoutingQuery,
+          success: described(Schema.Void, "Session skill unloaded"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.skills.unload",
+            summary: "Unload session skill",
+            description: "Remove a skill from a specific OpenCode session.",
+          }),
+        ),
+        HttpApiEndpoint.delete("skillsClear", SessionPaths.skills, {
+          params: { sessionID: SessionID },
+          query: WorkspaceRoutingQuery,
+          success: described(Schema.Void, "Session skills cleared"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.skills.clear",
+            summary: "Clear session skills",
+            description: "Remove all skills attached to a specific OpenCode session.",
+          }),
+        ),
+        HttpApiEndpoint.get("agents", SessionPaths.agents, {
+          params: { sessionID: SessionID },
+          query: WorkspaceRoutingQuery,
+          success: described(Schema.Array(Agent.Info), "Session agents"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.agents",
+            summary: "List session agents",
+            description: "Get agents attached to a specific OpenCode session.",
+          }),
+        ),
+        HttpApiEndpoint.post("agentsCreate", SessionPaths.agentsCreate, {
+          params: { sessionID: SessionID },
+          query: WorkspaceRoutingQuery,
+          payload: AgentCreatePayload,
+          success: described(Agent.Info, "Created session agent"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.agents.create",
+            summary: "Create session agent",
+            description: "Create or update an inline agent attached to a specific OpenCode session. Only available in SaaS mode.",
+          }),
+        ),
+        HttpApiEndpoint.delete("agentsDelete", SessionPaths.agentsDelete, {
+          params: { sessionID: SessionID, name: Schema.String },
+          query: WorkspaceRoutingQuery,
+          success: described(Schema.Void, "Session agent unloaded"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.agents.unload",
+            summary: "Unload session agent",
+            description: "Remove an agent from a specific OpenCode session.",
+          }),
+        ),
+        HttpApiEndpoint.delete("agentsClear", SessionPaths.agents, {
+          params: { sessionID: SessionID },
+          query: WorkspaceRoutingQuery,
+          success: described(Schema.Void, "Session agents cleared"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.agents.clear",
+            summary: "Clear session agents",
+            description: "Remove all agents attached to a specific OpenCode session.",
           }),
         ),
       )

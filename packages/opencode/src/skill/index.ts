@@ -33,11 +33,19 @@ const CUSTOMIZE_OPENCODE_SKILL_NAME = "customize-opencode"
 const CUSTOMIZE_OPENCODE_SKILL_DESCRIPTION =
   "Use ONLY when the user is editing or creating opencode's own configuration: opencode.json, opencode.jsonc, files under .opencode/, or files under ~/.config/opencode/. Also use when creating or fixing opencode agents, subagents, skills, plugins, MCP servers, or permission rules. Do not use for the user's own application code, or for any project that is not configuring opencode itself."
 
+export const Resource = Schema.Struct({
+  path: Schema.String,
+  type: Schema.Literals(["doc", "script", "template", "asset"]),
+  content: Schema.String,
+})
+export type Resource = Schema.Schema.Type<typeof Resource>
+
 export const Info = Schema.Struct({
   name: Schema.String,
   description: Schema.optional(Schema.String),
   location: Schema.String,
   content: Schema.String,
+  resources: Schema.optional(Schema.Array(Resource)),
 })
 export type Info = Schema.Schema.Type<typeof Info>
 
@@ -81,6 +89,7 @@ export class NotFoundError extends Schema.TaggedErrorClass<NotFoundError>()("Ski
 type State = {
   skills: Record<string, Info>
   dirs: Set<string>
+  sessions: Record<string, Record<string, Info>>
 }
 
 type DiscoveryState = {
@@ -93,12 +102,25 @@ type ScanState = {
   dirs: Set<string>
 }
 
+export const CreateInput = Schema.Struct({
+  name: Schema.String,
+  description: Schema.optional(Schema.String),
+  content: Schema.String,
+  resources: Schema.optional(Schema.Array(Resource)),
+})
+export type CreateInput = Schema.Schema.Type<typeof CreateInput>
+
 export interface Interface {
-  readonly get: (name: string) => Effect.Effect<Info | undefined>
-  readonly require: (name: string) => Effect.Effect<Info, NotFoundError>
-  readonly all: () => Effect.Effect<Info[]>
+  readonly get: (name: string, session?: string) => Effect.Effect<Info | undefined>
+  readonly require: (name: string, session?: string) => Effect.Effect<Info, NotFoundError>
+  readonly all: (session?: string) => Effect.Effect<Info[]>
   readonly dirs: () => Effect.Effect<string[]>
-  readonly available: (agent?: Agent.Info) => Effect.Effect<Info[]>
+  readonly available: (agent?: Agent.Info, session?: string) => Effect.Effect<Info[]>
+  readonly sessionList: (session: string) => Effect.Effect<Info[]>
+  readonly sessionCreate: (session: string, input: CreateInput) => Effect.Effect<Info>
+  readonly sessionLoad: (session: string, dir: string) => Effect.Effect<Info[]>
+  readonly sessionUnload: (session: string, name: string) => Effect.Effect<void>
+  readonly sessionClear: (session: string) => Effect.Effect<void>
 }
 
 const add = Effect.fnUntraced(function* (state: State, match: string, bus: Bus.Interface) {
@@ -268,7 +290,7 @@ export const layer = Layer.effect(
     )
     const state = yield* InstanceState.make(
       Effect.fn("Skill.state")(function* () {
-        const s: State = { skills: {}, dirs: new Set() }
+        const s: State = { skills: {}, dirs: new Set(), sessions: {} }
         // Register the built-in skill BEFORE disk discovery so a user-disk
         // skill with the same name can override it.
         s.skills[CUSTOMIZE_OPENCODE_SKILL_NAME] = {
@@ -282,35 +304,98 @@ export const layer = Layer.effect(
       }),
     )
 
-    const get = Effect.fn("Skill.get")(function* (name: string) {
+    const get = Effect.fn("Skill.get")(function* (name: string, session?: string) {
       const s = yield* InstanceState.get(state)
+      if (session && s.sessions[session]?.[name]) return s.sessions[session][name]
       return s.skills[name]
     })
 
-    const require = Effect.fn("Skill.require")(function* (name: string) {
+    const require = Effect.fn("Skill.require")(function* (name: string, session?: string) {
       const s = yield* InstanceState.get(state)
-      const info = s.skills[name]
+      const info = session ? (s.sessions[session]?.[name] ?? s.skills[name]) : s.skills[name]
       if (info) return info
       return yield* new NotFoundError({ name, available: Object.keys(s.skills).toSorted() })
     })
 
-    const all = Effect.fn("Skill.all")(function* () {
+    const all = Effect.fn("Skill.all")(function* (session?: string) {
       const s = yield* InstanceState.get(state)
-      return Object.values(s.skills)
+      if (!session) return Object.values(s.skills)
+      const merged = { ...s.skills }
+      for (const [name, skill] of Object.entries(s.sessions[session] ?? {})) {
+        merged[name] = skill
+      }
+      return Object.values(merged)
     })
 
     const dirs = Effect.fn("Skill.dirs")(function* () {
       return (yield* InstanceState.get(discovered)).dirs
     })
 
-    const available = Effect.fn("Skill.available")(function* (agent?: Agent.Info) {
+    const available = Effect.fn("Skill.available")(function* (agent?: Agent.Info, session?: string) {
       const s = yield* InstanceState.get(state)
-      const list = Object.values(s.skills).toSorted((a, b) => a.name.localeCompare(b.name))
+      let list = session
+        ? [...Object.values(s.sessions[session] ?? {}), ...Object.values(s.skills)]
+        : Object.values(s.skills)
+      const seen = new Set<string>()
+      list = list.filter((skill) => {
+        if (seen.has(skill.name)) return false
+        seen.add(skill.name)
+        return true
+      }).toSorted((a, b) => a.name.localeCompare(b.name))
       if (!agent) return list
       return list.filter((skill) => Permission.evaluate("skill", skill.name, agent.permission).action !== "deny")
     })
 
-    return Service.of({ get, require, all, dirs, available })
+    const sessionList = Effect.fn("Skill.sessionList")(function* (session: string) {
+      const s = yield* InstanceState.get(state)
+      return Object.values(s.sessions[session] ?? {})
+    })
+
+    const sessionCreate = Effect.fn("Skill.sessionCreate")(function* (session: string, value: CreateInput) {
+      const info: Info = {
+        name: value.name,
+        description: value.description,
+        location: `memory://${value.name}`,
+        content: value.content,
+        resources: value.resources,
+      }
+      const s = yield* InstanceState.get(state)
+      if (!s.sessions[session]) s.sessions[session] = {}
+      s.sessions[session][value.name] = info
+      return info
+    })
+
+    const sessionLoad = Effect.fn("Skill.sessionLoad")(function* (session: string, dir: string) {
+      const isDir = yield* fsys.isDir(dir).pipe(Effect.catch(() => Effect.succeed(false)))
+      if (!isDir) return []
+      const scanState: ScanState = { matches: new Set(), dirs: new Set() }
+      yield* scan(scanState, dir, SKILL_PATTERN)
+      const tmp: State = { skills: {}, dirs: new Set(), sessions: {} }
+      yield* Effect.forEach([...scanState.matches], (match) => add(tmp, match, bus), {
+        concurrency: "unbounded",
+        discard: true,
+      })
+      const loaded = Object.values(tmp.skills)
+      const s = yield* InstanceState.get(state)
+      if (!s.sessions[session]) s.sessions[session] = {}
+      for (const skill of loaded) s.sessions[session][skill.name] = skill
+      return loaded
+    })
+
+    const sessionUnload = Effect.fn("Skill.sessionUnload")(function* (session: string, name: string) {
+      const s = yield* InstanceState.get(state)
+      if (s.sessions[session]) {
+        delete s.sessions[session][name]
+        if (Object.keys(s.sessions[session]).length === 0) delete s.sessions[session]
+      }
+    })
+
+    const sessionClear = Effect.fn("Skill.sessionClear")(function* (session: string) {
+      const s = yield* InstanceState.get(state)
+      delete s.sessions[session]
+    })
+
+    return Service.of({ get, require, all, dirs, available, sessionList, sessionCreate, sessionLoad, sessionUnload, sessionClear })
   }),
 )
 

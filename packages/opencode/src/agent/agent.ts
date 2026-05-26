@@ -19,12 +19,15 @@ import { Global } from "@opencode-ai/core/global"
 import path from "path"
 import { Plugin } from "@/plugin"
 import { Skill } from "../skill"
+import { SessionAgent } from "./session-agent"
+import { NamedError } from "@opencode-ai/core/util/error"
 import { Effect, Context, Layer, Schema } from "effect"
 import { InstanceState } from "@/effect/instance-state"
 import { RuntimeFlags } from "@/effect/runtime-flags"
 import * as Option from "effect/Option"
 import * as OtelTracer from "@effect/opentelemetry/Tracer"
 import { type DeepMutable } from "@opencode-ai/core/schema"
+import type { SessionID } from "../session/schema"
 
 export const Info = Schema.Struct({
   name: Schema.String,
@@ -55,6 +58,24 @@ const GeneratedAgent = Schema.Struct({
   systemPrompt: Schema.String,
 })
 
+export const CreateInput = Schema.Struct({
+  name: Schema.String,
+  description: Schema.optional(Schema.String),
+  mode: Schema.Literals(["subagent", "primary", "all"]),
+  prompt: Schema.optional(Schema.String),
+  permission: Schema.optional(Permission.Ruleset),
+  model: Schema.optional(Schema.Struct({ modelID: ModelID, providerID: ProviderID })),
+  temperature: Schema.optional(Schema.Finite),
+  topP: Schema.optional(Schema.Finite),
+  steps: Schema.optional(Schema.Finite),
+  color: Schema.optional(Schema.String),
+  variant: Schema.optional(Schema.String),
+  options: Schema.optional(Schema.Record(Schema.String, Schema.Unknown)),
+})
+export type CreateInput = Schema.Schema.Type<typeof CreateInput>
+
+export const InvalidError = NamedError.create("AgentInvalidError", Schema.Struct({ message: Schema.String }))
+
 export interface Interface {
   readonly get: (agent: string) => Effect.Effect<Info>
   readonly list: () => Effect.Effect<Info[]>
@@ -71,13 +92,42 @@ export interface Interface {
     },
     Provider.DefaultModelError
   >
+  readonly sessionList: (session: SessionID) => Effect.Effect<Info[]>
+  readonly sessionCreate: (session: SessionID, input: CreateInput) => Effect.Effect<Info, unknown>
+  readonly sessionUnload: (session: SessionID, name: string) => Effect.Effect<void>
+  readonly sessionClear: (session: SessionID) => Effect.Effect<void>
 }
 
-type State = Omit<Interface, "generate">
+type State = Omit<Interface, "generate" | "sessionList" | "sessionCreate" | "sessionUnload" | "sessionClear">
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/Agent") {}
 
 export const use = serviceUse(Service)
+
+function rowToInfo(row: SessionAgent.Row): Info {
+  return {
+    name: row.name,
+    description: row.description ?? undefined,
+    mode: row.mode ?? "all",
+    prompt: row.prompt ?? undefined,
+    permission: row.permission ?? [],
+    model: row.model
+      ? { providerID: ProviderID.make(row.model.providerID), modelID: ModelID.make(row.model.modelID) }
+      : undefined,
+    temperature: row.temperature ?? undefined,
+    topP: row.top_p ?? undefined,
+    steps: row.steps ?? undefined,
+    color: row.color ?? undefined,
+    variant: row.variant ?? undefined,
+    options: row.options ?? {},
+  }
+}
+
+function mergeInfo(row: SessionAgent.Row, base?: Info): Info {
+  const info = rowToInfo(row)
+  if (!base) return info
+  return { ...info, native: base.native, hidden: base.hidden }
+}
 
 export const layer = Layer.effect(
   Service,
@@ -88,6 +138,7 @@ export const layer = Layer.effect(
     const skill = yield* Skill.Service
     const provider = yield* Provider.Service
     const flags = yield* RuntimeFlags.Service
+    const sessionAgent = yield* SessionAgent.Service
 
     const state = yield* InstanceState.make<State>(
       Effect.fn("Agent.state")(function* (ctx) {
@@ -450,6 +501,35 @@ export const layer = Layer.effect(
 
         return yield* Effect.promise(() => generateObject(params).then((r) => r.object))
       }),
+      sessionList: Effect.fn("Agent.sessionList")(function* (session: SessionID) {
+        const base = yield* InstanceState.useEffect(state, (s) => s.list())
+        const rows = yield* sessionAgent.list(session)
+        if (rows.length === 0) return base
+        const overlay = new Map(rows.map((r) => [r.name, rowToInfo(r)]))
+        return base
+          .map((a) => {
+            const o = overlay.get(a.name)
+            if (!o) return a
+            return { ...o, native: a.native, hidden: a.hidden }
+          })
+          .concat([...overlay.values()].filter((a) => !base.some((b) => b.name === a.name)))
+      }),
+      sessionCreate: Effect.fn("Agent.sessionCreate")(function* (session: SessionID, input: CreateInput) {
+        if (input.name === "compaction" || input.name === "title" || input.name === "summary") {
+          throw new InvalidError({ message: `Cannot override internal agent: ${input.name}` })
+        }
+        const row = yield* sessionAgent.upsert(session, input)
+        const base = yield* InstanceState.useEffect(state, (s) => s.get(input.name)).pipe(
+          Effect.catch(() => Effect.succeed(undefined)),
+        )
+        return mergeInfo(row, base)
+      }),
+      sessionUnload: Effect.fn("Agent.sessionUnload")(function* (session: SessionID, name: string) {
+        yield* sessionAgent.remove(session, name)
+      }),
+      sessionClear: Effect.fn("Agent.sessionClear")(function* (session: SessionID) {
+        yield* sessionAgent.removeAll(session)
+      }),
     })
   }),
 )
@@ -461,6 +541,7 @@ export const defaultLayer = layer.pipe(
   Layer.provide(Config.defaultLayer),
   Layer.provide(Skill.defaultLayer),
   Layer.provide(RuntimeFlags.defaultLayer),
+  Layer.provide(SessionAgent.noopLayer),
 )
 
 export * as Agent from "./agent"

@@ -14,6 +14,7 @@ import { SessionStatus } from "@/session/status"
 import { SessionSummary } from "@/session/summary"
 import { Todo } from "@/session/todo"
 import { MessageID, PartID, SessionID } from "@/session/schema"
+import { Skill } from "@/skill"
 import { NamedError } from "@opencode-ai/core/util/error"
 import { Cause, Effect, Option, Schema, Scope } from "effect"
 import * as Stream from "effect/Stream"
@@ -31,6 +32,9 @@ import {
   PromptPayload,
   RevertPayload,
   ShellPayload,
+  SkillCreatePayload,
+  SkillLoadPayload,
+  AgentCreatePayload,
   SummarizePayload,
   UpdatePayload,
 } from "../groups/session"
@@ -55,6 +59,7 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
     const permissionSvc = yield* Permission.Service
     const statusSvc = yield* SessionStatus.Service
     const todoSvc = yield* Todo.Service
+    const skillSvc = yield* Skill.Service
     const summary = yield* SessionSummary.Service
     const bus = yield* Bus.Service
     const scope = yield* Scope.Scope
@@ -403,6 +408,63 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       return yield* session.updatePart(payload)
     })
 
+    const listSkills = Effect.fn("SessionHttpApi.skills")(function* (ctx: {
+      params: { sessionID: SessionID }
+    }) {
+      return yield* skillSvc.sessionList(ctx.params.sessionID)
+    })
+
+    const createSkill = Effect.fn("SessionHttpApi.skillsCreate")(function* (ctx: {
+      params: { sessionID: SessionID }
+      payload: typeof SkillCreatePayload.Type
+    }) {
+      return yield* skillSvc.sessionCreate(ctx.params.sessionID, ctx.payload)
+    })
+
+    const loadSkills = Effect.fn("SessionHttpApi.skillsLoad")(function* (ctx: {
+      params: { sessionID: SessionID }
+      payload: typeof SkillLoadPayload.Type
+    }) {
+      return yield* skillSvc.sessionLoad(ctx.params.sessionID, ctx.payload.path)
+    })
+
+    const deleteSkill = Effect.fn("SessionHttpApi.skillsDelete")(function* (ctx: {
+      params: { sessionID: SessionID; name: string }
+    }) {
+      yield* skillSvc.sessionUnload(ctx.params.sessionID, ctx.params.name)
+    })
+
+    const clearSkills = Effect.fn("SessionHttpApi.skillsClear")(function* (ctx: {
+      params: { sessionID: SessionID }
+    }) {
+      yield* skillSvc.sessionClear(ctx.params.sessionID)
+    })
+
+    const listAgents = Effect.fn("SessionHttpApi.agents")(function* (ctx: {
+      params: { sessionID: SessionID }
+    }) {
+      return yield* agentSvc.sessionList(ctx.params.sessionID)
+    })
+
+    const createAgent = Effect.fn("SessionHttpApi.agentsCreate")(function* (ctx: {
+      params: { sessionID: SessionID }
+      payload: any
+    }) {
+      return yield* agentSvc.sessionCreate(ctx.params.sessionID, ctx.payload).pipe(Effect.orDie)
+    })
+
+    const deleteAgent = Effect.fn("SessionHttpApi.agentsDelete")(function* (ctx: {
+      params: { sessionID: SessionID; name: string }
+    }) {
+      yield* agentSvc.sessionUnload(ctx.params.sessionID, ctx.params.name)
+    })
+
+    const clearAgents = Effect.fn("SessionHttpApi.agentsClear")(function* (ctx: {
+      params: { sessionID: SessionID }
+    }) {
+      yield* agentSvc.sessionClear(ctx.params.sessionID)
+    })
+
     return handlers
       .handle("list", list)
       .handle("status", status)
@@ -431,5 +493,14 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       .handle("deleteMessage", deleteMessage)
       .handle("deletePart", deletePart)
       .handle("updatePart", updatePart)
+      .handle("skills", listSkills)
+      .handle("skillsCreate", createSkill)
+      .handle("skillsLoad", loadSkills)
+      .handle("skillsDelete", deleteSkill)
+      .handle("skillsClear", clearSkills)
+      .handle("agents", listAgents)
+      .handle("agentsCreate", createAgent)
+      .handle("agentsDelete", deleteAgent)
+      .handle("agentsClear", clearAgents)
   }),
 )
