@@ -15,8 +15,10 @@ const log = Log.create({ service: "session.projector" })
 
 function foreign(err: unknown) {
   if (typeof err !== "object" || err === null) return false
-  if ("code" in err && err.code === "SQLITE_CONSTRAINT_FOREIGNKEY") return true
-  return "message" in err && typeof err.message === "string" && err.message.includes("FOREIGN KEY constraint failed")
+  if ("code" in err && (err.code === "SQLITE_CONSTRAINT_FOREIGNKEY" || err.code === "23503")) return true
+  if ("cause" in err && typeof err.cause === "object" && err.cause !== null && "code" in err.cause && ((err.cause as any).code === "23503" || (err.cause as any).code === "SQLITE_CONSTRAINT_FOREIGNKEY")) return true
+  if ("message" in err && typeof err.message === "string" && (err.message.includes("FOREIGN KEY constraint failed") || err.message.includes("violates foreign key constraint"))) return true
+  return false
 }
 
 export type DeepPartial<T> = T extends object ? { [K in keyof T]?: DeepPartial<T[K]> | null } : T

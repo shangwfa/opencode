@@ -2,10 +2,9 @@ import { Effect, Context, Layer, Cause, Deferred, Ref, Semaphore, Schedule } fro
 import { Sandbox, ConnectionConfig } from "@alibaba-group/opensandbox"
 import type { CommandExecution, Volume } from "@alibaba-group/opensandbox"
 import { and, eq, lt } from "drizzle-orm"
-import postgres from "postgres"
 import * as Log from "@opencode-ai/core/util/log"
 import { Flag } from "@/flag/flag"
-import * as PgInit from "../storage/db.pg"
+import { Database } from "../storage/db"
 import { SandboxTable } from "./sandbox.pg"
 import type { SessionID } from "../session/schema"
 
@@ -406,9 +405,7 @@ export namespace SandboxProvider {
 
       const hasVolume = config.volumeType !== "none"
 
-      const { db } = PgInit.init(Flag.OPENCODE_DATABASE_URL!)
-      const pgDb: any = db
-      PgInit.install(pgDb, SandboxTable)
+      const pgDb: any = Database.Client()
 
       type Row = {
         id: string
@@ -543,17 +540,16 @@ export namespace SandboxProvider {
 
       function lock<A, E>(sessionID: string, effect: Effect.Effect<A, E>) {
         return Effect.gen(function* () {
-          const client = postgres(Flag.OPENCODE_DATABASE_URL!, { max: 1 })
+          const sql = (Database.Client() as any).$client
           return yield* Effect.tryPromise({
-            try: () => client`SELECT pg_advisory_lock(hashtext(${sessionID}))`,
+            try: () => sql`SELECT pg_advisory_lock(hashtext(${sessionID}))`,
             catch: (e) => new Error(`db.lock failed: ${String(e)}`),
           }).pipe(
             Effect.orDie,
             Effect.andThen(effect),
             Effect.ensuring(
-              Effect.tryPromise(() => client`SELECT pg_advisory_unlock(hashtext(${sessionID}))`).pipe(
+              Effect.tryPromise(() => sql`SELECT pg_advisory_unlock(hashtext(${sessionID}))`).pipe(
                 Effect.catchCause(() => Effect.void),
-                Effect.andThen(Effect.tryPromise(() => client.end()).pipe(Effect.catchCause(() => Effect.void))),
               ),
             ),
           )

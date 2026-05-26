@@ -2,9 +2,7 @@ import z from "zod"
 import { randomBytes } from "crypto"
 import { Effect, Context, Layer } from "effect"
 import { Database, and, asc, eq } from "../storage/db"
-import postgres from "postgres"
 import { SessionAgentTable } from "./agent.pg"
-import { Flag } from "@opencode-ai/core/flag/flag"
 import type { SessionID } from "../session/schema"
 import type { Permission } from "@/permission"
 import type { ModelID, ProviderID } from "@/provider/schema"
@@ -221,7 +219,7 @@ export namespace SessionAgent {
   export const pgLayer = Layer.effect(
     Service,
     Effect.gen(function* () {
-      const sql = postgres(Flag.OPENCODE_DATABASE_URL!, { max: 2 })
+      const sql = (Database.Client() as any).$client
 
       const query = (strings: TemplateStringsArray, ...values: any[]) =>
         Effect.promise(() => sql(strings, ...values) as Promise<any[]>)

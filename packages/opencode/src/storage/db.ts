@@ -116,10 +116,13 @@ async function migratePg(db: any, entries: Journal) {
       const rows = await db.execute(sql`SELECT 1 FROM __drizzle_migrations WHERE hash = ${hash}`)
       if (rows.length > 0) continue
       const stmts = entry.sql.split("--> statement-breakpoint").filter((s: string) => s.trim())
-      for (const stmt of stmts) {
-        await db.execute(sql.raw(stmt))
-      }
-      await db.execute(sql`INSERT INTO __drizzle_migrations (hash, created_at) VALUES (${hash}, ${entry.timestamp})`)
+      // Use drizzle transaction for atomicity (postgres.js disallows raw BEGIN on pooled connections)
+      await db.transaction(async (tx: any) => {
+        for (const stmt of stmts) {
+          await tx.execute(sql.raw(stmt))
+        }
+        await tx.execute(sql`INSERT INTO __drizzle_migrations (hash, created_at) VALUES (${hash}, ${entry.timestamp})`)
+      })
     }
   } finally {
     try {

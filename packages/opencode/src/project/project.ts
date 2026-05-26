@@ -353,7 +353,8 @@ export const layer = Layer.effect(
     })
 
     const list = Effect.fn("Project.list")(function* () {
-      return yield* db(async (d) => (await d.select().from(ProjectTable).all()).map(fromRow))
+      const rows: any = yield* db(async (d) => d.select().from(ProjectTable).all())
+      return rows.map(fromRow)
     })
 
     const get = Effect.fn("Project.get")(function* (id: ProjectID) {

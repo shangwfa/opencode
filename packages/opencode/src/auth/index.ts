@@ -3,8 +3,7 @@ import { Effect, Layer, Record, Result, Schema, Context } from "effect"
 import { NonNegativeInt } from "@opencode-ai/core/schema"
 import { Global } from "@opencode-ai/core/global"
 import { AppFileSystem } from "@opencode-ai/core/filesystem"
-import { Flag } from "@/flag/flag"
-import * as PgInit from "../storage/db.pg"
+import { Database } from "../storage/db"
 import { AuthTable } from "./auth.pg"
 
 export const OAUTH_DUMMY_KEY = "opencode-oauth-dummy-key"
@@ -97,24 +96,12 @@ export const layer = Layer.effect(
 export const pgLayer = Layer.effect(
   Service,
   Effect.gen(function* () {
-    const { db: pgDb, client: pgClient } = PgInit.init(Flag.OPENCODE_DATABASE_URL!)
-    yield* Effect.tryPromise({
-      try: () =>
-        pgClient`CREATE TABLE IF NOT EXISTS auth (
-          provider_id TEXT PRIMARY KEY,
-          type TEXT NOT NULL,
-          data JSONB NOT NULL,
-          time_created BIGINT NOT NULL DEFAULT 0,
-          time_updated BIGINT NOT NULL DEFAULT 0
-        )`,
-      catch: (e) => new AuthError({ message: "Failed to create auth table", cause: e }),
-    }).pipe(Effect.orDie)
-    PgInit.install(pgDb, AuthTable)
+    const pgClient = (Database.Client() as any).$client
     const decode = Schema.decodeUnknownOption(Info)
 
     const all = Effect.fn("Auth.all")(function* () {
       const rows: any[] = yield* Effect.tryPromise({
-        try: () => pgDb.select().from(AuthTable),
+        try: () => pgClient`SELECT * FROM auth` as Promise<any[]>,
         catch: (e) => new AuthError({ message: "Failed to read auth from pg", cause: e }),
       }).pipe(Effect.orDie)
       const result: Record<string, any> = {}

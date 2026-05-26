@@ -3,7 +3,7 @@
 // in effectPayloads() so existing HTTP/SDK schema generation remains stable.
 // Remove that registry read when event schemas are generated from core directly.
 import { Database } from "@/storage/db"
-import { eq } from "drizzle-orm"
+import { eq, sql } from "drizzle-orm"
 import { GlobalBus } from "@/bus/global"
 import { Bus as ProjectBus } from "@/bus"
 import { BusEvent } from "@/bus/bus-event"
@@ -159,11 +159,18 @@ export const layer = Layer.effect(Service)(
         Database.transaction(
           async (tx) => {
             const id = EventID.ascending()
-            const row = await tx
-              .select({ seq: EventSequenceTable.seq })
-              .from(EventSequenceTable)
-              .where(eq(EventSequenceTable.aggregate_id, agg))
-              .get()
+            // PG mode: use FOR UPDATE to lock the row and prevent concurrent seq races
+            let row: { seq: number } | undefined
+            if (Database.dialect === "pg") {
+              const rows: any[] = await tx.execute(sql`SELECT seq FROM event_sequence WHERE aggregate_id = ${agg} FOR UPDATE`)
+              row = rows[0] ?? undefined
+            } else {
+              row = await tx
+                .select({ seq: EventSequenceTable.seq })
+                .from(EventSequenceTable)
+                .where(eq(EventSequenceTable.aggregate_id, agg))
+                .get()
+            }
             const seq = row?.seq != null ? row.seq + 1 : 0
 
             const event = { id, seq, aggregateID: agg, data }

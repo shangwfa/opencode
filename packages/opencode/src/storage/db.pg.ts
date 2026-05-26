@@ -70,6 +70,9 @@ export function init(url: string) {
   // unchanged against PG: the text-json decoder parses the string, and the
   // integer decoder converts the numeric string to a number.
   const client = postgres(url, {
+    connect_timeout: 10,
+    idle_timeout: 30,
+    max_lifetime: 600,
     types: {
       bigint: {
         to: OID_INT8,
