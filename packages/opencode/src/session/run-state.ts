@@ -6,6 +6,7 @@ import * as Session from "./session"
 import { MessageV2 } from "./message-v2"
 import { SessionID } from "./schema"
 import { SessionStatus } from "./status"
+import { SandboxProvider } from "@/tool/sandbox-provider"
 
 export interface Interface {
   readonly assertNotBusy: (sessionID: SessionID) => Effect.Effect<void, Session.BusyError>
@@ -59,6 +60,15 @@ export const layer = Layer.effect(
         onIdle: Effect.gen(function* () {
           data.runners.delete(sessionID)
           yield* status.set(sessionID, { type: "idle" })
+          const sandbox = yield* Effect.serviceOption(SandboxProvider.Service)
+          if (sandbox._tag === "Some") {
+            const keep = yield* sandbox.value.isKeepAlive(sessionID)
+            if (keep) {
+              yield* sandbox.value.release(sessionID).pipe(Effect.catchCause(() => Effect.void))
+            } else {
+              yield* sandbox.value.destroy(sessionID).pipe(Effect.catchCause(() => Effect.void))
+            }
+          }
         }),
         onBusy: status.set(sessionID, { type: "busy" }),
         onInterrupt,

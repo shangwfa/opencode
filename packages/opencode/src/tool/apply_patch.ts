@@ -14,6 +14,8 @@ import DESCRIPTION from "./apply_patch.txt"
 import { File } from "../file"
 import { Format } from "../format"
 import * as Bom from "@/util/bom"
+import { toSandboxPath } from "./sandbox-path"
+import { SandboxProvider } from "./sandbox-provider"
 
 export const Parameters = Schema.Struct({
   patchText: Schema.String.annotate({ description: "The full patch text that describes all changes to be made" }),
@@ -26,6 +28,51 @@ export const ApplyPatchTool = Tool.define(
     const afs = yield* AppFileSystem.Service
     const format = yield* Format.Service
     const bus = yield* Bus.Service
+    const readFile = (filePath: string, ctx: Tool.Context, instance: { directory: string }) =>
+      ctx.sandbox !== null
+        ? Effect.gen(function* () {
+            const sb: any = yield* Effect.tryPromise({ try: () => ctx.sandbox!, catch: (e) => new Error(String(e)) })
+            return yield* Effect.tryPromise({
+              try: () => sb.files.readFile(toSandboxPath(filePath, instance.directory)) as Promise<string>,
+              catch: () => new Error(`File not found: ${filePath}`),
+            })
+          })
+        : Bom.readFile(afs, filePath).pipe(Effect.map((s) => Bom.join(s.text, s.bom)))
+
+    const writeFile = (filePath: string, content: string, ctx: Tool.Context, instance: { directory: string }) =>
+      ctx.sandbox !== null
+        ? Effect.gen(function* () {
+            const sb: any = yield* Effect.tryPromise({ try: () => ctx.sandbox!, catch: (e) => new Error(String(e)) })
+            yield* Effect.tryPromise({
+              try: () => sb.files.writeFiles([{ path: toSandboxPath(filePath, instance.directory), data: content }]),
+              catch: () => new Error(`Failed to write file: ${filePath}`),
+            })
+          })
+        : afs.writeWithDirs(filePath, content)
+
+    const removeFile = (filePath: string, ctx: Tool.Context, instance: { directory: string }) =>
+      ctx.sandbox !== null
+        ? Effect.gen(function* () {
+            const svc = yield* Effect.serviceOption(SandboxProvider.Service)
+            if (svc._tag === "Some") {
+              yield* svc.value.runInSession(ctx.sessionID, `rm -f "${toSandboxPath(filePath, instance.directory)}"`, { timeoutSeconds: 10 }).pipe(Effect.catchCause(() => Effect.void))
+            }
+          })
+        : afs.remove(filePath)
+
+    const statFile = (filePath: string, ctx: Tool.Context, instance: { directory: string }) =>
+      ctx.sandbox !== null
+        ? (Effect.gen(function* () {
+            const sb: any = yield* Effect.tryPromise({ try: () => ctx.sandbox!, catch: (e) => new Error(String(e)) })
+            const content = yield* Effect.tryPromise({
+              try: () => sb.files.readFile(toSandboxPath(filePath, instance.directory)) as Promise<string>,
+              catch: () => undefined as string | undefined,
+            })
+            return content !== undefined ? ({ type: "File" } as const) : undefined
+          }) as Effect.Effect<{ type: "File" } | undefined>)
+        : (afs.stat(filePath).pipe(Effect.catch(() => Effect.succeed(undefined))) as Effect.Effect<
+            { type: "File" } | { type: "Directory" } | undefined
+          >)
 
     const run = Effect.fn("ApplyPatchTool.execute")(function* (
       params: Schema.Schema.Type<typeof Parameters>,
@@ -105,27 +152,31 @@ export const ApplyPatchTool = Tool.define(
 
           case "update": {
             // Check if file exists for update
-            const stats = yield* afs.stat(filePath).pipe(Effect.catch(() => Effect.succeed(undefined)))
+            const stats = yield* statFile(filePath, ctx, instance)
             if (!stats || stats.type === "Directory") {
               return yield* Effect.fail(
                 new Error(`apply_patch verification failed: Failed to read file to update: ${filePath}`),
               )
             }
 
-            const source = yield* Bom.readFile(afs, filePath)
-            const oldContent = source.text
+            let oldContent: string
+            let bom: boolean
+            if (ctx.sandbox !== null) {
+              oldContent = yield* readFile(filePath, ctx, instance)
+              bom = false
+            } else {
+              const source = yield* Bom.readFile(afs, filePath)
+              oldContent = source.text
+              bom = source.bom
+            }
             let newContent = oldContent
-            let bom = source.bom
 
             // Apply the update chunks to get new content
             try {
-              const fileUpdate = Patch.deriveNewContentsFromChunks(
-                filePath,
-                hunk.chunks,
-                Bom.join(source.text, source.bom),
-              )
+              const rawContent = ctx.sandbox !== null ? oldContent : Bom.join(oldContent, bom)
+              const fileUpdate = Patch.deriveNewContentsFromChunks(filePath, hunk.chunks, rawContent)
               newContent = fileUpdate.content
-              bom = fileUpdate.bom
+              bom = ctx.sandbox !== null ? false : fileUpdate.bom
             } catch (error) {
               return yield* Effect.fail(new Error(`apply_patch verification failed: ${error}`))
             }
@@ -159,16 +210,32 @@ export const ApplyPatchTool = Tool.define(
           }
 
           case "delete": {
-            const source = yield* Bom.readFile(afs, filePath).pipe(
-              Effect.catch((error) =>
-                Effect.fail(
-                  new Error(
-                    `apply_patch verification failed: ${error instanceof Error ? error.message : String(error)}`,
+            let contentToDelete: string
+            let deleteBom: boolean
+            if (ctx.sandbox !== null) {
+              contentToDelete = yield* (readFile(filePath, ctx, instance) as Effect.Effect<string, Error>).pipe(
+                Effect.catch((error: any) =>
+                  Effect.fail(
+                    new Error(
+                      `apply_patch verification failed: ${error instanceof Error ? error.message : String(error)}`,
+                    ),
                   ),
                 ),
-              ),
-            )
-            const contentToDelete = source.text
+              )
+              deleteBom = false
+            } else {
+              const source = yield* Bom.readFile(afs, filePath).pipe(
+                Effect.catch((error) =>
+                  Effect.fail(
+                    new Error(
+                      `apply_patch verification failed: ${error instanceof Error ? error.message : String(error)}`,
+                    ),
+                  ),
+                ),
+              )
+              contentToDelete = source.text
+              deleteBom = source.bom
+            }
             const deleteDiff = trimDiff(createTwoFilesPatch(filePath, filePath, contentToDelete, ""))
 
             const deletions = contentToDelete.split("\n").length
@@ -181,7 +248,7 @@ export const ApplyPatchTool = Tool.define(
               diff: deleteDiff,
               additions: 0,
               deletions,
-              bom: source.bom,
+              bom: deleteBom,
             })
 
             totalDiff += deleteDiff + "\n"
@@ -219,38 +286,35 @@ export const ApplyPatchTool = Tool.define(
 
       for (const change of fileChanges) {
         const edited = change.type === "delete" ? undefined : (change.movePath ?? change.filePath)
+        const content = ctx.sandbox !== null ? change.newContent : Bom.join(change.newContent, change.bom)
         switch (change.type) {
           case "add":
-            // Create parent directories (recursive: true is safe on existing/root dirs)
-
-            yield* afs.writeWithDirs(change.filePath, Bom.join(change.newContent, change.bom))
+            yield* writeFile(change.filePath, content, ctx, instance)
             updates.push({ file: change.filePath, event: "add" })
             break
 
           case "update":
-            yield* afs.writeWithDirs(change.filePath, Bom.join(change.newContent, change.bom))
+            yield* writeFile(change.filePath, content, ctx, instance)
             updates.push({ file: change.filePath, event: "change" })
             break
 
           case "move":
             if (change.movePath) {
-              // Create parent directories (recursive: true is safe on existing/root dirs)
-
-              yield* afs.writeWithDirs(change.movePath!, Bom.join(change.newContent, change.bom))
-              yield* afs.remove(change.filePath)
+              yield* writeFile(change.movePath!, content, ctx, instance)
+              yield* removeFile(change.filePath, ctx, instance)
               updates.push({ file: change.filePath, event: "unlink" })
               updates.push({ file: change.movePath, event: "add" })
             }
             break
 
           case "delete":
-            yield* afs.remove(change.filePath)
+            yield* removeFile(change.filePath, ctx, instance)
             updates.push({ file: change.filePath, event: "unlink" })
             break
         }
 
         if (edited) {
-          if (yield* format.file(edited)) {
+          if (ctx.sandbox === null && (yield* format.file(edited))) {
             yield* Bom.syncFile(afs, edited, change.bom)
           }
           yield* bus.publish(File.Event.Edited, { file: edited })
