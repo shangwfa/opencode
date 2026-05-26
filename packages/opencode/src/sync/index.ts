@@ -159,9 +159,11 @@ export const layer = Layer.effect(Service)(
         Database.transaction(
           async (tx) => {
             const id = EventID.ascending()
-            // PG mode: use FOR UPDATE to lock the row and prevent concurrent seq races
             let row: { seq: number } | undefined
             if (Database.dialect === "pg") {
+              // Ensure the row exists so FOR UPDATE can lock it.
+              // ON CONFLICT DO NOTHING is safe under concurrent inserts.
+              await tx.execute(sql`INSERT INTO event_sequence (aggregate_id, seq) VALUES (${agg}, -1) ON CONFLICT DO NOTHING`)
               const rows: any[] = await tx.execute(sql`SELECT seq FROM event_sequence WHERE aggregate_id = ${agg} FOR UPDATE`)
               row = rows[0] ?? undefined
             } else {

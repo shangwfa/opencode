@@ -538,21 +538,18 @@ export namespace SandboxProvider {
         }).pipe(Effect.orDie)
       }
 
+      // Semaphore per session — serializes sandbox lifecycle operations
+      // within a single process. Cross-process safety is ensured by PG's
+      // ON CONFLICT and state checks inside getOrCreate/destroy.
+      const lockSemaphores = new Map<string, Semaphore.Semaphore>()
       function lock<A, E>(sessionID: string, effect: Effect.Effect<A, E>) {
         return Effect.gen(function* () {
-          const sql = (Database.Client() as any).$client
-          return yield* Effect.tryPromise({
-            try: () => sql`SELECT pg_advisory_lock(hashtext(${sessionID}))`,
-            catch: (e) => new Error(`db.lock failed: ${String(e)}`),
-          }).pipe(
-            Effect.orDie,
-            Effect.andThen(effect),
-            Effect.ensuring(
-              Effect.tryPromise(() => sql`SELECT pg_advisory_unlock(hashtext(${sessionID}))`).pipe(
-                Effect.catchCause(() => Effect.void),
-              ),
-            ),
-          )
+          let sem = lockSemaphores.get(sessionID)
+          if (!sem) {
+            sem = yield* Semaphore.make(1)
+            lockSemaphores.set(sessionID, sem)
+          }
+          return yield* sem.withPermits(1)(effect)
         })
       }
 
