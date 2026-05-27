@@ -63,11 +63,10 @@ export const layer = Layer.effect(
           const sandbox = yield* Effect.serviceOption(SandboxProvider.Service)
           if (sandbox._tag === "Some") {
             const keep = yield* sandbox.value.isKeepAlive(sessionID)
-            if (keep) {
-              yield* sandbox.value.release(sessionID).pipe(Effect.catchCause(() => Effect.void))
-            } else {
+            if (!keep) {
               yield* sandbox.value.destroy(sessionID).pipe(Effect.catchCause(() => Effect.void))
             }
+            // keepAlive=true: sandbox 保持存活，由用户显式调用 kill-sandbox 或 delete session 销毁
           }
         }),
         onBusy: status.set(sessionID, { type: "busy" }),

@@ -20,6 +20,60 @@
 - **关键修复**：`Flag.OPENCODE_DEFAULT_DIRECTORY` 需添加到 `packages/core/src/flag/flag.ts`（非 `packages/opencode`）
 - **工具调用说明**：upstream 的 part type 为 `tool`（非 `tool-use`），响应结构含 `step-start`, `reasoning`, `tool`, `text`, `step-finish`
 
+### 消息结构说明
+
+`POST /session/:sessionID/message` 的返回值是 **AI 最后一条消息**（通常是文字总结），而工具调用在**前一条消息**中。完整的消息流为：
+
+```
+💬 [N]   用户 prompt
+🔧 [N+1] AI 工具调用（bash/write/read/edit 等，可能多个）
+💬 [N+2] AI 文字总结 ← POST /message 返回的是这条
+```
+
+因此，仅解析 `POST /message` 的返回值无法验证工具是否被调用。验证工具调用过程需要查询 `GET /session/:sessionID/message` 获取完整消息列表。
+
+### 通用验证函数
+
+以下 bash 函数可在测试脚本中复用：
+
+```bash
+BASE="http://localhost:14096"
+MODEL='{"providerID":"zhipuai","modelID":"glm-5.1"}'
+
+# send_and_verify: 发送消息并验证工具调用过程 + 最终结果
+# 用法: send_and_verify $SID "prompt文本" "测试标签"
+send_and_verify() {
+  local sid=$1 prompt=$2 label=$3
+  echo "=== $label ==="
+
+  # 发送消息（返回值是最后一条文字总结）
+  curl -s --max-time 120 -X POST "$BASE/session/$sid/message" \
+    -H 'Content-Type: application/json' \
+    -d "{\"parts\":[{\"type\":\"text\",\"text\":\"$prompt\"}],\"model\":$MODEL}" > /dev/null 2>&1
+
+  # 从完整消息列表验证工具调用过程
+  curl -s "$BASE/session/$sid/message" | python3 -c "
+import json, sys
+msgs = json.load(sys.stdin)
+# 取最后3条消息（prompt + tool calls + summary）
+recent = msgs[-3:] if len(msgs) >= 3 else msgs
+tools, texts = [], []
+for m in recent:
+    for p in m.get('parts', []):
+        if p.get('type') == 'tool':
+            t = p.get('tool', '?')
+            s = p.get('state', {})
+            status = s.get('status', '?')
+            output = s.get('output', '')[:80] if s.get('output') else ''
+            tools.append(f'{t}({status})')
+        elif p.get('type') == 'text':
+            texts.append(p.get('text', '')[:100])
+print(f'  工具调用: {\"✅ \" + str(tools) if tools else \"❌ 无工具调用\"}')
+print(f'  AI回复: {texts[-1] if texts else \"(空)\"}')
+"
+}
+```
+
 ### API 路径速查
 
 | 功能 | 正确路径 |
@@ -31,6 +85,10 @@
 | 全局事件流 | `GET /global/event`（SSE） |
 | Auth 凭据 | `PUT/DELETE /auth/:providerID` |
 | Sandbox proxy | `/session/:sessionID/proxy/:port/*` |
+| Sandbox 直连 endpoint | `GET /session/:sessionID/endpoint/:port` |
+| 沙箱执行命令 | `POST /session/:sessionID/exec` |
+| 设置 keepAlive | `POST /session/:sessionID/keep-alive` |
+| 查询 keepAlive | `GET /session/:sessionID/keep-alive` |
 | 健康检查 | `GET /global/health` |
 | 全局配置 | `GET /global/config` |
 
@@ -165,21 +223,45 @@ bun -e "fetch('http://127.0.0.1:4096/session/$SID/message',{method:'POST',header
 
 ### T4.3 写文件工具
 ```bash
-bun -e "fetch('http://127.0.0.1:4096/session/$SID/message',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({parts:[{type:'text',text:'在 /workspace 创建 t4-3.txt 内容是 hello'}],model:{providerID:'zhipuai',modelID:'glm-5.1'}})}).then(r=>r.json()).then(d=>{const t=d.parts.find(p=>p.type==='tool');console.log('tool:',t?.tool,'callID:',t?.callID?.slice(0,8))})"
+# 发送消息
+bun -e "fetch('http://127.0.0.1:4096/session/$SID/message',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({parts:[{type:'text',text:'在 /workspace 创建 t4-3.txt 内容是 hello'}],model:{providerID:'zhipuai',modelID:'glm-5.1'}})}).then(r=>r.json()).then(d=>console.log('result:',d.parts.find(p=>p.type==='text')?.text?.slice(0,200)))"
+
+# 验证工具调用过程（POST /message 返回的是文字总结，工具调用在前一条消息中）
+bun -e "fetch('http://127.0.0.1:4096/session/$SID/message').then(r=>r.json()).then(msgs=>{
+  const recent=msgs.slice(-3);
+  const tools=recent.flatMap(m=>m.parts.filter(p=>p.type==='tool').map(p=>p.tool+'('+p.state?.status+')'));
+  console.log('tools:',tools.length?tools:'❌ NO TOOLS');
+})"
 ```
-**期望**：`tool: bash`（或 `write`），有 `callID`
+**期望**：`tools` 包含 `write(completed)` 或 `bash(completed)`；文字总结确认文件已创建
 
 ### T4.4 读文件工具
 ```bash
-bun -e "fetch('http://127.0.0.1:4096/session/$SID/message',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({parts:[{type:'text',text:'读 /workspace/t4-3.txt'}],model:{providerID:'zhipuai',modelID:'glm-5.1'}})}).then(r=>r.json()).then(d=>console.log(d.parts.find(p=>p.type==='text')?.text))"
+# 发送消息
+bun -e "fetch('http://127.0.0.1:4096/session/$SID/message',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({parts:[{type:'text',text:'读 /workspace/t4-3.txt'}],model:{providerID:'zhipuai',modelID:'glm-5.1'}})}).then(r=>r.json()).then(d=>console.log('result:',d.parts.find(p=>p.type==='text')?.text))"
+
+# 验证工具调用过程
+bun -e "fetch('http://127.0.0.1:4096/session/$SID/message').then(r=>r.json()).then(msgs=>{
+  const recent=msgs.slice(-3);
+  const tools=recent.flatMap(m=>m.parts.filter(p=>p.type==='tool').map(p=>p.tool+'('+p.state?.status+')'));
+  console.log('tools:',tools.length?tools:'❌ NO TOOLS');
+})"
 ```
-**期望**：回复中含 `hello`
+**期望**：`tools` 包含 `read(completed)`；回复中含 `hello`
 
 ### T4.5 bash 命令执行
 ```bash
-bun -e "fetch('http://127.0.0.1:4096/session/$SID/message',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({parts:[{type:'text',text:'执行 ls /workspace 命令'}],model:{providerID:'zhipuai',modelID:'glm-5.1'}})}).then(r=>r.json()).then(d=>console.log(d.parts.find(p=>p.type==='text')?.text?.slice(0,200)))"
+# 发送消息
+bun -e "fetch('http://127.0.0.1:4096/session/$SID/message',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({parts:[{type:'text',text:'执行 ls /workspace 命令'}],model:{providerID:'zhipuai',modelID:'glm-5.1'}})}).then(r=>r.json()).then(d=>console.log('result:',d.parts.find(p=>p.type==='text')?.text?.slice(0,200)))"
+
+# 验证工具调用过程
+bun -e "fetch('http://127.0.0.1:4096/session/$SID/message').then(r=>r.json()).then(msgs=>{
+  const recent=msgs.slice(-3);
+  const tools=recent.flatMap(m=>m.parts.filter(p=>p.type==='tool').map(p=>p.tool+'('+p.state?.status+')'));
+  console.log('tools:',tools.length?tools:'❌ NO TOOLS');
+})"
 ```
-**期望**：回复中含文件列表或 `t4-3.txt`
+**期望**：`tools` 包含 `bash(completed)` 或 `read(completed)`；回复中含文件列表或 `t4-3.txt`
 
 ### T4.6 异步消息（不等结果）
 ```bash
@@ -1575,6 +1657,25 @@ PY
 | T12.9 | | 多 session PVC 子目录隔离 |
 | T12.10 | | 不同 session 进程隔离 |
 | T12.12 | | proxy 访问不触发 keepAlive |
+| T17.1 | ✅ | 无沙箱时 endpoint API 返回 502 |
+| T17.2 | | endpoint API 端口参数校验 |
+| T17.3 | ✅ | Vite 项目 endpoint API 返回直连 IP |
+| T17.4 | ✅ | 通过直连 IP 访问 Vite 页面 HTTP 200 |
+| T17.5 | ✅ | Proxy 模式有注入，直连模式无注入 |
+| T17.6 | | 沙箱销毁后 endpoint API 返回 502 |
+| T18.1 | ✅ | 7 种工具调用场景全部验证通过 |
+| T18.2 | ✅ | 消息流结构正确（prompt → tool → summary） |
+| T19.1 | | exec API：简单命令执行 |
+| T19.2 | | exec API：多行输出与 stderr |
+| T19.3 | | exec API：指定工作目录 |
+| T19.4 | | exec API：命令执行失败 |
+| T19.5 | | exec API：缺少 command 参数 |
+| T19.6 | | exec API：不存在的 session |
+| T19.7 | | exec API + keepAlive：启动 dev server |
+| T19.8 | | keepAlive 阻止 idle 销毁（纯 API） |
+| T19.9 | | 释放 keepAlive 后 idle 销毁 |
+| T19.10 | | exec API：超时控制 |
+| T19.11 | | exec API：环境信息收集 |
 | T15.1 | ✅ | 简单 session skill 创建并通过 `skills` 触发 |
 | T15.2 | ✅ | 复杂 session skill bundle resources 写入、读取、注入 |
 | T15.3 | ✅ | session skill 删除单个与清空 |
@@ -2028,3 +2129,507 @@ print(f'  验证: 回复包含翻译+代码内容 = {has_eng}')
 "
 ```
 **期望**：主 agent (manager) 自动调度 @translator 和 @coder 子 agent，分别完成翻译和代码生成子任务，最终汇总结果。验证方式：回复文本包含翻译内容（如 "Hello World"）和代码内容（如 `def`/`fibonacci`）
+
+---
+
+## 十七、Sandbox Endpoint API（沙箱直连访问）
+
+> 前置条件：同第十一节。本节验证 `GET /session/:sessionID/endpoint/:port` 直连 API，返回沙箱 Pod IP 供浏览器直连访问。
+
+```bash
+BASE="http://localhost:14096"
+MODEL='{"providerID":"zhipuai","modelID":"glm-5.1"}'
+SID=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+echo "SID: $SID"
+```
+
+### T17.1 无沙箱时 endpoint API 返回 502
+
+```bash
+curl -s "$BASE/session/$SID/endpoint/5173" | python3 -m json.tool
+```
+**期望**：`{"error": "sandbox unreachable"}`，HTTP 502（沙箱尚未创建）
+
+### T17.2 端口参数校验
+
+```bash
+curl -s -o /dev/null -w "%{http_code}" "$BASE/session/$SID/endpoint/0"
+echo ""
+curl -s -o /dev/null -w "%{http_code}" "$BASE/session/$SID/endpoint/99999"
+echo ""
+curl -s -o /dev/null -w "%{http_code}" "$BASE/session/$SID/endpoint/abc"
+```
+**期望**：三个请求均返回 `400`
+
+### T17.3 创建 Vite 项目并验证 endpoint API 返回直连 IP
+
+```bash
+# Step 1: 创建项目 + 安装依赖
+curl -s --max-time 300 -X POST "$BASE/session/$SID/message" \
+  -H 'Content-Type: application/json' \
+  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"用 bash 执行: mkdir -p /workspace/vite-app/src && cd /workspace/vite-app && npm init -y && npm install react react-dom && npm install -D vite @vitejs/plugin-react typescript\"}],\"model\":$MODEL}" > /dev/null
+
+# Step 2: 创建项目文件
+curl -s --max-time 120 -X POST "$BASE/session/$SID/message" \
+  -H 'Content-Type: application/json' \
+  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"在 /workspace/vite-app 下创建6个文件：vite.config.ts、index.html、src/main.tsx、src/App.tsx（用 import { useState } from 'react'）、tsconfig.json、src/vite-env.d.ts\"}],\"model\":$MODEL}" > /dev/null
+
+# Step 3: 验证工具调用过程
+echo "=== 验证工具调用过程 ==="
+curl -s "$BASE/session/$SID/message" | python3 -c "
+import json, sys
+msgs = json.load(sys.stdin)
+for i, m in enumerate(msgs):
+    tools = [p.get('tool','') for p in m.get('parts',[]) if p.get('type')=='tool']
+    if tools:
+        print(f'  🔧 [{i}] {tools}')
+"
+
+# Step 4: 启动 Vite（background:true）
+curl -s --max-time 120 -X POST "$BASE/session/$SID/message" \
+  -H 'Content-Type: application/json' \
+  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"用 bash 工具执行，background 必须设为 true: cd /workspace/vite-app && npx vite --host 0.0.0.0 --port 5173\"}],\"model\":$MODEL}" > /dev/null
+sleep 12
+
+# Step 5: Proxy 验证
+echo "=== Proxy 验证 ==="
+curl -s "$BASE/session/$SID/proxy/5173/" -o /dev/null -w "Proxy: HTTP %{http_code}\n"
+
+# Step 6: Endpoint API 验证
+echo "=== Endpoint API ==="
+ENDPOINT=$(curl -s "$BASE/session/$SID/endpoint/5173")
+echo "$ENDPOINT" | python3 -m json.tool
+
+# Step 7: 验证返回结构
+echo "$ENDPOINT" | python3 -c "
+import json, sys
+d = json.load(sys.stdin)
+assert d.get('mode') in ('direct','proxy'), f'mode 异常: {d.get(\"mode\")}'
+assert d.get('url'), 'url 缺失'
+assert d.get('port') == 5173, f'port 异常: {d.get(\"port\")}'
+assert d.get('sandboxId'), 'sandboxId 缺失'
+assert d.get('fallback','').startswith('/session/'), f'fallback 异常: {d.get(\"fallback\")}'
+print('✅ 返回结构验证通过')
+print(f'  mode={d[\"mode\"]} url={d[\"url\"]} sandboxId={d[\"sandboxId\"][:12]}...')
+"
+```
+**期望**：
+- Proxy 返回 HTTP 200
+- Endpoint API 返回 JSON，包含 `mode`、`url`（沙箱 IP）、`port`、`sandboxId`、`fallback`
+- `mode=direct` 时 `url` 为沙箱 Pod IP（如 `http://10.12.11.x:5173`）
+
+### T17.4 通过直连 IP 访问 Vite 页面
+
+```bash
+# 获取直连 URL
+URL=$(curl -s "$BASE/session/$SID/endpoint/5173" | python3 -c "import json,sys;print(json.load(sys.stdin).get('url',''))")
+echo "Direct URL: $URL"
+
+# 直连访问
+curl -s --max-time 10 "$URL/" -o /dev/null -w "Direct: HTTP %{http_code}\n"
+
+# 验证内容
+curl -s --max-time 10 "$URL/" | python3 -c "
+import sys
+html = sys.stdin.read()
+print(f'  body.length={len(html)}')
+print(f'  has Vite: {\"vite\" in html.lower()}')
+print(f'  has module: {\"type=\\\"module\\\"\" in html}')
+# 直连模式没有 proxy prefix 注入
+print(f'  无 proxy 注入: {\"data-oc-prefix\" not in html}')
+"
+```
+**期望**：
+- 直连 HTTP 200
+- HTML 包含 Vite 标识
+- 直连模式下没有 proxy prefix 注入（与 proxy 模式的 key 区别）
+
+### T17.5 Proxy 与直连模式对比
+
+```bash
+URL=$(curl -s "$BASE/session/$SID/endpoint/5173" | python3 -c "import json,sys;print(json.load(sys.stdin).get('url',''))")
+
+echo "=== Proxy 模式 ==="
+curl -s "$BASE/session/$SID/proxy/5173/" | python3 -c "
+import sys; html=sys.stdin.read()
+print(f'  长度: {len(html)}')
+print(f'  有 prefix 注入: {\"data-oc-prefix\" in html}')
+print(f'  有 fetch patch: {\"window.fetch=function\" in html}')
+print(f'  有 WebSocket patch: {\"window.WebSocket=function\" in html}')
+"
+
+echo "=== 直连模式 ==="
+curl -s --max-time 10 "$URL/" | python3 -c "
+import sys; html=sys.stdin.read()
+print(f'  长度: {len(html)}')
+print(f'  无 prefix 注入: {\"data-oc-prefix\" not in html}')
+print(f'  无 fetch patch: {\"window.fetch=function\" not in html}')
+print(f'  原始 Vite 输出: {\"@vite/client\" in html}')
+"
+```
+**期望**：
+- Proxy 模式：有 prefix 注入、fetch/WebSocket patch、路径重写
+- 直连模式：没有任何注入，是原始 Vite 输出
+
+### T17.6 沙箱销毁后 endpoint API 返回 502
+
+```bash
+curl -s -X POST "$BASE/instance/dispose" > /dev/null
+sleep 3
+curl -s "$BASE/session/$SID/endpoint/5173" | python3 -m json.tool
+```
+**期望**：`{"error": "sandbox unreachable"}`，沙箱销毁后 endpoint 不可用
+
+---
+
+## 十八、工具调用过程批量验证
+
+> 本节专门验证 AI 工具调用的**过程**而非仅最终结果，确保 `POST /message` 返回的文字总结背后确实执行了工具。
+
+```bash
+BASE="http://localhost:14096"
+MODEL='{"providerID":"zhipuai","modelID":"glm-5.1"}'
+SID=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+echo "SID: $SID"
+```
+
+### T18.1 批量验证 7 种工具调用场景
+
+```bash
+# 通用发送+验证函数
+send_and_verify() {
+  local sid=$1 prompt=$2 label=$3
+  echo ""
+  echo "=== $label ==="
+  curl -s --max-time 120 -X POST "$BASE/session/$sid/message" \
+    -H 'Content-Type: application/json' \
+    -d "{\"parts\":[{\"type\":\"text\",\"text\":\"$prompt\"}],\"model\":$MODEL}" > /dev/null 2>&1
+
+  curl -s "$BASE/session/$sid/message" | python3 -c "
+import json, sys
+msgs = json.load(sys.stdin)
+recent = msgs[-3:] if len(msgs) >= 3 else msgs
+tools, texts = [], []
+for m in recent:
+    for p in m.get('parts', []):
+        if p.get('type') == 'tool':
+            t = p.get('tool', '?')
+            s = p.get('state', {})
+            status = s.get('status', '?')
+            tools.append(f'{t}({status})')
+        elif p.get('type') == 'text':
+            texts.append(p.get('text', '')[:80])
+print(f'  工具: {\"✅ \" + str(tools) if tools else \"❌ 无工具调用\"}')
+print(f'  回复: {texts[-1] if texts else \"(空)\"}')
+"
+}
+
+send_and_verify "$SID" "用 bash 执行: echo hello"                   "T18.1a: bash 命令"
+send_and_verify "$SID" "在 /workspace 创建 test.txt 内容是 hello"     "T18.1b: write 写文件"
+send_and_verify "$SID" "读取 /workspace/test.txt 的内容"              "T18.1c: read 读文件"
+send_and_verify "$SID" "列出 /workspace 下所有文件"                   "T18.1d: 模糊指令"
+send_and_verify "$SID" "在 /workspace 下创建三个文件：a.txt 内容 AAA，b.txt 内容 BBB，c.txt 内容 CCC" "T18.1e: 批量写"
+send_and_verify "$SID" "把 /workspace/test.txt 的内容改为 modified"   "T18.1f: 修改文件"
+send_and_verify "$SID" "用 bash 工具执行，background 必须设为 true: sleep 1 && echo bg-done" "T18.1g: background bash"
+```
+**期望**：全部显示 `✅`，每个场景都有对应的工具调用（bash/write/read/edit）
+
+### T18.2 验证完整消息流结构
+
+```bash
+echo "=== 完整消息列表 ==="
+curl -s "$BASE/session/$SID/message" | python3 -c "
+import json, sys
+msgs = json.load(sys.stdin)
+for i, m in enumerate(msgs):
+    parts = m.get('parts', [])
+    types = [p.get('type', '?') for p in parts]
+    tools = [p.get('tool', '') for p in parts if p.get('type') == 'tool']
+    text = [p.get('text', '')[:50] for p in parts if p.get('type') == 'text']
+    marker = '🔧' if tools else '💬'
+    print(f'  {marker} [{i:2d}] tools={tools or \"-\"} text={text[:1] or \"-\"}')
+"
+```
+**期望**：消息交替出现 `💬`（用户 prompt / AI 文字总结）和 `🔧`（工具调用），结构为：`💬 prompt → 🔧 tool call → 💬 summary`
+
+---
+
+## 十九、沙箱命令执行 API（exec / keep-alive）
+
+> 本节验证直接通过 HTTP API 在沙箱中执行命令、设置 keepAlive 的能力。不依赖 AI 模型是否正确传递 `background:true`，可用于程序化控制沙箱。
+
+```bash
+BASE="http://localhost:14096"
+MODEL='{"providerID":"zhipuai","modelID":"glm-5.1"}'
+SID=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+echo "SID: $SID"
+```
+
+### T19.1 exec API：简单命令执行
+
+```bash
+# 先通过 AI 消息创建沙箱（exec 依赖沙箱存在）
+curl -s --max-time 60 -X POST "$BASE/session/$SID/message" \
+  -H 'Content-Type: application/json' \
+  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"用 bash 执行: echo sandbox-ready\"}],\"model\":$MODEL}" > /dev/null
+
+# 使用 exec API 执行命令
+curl -s --max-time 30 -X POST "$BASE/session/$SID/exec" \
+  -H 'Content-Type: application/json' \
+  -d '{"command":"echo hello-from-exec"}' | python3 -m json.tool
+```
+**期望**：返回 `{id: "...", exitCode: 0, stdout: "hello-from-exec\n", stderr: ""}`
+
+### T19.2 exec API：多行输出与 stderr
+
+```bash
+curl -s --max-time 30 -X POST "$BASE/session/$SID/exec" \
+  -H 'Content-Type: application/json' \
+  -d '{"command":"echo line1 && echo line2 && echo err >&2"}' | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+print(f'exitCode: {d.get(\"exitCode\")}')
+print(f'stdout: {repr(d.get(\"stdout\",\"\"))}')
+print(f'stderr: {repr(d.get(\"stderr\",\"\"))}')
+"
+```
+**期望**：`exitCode: 0`，stdout 含 `line1` 和 `line2`，stderr 含 `err`
+
+### T19.3 exec API：指定工作目录
+
+```bash
+curl -s --max-time 30 -X POST "$BASE/session/$SID/exec" \
+  -H 'Content-Type: application/json' \
+  -d '{"command":"pwd","workingDirectory":"/tmp"}' | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+print(f'pwd: {d.get(\"stdout\",\"\").strip()}')
+"
+```
+**期望**：`pwd: /tmp`
+
+### T19.4 exec API：命令执行失败
+
+```bash
+curl -s --max-time 30 -X POST "$BASE/session/$SID/exec" \
+  -H 'Content-Type: application/json' \
+  -d '{"command":"exit 42"}' | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+print(f'exitCode: {d.get(\"exitCode\")}')
+print(f'非0: {d.get(\"exitCode\") != 0}')
+"
+```
+**期望**：`exitCode: 42`，非 0 退出码
+
+### T19.5 exec API：缺少 command 参数
+
+```bash
+curl -s -o /dev/null -w "%{http_code}" -X POST "$BASE/session/$SID/exec" \
+  -H 'Content-Type: application/json' \
+  -d '{}'
+echo ""
+```
+**期望**：`400`
+
+### T19.6 exec API：不存在的 session
+
+```bash
+curl -s -o /dev/null -w "%{http_code}" -X POST "$BASE/session/ses_NOTEXIST/exec" \
+  -H 'Content-Type: application/json' \
+  -d '{"command":"echo test"}'
+echo ""
+```
+**期望**：`502`（sandbox unreachable）
+
+### T19.7 exec API：启动 dev server 并设置 keepAlive
+
+```bash
+# 创建 Vite 项目（如果不存在）
+curl -s --max-time 300 -X POST "$BASE/session/$SID/message" \
+  -H 'Content-Type: application/json' \
+  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"用 bash 执行: if [ ! -d /workspace/vite-app ]; then npx create-vite@5 /workspace/vite-app --template react-ts --yes && cd /workspace/vite-app && npm install; fi && echo vite-ready\"}],\"model\":$MODEL}" > /dev/null
+
+# 通过 exec API 安装依赖（如果需要）
+curl -s --max-time 120 -X POST "$BASE/session/$SID/exec" \
+  -H 'Content-Type: application/json' \
+  -d '{"command":"cd /workspace/vite-app && npm install 2>&1 | tail -1"}' | python3 -c "
+import json,sys; d=json.load(sys.stdin); print(f'npm install: exit={d.get(\"exitCode\")} stdout={d.get(\"stdout\",\"\").strip()[:80]}')
+"
+
+# 通过 exec API 设置 keepAlive
+curl -s -X POST "$BASE/session/$SID/keep-alive" \
+  -H 'Content-Type: application/json' \
+  -d '{"enabled":true}' | python3 -m json.tool
+
+# 通过 exec API 启动 Vite（前台执行，但 keepAlive 保护沙箱不被销毁）
+# 注意：exec 是同步的，启动 dev server 会阻塞直到超时，所以用 nohup 放后台
+curl -s --max-time 10 -X POST "$BASE/session/$SID/exec" \
+  -H 'Content-Type: application/json' \
+  -d '{"command":"cd /workspace/vite-app && nohup npx vite --host 0.0.0.0 --port 5173 > /tmp/vite.log 2>&1 & echo $!"}' | python3 -c "
+import json,sys; d=json.load(sys.stdin); print(f'Vite PID: {d.get(\"stdout\",\"\").strip()}')
+"
+
+sleep 8
+
+# 验证 Vite 运行
+curl -s "$BASE/session/$SID/proxy/5173/" -o /dev/null -w "Vite proxy: %{http_code}\n"
+
+# 验证 keepAlive 状态
+curl -s "$BASE/session/$SID/keep-alive" | python3 -m json.tool
+```
+**期望**：
+- keep-alive 设置返回 `{keepAlive: true}`
+- Vite proxy 返回 HTTP 200
+- keep-alive 查询返回 `{keepAlive: true}`
+
+### T19.8 keepAlive 阻止 idle 销毁（纯 API 方式）
+
+```bash
+# 创建新 session
+SID2=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+
+# 先用 AI 消息创建沙箱
+curl -s --max-time 60 -X POST "$BASE/session/$SID2/message" \
+  -H 'Content-Type: application/json' \
+  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"用 bash 执行: echo ready\"}],\"model\":$MODEL}" > /dev/null
+
+# 通过 API 设置 keepAlive
+curl -s -X POST "$BASE/session/$SID2/keep-alive" \
+  -H 'Content-Type: application/json' \
+  -d '{"enabled":true}' > /dev/null
+
+# 等待 idle 触发
+sleep 15
+
+# 检查：sandbox 应仍然存活（不被销毁）
+RESULT=$(curl -s --max-time 10 -X POST "$BASE/session/$SID2/exec" \
+  -H 'Content-Type: application/json' \
+  -d '{"command":"echo alive"}')
+echo "After idle + keepAlive: $RESULT" | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+print(f'exitCode={d.get(\"exitCode\")} stdout={d.get(\"stdout\",\"\").strip()}')
+print(f'PASS: sandbox still alive = {d.get(\"exitCode\")==0}')
+"
+```
+**期望**：`sandbox still alive = True`，证明 keepAlive 阻止了 idle 销毁
+
+### T19.9 释放 keepAlive 后 idle 销毁
+
+```bash
+SID3=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+
+# 创建沙箱
+curl -s --max-time 60 -X POST "$BASE/session/$SID3/message" \
+  -H 'Content-Type: application/json' \
+  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"用 bash 执行: echo ready\"}],\"model\":$MODEL}" > /dev/null
+
+# 设置 keepAlive
+curl -s -X POST "$BASE/session/$SID3/keep-alive" \
+  -H 'Content-Type: application/json' \
+  -d '{"enabled":true}' > /dev/null
+
+# 确认存活
+sleep 5
+curl -s -X POST "$BASE/session/$SID3/exec" \
+  -H 'Content-Type: application/json' \
+  -d '{"command":"echo alive"}' | python3 -c "import json,sys;print('alive:', json.load(sys.stdin).get('exitCode')==0)"
+
+# 释放 keepAlive
+curl -s -X POST "$BASE/session/$SID3/keep-alive" \
+  -H 'Content-Type: application/json' \
+  -d '{"enabled":false}' | python3 -c "import json,sys;print(json.load(sys.stdin))"
+
+# 等待 idle + destroy
+sleep 15
+
+# 检查：sandbox 应已被销毁
+curl -s --max-time 10 -X POST "$BASE/session/$SID3/exec" \
+  -H 'Content-Type: application/json' \
+  -d '{"command":"echo dead"}' | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+print(f'After release: exitCode={d.get(\"exitCode\")} error={d.get(\"error\")}')
+"
+```
+**期望**：释放 keepAlive 后，sandbox 被 idle 回收，exec 返回 502 或执行失败
+
+### T19.10 exec API：超时控制
+
+```bash
+curl -s --max-time 15 -X POST "$BASE/session/$SID/exec" \
+  -H 'Content-Type: application/json' \
+  -d '{"command":"sleep 30 && echo done","timeoutSeconds":5}' | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+print(f'exitCode: {d.get(\"exitCode\")}')
+print(f'has error: {bool(d.get(\"error\"))}')
+"
+```
+**期望**：命令在 5 秒后被终止，返回非 0 exitCode 或 error
+
+### T19.11 exec API：环境信息收集
+
+```bash
+curl -s --max-time 30 -X POST "$BASE/session/$SID/exec" \
+  -H 'Content-Type: application/json' \
+  -d '{"command":"echo \"node=$(node -v) npm=$(npm -v) pwd=$(pwd)\""}' | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+print(d.get('stdout','').strip())
+"
+```
+**期望**：输出包含 node 版本、npm 版本和当前工作目录
+
+---
+
+### API 接口详情
+
+#### `POST /session/:sessionID/exec`
+
+在沙箱中执行命令。沙箱不存在时自动创建（首次 AI 消息后）。
+
+**请求体**：
+```json
+{
+  "command": "echo hello",
+  "workingDirectory": "/workspace",  // 可选，默认 /workspace
+  "timeoutSeconds": 30               // 可选，默认不限
+}
+```
+
+**响应**：
+```json
+{
+  "id": "exec-xxx",
+  "exitCode": 0,
+  "stdout": "hello\n",
+  "stderr": "",
+  "error": null  // 或 {"name":"...","value":"...","traceback":[...]}
+}
+```
+
+#### `POST /session/:sessionID/keep-alive`
+
+设置或释放 keepAlive。keepAlive=true 时，sandbox 在 session idle 后不会被自动销毁。
+
+**请求体**：
+```json
+{"enabled": true}   // 设置 keepAlive
+{"enabled": false}  // 释放 keepAlive
+```
+
+**响应**：
+```json
+{"sessionID": "ses_xxx", "keepAlive": true}
+```
+
+#### `GET /session/:sessionID/keep-alive`
+
+查询 keepAlive 状态。
+
+**响应**：
+```json
+{"sessionID": "ses_xxx", "keepAlive": true}
+```

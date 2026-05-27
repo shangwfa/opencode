@@ -1,6 +1,8 @@
-import { Effect, Schema } from "effect"
+import { Effect, Schema, Queue, Stream } from "effect"
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
 import * as Socket from "effect/unstable/socket/Socket"
+import * as Sse from "effect/unstable/encoding/Sse"
+import { ConnectionConfig } from "@alibaba-group/opensandbox"
 import { Bus } from "@/bus"
 import { Session } from "@/session/session"
 import { SessionID } from "@/session/schema"
@@ -135,7 +137,37 @@ function headersToRecord(headers: Headers): Record<string, string> {
 
 const MAX_BODY = 5 * 1024 * 1024
 const PathParams = Schema.Struct({ sessionID: SessionID, port: Schema.String })
+const SessionParams = Schema.Struct({ sessionID: SessionID })
+const ExecIdParams = Schema.Struct({ sessionID: SessionID, execId: Schema.String })
 const ErrorReportQuery = Schema.Struct({ e: Schema.optional(Schema.String) })
+const ExecBody = Schema.Struct({
+  command: Schema.String,
+  workingDirectory: Schema.optional(Schema.String),
+  timeoutSeconds: Schema.optional(Schema.Number),
+})
+const KeepAliveBody = Schema.Struct({
+  enabled: Schema.optional(Schema.Boolean),
+})
+
+type ExecSseEvent =
+  | { _tag: "stdout"; text: string }
+  | { _tag: "stderr"; text: string }
+  | { _tag: "done"; exitCode: number | null; stdout: string; stderr: string }
+
+type ExecState = {
+  status: "running" | "completed" | "failed"
+  exitCode: number | null
+  stdout: string
+  stderr: string
+  startedAt: number
+  finishedAt: number | null
+  error?: { name: string; value: string; traceback: string[] }
+  queue: Queue.Queue<ExecSseEvent>
+  seq: number
+}
+const execStore = new Map<string, ExecState>()
+const MAX_EXEC_STORE = 200
+let execCounter = 0
 
 export const sandboxProxyRoute = HttpRouter.use((router) =>
   Effect.gen(function* () {
@@ -197,6 +229,202 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
           }
         }
         return HttpServerResponse.jsonUnsafe(result)
+      }),
+    )
+
+    yield* router.add("GET", "/session/:sessionID/endpoint/:port",
+      Effect.gen(function* () {
+        const params = yield* HttpRouter.schemaPathParams(PathParams)
+        const port = parsePort(params.port)
+        if (!port) return HttpServerResponse.jsonUnsafe({ error: "invalid port" }, { status: 400 })
+
+        const sb = yield* sandbox.get(params.sessionID).pipe(Effect.catch(() => Effect.succeed(undefined)))
+        if (!sb) return HttpServerResponse.jsonUnsafe({ error: "sandbox unreachable" }, { status: 502 })
+
+        const domain = process.env.OPENCODE_SANDBOX_DOMAIN ?? "localhost:8080"
+        const protocol = (process.env.OPENCODE_SANDBOX_PROTOCOL as "http" | "https") ?? "http"
+        const apiKey = process.env.OPENCODE_SANDBOX_API_KEY
+
+        const directUrl = yield* Effect.tryPromise({
+          try: async () => {
+            const ep = await (sb as any).sandboxes.getSandboxEndpoint(sb.id, port, false)
+            return `${protocol}://${ep.endpoint}` as string | undefined
+          },
+          catch: () => undefined as string | undefined,
+        })
+
+        const proxyUrl = yield* Effect.tryPromise({
+          try: () => sb.getEndpointUrl(port),
+          catch: () => undefined as string | undefined,
+        })
+
+        return HttpServerResponse.jsonUnsafe({
+          mode: directUrl ? "direct" : "proxy",
+          url: directUrl ?? proxyUrl,
+          port,
+          sandboxId: sb.id,
+          fallback: `/session/${params.sessionID}/proxy/${port}/`,
+        })
+      }),
+    )
+
+    yield* router.add("POST", "/session/:sessionID/exec",
+      Effect.gen(function* () {
+        const params = yield* HttpRouter.schemaPathParams(SessionParams)
+        const body = yield* HttpServerRequest.schemaBodyJson(ExecBody).pipe(
+          Effect.catch(() => Effect.succeed({ command: "", workingDirectory: undefined, timeoutSeconds: undefined })),
+        )
+        if (!body.command) return HttpServerResponse.jsonUnsafe({ error: "command is required" }, { status: 400 })
+
+        const result = yield* sandbox.runInSession(
+          params.sessionID,
+          body.command,
+          { workingDirectory: body.workingDirectory, timeoutSeconds: body.timeoutSeconds },
+        ).pipe(Effect.catch((err) => Effect.succeed(null as any)))
+
+        if (!result) return HttpServerResponse.jsonUnsafe({ error: "execution failed" }, { status: 502 })
+
+        return HttpServerResponse.jsonUnsafe({
+          id: result.id,
+          exitCode: result.exitCode,
+          stdout: result.logs.stdout.map((m: any) => m.text).join("\n"),
+          stderr: result.logs.stderr.map((m: any) => m.text).join("\n"),
+          error: result.error ? { name: result.error.name, value: result.error.value, traceback: result.error.traceback } : undefined,
+        })
+      }),
+    )
+
+    // ── async exec: 立即返回 execId，后台执行 ──────────────────────
+    yield* router.add("POST", "/session/:sessionID/exec/async",
+      Effect.gen(function* () {
+        const params = yield* HttpRouter.schemaPathParams(SessionParams)
+        const body = yield* HttpServerRequest.schemaBodyJson(ExecBody).pipe(
+          Effect.catch(() => Effect.succeed({ command: "", workingDirectory: undefined, timeoutSeconds: undefined })),
+        )
+        if (!body.command) return HttpServerResponse.jsonUnsafe({ error: "command is required" }, { status: 400 })
+
+        const execId = `exec-${++execCounter}-${Date.now()}`
+        const q = yield* Queue.unbounded<ExecSseEvent>()
+        const state: ExecState = {
+          status: "running",
+          exitCode: null,
+          stdout: "",
+          stderr: "",
+          startedAt: Date.now(),
+          finishedAt: null,
+          queue: q,
+          seq: 0,
+        }
+        execStore.set(execId, state)
+        if (execStore.size > MAX_EXEC_STORE) {
+          const oldest = execStore.keys().next().value
+          if (oldest) execStore.delete(oldest)
+        }
+
+        const cmd = body.command
+        const opts = { workingDirectory: body.workingDirectory, timeoutSeconds: body.timeoutSeconds }
+        const sid = params.sessionID
+
+        const handlers = {
+          onStdout: (msg: { text: string }) => { Queue.offerUnsafe(q, { _tag: "stdout" as const, text: msg.text }) },
+          onStderr: (msg: { text: string }) => { Queue.offerUnsafe(q, { _tag: "stderr" as const, text: msg.text }) },
+        }
+
+        const runAsync = Effect.gen(function* () {
+          const result = yield* sandbox.runInSession(sid, cmd, opts, handlers).pipe(
+            Effect.catch(() => Effect.succeed(null as any)),
+          )
+          if (result) {
+            state.exitCode = result.exitCode
+            state.stdout = result.logs.stdout.map((m: any) => m.text).join("\n")
+            state.stderr = result.logs.stderr.map((m: any) => m.text).join("\n")
+            if (result.error) state.error = { name: result.error.name, value: result.error.value, traceback: result.error.traceback }
+            state.status = "completed"
+          } else {
+            state.status = "failed"
+          }
+          state.finishedAt = Date.now()
+          Queue.offerUnsafe(q, { _tag: "done" as const, exitCode: state.exitCode, stdout: state.stdout, stderr: state.stderr })
+          Queue.endUnsafe(q as any)
+        }).pipe(Effect.catch(() => Effect.sync(() => { state.status = "failed"; state.finishedAt = Date.now(); Queue.offerUnsafe(q, { _tag: "done" as const, exitCode: null, stdout: "", stderr: "" }); Queue.endUnsafe(q as any) })))
+
+        void Effect.runPromise(runAsync.pipe(Effect.provideService(SandboxProvider.Service, sandbox)))
+
+        return HttpServerResponse.jsonUnsafe({ execId, status: "running", sessionID: sid })
+      }),
+    )
+
+    // ── exec status: 查看 async 执行结果 ─────────────────────────
+    yield* router.add("GET", "/session/:sessionID/exec/:execId",
+      Effect.gen(function* () {
+        const params = yield* HttpRouter.schemaPathParams(ExecIdParams)
+        const state = execStore.get(params.execId)
+        if (!state) return HttpServerResponse.jsonUnsafe({ error: "execId not found" }, { status: 404 })
+        const { queue: _, seq: __, ...rest } = state
+        return HttpServerResponse.jsonUnsafe({ execId: params.execId, ...rest })
+      }),
+    )
+
+    // ── exec stream: SSE 实时输出 ────────────────────────────────
+    yield* router.add("GET", "/session/:sessionID/exec/:execId/stream",
+      Effect.gen(function* () {
+        const params = yield* HttpRouter.schemaPathParams(ExecIdParams)
+        const state = execStore.get(params.execId)
+        if (!state) return HttpServerResponse.jsonUnsafe({ error: "execId not found" }, { status: 404 })
+
+        const q = state.queue
+
+        const heartbeat = Stream.tick("15 seconds").pipe(
+          Stream.drop(1),
+          Stream.map(() => ({ _tag: "heartbeat" as const })),
+        )
+
+        const sseEvent = (ev: ExecSseEvent | { _tag: "heartbeat" }): Sse.Event | null => {
+          if (ev._tag === "heartbeat") return { _tag: "Event" as const, event: "ping", id: undefined, data: "" }
+          if (ev._tag === "stdout") return { _tag: "Event" as const, event: "output", id: undefined, data: JSON.stringify({ text: ev.text + "\n" }) }
+          if (ev._tag === "stderr") return { _tag: "Event" as const, event: "output", id: undefined, data: JSON.stringify({ text: "[stderr] " + ev.text + "\n" }) }
+          return { _tag: "Event" as const, event: "done", id: undefined, data: JSON.stringify({ execId: params.execId, status: state.status, exitCode: ev.exitCode, stdout: ev.stdout, stderr: ev.stderr }) }
+        }
+
+        return HttpServerResponse.stream(
+          Stream.fromQueue(q).pipe(
+            Stream.merge(heartbeat, { haltStrategy: "left" }),
+            Stream.map(sseEvent),
+            Stream.filter((ev): ev is Sse.Event => ev !== null),
+            Stream.pipeThroughChannel(Sse.encode()),
+            Stream.encodeText,
+          ),
+          {
+            contentType: "text/event-stream",
+            headers: {
+              "Cache-Control": "no-cache, no-transform",
+              "X-Accel-Buffering": "no",
+            },
+          },
+        )
+      }),
+    )
+
+    yield* router.add("POST", "/session/:sessionID/keep-alive",
+      Effect.gen(function* () {
+        const params = yield* HttpRouter.schemaPathParams(SessionParams)
+        const body = yield* HttpServerRequest.schemaBodyJson(KeepAliveBody).pipe(
+          Effect.catch(() => Effect.succeed({ enabled: true })),
+        )
+        if (body.enabled !== false) {
+          yield* sandbox.keepAlive(params.sessionID)
+        } else {
+          yield* sandbox.release(params.sessionID)
+        }
+        return HttpServerResponse.jsonUnsafe({ sessionID: params.sessionID, keepAlive: body.enabled })
+      }),
+    )
+
+    yield* router.add("GET", "/session/:sessionID/keep-alive",
+      Effect.gen(function* () {
+        const params = yield* HttpRouter.schemaPathParams(SessionParams)
+        const keep = yield* sandbox.isKeepAlive(params.sessionID)
+        return HttpServerResponse.jsonUnsafe({ sessionID: params.sessionID, keepAlive: keep })
       }),
     )
 

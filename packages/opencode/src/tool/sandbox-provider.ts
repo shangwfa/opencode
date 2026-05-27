@@ -527,6 +527,17 @@ export namespace SandboxProvider {
         }).pipe(Effect.orDie)
       }
 
+      function dbMarkDestroyed(sessionID: string, id: string) {
+        return Effect.tryPromise({
+          try: () => pgDb
+            .update(SandboxTable)
+            .set({ state: "destroyed", command_session_id: null, time_updated: Date.now() })
+            .where(and(eq(SandboxTable.session_id, sessionID), eq(SandboxTable.id, id)))
+            .run(),
+          catch: (e) => new Error(`db.markDestroyed failed: ${String(e)}`),
+        }).pipe(Effect.orDie)
+      }
+
       function dbAll() {
         return Effect.tryPromise({
           try: () => pgDb
@@ -583,8 +594,12 @@ export namespace SandboxProvider {
 
       function createSandbox(sessionID: SessionID) {
         return Effect.gen(function* () {
-          const timeoutSeconds = hasVolume ? config.maxTtlSeconds : config.timeoutSeconds
-          log.info("creating sandbox", { sessionID, volumeType: config.volumeType, timeoutSeconds })
+          const existingRow = yield* dbGet(sessionID).pipe(Effect.orElseSucceed(() => null))
+          const isKept = existingRow?.keep_alive === true
+          const baseTtl = hasVolume ? config.maxTtlSeconds : config.timeoutSeconds
+          // keepAlive sandbox 使用 10x TTL，确保远程 sandbox 不会在保活期间自杀
+          const timeoutSeconds = isKept ? Math.max(baseTtl, config.maxTtlSeconds) * 10 : baseTtl
+          log.info("creating sandbox", { sessionID, volumeType: config.volumeType, timeoutSeconds, keepAlive: isKept })
           const volumes = buildVolumes(sessionID, config)
           const sb = yield* Effect.tryPromise({
             try: () =>
@@ -608,7 +623,7 @@ export namespace SandboxProvider {
             session_id: sessionID,
             host,
             state: "running",
-            keep_alive: false,
+            keep_alive: existingRow?.keep_alive ?? false,
             command_session_id: null,
             time_created: Date.now(),
             time_updated: Date.now(),
@@ -642,7 +657,7 @@ export namespace SandboxProvider {
           yield* Effect.tryPromise(() => sb.close()).pipe(
             Effect.catchCause(() => { log.error("sandbox close failed", { sessionID }); return Effect.void }),
           )
-          yield* dbDeleteFor(sessionID, sb.id)
+          yield* dbMarkDestroyed(sessionID, sb.id)
           log.info("sandbox destroyed", { sessionID })
         }).pipe(Effect.withSpan("SandboxProvider.destroySandbox"))
       }
@@ -680,6 +695,8 @@ export namespace SandboxProvider {
                 }
                 log.warn("sandbox unhealthy after reconnect, rebuilding", { sessionID })
                 yield* destroySandbox(existing, sessionID).pipe(Effect.catchCause(() => Effect.void))
+              } else {
+                log.warn("sandbox reconnect returned null, rebuilding", { sessionID, sandboxID: row.id })
               }
             }
             if (row?.state === "killed") {
@@ -736,10 +753,11 @@ export namespace SandboxProvider {
             if (sb) yield* destroySandbox(sb, sessionID).pipe(Effect.catchCause(() => Effect.void))
             else {
               yield* bestEffortKill(row.id, sessionID)
-              yield* dbDeleteFor(sessionID, row.id)
+              yield* dbMarkDestroyed(sessionID, row.id)
             }
-          } else {
-            yield* dbDelete(sessionID)
+          } else if (row) {
+            // 非 running 状态（killed/destroyed）：保留 keep_alive 字段，标记为 destroyed
+            yield* dbMarkDestroyed(sessionID, row.id)
           }
           commandSemaphores.delete(sessionID)
         })).pipe(Effect.withSpan("SandboxProvider.destroy"))
@@ -793,7 +811,21 @@ export namespace SandboxProvider {
 
       const keepAlive: Interface["keepAlive"] = (sessionID) =>
         Effect.gen(function* () {
-          yield* dbSetKeepAlive(sessionID, true)
+          const row = yield* dbGet(sessionID).pipe(Effect.orElseSucceed(() => null))
+          if (row) {
+            yield* dbSetKeepAlive(sessionID, true)
+          } else {
+            yield* dbUpsert({
+              id: `pending-${sessionID}`,
+              session_id: sessionID,
+              host: "",
+              state: "killed",
+              keep_alive: true,
+              command_session_id: null,
+              time_created: Date.now(),
+              time_updated: Date.now(),
+            })
+          }
           log.info("sandbox keep alive enabled", { sessionID })
         })
 
@@ -879,6 +911,7 @@ export namespace SandboxProvider {
                 .from(SandboxTable)
                 .where(and(
                   eq(SandboxTable.state, "running"),
+                  eq(SandboxTable.keep_alive, false),
                   lt(SandboxTable.time_updated, threshold),
                 ))
                 .all() as Promise<Row[]>,
@@ -900,7 +933,7 @@ export namespace SandboxProvider {
                   return
                 }
                 yield* bestEffortKill(row.id, row.session_id)
-                yield* dbDeleteFor(row.session_id, row.id).pipe(Effect.catchCause(() => Effect.void))
+                yield* dbMarkDestroyed(row.session_id, row.id).pipe(Effect.catchCause(() => Effect.void))
               }))
             }
           }),

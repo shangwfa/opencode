@@ -170,9 +170,72 @@ curl -s http://localhost:14096/session/$SID/proxy/3000/ -o /dev/null -w "Next.js
 ### Step 5：浏览器验证
 
 ```
-Vite:    http://localhost:14096/session/{SID}/proxy/5173/
-Next.js: http://localhost:14096/session/{SID}/proxy/3000/
+Vite (proxy):    http://localhost:14096/session/{SID}/proxy/5173/
+Next.js (proxy): http://localhost:14096/session/{SID}/proxy/3000/
 ```
+
+### Step 6：Endpoint API 验证（直连模式）
+
+```bash
+# 获取沙箱直连 IP
+curl -s http://localhost:14096/session/$SID/endpoint/5173 | python3 -m json.tool
+
+# 验证直连访问
+URL=$(curl -s http://localhost:14096/session/$SID/endpoint/5173 | python3 -c "import json,sys;print(json.load(sys.stdin).get('url',''))")
+echo "Direct URL: $URL"
+curl -s --max-time 10 "$URL/" -o /dev/null -w "Direct: HTTP %{http_code}\n"
+```
+
+期望：
+- `mode=direct`，`url` 为沙箱 Pod IP（如 `http://10.12.11.x:5173`）
+- 直连访问 HTTP 200
+- 直连模式下无 proxy prefix 注入，是原始 Vite 输出
+
+### Step 7：验证工具调用过程
+
+> `POST /message` 返回的是 AI 的文字总结，工具调用在前一条消息中。验证工具是否真正执行需要查完整消息列表。
+
+```bash
+curl -s http://localhost:14096/session/$SID/message | python3 -c "
+import json, sys
+msgs = json.load(sys.stdin)
+for i, m in enumerate(msgs):
+    tools = [p.get('tool','') for p in m.get('parts',[]) if p.get('type')=='tool']
+    text = [p.get('text','')[:50] for p in m.get('parts',[]) if p.get('type')=='text']
+    marker = '🔧' if tools else '💬'
+    print(f'  {marker} [{i:2d}] tools={tools or \"-\"} text={text[:1] or \"-\"}')
+')
+```
+
+### Step 8：使用 exec API 程序化控制沙箱
+
+> 不依赖 AI 模型是否正确传递 `background:true`，直接通过 HTTP API 在沙箱中执行命令和设置 keepAlive。
+
+```bash
+# 执行命令
+curl -s -X POST http://localhost:14096/session/$SID/exec \
+  -H 'Content-Type: application/json' \
+  -d '{"command":"echo hello-from-exec"}' | python3 -m json.tool
+
+# 设置 keepAlive（防止 sandbox idle 被回收）
+curl -s -X POST http://localhost:14096/session/$SID/keep-alive \
+  -H 'Content-Type: application/json' \
+  -d '{"enabled":true}' | python3 -m json.tool
+
+# 通过 exec 启动 dev server（nohup 放后台）
+curl -s --max-time 10 -X POST http://localhost:14096/session/$SID/exec \
+  -H 'Content-Type: application/json' \
+  -d '{"command":"cd /workspace/vite-app && nohup npx vite --host 0.0.0.0 --port 5173 > /tmp/vite.log 2>&1 & echo $!"}' \
+  | python3 -c "import json,sys;print('PID:', json.load(sys.stdin).get('stdout','').strip())"
+
+sleep 8
+curl -s http://localhost:14096/session/$SID/proxy/5173/ -o /dev/null -w "Vite: %{http_code}\n"
+```
+
+期望：
+- exec 返回 `{exitCode: 0, stdout: "hello-from-exec\n"}`
+- keep-alive 返回 `{keepAlive: true}`
+- Vite proxy 返回 HTTP 200
 
 ---
 
@@ -209,6 +272,10 @@ curl -s --max-time 60 -X POST "http://localhost:14096/session/$SID/message" \
 
 ## 五、keepAlive 机制说明
 
+有两种方式触发 keepAlive：
+
+### 方式一：bash 工具 `background:true`（AI 消息触发）
+
 ```
 bash.ts (background:true)
   → 命令执行完后调用 sandboxProvider.keepAlive(sessionID)
@@ -218,7 +285,19 @@ bash.ts (background:true)
       → false：destroy(sessionID)，sandbox 立即销毁
 ```
 
-> `OPENCODE_SANDBOX_IDLE_KILL_SEC=30` 在 opencode 代码中**未被使用**，回收完全由 `onIdle` 回调控制。
+### 方式二：exec + keep-alive API（程序化触发，推荐）
+
+```
+POST /session/:sessionID/keep-alive {"enabled":true}
+  → sandboxProvider.keepAlive(sessionID)
+  → 后续可通过 exec API 随时在沙箱中执行命令
+
+POST /session/:sessionID/exec {"command":"nohup npx vite ... &"}
+  → 直接在沙箱中执行命令，启动 dev server 等
+  → 配合 keepAlive 保证沙箱不被回收
+```
+
+> 方式二不依赖 AI 模型是否正确传递 `background:true`，更适合自动化测试和程序化控制。
 
 ---
 

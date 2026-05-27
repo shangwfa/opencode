@@ -827,7 +827,7 @@ async function openSandbox(sessionID: string, port: number) {
 
 | 阶段 | 内容 | 状态 |
 |---|---|---|
-| Phase 1 | 新增 endpoint API + 前端直连按钮，优先直连 fallback proxy | 待实现 |
+| Phase 1 | 新增 endpoint API + 前端直连按钮，优先直连 fallback proxy | ✅ API 已实现（`sandbox-proxy.ts`） |
 | Phase 2 | 评估直连模式下是否需要错误收集，如需则实现轻量上报 | 待评估 |
 | Phase 3 | 前端自动探测直连可达性，缓存结果 | 待实现 |
 
