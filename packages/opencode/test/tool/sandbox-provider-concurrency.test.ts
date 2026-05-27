@@ -203,6 +203,7 @@ const fakeProvider = Layer.effect(
           }
         }),
       runInSession,
+      interrupt: () => Effect.void,
       register: () => Effect.void,
       keepAlive: () => Effect.void,
       release: () => Effect.void,

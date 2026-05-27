@@ -1,4 +1,4 @@
-import { Effect, Schema, Queue, Stream } from "effect"
+import { Effect, Schema, Queue, Stream, Fiber } from "effect"
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
 import * as Socket from "effect/unstable/socket/Socket"
 import * as Sse from "effect/unstable/encoding/Sse"
@@ -155,7 +155,7 @@ type ExecSseEvent =
   | { _tag: "done"; exitCode: number | null; stdout: string; stderr: string }
 
 type ExecState = {
-  status: "running" | "completed" | "failed"
+  status: "running" | "completed" | "failed" | "killed"
   exitCode: number | null
   stdout: string
   stderr: string
@@ -164,8 +164,12 @@ type ExecState = {
   error?: { name: string; value: string; traceback: string[] }
   queue: Queue.Queue<ExecSseEvent>
   seq: number
+  sessionID: string
+  command: string
+  fiber: Fiber.Fiber<void, unknown> | null
 }
 const execStore = new Map<string, ExecState>()
+const sessionExecIndex = new Map<string, Set<string>>()
 const MAX_EXEC_STORE = 200
 let execCounter = 0
 
@@ -303,6 +307,7 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
         )
         if (!body.command) return HttpServerResponse.jsonUnsafe({ error: "command is required" }, { status: 400 })
 
+        const sid = params.sessionID
         const execId = `exec-${++execCounter}-${Date.now()}`
         const q = yield* Queue.unbounded<ExecSseEvent>()
         const state: ExecState = {
@@ -314,16 +319,28 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
           finishedAt: null,
           queue: q,
           seq: 0,
+          sessionID: sid,
+          command: body.command,
+          fiber: null,
         }
         execStore.set(execId, state)
+        const idx = sessionExecIndex.get(sid)
+        if (idx) idx.add(execId)
+        else sessionExecIndex.set(sid, new Set([execId]))
         if (execStore.size > MAX_EXEC_STORE) {
           const oldest = execStore.keys().next().value
-          if (oldest) execStore.delete(oldest)
+          if (oldest) {
+            const old = execStore.get(oldest)
+            execStore.delete(oldest)
+            if (old) {
+              const oldIdx = sessionExecIndex.get(old.sessionID)
+              if (oldIdx) { oldIdx.delete(oldest); if (!oldIdx.size) sessionExecIndex.delete(old.sessionID) }
+            }
+          }
         }
 
         const cmd = body.command
         const opts = { workingDirectory: body.workingDirectory, timeoutSeconds: body.timeoutSeconds }
-        const sid = params.sessionID
 
         const handlers = {
           onStdout: (msg: { text: string }) => { Queue.offerUnsafe(q, { _tag: "stdout" as const, text: msg.text }) },
@@ -348,7 +365,8 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
           Queue.endUnsafe(q as any)
         }).pipe(Effect.catch(() => Effect.sync(() => { state.status = "failed"; state.finishedAt = Date.now(); Queue.offerUnsafe(q, { _tag: "done" as const, exitCode: null, stdout: "", stderr: "" }); Queue.endUnsafe(q as any) })))
 
-        void Effect.runPromise(runAsync.pipe(Effect.provideService(SandboxProvider.Service, sandbox)))
+        const fiber = Effect.runFork(runAsync.pipe(Effect.provideService(SandboxProvider.Service, sandbox)))
+        state.fiber = fiber
 
         return HttpServerResponse.jsonUnsafe({ execId, status: "running", sessionID: sid })
       }),
@@ -381,8 +399,8 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
 
         const sseEvent = (ev: ExecSseEvent | { _tag: "heartbeat" }): Sse.Event | null => {
           if (ev._tag === "heartbeat") return { _tag: "Event" as const, event: "ping", id: undefined, data: "" }
-          if (ev._tag === "stdout") return { _tag: "Event" as const, event: "output", id: undefined, data: JSON.stringify({ text: ev.text + "\n" }) }
-          if (ev._tag === "stderr") return { _tag: "Event" as const, event: "output", id: undefined, data: JSON.stringify({ text: "[stderr] " + ev.text + "\n" }) }
+          if (ev._tag === "stdout") return { _tag: "Event" as const, event: "stdout", id: undefined, data: JSON.stringify({ text: ev.text + "\n" }) }
+          if (ev._tag === "stderr") return { _tag: "Event" as const, event: "stderr", id: undefined, data: JSON.stringify({ text: ev.text + "\n" }) }
           return { _tag: "Event" as const, event: "done", id: undefined, data: JSON.stringify({ execId: params.execId, status: state.status, exitCode: ev.exitCode, stdout: ev.stdout, stderr: ev.stderr }) }
         }
 
@@ -402,6 +420,42 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
             },
           },
         )
+      }),
+    )
+
+    // ── exec kill: 中断正在运行的命令 ──────────────────────────────
+    yield* router.add("POST", "/session/:sessionID/exec/:execId/kill",
+      Effect.gen(function* () {
+        const params = yield* HttpRouter.schemaPathParams(ExecIdParams)
+        const state = execStore.get(params.execId)
+        if (!state) return HttpServerResponse.jsonUnsafe({ error: "execId not found" }, { status: 404 })
+        if (state.status !== "running") return HttpServerResponse.jsonUnsafe({ error: "exec not running" }, { status: 409 })
+
+        state.status = "killed"
+        state.finishedAt = Date.now()
+        state.exitCode = null
+        Queue.offerUnsafe(state.queue, { _tag: "done" as const, exitCode: null, stdout: state.stdout, stderr: state.stderr })
+        Queue.endUnsafe(state.queue as any)
+
+        if (state.fiber) yield* Fiber.interrupt(state.fiber).pipe(Effect.catch(() => Effect.void))
+        yield* sandbox.interrupt(params.sessionID).pipe(Effect.catch(() => Effect.void))
+
+        return HttpServerResponse.jsonUnsafe({ execId: params.execId, status: "killed" })
+      }),
+    )
+
+    // ── exec list: 查询 session 的所有 exec ─────────────────────────
+    yield* router.add("GET", "/session/:sessionID/execs",
+      Effect.gen(function* () {
+        const params = yield* HttpRouter.schemaPathParams(SessionParams)
+        const ids = sessionExecIndex.get(params.sessionID)
+        if (!ids || !ids.size) return HttpServerResponse.jsonUnsafe({ execs: [] })
+        const execs = [...ids].map((id) => {
+          const s = execStore.get(id)
+          if (!s) return null
+          return { execId: id, command: s.command, status: s.status, startedAt: s.startedAt, finishedAt: s.finishedAt, exitCode: s.exitCode }
+        }).filter(Boolean)
+        return HttpServerResponse.jsonUnsafe({ execs })
       }),
     )
 

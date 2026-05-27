@@ -20,6 +20,7 @@ function mockProvider(runInSessionFn: (sessionID: string, command: string) => Ef
       destroyById: () => Effect.void,
       destroyAll: () => Effect.void,
       runInSession: runInSessionFn,
+      interrupt: () => Effect.void,
       register: () => Effect.void,
       keepAlive: () => Effect.void,
       release: () => Effect.void,

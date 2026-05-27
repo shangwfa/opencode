@@ -109,6 +109,7 @@ export namespace SandboxProvider {
       },
       signal?: AbortSignal,
     ) => Effect.Effect<CommandExecution, Error, never>
+    readonly interrupt: (sessionID: SessionID) => Effect.Effect<void>
     readonly register: (sessionID: SessionID, sb: Sandbox) => Effect.Effect<void>
     readonly getEndpoint: (sessionID: SessionID, port: number) => Effect.Effect<string>
   }
@@ -353,6 +354,19 @@ export namespace SandboxProvider {
           )
         }).pipe(Effect.withSpan("SandboxProvider.runInSession"))
 
+      const interrupt: Interface["interrupt"] = (sessionID) =>
+        Effect.gen(function* () {
+          const sessionId = commandSessions.get(sessionID)
+          if (!sessionId) return
+          const sb = sandboxes.get(sessionID)
+          if (!sb) return
+          yield* Effect.tryPromise({
+            try: () => sb.commands.interrupt(sessionId),
+            catch: () => {},
+          })
+          log.info("sandbox command interrupted", { sessionID })
+        }).pipe(Effect.catch(() => Effect.void), Effect.withSpan("SandboxProvider.interrupt"))
+
       const register: Interface["register"] = (sessionID, sb) =>
         Effect.sync(() => {
           commandSessions.delete(sessionID)
@@ -382,7 +396,7 @@ export namespace SandboxProvider {
 
       return Service.of({
         getOrCreate, get, destroy, destroyById, destroyAll, keepAlive, release, isKeepAlive,
-        runInSession, register, getEndpoint,
+        runInSession, interrupt, register, getEndpoint,
         cleanupSessionVolume: (sessionID) => cleanupSessionVolume(sessionID, config, connectionConfig),
       })
     }),
@@ -872,6 +886,18 @@ export namespace SandboxProvider {
           }))
         })).pipe(Effect.withSpan("SandboxProvider.runInSession"))
 
+      const interrupt: Interface["interrupt"] = (sessionID) =>
+        Effect.gen(function* () {
+          const row = yield* dbGet(sessionID).pipe(Effect.orElseSucceed(() => null))
+          if (!row?.command_session_id) return
+          const sb = yield* getOrCreate(sessionID)
+          yield* Effect.tryPromise({
+            try: () => sb.commands.interrupt(row.command_session_id!),
+            catch: () => {},
+          }).pipe(Effect.catch(() => Effect.void))
+          log.info("sandbox command interrupted", { sessionID })
+        }).pipe(Effect.withSpan("SandboxProvider.interrupt"))
+
       const register: Interface["register"] = (sessionID, sb) =>
         lock(sessionID, Effect.gen(function* () {
           commandSemaphores.delete(sessionID)
@@ -948,7 +974,7 @@ export namespace SandboxProvider {
 
       return Service.of({
         getOrCreate, get, destroy, destroyById, destroyAll, keepAlive, release, isKeepAlive,
-        runInSession, register, getEndpoint,
+        runInSession, interrupt, register, getEndpoint,
         cleanupSessionVolume: (sessionID) => cleanupSessionVolume(sessionID, config, connectionConfig),
       })
     }),
@@ -972,6 +998,7 @@ export namespace NoopSandboxProvider {
       release: () => Effect.void,
       isKeepAlive: () => Effect.succeed(false),
       runInSession: () => Effect.fail(new Error("Sandbox is disabled")),
+      interrupt: () => Effect.void,
       register: () => Effect.void,
       getEndpoint: () => Effect.die(new Error("Sandbox is disabled")),
       cleanupSessionVolume: () => Effect.void,
