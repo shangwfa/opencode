@@ -115,6 +115,15 @@
 | T16.15 | ✅ | 缺少必填字段 name → 400 |
 | T16.16 | ✅ | 多 agent 协作：主 agent 调度 translator + coder 子 agent |
 
+### Session Agents — 代码修复验证
+
+| 用例 | 状态 | 备注 |
+|---|---|---|
+| T16.17 | ✅ | 保留 agent 名拒绝：compaction/title/summary 全部返回 500 + AgentInvalidError |
+| T16.18 | ✅ | session agent @mention：创建 my-translator → AI 翻译天气为英文（@mention 解析通过 resolvePromptParts 但运行时路径正确） |
+| T16.19 | ✅ | 自定义 model/temperature：agent 创建含 model+temp=0.9，AI 使用该 agent 回复 |
+| T16.20 | ✅ | sessionGet 回退：无自定义 agent 时列出 7 个全局 agent，agent="build" 正常工作 |
+
 ### P1 SaaS 稳定性
 
 | 用例 | 状态 | 备注 |
