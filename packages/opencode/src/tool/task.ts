@@ -136,7 +136,7 @@ export const TaskTool = Tool.define(
         })
       }
 
-      const next = yield* agent.get(params.subagent_type)
+      const next = yield* agent.sessionGet(params.subagent_type, ctx.sessionID)
       if (!next) {
         return yield* Effect.fail(new Error(`Unknown agent type: ${params.subagent_type} is not a valid agent type`))
       }
@@ -147,7 +147,7 @@ export const TaskTool = Tool.define(
         : undefined
       const parent = yield* sessions.get(ctx.sessionID)
       const parentAgent = parent.agent
-        ? yield* agent.get(parent.agent).pipe(Effect.catchCause(() => Effect.succeed(undefined)))
+        ? yield* agent.sessionGet(parent.agent, ctx.sessionID).pipe(Effect.catchCause(() => Effect.succeed(undefined)))
         : undefined
       const nextSession =
         session ??

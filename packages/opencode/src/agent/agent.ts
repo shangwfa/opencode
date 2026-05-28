@@ -94,12 +94,13 @@ export interface Interface {
     Provider.DefaultModelError
   >
   readonly sessionList: (session: SessionID) => Effect.Effect<Info[]>
+  readonly sessionGet: (agent: string, session?: SessionID) => Effect.Effect<Info | undefined>
   readonly sessionCreate: (session: SessionID, input: CreateInput) => Effect.Effect<Info, unknown>
   readonly sessionUnload: (session: SessionID, name: string) => Effect.Effect<void>
   readonly sessionClear: (session: SessionID) => Effect.Effect<void>
 }
 
-type State = Omit<Interface, "generate" | "sessionList" | "sessionCreate" | "sessionUnload" | "sessionClear">
+type State = Omit<Interface, "generate" | "sessionList" | "sessionGet" | "sessionCreate" | "sessionUnload" | "sessionClear">
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/Agent") {}
 
@@ -516,6 +517,13 @@ export const layer = Layer.effect(
             return { ...o, native: a.native, hidden: a.hidden }
           })
           .concat([...overlay.values()].filter((a) => !base.some((b) => b.name === a.name)))
+      }),
+      sessionGet: Effect.fn("Agent.sessionGet")(function* (agent: string, session?: SessionID) {
+        if (!session || !Flag.OPENCODE_DATABASE_URL) return yield* InstanceState.useEffect(state, (s) => s.get(agent))
+        const row = yield* sessionAgent.get(session, agent)
+        const base = yield* InstanceState.useEffect(state, (s) => s.get(agent))
+        if (row) return mergeInfo(row, base)
+        return base
       }),
       sessionCreate: Effect.fn("Agent.sessionCreate")(function* (session: SessionID, input: CreateInput) {
         if (!Flag.OPENCODE_DATABASE_URL) throw new Error("Session agents are only available in SaaS mode")

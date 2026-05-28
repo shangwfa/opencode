@@ -359,9 +359,9 @@ export const layer = Layer.effect(
         { args: taskArgs },
       )
 
-      const taskAgent = yield* agents.get(task.agent)
+      const taskAgent = yield* agents.sessionGet(task.agent, sessionID)
       if (!taskAgent) {
-        const available = (yield* agents.list()).filter((a) => !a.hidden).map((a) => a.name)
+        const available = (yield* agents.sessionList(sessionID)).filter((a) => !a.hidden).map((a) => a.name)
         const hint = available.length ? ` Available agents: ${available.join(", ")}` : ""
         const error = new NamedError.Unknown({ message: `Agent not found: "${task.agent}".${hint}` })
         yield* bus.publish(Session.Event.Error, { sessionID, error: error.toObject() })
@@ -505,7 +505,7 @@ export const layer = Layer.effect(
             if (session.revert) {
               yield* revert.cleanup(session)
             }
-            const agent = yield* agents.get(input.agent)
+            const agent = yield* agents.sessionGet(input.agent, input.sessionID)
             if (!agent) {
               const available = (yield* agents.list()).filter((a) => !a.hidden).map((a) => a.name)
               const hint = available.length ? ` Available agents: ${available.join(", ")}` : ""
@@ -696,7 +696,7 @@ export const layer = Layer.effect(
 
     const createUserMessage = Effect.fn("SessionPrompt.createUserMessage")(function* (input: PromptInput) {
       const agentName = input.agent
-      const ag = agentName ? yield* agents.get(agentName) : yield* agents.defaultInfo()
+      const ag = agentName ? yield* agents.sessionGet(agentName, input.sessionID) : yield* agents.defaultInfo()
       if (!ag) {
         const available = (yield* agents.list()).filter((a) => !a.hidden).map((a) => a.name)
         const hint = available.length ? ` Available agents: ${available.join(", ")}` : ""
@@ -1335,7 +1335,7 @@ export const layer = Layer.effect(
             continue
           }
 
-          const agent = yield* agents.get(lastUser.agent)
+          const agent = yield* agents.sessionGet(lastUser.agent, sessionID)
           if (!agent) {
             const available = (yield* agents.list()).filter((a) => !a.hidden).map((a) => a.name)
             const hint = available.length ? ` Available agents: ${available.join(", ")}` : ""
@@ -1571,7 +1571,7 @@ export const layer = Layer.effect(
       const taskModel = yield* Effect.gen(function* () {
         if (cmd.model) return Provider.parseModel(cmd.model)
         if (cmd.agent) {
-          const cmdAgent = yield* agents.get(cmd.agent)
+          const cmdAgent = yield* agents.sessionGet(cmd.agent, input.sessionID)
           if (cmdAgent?.model) return cmdAgent.model
         }
         if (input.model) return Provider.parseModel(input.model)
@@ -1580,7 +1580,7 @@ export const layer = Layer.effect(
 
       yield* getModel(taskModel.providerID, taskModel.modelID, input.sessionID)
 
-      const agent = agentName ? yield* agents.get(agentName) : yield* agents.defaultInfo()
+      const agent = agentName ? yield* agents.sessionGet(agentName, input.sessionID) : yield* agents.defaultInfo()
       if (!agent) {
         const available = (yield* agents.list()).filter((a) => !a.hidden).map((a) => a.name)
         const hint = available.length ? ` Available agents: ${available.join(", ")}` : ""
