@@ -663,3 +663,143 @@ ORDER BY m.time_created;
 
 ---
 
+### T15.15 渐进式披露：preloaded_skills manifest 验证
+
+验证当消息带 `skills` 参数时，system prompt 中注入的 `<preloaded_skills>` 只包含 manifest（name/description/location + resource 元数据），不含 skill 完整 content。
+
+```bash
+BASE="http://localhost:14096"
+MODEL='{"providerID":"zhipuai","modelID":"glm-5.1"}'
+
+SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{"title":"progressive-disclosure-test"}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+
+curl -s -X POST "$BASE/session/$SID/skills/create" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "name":"api-designer",
+    "description":"REST API 设计专家",
+    "content":"# API Designer\n你是 REST API 设计专家。遵循 OpenAPI 3.0 规范。提供端点设计、请求/响应 schema、错误码设计等指导。",
+    "resources":[
+      {"path":"openapi-template.yaml","type":"template","content":"openapi: 3.0.0\ninfo:\n  title: API\n  version: 1.0.0\npaths: {}\n"},
+      {"path":"error-codes.md","type":"doc","content":"## 标准错误码\n- 400: 请求参数错误\n- 401: 未认证\n- 403: 无权限\n- 404: 资源不存在\n- 500: 服务器内部错误"}
+    ]
+  }' > /dev/null
+
+# 让 AI 检查自己的 system prompt 内容
+curl -s --max-time 180 -X POST "$BASE/session/$SID/message" \
+  -H 'Content-Type: application/json' \
+  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"请检查你的 system prompt，回答以下问题：\\n1. preloaded_skills 部分是否存在？\\n2. api-designer skill 的 content 是否出现在 system prompt 中？还是只有 name 和 description？\\n3. resources 部分是显示了完整 content 还是只有 path/size 元数据？\\n4. available_skills 列表中 api-designer 的信息是什么？\\n\\n请如实回答，逐条列出。\"}],\"skills\":[\"api-designer\"],\"model\":$MODEL}" \
+  | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+for p in d.get('parts',[]):
+    if p.get('type')=='text': print(p['text'])
+"
+```
+
+**期望**：
+1. `preloaded_skills` 存在
+2. api-designer 的 **完整 content 不在** system prompt 中，只有 name/description/location
+3. resources 只显示 path/type/size **元数据**，不含实际内容
+4. `available_skills` 列表只有 name/description/location
+5. System prompt 包含提示语："These preloaded skills are manifests only. Before applying a preloaded skill, call the skill tool with its name to load the full instructions."
+
+---
+
+### T15.16 渐进式披露：skill tool 不指定 resources 时只返回 manifest
+
+验证 AI 调用 `skill` tool 不指定 `resources` 参数时，返回的 resources 部分只有 path/type/size 元数据，不含实际 content。
+
+```bash
+BASE="http://localhost:14096"
+MODEL='{"providerID":"zhipuai","modelID":"glm-5.1"}'
+
+SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{"title":"resource-manifest-test"}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+
+curl -s -X POST "$BASE/session/$SID/skills/create" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "name":"code-reviewer",
+    "description":"代码审查专家",
+    "content":"# Code Reviewer\n你是代码审查专家。按 security/performance/style 三维度审查。",
+    "resources":[
+      {"path":"checklist.md","type":"doc","content":"## 审查清单\n1. SQL注入检查\n2. 内存泄漏检查\n3. 命名规范检查"},
+      {"path":"template.json","type":"template","content":"{\"severity\":\"HIGH\",\"category\":\"security\"}"}
+    ]
+  }' > /dev/null
+
+curl -s --max-time 180 -X POST "$BASE/session/$SID/message" \
+  -H 'Content-Type: application/json' \
+  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"请调用 skill tool 加载 code-reviewer，但不要指定 resources 参数。然后告诉我：\\n1. resources 部分显示的是什么？是完整内容还是只有 path/size 元数据？\\n2. 逐字列出 resources 部分的内容。\"}],\"model\":$MODEL}" \
+  | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+for p in d.get('parts',[]):
+    if p.get('type')=='text': print('AI:', p['text'][:800])
+    elif p.get('type')=='tool': print(f'TOOL input: {json.dumps(p.get(\"input\",{}),ensure_ascii=False)}')
+"
+
+# PG 验证 tool output
+docker exec ai-nova-postgres psql -U postgres -d opencode -c "
+SELECT substring(p.data->'state'->>'output', 1, 800) as output
+FROM message m JOIN part p ON p.message_id = m.id
+WHERE m.session_id='$SID' AND p.data->>'type'='tool'
+ORDER BY m.time_created;
+"
+```
+
+**期望**：PG tool output 中 resources 显示 `<resource path="checklist.md" type="doc" size="78" />`（只有元数据），**不含** "SQL注入检查" 等实际内容。
+
+---
+
+### T15.17 渐进式披露：指定 resources 获取内容 + 不存在 resource → missing_resource
+
+验证 AI 调用 `skill` tool 指定 `resources` 参数时：
+1. 存在的 resource 返回完整 content
+2. 不存在的 resource 标记为 `<missing_resource>`，不报错
+
+```bash
+BASE="http://localhost:14096"
+MODEL='{"providerID":"zhipuai","modelID":"glm-5.1"}'
+
+SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{"title":"resource-content-test"}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+
+curl -s -X POST "$BASE/session/$SID/skills/create" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "name":"code-reviewer",
+    "description":"代码审查专家",
+    "content":"# Code Reviewer\n你是代码审查专家。按 security/performance/style 三维度审查。",
+    "resources":[
+      {"path":"checklist.md","type":"doc","content":"## 审查清单\n1. SQL注入检查\n2. 内存泄漏检查\n3. 命名规范检查"},
+      {"path":"template.json","type":"template","content":"{\"severity\":\"HIGH\",\"category\":\"security\"}"}
+    ]
+  }' > /dev/null
+
+curl -s --max-time 180 -X POST "$BASE/session/$SID/message" \
+  -H 'Content-Type: application/json' \
+  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"调用 skill tool 加载 code-reviewer，指定 resources 为 [\\\"checklist.md\\\", \\\"nonexistent-file.md\\\"]。然后告诉我：\\n1. checklist.md 的完整内容是什么？\\n2. nonexistent-file.md 出现了什么？\\n3. 逐字列出 resources 部分的全部内容。\"}],\"model\":$MODEL}" \
+  | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+for p in d.get('parts',[]):
+    if p.get('type')=='text': print('AI:', p['text'][:1000])
+    elif p.get('type')=='tool': print(f'TOOL input: {json.dumps(p.get(\"input\",{}),ensure_ascii=False)}')
+"
+
+# PG 验证 tool output
+docker exec ai-nova-postgres psql -U postgres -d opencode -c "
+SELECT substring(p.data->'state'->>'output', 1, 1200) as output
+FROM message m JOIN part p ON p.message_id = m.id
+WHERE m.session_id='$SID' AND p.data->>'type'='tool'
+ORDER BY m.time_created;
+"
+```
+
+**期望**：
+1. `checklist.md` 返回完整内容：`<resource path="checklist.md" type="doc">## 审查清单\n1. SQL注入检查...</resource>`
+2. `nonexistent-file.md` 返回：`<missing_resource path="nonexistent-file.md" />`
+3. PG tool output 包含两者
+
+---
+

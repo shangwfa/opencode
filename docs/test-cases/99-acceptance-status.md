@@ -89,6 +89,9 @@
 | T15.12 | ✅ | 全局 skill 列表：GET /skill 返回 1 个内置 skill |
 | T15.13 | ✅ | 多 skills 主动触发：指定 3 个 skills，AI 依次加载并综合使用（安全+性能+风格三维度报告） |
 | T15.14 | ✅ | 多 skills 被动触发：不指定 skills，AI 自行判断加载 git-helper（而非 deploy-helper） |
+| T15.15 | ✅ | 渐进式披露：preloaded_skills 只有 manifest（name/desc/location + resource 元数据），无完整 content |
+| T15.16 | ✅ | 渐进式披露：skill tool 不指定 resources → 只返回 path/type/size 元数据 |
+| T15.17 | ✅ | 渐进式披露：指定 resources 获取完整 content + 不存在 resource → `<missing_resource>` |
 
 ### Session Agents（会话级动态 Agent）
 
