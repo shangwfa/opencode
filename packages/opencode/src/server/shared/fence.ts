@@ -1,6 +1,6 @@
 import { Database } from "@/storage/db"
 import { inArray } from "drizzle-orm"
-import { EventSequenceTable } from "@/sync/event.pg"
+import { EventSequenceTable } from "@/sync/event.sql"
 import { Workspace } from "@/control-plane/workspace"
 import type { WorkspaceID } from "@/control-plane/schema"
 import * as Log from "@opencode-ai/core/util/log"

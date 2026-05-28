@@ -1,9 +1,9 @@
 import { Context, Effect, Layer } from "effect"
 import { Database } from "./storage/db"
-import { DataMigrationTable } from "./data-migration.pg"
+import { DataMigrationTable } from "./data-migration.sql"
 import * as Log from "@opencode-ai/core/util/log"
 import { and, asc, eq, gt, inArray, sql } from "drizzle-orm"
-import { MessageTable, SessionTable } from "./session/session.pg"
+import { MessageTable, SessionTable } from "./session/session.sql"
 import type { SessionID } from "./session/schema"
 
 export type Migration<R = never> = {
@@ -24,6 +24,9 @@ export const layer = Layer.effect(
       {
         name: "session_usage_from_messages",
         run: Effect.gen(function* () {
+          // json_extract is SQLite-only syntax; skip this migration on PG
+          if (Database.dialect === "pg") return
+
           type Usage = {
             cost: number
             tokens: { input: number; output: number; reasoning: number; cache: { read: number; write: number } }
@@ -56,12 +59,12 @@ export const layer = Layer.effect(
                   for (const row of await db
                     .select({
                       session_id: MessageTable.session_id,
-                      cost: sql<number>`coalesce(sum(coalesce((${MessageTable.data}->>'cost')::numeric, 0)), 0)`,
-                      tokens_input: sql<number>`coalesce(sum(coalesce((${MessageTable.data}->'tokens'->>'input')::numeric, 0)), 0)`,
-                      tokens_output: sql<number>`coalesce(sum(coalesce((${MessageTable.data}->'tokens'->>'output')::numeric, 0)), 0)`,
-                      tokens_reasoning: sql<number>`coalesce(sum(coalesce((${MessageTable.data}->'tokens'->>'reasoning')::numeric, 0)), 0)`,
-                      tokens_cache_read: sql<number>`coalesce(sum(coalesce((${MessageTable.data}->'tokens'->'cache'->>'read')::numeric, 0)), 0)`,
-                      tokens_cache_write: sql<number>`coalesce(sum(coalesce((${MessageTable.data}->'tokens'->'cache'->>'write')::numeric, 0)), 0)`,
+                      cost: sql<number>`coalesce(sum(coalesce(json_extract(${MessageTable.data}, '$.cost'), 0)), 0)`,
+                      tokens_input: sql<number>`coalesce(sum(coalesce(json_extract(${MessageTable.data}, '$.tokens.input'), 0)), 0)`,
+                      tokens_output: sql<number>`coalesce(sum(coalesce(json_extract(${MessageTable.data}, '$.tokens.output'), 0)), 0)`,
+                      tokens_reasoning: sql<number>`coalesce(sum(coalesce(json_extract(${MessageTable.data}, '$.tokens.reasoning'), 0)), 0)`,
+                      tokens_cache_read: sql<number>`coalesce(sum(coalesce(json_extract(${MessageTable.data}, '$.tokens.cache.read'), 0)), 0)`,
+                      tokens_cache_write: sql<number>`coalesce(sum(coalesce(json_extract(${MessageTable.data}, '$.tokens.cache.write'), 0)), 0)`,
                     })
                     .from(MessageTable)
                     .where(
@@ -70,7 +73,7 @@ export const layer = Layer.effect(
                           MessageTable.session_id,
                           sessions.map((session: any) => session.id),
                         ),
-                        sql`${MessageTable.data}->>'role' = 'assistant'`,
+                        sql`json_extract(${MessageTable.data}, '$.role') = 'assistant'`,
                       ),
                     )
                     .groupBy(MessageTable.session_id)
@@ -122,7 +125,11 @@ export const layer = Layer.effect(
 
     yield* Effect.gen(function* () {
       if (migrations.length === 0) return
+      // data_migration table is SQLite-only; skip on PG
+      if (Database.dialect === "pg") return
 
+      // Migrations run in a background fiber, so they must be resumable until
+      // their completion row is written.
       for (const migration of migrations) {
         const completed = yield* Effect.promise(() =>
           Database.use((db) =>
