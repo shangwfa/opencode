@@ -16,12 +16,14 @@ const MODEL = { providerID: "zhipuai", modelID: "glm-5.1" }
 ### 辅助函数
 
 > 所有测试用例使用以下辅助函数：
-> - `sendAndWait`: 发送异步消息，监听 SSE 等待 `session.idle`，返回最后一条 AI 消息
-> - SSE 端点 `/event?sessionID=xxx` 按会话过滤（`feat/session-agent` 分支已支持，当前 `dev` 分支通过客户端过滤兼容）
+> - `sendAndWait`: 发送异步消息，监听 SSE 流等待 `session.idle`，返回最后一条 AI 消息
+> - SSE 端点 `/event?sessionID=xxx` 按会话过滤（`feat/session-agent` 分支已支持服务端过滤，当前 `dev` 分支通过客户端兼容）
+> - 流式输出 SSE 事件日志：agent 切换、tool 调用、文本增量等，方便调试
 
 ```js
 // 发送异步消息，监听 SSE 等待 session.idle，返回最后一条 AI 消息
-// 优先使用 /event?sessionID= 服务端过滤，回退到客户端 evt.properties?.sessionID 匹配
+// 使用 /event?sessionID= 按会话过滤，流式输出 SSE 事件日志
+
 async function sendAndWait(sid, body, timeout = 60000) {
   return new Promise(async (resolve, reject) => {
     const timer = setTimeout(() => reject(new Error("timeout")), timeout)
@@ -29,12 +31,10 @@ async function sendAndWait(sid, body, timeout = 60000) {
     const reader = eventRes.body.getReader()
     const decoder = new TextDecoder()
     let buffer = ""
-    const matchSession = (evt) => {
-      if (evt.type === "session.idle") {
-        const s = evt.properties?.sessionID || evt.sessionID
-        return !s || s === sid  // 服务端已过滤时 sessionID 可能不存在，视为匹配
-      }
-      return false
+    const logEvent = (e) => {
+      if (e.type === "server.connected" || e.type === "server.heartbeat") return
+      const d = e.properties ? JSON.stringify(e.properties).slice(0, 100) : ""
+      console.log("  [SSE] " + e.type + " " + d)
     }
     const readLoop = async () => {
       while (true) {
@@ -48,13 +48,17 @@ async function sendAndWait(sid, body, timeout = 60000) {
           if (line.startsWith("data: ")) {
             try {
               const evt = JSON.parse(line.slice(6))
-              if (matchSession(evt)) {
-                clearTimeout(timer)
-                const msgs = await (await fetch(BASE + "/session/" + sid + "/message")).json()
-                const lastAi = [...msgs].reverse().find(m => m.info?.role === "assistant")
-                reader.cancel()
-                resolve(lastAi)
-                return
+              logEvent(evt)
+              if (evt.type === "session.idle") {
+                const s = evt.properties?.sessionID || evt.sessionID
+                if (!s || s === sid) {
+                  clearTimeout(timer)
+                  const msgs = await (await fetch(BASE + "/session/" + sid + "/message")).json()
+                  const lastAi = [...msgs].reverse().find(m => m.info?.role === "assistant")
+                  reader.cancel()
+                  resolve(lastAi)
+                  return
+                }
               }
             } catch {}
           }
@@ -62,11 +66,10 @@ async function sendAndWait(sid, body, timeout = 60000) {
       }
     }
     readLoop()
-    const r = await fetch(BASE + "/session/" + sid + "/prompt_async", {
+    await fetch(BASE + "/session/" + sid + "/prompt_async", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     })
-    if (r.status !== 204) { clearTimeout(timer); reject(new Error("prompt_async: " + r.status)) }
   })
 }
 ```
@@ -198,7 +201,11 @@ async function sendAndWait(sid, body, timeout = 60000) {
     const reader = eventRes.body.getReader()
     const decoder = new TextDecoder()
     let buffer = ""
-    const matchSession = (e) => { if (e.type === "session.idle") { const s = e.properties?.sessionID || e.sessionID; return !s || s === sid } return false }
+    const logEvent = (e) => {
+      if (e.type === "server.connected" || e.type === "server.heartbeat") return
+      const d = e.properties ? JSON.stringify(e.properties).slice(0, 100) : ""
+      console.log("  [SSE] " + e.type + " " + d)
+    }
     const readLoop = async () => {
       while (true) {
         const { value, done } = await reader.read()
@@ -211,13 +218,17 @@ async function sendAndWait(sid, body, timeout = 60000) {
           if (line.startsWith("data: ")) {
             try {
               const evt = JSON.parse(line.slice(6))
-              if (matchSession(evt)) {
-                clearTimeout(timer)
-                const msgs = await (await fetch(BASE + "/session/" + sid + "/message")).json()
-                const lastAi = [...msgs].reverse().find(m => m.info?.role === "assistant")
-                reader.cancel()
-                resolve(lastAi)
-                return
+              logEvent(evt)
+              if (evt.type === "session.idle") {
+                const s = evt.properties?.sessionID || evt.sessionID
+                if (!s || s === sid) {
+                  clearTimeout(timer)
+                  const msgs = await (await fetch(BASE + "/session/" + sid + "/message")).json()
+                  const lastAi = [...msgs].reverse().find(m => m.info?.role === "assistant")
+                  reader.cancel()
+                  resolve(lastAi)
+                  return
+                }
               }
             } catch {}
           }
@@ -276,7 +287,11 @@ async function sendAndWait(sid, body, timeout = 60000) {
     const reader = eventRes.body.getReader()
     const decoder = new TextDecoder()
     let buffer = ""
-    const matchSession = (e) => { if (e.type === "session.idle") { const s = e.properties?.sessionID || e.sessionID; return !s || s === sid } return false }
+    const logEvent = (e) => {
+      if (e.type === "server.connected" || e.type === "server.heartbeat") return
+      const d = e.properties ? JSON.stringify(e.properties).slice(0, 100) : ""
+      console.log("  [SSE] " + e.type + " " + d)
+    }
     const readLoop = async () => {
       while (true) {
         const { value, done } = await reader.read()
@@ -289,13 +304,17 @@ async function sendAndWait(sid, body, timeout = 60000) {
           if (line.startsWith("data: ")) {
             try {
               const evt = JSON.parse(line.slice(6))
-              if (matchSession(evt)) {
-                clearTimeout(timer)
-                const msgs = await (await fetch(BASE + "/session/" + sid + "/message")).json()
-                const lastAi = [...msgs].reverse().find(m => m.info?.role === "assistant")
-                reader.cancel()
-                resolve(lastAi)
-                return
+              logEvent(evt)
+              if (evt.type === "session.idle") {
+                const s = evt.properties?.sessionID || evt.sessionID
+                if (!s || s === sid) {
+                  clearTimeout(timer)
+                  const msgs = await (await fetch(BASE + "/session/" + sid + "/message")).json()
+                  const lastAi = [...msgs].reverse().find(m => m.info?.role === "assistant")
+                  reader.cancel()
+                  resolve(lastAi)
+                  return
+                }
               }
             } catch {}
           }
@@ -343,7 +362,11 @@ async function sendAndWait(sid, body, timeout = 60000) {
     const reader = eventRes.body.getReader()
     const decoder = new TextDecoder()
     let buffer = ""
-    const matchSession = (e) => { if (e.type === "session.idle") { const s = e.properties?.sessionID || e.sessionID; return !s || s === sid } return false }
+    const logEvent = (e) => {
+      if (e.type === "server.connected" || e.type === "server.heartbeat") return
+      const d = e.properties ? JSON.stringify(e.properties).slice(0, 100) : ""
+      console.log("  [SSE] " + e.type + " " + d)
+    }
     const readLoop = async () => {
       while (true) {
         const { value, done } = await reader.read()
@@ -356,13 +379,17 @@ async function sendAndWait(sid, body, timeout = 60000) {
           if (line.startsWith("data: ")) {
             try {
               const evt = JSON.parse(line.slice(6))
-              if (matchSession(evt)) {
-                clearTimeout(timer)
-                const msgs = await (await fetch(BASE + "/session/" + sid + "/message")).json()
-                const lastAi = [...msgs].reverse().find(m => m.info?.role === "assistant")
-                reader.cancel()
-                resolve(lastAi)
-                return
+              logEvent(evt)
+              if (evt.type === "session.idle") {
+                const s = evt.properties?.sessionID || evt.sessionID
+                if (!s || s === sid) {
+                  clearTimeout(timer)
+                  const msgs = await (await fetch(BASE + "/session/" + sid + "/message")).json()
+                  const lastAi = [...msgs].reverse().find(m => m.info?.role === "assistant")
+                  reader.cancel()
+                  resolve(lastAi)
+                  return
+                }
               }
             } catch {}
           }
@@ -455,7 +482,11 @@ async function sendAndWait(sid, body, timeout = 60000) {
     const reader = eventRes.body.getReader()
     const decoder = new TextDecoder()
     let buffer = ""
-    const matchSession = (e) => { if (e.type === "session.idle") { const s = e.properties?.sessionID || e.sessionID; return !s || s === sid } return false }
+    const logEvent = (e) => {
+      if (e.type === "server.connected" || e.type === "server.heartbeat") return
+      const d = e.properties ? JSON.stringify(e.properties).slice(0, 100) : ""
+      console.log("  [SSE] " + e.type + " " + d)
+    }
     const readLoop = async () => {
       while (true) {
         const { value, done } = await reader.read()
@@ -468,13 +499,17 @@ async function sendAndWait(sid, body, timeout = 60000) {
           if (line.startsWith("data: ")) {
             try {
               const evt = JSON.parse(line.slice(6))
-              if (matchSession(evt)) {
-                clearTimeout(timer)
-                const msgs = await (await fetch(BASE + "/session/" + sid + "/message")).json()
-                const lastAi = [...msgs].reverse().find(m => m.info?.role === "assistant")
-                reader.cancel()
-                resolve(lastAi)
-                return
+              logEvent(evt)
+              if (evt.type === "session.idle") {
+                const s = evt.properties?.sessionID || evt.sessionID
+                if (!s || s === sid) {
+                  clearTimeout(timer)
+                  const msgs = await (await fetch(BASE + "/session/" + sid + "/message")).json()
+                  const lastAi = [...msgs].reverse().find(m => m.info?.role === "assistant")
+                  reader.cancel()
+                  resolve(lastAi)
+                  return
+                }
               }
             } catch {}
           }
@@ -596,14 +631,18 @@ const agents = await (await fetch(BASE + "/session/" + SID.id + "/agents")).json
 const custom = agents.filter(a => ["manager", "translator", "coder"].includes(a.name))
 console.log("自定义agent数:", custom.length, "(expect 3)")
 
-async function sendAndWait(sid, body, timeout = 120000) {
+async function sendAndWait(sid, body, timeout = 60000) {
   return new Promise(async (resolve, reject) => {
     const timer = setTimeout(() => reject(new Error("timeout")), timeout)
     const eventRes = await fetch(BASE + "/event?sessionID=" + sid)
     const reader = eventRes.body.getReader()
     const decoder = new TextDecoder()
     let buffer = ""
-    const matchSession = (e) => { if (e.type === "session.idle") { const s = e.properties?.sessionID || e.sessionID; return !s || s === sid } return false }
+    const logEvent = (e) => {
+      if (e.type === "server.connected" || e.type === "server.heartbeat") return
+      const d = e.properties ? JSON.stringify(e.properties).slice(0, 100) : ""
+      console.log("  [SSE] " + e.type + " " + d)
+    }
     const readLoop = async () => {
       while (true) {
         const { value, done } = await reader.read()
@@ -616,13 +655,17 @@ async function sendAndWait(sid, body, timeout = 120000) {
           if (line.startsWith("data: ")) {
             try {
               const evt = JSON.parse(line.slice(6))
-              if (matchSession(evt)) {
-                clearTimeout(timer)
-                const msgs = await (await fetch(BASE + "/session/" + sid + "/message")).json()
-                const lastAi = [...msgs].reverse().find(m => m.info?.role === "assistant")
-                reader.cancel()
-                resolve(lastAi)
-                return
+              logEvent(evt)
+              if (evt.type === "session.idle") {
+                const s = evt.properties?.sessionID || evt.sessionID
+                if (!s || s === sid) {
+                  clearTimeout(timer)
+                  const msgs = await (await fetch(BASE + "/session/" + sid + "/message")).json()
+                  const lastAi = [...msgs].reverse().find(m => m.info?.role === "assistant")
+                  reader.cancel()
+                  resolve(lastAi)
+                  return
+                }
               }
             } catch {}
           }
