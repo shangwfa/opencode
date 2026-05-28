@@ -530,3 +530,136 @@ for s in d:
 
 ---
 
+### T15.13 多 skills 主动触发（指定多个 skills 参数）
+
+验证在 `message` 请求中通过 `skills` 参数指定多个 skill 时，AI 能依次加载全部 skill 并综合使用。
+
+```bash
+BASE="http://localhost:14096"
+MODEL='{"providerID":"zhipuai","modelID":"glm-5.1"}'
+
+SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{"title":"multi-skills-active-test"}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+
+# 创建 3 个不同角色的 skills
+curl -s -X POST "$BASE/session/$SID/skills/create" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "name":"security-reviewer",
+    "description":"代码安全审查专家。检查 SQL注入、XSS、命令注入等安全漏洞。",
+    "content":"# Security Reviewer\n你是代码安全审查专家。按以下清单审查代码：\n1. SQL注入：字符串拼接SQL是HIGH风险\n2. XSS：未转义输出是HIGH风险\n3. 命令注入：shell拼接是HIGH风险\n4. 路径遍历：未校验路径是MEDIUM风险\n审查后给出：风险等级(HIGH/MEDIUM/LOW) + 修复建议。"
+  }' > /dev/null
+
+curl -s -X POST "$BASE/session/$SID/skills/create" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "name":"perf-optimizer",
+    "description":"代码性能优化专家。分析时间复杂度、内存使用、N+1查询等性能问题。",
+    "content":"# Performance Optimizer\n你是代码性能优化专家。按以下维度分析：\n1. 时间复杂度：是否有O(n²)或更高\n2. 内存：是否有大数组拷贝或不必要的对象创建\n3. N+1查询：循环内是否有数据库查询\n4. 缓存：是否缺少必要的缓存\n分析后给出：性能评分(1-10) + 优化建议。"
+  }' > /dev/null
+
+curl -s -X POST "$BASE/session/$SID/skills/create" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "name":"style-checker",
+    "description":"代码风格和质量审查专家。检查命名规范、函数长度、注释质量等。",
+    "content":"# Style Checker\n你是代码风格审查专家。按以下维度检查：\n1. 命名：变量/函数名是否语义清晰\n2. 函数长度：是否超过30行\n3. 重复代码：是否有DRY违反\n4. 错误处理：是否有空catch或未处理异常\n审查后给出：风格评分(A/B/C/D) + 改进建议。"
+  }' > /dev/null
+
+# 验证 skills 列表
+curl -s "$BASE/session/$SID/skills" | python3 -c "import json,sys;d=json.load(sys.stdin);print(f'count={len(d)}, names={[s[\"name\"] for s in d]}')"
+
+# PG 验证
+docker exec ai-nova-postgres psql -U postgres -d opencode -c \
+  "SELECT name, description FROM session_skill WHERE session_id='$SID' ORDER BY name;"
+
+# 主动触发：指定使用全部 3 个 skills 审查同一段代码
+curl -s --max-time 180 -X POST "$BASE/session/$SID/message" \
+  -H 'Content-Type: application/json' \
+  -d "{
+    \"parts\":[{\"type\":\"text\",\"text\":\"请分别用 security-reviewer、perf-optimizer、style-checker 三个 skill 审查以下代码，给出三个维度的完整报告：\\n\\n\`\`\`python\\ndef get_users(role=None):\\n    query = f\\\"SELECT * FROM users WHERE role='{role}'\\\"\\n    results = []\\n    db = connect_db()\\n    rows = db.execute(query)\\n    for row in rows:\\n        user = dict(row)\\n        orders = db.execute(f\\\"SELECT * FROM orders WHERE user_id={user['id']}\\\")\\n        user['orders'] = [dict(o) for o in orders]\\n        results.append(user)\\n    return results\\n\`\`\`\"}],
+    \"skills\":[\"security-reviewer\",\"perf-optimizer\",\"style-checker\"],
+    \"model\":$MODEL
+  }" \
+  | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+for p in d.get('parts',[]):
+    if p.get('type')=='text': print('AI:', p['text'][:1500])
+    elif p.get('type')=='tool': print(f'Tool: {json.dumps(p.get(\"input\",{}),ensure_ascii=False)[:200]}')
+"
+
+# PG 验证 tool 调用记录：应有 3 条 skill tool 调用
+docker exec ai-nova-postgres psql -U postgres -d opencode -c "
+SELECT p.data->>'name' as tool_name, substring(p.data->'state'->>'input', 1, 200) as input
+FROM message m JOIN part p ON p.message_id = m.id
+WHERE m.session_id='$SID' AND p.data->>'type'='tool'
+ORDER BY m.time_created;
+"
+```
+
+**期望**：AI 依次调用 3 次 `skill` tool，分别加载 `security-reviewer`、`perf-optimizer`、`style-checker`；回复包含三个维度的审查报告（安全风险、性能评分、风格评分）。PG `part` 表有 3 条 tool 调用记录。
+
+---
+
+### T15.14 多 skills 被动触发（不指定 skills，AI 自行判断加载）
+
+验证不传 `skills` 参数时，AI 能根据消息内容自动从可用 skills 中选择并加载合适的 skill。
+
+```bash
+BASE="http://localhost:14096"
+MODEL='{"providerID":"zhipuai","modelID":"glm-5.1"}'
+
+SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{"title":"multi-skills-passive-test"}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+
+# 创建 2 个不同场景的 skills
+curl -s -X POST "$BASE/session/$SID/skills/create" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "name":"deploy-helper",
+    "description":"部署助手。当用户需要部署、发布、上线、Docker、K8s 相关帮助时使用。",
+    "content":"# Deploy Helper\n你是部署专家。当被调用时，必须先说【DEPLOY_HELPER已激活】再回答。"
+  }' > /dev/null
+
+curl -s -X POST "$BASE/session/$SID/skills/create" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "name":"git-helper",
+    "description":"Git 版本控制助手。当用户需要 Git 操作、分支管理、合并冲突、rebase 等帮助时使用。",
+    "content":"# Git Helper\n你是 Git 专家。当被调用时，必须先说【GIT_HELPER已激活】再回答。"
+  }' > /dev/null
+
+# 验证 skills 列表
+curl -s "$BASE/session/$SID/skills" | python3 -c "import json,sys;d=json.load(sys.stdin);print(f'count={len(d)}, names={[s[\"name\"] for s in d]}')"
+
+# 被动触发：问 git 合并冲突问题（不传 skills 参数）
+curl -s --max-time 180 -X POST "$BASE/session/$SID/message" \
+  -H 'Content-Type: application/json' \
+  -d "{
+    \"parts\":[{\"type\":\"text\",\"text\":\"我遇到了一个 git 合并冲突，帮我解决。冲突内容如下：\\n\\n\`\`\`\\n<<<<<<< HEAD\\nconst port = process.env.PORT || 3000;\\napp.listen(port);\\n=======\\nconst port = process.env.PORT || 8080;\\nserver.listen(port, () => console.log('running'));\\n>>>>>>> feature/new-port\\n\`\`\`\\n\\n请使用合适的 skill 来指导我解决\"}],
+    \"model\":$MODEL
+  }" \
+  | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+for p in d.get('parts',[]):
+    if p.get('type')=='text': print('AI:', p['text'][:800])
+    elif p.get('type')=='tool': print(f'Tool: {json.dumps(p.get(\"input\",{}),ensure_ascii=False)[:200]}')
+"
+
+# PG 验证：应有 1 条 skill tool 调用，加载的是 git-helper（而非 deploy-helper）
+docker exec ai-nova-postgres psql -U postgres -d opencode -c "
+SELECT substring(p.data->'state'->>'input', 1, 100) as input,
+  substring(p.data->'state'->>'output', 1, 100) as output_preview
+FROM message m JOIN part p ON p.message_id = m.id
+WHERE m.session_id='$SID' AND p.data->>'type'='tool'
+  AND p.data->'state'->>'input' LIKE '%git-helper%'
+ORDER BY m.time_created;
+"
+```
+
+**期望**：AI 识别到 git 合并冲突场景，主动调用 `skill` tool 加载 `git-helper`（而非 `deploy-helper`）；回复包含 `【GIT_HELPER已激活】`。PG `part` 表有对应的 tool 调用记录，且加载的是 `git-helper`。
+
+> **注意**：被动触发依赖 AI 自主判断。对于 AI 自身已具备足够知识的问题（如简单 Dockerfile），AI 可能不加载 skill 而直接回答，这是合理行为。测试时应选择需要特定 skill 指导的场景（如本例的合并冲突）。
+
+---
+

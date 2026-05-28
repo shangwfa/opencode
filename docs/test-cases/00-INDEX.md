@@ -21,7 +21,7 @@
 | [`10-sandbox-lifecycle.md`](./10-sandbox-lifecycle.md) | 十二 | T12.x | 沙箱按需创建/复用/销毁、PVC 恢复、idle 超时、keepAlive、进程隔离 |
 | [`11-saas-stability.md`](./11-saas-stability.md) | 十三 | T13.x | kill-sandbox、dispose 并发、HMR、路径重写、PG FK、rate limit、安全、幂等性、观测性 |
 | [`12-compatibility.md`](./12-compatibility.md) | 十四 | T14.x | Session 列表过滤、status、fork、分页、share、diff/revert、file/find/VCS API |
-| [`13-session-skills.md`](./13-session-skills.md) | 十五 | T15.x | Session skill CRUD、bundle、resources、按需加载、upsert、同名覆盖、permission、边界 |
+| [`13-session-skills.md`](./13-session-skills.md) | 十五 | T15.x | Session skill CRUD、bundle、resources、按需加载、upsert、同名覆盖、permission、边界、多skills主动/被动触发 |
 | [`14-session-agents.md`](./14-session-agents.md) | 十六 | T16.x | 会话级动态 Agent 创建/列出/删除、primary/subagent 模式、权限、隔离、级联 |
 | [`15-sandbox-endpoint.md`](./15-sandbox-endpoint.md) | 十七 | T17.x | Sandbox 直连 IP 访问、endpoint API、proxy vs 直连对比 |
 | [`16-tool-calls.md`](./16-tool-calls.md) | 十八 | T18.x | 7 种工具调用批量验证、消息流结构 |

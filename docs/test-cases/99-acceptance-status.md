@@ -87,6 +87,8 @@
 | T15.10 | ✅ | permission deny 过滤：deny skill tool 后 AI 无法调用 |
 | T15.11 | ✅ | resources 边界：300KB 单个 resource + 70 个 resources 均成功写入 PG |
 | T15.12 | ✅ | 全局 skill 列表：GET /skill 返回 1 个内置 skill |
+| T15.13 | ✅ | 多 skills 主动触发：指定 3 个 skills，AI 依次加载并综合使用（安全+性能+风格三维度报告） |
+| T15.14 | ✅ | 多 skills 被动触发：不指定 skills，AI 自行判断加载 git-helper（而非 deploy-helper） |
 
 ### Session Agents（会话级动态 Agent）
 
