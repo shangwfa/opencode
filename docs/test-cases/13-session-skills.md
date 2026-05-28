@@ -1,0 +1,532 @@
+# Session Skills
+
+> 本文档从 `saas-test-cases.md` 拆分而来。公共测试环境和配置请参考 [`00-INDEX.md`](./00-INDEX.md)。
+
+## 十五、Session Skills
+
+本节验证 SaaS API 中 session 维度的 skills：创建、读取、删除、复杂 bundle、resources 注入，以及从 SkillsMP 拉取真实 skill bundle 后执行。所有请求都打容器服务 `BASE=http://localhost:14096`。
+
+```bash
+BASE="http://localhost:14096"
+MODEL='{"providerID":"zhipuai","modelID":"glm-5.1"}'
+```
+
+### T15.1 简单 session skill 创建与触发
+
+```bash
+SID_SKILL=$(curl -s -X POST "$BASE/session" \
+  -H 'Content-Type: application/json' \
+  -d '{"title":"session-skill-simple-test"}' \
+  | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+
+curl -s -X POST "$BASE/session/$SID_SKILL/skills/create" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "name":"reviewer",
+    "description":"代码审查专家，专注发现 bug 和安全问题",
+    "content":"# Reviewer\n\n审查代码时输出：严重程度、问题描述、修复建议。必须明确说你正在使用 reviewer skill。"
+  }' | python3 -m json.tool
+
+curl -s --max-time 180 -X POST "$BASE/session/$SID_SKILL/message" \
+  -H 'Content-Type: application/json' \
+  -d "{
+    \"parts\":[{\"type\":\"text\",\"text\":\"请使用 reviewer skill 审查：\\n\\`\\`\\`python\\ndef div(a,b):\\n    return a / b\\n\\`\\`\\`\"}],
+    \"skills\":[\"reviewer\"],
+    \"model\":$MODEL
+  }" | python3 -c "import json,sys;d=json.load(sys.stdin);print(''.join(p.get('text','') for p in d.get('parts',[]) if p.get('type')=='text')[:1200])"
+```
+
+**期望**：skill 创建返回 `resources: []`；AI 回复中明确提到 `reviewer skill`，并按「严重程度、问题描述、修复建议」格式审查代码。
+
+### T15.2 复杂 session skill bundle 创建、读取与触发
+
+```bash
+SID_BUNDLE=$(curl -s -X POST "$BASE/session" \
+  -H 'Content-Type: application/json' \
+  -d '{"title":"session-skill-bundle-test"}' \
+  | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+
+curl -s -X POST "$BASE/session/$SID_BUNDLE/skills/create" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "name":"complex-reviewer",
+    "description":"使用 checklist 和模板审查 Python 数据库代码",
+    "content":"# Complex Reviewer\n\n你必须根据 resources 中的 checklist 和模板审查代码。回复必须明确引用 resources 的文件路径。",
+    "resources":[
+      {
+        "path":"references/security-checklist.md",
+        "type":"doc",
+        "content":"Checklist:\n- SQL injection: direct string interpolation into SQL is HIGH severity.\n- Resource leak: DB connection without context manager or close is HIGH severity.\n- Return concrete rows, not raw cursors."
+      },
+      {
+        "path":"templates/safe-query.py",
+        "type":"template",
+        "content":"query = \"SELECT * FROM users WHERE id = ?\"\nwith db.connect() as conn:\n    return conn.execute(query, (user_id,)).fetchone()"
+      }
+    ]
+  }' | python3 -m json.tool
+
+curl -s "$BASE/session/$SID_BUNDLE/skills" \
+  | python3 -c "import json,sys;d=json.load(sys.stdin);print([(s['name'], [r['path'] for r in s.get('resources',[])]) for s in d])"
+
+curl -s --max-time 180 -X POST "$BASE/session/$SID_BUNDLE/message" \
+  -H 'Content-Type: application/json' \
+  -d "{
+    \"parts\":[{\"type\":\"text\",\"text\":\"请使用 complex-reviewer skill 审查这段代码：\\n\\`\\`\\`python\\ndef get_user(user_id):\\n    query = f\\\"SELECT * FROM users WHERE id = {user_id}\\\"\\n    conn = db.connect()\\n    result = conn.execute(query)\\n    return result\\n\\`\\`\\`\"}],
+    \"skills\":[\"complex-reviewer\"],
+    \"model\":$MODEL
+  }" | python3 -c "import json,sys;d=json.load(sys.stdin);t=''.join(p.get('text','') for p in d.get('parts',[]) if p.get('type')=='text');print(t[:1800])"
+```
+
+**期望**：`GET /skills` 能读回 `references/security-checklist.md` 和 `templates/safe-query.py`；AI 回复中明确引用这两个资源路径，并识别 SQL 注入、连接泄漏、返回 raw cursor 等问题。
+
+### T15.3 删除与清空 session skills
+
+```bash
+SID_DEL=$(curl -s -X POST "$BASE/session" \
+  -H 'Content-Type: application/json' \
+  -d '{"title":"session-skill-delete-test"}' \
+  | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+
+for name in complex-reviewer reviewer; do
+  curl -s -X POST "$BASE/session/$SID_DEL/skills/create" \
+    -H 'Content-Type: application/json' \
+    -d "{\"name\":\"$name\",\"description\":\"$name\",\"content\":\"# $name\"}" > /dev/null
+done
+
+curl -s "$BASE/session/$SID_DEL/skills" | python3 -c "import json,sys;print([s['name'] for s in json.load(sys.stdin)])"
+curl -s -o /dev/null -w "delete_one_status=%{http_code}\n" -X DELETE "$BASE/session/$SID_DEL/skills/complex-reviewer"
+curl -s "$BASE/session/$SID_DEL/skills" | python3 -c "import json,sys;print([s['name'] for s in json.load(sys.stdin)])"
+curl -s -o /dev/null -w "clear_status=%{http_code}\n" -X DELETE "$BASE/session/$SID_DEL/skills"
+curl -s "$BASE/session/$SID_DEL/skills" | python3 -m json.tool
+```
+
+**期望**：初始列表含两个 skills；删除单个返回 `204` 后只剩 `reviewer`；清空返回 `204` 后列表为 `[]`。
+
+### T15.4 从目录加载 session skill bundle
+
+`/session/:sessionID/skills/load` 读取的是 opencode 服务容器内路径，不是远端 sandbox 内路径。测试时先在 `opencode-saas-test` 容器内准备 `/workspace/skills`。
+
+```bash
+docker exec opencode-saas-test sh -lc 'mkdir -p /workspace/skills/complex-reviewer/references /workspace/skills/complex-reviewer/templates && cat > /workspace/skills/complex-reviewer/SKILL.md <<'"'"'EOF'"'"'
+---
+name: loaded-reviewer
+description: 从目录加载的 Python DB 审查 skill
+---
+
+# Loaded Reviewer
+
+你必须使用 resources 中的 checklist 和模板审查代码，并引用资源路径。
+EOF
+cat > /workspace/skills/complex-reviewer/references/security-checklist.md <<'"'"'EOF'"'"'
+Checklist:
+- SQL injection from f-string SQL is HIGH severity.
+- Connection without with/close is HIGH severity.
+EOF
+cat > /workspace/skills/complex-reviewer/templates/safe-query.py <<'"'"'EOF'"'"'
+query = "SELECT * FROM users WHERE id = ?"
+with db.connect() as conn:
+    return conn.execute(query, (user_id,)).fetchone()
+EOF'
+
+SID_LOAD=$(curl -s -X POST "$BASE/session" \
+  -H 'Content-Type: application/json' \
+  -d '{"title":"session-skill-load-test"}' \
+  | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+
+curl -s -X POST "$BASE/session/$SID_LOAD/skills/load" \
+  -H 'Content-Type: application/json' \
+  -d '{"path":"/workspace/skills"}' \
+  | python3 -c "import json,sys;d=json.load(sys.stdin);print([(s['name'], [r['path'] for r in s.get('resources',[])]) for s in d])"
+
+curl -s --max-time 180 -X POST "$BASE/session/$SID_LOAD/message" \
+  -H 'Content-Type: application/json' \
+  -d "{
+    \"parts\":[{\"type\":\"text\",\"text\":\"请使用 loaded-reviewer skill 审查：\\n\\`\\`\\`python\\ndef get_user(user_id):\\n    query = f\\\"SELECT * FROM users WHERE id = {user_id}\\\"\\n    conn = db.connect()\\n    return conn.execute(query)\\n\\`\\`\\`\"}],
+    \"skills\":[\"loaded-reviewer\"],
+    \"model\":$MODEL
+  }" | python3 -c "import json,sys;d=json.load(sys.stdin);print(''.join(p.get('text','') for p in d.get('parts',[]) if p.get('type')=='text')[:1600])"
+```
+
+**期望**：加载结果含 `loaded-reviewer`，resources 包含 `references/security-checklist.md` 和 `templates/safe-query.py`；AI 回复中引用这两个资源路径。
+
+### T15.5 从 SkillsMP 默认排序提取 10 个真实 skill bundle 并执行
+
+SkillsMP API 没有无查询的列表接口，`/api/v1/skills` 返回 404。该用例使用最宽泛的 `q=skill`，不传 `category`，不传 `sortBy`，沿用 SkillsMP 默认排序。若第一页存在 GitHub 目录没有可拉取 `SKILL.md` 的条目，则继续取下一页补满 10 个。
+
+```bash
+python3 - <<'PY'
+import json, re, urllib.parse, urllib.request
+
+BASE='http://localhost:14096'
+UA={'User-Agent':'opencode-skill-bundle-test'}
+
+def get(url, timeout=60):
+    req=urllib.request.Request(url, headers=UA)
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return r.read().decode()
+def get_json(url, timeout=60): return json.loads(get(url, timeout))
+def api(method,path,data=None,timeout=300):
+    body=json.dumps(data).encode() if data is not None else None
+    req=urllib.request.Request(BASE+path,data=body,method=method,headers={'Content-Type':'application/json'})
+    with urllib.request.urlopen(req,timeout=timeout) as r:
+        text=r.read().decode(); return json.loads(text) if text else None
+def parse_github(url):
+    m=re.match(r'https://github.com/([^/]+)/([^/]+)(?:/tree/([^/]+)/(.*))?$', url)
+    if not m: raise ValueError(url)
+    return m.group(1),m.group(2),m.group(3) or 'main',urllib.parse.unquote(m.group(4) or '')
+def fm(text):
+    if not text.startswith('---'): return {},text
+    m=re.search(r'^---\s*\n(.*?)\n---\s*\n',text,re.S)
+    if not m: return {},text
+    raw=m.group(1); body=text[m.end():]; meta={}; lines=raw.splitlines(); i=0
+    while i<len(lines):
+        line=lines[i]
+        if ':' not in line: i+=1; continue
+        k,v=line.split(':',1); k=k.strip(); v=v.strip().strip('"').strip("'")
+        if v in ('|','>'):
+            block=[]; i+=1
+            while i<len(lines) and (lines[i].startswith(' ') or not lines[i].strip()): block.append(lines[i].strip()); i+=1
+            meta[k]=' '.join(x for x in block if x); continue
+        meta[k]=v; i+=1
+    return meta,body
+def kind(p):
+    if p.startswith('templates/'): return 'template'
+    if p.startswith(('references/','docs/','rules/')): return 'doc'
+    ext='.'+p.rsplit('.',1)[-1].lower() if '.' in p else ''
+    if ext in ['.md','.mdx','.txt']: return 'doc'
+    if ext in ['.sh','.bash','.zsh','.py','.js','.ts','.tsx','.jsx']: return 'script'
+    return 'asset'
+def extract(item, idx, seen):
+    owner,repo,branch,root=parse_github(item['githubUrl'])
+    tree=get_json(f'https://api.github.com/repos/{owner}/{repo}/git/trees/{branch}?recursive=1')['tree']
+    blobs=[x['path'] for x in tree if x.get('type')=='blob']
+    skill_path=(root.rstrip('/')+'/SKILL.md').lstrip('/') if root else 'SKILL.md'
+    if skill_path not in blobs:
+        c=[p for p in blobs if p.endswith('/SKILL.md') or p=='SKILL.md']
+        if not c: raise FileNotFoundError('SKILL.md')
+        skill_path=c[0]; root=skill_path[:-len('/SKILL.md')] if skill_path.endswith('/SKILL.md') else ''
+    else: root=root.rstrip('/')
+    files=[p for p in blobs if p==skill_path or (root and p.startswith(root+'/'))]
+    raw=f'https://raw.githubusercontent.com/{owner}/{repo}/{branch}/'
+    meta,body=fm(get(raw+urllib.parse.quote(skill_path,safe='/')))
+    name=meta.get('name') or item['name']
+    if name in seen: name=f'{name}-{idx}'
+    seen.add(name)
+    resources=[]; total=len(body.encode())
+    for file in sorted(files):
+        if file==skill_path: continue
+        rel=file[len(root)+1:] if root else file
+        if rel.startswith('.') or rel.endswith(('.png','.jpg','.jpeg','.gif','.webp','.pdf','.zip','.mp3','.mp4')): continue
+        content=get(raw+urllib.parse.quote(file,safe='/'))
+        size=len(content.encode())
+        if size>256*1024 or total+size>900*1024: continue
+        resources.append({'path':rel,'type':kind(rel),'content':content}); total+=size
+        if len(resources)>=64: break
+    desc=meta.get('description') or item.get('description') or name
+    return {'name':name,'description':desc[:1200],'content':body,'resources':resources,'githubUrl':item['githubUrl']}
+
+print('health', urllib.request.urlopen(BASE+'/', timeout=20).status)
+bundles=[]; seen=set(); page=1
+while len(bundles)<10 and page<=3:
+    data=get_json(f'https://skillsmp.com/api/v1/skills/search?q=skill&limit=10&page={page}')['data']['skills']
+    for item in data:
+        if len(bundles)>=10: break
+        try:
+            b=extract(item, len(bundles)+1, seen)
+            bundles.append(b)
+            print(f'extracted {len(bundles)} {b["name"]} resources={len(b["resources"])}')
+        except Exception as e:
+            print('skip', item.get('githubUrl'), type(e).__name__, str(e)[:100])
+    page+=1
+if len(bundles)<10: raise SystemExit(f'only {len(bundles)}')
+
+s=api('POST','/session',{'title':'skillsmp-default-10-bundle-test'}); sid=s['id']; print('SID',sid)
+for b in bundles:
+    c=api('POST',f'/session/{sid}/skills/create',{k:b[k] for k in ['name','description','content','resources']})
+    print('created',c['name'],'resources=',len(c.get('resources',[])))
+listed=api('GET',f'/session/{sid}/skills')
+print('listed_count',len(listed)); print('listed_names',', '.join(x['name'] for x in listed))
+names=[b['name'] for b in bundles]
+msg=api('POST',f'/session/{sid}/message',{
+ 'parts':[{'type':'text','text':'请验证当前从 SkillsMP 默认排序提取的 10 个 skills 是否可用。要求：按名称列出每个 skill；每个 skill 用一句话说明用途；如果有 resources，列出至少一个资源路径；最后总结这些 skills 覆盖的能力范围。'}],
+ 'skills':names,
+ 'model':{'providerID':'zhipuai','modelID':'glm-5.1'}
+})
+text='\n'.join(p.get('text','') for p in msg.get('parts',[]) if p.get('type')=='text')
+print(text[:5000])
+print('validation_names_mentioned',sum(1 for n in names if n in text),'/',len(names))
+print('validation_resource_path_mentioned',any(r['path'] in text for b in bundles for r in b['resources']))
+PY
+```
+
+**期望**：`listed_count 10`；`validation_names_mentioned 10 / 10`；`validation_resource_path_mentioned True`。实际已验证过的默认排序样例包含 `skill-eval-测评`、`SkillSentry`、`skill-evaluator`、`skill-stocktake`、`skill-architect`、`skills-jk-gha-pr-creation`、`skill-creator`、`skill-soulsaying`、`skill-retrospective`、`skill-optimizer`。
+
+### T15.6 重复创建同名 skill（upsert 覆盖）
+
+验证同一 session 内重复创建同名 skill 时，第二次 upsert 覆盖第一次的内容和 resources。
+
+```bash
+BASE="http://localhost:14096"
+MODEL='{"providerID":"zhipuai","modelID":"glm-5.1"}'
+
+SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{"title":"upsert-test"}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+
+# 第一次：v1 + 1 resource
+curl -s -X POST "$BASE/session/$SID/skills/create" \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"checker","description":"v1","content":"# Checker V1\n必须说 V1","resources":[{"path":"a.md","type":"doc","content":"resource A"}]}'
+
+# PG 验证：name=checker, description=v1, res_count=1
+docker exec ai-nova-postgres psql -U postgres -d opencode -c \
+  "SELECT name, description, jsonb_array_length(resources) as res_count FROM session_skill WHERE session_id='$SID';"
+
+# 第二次：同一名字，不同内容和 resources
+curl -s -X POST "$BASE/session/$SID/skills/create" \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"checker","description":"v2","content":"# Checker V2\n必须说 V2","resources":[{"path":"b.md","type":"doc","content":"resource B"},{"path":"c.md","type":"doc","content":"resource C"}]}'
+
+# PG 验证：name=checker, description=v2, res_count=2（覆盖而非新增）
+docker exec ai-nova-postgres psql -U postgres -d opencode -c \
+  "SELECT name, description, jsonb_array_length(resources) as res_count FROM session_skill WHERE session_id='$SID';"
+
+# API 验证：skills 列表只有 1 个
+curl -s "$BASE/session/$SID/skills" | python3 -c \
+  "import json,sys;d=json.load(sys.stdin);print(f'count={len(d)}, desc={[s[\"description\"] for s in d]}, resources={[[r[\"path\"] for r in s.get(\"resources\",[])] for s in d]}')"
+
+# AI 验证：使用 v2 版本
+curl -s --max-time 180 -X POST "$BASE/session/$SID/message" \
+  -H 'Content-Type: application/json' \
+  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"使用 checker skill\"}],\"skills\":[\"checker\"],\"model\":$MODEL}" \
+  | python3 -c "import json,sys;d=json.load(sys.stdin);print(''.join(p.get('text','') for p in d.get('parts',[]) if p.get('type')=='text')[:400])"
+```
+
+**期望**：PG 第二次写入后 `description=v2`、`res_count=2`（resources 被 v2 覆盖）；skills 列表只有 1 个；AI 回复包含"V2"。
+
+---
+
+### T15.7 AI 通过 skill tool 按需加载 resource 内容
+
+验证 AI 在需要时会主动调用 `skill` tool 加载指定 resource 的完整内容，而非仅看 skill 摘要。
+
+```bash
+BASE="http://localhost:14096"
+MODEL='{"providerID":"zhipuai","modelID":"glm-5.1"}'
+
+SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{"title":"skill-tool-resource-test"}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+
+curl -s -X POST "$BASE/session/$SID/skills/create" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "name":"db-reviewer",
+    "description":"数据库代码审查 skill",
+    "content":"# DB Reviewer\n使用 resources 中的 checklist 和模板审查数据库代码。必须先加载 resources 内容再审查。",
+    "resources":[
+      {"path":"checklist.md","type":"doc","content":"## 安全检查清单\n1. SQL注入: f-string拼接SQL是HIGH\n2. 连接泄漏: 不用with/close是HIGH\n3. 必须返回具体行，不能返回cursor"},
+      {"path":"safe-template.py","type":"template","content":"query = \"SELECT * FROM users WHERE id = ?\"\nwith db.connect() as conn:\n    return conn.execute(query, (user_id,)).fetchone()"}
+    ]
+  }'
+
+curl -s --max-time 180 -X POST "$BASE/session/$SID/message" \
+  -H 'Content-Type: application/json' \
+  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"请使用 db-reviewer skill 审查这段代码。注意：你需要先用 skill 工具加载 db-reviewer 的 resources 内容（checklist.md 和 safe-template.py），然后按 checklist 审查。\\n\\n代码:\\n```python\\ndef get_user(user_id):\\n    query = f\\\"SELECT * FROM users WHERE id = {user_id}\\\"\\n    conn = db.connect()\\n    return conn.execute(query)\\n```\"}],\"skills\":[\"db-reviewer\"],\"model\":$MODEL}" \
+  | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+for p in d.get('parts',[]):
+    if p.get('type')=='text': print('AI:', p['text'][:500])
+    elif p.get('type')=='tool': print('Tool:', p.get('name',''), 'input:', json.dumps(p.get('input',{}))[:200])
+"
+
+# PG 验证：tool 调用记录
+docker exec ai-nova-postgres psql -U postgres -d opencode -c \"
+  SELECT p.data->>'name' as tool_name, substring(p.data->'state'->>'output', 1, 400) as output
+  FROM message m JOIN part p ON p.message_id = m.id
+  WHERE m.session_id='$SID' AND p.data->>'type'='tool';
+\"
+```
+
+**期望**：PG `part` 表存在 `tool_name` 为空的 `skill` tool 调用，`output` 包含 `<skill_content name="db-reviewer">` 且包含 checklist 和 safe-template 内容；AI 回复引用了 checklist 条目（SQL 注入 HIGH、连接泄漏 HIGH）。
+
+---
+
+### T15.8 skill 不存在时的错误处理
+
+验证当 AI 被引导使用不存在的 skill 时，能正确识别并给出明确的错误信息。
+
+```bash
+BASE="http://localhost:14096"
+MODEL='{"providerID":"zhipuai","modelID":"glm-5.1"}'
+
+SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{"title":"skill-not-found-test"}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+
+# 确认 skills 列表为空
+curl -s "$BASE/session/$SID/skills" | python3 -c "import json,sys;print(json.load(sys.stdin))"
+
+# AI 尝试使用不存在的 skill
+curl -s --max-time 180 -X POST "$BASE/session/$SID/message" \
+  -H 'Content-Type: application/json' \
+  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"请使用 nonexistent-skill-xyz 来帮我做代码审查\"}],\"model\":$MODEL}" \
+  | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+for p in d.get('parts',[]):
+    if p.get('type')=='text': print('AI:', p['text'][:600])
+    elif p.get('type')=='tool': print('Tool:', p.get('name',''), 'input:', json.dumps(p.get('input',{}))[:200])
+"
+```
+
+**期望**：AI 不调用 `skill` tool（因为 `nonexistent-skill-xyz` 不在 available 列表中），直接告知用户该 skill 不存在或不可用。PG 无 `skill` tool 调用记录。
+
+---
+
+### T15.9 session skill 与全局 skill 同名覆盖
+
+验证创建与全局 skill 同名的 session skill 时，AI 优先加载 session 版本。
+
+```bash
+BASE="http://localhost:14096"
+MODEL='{"providerID":"zhipuai","modelID":"glm-5.1"}'
+
+# 先查看全局 skill 列表
+curl -s "$BASE/skill" | python3 -c "import json,sys;d=json.load(sys.stdin);print([s['name'] for s in d])"
+# 全局有 customize-opencode
+
+SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{"title":"skill-override-test"}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+
+# 创建同名 session skill
+curl -s -X POST "$BASE/session/$SID/skills/create" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "name":"customize-opencode",
+    "description":"SESSION版-自定义opencode",
+    "content":"# Session 版 customize-opencode\n这是 session 版本的自定义 skill。当被问到时，你必须说【SESSION版本】。"
+  }'
+
+# PG 验证
+docker exec ai-nova-postgres psql -U postgres -d opencode -c \
+  "SELECT name, description FROM session_skill WHERE session_id='$SID';"
+
+# AI 测试：应加载 session 版本
+curl -s --max-time 180 -X POST "$BASE/session/$SID/message" \
+  -H 'Content-Type: application/json' \
+  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"请使用 customize-opencode skill，告诉我这个 skill 的内容和版本\"}],\"skills\":[\"customize-opencode\"],\"model\":$MODEL}" \
+  | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+for p in d.get('parts',[]):
+    if p.get('type')=='text': print('AI:', p['text'][:600])
+    elif p.get('type')=='tool': print('Tool output:', p.get('output','')[:400])
+"
+```
+
+**期望**：AI 加载的是 session 版本的 `customize-opencode`（内容含"SESSION版本"），而非全局版本。
+
+---
+
+### T15.10 permission deny 过滤
+
+验证通过 session permission deny `skill` tool 后，AI 无法调用 skill tool。
+
+```bash
+BASE="http://localhost:14096"
+MODEL='{"providerID":"zhipuai","modelID":"glm-5.1"}'
+
+# 创建带 permission deny skill tool 的 session
+SID=$(curl -s -X POST "$BASE/session" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "title":"permission-deny-test",
+    "permission": [{"permission":"tool","pattern":"skill","action":"deny"}]
+  }' | python3 -c "import json,sys;d=json.load(sys.stdin);print(d.get('id',''))")
+
+# 创建一个 skill
+curl -s -X POST "$BASE/session/$SID/skills/create" \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"blocked-skill","description":"应该被 deny 的 skill","content":"# Blocked Skill\n这是一个被 permission deny 的 skill。"}'
+
+# skills 列表应能查到（deny 只影响 AI tool 调用能力，不影响 CRUD）
+curl -s "$BASE/session/$SID/skills" | python3 -c "import json,sys;d=json.load(sys.stdin);print(f'count={len(d)}, names={[s[\"name\"] for s in d]}')"
+
+# AI 测试：应无法调用 skill tool
+curl -s --max-time 180 -X POST "$BASE/session/$SID/message" \
+  -H 'Content-Type: application/json' \
+  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"请使用 blocked-skill skill 帮我做代码审查\"}],\"model\":$MODEL}" \
+  | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+for p in d.get('parts',[]):
+    if p.get('type')=='text': print('AI:', p['text'][:600])
+    elif p.get('type')=='reasoning': print('Reasoning:', p['text'][:400])
+    elif p.get('type')=='tool': print('Tool:', p.get('name',''))
+"
+```
+
+**期望**：AI 回复中未调用 `skill` tool（PG 无 tool 调用记录），而是直接告知用户无法加载或提供替代方案。Skills 列表仍能通过 API 查到（CRUD 不受 deny 影响）。
+
+---
+
+### T15.11 resources 边界：超大 resource 与超多 resources
+
+验证单个超大 resource（>256KB）和超多 resources（>64个）能否正常写入 PG。
+
+```bash
+BASE="http://localhost:14096"
+
+# === T15.11a: 超大 resource (300KB) ===
+SID_A=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{"title":"boundary-large-test"}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+
+LARGE_CONTENT=$(python3 -c "print('x' * 300000)")
+curl -s -X POST "$BASE/session/$SID_A/skills/create" \
+  -H 'Content-Type: application/json' \
+  -d "{\"name\":\"huge-skill\",\"description\":\"超大 resource 测试\",\"content\":\"# Huge Skill\",\"resources\":[{\"path\":\"big.md\",\"type\":\"doc\",\"content\":\"$LARGE_CONTENT\"}]}"
+
+docker exec ai-nova-postgres psql -U postgres -d opencode -c \
+  "SELECT name, jsonb_array_length(resources) as res_count, length(resources->0->>'content') as first_res_size, pg_column_size(resources) as total_jsonb_size FROM session_skill WHERE session_id='$SID_A';"
+
+# === T15.11b: 超多 resources (70个) ===
+SID_B=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{"title":"boundary-many-test"}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+
+RESOURCES=$(python3 -c "
+import json
+resources = [{'path':f'file_{i}.md','type':'doc','content':f'content of file {i}'} for i in range(70)]
+print(json.dumps(resources))
+")
+
+curl -s -X POST "$BASE/session/$SID_B/skills/create" \
+  -H 'Content-Type: application/json' \
+  -d "{\"name\":\"many-resources\",\"description\":\"超多 resources 测试\",\"content\":\"# Many Resources\",\"resources\":$RESOURCES}"
+
+docker exec ai-nova-postgres psql -U postgres -d opencode -c \
+  "SELECT name, jsonb_array_length(resources) as res_count, pg_column_size(resources) as total_jsonb_size FROM session_skill WHERE session_id='$SID_B';"
+```
+
+**期望**：
+- T15.11a：PG `first_res_size=300000`，无截断无报错
+- T15.11b：PG `res_count=70`，无截断无报错
+
+---
+
+### T15.12 全局 skill 列表 (GET /skill)
+
+验证全局 skill 列表端点返回正确的内置 skills。
+
+```bash
+BASE="http://localhost:14096"
+
+# 列出全局 skills
+curl -s "$BASE/skill" | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+print(f'Total: {len(d)}')
+for s in d:
+    print(f'  - {s[\"name\"]}: {s.get(\"description\",\"\")[:80]}')
+    print(f'    location: {s.get(\"location\",\"N/A\")}')
+    print(f'    resources: {len(s.get(\"resources\",[]))}')
+"
+```
+
+**期望**：至少返回 1 个全局 skill（如 `customize-opencode`），包含 name、description、location 等字段。注意：`GET /skill/{name}` 无独立端点（返回 HTML 页面）。
+
+---
+
