@@ -14,7 +14,6 @@ import { RuntimeFlags } from "@/effect/runtime-flags"
 import { Glob } from "@opencode-ai/core/util/glob"
 import * as Log from "@opencode-ai/core/util/log"
 import { SessionSkill } from "./session-skill"
-import { Flag } from "@opencode-ai/core/flag/flag"
 import type { SessionID } from "@/session/schema"
 import { Discovery } from "./discovery"
 import CUSTOMIZE_OPENCODE_SKILL_BODY from "./prompt/customize-opencode.md" with { type: "text" }
@@ -278,7 +277,7 @@ export const layer = Layer.effect(
     const global = yield* Global.Service
     const flags = yield* RuntimeFlags.Service
     const sessionSkill = yield* SessionSkill.Service
-    const isPg = !!Flag.OPENCODE_DATABASE_URL
+
     const discovered = yield* InstanceState.make(
       Effect.fn("Skill.discovery")(function* (ctx) {
         return yield* discoverSkills(
@@ -310,14 +309,33 @@ export const layer = Layer.effect(
     )
 
     const get = Effect.fn("Skill.get")(function* (name: string, session?: string) {
+      if (session) {
+        const row = yield* sessionSkill.get(session as SessionID, name)
+        if (row) return {
+          name: row.name,
+          description: row.description,
+          location: `session://${session}/${row.name}`,
+          content: row.content,
+          resources: row.resources ?? [],
+        }
+      }
       const s = yield* InstanceState.get(state)
-      if (session && s.sessions[session]?.[name]) return s.sessions[session][name]
       return s.skills[name]
     })
 
     const require = Effect.fn("Skill.require")(function* (name: string, session?: string) {
+      if (session) {
+        const row = yield* sessionSkill.get(session as SessionID, name)
+        if (row) return {
+          name: row.name,
+          description: row.description,
+          location: `session://${session}/${row.name}`,
+          content: row.content,
+          resources: row.resources ?? [],
+        }
+      }
       const s = yield* InstanceState.get(state)
-      const info = session ? (s.sessions[session]?.[name] ?? s.skills[name]) : s.skills[name]
+      const info = s.skills[name]
       if (info) return info
       return yield* new NotFoundError({ name, available: Object.keys(s.skills).toSorted() })
     })
@@ -326,8 +344,15 @@ export const layer = Layer.effect(
       const s = yield* InstanceState.get(state)
       if (!session) return Object.values(s.skills)
       const merged = { ...s.skills }
-      for (const [name, skill] of Object.entries(s.sessions[session] ?? {})) {
-        merged[name] = skill
+      const rows = yield* sessionSkill.list(session as SessionID)
+      for (const row of rows) {
+        merged[row.name] = {
+          name: row.name,
+          description: row.description,
+          location: `session://${session}/${row.name}`,
+          content: row.content,
+          resources: row.resources ?? [],
+        }
       }
       return Object.values(merged)
     })
@@ -338,8 +363,19 @@ export const layer = Layer.effect(
 
     const available = Effect.fn("Skill.available")(function* (agent?: Agent.Info, session?: string) {
       const s = yield* InstanceState.get(state)
+      let sessionSkills: Info[] = []
+      if (session) {
+        const rows = yield* sessionSkill.list(session as SessionID)
+        sessionSkills = rows.map((row) => ({
+          name: row.name,
+          description: row.description,
+          location: `session://${session}/${row.name}`,
+          content: row.content,
+          resources: row.resources ?? [],
+        }))
+      }
       let list = session
-        ? [...Object.values(s.sessions[session] ?? {}), ...Object.values(s.skills)]
+        ? [...sessionSkills, ...Object.values(s.skills)]
         : Object.values(s.skills)
       const seen = new Set<string>()
       list = list.filter((skill) => {
@@ -352,48 +388,75 @@ export const layer = Layer.effect(
     })
 
     const sessionList = Effect.fn("Skill.sessionList")(function* (session: string) {
-      if (isPg) {
-        const rows = yield* sessionSkill.list(session as SessionID)
-        return rows.map((row: any) => ({
-          name: row.name,
-          description: row.description,
-          location: `session://${session}/${row.name}`,
-          content: row.content,
-          resources: row.resources ?? [],
-        }))
-      }
-      const s = yield* InstanceState.get(state)
-      return Object.values(s.sessions[session] ?? {})
+      const rows = yield* sessionSkill.list(session as SessionID)
+      return rows.map((row: any) => ({
+        name: row.name,
+        description: row.description,
+        location: `session://${session}/${row.name}`,
+        content: row.content,
+        resources: row.resources ?? [],
+      }))
     })
 
     const sessionCreate = Effect.fn("Skill.sessionCreate")(function* (session: string, value: CreateInput) {
-      if (isPg) {
-        const row = yield* sessionSkill.upsert(session as SessionID, {
-          name: value.name,
-          description: value.description ?? "",
-          content: value.content,
-          resources: value.resources as any,
-        })
-        return {
-          name: row.name,
-          description: row.description,
-          location: `session://${session}/${row.name}`,
-          content: row.content,
-          resources: row.resources ?? [],
-        }
-      }
-      const info: Info = {
+      const row = yield* sessionSkill.upsert(session as SessionID, {
         name: value.name,
-        description: value.description,
-        location: `memory://${value.name}`,
+        description: value.description ?? "",
         content: value.content,
-        resources: value.resources,
+        resources: value.resources as any,
+      })
+      return {
+        name: row.name,
+        description: row.description,
+        location: `session://${session}/${row.name}`,
+        content: row.content,
+        resources: row.resources ?? [],
       }
-      const s = yield* InstanceState.get(state)
-      if (!s.sessions[session]) s.sessions[session] = {}
-      s.sessions[session][value.name] = info
-      return info
     })
+
+    const RESOURCE_MAX = 256 * 1024
+    const BUNDLE_MAX = 1024 * 1024
+    const RESOURCE_COUNT_MAX = 64
+    const SKIP_DIRS = new Set([".git", "node_modules", ".DS_Store", "__pycache__", ".cache"])
+    const isSkipPath = (rel: string) => rel.split("/").some((seg) => SKIP_DIRS.has(seg))
+    const resourceKind = (file: string): Resource["type"] => {
+      if (file.startsWith("templates/")) return "template"
+      if (file.startsWith("references/")) return "doc"
+      const ext = path.extname(file)
+      if ([".md", ".mdx", ".txt"].includes(ext)) return "doc"
+      if ([".sh", ".bash", ".zsh", ".py", ".js", ".ts"].includes(ext)) return "script"
+      return "asset"
+    }
+
+    const attachResources = (skills: Info[]) =>
+      Effect.forEach(skills, (skill) =>
+        Effect.gen(function* () {
+          if (skill.location.startsWith("session://") || skill.location.startsWith("memory://")) return skill
+          if (skill.resources && skill.resources.length > 0) return skill
+          const root = path.dirname(skill.location)
+          const files = yield* fsys
+            .glob("**/*", { cwd: root, absolute: true, include: "file", dot: true })
+            .pipe(Effect.catch(Effect.die))
+          const candidates = files
+            .filter((file) => path.basename(file) !== "SKILL.md")
+            .map((file) => path.relative(root, file).split(path.sep).join("/"))
+            .filter((rel) => !isSkipPath(rel))
+            .toSorted()
+          const resources: Resource[] = []
+          for (const rel of candidates) {
+            const stat = yield* fsys.stat(path.join(root, rel)).pipe(Effect.option)
+            const size = stat._tag === "Some" ? Number((stat.value as any).size ?? 0) : 0
+            if (size > RESOURCE_MAX) continue
+            const content = yield* fsys.readFileString(path.join(root, rel)).pipe(Effect.catch(Effect.die))
+            if (!content) continue
+            resources.push({ path: rel, type: resourceKind(rel), content })
+            const total = Buffer.byteLength(skill.content)
+              + resources.reduce((sum, r) => sum + Buffer.byteLength(r.content), 0)
+            if (total > BUNDLE_MAX || resources.length >= RESOURCE_COUNT_MAX) break
+          }
+          return { ...skill, resources } satisfies Info
+        }),
+      )
 
     const sessionLoad = Effect.fn("Skill.sessionLoad")(function* (session: string, dir: string) {
       const isDir = yield* fsys.isDir(dir).pipe(Effect.catch(() => Effect.succeed(false)))
@@ -405,32 +468,32 @@ export const layer = Layer.effect(
         concurrency: "unbounded",
         discard: true,
       })
-      const loaded = Object.values(tmp.skills)
-      const s = yield* InstanceState.get(state)
-      if (!s.sessions[session]) s.sessions[session] = {}
-      for (const skill of loaded) s.sessions[session][skill.name] = skill
-      return loaded
+      const loaded = yield* attachResources(Object.values(tmp.skills))
+      const results: Info[] = []
+      for (const skill of loaded) {
+        const row = yield* sessionSkill.upsert(session as SessionID, {
+          name: skill.name,
+          description: skill.description ?? "",
+          content: skill.content,
+          resources: skill.resources as any,
+        })
+        results.push({
+          name: row.name,
+          description: row.description,
+          location: `session://${session}/${row.name}`,
+          content: row.content,
+          resources: row.resources ?? [],
+        })
+      }
+      return results
     })
 
     const sessionUnload = Effect.fn("Skill.sessionUnload")(function* (session: string, name: string) {
-      if (isPg) {
-        yield* sessionSkill.remove(session as SessionID, name)
-        return
-      }
-      const s = yield* InstanceState.get(state)
-      if (s.sessions[session]) {
-        delete s.sessions[session][name]
-        if (Object.keys(s.sessions[session]).length === 0) delete s.sessions[session]
-      }
+      yield* sessionSkill.remove(session as SessionID, name)
     })
 
     const sessionClear = Effect.fn("Skill.sessionClear")(function* (session: string) {
-      if (isPg) {
-        yield* sessionSkill.removeAll(session as SessionID)
-        return
-      }
-      const s = yield* InstanceState.get(state)
-      delete s.sessions[session]
+      yield* sessionSkill.removeAll(session as SessionID)
     })
 
     return Service.of({ get, require, all, dirs, available, sessionList, sessionCreate, sessionLoad, sessionUnload, sessionClear })
@@ -444,7 +507,7 @@ export const defaultLayer = layer.pipe(
   Layer.provide(AppFileSystem.defaultLayer),
   Layer.provide(Global.layer),
   Layer.provide(RuntimeFlags.defaultLayer),
-  Layer.provide(Flag.OPENCODE_DATABASE_URL ? SessionSkill.layer : SessionSkill.noopLayer),
+  Layer.provide(SessionSkill.layer),
 )
 
 export function fmt(list: Info[], opts: { verbose: boolean }) {

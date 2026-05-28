@@ -1607,6 +1607,272 @@ PY
 
 **期望**：`listed_count 10`；`validation_names_mentioned 10 / 10`；`validation_resource_path_mentioned True`。实际已验证过的默认排序样例包含 `skill-eval-测评`、`SkillSentry`、`skill-evaluator`、`skill-stocktake`、`skill-architect`、`skills-jk-gha-pr-creation`、`skill-creator`、`skill-soulsaying`、`skill-retrospective`、`skill-optimizer`。
 
+### T15.6 重复创建同名 skill（upsert 覆盖）
+
+验证同一 session 内重复创建同名 skill 时，第二次 upsert 覆盖第一次的内容和 resources。
+
+```bash
+BASE="http://localhost:14096"
+MODEL='{"providerID":"zhipuai","modelID":"glm-5.1"}'
+
+SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{"title":"upsert-test"}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+
+# 第一次：v1 + 1 resource
+curl -s -X POST "$BASE/session/$SID/skills/create" \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"checker","description":"v1","content":"# Checker V1\n必须说 V1","resources":[{"path":"a.md","type":"doc","content":"resource A"}]}'
+
+# PG 验证：name=checker, description=v1, res_count=1
+docker exec ai-nova-postgres psql -U postgres -d opencode -c \
+  "SELECT name, description, jsonb_array_length(resources) as res_count FROM session_skill WHERE session_id='$SID';"
+
+# 第二次：同一名字，不同内容和 resources
+curl -s -X POST "$BASE/session/$SID/skills/create" \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"checker","description":"v2","content":"# Checker V2\n必须说 V2","resources":[{"path":"b.md","type":"doc","content":"resource B"},{"path":"c.md","type":"doc","content":"resource C"}]}'
+
+# PG 验证：name=checker, description=v2, res_count=2（覆盖而非新增）
+docker exec ai-nova-postgres psql -U postgres -d opencode -c \
+  "SELECT name, description, jsonb_array_length(resources) as res_count FROM session_skill WHERE session_id='$SID';"
+
+# API 验证：skills 列表只有 1 个
+curl -s "$BASE/session/$SID/skills" | python3 -c \
+  "import json,sys;d=json.load(sys.stdin);print(f'count={len(d)}, desc={[s[\"description\"] for s in d]}, resources={[[r[\"path\"] for r in s.get(\"resources\",[])] for s in d]}')"
+
+# AI 验证：使用 v2 版本
+curl -s --max-time 180 -X POST "$BASE/session/$SID/message" \
+  -H 'Content-Type: application/json' \
+  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"使用 checker skill\"}],\"skills\":[\"checker\"],\"model\":$MODEL}" \
+  | python3 -c "import json,sys;d=json.load(sys.stdin);print(''.join(p.get('text','') for p in d.get('parts',[]) if p.get('type')=='text')[:400])"
+```
+
+**期望**：PG 第二次写入后 `description=v2`、`res_count=2`（resources 被 v2 覆盖）；skills 列表只有 1 个；AI 回复包含"V2"。
+
+---
+
+### T15.7 AI 通过 skill tool 按需加载 resource 内容
+
+验证 AI 在需要时会主动调用 `skill` tool 加载指定 resource 的完整内容，而非仅看 skill 摘要。
+
+```bash
+BASE="http://localhost:14096"
+MODEL='{"providerID":"zhipuai","modelID":"glm-5.1"}'
+
+SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{"title":"skill-tool-resource-test"}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+
+curl -s -X POST "$BASE/session/$SID/skills/create" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "name":"db-reviewer",
+    "description":"数据库代码审查 skill",
+    "content":"# DB Reviewer\n使用 resources 中的 checklist 和模板审查数据库代码。必须先加载 resources 内容再审查。",
+    "resources":[
+      {"path":"checklist.md","type":"doc","content":"## 安全检查清单\n1. SQL注入: f-string拼接SQL是HIGH\n2. 连接泄漏: 不用with/close是HIGH\n3. 必须返回具体行，不能返回cursor"},
+      {"path":"safe-template.py","type":"template","content":"query = \"SELECT * FROM users WHERE id = ?\"\nwith db.connect() as conn:\n    return conn.execute(query, (user_id,)).fetchone()"}
+    ]
+  }'
+
+curl -s --max-time 180 -X POST "$BASE/session/$SID/message" \
+  -H 'Content-Type: application/json' \
+  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"请使用 db-reviewer skill 审查这段代码。注意：你需要先用 skill 工具加载 db-reviewer 的 resources 内容（checklist.md 和 safe-template.py），然后按 checklist 审查。\\n\\n代码:\\n```python\\ndef get_user(user_id):\\n    query = f\\\"SELECT * FROM users WHERE id = {user_id}\\\"\\n    conn = db.connect()\\n    return conn.execute(query)\\n```\"}],\"skills\":[\"db-reviewer\"],\"model\":$MODEL}" \
+  | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+for p in d.get('parts',[]):
+    if p.get('type')=='text': print('AI:', p['text'][:500])
+    elif p.get('type')=='tool': print('Tool:', p.get('name',''), 'input:', json.dumps(p.get('input',{}))[:200])
+"
+
+# PG 验证：tool 调用记录
+docker exec ai-nova-postgres psql -U postgres -d opencode -c \"
+  SELECT p.data->>'name' as tool_name, substring(p.data->'state'->>'output', 1, 400) as output
+  FROM message m JOIN part p ON p.message_id = m.id
+  WHERE m.session_id='$SID' AND p.data->>'type'='tool';
+\"
+```
+
+**期望**：PG `part` 表存在 `tool_name` 为空的 `skill` tool 调用，`output` 包含 `<skill_content name="db-reviewer">` 且包含 checklist 和 safe-template 内容；AI 回复引用了 checklist 条目（SQL 注入 HIGH、连接泄漏 HIGH）。
+
+---
+
+### T15.8 skill 不存在时的错误处理
+
+验证当 AI 被引导使用不存在的 skill 时，能正确识别并给出明确的错误信息。
+
+```bash
+BASE="http://localhost:14096"
+MODEL='{"providerID":"zhipuai","modelID":"glm-5.1"}'
+
+SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{"title":"skill-not-found-test"}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+
+# 确认 skills 列表为空
+curl -s "$BASE/session/$SID/skills" | python3 -c "import json,sys;print(json.load(sys.stdin))"
+
+# AI 尝试使用不存在的 skill
+curl -s --max-time 180 -X POST "$BASE/session/$SID/message" \
+  -H 'Content-Type: application/json' \
+  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"请使用 nonexistent-skill-xyz 来帮我做代码审查\"}],\"model\":$MODEL}" \
+  | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+for p in d.get('parts',[]):
+    if p.get('type')=='text': print('AI:', p['text'][:600])
+    elif p.get('type')=='tool': print('Tool:', p.get('name',''), 'input:', json.dumps(p.get('input',{}))[:200])
+"
+```
+
+**期望**：AI 不调用 `skill` tool（因为 `nonexistent-skill-xyz` 不在 available 列表中），直接告知用户该 skill 不存在或不可用。PG 无 `skill` tool 调用记录。
+
+---
+
+### T15.9 session skill 与全局 skill 同名覆盖
+
+验证创建与全局 skill 同名的 session skill 时，AI 优先加载 session 版本。
+
+```bash
+BASE="http://localhost:14096"
+MODEL='{"providerID":"zhipuai","modelID":"glm-5.1"}'
+
+# 先查看全局 skill 列表
+curl -s "$BASE/skill" | python3 -c "import json,sys;d=json.load(sys.stdin);print([s['name'] for s in d])"
+# 全局有 customize-opencode
+
+SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{"title":"skill-override-test"}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+
+# 创建同名 session skill
+curl -s -X POST "$BASE/session/$SID/skills/create" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "name":"customize-opencode",
+    "description":"SESSION版-自定义opencode",
+    "content":"# Session 版 customize-opencode\n这是 session 版本的自定义 skill。当被问到时，你必须说【SESSION版本】。"
+  }'
+
+# PG 验证
+docker exec ai-nova-postgres psql -U postgres -d opencode -c \
+  "SELECT name, description FROM session_skill WHERE session_id='$SID';"
+
+# AI 测试：应加载 session 版本
+curl -s --max-time 180 -X POST "$BASE/session/$SID/message" \
+  -H 'Content-Type: application/json' \
+  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"请使用 customize-opencode skill，告诉我这个 skill 的内容和版本\"}],\"skills\":[\"customize-opencode\"],\"model\":$MODEL}" \
+  | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+for p in d.get('parts',[]):
+    if p.get('type')=='text': print('AI:', p['text'][:600])
+    elif p.get('type')=='tool': print('Tool output:', p.get('output','')[:400])
+"
+```
+
+**期望**：AI 加载的是 session 版本的 `customize-opencode`（内容含"SESSION版本"），而非全局版本。
+
+---
+
+### T15.10 permission deny 过滤
+
+验证通过 session permission deny `skill` tool 后，AI 无法调用 skill tool。
+
+```bash
+BASE="http://localhost:14096"
+MODEL='{"providerID":"zhipuai","modelID":"glm-5.1"}'
+
+# 创建带 permission deny skill tool 的 session
+SID=$(curl -s -X POST "$BASE/session" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "title":"permission-deny-test",
+    "permission": [{"permission":"tool","pattern":"skill","action":"deny"}]
+  }' | python3 -c "import json,sys;d=json.load(sys.stdin);print(d.get('id',''))")
+
+# 创建一个 skill
+curl -s -X POST "$BASE/session/$SID/skills/create" \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"blocked-skill","description":"应该被 deny 的 skill","content":"# Blocked Skill\n这是一个被 permission deny 的 skill。"}'
+
+# skills 列表应能查到（deny 只影响 AI tool 调用能力，不影响 CRUD）
+curl -s "$BASE/session/$SID/skills" | python3 -c "import json,sys;d=json.load(sys.stdin);print(f'count={len(d)}, names={[s[\"name\"] for s in d]}')"
+
+# AI 测试：应无法调用 skill tool
+curl -s --max-time 180 -X POST "$BASE/session/$SID/message" \
+  -H 'Content-Type: application/json' \
+  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"请使用 blocked-skill skill 帮我做代码审查\"}],\"model\":$MODEL}" \
+  | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+for p in d.get('parts',[]):
+    if p.get('type')=='text': print('AI:', p['text'][:600])
+    elif p.get('type')=='reasoning': print('Reasoning:', p['text'][:400])
+    elif p.get('type')=='tool': print('Tool:', p.get('name',''))
+"
+```
+
+**期望**：AI 回复中未调用 `skill` tool（PG 无 tool 调用记录），而是直接告知用户无法加载或提供替代方案。Skills 列表仍能通过 API 查到（CRUD 不受 deny 影响）。
+
+---
+
+### T15.11 resources 边界：超大 resource 与超多 resources
+
+验证单个超大 resource（>256KB）和超多 resources（>64个）能否正常写入 PG。
+
+```bash
+BASE="http://localhost:14096"
+
+# === T15.11a: 超大 resource (300KB) ===
+SID_A=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{"title":"boundary-large-test"}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+
+LARGE_CONTENT=$(python3 -c "print('x' * 300000)")
+curl -s -X POST "$BASE/session/$SID_A/skills/create" \
+  -H 'Content-Type: application/json' \
+  -d "{\"name\":\"huge-skill\",\"description\":\"超大 resource 测试\",\"content\":\"# Huge Skill\",\"resources\":[{\"path\":\"big.md\",\"type\":\"doc\",\"content\":\"$LARGE_CONTENT\"}]}"
+
+docker exec ai-nova-postgres psql -U postgres -d opencode -c \
+  "SELECT name, jsonb_array_length(resources) as res_count, length(resources->0->>'content') as first_res_size, pg_column_size(resources) as total_jsonb_size FROM session_skill WHERE session_id='$SID_A';"
+
+# === T15.11b: 超多 resources (70个) ===
+SID_B=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{"title":"boundary-many-test"}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+
+RESOURCES=$(python3 -c "
+import json
+resources = [{'path':f'file_{i}.md','type':'doc','content':f'content of file {i}'} for i in range(70)]
+print(json.dumps(resources))
+")
+
+curl -s -X POST "$BASE/session/$SID_B/skills/create" \
+  -H 'Content-Type: application/json' \
+  -d "{\"name\":\"many-resources\",\"description\":\"超多 resources 测试\",\"content\":\"# Many Resources\",\"resources\":$RESOURCES}"
+
+docker exec ai-nova-postgres psql -U postgres -d opencode -c \
+  "SELECT name, jsonb_array_length(resources) as res_count, pg_column_size(resources) as total_jsonb_size FROM session_skill WHERE session_id='$SID_B';"
+```
+
+**期望**：
+- T15.11a：PG `first_res_size=300000`，无截断无报错
+- T15.11b：PG `res_count=70`，无截断无报错
+
+---
+
+### T15.12 全局 skill 列表 (GET /skill)
+
+验证全局 skill 列表端点返回正确的内置 skills。
+
+```bash
+BASE="http://localhost:14096"
+
+# 列出全局 skills
+curl -s "$BASE/skill" | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+print(f'Total: {len(d)}')
+for s in d:
+    print(f'  - {s[\"name\"]}: {s.get(\"description\",\"\")[:80]}')
+    print(f'    location: {s.get(\"location\",\"N/A\")}')
+    print(f'    resources: {len(s.get(\"resources\",[]))}')
+"
+```
+
+**期望**：至少返回 1 个全局 skill（如 `customize-opencode`），包含 name、description、location 等字段。注意：`GET /skill/{name}` 无独立端点（返回 HTML 页面）。
+
 ---
 
 ## 验收状态表
@@ -1686,7 +1952,14 @@ PY
 | T15.2 | ✅ | 复杂 session skill bundle resources 写入、读取、注入 |
 | T15.3 | ✅ | session skill 删除单个与清空 |
 | T15.4 | ✅ | 从服务端目录加载 `SKILL.md` bundle 与 resources |
-| T15.5 | ✅ | SkillsMP 默认排序 10 个真实 skill bundle 创建与预加载验证 |
+| T15.5 | ⏭️ | SkillsMP 默认排序 10 个真实 skill bundle（跳过 — GitHub API SSL 网络不稳定） |
+| T15.6 | ✅ | 重复创建同名 skill（upsert 覆盖）：v1→v2，resources 覆盖，AI 使用 v2 |
+| T15.7 | ✅ | AI 通过 skill tool 按需加载 resource 内容：AI 调用 skill tool 加载 checklist.md + safe-template.py |
+| T15.8 | ✅ | skill 不存在时的错误处理：AI 识别不存在 skill，不调用 tool，直接告知用户 |
+| T15.9 | ✅ | session skill 与全局 skill 同名覆盖：AI 加载 session 版本 |
+| T15.10 | ✅ | permission deny 过滤：deny skill tool 后 AI 无法调用 |
+| T15.11 | ✅ | resources 边界：300KB 单个 resource + 70 个 resources 均成功写入 PG |
+| T15.12 | ✅ | 全局 skill 列表：GET /skill 返回 1 个内置 skill |
 
 ### Session Agents（会话级动态 Agent）
 
