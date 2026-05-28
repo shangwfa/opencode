@@ -15,17 +15,27 @@ const MODEL = { providerID: "zhipuai", modelID: "glm-5.1" }
 
 ### 辅助函数
 
-> 所有测试用例使用以下辅助函数：`sendAndWait` 发送异步消息并监听 SSE 流等待完成后返回 AI 回复。
+> 所有测试用例使用以下辅助函数：
+> - `sendAndWait`: 发送异步消息，监听 SSE 等待 `session.idle`，返回最后一条 AI 消息
+> - SSE 端点 `/event?sessionID=xxx` 按会话过滤（`feat/session-agent` 分支已支持，当前 `dev` 分支通过客户端过滤兼容）
 
 ```js
 // 发送异步消息，监听 SSE 等待 session.idle，返回最后一条 AI 消息
+// 优先使用 /event?sessionID= 服务端过滤，回退到客户端 evt.properties?.sessionID 匹配
 async function sendAndWait(sid, body, timeout = 60000) {
   return new Promise(async (resolve, reject) => {
     const timer = setTimeout(() => reject(new Error("timeout")), timeout)
-    const eventRes = await fetch(BASE + "/event")
+    const eventRes = await fetch(BASE + "/event?sessionID=" + sid)
     const reader = eventRes.body.getReader()
     const decoder = new TextDecoder()
     let buffer = ""
+    const matchSession = (evt) => {
+      if (evt.type === "session.idle") {
+        const s = evt.properties?.sessionID || evt.sessionID
+        return !s || s === sid  // 服务端已过滤时 sessionID 可能不存在，视为匹配
+      }
+      return false
+    }
     const readLoop = async () => {
       while (true) {
         const { value, done } = await reader.read()
@@ -38,7 +48,7 @@ async function sendAndWait(sid, body, timeout = 60000) {
           if (line.startsWith("data: ")) {
             try {
               const evt = JSON.parse(line.slice(6))
-              if (evt.type === "session.idle" && (evt.properties?.sessionID === sid || evt.sessionID === sid)) {
+              if (matchSession(evt)) {
                 clearTimeout(timer)
                 const msgs = await (await fetch(BASE + "/session/" + sid + "/message")).json()
                 const lastAi = [...msgs].reverse().find(m => m.info?.role === "assistant")
@@ -184,10 +194,11 @@ await fetch(BASE + "/session/" + SID.id + "/agents/create", {
 async function sendAndWait(sid, body, timeout = 60000) {
   return new Promise(async (resolve, reject) => {
     const timer = setTimeout(() => reject(new Error("timeout")), timeout)
-    const eventRes = await fetch(BASE + "/event")
+    const eventRes = await fetch(BASE + "/event?sessionID=" + sid)
     const reader = eventRes.body.getReader()
     const decoder = new TextDecoder()
     let buffer = ""
+    const matchSession = (e) => { if (e.type === "session.idle") { const s = e.properties?.sessionID || e.sessionID; return !s || s === sid } return false }
     const readLoop = async () => {
       while (true) {
         const { value, done } = await reader.read()
@@ -200,7 +211,7 @@ async function sendAndWait(sid, body, timeout = 60000) {
           if (line.startsWith("data: ")) {
             try {
               const evt = JSON.parse(line.slice(6))
-              if (evt.type === "session.idle" && (evt.properties?.sessionID === sid || evt.sessionID === sid)) {
+              if (matchSession(evt)) {
                 clearTimeout(timer)
                 const msgs = await (await fetch(BASE + "/session/" + sid + "/message")).json()
                 const lastAi = [...msgs].reverse().find(m => m.info?.role === "assistant")
@@ -261,10 +272,11 @@ console.log("permission数:", res.permission.length, "(expect 6)")
 async function sendAndWait(sid, body, timeout = 60000) {
   return new Promise(async (resolve, reject) => {
     const timer = setTimeout(() => reject(new Error("timeout")), timeout)
-    const eventRes = await fetch(BASE + "/event")
+    const eventRes = await fetch(BASE + "/event?sessionID=" + sid)
     const reader = eventRes.body.getReader()
     const decoder = new TextDecoder()
     let buffer = ""
+    const matchSession = (e) => { if (e.type === "session.idle") { const s = e.properties?.sessionID || e.sessionID; return !s || s === sid } return false }
     const readLoop = async () => {
       while (true) {
         const { value, done } = await reader.read()
@@ -277,7 +289,7 @@ async function sendAndWait(sid, body, timeout = 60000) {
           if (line.startsWith("data: ")) {
             try {
               const evt = JSON.parse(line.slice(6))
-              if (evt.type === "session.idle" && (evt.properties?.sessionID === sid || evt.sessionID === sid)) {
+              if (matchSession(evt)) {
                 clearTimeout(timer)
                 const msgs = await (await fetch(BASE + "/session/" + sid + "/message")).json()
                 const lastAi = [...msgs].reverse().find(m => m.info?.role === "assistant")
@@ -327,10 +339,11 @@ await fetch(BASE + "/session/" + SID.id + "/agents/create", {
 async function sendAndWait(sid, body, timeout = 60000) {
   return new Promise(async (resolve, reject) => {
     const timer = setTimeout(() => reject(new Error("timeout")), timeout)
-    const eventRes = await fetch(BASE + "/event")
+    const eventRes = await fetch(BASE + "/event?sessionID=" + sid)
     const reader = eventRes.body.getReader()
     const decoder = new TextDecoder()
     let buffer = ""
+    const matchSession = (e) => { if (e.type === "session.idle") { const s = e.properties?.sessionID || e.sessionID; return !s || s === sid } return false }
     const readLoop = async () => {
       while (true) {
         const { value, done } = await reader.read()
@@ -343,7 +356,7 @@ async function sendAndWait(sid, body, timeout = 60000) {
           if (line.startsWith("data: ")) {
             try {
               const evt = JSON.parse(line.slice(6))
-              if (evt.type === "session.idle" && (evt.properties?.sessionID === sid || evt.sessionID === sid)) {
+              if (matchSession(evt)) {
                 clearTimeout(timer)
                 const msgs = await (await fetch(BASE + "/session/" + sid + "/message")).json()
                 const lastAi = [...msgs].reverse().find(m => m.info?.role === "assistant")
@@ -438,10 +451,11 @@ const SID = await (await fetch(BASE + "/session", { method: "POST", headers: { "
 async function sendAndWait(sid, body, timeout = 60000) {
   return new Promise(async (resolve, reject) => {
     const timer = setTimeout(() => reject(new Error("timeout")), timeout)
-    const eventRes = await fetch(BASE + "/event")
+    const eventRes = await fetch(BASE + "/event?sessionID=" + sid)
     const reader = eventRes.body.getReader()
     const decoder = new TextDecoder()
     let buffer = ""
+    const matchSession = (e) => { if (e.type === "session.idle") { const s = e.properties?.sessionID || e.sessionID; return !s || s === sid } return false }
     const readLoop = async () => {
       while (true) {
         const { value, done } = await reader.read()
@@ -454,7 +468,7 @@ async function sendAndWait(sid, body, timeout = 60000) {
           if (line.startsWith("data: ")) {
             try {
               const evt = JSON.parse(line.slice(6))
-              if (evt.type === "session.idle" && (evt.properties?.sessionID === sid || evt.sessionID === sid)) {
+              if (matchSession(evt)) {
                 clearTimeout(timer)
                 const msgs = await (await fetch(BASE + "/session/" + sid + "/message")).json()
                 const lastAi = [...msgs].reverse().find(m => m.info?.role === "assistant")
@@ -585,10 +599,11 @@ console.log("自定义agent数:", custom.length, "(expect 3)")
 async function sendAndWait(sid, body, timeout = 120000) {
   return new Promise(async (resolve, reject) => {
     const timer = setTimeout(() => reject(new Error("timeout")), timeout)
-    const eventRes = await fetch(BASE + "/event")
+    const eventRes = await fetch(BASE + "/event?sessionID=" + sid)
     const reader = eventRes.body.getReader()
     const decoder = new TextDecoder()
     let buffer = ""
+    const matchSession = (e) => { if (e.type === "session.idle") { const s = e.properties?.sessionID || e.sessionID; return !s || s === sid } return false }
     const readLoop = async () => {
       while (true) {
         const { value, done } = await reader.read()
@@ -601,7 +616,7 @@ async function sendAndWait(sid, body, timeout = 120000) {
           if (line.startsWith("data: ")) {
             try {
               const evt = JSON.parse(line.slice(6))
-              if (evt.type === "session.idle" && (evt.properties?.sessionID === sid || evt.sessionID === sid)) {
+              if (matchSession(evt)) {
                 clearTimeout(timer)
                 const msgs = await (await fetch(BASE + "/session/" + sid + "/message")).json()
                 const lastAi = [...msgs].reverse().find(m => m.info?.role === "assistant")
