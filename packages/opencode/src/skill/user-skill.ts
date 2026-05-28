@@ -1,7 +1,7 @@
 import z from "zod"
 import { Effect, Context, Layer } from "effect"
 import { Database, eq, and } from "../storage/db"
-import { UserSkillTable } from "./skill.sql"
+import { UserSkillTable } from "./skill.pg"
 import * as Log from "@opencode-ai/core/util/log"
 import { randomBytes } from "crypto"
 

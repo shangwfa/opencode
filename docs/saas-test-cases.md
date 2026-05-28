@@ -2639,3 +2639,26 @@ print(d.get('stdout','').strip())
 ```json
 {"sessionID": "ses_xxx", "keepAlive": true}
 ```
+
+---
+
+## 附录：已知限制
+
+### L1. exec 路由无默认超时（P2）
+
+**影响**：`POST /session/:sessionID/exec` 和 `POST /session/:sessionID/exec/async` 的 `timeoutSeconds` 参数为可选。如果不传，execd 服务端不会强制超时，命令可无限运行。
+
+**超时链路**：
+- HTTP API `timeoutSeconds`（可选）→ SandboxProvider 透传 → SDK `timeoutSeconds × 1000 → timeout(ms)` → execd 服务端强制杀进程
+- opencode 内部调用者（`ls.ts` 30s、`apply_patch.ts` 10s）都显式传了超时
+- HTTP API 层无 `Effect.timeout` 兜底保护
+
+**建议修复**：为 exec 路由加默认超时（如 300s）或 `Effect.timeout` 兜底。
+
+### L2. 同一 session 密集 exec 后 stdout 可能为空（P2）
+
+**影响**：同一 session 经过多次 exec（尤其是 kill 操作）后，sync exec 可能返回 `stdout=""`、`exitCode=null`。新 session 上正常。
+
+**原因**：SDK 的 command session 状态在多次复用后可能变得不稳定。
+
+**建议修复**：在 sync exec 前检测状态异常时强制重建 command session。
