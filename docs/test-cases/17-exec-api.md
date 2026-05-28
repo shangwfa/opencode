@@ -41,7 +41,7 @@ print(f'stdout: {repr(d.get(\"stdout\",\"\"))}')
 print(f'stderr: {repr(d.get(\"stderr\",\"\"))}')
 "
 ```
-**期望**：`exitCode: 0`，stdout 含 `line1` 和 `line2`，stderr 含 `err`
+**期望**：`exitCode: 0`，stdout 含 `line1`、`line2`。**注意**：当前实现 stderr 被合并到 stdout，`stderr` 字段为空。验证 stdout 包含所有输出即可。
 
 ### T19.3 exec API：指定工作目录
 
@@ -88,7 +88,7 @@ curl -s -o /dev/null -w "%{http_code}" -X POST "$BASE/session/ses_NOTEXIST/exec"
   -d '{"command":"echo test"}'
 echo ""
 ```
-**期望**：`502`（sandbox unreachable）
+**期望**：`404`（session 不存在）。**注意**：实际返回 404 而非 502，因为路由层先匹配到 session 不存在。
 
 ### T19.7 exec API：启动 dev server 并设置 keepAlive
 

@@ -26,15 +26,27 @@ bun -e "fetch('http://127.0.0.1:4096/session/$SID/message',{method:'POST',header
 
 ### T5.4 多文件批量持久化
 ```bash
-bun -e "fetch('http://127.0.0.1:4096/session/$SID/message',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({parts:[{type:'text',text:'在 /workspace 下创建三个文件：a.txt 内容 A，b.txt 内容 B，c.txt 内容 C'}],model:{providerID:'zhipuai',modelID:'glm-5.1'}})}).then(r=>r.text()).then(()=>console.log('done'))"
+# 创建三个文件
+curl -s --max-time 30 -X POST "$BASE/session/$SID/exec" \
+  -H 'Content-Type: application/json' \
+  -d '{"command":"echo A > /workspace/a.txt && echo B > /workspace/b.txt && echo C > /workspace/c.txt"}'
 
 # dispose
-bun -e "fetch('http://127.0.0.1:4096/instance/dispose',{method:'POST'}).then(r=>r.text())"
+curl -s -X POST "$BASE/instance/dispose" > /dev/null
+sleep 3
 
-# 验证三个文件都在
-bun -e "fetch('http://127.0.0.1:4096/session/$SID/message',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({parts:[{type:'text',text:'用 ls 列出 /workspace 下所有 txt 文件'}],model:{providerID:'zhipuai',modelID:'glm-5.1'}})}).then(r=>r.json()).then(d=>console.log(d.parts.find(p=>p.type==='text')?.text))"
+# 验证三个文件都在（用 for 循环避免 xargs 控制字符问题）
+curl -s --max-time 30 -X POST "$BASE/session/$SID/exec" \
+  -H 'Content-Type: application/json' \
+  -d '{"command":"for f in a.txt b.txt c.txt; do echo \"$f: $(cat /workspace/$f)\"; done"}' | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+out=d.get('stdout','')
+ok = all(x in out for x in ['a.txt: A','b.txt: B','c.txt: C'])
+print('PASS' if ok else f'FAIL stdout={out!r}')
+"
 ```
-**期望**：a.txt、b.txt、c.txt 都在
+**期望**：`PASS` — a.txt、b.txt、c.txt 内容均在（A、B、C），证明 PVC 持久化
 
 ### T5.5 目录持久化
 ```bash

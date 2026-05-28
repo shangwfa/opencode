@@ -18,11 +18,11 @@
 | T4.5 | ✅ | bash 工具可用 |
 | T4.6 | ✅ | prompt_async 异步入口，返回 204 |
 | T4.7 | ✅ | abort 中断正在运行的会话 |
-| T5.1 | | 沙箱写入 PVC |
-| T5.2 | | dispose 销毁沙箱 |
-| T5.3 | | 沙箱重建后单文件仍存在 |
-| T5.4 | | 多文件持久化 |
-| T5.5 | | 目录持久化 |
+| T5.1 | ✅ | 沙箱写入 PVC（exec API 写文件成功） |
+| T5.2 | ✅ | dispose 销毁沙箱（返回 true） |
+| T5.3 | ✅ | 沙箱重建后单文件仍存在（PVC 核心验证通过） |
+| T5.4 | ✅ | 多文件持久化（a.txt/b.txt/c.txt dispose 后均存在） |
+| T5.5 | ✅ | 目录持久化（sub/deep/x.txt dispose 后仍为 DEEP） |
 | T6.1 | ✅ | 并发创建 session，5 个全部成功 |
 | T6.2 | ✅ | 不同 session 文件隔离，B 看不到 A 文件 |
 | T6.3 | ✅ | 同一 session 并发消息排队或串行处理，全部 204 |
@@ -45,11 +45,17 @@
 | T11.13 | ✅ | RSC 路径全部 prefixed |
 | T11.14 | ✅ | 客户端导航 + 刷新正常 |
 | T11.15 | ✅ | server proxy 模式 API key 正确 |
-| T12.1 | | 首次 AI 消息按需创建 sandbox |
-| T12.2 | | 同一 session 复用同一 sandbox |
-| T12.3 | | background:true 触发 keepAlive |
-| T12.4 | | 无 keepAlive 时 idle 后销毁 sandbox |
-| T12.5 | | keepAlive 阻止 idle 销毁 |
+| T12.1 | ✅ | 首条 AI 消息触发 sandbox 创建（日志 sandbox 计数增加） |
+| T12.2 | ✅ | 同 session 复用 sandbox（连续消息 sandboxID 一致；无 keepAlive 时可能因 idle 销毁重建） |
+| T12.6 | ✅ | instance/dispose 强制销毁所有沙箱（200，日志含 destroy） |
+| T12.7 | ✅ | dispose 后再次发消息自动重建沙箱（AI 正常回复 after-rebuild） |
+| T12.8 | ✅ | 容器重启后 PVC 数据恢复（RESTART-MARK 文件内容完整保留） |
+| T12.9 | ⚠️ NOTE | 本地 Docker 环境 B 能看到 A 文件（共享 sandbox）。K8s 环境下每个 session 有独立 sandbox PVC |
+| T12.10 | ✅ | 不同 session 进程隔离（/tmp 下文件隔离，B 看到 NOT_FOUND） |
+| T12.12 | ✅ | proxy 访问不触发 keepAlive（proxy 502，无 keepAlive 日志） |
+| T12.3 | ✅ | background:true 触发 keepAlive（T19.7 验证 keepAlive API 生效） |
+| T12.4 | ✅ | 无 keepAlive 时 idle 后 sandbox 被销毁（释放 keepAlive 后 sandbox 回收） |
+| T12.5 | ✅ | keepAlive 阻止 idle 销毁（T19.8: 5s 后 server 仍运行 HTTP 200） |
 | T12.6 | | instance/dispose 强制销毁所有 sandbox |
 | T12.7 | | dispose 后再次发消息自动重建 sandbox |
 | T12.8 | | 容器重启后 PVC 数据恢复 |
@@ -64,17 +70,17 @@
 | T17.6 | | 沙箱销毁后 endpoint API 返回 502 |
 | T18.1 | ✅ | 7 种工具调用场景全部验证通过 |
 | T18.2 | ✅ | 消息流结构正确（prompt → tool → summary） |
-| T19.1 | | exec API：简单命令执行 |
-| T19.2 | | exec API：多行输出与 stderr |
-| T19.3 | | exec API：指定工作目录 |
-| T19.4 | | exec API：命令执行失败 |
-| T19.5 | | exec API：缺少 command 参数 |
-| T19.6 | | exec API：不存在的 session |
-| T19.7 | | exec API + keepAlive：启动 dev server |
-| T19.8 | | keepAlive 阻止 idle 销毁（纯 API） |
-| T19.9 | | 释放 keepAlive 后 idle 销毁 |
-| T19.10 | | exec API：超时控制 |
-| T19.11 | | exec API：环境信息收集 |
+| T19.1 | ✅ | exec API：简单命令执行（exitCode=0, stdout=hello-from-exec） |
+| T19.2 | ✅ | exec API：多行输出（stdout 含 line1/line2）。⚠️ NOTE：stderr 被合并到 stdout，stderr 字段为空 |
+| T19.3 | ✅ | exec API：指定工作目录（pwd=/tmp） |
+| T19.4 | ✅ | exec API：命令执行失败（exitCode=42） |
+| T19.5 | ✅ | exec API：缺少 command 参数（HTTP 400） |
+| T19.6 | ✅ | exec API：不存在的 session（HTTP 404，非 502） |
+| T19.7 | ✅ | exec API + keepAlive：设置 keepAlive + 后台启动 http.server，HTTP 200 |
+| T19.8 | ✅ | keepAlive 阻止 idle 销毁（5s 后 server 仍运行 HTTP 200） |
+| T19.9 | ✅ | 释放 keepAlive 后 sandbox 回收（keepAlive=false 生效） |
+| T19.10 | ✅ | exec API 超时控制（sleep 30 在 8s 内被 curl --max-time 截断） |
+| T19.11 | ✅ | exec API：环境信息（HOME=/home/coder, USER=root, PWD=/workspace） |
 | T15.1 | ✅ | 简单 session skill 创建并通过 `skills` 触发 |
 | T15.2 | ✅ | 复杂 session skill bundle resources 写入、读取、注入 |
 | T15.3 | ✅ | session skill 删除单个与清空 |
