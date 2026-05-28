@@ -7,6 +7,9 @@ import { Bus } from "@/bus"
 import { Session } from "@/session/session"
 import { SessionID } from "@/session/schema"
 import { SandboxProvider } from "@/tool/sandbox-provider"
+import * as Database from "@/storage/db"
+import { SessionTable } from "@/session/session.pg"
+import { eq } from "drizzle-orm"
 import { WebSocketTracker } from "./routes/instance/httpapi/websocket-tracker"
 import { ProxyUtil } from "@/server/proxy-util"
 
@@ -178,6 +181,13 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
     const sandbox = yield* SandboxProvider.Service
     const bus = yield* Bus.Service
 
+    const requireSession = (sessionID: SessionID) =>
+      Effect.promise(() =>
+        Database.use((db) => db.select({ id: SessionTable.id }).from(SessionTable).where(eq(SessionTable.id, sessionID)).get()),
+      ).pipe(
+        Effect.flatMap((row) => row ? Effect.void : Effect.fail({ _tag: "NotFound" as const, sessionID })),
+      )
+
     yield* router.add("GET", "/session/:sessionID/proxy/:port/__errors",
       Effect.gen(function* () {
         const params = yield* HttpRouter.schemaPathParams(PathParams)
@@ -275,6 +285,7 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
     yield* router.add("POST", "/session/:sessionID/exec",
       Effect.gen(function* () {
         const params = yield* HttpRouter.schemaPathParams(SessionParams)
+        yield* requireSession(params.sessionID).pipe(Effect.catch(() => Effect.fail(HttpServerResponse.jsonUnsafe({ error: "session not found" }, { status: 404 }))))
         const body = yield* HttpServerRequest.schemaBodyJson(ExecBody).pipe(
           Effect.catch(() => Effect.succeed({ command: "", workingDirectory: undefined, timeoutSeconds: undefined })),
         )
@@ -284,6 +295,7 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
           params.sessionID,
           body.command,
           { workingDirectory: body.workingDirectory, timeoutSeconds: body.timeoutSeconds },
+          {},
         ).pipe(Effect.catch((err) => Effect.succeed(null as any)))
 
         if (!result) return HttpServerResponse.jsonUnsafe({ error: "execution failed" }, { status: 502 })
@@ -302,6 +314,7 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
     yield* router.add("POST", "/session/:sessionID/exec/async",
       Effect.gen(function* () {
         const params = yield* HttpRouter.schemaPathParams(SessionParams)
+        yield* requireSession(params.sessionID).pipe(Effect.catch(() => Effect.fail(HttpServerResponse.jsonUnsafe({ error: "session not found" }, { status: 404 }))))
         const body = yield* HttpServerRequest.schemaBodyJson(ExecBody).pipe(
           Effect.catch(() => Effect.succeed({ command: "", workingDirectory: undefined, timeoutSeconds: undefined })),
         )
@@ -479,6 +492,14 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
         const params = yield* HttpRouter.schemaPathParams(SessionParams)
         const keep = yield* sandbox.isKeepAlive(params.sessionID)
         return HttpServerResponse.jsonUnsafe({ sessionID: params.sessionID, keepAlive: keep })
+      }),
+    )
+
+    yield* router.add("POST", "/session/:sessionID/kill-sandbox",
+      Effect.gen(function* () {
+        const params = yield* HttpRouter.schemaPathParams(SessionParams)
+        yield* sandbox.destroy(params.sessionID).pipe(Effect.catch(() => Effect.void))
+        return HttpServerResponse.jsonUnsafe({ sessionID: params.sessionID, destroyed: true })
       }),
     )
 

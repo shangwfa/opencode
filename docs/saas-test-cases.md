@@ -87,8 +87,14 @@ print(f'  AI回复: {texts[-1] if texts else \"(空)\"}')
 | Sandbox proxy | `/session/:sessionID/proxy/:port/*` |
 | Sandbox 直连 endpoint | `GET /session/:sessionID/endpoint/:port` |
 | 沙箱执行命令 | `POST /session/:sessionID/exec` |
+| 异步执行命令 | `POST /session/:sessionID/exec/async` |
+| 查询执行状态 | `GET /session/:sessionID/exec/:execId` |
+| SSE 流式输出 | `GET /session/:sessionID/exec/:execId/stream` |
+| 中断执行 | `POST /session/:sessionID/exec/:execId/kill` |
+| 执行列表 | `GET /session/:sessionID/execs` |
 | 设置 keepAlive | `POST /session/:sessionID/keep-alive` |
 | 查询 keepAlive | `GET /session/:sessionID/keep-alive` |
+| 销毁 sandbox | `POST /session/:sessionID/kill-sandbox` |
 | 健康检查 | `GET /global/health` |
 | 全局配置 | `GET /global/config` |
 
@@ -761,7 +767,7 @@ echo "Second sandboxID: $SB2"
 
 [ "$SB1" = "$SB2" ] && echo "PASS: same sandbox reused" || echo "FAIL: different sandboxes"
 ```
-**期望**：两次 `sandboxID` 相同，沙箱被复用
+**期望**：无 keepAlive 时两次 `sandboxID` 可能不同（idle 后 sandbox 被销毁，下次消息自动重建新 sandbox）。有 keepAlive 时（`background:true` 启动了长后台进程）sandbox 保持存活，`sandboxID` 不变。这是预期行为，非 bug
 
 ---
 
@@ -996,7 +1002,7 @@ curl -s --max-time 60 -X POST "$BASE/session/$SID/message" \
   -d "{\"parts\":[{\"type\":\"text\",\"text\":\"用 bash 执行: echo kill-test > /workspace/kill-test.txt\"}],\"model\":$MODEL}" > /dev/null
 curl -s -X POST "$BASE/session/$SID/kill-sandbox" -w "\nkill-sandbox: %{http_code}\n"
 ```
-**期望**：HTTP 200，返回 `true`，日志中出现该 `SID` 对应的 sandbox destroyed 记录
+**期望**：HTTP 200，返回 `{"sessionID":"...","destroyed":true}`，日志中出现该 `SID` 对应的 sandbox destroyed 记录
 
 ### T13.2 kill-sandbox 后 PVC 保留并自动重建
 ```bash
