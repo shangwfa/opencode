@@ -2,21 +2,15 @@ import { Schema } from "effect"
 import * as path from "path"
 import { Effect } from "effect"
 import * as Tool from "./tool"
-import { LSP } from "@/lsp/lsp"
 import { createTwoFilesPatch } from "diff"
 import DESCRIPTION from "./write.txt"
 import { Bus } from "../bus"
 import { File } from "../file"
 import { FileWatcher } from "../file/watcher"
-import { Format } from "../format"
-import { AppFileSystem } from "@opencode-ai/core/filesystem"
 import { InstanceState } from "@/effect/instance-state"
 import { trimDiff } from "./edit"
 import { assertExternalDirectoryEffect } from "./external-directory"
-import * as Bom from "@/util/bom"
 import { toSandboxPath } from "./sandbox-path"
-
-const MAX_PROJECT_DIAGNOSTICS_FILES = 5
 
 export const Parameters = Schema.Struct({
   content: Schema.String.annotate({ description: "The content to write to the file" }),
@@ -28,10 +22,7 @@ export const Parameters = Schema.Struct({
 export const WriteTool = Tool.define(
   "write",
   Effect.gen(function* () {
-    const lsp = yield* LSP.Service
-    const fs = yield* AppFileSystem.Service
     const bus = yield* Bus.Service
-    const format = yield* Format.Service
 
     return {
       description: DESCRIPTION,
@@ -44,93 +35,35 @@ export const WriteTool = Tool.define(
             : path.join(instance.directory, params.filePath)
           yield* assertExternalDirectoryEffect(ctx, filepath)
 
-          if (ctx.sandbox !== null) {
-            const sb: any = yield* Effect.tryPromise({ try: () => ctx.sandbox!, catch: (e) => new Error(`Failed to initialize: ${e instanceof Error ? e.message : String(e)}`) })
-            const sandboxPath = toSandboxPath(filepath, instance.directory)
+          const sb: any = yield* Effect.tryPromise({ try: () => ctx.sandbox!, catch: (e) => new Error(`Failed to initialize: ${e instanceof Error ? e.message : String(e)}`) })
+          const sandboxPath = toSandboxPath(filepath, instance.directory)
 
-            let contentOld = ""
-            const readResult = yield* Effect.tryPromise(() => sb.files.readFile(sandboxPath)).pipe(
-              Effect.catch(() => Effect.succeed("")),
-            )
-            contentOld = readResult as string
+          let contentOld = ""
+          const readResult = yield* Effect.tryPromise(() => sb.files.readFile(sandboxPath)).pipe(
+            Effect.catch(() => Effect.succeed("")),
+          )
+          contentOld = readResult as string
 
-            const diff = trimDiff(createTwoFilesPatch(filepath, filepath, contentOld, params.content))
-            yield* ctx.ask({
-              permission: "edit",
-              patterns: [path.relative(instance.worktree, filepath)],
-              always: ["*"],
-              metadata: { filepath, diff },
-            })
-
-            yield* Effect.tryPromise({
-              try: () => sb.files.writeFiles([{ path: sandboxPath, data: params.content }]),
-              catch: (e) => new Error(`Failed to write file: ${params.filePath}`),
-            })
-
-            yield* bus.publish(File.Event.Edited, { file: filepath })
-            yield* bus.publish(FileWatcher.Event.Updated, { file: filepath, event: contentOld ? "change" : "add" })
-
-            return {
-              title: path.relative(instance.worktree, filepath),
-              metadata: { diagnostics: {}, filepath, exists: !!contentOld },
-              output: "Wrote file successfully.",
-            }
-          }
-
-          const exists = yield* fs.existsSafe(filepath)
-          const source = exists ? yield* Bom.readFile(fs, filepath) : { bom: false, text: "" }
-          const next = Bom.split(params.content)
-          const desiredBom = source.bom || next.bom
-          const contentOld = source.text
-          const contentNew = next.text
-
-          const diff = trimDiff(createTwoFilesPatch(filepath, filepath, contentOld, contentNew))
+          const diff = trimDiff(createTwoFilesPatch(filepath, filepath, contentOld, params.content))
           yield* ctx.ask({
             permission: "edit",
             patterns: [path.relative(instance.worktree, filepath)],
             always: ["*"],
-            metadata: {
-              filepath,
-              diff,
-            },
+            metadata: { filepath, diff },
           })
 
-          yield* fs.writeWithDirs(filepath, Bom.join(contentNew, desiredBom))
-          if (yield* format.file(filepath)) {
-            yield* Bom.syncFile(fs, filepath, desiredBom)
-          }
+          yield* Effect.tryPromise({
+            try: () => sb.files.writeFiles([{ path: sandboxPath, data: params.content }]),
+            catch: (e) => new Error(`Failed to write file: ${params.filePath}`),
+          })
+
           yield* bus.publish(File.Event.Edited, { file: filepath })
-          yield* bus.publish(FileWatcher.Event.Updated, {
-            file: filepath,
-            event: exists ? "change" : "add",
-          })
-
-          let output = "Wrote file successfully."
-          yield* lsp.touchFile(filepath, "document")
-          const diagnostics = yield* lsp.diagnostics()
-          const normalizedFilepath = AppFileSystem.normalizePath(filepath)
-          let projectDiagnosticsCount = 0
-          for (const [file, issues] of Object.entries(diagnostics)) {
-            const current = file === normalizedFilepath
-            if (!current && projectDiagnosticsCount >= MAX_PROJECT_DIAGNOSTICS_FILES) continue
-            const block = LSP.Diagnostic.report(current ? filepath : file, issues)
-            if (!block) continue
-            if (current) {
-              output += `\n\nLSP errors detected in this file, please fix:\n${block}`
-              continue
-            }
-            projectDiagnosticsCount++
-            output += `\n\nLSP errors detected in other files:\n${block}`
-          }
+          yield* bus.publish(FileWatcher.Event.Updated, { file: filepath, event: contentOld ? "change" : "add" })
 
           return {
             title: path.relative(instance.worktree, filepath),
-            metadata: {
-              diagnostics,
-              filepath,
-              exists: exists,
-            },
-            output,
+            metadata: { diagnostics: {}, filepath, exists: !!contentOld },
+            output: "Wrote file successfully.",
           }
         }).pipe(Effect.orDie),
     }

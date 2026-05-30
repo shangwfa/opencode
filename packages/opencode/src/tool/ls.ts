@@ -1,8 +1,6 @@
 import * as path from "path"
 import { Effect, Schema } from "effect"
-import * as Stream from "effect/Stream"
 import { InstanceState } from "@/effect/instance-state"
-import { Ripgrep } from "../file/ripgrep"
 import { assertExternalDirectoryEffect } from "./external-directory"
 import DESCRIPTION from "./ls.txt"
 import * as Tool from "./tool"
@@ -50,7 +48,6 @@ export const Parameters = Schema.Struct({
 export const ListTool = Tool.define(
   "list",
   Effect.gen(function* () {
-    const rg = yield* Ripgrep.Service
     const sandboxProvider = yield* SandboxProvider.Service
 
     return {
@@ -75,33 +72,20 @@ export const ListTool = Tool.define(
             params.ignore?.map((item) => `!${item}`) || [],
           )
 
-          let files: string[]
-          let truncated: boolean
-
-          if (ctx.sandbox !== null) {
-            const sandboxSearchPath = toSandboxPath(search, ins.directory)
-            const globArgs = glob.map((g) => `--glob '${g}'`).join(" ")
-            const cmd = `rg --files ${globArgs} '${sandboxSearchPath}' 2>/dev/null | head -${LIMIT + 1}`
-            const result = yield* sandboxProvider.runInSession(ctx.sessionID, cmd, { timeoutSeconds: 30 })
-            const stdout = result.logs.stdout
-              .map((l: { text: string }) => l.text)
-              .join("\n")
-              .trim()
-            const lines = stdout ? stdout.split("\n").filter((line: string) => line.length > 0) : []
-            truncated = lines.length > LIMIT
-            files = lines.slice(0, LIMIT).map((line: string) => {
-              const host = toHostPath(line.trim(), ins.directory)
-              return path.relative(search, host)
-            })
-          } else {
-            files = yield* rg.files({ cwd: search, glob, signal: ctx.abort }).pipe(
-              Stream.take(LIMIT + 1),
-              Stream.runCollect,
-              Effect.map((chunk) => [...chunk]),
-            )
-            truncated = files.length > LIMIT
-            if (truncated) files.length = LIMIT
-          }
+          const sandboxSearchPath = toSandboxPath(search, ins.directory)
+          const globArgs = glob.map((g) => `--glob '${g}'`).join(" ")
+          const cmd = `rg --files ${globArgs} '${sandboxSearchPath}' 2>/dev/null | head -${LIMIT + 1}`
+          const result = yield* sandboxProvider.runInSession(ctx.sessionID, cmd, { timeoutSeconds: 30 })
+          const stdout = result.logs.stdout
+            .map((l: { text: string }) => l.text)
+            .join("\n")
+            .trim()
+          const lines = stdout ? stdout.split("\n").filter((line: string) => line.length > 0) : []
+          const truncated = lines.length > LIMIT
+          const files = lines.slice(0, LIMIT).map((line: string) => {
+            const host = toHostPath(line.trim(), ins.directory)
+            return path.relative(search, host)
+          })
 
           const dirs = new Set<string>()
           const map = new Map<string, string[]>()

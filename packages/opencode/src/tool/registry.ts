@@ -55,6 +55,7 @@ import { Reference } from "@/reference/reference"
 import { BackgroundJob } from "@/background/job"
 import { SessionStatus } from "@/session/status"
 import { RuntimeFlags } from "@/effect/runtime-flags"
+import { SandboxProvider } from "./sandbox-provider"
 
 const log = Log.create({ service: "tool.registry" })
 
@@ -398,6 +399,7 @@ export const defaultLayer = Layer.suspend(() =>
       Layer.provide(CrossSpawnSpawner.defaultLayer),
       Layer.provide(Ripgrep.defaultLayer),
       Layer.provide(Truncate.defaultLayer),
+      Layer.provide(SandboxProvider.defaultLayer),
     )
     .pipe(Layer.provide(RuntimeFlags.defaultLayer)),
 )
