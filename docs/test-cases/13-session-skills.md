@@ -803,3 +803,253 @@ ORDER BY m.time_created;
 
 ---
 
+### T15.18 跨 session 隔离
+
+验证 session A 创建的 skill 在 session B 不可见。
+
+```bash
+BASE="http://localhost:14096"
+
+SID_A=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{"title":"isolation-A"}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+SID_B=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{"title":"isolation-B"}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+
+# A 创建 skill
+curl -s -X POST "$BASE/session/$SID_A/skills/create" \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"private-skill","description":"A 的私有 skill","content":"# Private\n仅 A 可见"}' > /dev/null
+
+# A 能看到
+curl -s "$BASE/session/$SID_A/skills" | python3 -c "import json,sys;d=json.load(sys.stdin);print(f'A skills: {[s[\"name\"] for s in d]}')"
+
+# B 看不到
+curl -s "$BASE/session/$SID_B/skills" | python3 -c "import json,sys;d=json.load(sys.stdin);print(f'B skills: {[s[\"name\"] for s in d]}')"
+
+# PG 验证
+docker exec ai-nova-postgres psql -U postgres -d opencode -t -A -c \
+  "SELECT session_id, name FROM session_skill WHERE name='private-skill';"
+```
+**期望**：A 返回 `['private-skill']`；B 返回 `[]`；PG 只有 A 的 session_id 关联该 skill
+
+---
+
+### T15.19 session 删除后 skill 级联清理
+
+验证 DELETE session 后，PG 中 session_skill 记录被级联删除。
+
+```bash
+BASE="http://localhost:14096"
+
+SID_DEL=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{"title":"cascade-delete-test"}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+
+# 创建 2 个 skills
+curl -s -X POST "$BASE/session/$SID_DEL/skills/create" \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"skill-a","description":"a","content":"# A"}' > /dev/null
+curl -s -X POST "$BASE/session/$SID_DEL/skills/create" \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"skill-b","description":"b","content":"# B","resources":[{"path":"r.md","type":"doc","content":"resource"}]}' > /dev/null
+
+# PG 验证：删除前
+docker exec ai-nova-postgres psql -U postgres -d opencode -t -A -c \
+  "SELECT COUNT(*) FROM session_skill WHERE session_id='$SID_DEL';"
+
+# 删除 session
+curl -s -X DELETE "$BASE/session/$SID_DEL" -o /dev/null -w "delete: %{http_code}\n"
+
+# PG 验证：删除后
+docker exec ai-nova-postgres psql -U postgres -d opencode -t -A -c \
+  "SELECT COUNT(*) FROM session_skill WHERE session_id='$SID_DEL';"
+```
+**期望**：删除前 `COUNT=2`；删除后 `COUNT=0`
+
+---
+
+### T15.20 skills[] 传不存在的名称
+
+验证 message 请求中 `skills` 数组包含不存在的 skill 名称时的行为。
+
+```bash
+BASE="http://localhost:14096"
+MODEL='{"providerID":"zhipuai","modelID":"glm-5.1"}'
+
+SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{"title":"bad-skills-array-test"}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+
+# 创建一个真实 skill
+curl -s -X POST "$BASE/session/$SID/skills/create" \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"real-skill","description":"真实 skill","content":"# Real\n回复时必须说【REAL_SKILL】"}' > /dev/null
+
+# skills[] 混入不存在的名称
+curl -s --max-time 180 -X POST "$BASE/session/$SID/message" \
+  -H 'Content-Type: application/json' \
+  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"请使用 real-skill 和 ghost-skill 帮我审查代码\"}],\"skills\":[\"real-skill\",\"ghost-skill\"],\"model\":$MODEL}" \
+  -w "\nHTTP: %{http_code}" \
+  | python3 -c "
+import json,sys
+lines=sys.stdin.read().strip().split('\n')
+http=lines[-1] if lines[-1].startswith('HTTP:') else ''
+body='\n'.join(lines[:-1]) if http else '\n'.join(lines)
+try:
+  d=json.loads(body)
+  for p in d.get('parts',[]):
+    if p.get('type')=='text': print('AI:', p['text'][:400])
+except: print('raw:', body[:400])
+print(http)
+"
+```
+**期望**：请求不报错（HTTP 200）；AI 能加载 `real-skill`（回复含 `REAL_SKILL`）；`ghost-skill` 被忽略或 AI 说明不可用
+
+---
+
+### T15.21 skill name 边界
+
+验证空名称、超长名称、特殊字符名称的创建行为。
+
+```bash
+BASE="http://localhost:14096"
+
+SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{"title":"name-boundary-test"}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+
+# 空名称
+echo "--- 空名称 ---"
+curl -s -X POST "$BASE/session/$SID/skills/create" \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"","description":"empty name","content":"# Empty"}' \
+  -w "\nHTTP: %{http_code}" | tail -1
+
+# 超长名称（300 字符）
+LONG_NAME=$(python3 -c "print('a'*300)")
+echo "--- 超长名称 (300) ---"
+curl -s -X POST "$BASE/session/$SID/skills/create" \
+  -H 'Content-Type: application/json' \
+  -d "{\"name\":\"$LONG_NAME\",\"description\":\"long name\",\"content\":\"# Long\"}" \
+  -w "\nHTTP: %{http_code}" | tail -1
+
+# 特殊字符
+for name in "../escape" "skill/slash" "skill with space" "skill<script>" "中文技能"; do
+  echo "--- name='$name' ---"
+  RESP=$(curl -s -X POST "$BASE/session/$SID/skills/create" \
+    -H 'Content-Type: application/json' \
+    -d "{\"name\":\"$name\",\"description\":\"special\",\"content\":\"# Special\"}" \
+    -w "\nHTTP: %{http_code}")
+  HTTP=$(echo "$RESP" | tail -1)
+  echo "  $HTTP"
+done
+
+# 列出创建成功的 skills
+curl -s "$BASE/session/$SID/skills" | python3 -c "import json,sys;d=json.load(sys.stdin);print('created:', [s['name'] for s in d])"
+```
+**期望**：空名称应返回 400 或被拒绝；超长名称视实现返回 400 或截断；特殊字符（`../`、`/`、`<>`）应被拒绝或转义；中文名可接受
+
+---
+
+### T15.22 并发创建同名 skill 竞态
+
+验证两个并发 POST 创建同名 skill 时，PG 最终只有一条记录（upsert 安全）。
+
+```bash
+BASE="http://localhost:14096"
+
+SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{"title":"concurrent-upsert-test"}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+
+# 并发 5 个 POST 同名 skill，不同 content
+for i in 1 2 3 4 5; do
+  curl -s -X POST "$BASE/session/$SID/skills/create" \
+    -H 'Content-Type: application/json' \
+    -d "{\"name\":\"race-skill\",\"description\":\"v$i\",\"content\":\"# V$i\"}" &
+done
+wait
+
+sleep 1
+
+# PG 验证：应只有 1 条
+docker exec ai-nova-postgres psql -U postgres -d opencode -t -A -c \
+  "SELECT COUNT(*) FROM session_skill WHERE session_id='$SID' AND name='race-skill';"
+
+# API 验证
+curl -s "$BASE/session/$SID/skills" | python3 -c "
+import json,sys;d=json.load(sys.stdin)
+print(f'count={len(d)}')
+for s in d: print(f'  {s[\"name\"]}: {s[\"description\"]}')
+"
+```
+**期望**：PG `COUNT=1`；API 返回 1 个 `race-skill`；description 是 5 个版本之一（最后写入的赢）
+
+---
+
+### T15.23 resource content 编码
+
+验证 resource content 中 Unicode、特殊字符、JSON 特殊字符的保真性。
+
+```bash
+BASE="http://localhost:14096"
+
+SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{"title":"encoding-test"}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+
+# 包含各种特殊字符的 resources
+curl -s -X POST "$BASE/session/$SID/skills/create" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "name":"encoding-skill",
+    "description":"编码测试",
+    "content":"# Encoding Test",
+    "resources":[
+      {"path":"unicode.md","type":"doc","content":"中文内容 🎉 日本語 한국어 émojis: 🚀💻🔥"},
+      {"path":"special.md","type":"doc","content":"引号\"双引号\" 反斜杠\\\\ 换行\\n制表符\\t 尖括号<tag>内容</tag>"},
+      {"path":"code.py","type":"script","content":"# -*- coding: utf-8 -*-\ndef greet(name):\n    return f\"你好 {name}! 🎉\"\n\nprint(greet(\"世界\"))"}
+    ]
+  }'
+
+# API 读回验证
+curl -s "$BASE/session/$SID/skills" | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+for s in d:
+  for r in s.get('resources',[]):
+    c=r['content']
+    print(f'{r[\"path\"]}: len={len(c)}, has_emoji={\"🎉\" in c}, has_chinese={\"中文\" in c}')
+    print(f'  first 80: {c[:80]}')
+"
+
+# PG 验证
+docker exec ai-nova-postgres psql -U postgres -d opencode -t -A -c \
+  "SELECT
+    r->>'path' as path,
+    length(r->>'content') as len,
+    (r->>'content') LIKE '%🎉%' as has_emoji,
+    (r->>'content') LIKE '%中文%' as has_chinese
+  FROM session_skill, jsonb_array_elements(resources) r
+  WHERE session_id='$SID';"
+```
+**期望**：API 和 PG 中 Unicode（中文、emoji）完整保留；特殊字符（引号、反斜杠、尖括号）不被截断或转义破坏
+
+---
+
+
+## 结果汇总
+
+| 用例 | 状态 | 说明 |
+|------|------|------|
+| T15.1 | 🧪 | 简单 skill 创建+触发 |
+| T15.2 | 🧪 | 复杂 bundle（含 resources）创建+读取+触发 |
+| T15.3 | 🧪 | 删除单个+清空全部 |
+| T15.4 | 🧪 | 从目录加载 skill bundle |
+| T15.5 | 🧪 | SkillsMP 拉取 10 个真实 skill 并执行 |
+| T15.6 | 🧪 | 重复创建同名 skill（upsert 覆盖） |
+| T15.7 | 🧪 | AI 通过 skill tool 按需加载 resource |
+| T15.8 | 🧪 | skill 不存在时的错误处理 |
+| T15.9 | 🧪 | session skill 与全局 skill 同名覆盖 |
+| T15.10 | 🧪 | permission deny 过滤 skill tool |
+| T15.11 | 🧪 | 超大 resource + 超多 resources |
+| T15.12 | 🧪 | 全局 skill 列表 |
+| T15.13 | 🧪 | 多 skills 主动触发 |
+| T15.14 | 🧪 | 多 skills 被动触发 |
+| T15.15 | 🧪 | preloaded_skills manifest 验证 |
+| T15.16 | 🧪 | skill tool 不指定 resources → manifest |
+| T15.17 | 🧪 | 指定 resources + missing_resource |
+| T15.18 | ✅ | A=['private-skill'], B=[], PG 只有 A |
+| T15.19 | ✅ | 删除前 COUNT=2, 删除后 COUNT=0 |
+| T15.20 | ✅ | HTTP 200, 不存在的 skill 名称不导致请求失败 |
+| T15.21 | ⚠️ | 空名称/`../`/`/` 均被接受（缺少输入校验） |
+| T15.22 | ✅ | 5 并发 PG COUNT=1, upsert 安全 |
+| T15.23 | ✅ | Unicode/emoji/中文 API+PG 完整保留 |

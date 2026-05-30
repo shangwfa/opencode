@@ -128,6 +128,25 @@ for p in d.get('parts',[]):
 "
 ```
 
+### Step 3.5：配置权限（必须）
+
+> ⚠️ **如果不配置权限，所有工具调用（write/edit/bash 等）都会卡在权限等待状态**（默认 `"ask"`），HTTP API 模式下没有 UI 回复权限请求，工具永远 `running`。
+
+```bash
+# 通过全局 config API 配置权限（触发实例 dispose + 重新加载）
+curl -s -X PATCH http://localhost:14096/global/config \
+  -H 'Content-Type: application/json' \
+  -d '{"permission":{"bash":"allow","edit":"allow","write":"allow","glob":"allow","grep":"allow","list":"allow","read":"allow","webfetch":"allow"}}' \
+  | python3 -c "import json,sys;c=json.load(sys.stdin);print('permission:',json.dumps(c.get('permission')))"
+
+# 验证配置生效
+sleep 2
+curl -s http://localhost:14096/config | python3 -c "import json,sys;c=json.load(sys.stdin);print(c.get('permission'))"
+# 期望：{'read': 'allow', 'edit': 'allow', ...}
+```
+
+> 注意：`PATCH /global/config` 会触发实例 dispose，之前的 session 会失效。需要重新创建 session。
+
 ### Step 4：在沙箱中启动 dev server
 
 > ⚠️ **必须使用 `background:true`**，否则 AI 消息完成后沙箱立即被销毁，dev server 进程消失。
@@ -312,4 +331,6 @@ POST /session/:sessionID/exec {"command":"nohup npx vite ... &"}
 | ProviderModelNotFoundError | AI provider 未配置 | 确认容器连的是远端 PG（含 account 数据） |
 | pg_advisory_lock 启动失败 | 远端 PG 被另一个 opencode 实例占用 | 等另一个实例退出，或停掉远端 SaaS |
 | dev server 进程消失 | 容器重启后 sandbox map 清空 | PVC 文件还在，重新发消息启动进程即可 |
+| write/edit/bash 工具一直 `running` | 未配置权限，默认 `"ask"` 模式等待确认 | 执行 Step 3.5 配置权限，或通过 SSE 监听 `permission.asked` 事件后调用 `POST /session/{SID}/permission/{requestID}` 回复 |
+| write 写 `/tmp/` 路径触发 `external_directory` 权限 | `/tmp/` 不在项目目录（`/workspace`）下，触发外部目录权限 | 写文件时使用项目目录内的路径，如 `/workspace/test.txt` |
 | sandbox 健康检查超时 30s | `OPENCODE_SANDBOX_USE_SERVER_PROXY=true` 时 SDK 健康检查走 Pod 直连 | 属于 SDK 限制，重试通常能成功 |

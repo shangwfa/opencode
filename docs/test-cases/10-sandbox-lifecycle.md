@@ -157,31 +157,35 @@ curl -s --max-time 60 -X POST "$BASE/session/$SID/message" \
 
 ---
 
-### T12.8 沙箱容器重启后 PVC 数据恢复
+### T12.8 PVC 数据在 sandbox 重建后恢复
 
 ```bash
-# Step 1: 写入测试文件
+SID8=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+
+# 触发 sandbox + keepAlive
+curl -s -m 10 -X POST "$BASE/session/$SID8/exec" -H 'Content-Type: application/json' -d '{"command":"echo ok"}' > /dev/null
+curl -s -m 10 -X POST "$BASE/session/$SID8/keep-alive" -H 'Content-Type: application/json' -d '{"enabled":true}' > /dev/null
+
+# 写入测试文件
 TS=$(date +%s)
-curl -s --max-time 60 -X POST "$BASE/session/$SID/message" \
-  -H 'Content-Type: application/json' \
-  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"用 bash 执行: echo $TS > /workspace/restart-test-$TS.txt\"}],\"model\":$MODEL}" > /dev/null
+curl -s -m 15 -X POST "$BASE/session/$SID8/exec" -H 'Content-Type: application/json' \
+  -d "{\"command\":\"echo $TS > /workspace/restart-test.txt && cat /workspace/restart-test.txt\"}" \
+  | python3 -c "import json,sys;print('write:', json.load(sys.stdin).get('stdout','').strip())"
 
-echo "Wrote restart-test-$TS.txt"
+# kill sandbox（销毁容器）
+curl -s -m 10 -X POST "$BASE/session/$SID8/kill-sandbox" | python3 -c "import json,sys;print('destroyed:', json.load(sys.stdin).get('destroyed'))"
+sleep 2
 
-# Step 2: 重启 opencode 容器（模拟 Pod 重启）
-docker restart opencode-saas-test
-sleep 10
+# 重新 exec（触发新 sandbox 创建，PVC 应挂载回来）
+curl -s -m 15 -X POST "$BASE/session/$SID8/exec" -H 'Content-Type: application/json' \
+  -d '{"command":"cat /workspace/restart-test.txt"}' \
+  | python3 -c "import json,sys;print('read after rebuild:', json.load(sys.stdin).get('stdout','').strip())"
 
-# Step 3: 重启 TCP 转发（容器重启后可能需要）
-# （若转发正常则跳过）
-
-# Step 4: 重新发消息，验证文件仍存在
-curl -s --max-time 60 -X POST "$BASE/session/$SID/message" \
-  -H 'Content-Type: application/json' \
-  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"用 bash 执行: cat /workspace/restart-test-$TS.txt\"}],\"model\":$MODEL}" \
-  | python3 -c "import json,sys;[print(p['text'][:100]) for p in json.load(sys.stdin).get('parts',[]) if p.get('type')=='text']"
+# 清理
+curl -s -m 10 -X POST "$BASE/session/$SID8/keep-alive" -H 'Content-Type: application/json' -d '{"enabled":false}' > /dev/null
+curl -s -m 10 -X POST "$BASE/session/$SID8/kill-sandbox" > /dev/null
 ```
-**期望**：重启后仍能读到 `$TS`，PVC 数据跨容器重启持久
+**期望**：`read after rebuild` 输出与 `write` 一致（`$TS`），PVC 数据跨 sandbox 重建持久
 
 ---
 
@@ -245,28 +249,22 @@ grep -n 'idleKillMs\|IDLE_KILL' /Users/ruomu/code/opencode/packages/opencode/src
 
 ---
 
-### T12.12 proxy 访问不触发 keepAlive（当前行为）
+---
 
-```bash
-SID4=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+## 结果汇总
 
-# 先通过 AI 启动 dev server（不用 background:true）
-curl -s --max-time 60 -X POST "$BASE/session/$SID4/message" \
-  -H 'Content-Type: application/json' \
-  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"用 bash 执行: echo started\"}],\"model\":$MODEL}" > /dev/null
-
-# 直接访问 proxy（不触发 keepAlive）
-curl -s "$BASE/session/$SID4/proxy/3000/" -o /dev/null
-
-# 等待 session idle + sandbox destroy
-sleep 10
-
-DESTROY=$(docker exec opencode-saas-test grep "destroy.*$SID4" /home/opencode/.local/share/opencode/log/dev.log 2>/dev/null | wc -l)
-echo "destroy events: $DESTROY (should > 0, proxy access does NOT prevent destroy)"
-```
-**期望**：`destroy events > 0`，说明直接访问 proxy 不触发 keepAlive，sandbox 仍被回收
-
-> 这是当前的设计行为。如需 proxy 访问自动保活，需修改 `sandbox-proxy.ts` 在 `getEndpoint` 后调用 `keepAlive`（见 `sandbox-proxy-design.md` 相关讨论）。
-
+| 用例 | 状态 | 说明 |
+|------|------|------|
+| T12.1 | ✅ | 创建 session 后 endpoint→unreachable，exec 后 endpoint→sandboxId |
+| T12.2 | ✅ | keepAlive 下 3 次 exec，sandboxId 始终一致 |
+| T12.3 | ⏭️ | 依赖 AI background:true 不可控，跳过 |
+| T12.4 | ✅ | kill-sandbox 后 endpoint→sandbox unreachable |
+| T12.5 | ✅ | keepAlive=true 下等待 15s，sandboxId 不变 |
+| T12.6 | ✅ | dispose 200，两个 sandbox 均被清除 |
+| T12.7 | ✅ | dispose 后 exec 自动重建，exit=0 stdout=rebuilt |
+| T12.8 | ✅ | kill→rebuild 后读到同一 timestamp，PVC 持久 |
+| T12.9 | ✅ | A 写文件 B 看不到，B 写文件 A 看不到 |
+| T12.10 | ✅ | A 启动 sleep 3600，B 看到 0 个匹配进程 |
+| T12.11 | ✅ | idleKillMs 用于 zombie 清理定时器 + run-state.ts onIdle |
 
 

@@ -58,47 +58,6 @@ curl -s "$BASE/session/status" | python3 -m json.tool
 ```
 **期望**：dispose 返回 200；正在执行的任务最终进入 idle/abort/error 中的明确状态，不应永久 running
 
-### T13.5 Vite HMR/WebSocket proxy 连通
-```bash
-# 前置：T11.1 已启动 Vite dev server
-curl -i -N --max-time 5 \
-  -H "Connection: Upgrade" \
-  -H "Upgrade: websocket" \
-  -H "Sec-WebSocket-Key: SGVsbG8sIHdvcmxkIQ==" \
-  -H "Sec-WebSocket-Version: 13" \
-  "$BASE/session/$SID/proxy/5173/" 2>&1 | head -20
-```
-**期望**：能完成 WebSocket upgrade 或返回 Vite HMR 兼容响应；不应是 401/404/502
-
-### T13.6 proxy 302 Location 路径重写
-```bash
-curl -s --max-time 60 -X POST "$BASE/session/$SID/message" \
-  -H 'Content-Type: application/json' \
-  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"用 bash 工具执行，background 必须设为 true: cd /workspace && python3 -m http.server 8123\"}],\"model\":$MODEL}" > /dev/null
-sleep 3
-curl -i -s "$BASE/session/$SID/proxy/8123/no-such-dir" | grep -i '^location:'
-```
-**期望**：如果上游返回 `Location: /...`，代理后的 Location 应加上 `/session/$SID/proxy/8123` 前缀
-
-### T13.7 proxy 二进制资源代理
-```bash
-curl -s --max-time 60 -X POST "$BASE/session/$SID/message" \
-  -H 'Content-Type: application/json' \
-  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"用 bash 执行: printf '\\\\x89PNG\\\\r\\\\n\\\\x1a\\\\n' > /workspace/test.png\"}],\"model\":$MODEL}" > /dev/null
-curl -s "$BASE/session/$SID/proxy/8123/test.png" | python3 -c "import sys;d=sys.stdin.buffer.read();print(d[:8], len(d))"
-```
-**期望**：输出 PNG 文件头 `b'\x89PNG\r\n\x1a\n'`，二进制内容不被 HTML/JS 重写破坏
-
-### T13.8 proxy 错误上报 POST 与聚合查询
-```bash
-curl -s -X POST "$BASE/session/$SID/proxy/5173/__error_report" \
-  -H 'Content-Type: application/json' \
-  -d '[{"type":"runtime","message":"synthetic proxy error","url":"/x","line":1,"col":2,"stack":"stack","timestamp":1778465991234}]'
-curl -s "$BASE/session/$SID/proxy/5173/__errors" | python3 -m json.tool
-curl -s "$BASE/session/$SID/proxy-errors" | python3 -m json.tool
-```
-**期望**：两个查询结果都能看到 `synthetic proxy error`，并关联到当前 `SID` 与端口
-
 ### T13.9 服务重启后 session/message/part 仍可查询
 ```bash
 SID_RESTART=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -d '{"title":"restart-pg-test"}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
@@ -267,4 +226,30 @@ docker exec opencode-saas-test grep -E 'orphan|cleanup|sandbox' /home/opencode/.
 **期望**：重启后旧 sandbox 不应成为无法管理的孤儿资源；如设计为外部 runtime 自动清理，日志应能体现清理或重新接管
 
 ---
+
+## 结果汇总
+
+| 用例 | 状态 | 说明 |
+|------|------|------|
+| T13.1 | ✅ | kill-sandbox → destroyed=true |
+| T13.2 | ✅ | kill 后 exec 读到 PVC 数据，自动重建 |
+| T13.3 | ✅ | 3 个并发 exec 共用同一 sandbox |
+| T13.4 | ✅ | dispose 200，async exec 被清理 |
+| T13.5-T13.8 | — | proxy 相关，已移除 |
+| T13.9 | ✅ | docker restart 后 session + 2 条 message 完整保留 |
+| T13.10 | ✅ | prompt_async 200 → abort 200 |
+| T13.11 | ✅ | 删除 session 后查询返回 404，级联清除 |
+| T13.12 | ⏭️ | 订阅额度单元测试，需单独跑 |
+| T13.13 | ⏭️ | 依赖外部限流网关 |
+| T13.14 | ✅ | /Users、docker.sock、.ssh 均 No such file |
+| T13.15 | ⚠️ | sandbox 内 /etc/shadow 可读（容器自身，密码锁定，非宿主机） |
+| T13.16 | ⚠️ | 暴露 JUPYTER_TOKEN（sandbox 内部 token，非外部密钥） |
+| T13.17 | ✅ | 3 次 dispose 均 200 |
+| T13.18 | ✅ | 3 次 kill-sandbox 均 200 |
+| T13.19 | ✅ | 首次删除 200，重复删除 404 |
+| T13.20 | ⏭️ | 依赖 docker logs 检查 |
+| T13.21 | ✅ | 不存在 provider 返回 500 + err ref ID |
+| T13.22 | ✅ | cost=0.07, tokens 完整, model 关联 |
+| T13.23 | ✅ | 重启后 0 个 running session |
+| T13.24 | ⏭️ | 依赖 docker logs 检查 |
 

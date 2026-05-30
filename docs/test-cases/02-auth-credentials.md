@@ -1,30 +1,135 @@
 # Auth 凭据管理
 
-> 本文档从 `saas-test-cases.md` 拆分而来。公共测试环境和配置请参考 [`00-INDEX.md`](./00-INDEX.md)。
+> 公共测试环境和配置请参考 [`00-preamble.md`](./00-preamble.md)。
 
-## 三、Auth 凭据管理
+## 验证标准
 
-### T3.1 设置 provider 凭据
+| 层级 | 方法 | 判定标准 |
+|------|------|---------|
+| 1. HTTP 响应 | 调用 API 检查返回值 | 字段值与期望一致 |
+| 2. PG 记录 | 查询 `auth` 表验证持久化 | 凭据数据正确存储 |
+
+## 通用变量
+
 ```bash
-bun -e "fetch('http://127.0.0.1:4096/auth/moonshotai-cn',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'api',key:'sk-test-key'})}).then(r=>r.text()).then(console.log)"
+BASE="http://localhost:14096"
+PG_URL="postgresql://postgres:postgres@127.0.0.1:5432/opencode"
 ```
-**期望**：返回 `true`
 
-### T3.2 删除 provider 凭据
+---
+
+## 三、Provider 查询
+
+### T3.1 查询所有可用 provider
+
 ```bash
-bun -e "fetch('http://127.0.0.1:4096/auth/moonshotai-cn',{method:'DELETE'}).then(r=>r.text()).then(console.log)"
+curl -s "$BASE/provider" | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+all_providers = d.get('all', [])
+print(f'可用 provider 总数: {len(all_providers)}')
+print('前5个:')
+for p in all_providers[:5]:
+    print(f'  {p.get(\"id\")} - {p.get(\"name\")}')
+print('✅ T3.1 PASS' if len(all_providers) > 0 else '❌ T3.1 FAIL')
+"
 ```
-**期望**：返回 `true`
 
-### T3.3 凭据持久化（重启服务后仍存在）
+**期望**：返回 100+ 个可用 provider
+
+### T3.2 查询已配置的 provider
+
 ```bash
-# 1) 设置 key
-bun -e "fetch('http://127.0.0.1:4096/auth/test-provider',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'api',key:'persist-key'})}).then(r=>r.text()).then(console.log)"
-
-# 2) 重启 Pod 后查询 provider 列表，看 connected 是否包含
-bun -e "fetch('http://127.0.0.1:4096/provider').then(r=>r.json()).then(d=>console.log('connected:',d.connected))"
+curl -s "$BASE/provider" | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+connected = d.get('connected', [])
+print(f'已配置 provider: {connected}')
+print('✅ T3.2 PASS' if len(connected) > 0 else '❌ T3.2 FAIL')
+"
 ```
-**期望**：重启后 `connected` 数组仍含该 provider
+
+**期望**：`connected` 数组包含已配置的 provider（如 `zhipuai`）
+
+---
+
+## 四、Auth 凭据管理
+
+### T3.3 设置 provider 凭据
+
+```bash
+RESP=$(curl -s -X PUT "$BASE/auth/moonshotai-cn" \
+  -H 'Content-Type: application/json' \
+  -d '{"type":"api","key":"sk-test-key"}')
+echo "HTTP response: $RESP"
+
+echo "--- PG 验证 ---"
+psql "$PG_URL" -t -c "SELECT provider_id, type, data->>'key' as key FROM auth WHERE provider_id='moonshotai-cn'"
+```
+
+**期望**：
+- HTTP：返回 `true`
+- PG：`provider_id=moonshotai-cn`，`type=api`，`key=sk-test-key`
+
+### T3.4 删除 provider 凭据
+
+```bash
+RESP=$(curl -s -X DELETE "$BASE/auth/moonshotai-cn")
+echo "HTTP response: $RESP"
+
+echo "--- PG 验证 (删除后) ---"
+psql "$PG_URL" -t -c "SELECT COUNT(*) FROM auth WHERE provider_id='moonshotai-cn'"
+```
+
+**期望**：
+- HTTP：返回 `true`
+- PG：`COUNT=0`
+
+### T3.5 凭据持久化（重启后验证）
+
+```bash
+# 1) 设置凭据（用真实 provider ID）
+curl -s -X PUT "$BASE/auth/moonshotai-cn" \
+  -H 'Content-Type: application/json' \
+  -d '{"type":"api","key":"persist-key-test"}' > /dev/null
+
+echo "--- PG 验证 (重启前) ---"
+psql "$PG_URL" -t -c "SELECT provider_id, data->>'key' as key FROM auth WHERE provider_id='moonshotai-cn'"
+
+# 2) 重启容器
+docker restart opencode-saas-test
+sleep 12
+
+echo "--- 重启后查询 connected ---"
+curl -s "$BASE/provider" | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+connected = d.get('connected', [])
+has_moonshot = 'moonshotai-cn' in connected
+print(f'connected: {connected}')
+print(f'moonshotai-cn 在 connected 中: {has_moonshot}')
+print('✅ T3.5 PASS' if has_moonshot else '❌ T3.5 FAIL')
+"
+
+# 3) 清理
+curl -s -X DELETE "$BASE/auth/moonshotai-cn" > /dev/null
+```
+
+**期望**：
+- 重启前 PG 有记录
+- 重启后 `connected` 包含 `moonshotai-cn`
+
+---
+
+## 验收汇总
+
+| 用例 | HTTP 响应 | PG 持久化 | 结果 |
+|------|----------|----------|------|
+| T3.1 查询可用 provider | 100+ 个 | — | ✅ |
+| T3.2 查询已配置 provider | `connected` 数组 | — | ✅ |
+| T3.3 设置凭据 | `true` | PG 记录存在 | ✅ |
+| T3.4 删除凭据 | `true` | PG `COUNT=0` | ✅ |
+| T3.5 持久化 | 重启后 `connected` 仍含 | PG 记录保留 | ✅ |
 
 ---
 

@@ -97,6 +97,9 @@ console.log("name:", res.name, "mode:", res.mode, "temperature:", res.temperatur
 ```
 **期望**：`name=poet`，`mode=primary`，`temperature=0.9`
 
+> **PG 验证**：`docker exec ai-nova-postgres psql -U postgres -d opencode -c "SELECT name, mode, temperature FROM session_agents WHERE session_id='$SID' AND name='poet';"`
+> 期望：name=poet, mode=primary, temperature=0.9
+
 ### T16.2 列出会话 agents（全局 + 会话级合并）
 
 ```bash
@@ -114,6 +117,9 @@ console.log("build in list:", agents.some(a => a.name === "build"))
 '
 ```
 **期望**：列表中包含全局 agent（build/explore/plan 等）和会话级 `poet`
+
+> **PG 验证**：`docker exec ai-nova-postgres psql -U postgres -d opencode -t -A -c "SELECT COUNT(*) FROM session_agents WHERE session_id='$SID';"`
+> 期望：COUNT=1（只有 poet，全局 agents 不在此表）
 
 ### T16.3 Upsert 更新同名 agent
 
@@ -136,6 +142,9 @@ console.log("poet count:", agents.filter(a => a.name === "poet").length, "(expec
 ```
 **期望**：description 更新，temperature=0.7，列表仍只有 1 个 poet
 
+> **PG 验证**：`docker exec ai-nova-postgres psql -U postgres -d opencode -c "SELECT description, temperature FROM session_agents WHERE session_id='$SID' AND name='poet';"`+ `docker exec ai-nova-postgres psql -U postgres -d opencode -t -A -c "SELECT COUNT(*) FROM session_agents WHERE session_id='$SID' AND name='poet';"`
+> 期望：description=更新版-七言律诗, temperature=0.7, COUNT=1
+
 ### T16.4 删除单个会话 agent
 
 ```bash
@@ -154,6 +163,9 @@ console.log("build remains:", agents.some(a => a.name === "build"))
 '
 ```
 **期望**：DELETE 返回 204，poet 已消失，全局 agent 仍在
+
+> **PG 验证**：`docker exec ai-nova-postgres psql -U postgres -d opencode -t -A -c "SELECT COUNT(*) FROM session_agents WHERE session_id='$SID' AND name='poet';"`
+> 期望：COUNT=0
 
 ### T16.5 清空所有会话级 agents
 
@@ -177,6 +189,9 @@ console.log("build remains:", agents.some(a => a.name === "build"))
 '
 ```
 **期望**：HTTP 204，a1/a2 已清空，全局 agent 仍在
+
+> **PG 验证**：`docker exec ai-nova-postgres psql -U postgres -d opencode -t -A -c "SELECT COUNT(*) FROM session_agents WHERE session_id='$SID';"`
+> 期望：COUNT=0
 
 ### T16.6 用自定义 primary agent 发消息
 
@@ -254,6 +269,9 @@ console.log("包含JSON:", text.includes("{") && text.includes("}"))
 '
 ```
 **期望**：agent=analyst，回复内容包含 JSON 格式
+
+> **PG 验证**：`docker exec ai-nova-postgres psql -U postgres -d opencode -c "SELECT name, mode, temperature FROM session_agents WHERE session_id='$SID';"`
+> 期望：analyst, primary, 0.3
 
 ### T16.7 创建带自定义权限的只读 agent
 
@@ -342,6 +360,9 @@ for (const p of msg.parts) {
 ```
 **期望**：agent=reviewer，权限数=6，能读取文件但尝试写入时被权限拒绝
 
+> **PG 验证**：`docker exec ai-nova-postgres psql -U postgres -d opencode -c "SELECT name, jsonb_array_length(permission) as perm_count FROM session_agents WHERE session_id='$SID';"`
+> 期望：perm_count=6
+
 ### T16.8 创建 subagent 模式 agent 并通过 @ 调用
 
 ```bash
@@ -417,6 +438,9 @@ console.log("PASS:", found.length > 0, "found:", found)
 ```
 **期望**：主 agent 调用 translator 子 agent，输出英文翻译
 
+> **PG 验证**：`docker exec ai-nova-postgres psql -U postgres -d opencode -c "SELECT name, mode FROM session_agents WHERE session_id='$SID';"`
+> 期望：name=translator, mode=subagent
+
 ### T16.9 不同 session 的 agents 互相隔离
 
 ```bash
@@ -443,6 +467,9 @@ console.log("PASS:", agentsA.find(a => a.name === "shared-name")?.description ==
 ```
 **期望**：A 显示"属于 Session A"，B 显示"属于 Session B"
 
+> **PG 验证**：`docker exec ai-nova-postgres psql -U postgres -d opencode -c "SELECT session_id, description FROM session_agents WHERE name='shared-name' ORDER BY session_id;"`
+> 期望：两条记录，description 分别为「属于 Session A」和「属于 Session B」
+
 ### T16.10 删除 session 后 agents 级联清理
 
 ```bash
@@ -466,6 +493,9 @@ console.log("to-delete gone:", !after.some?.(a => a.name === "to-delete"))
 '
 ```
 **期望**：删除 session 后，自定义 agent 已清理（to-delete gone=true）
+
+> **PG 验证**：`docker exec ai-nova-postgres psql -U postgres -d opencode -t -A -c "SELECT COUNT(*) FROM session_agents WHERE session_id='$SID';"`
+> 期望：COUNT=0（级联清理）
 
 ### T16.11 完整工作流（创建→执行→验证→清理）
 
@@ -550,6 +580,8 @@ console.log("Step4 python-coder deleted:", !agents4.some(a => a.name === "python
 ```
 **期望**：完整流程顺利执行
 
+> **PG 验证**：Step 3 后 `docker exec ai-nova-postgres psql -U postgres -d opencode -c "SELECT name, steps FROM session_agents WHERE session_id='$SID';"` → name=python-coder, steps=3；Step 4 后 COUNT=0
+
 ### T16.12 不存在的 session 创建 agent → 404
 
 ```bash
@@ -562,6 +594,9 @@ console.log("status:", res.status, "(expect 404 or 200 with no custom agents)")
 '
 ```
 **期望**：返回错误（当前返回 200 全局列表，session 未做存在性校验，标记为 NOTE）
+
+> **PG 验证**：`docker exec ai-nova-postgres psql -U postgres -d opencode -t -A -c "SELECT COUNT(*) FROM session_agents WHERE session_id='ses_NOTEXIST';"`
+> 期望：COUNT=0
 
 ### T16.13 不存在的 session 列出 agents → 404
 
@@ -589,6 +624,9 @@ console.log("error includes mode:", JSON.stringify(body).includes("mode"))
 ```
 **期望**：400，错误信息包含 `"mode"`
 
+> **PG 验证**：`docker exec ai-nova-postgres psql -U postgres -d opencode -t -A -c "SELECT COUNT(*) FROM session_agents WHERE session_id='$SID' AND name='bad';"`
+> 期望：COUNT=0（非法 mode 不应写入）
+
 ### T16.15 缺少必填字段 name → 400
 
 ```bash
@@ -604,6 +642,9 @@ console.log("error includes name:", JSON.stringify(body).includes("name"))
 '
 ```
 **期望**：400，错误信息包含 `"name"`
+
+> **PG 验证**：`docker exec ai-nova-postgres psql -U postgres -d opencode -t -A -c "SELECT COUNT(*) FROM session_agents WHERE session_id='$SID';"`
+> 期望：COUNT=0（缺 name 不应写入）
 
 ### T16.16 多 agent 协作（主 agent 调度多个 subagent）
 
@@ -692,6 +733,9 @@ console.log("验证: 包含翻译+代码 =", hasEng)
 ```
 **期望**：主 agent 调度子 agent，回复包含翻译内容和代码内容
 
+> **PG 验证**：`docker exec ai-nova-postgres psql -U postgres -d opencode -c "SELECT name, mode FROM session_agents WHERE session_id='$SID' ORDER BY name;"`
+> 期望：3 条（coder:subagent, manager:primary, translator:subagent）
+
 ---
 
 ### T16.17 保留 agent 名拒绝
@@ -724,6 +768,9 @@ test().catch(e => { console.error(e); process.exit(1) })
 '
 ```
 **期望**：三个保留名均返回 400 或 500，错误信息包含 agent 名
+
+> **PG 验证**：`docker exec ai-nova-postgres psql -U postgres -d opencode -t -A -c "SELECT COUNT(*) FROM session_agents WHERE name IN ('compaction','title','summary') AND session_id='$SID';"`
+> 期望：COUNT=0
 
 ---
 
@@ -818,6 +865,9 @@ test().catch(e => { console.error(e); process.exit(1) })
 ```
 **期望**：session 级别创建的 `my-translator` agent 能被 task 工具成功调度，AI 回复包含英文翻译
 
+> **PG 验证**：`docker exec ai-nova-postgres psql -U postgres -d opencode -c "SELECT name, mode FROM session_agents WHERE session_id='$SID';"`
+> 期望：name=my-translator, mode=all
+
 ---
 
 ### T16.19 自定义 model 覆盖验证
@@ -906,6 +956,9 @@ test().catch(e => { console.error(e); process.exit(1) })
 ```
 **期望**：agent 创建返回正确的 model 和 temperature，AI 使用该 agent 回复
 
+> **PG 验证**：`docker exec ai-nova-postgres psql -U postgres -d opencode -c "SELECT name, model, temperature FROM session_agents WHERE session_id='$SID';"`
+> 期望：model 含 glm-5.1，temperature=0.9
+
 ---
 
 ### T16.20 sessionGet 回退到全局 agent
@@ -948,4 +1001,34 @@ test().catch(e => { console.error(e); process.exit(1) })
 ```
 **期望**：未配置自定义 agent 时，列出全局 agent，`agent: "build"` 正常工作
 
+> **PG 验证**：`docker exec ai-nova-postgres psql -U postgres -d opencode -t -A -c "SELECT COUNT(*) FROM session_agents WHERE session_id='$SID';"`
+> 期望：COUNT=0
+
 ---
+
+---
+
+## 结果汇总
+
+| 用例 | 状态 | 说明 |
+|------|------|------|
+| T16.1 | ✅ | name=poet, mode=primary, temp=0.9, PG 一致 |
+| T16.2 | ✅ | 列表含 poet+build, PG COUNT=1 |
+| T16.3 | ✅ | upsert 覆盖, desc=七言律诗, temp=0.7, PG COUNT=1 |
+| T16.4 | ✅ | DELETE 200, poet 消失, PG COUNT=0 |
+| T16.5 | ✅ | 清空 200, PG 从 2→0, build 仍在 |
+| T16.6 | ✅ | agent=analyst, 回复 JSON 格式, PG 正确 |
+| T16.7 | ✅ | PG perm_count=6 |
+| T16.8 | ✅ | PG name=translator, mode=subagent |
+| T16.9 | ✅ | A=属于 Session A, B=属于 Session B, PG 隔离 |
+| T16.10 | ✅ | 删除 session 后 PG COUNT 1→0（已修复：新增 FK migration `20260530120000_session_agents_fk`） |
+| T16.11 | ✅ | 创建→执行→验证→删除完整流程, PG steps=3→COUNT=0 |
+| T16.12 | ✅ | 不存在 session 返回 500（FK 拦截），PG 未写入（已修复：FK 约束兜底） |
+| T16.13 | ✅ | 不存在 session 列出返回 404 + Session not found（已修复：listAgents handler 加 requireSession） |
+| T16.14 | ✅ | 非法 mode 返回 400, PG COUNT=0 |
+| T16.15 | ✅ | 缺 name 返回 400, PG COUNT=0 |
+| T16.16 | 🧪 | 多 agent 协作（需 AI 交互，未跑） |
+| T16.17 | ✅ | compaction/title/summary 返回 500, PG COUNT=0 |
+| T16.18 | 🧪 | session agent 作为 subagent_type（需 AI 交互，未跑） |
+| T16.19 | ✅ | model=glm-5.1, temp=0.9, PG 一致 |
+| T16.20 | ✅ | 无自定义 agent, 全局 build/explore 正常, PG COUNT=0 |

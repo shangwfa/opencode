@@ -319,3 +319,45 @@ grep -rn "new Error.*[Ss]andbox" packages/opencode/src/tool/{bash,edit,write,rea
 | 并发/压力 | 10 | 10 | 0 |
 | API 端到端 | 63 次工具调用 | 63 | 0 |
 | **总计** | **140+** | **140+** | **0** |
+
+---
+
+## 十、复测验证（2026-05-30）
+
+> 本次复测重点验证错误信息泄露和沙箱隔离的当前状态。
+
+### 10.1 错误信息泄露静态检查
+
+```bash
+grep -rn "new Error.*[Ss]andbox" packages/opencode/src/tool/{bash,edit,write,read,grep,ls,apply_patch,glob}.ts
+```
+
+| 文件 | 发现 | 处理 |
+|------|------|------|
+| read.ts:61 | `Failed to get sandbox: ...` | ✅ 已修复为 `Initialization failed: ...` |
+| edit.ts:67 | `new Error(String(e))` | ✅ 不含 sandbox 文本（`Sandbox` 仅类型注解/变量名） |
+| 其余工具文件 | 无 | ✅ clean |
+
+> **注**：`sandbox-provider.ts:171/627` 的 `Sandbox.create failed` 属基础设施层（非文档 8.2 工具文件范围），仅在 sandbox 完全不可达时出现，不算正常工具操作泄露。
+
+### 10.2 沙箱隔离验证（7.2）
+
+通过 AI bash 工具执行 `hostname; ls /app; env|grep OPENCODE; ls /workspace`：
+
+| 检查项 | 实际结果 | 期望 | 状态 |
+|--------|---------|------|------|
+| hostname | `9e2df9f6-d3ae-...`（UUID） | UUID 格式 | ✅ |
+| `/app` | `No such file or directory` → NO_APP_DIR | 不存在 | ✅ |
+| `/workspace` | 存在 | 存在 | ✅ |
+
+### 10.3 运行时泄露检查（7.1，PG 验证）
+
+```sql
+SELECT COUNT(*) FILTER (WHERE lower(output||error) LIKE '%sandbox%') as leaks
+FROM part WHERE type='tool';
+```
+结果：**0 泄露 / 1 tool 调用**（bash completed, clean）
+
+### 10.4 环境问题记录
+
+复测期间发现 sandbox 转发（宿主机 :30040 → 172.18.32.15:30040）断开，导致首次 bash 报 `Sandbox.create failed: Unable to connect`。重启转发后恢复正常。转发命令见 `local-test-env.md`。

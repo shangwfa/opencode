@@ -282,3 +282,26 @@ print(d.get('stdout','').strip())
 {"sessionID": "ses_xxx", "keepAlive": true}
 ```
 
+
+---
+
+## 结果汇总
+
+| 用例 | 状态 | 说明 |
+|------|------|------|
+| T19.1 | ✅ | exitCode=0, stdout=hello-from-exec |
+| T19.2 | ✅ | exitCode=0, stdout 含 line1/line2/err（stderr 合并到 stdout） |
+| T19.3 | ✅ | workingDirectory=/tmp 生效，pwd=/tmp |
+| T19.4 | ✅ | exitCode=42 |
+| T19.5 | ✅ | 缺 command 返回 400 |
+| T19.6 | ✅ | 不存在 session 返回 404 |
+| T19.7 | ✅ | keepAlive=true + dev server，endpoint direct 200，PG running+keep_alive=t |
+| T19.8 | ✅ | keepAlive=true 下等 15s，sandbox 仍 running，exec 成功 |
+| T19.9 | ⚠️ | 释放后 keep_alive=f（PG 确认）；但纯 exec 不触发 session runner onIdle，sandbox 不会立即销毁 |
+| T19.10 | ⚠️ | timeoutSeconds 透传链路正确（route→runInSession→SDK），但 execd 服务端未强制命令超时（sleep 30 跑满 30s）。非 opencode bug |
+| T19.11 | ✅ | node=v22.2.0 npm=10.7.0 pwd=/workspace |
+
+### 已知问题
+
+- **T19.10 命令超时未生效**：opencode 代码层透传链路完整（`POST /exec` → `runInSession({timeoutSeconds})` → SDK `runInSession`）。SDK `RunCommandOpts.timeoutSeconds` 注释为"server will not enforce any timeout if omitted"，传值后 execd 服务端仍未强制 5s 超时。属 opensandbox execd 服务端行为，需服务端侧排查。
+- **T19.9 idle 销毁机制**：sandbox 的 idle 回收由 session runner 的 `onIdle` 回调触发（见 `run-state.ts`），纯 exec API 调用不经过 session runner，因此释放 keepAlive 后不会仅凭 exec 探测触发销毁。需通过 `kill-sandbox` 或 `instance/dispose` 显式销毁。

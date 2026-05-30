@@ -99,3 +99,18 @@ curl -s "$BASE/command" | python3 -m json.tool | head -80
 
 ---
 
+## 结果汇总
+
+| 用例 | 状态 | 说明 |
+|------|------|------|
+| T14.1 | ✅ | search 找到 p2-base-test，limit=3 生效 |
+| T14.2 | ✅ | 返回对象（当前无 active session 时为空对象） |
+| T14.3 | ✅ | fork 返回子 session ID |
+| T14.4 | ✅ | limit=1 返回 1 条，X-Next-Cursor + Link header 正确 |
+| T14.5 | ✅ | share 返回 URL，unshare 移除 |
+| T14.6 | ✅ | diff/revert/unrevert 均正常返回（sandbox 内无 git 故 diff 为空） |
+| T14.7 | ✅ | file 列表、内容读取、status 均正常 |
+| T14.8 | ✅ | find file/pattern 返回数组（无匹配时为空，不报错） |
+| T14.9 | ✅ | vcs 返回 branch 信息，diff mode=git/branch 返回空数组 |
+| T14.10 | ✅ | agent/skill/command 均返回数组 |
+

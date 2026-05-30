@@ -72,5 +72,42 @@ for i, m in enumerate(msgs):
 ```
 **期望**：消息交替出现 `💬`（用户 prompt / AI 文字总结）和 `🔧`（工具调用），结构为：`💬 prompt → 🔧 tool call → 💬 summary`
 
+### PG 验证（推荐）
+
+> 解析 `POST /message` 响应只能看到 user message。验证 assistant 的 tool 调用应直接查 PG `part` 表：
+
+```bash
+# 验证各工具调用次数和状态
+docker exec ai-nova-postgres psql -U postgres -d opencode -c "
+SELECT p.data->>'tool' as tool, p.data->'state'->>'status' as status, COUNT(*)
+FROM message m JOIN part p ON p.message_id = m.id
+WHERE m.session_id='\$SID' AND p.data->>'type'='tool'
+GROUP BY p.data->>'tool', p.data->'state'->>'status'
+ORDER BY tool;
+"
+
+# 验证消息角色分布
+docker exec ai-nova-postgres psql -U postgres -d opencode -c "
+SELECT m.data->>'role' as role, COUNT(DISTINCT m.id) FROM message m
+WHERE m.session_id='\$SID' GROUP BY m.data->>'role';
+"
+```
+**期望**：bash/write/read/edit 均 status=completed；user 与 assistant 消息数符合 prompt 数
+
 ---
+
+## 结果汇总
+
+| 用例 | 状态 | 说明 |
+|------|------|------|
+| T18.1a | ✅ | bash echo，PG tool=bash completed |
+| T18.1b | ✅ | write test.txt，PG tool=write completed |
+| T18.1c | ✅ | read test.txt，PG tool=read completed |
+| T18.1d | ✅ | 模糊指令列文件，PG tool=read completed |
+| T18.1e | ✅ | 批量写 a/b/c.txt，1 条消息含 3 个 write |
+| T18.1f | ✅ | edit 改 test.txt→modified，PG tool=edit completed |
+| T18.1g | ✅ | bash sleep+echo，PG tool=bash completed |
+| T18.2 | ✅ | 21 消息（7 user + 14 assistant），结构 prompt→tool→summary |
+
+**工具调用统计**（PG）：bash×2, write×4, read×2, edit×1，全部 completed；文件系统验证 a/b/c/test.txt 实际写入，test.txt=modified
 

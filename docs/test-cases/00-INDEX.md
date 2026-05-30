@@ -27,6 +27,7 @@
 | [`16-tool-calls.md`](./16-tool-calls.md) | 十八 | T18.x | 7 种工具调用批量验证、消息流结构 |
 | [`17-exec-api.md`](./17-exec-api.md) | 十九 | T19.x | exec 命令执行 API、keepAlive、超时、环境信息 |
 | [`18-sandbox-tool-test.md`](./18-sandbox-tool-test.md) | — | — | 沙箱工具测试：apply_patch/ls 沙箱分支、路径转换、并发压力、错误信息泄露检查 |
+| [`19-saas-tool-sandbox-verify.md`](./19-saas-tool-sandbox-verify.md) | 二十 | T19.x | 8 工具沙箱执行三层验证（代码审查+运行时+PG），可执行脚本 `scripts/test-saas-tools.sh` |
 
 ## 快速定位
 

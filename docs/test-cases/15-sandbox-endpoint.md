@@ -144,11 +144,32 @@ print(f'  原始 Vite 输出: {\"@vite/client\" in html}')
 ### T17.6 沙箱销毁后 endpoint API 返回 502
 
 ```bash
+# 方式一：kill-sandbox（DB state running→destroyed）
+curl -s -X POST "$BASE/session/$SID/kill-sandbox" > /dev/null
+sleep 2
+docker exec ai-nova-postgres psql -U postgres -d opencode -t -A -c \
+  "SELECT state FROM sandbox WHERE session_id='$SID';"
+curl -s "$BASE/session/$SID/endpoint/5173" | python3 -m json.tool
+
+# 方式二：instance/dispose（彻底清理实例状态）
 curl -s -X POST "$BASE/instance/dispose" > /dev/null
 sleep 3
 curl -s "$BASE/session/$SID/endpoint/5173" | python3 -m json.tool
 ```
 **期望**：`{"error": "sandbox unreachable"}`，沙箱销毁后 endpoint 不可用
 
+> **注意**：若 async exec 启动的 dev server 进程仍在运行，kill-sandbox 后可能被 reconnect 拉活导致 endpoint 偶发仍返回 IP。生产场景下应先 kill async exec 再 kill-sandbox，或直接用 instance/dispose。
+
 ---
+
+## 结果汇总
+
+| 用例 | 状态 | 说明 |
+|------|------|------|
+| T17.1 | ✅ | 无沙箱 endpoint 502 + sandbox unreachable |
+| T17.2 | ✅ | port=0/99999/abc 均返回 400 |
+| T17.3 | ✅ | mode=direct, url=http://10.12.11.235:5173, 结构验证通过 |
+| T17.4 | ✅ | 直连 200, 原始 Vite 输出无 proxy 注入 |
+| T17.5 | ⏭️ | proxy 模式对比，已跳过 |
+| T17.6 | ✅ | kill-sandbox→state=destroyed→endpoint unreachable |
 
