@@ -443,6 +443,7 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
     const listAgents = Effect.fn("SessionHttpApi.agents")(function* (ctx: {
       params: { sessionID: SessionID }
     }) {
+      yield* requireSession(ctx.params.sessionID)
       return yield* agentSvc.sessionList(ctx.params.sessionID)
     })
 
