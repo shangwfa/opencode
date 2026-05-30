@@ -2,6 +2,11 @@ FROM opensandbox/code-interpreter:latest
 
 USER root
 
+# 安装 ripgrep（glob/grep/ls 工具的沙箱分支依赖 rg 命令）
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends ripgrep \
+  && rm -rf /var/lib/apt/lists/*
+
 # 全局安装 TypeScript LSP 和 Python LSP
 RUN npm install -g typescript typescript-language-server pyright 2>&1 \
   && ln -sf /usr/local/lib/node_modules/.bin/typescript-language-server /usr/local/bin/typescript-language-server \
