@@ -100,14 +100,14 @@ WHERE m.session_id='\$SID' GROUP BY m.data->>'role';
 
 | 用例 | 状态 | 说明 |
 |------|------|------|
-| T18.1a | ✅ | bash echo，PG tool=bash completed |
-| T18.1b | ✅ | write test.txt，PG tool=write completed |
-| T18.1c | ✅ | read test.txt，PG tool=read completed |
-| T18.1d | ✅ | 模糊指令列文件，PG tool=read completed |
-| T18.1e | ✅ | 批量写 a/b/c.txt，1 条消息含 3 个 write |
-| T18.1f | ✅ | edit 改 test.txt→modified，PG tool=edit completed |
-| T18.1g | ✅ | bash sleep+echo，PG tool=bash completed |
+| T18.1a | ✅ | bash echo hello-from-bash，PG tool=bash completed |
+| T18.1b | ✅ | write test.txt=hello-write，PG tool=write completed |
+| T18.1c | ✅ | read test.txt，PG tool=read completed，返回 hello-write |
+| T18.1d | ✅ | 列出 /workspace 文件，PG tool=read completed |
+| T18.1e | ✅ | 批量写 a/b/c.txt，1 条消息含 3 个 write，PG write×3 completed |
+| T18.1f | ✅ | edit test.txt→modified，PG tool=edit completed |
+| T18.1g | ✅ | bash sleep+echo bg-done，PG tool=bash completed |
 | T18.2 | ✅ | 21 消息（7 user + 14 assistant），结构 prompt→tool→summary |
 
-**工具调用统计**（PG）：bash×2, write×4, read×2, edit×1，全部 completed；文件系统验证 a/b/c/test.txt 实际写入，test.txt=modified
+**工具调用统计**（PG）：bash×2, write×4, read×2, edit×1，全部 completed
 

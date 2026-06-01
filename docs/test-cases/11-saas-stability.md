@@ -232,24 +232,24 @@ docker exec opencode-saas-test grep -E 'orphan|cleanup|sandbox' /home/opencode/.
 | 用例 | 状态 | 说明 |
 |------|------|------|
 | T13.1 | ✅ | kill-sandbox → destroyed=true |
-| T13.2 | ✅ | kill 后 exec 读到 PVC 数据，自动重建 |
-| T13.3 | ✅ | 3 个并发 exec 共用同一 sandbox |
-| T13.4 | ✅ | dispose 200，async exec 被清理 |
+| T13.2 | ✅ | kill 后 exec 读到 PVC 数据（kill-test），自动重建 |
+| T13.3 | ✅ | 3 个并发 exec 返回同一 sandboxId（4da9a966），只创建 1 个 sandbox |
+| T13.4 | ✅ | dispose 200，sessions 清零 |
 | T13.5-T13.8 | — | proxy 相关，已移除 |
-| T13.9 | ✅ | docker restart 后 session + 2 条 message 完整保留 |
-| T13.10 | ✅ | prompt_async 200 → abort 200 |
-| T13.11 | ✅ | 删除 session 后查询返回 404，级联清除 |
+| T13.9 | ✅ | docker restart 后 session 可查、messages=2 |
+| T13.10 | ✅ | prompt_async 204 → abort 200，messages=2 |
+| T13.11 | ✅ | 删除前 messages=3 parts=8，删除后 0/0，orphan=0 |
 | T13.12 | ⏭️ | 订阅额度单元测试，需单独跑 |
 | T13.13 | ⏭️ | 依赖外部限流网关 |
 | T13.14 | ✅ | /Users、docker.sock、.ssh 均 No such file |
-| T13.15 | ⚠️ | sandbox 内 /etc/shadow 可读（容器自身，密码锁定，非宿主机） |
+| T13.15 | ⚠️ | sandbox 内 /etc/passwd 可读（容器自身 root 用户，非宿主机） |
 | T13.16 | ⚠️ | 暴露 JUPYTER_TOKEN（sandbox 内部 token，非外部密钥） |
 | T13.17 | ✅ | 3 次 dispose 均 200 |
-| T13.18 | ✅ | 3 次 kill-sandbox 均 200 |
-| T13.19 | ✅ | 首次删除 200，重复删除 404 |
-| T13.20 | ⏭️ | 依赖 docker logs 检查 |
-| T13.21 | ✅ | 不存在 provider 返回 500 + err ref ID |
-| T13.22 | ✅ | cost=0.07, tokens 完整, model 关联 |
+| T13.18 | ✅ | 3 次 kill-sandbox 均返回 destroyed=true |
+| T13.19 | ✅ | 首次 delete session 200，重复 404；auth delete 均 200 |
+| T13.20 | ✅ | 日志含 sandbox created / keep alive enabled / destroying / destroyed 完整生命周期 |
+| T13.21 | ✅ | 不存在 provider 返回 500，日志含 sessionID 可关联 |
+| T13.22 | ✅ | cost=0.038, tokens=input:277/output:69/reasoning:177, PG 4 条 message |
 | T13.23 | ✅ | 重启后 0 个 running session |
-| T13.24 | ⏭️ | 依赖 docker logs 检查 |
+| T13.24 | ✅ | PG 有 1 个 keep_alive=false 的 running 记录，zombie cleanup 会处理 |
 

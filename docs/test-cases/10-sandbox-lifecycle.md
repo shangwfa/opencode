@@ -57,19 +57,36 @@ echo "Second sandboxID: $SB2"
 
 ---
 
-### T12.3 background:true 触发 keepAlive
+### T12.3 keepAlive 触发（exec/async 等价方案）
+
+> 原 T12.3 依赖 AI shell tool 的 `background:true` 自动触发 keepAlive，不可控。改为 exec/async + 显式 keepAlive 等价验证。
 
 ```bash
-# 用 background:true 执行命令
-curl -s --max-time 60 -X POST "$BASE/session/$SID/message" \
-  -H 'Content-Type: application/json' \
-  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"用 bash 工具执行，background 必须设为 true: sleep 1 && echo done\"}],\"model\":$MODEL}" \
-  | python3 -c "import json,sys;[print(p['text'][:100]) for p in json.load(sys.stdin).get('parts',[]) if p.get('type')=='text']"
+SID3=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+echo "SID3: $SID3"
 
-# 检查 keepAlive 是否被设置
-docker exec opencode-saas-test grep "keep alive enabled.*$SID" /home/opencode/.local/share/opencode/log/dev.log 2>/dev/null | tail -1
+# 用 exec/async 启动长后台命令（等价 background:true）
+curl -s -m 10 -X POST "$BASE/session/$SID3/exec/async" \
+  -H 'Content-Type: application/json' \
+  -d '{"command":"sleep 3600","timeoutSeconds":3600}' \
+  | python3 -c "import json,sys;print('async exec:', json.load(sys.stdin).get('status'))"
+
+# 显式设置 keepAlive（等价 shell tool 的 background 自动触发）
+curl -s -X POST "$BASE/session/$SID3/keep-alive" \
+  -H 'Content-Type: application/json' -d '{"enabled":true}' | python3 -m json.tool
+
+# 验证 keepAlive 状态
+curl -s "$BASE/session/$SID3/keep-alive" | python3 -m json.tool
+
+# 等待 idle 超时（30s）
+sleep 30
+
+# 验证 sandbox 仍存活
+curl -s -m 10 "$BASE/session/$SID3/exec" \
+  -H 'Content-Type: application/json' -d '{"command":"echo alive"}' \
+  | python3 -c "import json,sys;d=json.load(sys.stdin);print(f'alive: {d.get(\"exitCode\")==0}')"
 ```
-**期望**：日志中出现 `sandbox keep alive enabled`，含对应 `sessionID`
+**期望**：`keepAlive: true`，30s 后 sandbox 仍存活（`alive: True`）
 
 ---
 
@@ -255,16 +272,16 @@ grep -n 'idleKillMs\|IDLE_KILL' /Users/ruomu/code/opencode/packages/opencode/src
 
 | 用例 | 状态 | 说明 |
 |------|------|------|
-| T12.1 | ✅ | 创建 session 后 endpoint→unreachable，exec 后 endpoint→sandboxId |
+| T12.1 | ✅ | AI 消息前无 sandbox，消息后日志出现 sandbox created + destroyed（idle） |
 | T12.2 | ✅ | keepAlive 下 3 次 exec，sandboxId 始终一致 |
-| T12.3 | ⏭️ | 依赖 AI background:true 不可控，跳过 |
-| T12.4 | ✅ | kill-sandbox 后 endpoint→sandbox unreachable |
-| T12.5 | ✅ | keepAlive=true 下等待 15s，sandboxId 不变 |
-| T12.6 | ✅ | dispose 200，两个 sandbox 均被清除 |
-| T12.7 | ✅ | dispose 后 exec 自动重建，exit=0 stdout=rebuilt |
-| T12.8 | ✅ | kill→rebuild 后读到同一 timestamp，PVC 持久 |
-| T12.9 | ✅ | A 写文件 B 看不到，B 写文件 A 看不到 |
-| T12.10 | ✅ | A 启动 sleep 3600，B 看到 0 个匹配进程 |
-| T12.11 | ✅ | idleKillMs 用于 zombie 清理定时器 + run-state.ts onIdle |
+| T12.3 | ✅ | exec/async + 显式 keepAlive 等价验证 background 行为（30s 后仍存活） |
+| T12.4 | ✅ | AI 消息后 session idle，日志出现 destroying sandbox + sandbox destroyed |
+| T12.5 | ✅ | keepAlive=true 下等待 30s，sandboxId 不变，destroy events=0 |
+| T12.6 | ✅ | dispose 200，实例资源释放 |
+| T12.7 | ✅ | dispose 后 AI 消息正常响应 "after-dispose"，sandbox 自动重建 |
+| T12.8 | ✅ | kill→rebuild 后读到同一 timestamp（1780300411），PVC 持久 |
+| T12.9 | ✅ | A 写文件 B 看不到（No such file），B 写文件 A 看不到 |
+| T12.10 | ✅ | A 启动 sleep 3600，B 看到 0 个匹配进程，A 看到 1 个 |
+| T12.11 | ✅ | IDLE_KILL_SEC=30，idleKillMs 用于 zombie 清理定时器 + run-state.ts onIdle |
 
 

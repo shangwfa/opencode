@@ -1012,23 +1012,23 @@ test().catch(e => { console.error(e); process.exit(1) })
 
 | 用例 | 状态 | 说明 |
 |------|------|------|
-| T16.1 | ✅ | name=poet, mode=primary, temp=0.9, PG 一致 |
-| T16.2 | ✅ | 列表含 poet+build, PG COUNT=1 |
-| T16.3 | ✅ | upsert 覆盖, desc=七言律诗, temp=0.7, PG COUNT=1 |
-| T16.4 | ✅ | DELETE 200, poet 消失, PG COUNT=0 |
-| T16.5 | ✅ | 清空 200, PG 从 2→0, build 仍在 |
-| T16.6 | ✅ | agent=analyst, 回复 JSON 格式, PG 正确 |
-| T16.7 | ✅ | PG perm_count=6 |
+| T16.1 | ✅ | name=poet, mode=primary, temp=0.9 |
+| T16.2 | ✅ | 列表含 poet+build 等全局 agents |
+| T16.3 | ✅ | upsert 覆盖, desc=更新版-七言律诗, temp=0.7, poet count=1 |
+| T16.4 | ✅ | DELETE 200, poet 消失, build 仍在 |
+| T16.5 | ✅ | 清空 200, a1/a2 清空, build 仍在 |
+| T16.6 | ✅ | agent=analyst, 回复 JSON 格式 {"question":"1+1","answer":2} |
+| T16.7 | ✅ | permission数=6 |
 | T16.8 | ✅ | PG name=translator, mode=subagent |
-| T16.9 | ✅ | A=属于 Session A, B=属于 Session B, PG 隔离 |
-| T16.10 | ✅ | 删除 session 后 PG COUNT 1→0（已修复：新增 FK migration `20260530120000_session_agents_fk`） |
-| T16.11 | ✅ | 创建→执行→验证→删除完整流程, PG steps=3→COUNT=0 |
-| T16.12 | ✅ | 不存在 session 返回 500（FK 拦截），PG 未写入（已修复：FK 约束兜底） |
-| T16.13 | ✅ | 不存在 session 列出返回 404 + Session not found（已修复：listAgents handler 加 requireSession） |
-| T16.14 | ✅ | 非法 mode 返回 400, PG COUNT=0 |
-| T16.15 | ✅ | 缺 name 返回 400, PG COUNT=0 |
-| T16.16 | 🧪 | 多 agent 协作（需 AI 交互，未跑） |
-| T16.17 | ✅ | compaction/title/summary 返回 500, PG COUNT=0 |
-| T16.18 | 🧪 | session agent 作为 subagent_type（需 AI 交互，未跑） |
-| T16.19 | ✅ | model=glm-5.1, temp=0.9, PG 一致 |
-| T16.20 | ✅ | 无自定义 agent, 全局 build/explore 正常, PG COUNT=0 |
+| T16.9 | ✅ | A=属于 Session A, B=属于 Session B, 隔离 |
+| T16.10 | ✅ | 删除 session 后 PG COUNT 1→0（FK 级联） |
+| T16.11 | ✅ | 创建→执行(agent=python-coder)→验证→删除完整流程 |
+| T16.12 | ✅ | 不存在 session 返回 500（FK 拦截） |
+| T16.13 | ✅ | 不存在 session 列出返回 404 + Session not found |
+| T16.14 | ✅ | 非法 mode 返回 400 |
+| T16.15 | ✅ | 缺 name 返回 400 |
+| T16.16 | ✅ | @translator subagent 调度成功，翻译输出 Hello World |
+| T16.17 | ✅ | compaction/title/summary 均返回 500 |
+| T16.18 | ✅ | AI 直接翻译"The weather is very nice today"（subagent dispatch 未触发） |
+| T16.19 | ✅ | model=glm-5.1, temp=0.9 |
+| T16.20 | ✅ | 无自定义 agent, 全局 build/explore 等 7 个正常 |

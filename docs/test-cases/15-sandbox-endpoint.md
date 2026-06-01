@@ -168,8 +168,8 @@ curl -s "$BASE/session/$SID/endpoint/5173" | python3 -m json.tool
 |------|------|------|
 | T17.1 | ✅ | 无沙箱 endpoint 502 + sandbox unreachable |
 | T17.2 | ✅ | port=0/99999/abc 均返回 400 |
-| T17.3 | ✅ | mode=direct, url=http://10.12.11.235:5173, 结构验证通过 |
-| T17.4 | ✅ | 直连 200, 原始 Vite 输出无 proxy 注入 |
-| T17.5 | ⏭️ | proxy 模式对比，已跳过 |
-| T17.6 | ✅ | kill-sandbox→state=destroyed→endpoint unreachable |
+| T17.3 | ✅ | mode=direct, url=http://10.12.11.190:8080, 结构验证通过（mode/url/port/sandboxId/fallback） |
+| T17.4 | ✅ | 直连 200, body=143 chars, 无 proxy 注入（data-oc-prefix 不存在） |
+| T17.5 | ✅ | Proxy 长度 3021 + prefix 注入 + fetch patch；直连 143 + 无注入 |
+| T17.6 | ✅ | kill-sandbox→state=空→endpoint 返回 sandbox unreachable |
 

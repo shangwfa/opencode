@@ -1030,26 +1030,26 @@ docker exec ai-nova-postgres psql -U postgres -d opencode -t -A -c \
 
 | 用例 | 状态 | 说明 |
 |------|------|------|
-| T15.1 | 🧪 | 简单 skill 创建+触发 |
-| T15.2 | 🧪 | 复杂 bundle（含 resources）创建+读取+触发 |
-| T15.3 | 🧪 | 删除单个+清空全部 |
-| T15.4 | 🧪 | 从目录加载 skill bundle |
-| T15.5 | 🧪 | SkillsMP 拉取 10 个真实 skill 并执行 |
-| T15.6 | 🧪 | 重复创建同名 skill（upsert 覆盖） |
-| T15.7 | 🧪 | AI 通过 skill tool 按需加载 resource |
-| T15.8 | 🧪 | skill 不存在时的错误处理 |
-| T15.9 | 🧪 | session skill 与全局 skill 同名覆盖 |
-| T15.10 | 🧪 | permission deny 过滤 skill tool |
-| T15.11 | 🧪 | 超大 resource + 超多 resources |
-| T15.12 | 🧪 | 全局 skill 列表 |
-| T15.13 | 🧪 | 多 skills 主动触发 |
-| T15.14 | 🧪 | 多 skills 被动触发 |
-| T15.15 | 🧪 | preloaded_skills manifest 验证 |
-| T15.16 | 🧪 | skill tool 不指定 resources → manifest |
-| T15.17 | 🧪 | 指定 resources + missing_resource |
+| T15.1 | ✅ | 简单 skill 创建+触发，AI 明确提到 reviewer skill |
+| T15.2 | ✅ | 复杂 bundle（含 resources）创建+读取+触发，AI 引用资源路径 |
+| T15.3 | ✅ | 删除单个+清空全部 |
+| T15.4 | ✅ | 从目录加载 skill bundle，AI 引用 security-checklist + safe-query |
+| T15.5 | 🧪 | SkillsMP 拉取 10 个真实 skill 并执行（待测，依赖外部 API） |
+| T15.6 | ✅ | 重复创建同名 skill（upsert 覆盖），PG description=v2, res_count=2 |
+| T15.7 | ✅ | AI 通过 skill tool 加载 resource，PG 含 skill_content + resources |
+| T15.8 | ✅ | skill 不存在时 AI 未调用 skill tool，直接告知不可用 |
+| T15.9 | ✅ | session skill 覆盖全局同名，AI 加载 SESSION 版本 |
+| T15.10 | ✅ | permission deny 生效，skill tool 未被调用 |
+| T15.11 | ✅ | 300KB resource + 70 个 resources 均正常写入 PG |
+| T15.12 | ✅ | 全局 skill 列表返回 customize-opencode |
+| T15.13 | ✅ | 多 skills 主动触发，AI 三维度（安全/性能/风格）完整报告 |
+| T15.14 | ✅ | 多 skills 被动触发，AI 自动加载 git-helper（回复 GIT_HELPER已激活） |
+| T15.15 | ✅ | preloaded_skills manifest：只有 name/desc/location + resource 元数据 |
+| T15.16 | ✅ | skill tool 不指定 resources → 只显示 path/type/size |
+| T15.17 | ✅ | 指定 resources 返回完整 content，不存在返回 missing_resource |
 | T15.18 | ✅ | A=['private-skill'], B=[], PG 只有 A |
 | T15.19 | ✅ | 删除前 COUNT=2, 删除后 COUNT=0 |
-| T15.20 | ✅ | HTTP 200, 不存在的 skill 名称不导致请求失败 |
-| T15.21 | ⚠️ | 空名称/`../`/`/` 均被接受（缺少输入校验） |
+| T15.20 | ✅ | HTTP 200, real-skill 加载成功, ghost-skill 被忽略 |
+| T15.21 | ⚠️ | 空名称/超长/特殊字符均被接受（缺少输入校验） |
 | T15.22 | ✅ | 5 并发 PG COUNT=1, upsert 安全 |
 | T15.23 | ✅ | Unicode/emoji/中文 API+PG 完整保留 |
