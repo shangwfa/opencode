@@ -2,16 +2,25 @@ FROM oven/bun:1.3.11-alpine AS base
 RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories \
     && apk add --no-cache git ripgrep
 
-FROM base AS runtime
+FROM base AS builder
 WORKDIR /app
 
 COPY package.json bun.lock bunfig.toml ./
-COPY node_modules node_modules
+COPY patches/ patches/
 COPY packages packages
+RUN bun install --ignore-scripts
+
+RUN find /app -path "*/node-pty/prebuilds/*/spawn-helper" -exec chmod +x {} \;
+
+FROM base AS runtime
+WORKDIR /app
+
+COPY --from=builder /app/node_modules node_modules
+COPY --from=builder /app/packages packages
+COPY --from=builder /app/package.json /app/bun.lock /app/bunfig.toml ./
 
 WORKDIR /app/packages/opencode
 
-RUN find /app -path "*/node-pty/prebuilds/*/spawn-helper" -exec chmod +x {} \; || true
 RUN adduser -D opencode && mkdir -p /workspace && chown opencode:opencode /workspace
 
 ENV OPENCODE_DEFAULT_DIRECTORY=/workspace
