@@ -1,6 +1,6 @@
-# 前端使用 VCS Diff 接口
+# 前端使用 VCS Diff 与文件树接口
 
-Code review 面板通过 `GET /vcs/diff` 拉取变更文件清单。
+Code review 面板（`/vcs/diff`）和文件树（`/file`、`/file/content`）在沙箱环境下都必须带上 `sessionID`，否则返回的是 host 目录内容。
 
 ---
 
@@ -128,3 +128,46 @@ queryFn: () =>
 ```
 
 避免单个 panel 渲染失败影响整个会话页面。
+
+---
+
+## 文件树：`GET /file` 与 `GET /file/content`
+
+文件树（`packages/app/src/context/file.tsx`）也遵循同样规则：只要当前是某个 session 的页面，就必须把 `params.id` 作为 `sessionID` 透传，否则后端走 host 目录（`/` 根目录）列表，跟 review 面板会拿到完全不同的路径。
+
+### 改动要点
+
+- 引入 `useServer` / `usePlatform` / `authTokenFromCredentials`，把 Basic auth 头拼出来
+- 新增 `fetchFileList(dir)` / `fetchFileRead(filePath)`：直接用 `URL + searchParams` 走 `platform.fetch ?? fetch`
+- `createFileTreeStore({ list })` 与 `load(path)` 都改用上面的 helper
+
+```ts
+const fetchFileList = async (dir: string) => {
+  const url = new URL("/file", sdk.url)
+  url.searchParams.set("path", dir)
+  url.searchParams.set("directory", sdk.directory)
+  if (params.id) url.searchParams.set("sessionID", params.id)
+  const response = await (platform.fetch ?? fetch)(url, { headers: fileAuthHeaders() })
+  if (!response.ok) throw new Error(`Failed to list files: ${response.status}`)
+  return (await response.json()) as Awaited<ReturnType<typeof sdk.client.file.list>>["data"]
+}
+```
+
+`/file/content` 同理。完整实现见 `packages/app/src/context/file.tsx`。
+
+### 验证
+
+```bash
+# 沙箱内：返回 xybot-front-home-v3 的根目录
+curl "http://localhost:14096/file?directory=%2Fworkspace&path=&sessionID=ses_xxx" \
+  -H "Authorization: Bearer ..."
+# → [".env", ".git", "README.md", ".xybotrc.ts", ...]
+
+# 不传 sessionID：拿到 host 根目录（/etc, /usr, /var, ...），正是旧 bug 的现象
+```
+
+### 为什么用 `fetch` 而非 SDK
+
+- `sdk.client.file.list/read` 的生成类型（`packages/sdk/js/src/v2/gen/sdk.gen.ts`）**没有** `sessionID` 字段
+- 重新跑 `script/build.ts` 会在 `v2/gen` 引入 5+ 文件无关 diff
+- 前端用 `fetch` 携带额外 query param 是最干净的方式，跟 `vcs/diff` 那次修复保持一致
