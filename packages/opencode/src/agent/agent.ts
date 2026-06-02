@@ -14,6 +14,7 @@ import PROMPT_SCOUT from "./prompt/scout.txt"
 import PROMPT_SUMMARY from "./prompt/summary.txt"
 import PROMPT_TITLE from "./prompt/title.txt"
 import { Permission } from "@/permission"
+import { ConfigPermission } from "@/config/permission"
 import { mergeDeep, pipe, sortBy, values } from "remeda"
 import { Global } from "@opencode-ai/core/global"
 import path from "path"
@@ -29,6 +30,9 @@ import * as Option from "effect/Option"
 import * as OtelTracer from "@effect/opentelemetry/Tracer"
 import { type DeepMutable } from "@opencode-ai/core/schema"
 import type { SessionID } from "../session/schema"
+import { SessionTable } from "../session/session.sql"
+import { Database } from "../storage/db"
+import { and, eq } from "drizzle-orm"
 
 export const Info = Schema.Struct({
   name: Schema.String,
@@ -64,7 +68,7 @@ export const CreateInput = Schema.Struct({
   description: Schema.optional(Schema.String),
   mode: Schema.Literals(["subagent", "primary", "all"]),
   prompt: Schema.optional(Schema.String),
-  permission: Schema.optional(Permission.Ruleset),
+  permission: Schema.optional(ConfigPermission.Info),
   model: Schema.optional(Schema.Struct({ modelID: ModelID, providerID: ProviderID })),
   temperature: Schema.optional(Schema.Finite),
   topP: Schema.optional(Schema.Finite),
@@ -518,11 +522,22 @@ export const layer = Layer.effect(
           })
           .concat([...overlay.values()].filter((a) => !base.some((b) => b.name === a.name)))
       }),
-      sessionGet: Effect.fn("Agent.sessionGet")(function* (agent: string, session?: SessionID) {
+        sessionGet: Effect.fn("Agent.sessionGet")(function* (agent: string, session?: SessionID) {
         if (!session || !Flag.OPENCODE_DATABASE_URL) return yield* InstanceState.useEffect(state, (s) => s.get(agent))
-        const row = yield* sessionAgent.get(session, agent)
         const base = yield* InstanceState.useEffect(state, (s) => s.get(agent))
-        if (row) return mergeInfo(row, base)
+        let currentSID: SessionID | undefined = session
+        let visited = 0
+        while (currentSID && visited < 10) {
+          visited++
+          const row = yield* sessionAgent.get(currentSID, agent)
+          if (row) return mergeInfo(row, base)
+          const parent = yield* Effect.promise(() =>
+            Database.use((db) =>
+              db.select({ parent_id: SessionTable.parent_id }).from(SessionTable).where(eq(SessionTable.id, currentSID!)).get(),
+            ),
+          )
+          currentSID = parent?.parent_id ?? undefined
+        }
         return base
       }),
       sessionCreate: Effect.fn("Agent.sessionCreate")(function* (session: SessionID, input: CreateInput) {
@@ -530,7 +545,10 @@ export const layer = Layer.effect(
         if (input.name === "compaction" || input.name === "title" || input.name === "summary") {
           throw new InvalidError({ message: `Cannot override internal agent: ${input.name}` })
         }
-        const row = yield* sessionAgent.upsert(session, input)
+        const custom = input.permission ? Permission.fromConfig(input.permission) : []
+        const user = Permission.fromConfig((yield* config.get()).permission ?? {})
+        const permission = Permission.merge(user, custom)
+        const row = yield* sessionAgent.upsert(session, { ...input, permission })
         return mergeInfo(row, yield* InstanceState.useEffect(state, (s) => s.get(input.name)))
       }),
       sessionUnload: Effect.fn("Agent.sessionUnload")(function* (session: SessionID, name: string) {

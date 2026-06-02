@@ -1,5 +1,6 @@
 import { PlanExitTool } from "./plan"
 import { Session } from "@/session/session"
+import type { SessionID } from "@/session/schema"
 import { QuestionTool } from "./question"
 import { ShellTool } from "./shell"
 import { EditTool } from "./edit"
@@ -55,6 +56,7 @@ import { Reference } from "@/reference/reference"
 import { BackgroundJob } from "@/background/job"
 import { SessionStatus } from "@/session/status"
 import { RuntimeFlags } from "@/effect/runtime-flags"
+import { Flag } from "@opencode-ai/core/flag/flag"
 import { SandboxProvider } from "./sandbox-provider"
 
 const log = Log.create({ service: "tool.registry" })
@@ -77,7 +79,7 @@ export interface Interface {
   readonly ids: () => Effect.Effect<string[]>
   readonly all: () => Effect.Effect<Tool.Def[]>
   readonly named: () => Effect.Effect<{ task: TaskDef; read: ReadDef }>
-  readonly tools: (model: { providerID: ProviderID; modelID: ModelID; agent: Agent.Info }) => Effect.Effect<Tool.Def[]>
+  readonly tools: (model: { providerID: ProviderID; modelID: ModelID; agent: Agent.Info; sessionID?: SessionID }) => Effect.Effect<Tool.Def[]>
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/ToolRegistry") {}
@@ -305,8 +307,13 @@ export const layer: Layer.Layer<
       ].join("\n")
     })
 
-    const describeTask = Effect.fn("ToolRegistry.describeTask")(function* (agent: Agent.Info) {
-      const items = (yield* agents.list()).filter((item) => item.mode !== "primary")
+    const describeTask = Effect.fn("ToolRegistry.describeTask")(function* (agent: Agent.Info, sessionID?: SessionID) {
+      const globalAgents = yield* agents.list()
+      const sessionAgents = sessionID && Flag.OPENCODE_DATABASE_URL ? yield* agents.sessionList(sessionID) : []
+      const merged = new Map<string, Agent.Info>()
+      for (const a of globalAgents) merged.set(a.name, a)
+      for (const a of sessionAgents) merged.set(a.name, a)
+      const items = [...merged.values()].filter((item) => item.mode !== "primary")
       const filtered = items.filter(
         (item) => Permission.evaluate("task", item.name, agent.permission).action !== "deny",
       )
@@ -352,7 +359,7 @@ export const layer: Layer.Layer<
             id: tool.id,
             description: [
               output.description,
-              tool.id === TaskTool.id ? yield* describeTask(input.agent) : undefined,
+              tool.id === TaskTool.id ? yield* describeTask(input.agent, input.sessionID) : undefined,
               tool.id === SkillTool.id ? yield* describeSkill(input.agent) : undefined,
             ]
               .filter(Boolean)

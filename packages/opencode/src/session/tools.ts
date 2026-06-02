@@ -19,7 +19,9 @@ import { PartID, type SessionID } from "./schema"
 import * as Log from "@opencode-ai/core/util/log"
 import { EffectBridge } from "@/effect/bridge"
 import { SandboxProvider } from "@/tool/sandbox-provider"
-import { Flag } from "@/flag/flag"
+import { Database } from "@/storage/db"
+import { SessionTable } from "@/session/session.sql"
+import { eq } from "drizzle-orm"
 
 const log = Log.create({ service: "session.tools" })
 
@@ -42,11 +44,25 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
   const truncate = yield* Truncate.Service
 
   const maybeSandboxProvider = Option.getOrUndefined(yield* Effect.serviceOption(SandboxProvider.Service))
-  const sandboxEnabled = Flag.OPENCODE_SANDBOX_ENABLED && maybeSandboxProvider !== undefined
+  async function findRootSessionID(sessionID: SessionID): Promise<SessionID> {
+    let current = sessionID
+    let visited = 0
+    while (visited < 10) {
+      visited++
+      const row = await Database.use((db) =>
+        db.select({ parent_id: SessionTable.parent_id }).from(SessionTable).where(eq(SessionTable.id, current)).get(),
+      )
+      if (!row?.parent_id) break
+      current = row.parent_id as SessionID
+    }
+    return current
+  }
   function getSandbox(sessionID: SessionID): Promise<unknown> | null {
-    if (!sandboxEnabled || !maybeSandboxProvider) return null
-    return maybeSandboxProvider.getOrCreate(sessionID).pipe(
-      Effect.runPromise,
+    if (!maybeSandboxProvider) {
+      return null
+    }
+    return findRootSessionID(sessionID).then((rootID) =>
+      maybeSandboxProvider!.getOrCreate(rootID).pipe(Effect.runPromise)
     ).catch(() => null)
   }
 
@@ -88,6 +104,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
     modelID: ModelID.make(input.model.api.id),
     providerID: input.model.providerID,
     agent: input.agent,
+    sessionID: input.session.id,
   })) {
     const schema = ProviderTransform.schema(input.model, ToolJsonSchema.fromTool(item))
     tools[item.id] = tool({
