@@ -39,9 +39,11 @@ import { useLanguage } from "@/context/language"
 import { useLayout } from "@/context/layout"
 import { usePrompt } from "@/context/prompt"
 import { useSDK } from "@/context/sdk"
+import { useServer } from "@/context/server"
 import { useSettings } from "@/context/settings"
 import { useSync } from "@/context/sync"
 import { useTerminal } from "@/context/terminal"
+import { usePlatform } from "@/context/platform"
 import { type FollowupDraft, sendFollowupDraft } from "@/components/prompt-input/submit"
 import { createSessionComposerState, SessionComposerRegion } from "@/pages/session/composer"
 import {
@@ -65,6 +67,7 @@ import { diffs as list } from "@/utils/diffs"
 import { Persist, persisted } from "@/utils/persist"
 import { extractPromptFromParts } from "@/utils/prompt"
 import { same } from "@/utils/same"
+import { authTokenFromCredentials } from "@/utils/server"
 import { formatServerError } from "@/utils/server-errors"
 import { useUsageExceededDialogs } from "./session/usage-exceeded-dialogs"
 
@@ -191,6 +194,8 @@ export default function Page() {
   const dialog = useDialog()
   const language = useLanguage()
   const sdk = useSDK()
+  const server = useServer()
+  const platform = usePlatform()
   const settings = useSettings()
   const prompt = usePrompt()
   const comments = useComments()
@@ -458,8 +463,27 @@ export default function Page() {
     if (store.changes === "git" || store.changes === "branch") return store.changes
   })
   const vcsKey = createMemo(
-    () => ["session-vcs", sdk.directory, sync.data.vcs?.branch ?? "", sync.data.vcs?.default_branch ?? ""] as const,
+    () => ["session-vcs", sdk.directory, params.id ?? "", sync.data.vcs?.branch ?? "", sync.data.vcs?.default_branch ?? ""] as const,
   )
+  const fetchVcsDiff = async (mode: VcsMode) => {
+    const url = new URL("/vcs/diff", sdk.url)
+    url.searchParams.set("directory", sdk.directory)
+    url.searchParams.set("mode", mode)
+    if (params.id) url.searchParams.set("sessionID", params.id)
+
+    const response = await (platform.fetch ?? fetch)(url, {
+      headers: server.current?.http.password
+        ? {
+            Authorization: `Basic ${authTokenFromCredentials({
+              username: server.current.http.username,
+              password: server.current.http.password,
+            })}`,
+          }
+        : undefined,
+    })
+    if (!response.ok) throw new Error(`Failed to load VCS diff: ${response.status}`)
+    return list(await response.json())
+  }
   const vcsQuery = createQuery(() => {
     const mode = vcsMode()
     const enabled = wantsReview() && sync.project?.vcs === "git"
@@ -471,9 +495,7 @@ export default function Page() {
       gcTime: 60 * 1000,
       queryFn: mode
         ? () =>
-            sdk.client.vcs
-              .diff({ mode })
-              .then((result) => list(result.data))
+            fetchVcsDiff(mode)
               .catch((error) => {
                 console.debug("[session-review] failed to load vcs diff", { mode, error })
                 return []
