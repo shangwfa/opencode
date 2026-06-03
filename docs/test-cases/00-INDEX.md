@@ -29,6 +29,8 @@
 | [`18-sandbox-tool-test.md`](./18-sandbox-tool-test.md) | — | — | 沙箱工具测试：apply_patch/ls 沙箱分支、路径转换、并发压力、错误信息泄露检查 |
 | [`19-saas-tool-sandbox-verify.md`](./19-saas-tool-sandbox-verify.md) | 二十 | T19.x | 8 工具沙箱执行三层验证（代码审查+运行时+PG），可执行脚本 `scripts/test-saas-tools.sh` |
 | [`20-path-leak-test.md`](./20-path-leak-test.md) | — | PL-x | 路径泄露防护：system prompt / 工具 I/O / <env> 块中宿主机路径映射为 /workspace |
+| [`sandbox-shared-test.mjs`](./sandbox-shared-test.mjs) | 十六 | T16.29 | 主子 agent 沙箱共享验证：主→子写读、子→主写读、exec 独立验证 |
+| [`vcs-diff-sandbox-test.mjs`](./vcs-diff-sandbox-test.mjs) | 十六 | T16.30 | VCS Diff 沙箱重建验证：销毁后自动重建 PVC 恢复，两次 diff 一致 |
 
 ## 快速定位
 

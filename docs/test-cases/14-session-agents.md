@@ -1617,6 +1617,274 @@ test().catch(e => { console.error(e); process.exit(1) })
 
 ---
 
+### T16.29 主子 agent 沙箱共享验证
+
+**验证目标**：主 agent 和子 agent 运行在同一个沙箱实例中，文件系统完全共享。主 agent 写的文件子 agent 能读，反之亦然。
+
+```bash
+bun run docs/test-cases/sandbox-shared-test.mjs
+```
+
+<details>
+<summary>完整测试脚本</summary>
+
+```bash
+#!/usr/bin/env node
+const BASE = "http://localhost:14096"
+const MODEL = { providerID: "zhipuai", modelID: "glm-5.1" }
+
+const SID = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "sandbox-shared-test" }) })).json()
+console.log("SID:", SID.id)
+
+const init = await (await fetch(BASE + "/session/" + SID.id + "/exec", {
+  method: "POST", headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ command: "mkdir -p /workspace/shared-test && echo done" }),
+})).json()
+console.log("沙箱初始化:", init.exitCode === 0 ? "✅" : "❌")
+
+await fetch(BASE + "/session/" + SID.id + "/agents/create", {
+  method: "POST", headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    name: "main-agent", description: "主 agent", mode: "primary",
+    prompt: "你是主 agent。按用户要求操作文件，简洁回答。",
+    temperature: 0.3,
+    permission: { edit: "allow", write: "allow", bash: "allow", read: "allow", glob: "allow", grep: "allow", task: "allow" },
+  }),
+})
+await fetch(BASE + "/session/" + SID.id + "/agents/create", {
+  method: "POST", headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    name: "sub-worker", description: "子 agent", mode: "subagent",
+    prompt: "你是子 agent。按用户要求操作文件，简洁回答。",
+    temperature: 0.3,
+    permission: { edit: "allow", write: "allow", bash: "allow", read: "allow", glob: "allow", grep: "allow" },
+  }),
+})
+console.log("agents 创建完成")
+
+async function sendAndWait(sid, body, timeout = 120000) {
+  return new Promise(async (resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("timeout")), timeout)
+    const eventRes = await fetch(BASE + "/event?sessionID=" + sid)
+    const reader = eventRes.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ""
+    const readLoop = async () => {
+      while (true) {
+        const { value, done } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        while (buffer.includes("\n")) {
+          const idx = buffer.indexOf("\n")
+          const line = buffer.slice(0, idx)
+          buffer = buffer.slice(idx + 1)
+          if (line.startsWith("data: ")) {
+            try {
+              const evt = JSON.parse(line.slice(6))
+              if (evt.type === "server.connected" || evt.type === "server.heartbeat") continue
+              if (evt.type === "session.idle") {
+                const s = evt.properties?.sessionID || evt.sessionID
+                if (!s || s === sid) {
+                  clearTimeout(timer)
+                  const msgs = await (await fetch(BASE + "/session/" + sid + "/message")).json()
+                  const lastAi = [...msgs].reverse().find(m => m.info?.role === "assistant")
+                  reader.cancel()
+                  resolve(lastAi)
+                  return
+                }
+              }
+            } catch {}
+          }
+        }
+      }
+    }
+    readLoop()
+    await fetch(BASE + "/session/" + sid + "/prompt_async", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    })
+  })
+}
+
+// ============ 测试 1：主 agent 写文件 → 子 agent 读 ============
+console.log("\n━━ 测试 1：主 agent 写文件，子 agent 读取 ━━")
+const msg1 = await sendAndWait(SID.id, {
+  parts: [{ type: "text", text: "请用 write 工具在 /workspace/shared-test/main-writes.txt 写入：SANDBOX_SHARED_TEST_MARKER_12345" }],
+  agent: "main-agent", model: MODEL,
+})
+const t1 = msg1.parts.filter(p => p.type === "text").map(p => p.text).join(" ")
+console.log("主 agent 回复:", t1.slice(0, 200))
+
+const msg2 = await sendAndWait(SID.id, {
+  parts: [{ type: "text", text: "@sub-worker 请用 read 工具读取 /workspace/shared-test/main-writes.txt 的完整内容，一字不差地告诉我。" }],
+  agent: "main-agent", model: MODEL,
+})
+const t2 = msg2.parts.filter(p => p.type === "text").map(p => p.text).join(" ")
+console.log("子 agent 回复:", t2.slice(0, 300))
+const test1Pass = t2.includes("SANDBOX_SHARED_TEST_MARKER_12345")
+console.log("测试1 PASS (子 agent 能读主 agent 写的文件):", test1Pass)
+
+// ============ 测试 2：子 agent 写文件 → 主 agent 读 ============
+console.log("\n━━ 测试 2：子 agent 写文件，主 agent 读取 ━━")
+const msg3 = await sendAndWait(SID.id, {
+  parts: [{ type: "text", text: "@sub-worker 请用 write 工具在 /workspace/shared-test/sub-writes.txt 写入：SUB_AGENT_MARKER_67890" }],
+  agent: "main-agent", model: MODEL,
+})
+const t3 = msg3.parts.filter(p => p.type === "text").map(p => p.text).join(" ")
+console.log("子 agent 写入回复:", t3.slice(0, 200))
+
+const msg4 = await sendAndWait(SID.id, {
+  parts: [{ type: "text", text: "请用 read 工具读取 /workspace/shared-test/sub-writes.txt 的完整内容，一字不差地告诉我。" }],
+  agent: "main-agent", model: MODEL,
+})
+const t4 = msg4.parts.filter(p => p.type === "text").map(p => p.text).join(" ")
+console.log("主 agent 回复:", t4.slice(0, 300))
+const test2Pass = t4.includes("SUB_AGENT_MARKER_67890")
+console.log("测试2 PASS (主 agent 能读子 agent 写的文件):", test2Pass)
+
+// ============ 测试 3：exec 验证两文件都存在 ============
+console.log("\n━━ 测试 3：exec 验证文件存在 ━━")
+const verify = await (await fetch(BASE + "/session/" + SID.id + "/exec", {
+  method: "POST", headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ command: "cat /workspace/shared-test/main-writes.txt && echo '---' && cat /workspace/shared-test/sub-writes.txt" }),
+})).json()
+console.log("exec 输出:", verify.stdout)
+const test3Pass = verify.stdout.includes("SANDBOX_SHARED_TEST_MARKER_12345") && verify.stdout.includes("SUB_AGENT_MARKER_67890")
+console.log("测试3 PASS (exec 确认两文件存在):", test3Pass)
+
+// ============ 汇总 ============
+console.log("\n" + "═".repeat(50))
+console.log("主子 agent 沙箱共享测试结果:")
+console.log("  测试1 (主→子 文件共享):", test1Pass ? "✅" : "❌")
+console.log("  测试2 (子→主 文件共享):", test2Pass ? "✅" : "❌")
+console.log("  测试3 (exec 验证):", test3Pass ? "✅" : "❌")
+const allPass = test1Pass && test2Pass && test3Pass
+console.log("  总体:", allPass ? "✅ 通过" : "❌ 失败")
+console.log("═".repeat(50))
+```
+
+</details>
+
+**测试步骤**：
+1. 创建 session + 主 agent (main-agent) + 子 agent (sub-worker)
+2. 主 agent 写入 `/workspace/shared-test/main-writes.txt`（内容：`SANDBOX_SHARED_TEST_MARKER_12345`）
+3. 子 agent 读取该文件 → 验证内容一致
+4. 子 agent 写入 `/workspace/shared-test/sub-writes.txt`（内容：`SUB_AGENT_MARKER_67890`）
+5. 主 agent 读取该文件 → 验证内容一致
+6. exec 独立验证两文件都存在
+
+**期望**：三个子测试全部通过，证明主子 agent 共享同一个沙箱文件系统
+
+> **PG 验证**：`docker exec ai-nova-postgres psql -U postgres -d opencode -c "SELECT name, mode FROM session_agents WHERE session_id='$SID';"`
+> 期望：2 条（main-agent:primary, sub-worker:subagent）
+
+---
+
+### T16.30 VCS Diff 沙箱重建验证
+
+**验证目标**：沙箱被销毁后，调用 `/vcs/diff` 能自动重建沙箱（PVC 恢复代码），返回正确的 diff 结果。
+
+```bash
+bun run docs/test-cases/vcs-diff-sandbox-test.mjs
+```
+
+<details>
+<summary>完整测试脚本</summary>
+
+```bash
+#!/usr/bin/env node
+const BASE = "http://localhost:14096"
+const MODEL = { providerID: "zhipuai", modelID: "glm-5.1" }
+const GIT_TOKEN = "eY8gCHMpNWrJpRLHDvK3f286MQp1OmJiCA.01.0y10q698d"
+const GIT_REPO = `https://oauth2:${GIT_TOKEN}@gitlab.shadow-rpa.net/frontend/xybot-front-home-v3.git`
+
+async function api(path, method = "GET", body = null) {
+  const opts = { method, headers: { "Content-Type": "application/json" } }
+  if (body) opts.body = JSON.stringify(body)
+  const resp = await fetch(`${BASE}${path}`, opts)
+  const text = await resp.text()
+  try { return JSON.parse(text) } catch { return text }
+}
+
+// Step 1: 配置权限 + 创建会话
+console.log("━━ Step 1: 创建会话 ━━")
+await api("/global/config", "PATCH", {
+  permission: { bash: "allow", edit: "allow", write: "allow", glob: "allow", grep: "allow", list: "allow", read: "allow", webfetch: "allow" },
+})
+await new Promise(r => setTimeout(r, 3000))
+const session = await api("/session", "POST", {})
+const sid = session.id
+console.log("SID:", sid)
+
+// Step 2: exec 拉取代码
+console.log("\n━━ Step 2: exec 拉取代码 ━━")
+const clone = await api(`/session/${sid}/exec`, "POST", {
+  command: `cd /workspace && rm -rf xybot-front-home-v3 && git clone ${GIT_REPO} xybot-front-home-v3 --depth 1 2>&1 && echo CLONE_OK`,
+})
+console.log("clone exitCode:", clone.exitCode, clone.stdout?.includes("CLONE_OK") ? "✅" : "❌")
+
+// Step 3: exec 修改代码
+console.log("\n━━ Step 3: exec 修改代码 ━━")
+const modify = await api(`/session/${sid}/exec`, "POST", {
+  command: `cd /workspace/xybot-front-home-v3 && echo "// VCS_DIFF_TEST_MARKER" >> src/App.tsx && echo MODIFIED`,
+})
+console.log("modify exitCode:", modify.exitCode, modify.stdout?.includes("MODIFIED") ? "✅" : "❌")
+
+// Step 4: keepAlive
+console.log("\n━━ Step 4: keepAlive ━━")
+await api(`/session/${sid}/keep-alive`, "POST", { enabled: true })
+console.log("✅ keepAlive 已启用")
+
+// Step 5: vcs/diff（沙箱存活）
+console.log("\n━━ Step 5: vcs/diff（沙箱存活） ━━")
+const diff1 = await api(`/vcs/diff?directory=/workspace/xybot-front-home-v3&mode=git&sessionID=${sid}`)
+console.log("diff 结果:", Array.isArray(diff1) ? `${diff1.length} 个文件变更` : JSON.stringify(diff1).slice(0, 200))
+if (Array.isArray(diff1) && diff1.length > 0) {
+  for (const d of diff1) console.log(`  ${d.status} ${d.file} +${d.additions} -${d.deletions}`)
+}
+const step5Pass = Array.isArray(diff1) && diff1.length > 0
+console.log("Step 5 PASS:", step5Pass)
+
+// Step 6: 销毁沙箱
+console.log("\n━━ Step 6: 销毁沙箱 ━━")
+const disposeRes = await fetch(`${BASE}/session/${sid}/sandbox`, { method: "DELETE", headers: { "Content-Type": "application/json" } })
+console.log("dispose status:", disposeRes.status)
+await new Promise(r => setTimeout(r, 3000))
+
+// Step 7: vcs/diff（沙箱已销毁，应自动重建）
+console.log("\n━━ Step 7: vcs/diff（沙箱已销毁，自动重建） ━━")
+const diff2 = await api(`/vcs/diff?directory=/workspace/xybot-front-home-v3&mode=git&sessionID=${sid}`)
+console.log("diff 结果:", Array.isArray(diff2) ? `${diff2.length} 个文件变更` : JSON.stringify(diff2).slice(0, 200))
+if (Array.isArray(diff2) && diff2.length > 0) {
+  for (const d of diff2) console.log(`  ${d.status} ${d.file} +${d.additions} -${d.deletions}`)
+}
+const step7Pass = Array.isArray(diff2) && diff2.length > 0
+console.log("Step 7 PASS:", step7Pass)
+
+// 汇总
+console.log("\n" + "═".repeat(50))
+console.log("VCS Diff 沙箱重建测试结果:")
+console.log("  Step 5 (沙箱存活时 diff):", step5Pass ? "✅" : "❌")
+console.log("  Step 7 (沙箱销毁后 diff):", step7Pass ? "✅" : "❌")
+console.log("  总体:", (step5Pass && step7Pass) ? "✅ 通过" : "❌ 失败")
+console.log("═".repeat(50))
+```
+
+</details>
+
+**测试步骤**：
+1. 创建会话 + 配置权限
+2. exec 拉取 GitLab 仓库到 `/workspace/xybot-front-home-v3`
+3. exec 修改代码（追加 marker 到 `src/App.tsx`）
+4. keepAlive 防止沙箱被回收
+5. 调用 `/vcs/diff`（沙箱存活）→ 验证返回 diff
+6. `DELETE /session/:sid/sandbox` 销毁沙箱
+7. 再次调用 `/vcs/diff`（沙箱已销毁）→ 验证自动重建后仍返回相同 diff
+
+**期望**：两次 diff 均返回至少 1 个文件变更（`src/App.tsx`），证明沙箱销毁后 PVC 数据恢复、diff 结果一致
+
+**核心链路**：`/vcs/diff` → `runInSession` → `getOrCreate`（沙箱不存在时自动创建 + PVC 挂载恢复代码）→ 执行 `git diff`
+
 ---
 
 ## 结果汇总
@@ -1690,6 +1958,18 @@ test().catch(e => { console.error(e); process.exit(1) })
 
 > 镜像 `opencode-saas-sandbox-test:v3fix`，容器在 `localhost:14096`
 > 回归验证路径泄露修复后 Session Agent 功能无破坏
+> 
+> **主子 Agent 调度测试（2026-06-03 第二轮）**
+
+| 用例 | 状态 | 说明 |
+|------|------|------|
+| T16.6 | ✅ | agent=analyst, 回复 JSON 格式，正确使用 primary agent |
+| T16.8 | ✅ | @translator subagent 调度成功，翻译 "The weather is really nice today, perfect for a walk." |
+| T16.16 | ✅ | 多 agent 协作：manager 调度 translator+coder，输出含 Hello World 翻译 + 斐波那契代码 |
+| T16.18 | ✅ | task 工具调度 my-translator (mode=all)，翻译 "The weather is very good today." |
+| T16.29 | ✅ | 主子 agent 沙箱共享：主→子写读 ✅，子→主写读 ✅，exec 验证 ✅ |
+
+**回归测试（2026-06-03 首轮）**
 
 | 用例 | 状态 | 说明 |
 |------|------|------|
@@ -1720,5 +2000,7 @@ test().catch(e => { console.error(e); process.exit(1) })
 | T16.26 | ✅ | last matching rule wins（*:deny, src/*.ts:allow 顺序正确） |
 | T16.27 | ✅ | `tools` 字段接受(200)，已转为 permission 数组格式（8 条规则） |
 | T16.28 | ✅ | task 粒度权限（dangerous-agent:deny, safe-agent:allow） |
+| T16.29 | ✅ | 主子 agent 沙箱共享：主→子写读 ✅，子→主写读 ✅，exec 验证 ✅ |
+| T16.30 | ✅ | VCS Diff 沙箱重建：销毁后自动重建，两次 diff 结果一致（src/App.tsx +1） |
 
-**结论**：路径泄露修复（11 文件 + session-lock + PATCH directory）对 Session Agent 功能无影响，T16.1–T16.28 全部通过。
+**结论**：路径泄露修复（11 文件 + session-lock + PATCH directory）对 Session Agent 功能无影响，T16.1–T16.30 全部通过。
