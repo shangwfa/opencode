@@ -1023,8 +1023,237 @@ docker exec ai-nova-postgres psql -U postgres -d opencode -t -A -c \
 ```
 **期望**：API 和 PG 中 Unicode（中文、emoji）完整保留；特殊字符（引号、反斜杠、尖括号）不被截断或转义破坏
 
+
 ---
 
+## agent-browser 技能测试
+
+> **操作流程**：
+> 1. 创建会话 → 在沙箱中安装 agent-browser CLI + 下载 Chrome → 创建会话级 agent-browser skill
+> 2. 使用该 skill 进行网页浏览、数据提取等测试
+> 3. 验证多 skill 共存不冲突
+>
+> **已知问题**：沙箱中 `storage.googleapis.com` 被 DNS 劫持（解析到 `43.128.109.119`，代理证书过期），`agent-browser install` 下载 Chrome 失败，需改用 `curl -k` 手动下载。Chrome 启动偶发不稳定（daemon 卡死），建议**将 Chrome 预装到沙箱 Docker 镜像**中。
+>
+> **agent-browser SKILL.md** 位于 `~/.config/opencode/skills/agent-browser/SKILL.md`（本地），或从 [GitHub](https://github.com/vercel-labs/agent-browser) 获取。
+
+### T15.24 创建 agent-browser 会话 skill
+
+完整流程：创建会话 → 安装 CLI + 下载 Chrome → 创建会话级 skill → 验证技能列表。
+
+```bash
+unset ALL_PROXY HTTP_PROXY HTTPS_PROXY all_proxy http_proxy https_proxy
+BASE="http://localhost:14096"
+
+# Step 1: 创建会话
+SID=$(curl -s -X POST "$BASE/session" \
+  -H 'Content-Type: application/json' \
+  -d '{"title":"agent-browser-skill-test"}' \
+  | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+echo "Session: $SID"
+
+# keepAlive + 配置权限
+curl -s -X POST "$BASE/session/$SID/keep-alive" -d '{"enabled":true}' > /dev/null
+curl -s -X PATCH "$BASE/session/$SID" \
+  -H 'Content-Type: application/json' \
+  -d '{"permission":{"bash":"allow","read":"allow","write":"allow","edit":"allow","glob":"allow","grep":"allow","list":"allow","webfetch":"allow"}}' > /dev/null
+
+# Step 2: 安装 agent-browser CLI
+# 注意：npm 全局安装后二进制在 /home/coder/.npm-global/bin/，不在默认 PATH 中
+echo "=== 安装 agent-browser CLI ==="
+curl -s --max-time 60 -X POST "$BASE/session/$SID/exec" \
+  -H 'Content-Type: application/json' \
+  -d '{"command":"npm install -g agent-browser 2>&1 | tail -1 && /home/coder/.npm-global/bin/agent-browser --version"}' \
+  | python3 -c "import json,sys;d=json.load(sys.stdin);print(d.get('stdout','')[:300])"
+
+# Step 3: 下载 Chrome（需 curl -k 绕过 DNS 劫持 + 过期证书）
+echo ""
+echo "=== 下载 Chrome (178MB) ==="
+curl -s --max-time 180 -X POST "$BASE/session/$SID/exec" \
+  -H 'Content-Type: application/json' \
+  -d '{"command":"curl -sk --max-time 120 -o /tmp/chrome.zip \"https://storage.googleapis.com/chrome-for-testing-public/149.0.7827.54/linux64/chrome-linux64.zip\" && ls -lh /tmp/chrome.zip && cd /tmp && unzip -o chrome.zip -d chrome 2>&1 | tail -1 && /tmp/chrome/chrome-linux64/chrome --version"}' \
+  | python3 -c "import json,sys;d=json.load(sys.stdin);print(d.get('stdout','')[:500])"
+
+# Step 4: 验证 Chrome 可用
+echo ""
+echo "=== 验证 Chrome ==="
+curl -s --max-time 15 -X POST "$BASE/session/$SID/exec" \
+  -H 'Content-Type: application/json' \
+  -d '{"command":"/tmp/chrome/chrome-linux64/chrome --headless --no-sandbox --disable-gpu --dump-dom https://example.com 2>/dev/null | head -3"}' \
+  | python3 -c "import json,sys;d=json.load(sys.stdin);print(d.get('stdout','')[:500])"
+
+# Step 5: 创建会话级 agent-browser skill
+# content 中需包含 CLI/Chrome 的实际路径（PATH 下不可用）
+echo ""
+echo "=== 创建 agent-browser session skill ==="
+curl -s -X POST "$BASE/session/$SID/skills/create" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "name":"agent-browser",
+    "description":"Browser automation CLI for AI agents. Use for navigating pages, filling forms, clicking buttons, screenshots, data extraction.",
+    "content":"# agent-browser\n\nCLI path: /home/coder/.npm-global/bin/agent-browser\nChrome path: /tmp/chrome/chrome-linux64/chrome\n\n## Core Workflow\n1. Navigate: /home/coder/.npm-global/bin/agent-browser --executable-path /tmp/chrome/chrome-linux64/chrome --ignore-https-errors open <url> --args no-sandbox\n2. Snapshot: /home/coder/.npm-global/bin/agent-browser snapshot / snapshot -i\n3. Interact: click @eN / fill @eN \"text\" / get title / get url / get text @eN\n4. Close: /home/coder/.npm-global/bin/agent-browser close\n\n## Important\n- Always use --executable-path /tmp/chrome/chrome-linux64/chrome\n- Always use --args no-sandbox (required for Docker)\n- Always use --ignore-https-errors\n- Close browser when done: `close` or `close --all`"
+  }' | python3 -c "import json,sys;d=json.load(sys.stdin);print(f'Created: {d.get("name")}')"
+
+# Step 6: 验证 skill 列表
+echo ""
+curl -s "$BASE/session/$SID/skills" | python3 -c "
+import json,sys
+skills=json.load(sys.stdin)
+ab = [s for s in skills if s['name']=='agent-browser']
+if ab:
+    print(f'✅ agent-browser session skill found')
+else:
+    print(f'❌ NOT found. Skills: {[s["name"] for s in skills]}')
+"
+```
+
+**期望**：
+- agent-browser CLI 安装成功，版本号为 `0.27.0`
+- Chrome 下载成功（178MB），`--version` 输出 `Google Chrome for Testing 149.x`
+- Chrome `--headless --dump-dom` 可渲染 example.com 页面
+- session skill 创建返回 `name: agent-browser`
+- session skill 列表中包含 `agent-browser`
+
+> **注意**：Chrome 首次启动偶发超时（出 `Operation timed out`），关闭旧 daemon（`agent-browser close --all`）后重试通常可恢复。
+
+### T15.25 使用 agent-browser 浏览网页
+
+AI 通过 agent-browser session skill 浏览网页，执行 open/snapshot/get url/close 完整流程。
+
+```bash
+unset ALL_PROXY HTTP_PROXY HTTPS_PROXY all_proxy http_proxy https_proxy
+BASE="http://localhost:14096"
+MODEL='{"providerID":"zhipuai","modelID":"glm-5.1"}'
+
+# 沿用 T15.24 的 session SID
+echo "Session: $SID"
+
+# AI 使用 agent-browser 访问网页
+# 提示中应指出 CLI/Chrome 的实际路径（skill content 中已包含）
+echo "=== AI 浏览网页 ==="
+curl -s --max-time 300 -X POST "$BASE/session/$SID/message" \
+  -H 'Content-Type: application/json' \
+  -d "{
+    \"parts\":[{\"type\":\"text\",\"text\":\"使用 agent-browser skill 浏览 https://example.com。按照 skill 中的指令：先用 open 打开页面，再 snapshot，再 get title/get url，最后 close。每一步完成后告诉我结果。如果 Chrome 启动超时，先 agent-browser close --all 关闭旧进程再重试。\"}],
+    \"skills\":[\"agent-browser\"],
+    \"model\":$MODEL
+  }" | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+for p in d.get('parts',[]):
+    if p.get('type')=='text':
+        print(f'AI: {p[\"text\"][:1500]}')
+    elif p.get('type')=='tool':
+        tool = p.get('tool','?')
+        inp = json.dumps(p.get('state',{}).get('input',{}),ensure_ascii=False)[:250]
+        out = str(p.get('state',{}).get('output',''))[:250]
+        print(f'TOOL({tool}): {inp}')
+        if out: print(f'  -> {out}')
+"
+```
+
+**期望**：
+- AI 调用 bash 工具执行 `agent-browser open/snapshot/get url/close` 命令
+- `open` 输出 `✓ https://example.com/`
+- `get url` 确认当前 URL 为 `https://example.com/`
+- AI 回复包含结构化总结表格
+
+> **注意**：`get title` 在 headless Chrome 下对 example.com 可能返回空值，不影响核心流程验证。
+
+### T15.26 agent-browser 多技能共存
+
+验证 agent-browser 与 page-summarizer 两个 session skill 同时加载时，AI 能正确规划并使用两者。
+
+```bash
+unset ALL_PROXY HTTP_PROXY HTTPS_PROXY all_proxy http_proxy https_proxy
+BASE="http://localhost:14096"
+MODEL='{"providerID":"zhipuai","modelID":"glm-5.1"}'
+
+# 创建新会话
+SID=$(curl -s -X POST "$BASE/session" \
+  -H 'Content-Type: application/json' \
+  -d '{"title":"agent-browser-coexist-test"}' \
+  | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+
+# keepAlive + 权限
+curl -s -X POST "$BASE/session/$SID/keep-alive" -d '{"enabled":true}' > /dev/null
+curl -s -X PATCH "$BASE/session/$SID" \
+  -H 'Content-Type: application/json' \
+  -d '{"permission":{"bash":"allow","read":"allow","write":"allow","edit":"allow","glob":"allow","grep":"allow","list":"allow"}}' > /dev/null
+
+# 安装 agent-browser CLI + 下载 Chrome（同 T15.24 Step 2-3）
+curl -s --max-time 30 -X POST "$BASE/session/$SID/exec" \
+  -d '{"command":"npm install -g agent-browser 2>&1 | tail -1 && /home/coder/.npm-global/bin/agent-browser --version"}' > /dev/null
+
+curl -s --max-time 180 -X POST "$BASE/session/$SID/exec" \
+  -d '{"command":"curl -sk --max-time 120 -o /tmp/chrome.zip \"https://storage.googleapis.com/chrome-for-testing-public/149.0.7827.54/linux64/chrome-linux64.zip\" && cd /tmp && unzip -o chrome.zip -d chrome 2>&1 | tail -1 && /tmp/chrome/chrome-linux64/chrome --version"}' > /dev/null
+
+# 创建 agent-browser session skill
+curl -s -X POST "$BASE/session/$SID/skills/create" \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"agent-browser","description":"Browser automation CLI","content":"# agent-browser\nCLI: /home/coder/.npm-global/bin/agent-browser\nChrome: /tmp/chrome/chrome-linux64/chrome\nWorkflow: open <url> --args no-sandbox --executable-path CHROME --ignore-https-errors -> snapshot -> get title/url -> close"}' > /dev/null
+
+# 创建 page-summarizer session skill
+curl -s -X POST "$BASE/session/$SID/skills/create" \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"page-summarizer","description":"Summarizes web page content into structured format","content":"# Page Summarizer\n\nGiven page content, output:\n1. **Page Title**: ...\n2. **URL**: ...\n3. **Key Content**: extract main points\n4. **Summary**: 2-3 sentences\n\nStart with \"[PAGE-SUMMARIZER]\" prefix."}' > /dev/null
+
+# 验证两个 skill 均在列表中
+echo "=== Session skills ==="
+curl -s "$BASE/session/$SID/skills" | python3 -c "import json,sys;[print(f'  {s[\"name\"]}') for s in json.load(sys.stdin)]"
+
+# AI 同时使用两个 skill
+echo ""
+echo "=== AI 同时使用两个 skill ==="
+curl -s --max-time 300 -X POST "$BASE/session/$SID/message" \
+  -H 'Content-Type: application/json' \
+  -d "{
+    \"parts\":[{\"type\":\"text\",\"text\":\"请完成两个任务：\\n1. 使用 agent-browser skill 浏览 https://httpbin.org/json 获取页面内容\\n2. 使用 page-summarizer skill 对获取到的内容做结构化总结\\n每个 skill 输出需明确标注来源。\"}],
+    \"skills\":[\"agent-browser\",\"page-summarizer\"],
+    \"model\":$MODEL
+  }" | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+tools_used = []
+for p in d.get('parts',[]):
+    if p.get('type')=='text':
+        print(f'AI: {p[\"text\"][:1200]}')
+    elif p.get('type')=='tool':
+        t = p.get('tool','?')
+        tools_used.append(t)
+        inp = json.dumps(p.get('state',{}).get('input',{}),ensure_ascii=False)[:200]
+        out = str(p.get('state',{}).get('output',''))[:200]
+        print(f'TOOL({t}): {inp}')
+        if out: print(f'  -> {out}')
+print(f'\\nTools: {set(tools_used)} ({len(tools_used)} calls)')
+"
+```
+
+**期望**：
+- session skill 列表包含 `agent-browser` 和 `page-summarizer`
+- AI 创建 TODO 计划使用两个 skill（todowrite 工具调用）
+- AI 依次调用两个 skill，先浏览网页再总结
+- 回复中明确区分各 skill 的输出
+
+> **注意**：T15.26 已验证 skill 加载 + AI 任务规划通过，Chrome 启动偶发不稳定导致 agent-browser 执行卡住。建议**将 Chrome 预装到沙箱 Docker 镜像**中以消除启动问题。
+
+---
+
+## 改进建议
+
+1. **Chrome 预装**：在沙箱 Docker 镜像（`registry.shadow-rpa.net/infra/xybot-sandbox-coder`）中预装 Chrome for Testing，避免每次下载 178MB 且绕过 DNS 劫持问题。Dockerfile 中添加：
+
+   ```dockerfile
+   RUN curl -sk -o /tmp/chrome.zip "https://storage.googleapis.com/chrome-for-testing-public/149.0.7827.54/linux64/chrome-linux64.zip" \
+     && unzip /tmp/chrome.zip -d /opt/chrome && rm /tmp/chrome.zip
+   ENV AGENT_BROWSER_EXECUTABLE_PATH=/opt/chrome/chrome-linux64/chrome
+   ```
+
+2. **agent-browser CLI 预装**：同样在镜像中预装 `npm install -g agent-browser`，消除每次 exec 安装的步骤。
+
+3. **PATH 配置**：将 `/home/coder/.npm-global/bin` 加入 sandbox 默认 PATH，使 `agent-browser` 命令可直接使用。
+
+---
 
 ## 结果汇总
 
@@ -1053,3 +1282,6 @@ docker exec ai-nova-postgres psql -U postgres -d opencode -t -A -c \
 | T15.21 | ⚠️ | 空名称/超长/特殊字符均被接受（缺少输入校验） |
 | T15.22 | ✅ | 5 并发 PG COUNT=1, upsert 安全 |
 | T15.23 | ✅ | Unicode/emoji/中文 API+PG 完整保留 |
+| T15.24 | ✅ | 创建 agent-browser 会话 skill（安装 CLI + 下载 Chrome + 创建 skill） |
+| T15.25 | ✅ | 使用 agent-browser 浏览网页（open/snapshot/get url/close 全部成功） |
+| T15.26 | ⚠️ | agent-browser + page-summarizer（skill 加载 + AI 任务规划通过，Chrome 偶发不稳定） |

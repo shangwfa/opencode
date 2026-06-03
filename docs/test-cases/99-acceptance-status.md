@@ -93,6 +93,15 @@
 | T15.15 | ✅ | 渐进式披露：preloaded_skills 只有 manifest（name/desc/location + resource 元数据），无完整 content |
 | T15.16 | ✅ | 渐进式披露：skill tool 不指定 resources → 只返回 path/type/size 元数据 |
 | T15.17 | ✅ | 渐进式披露：指定 resources 获取完整 content + 不存在 resource → `<missing_resource>` |
+| T15.18 | ✅ | 跨 session 隔离：A=['private-skill'], B=[]，PG 只有 A |
+| T15.19 | ✅ | session 删除后 skill 级联清理 |
+| T15.20 | ✅ | 混合 skill 名：real-skill 加载成功，ghost-skill 被忽略 |
+| T15.21 | ⚠️ | 输入校验缺失：空名称/超长/特殊字符均被接受 |
+| T15.22 | ✅ | 5 并发创建同名 skill，upsert 安全，PG COUNT=1 |
+| T15.23 | ✅ | Unicode/emoji/中文 API+PG 完整保留 |
+| T15.24 | ✅ | 创建 agent-browser 会话 skill（安装 CLI + 创建 skill） |
+| T15.25 | ✅ | 使用 agent-browser 浏览网页（open/snapshot/close 均成功） |
+| T15.26 | ⚠️ | agent-browser + page-summarizer（skill 加载+规划通过，Chrome 启动不稳定） |
 
 ### Session Agents（会话级动态 Agent）
 
