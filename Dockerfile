@@ -8,12 +8,8 @@ WORKDIR /app
 COPY package.json bun.lock bunfig.toml ./
 COPY patches/ patches/
 COPY packages packages
-RUN rm -rf patches && sed -i '/"patchedDependencies"/,/^[[:space:]]*}/d' package.json && node -e "const f='package.json',s=require('fs').readFileSync(f,'utf8').replace(/,[ \t]*\n(\s*)\}/g,'\n\$1}');require('fs').writeFileSync(f,s)"
+RUN rm -rf patches && sed -i '/"patchedDependencies"/,/^[[:space:]]*}/d' package.json
 RUN bun install --ignore-scripts
-
-RUN bun run --cwd packages/app build
-
-RUN node packages/opencode/script/gen-web-ui.js
 
 RUN find /app -path "*/node-pty/prebuilds/*/spawn-helper" -exec chmod +x {} \;
 
@@ -37,6 +33,7 @@ ENV OPENCODE_SANDBOX_VOLUME_TYPE=pvc
 ENV OPENCODE_SANDBOX_PVC_CLAIM=sandbox-test
 ENV OPENCODE_SANDBOX_MAX_TTL_SEC=3600
 ENV OPENCODE_SANDBOX_IDLE_KILL_SEC=30
+ENV OPENCODE_DISABLE_EMBEDDED_WEB_UI=1
 ENV OPENCODE_DISABLE_AUTOUPDATE=1
 ENV OPENCODE_DATABASE_URL=postgresql://app:8zuhlMLd4gaeUG5k@172.18.32.14:5432/opencode
 ENV OPENCODE_SANDBOX_DOMAIN=172.18.32.15:30040
@@ -46,7 +43,7 @@ ENV OPENSANDBOX_INSECURE_SERVER=YES
 EXPOSE 4096
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD wget -qO- http://0.0.0.0:${OPENCODE_SERVER_PORT:-4096}/global/health || exit 1
+  CMD wget -qO- http://0.0.0.0:${OPENCODE_SERVER_PORT:-4096}/global/health || exit 1
 
 USER opencode
 
