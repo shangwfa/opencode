@@ -83,8 +83,8 @@ function selectedV2WorkspaceID(
   return workspaceID.value
 }
 
-function defaultDirectory(request: HttpServerRequest.HttpServerRequest, url: URL): string {
-  return url.searchParams.get("directory") || request.headers["x-opencode-directory"] || Flag.OPENCODE_DEFAULT_DIRECTORY || process.cwd()
+function defaultDirectory(request: HttpServerRequest.HttpServerRequest, url: URL, sessionDirectory?: string): string {
+  return url.searchParams.get("directory") || request.headers["x-opencode-directory"] || sessionDirectory || Flag.OPENCODE_DEFAULT_DIRECTORY || process.cwd()
 }
 
 function shouldStayOnControlPlane(request: HttpServerRequest.HttpServerRequest, url: URL): boolean {
@@ -159,14 +159,14 @@ function planWorkspaceRequest(
 
 function planRequest(
   request: HttpServerRequest.HttpServerRequest,
-  sessionWorkspaceID?: WorkspaceID,
+  options?: { sessionWorkspaceID?: WorkspaceID; sessionDirectory?: string },
 ): Effect.Effect<RequestPlan, never, Workspace.Service> {
   return Effect.gen(function* () {
     const url = requestURL(request)
     const envWorkspaceID = configuredWorkspaceID()
     const workspaceID = url.pathname.startsWith("/api/")
-      ? selectedV2WorkspaceID(url, sessionWorkspaceID)
-      : selectedWorkspaceID(url, sessionWorkspaceID)
+      ? selectedV2WorkspaceID(url, options?.sessionWorkspaceID)
+      : selectedWorkspaceID(url, options?.sessionWorkspaceID)
     if (workspaceID === InvalidWorkspaceID) return RequestPlan.InvalidWorkspace()
     const workspace = yield* resolveWorkspace(workspaceID, envWorkspaceID)
 
@@ -178,7 +178,7 @@ function planRequest(
       return yield* planWorkspaceRequest(request, url, workspace)
     }
 
-    return RequestPlan.Local({ directory: defaultDirectory(request, url), workspaceID: envWorkspaceID ?? workspaceID })
+    return RequestPlan.Local({ directory: defaultDirectory(request, url, options?.sessionDirectory), workspaceID: envWorkspaceID ?? workspaceID })
   })
 }
 
@@ -223,7 +223,7 @@ function routeHttpApiWorkspace<E>(
           Effect.catchDefect(() => Effect.succeed(undefined)),
         )
       : undefined
-    const plan = yield* planRequest(request, session?.workspaceID)
+    const plan = yield* planRequest(request, { sessionWorkspaceID: session?.workspaceID, sessionDirectory: session?.directory })
     return yield* routeWorkspace(client, effect, plan)
   })
 }

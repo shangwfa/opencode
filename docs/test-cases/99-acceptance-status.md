@@ -185,5 +185,15 @@
 | T14.9 | ✅ | `/vcs/status` 返回 200 |
 | T14.10 | ✅ | agent/skill/command 列表全部 200 |
 
+### Workspace Routing 路径解析
+
+| 用例 | 状态 | 备注 |
+|---|---|---|
+| WR-1 | ✅ | 沙箱存活 + 不带 directory，返回 diff 数据（session.directory fallback 生效） |
+| WR-2 | ✅ | 沙箱存活 + directory=/workspace，返回 diff 数据 |
+| WR-3 | ✅ | 沙箱存活 + directory=/workspace/project，返回 diff 数据 |
+| WR-4 | ✅ | 沙箱已销毁 + 不带 directory，返回空数组（沙箱不存在） |
+| WR-5 | ✅ | 本地路径（无 sessionID），返回空数组（本地无 git repo） |
+
 ---
 
