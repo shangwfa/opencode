@@ -5,7 +5,7 @@ import { assertExternalDirectoryEffect } from "./external-directory"
 import DESCRIPTION from "./glob.txt"
 import * as Tool from "./tool"
 import { Reference } from "@/reference/reference"
-import { toSandboxPath, toHostPath } from "./sandbox-path"
+import { toSandboxPath } from "./sandbox-path"
 import { SandboxProvider } from "./sandbox-provider"
 
 export const Parameters = Schema.Struct({
@@ -55,7 +55,7 @@ export const GlobTool = Tool.define(
           const lines = stdout ? stdout.split("\n").filter((line: string) => line.length > 0) : []
 
           let truncated = lines.length > limit
-          const files = lines.slice(0, limit).map((line: string) => toHostPath(line.trim(), ins.directory))
+          const files = lines.slice(0, limit).map((line: string) => line.trim())
 
           const output = []
           if (files.length === 0) output.push("No files found")

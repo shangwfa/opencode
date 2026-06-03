@@ -6,7 +6,7 @@ import { assertExternalDirectoryEffect } from "./external-directory"
 import DESCRIPTION from "./grep.txt"
 import * as Tool from "./tool"
 import { Reference } from "@/reference/reference"
-import { toSandboxPath, toHostPath } from "./sandbox-path"
+import { toSandboxPath } from "./sandbox-path"
 import { SandboxProvider } from "./sandbox-provider"
 
 const MAX_LINE_LENGTH = 2000
@@ -96,7 +96,7 @@ export const GrepTool = Tool.define(
               const parsed = JSON.parse(line) as GrepMatch
               if (parsed.type !== "match") continue
               rows.push({
-                path: toHostPath(parsed.data.path.text, ins.directory),
+                path: parsed.data.path.text,
                 line: parsed.data.line_number,
                 text: parsed.data.lines.text,
               })

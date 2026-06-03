@@ -4,7 +4,7 @@ import { InstanceState } from "@/effect/instance-state"
 import { assertExternalDirectoryEffect } from "./external-directory"
 import DESCRIPTION from "./ls.txt"
 import * as Tool from "./tool"
-import { toSandboxPath, toHostPath } from "./sandbox-path"
+import { toSandboxPath } from "./sandbox-path"
 import { SandboxProvider } from "./sandbox-provider"
 
 export const IGNORE_PATTERNS = [
@@ -83,8 +83,7 @@ export const ListTool = Tool.define(
           const lines = stdout ? stdout.split("\n").filter((line: string) => line.length > 0) : []
           const truncated = lines.length > LIMIT
           const files = lines.slice(0, LIMIT).map((line: string) => {
-            const host = toHostPath(line.trim(), ins.directory)
-            return path.relative(search, host)
+            return path.relative(sandboxSearchPath, line.trim())
           })
 
           const dirs = new Set<string>()
@@ -120,12 +119,12 @@ export const ListTool = Tool.define(
           }
 
           return {
-            title: path.relative(ins.worktree, search),
+            title: toSandboxPath(search, ins.worktree === "/" ? ins.directory : ins.worktree),
             metadata: {
               count: files.length,
               truncated,
             },
-            output: `${search}/\n` + render(".", 0),
+            output: `${sandboxSearchPath}/\n` + render(".", 0),
           }
         }).pipe(Effect.orDie),
     }

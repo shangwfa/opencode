@@ -2,7 +2,7 @@ import * as InstanceState from "@/effect/instance-state"
 import { File } from "@/file"
 import { Ripgrep } from "@/file/ripgrep"
 import { SandboxProvider } from "@/tool/sandbox-provider"
-import { toSandboxPath, toHostPath } from "@/tool/sandbox-path"
+import { toSandboxPath } from "@/tool/sandbox-path"
 import { Flag } from "@opencode-ai/core/flag/flag"
 import { Effect, Duration } from "effect"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
@@ -61,10 +61,11 @@ export const fileHandlers = HttpApiBuilder.group(InstanceHttpApi, "file", (handl
             const isDir = entry.endsWith("/")
             const name = isDir ? entry.slice(0, -1) : entry
             const filePath = ctx.query.path ? `${ctx.query.path}/${name}` : name
+            const absHost = `${instance.directory}/${filePath}`
             return {
               name,
               path: filePath,
-              absolute: `${instance.directory}/${filePath}`,
+              absolute: toSandboxPath(absHost, instance.directory),
               type: isDir ? ("directory" as const) : ("file" as const),
               ignored: false,
             }

@@ -8,6 +8,7 @@ import { Flag } from "@opencode-ai/core/flag/flag"
 import { AppFileSystem } from "@opencode-ai/core/filesystem"
 import { withTransientReadRetry } from "@/util/effect-http-client"
 import { Global } from "@opencode-ai/core/global"
+import { toSandboxPath } from "@/tool/sandbox-path"
 import type { MessageV2 } from "./message-v2"
 import type { MessageID } from "./schema"
 
@@ -91,6 +92,9 @@ export const layer: Layer.Layer<
       return yield* fs.readFileString(filepath).pipe(Effect.catch(() => Effect.succeed("")))
     })
 
+    const sandboxDisplayPath = (hostPath: string, worktree: string) =>
+      worktree === "/" ? hostPath : toSandboxPath(hostPath, worktree)
+
     const fetch = Effect.fnUntraced(function* (url: string) {
       const res = yield* http.execute(HttpClientRequest.get(url)).pipe(
         Effect.timeout(5000),
@@ -153,6 +157,7 @@ export const layer: Layer.Layer<
 
     const system = Effect.fn("Instruction.system")(function* () {
       const config = yield* cfg.get()
+      const ctx = yield* InstanceState.context
       const paths = yield* systemPaths()
       const urls = (config.instructions ?? []).filter(
         (item) => item.startsWith("https://") || item.startsWith("http://"),
@@ -162,7 +167,9 @@ export const layer: Layer.Layer<
       const remote = yield* Effect.forEach(urls, fetch, { concurrency: 4 })
 
       return [
-        ...Array.from(paths).flatMap((item, i) => (files[i] ? [`Instructions from: ${item}\n${files[i]}`] : [])),
+        ...Array.from(paths).flatMap((item, i) =>
+          files[i] ? [`Instructions from: ${sandboxDisplayPath(item, ctx.worktree)}\n${files[i]}`] : [],
+        ),
         ...urls.flatMap((item, i) => (remote[i] ? [`Instructions from: ${item}\n${remote[i]}`] : [])),
       ]
     })
@@ -180,6 +187,7 @@ export const layer: Layer.Layer<
       filepath: string,
       messageID: MessageID,
     ) {
+      const ctx = yield* InstanceState.context
       const sys = yield* systemPaths()
       const already = extract(messages)
       const results: { filepath: string; content: string }[] = []
@@ -210,7 +218,10 @@ export const layer: Layer.Layer<
         set.add(found)
         const content = yield* read(found)
         if (content) {
-          results.push({ filepath: found, content: `Instructions from: ${found}\n${content}` })
+          results.push({
+            filepath: found,
+            content: `Instructions from: ${sandboxDisplayPath(found, ctx.worktree)}\n${content}`,
+          })
         }
 
         current = path.dirname(current)

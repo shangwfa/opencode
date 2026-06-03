@@ -1685,3 +1685,40 @@ test().catch(e => { console.error(e); process.exit(1) })
 1. **Subagent 权限卡住**：subagent session 继承的权限中 `edit` 默认 `"ask"`，触发 `permission.asked` 事件发给 subagent sessionID，HTTP API 模式下无人应答，工具永远 `running`。**解决**：创建 subagent 时指定 `permission: { edit: "allow", write: "allow", bash: "allow", ... }`
 2. **Permission API 格式**：API 接受对象格式 `{edit:"deny",bash:"allow"}` 或字符串 `"allow"`/`"deny"`，**不接受数组格式** `[{permission:"edit",pattern:"*",action:"deny"}]`（返回 400）
 3. **T16.27**: `tools` 字段在 API 层不转换（预期——tools 向后兼容仅在全局配置文件层面）
+
+### v3fix 路径泄露修复回归测试（2026-06-03）
+
+> 镜像 `opencode-saas-sandbox-test:v3fix`，容器在 `localhost:14096`
+> 回归验证路径泄露修复后 Session Agent 功能无破坏
+
+| 用例 | 状态 | 说明 |
+|------|------|------|
+| T16.1 | ✅ | name=poet, mode=primary, temp=0.9 |
+| T16.2 | ✅ | 列表含全局+自定义 agents |
+| T16.3 | ✅ | upsert 覆盖正常 |
+| T16.4 | ✅ | DELETE 200, poet 消失, build 仍在 |
+| T16.5 | ✅ | 清空 200, a1/a2 清空, 全局保留 |
+| T16.6 | ✅ | agent=analyst, 回复 JSON 格式 |
+| T16.8 | ✅ | @translator subagent 调度成功 |
+| T16.9 | ✅ | Session A/B 隔离正常 |
+| T16.10 | ✅ | 删除 session 后 agents 级联清理 |
+| T16.11 | ✅ | 创建→执行(python-coder)→验证→删除完整流程 |
+| T16.12 | ✅ | 不存在 session 返回 500（FK 拦截） |
+| T16.13 | ✅ | 不存在 session 列出返回 404 |
+| T16.14 | ✅ | 非法 mode 返回 400 |
+| T16.15 | ✅ | 缺 name 返回 400 |
+| T16.16 | ✅ | 多 agent 协作：translator+coder 均完成，输出含翻译+代码 |
+| T16.17 | ✅ | 保留名 compaction/title/summary 返回 500 |
+| T16.18 | ✅ | task 工具调度 my-translator 翻译 "The weather is very good today." |
+| T16.19 | ✅ | 自定义 model=glm-5.1, temp=0.9 持久化正确 |
+| T16.20 | ✅ | 全局 agent 回退正常，build/explore 等 7 个 |
+| T16.21 | ✅ | 字符串简写权限持久化正确（edit:deny, write:deny 规则存在） |
+| T16.22 | ✅ | 粒度路径权限持久化（edit:deny *, edit:allow docs/*.md） |
+| T16.23 | ✅ | ask catch-all 权限持久化（edit:ask *, edit:allow docs/*.md） |
+| T16.24 | ✅ | bash 粒度命令权限持久化（git:allow, rm:deny, ls:allow） |
+| T16.25 | ✅ | 全局 allow/deny 字符串 → 9 条 ruleset |
+| T16.26 | ✅ | last matching rule wins（*:deny, src/*.ts:allow 顺序正确） |
+| T16.27 | ✅ | `tools` 字段接受(200)，已转为 permission 数组格式（8 条规则） |
+| T16.28 | ✅ | task 粒度权限（dangerous-agent:deny, safe-agent:allow） |
+
+**结论**：路径泄露修复（11 文件 + session-lock + PATCH directory）对 Session Agent 功能无影响，T16.1–T16.28 全部通过。

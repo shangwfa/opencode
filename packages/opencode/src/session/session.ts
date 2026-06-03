@@ -480,6 +480,7 @@ export interface Interface {
   readonly touch: (sessionID: SessionID) => Effect.Effect<void>
   readonly get: (id: SessionID) => Effect.Effect<Info, NotFound>
   readonly setTitle: (input: { sessionID: SessionID; title: string }) => Effect.Effect<void>
+  readonly setDirectory: (input: { sessionID: SessionID; directory: string }) => Effect.Effect<void>
   readonly setArchived: (input: { sessionID: SessionID; time?: number }) => Effect.Effect<void>
   readonly setPermission: (input: { sessionID: SessionID; permission: Permission.Ruleset }) => Effect.Effect<void>
   readonly setRevert: (input: {
@@ -752,6 +753,12 @@ export const layer: Layer.Layer<
       yield* patch(input.sessionID, { title: input.title })
     })
 
+    const setDirectory = Effect.fn("Session.setDirectory")(function* (input: { sessionID: SessionID; directory: string }) {
+      const ctx = yield* InstanceState.context
+      const newPath = sessionPath(ctx.worktree, input.directory)
+      yield* patch(input.sessionID, { directory: input.directory, path: newPath })
+    })
+
     const setArchived = Effect.fn("Session.setArchived")(function* (input: { sessionID: SessionID; time?: number }) {
       yield* patch(input.sessionID, { time: { archived: input.time } })
     })
@@ -867,6 +874,7 @@ export const layer: Layer.Layer<
       touch,
       get,
       setTitle,
+      setDirectory,
       setArchived,
       setPermission,
       setRevert,

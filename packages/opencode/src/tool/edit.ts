@@ -81,8 +81,8 @@ export const EditTool = Tool.define(
             })
             yield* Effect.tryPromise({
               try: () => sb.files.writeFiles([{ path: sandboxPath, data: params.newString }]),
-              catch: (e) => new Error(`Failed to write file: ${filePath}`),
-            }).pipe(Effect.orDie)
+            catch: (e) => new Error(`Failed to write file: ${params.filePath}`),
+          }).pipe(Effect.orDie)
             yield* bus.publish(File.Event.Edited, { file: filePath })
 
             let additions = 0
@@ -107,7 +107,7 @@ export const EditTool = Tool.define(
 
           contentOld = yield* Effect.tryPromise({
             try: () => sb.files.readFile(sandboxPath) as Promise<string>,
-            catch: () => new Error(`File ${filePath} not found`),
+            catch: () => new Error(`File ${params.filePath} not found`),
           }).pipe(Effect.orDie)
 
           const ending = detectLineEnding(contentOld)
@@ -134,7 +134,7 @@ export const EditTool = Tool.define(
 
           yield* Effect.tryPromise({
             try: () => sb.files.writeFiles([{ path: sandboxPath, data: contentNew }]),
-            catch: (e) => new Error(`Failed to write file: ${filePath}`),
+            catch: (e) => new Error(`Failed to write file: ${params.filePath}`),
           }).pipe(Effect.orDie)
 
           yield* bus.publish(File.Event.Edited, { file: filePath })

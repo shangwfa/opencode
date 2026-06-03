@@ -89,7 +89,7 @@ export const ReadTool = Tool.define(
         return {
           title,
           output: [
-            `<path>${filepath}</path>`,
+            `<path>${sandboxPath}</path>`,
             `<type>directory</type>`,
             `<entries>`,
             sliced.join("\n"),
@@ -104,7 +104,7 @@ export const ReadTool = Tool.define(
 
       const content = yield* Effect.tryPromise({
         try: () => sb.files.readFile(sandboxPath),
-        catch: () => new Error(`File not found: ${filepath}`),
+        catch: () => new Error(`File not found: ${sandboxPath}`),
       })
       const allLines = (content as string).split("\n")
       const start = (params.offset ?? 1) - 1
@@ -113,7 +113,7 @@ export const ReadTool = Tool.define(
       const truncated = start + selected.length < allLines.length
       const loaded = yield* instruction.resolve(ctx.messages, filepath, ctx.messageID)
 
-      let output = [`<path>${filepath}</path>`, `<type>file</type>`, "<content>\n"].join("\n")
+      let output = [`<path>${sandboxPath}</path>`, `<type>file</type>`, "<content>\n"].join("\n")
       output += selected
         .map(
           (line, i) =>

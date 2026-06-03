@@ -8,6 +8,7 @@ import { Vcs } from "@/project/vcs"
 import { SessionID } from "@/session/schema"
 import { Skill } from "@/skill"
 import { SandboxProvider } from "@/tool/sandbox-provider"
+import { toSandboxPath } from "@/tool/sandbox-path"
 import { Flag } from "@opencode-ai/core/flag/flag"
 import { Effect } from "effect"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
@@ -145,12 +146,13 @@ export const instanceHandlers = HttpApiBuilder.group(InstanceHttpApi, "instance"
 
     const getPath = Effect.fn("InstanceHttpApi.path")(function* () {
       const ctx = yield* InstanceState.context
+      const wt = ctx.worktree === "/" ? "/" : toSandboxPath(ctx.worktree, ctx.worktree)
       return {
         home: Global.Path.home,
         state: Global.Path.state,
         config: Global.Path.config,
-        worktree: ctx.worktree,
-        directory: ctx.directory,
+        worktree: wt,
+        directory: toSandboxPath(ctx.directory, ctx.worktree === "/" ? ctx.directory : ctx.worktree),
       }
     })
 
