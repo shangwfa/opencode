@@ -3,6 +3,7 @@ import { Runner } from "@/effect/runner"
 import { BackgroundJob } from "@/background/job"
 import { Effect, Latch, Layer, Scope, Context } from "effect"
 import * as Session from "./session"
+import { MCP } from "@/mcp"
 import { MessageV2 } from "./message-v2"
 import { SessionID } from "./schema"
 import { SessionStatus } from "./status"
@@ -61,12 +62,20 @@ export const layer = Layer.effect(
           data.runners.delete(sessionID)
           yield* status.set(sessionID, { type: "idle" })
           const sandbox = yield* Effect.serviceOption(SandboxProvider.Service)
+          let destroyed = false
           if (sandbox._tag === "Some") {
             const keep = yield* sandbox.value.isKeepAlive(sessionID)
             if (!keep) {
               yield* sandbox.value.destroy(sessionID).pipe(Effect.catchCause(() => Effect.void))
+              destroyed = true
             }
-            // keepAlive=true: sandbox 保持存活，由用户显式调用 kill-sandbox 或 delete session 销毁
+          }
+          // Only clear MCP cache when sandbox is destroyed
+          if (destroyed) {
+            const mcp = yield* Effect.serviceOption(MCP.Service)
+            if (mcp._tag === "Some") {
+              yield* mcp.value.clearSessionCache(sessionID).pipe(Effect.catchCause(() => Effect.void))
+            }
           }
         }),
         onBusy: status.set(sessionID, { type: "busy" }),

@@ -30,6 +30,7 @@
 | [`19-saas-tool-sandbox-verify.md`](./19-saas-tool-sandbox-verify.md) | 二十 | T19.x | 8 工具沙箱执行三层验证（代码审查+运行时+PG），可执行脚本 `scripts/test-saas-tools.sh` |
 | [`20-path-leak-test.md`](./20-path-leak-test.md) | — | PL-x | 路径泄露防护：system prompt / 工具 I/O / <env> 块中宿主机路径映射为 /workspace |
 | [`21-workspace-routing.md`](./21-workspace-routing.md) | — | WR-x | Workspace Routing 路径解析：API 请求 directory fallback 到 session.directory |
+| [`22-session-mcp.md`](./22-session-mcp.md) | 二十二 | T22.x | 会话级动态 MCP：CRUD、隔离、级联、校验 |
 | [`sandbox-shared-test.mjs`](./sandbox-shared-test.mjs) | 十六 | T16.29 | 主子 agent 沙箱共享验证：主→子写读、子→主写读、exec 独立验证 |
 | [`vcs-diff-sandbox-test.mjs`](./vcs-diff-sandbox-test.mjs) | 十六 | T16.30 | VCS Diff 沙箱重建验证：销毁后自动重建 PVC 恢复，两次 diff 一致 |
 
@@ -55,6 +56,7 @@ T16.x → 14-session-agents.md
 T17.x → 15-sandbox-endpoint.md
 T18.x → 16-tool-calls.md
 T19.x → 17-exec-api.md
+T22.x → 22-session-mcp.md
 
 沙箱工具（apply_patch/ls/错误泄露）→ 18-sandbox-tool-test.md
 路径泄露防护（PL-x）→ 20-path-leak-test.md

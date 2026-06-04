@@ -204,5 +204,25 @@
 | WR-4 | ✅ | 沙箱已销毁 + 不带 directory，返回空数组（沙箱不存在） |
 | WR-5 | ✅ | 本地路径（无 sessionID），返回空数组（本地无 git repo） |
 
+### Session MCP（会话级动态 MCP）
+
+| 用例 | 状态 | 备注 |
+|---|---|---|
+| T22.1 | ✅ | 创建会话级 local MCP（command + environment） |
+| T22.2 | ✅ | 创建会话级 remote MCP（url + headers） |
+| T22.3 | ✅ | 列出会话 MCP，local + remote 同列表 |
+| T22.4 | ✅ | Upsert 更新同名 MCP（local→remote，count=1） |
+| T22.5 | ✅ | 删除单个 MCP → 204 |
+| T22.6 | ✅ | 清空所有 MCP → 204 |
+| T22.7 | ✅ | 不同 session 同名 MCP 互相隔离 |
+| T22.8 | ✅ | 删除 session 后 MCP 级联清理 |
+| T22.9 | ✅ | 不存在的 session → 404 |
+| T22.10 | ✅ | 输入校验：缺 name/缺 type/非法 type → 400 |
+| T22.11 | ✅ | 完整字段持久化（url/env/headers/enabled） |
+| T22.12 | ✅ | disabled MCP 的 enabled=false 持久化 |
+| T22.13 | ✅ | Remote MCP 工具执行验证：ev_echo 调用成功，输出 Echo: hello |
+| T22.14 | ⏳ | Local MCP 在 Sandbox 中执行验证（需沙箱 + supergateway） |
+| T22.15 | ✅ | Session MCP 工具多轮对话持续可用：3 轮 3 次 MCP 调用全部成功 |
+
 ---
 

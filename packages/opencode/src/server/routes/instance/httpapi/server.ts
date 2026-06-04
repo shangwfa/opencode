@@ -24,6 +24,8 @@ import { Format } from "@/format"
 import { RuntimeFlags } from "@/effect/runtime-flags"
 import { LSP } from "@/lsp/lsp"
 import { MCP } from "@/mcp"
+import { SessionMcp } from "@/mcp/session-mcp"
+import { Flag } from "@/flag/flag"
 import { Permission } from "@/permission"
 import { Installation } from "@/installation"
 import { InstanceLayer } from "@/project/instance-layer"
@@ -207,6 +209,7 @@ export function createRoutes(
       LSP.defaultLayer,
       Installation.defaultLayer,
       MCP.defaultLayer,
+      Flag.OPENCODE_DATABASE_URL ? SessionMcp.pgLayer : SessionMcp.noopLayer,
       ModelsDev.defaultLayer,
       Permission.defaultLayer,
       Plugin.defaultLayer,

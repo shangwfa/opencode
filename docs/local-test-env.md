@@ -335,3 +335,4 @@ POST /session/:sessionID/exec {"command":"nohup npx vite ... &"}
 | subagent write/edit 卡在 `running`，主 agent 正常 | **subagent session 继承的权限中 `edit` 默认为 `"ask"`，触发 `permission.asked` 事件发给 subagent sessionID，HTTP API 模式下无人应答**。主 agent 的 write 可能走不同权限路径不触发询问，但 subagent 内部调用 write 时会触发 `edit` 权限请求，反复重试无人应答后永远卡住。 | 执行 Step 3.5 配置全局权限（必须包含 `edit:allow` 和 `write:allow`），或在 subagent 创建时显式设置 permission |
 | write 写 `/tmp/` 路径触发 `external_directory` 权限 | `/tmp/` 不在项目目录（`/workspace`）下，触发外部目录权限 | 写文件时使用项目目录内的路径，如 `/workspace/test.txt` |
 | sandbox 健康检查超时 30s | `OPENCODE_SANDBOX_USE_SERVER_PROXY=true` 时 SDK 健康检查走 Pod 直连 | 属于 SDK 限制，重试通常能成功 |
+| Local MCP 启动慢（npx 下载 supergateway） | sandbox 镜像未预装 supergateway，每次 `npx -y` 下载 | **待优化**：sandbox 镜像预装 `npm install -g supergateway`，后续 `connectSandboxLocal` 可去掉 `npx -y` 前缀 |

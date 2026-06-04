@@ -1,4 +1,5 @@
 import { Agent } from "@/agent/agent"
+import { SessionMcp } from "@/mcp/session-mcp"
 import { Bus } from "@/bus"
 import { Command } from "@/command"
 import { InstanceRef } from "@/effect/instance-ref"
@@ -62,6 +63,7 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
     const permissionSvc = yield* Permission.Service
     const statusSvc = yield* SessionStatus.Service
     const todoSvc = yield* Todo.Service
+    const mcpSessionSvc = Option.getOrUndefined(yield* Effect.serviceOption(SessionMcp.Service))
     const skillSvc = yield* Skill.Service
     const summary = yield* SessionSummary.Service
     const bus = yield* Bus.Service
@@ -477,6 +479,35 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       yield* agentSvc.sessionClear(ctx.params.sessionID)
     })
 
+    const listMcps = Effect.fn("SessionHttpApi.mcps")(function* (ctx: {
+      params: { sessionID: SessionID }
+    }) {
+      if (!mcpSessionSvc) return []
+      return yield* mcpSessionSvc.list(ctx.params.sessionID).pipe(Effect.catch(() => Effect.succeed([])))
+    })
+
+    const createMcp = Effect.fn("SessionHttpApi.mcpsCreate")(function* (ctx: {
+      params: { sessionID: SessionID }
+      payload: any
+    }) {
+      if (!mcpSessionSvc) throw new Error("Session MCPs are only available in SaaS mode")
+      return yield* mcpSessionSvc.upsert(ctx.params.sessionID, ctx.payload)
+    })
+
+    const deleteMcp = Effect.fn("SessionHttpApi.mcpsDelete")(function* (ctx: {
+      params: { sessionID: SessionID; name: string }
+    }) {
+      if (!mcpSessionSvc) throw new Error("Session MCPs are only available in SaaS mode")
+      yield* mcpSessionSvc.remove(ctx.params.sessionID, ctx.params.name)
+    })
+
+    const clearMcps = Effect.fn("SessionHttpApi.mcpsClear")(function* (ctx: {
+      params: { sessionID: SessionID }
+    }) {
+      if (!mcpSessionSvc) throw new Error("Session MCPs are only available in SaaS mode")
+      yield* mcpSessionSvc.removeAll(ctx.params.sessionID)
+    })
+
     return handlers
       .handle("list", list)
       .handle("status", status)
@@ -514,5 +545,9 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       .handle("agentsCreate", createAgent)
       .handle("agentsDelete", deleteAgent)
       .handle("agentsClear", clearAgents)
+      .handle("mcps", listMcps)
+      .handle("mcpsCreate", createMcp)
+      .handle("mcpsDelete", deleteMcp)
+      .handle("mcpsClear", clearMcps)
   }),
 )

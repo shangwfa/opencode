@@ -26,11 +26,15 @@ import { BusEvent } from "../bus/bus-event"
 import { Bus } from "@/bus"
 import { TuiEvent } from "@/cli/cmd/tui/event"
 import open from "open"
-import { Effect, Exit, Layer, Option, Context, Schema, Stream } from "effect"
+import { Effect, Exit, Layer, Option, Context, Schema, Stream, Ref, Schedule } from "effect"
 import { EffectBridge } from "@/effect/bridge"
 import { InstanceState } from "@/effect/instance-state"
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process"
 import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
+import { SandboxProvider } from "@/tool/sandbox-provider"
+import { Flag } from "@/flag/flag"
+import type { SessionID } from "@/session/schema"
+import { SessionMcp } from "./session-mcp"
 
 const log = Log.create({ service: "mcp" })
 const DEFAULT_TIMEOUT = 30_000
@@ -243,6 +247,8 @@ export interface Interface {
   readonly status: () => Effect.Effect<Record<string, Status>>
   readonly clients: () => Effect.Effect<Record<string, MCPClient>>
   readonly tools: () => Effect.Effect<Record<string, Tool>>
+  readonly toolsForSession: (sessionID: SessionID) => Effect.Effect<Record<string, Tool>>
+  readonly clearSessionCache: (sessionID: SessionID) => Effect.Effect<void>
   readonly prompts: () => Effect.Effect<Record<string, PromptInfo & { client: string }>>
   readonly resources: () => Effect.Effect<Record<string, ResourceInfo & { client: string }>>
   readonly add: (name: string, mcp: ConfigMCP.Info) => Effect.Effect<{ status: Record<string, Status> | Status }>
@@ -278,6 +284,14 @@ export const layer = Layer.effect(
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
     const auth = yield* McpAuth.Service
     const bus = yield* Bus.Service
+    const isSaaS = !!Flag.OPENCODE_DATABASE_URL
+    const sessionMcp = Option.getOrUndefined(yield* Effect.serviceOption(SessionMcp.Service))
+
+    // Sandbox MCP client cache: sessionID → Map<mcpName, { client, defs, port }>
+    const sandboxMcpRef = yield* Ref.make(new Map<string, Map<string, { client: MCPClient; defs: MCPToolDef[]; port: number }>>())
+
+    const SANDBOX_MCP_BASE_PORT = 9100
+    const SANDBOX_MCP_PORT_STEP = 100
 
     type Transport = StdioClientTransport | StreamableHTTPClientTransport | SSEClientTransport
 
@@ -544,6 +558,13 @@ export const layer = Layer.effect(
                 return
               }
 
+              // In SaaS mode, local MCP servers are started per-session in sandbox
+              if (isSaaS && mcp.type === "local") {
+                log.info("deferring local MCP to sandbox in SaaS mode", { key })
+                s.status[key] = { status: "connected" }
+                return
+              }
+
               const result = yield* create(key, mcp).pipe(Effect.catch(() => Effect.void))
               if (!result) return
 
@@ -693,6 +714,237 @@ export const layer = Layer.effect(
         { concurrency: "unbounded" },
       )
       return result
+    })
+
+    const connectSandboxLocal = Effect.fn("MCP.connectSandboxLocal")(function* (
+      key: string,
+      mcp: ConfigMCP.Info & { type: "local" },
+      sessionID: SessionID,
+      port: number,
+    ) {
+      const maybeSandboxProvider = Option.getOrUndefined(yield* Effect.serviceOption(SandboxProvider.Service))
+      if (!maybeSandboxProvider) {
+        return { client: undefined, defs: undefined } as { client: MCPClient | undefined; defs: MCPToolDef[] | undefined }
+      }
+
+      const [cmd, ...args] = mcp.command
+
+      // Use supergateway to bridge stdio MCP → StreamableHTTP inside the sandbox
+      const mcpServerCommand = `${cmd} ${args.join(" ")}`
+      const bridgeCommand = `npx -y supergateway --stdio '${mcpServerCommand.replace(/'/g, "'\\''")}' --outputTransport streamableHttp --port ${port} --logLevel none`
+      log.info("starting MCP in sandbox via supergateway", { key, sessionID, port, command: bridgeCommand })
+
+      yield* maybeSandboxProvider.runInSession(sessionID, `nohup ${bridgeCommand} > /tmp/mcp-${key}.log 2>&1 &`).pipe(
+        Effect.catch((err) => {
+          log.error("sandbox MCP start failed", { key, sessionID, error: String(err) })
+          return Effect.void
+        }),
+      )
+
+      // Wait for supergateway + MCP server to initialize
+      yield* Effect.sleep("3 seconds")
+
+      const endpointUrl = yield* maybeSandboxProvider.getEndpoint(sessionID, port)
+      const mcpUrl = new URL(endpointUrl.endsWith("/") ? endpointUrl + "mcp" : endpointUrl + "/mcp")
+
+      // Connect via HTTP transport with retry (supergateway may still be starting)
+      const connectTimeout = mcp.timeout ?? DEFAULT_TIMEOUT
+      const client = yield* Effect.gen(function* () {
+        for (let attempt = 0; attempt < 30; attempt++) {
+          const c = new Client({ name: "opencode", version: InstallationVersion })
+          const transport = new StreamableHTTPClientTransport(mcpUrl)
+          const result = yield* Effect.tryPromise(() => withTimeout(c.connect(transport), connectTimeout)).pipe(
+            Effect.map(() => c),
+            Effect.catch(() => Effect.succeed(undefined as MCPClient | undefined)),
+          )
+          if (result) return result
+          yield* Effect.sleep("2 seconds")
+        }
+        return undefined as MCPClient | undefined
+      }).pipe(
+        Effect.map((c): { client: MCPClient | undefined; defs: MCPToolDef[] | undefined } => {
+          if (c) log.info("connected to sandbox MCP", { key, sessionID })
+          return { client: c, defs: undefined }
+        }),
+      )
+
+      if (!client.client) return client
+
+      const listed = yield* defs(key, client.client, mcp.timeout)
+      if (!listed) {
+        yield* Effect.tryPromise(() => client.client!.close()).pipe(Effect.ignore)
+        return { client: undefined, defs: undefined }
+      }
+
+      return { client: client.client, defs: listed }
+    })
+
+    const toolsForSession = Effect.fn("MCP.toolsForSession")(function* (sessionID: SessionID) {
+      const baseTools = yield* tools()
+
+      if (!isSaaS) return baseTools
+
+      const cfg = yield* cfgSvc.get()
+      const config = cfg.mcp ?? {}
+      const defaultTimeout = cfg.experimental?.mcp_timeout
+      const result = { ...baseTools }
+
+      // Check sandbox cache for this session
+      const sessionClients = yield* Ref.modify(sandboxMcpRef, (m) => {
+        const existing = m.get(sessionID)
+        return [existing ?? null, m] as const
+      })
+
+      let portIndex = 0
+      for (const [key, mcp] of Object.entries(config)) {
+        if (!isMcpConfigured(mcp) || mcp.type !== "local" || mcp.enabled === false) continue
+
+        const cached = sessionClients?.get(key)
+        if (cached) {
+          const timeout = mcp.timeout ?? defaultTimeout
+          for (const mcpTool of cached.defs) {
+            result[sanitize(key) + "_" + sanitize(mcpTool.name)] = convertMcpTool(mcpTool, cached.client, timeout)
+          }
+          continue
+        }
+
+        const port = SANDBOX_MCP_BASE_PORT + portIndex * SANDBOX_MCP_PORT_STEP
+        portIndex++
+
+        const sandboxResult = yield* connectSandboxLocal(key, mcp as ConfigMCP.Info & { type: "local" }, sessionID, port).pipe(
+          Effect.catch(() => Effect.succeed({ client: undefined, defs: undefined } as { client: MCPClient | undefined; defs: MCPToolDef[] | undefined })),
+        )
+
+        if (!sandboxResult.client || !sandboxResult.defs) continue
+
+        // Cache the connection
+        yield* Ref.modify(sandboxMcpRef, (m) => {
+          let sessionMap = m.get(sessionID)
+          if (!sessionMap) {
+            sessionMap = new Map()
+            m.set(sessionID, sessionMap)
+          }
+          sessionMap.set(key, { client: sandboxResult.client!, defs: sandboxResult.defs!, port })
+          return [undefined, m] as const
+        })
+
+        const timeout = mcp.timeout ?? defaultTimeout
+        for (const mcpTool of sandboxResult.defs) {
+          result[sanitize(key) + "_" + sanitize(mcpTool.name)] = convertMcpTool(mcpTool, sandboxResult.client, timeout)
+        }
+      }
+
+      if (isSaaS && sessionMcp) {
+        const sessionMcps = yield* sessionMcp.list(sessionID).pipe(Effect.catch(() => Effect.succeed([] as SessionMcp.Row[])))
+
+        // Collect ports already in use by cached entries
+        const usedPorts = new Set<number>()
+        if (sessionClients) {
+          for (const [, entry] of sessionClients) {
+            if (entry.port > 0) usedPorts.add(entry.port)
+          }
+        }
+
+        for (const row of sessionMcps) {
+          if (!row.enabled) continue
+
+          // Check cache first (same mechanism as config-level local MCP)
+          const cached = sessionClients?.get(row.name)
+          if (cached) {
+            const timeout = cfg.experimental?.mcp_timeout ?? DEFAULT_TIMEOUT
+            for (const mcpTool of cached.defs) {
+              result[sanitize(row.name) + "_" + sanitize(mcpTool.name)] = convertMcpTool(mcpTool, cached.client, timeout)
+            }
+            continue
+          }
+
+          if (row.type === "remote" && row.url) {
+            // Session remote MCP: connect directly from server
+            const remoteCfg: ConfigMCP.Info & { type: "remote" } = {
+              type: "remote",
+              url: row.url,
+              headers: row.headers,
+            }
+            const { client } = yield* connectRemote(row.name, remoteCfg).pipe(
+              Effect.catch(() => Effect.succeed({ client: undefined, status: { status: "failed", error: "" } } as { client: MCPClient | undefined; status: any })),
+            )
+            if (!client) continue
+            const listed = yield* defs(row.name, client, cfg.experimental?.mcp_timeout)
+            if (!listed) {
+              yield* Effect.tryPromise(() => client.close()).pipe(Effect.ignore)
+              continue
+            }
+            // Cache the connection
+            yield* Ref.modify(sandboxMcpRef, (m) => {
+              let sessionMap = m.get(sessionID)
+              if (!sessionMap) {
+                sessionMap = new Map()
+                m.set(sessionID, sessionMap)
+              }
+              sessionMap.set(row.name, { client, defs: listed, port: 0 })
+              return [undefined, m] as const
+            })
+            for (const mcpTool of listed) {
+              result[sanitize(row.name) + "_" + sanitize(mcpTool.name)] = convertMcpTool(mcpTool, client, cfg.experimental?.mcp_timeout ?? DEFAULT_TIMEOUT)
+            }
+          } else if (row.type === "local" && row.command) {
+            const maybeSandboxProvider = Option.getOrUndefined(yield* Effect.serviceOption(SandboxProvider.Service))
+            if (!maybeSandboxProvider) continue
+            // Allocate next available port, skipping already-used ones
+            let port = SANDBOX_MCP_BASE_PORT + portIndex * SANDBOX_MCP_PORT_STEP
+            while (usedPorts.has(port)) {
+              portIndex++
+              port = SANDBOX_MCP_BASE_PORT + portIndex * SANDBOX_MCP_PORT_STEP
+            }
+            portIndex++
+            usedPorts.add(port)
+            const localCfg: ConfigMCP.Info & { type: "local" } = {
+              type: "local",
+              command: row.command,
+              environment: row.environment,
+            }
+            const sandboxResult = yield* connectSandboxLocal(row.name, localCfg, sessionID, port).pipe(
+              Effect.catch(() => Effect.succeed({ client: undefined, defs: undefined } as { client: MCPClient | undefined; defs: MCPToolDef[] | undefined })),
+            )
+            if (!sandboxResult.client || !sandboxResult.defs) continue
+            // Cache the connection
+            yield* Ref.modify(sandboxMcpRef, (m) => {
+              let sessionMap = m.get(sessionID)
+              if (!sessionMap) {
+                sessionMap = new Map()
+                m.set(sessionID, sessionMap)
+              }
+              sessionMap.set(row.name, { client: sandboxResult.client!, defs: sandboxResult.defs!, port })
+              return [undefined, m] as const
+            })
+            for (const mcpTool of sandboxResult.defs) {
+              result[sanitize(row.name) + "_" + sanitize(mcpTool.name)] = convertMcpTool(mcpTool, sandboxResult.client, cfg.experimental?.mcp_timeout ?? DEFAULT_TIMEOUT)
+            }
+          }
+        }
+      }
+
+      return result
+    })
+
+    const clearSessionCache = Effect.fn("MCP.clearSessionCache")(function* (sessionID: SessionID) {
+      const sessionMap = yield* Ref.modify(sandboxMcpRef, (m) => {
+        const existing = m.get(sessionID) ?? null
+        m.delete(sessionID)
+        return [existing, m] as const
+      })
+      if (!sessionMap) return
+
+      const maybeSandboxProvider = Option.getOrUndefined(yield* Effect.serviceOption(SandboxProvider.Service))
+
+      for (const [name, entry] of sessionMap) {
+        yield* Effect.tryPromise(() => entry.client.close()).pipe(Effect.ignore)
+        // Kill supergateway process in sandbox for local MCP entries with a port
+        if (maybeSandboxProvider && entry.port > 0) {
+          yield* maybeSandboxProvider.runInSession(sessionID, `pkill -f "supergateway.*--port ${entry.port}" || true`).pipe(Effect.ignore)
+          log.info("killed supergateway in sandbox", { sessionID, name, port: entry.port })
+        }
+      }
     })
 
     function collectFromConnected<T extends { name: string }>(
@@ -938,6 +1190,8 @@ export const layer = Layer.effect(
       status,
       clients,
       tools,
+      toolsForSession,
+      clearSessionCache,
       prompts,
       resources,
       add,
@@ -966,6 +1220,7 @@ export const defaultLayer = layer.pipe(
   Layer.provide(Config.defaultLayer),
   Layer.provide(CrossSpawnSpawner.defaultLayer),
   Layer.provide(AppFileSystem.defaultLayer),
+  Layer.provide(Flag.OPENCODE_DATABASE_URL ? SessionMcp.pgLayer : SessionMcp.noopLayer),
 )
 
 export * as MCP from "."

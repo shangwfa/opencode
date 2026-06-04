@@ -12,6 +12,7 @@ import { MessageID, PartID, SessionID } from "@/session/schema"
 import { Snapshot } from "@/snapshot"
 import { Skill } from "@/skill"
 import { Agent } from "@/agent/agent"
+import { SessionMcp } from "@/mcp/session-mcp"
 import { Schema, Struct } from "effect"
 import { HttpApi, HttpApiEndpoint, HttpApiError, HttpApiGroup, HttpApiSchema, OpenApi } from "effect/unstable/httpapi"
 import { Authorization } from "../middleware/authorization"
@@ -79,6 +80,16 @@ export const SkillLoadPayload = Schema.Struct({
 })
 export const AgentCreatePayload = Agent.CreateInput
 
+export const McpCreatePayload = Schema.Struct({
+  name: Schema.String,
+  type: Schema.Literals(["local", "remote"]),
+  command: Schema.optional(Schema.Array(Schema.String)),
+  url: Schema.optional(Schema.String),
+  environment: Schema.optional(Schema.Record(Schema.String, Schema.String)),
+  headers: Schema.optional(Schema.Record(Schema.String, Schema.String)),
+  enabled: Schema.optional(Schema.Boolean),
+})
+
 export const SessionPaths = {
   list: root,
   status: `${root}/status`,
@@ -113,6 +124,9 @@ export const SessionPaths = {
   agents: `${root}/:sessionID/agents`,
   agentsCreate: `${root}/:sessionID/agents/create`,
   agentsDelete: `${root}/:sessionID/agents/:name`,
+  mcps: `${root}/:sessionID/mcps`,
+  mcpsCreate: `${root}/:sessionID/mcps/create`,
+  mcpsDelete: `${root}/:sessionID/mcps/:name`,
 } as const
 
 export const SessionApi = HttpApi.make("session")
@@ -554,6 +568,52 @@ export const SessionApi = HttpApi.make("session")
             identifier: "session.agents.clear",
             summary: "Clear session agents",
             description: "Remove all agents attached to a specific OpenCode session.",
+          }),
+        ),
+        HttpApiEndpoint.get("mcps", SessionPaths.mcps, {
+          params: { sessionID: SessionID },
+          query: WorkspaceRoutingQuery,
+          success: described(Schema.Array(Schema.Unknown), "Session MCPs"),
+          error: [HttpApiError.BadRequest, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.mcps",
+            summary: "List session MCPs",
+            description: "Get MCP servers attached to a specific OpenCode session.",
+          }),
+        ),
+        HttpApiEndpoint.post("mcpsCreate", SessionPaths.mcpsCreate, {
+          params: { sessionID: SessionID },
+          query: WorkspaceRoutingQuery,
+          payload: McpCreatePayload,
+          success: described(Schema.Unknown, "Created session MCP"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.mcps.create",
+            summary: "Create session MCP",
+            description: "Create or update a session-level MCP server. Only available in SaaS mode.",
+          }),
+        ),
+        HttpApiEndpoint.delete("mcpsDelete", SessionPaths.mcpsDelete, {
+          params: { sessionID: SessionID, name: Schema.String },
+          query: WorkspaceRoutingQuery,
+          success: described(Schema.Void, "Session MCP removed"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.mcps.delete",
+            summary: "Delete session MCP",
+            description: "Remove a session-level MCP server.",
+          }),
+        ),
+        HttpApiEndpoint.delete("mcpsClear", SessionPaths.mcps, {
+          params: { sessionID: SessionID },
+          query: WorkspaceRoutingQuery,
+          success: described(Schema.Void, "Session MCPs cleared"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.mcps.clear",
+            summary: "Clear session MCPs",
+            description: "Remove all MCP servers attached to a specific OpenCode session.",
           }),
         ),
       )

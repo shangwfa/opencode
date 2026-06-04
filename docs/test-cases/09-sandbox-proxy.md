@@ -143,6 +143,51 @@ print('stdout:', d.get('stdout','')[:200])
 
 ---
 
+### T11.3b SSE stream 实时查看 async exec 输出
+
+```bash
+# 启动一个异步命令，逐步产生输出
+SSE_EXEC=$(curl -s -m 10 -X POST "$BASE/session/$SID/exec/async" \
+  -H 'Content-Type: application/json' \
+  -d '{"command":"echo line1; sleep 1; echo line2; sleep 1; echo line3; sleep 1; echo done","timeoutSeconds":30}')
+SSE_EXEC_ID=$(echo "$SSE_EXEC" | python3 -c "import json,sys;print(json.load(sys.stdin).get('execId',''))")
+echo "execId: $SSE_EXEC_ID"
+
+# 通过 SSE stream 实时读取输出
+# 注意：--no-buffer 确保行缓冲，-N 或 -s 控制输出时机
+curl -s -N --max-time 15 "$BASE/session/$SID/exec/$SSE_EXEC_ID/stream" 2>&1 | python3 -c "
+import sys
+events = []
+for line in sys.stdin:
+    line = line.strip()
+    if not line:
+        continue
+    if line.startswith('event: '):
+        events.append({'event': line[7:], 'data': ''})
+    elif line.startswith('data: ') and events:
+        events[-1]['data'] = line[6:]
+    elif line.startswith(':'):
+        pass  # comment(heartbeat)
+print('total events:', len(events))
+for e in events:
+    print(f\"  event={e['event']} data={e['data']}\")
+"
+
+# 查询最终状态确认
+curl -s "$BASE/session/$SID/exec/$SSE_EXEC_ID" | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+print('final status:', d.get('status'))
+print('final stdout:', d.get('stdout','').strip())
+"
+```
+**期望**：
+- SSE 流中收到 `line1`、`line2`、`line3`、`done` 的 stdout 事件，之间有时间间隔（非一次性返回）
+- 最终收到 `event: done`，status 为 `completed`
+- 查询接口确认 stdout 包含完整输出
+
+---
+
 ### T11.4 endpoint API 获取直连地址
 
 ```bash
@@ -316,6 +361,88 @@ import json,sys;d=json.load(sys.stdin);print('bad port:', d.get('error') or d)"
 
 ---
 
+### T11.12 完整流程：pnpm 创建 Vite 项目 + SSE stream 实时日志 + endpoint 访问
+
+> 自包含用例，独立创建 session，演示从零到访问前端的全流程。
+
+```bash
+BASE="http://localhost:14096"
+PNPM="/home/coder/.npm-global/bin/pnpm"
+
+# 1. 创建独立 session
+SID2=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -d '{}' \
+  | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+echo "SID2: $SID2"
+
+# 2. 设置 keepAlive（防止项目创建期间沙箱被回收）
+curl -s -X POST "$BASE/session/$SID2/keep-alive" \
+  -H 'Content-Type: application/json' \
+  -d '{"enabled":true}' > /dev/null && echo "keepAlive: OK"
+
+# 3. 触发 sandbox 创建 + 安装 pnpm + 创建 Vite 项目
+curl -s --max-time 80 -X POST "$BASE/session/$SID2/exec" \
+  -H 'Content-Type: application/json' \
+  -d "{\"command\":\"echo init && npm install -g pnpm@8 2>/dev/null && rm -rf /workspace/pnpm-app && cd /workspace && $PNPM create vite@5 pnpm-app --template react-ts 2>&1 | tail -1\",\"timeoutSeconds\":60}" \
+  | python3 -c "import json,sys;d=json.load(sys.stdin);print('create-vite exit:', d.get('exitCode'))"
+
+# 4. pnpm install 安装依赖
+curl -s --max-time 90 -X POST "$BASE/session/$SID2/exec" \
+  -H 'Content-Type: application/json' \
+  -d "{\"command\":\"cd /workspace/pnpm-app && $PNPM install 2>&1 | tail -2\",\"timeoutSeconds\":60}" \
+  | python3 -c "import json,sys;d=json.load(sys.stdin);print('pnpm install exit:', d.get('exitCode'));print(d.get('stdout','').strip()[-100:])"
+
+# 5. async exec 启动 dev server
+ASEXEC=$(curl -s -m 10 -X POST "$BASE/session/$SID2/exec/async" \
+  -H 'Content-Type: application/json' \
+  -d "{\"command\":\"cd /workspace/pnpm-app && $PNPM dev --host 0.0.0.0 --port 5173\",\"timeoutSeconds\":300}")
+ASEID=$(echo "$ASEXEC" | python3 -c "import json,sys;print(json.load(sys.stdin).get('execId',''))")
+echo "async execId: $ASEID"
+
+# 6. SSE stream 实时查看 dev server 启动日志
+curl -s -N --max-time 30 "$BASE/session/$SID2/exec/$ASEID/stream" 2>&1 | python3 -c "
+import sys
+lines = [l.strip() for l in sys.stdin if l.strip()]
+print(f'SSE events: {len(lines)}')
+for l in lines:
+    print(' ', l[:80])
+
+# 验证关键输出
+text = ' '.join(lines)
+checks = [
+    ('VITE ready', 'VITE' in text and 'ready' in text),
+    ('Local URL', 'Local' in text and 'localhost' in text),
+    ('Network URL', 'Network' in text),
+    ('event:done', 'event: done' not in lines and lines[-1:][0].startswith('event:') if lines else False),
+]
+for name, ok in checks:
+    print(f'  {\"✅\" if ok else \"❌\"} {name}')
+"
+
+# 7. 获取 endpoint 直连地址 + 访问前端
+sleep 3
+ENDPOINT=$(curl -s -m 10 "$BASE/session/$SID2/endpoint/5173")
+echo "endpoint: $ENDPOINT" | python3 -m json.tool
+
+EP_URL=$(echo "$ENDPOINT" | python3 -c "import json,sys;print(json.load(sys.stdin).get('url',''))")
+HTTP_CODE=$(curl -s --max-time 10 "$EP_URL" -o /dev/null -w "%{http_code}")
+echo "HTTP: $HTTP_CODE"
+
+curl -s --max-time 10 "$EP_URL" | python3 -c "
+import sys
+html = sys.stdin.read()
+print(f'DOCTYPE: {\"<!doctype\" in html.lower()}')
+print(f'has root: {\"id=\\\\"root\\\"\" in html or \"id=\\\\"app\\\"\" in html}')
+print(f'has script: {\"<script\" in html}')
+print(f'length: {len(html)}')
+"
+```
+**期望**：
+- create-vite/pnpm install 均 `exit: 0`
+- SSE stream 实时输出 Vite 启动过程（VITE ready、Local URL、Network URL）
+- endpoint 返回 `mode: direct`，HTTP 200，HTML 含 DOCTYPE/root/script
+
+---
+
 ## 注意事项
 
 1. **async exec 占用 Semaphore**：dev server 通过 async exec 启动后，该 session 的 Semaphore(1) 被持有。在 dev server 运行期间，**同步 exec 会被阻塞**。如需执行其他命令，需先 kill 掉 async exec 或使用另一个 session。
@@ -331,6 +458,7 @@ import json,sys;d=json.load(sys.stdin);print('bad port:', d.get('error') or d)"
 | T11.1 | ✅ | exec → keepAlive=true |
 | T11.2 | ✅ | create-vite + npm install（同步 exec 分步） |
 | T11.3 | ✅ | exec/async 启动 Vite，立即返回 execId |
+| T11.3b | ✅ | SSE stream 逐步收到 line1/line2/line3/done，最终 event: done |
 | T11.4 | ✅ | mode:direct, url:http://<ip>:5173 |
 | T11.5 | ✅ | HTML 含 DOCTYPE、script、main.tsx |
 | T11.6 | ✅ | sandboxId 不变 |
@@ -339,12 +467,13 @@ import json,sys;d=json.load(sys.stdin);print('bad port:', d.get('error') or d)"
 | T11.9 | ✅ | kill → status:killed，sandbox 仍在 |
 | T11.10 | ✅ | keepAlive=false, destroyed=true, endpoint→sandbox unreachable |
 | T11.11 | ✅ | bad session→sandbox unreachable, bad port→invalid port |
+| T11.12 | —（新增） | pnpm 创建 Vite + SSE stream 实时日志 + endpoint 访问 |
 
 ---
 
 ## 完整测试脚本
 
-> 将以下内容保存为 `test-sandbox.sh`，一键运行所有用例（T11.1-T11.11）。
+> 将以下内容保存为 `test-sandbox.sh`，一键运行所有用例（T11.1-T11.12）。
 
 ```bash
 #!/usr/bin/env bash
@@ -417,6 +546,30 @@ echo "execId: $EXEC_ID"
 check "T11.3 async exec 返回 running" [ "$EXEC_STATUS" = "running" ]
 
 sleep 8
+
+# ────────────────────────────────────────────
+echo ""
+echo "=== T11.3b SSE stream 实时查看 async exec 输出 ==="
+SSE_CID=$(curl -s -m 10 -X POST "$BASE/session/$SID/exec/async" \
+  -H 'Content-Type: application/json' \
+  -d '{"command":"echo line1; sleep 1; echo line2; sleep 1; echo line3; sleep 1; echo done","timeoutSeconds":30}')
+SSE_EID=$(echo "$SSE_CID" | jq_val execId)
+echo "execId: $SSE_EID"
+
+SSE_OK=$(curl -s -N --max-time 15 "$BASE/session/$SID/exec/$SSE_EID/stream" 2>&1 | python3 -c "
+import sys
+lines = [l.strip() for l in sys.stdin if l.strip()]
+has_line1 = any('line1' in l for l in lines)
+has_line2 = any('line2' in l for l in lines)
+has_line3 = any('line3' in l for l in lines)
+has_done  = any('done'  in l for l in lines)
+has_done_event = any('event: done' == l for l in lines)
+print(has_line1 and has_line2 and has_line3 and has_done and has_done_event)
+")
+check "T11.3b SSE stream 收到所有输出 (line1/2/3/done + event:done)" [ "$SSE_OK" = "True" ]
+
+SSE_STAT=$(curl -s -m 10 "$BASE/session/$SID/exec/$SSE_EID" | jq_val status)
+check "T11.3b SSE exec 最终 status=completed" [ "$SSE_STAT" = "completed" ]
 
 # ────────────────────────────────────────────
 echo ""
@@ -543,6 +696,64 @@ echo "bad session: $ERR_SESSION"
 echo "bad port: $ERR_PORT"
 check "T11.11a bad session 返回错误" [ -n "$ERR_SESSION" ]
 check "T11.11b bad port 返回错误" [ -n "$ERR_PORT" ]
+
+# ────────────────────────────────────────────
+echo ""
+echo "=== T11.12 完整流程：pnpm + Vite + SSE stream + endpoint ==="
+SID2=$(curl -s -m 10 -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jq_val id)
+echo "SID2: $SID2"
+
+# keepAlive
+curl -s -m 10 -X POST "$BASE/session/$SID2/keep-alive" \
+  -H 'Content-Type: application/json' -d '{"enabled":true}' > /dev/null
+
+# 触发 sandbox + 安装 pnpm + create vite
+T12_EXIT1=$(curl -s --max-time 80 -X POST "$BASE/session/$SID2/exec" \
+  -H 'Content-Type: application/json' \
+  -d '{"command":"echo init && npm install -g pnpm@8 2>/dev/null && rm -rf /workspace/pnpm-app && cd /workspace && /home/coder/.npm-global/bin/pnpm create vite@5 pnpm-app --template react-ts 2>&1 | tail -1","timeoutSeconds":60}' \
+  | jq_val exitCode)
+check "T11.12a create-vite exit=0" [ "$T12_EXIT1" = "0" ]
+
+# pnpm install
+T12_EXIT2=$(curl -s --max-time 90 -X POST "$BASE/session/$SID2/exec" \
+  -H 'Content-Type: application/json' \
+  -d '{"command":"cd /workspace/pnpm-app && /home/coder/.npm-global/bin/pnpm install 2>&1 | tail -2","timeoutSeconds":60}' \
+  | jq_val exitCode)
+check "T11.12b pnpm install exit=0" [ "$T12_EXIT2" = "0" ]
+
+# async exec dev server
+T12_ASYNC=$(curl -s -m 10 -X POST "$BASE/session/$SID2/exec/async" \
+  -H 'Content-Type: application/json' \
+  -d '{"command":"cd /workspace/pnpm-app && /home/coder/.npm-global/bin/pnpm dev --host 0.0.0.0 --port 5173","timeoutSeconds":300}')
+T12_EID=$(echo "$T12_ASYNC" | jq_val execId)
+echo "execId: $T12_EID"
+check "T11.12c async exec 返回 running" [ "$(echo "$T12_ASYNC" | jq_val status)" = "running" ]
+
+# SSE stream 验证 Vite 启动
+T12_SSE_OK=$(curl -s -N --max-time 30 "$BASE/session/$SID2/exec/$T12_EID/stream" 2>&1 | python3 -c "
+import sys
+lines = [l.strip() for l in sys.stdin if l.strip()]
+text = ' '.join(lines)
+ok = 'VITE' in text and 'ready' in text and 'Local' in text and 'Network' in text
+print(ok)
+")
+check "T11.12d SSE stream 含 VITE ready/Local/Network" [ "$T12_SSE_OK" = "True" ]
+
+# endpoint + 访问前端
+sleep 3
+T12_EP=$(curl -s -m 10 "$BASE/session/$SID2/endpoint/5173")
+T12_MODE=$(echo "$T12_EP" | jq_val mode)
+check "T11.12e endpoint mode=direct" [ "$T12_MODE" = "direct" ]
+
+T12_URL=$(echo "$T12_EP" | jq_val url)
+T12_HTTP=$(curl -s --max-time 10 "$T12_URL" -o /dev/null -w "%{http_code}")
+check "T11.12f frontend HTTP 200" [ "$T12_HTTP" = "200" ]
+
+T12_HTML_OK=$(curl -s --max-time 10 "$T12_URL" | python3 -c "
+import sys;html=sys.stdin.read()
+print('<!doctype' in html.lower() and ('id=\"root\"' in html or 'id=\"app\"' in html) and '<script' in html)
+")
+check "T11.12g HTML 含 DOCTYPE+root+script" [ "$T12_HTML_OK" = "True" ]
 
 # ────────────────────────────────────────────
 echo ""
