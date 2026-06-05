@@ -109,6 +109,12 @@ export namespace SandboxProvider {
       },
       signal?: AbortSignal,
     ) => Effect.Effect<CommandExecution, Error, never>
+    readonly runDetached: (
+      sessionID: SessionID,
+      command: string,
+      options?: { workingDirectory?: string; timeoutSeconds?: number },
+      signal?: AbortSignal,
+    ) => Effect.Effect<CommandExecution, Error, never>
     readonly interrupt: (sessionID: SessionID) => Effect.Effect<void>
     readonly register: (sessionID: SessionID, sb: Sandbox) => Effect.Effect<void>
     readonly getEndpoint: (sessionID: SessionID, port: number) => Effect.Effect<string>
@@ -354,6 +360,23 @@ export namespace SandboxProvider {
           )
         }).pipe(Effect.withSpan("SandboxProvider.runInSession"))
 
+      const runDetached: Interface["runDetached"] = (sessionID, command, options, signal) =>
+        Effect.gen(function* () {
+          const sb = yield* getOrCreate(sessionID)
+          const detachedSessionId = yield* Effect.tryPromise({
+            try: () => sb.commands.createSession({ workingDirectory: options?.workingDirectory ?? "/workspace" }),
+            catch: (e) => new Error(`Failed to create detached session: ${String(e)}`),
+          })
+          try {
+            return yield* Effect.tryPromise({
+              try: () => sb.commands.runInSession(detachedSessionId, command, options, undefined, signal),
+              catch: (e) => new Error(`runDetached failed: ${String(e)}`),
+            })
+          } finally {
+            yield* Effect.tryPromise(() => sb.commands.deleteSession(detachedSessionId)).pipe(Effect.ignore)
+          }
+        }).pipe(Effect.withSpan("SandboxProvider.runDetached"))
+
       const interrupt: Interface["interrupt"] = (sessionID) =>
         Effect.gen(function* () {
           const sessionId = commandSessions.get(sessionID)
@@ -396,7 +419,7 @@ export namespace SandboxProvider {
 
       return Service.of({
         getOrCreate, get, destroy, destroyById, destroyAll, keepAlive, release, isKeepAlive,
-        runInSession, interrupt, register, getEndpoint,
+        runInSession, runDetached, interrupt, register, getEndpoint,
         cleanupSessionVolume: (sessionID) => cleanupSessionVolume(sessionID, config, connectionConfig),
       })
     }),
@@ -886,6 +909,23 @@ export namespace SandboxProvider {
           }))
         })).pipe(Effect.withSpan("SandboxProvider.runInSession"))
 
+      const runDetached: Interface["runDetached"] = (sessionID, command, options, signal) =>
+        lock(sessionID, Effect.gen(function* () {
+          const sb = yield* getOrCreateUnlocked(sessionID)
+          const detachedSessionId = yield* Effect.tryPromise({
+            try: () => sb.commands.createSession({ workingDirectory: options?.workingDirectory ?? "/workspace" }),
+            catch: (e) => new Error(`Failed to create detached session: ${String(e)}`),
+          })
+          try {
+            return yield* Effect.tryPromise({
+              try: () => sb.commands.runInSession(detachedSessionId, command, options, undefined, signal),
+              catch: (e) => new Error(`runDetached failed: ${String(e)}`),
+            })
+          } finally {
+            yield* Effect.tryPromise(() => sb.commands.deleteSession(detachedSessionId)).pipe(Effect.ignore)
+          }
+        })).pipe(Effect.withSpan("SandboxProvider.runDetached"))
+
       const interrupt: Interface["interrupt"] = (sessionID) =>
         Effect.gen(function* () {
           const row = yield* dbGet(sessionID).pipe(Effect.orElseSucceed(() => null))
@@ -974,7 +1014,7 @@ export namespace SandboxProvider {
 
       return Service.of({
         getOrCreate, get, destroy, destroyById, destroyAll, keepAlive, release, isKeepAlive,
-        runInSession, interrupt, register, getEndpoint,
+        runInSession, runDetached, interrupt, register, getEndpoint,
         cleanupSessionVolume: (sessionID) => cleanupSessionVolume(sessionID, config, connectionConfig),
       })
     }),
@@ -998,6 +1038,7 @@ export namespace NoopSandboxProvider {
       release: () => Effect.void,
       isKeepAlive: () => Effect.succeed(false),
       runInSession: () => Effect.fail(new Error("Sandbox is disabled")),
+      runDetached: () => Effect.fail(new Error("Sandbox is disabled")),
       interrupt: () => Effect.void,
       register: () => Effect.void,
       getEndpoint: () => Effect.die(new Error("Sandbox is disabled")),

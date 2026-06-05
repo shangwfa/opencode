@@ -48,23 +48,32 @@ export const ShellTool = Tool.define(
         ? `cd ${input.cwd} && ( sh -c '${input.command.replace(/'/g, "'\\''")}' </dev/null > /tmp/opencode-bg-${ctx.callID ?? Date.now()}.log 2>&1 & ) && echo "started background"`
         : `cd ${input.cwd} && ${input.command}`
 
-      const sb = yield* Effect.tryPromise({ try: () => ctx.sandbox!, catch: (e) => new Error(`Initialization failed: ${e instanceof Error ? e.message : String(e)}`) })
-      const result = yield* sandboxProvider.runInSession(
-        ctx.sessionID,
-        fullCommand,
-        { timeoutSeconds: Math.ceil((input.timeout + 5000) / 1000) },
-        {
-          onStdout: (msg: { text: string }) => {
-            output += msg.text
-            ctx.metadata({ metadata: { output: output.slice(-MAX_METADATA_LENGTH), description: input.description } })
-          },
-          onStderr: (msg: { text: string }) => {
-            output += msg.text
-            ctx.metadata({ metadata: { output: output.slice(-MAX_METADATA_LENGTH), description: input.description } })
-          },
-        },
-        ctx.abort,
-      )
+      const result = input.background
+        ? yield* sandboxProvider.runDetached(
+            ctx.sessionID,
+            fullCommand,
+            { timeoutSeconds: Math.ceil((input.timeout + 5000) / 1000) },
+            ctx.abort,
+          )
+        : yield* Effect.gen(function* () {
+            const sb = yield* Effect.tryPromise({ try: () => ctx.sandbox!, catch: (e) => new Error(`Initialization failed: ${e instanceof Error ? e.message : String(e)}`) })
+            return yield* sandboxProvider.runInSession(
+              ctx.sessionID,
+              fullCommand,
+              { timeoutSeconds: Math.ceil((input.timeout + 5000) / 1000) },
+              {
+                onStdout: (msg: { text: string }) => {
+                  output += msg.text
+                  ctx.metadata({ metadata: { output: output.slice(-MAX_METADATA_LENGTH), description: input.description } })
+                },
+                onStderr: (msg: { text: string }) => {
+                  output += msg.text
+                  ctx.metadata({ metadata: { output: output.slice(-MAX_METADATA_LENGTH), description: input.description } })
+                },
+              },
+              ctx.abort,
+            )
+          })
 
       if (input.background) yield* sandboxProvider.keepAlive(ctx.sessionID)
 
