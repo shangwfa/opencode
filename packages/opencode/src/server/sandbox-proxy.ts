@@ -1,4 +1,4 @@
-import { Effect, Schema, Queue, Stream, Fiber } from "effect"
+import { Effect, Schema, Queue, Stream, Fiber, Duration } from "effect"
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
 import * as Socket from "effect/unstable/socket/Socket"
 import * as Sse from "effect/unstable/encoding/Sse"
@@ -361,9 +361,10 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
         }
 
         const runAsync = Effect.gen(function* () {
-          const result = yield* sandbox.runInSession(sid, cmd, opts, handlers).pipe(
+          const result = yield* sandbox.runDetached(sid, cmd, opts, handlers).pipe(
             Effect.catch(() => Effect.succeed(null as any)),
           )
+          if (state.status === "killed") return
           if (result) {
             state.exitCode = result.exitCode
             state.stdout = result.logs.stdout.map((m: any) => m.text).join("\n")
@@ -376,7 +377,13 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
           state.finishedAt = Date.now()
           Queue.offerUnsafe(q, { _tag: "done" as const, exitCode: state.exitCode, stdout: state.stdout, stderr: state.stderr })
           Queue.endUnsafe(q as any)
-        }).pipe(Effect.catch(() => Effect.sync(() => { state.status = "failed"; state.finishedAt = Date.now(); Queue.offerUnsafe(q, { _tag: "done" as const, exitCode: null, stdout: "", stderr: "" }); Queue.endUnsafe(q as any) })))
+        }).pipe(Effect.catch(() => Effect.sync(() => {
+          if (state.status === "killed") return
+          state.status = "failed"
+          state.finishedAt = Date.now()
+          Queue.offerUnsafe(q, { _tag: "done" as const, exitCode: null, stdout: "", stderr: "" })
+          Queue.endUnsafe(q as any)
+        })))
 
         const fiber = Effect.runFork(runAsync.pipe(Effect.provideService(SandboxProvider.Service, sandbox)))
         state.fiber = fiber
@@ -450,8 +457,17 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
         Queue.offerUnsafe(state.queue, { _tag: "done" as const, exitCode: null, stdout: state.stdout, stderr: state.stderr })
         Queue.endUnsafe(state.queue as any)
 
-        if (state.fiber) yield* Fiber.interrupt(state.fiber).pipe(Effect.catch(() => Effect.void))
-        yield* sandbox.interrupt(params.sessionID).pipe(Effect.catch(() => Effect.void))
+        // 并发 interrupt sandbox 命令 + fiber，加超时保护
+        const fiberInterrupt = state.fiber
+          ? Fiber.interrupt(state.fiber).pipe(Effect.catch(() => Effect.void))
+          : Effect.void
+        yield* Effect.all([
+          sandbox.interrupt(params.sessionID).pipe(
+            Effect.timeout(Duration.seconds(10)),
+            Effect.catch(() => Effect.void),
+          ),
+          fiberInterrupt,
+        ], { concurrency: "unbounded" }).pipe(Effect.catch(() => Effect.void))
 
         return HttpServerResponse.jsonUnsafe({ execId: params.execId, status: "killed" })
       }),

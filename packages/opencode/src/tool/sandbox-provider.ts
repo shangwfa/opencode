@@ -397,7 +397,14 @@ export namespace SandboxProvider {
             catch: () => {},
           })
           log.info("sandbox command interrupted", { sessionID })
-        }).pipe(Effect.catch(() => Effect.void), Effect.withSpan("SandboxProvider.interrupt"))
+        }).pipe(
+          Effect.ensuring(Effect.sync(() => {
+            commandSessions.delete(sessionID)
+            commandSemaphores.delete(sessionID)
+          })),
+          Effect.catch(() => Effect.void),
+          Effect.withSpan("SandboxProvider.interrupt"),
+        )
 
       const register: Interface["register"] = (sessionID, sb) =>
         Effect.sync(() => {
@@ -919,8 +926,8 @@ export namespace SandboxProvider {
         })).pipe(Effect.withSpan("SandboxProvider.runInSession"))
 
       const runDetached: Interface["runDetached"] = (sessionID, command, options, handlers, signal) =>
-        lock(sessionID, Effect.gen(function* () {
-          const sb = yield* getOrCreateUnlocked(sessionID)
+        Effect.gen(function* () {
+          const sb = yield* lock(sessionID, getOrCreateUnlocked(sessionID))
           const detachedSessionId = yield* Effect.tryPromise({
             try: () => sb.commands.createSession({ workingDirectory: options?.workingDirectory ?? "/workspace" }),
             catch: (e) => new Error(`Failed to create detached session: ${String(e)}`),
@@ -933,7 +940,7 @@ export namespace SandboxProvider {
           } finally {
             yield* Effect.tryPromise(() => sb.commands.deleteSession(detachedSessionId)).pipe(Effect.ignore)
           }
-        })).pipe(Effect.withSpan("SandboxProvider.runDetached"))
+        }).pipe(Effect.withSpan("SandboxProvider.runDetached"))
 
       const interrupt: Interface["interrupt"] = (sessionID) =>
         Effect.gen(function* () {
@@ -945,7 +952,20 @@ export namespace SandboxProvider {
             catch: () => {},
           }).pipe(Effect.catch(() => Effect.void))
           log.info("sandbox command interrupted", { sessionID })
-        }).pipe(Effect.withSpan("SandboxProvider.interrupt"))
+        }).pipe(
+          Effect.ensuring(Effect.gen(function* () {
+            commandSemaphores.delete(sessionID)
+            yield* Effect.tryPromise({
+              try: () => pgDb
+                .update(SandboxTable)
+                .set({ command_session_id: null, time_updated: Date.now() })
+                .where(eq(SandboxTable.session_id, sessionID))
+                .run(),
+              catch: () => {},
+            }).pipe(Effect.catch(() => Effect.void))
+          })),
+          Effect.withSpan("SandboxProvider.interrupt"),
+        )
 
       const register: Interface["register"] = (sessionID, sb) =>
         lock(sessionID, Effect.gen(function* () {
