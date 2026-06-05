@@ -45,7 +45,7 @@ export const ShellTool = Tool.define(
       })
 
       const fullCommand = input.background
-        ? `cd ${input.cwd} && ( sh -c '${input.command.replace(/'/g, "'\\''")}' </dev/null > /tmp/opencode-bg-${ctx.callID ?? Date.now()}.log 2>&1 & ) && echo "started background"`
+        ? `cd ${input.cwd} && ( nohup sh -c '${input.command.replace(/'/g, "'\\''")}' </dev/null > /tmp/opencode-bg-${ctx.callID ?? Date.now()}.log 2>&1 & ) && echo "started background"`
         : `cd ${input.cwd} && ${input.command}`
 
       const result = input.background
@@ -53,6 +53,16 @@ export const ShellTool = Tool.define(
             ctx.sessionID,
             fullCommand,
             { timeoutSeconds: Math.ceil((input.timeout + 5000) / 1000) },
+            {
+              onStdout: (msg: { text: string }) => {
+                output += msg.text
+                ctx.metadata({ metadata: { output: output.slice(-MAX_METADATA_LENGTH), description: input.description } })
+              },
+              onStderr: (msg: { text: string }) => {
+                output += msg.text
+                ctx.metadata({ metadata: { output: output.slice(-MAX_METADATA_LENGTH), description: input.description } })
+              },
+            },
             ctx.abort,
           )
         : yield* Effect.gen(function* () {
@@ -122,6 +132,7 @@ export const ShellTool = Tool.define(
                   cwd: sandboxCwd,
                   timeout,
                   description: params.description,
+                  background: params.background,
                 },
                 ctx,
               ).pipe(Effect.orDie)

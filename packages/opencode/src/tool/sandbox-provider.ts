@@ -113,6 +113,15 @@ export namespace SandboxProvider {
       sessionID: SessionID,
       command: string,
       options?: { workingDirectory?: string; timeoutSeconds?: number },
+      handlers?: {
+        onStdout?: (msg: { text: string }) => void | Promise<void>
+        onStderr?: (msg: { text: string }) => void | Promise<void>
+        onEvent?: (ev: unknown) => void | Promise<void>
+        onResult?: (res: unknown) => void | Promise<void>
+        onExecutionComplete?: (c: unknown) => void | Promise<void>
+        onError?: (err: unknown) => void | Promise<void>
+        onInit?: (init: unknown) => void | Promise<void>
+      },
       signal?: AbortSignal,
     ) => Effect.Effect<CommandExecution, Error, never>
     readonly interrupt: (sessionID: SessionID) => Effect.Effect<void>
@@ -360,7 +369,7 @@ export namespace SandboxProvider {
           )
         }).pipe(Effect.withSpan("SandboxProvider.runInSession"))
 
-      const runDetached: Interface["runDetached"] = (sessionID, command, options, signal) =>
+      const runDetached: Interface["runDetached"] = (sessionID, command, options, handlers, signal) =>
         Effect.gen(function* () {
           const sb = yield* getOrCreate(sessionID)
           const detachedSessionId = yield* Effect.tryPromise({
@@ -369,7 +378,7 @@ export namespace SandboxProvider {
           })
           try {
             return yield* Effect.tryPromise({
-              try: () => sb.commands.runInSession(detachedSessionId, command, options, undefined, signal),
+              try: () => sb.commands.runInSession(detachedSessionId, command, options, handlers, signal),
               catch: (e) => new Error(`runDetached failed: ${String(e)}`),
             })
           } finally {
@@ -909,7 +918,7 @@ export namespace SandboxProvider {
           }))
         })).pipe(Effect.withSpan("SandboxProvider.runInSession"))
 
-      const runDetached: Interface["runDetached"] = (sessionID, command, options, signal) =>
+      const runDetached: Interface["runDetached"] = (sessionID, command, options, handlers, signal) =>
         lock(sessionID, Effect.gen(function* () {
           const sb = yield* getOrCreateUnlocked(sessionID)
           const detachedSessionId = yield* Effect.tryPromise({
@@ -918,7 +927,7 @@ export namespace SandboxProvider {
           })
           try {
             return yield* Effect.tryPromise({
-              try: () => sb.commands.runInSession(detachedSessionId, command, options, undefined, signal),
+              try: () => sb.commands.runInSession(detachedSessionId, command, options, handlers, signal),
               catch: (e) => new Error(`runDetached failed: ${String(e)}`),
             })
           } finally {
