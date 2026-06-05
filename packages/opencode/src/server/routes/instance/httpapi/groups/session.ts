@@ -80,15 +80,22 @@ export const SkillLoadPayload = Schema.Struct({
 })
 export const AgentCreatePayload = Agent.CreateInput
 
-export const McpCreatePayload = Schema.Struct({
-  name: Schema.String,
-  type: Schema.Literals(["local", "remote"]),
-  command: Schema.optional(Schema.Array(Schema.String)),
-  url: Schema.optional(Schema.String),
-  environment: Schema.optional(Schema.Record(Schema.String, Schema.String)),
-  headers: Schema.optional(Schema.Record(Schema.String, Schema.String)),
-  enabled: Schema.optional(Schema.Boolean),
-})
+export const McpCreatePayload = Schema.Union([
+  Schema.Struct({
+    name: Schema.String,
+    type: Schema.Literal("local"),
+    command: Schema.NonEmptyArray(Schema.String),
+    environment: Schema.optional(Schema.Record(Schema.String, Schema.String)),
+    enabled: Schema.optional(Schema.Boolean),
+  }),
+  Schema.Struct({
+    name: Schema.String,
+    type: Schema.Literal("remote"),
+    url: Schema.String,
+    headers: Schema.optional(Schema.Record(Schema.String, Schema.String)),
+    enabled: Schema.optional(Schema.Boolean),
+  }),
+]).annotate({ discriminator: "type" })
 
 export const SessionPaths = {
   list: root,

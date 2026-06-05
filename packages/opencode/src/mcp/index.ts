@@ -39,6 +39,29 @@ import { SessionMcp } from "./session-mcp"
 const log = Log.create({ service: "mcp" })
 const DEFAULT_TIMEOUT = 30_000
 
+function shellQuote(value: string) {
+  return `'${value.replace(/'/g, `'"'"'`)}'`
+}
+
+function safeFilePart(value: string) {
+  return value.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 80) || "mcp"
+}
+
+function sandboxMcpPaths(name: string, port: number) {
+  const file = `${safeFilePart(name)}-${port}`
+  return {
+    log: `/tmp/opencode-mcp/${file}.log`,
+    pid: `/tmp/opencode-mcp/${file}.pid`,
+  }
+}
+
+function stdioCommand(mcp: ConfigMCP.Info & { type: "local" }) {
+  const env = Object.entries(mcp.environment ?? {}).flatMap(([key, value]) =>
+    /^[A-Za-z_][A-Za-z0-9_]*$/.test(key) ? [`${key}=${shellQuote(value)}`] : [],
+  )
+  return [...env, ...mcp.command.map(shellQuote)].join(" ")
+}
+
 const TolerantListToolsResultSchema = ListToolsResultSchema.extend({
   tools: ToolSchema.omit({ outputSchema: true }).array(),
 })
@@ -727,22 +750,20 @@ export const layer = Layer.effect(
         return { client: undefined, defs: undefined } as { client: MCPClient | undefined; defs: MCPToolDef[] | undefined }
       }
 
-      const [cmd, ...args] = mcp.command
-
       // Use supergateway to bridge stdio MCP → StreamableHTTP inside the sandbox
-      const mcpServerCommand = `${cmd} ${args.join(" ")}`
-      const bridgeCommand = `npx -y supergateway --stdio '${mcpServerCommand.replace(/'/g, "'\\''")}' --outputTransport streamableHttp --port ${port} --logLevel none`
+      const paths = sandboxMcpPaths(key, port)
+      const bridgeCommand = `npx -y supergateway --stdio ${shellQuote(stdioCommand(mcp))} --outputTransport streamableHttp --port ${port} --logLevel none`
       log.info("starting MCP in sandbox via supergateway", { key, sessionID, port, command: bridgeCommand })
 
-      yield* maybeSandboxProvider.runInSession(sessionID, `nohup ${bridgeCommand} > /tmp/mcp-${key}.log 2>&1 &`).pipe(
+      yield* maybeSandboxProvider.runInSession(
+        sessionID,
+        `mkdir -p /tmp/opencode-mcp; nohup ${bridgeCommand} > ${shellQuote(paths.log)} 2>&1 & echo $! > ${shellQuote(paths.pid)}`,
+      ).pipe(
         Effect.catch((err) => {
           log.error("sandbox MCP start failed", { key, sessionID, error: String(err) })
           return Effect.void
         }),
       )
-
-      // Wait for supergateway + MCP server to initialize
-      yield* Effect.sleep("3 seconds")
 
       const endpointUrl = yield* maybeSandboxProvider.getEndpoint(sessionID, port)
       const mcpUrl = new URL(endpointUrl.endsWith("/") ? endpointUrl + "mcp" : endpointUrl + "/mcp")
@@ -939,9 +960,15 @@ export const layer = Layer.effect(
 
       for (const [name, entry] of sessionMap) {
         yield* Effect.tryPromise(() => entry.client.close()).pipe(Effect.ignore)
-        // Kill supergateway process in sandbox for local MCP entries with a port
+        // Kill the supergateway process in sandbox for local MCP entries with a port.
         if (maybeSandboxProvider && entry.port > 0) {
-          yield* maybeSandboxProvider.runInSession(sessionID, `pkill -f "supergateway.*--port ${entry.port}" || true`).pipe(Effect.ignore)
+          const paths = sandboxMcpPaths(name, entry.port)
+          yield* maybeSandboxProvider
+            .runInSession(
+              sessionID,
+              `if [ -f ${shellQuote(paths.pid)} ]; then kill "$(cat ${shellQuote(paths.pid)})" 2>/dev/null || true; rm -f ${shellQuote(paths.pid)} ${shellQuote(paths.log)}; fi`,
+            )
+            .pipe(Effect.ignore)
           log.info("killed supergateway in sandbox", { sessionID, name, port: entry.port })
         }
       }
