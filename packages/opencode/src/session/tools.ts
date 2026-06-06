@@ -57,24 +57,26 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
     }
     return current
   }
-  function getSandbox(sessionID: SessionID): Promise<unknown> | null {
+  const sandboxSessionID = maybeSandboxProvider
+    ? yield* Effect.promise(() => findRootSessionID(input.session.id))
+    : input.session.id
+  function getSandbox(): Promise<unknown> | null {
     if (!maybeSandboxProvider) {
       return null
     }
-    return findRootSessionID(sessionID).then((rootID) =>
-      maybeSandboxProvider!.getOrCreate(rootID).pipe(Effect.runPromise)
-    ).catch(() => null)
+    return maybeSandboxProvider.getOrCreate(sandboxSessionID).pipe(Effect.runPromise).catch(() => null)
   }
 
   const context = (args: Record<string, unknown>, options: ToolExecutionOptions): Tool.Context => ({
     sessionID: input.session.id,
+    sandboxSessionID,
     abort: options.abortSignal!,
     messageID: input.processor.message.id,
     callID: options.toolCallId,
     extra: { model: input.model, bypassAgentCheck: input.bypassAgentCheck, promptOps: input.promptOps },
     agent: input.agent.name,
     messages: input.messages,
-    sandbox: getSandbox(input.session.id),
+    sandbox: getSandbox(),
     metadata: (val) =>
       input.processor.updateToolCall(options.toolCallId, (match) => {
         if (!["running", "pending"].includes(match.state.status)) return match

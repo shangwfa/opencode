@@ -63,7 +63,7 @@ export const ReadTool = Tool.define(
       const sandboxPath = toSandboxPath(filepath, instance.directory)
 
       const dirCheck = yield* sandboxProvider.runInSession(
-        ctx.sessionID,
+        ctx.sandboxSessionID ?? ctx.sessionID,
         `test -d "${sandboxPath}" && echo "DIR" || echo "FILE"`,
         { timeoutSeconds: 5 },
       ).pipe(Effect.catch(() => Effect.succeed({ logs: { stdout: [], stderr: [] }, exitCode: 1 } as any)))
@@ -72,7 +72,7 @@ export const ReadTool = Tool.define(
 
       if (isDirectory) {
         const lsResult = yield* sandboxProvider.runInSession(
-          ctx.sessionID,
+          ctx.sandboxSessionID ?? ctx.sessionID,
           `ls -1 "${sandboxPath}"`,
           { timeoutSeconds: 10 },
         ).pipe(Effect.catch(() => Effect.succeed({ logs: { stdout: [], stderr: [] }, exitCode: 1 } as any)))

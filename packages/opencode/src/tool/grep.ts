@@ -81,7 +81,7 @@ export const GrepTool = Tool.define(
             cmd += ` --glob '${escapedInclude}'`
           }
 
-          const result = yield* sandboxProvider.runInSession(ctx.sessionID, cmd, { timeoutSeconds: 30 })
+          const result = yield* sandboxProvider.runInSession(ctx.sandboxSessionID ?? ctx.sessionID, cmd, { timeoutSeconds: 30 })
           const stdout = result.logs.stdout
             .map((l: { text: string }) => l.text)
             .join("")

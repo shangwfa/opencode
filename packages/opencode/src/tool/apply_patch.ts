@@ -47,7 +47,7 @@ export const ApplyPatchTool = Tool.define(
       Effect.gen(function* () {
         const svc = yield* Effect.serviceOption(SandboxProvider.Service)
         if (svc._tag === "Some") {
-          yield* svc.value.runInSession(ctx.sessionID, `rm -f "${toSandboxPath(filePath, instance.directory)}"`, { timeoutSeconds: 10 }).pipe(Effect.catchCause(() => Effect.void))
+          yield* svc.value.runInSession(ctx.sandboxSessionID ?? ctx.sessionID, `rm -f "${toSandboxPath(filePath, instance.directory)}"`, { timeoutSeconds: 10 }).pipe(Effect.catchCause(() => Effect.void))
         }
       })
 

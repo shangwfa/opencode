@@ -50,7 +50,7 @@ export const ShellTool = Tool.define(
 
       const result = input.background
         ? yield* sandboxProvider.runDetached(
-            ctx.sessionID,
+            ctx.sandboxSessionID ?? ctx.sessionID,
             fullCommand,
             { timeoutSeconds: Math.ceil((input.timeout + 5000) / 1000) },
             {
@@ -68,7 +68,7 @@ export const ShellTool = Tool.define(
         : yield* Effect.gen(function* () {
             const sb = yield* Effect.tryPromise({ try: () => ctx.sandbox!, catch: (e) => new Error(`Initialization failed: ${e instanceof Error ? e.message : String(e)}`) })
             return yield* sandboxProvider.runInSession(
-              ctx.sessionID,
+              ctx.sandboxSessionID ?? ctx.sessionID,
               fullCommand,
               { timeoutSeconds: Math.ceil((input.timeout + 5000) / 1000) },
               {
@@ -85,7 +85,7 @@ export const ShellTool = Tool.define(
             )
           })
 
-      if (input.background) yield* sandboxProvider.keepAlive(ctx.sessionID)
+      if (input.background) yield* sandboxProvider.keepAlive(ctx.sandboxSessionID ?? ctx.sessionID)
 
       const exitCode = result.exitCode ?? null
       if (exitCode === null) expired = true

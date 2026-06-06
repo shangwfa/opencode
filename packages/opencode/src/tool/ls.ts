@@ -75,7 +75,7 @@ export const ListTool = Tool.define(
           const sandboxSearchPath = toSandboxPath(search, ins.directory)
           const globArgs = glob.map((g) => `--glob '${g}'`).join(" ")
           const cmd = `rg --files ${globArgs} '${sandboxSearchPath}' 2>/dev/null | head -${LIMIT + 1}`
-          const result = yield* sandboxProvider.runInSession(ctx.sessionID, cmd, { timeoutSeconds: 30 })
+          const result = yield* sandboxProvider.runInSession(ctx.sandboxSessionID ?? ctx.sessionID, cmd, { timeoutSeconds: 30 })
           const stdout = result.logs.stdout
             .map((l: { text: string }) => l.text)
             .join("\n")

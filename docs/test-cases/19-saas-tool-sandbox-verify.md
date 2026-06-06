@@ -328,7 +328,7 @@ RUN apt-get update \
 - 在运行沙箱中 `apt-get install ripgrep` 成功安装 ripgrep 14.1.0，确认 apt 源可用
 - 临时安装的 rg 在 sandbox 回收重建后丢失，印证必须烤进镜像才能持久（方案 B 的必要性）
 
-**待部署**：需重新构建 `packages/containers/sandbox` 镜像并推送到 opensandbox 服务端（172.18.32.15 K8s registry）。部署后 glob/grep/ls 三工具的沙箱分支即可正常工作。
+**已构建并推送**：`shangwfa/opencode-saas-sandbox:rg`（amd64/linux，含 ripgrep 14.1.0）。使用时将 `OPENCODE_SANDBOX_IMAGE` 指向该 tag；旧的 `shangwfa/opencode-saas-sandbox:latest` 仍不含 `rg`。
 
 > **方案 A（未采用）**：opencode 代码层 rg fallback 到 find/grep。需改 3 个工具 + 适配输出解析，改动较大。
 
