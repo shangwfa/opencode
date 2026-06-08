@@ -16,7 +16,17 @@ import { SandboxProvider } from "./sandbox-provider"
 export { Parameters } from "./shell/prompt"
 
 const MAX_METADATA_LENGTH = 30_000
+const MAX_TIMEOUT_MS = 5 * 60 * 1000
+const COMMAND_NOT_FOUND_RE = /command not found|No such file or directory/i
 export const log = Log.create({ service: "shell-tool" })
+
+function checkCommandNotFound(text: string): string | undefined {
+  const m = text.match(COMMAND_NOT_FOUND_RE)
+  if (m) {
+    const line = text.trim().split("\n").find(l => COMMAND_NOT_FOUND_RE.test(l))
+    return line ?? m[0]
+  }
+}
 
 export const ShellTool = Tool.define(
   ShellID.ToolID,
@@ -59,6 +69,8 @@ export const ShellTool = Tool.define(
                 ctx.metadata({ metadata: { output: output.slice(-MAX_METADATA_LENGTH), description: input.description } })
               },
               onStderr: (msg: { text: string }) => {
+                const cmdErr = checkCommandNotFound(msg.text)
+                if (cmdErr) throw new Error(`Command failed: ${cmdErr}`)
                 output += msg.text
                 ctx.metadata({ metadata: { output: output.slice(-MAX_METADATA_LENGTH), description: input.description } })
               },
@@ -77,6 +89,8 @@ export const ShellTool = Tool.define(
                   ctx.metadata({ metadata: { output: output.slice(-MAX_METADATA_LENGTH), description: input.description } })
                 },
                 onStderr: (msg: { text: string }) => {
+                  const cmdErr = checkCommandNotFound(msg.text)
+                  if (cmdErr) throw new Error(`Command failed: ${cmdErr}`)
                   output += msg.text
                   ctx.metadata({ metadata: { output: output.slice(-MAX_METADATA_LENGTH), description: input.description } })
                 },
@@ -91,7 +105,7 @@ export const ShellTool = Tool.define(
       if (exitCode === null) expired = true
 
       const meta: string[] = []
-      if (expired) meta.push(`bash tool terminated command after exceeding timeout ${input.timeout} ms.`)
+      if (expired) meta.push(`bash tool terminated command after exceeding timeout ${Math.min(input.timeout, MAX_TIMEOUT_MS)} ms.`)
       if (meta.length > 0) output += "\n\n<bash_metadata>\n" + meta.join("\n") + "\n</bash_metadata>"
 
       return {
@@ -119,7 +133,7 @@ export const ShellTool = Tool.define(
               if (params.timeout !== undefined && params.timeout < 0) {
                 throw new Error(`Invalid timeout value: ${params.timeout}. Timeout must be a positive number.`)
               }
-              const timeout = params.timeout ?? defaultTimeoutMs
+              const timeout = Math.min(params.timeout ?? defaultTimeoutMs, MAX_TIMEOUT_MS)
 
               const sandboxProviderOpt = yield* Effect.serviceOption(SandboxProvider.Service)
               if (sandboxProviderOpt._tag === "None") throw new Error("Execution environment not available")
