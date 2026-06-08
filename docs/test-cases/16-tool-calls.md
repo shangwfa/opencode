@@ -188,13 +188,17 @@ send_and_verify "$SID" "用 bash 执行: netstat -tlnp" "T18.9b: AI 自动改用
 
 # 验证超长 timeout 不会被 AI 滥用导致卡顿。
 send_and_verify "$SID" "用 bash 执行，timeout 设置为 600000: nonexistent-command-xyz" "T18.9c: 超长 timeout 不应导致超时等待"
+
+# 端到端测试：给 AI 一个真实场景任务，观察其在命令不存在时的恢复行为。
+send_and_verify "$SID" "项目是 Vite + React 应用，运行在沙箱的 /workspace 目录。请帮我查看 5173 端口是否被占用，如果被占用找到占用进程并杀掉" "T18.9d: 端到端端口检查任务"
 ```
 
 **期望**：
 - T18.9a 的 `bash` 状态应为 `completed`（快速失败返回错误信息，不是卡到超时），输出应包含 `command not found` 或类似信息。
 - T18.9b 的 `bash` 状态为 `completed`，输出应包含正常结果（如 `Active Internet connections` 或类似），说明 AI 从错误中恢复并使用了替代方案。
 - T18.9c 即使 AI 设置了 10 分钟 timeout，系统应在几秒内返回 `command not found`，不应真正等待 10 分钟。
-- PG 中 T18.9a 和 T18.9c 的 tool 耗时不应超过 30 秒。
+- T18.9d 的 PG 中每个 bash 工具调用耗时不应超过 30 秒；AI 最终应完成任务（找到端口状态），而非卡在 `command not found` 上无限重试。
+- PG 中 T18.9a/T18.9c 的 tool 耗时不应超过 30 秒。
 
 ### PG 验证（推荐）
 
@@ -299,7 +303,7 @@ ORDER BY p.time_created;
 | T18.6 | ✅ | `webfetch` completed，抓取 `https://example.com` 标题为 Example Domain；`skill` completed，加载 `frontend-design` skill |
 | T18.7 | ✅ | 完整消息流验证通过：父 session 共 66 条消息，结构按 `user text → tool → assistant text` 交替出现，所有 tool part 状态为 completed |
 | T18.8 | ✅ | 子项目路径映射回归通过：write/edit/read 正确写入 `/workspace/app/src/App.tsx`，sentinel 未泄露到 `/workspace/src`；bash workdir 正确保留 `/workspace/app` |
-| T18.9 | ✅ | bash 命令不存在快速失败：`ss: command not found` 在几秒内返回而非等待 10 分钟超时；AI 自动改用替代命令完成操作 |
+| T18.9 | ✅ | bash 命令不存在快速失败：`ss: command not found` 在 2 秒内返回而非等待 28 分钟；`lsof` 失败后 AI 自动尝试 `netstat` → `ps aux | grep` → 完成端口检查任务，全程 < 10 秒 |
 
 **本轮全量回归环境**：宿主机 opencode server `127.0.0.1:14097`，PG auth，OpenSandbox Docker runtime `127.0.0.1:8080`，sandbox image `opencode-opensandbox:local`，`OPENCODE_SANDBOX_USE_SERVER_PROXY=false`，`OPENCODE_EXPERIMENTAL_BACKGROUND_SUBAGENTS=true`，session `ses_15d763272ffeVyMjgYRDGWX3bu`。
 
