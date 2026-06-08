@@ -15,6 +15,9 @@ import { Snapshot } from "@/snapshot"
 import { assertExternalDirectoryEffect } from "./external-directory"
 import { toSandboxPath } from "./sandbox-path"
 import type { Sandbox } from "@alibaba-group/opensandbox"
+import * as Log from "@opencode-ai/core/util/log"
+
+const editLog = Log.create({ service: "edit-tool" })
 
 function normalizeLineEndings(text: string): string {
   return text.replaceAll("\r\n", "\n")
@@ -81,8 +84,12 @@ export const EditTool = Tool.define(
             })
             yield* Effect.tryPromise({
               try: () => sb.files.writeFiles([{ path: sandboxPath, data: params.newString }]),
-            catch: (e) => new Error(`Failed to write file: ${params.filePath}`),
-          }).pipe(Effect.orDie)
+              catch: (e) => {
+                const msg = e instanceof Error ? e.message : String(e)
+                editLog.warn("writeFiles failed, retrying once", { sandboxPath, error: msg })
+                return sb.files.writeFiles([{ path: sandboxPath, data: params.newString }])
+              },
+            }).pipe(Effect.orDie)
             yield* bus.publish(File.Event.Edited, { file: filePath })
 
             let additions = 0
@@ -134,7 +141,11 @@ export const EditTool = Tool.define(
 
           yield* Effect.tryPromise({
             try: () => sb.files.writeFiles([{ path: sandboxPath, data: contentNew }]),
-            catch: (e) => new Error(`Failed to write file: ${params.filePath}`),
+            catch: (e) => {
+              const msg = e instanceof Error ? e.message : String(e)
+              editLog.warn("writeFiles failed, retrying once", { sandboxPath, error: msg })
+                return sb.files.writeFiles([{ path: sandboxPath, data: contentNew }])
+            },
           }).pipe(Effect.orDie)
 
           yield* bus.publish(File.Event.Edited, { file: filePath })

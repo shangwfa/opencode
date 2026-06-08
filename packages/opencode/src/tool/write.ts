@@ -11,6 +11,9 @@ import { InstanceState } from "@/effect/instance-state"
 import { trimDiff } from "./edit"
 import { assertExternalDirectoryEffect } from "./external-directory"
 import { toSandboxPath } from "./sandbox-path"
+import * as Log from "@opencode-ai/core/util/log"
+
+const writeLog = Log.create({ service: "write-tool" })
 
 export const Parameters = Schema.Struct({
   content: Schema.String.annotate({ description: "The content to write to the file" }),
@@ -54,7 +57,11 @@ export const WriteTool = Tool.define(
 
           yield* Effect.tryPromise({
             try: () => sb.files.writeFiles([{ path: sandboxPath, data: params.content }]),
-            catch: (e) => new Error(`Failed to write file: ${params.filePath}`),
+            catch: (e) => {
+              const msg = e instanceof Error ? e.message : String(e)
+              writeLog.warn("writeFiles failed, retrying once", { sandboxPath, error: msg })
+              return sb.files.writeFiles([{ path: sandboxPath, data: params.content }])
+            },
           })
 
           yield* bus.publish(File.Event.Edited, { file: filepath })
