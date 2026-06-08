@@ -18,11 +18,12 @@ RUN curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash - \
   && rm -rf /opt/node/v18.20.3 /opt/node/v20.14.0 \
   && for bin in node npm npx corepack; do ln -sf /usr/bin/$bin /opt/node/v22.2.0/bin/$bin; done \
   && rm -f /opt/node/v22.2.0/bin/pnpm /opt/node/v22.2.0/bin/yarn /opt/node/v22.2.0/bin/pnpx \
-  && npm install -g corepack@${COREPACK_VERSION} \
+  && npm install -g corepack@${COREPACK_VERSION} supergateway \
   && corepack enable \
   && corepack prepare pnpm@${PNPM_VERSION} --activate \
   && corepack prepare yarn@${YARN_VERSION} --activate \
   && for bin in pnpm yarn pnpx; do ln -sf /usr/local/bin/$bin /opt/node/v22.2.0/bin/$bin 2>/dev/null || true; done \
+  && ln -sf /usr/local/lib/node_modules/.bin/supergateway /usr/local/bin/supergateway \
   && curl -fsSL https://bun.sh/install | bash -s -- bun-v${BUN_VERSION} \
   && ln -s /root/.bun/bin/bun /usr/local/bin/bun
 

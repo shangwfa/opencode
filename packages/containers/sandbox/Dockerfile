@@ -39,11 +39,12 @@ RUN curl -LsSf https://astral.sh/uv/install.sh | sh \
   && ln -sf /root/.local/bin/uv /usr/local/bin/uv \
   && ln -sf /root/.local/bin/uvx /usr/local/bin/uvx
 
-# P2: 全局安装 TypeScript LSP 和 Python LSP
-RUN npm install -g typescript typescript-language-server pyright 2>&1 \
+# P2: 全局安装 TypeScript LSP、Python LSP 和 MCP stdio bridge
+RUN npm install -g typescript typescript-language-server pyright supergateway 2>&1 \
   && ln -sf /usr/local/lib/node_modules/.bin/typescript-language-server /usr/local/bin/typescript-language-server \
   && ln -sf /usr/local/lib/node_modules/.bin/pyright-langserver /usr/local/bin/pyright-langserver \
-  && ln -sf /usr/local/lib/node_modules/.bin/pyright /usr/local/bin/pyright
+  && ln -sf /usr/local/lib/node_modules/.bin/pyright /usr/local/bin/pyright \
+  && ln -sf /usr/local/lib/node_modules/.bin/supergateway /usr/local/bin/supergateway
 
 # 创建 workspace 目录（opencode 沙箱默认挂载点）
 RUN mkdir -p /workspace
