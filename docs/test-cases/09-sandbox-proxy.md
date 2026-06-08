@@ -13,7 +13,7 @@
 - **Endpoint API**：`GET /session/:id/endpoint/:port` 返回 sandbox 直接访问地址
 - **exec 是同步的**：`POST /session/:id/exec` 阻塞等待命令完成，且 Semaphore(1) 保证同一 session 串行执行
 - **exec/async 是异步的**：`POST /session/:id/exec/async` 立即返回 execId，后台执行
-- **Dev server 必须用 async exec 启动**：长期运行的进程（Vite/Next.js）不能用同步 exec
+- **Dev server 首选 async exec 启动**：长期运行的进程（Vite/Next.js）优先用 `exec/async`；如果必须走同步 `exec`，需要用 `nohup ... </dev/null > /tmp/app.log 2>&1 & echo $!` 显式后台化并断开 fd
 
 ### API 一览
 
@@ -49,7 +49,8 @@ BASE="http://localhost:14096"
 │ 5. POST /session/:id/exec               安装依赖（同步）        │
 │    {command: "npm install ..."}                                 │
 │ 6. POST /session/:id/exec/async          启动 dev server（异步）│
-│    {command: "npx vite --host 0.0.0.0"}  → 返回 execId          │
+│    {command: "./node_modules/.bin/vite --host 0.0.0.0"}        │
+│    → 返回 execId                                                 │
 │ 7. GET  /session/:id/endpoint/:port      获取直连 IP 地址       │
 │    → { mode: "direct", url: "http://<ip>:5173" }               │
 │                                                                 │
@@ -70,7 +71,8 @@ BASE="http://localhost:14096"
 - **异步 exec 用于长期进程**：dev server、watch 模式等。立即返回 execId，后台运行。
 - **Semaphore(1) 串行限制**：同一 session 的所有 exec（sync + async）共用一个信号量，同时只能执行一个。async exec 运行期间，sync exec 会被阻塞。如需在 dev server 运行时执行其他命令，需先 kill async exec 或使用另一个 session。
 - **必须先 keepAlive 再启动 dev server**：否则 session idle 后 sandbox 被回收，dev server 丢失。
-- **fd 重定向**：如果非要用同步 exec 后台启动进程，必须 `( cmd </dev/null > log 2>&1 & )` 断开所有 fd，否则 execd 不会发送 `execution_complete`。
+- **fd 重定向**：如果非要用同步 exec 后台启动进程，必须 `nohup cmd </dev/null > /tmp/app.log 2>&1 & echo $!` 断开所有 fd，否则 execd 可能不会发送 `execution_complete`。
+- **本地二进制优先**：启动 dev server 时优先使用 `./node_modules/.bin/vite` / `./node_modules/.bin/next`，避免 `npx` 拉取 latest 版本引入 Node 版本不兼容。
 
 ---
 
@@ -123,7 +125,7 @@ curl -s -m 120 -X POST "$BASE/session/$SID/exec" \
 # 异步启动（立即返回）
 EXEC=$(curl -s -m 10 -X POST "$BASE/session/$SID/exec/async" \
   -H 'Content-Type: application/json' \
-  -d '{"command":"cd /workspace/vite-app && npx vite --host 0.0.0.0 --port 5173","timeoutSeconds":300}')
+  -d '{"command":"cd /workspace/vite-app && ./node_modules/.bin/vite --host 0.0.0.0 --port 5173","timeoutSeconds":300}')
 echo "$EXEC"
 EXEC_ID=$(echo "$EXEC" | python3 -c "import json,sys;print(json.load(sys.stdin).get('execId',''))")
 echo "execId: $EXEC_ID"
@@ -271,7 +273,7 @@ chmod +x /tmp/hmr-modify.sh
 # async exec：后台跑修改脚本 + 前台启动 vite
 EXEC_ID=$(curl -s -m 10 -X POST "$BASE/session/$SID/exec/async" \
   -H 'Content-Type: application/json' \
-  -d '{"command":"/tmp/hmr-modify.sh & cd /workspace/vite-app && npx vite --host 0.0.0.0 --port 5173","timeoutSeconds":600}' \
+  -d '{"command":"/tmp/hmr-modify.sh & cd /workspace/vite-app && ./node_modules/.bin/vite --host 0.0.0.0 --port 5173","timeoutSeconds":600}' \
   | python3 -c "import json,sys;print(json.load(sys.stdin).get('execId',''))")
 
 sleep 6
@@ -539,7 +541,7 @@ echo ""
 echo "=== T11.3 async exec 启动 dev server ==="
 EXEC_RESP=$(curl -s -m 10 -X POST "$BASE/session/$SID/exec/async" \
   -H 'Content-Type: application/json' \
-  -d '{"command":"cd /workspace/vite-app && npx vite --host 0.0.0.0 --port 5173","timeoutSeconds":600}')
+  -d '{"command":"cd /workspace/vite-app && ./node_modules/.bin/vite --host 0.0.0.0 --port 5173","timeoutSeconds":600}')
 EXEC_ID=$(echo "$EXEC_RESP" | jq_val execId)
 EXEC_STATUS=$(echo "$EXEC_RESP" | jq_val status)
 echo "execId: $EXEC_ID"
@@ -636,7 +638,7 @@ curl -s -m 15 -X POST "$BASE/session/$SID/exec" \
 # async exec: 后台跑修改脚本 + 前台启动 vite
 EXEC_RESP2=$(curl -s -m 10 -X POST "$BASE/session/$SID/exec/async" \
   -H 'Content-Type: application/json' \
-  -d '{"command":"/tmp/hmr-modify.sh & cd /workspace/vite-app && npx vite --host 0.0.0.0 --port 5173","timeoutSeconds":600}')
+  -d '{"command":"/tmp/hmr-modify.sh & cd /workspace/vite-app && ./node_modules/.bin/vite --host 0.0.0.0 --port 5173","timeoutSeconds":600}')
 EXEC_ID=$(echo "$EXEC_RESP2" | jq_val execId)
 echo "execId: $EXEC_ID"
 

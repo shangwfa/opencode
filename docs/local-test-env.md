@@ -2,6 +2,8 @@
 
 本地运行 opencode SaaS 容器，连接远端基础设施（PG + Sandbox API），用于开发调试。
 
+也可以只连接远端 PG，使用本机 OpenSandbox server + Docker runtime 创建 sandbox 容器，避免依赖远端 K8s Sandbox API。
+
 ---
 
 ## 一、基础设施架构
@@ -17,6 +19,18 @@
   └─ 浏览器访问 http://localhost:14096/...
 ```
 
+本地 OpenSandbox 模式：
+
+```
+本机（macOS）
+  ├─ Docker 容器 opencode-saas-test（localhost:14096）
+  │    ├─ 通过 host.docker.internal:15432 → 宿主机转发 → 172.18.32.14:5432（远端 PG）
+  │    └─ 通过 host.docker.internal:8080 → 本地 OpenSandbox server
+  ├─ OpenSandbox server（localhost:8080）
+  │    └─ Docker runtime 创建 sandbox 容器
+  └─ sandbox 镜像：由 packages/opencode/Dockerfile 构建
+```
+
 | 组件 | 地址 | 说明 |
 |---|---|---|
 | opencode 容器 | `localhost:14096` | 映射容器内 4096 端口 |
@@ -24,6 +38,7 @@
 | 远端 Sandbox API | `172.18.32.15:30040` | K8s 沙箱管理服务 |
 | PG 本地转发 | `localhost:15432` | 容器通过 host.docker.internal:15432 访问 |
 | Sandbox 本地转发 | `localhost:30040` | 容器通过 host.docker.internal:30040 访问 |
+| 本地 OpenSandbox server | `localhost:8080` | Docker runtime，本地创建 sandbox 容器 |
 
 ---
 
@@ -37,6 +52,42 @@ docker build -t opencode-saas-sandbox-test:v2fix -f Dockerfile .
 ```
 
 > 代码有改动时才需要重新构建。
+
+### 2.1.1 构建本地 OpenSandbox sandbox 镜像（可选）
+
+如果要使用本地 OpenSandbox server + Docker runtime，不走远端 K8s Sandbox API，需要先构建 OpenSandbox 使用的 sandbox 镜像。
+
+> 注意区分两个 Dockerfile：
+> - 根目录 `Dockerfile`：opencode SaaS 服务容器。
+> - `packages/opencode/Dockerfile`：OpenSandbox sandbox 镜像，基于 `opensandbox/code-interpreter:latest`，内置 `opencode` 二进制和 `ripgrep`。
+
+```bash
+cd /Users/ruomu/code/opencode/packages/opencode
+
+# 先生成 Dockerfile 需要复制的 opencode 二进制。
+# 如果已经有 dist/opencode-linux-arm64/bin/opencode，可跳过。
+bun run script/build.ts --skip-install --skip-embed-web-ui
+
+# 本地 macOS Apple Silicon 用 arm64。
+docker buildx build --platform linux/arm64 \
+  -t opencode-opensandbox:local \
+  --load .
+
+# 验证镜像继承了 code-interpreter 入口，且 opencode/rg 可用。
+docker image inspect opencode-opensandbox:local \
+  --format 'entrypoint={{json .Config.Entrypoint}} workdir={{json .Config.WorkingDir}}'
+
+docker run --rm --entrypoint /bin/bash opencode-opensandbox:local -lc \
+  'opencode --version && rg --version | head -1 && node --version && python3 --version'
+```
+
+期望：
+- `entrypoint=["/opt/opensandbox/code-interpreter.sh"]`
+- `workdir=/workspace`
+- `opencode --version` 正常输出
+- `ripgrep 14.1.0` 或兼容版本正常输出
+
+> 不要在 `packages/opencode/Dockerfile` 里设置 `ENTRYPOINT ["opencode"]`。OpenSandbox 需要继承 `code-interpreter` 的入口脚本以便注入并启动 execd；覆盖入口会导致 `commands.run()` 返回 502。
 
 ### 2.2 确认远端连通性
 
@@ -86,6 +137,84 @@ lsof -i :15432 | grep LISTEN && echo "PG forward OK"
 lsof -i :30040 | grep LISTEN && echo "Sandbox forward OK"
 ```
 
+### Step 1.5：启动本地 OpenSandbox server（可选）
+
+如果使用远端 Sandbox API，可跳过本节，继续使用 `localhost:30040` 转发。
+
+本地 OpenSandbox server 读取 `~/.sandbox.toml`，使用 Docker runtime 创建 sandbox 容器。
+
+```bash
+# 确保 Docker Desktop 已启动
+docker info >/dev/null && echo "Docker OK"
+
+# 推荐配置：Docker runtime + direct ingress
+cat > ~/.sandbox.toml <<'EOF'
+[runtime]
+type = "docker"
+
+[docker]
+network_mode = "bridge"
+
+[ingress]
+mode = "direct"
+
+[egress]
+image = "opensandbox/egress:v1.0.8"
+mode = "dns"
+EOF
+
+# 启动本地 OpenSandbox server
+kill $(lsof -ti :8080) 2>/dev/null || true
+nohup env OPENSANDBOX_INSECURE_SERVER=YES uvx opensandbox-server \
+  > /tmp/opensandbox-server.log 2>&1 &
+
+# 验证健康状态
+for i in 1 2 3 4 5 6 7 8 9 10; do
+  curl -s http://127.0.0.1:8080/health && break
+  sleep 2
+done
+```
+
+期望：
+
+```json
+{"status":"healthy"}
+```
+
+本地 OpenSandbox server 验证 sandbox 镜像：
+
+```bash
+cd /Users/ruomu/code/opencode/packages/opencode
+
+OPENCODE_SANDBOX_DOMAIN=localhost:8080 OPENCODE_SANDBOX_API_KEY= bun -e '
+import { ConnectionConfig, Sandbox } from "@alibaba-group/opensandbox"
+
+const sb = await Sandbox.create({
+  connectionConfig: new ConnectionConfig({
+    domain: "localhost:8080",
+    protocol: "http",
+    useServerProxy: false,
+  }),
+  image: "opencode-opensandbox:local",
+  timeoutSeconds: 120,
+})
+
+try {
+  const result = await sb.commands.run("opencode --version && rg --version | head -1 && node --version && python3 --version 2>&1")
+  console.log(result.logs.stdout.map((line) => line.text).join("\n"))
+} finally {
+  await sb.kill().catch(() => {})
+  await sb.close().catch(() => {})
+}
+'
+```
+
+如果这里返回 502，优先检查：
+- `docker image inspect opencode-opensandbox:local` 的 entrypoint 是否为 `/opt/opensandbox/code-interpreter.sh`
+- sandbox 容器内 `/tmp/execd.log`
+- `/tmp/opensandbox-server.log`
+- 本地是否误用了 amd64 镜像导致 QEMU 下 execd 崩溃
+
 ### Step 2：启动容器
 
 ```bash
@@ -102,6 +231,47 @@ docker run -d --name opencode-saas-test \
 sleep 10 && docker logs opencode-saas-test 2>&1 | tail -3
 # 期望：Warning: OPENCODE_SERVER_PASSWORD is not set
 #        opencode server listening on http://0.0.0.0:4096
+```
+
+如果使用本地 OpenSandbox server，改用：
+
+```bash
+docker rm -f opencode-saas-test 2>/dev/null
+
+docker run -d --name opencode-saas-test \
+  -p 14096:4096 \
+  -e OPENCODE_DATABASE_URL=postgresql://app:8zuhlMLd4gaeUG5k@host.docker.internal:15432/opencode \
+  -e OPENCODE_SANDBOX_DOMAIN=host.docker.internal:8080 \
+  -e OPENCODE_SANDBOX_USE_SERVER_PROXY=true \
+  -e OPENCODE_SANDBOX_IMAGE=opencode-opensandbox:local \
+  opencode-saas-sandbox-test:v2fix
+
+sleep 10 && docker logs opencode-saas-test 2>&1 | tail -5
+```
+
+本地 OpenSandbox Docker runtime 场景下：
+- `OPENCODE_SANDBOX_DOMAIN=host.docker.internal:8080`，因为 SaaS 容器需要从容器内访问宿主机 OpenSandbox server。
+- `OPENCODE_SANDBOX_IMAGE=opencode-opensandbox:local`，指定本地构建的 sandbox 镜像。
+- `OPENCODE_SANDBOX_USE_SERVER_PROXY=true`，因为 SDK 在 SaaS 容器内运行，不能直接访问 OpenSandbox server 返回的宿主机本地 Docker endpoint，必须通过 OpenSandbox server proxy 转发到 execd。
+
+> 当前本地 Docker runtime 的稳定回归路径是：在宿主机直接启动 opencode server，使用 `OPENCODE_SANDBOX_DOMAIN=127.0.0.1:8080` 和 `OPENCODE_SANDBOX_USE_SERVER_PROXY=false`。SaaS server 跑在 Docker 容器内时，`useServerProxy=false` 无法访问宿主机 Docker 暴露的 direct endpoint；`useServerProxy=true` 又依赖 OpenSandbox server proxy 转发，遇到 502 时应先改用宿主机 server 路径验证工具链，再单独排查 OpenSandbox proxy。
+
+宿主机 server 示例：
+
+```bash
+cd /Users/ruomu/code/opencode/packages/opencode
+
+env \
+  OPENCODE_DATABASE_URL='postgresql://app:8zuhlMLd4gaeUG5k@127.0.0.1:15432/opencode' \
+  OPENCODE_AUTH_PROVIDER=pg \
+  OPENCODE_SANDBOX_ENABLED=1 \
+  OPENCODE_SANDBOX_DOMAIN=127.0.0.1:8080 \
+  OPENCODE_SANDBOX_IMAGE=opencode-opensandbox:local \
+  OPENCODE_SANDBOX_USE_SERVER_PROXY=false \
+  OPENCODE_DEFAULT_DIRECTORY='/Users/ruomu/code/opencode' \
+  OPENCODE_DISABLE_DEFAULT_PLUGINS=1 \
+  OPENCODE_DISABLE_EXTERNAL_SKILLS=1 \
+  bun run --conditions=browser ./src/index.ts serve --hostname 127.0.0.1 --port 14097 --print-logs --pure
 ```
 
 ### Step 3：验证服务可用
@@ -327,6 +497,10 @@ POST /session/:sessionID/exec {"command":"nohup npx vite ... &"}
 | 502 sandbox unreachable | sandbox 被回收（没有 keepAlive）| 重新发消息用 `background:true` 启动 dev server |
 | 502 "All connection attempts failed" | TCP 转发进程死了 | 重新执行 Step 1 |
 | 404 from sandbox server proxy | `OPENCODE_SANDBOX_USE_SERVER_PROXY` 未设置 | 重新启动容器加 `-e OPENCODE_SANDBOX_USE_SERVER_PROXY=true` |
+| 本地 OpenSandbox `commands.run()` 502 | sandbox 镜像覆盖了 `code-interpreter` entrypoint，或 execd 崩溃 | 确认 sandbox 镜像继承 `/opt/opensandbox/code-interpreter.sh`，不要设置 `ENTRYPOINT ["opencode"]` |
+| 本地 arm64 上 execd 崩溃 | 使用了 amd64 镜像，Docker 通过 QEMU 运行 | 用 `docker buildx build --platform linux/arm64 --load` 构建本地镜像 |
+| opencode 二进制 `required file not found` | Ubuntu/glibc 基础镜像复制了 `*-musl` 二进制 | `packages/opencode/Dockerfile` 应复制 `dist/opencode-linux-arm64/bin/opencode` 或 `dist/opencode-linux-x64-baseline/bin/opencode` |
+| 本地 OpenSandbox 找不到镜像 | SaaS 容器指定的 image 名称不是 Docker daemon 中的本地镜像名 | 先 `docker images | grep opencode-opensandbox`，并设置 `OPENCODE_SANDBOX_IMAGE=opencode-opensandbox:local` |
 | 401 MISSING_API_KEY | proxy fetch 未带 API key | 检查代码是否有 `Flag.OPENCODE_SANDBOX_API_KEY` header 注入 |
 | ProviderModelNotFoundError | AI provider 未配置 | 确认容器连的是远端 PG（含 account 数据） |
 | pg_advisory_lock 启动失败 | 远端 PG 被另一个 opencode 实例占用 | 等另一个实例退出，或停掉远端 SaaS |

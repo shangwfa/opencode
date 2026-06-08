@@ -53,9 +53,9 @@
 | T12.9 | ⚠️ NOTE | 本地 Docker 环境 B 能看到 A 文件（共享 sandbox）。K8s 环境下每个 session 有独立 sandbox PVC |
 | T12.10 | ✅ | 不同 session 进程隔离（/tmp 下文件隔离，B 看到 NOT_FOUND） |
 | T12.12 | ✅ | proxy 访问不触发 keepAlive（proxy 502，无 keepAlive 日志） |
-| T12.3 | ✅ | background:true 触发 keepAlive（T19.7 验证 keepAlive API 生效） |
-| T12.4 | ✅ | 无 keepAlive 时 idle 后 sandbox 被销毁（释放 keepAlive 后 sandbox 回收） |
-| T12.5 | ✅ | keepAlive 阻止 idle 销毁（T19.8: 5s 后 server 仍运行 HTTP 200） |
+| T12.3 | ✅ | background:true / keepAlive API 生效（T19.7 验证 keepAlive + dev server proxy 200） |
+| T12.4 | ⚠️ NOTE | session runner idle 可回收 sandbox；纯 exec API 不保证仅凭释放 keepAlive 触发 idle destroy（见 T19.9） |
+| T12.5 | ✅ | keepAlive 阻止 idle 销毁（T19.8: 15s 后 exec 仍成功） |
 
 | T17.1 | ✅ | 无沙箱时 endpoint API 返回 502 |
 | T17.2 | | endpoint API 端口参数校验 |
@@ -71,11 +71,12 @@
 | T19.4 | ✅ | exec API：命令执行失败（exitCode=42） |
 | T19.5 | ✅ | exec API：缺少 command 参数（HTTP 400） |
 | T19.6 | ✅ | exec API：不存在的 session（HTTP 404，非 502） |
-| T19.7 | ✅ | exec API + keepAlive：设置 keepAlive + 后台启动 http.server，HTTP 200 |
-| T19.8 | ✅ | keepAlive 阻止 idle 销毁（5s 后 server 仍运行 HTTP 200） |
-| T19.9 | ✅ | 释放 keepAlive 后 sandbox 回收（keepAlive=false 生效） |
-| T19.10 | ✅ | exec API 超时控制（sleep 30 在 8s 内被 curl --max-time 截断） |
-| T19.11 | ✅ | exec API：环境信息（HOME=/home/coder, USER=root, PWD=/workspace） |
+| T19.7 | ✅ | exec API + keepAlive：同步 exec 用 `nohup ./node_modules/.bin/vite ... & echo $!` 后台启动 Vite 5，proxy HTTP 200；长驻进程首选 `/exec/async` |
+| T19.8 | ✅ | keepAlive 阻止 idle 销毁（15s 后 `exec echo alive` 仍成功） |
+| T19.9 | ⚠️ | 释放 keepAlive 后纯 exec 仍可执行；纯 exec 不保证触发 session runner idle destroy，需 `kill-sandbox`/dispose 显式清理 |
+| T19.10 | ⚠️ | `timeoutSeconds=5` 已透传，但 opensandbox execd 未强制 5s 中止，约 30s 后返回 `exitCode=null` |
+| T19.11 | ✅ | exec API：环境信息（node=v22.2.0 npm=10.7.0 pwd=/workspace） |
+| T19.12 | ✅ | exec/async 流式日志最佳实践：启动后立即订阅 `/stream`，收到 `stdout×4` + `done`，final status=`completed`，sandbox 清理为 destroyed |
 | T15.1 | ✅ | 简单 session skill 创建并通过 `skills` 触发 |
 | T15.2 | ✅ | 复杂 session skill bundle resources 写入、读取、注入 |
 | T15.3 | ✅ | session skill 删除单个与清空 |
@@ -225,4 +226,3 @@
 | T22.15 | ✅ | Session MCP 工具多轮对话持续可用：3 轮 3 次 MCP 调用全部成功 |
 
 ---
-

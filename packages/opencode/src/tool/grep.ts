@@ -84,7 +84,7 @@ export const GrepTool = Tool.define(
           const result = yield* sandboxProvider.runInSession(ctx.sandboxSessionID ?? ctx.sessionID, cmd, { timeoutSeconds: 30 })
           const stdout = result.logs.stdout
             .map((l: { text: string }) => l.text)
-            .join("")
+            .join("\n")
             .trim()
 
           if (!stdout) return empty

@@ -56,9 +56,10 @@ for i, m in enumerate(msgs):
 "
 
 # Step 4: 启动 Vite（background:true）
+# 使用项目本地二进制，避免 npx 拉取 latest 版本导致 Node 版本不兼容。
 curl -s --max-time 120 -X POST "$BASE/session/$SID/message" \
   -H 'Content-Type: application/json' \
-  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"用 bash 工具执行，background 必须设为 true: cd /workspace/vite-app && npx vite --host 0.0.0.0 --port 5173\"}],\"model\":$MODEL}" > /dev/null
+  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"用 bash 工具执行，background 必须设为 true: cd /workspace/vite-app && ./node_modules/.bin/vite --host 0.0.0.0 --port 5173\"}],\"model\":$MODEL}" > /dev/null
 sleep 12
 
 # Step 5: Proxy 验证
@@ -172,4 +173,3 @@ curl -s "$BASE/session/$SID/endpoint/5173" | python3 -m json.tool
 | T17.4 | ✅ | 直连 200, body=143 chars, 无 proxy 注入（data-oc-prefix 不存在） |
 | T17.5 | ✅ | Proxy 长度 3021 + prefix 注入 + fetch patch；直连 143 + 无注入 |
 | T17.6 | ✅ | kill-sandbox→state=空→endpoint 返回 sandbox unreachable |
-
