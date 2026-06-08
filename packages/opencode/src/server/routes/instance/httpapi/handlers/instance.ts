@@ -76,7 +76,7 @@ function parseNameStatus(text) {
 }
 
 function untracked() {
-  const parts = output(["status", "--porcelain=v1", "-z"])?.split("\\0").filter(Boolean) ?? []
+  const parts = output(["status", "--porcelain=v1", "-z", "--untracked-files=all"])?.split("\\0").filter(Boolean) ?? []
   return parts.flatMap((entry) => entry.startsWith("?? ") ? [{ file: entry.slice(3), status: "added" }] : [])
 }
 
