@@ -175,6 +175,27 @@ send_and_verify "$SID" "用 bash 工具执行 npm run build，workdir 必须设�
 - T18.8e/T18.8f 后，`SUBPROJECT_EDIT_SENTINEL` 只出现在 `/workspace/app/src/App.tsx`。
 - T18.8g 不应出现 `npm error path /workspace/package.json`；如果出现，说明 `workdir=/workspace/app` 被错误映射成 `/workspace`。
 
+### T18.9 bash 命令不存在快速失败
+
+> 该组用例覆盖 session `ses_15ad78f66ffea1OvpVGbRZBrYv` 暴露的问题：当 bash 命令不存在（如 `ss`）时，工具应立即失败返回错误信息，而非等到 timeout 超时。AI 收到错误后应自动调整策略（如改用替代命令 `netstat`），无需用户介入。
+
+```bash
+# 执行一个不存在的命令，验证快速失败。
+send_and_verify "$SID" "用 bash 执行: ss -tlnp" "T18.9a: 执行不存在的命令 ss"
+
+# AI 应快速从错误中恢复，改用替代命令。
+send_and_verify "$SID" "用 bash 执行: netstat -tlnp" "T18.9b: AI 自动改用替代命令"
+
+# 验证超长 timeout 不会被 AI 滥用导致卡顿。
+send_and_verify "$SID" "用 bash 执行，timeout 设置为 600000: nonexistent-command-xyz" "T18.9c: 超长 timeout 不应导致超时等待"
+```
+
+**期望**：
+- T18.9a 的 `bash` 状态应为 `completed`（快速失败返回错误信息，不是卡到超时），输出应包含 `command not found` 或类似信息。
+- T18.9b 的 `bash` 状态为 `completed`，输出应包含正常结果（如 `Active Internet connections` 或类似），说明 AI 从错误中恢复并使用了替代方案。
+- T18.9c 即使 AI 设置了 10 分钟 timeout，系统应在几秒内返回 `command not found`，不应真正等待 10 分钟。
+- PG 中 T18.9a 和 T18.9c 的 tool 耗时不应超过 30 秒。
+
 ### PG 验证（推荐）
 
 > 解析 `POST /message` 响应只能看到 user message。验证 assistant 的 tool 调用应直接查 PG `part` 表：
@@ -254,6 +275,7 @@ ORDER BY p.time_created;
 | `bash rg --version` 失败 | FAIL | 默认 sandbox image 不含 ripgrep |
 | `write /workspace/app/src/App.tsx` completed，但 `bash cat /workspace/app/src/App.tsx` 仍是旧内容 | FAIL | `/workspace/app` 被路径映射折叠成 `/workspace`，实际写到 `/workspace/src/App.tsx` |
 | `workdir=/workspace/app` 执行 `npm run build` 报 `/workspace/package.json` 不存在 | FAIL | `toSandboxCwd` 把已在 sandbox 内的 cwd 二次映射成 `/workspace` |
+| `bash ss -tlnp` 挂起 28 分钟才返回 `command not found` | FAIL | stderr 中 `command not found` 未触发快速失败，shell tool 等到 timeout 才返回 |
 | 只有最终 assistant 文本，没有 tool part | FAIL | 模型未调用工具或工具注册失败 |
 | PG 中 tool status=error | FAIL | 需要查看 `state.output` 和 sandbox/server 日志 |
 
@@ -276,6 +298,8 @@ ORDER BY p.time_created;
 | T18.5 | ✅ | 开启 `OPENCODE_EXPERIMENTAL_BACKGROUND_SUBAGENTS=true` 后，background `task` completed，`task_status×2 completed`，后台子 session `ses_15d71a3b3ffe8CYluGMfkKbuZt` 找到 2 个 ts 文件 |
 | T18.6 | ✅ | `webfetch` completed，抓取 `https://example.com` 标题为 Example Domain；`skill` completed，加载 `frontend-design` skill |
 | T18.7 | ✅ | 完整消息流验证通过：父 session 共 66 条消息，结构按 `user text → tool → assistant text` 交替出现，所有 tool part 状态为 completed |
+| T18.8 | ✅ | 子项目路径映射回归通过：write/edit/read 正确写入 `/workspace/app/src/App.tsx`，sentinel 未泄露到 `/workspace/src`；bash workdir 正确保留 `/workspace/app` |
+| T18.9 | ✅ | bash 命令不存在快速失败：`ss: command not found` 在几秒内返回而非等待 10 分钟超时；AI 自动改用替代命令完成操作 |
 
 **本轮全量回归环境**：宿主机 opencode server `127.0.0.1:14097`，PG auth，OpenSandbox Docker runtime `127.0.0.1:8080`，sandbox image `opencode-opensandbox:local`，`OPENCODE_SANDBOX_USE_SERVER_PROXY=false`，`OPENCODE_EXPERIMENTAL_BACKGROUND_SUBAGENTS=true`，session `ses_15d763272ffeVyMjgYRDGWX3bu`。
 
