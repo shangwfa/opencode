@@ -21,6 +21,7 @@ export namespace SandboxConfig {
     readonly pvcClaimName: string
     readonly idleKillMs: number
     readonly maxTtlSeconds: number
+    readonly packageCacheMount: string
   }
 
   export class Service extends Context.Service<Service, Interface>()("@opencode/SandboxConfig") {}
@@ -37,6 +38,7 @@ export namespace SandboxConfig {
     pvcClaimName: Flag.OPENCODE_SANDBOX_PVC_CLAIM,
     idleKillMs: Flag.OPENCODE_SANDBOX_IDLE_KILL_SEC * 1000,
     maxTtlSeconds: Flag.OPENCODE_SANDBOX_MAX_TTL_SEC,
+    packageCacheMount: Flag.OPENCODE_SANDBOX_PACKAGE_CACHE_MOUNT,
   }
 
   export const layer = Layer.succeed(Service, Service.of(defaultConfig))
@@ -60,7 +62,7 @@ export function buildVolumes(sessionID: string, config: SandboxConfig.Interface)
     { name: "tmp", mountPath: "/home/sandbox/tmp", sub: `${prefix}/tmp` },
   ]
 
-  return mounts.map((m) => {
+  const result = mounts.map((m) => {
     const base: Volume = { name: m.name, mountPath: m.mountPath, subPath: m.sub }
     if (config.volumeType === "pvc") {
       base.pvc = { claimName: config.pvcClaimName }
@@ -69,6 +71,36 @@ export function buildVolumes(sessionID: string, config: SandboxConfig.Interface)
     }
     return base
   })
+
+  if (config.volumeType === "pvc") {
+    const packageCacheMount = requirePackageCacheMount(config.packageCacheMount, mounts.map((m) => m.mountPath))
+    result.push({
+      name: "package-cache",
+      mountPath: packageCacheMount,
+      subPath: "shared/package-cache",
+      pvc: { claimName: config.pvcClaimName },
+    })
+  }
+
+  return result
+}
+
+function requirePackageCacheMount(mountPath: string, reservedPaths: string[]) {
+  const trimmed = mountPath.trim()
+  const normalized = trimmed === "/" ? trimmed : trimmed.replace(/\/+$/, "")
+  if (!normalized.startsWith("/") || normalized === "") {
+    throw new Error(`OPENCODE_SANDBOX_PACKAGE_CACHE_MOUNT must be an absolute path, got ${JSON.stringify(mountPath)}`)
+  }
+  if (normalized === "/") {
+    throw new Error("OPENCODE_SANDBOX_PACKAGE_CACHE_MOUNT cannot be /")
+  }
+  const conflict = reservedPaths.find(
+    (reserved) => normalized === reserved || normalized.startsWith(`${reserved}/`) || reserved.startsWith(`${normalized}/`),
+  )
+  if (conflict) {
+    throw new Error(`OPENCODE_SANDBOX_PACKAGE_CACHE_MOUNT conflicts with reserved mount path ${conflict}`)
+  }
+  return normalized
 }
 
 export function cleanupSessionVolume(

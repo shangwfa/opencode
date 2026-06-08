@@ -54,6 +54,7 @@ const configLayer = Layer.succeed(
     pvcClaimName: "",
     idleKillMs: 30_000,
     maxTtlSeconds: 3600,
+    packageCacheMount: "/xybot-front/cache",
   }),
 )
 

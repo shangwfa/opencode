@@ -14,6 +14,7 @@ const baseConfig: SandboxConfigType.Interface = {
   pvcClaimName: "",
   idleKillMs: 3_600_000,
   maxTtlSeconds: 3600,
+  packageCacheMount: "/xybot-front/cache",
 }
 
 describe("buildVolumes", () => {
@@ -21,18 +22,22 @@ describe("buildVolumes", () => {
     expect(buildVolumes("ses_1", baseConfig)).toEqual([])
   })
 
-  test("pvc: 6 volumes, same claimName, different subPaths", () => {
+  test("pvc: 7 volumes (6 session + 1 shared cache), same claimName, different subPaths", () => {
     const cfg = { ...baseConfig, volumeType: "pvc" as const, pvcClaimName: "my-pvc" }
     const vols = buildVolumes("ses_abc", cfg)
-    expect(vols.length).toBe(6)
+    expect(vols.length).toBe(7)
     for (const v of vols) {
       expect(v.pvc!.claimName).toBe("my-pvc")
-      expect(v.subPath!.startsWith("sessions/ses_abc/")).toBe(true)
       expect(v.host).toBeUndefined()
+    }
+    const sessionVols = vols.filter((v) => v.name !== "package-cache")
+    for (const v of sessionVols) {
+      expect(v.subPath!.startsWith("sessions/ses_abc/")).toBe(true)
     }
     expect(vols.map((v) => v.mountPath)).toEqual([
       "/workspace", "/home/sandbox", "/home/sandbox/.cache",
       "/home/sandbox/.config", "/home/sandbox/.local", "/home/sandbox/tmp",
+      "/xybot-front/cache",
     ])
   })
 
@@ -81,12 +86,15 @@ describe("buildVolumes", () => {
     expect(new Set(names).size).toBe(names.length)
   })
 
-  test("subPath prefix matches sessionID", () => {
+  test("subPath prefix matches sessionID (session-scoped volumes only)", () => {
     const cfg = { ...baseConfig, volumeType: "pvc" as const, pvcClaimName: "pvc" }
     const vols = buildVolumes("my-session-123", cfg)
-    for (const v of vols) {
+    const sessionVols = vols.filter((v) => v.name !== "package-cache")
+    for (const v of sessionVols) {
       expect(v.subPath!.startsWith("sessions/my-session-123/")).toBe(true)
     }
+    const cache = vols.find((v) => v.name === "package-cache")!
+    expect(cache.subPath).toBe("shared/package-cache")
   })
 })
 
@@ -254,5 +262,65 @@ describe("Full PVC lifecycle (kill/recreate)", () => {
 
     expect(v1[0].subPath).toBe(v2[0].subPath)
     expect(v1[0].pvc!.claimName).toBe("shared-pvc")
+  })
+})
+
+describe("shared package cache", () => {
+  const cfg = { ...baseConfig, volumeType: "pvc" as const, pvcClaimName: "my-pvc" }
+
+  test("PVC mode includes shared package-cache volume", () => {
+    const vols = buildVolumes("ses_1", cfg)
+    const cache = vols.find((v) => v.name === "package-cache")
+    expect(cache).toBeDefined()
+    expect(cache!.mountPath).toBe("/xybot-front/cache")
+    expect(cache!.subPath).toBe("shared/package-cache")
+    expect(cache!.pvc).toEqual({ claimName: "my-pvc" })
+  })
+
+  test("all sessions share the same package-cache subPath", () => {
+    const a = buildVolumes("ses_aaa", cfg)
+    const b = buildVolumes("ses_bbb", cfg)
+    const cacheA = a.find((v) => v.name === "package-cache")!
+    const cacheB = b.find((v) => v.name === "package-cache")!
+    expect(cacheA.subPath).toBe(cacheB.subPath)
+    expect(cacheA.mountPath).toBe(cacheB.mountPath)
+  })
+
+  test("volumeType=none does not mount package-cache", () => {
+    const vols = buildVolumes("ses_1", baseConfig)
+    expect(vols.find((v) => v.name === "package-cache")).toBeUndefined()
+  })
+
+  test("volumeType=host does not mount package-cache", () => {
+    const cfg = { ...baseConfig, volumeType: "host" as const }
+    const vols = buildVolumes("ses_1", cfg)
+    expect(vols.find((v) => v.name === "package-cache")).toBeUndefined()
+  })
+
+  test("custom packageCacheMount", () => {
+    const customCfg = { ...cfg, packageCacheMount: "/custom/cache" }
+    const vols = buildVolumes("ses_1", customCfg)
+    const cache = vols.find((v) => v.name === "package-cache")!
+    expect(cache.mountPath).toBe("/custom/cache")
+  })
+
+  test("custom packageCacheMount strips trailing slash", () => {
+    const customCfg = { ...cfg, packageCacheMount: "/custom/cache/" }
+    const vols = buildVolumes("ses_1", customCfg)
+    const cache = vols.find((v) => v.name === "package-cache")!
+    expect(cache.mountPath).toBe("/custom/cache")
+  })
+
+  test("invalid packageCacheMount is rejected", () => {
+    for (const packageCacheMount of ["", "cache", "/", "/workspace", "/workspace/cache", "/home", "/home/sandbox/.cache/npm"]) {
+      expect(() => buildVolumes("ses_1", { ...cfg, packageCacheMount })).toThrow()
+    }
+  })
+
+  test("package-cache uses the same PVC claim as session volumes", () => {
+    const vols = buildVolumes("ses_1", cfg)
+    const cache = vols.find((v) => v.name === "package-cache")!
+    const workspace = vols.find((v) => v.name === "workspace")!
+    expect(cache.pvc!.claimName).toBe(workspace.pvc!.claimName)
   })
 })

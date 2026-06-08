@@ -16,6 +16,7 @@ const noneConfig: SandboxConfig.Interface = {
   pvcClaimName: "",
   idleKillMs: 3_600_000,
   maxTtlSeconds: 3600,
+  packageCacheMount: "/xybot-front/cache",
 }
 
 const pvcConfig: SandboxConfig.Interface = {
@@ -125,7 +126,7 @@ describe("cleanupSessionVolume vs buildVolumes", () => {
     const cleanupVols = [
       { name: "cleanup-root", mountPath: "/cleanup", pvc: { claimName: pvcConfig.pvcClaimName } },
     ]
-    expect(normalVols.length).toBe(6)
+    expect(normalVols.length).toBe(7)
     expect(cleanupVols.length).toBe(1)
   })
 
@@ -137,7 +138,8 @@ describe("cleanupSessionVolume vs buildVolumes", () => {
       mountPath: "/cleanup",
       pvc: { claimName: pvcConfig.pvcClaimName },
     }
-    for (const v of normalVols) {
+    const sessionVols = normalVols.filter((v) => v.name !== "package-cache")
+    for (const v of sessionVols) {
       expect(v.subPath).toBeDefined()
       expect(v.subPath!.startsWith("sessions/" + sid + "/")).toBe(true)
     }
@@ -147,13 +149,14 @@ describe("cleanupSessionVolume vs buildVolumes", () => {
   test("cleanup deletes entire session tree that buildVolumes creates", () => {
     const sid = "ses_tree"
     const normalVols = buildVolumes(sid, pvcConfig)
-    const subDirs = normalVols.map((v) => {
+    const sessionVols = normalVols.filter((v) => v.name !== "package-cache")
+    const subDirs = sessionVols.map((v) => {
       const parts = v.subPath!.split("/")
       return parts[parts.length - 1]
     })
     expect(subDirs.sort()).toEqual(["cache", "config", "home", "local", "tmp", "workspace"])
     const rmTarget = `sessions/${sid}`
-    for (const v of normalVols) {
+    for (const v of sessionVols) {
       expect(v.subPath!.startsWith(rmTarget + "/")).toBe(true)
     }
   })

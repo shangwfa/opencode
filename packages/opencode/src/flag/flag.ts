@@ -99,6 +99,8 @@ export namespace Flag {
   export const OPENCODE_SANDBOX_PVC_CLAIM = process.env["OPENCODE_SANDBOX_PVC_CLAIM"] ?? "sandbox-test"
   export const OPENCODE_SANDBOX_IDLE_KILL_SEC = number("OPENCODE_SANDBOX_IDLE_KILL_SEC") ?? 3600
   export const OPENCODE_SANDBOX_MAX_TTL_SEC = number("OPENCODE_SANDBOX_MAX_TTL_SEC") ?? 3600
+  export const OPENCODE_SANDBOX_PACKAGE_CACHE_MOUNT =
+    process.env["OPENCODE_SANDBOX_PACKAGE_CACHE_MOUNT"] ?? "/xybot-front/cache"
 
   function number(key: string) {
     const value = process.env[key]

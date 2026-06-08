@@ -70,6 +70,7 @@ function buildFakeLayer() {
     pvcClaimName: "",
     idleKillMs: 30000,
     maxTtlSeconds: 3600,
+    packageCacheMount: "/xybot-front/cache",
   }))
 
   const providerLayer = Layer.effect(
