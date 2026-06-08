@@ -106,6 +106,30 @@ describe("toSandboxPath", () => {
     test("maps /workspace/src to /workspace/src", () => {
       expect(toSandboxPath("/workspace/src", "/workspace")).toBe("/workspace/src")
     })
+
+    test("preserves nested sandbox path when workdir is inside /workspace", () => {
+      expect(toSandboxPath("/workspace/app/src/App.tsx", "/workspace/app")).toBe("/workspace/app/src/App.tsx")
+    })
+
+    test("preserves subproject files from SaaS sessions", () => {
+      const instanceDirectory = "/workspace/app"
+      const paths = [
+        "/workspace/app/package.json",
+        "/workspace/app/index.html",
+        "/workspace/app/src/App.tsx",
+        "/workspace/app/src/App.css",
+        "/workspace/app/src/index.css",
+      ]
+
+      for (const filePath of paths) {
+        expect(toSandboxPath(filePath, instanceDirectory)).toBe(filePath)
+      }
+    })
+
+    test("does not collapse nested sandbox workdir to workspace root", () => {
+      expect(toSandboxCwd("/workspace/app", "/workspace/app")).toBe("/workspace/app")
+      expect(toSandboxCwd("/workspace/app/src", "/workspace/app")).toBe("/workspace/app/src")
+    })
   })
 })
 
@@ -145,6 +169,10 @@ describe("toHostPath", () => {
   describe("paths outside sandbox", () => {
     test("preserves paths that are not sandbox paths", () => {
       expect(toHostPath("/usr/local/bin", workdir)).toBe("/usr/local/bin")
+    })
+
+    test("preserves sandbox paths when host workdir is already inside /workspace", () => {
+      expect(toHostPath("/workspace/app/src/App.tsx", "/workspace/app")).toBe("/workspace/app/src/App.tsx")
     })
   })
 })
@@ -192,6 +220,10 @@ describe("toSandboxCwd", () => {
 
   test("maps host workdir itself", () => {
     expect(toSandboxCwd(workdir, workdir)).toBe("/workspace")
+  })
+
+  test("preserves provided sandbox cwd", () => {
+    expect(toSandboxCwd("/workspace/app", "/workspace/app")).toBe("/workspace/app")
   })
 })
 

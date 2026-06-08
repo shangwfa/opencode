@@ -32,7 +32,7 @@ describe("instance.ts getPath path mapping logic", () => {
   test("worktree='/' with subpath directory maps directory against itself", () => {
     const result = computeGetPath("/workspace/my-repo", "/")
     expect(result.worktree).toBe("/")
-    expect(result.directory).toBe("/workspace")
+    expect(result.directory).toBe("/workspace/my-repo")
   })
 
   test("never leaks host path in worktree", () => {
@@ -55,8 +55,8 @@ describe("instance.ts getPath path mapping logic", () => {
 
   test("/workspace subdirectory with /workspace worktree", () => {
     const result = computeGetPath("/workspace/repo", "/workspace/repo")
-    expect(result.worktree).toBe("/workspace")
-    expect(result.directory).toBe("/workspace")
+    expect(result.worktree).toBe("/workspace/repo")
+    expect(result.directory).toBe("/workspace/repo")
   })
 })
 
@@ -177,7 +177,7 @@ describe("lsp.ts output path mapping logic", () => {
 
   test("worktree='/' uses directory for mapping", () => {
     const result = computeLspOutput("/workspace/my-repo/src/foo.ts", "/", "/workspace/my-repo")
-    expect(result.displayPath).toBe("/workspace/src/foo.ts")
+    expect(result.displayPath).toBe("/workspace/my-repo/src/foo.ts")
   })
 
   test("URI in LSP result is also mapped", () => {

@@ -30,6 +30,8 @@ export function toSandboxPath(hostPath: string, hostWorkdir: string): string {
     return stripped ? `${SANDBOX_WORKDIR}/${stripped}` : SANDBOX_WORKDIR
   }
 
+  if (isSandboxPath(hostPath)) return hostPath
+
   const normalisedWorkdir = hostWorkdir.endsWith("/")
     ? hostWorkdir.slice(0, -1)
     : hostWorkdir
@@ -56,6 +58,8 @@ export function toHostPath(sandboxPath: string, hostWorkdir: string): string {
   if (!sandboxPath) {
     return hostWorkdir
   }
+
+  if (isSandboxPath(hostWorkdir)) return sandboxPath
 
   const normalisedWorkdir = hostWorkdir.endsWith("/")
     ? hostWorkdir.slice(0, -1)

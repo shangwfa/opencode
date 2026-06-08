@@ -143,6 +143,38 @@ for i, m in enumerate(msgs):
 ```
 **期望**：消息交替出现 `💬`（用户 prompt / AI 文字总结）和 `🔧`（工具调用），结构为：`💬 prompt → 🔧 tool call → 💬 summary`
 
+### T18.8 子项目路径映射回归
+
+> 该组用例覆盖 session `ses_15ad78f66ffea1OvpVGbRZBrYv` 暴露的问题：当项目目录位于 `/workspace/app` 时，`read/write/edit/bash workdir` 不能把 `/workspace/app/...` 错误折叠成 `/workspace/...`。该问题会表现为 `write` 返回 completed 但 bash 读到的仍是旧内容，或 `workdir=/workspace/app` 执行 `npm run build` 却去读取 `/workspace/package.json`。
+
+```bash
+# 准备一个子项目目录。注意：路径必须是 /workspace/app，不是 /workspace 根目录。
+send_and_verify "$SID" "用 bash 执行: rm -rf /workspace/app && npx create-vite@5 /workspace/app --template react-ts --yes && cd /workspace/app && npm install" "T18.8a: 创建 /workspace/app 子项目"
+
+# 通过 write 工具写入子项目文件。
+send_and_verify "$SID" "只用 write 工具把 /workspace/app/src/App.tsx 改成以下内容：export default function App() { return <main>SUBPROJECT_WRITE_SENTINEL</main> }" "T18.8b: write 子项目 App.tsx"
+
+# 通过 bash 直接读取同一路径，验证 write 写到的就是 /workspace/app/src/App.tsx，而不是 /workspace/src/App.tsx。
+send_and_verify "$SID" "用 bash 执行: cat /workspace/app/src/App.tsx && test ! -f /workspace/src/App.tsx" "T18.8c: bash 验证 write 落点"
+
+# 通过 read 工具读取同一路径，验证 read 与 bash 看到同一个文件系统位置。
+send_and_verify "$SID" "只用 read 工具读取 /workspace/app/src/App.tsx，确认包含 SUBPROJECT_WRITE_SENTINEL" "T18.8d: read 子项目文件"
+
+# 通过 edit 修改子项目文件，再用 bash 验证。
+send_and_verify "$SID" "只用 edit 工具把 /workspace/app/src/App.tsx 里的 SUBPROJECT_WRITE_SENTINEL 改成 SUBPROJECT_EDIT_SENTINEL" "T18.8e: edit 子项目 App.tsx"
+send_and_verify "$SID" "用 bash 执行: grep SUBPROJECT_EDIT_SENTINEL /workspace/app/src/App.tsx && ! grep -R SUBPROJECT_EDIT_SENTINEL /workspace/src 2>/dev/null" "T18.8f: bash 验证 edit 落点"
+
+# workdir 必须保留 /workspace/app，不能被映射为 /workspace。
+send_and_verify "$SID" "用 bash 工具执行 npm run build，workdir 必须设置为 /workspace/app，不要在命令里写 cd" "T18.8g: bash workdir 子项目 build"
+```
+
+**期望**：
+- T18.8b 的 `write` 状态为 completed，T18.8c 能在 `/workspace/app/src/App.tsx` 读到 `SUBPROJECT_WRITE_SENTINEL`。
+- T18.8c 中 `/workspace/src/App.tsx` 不应存在；如果存在，说明子项目路径被错误折叠。
+- T18.8d 的 `read` 输出必须包含 `/workspace/app/src/App.tsx` 和 `SUBPROJECT_WRITE_SENTINEL`。
+- T18.8e/T18.8f 后，`SUBPROJECT_EDIT_SENTINEL` 只出现在 `/workspace/app/src/App.tsx`。
+- T18.8g 不应出现 `npm error path /workspace/package.json`；如果出现，说明 `workdir=/workspace/app` 被错误映射成 `/workspace`。
+
 ### PG 验证（推荐）
 
 > 解析 `POST /message` 响应只能看到 user message。验证 assistant 的 tool 调用应直接查 PG `part` 表：
@@ -184,12 +216,33 @@ FROM sandbox
 WHERE session_id IN (SELECT id FROM tree)
 ORDER BY time_created;
 "
+
+# 验证子项目路径没有被折叠：失败会出现 /workspace/package.json 或 /workspace/src/App.tsx
+PGPASSWORD='<password>' psql "host=127.0.0.1 port=15432 dbname=opencode user=app password=<password> sslmode=disable" -c "
+SELECT p.id,
+  p.data->>'tool' as tool,
+  p.data->'state'->'input'->>'filePath' as file_path,
+  p.data->'state'->'input'->>'workdir' as workdir,
+  p.data->'state'->>'status' as status,
+  substring(coalesce(p.data->'state'->>'output', p.data->'state'->>'error', ''), 1, 240) as output_or_error
+FROM part p
+WHERE p.session_id='\$SID'
+  AND p.data->>'type'='tool'
+  AND (
+    p.data->'state'->'input'->>'filePath' LIKE '/workspace/app/%'
+    OR p.data->'state'->'input'->>'workdir' = '/workspace/app'
+    OR p.data->'state'->>'output' LIKE '%/workspace/package.json%'
+    OR p.data->'state'->>'error' LIKE '%/workspace/package.json%'
+  )
+ORDER BY p.time_created;
+"
 ```
 **期望**：
 - `bash/read/grep/glob/task` 至少出现一次且 status=completed。
 - 非 GPT 模型应出现 `write/edit`；GPT 模型应出现 `apply_patch`。
 - `grep/glob` 不能全部为 `No files found`。
 - 子会话不应因为独立 sandbox 导致 `/workspace` 为空。
+- 子项目路径回归中不应出现 `/workspace/package.json` 构建错误，也不应出现 sentinel 写到 `/workspace/src/*` 的情况。
 
 ### 问题判定标准
 
@@ -199,6 +252,8 @@ ORDER BY time_created;
 | 子会话 `read /workspace` 为 `(0 entries)` | FAIL | subagent 未复用 root sandbox |
 | `task` completed 但子会话找不到父会话创建文件 | FAIL | `sandboxSessionID` 未正确传入工具上下文 |
 | `bash rg --version` 失败 | FAIL | 默认 sandbox image 不含 ripgrep |
+| `write /workspace/app/src/App.tsx` completed，但 `bash cat /workspace/app/src/App.tsx` 仍是旧内容 | FAIL | `/workspace/app` 被路径映射折叠成 `/workspace`，实际写到 `/workspace/src/App.tsx` |
+| `workdir=/workspace/app` 执行 `npm run build` 报 `/workspace/package.json` 不存在 | FAIL | `toSandboxCwd` 把已在 sandbox 内的 cwd 二次映射成 `/workspace` |
 | 只有最终 assistant 文本，没有 tool part | FAIL | 模型未调用工具或工具注册失败 |
 | PG 中 tool status=error | FAIL | 需要查看 `state.output` 和 sandbox/server 日志 |
 
