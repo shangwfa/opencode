@@ -17,7 +17,7 @@
  *
  * 环境变量（可选）：
  *   OPENCODE_SANDBOX_API_KEY  - API 密钥
- *   OPENCODE_SANDBOX_IMAGE    - 沙箱镜像（默认 registry.shadow-rpa.net/infra/xybot-sandbox-coder:latest）
+ *   OPENCODE_SANDBOX_IMAGE    - 沙箱镜像（默认 registry.shadow-rpa.net/infra/opensandboxinfra/opencode-saas-sandbox:latest）
  *   HTTP_PORT                 - 沙箱内 HTTP 服务端口（默认 9999，避免与 opensandbox 的 8080 冲突）
  */
 
@@ -25,7 +25,7 @@ import { Sandbox, ConnectionConfig } from "@alibaba-group/opensandbox"
 
 const DOMAIN = process.env.OPENCODE_SANDBOX_DOMAIN
 const API_KEY = process.env.OPENCODE_SANDBOX_API_KEY ?? ""
-const IMAGE = process.env.OPENCODE_SANDBOX_IMAGE ?? "registry.shadow-rpa.net/infra/xybot-sandbox-coder:latest"
+const IMAGE = process.env.OPENCODE_SANDBOX_IMAGE ?? "registry.shadow-rpa.net/infra/opensandboxinfra/opencode-saas-sandbox:latest"
 const PORT = Number(process.env.HTTP_PORT ?? "9999")
 
 function log(tag: string, ...args: unknown[]) {

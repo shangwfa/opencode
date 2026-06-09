@@ -7,7 +7,7 @@
  * 运行方式：
  *   OPENCODE_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/opencode_test \
  *   OPENCODE_SANDBOX_DOMAIN=172.18.32.15:30040 \
- *   OPENCODE_SANDBOX_IMAGE=registry.shadow-rpa.net/infra/xybot-sandbox-coder:latest \
+ *   OPENCODE_SANDBOX_IMAGE=registry.shadow-rpa.net/infra/opensandboxinfra/opencode-saas-sandbox:latest \
  *   OPENCODE_SANDBOX_USE_SERVER_PROXY=true \
  *   bun test test/tool/sandbox-provider-pg-e2e.test.ts
  */

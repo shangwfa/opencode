@@ -61,7 +61,7 @@ export const Flag = {
   OPENCODE_EVENT_BUS: process.env["OPENCODE_EVENT_BUS"] ?? "local",
   OPENCODE_SANDBOX_ENABLED: truthy("OPENCODE_SANDBOX_ENABLED"),
   OPENCODE_SANDBOX_DOMAIN: process.env["OPENCODE_SANDBOX_DOMAIN"] ?? "localhost:8080",
-  OPENCODE_SANDBOX_IMAGE: process.env["OPENCODE_SANDBOX_IMAGE"] ?? "registry.shadow-rpa.net/infra/xybot-sandbox-coder:latest",
+  OPENCODE_SANDBOX_IMAGE: process.env["OPENCODE_SANDBOX_IMAGE"] ?? "registry.shadow-rpa.net/infra/opensandboxinfra/opencode-saas-sandbox:latest",
   OPENCODE_SANDBOX_API_KEY: process.env["OPENCODE_SANDBOX_API_KEY"] ?? "",
   OPENCODE_SANDBOX_USE_SERVER_PROXY: truthy("OPENCODE_SANDBOX_USE_SERVER_PROXY"),
   OPENCODE_SANDBOX_VOLUME_TYPE: (process.env["OPENCODE_SANDBOX_VOLUME_TYPE"] ?? "none") as "none" | "pvc" | "host",
