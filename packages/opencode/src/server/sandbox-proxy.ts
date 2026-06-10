@@ -503,6 +503,17 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
       }),
     )
 
+    yield* router.add("GET", "/session/:sessionID/sandbox",
+      Effect.gen(function* () {
+        const params = yield* HttpRouter.schemaPathParams(SessionParams)
+        const sb = yield* sandbox.get(params.sessionID).pipe(Effect.catch(() => Effect.succeed(undefined)))
+        if (!sb) return HttpServerResponse.jsonUnsafe({ sessionID: params.sessionID, sandboxId: null })
+        const healthy = yield* Effect.tryPromise(() => sb.isHealthy()).pipe(Effect.catch(() => Effect.succeed(false)))
+        if (!healthy) return HttpServerResponse.jsonUnsafe({ sessionID: params.sessionID, sandboxId: null })
+        return HttpServerResponse.jsonUnsafe({ sessionID: params.sessionID, sandboxId: sb.id })
+      }),
+    )
+
     yield* router.add("GET", "/session/:sessionID/keep-alive",
       Effect.gen(function* () {
         const params = yield* HttpRouter.schemaPathParams(SessionParams)

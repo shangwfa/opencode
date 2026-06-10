@@ -32,6 +32,7 @@
 | [`21-workspace-routing.md`](./21-workspace-routing.md) | — | WR-x | Workspace Routing 路径解析：API 请求 directory fallback 到 session.directory |
 | [`22-session-mcp.md`](./22-session-mcp.md) | 二十二 | T22.x | 会话级动态 MCP：CRUD、隔离、级联、校验 |
 | [`23-package-cache.md`](./23-package-cache.md) | 二十三 | T23.x | 共享 Package Cache：标准 exec 使用流程、跨 session 缓存共享、npm/pnpm/yarn/bun、加速/并发、mountPath 校验 |
+| [`24-preload-cache.md`](./24-preload-cache.md) | 二十四 | T24.x | 预装依赖缓存：镜像层预装 pnpm store/npm cache/node_modules、pnpm/npm install 命中率、性能对比、跨 session 独立性 |
 | [`sandbox-shared-test.mjs`](./sandbox-shared-test.mjs) | 十六 | T16.29 | 主子 agent 沙箱共享验证：主→子写读、子→主写读、exec 独立验证 |
 | [`vcs-diff-sandbox-test.mjs`](./vcs-diff-sandbox-test.mjs) | 十六 | T16.30 | VCS Diff 沙箱重建验证：销毁后自动重建 PVC 恢复，两次 diff 一致 |
 
@@ -59,6 +60,7 @@ T18.x → 16-tool-calls.md
 T19.x → 17-exec-api.md
 T22.x → 22-session-mcp.md
 T23.x → 23-package-cache.md
+T24.x → 24-preload-cache.md
 
 沙箱工具（apply_patch/ls/错误泄露）→ 18-sandbox-tool-test.md
 路径泄露防护（PL-x）→ 20-path-leak-test.md

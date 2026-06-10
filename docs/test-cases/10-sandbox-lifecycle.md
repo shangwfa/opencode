@@ -266,6 +266,41 @@ grep -n 'idleKillMs\|IDLE_KILL' /Users/ruomu/code/opencode/packages/opencode/src
 
 ---
 
+### T12.12 GET /session/:sessionID/sandbox 查询沙箱 ID
+
+```bash
+# 创建 session 并触发 sandbox 创建
+SID12=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+echo "SID12: $SID12"
+
+# 初始状态（无 sandbox）
+curl -s "$BASE/session/$SID12/sandbox" | python3 -m json.tool
+
+# 触发 sandbox 创建
+curl -s -m 10 -X POST "$BASE/session/$SID12/exec" -H 'Content-Type: application/json' -d '{"command":"echo hello"}' > /dev/null
+
+# 查询 sandbox ID
+SB12=$(curl -s "$BASE/session/$SID12/sandbox" | python3 -c "import json,sys;d=json.load(sys.stdin);print(d.get('sandboxId',''))")
+echo "sandboxId: $SB12"
+
+# 验证返回值非空且与日志一致
+LOG_SB=$(docker exec opencode-saas-test grep "$SID12" /home/opencode/.local/share/opencode/log/dev.log 2>/dev/null | grep "sandbox created" | sed -n 's/.*sandboxID=\([^ ]*\).*/\1/p' | tail -1)
+echo "log sandboxId: $LOG_SB"
+[ "$SB12" = "$LOG_SB" ] && echo "PASS: sandboxId matches" || echo "FAIL: mismatch"
+
+# kill sandbox 后再查询
+curl -s -m 10 -X POST "$BASE/session/$SID12/kill-sandbox" > /dev/null
+sleep 2
+curl -s "$BASE/session/$SID12/sandbox" | python3 -m json.tool
+```
+**期望**：
+- 初始查询返回 `{ "sessionID": "...", "sandboxId": null }`
+- exec 后查询返回 `{ "sessionID": "...", "sandboxId": "<非空ID>" }`
+- sandboxId 与日志中的 `sandboxID` 一致
+- kill-sandbox 后查询返回 `{ "sessionID": "...", "sandboxId": null }`
+
+---
+
 ---
 
 ## 结果汇总
@@ -283,5 +318,6 @@ grep -n 'idleKillMs\|IDLE_KILL' /Users/ruomu/code/opencode/packages/opencode/src
 | T12.9 | ✅ | A 写文件 B 看不到（No such file），B 写文件 A 看不到 |
 | T12.10 | ✅ | A 启动 sleep 3600，B 看到 0 个匹配进程，A 看到 1 个 |
 | T12.11 | ✅ | IDLE_KILL_SEC=30，idleKillMs 用于 zombie 清理定时器 + run-state.ts onIdle |
+| T12.12 | ✅ | GET /session/:sessionID/sandbox（含 isHealthy 检查）：初始 null → exec 后返回 sandboxId（与日志一致）→ kill 后 null |
 
 
