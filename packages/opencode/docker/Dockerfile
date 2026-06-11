@@ -32,9 +32,7 @@ ENV PATH="$MISE_DATA_DIR/shims:$MISE_DATA_DIR/installs/node/24/bin:/usr/local/bi
 
 # ── 5. Configure npm registry (npmmirror) before installing pnpm via npm backend ──
 RUN npm config set registry https://registry.npmmirror.com \
-  && npm config set cache /opt/package-cache-base/npm \
-  && echo "confirm-modules-purge=false" >> /etc/npmrc \
-  && echo "confirm-modules-purge=false" >> /root/.npmrc
+    && npm config set cache /opt/package-cache-base/npm
 
 # ── 6. Install multiple pnpm versions (via npm backend, uses npmmirror) ──
 # Default backend (aqua) downloads from GitHub which is slow/blocked in China.
@@ -60,19 +58,22 @@ RUN OLD_NODE_BIN=$(dirname $(readlink -f $(which node) 2>/dev/null) 2>/dev/null 
        [ -n "$target" ] && ln -sf "$target" "$OLD_NODE_BIN/$bin" 2>/dev/null || true; \
      done
 
-# ── 10. Pre-populate npm node_modules + npm cache via workspace template ──
-# npm:  pre-installed node_modules saved to /opt/preload/<template>/node_modules
-# npm cache: tarball cache at /opt/package-cache-base/npm (shared across all versions)
-# pnpm store: NOT pre-populated (format incompatible across pnpm 8/9/10/11)
+# ── 10. Configure pnpm: store + virtual-store on overlay (fast) instead of NFS ──
+# When /workspace is NFS-mounted (PVC), pnpm's default store lands on NFS (slow).
+# By pointing store-dir to /opt/pnpm-store (overlay, image layer) and
+# virtual-store-dir to /tmp/pnpm-vs (overlay, ephemeral), all heavy IO
+# stays on fast local disk. NFS only receives lightweight symlinks.
+# /opt and /tmp are both overlay → same filesystem → hardlink works.
+RUN pnpm config set store-dir /opt/pnpm-store --global \
+  && pnpm config set virtual-store-dir /tmp/pnpm-vs --global
+
+# ── 11. Pre-populate pnpm store via workspace templates ──
+# pnpm store pre-populated at /opt/pnpm-store (content-addressable).
+# Only pnpm@10 (default version) store is pre-populated.
 COPY . /tmp/preload/
 RUN cd /tmp/preload \
-    && mkdir -p /opt/package-cache-base/npm /opt/preload \
+    && mkdir -p /opt/pnpm-store \
     && for dir in packages/*/; do \
-         name=$(basename "$dir"); \
-         (cd "$dir" && npm install --ignore-scripts); \
-         mkdir -p "/opt/preload/$name"; \
-         cp -a "$dir/node_modules" "/opt/preload/$name/node_modules"; \
-         cp "$dir/package.json" "/opt/preload/$name/package.json"; \
-         cp "$dir/package-lock.json" "/opt/preload/$name/package-lock.json" 2>/dev/null || true; \
+         (cd "$dir" && pnpm install --ignore-scripts 2>/dev/null || true); \
        done \
-    && rm -rf /tmp/preload
+    && rm -rf /tmp/preload /tmp/pnpm-vs

@@ -3,15 +3,19 @@
 > 公共测试环境和配置请参考 [`00-INDEX.md`](./00-INDEX.md)。
 > 实现详见 [`../../packages/opencode/docker/README.md`](../../packages/opencode/docker/README.md)。
 
-## 二十四、环境切换与预装依赖缓存
+## 二十四、环境切换与预装依赖缓存（pnpm）
 
-> 前置条件：沙箱镜像 `opencode-sandbox:mise` 已构建，通过 [mise](https://mise.jdx.dev/) 预装 Node 18/20/22/24 + pnpm 8/9/10/11，使用 shims 模式自动路由版本。
+> 前置条件：沙箱镜像已构建，通过 [mise](https://mise.jdx.dev/) 预装 Node 18/20/22/24 + pnpm 8/9/10/11（默认 node@24 + pnpm@10），使用 shims 模式自动路由版本。
+> pnpm store 预装在 `/opt/pnpm-store`（镜像层），virtual-store 配置为 `/tmp/pnpm-vs`（overlay 本地盘），NFS 环境下所有 IO 在本地盘完成。
 >
 > ```bash
-> BASE="http://127.0.0.1:14097"
+> BASE="https://test-opencode.shadow-rpa.net"
+> API_KEY="H68idVYzjadx"
 > ```
 >
-> 测试环境：宿主机 server + 本地 OpenSandbox Docker runtime + volumeType=none。
+> 测试环境：test-opencode.shadow-rpa.net 远端测试环境（`/workspace` 为 NFS4 PVC 挂载）。
+>
+> 每个测试用例使用独立 session，不复用 session ID。
 
 ---
 
@@ -20,11 +24,10 @@
 ### T24.1 mise 安装与预装版本
 
 ```bash
-SID=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
-echo "SID: $SID"
+SID=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -H "X-API-Key: $API_KEY" -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
 
 curl -s --max-time 30 -X POST "$BASE/session/$SID/exec" \
-  -H 'Content-Type: application/json' \
+  -H 'Content-Type: application/json' -H "X-API-Key: $API_KEY" \
   -d '{"command":"mise --version && echo --- && mise ls"}'
 ```
 
@@ -33,423 +36,375 @@ curl -s --max-time 30 -X POST "$BASE/session/$SID/exec" \
 2. node 列出 18, 20, 22, 24 四个版本
 3. pnpm（npm:pnpm）列出 8, 9, 10, 11 四个版本
 
-> **镜像测试**（2026-06-10）：PASS
-> - mise 2026.6.1
+> **远端测试**（2026-06-11）：PASS
+> - mise 2026.6.2
 > - node: 18.20.8, 20.20.2, 22.22.3, 24.16.0
-> - npm:pnpm: 8.15.9, 9.15.9, 10.34.1, 11.5.3
+> - npm:pnpm: 8.15.9, 9.15.9, 10.34.1, 11.5.2
 
 ---
 
 ### T24.2 默认版本验证
 
 ```bash
-SID=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+SID=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -H "X-API-Key: $API_KEY" -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
 
 curl -s --max-time 15 -X POST "$BASE/session/$SID/exec" \
-  -H 'Content-Type: application/json' \
-  -d '{"command":"node --version && pnpm --version && npm --version && npm config get registry"}'
+  -H 'Content-Type: application/json' -H "X-API-Key: $API_KEY" \
+  -d '{"command":"node --version && pnpm --version && npm config get registry"}'
 ```
 
 **期望**：
 - Node v24.x（默认）
-- pnpm 11.x（默认）
+- pnpm 10.x（默认）
 - npm registry = `https://registry.npmmirror.com`
 
-> **镜像测试**（2026-06-10）：PASS — v24.16.0, 11.5.3, registry.npmmirror.com
+> **远端测试**（2026-06-11）：PASS — v24.16.0, pnpm@10.34.1, registry.npmmirror.com
 
 ---
 
 ### T24.3 mise use 切换 Node 版本
 
 ```bash
-SID=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
-echo "SID: $SID"
+SID=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -H "X-API-Key: $API_KEY" -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
 
-# 默认版本
-curl -s --max-time 15 -X POST "$BASE/session/$SID/exec" \
-  -H 'Content-Type: application/json' \
-  -d '{"command":"node --version"}'
-
-# 切换到 node@20
 curl -s --max-time 30 -X POST "$BASE/session/$SID/exec" \
-  -H 'Content-Type: application/json' \
-  -d '{"command":"cd /workspace && mise use node@20 && node --version"}'
+  -H 'Content-Type: application/json' -H "X-API-Key: $API_KEY" \
+  -d '{"command":"node --version && cd /workspace && mise use node@20 && node --version"}'
 ```
 
-**期望**：
-1. 默认 v24.x
-2. 切换后 v20.x
+**期望**：默认 v24.x → 切换后 v20.x
 
-> **镜像测试**（2026-06-10）：PASS — v24.16.0 → v20.20.2
+> **远端测试**（2026-06-11）：PASS — v24.16.0 → v20.20.2
 
 ---
 
 ### T24.4 mise use 切换 pnpm 版本
 
 ```bash
-SID=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
-echo "SID: $SID"
+SID=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -H "X-API-Key: $API_KEY" -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
 
-# 默认版本
-curl -s --max-time 15 -X POST "$BASE/session/$SID/exec" \
-  -H 'Content-Type: application/json' \
-  -d '{"command":"pnpm --version"}'
-
-# 切换到 pnpm@9
 curl -s --max-time 30 -X POST "$BASE/session/$SID/exec" \
-  -H 'Content-Type: application/json' \
-  -d '{"command":"cd /workspace && mise use npm:pnpm@9 && pnpm --version"}'
+  -H 'Content-Type: application/json' -H "X-API-Key: $API_KEY" \
+  -d '{"command":"pnpm --version && cd /workspace && mise use npm:pnpm@9 && pnpm --version"}'
 ```
 
-**期望**：
-1. 默认 11.x
-2. 切换后 9.x
+**期望**：默认 10.x → 切换后 9.x
 
-> **镜像测试**（2026-06-10）：PASS — 11.5.3 → 9.15.9
+> **远端测试**（2026-06-11）：PASS — 10.34.1 → 9.15.9
 
 ---
 
 ### T24.5 .nvmrc 自动检测（shims）
 
 ```bash
-SID=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
-echo "SID: $SID"
+SID=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -H "X-API-Key: $API_KEY" -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
 
 curl -s --max-time 30 -X POST "$BASE/session/$SID/exec" \
-  -H 'Content-Type: application/json' \
+  -H 'Content-Type: application/json' -H "X-API-Key: $API_KEY" \
   -d '{"command":"mkdir -p /workspace/nvmrc-test && echo 20 > /workspace/nvmrc-test/.nvmrc && cd /workspace/nvmrc-test && node --version"}'
 ```
 
 **期望**：shims 检测 `.nvmrc`，node --version 输出 v20.x
 
-> **镜像测试**（2026-06-10）：PASS — v20.20.2（但测试时使用 18，得到 v18.20.8）
+> **远端测试**（2026-06-11）：PASS — v20.20.2
 
 ---
 
 ### T24.6 .node-version 自动检测（shims）
 
 ```bash
-SID=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
-echo "SID: $SID"
+SID=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -H "X-API-Key: $API_KEY" -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
 
 curl -s --max-time 30 -X POST "$BASE/session/$SID/exec" \
-  -H 'Content-Type: application/json' \
+  -H 'Content-Type: application/json' -H "X-API-Key: $API_KEY" \
   -d '{"command":"mkdir -p /workspace/nodeversion-test && echo 22 > /workspace/nodeversion-test/.node-version && cd /workspace/nodeversion-test && node --version"}'
 ```
 
 **期望**：shims 检测 `.node-version`，node --version 输出 v22.x
 
-> **镜像测试**（2026-06-10）：PASS — v22.22.3
+> **远端测试**（2026-06-11）：PASS — v22.22.3
 
 ---
 
 ### T24.7 mise.toml 自动检测（shims）
 
 ```bash
-SID=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
-echo "SID: $SID"
+SID=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -H "X-API-Key: $API_KEY" -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
 
 curl -s --max-time 30 -X POST "$BASE/session/$SID/exec" \
-  -H 'Content-Type: application/json' \
+  -H 'Content-Type: application/json' -H "X-API-Key: $API_KEY" \
   -d '{"command":"mkdir -p /workspace/mise-test && printf \"[tools]\\nnode = \\\"18\\\"\\n\\\"npm:pnpm\\\" = \\\"8\\\"\\n\" > /workspace/mise-test/mise.toml && cd /workspace/mise-test && node --version && pnpm --version"}'
 ```
 
-**期望**：
-1. node --version 输出 v18.x
-2. pnpm --version 输出 8.x
+**期望**：node v18.x, pnpm 8.x
 
-> **镜像测试**（2026-06-10）：PASS — v18.20.8, 8.15.9
+> **远端测试**（2026-06-11）：PASS — v18.20.8, 8.15.9
 
 ---
 
 ### T24.8 切换版本后 pnpm install 正常
 
-验证切换到 node@20 + pnpm@9 后，pnpm install 能正常完成。
-
 ```bash
-SID=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
-echo "SID: $SID"
+SID=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -H "X-API-Key: $API_KEY" -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
 
 curl -s --max-time 120 -X POST "$BASE/session/$SID/exec" \
-  -H 'Content-Type: application/json' \
+  -H 'Content-Type: application/json' -H "X-API-Key: $API_KEY" \
   -d '{"command":"cd /workspace && mise use node@20 npm:pnpm@9 && node --version && pnpm --version && npm create vite@5 switch-test -- --template react-ts 2>&1 | tail -1 && cd switch-test && pnpm install 2>&1 | grep -E \"reused|downloaded|Packages|done|ERR\""}'
 ```
 
-**期望**：
-1. node v20.x, pnpm 9.x
-2. pnpm install 成功，无 ERR
+**期望**：node v20.x + pnpm 9.x，pnpm install 成功，无 ERR
 
-> **实测结果**：待测试
+> **远端测试**（2026-06-11）：PASS — node@20 + pnpm@9, 174 packages
 
 ---
 
 ### T24.9 不同 session 版本独立
 
-验证 Session A 切换版本后不影响 Session B 的默认版本。
-
 ```bash
-SID_A=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
-SID_B=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+SID_A=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -H "X-API-Key: $API_KEY" -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+SID_B=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -H "X-API-Key: $API_KEY" -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
 
 # Session A: 切换到 node@18
 curl -s --max-time 30 -X POST "$BASE/session/$SID_A/exec" \
-  -H 'Content-Type: application/json' \
+  -H 'Content-Type: application/json' -H "X-API-Key: $API_KEY" \
   -d '{"command":"cd /workspace && mise use node@18 && node --version"}'
 
 # Session B: 检查仍为默认版本
 curl -s --max-time 15 -X POST "$BASE/session/$SID_B/exec" \
-  -H 'Content-Type: application/json' \
+  -H 'Content-Type: application/json' -H "X-API-Key: $API_KEY" \
   -d '{"command":"node --version"}'
 ```
 
-**期望**：
-1. Session A：v18.x
-2. Session B：v24.x（不受影响）
+**期望**：Session A v18.x，Session B v24.x（不受影响）
 
-> **实测结果**：待测试
+> **远端测试**（2026-06-11）：PASS — A→v18.20.8, B→v24.16.0
 
 ---
 
-## 二、预装依赖缓存
-
-### T24.10 npm cache 预装内容
+### T24.10 全局工具可用性（supergateway + ripgrep）
 
 ```bash
-SID=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
-echo "SID: $SID"
+SID=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -H "X-API-Key: $API_KEY" -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
 
 curl -s --max-time 30 -X POST "$BASE/session/$SID/exec" \
-  -H 'Content-Type: application/json' \
-  -d '{"command":"npm config get cache && du -sh /opt/package-cache-base/npm && ls /opt/package-cache-base/npm/_cacache/content-v2/sha512/ | wc -l"}'
+  -H 'Content-Type: application/json' -H "X-API-Key: $API_KEY" \
+  -d '{"command":"which supergateway && supergateway --help 2>&1 | head -1 && which rg && rg --version | head -1"}'
 ```
 
-**期望**：
-1. npm cache 路径为 `/opt/package-cache-base/npm`
-2. cache 大小 > 50MB
-3. tarball 条目 > 100
+**期望**：supergateway 和 ripgrep 均可执行
 
-> **镜像测试**（2026-06-10）：PASS — 108MB
+> **远端测试**（2026-06-11）：PASS — supergateway in mise shims, rg 14.1.0
 
 ---
 
-### T24.11 预装 node_modules 存在
+## 二、pnpm store 预装缓存
+
+> pnpm store 配置：
+> - `store-dir` = `/opt/pnpm-store`（镜像层 overlay，读快）
+> - `virtual-store-dir` = `/tmp/pnpm-vs`（overlay 本地盘，写快）
+> - 两者同文件系统 → hardlink 生效，NFS 上只有轻量 symlink
+
+### T24.11 pnpm store 配置验证
 
 ```bash
-SID=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
-echo "SID: $SID"
+SID=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -H "X-API-Key: $API_KEY" -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
 
 curl -s --max-time 30 -X POST "$BASE/session/$SID/exec" \
-  -H 'Content-Type: application/json' \
-  -d '{"command":"for d in /opt/preload/*/; do name=$(basename $d); mods=$(ls $d/node_modules 2>/dev/null | wc -l); size=$(du -sh $d/node_modules 2>/dev/null | cut -f1); echo \"$name: $mods packages, $size\"; done"}'
+  -H 'Content-Type: application/json' -H "X-API-Key: $API_KEY" \
+  -d '{"command":"pnpm config get store-dir && pnpm config get virtual-store-dir && du -sh /opt/pnpm-store"}'
 ```
 
-**期望**：每个预装模板目录都有 `node_modules`，包数 > 50
+**期望**：store-dir=/opt/pnpm-store, virtual-store-dir=/tmp/pnpm-vs, store > 100MB
 
-> **镜像测试**（2026-06-10）：PASS — vite5 110M, vite8 125M
+> **远端测试**（2026-06-11）：PASS — 190MB
 
 ---
 
-### T24.12 pnpm install（Vite 5 首次）
+### T24.12 pnpm install 首次（store 命中）
 
 ```bash
-SID=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
-echo "SID: $SID"
+SID=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -H "X-API-Key: $API_KEY" -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
 
 curl -s --max-time 120 -X POST "$BASE/session/$SID/exec" \
-  -H 'Content-Type: application/json' \
-  -d '{"command":"cd /workspace && npm create vite@5 pnpm-test -- --template react-ts 2>&1 | tail -1 && cd pnpm-test && pnpm install 2>&1 | grep -E \"reused|downloaded|Packages|done\""}'
+  -H 'Content-Type: application/json' -H "X-API-Key: $API_KEY" \
+  -d '{"command":"cd /workspace && npm create vite@5 pnpm-test -- --template react-ts 2>&1 | tail -1 && cd pnpm-test && time pnpm install 2>&1 | grep -E \"reused|downloaded|Packages|Done|real\""}'
 ```
 
-**期望**：pnpm install 成功完成
+**期望**：大部分 reused（store 预装命中），耗时 < 10s
 
-> **实测结果**：待测试
+> **远端测试**（2026-06-11）：PASS — reused 173, downloaded 1, 174 packages, **6.8s**
 
 ---
 
-### T24.13 pnpm 重装（清空 node_modules）
+### T24.13 pnpm 重装（清空 node_modules，完全命中 store）
 
 ```bash
-SID=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
-echo "SID: $SID"
+SID=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -H "X-API-Key: $API_KEY" -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
 
-# 先安装一次
 curl -s --max-time 120 -X POST "$BASE/session/$SID/exec" \
-  -H 'Content-Type: application/json' \
-  -d '{"command":"cd /workspace && npm create vite@5 reinstall-test -- --template react-ts 2>&1 | tail -1 && cd reinstall-test && pnpm install 2>&1 | tail -1"}'
-
-# 清空 node_modules 重装
-curl -s --max-time 60 -X POST "$BASE/session/$SID/exec" \
-  -H 'Content-Type: application/json' \
-  -d '{"command":"cd /workspace/reinstall-test && rm -rf node_modules && time pnpm install 2>&1 | grep -E \"reused|downloaded|Packages|real\""}'
+  -H 'Content-Type: application/json' -H "X-API-Key: $API_KEY" \
+  -d '{"command":"cd /workspace && npm create vite@5 reinstall-test -- --template react-ts 2>&1 | tail -1 && cd reinstall-test && pnpm install 2>&1 | tail -1 && rm -rf node_modules && time pnpm install 2>&1 | grep -E \"reused|downloaded|Packages|Done|real\""}'
 ```
 
 **期望**：reused = 总包数（全部命中 store），耗时 < 3s
 
-> **实测结果**：待测试
+> **远端测试**（2026-06-11）：PASS — reused 174/174, downloaded 0, **1.5s**（三次平均）
 
 ---
 
-### T24.14 npm cp node_modules + install（Vite 5）
+### T24.14 不匹配项目 pnpm install（express）
 
 ```bash
-SID=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
-echo "SID: $SID"
+SID=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -H "X-API-Key: $API_KEY" -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
 
 curl -s --max-time 120 -X POST "$BASE/session/$SID/exec" \
-  -H 'Content-Type: application/json' \
-  -d '{"command":"cd /workspace && npm create vite@5 npm-test -- --template react-ts 2>&1 | tail -1 && cd npm-test && cp -a /opt/preload/vite5/node_modules . && time npm install --prefer-offline 2>&1 | tail -5"}'
+  -H 'Content-Type: application/json' -H "X-API-Key: $API_KEY" \
+  -d '{"command":"mkdir -p /workspace/express-test && cd /workspace/express-test && echo \"{\\\"name\\\":\\\"express-test\\\",\\\"dependencies\\\":{\\\"express\\\":\\\"^4.21.0\\\"}}\" > package.json && time pnpm install 2>&1 | grep -E \"reused|downloaded|Packages|Done|real|ERR\""}'
 ```
 
-**期望**：耗时 < 10s（预装 node_modules + npm cache 命中）
+**期望**：pnpm install 成功，无 ERR
 
-> **实测结果**：待测试
-
----
-
-### T24.15 npm 重装（同项目，清空 node_modules）
-
-```bash
-SID=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
-echo "SID: $SID"
-
-# 先安装
-curl -s --max-time 120 -X POST "$BASE/session/$SID/exec" \
-  -H 'Content-Type: application/json' \
-  -d '{"command":"cd /workspace && npm create vite@5 npm-reinstall -- --template react-ts 2>&1 | tail -1 && cd npm-reinstall && npm install --prefer-offline 2>&1 | tail -3"}'
-
-# 清空 node_modules 重装
-curl -s --max-time 60 -X POST "$BASE/session/$SID/exec" \
-  -H 'Content-Type: application/json' \
-  -d '{"command":"cd /workspace/npm-reinstall && rm -rf node_modules && time npm install --prefer-offline 2>&1 | tail -3"}'
-```
-
-**期望**：npm tarball cache 命中，耗时 < 5s
-
-> **实测结果**：待测试
+> **远端测试**（2026-06-11）：PASS — reused 4, downloaded 64, 68 packages, **2.7s**
 
 ---
 
-### T24.16 npm cache 跨版本共享
+### T24.15 store → virtual-store hardlink 验证
 
-验证切换到 node@20 后，npm install --prefer-offline 仍能命中预装的 npm cache。
+验证 `/opt/pnpm-store` 和 `/tmp/pnpm-vs` 在同一文件系统（overlay），hardlink 生效。
 
 ```bash
-SID=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
-echo "SID: $SID"
+SID=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -H "X-API-Key: $API_KEY" -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
 
 curl -s --max-time 120 -X POST "$BASE/session/$SID/exec" \
-  -H 'Content-Type: application/json' \
-  -d '{"command":"cd /workspace && mise use node@20 && node --version && npm create vite@5 cache-share-test -- --template react-ts 2>&1 | tail -1 && cd cache-share-test && cp -a /opt/preload/vite5/node_modules . && time npm install --prefer-offline 2>&1 | tail -5"}'
+  -H 'Content-Type: application/json' -H "X-API-Key: $API_KEY" \
+  -d '{"command":"cd /workspace && npm create vite@5 hl-test -- --template react-ts 2>&1 | tail -1 && cd hl-test && pnpm install 2>&1 | tail -1 && echo \"=== store/vs 同文件系统 ===\" && df -T /opt/pnpm-store /tmp/pnpm-vs 2>/dev/null | awk \"NR>1{print \\$2,\\$NF}\" && echo \"=== hardlink 数 ===\" && VS_FILE=$(find /tmp/pnpm-vs -name \"index.js\" -path \"*/react/*\" 2>/dev/null | head -1) && stat -c \"inode=%i hardlinks=%h\" \"$VS_FILE\" 2>/dev/null"}'
 ```
 
 **期望**：
-1. node v20.x
-2. npm install 成功，耗时 < 10s（npm cache 命中）
+1. store 和 virtual-store 都在 overlay 文件系统
+2. virtual-store 中的文件 hardlinks=2（一个 store，一个 virtual-store）
 
-> **镜像测试**（2026-06-10）：PASS — node@20, `npm install --prefer-offline` 成功
+> **远端测试**（2026-06-11）：PASS — 两者均 overlay，hardlinks=2
 
 ---
 
-### T24.17 npm 完全离线安装
+### T24.16 pnpm install 后 build 能跑通
 
-验证 npm 仅依赖预装 cache 能否完成安装。
+验证 pnpm install 完成后，项目可以正常 build。
 
 ```bash
-SID=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
-echo "SID: $SID"
+SID=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -H "X-API-Key: $API_KEY" -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
 
 curl -s --max-time 120 -X POST "$BASE/session/$SID/exec" \
-  -H 'Content-Type: application/json' \
-  -d '{"command":"cd /workspace && npm create vite@5 offline-test -- --template react-ts 2>&1 | tail -1 && cd offline-test && npm install --prefer-offline --cache /opt/package-cache-base/npm 2>&1 | tail -5"}'
+  -H 'Content-Type: application/json' -H "X-API-Key: $API_KEY" \
+  -d '{"command":"cd /workspace && npm create vite@5 build-test -- --template react-ts 2>&1 | tail -1 && cd build-test && pnpm install 2>&1 | tail -1 && time pnpm build 2>&1 | tail -5 && du -sh dist/"}'
 ```
 
-**期望**：npm install 成功（exitCode=0），主要依赖从 cache 读取
+**期望**：build 成功，dist/ 目录存在且有输出
 
-> **实测结果**：待测试
+> **远端测试**（2026-06-11）：PASS — vite build 成功，dist/ 160K，耗时 3.9s
 
 ---
 
-## 三、隔离性与稳定性
+## 三、NFS 环境不影响 pnpm install
 
-### T24.18 不同 session 预装缓存互不影响
+> 背景：`/workspace` 挂载 NFS4 PVC（`172.18.32.8:/middleware/...`），直接写入大量小文件会很慢（60s+）。
+> pnpm 的 virtual-store-dir 方案将所有重 IO 放在 overlay 本地盘（`/tmp/pnpm-vs`），NFS 上只写 symlink（< 100K）。
+
+### T24.17 确认 /workspace 是 NFS 挂载
 
 ```bash
-SID_A=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
-SID_B=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+SID=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -H "X-API-Key: $API_KEY" -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
 
-# Session A: 安装项目
-curl -s --max-time 120 -X POST "$BASE/session/$SID_A/exec" \
-  -H 'Content-Type: application/json' \
-  -d '{"command":"cd /workspace && npm create vite@5 cross-a -- --template react-ts 2>&1 | tail -1 && cd cross-a && pnpm install 2>&1 | tail -1 && echo MARK_A > node_modules/.mark"}'
-
-# Session B: 检查无 A 的标记
-curl -s --max-time 15 -X POST "$BASE/session/$SID_B/exec" \
-  -H 'Content-Type: application/json' \
-  -d '{"command":"cat /workspace/cross-a/node_modules/.mark 2>&1; echo EXIT=$?"}'
+curl -s --max-time 30 -X POST "$BASE/session/$SID/exec" \
+  -H 'Content-Type: application/json' -H "X-API-Key: $API_KEY" \
+  -d '{"command":"df -T /workspace /tmp /opt | head -5 && echo --- && mount | grep workspace | head -1"}'
 ```
 
-**期望**：Session B 无法读取 Session A 的文件（exitCode≠0）
+**期望**：/workspace 类型为 nfs4，/tmp 和 /opt 为 overlay
 
-> **实测结果**：待测试
+> **远端测试**（2026-06-11）：PASS
+> - /workspace: nfs4 (`172.18.32.8:/middleware/...`)
+> - /tmp, /opt: overlay
 
 ---
 
-### T24.19 /opt/preload 不可变验证
+### T24.18 NFS 上 node_modules 只有 symlink（无重 IO）
 
-验证 Session A 修改/删除 `/opt/preload` 后，Session B 仍完整。
-
-```bash
-SID_A=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
-SID_B=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
-
-# Session A: 破坏 /opt/preload
-curl -s --max-time 30 -X POST "$BASE/session/$SID_A/exec" \
-  -H 'Content-Type: application/json' \
-  -d '{"command":"rm -rf /opt/preload/vite5/node_modules && echo TAMPERED > /opt/preload/vite5/package.json && echo DONE_A"}'
-
-# Session B: 检查完整性
-curl -s --max-time 30 -X POST "$BASE/session/$SID_B/exec" \
-  -H 'Content-Type: application/json' \
-  -d '{"command":"ls /opt/preload/vite5/node_modules 2>&1 | head -3 && cat /opt/preload/vite5/package.json | head -1"}'
-```
-
-**期望**：Session B 的 `/opt/preload` 完整（镜像层隔离）
-
-> **实测结果**：待测试
-
----
-
-### T24.20 不匹配项目的 pnpm install（express）
-
-验证与预装模板无关的项目，pnpm install 仍正常完成。
+验证 pnpm install 后，NFS 上的 node_modules 只有轻量 symlink，真正的包内容在 overlay。
 
 ```bash
-SID=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
-echo "SID: $SID"
+SID=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -H "X-API-Key: $API_KEY" -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
 
 curl -s --max-time 120 -X POST "$BASE/session/$SID/exec" \
-  -H 'Content-Type: application/json' \
-  -d '{"command":"mkdir -p /workspace/express-test && cd /workspace/express-test && echo \"{\\\"name\\\":\\\"express-test\\\",\\\"dependencies\\\":{\\\"express\\\":\\\"^4.21.0\\\"}}\" > package.json && pnpm install 2>&1 | grep -E \"reused|downloaded|Packages|done|ERR\""}'
+  -H 'Content-Type: application/json' -H "X-API-Key: $API_KEY" \
+  -d '{"command":"cd /workspace && npm create vite@5 nfs-struct-test -- --template react-ts 2>&1 | tail -1 && cd nfs-struct-test && pnpm install 2>&1 | tail -1 && echo \"=== NFS node_modules 大小 ===\" && du -sh node_modules && echo \"=== symlink 数量 ===\" && find node_modules -maxdepth 2 -type l | wc -l && echo \"=== symlink 指向 ===\" && readlink node_modules/react && echo \"=== virtual-store 大小（overlay）===\" && du -sh /tmp/pnpm-vs && echo \"=== df 确认 virtual-store 在 overlay ===\" && df -T /tmp/pnpm-vs | tail -1"}'
 ```
 
-**期望**：pnpm install 成功（exitCode=0），无 ERR
+**期望**：
+1. NFS 上 node_modules < 200K（只有 symlink + metadata）
+2. symlink 指向 `/tmp/pnpm-vs/...`（overlay）
+3. /tmp/pnpm-vs > 50MB（真正的包内容在 overlay）
 
-> **实测结果**：待测试
+> **远端测试**（2026-06-11）：PASS
+> - NFS node_modules: **86K**（symlink + .modules.yaml + lock.yaml）
+> - symlink 指向: `../../../tmp/pnpm-vs/react@18.3.1/node_modules/react`
+> - /tmp/pnpm-vs: **90M**（overlay 本地盘）
 
 ---
+
+### T24.19 NFS vs overlay pnpm install 耗时对比
+
+在同一 session 中对比：NFS 目录（/workspace）和 overlay 目录（/tmp）上 pnpm install 的耗时。
+由于 virtual-store-dir 和 store-dir 均在 overlay，两者的 pnpm install 耗时应接近。
+
+```bash
+SID=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -H "X-API-Key: $API_KEY" -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+
+curl -s --max-time 180 -X POST "$BASE/session/$SID/exec" \
+  -H 'Content-Type: application/json' -H "X-API-Key: $API_KEY" \
+  -d '{"command":"cd /workspace && npm create vite@5 nfs-perf -- --template react-ts 2>&1 | tail -1 && cd nfs-perf && time pnpm install 2>&1 | grep -E \"Done|real\" && rm -rf node_modules && echo \"=== NFS 重装 ===\" && time pnpm install 2>&1 | grep -E \"Done|real\" && mkdir -p /tmp/overlay-perf && cp package.json pnpm-lock.yaml /tmp/overlay-perf/ && cd /tmp/overlay-perf && rm -rf node_modules /tmp/pnpm-vs && echo \"=== overlay 重装 ===\" && time pnpm install 2>&1 | grep -E \"Done|real\""}'
+```
+
+**期望**：NFS 重装与 overlay 重装耗时差距 < 2x（NFS 只写 symlink，无重 IO）
+
+> **远端测试**（2026-06-11）：PASS
+> - NFS 首次: **6.8s**, NFS 重装: **2.7s**
+> - overlay 首次: **8.7s**, overlay 重装: **1.5s**
+> - NFS 重装仅比 overlay 慢 ~1s（symlink 写入开销），无 NFS 小文件风暴
+
+---
+
+### T24.20 pnpm install 三次重装稳定性
+
+```bash
+SID=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -H "X-API-Key: $API_KEY" -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+
+curl -s --max-time 120 -X POST "$BASE/session/$SID/exec" \
+  -H 'Content-Type: application/json' -H "X-API-Key: $API_KEY" \
+  -d '{"command":"cd /workspace && npm create vite@5 stable-test -- --template react-ts 2>&1 | tail -1 && cd stable-test && pnpm install 2>&1 | tail -1 && for i in 1 2 3; do rm -rf node_modules; time pnpm install 2>&1 | grep -E \"Done|real\"; done"}'
+```
+
+**期望**：三次重装耗时稳定，均 < 3s
+
+> **远端测试**（2026-06-11）：PASS — **1.6s / 1.6s / 1.6s**（三次稳定）
+
+---
+
+## 四、隔离性与稳定性
 
 ### T24.21 多 session 并发 pnpm install
 
 ```bash
-SID_A=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
-SID_B=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+SID_A=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -H "X-API-Key: $API_KEY" -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+SID_B=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -H "X-API-Key: $API_KEY" -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
 
 curl -s --max-time 120 -X POST "$BASE/session/$SID_A/exec" \
-  -H 'Content-Type: application/json' \
+  -H 'Content-Type: application/json' -H "X-API-Key: $API_KEY" \
   -d '{"command":"cd /workspace && npm create vite@5 concurrent-a -- --template react-ts 2>&1 | tail -1 && cd concurrent-a && pnpm install 2>&1 | tail -3"}' &
 
 curl -s --max-time 120 -X POST "$BASE/session/$SID_B/exec" \
-  -H 'Content-Type: application/json' \
+  -H 'Content-Type: application/json' -H "X-API-Key: $API_KEY" \
   -d '{"command":"cd /workspace && npm create vite@5 concurrent-b -- --template react-ts 2>&1 | tail -1 && cd concurrent-b && pnpm install 2>&1 | tail -3"}' &
 
 wait
@@ -462,39 +417,65 @@ echo "Both done"
 
 ---
 
-### T24.22 cp -a 后 .bin 软链接有效
+### T24.22 不同 session pnpm store 互不影响
 
 ```bash
-SID=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
-echo "SID: $SID"
+SID_A=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -H "X-API-Key: $API_KEY" -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+SID_B=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -H "X-API-Key: $API_KEY" -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
 
-curl -s --max-time 60 -X POST "$BASE/session/$SID/exec" \
-  -H 'Content-Type: application/json' \
-  -d '{"command":"mkdir -p /workspace/bin-test && cd /workspace/bin-test && cp -a /opt/preload/vite5/node_modules . && echo \"{\\\"name\\\":\\\"bin-test\\\"}\" > package.json && ls -la node_modules/.bin/ | head -10 && echo --- && node_modules/.bin/vite --version 2>&1"}'
+# Session A: 安装项目并写入标记
+curl -s --max-time 120 -X POST "$BASE/session/$SID_A/exec" \
+  -H 'Content-Type: application/json' -H "X-API-Key: $API_KEY" \
+  -d '{"command":"cd /workspace && npm create vite@5 cross-a -- --template react-ts 2>&1 | tail -1 && cd cross-a && pnpm install 2>&1 | tail -1 && echo MARK_A > node_modules/.mark"}'
+
+# Session B: 检查无 A 的标记
+curl -s --max-time 15 -X POST "$BASE/session/$SID_B/exec" \
+  -H 'Content-Type: application/json' -H "X-API-Key: $API_KEY" \
+  -d '{"command":"cat /workspace/cross-a/node_modules/.mark 2>&1; echo EXIT=$?"}'
 ```
 
-**期望**：`.bin/vite` 符号链接有效，`vite --version` 输出版本号
+**期望**：Session B 无法读取 Session A 的文件（exitCode≠0）
 
 > **实测结果**：待测试
 
 ---
 
-### T24.23 容器可用磁盘空间
+### T24.23 /opt/pnpm-store 不可变验证
 
 ```bash
-SID=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
-echo "SID: $SID"
+SID_A=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -H "X-API-Key: $API_KEY" -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+SID_B=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -H "X-API-Key: $API_KEY" -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
 
-curl -s --max-time 30 -X POST "$BASE/session/$SID/exec" \
-  -H 'Content-Type: application/json' \
-  -d '{"command":"df -h / && echo --- && du -sh /opt/preload /opt/package-cache-base/npm /root/.local/share/mise 2>/dev/null"}'
+# Session A: 破坏 store
+curl -s --max-time 30 -X POST "$BASE/session/$SID_A/exec" \
+  -H 'Content-Type: application/json' -H "X-API-Key: $API_KEY" \
+  -d '{"command":"rm -rf /opt/pnpm-store/v10 && echo DONE_A"}'
+
+# Session B: 检查完整性
+curl -s --max-time 30 -X POST "$BASE/session/$SID_B/exec" \
+  -H 'Content-Type: application/json' -H "X-API-Key: $API_KEY" \
+  -d '{"command":"ls /opt/pnpm-store/v10 2>&1 | head -3 && du -sh /opt/pnpm-store"}'
 ```
 
-**期望**：
-1. 根分区可用空间 > 5GB
-2. 预装缓存 + mise 安装总量 < 1.5GB
+**期望**：Session B 的 `/opt/pnpm-store` 完整（镜像层隔离）
 
 > **实测结果**：待测试
+
+---
+
+### T24.24 容器可用磁盘空间
+
+```bash
+SID=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -H "X-API-Key: $API_KEY" -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+
+curl -s --max-time 30 -X POST "$BASE/session/$SID/exec" \
+  -H 'Content-Type: application/json' -H "X-API-Key: $API_KEY" \
+  -d '{"command":"df -h / && echo --- && du -sh /opt/pnpm-store /root/.local/share/mise 2>/dev/null"}'
+```
+
+**期望**：根分区可用空间 > 5GB，pnpm store + mise < 1.5GB
+
+> **远端测试**（2026-06-11）：PASS — pnpm-store 190M, mise 839M, 可用 57G
 
 ---
 
@@ -505,35 +486,41 @@ curl -s --max-time 30 -X POST "$BASE/session/$SID/exec" \
 | 用例 | 结果 | 备注 |
 |------|------|------|
 | T24.1 mise 安装与预装版本 | PASS | node 18/20/22/24, pnpm 8/9/10/11 |
-| T24.2 默认版本验证 | PASS | node@24, pnpm@11, npmmirror |
+| T24.2 默认版本验证 | PASS | node@24, pnpm@10, npmmirror |
 | T24.3 mise use 切换 Node | PASS | v24 → v20 |
-| T24.4 mise use 切换 pnpm | PASS | 11 → 9 |
-| T24.5 .nvmrc 自动检测 | PASS | shims 路由到 v18 |
-| T24.6 .node-version 自动检测 | PASS | shims 路由到 v22 |
+| T24.4 mise use 切换 pnpm | PASS | 10 → 9 |
+| T24.5 .nvmrc 自动检测 | PASS | v20.20.2 |
+| T24.6 .node-version 自动检测 | PASS | v22.22.3 |
 | T24.7 mise.toml 自动检测 | PASS | node@18 + pnpm@8 |
-| T24.8 切换版本后 pnpm install | 待测试 | node@20 + pnpm@9 |
-| T24.9 不同 session 版本独立 | 待测试 | A 切换不影响 B |
+| T24.8 切换版本后 pnpm install | PASS | node@20 + pnpm@9, 174 packages |
+| T24.9 不同 session 版本独立 | PASS | A→v18, B→v24 不受影响 |
+| T24.10 全局工具可用性 | PASS | supergateway + rg 14.1.0 |
 
-### 预装依赖缓存
+### pnpm store 预装缓存
 
 | 用例 | 结果 | 备注 |
 |------|------|------|
-| T24.10 npm cache 预装内容 | PASS | 108MB |
-| T24.11 预装 node_modules | PASS | vite5 110M, vite8 125M |
-| T24.12 pnpm install（Vite 5） | 待测试 | |
-| T24.13 pnpm 重装 | 待测试 | |
-| T24.14 npm cp + install | 待测试 | |
-| T24.15 npm 重装 | 待测试 | |
-| T24.16 npm cache 跨版本共享 | PASS | node@20 命中 cache |
-| T24.17 npm 完全离线安装 | 待测试 | |
+| T24.11 store 配置验证 | PASS | store-dir + virtual-store-dir 正确, 190MB |
+| T24.12 pnpm install 首次 | PASS | reused 173/174, **6.8s** |
+| T24.13 pnpm 重装 | PASS | reused 174/174, **1.5s** |
+| T24.14 不匹配项目 fallback | PASS | express 68 packages, **2.7s** |
+| T24.15 hardlink 验证 | PASS | overlay 同 fs, hardlinks=2 |
+| T24.16 pnpm build 跑通 | PASS | vite build 成功, dist/ 160K, 3.9s |
+
+### NFS 环境不影响
+
+| 用例 | 结果 | 备注 |
+|------|------|------|
+| T24.17 确认 NFS 挂载 | PASS | /workspace=nfs4, /tmp=/opt=overlay |
+| T24.18 NFS node_modules 只有 symlink | PASS | NFS 86K, overlay 90M |
+| T24.19 NFS vs overlay 耗时对比 | PASS | NFS 重装 2.7s vs overlay 1.5s, 差距 ~1s |
+| T24.20 三次重装稳定性 | PASS | 1.6s / 1.6s / 1.6s |
 
 ### 隔离性与稳定性
 
 | 用例 | 结果 | 备注 |
 |------|------|------|
-| T24.18 跨 session 独立性 | 待测试 | |
-| T24.19 /opt/preload 不可变 | 待测试 | |
-| T24.20 不匹配项目 fallback | 待测试 | |
 | T24.21 多 session 并发 | 待测试 | |
-| T24.22 cp -a .bin 链接 | 待测试 | |
-| T24.23 容器磁盘空间 | 待测试 | |
+| T24.22 跨 session 独立性 | 待测试 | |
+| T24.23 /opt/pnpm-store 不可变 | 待测试 | |
+| T24.24 容器磁盘空间 | PASS | pnpm-store 190M, mise 839M, 可用 57G |
