@@ -1,9 +1,9 @@
 import { pgTable, text, bigint, jsonb } from "drizzle-orm/pg-core"
 import { Timestamps } from "../storage/schema.pg"
-import type { ProjectID } from "./schema"
+import type { ProjectV2 } from "@opencode-ai/core/project"
 
 export const ProjectTable = pgTable("project", {
-  id: text().$type<ProjectID>().primaryKey(),
+  id: text().$type<ProjectV2.ID>().primaryKey(),
   worktree: text().notNull(),
   vcs: text(),
   name: text(),

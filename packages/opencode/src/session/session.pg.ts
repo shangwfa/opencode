@@ -1,25 +1,25 @@
 import { pgTable, text, bigint, jsonb, integer, real, index, primaryKey } from "drizzle-orm/pg-core"
 import { ProjectTable } from "../project/project.pg"
-import type { MessageV2 } from "./message-v2"
+import type { SessionV1 } from "@opencode-ai/core/v1/session"
 import type { Snapshot } from "../snapshot"
-import type { Permission } from "../permission"
-import type { ProjectID } from "../project/schema"
+import type { PermissionV1 } from "@opencode-ai/core/v1/permission"
+import type { ProjectV2 } from "@opencode-ai/core/project"
 import type { SessionID, MessageID, PartID } from "./schema"
-import type { WorkspaceID } from "../control-plane/schema"
+import type { WorkspaceV2 } from "@opencode-ai/core/workspace"
 import { Timestamps } from "../storage/schema.pg"
 
-type PartData = Omit<MessageV2.Part, "id" | "sessionID" | "messageID">
-type InfoData = Omit<MessageV2.Info, "id" | "sessionID">
+type PartData = Omit<SessionV1.Part, "id" | "sessionID" | "messageID">
+type InfoData = Omit<SessionV1.Info, "id" | "sessionID">
 
 export const SessionTable = pgTable(
   "session",
   {
     id: text().$type<SessionID>().primaryKey(),
     project_id: text()
-      .$type<ProjectID>()
+      .$type<ProjectV2.ID>()
       .notNull()
       .references(() => ProjectTable.id, { onDelete: "cascade" }),
-    workspace_id: text().$type<WorkspaceID>(),
+    workspace_id: text().$type<WorkspaceV2.ID>(),
     parent_id: text().$type<SessionID>(),
     slug: text().notNull(),
     directory: text().notNull(),
@@ -38,7 +38,7 @@ export const SessionTable = pgTable(
     tokens_cache_read: integer().notNull().default(0),
     tokens_cache_write: integer().notNull().default(0),
     revert: jsonb().$type<{ messageID: MessageID; partID?: PartID; snapshot?: string; diff?: string }>(),
-    permission: jsonb().$type<Permission.Ruleset>(),
+    permission: jsonb().$type<PermissionV1.Ruleset>(),
     agent: text(),
     model: jsonb().$type<{
       id: string
@@ -131,5 +131,5 @@ export const PermissionTable = pgTable("permission", {
     .primaryKey()
     .references(() => ProjectTable.id, { onDelete: "cascade" }),
   ...Timestamps,
-  data: jsonb().notNull().$type<Permission.Ruleset>(),
+  data: jsonb().notNull().$type<PermissionV1.Ruleset>(),
 })

@@ -33,8 +33,24 @@ import { Flag } from "@opencode-ai/core/flag/flag"
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process"
 import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
 import { McpCatalog } from "./catalog"
+import type { SessionID } from "@/session/schema"
+import { SessionMcp } from "@/mcp/session-mcp"
+import { SandboxProvider } from "@/tool/sandbox-provider"
 
 const DEFAULT_TIMEOUT = 30_000
+
+function shellQuote(s: string): string {
+  return "'" + s.replace(/'/g, "'\\''") + "'"
+}
+
+function stdioCommand(mcp: { command: string[] }): string {
+  return mcp.command.map(shellQuote).join(" ")
+}
+
+function sandboxMcpPaths(key: string, port: number) {
+  const base = `/tmp/opencode-mcp/${key}-${port}`
+  return { log: `${base}.log`, pid: `${base}.pid` }
+}
 
 export const Resource = Schema.Struct({
   name: Schema.String,
@@ -631,16 +647,15 @@ export const layer = Layer.effect(
       // Use supergateway to bridge stdio MCP → StreamableHTTP inside the sandbox
       const paths = sandboxMcpPaths(key, port)
       const bridgeCommand = `supergateway --stdio ${shellQuote(stdioCommand(mcp))} --outputTransport streamableHttp --port ${port} --logLevel none`
-      log.info("starting MCP in sandbox via supergateway", { key, sessionID, port, command: bridgeCommand })
+      yield* Effect.logInfo("starting MCP in sandbox via supergateway", { key, sessionID, port, command: bridgeCommand })
 
       yield* maybeSandboxProvider.runInSession(
         sessionID,
         `mkdir -p /tmp/opencode-mcp; nohup ${bridgeCommand} > ${shellQuote(paths.log)} 2>&1 & echo $! > ${shellQuote(paths.pid)}`,
       ).pipe(
-        Effect.catch((err) => {
-          log.error("sandbox MCP start failed", { key, sessionID, error: String(err) })
-          return Effect.void
-        }),
+        Effect.catch((err) =>
+          Effect.logError("sandbox MCP start failed", { key, sessionID, error: String(err) }),
+        ),
       )
 
       const endpointUrl = yield* maybeSandboxProvider.getEndpoint(sessionID, port)
@@ -661,10 +676,11 @@ export const layer = Layer.effect(
         }
         return undefined as MCPClient | undefined
       }).pipe(
-        Effect.map((c): { client: MCPClient | undefined; defs: MCPToolDef[] | undefined } => {
-          if (c) log.info("connected to sandbox MCP", { key, sessionID })
-          return { client: c, defs: undefined }
-        }),
+        Effect.tap((c) => (c ? Effect.logInfo("connected to sandbox MCP", { key, sessionID }) : Effect.void)),
+        Effect.map((c): { client: MCPClient | undefined; defs: MCPToolDef[] | undefined } => ({
+          client: c,
+          defs: undefined,
+        })),
       )
 
       if (!client.client) return client
@@ -847,7 +863,7 @@ export const layer = Layer.effect(
               `if [ -f ${shellQuote(paths.pid)} ]; then kill "$(cat ${shellQuote(paths.pid)})" 2>/dev/null || true; rm -f ${shellQuote(paths.pid)} ${shellQuote(paths.log)}; fi`,
             )
             .pipe(Effect.ignore)
-          log.info("killed supergateway in sandbox", { sessionID, name, port: entry.port })
+          yield* Effect.logInfo("killed supergateway in sandbox", { sessionID, name, port: entry.port })
         }
       }
     })
@@ -1119,8 +1135,8 @@ export const layer = Layer.effect(
       status,
       clients,
       tools,
-      toolsForSession,
-      clearSessionCache,
+      toolsForSession: (sessionID: SessionID) => toolsForSession(sessionID).pipe(Effect.orDie),
+      clearSessionCache: (sessionID: SessionID) => clearSessionCache(sessionID).pipe(Effect.orDie),
       prompts,
       resources,
       add,

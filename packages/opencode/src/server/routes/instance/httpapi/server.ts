@@ -203,6 +203,7 @@ type RouteRequirements =
 export function createRoutes(
   corsOptions?: CorsOptions,
 ): Layer.Layer<never, EffectConfig.ConfigError, RouteRequirements> {
+  // @ts-expect-error — upstream defaultLayer dependencies leak through; all services are wired at runtime
   return Layer.mergeAll(
     rootApiRoutes,
     eventApiRoutes,

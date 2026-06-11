@@ -16,9 +16,10 @@ import { assertExternalDirectoryEffect } from "./external-directory"
 import * as Bom from "@/util/bom"
 import { toSandboxPath } from "./sandbox-path"
 import { SandboxProvider } from "./sandbox-provider"
-import * as Log from "@opencode-ai/core/util/log"
 
-const writeLog = Log.create({ service: "write-tool" })
+const writeLog = {
+  warn(msg: string, data?: Record<string, unknown>) { console.warn(`[write-tool] ${msg}`, data ?? "") },
+}
 
 const MAX_PROJECT_DIAGNOSTICS_FILES = 5
 

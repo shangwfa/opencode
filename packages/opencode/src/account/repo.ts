@@ -56,17 +56,18 @@ export const layer = Layer.effect(
       return { ...account, active_org_id: state.active_org_id ?? null }
     })
 
-    const state = (accountID: AccountID, orgID: Option.Option<OrgID>) => {
-      const id = Option.getOrNull(orgID)
-      await db
-        .insert(AccountStateTable)
-        .values({ id: ACCOUNT_STATE_ID, active_account_id: accountID, active_org_id: id })
-        .onConflictDoUpdate({
-          target: AccountStateTable.id,
-          set: { active_account_id: accountID, active_org_id: id },
-        })
-        .run()
-    }
+    const state = (accountID: AccountID, orgID: Option.Option<OrgID>) =>
+      Effect.gen(function* () {
+        const id = Option.getOrNull(orgID)
+        yield* db
+          .insert(AccountStateTable)
+          .values({ id: ACCOUNT_STATE_ID, active_account_id: accountID, active_org_id: id })
+          .onConflictDoUpdate({
+            target: AccountStateTable.id,
+            set: { active_account_id: accountID, active_org_id: id },
+          })
+          .run()
+      })
 
     const active = Effect.fn("AccountRepo.active")(() =>
       query(current()).pipe(Effect.map((row) => (row ? Option.some(decode(row)) : Option.none()))),

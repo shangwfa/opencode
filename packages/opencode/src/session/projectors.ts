@@ -6,12 +6,24 @@ import type { TxOrDb } from "@/storage/db"
 import { SyncEvent } from "@/sync"
 import * as Session from "./session"
 import { MessageV2 } from "./message-v2"
-import { SessionTable, MessageTable, PartTable } from "./session.sql"
-import { WorkspaceTable } from "@/control-plane/workspace.sql"
-import { Log } from "@opencode-ai/core/util/log"
+import { SessionTable, MessageTable, PartTable } from "./session.pg"
+import { WorkspaceTable } from "@/control-plane/workspace.pg"
+import { SessionV1 } from "@opencode-ai/core/v1/session"
 import nextProjectors from "./projectors-next"
+import type { EventV2 } from "@opencode-ai/core/event"
 
-const log = Log.create({ service: "session.projector" })
+/** Bridge an EventV2 Definition (core) into a SyncEvent Definition (opencode sync). */
+function toSyncDefinition<D extends EventV2.Definition>(def: D): SyncEvent.Definition<D["type"]> {
+  return {
+    type: def.type,
+    version: def.sync?.version ?? 0,
+    aggregate: def.sync?.aggregate ?? "sessionID",
+    schema: def.data,
+    properties: def.data,
+  }
+}
+
+const log = { warn: (...args: unknown[]) => console.warn("[session.projector]", ...args) }
 
 function foreign(err: unknown) {
   if (typeof err !== "object" || err === null) return false
@@ -23,9 +35,9 @@ function foreign(err: unknown) {
 
 export type DeepPartial<T> = T extends object ? { [K in keyof T]?: DeepPartial<T[K]> | null } : T
 
-type Usage = Pick<MessageV2.StepFinishPart, "cost" | "tokens">
+type Usage = Pick<SessionV1.StepFinishPart, "cost" | "tokens">
 
-function usage(part: MessageV2.Part | (typeof PartTable.$inferSelect)["data"]): Usage | undefined {
+function usage(part: SessionV1.Part | (typeof PartTable.$inferSelect)["data"]): Usage | undefined {
   if (part.type !== "step-finish") return undefined
   if (!("cost" in part) || !("tokens" in part)) return undefined
   return { cost: part.cost, tokens: part.tokens }
@@ -99,7 +111,7 @@ export function toPartialRow(info: DeepPartial<Session.Info>) {
 }
 
 export default [
-  SyncEvent.project(Session.Event.Created, async (db, data) => {
+  SyncEvent.project(toSyncDefinition(Session.Event.Created), async (db, data: any) => {
     await db.insert(SessionTable)
       .values(Session.toRow(data.info as Session.Info))
       .run()
@@ -109,7 +121,7 @@ export default [
     }
   }),
 
-  SyncEvent.project(Session.Event.Updated, async (db, data) => {
+  SyncEvent.project(toSyncDefinition(Session.Event.Updated), async (db, data: any) => {
     const info = data.info
     const [row] = await db
       .update(SessionTable)
@@ -119,11 +131,11 @@ export default [
     if (!row) throw new NotFoundError({ message: `Session not found: ${data.sessionID}` })
   }),
 
-  SyncEvent.project(Session.Event.Deleted, async (db, data) => {
+  SyncEvent.project(toSyncDefinition(Session.Event.Deleted), async (db, data: any) => {
     await db.delete(SessionTable).where(eq(SessionTable.id, data.sessionID)).run()
   }),
 
-  SyncEvent.project(MessageV2.Event.Updated, async (db, data) => {
+  SyncEvent.project(toSyncDefinition(MessageV2.Event.Updated), async (db, data: any) => {
     const time_created = data.info.time.created
     const { id, sessionID, ...rest } = data.info
 
@@ -143,7 +155,7 @@ export default [
     }
   }),
 
-  SyncEvent.project(MessageV2.Event.Removed, async (db, data) => {
+  SyncEvent.project(toSyncDefinition(MessageV2.Event.Removed), async (db, data: any) => {
     const rows = await db
       .select()
       .from(PartTable)
@@ -158,7 +170,7 @@ export default [
       .run()
   }),
 
-  SyncEvent.project(MessageV2.Event.PartRemoved, async (db, data) => {
+  SyncEvent.project(toSyncDefinition(MessageV2.Event.PartRemoved), async (db, data: any) => {
     const row = await db
       .select()
       .from(PartTable)
@@ -172,7 +184,7 @@ export default [
       .run()
   }),
 
-  SyncEvent.project(MessageV2.Event.PartUpdated, async (db, data) => {
+  SyncEvent.project(toSyncDefinition(MessageV2.Event.PartUpdated), async (db, data: any) => {
     const { id, messageID, sessionID, ...rest } = data.part
     const row = await db.select().from(PartTable).where(eq(PartTable.id, id)).get()
 

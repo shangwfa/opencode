@@ -675,8 +675,6 @@ export const layer = Layer.effect(
         },
         system: input.system,
         format: input.format,
-        userName: input.userName,
-        userId: input.userId,
       }
 
       if (current?.agent !== info.agent) {
@@ -1135,8 +1133,8 @@ export const layer = Layer.effect(
       throw new Error("Impossible")
     })
 
-    const runLoop: (sessionID: SessionID) => Effect.Effect<SessionV1.WithParts> = Effect.fn("SessionPrompt.run")(
-      function* (sessionID: SessionID) {
+    const runLoop: (sessionID: SessionID, skills?: string[]) => Effect.Effect<SessionV1.WithParts> = Effect.fn("SessionPrompt.run")(
+      function* (sessionID: SessionID, skills?: string[]) {
         const ctx = yield* InstanceState.context
         let structured: unknown
         let step = 0
@@ -1329,7 +1327,7 @@ export const layer = Layer.effect(
             yield* plugin.trigger("experimental.chat.messages.transform", {}, { messages: msgs })
 
             const [skillsResult, env, instructions, modelMsgs] = yield* Effect.all([
-              sys.skills(agent, skills, sessionID),
+              sys.skills(agent, skills),
               sys.environment(model),
               instruction.system().pipe(Effect.orDie),
               MessageV2.toModelMessagesEffect(msgs, model),

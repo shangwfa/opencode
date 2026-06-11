@@ -2,7 +2,8 @@ import { Effect, Context, Layer, Cause, Deferred, Ref, Semaphore, Schedule } fro
 import { Sandbox, ConnectionConfig } from "@alibaba-group/opensandbox"
 import type { CommandExecution, Volume } from "@alibaba-group/opensandbox"
 import { and, eq, lt } from "drizzle-orm"
-import * as Log from "@opencode-ai/core/util/log"
+
+
 import { Flag } from "@/flag/flag"
 import { Database } from "../storage/db"
 import { SandboxTable } from "./sandbox.pg"
@@ -114,7 +115,11 @@ export function cleanupSessionVolume(
 }
 
 export namespace SandboxProvider {
-  const log = Log.create({ service: "sandbox-provider" })
+  const log = {
+    info(msg: string, data?: Record<string, unknown>) { console.info(`[sandbox-provider] ${msg}`, data ?? "") },
+    warn(msg: string, data?: Record<string, unknown>) { console.warn(`[sandbox-provider] ${msg}`, data ?? "") },
+    error(msg: string, data?: Record<string, unknown>) { console.error(`[sandbox-provider] ${msg}`, data ?? "") },
+  }
 
   export interface Interface {
     readonly getOrCreate: (sessionID: SessionID) => Effect.Effect<Sandbox>

@@ -7,7 +7,7 @@ import { eq, sql } from "drizzle-orm"
 import { GlobalBus } from "@/bus/global"
 import { Bus as ProjectBus } from "@/bus"
 import { BusEvent } from "@/bus/bus-event"
-import { EventSequenceTable, EventTable } from "./event.sql"
+import { EventSequenceTable, EventTable } from "./event.pg"
 import { EventID } from "./schema"
 import { Context, Effect, Layer, Schema as EffectSchema } from "effect"
 import type { DeepMutable } from "@opencode-ai/core/schema"
@@ -234,12 +234,12 @@ export function reset() {
 
 export function init(input: { projectors: Array<[Definition, ProjectorFunc]>; convertEvent?: ConvertEvent }) {
   projectors = new Map(input.projectors.map(([def, func]) => [versionedType(def.type, def.version), func]))
-  for (let entry of EventV2.registry.values()) {
-    if (!entry.version || !entry.aggregate) continue
+  for (const entry of EventV2.registry.values()) {
+    if (!entry.sync?.version || !entry.sync?.aggregate) continue
     register({
       type: entry.type,
-      version: entry.version,
-      aggregate: entry.aggregate,
+      version: entry.sync.version,
+      aggregate: entry.sync.aggregate,
       properties: entry.data,
       schema: entry.data,
     })
@@ -249,8 +249,8 @@ export function init(input: { projectors: Array<[Definition, ProjectorFunc]>; co
   // latest versions from code, and keep around old versions for
   // replaying. Replaying does not go through the bus, and it
   // simplifies the bus to only use unversioned latest events
-  for (let [type, version] of versions.entries()) {
-    let def = registry.get(versionedType(type, version))!
+  for (const [type, version] of versions.entries()) {
+    const def = registry.get(versionedType(type, version))!
     BusEvent.define(def.type, def.properties)
   }
 
@@ -409,15 +409,15 @@ export function effectPayloads() {
       .values()
       .filter(
         (definition) =>
-          definition.version !== undefined && !registry.has(versionedType(definition.type, definition.version)),
+          definition.sync?.version !== undefined && !registry.has(versionedType(definition.type, definition.sync.version)),
       )
       .map((definition) =>
         EffectSchema.Struct({
           type: EffectSchema.Literal("sync"),
-          name: EffectSchema.Literal(versionedType(definition.type, definition.version!)),
+          name: EffectSchema.Literal(versionedType(definition.type, definition.sync!.version)),
           id: EffectSchema.String,
           seq: EffectSchema.Finite,
-          aggregateID: EffectSchema.Literal(definition.aggregate!),
+          aggregateID: EffectSchema.Literal(definition.sync!.aggregate),
           data: definition.data,
         }).annotate({ identifier: `SyncEvent.${definition.type}` }),
       )

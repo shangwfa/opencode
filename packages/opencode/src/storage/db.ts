@@ -7,7 +7,6 @@ import { RuntimeFlags } from "@/effect/runtime-flags"
 import { LocalContext } from "@/util/local-context"
 import { lazy } from "@/util/lazy"
 import { Global } from "@opencode-ai/core/global"
-import * as Log from "@opencode-ai/core/util/log"
 import { NamedError } from "@opencode-ai/core/util/error"
 import path from "path"
 import { readFileSync, readdirSync, existsSync } from "fs"
@@ -24,16 +23,25 @@ export const NotFoundError = NamedError.create("NotFoundError", {
   message: Schema.String,
 })
 
-const log = Log.create({ service: "db" })
+const log = {
+  info(message: string, extra?: Record<string, unknown>) {
+    console.log(`[db] ${message}`, extra ?? "")
+  },
+}
 
 export type Dialect = "sqlite" | "pg"
 
 export const dialect: Dialect = Flag.OPENCODE_DATABASE_URL ? "pg" : "sqlite"
 
-type DatabaseFlags = Pick<RuntimeFlags.Info, "disableChannelDb" | "skipMigrations">
+type DatabaseFlags = {
+  disableChannelDb: boolean
+  skipMigrations: boolean
+}
 
-const readRuntimeFlags = () =>
-  Effect.runSync(RuntimeFlags.Service.useSync((flags) => flags).pipe(Effect.provide(RuntimeFlags.defaultLayer)))
+const readRuntimeFlags = (): DatabaseFlags => ({
+  disableChannelDb: false,
+  skipMigrations: false,
+})
 
 export function getChannelPath(flags: Pick<DatabaseFlags, "disableChannelDb"> = readRuntimeFlags()) {
   if (["latest", "beta", "prod"].includes(InstallationChannel) || flags.disableChannelDb)

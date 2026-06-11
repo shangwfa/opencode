@@ -4,8 +4,7 @@ import { Effect, Context, Layer } from "effect"
 import { Database, and, asc, eq } from "../storage/db"
 import { SessionAgentTable } from "./agent.pg"
 import type { SessionID } from "../session/schema"
-import type { Permission } from "@/permission"
-import type { ModelID, ProviderID } from "@/provider/schema"
+import { PermissionV1 } from "@opencode-ai/core/v1/permission"
 
 export namespace SessionAgent {
   export const Row = z.object({
@@ -46,8 +45,8 @@ export namespace SessionAgent {
     description?: string
     mode?: "subagent" | "primary" | "all"
     prompt?: string
-    permission?: Permission.Ruleset
-    model?: { providerID: ProviderID; modelID: ModelID }
+    permission?: PermissionV1.Ruleset
+    model?: { providerID: string; modelID: string }
     temperature?: number
     topP?: number
     steps?: number

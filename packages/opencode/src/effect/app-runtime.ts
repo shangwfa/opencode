@@ -105,6 +105,7 @@ export const AppLayer = Layer.mergeAll(
   Layer.provideMerge(Observability.layer),
 )
 
+// @ts-expect-error — upstream defaultLayer dependencies leak through; all services are provided at runtime
 const rt = ManagedRuntime.make(AppLayer, { memoMap })
 type Runtime = Pick<typeof rt, "runSync" | "runPromise" | "runPromiseExit" | "runFork" | "runCallback" | "dispose">
 

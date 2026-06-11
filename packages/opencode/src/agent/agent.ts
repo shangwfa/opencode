@@ -16,7 +16,7 @@ import PROMPT_SCOUT from "./prompt/scout.txt"
 import PROMPT_SUMMARY from "./prompt/summary.txt"
 import PROMPT_TITLE from "./prompt/title.txt"
 import { Permission } from "@/permission"
-import { ConfigPermission } from "@/config/permission"
+import { ConfigPermissionV1 } from "@opencode-ai/core/v1/config/permission"
 import { mergeDeep, pipe, sortBy, values } from "remeda"
 import { Global } from "@opencode-ai/core/global"
 import path from "path"
@@ -25,6 +25,9 @@ import { Skill } from "../skill"
 import { SessionAgent } from "./session-agent"
 import { Flag } from "@opencode-ai/core/flag/flag"
 import { NamedError } from "@opencode-ai/core/util/error"
+import type { SessionID } from "@/session/schema"
+import { Database, eq } from "@/storage/db"
+import { SessionTable } from "@/session/session.pg"
 import { Effect, Context, Layer, Schema } from "effect"
 import { InstanceState } from "@/effect/instance-state"
 import { RuntimeFlags } from "@/effect/runtime-flags"
@@ -72,8 +75,8 @@ export const CreateInput = Schema.Struct({
   description: Schema.optional(Schema.String),
   mode: Schema.Literals(["subagent", "primary", "all"]),
   prompt: Schema.optional(Schema.String),
-  permission: Schema.optional(ConfigPermission.Info),
-  model: Schema.optional(Schema.Struct({ modelID: ModelID, providerID: ProviderID })),
+  permission: Schema.optional(ConfigPermissionV1.Info),
+  model: Schema.optional(Schema.Struct({ modelID: ModelV2.ID, providerID: ProviderV2.ID })),
   temperature: Schema.optional(Schema.Finite),
   topP: Schema.optional(Schema.Finite),
   steps: Schema.optional(Schema.Finite),
@@ -122,7 +125,7 @@ function rowToInfo(row: SessionAgent.Row): Info {
     prompt: row.prompt ?? undefined,
     permission: row.permission ?? [],
     model: row.model
-      ? { providerID: ProviderID.make(row.model.providerID), modelID: ModelID.make(row.model.modelID) }
+      ? { providerID: ProviderV2.ID.make(row.model.providerID), modelID: ModelV2.ID.make(row.model.modelID) }
       : undefined,
     temperature: row.temperature ?? undefined,
     topP: row.top_p ?? undefined,
@@ -149,6 +152,7 @@ export const layer = Layer.effect(
     const provider = yield* Provider.Service
     const locations = yield* LocationServiceMap
     const flags = yield* RuntimeFlags.Service
+    const sessionAgent = yield* SessionAgent.Service
 
     const state = yield* InstanceState.make<State>(
       Effect.fn("Agent.state")(function* (ctx) {
@@ -525,16 +529,16 @@ export const layer = Layer.effect(
         if (!isPg) return base
         const rows = yield* sessionAgent.list(session)
         if (rows.length === 0) return base
-        const overlay = new Map(rows.map((r) => [r.name, rowToInfo(r)]))
+        const overlay = new Map(rows.map((r: SessionAgent.Row) => [r.name, rowToInfo(r)]))
         return base
-          .map((a) => {
+          .map((a: Info) => {
             const o = overlay.get(a.name)
             if (!o) return a
             return { ...o, native: a.native, hidden: a.hidden }
           })
-          .concat([...overlay.values()].filter((a) => !base.some((b) => b.name === a.name)))
-      }),
-        sessionGet: Effect.fn("Agent.sessionGet")(function* (agent: string, session?: SessionID) {
+          .concat([...overlay.values()].filter((a: Info) => !base.some((b: Info) => b.name === a.name)))
+      }, Effect.orDie),
+      sessionGet: Effect.fn("Agent.sessionGet")(function* (agent: string, session?: SessionID) {
         if (!session || !Flag.OPENCODE_DATABASE_URL) return yield* InstanceState.useEffect(state, (s) => s.get(agent))
         const base = yield* InstanceState.useEffect(state, (s) => s.get(agent))
         let currentSID: SessionID | undefined = session
@@ -543,15 +547,16 @@ export const layer = Layer.effect(
           visited++
           const row = yield* sessionAgent.get(currentSID, agent)
           if (row) return mergeInfo(row, base)
-          const parent = yield* Effect.promise(() =>
-            Database.use((db) =>
-              db.select({ parent_id: SessionTable.parent_id }).from(SessionTable).where(eq(SessionTable.id, currentSID!)).get(),
+          const sid: SessionID = currentSID
+          const parent = yield* Effect.promise((): Promise<{ parent_id: SessionID | null } | undefined> =>
+            Database.use((db: any) =>
+              db.select({ parent_id: SessionTable.parent_id }).from(SessionTable).where(eq(SessionTable.id, sid)).get(),
             ),
           )
           currentSID = parent?.parent_id ?? undefined
         }
         return base
-      }),
+      }, Effect.orDie),
       sessionCreate: Effect.fn("Agent.sessionCreate")(function* (session: SessionID, input: CreateInput) {
         if (!Flag.OPENCODE_DATABASE_URL) throw new Error("Session agents are only available in SaaS mode")
         if (input.name === "compaction" || input.name === "title" || input.name === "summary") {
@@ -562,15 +567,15 @@ export const layer = Layer.effect(
         const permission = Permission.merge(user, custom)
         const row = yield* sessionAgent.upsert(session, { ...input, permission })
         return mergeInfo(row, yield* InstanceState.useEffect(state, (s) => s.get(input.name)))
-      }),
+      }, Effect.orDie),
       sessionUnload: Effect.fn("Agent.sessionUnload")(function* (session: SessionID, name: string) {
         if (!Flag.OPENCODE_DATABASE_URL) throw new Error("Session agents are only available in SaaS mode")
         yield* sessionAgent.remove(session, name)
-      }),
+      }, Effect.orDie),
       sessionClear: Effect.fn("Agent.sessionClear")(function* (session: SessionID) {
         if (!Flag.OPENCODE_DATABASE_URL) throw new Error("Session agents are only available in SaaS mode")
         yield* sessionAgent.removeAll(session)
-      }),
+      }, Effect.orDie),
     })
   }),
 )
@@ -587,6 +592,10 @@ export const defaultLayer = layer.pipe(
 )
 
 const locationServiceMapNode = LayerNode.make(LocationServiceMap.layer, [])
+const sessionAgentNode = LayerNode.make(
+  Flag.OPENCODE_DATABASE_URL ? SessionAgent.pgLayer : SessionAgent.noopLayer,
+  [],
+)
 
 export const node = LayerNode.make(layer, [
   Config.node,
@@ -595,6 +604,8 @@ export const node = LayerNode.make(layer, [
   Skill.node,
   Provider.node,
   locationServiceMapNode,
+  RuntimeFlags.node,
+  sessionAgentNode,
 ])
 
 export * as Agent from "./agent"

@@ -24,6 +24,8 @@ function number(key: string) {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined
 }
 
+const OPENCODE_EXPERIMENTAL = truthy("OPENCODE_EXPERIMENTAL")
+
 export const Flag = {
   OTEL_EXPORTER_OTLP_ENDPOINT: process.env["OTEL_EXPORTER_OTLP_ENDPOINT"],
   OTEL_EXPORTER_OTLP_HEADERS: process.env["OTEL_EXPORTER_OTLP_HEADERS"],

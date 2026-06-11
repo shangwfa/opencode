@@ -8,6 +8,7 @@ import { Session } from "./session"
 import { SessionID } from "./schema"
 import { SessionStatus } from "./status"
 import { SandboxProvider } from "@/tool/sandbox-provider"
+import { MCP } from "@/mcp"
 
 export interface Interface {
   readonly assertNotBusy: (sessionID: SessionID) => Effect.Effect<void, Session.BusyError>
@@ -64,7 +65,7 @@ export const layer = Layer.effect(
           const sandbox = yield* Effect.serviceOption(SandboxProvider.Service)
           let destroyed = false
           if (sandbox._tag === "Some") {
-            const keep = yield* sandbox.value.isKeepAlive(sessionID)
+            const keep = yield* sandbox.value.isKeepAlive(sessionID).pipe(Effect.orDie)
             if (!keep) {
               yield* sandbox.value.destroy(sessionID).pipe(Effect.catchCause(() => Effect.void))
               destroyed = true

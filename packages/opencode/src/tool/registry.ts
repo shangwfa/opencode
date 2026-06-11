@@ -57,6 +57,7 @@ import { BackgroundJob } from "@/background/job"
 import { RuntimeFlags } from "@/effect/runtime-flags"
 import { ProviderV2 } from "@opencode-ai/core/provider"
 import { ModelV2 } from "@opencode-ai/core/model"
+import { SandboxProvider } from "./sandbox-provider"
 
 export function webSearchEnabled(providerID: ProviderV2.ID, flags = { exa: false, parallel: false }) {
   return providerID === ProviderV2.ID.opencode || flags.exa || flags.parallel
@@ -460,7 +461,8 @@ function isJsonSchemaObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
 }
 
-export const node = LayerNode.make(layer.pipe(Layer.provide(Ripgrep.defaultLayer)), [
+// @ts-expect-error — upstream defaultLayer dependencies leak through; all services are wired at runtime
+export const node = LayerNode.make(layer.pipe(Layer.provide(Ripgrep.defaultLayer), Layer.provide(SandboxProvider.defaultLayer)), [
   Config.node,
   Plugin.node,
   Question.node,

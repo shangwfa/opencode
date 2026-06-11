@@ -800,7 +800,7 @@ export const layer: Layer.Layer<
     const setDirectory = Effect.fn("Session.setDirectory")(function* (input: { sessionID: SessionID; directory: string }) {
       const ctx = yield* InstanceState.context
       const newPath = sessionPath(ctx.worktree, input.directory)
-      yield* patch(input.sessionID, { directory: input.directory, path: newPath })
+      yield* patch(input.sessionID, { directory: input.directory, path: newPath }).pipe(Effect.orDie)
     })
 
     const setArchived = Effect.fn("Session.setArchived")(function* (input: { sessionID: SessionID; time?: number }) {
@@ -1095,7 +1095,7 @@ export async function* listGlobal(input?: {
     return query.orderBy(desc(SessionTable.time_updated), desc(SessionTable.id)).limit(limit).all().pipe(Effect.orDie)
   })
 
-  const ids = [...new Set(rows.map((row: any) => row.project_id as ProjectID))]
+  const ids = [...new Set(rows.map((row: any) => row.project_id as ProjectV2.ID))]
   const projects = new Map<string, ProjectInfo>()
 
   if (ids.length > 0) {

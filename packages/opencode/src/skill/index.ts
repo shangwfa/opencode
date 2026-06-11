@@ -16,6 +16,8 @@ import { ConfigMarkdown } from "@/config/markdown"
 import { RuntimeFlags } from "@/effect/runtime-flags"
 import { Glob } from "@opencode-ai/core/util/glob"
 import { Discovery } from "./discovery"
+import { SessionSkill } from "./session-skill"
+import type { SessionID } from "@/session/schema"
 import { isRecord } from "@/util/record"
 
 const CLAUDE_EXTERNAL_DIR = ".claude"
@@ -269,7 +271,7 @@ const loadSkills = Effect.fnUntraced(function* (
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/Skill") {}
 
-export const layer = Layer.effect(
+const layerImpl = Layer.effect(
   Service,
   Effect.gen(function* () {
     const discovery = yield* Discovery.Service
@@ -312,7 +314,7 @@ export const layer = Layer.effect(
 
     const get = Effect.fn("Skill.get")(function* (name: string, session?: string) {
       if (session) {
-        const row = yield* sessionSkill.get(session as SessionID, name)
+        const row = yield* sessionSkill.get(session as SessionID, name).pipe(Effect.orDie)
         if (row) return {
           name: row.name,
           description: row.description,
@@ -327,7 +329,7 @@ export const layer = Layer.effect(
 
     const require = Effect.fn("Skill.require")(function* (name: string, session?: string) {
       if (session) {
-        const row = yield* sessionSkill.get(session as SessionID, name)
+        const row = yield* sessionSkill.get(session as SessionID, name).pipe(Effect.orDie)
         if (row) return {
           name: row.name,
           description: row.description,
@@ -346,7 +348,7 @@ export const layer = Layer.effect(
       const s = yield* InstanceState.get(state)
       if (!session) return Object.values(s.skills)
       const merged = { ...s.skills }
-      const rows = yield* sessionSkill.list(session as SessionID)
+      const rows = yield* sessionSkill.list(session as SessionID).pipe(Effect.orDie)
       for (const row of rows) {
         merged[row.name] = {
           name: row.name,
@@ -367,7 +369,7 @@ export const layer = Layer.effect(
       const s = yield* InstanceState.get(state)
       let sessionSkills: Info[] = []
       if (session) {
-        const rows = yield* sessionSkill.list(session as SessionID)
+        const rows = yield* sessionSkill.list(session as SessionID).pipe(Effect.orDie)
         sessionSkills = rows.map((row) => ({
           name: row.name,
           description: row.description,
@@ -390,7 +392,7 @@ export const layer = Layer.effect(
     })
 
     const sessionList = Effect.fn("Skill.sessionList")(function* (session: string) {
-      const rows = yield* sessionSkill.list(session as SessionID)
+      const rows = yield* sessionSkill.list(session as SessionID).pipe(Effect.orDie)
       return rows.map((row: any) => ({
         name: row.name,
         description: row.description,
@@ -406,7 +408,7 @@ export const layer = Layer.effect(
         description: value.description ?? "",
         content: value.content,
         resources: value.resources as any,
-      })
+      }).pipe(Effect.orDie)
       return {
         name: row.name,
         description: row.description,
@@ -466,7 +468,7 @@ export const layer = Layer.effect(
       const scanState: ScanState = { matches: new Set(), dirs: new Set() }
       yield* scan(scanState, dir, SKILL_PATTERN)
       const tmp: State = { skills: {}, dirs: new Set(), sessions: {} }
-      yield* Effect.forEach([...scanState.matches], (match) => add(tmp, match, bus), {
+      yield* Effect.forEach([...scanState.matches], (match) => add(tmp, match, events), {
         concurrency: "unbounded",
         discard: true,
       })
@@ -478,7 +480,7 @@ export const layer = Layer.effect(
           description: skill.description ?? "",
           content: skill.content,
           resources: skill.resources as any,
-        })
+        }).pipe(Effect.orDie)
         results.push({
           name: row.name,
           description: row.description,
@@ -491,16 +493,18 @@ export const layer = Layer.effect(
     })
 
     const sessionUnload = Effect.fn("Skill.sessionUnload")(function* (session: string, name: string) {
-      yield* sessionSkill.remove(session as SessionID, name)
+      yield* sessionSkill.remove(session as SessionID, name).pipe(Effect.orDie)
     })
 
     const sessionClear = Effect.fn("Skill.sessionClear")(function* (session: string) {
-      yield* sessionSkill.removeAll(session as SessionID)
+      yield* sessionSkill.removeAll(session as SessionID).pipe(Effect.orDie)
     })
 
     return Service.of({ get, require, all, dirs, available, sessionList, sessionCreate, sessionLoad, sessionUnload, sessionClear })
   }),
 )
+
+export const layer = layerImpl.pipe(Layer.provide(SessionSkill.layer))
 
 export const defaultLayer = layer.pipe(
   Layer.provide(Discovery.defaultLayer),
@@ -509,7 +513,6 @@ export const defaultLayer = layer.pipe(
   Layer.provide(FSUtil.defaultLayer),
   Layer.provide(Global.layer),
   Layer.provide(RuntimeFlags.defaultLayer),
-  Layer.provide(SessionSkill.layer),
 )
 
 export function fmt(list: Info[], opts: { verbose: boolean }) {

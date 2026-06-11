@@ -1,6 +1,6 @@
 import { lazy } from "@/util/lazy"
-import type { ProjectID } from "@/project/schema"
-import type { WorkspaceAdaptor } from "../types"
+import { ProjectV2 } from "@opencode-ai/core/project"
+import type { WorkspaceAdapter } from "../types"
 
 export type WorkspaceAdaptorEntry = {
   type: string
@@ -8,13 +8,13 @@ export type WorkspaceAdaptorEntry = {
   description: string
 }
 
-const BUILTIN: Record<string, () => Promise<WorkspaceAdaptor>> = {
+const BUILTIN: Record<string, () => Promise<WorkspaceAdapter>> = {
   worktree: lazy(async () => (await import("./worktree")).WorktreeAdaptor),
 }
 
-const state = new Map<ProjectID, Map<string, WorkspaceAdaptor>>()
+const state = new Map<ProjectV2.ID, Map<string, WorkspaceAdapter>>()
 
-export async function getAdaptor(projectID: ProjectID, type: string): Promise<WorkspaceAdaptor> {
+export async function getAdaptor(projectID: ProjectV2.ID, type: string): Promise<WorkspaceAdapter> {
   const custom = state.get(projectID)?.get(type)
   if (custom) return custom
 
@@ -24,7 +24,7 @@ export async function getAdaptor(projectID: ProjectID, type: string): Promise<Wo
   throw new Error(`Unknown workspace adaptor: ${type}`)
 }
 
-export async function listAdaptors(projectID: ProjectID): Promise<WorkspaceAdaptorEntry[]> {
+export async function listAdaptors(projectID: ProjectV2.ID): Promise<WorkspaceAdaptorEntry[]> {
   const builtin = await Promise.all(
     Object.entries(BUILTIN).map(async ([type, init]) => {
       const adaptor = await init()
@@ -45,8 +45,8 @@ export async function listAdaptors(projectID: ProjectID): Promise<WorkspaceAdapt
 
 // Plugins can be loaded per-project so we need to scope them. If you
 // want to install a global one pass `ProjectID.global`
-export function registerAdaptor(projectID: ProjectID, type: string, adaptor: WorkspaceAdaptor) {
-  const adaptors = state.get(projectID) ?? new Map<string, WorkspaceAdaptor>()
+export function registerAdaptor(projectID: ProjectV2.ID, type: string, adaptor: WorkspaceAdapter) {
+  const adaptors = state.get(projectID) ?? new Map<string, WorkspaceAdapter>()
   adaptors.set(type, adaptor)
   state.set(projectID, adaptors)
 }

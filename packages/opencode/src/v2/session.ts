@@ -1,13 +1,13 @@
-import { SessionMessageTable, SessionTable } from "@/session/session.sql"
+import { SessionMessageTable, SessionTable } from "@opencode-ai/core/session/sql"
 import { SessionID } from "@/session/schema"
-import { WorkspaceID } from "@/control-plane/schema"
+import { WorkspaceV2 } from "@opencode-ai/core/workspace"
 import { and, asc, desc, eq, gt, gte, isNull, like, lt, or, type SQL } from "@/storage/db"
 import * as Database from "@/storage/db"
 import { Context, DateTime, Effect, Layer, Schema } from "effect"
-import { SessionMessage } from "@opencode-ai/core/session-message"
-import type { Prompt } from "@opencode-ai/core/session-prompt"
-import { ProjectID } from "@/project/schema"
-import { SessionEvent } from "@opencode-ai/core/session-event"
+import { SessionMessage } from "@opencode-ai/core/session/message"
+import { Prompt } from "@opencode-ai/core/session/prompt"
+import { ProjectV2 } from "@opencode-ai/core/project"
+import { SessionEvent } from "@opencode-ai/core/session/event"
 import { V2Schema } from "@opencode-ai/core/v2-schema"
 import { optionalOmitUndefined } from "@opencode-ai/core/schema"
 import { EventV2 } from "@opencode-ai/core/event"
@@ -25,8 +25,8 @@ export const DefaultDelivery = "immediate" satisfies Delivery
 export class Info extends Schema.Class<Info>("Session.Info")({
   id: SessionID,
   parentID: optionalOmitUndefined(SessionID),
-  projectID: ProjectID,
-  workspaceID: optionalOmitUndefined(WorkspaceID),
+  projectID: ProjectV2.ID,
+  workspaceID: optionalOmitUndefined(WorkspaceV2.ID),
   path: optionalOmitUndefined(Schema.String),
   agent: optionalOmitUndefined(Schema.String),
   model: ModelV2.Ref.pipe(optionalOmitUndefined),
@@ -82,7 +82,7 @@ export interface Interface {
     agent?: string
     model?: ModelV2.Ref
     parentID?: SessionID
-    workspaceID?: WorkspaceID
+    workspaceID?: WorkspaceV2.ID
   }) => Effect.Effect<Info>
   readonly get: (sessionID: SessionID) => Effect.Effect<Info, NotFoundError>
   readonly list: (input: {
@@ -90,7 +90,7 @@ export interface Interface {
     order?: "asc" | "desc"
     directory?: string
     path?: string
-    workspaceID?: WorkspaceID
+    workspaceID?: WorkspaceV2.ID
     roots?: boolean
     start?: number
     search?: string
@@ -156,8 +156,8 @@ export const layer = Layer.effect(
     function fromRow(row: typeof SessionTable.$inferSelect): Info {
       return new Info({
         id: SessionID.make(row.id),
-        projectID: ProjectID.make(row.project_id),
-        workspaceID: row.workspace_id ? WorkspaceID.make(row.workspace_id) : undefined,
+        projectID: ProjectV2.ID.make(row.project_id),
+        workspaceID: row.workspace_id ? WorkspaceV2.ID.make(row.workspace_id) : undefined,
         title: row.title,
         parentID: row.parent_id ? SessionID.make(row.parent_id) : undefined,
         path: row.path ?? "",
@@ -283,7 +283,7 @@ export const layer = Layer.effect(
             return direction === "previous" ? rows.toReversed() : rows
           }),
         )
-        return yield* Effect.forEach(rows as any[], (row: any) => decode(row))
+        return yield* Effect.forEach(rows as any[], (row: any) => decode(row)) as Effect.Effect<SessionMessage.Message[], MessageDecodeError>
       }),
       context: Effect.fn("V2Session.context")(function* (sessionID) {
         yield* result.get(sessionID)
@@ -318,7 +318,7 @@ export const layer = Layer.effect(
             .all()
           }),
         )
-        return yield* Effect.forEach(rows as any[], (row: any) => decode(row))
+        return yield* Effect.forEach(rows as any[], (row: any) => decode(row)) as Effect.Effect<SessionMessage.Message[], MessageDecodeError>
       }),
       prompt: Effect.fn("V2Session.prompt")(function* (input) {
         yield* result.get(input.sessionID)
@@ -329,6 +329,7 @@ export const layer = Layer.effect(
       switchAgent: Effect.fn("V2Session.switchAgent")(function* (input) {
         yield* events.publish(SessionEvent.AgentSwitched, {
           sessionID: input.sessionID,
+          messageID: SessionMessage.ID.make(""),
           timestamp: DateTime.makeUnsafe(Date.now()),
           agent: input.agent,
         })
@@ -336,6 +337,7 @@ export const layer = Layer.effect(
       switchModel: Effect.fn("V2Session.switchModel")(function* (input) {
         yield* events.publish(SessionEvent.ModelSwitched, {
           sessionID: input.sessionID,
+          messageID: SessionMessage.ID.make(""),
           timestamp: DateTime.makeUnsafe(Date.now()),
           model: input.model,
         })
@@ -357,7 +359,7 @@ export const layer = Layer.effect(
           const messages = yield* result.messages({ sessionID: child.id, order: "desc" })
           const assistant = messages.find((msg) => msg.type === "assistant")
           if (!assistant) return
-          const text = assistant.content.findLast((part) => part.type === "text")
+          const text = assistant.content.findLast((part: { type: string }) => part.type === "text")
           if (!text) return
         }).pipe(Effect.forkChild())
       }),

@@ -1,18 +1,18 @@
 import z from "zod"
 import { AppRuntime } from "@/effect/app-runtime"
 import { Worktree } from "@/worktree"
-import { type WorkspaceAdaptor, WorkspaceInfo } from "../types"
+import type { WorkspaceAdapter, WorkspaceInfo } from "../types"
 
 const WorktreeConfig = z.object({
-  name: WorkspaceInfo.shape.name,
-  branch: WorkspaceInfo.shape.branch.unwrap(),
-  directory: WorkspaceInfo.shape.directory.unwrap(),
+  name: z.string(),
+  branch: z.string(),
+  directory: z.string(),
 })
 
-export const WorktreeAdaptor: WorkspaceAdaptor = {
+export const WorktreeAdaptor: WorkspaceAdapter = {
   name: "Worktree",
   description: "Create a git worktree",
-  async configure(info) {
+  async configure(info: WorkspaceInfo) {
     const worktree = await AppRuntime.runPromise(Worktree.Service.use((svc) => svc.makeWorktreeInfo()))
     return {
       ...info,
@@ -21,7 +21,7 @@ export const WorktreeAdaptor: WorkspaceAdaptor = {
       directory: worktree.directory,
     }
   },
-  async create(info) {
+  async create(info: WorkspaceInfo) {
     const config = WorktreeConfig.parse(info)
     await AppRuntime.runPromise(
       Worktree.Service.use((svc) =>
@@ -33,14 +33,14 @@ export const WorktreeAdaptor: WorkspaceAdaptor = {
       ),
     )
   },
-  async remove(info) {
+  async remove(info: WorkspaceInfo) {
     const config = WorktreeConfig.parse(info)
     await AppRuntime.runPromise(Worktree.Service.use((svc) => svc.remove({ directory: config.directory })))
   },
-  target(info) {
+  target(info: WorkspaceInfo) {
     const config = WorktreeConfig.parse(info)
     return {
-      type: "local",
+      type: "local" as const,
       directory: config.directory,
     }
   },

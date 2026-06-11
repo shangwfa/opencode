@@ -1,5 +1,5 @@
 import { sqliteTable, text, index, uniqueIndex } from "drizzle-orm/sqlite-core"
-import { Timestamps } from "../storage/schema.sql"
+import { Timestamps } from "../storage/schema.pg"
 
 export const UserSkillTable = sqliteTable(
   "user_skill",

@@ -224,9 +224,6 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
             timestamp: typeof e.timestamp === "number" ? e.timestamp : Date.now(),
           }))
           push(params.sessionID, port, items)
-          yield* bus.publish(Session.Event.ProxyError, {
-            sessionID: params.sessionID, port, errors: items as any,
-          }).pipe(Effect.catch(() => Effect.void))
         } catch {}
         return HttpServerResponse.jsonUnsafe({ ok: true })
       }),

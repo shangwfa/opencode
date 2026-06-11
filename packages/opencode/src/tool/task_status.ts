@@ -3,6 +3,7 @@ import DESCRIPTION from "./task_status.txt"
 import { BackgroundJob } from "@/background/job"
 import { Session } from "@/session/session"
 import { MessageV2 } from "@/session/message-v2"
+import type { Assistant, WithParts, Part } from "@opencode-ai/core/v1/session"
 import { SessionID } from "@/session/schema"
 import { SessionStatus } from "@/session/status"
 import { PositiveInt } from "@opencode-ai/core/schema"
@@ -30,16 +31,16 @@ function format(input: { taskID: SessionID; state: State; text: string }) {
   return [`task_id: ${input.taskID}`, `state: ${input.state}`, "", `<${tag}>`, input.text, `</${tag}>`].join("\n")
 }
 
-function errorText(error: NonNullable<MessageV2.Assistant["error"]>) {
+function errorText(error: NonNullable<Assistant["error"]>) {
   const data = Reflect.get(error, "data")
   const message = data && typeof data === "object" ? Reflect.get(data, "message") : undefined
   if (typeof message === "string" && message) return message
   return error.name
 }
 
-function inspectMessage(message: MessageV2.WithParts): InspectResult | undefined {
+function inspectMessage(message: WithParts): InspectResult | undefined {
   if (message.info.role !== "assistant") return
-  const text = message.parts.findLast((part) => part.type === "text")?.text ?? ""
+  const text = message.parts.findLast((part: Part) => part.type === "text")?.text ?? ""
   if (message.info.error) return { state: "error", text: text || errorText(message.info.error) }
   if (message.info.finish && !["tool-calls", "unknown"].includes(message.info.finish))
     return { state: "completed", text }

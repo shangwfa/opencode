@@ -1,19 +1,25 @@
 import { Effect } from "effect"
+import os from "os"
 import * as Tool from "./tool"
 import path from "path"
 import { containsPath, type InstanceContext } from "../project/instance-context"
 import { InstanceState } from "@/effect/instance-state"
+import { lazy } from "@/util/lazy"
+import { Language, type Node } from "web-tree-sitter"
 
 import { FSUtil } from "@opencode-ai/core/fs-util"
 import { fileURLToPath } from "url"
-import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process"
+import { ChildProcess } from "effect/unstable/process"
+import { ChildProcessSpawner } from "effect/unstable/process/ChildProcessSpawner"
 import { Config } from "@/config/config"
 import { RuntimeFlags } from "@/effect/runtime-flags"
 import { Shell } from "@/shell/shell"
 import { ShellID } from "./shell/id"
 
 import * as Truncate from "./truncate"
+import { Plugin } from "@/plugin"
 import { ShellPrompt, type Parameters } from "./shell/prompt"
+import { BashArity } from "@/permission/arity"
 import { toSandboxCwd } from "./sandbox-path"
 import { SandboxProvider } from "./sandbox-provider"
 
@@ -511,6 +517,8 @@ export const ShellTool = Tool.define(
       return scan
     })
 
+    const plugin = yield* Plugin.Service
+
     const shellEnv = Effect.fn("ShellTool.shellEnv")(function* (ctx: Tool.Context, cwd: string) {
       const extra = yield* plugin.trigger(
         "shell.env",
@@ -524,6 +532,7 @@ export const ShellTool = Tool.define(
     })
 
     const run = Effect.fn("ShellTool.run")(function* (
+      sandboxProvider: SandboxProvider.Interface,
       input: {
         command: string
         cwd: string
@@ -621,6 +630,9 @@ export const ShellTool = Tool.define(
               }
               const timeout = params.timeout ?? defaultTimeoutMs
               const ps = Shell.ps(shell)
+              const cwd = params.workdir
+                ? yield* resolvePath(params.workdir, instanceCtx.directory, shell)
+                : instanceCtx.directory
               yield* Effect.scoped(
                 Effect.gen(function* () {
                   const tree = yield* Effect.acquireRelease(parse(params.command, ps), (tree) =>

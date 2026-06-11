@@ -1,17 +1,14 @@
 import { Context, Effect, Layer } from "effect"
 import { Database } from "./storage/db"
-import { DataMigrationTable } from "./data-migration.sql"
-import * as Log from "@opencode-ai/core/util/log"
+import { DataMigrationTable } from "./data-migration.pg"
 import { and, asc, eq, gt, inArray, sql } from "drizzle-orm"
-import { MessageTable, SessionTable } from "./session/session.sql"
+import { MessageTable, SessionTable } from "./session/session.pg"
 import type { SessionID } from "./session/schema"
 
 export type Migration<R = never> = {
   name: string
   run: Effect.Effect<void, unknown, R>
 }
-
-const log = Log.create({ service: "data-migration" })
 
 export interface Interface {}
 
@@ -142,7 +139,7 @@ export const layer = Layer.effect(
         )
         if (completed) continue
 
-        log.info("running data migration", { name: migration.name })
+        console.log("[data-migration] running data migration", { name: migration.name })
         yield* migration.run.pipe(Effect.withSpan("DataMigration", { attributes: { name: migration.name } }))
         yield* Effect.promise(() =>
           Database.use((db) =>
