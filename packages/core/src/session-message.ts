@@ -39,6 +39,8 @@ export class User extends Schema.Class<User>("Session.Message.User")({
   time: Schema.Struct({
     created: V2Schema.DateTimeUtcFromMillis,
   }),
+  userName: Schema.optional(Schema.String),
+  userId: Schema.optional(Schema.String),
 }) {}
 
 export class Synthetic extends Schema.Class<Synthetic>("Session.Message.Synthetic")({

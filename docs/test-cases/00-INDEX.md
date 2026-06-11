@@ -33,6 +33,7 @@
 | [`22-session-mcp.md`](./22-session-mcp.md) | 二十二 | T22.x | 会话级动态 MCP：CRUD、隔离、级联、校验 |
 | [`23-package-cache.md`](./23-package-cache.md) | 二十三 | T23.x | 共享 Package Cache：标准 exec 使用流程、跨 session 缓存共享、npm/pnpm/yarn/bun、加速/并发、mountPath 校验 |
 | [`24-preload-cache.md`](./24-preload-cache-switch-env.md) | 二十四 | T24.x | 环境切换与预装依赖缓存：mise 多版本 Node/pnpm 切换、shims 自动检测、npm cache/node_modules 预装、跨版本缓存共享、隔离性 |
+| [`25-session-user-fields.md`](./25-session-user-fields.md) | 二十五 | T25.x | Session 用户标识字段：userName/userId 传递、持久化、向后兼容、多轮独立标识 |
 | [`sandbox-shared-test.mjs`](./sandbox-shared-test.mjs) | 十六 | T16.29 | 主子 agent 沙箱共享验证：主→子写读、子→主写读、exec 独立验证 |
 | [`vcs-diff-sandbox-test.mjs`](./vcs-diff-sandbox-test.mjs) | 十六 | T16.30 | VCS Diff 沙箱重建验证：销毁后自动重建 PVC 恢复，两次 diff 一致 |
 
@@ -61,6 +62,7 @@ T19.x → 17-exec-api.md
 T22.x → 22-session-mcp.md
 T23.x → 23-package-cache.md
 T24.x → 24-preload-cache.md
+T25.x → 25-session-user-fields.md
 
 沙箱工具（apply_patch/ls/错误泄露）→ 18-sandbox-tool-test.md
 路径泄露防护（PL-x）→ 20-path-leak-test.md

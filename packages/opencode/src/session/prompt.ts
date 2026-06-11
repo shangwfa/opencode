@@ -738,6 +738,8 @@ export const layer = Layer.effect(
         },
         system: input.system,
         format: input.format,
+        userName: input.userName,
+        userId: input.userId,
       }
 
       if (current?.agent !== info.agent) {
@@ -1698,6 +1700,8 @@ export const PromptInput = Schema.Struct({
   format: Schema.optional(MessageV2.Format),
   system: Schema.optional(Schema.String),
   variant: Schema.optional(Schema.String),
+  userName: Schema.optional(Schema.String),
+  userId: Schema.optional(Schema.String),
   skills: Schema.optional(Schema.Array(Schema.String)).annotate({
     description: "Skill names to preload into the system prompt for this request",
   }),
