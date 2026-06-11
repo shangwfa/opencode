@@ -7,6 +7,10 @@ import os from "os"
 import { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import { EventV2Bridge } from "@/event-v2-bridge"
 import { EventV2 } from "@opencode-ai/core/event"
+import { Flag } from "@opencode-ai/core/flag/flag"
+import { PermissionTable } from "@/session/session.pg"
+import { Database } from "@/storage/db"
+import { eq } from "drizzle-orm"
 
 export const Event = {
   Asked: EventV2.define({ type: "permission.asked", schema: PermissionV1.Request.fields }),
@@ -56,10 +60,18 @@ export const layer = Layer.effect(
     const events = yield* EventV2Bridge.Service
     const state = yield* InstanceState.make<State>(
       Effect.fn("Permission.state")(function* (ctx) {
-        void ctx
+        let initialApproved: PermissionV1.Rule[] = []
+        if (Flag.OPENCODE_DATABASE_URL) {
+          const row = yield* Effect.promise(() =>
+            Database.use((db) =>
+              (db as any).select().from(PermissionTable).where(eq(PermissionTable.project_id, ctx.project.id)).get(),
+            ),
+          ).pipe(Effect.catch(() => Effect.succeed(undefined)))
+          if (row?.data) initialApproved = [...row.data]
+        }
         const state = {
           pending: new Map<PermissionV1.ID, PendingEntry>(),
-          approved: [],
+          approved: initialApproved,
         }
 
         yield* Effect.addFinalizer(() =>

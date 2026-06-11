@@ -6,6 +6,7 @@ import { InstanceState } from "@/effect/instance-state"
 
 import { FSUtil } from "@opencode-ai/core/fs-util"
 import { fileURLToPath } from "url"
+import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process"
 import { Config } from "@/config/config"
 import { RuntimeFlags } from "@/effect/runtime-flags"
 import { Shell } from "@/shell/shell"
@@ -335,6 +336,17 @@ const parser = lazy(async () => {
   return { bash, ps }
 })
 
+const MAX_TIMEOUT_MS = 5 * 60 * 1000
+const COMMAND_NOT_FOUND_RE = /command not found|No such file or directory/i
+
+function checkCommandNotFound(text: string): string | undefined {
+  const m = text.match(COMMAND_NOT_FOUND_RE)
+  if (m) {
+    const line = text.trim().split("\n").find((l) => COMMAND_NOT_FOUND_RE.test(l))
+    return line ?? m[0]
+  }
+}
+
 export const ShellTool = Tool.define(
   ShellID.ToolID,
   Effect.gen(function* () {
@@ -344,6 +356,93 @@ export const ShellTool = Tool.define(
     const trunc = yield* Truncate.Service
     const flags = yield* RuntimeFlags.Service
     const defaultTimeoutMs = flags.bashDefaultTimeoutMs ?? 2 * 60 * 1000
+
+    const runSandbox = Effect.fn("ShellTool.runSandbox")(function* (
+      sandboxProvider: SandboxProvider.Interface,
+      input: {
+        command: string
+        cwd: string
+        timeout: number
+        description: string
+        background?: boolean | undefined
+      },
+      ctx: Tool.Context,
+    ) {
+      let output = ""
+      let expired = false
+
+      yield* ctx.metadata({
+        metadata: { output: "", description: input.description },
+      })
+
+      const fullCommand = input.background
+        ? `cd ${input.cwd} && ( nohup sh -c '${input.command.replace(/'/g, "'\\''")}' </dev/null > /tmp/opencode-bg-${ctx.callID ?? Date.now()}.log 2>&1 & ) && echo "started background"`
+        : `cd ${input.cwd} && ${input.command}`
+
+      const result = input.background
+        ? yield* sandboxProvider.runDetached(
+            ctx.sandboxSessionID ?? ctx.sessionID,
+            fullCommand,
+            { timeoutSeconds: Math.ceil((input.timeout + 5000) / 1000) },
+            {
+              onStdout: (msg: { text: string }) => {
+                output += msg.text
+                ctx.metadata({ metadata: { output: output.slice(-MAX_METADATA_LENGTH), description: input.description } })
+              },
+              onStderr: (msg: { text: string }) => {
+                const cmdErr = checkCommandNotFound(msg.text)
+                if (cmdErr) throw new Error(`Command failed: ${cmdErr}`)
+                output += msg.text
+                ctx.metadata({ metadata: { output: output.slice(-MAX_METADATA_LENGTH), description: input.description } })
+              },
+            },
+            ctx.abort,
+          )
+        : yield* Effect.gen(function* () {
+            const sb = yield* Effect.tryPromise({
+              try: () => ctx.sandbox!,
+              catch: (e) =>
+                new Error(`Initialization failed: ${e instanceof Error ? e.message : String(e)}`),
+            })
+            return yield* sandboxProvider.runInSession(
+              ctx.sandboxSessionID ?? ctx.sessionID,
+              fullCommand,
+              { timeoutSeconds: Math.ceil((input.timeout + 5000) / 1000) },
+              {
+                onStdout: (msg: { text: string }) => {
+                  output += msg.text
+                  ctx.metadata({
+                    metadata: { output: output.slice(-MAX_METADATA_LENGTH), description: input.description },
+                  })
+                },
+                onStderr: (msg: { text: string }) => {
+                  const cmdErr = checkCommandNotFound(msg.text)
+                  if (cmdErr) throw new Error(`Command failed: ${cmdErr}`)
+                  output += msg.text
+                  ctx.metadata({
+                    metadata: { output: output.slice(-MAX_METADATA_LENGTH), description: input.description },
+                  })
+                },
+              },
+              ctx.abort,
+            )
+          })
+
+      if (input.background) yield* sandboxProvider.keepAlive(ctx.sandboxSessionID ?? ctx.sessionID)
+
+      const exitCode = result.exitCode ?? null
+      if (exitCode === null) expired = true
+
+      const meta: string[] = []
+      if (expired) meta.push(`bash tool terminated command after exceeding timeout ${Math.min(input.timeout, MAX_TIMEOUT_MS)} ms.`)
+      if (meta.length > 0) output += "\n\n<bash_metadata>\n" + meta.join("\n") + "\n</bash_metadata>"
+
+      return {
+        title: input.description,
+        metadata: { output: output.slice(-MAX_METADATA_LENGTH), exit: exitCode, description: input.description },
+        output,
+      }
+    })
 
     const cygpath = Effect.fn("ShellTool.cygpath")(function* (shell: string, text: string) {
       const lines = yield* spawner

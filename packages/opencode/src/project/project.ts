@@ -3,6 +3,7 @@ import { and, eq, sql } from "drizzle-orm"
 import { Database } from "@opencode-ai/core/database/database"
 import { ProjectDirectoryTable, ProjectTable } from "@opencode-ai/core/project/sql"
 import { SessionTable } from "@opencode-ai/core/session/sql"
+import { PermissionTable } from "@opencode-ai/core/permission/sql"
 import { WorkspaceTable } from "@opencode-ai/core/control-plane/workspace.sql"
 import { Flag } from "@opencode-ai/core/flag/flag"
 import { GlobalBus } from "@/bus/global"
@@ -83,6 +84,10 @@ export function fromRow(row: Row): Info {
     sandboxes: row.sandboxes,
     commands: row.commands ?? undefined,
   }
+}
+
+function mergePermissionRules<T extends readonly unknown[]>(oldRules: T, newRules: T): T {
+  return [...new Map([...oldRules, ...newRules].map((rule) => [JSON.stringify(rule), rule])).values()] as unknown as T
 }
 
 export const UpdateInput = Schema.Struct({
@@ -195,6 +200,38 @@ export const layer = Layer.effect(
                     time_updated: Date.now(),
                   })
                   .run()
+              }
+
+              // Migrate permission rules
+              const oldPermissions = yield* d
+                .select()
+                .from(PermissionTable)
+                .where(eq(PermissionTable.project_id, oldID))
+                .all()
+                .pipe(Effect.catch(() => Effect.succeed([] as any[])))
+              if (oldPermissions.length > 0) {
+                const newPermissions = yield* d
+                  .select()
+                  .from(PermissionTable)
+                  .where(eq(PermissionTable.project_id, newID))
+                  .all()
+                  .pipe(Effect.catch(() => Effect.succeed([] as any[])))
+                const existingKeys = new Set(newPermissions.map((p: any) => `${p.action}:${p.resource}`))
+                for (const perm of oldPermissions) {
+                  const key = `${perm.action}:${perm.resource}`
+                  if (!existingKeys.has(key)) {
+                    yield* d
+                      .insert(PermissionTable)
+                      .values({ ...perm, project_id: newID })
+                      .run()
+                      .pipe(Effect.catch(() => Effect.void))
+                  }
+                }
+                yield* d
+                  .delete(PermissionTable)
+                  .where(eq(PermissionTable.project_id, oldID))
+                  .run()
+                  .pipe(Effect.catch(() => Effect.void))
               }
 
               yield* d

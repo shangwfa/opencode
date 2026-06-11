@@ -29,6 +29,42 @@ export const ApplyPatchTool = Tool.define(
     const format = yield* Format.Service
     const events = yield* EventV2Bridge.Service
 
+    const readFile = (filePath: string, ctx: Tool.Context, instance: { directory: string }) =>
+      Effect.gen(function* () {
+        const sb: any = yield* Effect.tryPromise({ try: () => ctx.sandbox!, catch: (e) => new Error(String(e)) })
+        return yield* Effect.tryPromise({
+          try: () => sb.files.readFile(toSandboxPath(filePath, instance.directory)) as Promise<string>,
+          catch: () => new Error(`File not found: ${filePath}`),
+        })
+      })
+
+    const writeFile = (filePath: string, content: string, ctx: Tool.Context, instance: { directory: string }) =>
+      Effect.gen(function* () {
+        const sb: any = yield* Effect.tryPromise({ try: () => ctx.sandbox!, catch: (e) => new Error(String(e)) })
+        yield* Effect.tryPromise({
+          try: () => sb.files.writeFiles([{ path: toSandboxPath(filePath, instance.directory), data: content }]),
+          catch: () => new Error(`Failed to write file: ${filePath}`),
+        })
+      })
+
+    const removeFile = (filePath: string, ctx: Tool.Context, instance: { directory: string }) =>
+      Effect.gen(function* () {
+        const svc = yield* Effect.serviceOption(SandboxProvider.Service)
+        if (svc._tag === "Some") {
+          yield* svc.value.runInSession(ctx.sandboxSessionID ?? ctx.sessionID, `rm -f "${toSandboxPath(filePath, instance.directory)}"`, { timeoutSeconds: 10 }).pipe(Effect.catchCause(() => Effect.void))
+        }
+      })
+
+    const statFile = (filePath: string, ctx: Tool.Context, instance: { directory: string }) =>
+      (Effect.gen(function* () {
+        const sb: any = yield* Effect.tryPromise({ try: () => ctx.sandbox!, catch: (e) => new Error(String(e)) })
+        const content = yield* Effect.tryPromise({
+          try: () => sb.files.readFile(toSandboxPath(filePath, instance.directory)) as Promise<string>,
+          catch: () => undefined as string | undefined,
+        })
+        return content !== undefined ? ({ type: "File" } as const) : undefined
+      }) as Effect.Effect<{ type: "File" } | undefined>)
+
     const run = Effect.fn("ApplyPatchTool.execute")(function* (
       params: Schema.Schema.Type<typeof Parameters>,
       ctx: Tool.Context,

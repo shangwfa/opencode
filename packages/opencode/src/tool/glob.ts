@@ -6,6 +6,8 @@ import { Ripgrep } from "@opencode-ai/core/ripgrep"
 import { assertExternalDirectoryEffect } from "./external-directory"
 import DESCRIPTION from "./glob.txt"
 import * as Tool from "./tool"
+import { toSandboxPath } from "./sandbox-path"
+import { SandboxProvider } from "./sandbox-provider"
 
 export const Parameters = Schema.Struct({
   pattern: Schema.String.annotate({ description: "The glob pattern to match files against" }),
@@ -19,6 +21,7 @@ export const GlobTool = Tool.define(
   Effect.gen(function* () {
     const fs = yield* FSUtil.Service
     const ripgrep = yield* Ripgrep.Service
+    const sandboxProvider = yield* Effect.serviceOption(SandboxProvider.Service)
     return {
       description: DESCRIPTION,
       parameters: Parameters,
@@ -37,6 +40,46 @@ export const GlobTool = Tool.define(
 
           let search = params.path ?? ins.directory
           search = path.isAbsolute(search) ? search : path.resolve(ins.directory, search)
+
+          if (sandboxProvider._tag === "Some") {
+            yield* assertExternalDirectoryEffect(ctx, search, {
+              bypass: false,
+              kind: "directory",
+            })
+
+            const limit = 100
+            const sandboxSearchPath = toSandboxPath(search, ins.directory)
+            const escapedPattern = params.pattern.replace(/'/g, "'\\''")
+            const cmd = `rg --files --glob '${escapedPattern}' --sortr modified '${sandboxSearchPath}' 2>/dev/null | head -${limit + 1}`
+            const result = yield* sandboxProvider.value.runInSession(ctx.sandboxSessionID ?? ctx.sessionID, cmd, { timeoutSeconds: 30 })
+            const stdout = result.logs.stdout.map((l: { text: string }) => l.text).join("\n").trim()
+            const lines = stdout ? stdout.split("\n").filter((line: string) => line.length > 0) : []
+
+            const truncated = lines.length > limit
+            const files = lines.slice(0, limit).map((line: string) => line.trim())
+
+            const output = []
+            if (files.length === 0) output.push("No files found")
+            if (files.length > 0) {
+              output.push(...files)
+              if (truncated) {
+                output.push("")
+                output.push(
+                  `(Results are truncated: showing first ${limit} results. Consider using a more specific path or pattern.)`,
+                )
+              }
+            }
+
+            return {
+              title: path.relative(ins.worktree, search),
+              metadata: {
+                count: files.length,
+                truncated,
+              },
+              output: output.join("\n"),
+            }
+          }
+
           const info = yield* fs.stat(search).pipe(Effect.catch(() => Effect.succeed(undefined)))
           if (info?.type === "File") {
             throw new Error(`glob path must be a directory: ${search}`)

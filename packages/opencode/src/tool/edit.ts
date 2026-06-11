@@ -4,8 +4,9 @@
 // https://github.com/cline/cline/blob/main/evals/diff-edits/diff-apply/diff-06-26-25.ts
 
 import * as path from "path"
-import { Effect, Schema } from "effect"
+import { Effect, Schema, Semaphore } from "effect"
 import * as Tool from "./tool"
+import { LSP } from "@/lsp/lsp"
 import { createTwoFilesPatch, diffLines } from "diff"
 import DESCRIPTION from "./edit.txt"
 import { FileSystem } from "@opencode-ai/core/filesystem"
@@ -81,9 +82,7 @@ export const EditTool = Tool.define(
             : path.join(instance.directory, params.filePath)
           yield* assertExternalDirectoryEffect(ctx, filePath)
 
-          const sb = (yield* Effect.tryPromise({ try: () => ctx.sandbox!, catch: (e) => new Error(String(e)) }).pipe(Effect.orDie)) as unknown as Sandbox
-          const sandboxPath = toSandboxPath(filePath, instance.directory)
-
+          let diff = ""
           let contentOld = ""
           let contentNew = ""
           yield* lock(filePath).withPermits(1)(
@@ -121,49 +120,37 @@ export const EditTool = Tool.define(
                 return
               }
 
-          if (params.oldString === "") {
-            contentNew = params.newString
-            const diff = trimDiff(createTwoFilesPatch(filePath, filePath, contentOld, contentNew))
-            yield* ctx.ask({
-              permission: "edit",
-              patterns: [path.relative(instance.worktree, filePath)],
-              always: ["*"],
-              metadata: { filepath: filePath, diff },
-            })
-            yield* Effect.tryPromise({
-              try: () => sb.files.writeFiles([{ path: sandboxPath, data: params.newString }]),
-              catch: (e) => {
-                const msg = e instanceof Error ? e.message : String(e)
-                editLog.warn("writeFiles failed, retrying once", { sandboxPath, error: msg })
-                return sb.files.writeFiles([{ path: sandboxPath, data: params.newString }])
-              },
-            }).pipe(Effect.orDie)
-            yield* bus.publish(File.Event.Edited, { file: filePath })
+              const info = yield* afs.stat(filePath).pipe(Effect.catch(() => Effect.succeed(undefined)))
+              if (!info) throw new Error(`File ${filePath} not found`)
+              if (info.type === "Directory") throw new Error(`Path is a directory, not a file: ${filePath}`)
+              const source = yield* Bom.readFile(afs, filePath)
+              contentOld = source.text
 
-            let additions = 0
-            let deletions = 0
-            for (const change of diffLines(contentOld, contentNew)) {
-              if (change.added) additions += change.count || 0
-              if (change.removed) deletions += change.count || 0
-            }
-            const filediff: Snapshot.FileDiff = {
-              file: filePath,
-              patch: diff,
-              additions,
-              deletions,
-            }
+              const ending = detectLineEnding(contentOld)
+              const old = convertToLineEnding(normalizeLineEndings(params.oldString), ending)
+              const replacement = convertToLineEnding(normalizeLineEndings(params.newString), ending)
 
-            return {
-              title: `${path.relative(instance.worktree, filePath)}`,
-              metadata: { diagnostics: {}, diff, filediff },
-              output: "Edit applied successfully.",
-            }
-          }
+              const next = Bom.split(replace(contentOld, old, replacement, params.replaceAll))
+              const desiredBom = source.bom || next.bom
+              contentNew = next.text
 
-          contentOld = yield* Effect.tryPromise({
-            try: () => sb.files.readFile(sandboxPath) as Promise<string>,
-            catch: () => new Error(`File ${params.filePath} not found`),
-          }).pipe(Effect.orDie)
+              diff = trimDiff(
+                createTwoFilesPatch(
+                  filePath,
+                  filePath,
+                  normalizeLineEndings(contentOld),
+                  normalizeLineEndings(contentNew),
+                ),
+              )
+              yield* ctx.ask({
+                permission: "edit",
+                patterns: [path.relative(instance.worktree, filePath)],
+                always: ["*"],
+                metadata: {
+                  filepath: filePath,
+                  diff,
+                },
+              })
 
               yield* afs.writeWithDirs(filePath, Bom.join(contentNew, desiredBom))
               if (yield* format.file(filePath)) {
@@ -184,24 +171,6 @@ export const EditTool = Tool.define(
               )
             }).pipe(Effect.orDie),
           )
-
-          yield* ctx.ask({
-            permission: "edit",
-            patterns: [path.relative(instance.worktree, filePath)],
-            always: ["*"],
-            metadata: { filepath: filePath, diff },
-          })
-
-          yield* Effect.tryPromise({
-            try: () => sb.files.writeFiles([{ path: sandboxPath, data: contentNew }]),
-            catch: (e) => {
-              const msg = e instanceof Error ? e.message : String(e)
-              editLog.warn("writeFiles failed, retrying once", { sandboxPath, error: msg })
-                return sb.files.writeFiles([{ path: sandboxPath, data: contentNew }])
-            },
-          }).pipe(Effect.orDie)
-
-          yield* bus.publish(File.Event.Edited, { file: filePath })
 
           let additions = 0
           let deletions = 0
@@ -232,9 +201,13 @@ export const EditTool = Tool.define(
           if (block) output += `\n\nLSP errors detected in this file, please fix:\n${block}`
 
           return {
+            metadata: {
+              diagnostics,
+              diff,
+              filediff,
+            },
             title: `${path.relative(instance.worktree, filePath)}`,
-            metadata: { diagnostics: {}, diff, filediff },
-            output: "Edit applied successfully.",
+            output,
           }
         }),
     }

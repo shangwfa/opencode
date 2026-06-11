@@ -26,9 +26,10 @@ import { EventV2Bridge } from "@/event-v2-bridge"
 import { EventV2 } from "@opencode-ai/core/event"
 import { TuiEvent } from "@/server/tui-event"
 import open from "open"
-import { Cause, Effect, Exit, Layer, Option, Context, Schema, Stream } from "effect"
+import { Cause, Effect, Exit, Layer, Option, Context, Schema, Stream, Ref } from "effect"
 import { EffectBridge } from "@/effect/bridge"
 import { InstanceState } from "@/effect/instance-state"
+import { Flag } from "@opencode-ai/core/flag/flag"
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process"
 import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
 import { McpCatalog } from "./catalog"
@@ -372,6 +373,14 @@ export const layer = Layer.effect(
       }),
     )
     const cfgSvc = yield* Config.Service
+    const isSaaS = !!Flag.OPENCODE_DATABASE_URL
+    const sessionMcp = Option.getOrUndefined(yield* Effect.serviceOption(SessionMcp.Service))
+
+    type SandboxMcpEntry = { client: MCPClient; defs: MCPToolDef[]; port: number }
+    const sandboxMcpRef = yield* Ref.make(new Map<string, Map<string, SandboxMcpEntry>>())
+
+    const SANDBOX_MCP_BASE_PORT = 9100
+    const SANDBOX_MCP_PORT_STEP = 100
 
     const descendants = Effect.fnUntraced(
       function* (pid: number) {
@@ -610,7 +619,7 @@ export const layer = Layer.effect(
 
     const connectSandboxLocal = Effect.fn("MCP.connectSandboxLocal")(function* (
       key: string,
-      mcp: ConfigMCP.Info & { type: "local" },
+      mcp: ConfigMCPV1.Info & { type: "local" },
       sessionID: SessionID,
       port: number,
     ) {
@@ -660,7 +669,7 @@ export const layer = Layer.effect(
 
       if (!client.client) return client
 
-      const listed = yield* defs(key, client.client, mcp.timeout)
+      const listed = yield* McpCatalog.defs(client.client, mcp.timeout)
       if (!listed) {
         yield* Effect.tryPromise(() => client.client!.close()).pipe(Effect.ignore)
         return { client: undefined, defs: undefined }
@@ -693,7 +702,7 @@ export const layer = Layer.effect(
         if (cached) {
           const timeout = mcp.timeout ?? defaultTimeout
           for (const mcpTool of cached.defs) {
-            result[sanitize(key) + "_" + sanitize(mcpTool.name)] = convertMcpTool(mcpTool, cached.client, timeout)
+            result[McpCatalog.sanitize(key) + "_" + McpCatalog.sanitize(mcpTool.name)] = McpCatalog.convertTool(mcpTool, cached.client, timeout)
           }
           continue
         }
@@ -701,7 +710,7 @@ export const layer = Layer.effect(
         const port = SANDBOX_MCP_BASE_PORT + portIndex * SANDBOX_MCP_PORT_STEP
         portIndex++
 
-        const sandboxResult = yield* connectSandboxLocal(key, mcp as ConfigMCP.Info & { type: "local" }, sessionID, port).pipe(
+        const sandboxResult = yield* connectSandboxLocal(key, mcp as ConfigMCPV1.Info & { type: "local" }, sessionID, port).pipe(
           Effect.catch(() => Effect.succeed({ client: undefined, defs: undefined } as { client: MCPClient | undefined; defs: MCPToolDef[] | undefined })),
         )
 
@@ -720,7 +729,7 @@ export const layer = Layer.effect(
 
         const timeout = mcp.timeout ?? defaultTimeout
         for (const mcpTool of sandboxResult.defs) {
-          result[sanitize(key) + "_" + sanitize(mcpTool.name)] = convertMcpTool(mcpTool, sandboxResult.client, timeout)
+          result[McpCatalog.sanitize(key) + "_" + McpCatalog.sanitize(mcpTool.name)] = McpCatalog.convertTool(mcpTool, sandboxResult.client, timeout)
         }
       }
 
@@ -743,14 +752,14 @@ export const layer = Layer.effect(
           if (cached) {
             const timeout = cfg.experimental?.mcp_timeout ?? DEFAULT_TIMEOUT
             for (const mcpTool of cached.defs) {
-              result[sanitize(row.name) + "_" + sanitize(mcpTool.name)] = convertMcpTool(mcpTool, cached.client, timeout)
+              result[McpCatalog.sanitize(row.name) + "_" + McpCatalog.sanitize(mcpTool.name)] = McpCatalog.convertTool(mcpTool, cached.client, timeout)
             }
             continue
           }
 
           if (row.type === "remote" && row.url) {
             // Session remote MCP: connect directly from server
-            const remoteCfg: ConfigMCP.Info & { type: "remote" } = {
+            const remoteCfg: ConfigMCPV1.Info & { type: "remote" } = {
               type: "remote",
               url: row.url,
               headers: row.headers,
@@ -759,7 +768,7 @@ export const layer = Layer.effect(
               Effect.catch(() => Effect.succeed({ client: undefined, status: { status: "failed", error: "" } } as { client: MCPClient | undefined; status: any })),
             )
             if (!client) continue
-            const listed = yield* defs(row.name, client, cfg.experimental?.mcp_timeout)
+            const listed = yield* McpCatalog.defs(client, cfg.experimental?.mcp_timeout)
             if (!listed) {
               yield* Effect.tryPromise(() => client.close()).pipe(Effect.ignore)
               continue
@@ -775,7 +784,7 @@ export const layer = Layer.effect(
               return [undefined, m] as const
             })
             for (const mcpTool of listed) {
-              result[sanitize(row.name) + "_" + sanitize(mcpTool.name)] = convertMcpTool(mcpTool, client, cfg.experimental?.mcp_timeout ?? DEFAULT_TIMEOUT)
+              result[McpCatalog.sanitize(row.name) + "_" + McpCatalog.sanitize(mcpTool.name)] = McpCatalog.convertTool(mcpTool, client, cfg.experimental?.mcp_timeout ?? DEFAULT_TIMEOUT)
             }
           } else if (row.type === "local" && row.command) {
             const maybeSandboxProvider = Option.getOrUndefined(yield* Effect.serviceOption(SandboxProvider.Service))
@@ -788,7 +797,7 @@ export const layer = Layer.effect(
             }
             portIndex++
             usedPorts.add(port)
-            const localCfg: ConfigMCP.Info & { type: "local" } = {
+            const localCfg: ConfigMCPV1.Info & { type: "local" } = {
               type: "local",
               command: row.command,
               environment: row.environment,
@@ -808,7 +817,7 @@ export const layer = Layer.effect(
               return [undefined, m] as const
             })
             for (const mcpTool of sandboxResult.defs) {
-              result[sanitize(row.name) + "_" + sanitize(mcpTool.name)] = convertMcpTool(mcpTool, sandboxResult.client, cfg.experimental?.mcp_timeout ?? DEFAULT_TIMEOUT)
+              result[McpCatalog.sanitize(row.name) + "_" + McpCatalog.sanitize(mcpTool.name)] = McpCatalog.convertTool(mcpTool, sandboxResult.client, cfg.experimental?.mcp_timeout ?? DEFAULT_TIMEOUT)
             }
           }
         }
@@ -1140,6 +1149,7 @@ export const defaultLayer = layer.pipe(
   Layer.provide(Config.defaultLayer),
   Layer.provide(CrossSpawnSpawner.defaultLayer),
   Layer.provide(FSUtil.defaultLayer),
+  Layer.provide(Flag.OPENCODE_DATABASE_URL ? SessionMcp.pgLayer : SessionMcp.noopLayer),
 )
 
 export const node = LayerNode.make(layer, [CrossSpawnSpawner.node, McpAuth.node, EventV2Bridge.node, Config.node])

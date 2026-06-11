@@ -9,6 +9,9 @@ import { InstanceState } from "@/effect/instance-state"
 import { assertExternalDirectoryEffect } from "./external-directory"
 import { Instruction } from "../session/instruction"
 import { isPdfAttachment, sniffAttachmentMime } from "@/util/media"
+import { toSandboxPath } from "./sandbox-path"
+import { SandboxProvider } from "./sandbox-provider"
+import type { Sandbox } from "@alibaba-group/opensandbox"
 
 const DEFAULT_READ_LIMIT = 2000
 const MAX_LINE_LENGTH = 2000
@@ -258,6 +261,114 @@ export const ReadTool = Tool.define<
         always: ["*"],
         metadata: {},
       })
+
+      // Sandbox branch: if a sandbox is available, read from it instead of local filesystem
+      const sandboxProviderOpt = yield* Effect.serviceOption(SandboxProvider.Service)
+      if (sandboxProviderOpt._tag === "Some") {
+        const sandboxProviderSvc = sandboxProviderOpt.value
+        const sb = (yield* Effect.tryPromise({
+          try: () => ctx.sandbox!,
+          catch: (e) => new Error(`Initialization failed: ${e instanceof Error ? e.message : String(e)}`),
+        }).pipe(Effect.orDie)) as unknown as Sandbox
+        const sandboxPath = toSandboxPath(filepath, instance.directory)
+
+        const dirCheck = yield* sandboxProviderSvc.runInSession(
+          ctx.sandboxSessionID ?? ctx.sessionID,
+          `test -d "${sandboxPath}" && echo "DIR" || echo "FILE"`,
+          { timeoutSeconds: 5 },
+        ).pipe(Effect.catch(() => Effect.succeed({ logs: { stdout: [], stderr: [] }, exitCode: 1 } as any)))
+        const isDirOutput = (dirCheck as any).logs?.stdout?.map((l: { text: string }) => l.text).join("").trim()
+        const isDirectory = isDirOutput.includes("DIR")
+
+        if (isDirectory) {
+          const lsResult = yield* sandboxProviderSvc.runInSession(
+            ctx.sandboxSessionID ?? ctx.sessionID,
+            `ls -1 "${sandboxPath}"`,
+            { timeoutSeconds: 10 },
+          ).pipe(Effect.catch(() => Effect.succeed({ logs: { stdout: [], stderr: [] }, exitCode: 1 } as any)))
+          const items = ((lsResult as any).logs?.stdout?.map((l: { text: string }) => l.text).join("\n").trim() || "")
+            .split("\n")
+            .filter((s: string) => s.length > 0)
+            .sort((a: string, b: string) => a.localeCompare(b))
+          const limit = params.limit ?? DEFAULT_READ_LIMIT
+          const offset = params.offset || 1
+          const start = offset - 1
+          const sliced = items.slice(start, start + limit)
+          const truncated = start + sliced.length < items.length
+
+          return {
+            title,
+            output: [
+              `<path>${filepath}</path>`,
+              `<type>directory</type>`,
+              `<entries>`,
+              sliced.join("\n"),
+              truncated
+                ? `\n(Showing ${sliced.length} of ${items.length} entries. Use 'offset' parameter to read beyond entry ${offset + sliced.length})`
+                : `\n(${items.length} entries)`,
+              `</entries>`,
+            ].join("\n"),
+            metadata: {
+              preview: sliced.slice(0, 20).join("\n"),
+              truncated,
+              loaded: [] as string[],
+              display: {
+                type: "directory" as const,
+                path: filepath,
+                entries: sliced,
+                offset,
+                totalEntries: items.length,
+                truncated,
+              },
+            },
+          }
+        }
+
+        const content = yield* Effect.tryPromise({
+          try: () => sb.files.readFile(sandboxPath),
+          catch: () => new Error(`File not found: ${filepath}`),
+        })
+        const allLines = (content as string).split("\n")
+        const start = (params.offset ?? 1) - 1
+        const readLimit = params.limit ?? DEFAULT_READ_LIMIT
+        const selected = allLines.slice(start, start + readLimit)
+        const truncatedFile = start + selected.length < allLines.length
+        const loaded = yield* instruction.resolve(ctx.messages, filepath, ctx.messageID)
+
+        let output = [`<path>${filepath}</path>`, `<type>file</type>`, "<content>\n"].join("\n")
+        output += selected
+          .map(
+            (line, i) =>
+              `${i + start + 1}: ${line.length > MAX_LINE_LENGTH ? line.substring(0, MAX_LINE_LENGTH) + MAX_LINE_SUFFIX : line}`,
+          )
+          .join("\n")
+        const last = start + selected.length
+        if (truncatedFile)
+          output += `\n\n(Showing lines ${start + 1}-${last} of ${allLines.length}. Use offset=${last + 1} to continue.)`
+        else output += `\n\n(End of file - total ${allLines.length} lines)`
+        output += "\n</content>"
+        if (loaded.length > 0)
+          output += `\n\n<system-reminder>\n${loaded.map((item) => item.content).join("\n\n")}\n</system-reminder>`
+
+        return {
+          title,
+          output,
+          metadata: {
+            preview: selected.slice(0, 20).join("\n"),
+            truncated: truncatedFile,
+            loaded: loaded.map((item) => item.filepath),
+            display: {
+              type: "file" as const,
+              path: filepath,
+              text: selected.join("\n"),
+              lineStart: start + 1,
+              lineEnd: last,
+              totalLines: allLines.length,
+              truncated: truncatedFile,
+            },
+          },
+        }
+      }
 
       if (!stat) return yield* miss(filepath)
 

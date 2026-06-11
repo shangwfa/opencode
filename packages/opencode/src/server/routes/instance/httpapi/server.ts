@@ -209,6 +209,7 @@ export function createRoutes(
     ptyConnectApiRoutes,
     instanceRoutes,
     serverRoutes,
+    sandboxProxyRoute,
     docRoute,
     uiRoute,
   ).pipe(

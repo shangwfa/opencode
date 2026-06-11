@@ -28,6 +28,10 @@ import { Provider } from "@/provider/provider"
 
 import { WebSearchTool } from "./websearch"
 import { LspTool } from "./lsp"
+import { TaskStatusTool } from "./task_status"
+import { RepoCloneTool } from "./repo_clone"
+import { RepoOverviewTool } from "./repo_overview"
+import { Flag } from "@opencode-ai/core/flag/flag"
 import * as Truncate from "./truncate"
 import { ApplyPatchTool } from "./apply_patch"
 import { Glob } from "@opencode-ai/core/util/glob"
@@ -76,6 +80,7 @@ export interface Interface {
     providerID: ProviderV2.ID
     modelID: ModelV2.ID
     agent: Agent.Info
+    sessionID?: SessionID
   }) => Effect.Effect<Tool.Def[]>
 }
 
@@ -92,6 +97,7 @@ export const layer = Layer.effect(
 
     const invalid = yield* InvalidTool
     const task = yield* TaskTool
+    const taskStatus = yield* TaskStatusTool
     const read = yield* ReadTool
     const question = yield* QuestionTool
     const todo = yield* TodoWriteTool
@@ -99,6 +105,8 @@ export const layer = Layer.effect(
     const plan = yield* PlanExitTool
     const webfetch = yield* WebFetchTool
     const websearch = yield* WebSearchTool
+    const repoClone = yield* RepoCloneTool
+    const repoOverview = yield* RepoOverviewTool
     const shell = yield* ShellTool
     const globtool = yield* GlobTool
     const writetool = yield* WriteTool
@@ -205,9 +213,12 @@ export const layer = Layer.effect(
           edit: Tool.init(edit),
           write: Tool.init(writetool),
           task: Tool.init(task),
+          task_status: Tool.init(taskStatus),
           fetch: Tool.init(webfetch),
           todo: Tool.init(todo),
           search: Tool.init(websearch),
+          repo_clone: Tool.init(repoClone),
+          repo_overview: Tool.init(repoOverview),
           skill: Tool.init(skilltool),
           patch: Tool.init(patchtool),
           question: Tool.init(question),
@@ -227,9 +238,11 @@ export const layer = Layer.effect(
             tool.edit,
             tool.write,
             tool.task,
+            ...(flags.experimentalBackgroundSubagents ? [tool.task_status] : []),
             tool.fetch,
             tool.todo,
             tool.search,
+            ...(flags.experimentalScout ? [tool.repo_clone, tool.repo_overview] : []),
             tool.skill,
             tool.patch,
             ...(flags.experimentalLspTool ? [tool.lsp] : []),
@@ -250,8 +263,15 @@ export const layer = Layer.effect(
       return (yield* all()).map((tool) => tool.id)
     })
 
-    const describeTask = Effect.fn("ToolRegistry.describeTask")(function* (agent: Agent.Info) {
-      const items = (yield* agents.list()).filter((item) => item.mode !== "primary")
+    const skill = yield* Skill.Service
+
+    const describeTask = Effect.fn("ToolRegistry.describeTask")(function* (agent: Agent.Info, sessionID?: SessionID) {
+      const globalAgents = yield* agents.list()
+      const sessionAgents = sessionID && Flag.OPENCODE_DATABASE_URL ? yield* agents.sessionList(sessionID) : []
+      const merged = new Map<string, Agent.Info>()
+      for (const a of globalAgents) merged.set(a.name, a)
+      for (const a of sessionAgents) merged.set(a.name, a)
+      const items = [...merged.values()].filter((item) => item.mode !== "primary")
       const filtered = items.filter(
         (item) => Permission.evaluate("task", item.name, agent.permission).action !== "deny",
       )
@@ -263,6 +283,25 @@ export const layer = Layer.effect(
         )
         .join("\n")
       return ["Available agent types and the tools they have access to:", description].join("\n")
+    })
+
+    const describeSkill = Effect.fn("ToolRegistry.describeSkill")(function* (agent: Agent.Info) {
+      const list = yield* skill.available(agent)
+      if (list.length === 0) return "No skills are currently available."
+      return [
+        "Load a specialized skill that provides domain-specific instructions and workflows.",
+        "",
+        "When you recognize that a task matches one of the available skills listed below, use this tool to load the full skill instructions.",
+        "",
+        "The skill will inject detailed instructions, workflows, and access to bundled resources (scripts, references, templates) into the conversation context.",
+        "",
+        'Tool output includes a `<skill_content name="...">` block with the loaded content.',
+        "",
+        "The following skills provide specialized sets of instructions for particular tasks",
+        "Invoke this tool to load a skill when a task matches its description.",
+        "",
+        ...list.map((s) => `- ${s.name}: ${s.description ?? ""}`),
+      ].join("\n")
     })
 
     const tools: Interface["tools"] = Effect.fn("ToolRegistry.tools")(function* (input) {
@@ -294,7 +333,11 @@ export const layer = Layer.effect(
               : undefined
           return {
             id: tool.id,
-            description: [output.description, tool.id === TaskTool.id ? yield* describeTask(input.agent) : undefined]
+            description: [
+              output.description,
+              tool.id === TaskTool.id ? yield* describeTask(input.agent, input.sessionID) : undefined,
+              tool.id === SkillTool.id ? yield* describeSkill(input.agent) : undefined,
+            ]
               .filter(Boolean)
               .join("\n"),
             parameters: output.parameters,
