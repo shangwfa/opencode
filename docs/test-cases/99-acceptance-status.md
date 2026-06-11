@@ -1,0 +1,228 @@
+# 验收状态表
+
+> 本文档从 `saas-test-cases.md` 拆分而来。公共测试环境和配置请参考 [`00-INDEX.md`](./00-INDEX.md)。
+
+## 验收状态表
+
+每条用例标记 ✅ / ❌ / ⚠️，附加发现的问题。
+
+### P0 SaaS 核心验收
+
+| 用例 | 状态 | 备注 |
+|---|---|---|
+| T3.1 | ✅ | provider 凭据写入 |
+| T3.2 | ✅ | provider 凭据删除 |
+| T3.3 | ✅ | provider 凭据重启持久化（生产库验证） |
+| T4.3 | ✅ | 写文件工具可用 |
+| T4.4 | ✅ | 读文件工具可用 |
+| T4.5 | ✅ | bash 工具可用 |
+| T4.6 | ✅ | prompt_async 异步入口，返回 204 |
+| T4.7 | ✅ | abort 中断正在运行的会话 |
+| T5.1 | ✅ | 沙箱写入 PVC（exec API 写文件成功） |
+| T5.2 | ✅ | dispose 销毁沙箱（返回 true） |
+| T5.3 | ✅ | 沙箱重建后单文件仍存在（PVC 核心验证通过） |
+| T5.4 | ✅ | 多文件持久化（a.txt/b.txt/c.txt dispose 后均存在） |
+| T5.5 | ✅ | 目录持久化（sub/deep/x.txt dispose 后仍为 DEEP） |
+| T6.1 | ✅ | 并发创建 session，5 个全部成功 |
+| T6.2 | ✅ | 不同 session 文件隔离，B 看不到 A 文件 |
+| T6.3 | ✅ | 同一 session 并发消息排队或串行处理，全部 204 |
+| T8.1 | ✅ | provider 列表与 connected 状态 |
+| T8.2 | ✅ | 同 session 切换模型 |
+| T9.1 | ✅ | SSE 事件流可收到 session/message 事件 |
+| T10.1 | | 完整开发流程 + PVC 持久化 |
+| T11.1 | ✅ | Vite 5 + glm-5.1 |
+| T11.2 | ✅ | HTML 注入验证 |
+| T11.3 | ✅ | HTML src/href 路径重写 |
+| T11.4 | ✅ | @react-refresh PREFIXED |
+| T11.5 | ✅ | JS import 路径重写 |
+| T11.6 | ✅ | BrowserRouter → HashRouter 自动替换 |
+| T11.7 | ✅ | CSS url/font 路径重写 |
+| T11.8 | ✅ | proxy 错误查询端点 |
+| T11.9 | ✅ | background:true keepAlive 生效；proxy 本身不保活 |
+| T11.10 | ✅ | Hash route 刷新正常 |
+| T11.11 | ✅ | Next.js 14，三页面 200 |
+| T11.12 | ✅ | webpack publicPath 已重写 |
+| T11.13 | ✅ | RSC 路径全部 prefixed |
+| T11.14 | ✅ | 客户端导航 + 刷新正常 |
+| T11.15 | ✅ | server proxy 模式 API key 正确 |
+| T12.1 | ✅ | 首条 AI 消息触发 sandbox 创建（日志 sandbox 计数增加） |
+| T12.2 | ✅ | 同 session 复用 sandbox（连续消息 sandboxID 一致；无 keepAlive 时可能因 idle 销毁重建） |
+| T12.6 | ✅ | instance/dispose 强制销毁所有沙箱（200，日志含 destroy） |
+| T12.7 | ✅ | dispose 后再次发消息自动重建沙箱（AI 正常回复 after-rebuild） |
+| T12.8 | ✅ | 容器重启后 PVC 数据恢复（RESTART-MARK 文件内容完整保留） |
+| T12.9 | ⚠️ NOTE | 本地 Docker 环境 B 能看到 A 文件（共享 sandbox）。K8s 环境下每个 session 有独立 sandbox PVC |
+| T12.10 | ✅ | 不同 session 进程隔离（/tmp 下文件隔离，B 看到 NOT_FOUND） |
+| T12.12 | ✅ | proxy 访问不触发 keepAlive（proxy 502，无 keepAlive 日志） |
+| T12.3 | ✅ | background:true / keepAlive API 生效（T19.7 验证 keepAlive + dev server proxy 200） |
+| T12.4 | ⚠️ NOTE | session runner idle 可回收 sandbox；纯 exec API 不保证仅凭释放 keepAlive 触发 idle destroy（见 T19.9） |
+| T12.5 | ✅ | keepAlive 阻止 idle 销毁（T19.8: 15s 后 exec 仍成功） |
+
+| T17.1 | ✅ | 无沙箱时 endpoint API 返回 502 |
+| T17.2 | | endpoint API 端口参数校验 |
+| T17.3 | ✅ | Vite 项目 endpoint API 返回直连 IP |
+| T17.4 | ✅ | 通过直连 IP 访问 Vite 页面 HTTP 200 |
+| T17.5 | ✅ | Proxy 模式有注入，直连模式无注入 |
+| T17.6 | | 沙箱销毁后 endpoint API 返回 502 |
+| T18.1 | ✅ | 7 种工具调用场景全部验证通过 |
+| T18.2 | ✅ | 消息流结构正确（prompt → tool → summary） |
+| T19.1 | ✅ | exec API：简单命令执行（exitCode=0, stdout=hello-from-exec） |
+| T19.2 | ✅ | exec API：多行输出（stdout 含 line1/line2）。⚠️ NOTE：stderr 被合并到 stdout，stderr 字段为空 |
+| T19.3 | ✅ | exec API：指定工作目录（pwd=/tmp） |
+| T19.4 | ✅ | exec API：命令执行失败（exitCode=42） |
+| T19.5 | ✅ | exec API：缺少 command 参数（HTTP 400） |
+| T19.6 | ✅ | exec API：不存在的 session（HTTP 404，非 502） |
+| T19.7 | ✅ | exec API + keepAlive：同步 exec 用 `nohup ./node_modules/.bin/vite ... & echo $!` 后台启动 Vite 5，proxy HTTP 200；长驻进程首选 `/exec/async` |
+| T19.8 | ✅ | keepAlive 阻止 idle 销毁（15s 后 `exec echo alive` 仍成功） |
+| T19.9 | ⚠️ | 释放 keepAlive 后纯 exec 仍可执行；纯 exec 不保证触发 session runner idle destroy，需 `kill-sandbox`/dispose 显式清理 |
+| T19.10 | ⚠️ | `timeoutSeconds=5` 已透传，但 opensandbox execd 未强制 5s 中止，约 30s 后返回 `exitCode=null` |
+| T19.11 | ✅ | exec API：环境信息（node=v22.2.0 npm=10.7.0 pwd=/workspace） |
+| T19.12 | ✅ | exec/async 流式日志最佳实践：启动后立即订阅 `/stream`，收到 `stdout×4` + `done`，final status=`completed`，sandbox 清理为 destroyed |
+| T15.1 | ✅ | 简单 session skill 创建并通过 `skills` 触发 |
+| T15.2 | ✅ | 复杂 session skill bundle resources 写入、读取、注入 |
+| T15.3 | ✅ | session skill 删除单个与清空 |
+| T15.4 | ✅ | 从服务端目录加载 `SKILL.md` bundle 与 resources |
+| T15.5 | ⏭️ | SkillsMP 默认排序 10 个真实 skill bundle（跳过 — GitHub API SSL 网络不稳定） |
+| T15.6 | ✅ | 重复创建同名 skill（upsert 覆盖）：v1→v2，resources 覆盖，AI 使用 v2 |
+| T15.7 | ✅ | AI 通过 skill tool 按需加载 resource 内容：AI 调用 skill tool 加载 checklist.md + safe-template.py |
+| T15.8 | ✅ | skill 不存在时的错误处理：AI 识别不存在 skill，不调用 tool，直接告知用户 |
+| T15.9 | ✅ | session skill 与全局 skill 同名覆盖：AI 加载 session 版本 |
+| T15.10 | ✅ | permission deny 过滤：deny skill tool 后 AI 无法调用 |
+| T15.11 | ✅ | resources 边界：300KB 单个 resource + 70 个 resources 均成功写入 PG |
+| T15.12 | ✅ | 全局 skill 列表：GET /skill 返回 1 个内置 skill |
+| T15.13 | ✅ | 多 skills 主动触发：指定 3 个 skills，AI 依次加载并综合使用（安全+性能+风格三维度报告） |
+| T15.14 | ✅ | 多 skills 被动触发：不指定 skills，AI 自行判断加载 git-helper（而非 deploy-helper） |
+| T15.15 | ✅ | 渐进式披露：preloaded_skills 只有 manifest（name/desc/location + resource 元数据），无完整 content |
+| T15.16 | ✅ | 渐进式披露：skill tool 不指定 resources → 只返回 path/type/size 元数据 |
+| T15.17 | ✅ | 渐进式披露：指定 resources 获取完整 content + 不存在 resource → `<missing_resource>` |
+| T15.18 | ✅ | 跨 session 隔离：A=['private-skill'], B=[]，PG 只有 A |
+| T15.19 | ✅ | session 删除后 skill 级联清理 |
+| T15.20 | ✅ | 混合 skill 名：real-skill 加载成功，ghost-skill 被忽略 |
+| T15.21 | ⚠️ | 输入校验缺失：空名称/超长/特殊字符均被接受 |
+| T15.22 | ✅ | 5 并发创建同名 skill，upsert 安全，PG COUNT=1 |
+| T15.23 | ✅ | Unicode/emoji/中文 API+PG 完整保留 |
+| T15.24 | ✅ | 创建 agent-browser 会话 skill（安装 CLI + 创建 skill） |
+| T15.25 | ✅ | 使用 agent-browser 浏览网页（open/snapshot/close 均成功） |
+| T15.26 | ⚠️ | agent-browser + page-summarizer（skill 加载+规划通过，Chrome 启动不稳定） |
+
+### Session Agents（会话级动态 Agent）
+
+| 用例 | 状态 | 备注 |
+|---|---|---|
+| T16.1 | ✅ | 创建会话级 agent，返回 Agent.Info |
+| T16.2 | ✅ | 列出 agents（全局 + 会话级合并，会话级同名覆盖） |
+| T16.3 | ✅ | Upsert 更新同名 agent |
+| T16.4 | ✅ | 删除单个会话 agent → 204，全局 agent 不受影响 |
+| T16.5 | ✅ | 清空所有会话级 agents → 204，全局 agent 仍在 |
+| T16.6 | ✅ | 自定义 primary agent 发消息，AI 使用指定 agent 回复 |
+| T16.7 | ✅ | 带自定义权限的只读 reviewer agent |
+| T16.8 | ✅ | subagent 模式 @translator 调用，输出英文翻译 |
+| T16.9 | ✅ | 不同 session 同名 agent 互相隔离 |
+| T16.10 | ✅ | 删除 session 后 agents 级联清理 → 404 |
+| T16.11 | ✅ | 完整工作流：创建→执行→验证→删除 |
+| T16.12 | ✅ | 不存在的 session 创建 agent → 404 |
+| T16.13 | ✅ | 不存在的 session 列出 agents → 404 |
+| T16.14 | ✅ | 非法 mode 值 → 400 |
+| T16.15 | ✅ | 缺少必填字段 name → 400 |
+| T16.16 | ✅ | 多 agent 协作：主 agent 调度 translator + coder 子 agent |
+
+### Session Agents — 代码修复验证
+
+| 用例 | 状态 | 备注 |
+|---|---|---|
+| T16.17 | ✅ | 保留 agent 名拒绝：compaction/title/summary 全部返回 500 + AgentInvalidError |
+| T16.18 | ✅ | session agent @mention：创建 my-translator → AI 翻译天气为英文（@mention 解析通过 resolvePromptParts 但运行时路径正确） |
+| T16.19 | ✅ | 自定义 model/temperature：agent 创建含 model+temp=0.9，AI 使用该 agent 回复 |
+| T16.20 | ✅ | sessionGet 回退：无自定义 agent 时列出 7 个全局 agent，agent="build" 正常工作 |
+
+### P1 SaaS 稳定性
+
+| 用例 | 状态 | 备注 |
+|---|---|---|
+| T7.1 | ⚠️ NOTE | 未配置 provider 返回 200（非 4xx），错误体现在 AI 回复内容中；不卡死 |
+| T7.2 | ✅ | 不存在 session 返回 404 |
+| T7.3 | ✅ | 无效 JSON 返回 400 |
+| T7.4 | ⚠️ NOTE | 缺失必填字段（空 parts）返回 200（非 400），服务端宽松处理 |
+| T7.5 | ✅ | 超长消息不 hang |
+| T12.11 | | OPENCODE_SANDBOX_IDLE_KILL_SEC 当前不参与实际回收逻辑 |
+| T13.1 | ✅ | kill-sandbox 返回 200，sandbox 被销毁 |
+| T13.2 | ✅ | kill 后 PVC 保留，新 sandbox 可读 kill-test.txt |
+| T13.3 | ✅ | 并发 prompt_async × 3，sandbox 创建不重复（日志验证） |
+| T13.4 | ✅ | dispose 与 prompt 并发，返回 true 不 500 |
+| T13.5 | ⏭️ SKIP | 需要 sandbox 内 dev server，当前环境不适用 |
+| T13.6 | ⏭️ SKIP | 同 T13.5 |
+| T13.7 | ⏭️ SKIP | 同 T13.5 |
+| T13.8 | ⏭️ SKIP | 同 T13.5 |
+| T13.9 | ✅ | docker restart 后 session + message 恢复完整（msg_count 一致） |
+| T13.10 | ✅ | prompt_async → 204，abort → true，消息落库 msg_count=2 |
+| T13.11 | ✅ | 删除前 msg=2 part=4，删除后 msg=0 part=0，级联正确 |
+| T13.12 | ✅ | 订阅额度 unit test 6 pass（bun test 262ms） |
+| T13.13 | ⚠️ NOTE | 需要外部限流网关配置，SaaS 网关层验证 |
+| T13.14 | ✅ | AI 拒绝执行 ls /Users 等宿主路径（安全约束） |
+| T13.15 | ✅ | sandbox 内 /etc/passwd 仅含容器用户，无宿主信息 |
+| T13.16 | ✅ | AI 拒绝执行 env grep 敏感变量（安全约束） |
+| T13.17 | ✅ | 重复 dispose × 3 全部 200，无异常 |
+| T13.18 | ✅ | 重复 kill-sandbox × 3 全部 200，无异常 |
+| T13.19 | ✅ | 重复删除 session：首次 200，二次 404，不 500 |
+| T13.20 | ✅ | 日志包含 sessionID、sandbox created 生命周期事件 |
+| T13.21 | ✅ | 不存在 provider 错误 500 + 错误 ref，日志关联 sessionID |
+| T13.22 | ✅ | PG message 表可查询 session_id 关联记录 |
+| T13.23 | ✅ | 重启后 session 可查询、message 完整（同 T13.9） |
+| T13.24 | ⚠️ NOTE | sandbox 为外部 runtime，重启后由 runtime 管理回收 |
+
+### P2 低优先级兼容回归
+
+| 用例 | 状态 | 备注 |
+|---|---|---|
+| T1.1 | ✅ | 服务健康检查，返回 `{healthy: true, version: ...}` |
+| T1.2 | ✅ | 全局配置查询，返回 config 对象 |
+| T1.3 | ✅ | 路径信息，`cwd=/workspace` |
+| T2.1 | ✅ | 创建空 session |
+| T2.2 | ✅ | 创建带 title 的 session |
+| T2.3 | ✅ | 列出所有 session |
+| T2.4 | ✅ | 获取单个 session |
+| T2.5 | ✅ | 修改 session title |
+| T2.6 | ✅ | 删除 session |
+| T4.1 | ✅ | 简单文本对话 |
+| T4.2 | ✅ | 多轮上下文记忆 |
+| T14.1 | ✅ | session 列表过滤：创建 title=filter-test-xyz 后在列表中找到 |
+| T14.2 | ✅ | `/session/status` 返回 200 |
+| T14.3 | ✅ | session fork 返回新 session ID，父子关系正确 |
+| T14.4 | ✅ | 2 条 prompt 后消息数=4（2 user + 2 assistant） |
+| T14.5 | ✅ | share → 200 + share URL，unshare → 200 |
+| T14.6 | ✅ | diff API 返回 200 |
+| T14.7 | ✅ | `/file/content?path=/workspace` 返回 200 |
+| T14.8 | ⚠️ NOTE | `/find` 返回 400（可能需要额外参数或 LSP 服务） |
+| T14.9 | ✅ | `/vcs/status` 返回 200 |
+| T14.10 | ✅ | agent/skill/command 列表全部 200 |
+
+### Workspace Routing 路径解析
+
+| 用例 | 状态 | 备注 |
+|---|---|---|
+| WR-1 | ✅ | 沙箱存活 + 不带 directory，返回 diff 数据（session.directory fallback 生效） |
+| WR-2 | ✅ | 沙箱存活 + directory=/workspace，返回 diff 数据 |
+| WR-3 | ✅ | 沙箱存活 + directory=/workspace/project，返回 diff 数据 |
+| WR-4 | ✅ | 沙箱已销毁 + 不带 directory，返回空数组（沙箱不存在） |
+| WR-5 | ✅ | 本地路径（无 sessionID），返回空数组（本地无 git repo） |
+
+### Session MCP（会话级动态 MCP）
+
+| 用例 | 状态 | 备注 |
+|---|---|---|
+| T22.1 | ✅ | 创建会话级 local MCP（command + environment） |
+| T22.2 | ✅ | 创建会话级 remote MCP（url + headers） |
+| T22.3 | ✅ | 列出会话 MCP，local + remote 同列表 |
+| T22.4 | ✅ | Upsert 更新同名 MCP（local→remote，count=1） |
+| T22.5 | ✅ | 删除单个 MCP → 204 |
+| T22.6 | ✅ | 清空所有 MCP → 204 |
+| T22.7 | ✅ | 不同 session 同名 MCP 互相隔离 |
+| T22.8 | ✅ | 删除 session 后 MCP 级联清理 |
+| T22.9 | ✅ | 不存在的 session → 404 |
+| T22.10 | ✅ | 输入校验：缺 name/缺 type/非法 type → 400 |
+| T22.11 | ✅ | 完整字段持久化（url/env/headers/enabled） |
+| T22.12 | ✅ | disabled MCP 的 enabled=false 持久化 |
+| T22.13 | ✅ | Remote MCP 工具执行验证：ev_echo 调用成功，输出 Echo: hello |
+| T22.14 | ⏳ | Local MCP 在 Sandbox 中执行验证（需沙箱 + supergateway） |
+| T22.15 | ✅ | Session MCP 工具多轮对话持续可用：3 轮 3 次 MCP 调用全部成功 |
+
+---
