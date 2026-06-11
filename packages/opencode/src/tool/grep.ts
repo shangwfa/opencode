@@ -7,6 +7,15 @@ import { assertExternalDirectoryEffect } from "./external-directory"
 import DESCRIPTION from "./grep.txt"
 import * as Tool from "./tool"
 
+interface GrepMatch {
+  type: "match"
+  data: {
+    path: { text: string }
+    line_number: number
+    lines: { text: string }
+  }
+}
+
 export const Parameters = Schema.Struct({
   pattern: Schema.String.annotate({ description: "The regex pattern to search for in file contents" }),
   path: Schema.optional(Schema.String).annotate({
@@ -100,10 +109,7 @@ export const GrepTool = Tool.define(
 
           return {
             title: params.pattern,
-            metadata: {
-              matches: total,
-              truncated,
-            },
+            metadata: { matches: total, truncated },
             output: output.join("\n"),
           }
         }).pipe(Effect.orDie),

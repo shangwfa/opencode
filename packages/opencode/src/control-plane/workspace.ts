@@ -741,7 +741,7 @@ export const layer = Layer.effect(
     })
 
     const syncList = Effect.fn("Workspace.syncList")(function* (project: Project.Info) {
-      const names = new Set((yield* list(project)).map((workspace) => workspace.name))
+      const names = new Set((yield* list(project)).map((workspace: any) => workspace.name))
       const discovered = yield* Effect.forEach(
         registeredAdapters(project.id),
         ([type, adapter]) =>
@@ -807,8 +807,8 @@ export const layer = Layer.effect(
         .pipe(Effect.orDie)
       const sessionIDs = new Set(sessions.map((sessionInfo) => sessionInfo.id))
       yield* Effect.forEach(
-        sessions.filter((sessionInfo) => !sessionInfo.parentID || !sessionIDs.has(sessionInfo.parentID)),
-        (sessionInfo) =>
+        sessions.filter((sessionInfo: any) => !sessionInfo.parentID || !sessionIDs.has(sessionInfo.parentID)),
+        (sessionInfo: any) =>
           session.remove(sessionInfo.id).pipe(Effect.catchIf(NotFoundError.isInstance, () => Effect.void)),
         { discard: true },
       )

@@ -22,6 +22,8 @@ import { Format } from "@/format"
 import { RuntimeFlags } from "@/effect/runtime-flags"
 import { LSP } from "@/lsp/lsp"
 import { MCP } from "@/mcp"
+import { SessionMcp } from "@/mcp/session-mcp"
+import { Flag } from "@/flag/flag"
 import { Permission } from "@/permission"
 import { Installation } from "@/installation"
 import { InstanceLayer } from "@/project/instance-layer"
@@ -56,9 +58,11 @@ import { lazy } from "@/util/lazy"
 import { Vcs } from "@/project/vcs"
 import { Worktree } from "@/worktree"
 import { Workspace } from "@/control-plane/workspace"
-import { CorsConfig, isAllowedCorsOrigin, type CorsOptions } from "@/server/cors"
+import { CorsConfig, type CorsOptions } from "@/server/cors"
 import { serveUIEffect } from "@/server/shared/ui"
 import { ServerAuth } from "@/server/auth"
+import { SandboxProvider } from "@/tool/sandbox-provider"
+import { sandboxProxyRoute } from "@/server/sandbox-proxy"
 import { InstanceHttpApi, RootHttpApi } from "./api"
 import { Api } from "@opencode-ai/server/api"
 import { PublicApi } from "./public"
@@ -103,10 +107,13 @@ import { schemaErrorLayer } from "./middleware/schema-error"
 
 export const context = Context.makeUnsafe<unknown>(new Map())
 
-const cors = (corsOptions?: CorsOptions) =>
+const cors = (_corsOptions?: CorsOptions) =>
   HttpRouter.middleware(
     HttpMiddleware.cors({
-      allowedOrigins: (origin) => isAllowedCorsOrigin(origin, corsOptions),
+      allowedOrigins: ["*"],
+      allowedMethods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE", "OPTIONS"],
+      allowedHeaders: ["*"],
+      exposedHeaders: ["*"],
       maxAge: 86_400,
     }),
     { global: true },
@@ -223,6 +230,7 @@ export function createRoutes(
       LLM.defaultLayer,
       Installation.defaultLayer,
       MCP.defaultLayer,
+      Flag.OPENCODE_DATABASE_URL ? SessionMcp.pgLayer : SessionMcp.noopLayer,
       ModelsDev.defaultLayer,
       Permission.defaultLayer,
       Plugin.defaultLayer,
@@ -235,6 +243,7 @@ export function createRoutes(
       PtyTicket.defaultLayer,
       Question.defaultLayer,
       RuntimeFlags.defaultLayer,
+      SandboxProvider.defaultLayer,
       Session.defaultLayer,
       SessionCompaction.defaultLayer,
       SessionPrompt.defaultLayer,

@@ -529,11 +529,11 @@ export const get = Effect.fn("MessageV2.get")(function* (input: { sessionID: Ses
   }
 })
 
-export function filterCompacted(msgs: Iterable<WithParts>) {
+export async function filterCompacted(msgs: Iterable<WithParts> | AsyncIterable<WithParts>) {
   const result = [] as WithParts[]
   const completed = new Set<string>()
   let retain: MessageID | undefined
-  for (const msg of msgs) {
+  for await (const msg of msgs) {
     result.push(msg)
     if (retain) {
       if (msg.info.id === retain) break

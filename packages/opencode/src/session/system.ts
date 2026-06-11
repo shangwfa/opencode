@@ -2,6 +2,7 @@ import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { Context, Effect, Layer } from "effect"
 
 import { InstanceState } from "@/effect/instance-state"
+import { toSandboxPath } from "@/tool/sandbox-path"
 
 import PROMPT_ANTHROPIC from "./prompt/anthropic.txt"
 import PROMPT_DEFAULT from "./prompt/default.txt"
@@ -40,7 +41,7 @@ export function provider(model: Provider.Model) {
 
 export interface Interface {
   readonly environment: (model: Provider.Model) => Effect.Effect<string[]>
-  readonly skills: (agent: Agent.Info) => Effect.Effect<string | undefined>
+  readonly skills: (agent: Agent.Info, preload?: string[], session?: string) => Effect.Effect<string | undefined>
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/SystemPrompt") {}
@@ -63,8 +64,8 @@ export const layer = Layer.effect(
             `You are powered by the model named ${model.api.id}. The exact model ID is ${model.providerID}/${model.api.id}`,
             `Here is some useful information about the environment you are running in:`,
             `<env>`,
-            `  Working directory: ${ctx.directory}`,
-            `  Workspace root folder: ${ctx.worktree}`,
+            `  Working directory: ${cwd}`,
+            `  Workspace root folder: ${root}`,
             `  Is directory a git repo: ${ctx.project.vcs === "git" ? "yes" : "no"}`,
             `  Platform: ${process.platform}`,
             `  Today's date: ${new Date().toDateString()}`,
@@ -91,18 +92,48 @@ export const layer = Layer.effect(
         ].filter((part): part is string => part !== undefined)
       }),
 
-      skills: Effect.fn("SystemPrompt.skills")(function* (agent: Agent.Info) {
+      skills: Effect.fn("SystemPrompt.skills")(function* (agent: Agent.Info, preload?: string[], session?: string) {
         if (Permission.disabled(["skill"], agent.permission).has("skill")) return
 
-        const list = yield* skill.available(agent)
+        const list = yield* skill.available(agent, session)
 
-        return [
+        const parts: string[] = []
+
+        if (preload?.length) {
+          parts.push("<preloaded_skills>")
+          for (const name of preload) {
+            const info = yield* skill.get(name, session)
+            if (!info) continue
+            parts.push(
+              "  <skill>",
+              `    <name>${info.name}</name>`,
+              `    <description>${info.description ?? ""}</description>`,
+              `    <location>${info.location}</location>`,
+            )
+            if (info.resources && info.resources.length > 0) {
+              parts.push(
+                "    <resources>",
+                ...info.resources.map((resource) =>
+                  `      <resource path="${resource.path}" type="${resource.type}" size="${Buffer.byteLength(resource.content)}" />`,
+                ),
+                "    </resources>",
+              )
+            }
+            parts.push("  </skill>")
+          }
+          parts.push(
+            "</preloaded_skills>",
+            "These preloaded skills are manifests only. Before applying a preloaded skill, call the skill tool with its name to load the full instructions. If specific resource content is needed, call the skill tool with the resource paths.",
+          )
+        }
+
+        parts.push(
           "Skills provide specialized instructions and workflows for specific tasks.",
-          "Use the skill tool to load a skill when a task matches its description.",
-          // the agents seem to ingest the information about skills a bit better if we present a more verbose
-          // version of them here and a less verbose version in tool description, rather than vice versa.
+          "Use the skill tool to load a skill when a task matches its description. The available_skills list is only a manifest; do not assume the full instructions are loaded until the skill tool returns skill_content.",
           Skill.fmt(list, { verbose: true }),
-        ].join("\n")
+        )
+
+        return parts.join("\n")
       }),
     })
   }),

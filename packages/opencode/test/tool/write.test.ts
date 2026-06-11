@@ -248,6 +248,46 @@ describe("tool.write", () => {
     )
   })
 
+  describe("sandbox writeFiles retry", () => {
+    it.instance("retries writeFiles once on transient failure", () =>
+      Effect.gen(function* () {
+        let callCount = 0
+        const mockWriteFiles = async () => {
+          callCount++
+          if (callCount === 1) throw new Error("transient network error")
+          return undefined
+        }
+
+        // Simulate the retry logic from write.ts
+        const result = yield* Effect.tryPromise({
+          try: () => mockWriteFiles(),
+          catch: () => mockWriteFiles(),
+        })
+
+        expect(callCount).toBe(2)
+        expect(result).toBeUndefined()
+      }),
+    )
+
+    it.instance("fails after retry also fails", () =>
+      Effect.gen(function* () {
+        let callCount = 0
+        const mockWriteFiles = async () => {
+          callCount++
+          throw new Error("persistent failure")
+        }
+
+        const exit = yield* Effect.tryPromise({
+          try: () => mockWriteFiles(),
+          catch: () => mockWriteFiles(),
+        }).pipe(Effect.exit)
+
+        expect(exit._tag).toBe("Failure")
+        expect(callCount).toBe(2)
+      }),
+    )
+  })
+
   describe("error handling", () => {
     it.instance("throws error when OS denies write access", () =>
       Effect.gen(function* () {

@@ -110,14 +110,14 @@ const aggregateSessionStats = Effect.fn("Cli.stats.aggregate")(function* (
     return days
   })()
 
-  let filteredSessions = cutoffTime > 0 ? sessions.filter((session) => session.time.updated >= cutoffTime) : sessions
+  let filteredSessions = cutoffTime > 0 ? sessions.filter((session: any) => session.time.updated >= cutoffTime) : sessions
 
   if (projectFilter !== undefined) {
     if (projectFilter === "") {
       if (!currentProject) throw new Error("currentProject required when projectFilter is empty string")
-      filteredSessions = filteredSessions.filter((session) => session.projectID === currentProject.id)
+      filteredSessions = filteredSessions.filter((session: any) => session.projectID === currentProject.id)
     } else {
-      filteredSessions = filteredSessions.filter((session) => session.projectID === projectFilter)
+      filteredSessions = filteredSessions.filter((session: any) => session.projectID === projectFilter)
     }
   }
 
@@ -162,7 +162,7 @@ const aggregateSessionStats = Effect.fn("Cli.stats.aggregate")(function* (
 
   const results = yield* Effect.forEach(
     filteredSessions,
-    (session) =>
+    (session: any) =>
       Effect.gen(function* () {
         const messages = yield* svc
           .messages({ sessionID: session.id })

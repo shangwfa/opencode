@@ -14,6 +14,8 @@ import DESCRIPTION from "./apply_patch.txt"
 import { FileSystem } from "@opencode-ai/core/filesystem"
 import { Format } from "../format"
 import * as Bom from "@/util/bom"
+import { toSandboxPath } from "./sandbox-path"
+import { SandboxProvider } from "./sandbox-provider"
 
 export const Parameters = Schema.Struct({
   patchText: Schema.String.annotate({ description: "The full patch text that describes all changes to be made" }),
@@ -35,7 +37,6 @@ export const ApplyPatchTool = Tool.define(
         return yield* Effect.fail(new Error("patchText is required"))
       }
 
-      // Parse the patch to get hunks
       let hunks: Patch.Hunk[]
       try {
         const parseResult = Patch.parsePatch(params.patchText)
@@ -54,7 +55,6 @@ export const ApplyPatchTool = Tool.define(
 
       const instance = yield* InstanceState.context
 
-      // Validate file paths and check permissions
       const fileChanges: Array<{
         filePath: string
         oldContent: string
@@ -104,28 +104,19 @@ export const ApplyPatchTool = Tool.define(
           }
 
           case "update": {
-            // Check if file exists for update
-            const stats = yield* afs.stat(filePath).pipe(Effect.catch(() => Effect.succeed(undefined)))
-            if (!stats || stats.type === "Directory") {
+            const stats = yield* statFile(filePath, ctx, instance)
+            if (!stats) {
               return yield* Effect.fail(
                 new Error(`apply_patch verification failed: Failed to read file to update: ${filePath}`),
               )
             }
 
-            const source = yield* Bom.readFile(afs, filePath)
-            const oldContent = source.text
+            const oldContent = yield* readFile(filePath, ctx, instance)
             let newContent = oldContent
-            let bom = source.bom
 
-            // Apply the update chunks to get new content
             try {
-              const fileUpdate = Patch.deriveNewContentsFromChunks(
-                filePath,
-                hunk.chunks,
-                Bom.join(source.text, source.bom),
-              )
+              const fileUpdate = Patch.deriveNewContentsFromChunks(filePath, hunk.chunks, oldContent)
               newContent = fileUpdate.content
-              bom = fileUpdate.bom
             } catch (error) {
               return yield* Effect.fail(new Error(`apply_patch verification failed: ${error}`))
             }
@@ -151,7 +142,7 @@ export const ApplyPatchTool = Tool.define(
               diff,
               additions,
               deletions,
-              bom,
+              bom: false,
             })
 
             totalDiff += diff + "\n"
@@ -159,8 +150,8 @@ export const ApplyPatchTool = Tool.define(
           }
 
           case "delete": {
-            const source = yield* Bom.readFile(afs, filePath).pipe(
-              Effect.catch((error) =>
+            const contentToDelete = yield* (readFile(filePath, ctx, instance) as Effect.Effect<string, Error>).pipe(
+              Effect.catch((error: any) =>
                 Effect.fail(
                   new Error(
                     `apply_patch verification failed: ${error instanceof Error ? error.message : String(error)}`,
@@ -168,7 +159,6 @@ export const ApplyPatchTool = Tool.define(
                 ),
               ),
             )
-            const contentToDelete = source.text
             const deleteDiff = trimDiff(createTwoFilesPatch(filePath, filePath, contentToDelete, ""))
 
             const deletions = contentToDelete.split("\n").length
@@ -181,7 +171,7 @@ export const ApplyPatchTool = Tool.define(
               diff: deleteDiff,
               additions: 0,
               deletions,
-              bom: source.bom,
+              bom: false,
             })
 
             totalDiff += deleteDiff + "\n"
@@ -190,7 +180,6 @@ export const ApplyPatchTool = Tool.define(
         }
       }
 
-      // Build per-file metadata for UI rendering (used for both permission and result)
       const files = fileChanges.map((change) => ({
         filePath: change.filePath,
         relativePath: path.relative(instance.worktree, change.movePath ?? change.filePath).replaceAll("\\", "/"),
@@ -201,7 +190,6 @@ export const ApplyPatchTool = Tool.define(
         movePath: change.movePath,
       }))
 
-      // Check permissions if needed
       const relativePaths = fileChanges.map((c) => path.relative(instance.worktree, c.filePath).replaceAll("\\", "/"))
       yield* ctx.ask({
         permission: "edit",
@@ -214,37 +202,33 @@ export const ApplyPatchTool = Tool.define(
         },
       })
 
-      // Apply the changes
       const updates: Array<{ file: string; event: "add" | "change" | "unlink" }> = []
 
       for (const change of fileChanges) {
         const edited = change.type === "delete" ? undefined : (change.movePath ?? change.filePath)
+        const content = change.newContent
         switch (change.type) {
           case "add":
-            // Create parent directories (recursive: true is safe on existing/root dirs)
-
-            yield* afs.writeWithDirs(change.filePath, Bom.join(change.newContent, change.bom))
+            yield* writeFile(change.filePath, content, ctx, instance)
             updates.push({ file: change.filePath, event: "add" })
             break
 
           case "update":
-            yield* afs.writeWithDirs(change.filePath, Bom.join(change.newContent, change.bom))
+            yield* writeFile(change.filePath, content, ctx, instance)
             updates.push({ file: change.filePath, event: "change" })
             break
 
           case "move":
             if (change.movePath) {
-              // Create parent directories (recursive: true is safe on existing/root dirs)
-
-              yield* afs.writeWithDirs(change.movePath!, Bom.join(change.newContent, change.bom))
-              yield* afs.remove(change.filePath)
+              yield* writeFile(change.movePath!, content, ctx, instance)
+              yield* removeFile(change.filePath, ctx, instance)
               updates.push({ file: change.filePath, event: "unlink" })
               updates.push({ file: change.movePath, event: "add" })
             }
             break
 
           case "delete":
-            yield* afs.remove(change.filePath)
+            yield* removeFile(change.filePath, ctx, instance)
             updates.push({ file: change.filePath, event: "unlink" })
             break
         }
@@ -257,12 +241,10 @@ export const ApplyPatchTool = Tool.define(
         }
       }
 
-      // Publish file change events
       for (const update of updates) {
         yield* events.publish(Watcher.Event.Updated, update)
       }
 
-      // Notify LSP of file changes and collect diagnostics
       for (const change of fileChanges) {
         if (change.type === "delete") continue
         const target = change.movePath ?? change.filePath
@@ -270,7 +252,6 @@ export const ApplyPatchTool = Tool.define(
       }
       const diagnostics = yield* lsp.diagnostics()
 
-      // Generate output summary
       const summaryLines = fileChanges.map((change) => {
         if (change.type === "add") {
           return `A ${path.relative(instance.worktree, change.filePath).replaceAll("\\", "/")}`

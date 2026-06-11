@@ -58,7 +58,7 @@ export const layer = Layer.effect(
 
     const state = (accountID: AccountID, orgID: Option.Option<OrgID>) => {
       const id = Option.getOrNull(orgID)
-      return db
+      await db
         .insert(AccountStateTable)
         .values({ id: ACCOUNT_STATE_ID, active_account_id: accountID, active_org_id: id })
         .onConflictDoUpdate({

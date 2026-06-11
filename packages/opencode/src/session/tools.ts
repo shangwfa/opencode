@@ -12,7 +12,7 @@ import { Truncate } from "@/tool/truncate"
 import { Plugin } from "@/plugin"
 import type { TaskPromptOps } from "@/tool/task"
 import { type Tool as AITool, tool, jsonSchema, type ToolExecutionOptions, asSchema } from "ai"
-import { Effect } from "effect"
+import { Effect, Option } from "effect"
 import { MessageV2 } from "./message-v2"
 import { Session } from "./session"
 import { SessionProcessor } from "./processor"
@@ -38,14 +38,40 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
   const mcp = yield* MCP.Service
   const truncate = yield* Truncate.Service
 
+  const maybeSandboxProvider = Option.getOrUndefined(yield* Effect.serviceOption(SandboxProvider.Service))
+  async function findRootSessionID(sessionID: SessionID): Promise<SessionID> {
+    let current = sessionID
+    let visited = 0
+    while (visited < 10) {
+      visited++
+      const row = await Database.use((db) =>
+        db.select({ parent_id: SessionTable.parent_id }).from(SessionTable).where(eq(SessionTable.id, current)).get(),
+      )
+      if (!row?.parent_id) break
+      current = row.parent_id as SessionID
+    }
+    return current
+  }
+  const sandboxSessionID = maybeSandboxProvider
+    ? yield* Effect.promise(() => findRootSessionID(input.session.id))
+    : input.session.id
+  function getSandbox(): Promise<unknown> | null {
+    if (!maybeSandboxProvider) {
+      return null
+    }
+    return maybeSandboxProvider.getOrCreate(sandboxSessionID).pipe(Effect.runPromise).catch(() => null)
+  }
+
   const context = (args: Record<string, unknown>, options: ToolExecutionOptions): Tool.Context => ({
     sessionID: input.session.id,
+    sandboxSessionID,
     abort: options.abortSignal!,
     messageID: input.processor.message.id,
     callID: options.toolCallId,
     extra: { model: input.model, bypassAgentCheck: input.bypassAgentCheck, promptOps: input.promptOps },
     agent: input.agent.name,
     messages: input.messages,
+    sandbox: getSandbox(),
     metadata: (val) =>
       input.processor.updateToolCall(options.toolCallId, (match) => {
         if (!["running", "pending"].includes(match.state.status)) return match
@@ -75,6 +101,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
     modelID: ModelV2.ID.make(input.model.api.id),
     providerID: input.model.providerID,
     agent: input.agent,
+    sessionID: input.session.id,
   })) {
     const schema = ProviderTransform.schema(input.model, ToolJsonSchema.fromTool(item))
     tools[item.id] = tool({
@@ -114,7 +141,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
     })
   }
 
-  for (const [key, item] of Object.entries(yield* mcp.tools())) {
+  for (const [key, item] of Object.entries(yield* mcp.toolsForSession(input.session.id))) {
     const execute = item.execute
     if (!execute) continue
 

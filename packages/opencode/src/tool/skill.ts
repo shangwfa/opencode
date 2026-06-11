@@ -8,6 +8,9 @@ import DESCRIPTION from "./skill.txt"
 
 export const Parameters = Schema.Struct({
   name: Schema.String.annotate({ description: "The name of the skill from available_skills" }),
+  resources: Schema.optional(Schema.Array(Schema.String)).annotate({
+    description: "Optional resource paths to load from this skill bundle",
+  }),
 })
 
 export const SkillTool = Tool.define(
@@ -21,9 +24,12 @@ export const SkillTool = Tool.define(
       parameters: Parameters,
       execute: (params: Schema.Schema.Type<typeof Parameters>, ctx: Tool.Context) =>
         Effect.gen(function* () {
-          const info = yield* skill
-            .require(params.name)
-            .pipe(Effect.catchTag("Skill.NotFoundError", (error) => Effect.die(new Error(error.message))))
+          const info = yield* skill.get(params.name, ctx.sessionID)
+          if (!info) {
+            const all = yield* skill.all(ctx.sessionID)
+            const available = all.map((item) => item.name).join(", ")
+            throw new Error(`Skill "${params.name}" not found. Available skills: ${available || "none"}`)
+          }
 
           yield* ctx.ask({
             permission: "skill",
@@ -32,6 +38,48 @@ export const SkillTool = Tool.define(
             metadata: {},
           })
 
+          const resources = info.resources ?? []
+          const requested = new Set(params.resources ?? [])
+          const selected = params.resources ? resources.filter((item) => requested.has(item.path)) : []
+          const missing =
+            params.resources?.filter((item) => !resources.some((resource) => resource.path === item)) ?? []
+
+          // session:// and memory:// skills: manifest + on-demand resources only
+          if (info.location.startsWith("session://") || info.location.startsWith("memory://")) {
+            return {
+              title: `Loaded skill: ${info.name}`,
+              output: [
+                `<skill_content name="${info.name}">`,
+                `# Skill: ${info.name}`,
+                "",
+                info.content.trim(),
+                "",
+                resources.length > 0 ? "<resources>" : undefined,
+                ...(params.resources
+                  ? selected.flatMap((resource) => [
+                      `  <resource path="${resource.path}" type="${resource.type}">`,
+                      resource.content.trim(),
+                      "  </resource>",
+                    ])
+                  : resources.map(
+                      (resource) =>
+                        `  <resource path="${resource.path}" type="${resource.type}" size="${Buffer.byteLength(resource.content)}" />`,
+                    )),
+                ...missing.map((item) => `  <missing_resource path="${item}" />`),
+                resources.length > 0 ? "</resources>" : undefined,
+                "</skill_content>",
+              ]
+                .filter((line) => line !== undefined)
+                .join("\n"),
+              metadata: {
+                name: info.name,
+                dir: info.location,
+                resources: selected.map((item) => item.path),
+              },
+            }
+          }
+
+          // file-based skill: always output Base directory + skill_files
           const dir = path.dirname(info.location)
           const base = pathToFileURL(dir).href
           const files = yield* ripgrep.find({
@@ -42,6 +90,26 @@ export const SkillTool = Tool.define(
             signal: ctx.abort,
             limit: 10,
           })
+
+          const resourcesBlock =
+            resources.length > 0
+              ? [
+                  "",
+                  "<resources>",
+                  ...(params.resources
+                    ? selected.flatMap((resource) => [
+                        `  <resource path="${resource.path}" type="${resource.type}">`,
+                        resource.content.trim(),
+                        "  </resource>",
+                      ])
+                    : resources.map(
+                        (resource) =>
+                          `  <resource path="${resource.path}" type="${resource.type}" size="${Buffer.byteLength(resource.content)}" />`,
+                      )),
+                  ...missing.map((item) => `  <missing_resource path="${item}" />`),
+                  "</resources>",
+                ]
+              : []
 
           return {
             title: `Loaded skill: ${info.name}`,
@@ -58,11 +126,13 @@ export const SkillTool = Tool.define(
               "<skill_files>",
               files.map((file) => `<file>${path.resolve(dir, file.path)}</file>`).join("\n"),
               "</skill_files>",
+              ...resourcesBlock,
               "</skill_content>",
             ].join("\n"),
             metadata: {
               name: info.name,
               dir,
+              resources: selected.map((item) => item.path),
             },
           }
         }).pipe(Effect.orDie),

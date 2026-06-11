@@ -1,12 +1,8 @@
-import { Effect, Stream } from "effect"
-import os from "os"
-import { createWriteStream } from "node:fs"
+import { Effect } from "effect"
 import * as Tool from "./tool"
 import path from "path"
 import { containsPath, type InstanceContext } from "../project/instance-context"
 import { InstanceState } from "@/effect/instance-state"
-import { lazy } from "@/util/lazy"
-import { Language, type Node } from "web-tree-sitter"
 
 import { FSUtil } from "@opencode-ai/core/fs-util"
 import { fileURLToPath } from "url"
@@ -16,11 +12,9 @@ import { Shell } from "@/shell/shell"
 import { ShellID } from "./shell/id"
 
 import * as Truncate from "./truncate"
-import { Plugin } from "@/plugin"
-import { ChildProcess } from "effect/unstable/process"
-import { ChildProcessSpawner } from "effect/unstable/process/ChildProcessSpawner"
 import { ShellPrompt, type Parameters } from "./shell/prompt"
-import { BashArity } from "@/permission/arity"
+import { toSandboxCwd } from "./sandbox-path"
+import { SandboxProvider } from "./sandbox-provider"
 
 export { Parameters } from "./shell/prompt"
 
@@ -348,7 +342,6 @@ export const ShellTool = Tool.define(
     const spawner = yield* ChildProcessSpawner
     const fs = yield* FSUtil.Service
     const trunc = yield* Truncate.Service
-    const plugin = yield* Plugin.Service
     const flags = yield* RuntimeFlags.Service
     const defaultTimeoutMs = flags.bashDefaultTimeoutMs ?? 2 * 60 * 1000
 
@@ -433,174 +426,78 @@ export const ShellTool = Tool.define(
 
     const run = Effect.fn("ShellTool.run")(function* (
       input: {
-        shell: string
         command: string
         cwd: string
-        env: NodeJS.ProcessEnv
         timeout: number
         description: string
+        background?: boolean | undefined
       },
       ctx: Tool.Context,
     ) {
-      const limits = yield* trunc.limits()
-      const keep = limits.maxBytes * 2
-      let full = ""
-      let last = ""
-      const list: Chunk[] = []
-      let used = 0
-      let file = ""
-      let sink: ReturnType<typeof createWriteStream> | undefined
-      let cut = false
+      let output = ""
       let expired = false
-      let aborted = false
-
-      const closeSink = Effect.fnUntraced(function* () {
-        const stream = sink
-        if (!stream) return
-        sink = undefined
-        if (stream.destroyed || stream.closed) return
-        yield* Effect.promise(
-          () =>
-            new Promise<void>((resolve) => {
-              let settled = false
-              const done = () => {
-                if (settled) return
-                settled = true
-                stream.off("close", done)
-                stream.off("error", done)
-                stream.off("finish", done)
-                resolve()
-              }
-              stream.once("close", done)
-              stream.once("error", done)
-              stream.once("finish", done)
-              stream.end(done)
-            }),
-        ).pipe(Effect.catch(() => Effect.void))
-      })
 
       yield* ctx.metadata({
-        metadata: {
-          output: "",
-          description: input.description,
-        },
+        metadata: { output: "", description: input.description },
       })
 
-      const code: number | null = yield* Effect.scoped(
-        Effect.gen(function* () {
-          yield* Effect.addFinalizer(closeSink)
-          const handle = yield* spawner.spawn(cmd(input.shell, input.command, input.cwd, input.env))
+      const fullCommand = input.background
+        ? `cd ${input.cwd} && ( nohup sh -c '${input.command.replace(/'/g, "'\\''")}' </dev/null > /tmp/opencode-bg-${ctx.callID ?? Date.now()}.log 2>&1 & ) && echo "started background"`
+        : `cd ${input.cwd} && ${input.command}`
 
-          yield* Effect.forkScoped(
-            Stream.runForEach(Stream.decodeText(handle.all), (chunk) => {
-              const size = Buffer.byteLength(chunk, "utf-8")
-              list.push({ text: chunk, size })
-              used += size
-              while (used > keep && list.length > 1) {
-                const item = list.shift()
-                if (!item) break
-                used -= item.size
-                cut = true
-              }
-
-              last = preview(last + chunk)
-
-              if (file) {
-                sink?.write(chunk)
-              } else {
-                full += chunk
-                if (Buffer.byteLength(full, "utf-8") > limits.maxBytes) {
-                  return trunc.write(full).pipe(
-                    Effect.andThen((next) =>
-                      Effect.sync(() => {
-                        file = next
-                        cut = true
-                        sink = createWriteStream(next, { flags: "a" })
-                        full = ""
-                      }),
-                    ),
-                    Effect.andThen(
-                      ctx.metadata({
-                        metadata: {
-                          output: last,
-                          description: input.description,
-                        },
-                      }),
-                    ),
-                  )
-                }
-              }
-
-              return ctx.metadata({
-                metadata: {
-                  output: last,
-                  description: input.description,
-                },
-              })
-            }),
+      const result = input.background
+        ? yield* sandboxProvider.runDetached(
+            ctx.sandboxSessionID ?? ctx.sessionID,
+            fullCommand,
+            { timeoutSeconds: Math.ceil((input.timeout + 5000) / 1000) },
+            {
+              onStdout: (msg: { text: string }) => {
+                output += msg.text
+                ctx.metadata({ metadata: { output: output.slice(-MAX_METADATA_LENGTH), description: input.description } })
+              },
+              onStderr: (msg: { text: string }) => {
+                const cmdErr = checkCommandNotFound(msg.text)
+                if (cmdErr) throw new Error(`Command failed: ${cmdErr}`)
+                output += msg.text
+                ctx.metadata({ metadata: { output: output.slice(-MAX_METADATA_LENGTH), description: input.description } })
+              },
+            },
+            ctx.abort,
           )
-
-          const abort = Effect.callback<void>((resume) => {
-            if (ctx.abort.aborted) return resume(Effect.void)
-            const handler = () => resume(Effect.void)
-            ctx.abort.addEventListener("abort", handler, { once: true })
-            return Effect.sync(() => ctx.abort.removeEventListener("abort", handler))
+        : yield* Effect.gen(function* () {
+            const sb = yield* Effect.tryPromise({ try: () => ctx.sandbox!, catch: (e) => new Error(`Initialization failed: ${e instanceof Error ? e.message : String(e)}`) })
+            return yield* sandboxProvider.runInSession(
+              ctx.sandboxSessionID ?? ctx.sessionID,
+              fullCommand,
+              { timeoutSeconds: Math.ceil((input.timeout + 5000) / 1000) },
+              {
+                onStdout: (msg: { text: string }) => {
+                  output += msg.text
+                  ctx.metadata({ metadata: { output: output.slice(-MAX_METADATA_LENGTH), description: input.description } })
+                },
+                onStderr: (msg: { text: string }) => {
+                  const cmdErr = checkCommandNotFound(msg.text)
+                  if (cmdErr) throw new Error(`Command failed: ${cmdErr}`)
+                  output += msg.text
+                  ctx.metadata({ metadata: { output: output.slice(-MAX_METADATA_LENGTH), description: input.description } })
+                },
+              },
+              ctx.abort,
+            )
           })
 
-          const timeout = Effect.sleep(`${input.timeout + 100} millis`)
+      if (input.background) yield* sandboxProvider.keepAlive(ctx.sandboxSessionID ?? ctx.sessionID)
 
-          const exit = yield* Effect.raceAll([
-            handle.exitCode.pipe(Effect.map((code) => ({ kind: "exit" as const, code }))),
-            abort.pipe(Effect.map(() => ({ kind: "abort" as const, code: null }))),
-            timeout.pipe(Effect.map(() => ({ kind: "timeout" as const, code: null }))),
-          ])
-
-          if (exit.kind === "abort") {
-            aborted = true
-            yield* handle.kill({ forceKillAfter: "3 seconds" }).pipe(Effect.orDie)
-          }
-          if (exit.kind === "timeout") {
-            expired = true
-            yield* handle.kill({ forceKillAfter: "3 seconds" }).pipe(Effect.orDie)
-          }
-
-          return exit.kind === "exit" ? exit.code : null
-        }),
-      ).pipe(Effect.orDie)
+      const exitCode = result.exitCode ?? null
+      if (exitCode === null) expired = true
 
       const meta: string[] = []
-      if (expired) {
-        meta.push(
-          `shell tool terminated command after exceeding timeout ${input.timeout} ms. If this command is expected to take longer and is not waiting for interactive input, retry with a larger timeout value in milliseconds.`,
-        )
-      }
-      if (aborted) meta.push("User aborted the command")
-      const raw = list.map((item) => item.text).join("")
-      const end = tail(raw, limits.maxLines, limits.maxBytes)
-      if (end.cut) cut = true
-      if (!file && end.cut) {
-        file = yield* trunc.write(raw)
-      }
+      if (expired) meta.push(`bash tool terminated command after exceeding timeout ${Math.min(input.timeout, MAX_TIMEOUT_MS)} ms.`)
+      if (meta.length > 0) output += "\n\n<bash_metadata>\n" + meta.join("\n") + "\n</bash_metadata>"
 
-      let output = end.text
-      if (!output) output = "(no output)"
-
-      if (cut && file) {
-        output = `...output truncated...\n\nFull output saved to: ${file}\n\n` + output
-      }
-
-      if (meta.length > 0) {
-        output += "\n\n<shell_metadata>\n" + meta.join("\n") + "\n</shell_metadata>"
-      }
       return {
         title: input.description,
-        metadata: {
-          output: last || preview(output),
-          exit: code,
-          description: input.description,
-          truncated: cut,
-          ...(cut && file ? { outputPath: file } : {}),
-        },
+        metadata: { output: output.slice(-MAX_METADATA_LENGTH), exit: exitCode, description: input.description },
         output,
       }
     })
@@ -620,9 +517,6 @@ export const ShellTool = Tool.define(
           execute: (params: Parameters, ctx: Tool.Context) =>
             Effect.gen(function* () {
               const instanceCtx = yield* InstanceState.context
-              const cwd = params.workdir
-                ? yield* resolvePath(params.workdir, instanceCtx.directory, shell)
-                : instanceCtx.directory
               if (params.timeout !== undefined && params.timeout < 0) {
                 throw new Error(`Invalid timeout value: ${params.timeout}. Timeout must be a positive number.`)
               }
@@ -639,17 +533,21 @@ export const ShellTool = Tool.define(
                 }),
               )
 
-              return yield* run(
+              const sandboxProviderOpt = yield* Effect.serviceOption(SandboxProvider.Service)
+              if (sandboxProviderOpt._tag === "None") throw new Error("Execution environment not available")
+              const sandboxProvider = sandboxProviderOpt.value
+              const sandboxCwd = toSandboxCwd(params.workdir, instanceCtx.directory)
+              return yield* runSandbox(
+                sandboxProvider,
                 {
-                  shell,
                   command: params.command,
-                  cwd,
-                  env: yield* shellEnv(ctx, cwd),
+                  cwd: sandboxCwd,
                   timeout,
                   description: params.description,
+                  background: params.background,
                 },
                 ctx,
-              )
+              ).pipe(Effect.orDie)
             }),
         }
       })

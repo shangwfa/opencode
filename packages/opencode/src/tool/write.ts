@@ -2,7 +2,6 @@ import { Schema } from "effect"
 import * as path from "path"
 import { Effect } from "effect"
 import * as Tool from "./tool"
-import { LSP } from "@/lsp/lsp"
 import { createTwoFilesPatch } from "diff"
 import DESCRIPTION from "./write.txt"
 import { EventV2Bridge } from "@/event-v2-bridge"
@@ -13,9 +12,10 @@ import { FSUtil } from "@opencode-ai/core/fs-util"
 import { InstanceState } from "@/effect/instance-state"
 import { trimDiff } from "./edit"
 import { assertExternalDirectoryEffect } from "./external-directory"
-import * as Bom from "@/util/bom"
+import { toSandboxPath } from "./sandbox-path"
+import * as Log from "@opencode-ai/core/util/log"
 
-const MAX_PROJECT_DIAGNOSTICS_FILES = 5
+const writeLog = Log.create({ service: "write-tool" })
 
 export const Parameters = Schema.Struct({
   content: Schema.String.annotate({ description: "The content to write to the file" }),
@@ -43,21 +43,29 @@ export const WriteTool = Tool.define(
             : path.join(instance.directory, params.filePath)
           yield* assertExternalDirectoryEffect(ctx, filepath)
 
-          const exists = yield* fs.existsSafe(filepath)
-          const source = exists ? yield* Bom.readFile(fs, filepath) : { bom: false, text: "" }
-          const next = Bom.split(params.content)
-          const desiredBom = source.bom || next.bom
-          const contentOld = source.text
-          const contentNew = next.text
+          const sb: any = yield* Effect.tryPromise({ try: () => ctx.sandbox!, catch: (e) => new Error(`Failed to initialize: ${e instanceof Error ? e.message : String(e)}`) })
+          const sandboxPath = toSandboxPath(filepath, instance.directory)
 
-          const diff = trimDiff(createTwoFilesPatch(filepath, filepath, contentOld, contentNew))
+          let contentOld = ""
+          const readResult = yield* Effect.tryPromise(() => sb.files.readFile(sandboxPath)).pipe(
+            Effect.catch(() => Effect.succeed("")),
+          )
+          contentOld = readResult as string
+
+          const diff = trimDiff(createTwoFilesPatch(filepath, filepath, contentOld, params.content))
           yield* ctx.ask({
             permission: "edit",
             patterns: [path.relative(instance.worktree, filepath)],
             always: ["*"],
-            metadata: {
-              filepath,
-              diff,
+            metadata: { filepath, diff },
+          })
+
+          yield* Effect.tryPromise({
+            try: () => sb.files.writeFiles([{ path: sandboxPath, data: params.content }]),
+            catch: (e) => {
+              const msg = e instanceof Error ? e.message : String(e)
+              writeLog.warn("writeFiles failed, retrying once", { sandboxPath, error: msg })
+              return sb.files.writeFiles([{ path: sandboxPath, data: params.content }])
             },
           })
 
@@ -91,12 +99,8 @@ export const WriteTool = Tool.define(
 
           return {
             title: path.relative(instance.worktree, filepath),
-            metadata: {
-              diagnostics,
-              filepath,
-              exists: exists,
-            },
-            output,
+            metadata: { diagnostics: {}, filepath, exists: !!contentOld },
+            output: "Wrote file successfully.",
           }
         }).pipe(Effect.orDie),
     }

@@ -7,6 +7,7 @@ import { Effect, Latch, Layer, Scope, Context } from "effect"
 import { Session } from "./session"
 import { SessionID } from "./schema"
 import { SessionStatus } from "./status"
+import { SandboxProvider } from "@/tool/sandbox-provider"
 
 export interface Interface {
   readonly assertNotBusy: (sessionID: SessionID) => Effect.Effect<void, Session.BusyError>
@@ -60,6 +61,22 @@ export const layer = Layer.effect(
         onIdle: Effect.gen(function* () {
           data.runners.delete(sessionID)
           yield* status.set(sessionID, { type: "idle" })
+          const sandbox = yield* Effect.serviceOption(SandboxProvider.Service)
+          let destroyed = false
+          if (sandbox._tag === "Some") {
+            const keep = yield* sandbox.value.isKeepAlive(sessionID)
+            if (!keep) {
+              yield* sandbox.value.destroy(sessionID).pipe(Effect.catchCause(() => Effect.void))
+              destroyed = true
+            }
+          }
+          // Only clear MCP cache when sandbox is destroyed
+          if (destroyed) {
+            const mcp = yield* Effect.serviceOption(MCP.Service)
+            if (mcp._tag === "Some") {
+              yield* mcp.value.clearSessionCache(sessionID).pipe(Effect.catchCause(() => Effect.void))
+            }
+          }
         }),
         onBusy: status.set(sessionID, { type: "busy" }),
         onInterrupt,

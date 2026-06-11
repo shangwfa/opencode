@@ -15,11 +15,15 @@ import PROMPT_EXPLORE from "./prompt/explore.txt"
 import PROMPT_SUMMARY from "./prompt/summary.txt"
 import PROMPT_TITLE from "./prompt/title.txt"
 import { Permission } from "@/permission"
+import { ConfigPermission } from "@/config/permission"
 import { mergeDeep, pipe, sortBy, values } from "remeda"
 import { Global } from "@opencode-ai/core/global"
 import path from "path"
 import { Plugin } from "@/plugin"
 import { Skill } from "../skill"
+import { SessionAgent } from "./session-agent"
+import { Flag } from "@opencode-ai/core/flag/flag"
+import { NamedError } from "@opencode-ai/core/util/error"
 import { Effect, Context, Layer, Schema } from "effect"
 import { InstanceState } from "@/effect/instance-state"
 import * as Option from "effect/Option"
@@ -61,6 +65,24 @@ const GeneratedAgent = Schema.Struct({
   systemPrompt: Schema.String,
 })
 
+export const CreateInput = Schema.Struct({
+  name: Schema.String,
+  description: Schema.optional(Schema.String),
+  mode: Schema.Literals(["subagent", "primary", "all"]),
+  prompt: Schema.optional(Schema.String),
+  permission: Schema.optional(ConfigPermission.Info),
+  model: Schema.optional(Schema.Struct({ modelID: ModelID, providerID: ProviderID })),
+  temperature: Schema.optional(Schema.Finite),
+  topP: Schema.optional(Schema.Finite),
+  steps: Schema.optional(Schema.Finite),
+  color: Schema.optional(Schema.String),
+  variant: Schema.optional(Schema.String),
+  options: Schema.optional(Schema.Record(Schema.String, Schema.Unknown)),
+})
+export type CreateInput = Schema.Schema.Type<typeof CreateInput>
+
+export const InvalidError = NamedError.create("AgentInvalidError", Schema.Struct({ message: Schema.String }))
+
 export interface Interface {
   readonly get: (agent: string) => Effect.Effect<Info>
   readonly list: () => Effect.Effect<Info[]>
@@ -77,13 +99,43 @@ export interface Interface {
     },
     Provider.DefaultModelError
   >
+  readonly sessionList: (session: SessionID) => Effect.Effect<Info[]>
+  readonly sessionGet: (agent: string, session?: SessionID) => Effect.Effect<Info | undefined>
+  readonly sessionCreate: (session: SessionID, input: CreateInput) => Effect.Effect<Info, unknown>
+  readonly sessionUnload: (session: SessionID, name: string) => Effect.Effect<void>
+  readonly sessionClear: (session: SessionID) => Effect.Effect<void>
 }
 
-type State = Omit<Interface, "generate">
+type State = Omit<Interface, "generate" | "sessionList" | "sessionGet" | "sessionCreate" | "sessionUnload" | "sessionClear">
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/Agent") {}
 
 export const use = serviceUse(Service)
+
+function rowToInfo(row: SessionAgent.Row): Info {
+  return {
+    name: row.name,
+    description: row.description ?? undefined,
+    mode: row.mode ?? "all",
+    prompt: row.prompt ?? undefined,
+    permission: row.permission ?? [],
+    model: row.model
+      ? { providerID: ProviderID.make(row.model.providerID), modelID: ModelID.make(row.model.modelID) }
+      : undefined,
+    temperature: row.temperature ?? undefined,
+    topP: row.top_p ?? undefined,
+    steps: row.steps ?? undefined,
+    color: row.color ?? undefined,
+    variant: row.variant ?? undefined,
+    options: row.options ?? {},
+  }
+}
+
+function mergeInfo(row: SessionAgent.Row, base?: Info): Info {
+  const info = rowToInfo(row)
+  if (!base) return info
+  return { ...info, native: base.native, hidden: base.hidden }
+}
 
 export const layer = Layer.effect(
   Service,
@@ -431,6 +483,58 @@ export const layer = Layer.effect(
         }
 
         return yield* Effect.promise(() => generateObject(params).then((r) => r.object))
+      }),
+      sessionList: Effect.fn("Agent.sessionList")(function* (session: SessionID) {
+        const base = yield* InstanceState.useEffect(state, (s) => s.list())
+        const isPg = !!Flag.OPENCODE_DATABASE_URL
+        if (!isPg) return base
+        const rows = yield* sessionAgent.list(session)
+        if (rows.length === 0) return base
+        const overlay = new Map(rows.map((r) => [r.name, rowToInfo(r)]))
+        return base
+          .map((a) => {
+            const o = overlay.get(a.name)
+            if (!o) return a
+            return { ...o, native: a.native, hidden: a.hidden }
+          })
+          .concat([...overlay.values()].filter((a) => !base.some((b) => b.name === a.name)))
+      }),
+        sessionGet: Effect.fn("Agent.sessionGet")(function* (agent: string, session?: SessionID) {
+        if (!session || !Flag.OPENCODE_DATABASE_URL) return yield* InstanceState.useEffect(state, (s) => s.get(agent))
+        const base = yield* InstanceState.useEffect(state, (s) => s.get(agent))
+        let currentSID: SessionID | undefined = session
+        let visited = 0
+        while (currentSID && visited < 10) {
+          visited++
+          const row = yield* sessionAgent.get(currentSID, agent)
+          if (row) return mergeInfo(row, base)
+          const parent = yield* Effect.promise(() =>
+            Database.use((db) =>
+              db.select({ parent_id: SessionTable.parent_id }).from(SessionTable).where(eq(SessionTable.id, currentSID!)).get(),
+            ),
+          )
+          currentSID = parent?.parent_id ?? undefined
+        }
+        return base
+      }),
+      sessionCreate: Effect.fn("Agent.sessionCreate")(function* (session: SessionID, input: CreateInput) {
+        if (!Flag.OPENCODE_DATABASE_URL) throw new Error("Session agents are only available in SaaS mode")
+        if (input.name === "compaction" || input.name === "title" || input.name === "summary") {
+          throw new InvalidError({ message: `Cannot override internal agent: ${input.name}` })
+        }
+        const custom = input.permission ? Permission.fromConfig(input.permission) : []
+        const user = Permission.fromConfig((yield* config.get()).permission ?? {})
+        const permission = Permission.merge(user, custom)
+        const row = yield* sessionAgent.upsert(session, { ...input, permission })
+        return mergeInfo(row, yield* InstanceState.useEffect(state, (s) => s.get(input.name)))
+      }),
+      sessionUnload: Effect.fn("Agent.sessionUnload")(function* (session: SessionID, name: string) {
+        if (!Flag.OPENCODE_DATABASE_URL) throw new Error("Session agents are only available in SaaS mode")
+        yield* sessionAgent.remove(session, name)
+      }),
+      sessionClear: Effect.fn("Agent.sessionClear")(function* (session: SessionID) {
+        if (!Flag.OPENCODE_DATABASE_URL) throw new Error("Session agents are only available in SaaS mode")
+        yield* sessionAgent.removeAll(session)
       }),
     })
   }),

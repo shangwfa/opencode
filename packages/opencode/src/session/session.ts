@@ -474,6 +474,7 @@ export interface Interface {
   readonly touch: (sessionID: SessionID) => Effect.Effect<void>
   readonly get: (id: SessionID) => Effect.Effect<Info, NotFound>
   readonly setTitle: (input: { sessionID: SessionID; title: string }) => Effect.Effect<void>
+  readonly setDirectory: (input: { sessionID: SessionID; directory: string }) => Effect.Effect<void>
   readonly setArchived: (input: { sessionID: SessionID; time?: number }) => Effect.Effect<void>
   readonly setMetadata: (input: typeof SetMetadataInput.Type) => Effect.Effect<void>
   readonly setPermission: (input: { sessionID: SessionID; permission: PermissionV1.Ruleset }) => Effect.Effect<void>
@@ -796,6 +797,12 @@ export const layer: Layer.Layer<
       yield* patch(input.sessionID, { title: input.title }).pipe(Effect.orDie)
     })
 
+    const setDirectory = Effect.fn("Session.setDirectory")(function* (input: { sessionID: SessionID; directory: string }) {
+      const ctx = yield* InstanceState.context
+      const newPath = sessionPath(ctx.worktree, input.directory)
+      yield* patch(input.sessionID, { directory: input.directory, path: newPath })
+    })
+
     const setArchived = Effect.fn("Session.setArchived")(function* (input: { sessionID: SessionID; time?: number }) {
       yield* patch(input.sessionID, { time: { archived: input.time } }).pipe(Effect.orDie)
     })
@@ -940,6 +947,7 @@ export const layer: Layer.Layer<
       touch,
       get,
       setTitle,
+      setDirectory,
       setArchived,
       setMetadata,
       setPermission,
@@ -1044,7 +1052,7 @@ function listByProject(
     )
 }
 
-export function* listGlobal(input?: {
+export async function* listGlobal(input?: {
   directory?: string
   roots?: boolean
   start?: number
@@ -1087,7 +1095,7 @@ export function* listGlobal(input?: {
     return query.orderBy(desc(SessionTable.time_updated), desc(SessionTable.id)).limit(limit).all().pipe(Effect.orDie)
   })
 
-  const ids = [...new Set(rows.map((row) => row.project_id))]
+  const ids = [...new Set(rows.map((row: any) => row.project_id as ProjectID))]
   const projects = new Map<string, ProjectInfo>()
 
   if (ids.length > 0) {

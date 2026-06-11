@@ -134,6 +134,7 @@ try {
   }
   process.exitCode = 1
 } finally {
+  await Database.close()
   // Some subprocesses don't react properly to SIGTERM and similar signals.
   // Most notably, some docker-container-based MCP servers don't handle such signals unless
   // run using `docker run --init`.

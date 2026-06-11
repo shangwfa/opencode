@@ -46,6 +46,7 @@ export const LspTool = Tool.define(
         Effect.gen(function* () {
           const instance = yield* InstanceState.context
           const file = path.isAbsolute(args.filePath) ? args.filePath : path.join(instance.directory, args.filePath)
+          const displayPath = toSandboxPath(file, instance.worktree === "/" ? instance.directory : instance.worktree)
           yield* assertExternalDirectoryEffect(ctx, file)
           const meta =
             args.operation === "workspaceSymbol"
@@ -72,7 +73,7 @@ export const LspTool = Tool.define(
           const title = detail ? `${args.operation} ${detail}` : args.operation
 
           const exists = yield* fs.existsSafe(file)
-          if (!exists) throw new Error(`File not found: ${file}`)
+          if (!exists) throw new Error(`File not found: ${displayPath}`)
 
           const available = yield* lsp.hasClients(file)
           if (!available) throw new Error("No LSP server available for this file type.")
@@ -102,10 +103,14 @@ export const LspTool = Tool.define(
             }
           })()
 
+          const worktree = instance.worktree === "/" ? instance.directory : instance.worktree
+          const mappedOutput = result.length === 0
+            ? `No results found for ${args.operation}`
+            : JSON.stringify(result, null, 2).replaceAll(worktree, "/workspace")
           return {
             title,
             metadata: { result },
-            output: result.length === 0 ? `No results found for ${args.operation}` : JSON.stringify(result, null, 2),
+            output: mappedOutput,
           }
         }).pipe(Effect.orDie),
     }
