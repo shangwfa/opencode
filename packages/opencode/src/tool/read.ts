@@ -1,4 +1,4 @@
-import { Effect, Schema } from "effect"
+import { Effect, Option, Schema, Scope, Stream } from "effect"
 import { NonNegativeInt } from "@opencode-ai/core/schema"
 import * as path from "path"
 import * as Tool from "./tool"
@@ -13,7 +13,18 @@ import { isPdfAttachment, sniffAttachmentMime } from "@/util/media"
 const DEFAULT_READ_LIMIT = 2000
 const MAX_LINE_LENGTH = 2000
 const MAX_LINE_SUFFIX = `... (line truncated to ${MAX_LINE_LENGTH} chars)`
+const MAX_BYTES = 50 * 1024
+const MAX_BYTES_LABEL = `${MAX_BYTES / 1024} KB`
+const SAMPLE_BYTES = 4096
+const SUPPORTED_IMAGE_MIMES = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"])
 
+class ReadStop extends Schema.TaggedErrorClass<ReadStop>()("ReadStop", {}) {}
+
+// `offset` and `limit` were originally `z.coerce.number()` — the runtime
+// coercion was useful when the tool was called from a shell but serves no
+// purpose in the LLM tool-call path (the model emits typed JSON). The JSON
+// Schema output is identical (`type: "number"`), so the LLM view is
+// unchanged; purely CLI-facing uses must now send numbers rather than strings.
 export const Parameters = Schema.Struct({
   filePath: Schema.String.annotate({ description: "The absolute path to the file or directory to read" }),
   offset: Schema.optional(NonNegativeInt).annotate({
@@ -229,6 +240,13 @@ export const ReadTool = Tool.define<
       }
       const title = path.relative(instance.worktree, filepath)
 
+      const stat = yield* fs.stat(filepath).pipe(
+        Effect.catchIf(
+          (err) => "reason" in err && err.reason._tag === "NotFound",
+          () => Effect.succeed(undefined),
+        ),
+      )
+
       yield* assertExternalDirectoryEffect(ctx, filepath, {
         bypass: Boolean(ctx.extra?.["bypassCwdCheck"]),
         kind: stat?.type === "Directory" ? "directory" : "file",
@@ -241,30 +259,10 @@ export const ReadTool = Tool.define<
         metadata: {},
       })
 
-      const sb = (yield* Effect.tryPromise({
-        try: () => ctx.sandbox!,
-        catch: (e) => new Error(`Initialization failed: ${e instanceof Error ? e.message : String(e)}`),
-      }).pipe(Effect.orDie)) as unknown as Sandbox
-      const sandboxPath = toSandboxPath(filepath, instance.directory)
+      if (!stat) return yield* miss(filepath)
 
-      const dirCheck = yield* sandboxProvider.runInSession(
-        ctx.sandboxSessionID ?? ctx.sessionID,
-        `test -d "${sandboxPath}" && echo "DIR" || echo "FILE"`,
-        { timeoutSeconds: 5 },
-      ).pipe(Effect.catch(() => Effect.succeed({ logs: { stdout: [], stderr: [] }, exitCode: 1 } as any)))
-      const isDirOutput = (dirCheck as any).logs?.stdout?.map((l: { text: string }) => l.text).join("").trim()
-      const isDirectory = isDirOutput.includes("DIR")
-
-      if (isDirectory) {
-        const lsResult = yield* sandboxProvider.runInSession(
-          ctx.sandboxSessionID ?? ctx.sessionID,
-          `ls -1 "${sandboxPath}"`,
-          { timeoutSeconds: 10 },
-        ).pipe(Effect.catch(() => Effect.succeed({ logs: { stdout: [], stderr: [] }, exitCode: 1 } as any)))
-        const items = ((lsResult as any).logs?.stdout ?? [])
-          .map((l: { text: string }) => l.text.trim())
-          .filter(Boolean)
-          .sort()
+      if (stat.type === "Directory") {
+        const items = yield* list(filepath)
         const limit = params.limit ?? DEFAULT_READ_LIMIT
         const offset = params.offset || 1
         const start = offset - 1
@@ -274,12 +272,12 @@ export const ReadTool = Tool.define<
         return {
           title,
           output: [
-            `<path>${sandboxPath}</path>`,
+            `<path>${filepath}</path>`,
             `<type>directory</type>`,
             `<entries>`,
             sliced.join("\n"),
             truncated
-              ? `\n(Showing ${sliced.length} of ${items.length} entries)`
+              ? `\n(Showing ${sliced.length} of ${items.length} entries. Use 'offset' parameter to read beyond entry ${offset + sliced.length})`
               : `\n(${items.length} entries)`,
             `</entries>`,
           ].join("\n"),
@@ -299,16 +297,8 @@ export const ReadTool = Tool.define<
         }
       }
 
-      const content = yield* Effect.tryPromise({
-        try: () => sb.files.readFile(sandboxPath),
-        catch: () => new Error(`File not found: ${sandboxPath}`),
-      })
-      const allLines = (content as string).split("\n")
-      const start = (params.offset ?? 1) - 1
-      const limit = params.limit ?? DEFAULT_READ_LIMIT
-      const selected = allLines.slice(start, start + limit)
-      const truncated = start + selected.length < allLines.length
       const loaded = yield* instruction.resolve(ctx.messages, filepath, ctx.messageID)
+      const sample = yield* readSample(filepath, Number(stat.size), SAMPLE_BYTES)
 
       const mime = sniffAttachmentMime(sample, FSUtil.mimeType(filepath))
       const isImage = SUPPORTED_IMAGE_MIMES.has(mime)
@@ -343,19 +333,34 @@ export const ReadTool = Tool.define<
         return yield* Effect.fail(
           new Error(`Offset ${file.offset} is out of range for this file (${file.count} lines)`),
         )
-        .join("\n")
-      if (truncated)
-        output += `\n\n(Showing lines ${start + 1}-${start + selected.length} of ${allLines.length}. Use offset=${start + selected.length + 1} to continue.)`
-      else output += `\n\n(End of file - total ${allLines.length} lines)`
+      }
+
+      let output = [`<path>${filepath}</path>`, `<type>file</type>`, "<content>\n"].join("\n")
+      output += file.raw.map((line, i) => `${i + file.offset}: ${line}`).join("\n")
+
+      const last = file.offset + file.raw.length - 1
+      const next = last + 1
+      const truncated = file.more || file.cut
+      if (file.cut) {
+        output += `\n\n(Output capped at ${MAX_BYTES_LABEL}. Showing lines ${file.offset}-${last}. Use offset=${next} to continue.)`
+      } else if (file.more) {
+        output += `\n\n(Showing lines ${file.offset}-${last} of ${file.count}. Use offset=${next} to continue.)`
+      } else {
+        output += `\n\n(End of file - total ${file.count} lines)`
+      }
       output += "\n</content>"
-      if (loaded.length > 0)
+
+      yield* warm(filepath)
+
+      if (loaded.length > 0) {
         output += `\n\n<system-reminder>\n${loaded.map((item) => item.content).join("\n\n")}\n</system-reminder>`
+      }
 
       return {
         title,
         output,
         metadata: {
-          preview: selected.slice(0, 20).join("\n"),
+          preview: file.raw.slice(0, 20).join("\n"),
           truncated,
           loaded: loaded.map((item) => item.filepath),
           display: {
