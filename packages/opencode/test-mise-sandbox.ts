@@ -2,7 +2,7 @@ import { Sandbox, ConnectionConfig } from "@alibaba-group/opensandbox"
 
 const DOMAIN = "172.18.32.15:30040"
 const API_KEY = "H68idVYzjadx"
-const IMAGE = "crpi-hlpnu8kiweghie0r.cn-hangzhou.personal.cr.aliyuncs.com/shangwfa/opencode-sandbox:mise"
+const IMAGE = "crpi-hlpnu8kiweghie0r.cn-hangzhou.personal.cr.aliyuncs.com/shangwfa/opencode-sandbox:latest"
 
 const cfg = new ConnectionConfig({
   domain: DOMAIN,
