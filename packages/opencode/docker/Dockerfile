@@ -41,8 +41,8 @@ RUN npm config set registry https://registry.npmmirror.com \
 # npm backend downloads from npm registry (npmmirror) instead.
 RUN mise install npm:pnpm@8 npm:pnpm@9 npm:pnpm@10 npm:pnpm@11
 
-# ── 7. Set default versions (node@24 + pnpm@11) and refresh shims ──
-RUN mise use -g npm:pnpm@11 && mise reshim
+# ── 7. Set default versions (node@24 + pnpm@10) and refresh shims ──
+RUN mise use -g npm:pnpm@10 && mise reshim
 
 # ── 8. Install global npm tools + ripgrep ──
 RUN npm install -g supergateway
@@ -64,7 +64,7 @@ RUN OLD_NODE_BIN=$(dirname $(readlink -f $(which node) 2>/dev/null) 2>/dev/null 
 # npm:  pre-installed node_modules saved to /opt/preload/<template>/node_modules
 # npm cache: tarball cache at /opt/package-cache-base/npm (shared across all versions)
 # pnpm store: NOT pre-populated (format incompatible across pnpm 8/9/10/11)
-COPY docker/ /tmp/preload/
+COPY . /tmp/preload/
 RUN cd /tmp/preload \
     && mkdir -p /opt/package-cache-base/npm /opt/preload \
     && for dir in packages/*/; do \
