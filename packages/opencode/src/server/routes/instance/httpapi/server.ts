@@ -55,11 +55,7 @@ import { RepositoryCache } from "@opencode-ai/core/repository-cache"
 import { Git } from "@/git"
 import { Bus } from "@/bus"
 
-// SaaS PG mode: core Database layer defaults to SQLite which is unnecessary.
-// Provide in-memory SQLite so fence/migration layers don't block on disk I/O.
-const coreDatabaseLayer = Flag.OPENCODE_DATABASE_URL
-  ? Database.layerFromPath(":memory:")
-  : Database.defaultLayer
+// Database.defaultLayer is overridden via setDefaultLayer in app-runtime.ts for PG mode
 import { Skill } from "@/skill"
 import { Snapshot } from "@/snapshot"
 import { ToolRegistry } from "@/tool/registry"
@@ -227,9 +223,9 @@ export function createRoutes(
       errorLayer,
       compressionLayer,
       corsVaryFix,
-      fenceLayer.pipe(Layer.provide(coreDatabaseLayer)),
+      fenceLayer.pipe(Layer.provide(Database.defaultLayer)),
       cors(corsOptions),
-      coreDatabaseLayer,
+      Database.defaultLayer,
       Account.defaultLayer,
       Agent.defaultLayer,
       Auth.defaultLayer,
@@ -283,7 +279,7 @@ export function createRoutes(
     Layer.provideMerge(SessionStatus.defaultLayer),
     Layer.provideMerge(RepositoryCache.defaultLayer),
     Layer.provideMerge(Git.defaultLayer),
-    Layer.provideMerge(coreDatabaseLayer),
+    Layer.provideMerge(Database.defaultLayer),
     Layer.provideMerge(Ripgrep.defaultLayer),
     Layer.provide(InstanceLayer.layer),
     Layer.provideMerge(Observability.layer),

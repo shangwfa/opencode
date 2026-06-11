@@ -54,10 +54,19 @@ export function path() {
   return join(Global.Path.data, `opencode-${InstallationChannel.replace(/[^a-zA-Z0-9._-]/g, "-")}.db`)
 }
 
-export const defaultLayer = Layer.unwrap(
-  Effect.gen(function* () {
-    return layerFromPath(path())
+// Allow SaaS layer override: if a PG layer is registered before first use,
+// all `Database.defaultLayer` consumers transparently go through PG.
+let _overrideLayer: Layer.Layer<Service> | undefined
+
+export function setDefaultLayer(layer: Layer.Layer<Service>) {
+  _overrideLayer = layer
+}
+
+export const defaultLayer: Layer.Layer<Service> = Layer.unwrap(
+  Effect.sync(() => {
+    if (_overrideLayer) return _overrideLayer
+    return layerFromPath(path()).pipe(Layer.provide(Global.defaultLayer))
   }),
-).pipe(Layer.provide(Global.defaultLayer))
+)
 
 export const node = LayerNode.make(layerFromPath(path()), [])

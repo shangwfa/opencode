@@ -8,9 +8,16 @@ import { Flag } from "@opencode-ai/core/flag/flag"
 import { RepositoryCache } from "@opencode-ai/core/repository-cache"
 import { Bus } from "@/bus"
 
-const coreDatabaseLayer = Flag.OPENCODE_DATABASE_URL
-  ? Database.layerFromPath(":memory:")
-  : Database.defaultLayer
+// SaaS PG mode: replace core Database.defaultLayer globally so that every
+// module that does `Layer.provide(Database.defaultLayer)` transparently goes
+// through PG instead of opening a local SQLite file.
+// SaaS PG mode: register PG bridge layer as the default Database layer.
+// The bridge wraps our PG drizzle instance to match core's Effect-based
+// SQLite drizzle API (.get/.run/.all return Effect instead of Promise).
+if (Flag.OPENCODE_DATABASE_URL) {
+  const { pgDatabaseLayer } = require("@/storage/db-core-bridge") as typeof import("@/storage/db-core-bridge")
+  Database.setDefaultLayer(pgDatabaseLayer)
+}
 import { Auth } from "@/auth"
 import { Account } from "@/account/account"
 import { Config } from "@/config/config"
@@ -62,7 +69,7 @@ import { EventV2Bridge } from "@/event-v2-bridge"
 export const AppLayer = Layer.mergeAll(
   Npm.defaultLayer,
   FSUtil.defaultLayer,
-  coreDatabaseLayer,
+  Database.defaultLayer,
   Auth.defaultLayer,
   Account.defaultLayer,
   Config.defaultLayer,
@@ -113,7 +120,7 @@ export const AppLayer = Layer.mergeAll(
   Layer.provideMerge(SessionStatus.defaultLayer),
   Layer.provideMerge(RepositoryCache.defaultLayer),
   Layer.provideMerge(Git.defaultLayer),
-  Layer.provideMerge(coreDatabaseLayer),
+  Layer.provideMerge(Database.defaultLayer),
   Layer.provideMerge(Ripgrep.defaultLayer),
   Layer.provideMerge(InstanceLayer.layer),
   Layer.provideMerge(Observability.layer),
