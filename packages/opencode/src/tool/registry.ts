@@ -12,6 +12,7 @@ import { GrepTool } from "./grep"
 import { ReadTool } from "./read"
 import { TaskTool } from "./task"
 import { Database } from "@opencode-ai/core/database/database"
+import { SessionRunState } from "@/session/run-state"
 import { TodoWriteTool } from "./todo"
 import { WebFetchTool } from "./webfetch"
 import { WriteTool } from "./write"
@@ -382,7 +383,11 @@ export const defaultLayer = Layer.suspend(() =>
       Layer.provide(Truncate.defaultLayer),
       Layer.provide(SandboxProvider.defaultLayer),
     )
-    .pipe(Layer.provide(Database.defaultLayer), Layer.provide(RuntimeFlags.defaultLayer)),
+    .pipe(
+      Layer.provide(Database.defaultLayer),
+      Layer.provide(RuntimeFlags.defaultLayer),
+      Layer.provide(SessionRunState.defaultLayer),
+    ),
 )
 
 function isZodType(value: unknown): value is z.ZodType {

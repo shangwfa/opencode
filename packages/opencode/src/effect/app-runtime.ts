@@ -4,6 +4,13 @@ import * as Observability from "@opencode-ai/core/observability"
 
 import { FSUtil } from "@opencode-ai/core/fs-util"
 import { Database } from "@opencode-ai/core/database/database"
+import { Flag } from "@opencode-ai/core/flag/flag"
+import { RepositoryCache } from "@opencode-ai/core/repository-cache"
+import { Bus } from "@/bus"
+
+const coreDatabaseLayer = Flag.OPENCODE_DATABASE_URL
+  ? Database.layerFromPath(":memory:")
+  : Database.defaultLayer
 import { Auth } from "@/auth"
 import { Account } from "@/account/account"
 import { Config } from "@/config/config"
@@ -55,7 +62,7 @@ import { EventV2Bridge } from "@/event-v2-bridge"
 export const AppLayer = Layer.mergeAll(
   Npm.defaultLayer,
   FSUtil.defaultLayer,
-  Database.defaultLayer,
+  coreDatabaseLayer,
   Auth.defaultLayer,
   Account.defaultLayer,
   Config.defaultLayer,
@@ -73,7 +80,6 @@ export const AppLayer = Layer.mergeAll(
   Permission.defaultLayer,
   Todo.defaultLayer,
   Session.defaultLayer,
-  SessionStatus.defaultLayer,
   BackgroundJob.defaultLayer,
   RuntimeFlags.defaultLayer,
   EventV2Bridge.defaultLayer,
@@ -100,6 +106,14 @@ export const AppLayer = Layer.mergeAll(
   ShareNext.defaultLayer,
   SessionShare.defaultLayer,
 ).pipe(
+  // SaaS: provide foundational services early so SaaS-injected layers
+  // (SandboxProvider, SessionAgent.pgLayer, repo tools, etc.) can resolve
+  // their transitive dependencies during parallel Layer.mergeAll construction.
+  Layer.provideMerge(Bus.defaultLayer),
+  Layer.provideMerge(SessionStatus.defaultLayer),
+  Layer.provideMerge(RepositoryCache.defaultLayer),
+  Layer.provideMerge(Git.defaultLayer),
+  Layer.provideMerge(coreDatabaseLayer),
   Layer.provideMerge(Ripgrep.defaultLayer),
   Layer.provideMerge(InstanceLayer.layer),
   Layer.provideMerge(Observability.layer),

@@ -51,6 +51,15 @@ import { ShareNext } from "@/share/share-next"
 import { EventV2Bridge } from "@/event-v2-bridge"
 import { EventV2 } from "@opencode-ai/core/event"
 import { Database } from "@opencode-ai/core/database/database"
+import { RepositoryCache } from "@opencode-ai/core/repository-cache"
+import { Git } from "@/git"
+import { Bus } from "@/bus"
+
+// SaaS PG mode: core Database layer defaults to SQLite which is unnecessary.
+// Provide in-memory SQLite so fence/migration layers don't block on disk I/O.
+const coreDatabaseLayer = Flag.OPENCODE_DATABASE_URL
+  ? Database.layerFromPath(":memory:")
+  : Database.defaultLayer
 import { Skill } from "@/skill"
 import { Snapshot } from "@/snapshot"
 import { ToolRegistry } from "@/tool/registry"
@@ -218,9 +227,9 @@ export function createRoutes(
       errorLayer,
       compressionLayer,
       corsVaryFix,
-      fenceLayer.pipe(Layer.provide(Database.defaultLayer)),
+      fenceLayer.pipe(Layer.provide(coreDatabaseLayer)),
       cors(corsOptions),
-      Database.defaultLayer,
+      coreDatabaseLayer,
       Account.defaultLayer,
       Agent.defaultLayer,
       Auth.defaultLayer,
@@ -269,6 +278,12 @@ export function createRoutes(
       HttpServer.layerServices,
     ]),
     Layer.provide(Layer.succeed(CorsConfig)(corsOptions)),
+    // SaaS: provide foundational services before mergeAll layers resolve
+    Layer.provideMerge(Bus.defaultLayer),
+    Layer.provideMerge(SessionStatus.defaultLayer),
+    Layer.provideMerge(RepositoryCache.defaultLayer),
+    Layer.provideMerge(Git.defaultLayer),
+    Layer.provideMerge(coreDatabaseLayer),
     Layer.provideMerge(Ripgrep.defaultLayer),
     Layer.provide(InstanceLayer.layer),
     Layer.provideMerge(Observability.layer),
