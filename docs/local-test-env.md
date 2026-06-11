@@ -28,7 +28,7 @@
   │    └─ 通过 host.docker.internal:8080 → 本地 OpenSandbox server
   ├─ OpenSandbox server（localhost:8080）
   │    └─ Docker runtime 创建 sandbox 容器
-  └─ sandbox 镜像：由 packages/opencode/Dockerfile 构建
+  └─ sandbox 镜像：由 packages/opencode/docker/Dockerfile 构建
 ```
 
 | 组件 | 地址 | 说明 |
@@ -59,7 +59,7 @@ docker build -t opencode-saas-sandbox-test:v2fix -f Dockerfile .
 
 > 注意区分两个 Dockerfile：
 > - 根目录 `Dockerfile`：opencode SaaS 服务容器。
-> - `packages/opencode/Dockerfile`：OpenSandbox sandbox 镜像，基于 `opensandbox/code-interpreter:latest`，内置 `opencode` 二进制和 `ripgrep`。
+> - `packages/opencode/docker/Dockerfile`：OpenSandbox sandbox 镜像，基于 `opensandbox/code-interpreter:latest`，内置 `opencode` 二进制和 `ripgrep`。
 
 ```bash
 cd /Users/ruomu/code/opencode/packages/opencode
@@ -87,7 +87,7 @@ docker run --rm --entrypoint /bin/bash opencode-opensandbox:local -lc \
 - `opencode --version` 正常输出
 - `ripgrep 14.1.0` 或兼容版本正常输出
 
-> 不要在 `packages/opencode/Dockerfile` 里设置 `ENTRYPOINT ["opencode"]`。OpenSandbox 需要继承 `code-interpreter` 的入口脚本以便注入并启动 execd；覆盖入口会导致 `commands.run()` 返回 502。
+> 不要在 `packages/opencode/docker/Dockerfile` 里设置 `ENTRYPOINT ["opencode"]`。OpenSandbox 需要继承 `code-interpreter` 的入口脚本以便注入并启动 execd；覆盖入口会导致 `commands.run()` 返回 502。
 
 ### 2.2 确认远端连通性
 
@@ -499,7 +499,7 @@ POST /session/:sessionID/exec {"command":"nohup npx vite ... &"}
 | 404 from sandbox server proxy | `OPENCODE_SANDBOX_USE_SERVER_PROXY` 未设置 | 重新启动容器加 `-e OPENCODE_SANDBOX_USE_SERVER_PROXY=true` |
 | 本地 OpenSandbox `commands.run()` 502 | sandbox 镜像覆盖了 `code-interpreter` entrypoint，或 execd 崩溃 | 确认 sandbox 镜像继承 `/opt/opensandbox/code-interpreter.sh`，不要设置 `ENTRYPOINT ["opencode"]` |
 | 本地 arm64 上 execd 崩溃 | 使用了 amd64 镜像，Docker 通过 QEMU 运行 | 用 `docker buildx build --platform linux/arm64 --load` 构建本地镜像 |
-| opencode 二进制 `required file not found` | Ubuntu/glibc 基础镜像复制了 `*-musl` 二进制 | `packages/opencode/Dockerfile` 应复制 `dist/opencode-linux-arm64/bin/opencode` 或 `dist/opencode-linux-x64-baseline/bin/opencode` |
+| opencode 二进制 `required file not found` | Ubuntu/glibc 基础镜像复制了 `*-musl` 二进制 | `packages/opencode/docker/Dockerfile` 应复制 `dist/opencode-linux-arm64/bin/opencode` 或 `dist/opencode-linux-x64-baseline/bin/opencode` |
 | 本地 OpenSandbox 找不到镜像 | SaaS 容器指定的 image 名称不是 Docker daemon 中的本地镜像名 | 先 `docker images | grep opencode-opensandbox`，并设置 `OPENCODE_SANDBOX_IMAGE=opencode-opensandbox:local` |
 | 401 MISSING_API_KEY | proxy fetch 未带 API key | 检查代码是否有 `Flag.OPENCODE_SANDBOX_API_KEY` header 注入 |
 | ProviderModelNotFoundError | AI provider 未配置 | 确认容器连的是远端 PG（含 account 数据） |

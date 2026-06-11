@@ -1,6 +1,7 @@
-# Sandbox 镜像 — 预装依赖缓存
+# Sandbox 镜像 — 多版本运行时 + 预装依赖缓存
 
-OpenSandbox 沙箱容器镜像，基于 `opensandbox/code-interpreter:latest`，预装 npm/pnpm 依赖缓存以加速项目初始化。
+OpenSandbox 沙箱容器镜像，基于 `opensandbox/code-interpreter:latest`。
+通过 [mise](https://mise.jdx.dev/) 管理多版本 Node.js / pnpm，并预装 npm 依赖缓存以加速项目初始化。
 
 ## 目录结构
 
@@ -8,55 +9,96 @@ OpenSandbox 沙箱容器镜像，基于 `opensandbox/code-interpreter:latest`，
 docker/
 ├── Dockerfile                  # 沙箱镜像构建文件
 ├── README.md                   # 本文档
-├── sandbox-entrypoint.sh       # OverlayFS 挂载 + 原始 entrypoint 透传
-├── package.json                # pnpm workspace root
+├── package.json                # pnpm workspace root（构建时用）
 ├── pnpm-workspace.yaml         # workspace 配置
 └── packages/                   # 模板项目（每个子目录 = 一个模板）
-    └── vite5/
-        ├── package.json        # 模板依赖声明
-        └── package-lock.json   # npm 锁文件（锁定精确版本）
+    ├── vite5/
+    │   ├── package.json
+    │   └── package-lock.json
+    └── vite8/
+        ├── package.json
+        └── package-lock.json
 ```
 
-## 预装策略
+## 版本管理（mise）
+
+使用 [mise](https://mise.jdx.dev/) 的 **shims 模式**管理运行时版本。
+shims 放在 `~/.local/share/mise/shims/`，PATH 最前面。
+调用 `node`/`pnpm` 时，shim 自动检测当前目录的版本文件，路由到正确版本的二进制。
+
+### 预装版本
+
+| 工具 | 预装版本 | 默认版本 |
+|------|---------|---------|
+| Node.js | 18, 20, 22, 24 | 24 |
+| pnpm | 8, 9, 10, 11 | 11 |
+
+### 版本切换
+
+通过 exec 接口执行命令切换版本：
+
+```bash
+# 方式一：mise use（修改当前目录的 mise.toml）
+cd /workspace && mise use node@20 pnpm@9
+
+# 方式二：mise install + mise.toml（项目已有版本声明）
+cd /workspace && mise install
+
+# 方式三：直接设置环境变量（临时生效）
+MISE_NODE_VERSION=20 node -v
+```
+
+### 版本文件检测（自动）
+
+mise 支持检测以下版本文件（已全部启用）：
+
+| 文件 | 示例 |
+|------|------|
+| `mise.toml` | `[tools] node = "20"` |
+| `.tool-versions` | `node 20.18.0` |
+| `.nvmrc` | `20` |
+| `.node-version` | `20.18.0` |
+| `package.json` `devEngines` | `"devEngines": { "node": "20" }` |
+
+shims 在每次调用时自动检测，无需 shell hook。
+
+## 预装缓存
+
+### npm cache — tarball 缓存（通用）
+
+npm cache 目录设为 `/opt/package-cache-base/npm`，构建时已填充所有模板的 tarball。
+**tarball 缓存不依赖 node/pnpm 版本，所有版本共享。**
 
 ### npm — 预装 node_modules
 
 构建时对每个模板项目执行 `npm install`，将完整的 `node_modules` 保存到镜像内：
 
 ```
-/opt/preload/<template>/node_modules   # 预装的 node_modules（只读）
-/opt/preload/<template>/package.json   # 模板 package.json
+/opt/preload/<template>/node_modules   # 预装的 node_modules
+/opt/preload/<template>/package.json
 /opt/preload/<template>/package-lock.json
 ```
 
-用户在 sandbox 中创建匹配的项目后，复制 `node_modules` 再增量安装：
+使用方式：
 
 ```bash
 cp -a /opt/preload/vite5/node_modules .
 npm install --prefer-offline   # 只补差异包，跳过已有包
 ```
 
-### pnpm — 预装 store
+### pnpm store — 不预装
 
-构建时通过 `pnpm install`（workspace 模式）将所有模板依赖填充到 pnpm 默认 store：
-
-```
-/root/.local/share/pnpm/store/v11/    # pnpm store（hardlink 源）
-```
-
-用户在 sandbox 中 `pnpm install` 时，store 命中的包直接 hardlink，无需下载。
-
-### npm cache — tarball 缓存
-
-npm 默认 cache 目录设为 `/opt/package-cache-base/npm`，构建时已填充所有模板的 tarball。未命中 store 的包从本地 cache 读取，避免网络下载。
+pnpm store 格式跨版本不兼容（v3 / v10 / v11 各不相同），不预装。
+pnpm install 时依赖 npm cache 中的 tarball 减少网络下载。
 
 ## 镜像内缓存清单
 
 | 路径 | 用途 | 大小（参考） |
 |------|------|-------------|
 | `/opt/preload/<template>/node_modules` | npm 预装 node_modules | 每个 100-120MB |
-| `/root/.local/share/pnpm/store/v11` | pnpm store（hardlink） | ~220MB |
-| `/opt/package-cache-base/npm` | npm tarball cache | ~85MB |
+| `/opt/package-cache-base/npm` | npm tarball cache（通用） | ~85MB |
+| `/root/.local/share/mise/installs/node/*` | mise 管理的 Node.js 版本 | 每个 ~80MB |
+| `/root/.local/share/mise/installs/pnpm/*` | mise 管理的 pnpm 版本 | 每个 ~5MB |
 
 ## 构建命令
 
@@ -64,12 +106,10 @@ npm 默认 cache 目录设为 `/opt/package-cache-base/npm`，构建时已填充
 cd packages/opencode
 
 docker build \
-  -t opencode-sandbox:overlayfs-test \
+  -t opencode-sandbox:mise \
   -f docker/Dockerfile \
   .
 ```
-
-构建时间约 40-60s（BuildKit cache mount 加速），首次约 5-10 分钟。
 
 ## 添加新模板项目
 
@@ -84,15 +124,7 @@ packages/
 
 2. 重新构建镜像
 
-```bash
-docker build -t opencode-sandbox:overlayfs-test -f docker/Dockerfile .
-```
-
-新模板的 `node_modules` 和 pnpm store 会自动包含在镜像中。
-
 ### 生成 lockfile
-
-npm lockfile 需要在本机生成后放入目录：
 
 ```bash
 cd packages/next15
@@ -100,37 +132,22 @@ npm install --ignore-scripts --cache /tmp/npm-cache-tmp
 # package-lock.json 自动生成
 ```
 
-pnpm lockfile 由 Dockerfile 内 `pnpm install` 自动生成（workspace 级别），无需手动管理。
+## 与旧方案的区别
 
-> **注意**：本地 pnpm 版本可能与镜像内版本不同，lockfile 可能不兼容。镜像构建时会自动重新解析。提供真实 lockfile 后可改用 `--frozen-lockfile` 锁定版本。
-
-## OverlayFS（PVC 模式）
-
-`sandbox-entrypoint.sh` 提供 OverlayFS 三级降级，用于 PVC 持久化场景：
-
-1. **kernel overlay**（需要 `CAP_SYS_ADMIN`）
-2. **fuse-overlayfs**（用户态，无需特权）
-3. **cp -a**（直接复制，兜底方案）
-
-降级到 cp -a 时，首次启动会将 `/opt/package-cache-base` 复制到 PVC 挂载点，后续启动跳过。
-
-> 在本地 Docker 测试中，OpenSandbox 会覆盖 entrypoint 为 `/opt/opensandbox/bootstrap.sh`，因此 OverlayFS 挂载不会触发。OverlayFS 主要为远端 K8s 环境设计。
-
-## 性能对比
-
-基于 Vite 5 + React 18 + TypeScript 模板测试：
-
-| 场景 | 包管理器 | 优化前 | 优化后 | 提升 |
-|------|---------|--------|--------|------|
-| 新项目首次 install | pnpm | 24s（downloaded 204） | ~10s（reused 190, downloaded 14） | 58% |
-| 清空 node_modules 重装 | pnpm | 24s | 1.7s（reused 204） | 93% |
-| cp node_modules + npm install | npm | 25s | 4.5s | 82% |
-| npm 重装（同 lockfile） | npm | 25s | 3.9s | 84% |
+| | 旧方案 | 新方案 |
+|---|---|---|
+| 版本管理 | 固定 Node v24 + corepack + pnpm 11 | mise 管理多版本 Node + pnpm |
+| 版本切换 | 不支持 | `mise use node@20 pnpm@9` |
+| pnpm 来源 | corepack | mise（独立安装） |
+| pnpm store 预装 | 是（~220MB） | 否（格式跨版本不兼容） |
+| npm cache 预装 | 是 | 是（通用，不变） |
+| node_modules 预装 | 是 | 是（不变） |
+| 版本文件检测 | 无 | `.nvmrc` / `.node-version` / `mise.toml` / `.tool-versions` |
 
 ## 注意事项
 
 - 镜像基于 `opensandbox/code-interpreter:latest`（~10GB），包含 Python/Java/Go/Node 等完整运行时
-- 预装缓存会增加镜像约 300-500MB
-- npm registry 已设为 `https://registry.npmmirror.com`
-- Node.js 版本 v24，pnpm 11.5.2
+- 预装 4 个 Node 版本 + 4 个 pnpm 版本约增加 ~340MB
+- npm registry 设为 `https://registry.npmmirror.com`
 - 模板项目的 lockfile 应定期更新以保持缓存新鲜度
+- pnpm 11 要求 Node.js 22+，如果项目用 node@18 + pnpm@11 会报错（mise 不干预这种组合）

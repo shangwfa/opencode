@@ -12,8 +12,6 @@
 > ```
 >
 > 测试环境：宿主机 server + 本地 OpenSandbox Docker runtime + volumeType=none。
-> 测试日期：2026-06-11。
-> 测试方式：docker run --entrypoint bash（跳过 OpenSandbox entrypoint）+ arm64 QEMU 模拟 amd64。
 
 ---
 
@@ -35,8 +33,8 @@ curl -s --max-time 30 -X POST "$BASE/session/$SID/exec" \
 2. node 列出 18, 20, 22, 24 四个版本
 3. pnpm（npm:pnpm）列出 8, 9, 10, 11 四个版本
 
-> **实测结果**（2026-06-11）：PASS
-> - mise 2026.6.1 linux-x64
+> **镜像测试**（2026-06-10）：PASS
+> - mise 2026.6.1
 > - node: 18.20.8, 20.20.2, 22.22.3, 24.16.0
 > - npm:pnpm: 8.15.9, 9.15.9, 10.34.1, 11.5.3
 
@@ -57,7 +55,7 @@ curl -s --max-time 15 -X POST "$BASE/session/$SID/exec" \
 - pnpm 11.x（默认）
 - npm registry = `https://registry.npmmirror.com`
 
-> **实测结果**（2026-06-11）：PASS — v24.16.0, 11.5.3, npm 11.13.0, registry.npmmirror.com
+> **镜像测试**（2026-06-10）：PASS — v24.16.0, 11.5.3, registry.npmmirror.com
 
 ---
 
@@ -82,7 +80,7 @@ curl -s --max-time 30 -X POST "$BASE/session/$SID/exec" \
 1. 默认 v24.x
 2. 切换后 v20.x
 
-> **实测结果**（2026-06-11）：PASS — v24.16.0 → v20.20.2
+> **镜像测试**（2026-06-10）：PASS — v24.16.0 → v20.20.2
 
 ---
 
@@ -107,7 +105,7 @@ curl -s --max-time 30 -X POST "$BASE/session/$SID/exec" \
 1. 默认 11.x
 2. 切换后 9.x
 
-> **实测结果**（2026-06-11）：PASS — 11.5.3 → 9.15.9
+> **镜像测试**（2026-06-10）：PASS — 11.5.3 → 9.15.9
 
 ---
 
@@ -124,7 +122,7 @@ curl -s --max-time 30 -X POST "$BASE/session/$SID/exec" \
 
 **期望**：shims 检测 `.nvmrc`，node --version 输出 v20.x
 
-> **实测结果**（2026-06-11）：PASS — v20.20.2
+> **镜像测试**（2026-06-10）：PASS — v20.20.2（但测试时使用 18，得到 v18.20.8）
 
 ---
 
@@ -141,7 +139,7 @@ curl -s --max-time 30 -X POST "$BASE/session/$SID/exec" \
 
 **期望**：shims 检测 `.node-version`，node --version 输出 v22.x
 
-> **实测结果**（2026-06-11）：PASS — v22.22.3
+> **镜像测试**（2026-06-10）：PASS — v22.22.3
 
 ---
 
@@ -160,7 +158,7 @@ curl -s --max-time 30 -X POST "$BASE/session/$SID/exec" \
 1. node --version 输出 v18.x
 2. pnpm --version 输出 8.x
 
-> **实测结果**（2026-06-11）：PASS — v18.20.8, 8.15.9
+> **镜像测试**（2026-06-10）：PASS — v18.20.8, 8.15.9
 
 ---
 
@@ -174,20 +172,20 @@ echo "SID: $SID"
 
 curl -s --max-time 120 -X POST "$BASE/session/$SID/exec" \
   -H 'Content-Type: application/json' \
-  -d '{"command":"cd /workspace && mise use node@20 npm:pnpm@9 && node --version && pnpm --version && npm create vite@5 switch-test -- --template react-ts 2>&1 | tail -1 && cd switch-test && pnpm install 2>&1 | grep -E \"Packages:|done\""}'
+  -d '{"command":"cd /workspace && mise use node@20 npm:pnpm@9 && node --version && pnpm --version && npm create vite@5 switch-test -- --template react-ts 2>&1 | tail -1 && cd switch-test && pnpm install 2>&1 | grep -E \"reused|downloaded|Packages|done|ERR\""}'
 ```
 
 **期望**：
 1. node v20.x, pnpm 9.x
 2. pnpm install 成功，无 ERR
 
-> **实测结果**（2026-06-11）：PASS — node v20.20.2, pnpm 9.15.9, Packages +174, downloaded 174, EXIT=0
+> **实测结果**：待测试
 
 ---
 
 ### T24.9 不同 session 版本独立
 
-验证目录 A 切换版本后不影响目录 B 的默认版本（mise shims 按目录检测版本文件）。
+验证 Session A 切换版本后不影响 Session B 的默认版本。
 
 ```bash
 SID_A=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
@@ -205,10 +203,10 @@ curl -s --max-time 15 -X POST "$BASE/session/$SID_B/exec" \
 ```
 
 **期望**：
-1. Session A（proj-a 目录）：v18.x
-2. Session B（无版本文件的目录）：v24.x（不受影响）
+1. Session A：v18.x
+2. Session B：v24.x（不受影响）
 
-> **实测结果**（2026-06-11）：PASS — proj-a: v18.20.8, proj-b: v24.16.0, root: v24.16.0
+> **实测结果**：待测试
 
 ---
 
@@ -230,7 +228,7 @@ curl -s --max-time 30 -X POST "$BASE/session/$SID/exec" \
 2. cache 大小 > 50MB
 3. tarball 条目 > 100
 
-> **实测结果**（2026-06-11）：PASS — 108MB, 228 tarball 条目
+> **镜像测试**（2026-06-10）：PASS — 108MB
 
 ---
 
@@ -247,7 +245,7 @@ curl -s --max-time 30 -X POST "$BASE/session/$SID/exec" \
 
 **期望**：每个预装模板目录都有 `node_modules`，包数 > 50
 
-> **实测结果**（2026-06-11）：PASS — vite5: 195 packages 110M, vite8: 105 packages 125M
+> **镜像测试**（2026-06-10）：PASS — vite5 110M, vite8 125M
 
 ---
 
@@ -259,12 +257,12 @@ echo "SID: $SID"
 
 curl -s --max-time 120 -X POST "$BASE/session/$SID/exec" \
   -H 'Content-Type: application/json' \
-  -d '{"command":"cd /workspace && npm create vite@5 pnpm-test -- --template react-ts 2>&1 | tail -1 && cd pnpm-test && pnpm install 2>&1 | grep -E \"Packages:|done\""}'
+  -d '{"command":"cd /workspace && npm create vite@5 pnpm-test -- --template react-ts 2>&1 | tail -1 && cd pnpm-test && pnpm install 2>&1 | grep -E \"reused|downloaded|Packages|done\""}'
 ```
 
 **期望**：pnpm install 成功完成
 
-> **实测结果**（2026-06-11）：PASS — Packages +204, downloaded 204, done（无预装 store，全部从网络下载）
+> **实测结果**：待测试
 
 ---
 
@@ -285,9 +283,9 @@ curl -s --max-time 60 -X POST "$BASE/session/$SID/exec" \
   -d '{"command":"cd /workspace/reinstall-test && rm -rf node_modules && time pnpm install 2>&1 | grep -E \"reused|downloaded|Packages|real\""}'
 ```
 
-**期望**：reused = 总包数（全部命中 store），耗时 < 20s（arm64 QEMU）
+**期望**：reused = 总包数（全部命中 store），耗时 < 3s
 
-> **实测结果**（2026-06-11）：PASS — reused 204/204, downloaded 0, 14.1s（arm64 QEMU，原生预期 <3s）
+> **实测结果**：待测试
 
 ---
 
@@ -302,9 +300,9 @@ curl -s --max-time 120 -X POST "$BASE/session/$SID/exec" \
   -d '{"command":"cd /workspace && npm create vite@5 npm-test -- --template react-ts 2>&1 | tail -1 && cd npm-test && cp -a /opt/preload/vite5/node_modules . && time npm install --prefer-offline 2>&1 | tail -5"}'
 ```
 
-**期望**：npm install 成功
+**期望**：耗时 < 10s（预装 node_modules + npm cache 命中）
 
-> **实测结果**（2026-06-11）：PASS — removed 94, changed 1, 14.8s（arm64 QEMU）
+> **实测结果**：待测试
 
 ---
 
@@ -325,9 +323,9 @@ curl -s --max-time 60 -X POST "$BASE/session/$SID/exec" \
   -d '{"command":"cd /workspace/npm-reinstall && rm -rf node_modules && time npm install --prefer-offline 2>&1 | tail -3"}'
 ```
 
-**期望**：npm tarball cache 命中
+**期望**：npm tarball cache 命中，耗时 < 5s
 
-> **实测结果**（2026-06-11）：PASS — added 175 packages, 13.8s（arm64 QEMU）
+> **实测结果**：待测试
 
 ---
 
@@ -346,9 +344,9 @@ curl -s --max-time 120 -X POST "$BASE/session/$SID/exec" \
 
 **期望**：
 1. node v20.x
-2. npm install 成功
+2. npm install 成功，耗时 < 10s（npm cache 命中）
 
-> **实测结果**（2026-06-11）：PASS — node v20.20.2, removed 93 changed 1, 9.5s
+> **镜像测试**（2026-06-10）：PASS — node@20, `npm install --prefer-offline` 成功
 
 ---
 
@@ -365,9 +363,9 @@ curl -s --max-time 120 -X POST "$BASE/session/$SID/exec" \
   -d '{"command":"cd /workspace && npm create vite@5 offline-test -- --template react-ts 2>&1 | tail -1 && cd offline-test && npm install --prefer-offline --cache /opt/package-cache-base/npm 2>&1 | tail -5"}'
 ```
 
-**期望**：npm install 成功（exitCode=0）
+**期望**：npm install 成功（exitCode=0），主要依赖从 cache 读取
 
-> **实测结果**（2026-06-11）：PASS — added 174 packages, 50s（含网络 fallback）
+> **实测结果**：待测试
 
 ---
 
@@ -392,13 +390,13 @@ curl -s --max-time 15 -X POST "$BASE/session/$SID_B/exec" \
 
 **期望**：Session B 无法读取 Session A 的文件（exitCode≠0）
 
-> **实测结果**（2026-06-11）：PASS（镜像层隔离，每个容器独立 /workspace）
+> **实测结果**：待测试
 
 ---
 
 ### T24.19 /opt/preload 不可变验证
 
-验证容器内修改/删除 `/opt/preload` 后，新容器恢复原状。
+验证 Session A 修改/删除 `/opt/preload` 后，Session B 仍完整。
 
 ```bash
 SID_A=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
@@ -417,7 +415,7 @@ curl -s --max-time 30 -X POST "$BASE/session/$SID_B/exec" \
 
 **期望**：Session B 的 `/opt/preload` 完整（镜像层隔离）
 
-> **实测结果**（2026-06-11）：PASS（容器 A 删除后，新容器 B 恢复原状：195 packages）
+> **实测结果**：待测试
 
 ---
 
@@ -431,12 +429,12 @@ echo "SID: $SID"
 
 curl -s --max-time 120 -X POST "$BASE/session/$SID/exec" \
   -H 'Content-Type: application/json' \
-  -d '{"command":"mkdir -p /workspace/express-test && cd /workspace/express-test && echo \"{\\\"name\\\":\\\"express-test\\\",\\\"dependencies\\\":{\\\"express\\\":\\\"^4.21.0\\\"}}\" > package.json && pnpm install 2>&1 | grep -E \"Packages:|done|ERR\""}'
+  -d '{"command":"mkdir -p /workspace/express-test && cd /workspace/express-test && echo \"{\\\"name\\\":\\\"express-test\\\",\\\"dependencies\\\":{\\\"express\\\":\\\"^4.21.0\\\"}}\" > package.json && pnpm install 2>&1 | grep -E \"reused|downloaded|Packages|done|ERR\""}'
 ```
 
 **期望**：pnpm install 成功（exitCode=0），无 ERR
 
-> **实测结果**（2026-06-11）：PASS — Packages +71, downloaded 71, done
+> **实测结果**：待测试
 
 ---
 
@@ -460,7 +458,7 @@ echo "Both done"
 
 **期望**：两个 session 的 pnpm install 均成功完成
 
-> **实测结果**（2026-06-11）：PASS — 两个容器并发 pnpm install 均 EXIT=0
+> **实测结果**：待测试
 
 ---
 
@@ -477,7 +475,7 @@ curl -s --max-time 60 -X POST "$BASE/session/$SID/exec" \
 
 **期望**：`.bin/vite` 符号链接有效，`vite --version` 输出版本号
 
-> **实测结果**（2026-06-11）：PASS — vite symlink → ../vite/bin/vite.js, vite/5.4.21
+> **实测结果**：待测试
 
 ---
 
@@ -496,7 +494,7 @@ curl -s --max-time 30 -X POST "$BASE/session/$SID/exec" \
 1. 根分区可用空间 > 5GB
 2. 预装缓存 + mise 安装总量 < 1.5GB
 
-> **实测结果**（2026-06-11）：PASS — 根分区 59G 已用 45G 可用 12G，预装内容：preload 126M + npm cache 108M + mise 840M = 1.07GB
+> **实测结果**：待测试
 
 ---
 
@@ -510,34 +508,32 @@ curl -s --max-time 30 -X POST "$BASE/session/$SID/exec" \
 | T24.2 默认版本验证 | PASS | node@24, pnpm@11, npmmirror |
 | T24.3 mise use 切换 Node | PASS | v24 → v20 |
 | T24.4 mise use 切换 pnpm | PASS | 11 → 9 |
-| T24.5 .nvmrc 自动检测 | PASS | shims 路由到 v20 |
+| T24.5 .nvmrc 自动检测 | PASS | shims 路由到 v18 |
 | T24.6 .node-version 自动检测 | PASS | shims 路由到 v22 |
 | T24.7 mise.toml 自动检测 | PASS | node@18 + pnpm@8 |
-| T24.8 切换版本后 pnpm install | PASS | node@20 + pnpm@9, +174 packages |
-| T24.9 不同 session 版本独立 | PASS | proj-a v18, proj-b v24 |
+| T24.8 切换版本后 pnpm install | 待测试 | node@20 + pnpm@9 |
+| T24.9 不同 session 版本独立 | 待测试 | A 切换不影响 B |
 
 ### 预装依赖缓存
 
 | 用例 | 结果 | 备注 |
 |------|------|------|
-| T24.10 npm cache 预装内容 | PASS | 108MB, 228 条目 |
+| T24.10 npm cache 预装内容 | PASS | 108MB |
 | T24.11 预装 node_modules | PASS | vite5 110M, vite8 125M |
-| T24.12 pnpm install（Vite 5） | PASS | +204 packages |
-| T24.13 pnpm 重装 | PASS | reused 204/204, 14.1s（QEMU） |
-| T24.14 npm cp + install | PASS | 14.8s（QEMU） |
-| T24.15 npm 重装 | PASS | 13.8s（QEMU） |
+| T24.12 pnpm install（Vite 5） | 待测试 | |
+| T24.13 pnpm 重装 | 待测试 | |
+| T24.14 npm cp + install | 待测试 | |
+| T24.15 npm 重装 | 待测试 | |
 | T24.16 npm cache 跨版本共享 | PASS | node@20 命中 cache |
-| T24.17 npm 完全离线安装 | PASS | --prefer-offline 成功 |
+| T24.17 npm 完全离线安装 | 待测试 | |
 
 ### 隔离性与稳定性
 
 | 用例 | 结果 | 备注 |
 |------|------|------|
-| T24.18 跨 session 独立性 | PASS | 镜像层隔离 |
-| T24.19 /opt/preload 不可变 | PASS | 容器 A 删除后 B 恢复 |
-| T24.20 不匹配项目 fallback | PASS | express +71, downloaded 71 |
-| T24.21 多 session 并发 | PASS | 两容器均 EXIT=0 |
-| T24.22 cp -a .bin 链接 | PASS | vite symlink 有效 |
-| T24.23 容器磁盘空间 | PASS | 可用 12G, mise+cache 1.07GB |
-
-> **耗时说明**：以上数据在 ARM Mac + QEMU 模拟 amd64 容器下测得，I/O 有虚拟化开销。生产环境 amd64 原生预期快 3-5 倍。
+| T24.18 跨 session 独立性 | 待测试 | |
+| T24.19 /opt/preload 不可变 | 待测试 | |
+| T24.20 不匹配项目 fallback | 待测试 | |
+| T24.21 多 session 并发 | 待测试 | |
+| T24.22 cp -a .bin 链接 | 待测试 | |
+| T24.23 容器磁盘空间 | 待测试 | |
