@@ -95,6 +95,6 @@ export function init(url: string) {
       },
     } as any,
   })
-  const db = drizzle(client as any)
+  const db = drizzle({ client: client as any })
   return { db, client }
 }

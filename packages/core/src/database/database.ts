@@ -54,19 +54,16 @@ export function path() {
   return join(Global.Path.data, `opencode-${InstallationChannel.replace(/[^a-zA-Z0-9._-]/g, "-")}.db`)
 }
 
-// Allow SaaS layer override: if a PG layer is registered before first use,
-// all `Database.defaultLayer` consumers transparently go through PG.
-let _overrideLayer: Layer.Layer<Service> | undefined
-
-export function setDefaultLayer(layer: Layer.Layer<Service>) {
-  _overrideLayer = layer
+// SaaS PG mode: allow opencode to override the default layer before first use.
+// The override must be set before any layer is constructed (i.e., at module top level).
+let _override: Layer.Layer<Service> | undefined
+export function setDefaultLayer(override: Layer.Layer<Service>) {
+  _override = override
 }
 
-export const defaultLayer: Layer.Layer<Service> = Layer.unwrap(
-  Effect.sync(() => {
-    if (_overrideLayer) return _overrideLayer
-    return layerFromPath(path()).pipe(Layer.provide(Global.defaultLayer))
-  }),
-)
+export const defaultLayer: Layer.Layer<Service> = Layer.suspend(() => {
+  if (_override) return _override
+  return layerFromPath(path()).pipe(Layer.provide(Global.defaultLayer))
+})
 
 export const node = LayerNode.make(layerFromPath(path()), [])

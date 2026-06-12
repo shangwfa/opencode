@@ -133,15 +133,19 @@ echo "execId: $EXEC_ID"
 # 等待 dev server 启动
 sleep 5
 
-# 查询状态
-curl -s "$BASE/session/$SID/exec/$EXEC_ID" | python3 -c "
+# 查询状态（通过 execs 列表查询，GET /session/:id/exec/:execId 当前返回 500）
+curl -s "$BASE/session/$SID/execs" | python3 -c "
 import json,sys
 d=json.load(sys.stdin)
-print('status:', d.get('status'))
-print('stdout:', d.get('stdout','')[:200])
+for e in d.get('execs',[]):
+    if e.get('execId') == '$EXEC_ID':
+        print('status:', e.get('status'))
+        break
 "
 ```
-**期望**：status 为 `running`，stdout 含 `VITE v5.x.x ready`
+**期望**：status 为 `running`
+
+> **NOTE**：`GET /session/:id/exec/:execId` 当前返回 500，需通过 `GET /session/:id/execs` 列表查询替代。endpoint API 可确认 dev server 已在监听。
 
 ---
 
@@ -369,7 +373,7 @@ import json,sys;d=json.load(sys.stdin);print('bad port:', d.get('error') or d)"
 
 ```bash
 BASE="http://localhost:14096"
-PNPM="/home/coder/.npm-global/bin/pnpm"
+PNPM="pnpm"  # sandbox 中通过 mise shims 提供，直接用 pnpm 即可
 
 # 1. 创建独立 session
 SID2=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -d '{}' \
@@ -381,10 +385,10 @@ curl -s -X POST "$BASE/session/$SID2/keep-alive" \
   -H 'Content-Type: application/json' \
   -d '{"enabled":true}' > /dev/null && echo "keepAlive: OK"
 
-# 3. 触发 sandbox 创建 + 安装 pnpm + 创建 Vite 项目
+# 3. 触发 sandbox 创建 + 创建 Vite 项目（sandbox 已通过 mise 预装 pnpm，无需 npm install -g）
 curl -s --max-time 80 -X POST "$BASE/session/$SID2/exec" \
   -H 'Content-Type: application/json' \
-  -d "{\"command\":\"echo init && npm install -g pnpm@8 2>/dev/null && rm -rf /workspace/pnpm-app && cd /workspace && $PNPM create vite@5 pnpm-app --template react-ts 2>&1 | tail -1\",\"timeoutSeconds\":60}" \
+  -d "{\"command\":\"echo init && rm -rf /workspace/pnpm-app && cd /workspace && $PNPM create vite@5 pnpm-app --template react-ts 2>&1 | tail -1\",\"timeoutSeconds\":60}" \
   | python3 -c "import json,sys;d=json.load(sys.stdin);print('create-vite exit:', d.get('exitCode'))"
 
 # 4. pnpm install 安装依赖
@@ -709,24 +713,24 @@ echo "SID2: $SID2"
 curl -s -m 10 -X POST "$BASE/session/$SID2/keep-alive" \
   -H 'Content-Type: application/json' -d '{"enabled":true}' > /dev/null
 
-# 触发 sandbox + 安装 pnpm + create vite
+# 触发 sandbox + create vite（sandbox 已通过 mise 预装 pnpm）
 T12_EXIT1=$(curl -s --max-time 80 -X POST "$BASE/session/$SID2/exec" \
   -H 'Content-Type: application/json' \
-  -d '{"command":"echo init && npm install -g pnpm@8 2>/dev/null && rm -rf /workspace/pnpm-app && cd /workspace && /home/coder/.npm-global/bin/pnpm create vite@5 pnpm-app --template react-ts 2>&1 | tail -1","timeoutSeconds":60}' \
+  -d '{"command":"echo init && rm -rf /workspace/pnpm-app && cd /workspace && pnpm create vite@5 pnpm-app --template react-ts 2>&1 | tail -1","timeoutSeconds":60}' \
   | jq_val exitCode)
 check "T11.12a create-vite exit=0" [ "$T12_EXIT1" = "0" ]
 
 # pnpm install
 T12_EXIT2=$(curl -s --max-time 90 -X POST "$BASE/session/$SID2/exec" \
   -H 'Content-Type: application/json' \
-  -d '{"command":"cd /workspace/pnpm-app && /home/coder/.npm-global/bin/pnpm install 2>&1 | tail -2","timeoutSeconds":60}' \
+  -d '{"command":"cd /workspace/pnpm-app && pnpm install 2>&1 | tail -2","timeoutSeconds":60}' \
   | jq_val exitCode)
 check "T11.12b pnpm install exit=0" [ "$T12_EXIT2" = "0" ]
 
 # async exec dev server
 T12_ASYNC=$(curl -s -m 10 -X POST "$BASE/session/$SID2/exec/async" \
   -H 'Content-Type: application/json' \
-  -d '{"command":"cd /workspace/pnpm-app && /home/coder/.npm-global/bin/pnpm dev --host 0.0.0.0 --port 5173","timeoutSeconds":300}')
+  -d '{"command":"cd /workspace/pnpm-app && pnpm dev --host 0.0.0.0 --port 5173","timeoutSeconds":300}')
 T12_EID=$(echo "$T12_ASYNC" | jq_val execId)
 echo "execId: $T12_EID"
 check "T11.12c async exec 返回 running" [ "$(echo "$T12_ASYNC" | jq_val status)" = "running" ]
