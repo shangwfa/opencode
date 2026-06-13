@@ -3,10 +3,13 @@
 // https://github.com/google-gemini/gemini-cli/blob/main/packages/core/src/utils/editCorrector.ts
 // https://github.com/cline/cline/blob/main/evals/diff-edits/diff-apply/diff-06-26-25.ts
 
+const MAX_PROJECT_DIAGNOSTICS_FILES = 5
+
 import * as path from "path"
 import { Effect, Schema, Semaphore } from "effect"
 import * as Tool from "./tool"
 import { LSP } from "@/lsp/lsp"
+import * as LSPClient from "@/lsp/client"
 import { createTwoFilesPatch, diffLines } from "diff"
 import DESCRIPTION from "./edit.txt"
 import { FileSystem } from "@opencode-ai/core/filesystem"
@@ -18,6 +21,9 @@ import { Snapshot } from "@/snapshot"
 import { assertExternalDirectoryEffect } from "./external-directory"
 import { FSUtil } from "@opencode-ai/core/fs-util"
 import * as Bom from "@/util/bom"
+import { SandboxProvider } from "./sandbox-provider"
+import { Agent as LspAgent } from "@/lsp/agent"
+import { toSandboxPath, toHostPath } from "./sandbox-path"
 
 function normalizeLineEndings(text: string): string {
   return text.replaceAll("\r\n", "\n")
@@ -81,6 +87,193 @@ export const EditTool = Tool.define(
             ? params.filePath
             : path.join(instance.directory, params.filePath)
           yield* assertExternalDirectoryEffect(ctx, filePath)
+
+          const sandboxProviderOpt = yield* Effect.serviceOption(SandboxProvider.Service)
+          if (sandboxProviderOpt._tag === "Some") {
+            let sbOutput = ""
+            let sbDiff = ""
+            let sbContentOld = ""
+            let sbContentNew = ""
+            let sbFilediff: Snapshot.FileDiff | undefined
+            let sbDiagnostics: Record<string, LSPClient.Diagnostic[]> = {}
+            yield* lock(filePath).withPermits(1)(
+              Effect.gen(function* () {
+                const sb: any = yield* Effect.tryPromise({
+                  try: () => ctx.sandbox!,
+                  catch: (e) => new Error(`Failed to initialize: ${e instanceof Error ? e.message : String(e)}`),
+                })
+                const sandboxPath = toSandboxPath(filePath, instance.directory)
+
+                if (params.oldString === "") {
+                  const readResult = yield* Effect.tryPromise(() => sb.files.readFile(sandboxPath)).pipe(
+                    Effect.catch(() => Effect.succeed("")),
+                  )
+                  const contentOld = readResult as string
+                  if (contentOld) {
+                    throw new Error(
+                      "oldString cannot be empty when editing an existing file. Provide the exact text to replace, or use write for an intentional full-file replacement.",
+                    )
+                  }
+                  const next = Bom.split(params.newString)
+                  const contentNew = next.text
+                  const diff = trimDiff(createTwoFilesPatch(filePath, filePath, contentOld, contentNew))
+                  yield* ctx.ask({
+                    permission: "edit",
+                    patterns: [path.relative(instance.worktree, filePath)],
+                    always: ["*"],
+                    metadata: { filepath: filePath, diff },
+                  })
+                  yield* Effect.tryPromise(() =>
+                    sb.files.writeFiles([{ path: sandboxPath, data: contentNew }]),
+                  )
+                  yield* events.publish(FileSystem.Event.Edited, { file: filePath })
+                  yield* events.publish(Watcher.Event.Updated, { file: filePath, event: "add" })
+
+                  let output = "Edit applied successfully."
+                  const diagnostics: Record<string, LSPClient.Diagnostic[]> = {}
+                  const agentOpt = yield* Effect.serviceOption(LspAgent.Service)
+                  if (agentOpt._tag === "Some") {
+                    const sid = ctx.sandboxSessionID ?? ctx.sessionID
+                    yield* agentOpt.value.touch(sid, filePath, instance.directory).pipe(
+                      Effect.catchCause(() => Effect.void),
+                    )
+                    const result = yield* agentOpt.value.diagnostics(sid, filePath, instance.directory).pipe(
+                      Effect.catchCause(() => Effect.succeed(null)),
+                    )
+                    if (result) {
+                      for (const [sp, diags] of Object.entries(result.diagnostics)) {
+                        const hp = toHostPath(sp, instance.directory)
+                        diagnostics[FSUtil.normalizePath(hp)] = diags as LSPClient.Diagnostic[]
+                      }
+                      const normalizedFilePath = FSUtil.normalizePath(filePath)
+                      let projectDiagnosticsCount = 0
+                      for (const [file, issues] of Object.entries(diagnostics)) {
+                        const current = file === normalizedFilePath
+                        if (!current && projectDiagnosticsCount >= MAX_PROJECT_DIAGNOSTICS_FILES) continue
+                        const block = LSP.Diagnostic.report(current ? filePath : file, issues)
+                        if (!block) continue
+                        if (current) {
+                          output += `\n\nLSP errors detected in this file, please fix:\n${block}`
+                          continue
+                        }
+                        projectDiagnosticsCount++
+                        output += `\n\nLSP errors detected in other files:\n${block}`
+                      }
+                    }
+                  }
+
+                  let additions = 0
+                  let deletions = 0
+                  for (const change of diffLines(contentOld, contentNew)) {
+                    if (change.added) additions += change.count || 0
+                    if (change.removed) deletions += change.count || 0
+                  }
+                  const filediff: Snapshot.FileDiff = { file: filePath, patch: diff, additions, deletions }
+
+                  yield* ctx.metadata({ metadata: { diff, filediff, diagnostics: {} } })
+
+                  sbOutput = output
+                  sbDiff = diff
+                  sbContentOld = contentOld
+                  sbContentNew = contentNew
+                  sbFilediff = filediff
+                  sbDiagnostics = diagnostics
+                  return
+                }
+
+                const readResult = yield* Effect.tryPromise(() => sb.files.readFile(sandboxPath)).pipe(
+                  Effect.catch(() => Effect.succeed("")),
+                )
+                const contentOld = readResult as string
+                if (!contentOld) {
+                  throw new Error(`File ${filePath} not found`)
+                }
+
+                const ending = detectLineEnding(contentOld)
+                const old = convertToLineEnding(normalizeLineEndings(params.oldString), ending)
+                const replacement = convertToLineEnding(normalizeLineEndings(params.newString), ending)
+                const contentNew = replace(contentOld, old, replacement, params.replaceAll)
+
+                const diff = trimDiff(
+                  createTwoFilesPatch(
+                    filePath,
+                    filePath,
+                    normalizeLineEndings(contentOld),
+                    normalizeLineEndings(contentNew),
+                  ),
+                )
+                yield* ctx.ask({
+                  permission: "edit",
+                  patterns: [path.relative(instance.worktree, filePath)],
+                  always: ["*"],
+                  metadata: { filepath: filePath, diff },
+                })
+
+                yield* Effect.tryPromise(() =>
+                  sb.files.writeFiles([{ path: sandboxPath, data: contentNew }]),
+                )
+
+                yield* events.publish(FileSystem.Event.Edited, { file: filePath })
+                yield* events.publish(Watcher.Event.Updated, { file: filePath, event: "change" })
+
+                let output = "Edit applied successfully."
+                const diagnostics: Record<string, LSPClient.Diagnostic[]> = {}
+                const agentOpt = yield* Effect.serviceOption(LspAgent.Service)
+                if (agentOpt._tag === "Some") {
+                  const sid = ctx.sandboxSessionID ?? ctx.sessionID
+                  yield* agentOpt.value.touch(sid, filePath, instance.directory).pipe(
+                    Effect.catchCause(() => Effect.void),
+                  )
+                  const result = yield* agentOpt.value.diagnostics(sid, filePath, instance.directory).pipe(
+                    Effect.catchCause(() => Effect.succeed(null)),
+                  )
+                  if (result) {
+                    for (const [sp, diags] of Object.entries(result.diagnostics)) {
+                      const hp = toHostPath(sp, instance.directory)
+                      diagnostics[FSUtil.normalizePath(hp)] = diags as LSPClient.Diagnostic[]
+                    }
+                    const normalizedFilePath = FSUtil.normalizePath(filePath)
+                    let projectDiagnosticsCount = 0
+                    for (const [file, issues] of Object.entries(diagnostics)) {
+                      const current = file === normalizedFilePath
+                      if (!current && projectDiagnosticsCount >= MAX_PROJECT_DIAGNOSTICS_FILES) continue
+                      const block = LSP.Diagnostic.report(current ? filePath : file, issues)
+                      if (!block) continue
+                      if (current) {
+                        output += `\n\nLSP errors detected in this file, please fix:\n${block}`
+                        continue
+                      }
+                      projectDiagnosticsCount++
+                      output += `\n\nLSP errors detected in other files:\n${block}`
+                    }
+                  }
+                }
+
+                let additions = 0
+                let deletions = 0
+                for (const change of diffLines(contentOld, contentNew)) {
+                  if (change.added) additions += change.count || 0
+                  if (change.removed) deletions += change.count || 0
+                }
+                const filediff: Snapshot.FileDiff = { file: filePath, patch: diff, additions, deletions }
+
+                yield* ctx.metadata({ metadata: { diff, filediff, diagnostics: {} } })
+
+                sbOutput = output
+                sbDiff = diff
+                sbContentOld = contentOld
+                sbContentNew = contentNew
+                sbFilediff = filediff
+                sbDiagnostics = diagnostics
+              }).pipe(Effect.orDie),
+            )
+
+            return {
+              metadata: { diagnostics: sbDiagnostics, diff: sbDiff, filediff: sbFilediff! },
+              title: path.relative(instance.worktree, filePath),
+              output: sbOutput,
+            }
+          }
 
           let diff = ""
           let contentOld = ""

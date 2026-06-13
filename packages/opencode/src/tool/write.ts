@@ -16,6 +16,9 @@ import { assertExternalDirectoryEffect } from "./external-directory"
 import * as Bom from "@/util/bom"
 import { toSandboxPath } from "./sandbox-path"
 import { SandboxProvider } from "./sandbox-provider"
+import { Agent as LspAgent } from "@/lsp/agent"
+import * as LSPClient from "@/lsp/client"
+import { toHostPath } from "./sandbox-path"
 
 const writeLog = {
   warn(msg: string, data?: Record<string, unknown>) { console.warn(`[write-tool] ${msg}`, data ?? "") },
@@ -81,10 +84,44 @@ export const WriteTool = Tool.define(
             yield* events.publish(FileSystem.Event.Edited, { file: filepath })
             yield* events.publish(Watcher.Event.Updated, { file: filepath, event: contentOld ? "change" : "add" })
 
+            let output = "Wrote file successfully."
+            const diagnostics: Record<string, LSPClient.Diagnostic[]> = {}
+            const agentOpt = yield* Effect.serviceOption(LspAgent.Service)
+            if (agentOpt._tag === "Some") {
+              const sid = ctx.sandboxSessionID ?? ctx.sessionID
+              yield* agentOpt.value.touch(sid, filepath, instance.directory).pipe(
+                Effect.catchCause(() => Effect.void),
+              )
+              const result = yield* agentOpt.value.diagnostics(sid, filepath, instance.directory).pipe(
+                Effect.catchCause(() => Effect.succeed(null)),
+              )
+              if (result) {
+                for (const [sandboxPath, diags] of Object.entries(result.diagnostics)) {
+                  const hostPath = toHostPath(sandboxPath, instance.directory)
+                  const normalizedFilepath = FSUtil.normalizePath(hostPath)
+                  diagnostics[normalizedFilepath] = diags as LSPClient.Diagnostic[]
+                }
+                const normalizedFilepath = FSUtil.normalizePath(filepath)
+                let projectDiagnosticsCount = 0
+                for (const [file, issues] of Object.entries(diagnostics)) {
+                  const current = file === normalizedFilepath
+                  if (!current && projectDiagnosticsCount >= MAX_PROJECT_DIAGNOSTICS_FILES) continue
+                  const block = LSP.Diagnostic.report(current ? filepath : file, issues)
+                  if (!block) continue
+                  if (current) {
+                    output += `\n\nLSP errors detected in this file, please fix:\n${block}`
+                    continue
+                  }
+                  projectDiagnosticsCount++
+                  output += `\n\nLSP errors detected in other files:\n${block}`
+                }
+              }
+            }
+
             return {
               title: path.relative(instance.worktree, filepath),
-              metadata: { diagnostics: {}, filepath, exists: !!contentOld },
-              output: "Wrote file successfully.",
+              metadata: { diagnostics, filepath, exists: !!contentOld },
+              output,
             }
           }
 

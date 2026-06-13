@@ -14,8 +14,12 @@ import DESCRIPTION from "./apply_patch.txt"
 import { FileSystem } from "@opencode-ai/core/filesystem"
 import { Format } from "../format"
 import * as Bom from "@/util/bom"
-import { toSandboxPath } from "./sandbox-path"
+import { toSandboxPath, toHostPath } from "./sandbox-path"
 import { SandboxProvider } from "./sandbox-provider"
+import { Agent as LspAgent } from "@/lsp/agent"
+import * as LSPClient from "@/lsp/client"
+
+const MAX_PROJECT_DIAGNOSTICS_FILES = 5
 
 export const Parameters = Schema.Struct({
   patchText: Schema.String.annotate({ description: "The full patch text that describes all changes to be made" }),
@@ -270,8 +274,14 @@ export const ApplyPatchTool = Tool.define(
         }
 
         if (edited) {
-          if (yield* format.file(edited)) {
-            yield* Bom.syncFile(afs, edited, change.bom)
+          // In SaaS sandbox mode the file lives inside the container, so the
+          // main process cannot run formatters or BOM-sync against it. Skip
+          // both (consistent with write.ts/edit.ts sandbox branches).
+          const sandboxOpt = yield* Effect.serviceOption(SandboxProvider.Service)
+          if (sandboxOpt._tag === "None") {
+            if (yield* format.file(edited)) {
+              yield* Bom.syncFile(afs, edited, change.bom)
+            }
           }
           yield* events.publish(FileSystem.Event.Edited, { file: edited })
         }
@@ -280,13 +290,6 @@ export const ApplyPatchTool = Tool.define(
       for (const update of updates) {
         yield* events.publish(Watcher.Event.Updated, update)
       }
-
-      for (const change of fileChanges) {
-        if (change.type === "delete") continue
-        const target = change.movePath ?? change.filePath
-        yield* lsp.touchFile(target, "document")
-      }
-      const diagnostics = yield* lsp.diagnostics()
 
       const summaryLines = fileChanges.map((change) => {
         if (change.type === "add") {
@@ -299,6 +302,74 @@ export const ApplyPatchTool = Tool.define(
         return `M ${path.relative(instance.worktree, target).replaceAll("\\", "/")}`
       })
       let output = `Success. Updated the following files:\n${summaryLines.join("\n")}`
+
+      const sandboxProviderOpt = yield* Effect.serviceOption(SandboxProvider.Service)
+      if (sandboxProviderOpt._tag === "Some") {
+        const agentOpt = yield* Effect.serviceOption(LspAgent.Service)
+        if (agentOpt._tag === "Some") {
+          const sid = ctx.sandboxSessionID ?? ctx.sessionID
+          for (const change of fileChanges) {
+            if (change.type === "delete") continue
+            const target = change.movePath ?? change.filePath
+            yield* agentOpt.value.touch(sid, target, instance.directory).pipe(
+              Effect.catchCause(() => Effect.void),
+            )
+          }
+          const diagnostics: Record<string, LSPClient.Diagnostic[]> = {}
+          for (const change of fileChanges) {
+            if (change.type === "delete") continue
+            const target = change.movePath ?? change.filePath
+            const result = yield* agentOpt.value.diagnostics(sid, target, instance.directory).pipe(
+              Effect.catchCause(() => Effect.succeed(null)),
+            )
+            if (result) {
+              for (const [sbPath, diags] of Object.entries(result.diagnostics)) {
+                const hostPath = toHostPath(sbPath, instance.directory)
+                const normalized = FSUtil.normalizePath(hostPath)
+                if (!diagnostics[normalized]) {
+                  diagnostics[normalized] = diags as LSPClient.Diagnostic[]
+                }
+              }
+            }
+          }
+          let projectDiagnosticsCount = 0
+          for (const change of fileChanges) {
+            if (change.type === "delete") continue
+            const target = change.movePath ?? change.filePath
+            const normalized = FSUtil.normalizePath(target)
+            const currentDiags = diagnostics[normalized] ?? []
+            const block = LSP.Diagnostic.report(target, currentDiags)
+            if (block) {
+              const rel = path.relative(instance.worktree, target).replaceAll("\\", "/")
+              output += `\n\nLSP errors detected in ${rel}, please fix:\n${block}`
+            }
+          }
+          for (const [file, issues] of Object.entries(diagnostics)) {
+            const isDirect = fileChanges.some(
+              (c) => c.type !== "delete" && FSUtil.normalizePath(c.movePath ?? c.filePath) === file,
+            )
+            if (isDirect) continue
+            if (projectDiagnosticsCount >= MAX_PROJECT_DIAGNOSTICS_FILES) continue
+            const block = LSP.Diagnostic.report(file, issues)
+            if (!block) continue
+            projectDiagnosticsCount++
+            output += `\n\nLSP errors detected in other files:\n${block}`
+          }
+
+          return {
+            title: output,
+            metadata: { diff: totalDiff, files, diagnostics },
+            output,
+          }
+        }
+      }
+
+      for (const change of fileChanges) {
+        if (change.type === "delete") continue
+        const target = change.movePath ?? change.filePath
+        yield* lsp.touchFile(target, "document")
+      }
+      const diagnostics = yield* lsp.diagnostics()
 
       for (const change of fileChanges) {
         if (change.type === "delete") continue

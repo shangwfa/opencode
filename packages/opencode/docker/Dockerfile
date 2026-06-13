@@ -76,4 +76,9 @@ RUN cd /tmp/preload \
     && for dir in packages/*/; do \
          (cd "$dir" && pnpm install --ignore-scripts 2>/dev/null || true); \
        done \
-    && rm -rf /tmp/preload /tmp/pnpm-vs
+     && rm -rf /tmp/preload /tmp/pnpm-vs
+
+# ── 12. Install opencode LSP daemon + typescript-language-server ──
+COPY docker/opt/opencode-lsp-daemon/ /opt/opencode-lsp-daemon/
+RUN npm install -g typescript-language-server typescript \
+    && ln -sf /opt/opencode-lsp-daemon/index.js /usr/local/bin/opencode-lsp-agent
