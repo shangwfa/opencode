@@ -1617,6 +1617,179 @@ test().catch(e => { console.error(e); process.exit(1) })
 
 ---
 
+### T16.31 对象语法白名单 — `edit: { "*": "deny", "analysis/.../spec/*.md": "allow" }`
+
+**验证目标**：对象语法细粒度白名单，pattern 使用**相对路径**（不加 `**/` 前缀），白名单路径 allow，其他路径 deny
+
+> **背景**：write/edit 工具传入权限检查的 pattern 是 `path.relative(worktree, filepath)`（相对路径，不以 `/` 开头）。通配符 `*` 匹配零个或多个任意字符（含 `/`），**没有 `**` 特殊语义**。因此白名单 pattern 必须用相对路径写法。
+
+```bash
+bun -e '
+const BASE = "http://localhost:14096"
+
+async function test() {
+  const sid = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" })).json()
+  console.log("SID:", sid.id)
+
+  const agentRes = await fetch(BASE + "/session/" + sid.id + "/agents/create", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name: "specer",
+      mode: "primary",
+      prompt: "需求分析 agent，仅允许写 spec 文件",
+      permission: {
+        read: "allow",
+        edit: {
+          "*": "deny",
+          "analysis/9f06e4c6/spec/*.md": "allow",
+          "analysis/9f06e4c6/suggest-step.json": "allow",
+        },
+        glob: "allow",
+        grep: "allow",
+        list: "allow",
+        bash: "deny",
+      },
+    }),
+  })
+  const data = await agentRes.json()
+  console.log("创建 status:", agentRes.status)
+  console.log("permission 规则数:", data.permission?.length)
+
+  // 验证持久化的 ruleset
+  const editRules = data.permission?.filter(r => r.permission === "edit") || []
+  console.log("edit 规则:", JSON.stringify(editRules))
+
+  // 白名单路径应 allow
+  const specAllow = editRules.some(r => r.pattern === "analysis/9f06e4c6/spec/*.md" && r.action === "allow")
+  const suggestAllow = editRules.some(r => r.pattern === "analysis/9f06e4c6/suggest-step.json" && r.action === "allow")
+  // catch-all 应 deny
+  const denyAll = editRules.some(r => r.pattern === "*" && r.action === "deny")
+  // bash 应 deny
+  const bashDeny = data.permission?.some(r => r.permission === "bash" && r.pattern === "*" && r.action === "deny")
+
+  console.log("spec/*.md allow:", specAllow)
+  console.log("suggest-step.json allow:", suggestAllow)
+  console.log("* deny:", denyAll)
+  console.log("bash deny:", bashDeny)
+  console.log("✅ T16.31: " + (specAllow && suggestAllow && denyAll && bashDeny ? "PASS" : "FAIL"))
+}
+test().catch(e => { console.error(e); process.exit(1) })
+'
+```
+**期望**：permission 持久化为 ruleset，edit 包含 3 条规则（`*:deny` + `analysis/.../spec/*.md:allow` + `analysis/.../suggest-step.json:allow`），bash deny
+
+> **PG 验证**：`SELECT name, jsonb_pretty(permission) FROM session_agents WHERE session_id='$SID';`
+> 期望：edit 规则使用相对路径 pattern，无 `**/` 前缀
+
+---
+
+### T16.32 `**/` 前缀无法匹配相对路径（已知限制）
+
+**验证目标**：`**/analysis/...` 前缀的白名单 pattern **不能**匹配相对路径 `analysis/...`，导致白名单失效
+
+> **已知限制**：Wildcard 实现中 `*` → `.*`（匹配含 `/` 的任意字符），**没有 `**` 特殊语义**。`**/analysis/...` 被转为 `.*.*/analysis/...`，要求路径中存在 `/analysis/` 子串。但 write/edit 工具传入的是相对路径 `analysis/...`（无前导 `/`），不包含 `/analysis/`，因此白名单不匹配，回退到 `deny *`。
+>
+> **正确做法**：去掉 `**/` 前缀，直接用 `analysis/.../spec/*.md`。
+
+```bash
+bun -e '
+const BASE = "http://localhost:14096"
+
+async function test() {
+  const sid = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" })).json()
+  console.log("SID:", sid.id)
+
+  // 使用 **/ 前缀（错误写法）
+  const agentRes = await fetch(BASE + "/session/" + sid.id + "/agents/create", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name: "specer-bad",
+      mode: "primary",
+      prompt: "test",
+      permission: {
+        edit: {
+          "*": "deny",
+          "**/analysis/9f06e4c6/spec/*.md": "allow",
+        },
+      },
+    }),
+  })
+  const data = await agentRes.json()
+  const editRules = data.permission?.filter(r => r.permission === "edit") || []
+  console.log("edit 规则:", JSON.stringify(editRules))
+
+  const hasDoubleStar = editRules.some(r => r.pattern === "**/analysis/9f06e4c6/spec/*.md")
+  console.log("**/ 前缀规则持久化:", hasDoubleStar)
+  console.log("✅ T16.32: PASS — **/ 前缀被原样存储，运行时将无法匹配相对路径 analysis/...")
+  console.log("   根因: Wildcard 中 **/ 转为 .*.*/ ，要求路径含 /analysis/ 子串")
+  console.log("   但 write 工具传入 path.relative(worktree, file) = analysis/... (无前导 /)")
+  console.log("   修复: 去掉 **/ 前缀，改为 analysis/.../spec/*.md")
+}
+test().catch(e => { console.error(e); process.exit(1) })
+'
+```
+**期望**：`**/` 前缀规则被原样持久化（不报错），但运行时权限检查中**无法匹配**相对路径 `analysis/.../spec/spec.md`，白名单形同虚设
+
+> **结论**：权限 pattern 必须使用相对路径写法（与 write/edit 工具传入的 `path.relative(worktree, filepath)` 一致），不要使用 `**/` 前缀。参考 [OpenCode 权限文档](https://opencode.ai/docs/permissions/) — 通配符只有 `*`（匹配零个或多个任意字符，含 `/`）和 `?`。
+
+---
+
+### T16.33 pattern 中 `...` 是字面点，不能当通配符
+
+**验证目标**：pattern 中写 `analysis/.../spec/*.md`（三个点），`.` 会被转义为字面点，**不能**匹配中间的 UUID 路径段。正确写法用 `*`。
+
+> **原理**：Wildcard 实现中 `.replace(/[.+^${}()|[\]\\]/g, "\\$&")` 会将每个 `.` 转义为 `\.`（字面匹配）。所以 `...` 等价于 `\.\.\.`，只匹配路径中真的有三个连续 `.` 的位置。要通配中间路径段，用 `*`（匹配零个或多个任意字符，含 `/`）。
+
+| pattern | 实际路径 | 匹配 | 原因 |
+|---------|----------|------|------|
+| `analysis/.../spec/*.md` | `analysis/9f06e4c6-.../spec/spec.md` | **否** | `.` 被转义为字面点，不匹配 UUID |
+| `analysis/.../spec/*.md` | `analysis/.../spec/spec.md` | 是 | 路径中真的有 `...` |
+| `analysis/*/spec/*.md` | `analysis/9f06e4c6-.../spec/spec.md` | **是** | `*` 通配 UUID 路径段 |
+
+```bash
+bun -e '
+const BASE = "http://localhost:14096"
+
+async function test() {
+  const sid = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" })).json()
+  console.log("SID:", sid.id)
+
+  // 错误写法：用 ... 当通配符
+  const res1 = await (await fetch(BASE + "/session/" + sid.id + "/agents/create", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name: "specer-dots", mode: "primary", prompt: "test",
+      permission: { edit: { "*": "deny", "analysis/.../spec/*.md": "allow" } },
+    }),
+  })).json()
+  const dotsRules = res1.permission?.filter(r => r.permission === "edit") || []
+  console.log("... 写法 edit 规则:", JSON.stringify(dotsRules))
+  console.log("  pattern 含 ...:", dotsRules.some(r => r.pattern === "analysis/.../spec/*.md"))
+
+  // 正确写法：用 * 通配中间路径段
+  const res2 = await (await fetch(BASE + "/session/" + sid.id + "/agents/create", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name: "specer-star", mode: "primary", prompt: "test",
+      permission: { edit: { "*": "deny", "analysis/*/spec/*.md": "allow" } },
+    }),
+  })).json()
+  const starRules = res2.permission?.filter(r => r.permission === "edit") || []
+  console.log("* 写法 edit 规则:", JSON.stringify(starRules))
+  console.log("  pattern 含 *:", starRules.some(r => r.pattern === "analysis/*/spec/*.md"))
+
+  console.log("✅ T16.33: PASS — ... 被原样存储（字面点），* 被原样存储（通配符）")
+  console.log("   运行时：... 无法匹配 UUID 路径段，* 可以")
+}
+test().catch(e => { console.error(e); process.exit(1) })
+'
+```
+**期望**：两种 pattern 都被原样持久化（不报错），但运行时 `...` 只匹配字面三个点，`*` 才能通配 UUID 路径段
+
+> **结论**：权限 pattern 中不要用 `...` 省略中间路径，用 `*` 代替。例如 `analysis/*/spec/*.md` 匹配任意 analysis 子目录下的 spec/*.md。
+
+---
+
 ### T16.29 主子 agent 沙箱共享验证
 
 **验证目标**：主 agent 和子 agent 运行在同一个沙箱实例中，文件系统完全共享。主 agent 写的文件子 agent 能读，反之亦然。
@@ -1926,6 +2099,9 @@ console.log("═".repeat(50))
 | T16.26 | ✅ | last matching rule wins：edit 规则按数组顺序持久化（*:deny, src/*.ts:allow） |
 | T16.27 | ⚠️ | `tools` 字段被 API 接受（200）但未自动转换为 permission（permission=[]空） |
 | T16.28 | ✅ | task 粒度权限 5 条持久化：dangerous-agent:deny, safe-agent:allow, *:ask |
+| T16.31 | 🔲 | 对象语法白名单（相对路径）：edit 规则 3 条（*:deny + analysis/.../spec/*.md:allow + suggest-step.json:allow） |
+| T16.32 | 🔲 | `**/` 前缀已知限制：被原样持久化但运行时无法匹配相对路径，白名单失效 |
+| T16.33 | 🔲 | `...` 是字面点（被转义为 `\.`），不能当通配符；正确写法用 `*`（如 `analysis/*/spec/*.md`） |
 
 ### v77 回归测试结果（2026-06-02）
 
