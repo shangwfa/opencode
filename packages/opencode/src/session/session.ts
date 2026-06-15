@@ -75,6 +75,8 @@ export function fromRow(row: SessionRow): Info {
     slug: row.slug,
     projectID: row.project_id,
     workspaceID: row.workspace_id ?? undefined,
+    pvcMode: row.pvc_mode ?? undefined,
+    appID: row.app_id ?? undefined,
     directory: row.directory,
     path: row.path ?? undefined,
     parentID: row.parent_id ?? undefined,
@@ -118,6 +120,8 @@ export function toRow(info: Info) {
     workspace_id: info.workspaceID,
     parent_id: info.parentID,
     slug: info.slug,
+    pvc_mode: info.pvcMode,
+    app_id: info.appID,
     directory: info.directory,
     path: info.path,
     title: info.title,
@@ -205,11 +209,16 @@ const Model = Schema.Struct({
   variant: optionalOmitUndefined(Schema.String),
 })
 
+export const PvcMode = Schema.Literals(["session", "app"])
+export type PvcMode = Schema.Schema.Type<typeof PvcMode>
+
 export const Info = Schema.Struct({
   id: SessionID,
   slug: Schema.String,
   projectID: ProjectID,
   workspaceID: optionalOmitUndefined(WorkspaceID),
+  pvcMode: optionalOmitUndefined(PvcMode),
+  appID: optionalOmitUndefined(Schema.String),
   directory: Schema.String,
   path: optionalOmitUndefined(Schema.String),
   parentID: optionalOmitUndefined(SessionID),
@@ -248,6 +257,8 @@ export const CreateInput = Schema.optional(
     model: Schema.optional(Model),
     permission: Schema.optional(Permission.Ruleset),
     workspaceID: Schema.optional(WorkspaceID),
+    pvcMode: Schema.optional(PvcMode),
+    appID: Schema.optional(Schema.String),
   }),
 )
 export type CreateInput = Types.DeepMutable<Schema.Schema.Type<typeof CreateInput>>
@@ -464,6 +475,13 @@ export class BusyError extends Schema.TaggedErrorClass<BusyError>()("SessionBusy
   sessionID: SessionID,
 }) {}
 
+export class InvalidPvcConfigError extends Schema.TaggedErrorClass<InvalidPvcConfigError>()(
+  "SessionInvalidPvcConfigError",
+  {
+    message: Schema.String,
+  },
+) {}
+
 export type NotFound = NotFoundError
 
 export interface Interface {
@@ -475,7 +493,9 @@ export interface Interface {
     model?: Schema.Schema.Type<typeof Model>
     permission?: Permission.Ruleset
     workspaceID?: WorkspaceID
-  }) => Effect.Effect<Info>
+    pvcMode?: PvcMode
+    appID?: string
+  }) => Effect.Effect<Info, InvalidPvcConfigError>
   readonly fork: (input: { sessionID: SessionID; messageID?: MessageID }) => Effect.Effect<Info, NotFound>
   readonly touch: (sessionID: SessionID) => Effect.Effect<void>
   readonly get: (id: SessionID) => Effect.Effect<Info, NotFound>
@@ -549,6 +569,8 @@ export const layer: Layer.Layer<
       directory: string
       path?: string
       permission?: Permission.Ruleset
+      pvcMode?: PvcMode
+      appID?: string
     }) {
       const ctx = yield* InstanceState.context
       const result: Info = {
@@ -559,6 +581,8 @@ export const layer: Layer.Layer<
         directory: input.directory,
         path: input.path,
         workspaceID: input.workspaceID,
+        pvcMode: input.pvcMode,
+        appID: input.appID,
         parentID: input.parentID,
         title: input.title ?? createDefaultTitle(!!input.parentID),
         agent: input.agent,
@@ -686,7 +710,12 @@ export const layer: Layer.Layer<
       model?: Schema.Schema.Type<typeof Model>
       permission?: Permission.Ruleset
       workspaceID?: WorkspaceID
+      pvcMode?: PvcMode
+      appID?: string
     }) {
+      if (input?.pvcMode === "app" && !input.appID?.trim()) {
+        return yield* new InvalidPvcConfigError({ message: "appID is required when pvcMode is app" })
+      }
       const ctx = yield* InstanceState.context
       const workspace = yield* InstanceState.workspaceID
       return yield* createNext({
@@ -698,6 +727,8 @@ export const layer: Layer.Layer<
         model: input?.model,
         permission: input?.permission,
         workspaceID: input?.workspaceID ?? workspace,
+        pvcMode: input?.pvcMode,
+        appID: input?.appID?.trim(),
       })
     })
 

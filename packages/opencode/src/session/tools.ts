@@ -44,27 +44,67 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
   const truncate = yield* Truncate.Service
 
   const maybeSandboxProvider = Option.getOrUndefined(yield* Effect.serviceOption(SandboxProvider.Service))
-  async function findRootSessionID(sessionID: SessionID): Promise<SessionID> {
+  // 解析 root session，并取出其 PVC 配置（子会话共享 root 的 PVC 空间与 worktree）
+  async function findRoot(
+    sessionID: SessionID,
+  ): Promise<{ id: SessionID; pvcMode?: "session" | "app"; appID?: string }> {
     let current = sessionID
     let visited = 0
     while (visited < 10) {
       visited++
       const row = await Database.use((db) =>
-        db.select({ parent_id: SessionTable.parent_id }).from(SessionTable).where(eq(SessionTable.id, current)).get(),
+        db
+          .select({ parent_id: SessionTable.parent_id, pvc_mode: SessionTable.pvc_mode, app_id: SessionTable.app_id })
+          .from(SessionTable)
+          .where(eq(SessionTable.id, current))
+          .get(),
       )
-      if (!row?.parent_id) break
+      if (!row?.parent_id) {
+        return { id: current, pvcMode: row?.pvc_mode ?? undefined, appID: row?.app_id ?? undefined }
+      }
       current = row.parent_id as SessionID
     }
-    return current
+    return { id: current }
   }
-  const sandboxSessionID = maybeSandboxProvider
-    ? yield* Effect.promise(() => findRootSessionID(input.session.id))
-    : input.session.id
+  const root = maybeSandboxProvider
+    ? yield* Effect.promise(() => findRoot(input.session.id))
+    : { id: input.session.id }
+  const sandboxSessionID = root.id
+  const useApp = root.pvcMode === "app" && !!root.appID?.trim()
+
+  // app 模式：detached worktree 自动准备脚本（幂等 + repo 不存在时降级）。
+  // repo 与 worktrees 同在 workspace 卷内（P1）：/workspace/repo + /workspace/worktrees/{sessionID}
+  function worktreeScript(): string {
+    const wt = `/workspace/worktrees/${sandboxSessionID}`
+    return [
+      `if [ -d /workspace/repo/.git ]; then`,
+      `  if [ ! -d ${wt} ]; then`,
+      `    git -C /workspace/repo worktree add --detach ${wt} HEAD;`,
+      `  fi;`,
+      `fi`,
+    ].join(" ")
+  }
+
+  async function ensureWorktree(): Promise<void> {
+    if (!useApp || !maybeSandboxProvider) return
+    await maybeSandboxProvider
+      .runInSession(sandboxSessionID, worktreeScript())
+      .pipe(Effect.runPromise)
+      .catch((err) => log.error("app worktree ensure failed", { sandboxSessionID, err: String(err) }))
+  }
+
   function getSandbox(): Promise<unknown> | null {
     if (!maybeSandboxProvider) {
       return null
     }
-    return maybeSandboxProvider.getOrCreate(sandboxSessionID).pipe(Effect.runPromise).catch(() => null)
+    return maybeSandboxProvider
+      .getOrCreate(sandboxSessionID, useApp ? { pvcMode: root.pvcMode, appID: root.appID } : undefined)
+      .pipe(Effect.runPromise)
+      .then(async (sb) => {
+        await ensureWorktree()
+        return sb
+      })
+      .catch(() => null)
   }
 
   const context = (args: Record<string, unknown>, options: ToolExecutionOptions): Tool.Context => ({

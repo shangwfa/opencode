@@ -50,6 +50,8 @@ export const SessionTable = sqliteTable(
     ...Timestamps,
     time_compacting: integer(),
     time_archived: integer(),
+    pvc_mode: text().$type<"session" | "app">(),
+    app_id: text(),
   },
   (table) => [
     index("session_project_idx").on(table.project_id),

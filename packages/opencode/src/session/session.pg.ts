@@ -48,6 +48,8 @@ export const SessionTable = pgTable(
     ...Timestamps,
     time_compacting: bigint({ mode: "number" }),
     time_archived: bigint({ mode: "number" }),
+    pvc_mode: text().$type<"session" | "app">(),
+    app_id: text(),
   },
   (table) => [
     index("session_project_idx").on(table.project_id),
