@@ -6,7 +6,7 @@ import { eq } from "drizzle-orm"
 export interface SandboxOpts {
   id: SessionID
   pvcMode?: "session" | "app"
-  appID?: string
+  appId?: string
 }
 
 export async function resolveSandboxOpts(sessionID: SessionID): Promise<SandboxOpts> {
@@ -22,7 +22,7 @@ export async function resolveSandboxOpts(sessionID: SessionID): Promise<SandboxO
         .get(),
     )
     if (!row?.parent_id) {
-      return { id: current, pvcMode: (row?.pvc_mode as "session" | "app") ?? undefined, appID: row?.app_id ?? undefined }
+      return { id: current, pvcMode: (row?.pvc_mode as "session" | "app") ?? undefined, appId: row?.app_id ?? undefined }
     }
     current = row.parent_id as SessionID
   }

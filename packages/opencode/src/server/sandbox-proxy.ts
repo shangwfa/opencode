@@ -292,13 +292,13 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
         )
         if (!body.command) return HttpServerResponse.jsonUnsafe({ error: "command is required" }, { status: 400 })
 
-        // 查 root session 的 pvcMode/appID（app 模式需正确 PVC subPath）
+        // 查 root session 的 pvcMode/appId（app 模式需正确 PVC subPath）
         const root = yield* Effect.promise(() => resolveSandboxOpts(params.sessionID))
-        const useApp = root.pvcMode === "app" && !!root.appID?.trim()
+        const useApp = root.pvcMode === "app" && !!root.appId?.trim()
 
         // 确保 sandbox 用正确的 PVC 前缀创建（幂等：已存在则跳过）
         if (useApp) {
-          yield* sandbox.getOrCreate(root.id, { pvcMode: root.pvcMode, appID: root.appID }).pipe(
+          yield* sandbox.getOrCreate(root.id, { pvcMode: root.pvcMode, appId: root.appId }).pipe(
             Effect.catch(() => Effect.void),
           )
           // app 模式：确保 worktree 存在（幂等 + repo 不存在时降级）
@@ -336,13 +336,13 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
         )
         if (!body.command) return HttpServerResponse.jsonUnsafe({ error: "command is required" }, { status: 400 })
 
-        // 查 root session 的 pvcMode/appID（app 模式需正确 PVC subPath）
+        // 查 root session 的 pvcMode/appId（app 模式需正确 PVC subPath）
         const root = yield* Effect.promise(() => resolveSandboxOpts(params.sessionID))
-        const useApp = root.pvcMode === "app" && !!root.appID?.trim()
+        const useApp = root.pvcMode === "app" && !!root.appId?.trim()
 
         // 确保 sandbox 用正确的 PVC 前缀创建（幂等）
         if (useApp) {
-          yield* sandbox.getOrCreate(root.id, { pvcMode: root.pvcMode, appID: root.appID }).pipe(
+          yield* sandbox.getOrCreate(root.id, { pvcMode: root.pvcMode, appId: root.appId }).pipe(
             Effect.catch(() => Effect.void),
           )
           // app 模式：确保 worktree 存在（幂等 + repo 不存在时降级）

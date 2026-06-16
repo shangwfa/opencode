@@ -30,14 +30,14 @@ const BASE = "http://localhost:14096"
 const sid = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" })).json()
 console.log("SID:", sid.id)
 console.log("pvcMode:", sid.pvcMode ?? "(undefined=默认session)")
-console.log("appID:", sid.appID ?? "(undefined)")
+console.log("appId:", sid.appId ?? "(undefined)")
 
 // 验证：不传 pvcMode → undefined → session 模式
 const pass = sid.pvcMode === undefined
 console.log("✅ T27.1: " + (pass ? "PASS — 默认行为不变" : "FAIL"))
 '
 ```
-**期望**：`pvcMode=undefined`，`appID=undefined`，行为与现有 session 模式一致
+**期望**：`pvcMode=undefined`，`appId=undefined`，行为与现有 session 模式一致
 
 ---
 
@@ -55,28 +55,28 @@ console.log("✅ T27.2: " + (sid.pvcMode === "session" ? "PASS" : "FAIL"))
 
 ---
 
-### T27.3 创建 app 模式会话（pvcMode=app + appID）
+### T27.3 创建 app 模式会话（pvcMode=app + appId）
 
 ```bash
 bun -e '
 const BASE = "http://localhost:14096"
-const sid = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pvcMode: "app", appID: "test-app-1" }) })).json()
+const sid = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pvcMode: "app", appId: "test-app-1" }) })).json()
 console.log("pvcMode:", sid.pvcMode)
-console.log("appID:", sid.appID)
-const pass = sid.pvcMode === "app" && sid.appID === "test-app-1"
+console.log("appId:", sid.appId)
+const pass = sid.pvcMode === "app" && sid.appId === "test-app-1"
 console.log("✅ T27.3: " + (pass ? "PASS" : "FAIL"))
 '
 ```
-**期望**：`pvcMode="app"`，`appID="test-app-1"`
+**期望**：`pvcMode="app"`，`appId="test-app-1"`
 
 > **PG 验证**：`SELECT pvc_mode, app_id FROM session WHERE id='$SID';`
 > 期望：pvc_mode=app, app_id=test-app-1
 
 ---
 
-### T27.4 app 模式缺少 appID → 报错
+### T27.4 app 模式缺少 appId → 报错
 
-**验证目标**：`pvcMode=app` 但不传 `appID` 时，返回错误。
+**验证目标**：`pvcMode=app` 但不传 `appId` 时，返回错误。
 
 ```bash
 bun -e '
@@ -85,23 +85,23 @@ const res = await fetch(BASE + "/session", { method: "POST", headers: { "Content
 console.log("status:", res.status)
 const body = await res.text()
 console.log("body:", body.slice(0, 200))
-const pass = res.status >= 400 && body.includes("appID")
-console.log("✅ T27.4: " + (pass ? "PASS — app 模式缺 appID 报错" : "FAIL"))
+const pass = res.status >= 400 && body.includes("appId")
+console.log("✅ T27.4: " + (pass ? "PASS — app 模式缺 appId 报错" : "FAIL"))
 '
 ```
-**期望**：HTTP 400/500，错误信息含 `appID`
+**期望**：HTTP 400/500，错误信息含 `appId`
 
 ---
 
-### T27.5 app 模式 appID 空白 → 报错
+### T27.5 app 模式 appId 空白 → 报错
 
 ```bash
 bun -e '
 const BASE = "http://localhost:14096"
-const res = await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pvcMode: "app", appID: "   " }) })
+const res = await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pvcMode: "app", appId: "   " }) })
 console.log("status:", res.status)
 const pass = res.status >= 400
-console.log("✅ T27.5: " + (pass ? "PASS — 空白 appID 报错" : "FAIL"))
+console.log("✅ T27.5: " + (pass ? "PASS — 空白 appId 报错" : "FAIL"))
 '
 ```
 **期望**：HTTP 400/500
@@ -123,9 +123,9 @@ console.log("✅ T27.6: " + (pass ? "PASS — 非法 pvcMode 报错" : "FAIL"))
 
 ---
 
-### T27.7 同 appID 不同会话共享 PVC 空间
+### T27.7 同 appId 不同会话共享 PVC 空间
 
-**验证目标**：同一 `appID` 的两个会话，写入的文件互相可见（共享 `apps/{appID}/workspace`）。
+**验证目标**：同一 `appId` 的两个会话，写入的文件互相可见（共享 `apps/{appId}/workspace`）。
 
 ```bash
 bun -e '
@@ -133,7 +133,7 @@ const BASE = "http://localhost:14096"
 const APP_ID = "share-test-" + Date.now().toString(36)
 
 // 会话 A：app 模式，写入文件
-const sidA = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pvcMode: "app", appID: APP_ID }) })).json().then(d=>d.id)
+const sidA = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pvcMode: "app", appId: APP_ID }) })).json().then(d=>d.id)
 const execA = (cmd) => fetch(BASE + "/session/" + sidA + "/exec", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ command: cmd }) }).then(r=>r.json())
 
 // A 写文件
@@ -141,15 +141,15 @@ await execA("mkdir -p /workspace/repo && echo shared-content > /workspace/repo/s
 const writeRes = await execA("cat /workspace/repo/shared-file.txt")
 console.log("A 写入:", writeRes.stdout?.trim())
 
-// 会话 B：同 appID，读 A 写的文件
-const sidB = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pvcMode: "app", appID: APP_ID }) })).json().then(d=>d.id)
+// 会话 B：同 appId，读 A 写的文件
+const sidB = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pvcMode: "app", appId: APP_ID }) })).json().then(d=>d.id)
 const execB = (cmd) => fetch(BASE + "/session/" + sidB + "/exec", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ command: cmd }) }).then(r=>r.json())
 
 const readRes = await execB("cat /workspace/repo/shared-file.txt 2>&1")
 console.log("B 读取:", readRes.stdout?.trim())
 
 const pass = readRes.stdout?.includes("shared-content")
-console.log("✅ T27.7: " + (pass ? "PASS — 同 appID 共享 PVC" : "FAIL"))
+console.log("✅ T27.7: " + (pass ? "PASS — 同 appId 共享 PVC" : "FAIL"))
 '
 ```
 **期望**：会话 B 能读到会话 A 写入的文件
@@ -158,9 +158,9 @@ console.log("✅ T27.7: " + (pass ? "PASS — 同 appID 共享 PVC" : "FAIL"))
 
 ---
 
-### T27.8 不同 appID 之间 PVC 隔离
+### T27.8 不同 appId 之间 PVC 隔离
 
-**验证目标**：不同 `appID` 的会话，文件互相不可见。
+**验证目标**：不同 `appId` 的会话，文件互相不可见。
 
 ```bash
 bun -e '
@@ -168,18 +168,18 @@ const BASE = "http://localhost:14096"
 const TS = Date.now().toString(36)
 
 // 会话 A：app-1
-const sidA = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pvcMode: "app", appID: "iso-a-" + TS }) })).json().then(d=>d.id)
+const sidA = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pvcMode: "app", appId: "iso-a-" + TS }) })).json().then(d=>d.id)
 const execA = (cmd) => fetch(BASE + "/session/" + sidA + "/exec", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ command: cmd }) }).then(r=>r.json())
 await execA("echo from-a > /workspace/repo/iso-a.txt")
 
-// 会话 B：app-2（不同 appID）
-const sidB = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pvcMode: "app", appID: "iso-b-" + TS }) })).json().then(d=>d.id)
+// 会话 B：app-2（不同 appId）
+const sidB = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pvcMode: "app", appId: "iso-b-" + TS }) })).json().then(d=>d.id)
 const execB = (cmd) => fetch(BASE + "/session/" + sidB + "/exec", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ command: cmd }) }).then(r=>r.json())
 const readRes = await execB("cat /workspace/repo/iso-a.txt 2>&1")
 
 const isolated = readRes.stdout?.includes("No such file")
 console.log("B 读 A 的文件:", isolated ? "不存在（隔离）" : "存在（泄漏！）")
-console.log("✅ T27.8: " + (isolated ? "PASS — 不同 appID 隔离" : "FAIL"))
+console.log("✅ T27.8: " + (isolated ? "PASS — 不同 appId 隔离" : "FAIL"))
 '
 ```
 **期望**：会话 B 读不到会话 A 的文件
@@ -201,7 +201,7 @@ const execS = (cmd) => fetch(BASE + "/session/" + sidS + "/exec", { method: "POS
 await execS("echo session-data > /workspace/repo/session-only.txt")
 
 // app 模式会话读（不同空间）
-const sidA = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pvcMode: "app", appID: "cross-" + TS }) })).json().then(d=>d.id)
+const sidA = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pvcMode: "app", appId: "cross-" + TS }) })).json().then(d=>d.id)
 const execA = (cmd) => fetch(BASE + "/session/" + sidA + "/exec", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ command: cmd }) }).then(r=>r.json())
 const readRes = await execA("cat /workspace/repo/session-only.txt 2>&1")
 
@@ -223,7 +223,7 @@ const BASE = "http://localhost:14096"
 const APP_ID = "wt-test-" + Date.now().toString(36)
 
 // 会话 A：app 模式，先 clone repo
-const sidA = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pvcMode: "app", appID: APP_ID }) })).json().then(d=>d.id)
+const sidA = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pvcMode: "app", appId: APP_ID }) })).json().then(d=>d.id)
 const execA = (cmd) => fetch(BASE + "/session/" + sidA + "/exec", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ command: cmd }) }).then(r=>r.json())
 
 // 初始化 repo（模拟上层 clone）
@@ -239,8 +239,8 @@ await new Promise(r => setTimeout(r, 3000))
 const wtCheck = await execA("ls -d /workspace/worktrees/*/ 2>&1")
 console.log("worktree 目录:", wtCheck.stdout?.trim())
 
-// 会话 B：同 appID，验证 B 有自己的 worktree
-const sidB = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pvcMode: "app", appID: APP_ID }) })).json().then(d=>d.id)
+// 会话 B：同 appId，验证 B 有自己的 worktree
+const sidB = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pvcMode: "app", appId: APP_ID }) })).json().then(d=>d.id)
 const execB = (cmd) => fetch(BASE + "/session/" + sidB + "/exec", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ command: cmd }) }).then(r=>r.json())
 await fetch(BASE + "/session/" + sidB + "/exec", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ command: "echo trigger-b" }) })
 await new Promise(r => setTimeout(r, 3000))
@@ -268,7 +268,7 @@ const BASE = "http://localhost:14096"
 const APP_ID = "norepo-" + Date.now().toString(36)
 
 // app 模式会话，不 clone repo
-const sid = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pvcMode: "app", appID: APP_ID }) })).json().then(d=>d.id)
+const sid = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pvcMode: "app", appId: APP_ID }) })).json().then(d=>d.id)
 const exec = (cmd) => fetch(BASE + "/session/" + sid + "/exec", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ command: cmd }) }).then(r=>r.json())
 
 // exec 应该成功（sandbox 创建 + worktree 降级跳过）
@@ -296,7 +296,7 @@ bun -e '
 const BASE = "http://localhost:14096"
 const APP_ID = "idem-" + Date.now().toString(36)
 
-const sid = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pvcMode: "app", appID: APP_ID }) })).json().then(d=>d.id)
+const sid = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pvcMode: "app", appId: APP_ID }) })).json().then(d=>d.id)
 const exec = (cmd) => fetch(BASE + "/session/" + sid + "/exec", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ command: cmd }) }).then(r=>r.json())
 
 // 初始化 repo
@@ -328,30 +328,30 @@ console.log("✅ T27.12: " + (pass ? "PASS — worktree 幂等" : "FAIL"))
 
 ### T27.13 pvcMode 持久化到 PG
 
-**验证目标**：`pvcMode` 和 `appID` 持久化到 session 表。
+**验证目标**：`pvcMode` 和 `appId` 持久化到 session 表。
 
 ```bash
 bun -e '
 const BASE = "http://localhost:14096"
 const APP_ID = "pg-" + Date.now().toString(36)
-const sid = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pvcMode: "app", appID: APP_ID }) })).json().then(d=>d.id)
+const sid = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pvcMode: "app", appId: APP_ID }) })).json().then(d=>d.id)
 
 // 通过 API 查询
 const info = await (await fetch(BASE + "/session/" + sid)).json()
-console.log("API: pvcMode=" + info.pvcMode + " appID=" + info.appID)
-const pass = info.pvcMode === "app" && info.appID === APP_ID
+console.log("API: pvcMode=" + info.pvcMode + " appId=" + info.appId)
+const pass = info.pvcMode === "app" && info.appId === APP_ID
 console.log("✅ T27.13: " + (pass ? "PASS — PG 持久化" : "FAIL"))
 console.log("   PG 验证: SELECT pvc_mode, app_id FROM session WHERE id='" + sid + "';")
 '
 ```
-**期望**：API 返回 `pvcMode=app`，`appID` 正确
+**期望**：API 返回 `pvcMode=app`，`appId` 正确
 
 > **PG 验证**：`SELECT pvc_mode, app_id FROM session WHERE id='$SID';`
 > 期望：pvc_mode=app, app_id=<APP_ID>
 
 ---
 
-### T27.14 子会话继承父会话的 pvcMode 和 appID
+### T27.14 子会话继承父会话的 pvcMode 和 appId
 
 **验证目标**：subagent 子会话自动继承父会话的 PVC 配置，共享同一 sandbox。
 
@@ -361,7 +361,7 @@ const BASE = "http://localhost:14096"
 const APP_ID = "child-" + Date.now().toString(36)
 
 // 父会话 app 模式
-const sid = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pvcMode: "app", appID: APP_ID }) })).json().then(d=>d.id)
+const sid = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pvcMode: "app", appId: APP_ID }) })).json().then(d=>d.id)
 const exec = (cmd) => fetch(BASE + "/session/" + sid + "/exec", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ command: cmd }) }).then(r=>r.json())
 
 // 父会话写入文件
@@ -370,17 +370,17 @@ await exec("mkdir -p /workspace/repo && echo parent-data > /workspace/repo/paren
 // 通过 task 工具创建子会话（子会话应继承 pvcMode）
 // 这里用 fork 模拟
 const fork = await (await fetch(BASE + "/session/" + sid + "/fork", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" })).json()
-console.log("子会话:", fork.id, "pvcMode:", fork.pvcMode, "appID:", fork.appID)
+console.log("子会话:", fork.id, "pvcMode:", fork.pvcMode, "appId:", fork.appId)
 
 const childExec = (cmd) => fetch(BASE + "/session/" + fork.id + "/exec", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ command: cmd }) }).then(r=>r.json())
 const readRes = await childExec("cat /workspace/repo/parent.txt 2>&1")
 console.log("子会话读父文件:", readRes.stdout?.trim())
 
-const pass = fork.pvcMode === "app" && fork.appID === APP_ID
+const pass = fork.pvcMode === "app" && fork.appId === APP_ID
 console.log("✅ T27.14: " + (pass ? "PASS — 子会话继承 PVC 配置" : "NOTE — fork 可能不继承 pvcMode"))
 '
 ```
-**期望**：子会话 `pvcMode=app`，`appID` 与父一致（或共享 sandbox 时能读到父文件）
+**期望**：子会话 `pvcMode=app`，`appId` 与父一致（或共享 sandbox 时能读到父文件）
 
 ---
 
@@ -390,17 +390,17 @@ console.log("✅ T27.14: " + (pass ? "PASS — 子会话继承 PVC 配置" : "NO
 |------|------|------|
 | T27.1 | ✅ | 默认行为不变（pvcMode=undefined） |
 | T27.2 | ✅ | 显式 pvcMode=session |
-| T27.3 | ✅ | pvcMode=app + appID 持久化 |
-| T27.4 | ✅ | app 缺 appID → 400 |
-| T27.5 | ✅ | app 空白 appID → 400 |
+| T27.3 | ✅ | pvcMode=app + appId 持久化 |
+| T27.4 | ✅ | app 缺 appId → 400 |
+| T27.5 | ✅ | app 空白 appId → 400 |
 | T27.6 | ✅ | 非法 pvcMode → 400 |
-| T27.7 | ✅ | 同 appID 共享 PVC（exec API 修复后生效） |
-| T27.8 | ✅ | 不同 appID 隔离 |
+| T27.7 | ✅ | 同 appId 共享 PVC（exec API 修复后生效） |
+| T27.8 | ✅ | 不同 appId 隔离 |
 | T27.9 | ✅ | session/app 隔离 |
 | T27.10 | ✅ | app 模式自动 worktree（repo 不存在时降级） |
 | T27.11 | ✅ | repo 不存在时降级不阻塞 |
 | T27.12 | ✅ | worktree 幂等（重建不重复） |
-| T27.13 | ✅ | PG 持久化（pvcMode=app, appID 正确） |
+| T27.13 | ✅ | PG 持久化（pvcMode=app, appId 正确） |
 | T27.14 | 🔲 | 子会话继承 |
 
 ---
@@ -409,17 +409,17 @@ console.log("✅ T27.14: " + (pass ? "PASS — 子会话继承 PVC 配置" : "NO
 
 ### exec API 不传 pvcMode（T27.7 根因）
 
-exec API（`POST /session/:id/exec`）走 `sandbox-proxy.ts` → `sandbox.runInSession(sessionID)` → `getOrCreate(sessionID)`，**不传 pvcMode/appID opts**。
+exec API（`POST /session/:id/exec`）走 `sandbox-proxy.ts` → `sandbox.runInSession(sessionID)` → `getOrCreate(sessionID)`，**不传 pvcMode/appId opts**。
 
 只有 AI 消息路径（`session/tools.ts`）通过 `findRoot()` 查 session 的 pvcMode 并传 opts 给 `getOrCreate`。
 
-**影响**：app 模式会话通过 exec API 操作时，sandbox 用 session 模式的 PVC subPath（`sessions/{sessionID}/`），而非 app 模式的 `apps/{appID}/`，导致同 appID 的会话不共享空间。
+**影响**：app 模式会话通过 exec API 操作时，sandbox 用 session 模式的 PVC subPath（`sessions/{sessionID}/`），而非 app 模式的 `apps/{appId}/`，导致同 appId 的会话不共享空间。
 
-**修复方向**：`sandbox-proxy.ts` 的 `runInSession` 调用前，查 session 的 pvcMode/appID 并传入 opts。
+**修复方向**：`sandbox-proxy.ts` 的 `runInSession` 调用前，查 session 的 pvcMode/appId 并传入 opts。
 
 ### 代码路径对比
 
 | 路径 | 查 pvcMode？ | 传 opts？ | subPath |
 |------|-------------|----------|---------|
-| AI 消息 → tools.ts → getOrCreate | ✅ findRoot() | ✅ {pvcMode, appID} | apps/{appID}/ 或 sessions/{sessionID}/ |
+| AI 消息 → tools.ts → getOrCreate | ✅ findRoot() | ✅ {pvcMode, appId} | apps/{appId}/ 或 sessions/{sessionID}/ |
 | exec API → sandbox-proxy.ts → runInSession | ❌ 不查 | ❌ 不传 | sessions/{sessionID}/（总是 session 模式） |

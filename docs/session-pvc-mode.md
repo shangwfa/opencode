@@ -15,10 +15,10 @@
 
 ### 1.2 目标
 
-在现有「按 sessionID 隔离」的基础上，新增「按 appID 隔离」的 PVC 模式：
+在现有「按 sessionID 隔离」的基础上，新增「按 appId 隔离」的 PVC 模式：
 
 - **PVC 模式是会话级配置**：在创建会话时传入，持久化到 session 记录上
-- **app 模式**：同一应用（appID）的所有会话**共享同一份 PVC 空间**，subPath 前缀为 `apps/{appID}/...`
+- **app 模式**：同一应用（appId）的所有会话**共享同一份 PVC 空间**，subPath 前缀为 `apps/{appId}/...`
 - 同一 app 下的不同需求（会话）用 **git worktree** 区分，每个会话对应 `/workspace/worktrees/{sessionID}`
 - **worktree 创建由 opencode 自动处理**（detach 模式、幂等、repo 不存在时降级）
 - **两种模式并存**，session 模式行为完全保持不变（回归零影响）
@@ -27,7 +27,7 @@
 
 | 职责 | 归属 |
 |------|------|
-| 会话承载 `pvcMode` + `appID` | **opencode（本方案）** |
+| 会话承载 `pvcMode` + `appId` | **opencode（本方案）** |
 | 按会话 PVC 模式产出正确卷布局 | **opencode（本方案）** |
 | app 模式自动创建 worktree（detach、幂等、降级） | **opencode（本方案）** |
 | 提供 exec 接口（沙箱内执行命令） | opencode（已有） |
@@ -44,8 +44,8 @@
 
 | 维度 | session 模式（现有） | app 模式（新增） |
 |------|---------------------|------------------|
-| subPath 前缀 | `sessions/{sessionID}` | `apps/{appID}` |
-| `/workspace` 指向 | `sessions/{sessionID}/workspace` | `apps/{appID}/workspace`（整个 app 空间根） |
+| subPath 前缀 | `sessions/{sessionID}` | `apps/{appId}` |
+| `/workspace` 指向 | `sessions/{sessionID}/workspace` | `apps/{appId}/workspace`（整个 app 空间根） |
 | 隔离粒度 | 每会话独立 | 同 app 所有会话共享 |
 | worktree | 无 | opencode 自动建 `/workspace/worktrees/{sessionID}`（detach） |
 | 6 个会话级卷归属 | 各会话独立 | **全部按 app 共享**（B1） |
@@ -53,11 +53,11 @@
 
 ### 2.2 app 模式 PVC 布局（P1：repo 在 workspace 卷内）
 
-所有 6 个卷的 subPath 前缀统一改为 `apps/{appID}`。**repo 与 worktrees 都放在 workspace 卷内**，沙箱里同处 `/workspace` 单一挂载点，git worktree 引用主仓库 `.git` 无跨挂载点问题：
+所有 6 个卷的 subPath 前缀统一改为 `apps/{appId}`。**repo 与 worktrees 都放在 workspace 卷内**，沙箱里同处 `/workspace` 单一挂载点，git worktree 引用主仓库 `.git` 无跨挂载点问题：
 
 ```
 PVC (claimName 不变)
-└── apps/{appID}/
+└── apps/{appId}/
     ├── workspace/  → /workspace                # 整个 app 空间根，单一挂载点
     │   ├── repo/                               # 上层 clone 一次 → 沙箱内 /workspace/repo
     │   └── worktrees/{sessionID}/              # opencode 自动建 → /workspace/worktrees/{sessionID}
@@ -104,16 +104,16 @@ fi
 "项目初始化"与"业务开发"**不是两条流程**——opencode 侧逻辑完全一致，差异仅由"repo 是否已存在"在自动 worktree 步骤内自然分叉（幂等降级收敛）。opencode 不感知当前是哪种场景，只看 `repo/.git` 在不在。
 
 ```
-① 创建会话（传入 pvcMode + appID）
-     → 校验：app 模式必须有 appID（否则 InvalidPvcConfigError）
+① 创建会话（传入 pvcMode + appId）
+     → 校验：app 模式必须有 appId（否则 InvalidPvcConfigError）
      → 持久化到 session 表（pvc_mode, app_id）
 
 ② 执行任务
      → session/tools.ts 查会话 pvc_mode / app_id
-     → SandboxProvider.getOrCreate(sessionID, { pvcMode, appID })   ← 可选入参（A 方案）
+     → SandboxProvider.getOrCreate(sessionID, { pvcMode, appId })   ← 可选入参（A 方案）
      → [沙箱创建 / 复用逻辑不变，仍按 root sessionID 一对一]
      → createSandbox 透传 opts → buildVolumes 按 pvcMode 决定 subPath 前缀
-       · app 模式 → 挂 apps/{appID} 空间（同 appID 共享，/workspace = apps/{appID}/workspace）
+       · app 模式 → 挂 apps/{appId} 空间（同 appId 共享，/workspace = apps/{appId}/workspace）
        · 否则     → 挂 sessions/{sessionID}（原逻辑不变）
 
 ③ 自动 worktree（仅 app 模式；幂等 + 降级，单一逻辑）
@@ -159,14 +159,14 @@ cd packages/opencode && bun run db generate --name session_pvc_mode
 
 ```ts
 pvcMode: optionalOmitUndefined(Schema.Literals(["session", "app"])),
-appID: optionalOmitUndefined(Schema.String),
+appId: optionalOmitUndefined(Schema.String),
 ```
 
 `CreateInput`（约 line 243）增加：
 
 ```ts
 pvcMode: Schema.optional(Schema.Literals(["session", "app"])),
-appID: Schema.optional(Schema.String),
+appId: Schema.optional(Schema.String),
 ```
 
 ### 3.4 toRow / fromRow（`src/session/session.ts`）
@@ -175,21 +175,21 @@ appID: Schema.optional(Schema.String),
 
 ```ts
 pvcMode: row.pvc_mode ?? undefined,
-appID: row.app_id ?? undefined,
+appId: row.app_id ?? undefined,
 ```
 
 `toRow`（约 line 115）增加：
 
 ```ts
 pvc_mode: info.pvcMode,
-app_id: info.appID,
+app_id: info.appId,
 ```
 
 ### 3.5 create / createNext 透传 + 校验（`src/session/session.ts`）
 
-- `createNext`（约 line 542）入参与 result 增加 `pvcMode` / `appID`
+- `createNext`（约 line 542）入参与 result 增加 `pvcMode` / `appId`
 - `Session.create`（约 line 682）从 input 透传
-- **校验**：app 模式必须有 appID，否则 fail。新增 typed error：
+- **校验**：app 模式必须有 appId，否则 fail。新增 typed error：
 
 ```ts
 export class InvalidPvcConfigError extends Schema.TaggedErrorClass<InvalidPvcConfigError>()(
@@ -204,7 +204,7 @@ export class InvalidPvcConfigError extends Schema.TaggedErrorClass<InvalidPvcCon
 
 ```ts
 export function buildVolumes(
-  input: { sessionID: string; pvcMode?: "session" | "app"; appID?: string },
+  input: { sessionID: string; pvcMode?: "session" | "app"; appId?: string },
   config: SandboxConfig.Interface,
 ): Volume[]
 ```
@@ -213,14 +213,14 @@ export function buildVolumes(
 
 ```ts
 if (config.volumeType === "none") return []
-const useApp = config.volumeType === "pvc" && input.pvcMode === "app" && !!input.appID
-const prefix = useApp ? `apps/${input.appID}` : `sessions/${input.sessionID}`
+const useApp = config.volumeType === "pvc" && input.pvcMode === "app" && !!input.appId
+const prefix = useApp ? `apps/${input.appId}` : `sessions/${input.sessionID}`
 // mounts 数组结构不变，subPath 由 prefix 拼接
 // host 模式 host.path 维持 /var/opencode/sessions/{sessionID}/... 不变
 // package-cache 共享卷逻辑保留
 ```
 
-> session 模式走原分支，行为零变化。app 模式缺 appID 时安全回退到 session 前缀。
+> session 模式走原分支，行为零变化。app 模式缺 appId 时安全回退到 session 前缀。
 
 ### 3.7 getOrCreate 增加可选入参（A 方案）
 
@@ -229,7 +229,7 @@ const prefix = useApp ? `apps/${input.appID}` : `sessions/${input.sessionID}`
 ```ts
 getOrCreate: (
   sessionID: SessionID,
-  opts?: { pvcMode?: "session" | "app"; appID?: string },
+  opts?: { pvcMode?: "session" | "app"; appId?: string },
 ) => Effect.Effect<Sandbox>
 ```
 
@@ -241,7 +241,7 @@ getOrCreate: (
 
 `getSandbox()`（约 line 63）：
 
-1. 查会话的 `pvc_mode` / `app_id`，传入 `getOrCreate(sandboxSessionID, { pvcMode, appID })`
+1. 查会话的 `pvc_mode` / `app_id`，传入 `getOrCreate(sandboxSessionID, { pvcMode, appId })`
 2. app 模式下，拿到 sandbox 后执行自动 worktree 逻辑（2.3 的脚本，幂等 + 降级），通过 `runInSession` 在沙箱内执行
 3. 解析出会话工作目录（worktree 建成 → `/workspace/worktrees/{sessionID}`；否则 → `/workspace`）供后续工具使用
 
@@ -251,8 +251,8 @@ getOrCreate: (
 
 `test/tool/sandbox-pvc.test.ts` 扩展（纯函数 `buildVolumes`，无需真实沙箱）：
 
-- **app 模式**：subPath 前缀为 `apps/{appID}`，7 个卷（6 会话级 + package-cache）claimName 一致
-- **app 模式缺 appID**：安全回退到 session 前缀
+- **app 模式**：subPath 前缀为 `apps/{appId}`，7 个卷（6 会话级 + package-cache）claimName 一致
+- **app 模式缺 appId**：安全回退到 session 前缀
 - **session 模式回归**：与现有断言完全一致（保护原行为）
 - **host / none 模式**：不受 pvcMode 影响
 - **同 app 不同 session**：6 个卷 subPath 相同（共享验证）
@@ -267,8 +267,8 @@ getOrCreate: (
 
 Session schema 层：
 
-- `CreateInput` 接受 `pvcMode` / `appID`
-- app 模式缺 appID → `InvalidPvcConfigError`
+- `CreateInput` 接受 `pvcMode` / `appId`
+- app 模式缺 appId → `InvalidPvcConfigError`
 - `toRow` / `fromRow` 往返保持字段
 
 ## 5. 兼容性与回滚
@@ -284,7 +284,7 @@ Session schema 层：
 | A. buildVolumes 取数方式 | getOrCreate 增加可选入参 | sandbox-provider 不反向依赖 session 表，分层干净 |
 | B. app 模式卷归属 | 全部 6 卷按 app 共享（B1） | 同 app 环境一致、缓存复用；会话隔离交给 worktree |
 | 配置存储 | session 表新增字段 | 模式是会话级配置，随会话创建传入 |
-| appID 来源 | 创建会话时一起传入 | 上层服务控制，opencode 只承载与消费 |
+| appId 来源 | 创建会话时一起传入 | 上层服务控制，opencode 只承载与消费 |
 | repo clone | 上层服务通过 exec 执行 | opencode 不碰 repo 来源 / 凭证 |
 | worktree 创建 | opencode 自动处理 | 会话启动即就绪，体验更顺 |
 | worktree 分支 | detach 模式，不碰分支 | 分支由上层 `checkout -b` 处理 |

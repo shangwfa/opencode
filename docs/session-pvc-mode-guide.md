@@ -29,11 +29,11 @@ PVC
 
 ### app 模式（新增）
 
-同一应用（appID）的所有会话**共享同一份 PVC 空间**，各自通过 **git worktree** 在独立目录中工作：
+同一应用（appId）的所有会话**共享同一份 PVC 空间**，各自通过 **git worktree** 在独立目录中工作：
 
 ```
 PVC
-└── apps/{appID}/
+└── apps/{appId}/
     ├── workspace/  → /workspace（整个应用空间根）
     │   ├── repo/                          # 共享仓库（clone 一次）
     │   └── worktrees/
@@ -66,7 +66,7 @@ POST /session
 
 ```bash
 POST /session
-{ "pvcMode": "app", "appID": "my-project-001" }
+{ "pvcMode": "app", "appId": "my-project-001" }
 ```
 
 **必填参数**：
@@ -74,11 +74,11 @@ POST /session
 | 参数 | 说明 |
 |------|------|
 | `pvcMode` | `"app"` |
-| `appID` | 应用唯一标识，不能为空或纯空白 |
+| `appId` | 应用唯一标识，不能为空或纯空白 |
 
 **校验规则**：
-- `pvcMode=app` 但不传 `appID` → HTTP 400
-- `appID` 为纯空白 → HTTP 400
+- `pvcMode=app` 但不传 `appId` → HTTP 400
+- `appId` 为纯空白 → HTTP 400
 - `pvcMode` 非 `session`/`app` → HTTP 400
 
 ### 查询会话 PVC 配置
@@ -90,7 +90,7 @@ GET /session/{sessionID}
 {
   "id": "ses_xxx",
   "pvcMode": "app",
-  "appID": "my-project-001",
+  "appId": "my-project-001",
   ...
 }
 ```
@@ -104,12 +104,12 @@ GET /session/{sessionID}
 同一前端项目，多个需求（会话）同时开发：
 
 ```
-① 编排系统：创建会话（pvcMode=app, appID=影刀官网）
+① 编排系统：创建会话（pvcMode=app, appId=影刀官网）
 ② 编排系统：首次 exec clone 仓库到 /workspace/repo
 ③ opencode：自动创建 worktree（/workspace/worktrees/{sessionID}）
 ④ 编排系统：在 worktree 中切分支、开发
 ⑤ 编排系统：commit、push
-⑥ 重复 ①-⑤ 创建更多同 appID 会话
+⑥ 重复 ①-⑤ 创建更多同 appId 会话
 ```
 
 ### 步骤详解
@@ -119,7 +119,7 @@ GET /session/{sessionID}
 ```bash
 SID=$(curl -s -X POST http://localhost:14096/session \
   -H 'Content-Type: application/json' \
-  -d '{"pvcMode":"app","appID":"my-app-001"}' \
+  -d '{"pvcMode":"app","appId":"my-app-001"}' \
   | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
 ```
 
@@ -144,12 +144,12 @@ curl -s -X POST http://localhost:14096/session/$SID/exec \
 
 每个会话有自己的 worktree 目录（`/workspace/worktrees/{sessionID}`），独立切分支、提交。
 
-#### Step 4：创建第二个同 appID 会话
+#### Step 4：创建第二个同 appId 会话
 
 ```bash
 SID2=$(curl -s -X POST http://localhost:14096/session \
   -H 'Content-Type: application/json' \
-  -d '{"pvcMode":"app","appID":"my-app-001"}' \
+  -d '{"pvcMode":"app","appId":"my-app-001"}' \
   | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
 ```
 
@@ -159,7 +159,7 @@ SID2=$(curl -s -X POST http://localhost:14096/session \
 
 ## 四、共享与隔离
 
-### 共享（同 appID）
+### 共享（同 appId）
 
 | 维度 | 说明 |
 |------|------|
@@ -168,7 +168,7 @@ SID2=$(curl -s -X POST http://localhost:14096/session \
 | `/home/sandbox/.config` | 工具配置（跨会话一致） |
 | `shared/package-cache` | 全局包缓存（跨 app 共享） |
 
-### 隔离（同 appID 不同会话）
+### 隔离（同 appId 不同会话）
 
 | 维度 | 隔离方式 |
 |------|---------|
@@ -178,13 +178,13 @@ SID2=$(curl -s -X POST http://localhost:14096/session \
 | **sandbox 容器** | 不同沙箱实例（进程隔离） |
 | **repo 主分支** | 不受 worktree 分支影响 |
 
-### 跨 appID 隔离
+### 跨 appId 隔离
 
-不同 `appID` 的会话 PVC 路径完全不同（`apps/app-1/` vs `apps/app-2/`），文件系统隔离。
+不同 `appId` 的会话 PVC 路径完全不同（`apps/app-1/` vs `apps/app-2/`），文件系统隔离。
 
 ### session/app 隔离
 
-session 模式（`sessions/{sessionID}/`）与 app 模式（`apps/{appID}/`）路径完全不同。
+session 模式（`sessions/{sessionID}/`）与 app 模式（`apps/{appId}/`）路径完全不同。
 
 ---
 
@@ -237,7 +237,7 @@ OPENCODE_SANDBOX_PVC_CLAIM=<claim-name>   # PVC claim 名称
 |------|-------------|
 | `VOLUME_TYPE=none` | 不挂载任何卷，app 模式无效（安全回退） |
 | `VOLUME_TYPE=host` | 使用本地目录，app 模式无效（安全回退） |
-| `VOLUME_TYPE=pvc` + 缺 appID | 安全回退到 session 模式 |
+| `VOLUME_TYPE=pvc` + 缺 appId | 安全回退到 session 模式 |
 
 ---
 
@@ -271,7 +271,7 @@ POST /session/{sessionID}/keep-alive {"enabled": true}
 
 ### 4. 子会话（subagent）自动共享
 
-subagent 通过 `findRoot()` 沿 parent_id 链向上查 root 会话的 pvcMode/appID，自动共享父会话的 sandbox 和 PVC 空间。
+subagent 通过 `findRoot()` 沿 parent_id 链向上查 root 会话的 pvcMode/appId，自动共享父会话的 sandbox 和 PVC 空间。
 
 ### 5. 编排系统 git 操作建议
 
@@ -286,9 +286,9 @@ rm -f /workspace/repo/.git/index.lock && git add -A && git commit -m "msg"
 ## 八、快速验证
 
 ```bash
-# 1. 创建两个同 appID 会话
-SID1=$(curl -s -X POST http://localhost:14096/session -H 'Content-Type: application/json' -d '{"pvcMode":"app","appID":"test"}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
-SID2=$(curl -s -X POST http://localhost:14096/session -H 'Content-Type: application/json' -d '{"pvcMode":"app","appID":"test"}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+# 1. 创建两个同 appId 会话
+SID1=$(curl -s -X POST http://localhost:14096/session -H 'Content-Type: application/json' -d '{"pvcMode":"app","appId":"test"}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+SID2=$(curl -s -X POST http://localhost:14096/session -H 'Content-Type: application/json' -d '{"pvcMode":"app","appId":"test"}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
 
 # 2. 会话1 写文件
 curl -s -X POST http://localhost:14096/session/$SID1/exec -H 'Content-Type: application/json' -d '{"command":"echo shared > /workspace/repo/test.txt"}'

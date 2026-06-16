@@ -49,7 +49,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
     ? yield* Effect.promise(() => resolveSandboxOpts(input.session.id))
     : { id: input.session.id }
   const sandboxSessionID = root.id
-  const useApp = root.pvcMode === "app" && !!root.appID?.trim()
+  const useApp = root.pvcMode === "app" && !!root.appId?.trim()
 
   async function ensureWorktree(): Promise<void> {
     if (!useApp || !maybeSandboxProvider) return
@@ -64,7 +64,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
       return null
     }
     return maybeSandboxProvider
-      .getOrCreate(sandboxSessionID, useApp ? { pvcMode: root.pvcMode, appID: root.appID } : undefined)
+      .getOrCreate(sandboxSessionID, useApp ? { pvcMode: root.pvcMode, appId: root.appId } : undefined)
       .pipe(Effect.runPromise)
       .then(async (sb) => {
         await ensureWorktree()

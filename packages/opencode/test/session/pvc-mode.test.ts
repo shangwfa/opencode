@@ -19,36 +19,36 @@ describe("PvcMode schema", () => {
 
 describe("InvalidPvcConfigError", () => {
   test("can be constructed", () => {
-    const err = new Session.InvalidPvcConfigError({ message: "appID is required when pvcMode is app" })
+    const err = new Session.InvalidPvcConfigError({ message: "appId is required when pvcMode is app" })
     expect(err._tag).toBe("SessionInvalidPvcConfigError")
-    expect(err.message).toBe("appID is required when pvcMode is app")
+    expect(err.message).toBe("appId is required when pvcMode is app")
   })
 })
 
-describe("create validation: pvcMode=app requires appID", () => {
+describe("create validation: pvcMode=app requires appId", () => {
   // 模拟 session.ts:712-714 的校验逻辑
-  function validatePvcConfig(pvcMode?: string, appID?: string): string | null {
-    if (pvcMode === "app" && !appID?.trim()) {
-      return "appID is required when pvcMode is app"
+  function validatePvcConfig(pvcMode?: string, appId?: string): string | null {
+    if (pvcMode === "app" && !appId?.trim()) {
+      return "appId is required when pvcMode is app"
     }
     return null
   }
 
-  test("app without appID → error", () => {
+  test("app without appId → error", () => {
     expect(validatePvcConfig("app", undefined)).not.toBeNull()
     expect(validatePvcConfig("app", "")).not.toBeNull()
   })
 
-  test("app with whitespace-only appID → error", () => {
+  test("app with whitespace-only appId → error", () => {
     expect(validatePvcConfig("app", "   ")).not.toBeNull()
   })
 
-  test("app with valid appID → no error", () => {
+  test("app with valid appId → no error", () => {
     expect(validatePvcConfig("app", "app-42")).toBeNull()
     expect(validatePvcConfig("app", "  app-42  ")).toBeNull()
   })
 
-  test("session mode → no error regardless of appID", () => {
+  test("session mode → no error regardless of appId", () => {
     expect(validatePvcConfig("session", undefined)).toBeNull()
     expect(validatePvcConfig("session", "")).toBeNull()
     expect(validatePvcConfig("session", "app-1")).toBeNull()
@@ -62,15 +62,15 @@ describe("create validation: pvcMode=app requires appID", () => {
 
 describe("PVC volume routing logic", () => {
   // 模拟 buildVolumes 的 useApp 判断逻辑
-  function shouldUseApp(volumeType: string, pvcMode?: string, appID?: string): boolean {
-    return volumeType === "pvc" && pvcMode === "app" && !!appID?.trim()
+  function shouldUseApp(volumeType: string, pvcMode?: string, appId?: string): boolean {
+    return volumeType === "pvc" && pvcMode === "app" && !!appId?.trim()
   }
 
-  test("pvc + app + appID → true", () => {
+  test("pvc + app + appId → true", () => {
     expect(shouldUseApp("pvc", "app", "app-1")).toBe(true)
   })
 
-  test("pvc + app + empty appID → false (fallback)", () => {
+  test("pvc + app + empty appId → false (fallback)", () => {
     expect(shouldUseApp("pvc", "app", "")).toBe(false)
     expect(shouldUseApp("pvc", "app", "  ")).toBe(false)
     expect(shouldUseApp("pvc", "app", undefined)).toBe(false)

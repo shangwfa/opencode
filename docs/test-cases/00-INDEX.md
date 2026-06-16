@@ -35,7 +35,7 @@
 | [`24-preload-cache.md`](./24-preload-cache-switch-env.md) | 二十四 | T24.x | 环境切换与预装依赖缓存：mise 多版本 Node/pnpm 切换、shims 自动检测、npm cache/node_modules 预装、跨版本缓存共享、隔离性 |
 | [`25-session-user-fields.md`](./25-session-user-fields.md) | 二十五 | T25.x | Session 用户标识字段：userName/userId 传递、持久化、向后兼容、多轮独立标识 |
 | [`26-session-agent-permissions.md`](./26-session-agent-permissions.md) | 二十六 | T26.x | Session Agent 权限：字符串简写、对象语法白名单、bash 粒度命令、last matching rule wins、worktree 影响权限 pattern（directory 基准修复）、`**/`/`*` 前缀匹配、`...` 字面点限制 |
-| [`27-session-pvc-mode.md`](./27-session-pvc-mode.md) | 二十七 | T27.x | Session PVC 模式：session/app 模式创建、appID 校验、PVC 共享/隔离、自动 worktree（detach+幂等+降级）、PG 持久化、子会话继承 |
+| [`27-session-pvc-mode.md`](./27-session-pvc-mode.md) | 二十七 | T27.x | Session PVC 模式：session/app 模式创建、appId 校验、PVC 共享/隔离、自动 worktree（detach+幂等+降级）、PG 持久化、子会话继承 |
 | [`sandbox-shared-test.mjs`](./sandbox-shared-test.mjs) | 十六 | T16.29 | 主子 agent 沙箱共享验证：主→子写读、子→主写读、exec 独立验证 |
 | [`vcs-diff-sandbox-test.mjs`](./vcs-diff-sandbox-test.mjs) | 十六 | T16.30 | VCS Diff 沙箱重建验证：销毁后自动重建 PVC 恢复，两次 diff 一致 |
 

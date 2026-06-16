@@ -76,7 +76,7 @@ export function fromRow(row: SessionRow): Info {
     projectID: row.project_id,
     workspaceID: row.workspace_id ?? undefined,
     pvcMode: row.pvc_mode ?? undefined,
-    appID: row.app_id ?? undefined,
+    appId: row.app_id ?? undefined,
     directory: row.directory,
     path: row.path ?? undefined,
     parentID: row.parent_id ?? undefined,
@@ -121,7 +121,7 @@ export function toRow(info: Info) {
     parent_id: info.parentID,
     slug: info.slug,
     pvc_mode: info.pvcMode,
-    app_id: info.appID,
+    app_id: info.appId,
     directory: info.directory,
     path: info.path,
     title: info.title,
@@ -218,7 +218,7 @@ export const Info = Schema.Struct({
   projectID: ProjectID,
   workspaceID: optionalOmitUndefined(WorkspaceID),
   pvcMode: optionalOmitUndefined(PvcMode),
-  appID: optionalOmitUndefined(Schema.String),
+  appId: optionalOmitUndefined(Schema.String),
   directory: Schema.String,
   path: optionalOmitUndefined(Schema.String),
   parentID: optionalOmitUndefined(SessionID),
@@ -258,7 +258,7 @@ export const CreateInput = Schema.optional(
     permission: Schema.optional(Permission.Ruleset),
     workspaceID: Schema.optional(WorkspaceID),
     pvcMode: Schema.optional(PvcMode),
-    appID: Schema.optional(Schema.String),
+    appId: Schema.optional(Schema.String),
   }),
 )
 export type CreateInput = Types.DeepMutable<Schema.Schema.Type<typeof CreateInput>>
@@ -494,7 +494,7 @@ export interface Interface {
     permission?: Permission.Ruleset
     workspaceID?: WorkspaceID
     pvcMode?: PvcMode
-    appID?: string
+    appId?: string
   }) => Effect.Effect<Info, InvalidPvcConfigError>
   readonly fork: (input: { sessionID: SessionID; messageID?: MessageID }) => Effect.Effect<Info, NotFound>
   readonly touch: (sessionID: SessionID) => Effect.Effect<void>
@@ -570,7 +570,7 @@ export const layer: Layer.Layer<
       path?: string
       permission?: Permission.Ruleset
       pvcMode?: PvcMode
-      appID?: string
+      appId?: string
     }) {
       const ctx = yield* InstanceState.context
       const result: Info = {
@@ -582,7 +582,7 @@ export const layer: Layer.Layer<
         path: input.path,
         workspaceID: input.workspaceID,
         pvcMode: input.pvcMode,
-        appID: input.appID,
+        appId: input.appId,
         parentID: input.parentID,
         title: input.title ?? createDefaultTitle(!!input.parentID),
         agent: input.agent,
@@ -711,10 +711,10 @@ export const layer: Layer.Layer<
       permission?: Permission.Ruleset
       workspaceID?: WorkspaceID
       pvcMode?: PvcMode
-      appID?: string
+      appId?: string
     }) {
-      if (input?.pvcMode === "app" && !input.appID?.trim()) {
-        return yield* new InvalidPvcConfigError({ message: "appID is required when pvcMode is app" })
+      if (input?.pvcMode === "app" && !input.appId?.trim()) {
+        return yield* new InvalidPvcConfigError({ message: "appId is required when pvcMode is app" })
       }
       const ctx = yield* InstanceState.context
       const workspace = yield* InstanceState.workspaceID
@@ -728,7 +728,7 @@ export const layer: Layer.Layer<
         permission: input?.permission,
         workspaceID: input?.workspaceID ?? workspace,
         pvcMode: input?.pvcMode,
-        appID: input?.appID?.trim(),
+        appId: input?.appId?.trim(),
       })
     })
 
