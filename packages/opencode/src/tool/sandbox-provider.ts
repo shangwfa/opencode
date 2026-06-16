@@ -1071,7 +1071,14 @@ export namespace SandboxProvider {
         )
       })
 
-      yield* Effect.addFinalizer(() => Effect.sync(() => commandSemaphores.clear()))
+      yield* Effect.addFinalizer(() =>
+        destroyAll().pipe(
+          Effect.catchCause((cause) => {
+            log.error("sandbox cleanup on scope exit failed", { cause: Cause.pretty(cause) })
+            return Effect.void
+          }),
+        ),
+      )
 
       return Service.of({
         getOrCreate, get, destroy, destroyById, destroyAll, keepAlive, release, isKeepAlive,
