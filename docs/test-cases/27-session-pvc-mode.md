@@ -391,10 +391,10 @@ console.log("✅ T27.14: " + (pass ? "PASS — 子会话继承 PVC 配置" : "NO
 | T27.1 | 🔲 | 默认行为不变（不传 pvcMode → undefined） |
 | T27.2 | 🔲 | 显式 pvcMode=session |
 | T27.3 | 🔲 | pvcMode=app + appID |
-| T27.4 | 🔲 | app 缺 appID → 报错 |
+| T27.4 | ✅ | app 缺 appID → 400（body 为 `{"_tag":"BadRequest"}`，不含 appID 字样） |
 | T27.5 | 🔲 | app 空白 appID → 报错 |
 | T27.6 | 🔲 | 非法 pvcMode → 报错 |
-| T27.7 | 🔲 | 同 appID 共享 PVC |
+| T27.7 | ⚠️ | 同 appID 共享：exec API 路径不传 pvcMode opts（已知限制，需修复 sandbox-proxy.ts 的 runInSession） |
 | T27.8 | 🔲 | 不同 appID 隔离 |
 | T27.9 | 🔲 | session/app 隔离 |
 | T27.10 | 🔲 | app 模式自动 worktree |
@@ -402,3 +402,24 @@ console.log("✅ T27.14: " + (pass ? "PASS — 子会话继承 PVC 配置" : "NO
 | T27.12 | 🔲 | worktree 幂等 |
 | T27.13 | 🔲 | PG 持久化 |
 | T27.14 | 🔲 | 子会话继承 |
+
+---
+
+## 已知限制
+
+### exec API 不传 pvcMode（T27.7 根因）
+
+exec API（`POST /session/:id/exec`）走 `sandbox-proxy.ts` → `sandbox.runInSession(sessionID)` → `getOrCreate(sessionID)`，**不传 pvcMode/appID opts**。
+
+只有 AI 消息路径（`session/tools.ts`）通过 `findRoot()` 查 session 的 pvcMode 并传 opts 给 `getOrCreate`。
+
+**影响**：app 模式会话通过 exec API 操作时，sandbox 用 session 模式的 PVC subPath（`sessions/{sessionID}/`），而非 app 模式的 `apps/{appID}/`，导致同 appID 的会话不共享空间。
+
+**修复方向**：`sandbox-proxy.ts` 的 `runInSession` 调用前，查 session 的 pvcMode/appID 并传入 opts。
+
+### 代码路径对比
+
+| 路径 | 查 pvcMode？ | 传 opts？ | subPath |
+|------|-------------|----------|---------|
+| AI 消息 → tools.ts → getOrCreate | ✅ findRoot() | ✅ {pvcMode, appID} | apps/{appID}/ 或 sessions/{sessionID}/ |
+| exec API → sandbox-proxy.ts → runInSession | ❌ 不查 | ❌ 不传 | sessions/{sessionID}/（总是 session 模式） |
