@@ -214,7 +214,7 @@ export const ApplyPatchTool = Tool.define(
 
       const files = fileChanges.map((change) => ({
         filePath: change.filePath,
-        relativePath: path.relative(instance.worktree, change.movePath ?? change.filePath).replaceAll("\\", "/"),
+        relativePath: path.relative(instance.directory, change.movePath ?? change.filePath).replaceAll("\\", "/"),
         type: change.type,
         patch: change.diff,
         additions: change.additions,
@@ -222,7 +222,7 @@ export const ApplyPatchTool = Tool.define(
         movePath: change.movePath,
       }))
 
-      const relativePaths = fileChanges.map((c) => path.relative(instance.worktree, c.filePath).replaceAll("\\", "/"))
+      const relativePaths = fileChanges.map((c) => path.relative(instance.directory, c.filePath).replaceAll("\\", "/"))
       yield* ctx.ask({
         permission: "edit",
         patterns: relativePaths,

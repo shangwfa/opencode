@@ -34,6 +34,7 @@
 | [`23-package-cache.md`](./23-package-cache.md) | 二十三 | T23.x | 共享 Package Cache：标准 exec 使用流程、跨 session 缓存共享、npm/pnpm/yarn/bun、加速/并发、mountPath 校验 |
 | [`24-preload-cache.md`](./24-preload-cache-switch-env.md) | 二十四 | T24.x | 环境切换与预装依赖缓存：mise 多版本 Node/pnpm 切换、shims 自动检测、npm cache/node_modules 预装、跨版本缓存共享、隔离性 |
 | [`25-session-user-fields.md`](./25-session-user-fields.md) | 二十五 | T25.x | Session 用户标识字段：userName/userId 传递、持久化、向后兼容、多轮独立标识 |
+| [`26-session-agent-permissions.md`](./26-session-agent-permissions.md) | 二十六 | T26.x | Session Agent 权限：字符串简写、对象语法白名单、bash 粒度命令、last matching rule wins、worktree 影响权限 pattern（directory 基准修复）、`**/`/`*` 前缀匹配、`...` 字面点限制 |
 | [`sandbox-shared-test.mjs`](./sandbox-shared-test.mjs) | 十六 | T16.29 | 主子 agent 沙箱共享验证：主→子写读、子→主写读、exec 独立验证 |
 | [`vcs-diff-sandbox-test.mjs`](./vcs-diff-sandbox-test.mjs) | 十六 | T16.30 | VCS Diff 沙箱重建验证：销毁后自动重建 PVC 恢复，两次 diff 一致 |
 
@@ -55,7 +56,7 @@ T12.x → 10-sandbox-lifecycle.md
 T13.x → 11-saas-stability.md
 T14.x → 12-compatibility.md
 T15.x → 13-session-skills.md
-T16.x → 14-session-agents.md
+T16.x → 14-session-agents.md（基础 CRUD/隔离）+ 26-session-agent-permissions.md（权限 T26.x）
 T17.x → 15-sandbox-endpoint.md
 T18.x → 16-tool-calls.md
 T19.x → 17-exec-api.md
@@ -63,6 +64,7 @@ T22.x → 22-session-mcp.md
 T23.x → 23-package-cache.md
 T24.x → 24-preload-cache.md
 T25.x → 25-session-user-fields.md
+T26.x → 26-session-agent-permissions.md
 
 沙箱工具（apply_patch/ls/错误泄露）→ 18-sandbox-tool-test.md
 路径泄露防护（PL-x）→ 20-path-leak-test.md
