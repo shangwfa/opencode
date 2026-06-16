@@ -21,6 +21,7 @@ import { EffectBridge } from "@/effect/bridge"
 import { SandboxProvider } from "@/tool/sandbox-provider"
 import { Database } from "@/storage/db"
 import { SessionTable } from "@/session/session.sql"
+import { resolveSandboxOpts, worktreeScript } from "@/session/sandbox-opts"
 import { eq } from "drizzle-orm"
 
 const log = Log.create({ service: "session.tools" })
@@ -44,51 +45,16 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
   const truncate = yield* Truncate.Service
 
   const maybeSandboxProvider = Option.getOrUndefined(yield* Effect.serviceOption(SandboxProvider.Service))
-  // 解析 root session，并取出其 PVC 配置（子会话共享 root 的 PVC 空间与 worktree）
-  async function findRoot(
-    sessionID: SessionID,
-  ): Promise<{ id: SessionID; pvcMode?: "session" | "app"; appID?: string }> {
-    let current = sessionID
-    let visited = 0
-    while (visited < 10) {
-      visited++
-      const row = await Database.use((db) =>
-        db
-          .select({ parent_id: SessionTable.parent_id, pvc_mode: SessionTable.pvc_mode, app_id: SessionTable.app_id })
-          .from(SessionTable)
-          .where(eq(SessionTable.id, current))
-          .get(),
-      )
-      if (!row?.parent_id) {
-        return { id: current, pvcMode: row?.pvc_mode ?? undefined, appID: row?.app_id ?? undefined }
-      }
-      current = row.parent_id as SessionID
-    }
-    return { id: current }
-  }
   const root = maybeSandboxProvider
-    ? yield* Effect.promise(() => findRoot(input.session.id))
+    ? yield* Effect.promise(() => resolveSandboxOpts(input.session.id))
     : { id: input.session.id }
   const sandboxSessionID = root.id
   const useApp = root.pvcMode === "app" && !!root.appID?.trim()
 
-  // app 模式：detached worktree 自动准备脚本（幂等 + repo 不存在时降级）。
-  // repo 与 worktrees 同在 workspace 卷内（P1）：/workspace/repo + /workspace/worktrees/{sessionID}
-  function worktreeScript(): string {
-    const wt = `/workspace/worktrees/${sandboxSessionID}`
-    return [
-      `if [ -d /workspace/repo/.git ]; then`,
-      `  if [ ! -d ${wt} ]; then`,
-      `    git -C /workspace/repo worktree add --detach ${wt} HEAD;`,
-      `  fi;`,
-      `fi`,
-    ].join(" ")
-  }
-
   async function ensureWorktree(): Promise<void> {
     if (!useApp || !maybeSandboxProvider) return
     await maybeSandboxProvider
-      .runInSession(sandboxSessionID, worktreeScript())
+      .runInSession(sandboxSessionID, worktreeScript(sandboxSessionID))
       .pipe(Effect.runPromise)
       .catch((err) => log.error("app worktree ensure failed", { sandboxSessionID, err: String(err) }))
   }

@@ -12,39 +12,7 @@ import { SessionTable } from "@/session/session.pg"
 import { eq } from "drizzle-orm"
 import { WebSocketTracker } from "./routes/instance/httpapi/websocket-tracker"
 import { ProxyUtil } from "@/server/proxy-util"
-
-// 解析 root session 的 pvcMode/appID（与 session/tools.ts findRoot 逻辑一致）
-async function resolveSandboxOpts(sessionID: SessionID): Promise<{ id: SessionID; pvcMode?: "session" | "app"; appID?: string }> {
-  let current: SessionID = sessionID
-  let visited = 0
-  while (visited < 10) {
-    visited++
-    const row = await Database.use((db) =>
-      db
-        .select({ parent_id: SessionTable.parent_id, pvc_mode: SessionTable.pvc_mode, app_id: SessionTable.app_id })
-        .from(SessionTable)
-        .where(eq(SessionTable.id, current))
-        .get(),
-    )
-    if (!row?.parent_id) {
-      return { id: current, pvcMode: (row?.pvc_mode as "session" | "app") ?? undefined, appID: row?.app_id ?? undefined }
-    }
-    current = row.parent_id as SessionID
-  }
-  return { id: current }
-}
-
-// app 模式 worktree 脚本（幂等 + repo 不存在时降级）
-function worktreeScript(sessionID: string): string {
-  const wt = `/workspace/worktrees/${sessionID}`
-  return [
-    `if [ -d /workspace/repo/.git ]; then`,
-    `  if [ ! -d ${wt} ]; then`,
-    `    git -C /workspace/repo worktree add --detach ${wt} HEAD;`,
-    `  fi;`,
-    `fi`,
-  ].join(" ")
-}
+import { resolveSandboxOpts, worktreeScript } from "@/session/sandbox-opts"
 
 type ProxyError = {
   type: "runtime" | "network" | "compile"
