@@ -34,6 +34,18 @@ async function resolveSandboxOpts(sessionID: SessionID): Promise<{ id: SessionID
   return { id: current }
 }
 
+// app 模式 worktree 脚本（幂等 + repo 不存在时降级）
+function worktreeScript(sessionID: string): string {
+  const wt = `/workspace/worktrees/${sessionID}`
+  return [
+    `if [ -d /workspace/repo/.git ]; then`,
+    `  if [ ! -d ${wt} ]; then`,
+    `    git -C /workspace/repo worktree add --detach ${wt} HEAD;`,
+    `  fi;`,
+    `fi`,
+  ].join(" ")
+}
+
 type ProxyError = {
   type: "runtime" | "network" | "compile"
   message: string
@@ -321,6 +333,10 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
           yield* sandbox.getOrCreate(root.id, { pvcMode: root.pvcMode, appID: root.appID }).pipe(
             Effect.catch(() => Effect.void),
           )
+          // app 模式：确保 worktree 存在（幂等 + repo 不存在时降级）
+          yield* sandbox.runInSession(root.id, worktreeScript(params.sessionID), { timeoutSeconds: 30 }, {}).pipe(
+            Effect.catch(() => Effect.void),
+          )
         }
 
         const result = yield* sandbox.runInSession(
@@ -359,6 +375,10 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
         // 确保 sandbox 用正确的 PVC 前缀创建（幂等）
         if (useApp) {
           yield* sandbox.getOrCreate(root.id, { pvcMode: root.pvcMode, appID: root.appID }).pipe(
+            Effect.catch(() => Effect.void),
+          )
+          // app 模式：确保 worktree 存在（幂等 + repo 不存在时降级）
+          yield* sandbox.runInSession(root.id, worktreeScript(params.sessionID), { timeoutSeconds: 30 }, {}).pipe(
             Effect.catch(() => Effect.void),
           )
         }
