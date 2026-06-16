@@ -13,6 +13,27 @@ import { eq } from "drizzle-orm"
 import { WebSocketTracker } from "./routes/instance/httpapi/websocket-tracker"
 import { ProxyUtil } from "@/server/proxy-util"
 
+// 解析 root session 的 pvcMode/appID（与 session/tools.ts findRoot 逻辑一致）
+async function resolveSandboxOpts(sessionID: SessionID): Promise<{ id: SessionID; pvcMode?: "session" | "app"; appID?: string }> {
+  let current: SessionID = sessionID
+  let visited = 0
+  while (visited < 10) {
+    visited++
+    const row = await Database.use((db) =>
+      db
+        .select({ parent_id: SessionTable.parent_id, pvc_mode: SessionTable.pvc_mode, app_id: SessionTable.app_id })
+        .from(SessionTable)
+        .where(eq(SessionTable.id, current))
+        .get(),
+    )
+    if (!row?.parent_id) {
+      return { id: current, pvcMode: (row?.pvc_mode as "session" | "app") ?? undefined, appID: row?.app_id ?? undefined }
+    }
+    current = row.parent_id as SessionID
+  }
+  return { id: current }
+}
+
 type ProxyError = {
   type: "runtime" | "network" | "compile"
   message: string
@@ -291,8 +312,19 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
         )
         if (!body.command) return HttpServerResponse.jsonUnsafe({ error: "command is required" }, { status: 400 })
 
+        // 查 root session 的 pvcMode/appID（app 模式需正确 PVC subPath）
+        const root = yield* Effect.promise(() => resolveSandboxOpts(params.sessionID))
+        const useApp = root.pvcMode === "app" && !!root.appID?.trim()
+
+        // 确保 sandbox 用正确的 PVC 前缀创建（幂等：已存在则跳过）
+        if (useApp) {
+          yield* sandbox.getOrCreate(root.id, { pvcMode: root.pvcMode, appID: root.appID }).pipe(
+            Effect.catch(() => Effect.void),
+          )
+        }
+
         const result = yield* sandbox.runInSession(
-          params.sessionID,
+          root.id,
           body.command,
           { workingDirectory: body.workingDirectory, timeoutSeconds: body.timeoutSeconds },
           {},
@@ -320,7 +352,18 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
         )
         if (!body.command) return HttpServerResponse.jsonUnsafe({ error: "command is required" }, { status: 400 })
 
-        const sid = params.sessionID
+        // 查 root session 的 pvcMode/appID（app 模式需正确 PVC subPath）
+        const root = yield* Effect.promise(() => resolveSandboxOpts(params.sessionID))
+        const useApp = root.pvcMode === "app" && !!root.appID?.trim()
+
+        // 确保 sandbox 用正确的 PVC 前缀创建（幂等）
+        if (useApp) {
+          yield* sandbox.getOrCreate(root.id, { pvcMode: root.pvcMode, appID: root.appID }).pipe(
+            Effect.catch(() => Effect.void),
+          )
+        }
+
+        const sid = root.id
         const execId = `exec-${++execCounter}-${Date.now()}`
         const q = yield* Queue.unbounded<ExecSseEvent>()
         const state: ExecState = {
