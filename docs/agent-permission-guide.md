@@ -172,23 +172,24 @@ skill 工具（加载技能）    → 查 "skill" 权限
 
 ### disabled() 工具级粗开关
 
-`disabled()` 决定工具是否出现在 LLM 的工具列表里。它检查 ruleset 中该权限 key 最后一条匹配 `*` 的规则：
+`disabled()` 决定工具是否出现在 LLM 的工具列表里。它用 `findLast` 找 ruleset 中**最后一条**匹配该 permission 的规则，检查那条规则的 pattern 是不是 `*` 且 action 是 `deny`：
 
 ```typescript
-// permission.ts:37
-EDIT_TOOLS = ["edit", "write", "apply_patch"]
-// 如果 edit 的最后一条 * 规则是 deny → write/edit/apply_patch 全部从工具列表移除
+// permission.ts:41-42
+const rule = ruleset.findLast(rule => match(permission, rule.permission))  // 只匹配 permission，不看 pattern
+return rule?.pattern === "*" && rule.action === "deny"
 ```
 
-| 配置 | disabled 结果 | LLM 能看到 write 工具？ |
-|------|-------------|----------------------|
-| `edit: { "*": "deny" }` | write/edit/apply_patch 移除 | ❌ 看不到 |
-| `edit: { "*": "deny", "docs/*.md": "allow" }` | **仍然移除**（只看 `*:deny`） | ❌ 看不到 |
-| `edit: { "*": "ask", "docs/*.md": "allow" }` | 工具保留（ask ≠ deny） | ✅ 能看到 |
+| 配置 | findLast 找到的最后一条 edit 规则 | pattern 是 `*`？ | 工具 |
+|------|------|------|------|
+| `{ "*": "deny" }` | `deny *` | ✅ | ❌ 移除 |
+| `{ "*": "deny", "docs/*.md": "allow" }` | `allow docs/*.md`（白名单在最后） | ❌ | ✅ 保留 |
+| `{ "docs/*.md": "allow", "*": "deny" }` | `deny *`（deny 在最后） | ✅ | ❌ 移除 |
+| `{ "*": "ask", "docs/*.md": "allow" }` | `allow docs/*.md` | ❌ | ✅ 保留 |
 
-> **关键**：`disabled()` 只看 `*:deny`，不看白名单。如果 catch-all 是 `deny`，即使配了白名单，工具也被完全移除——白名单没机会在运行时生效。
+> **关键**：`disabled()` 找的是**最后一条**匹配的 edit 规则。白名单写在 `*:deny` **后面**时，findLast 找到的是白名单（pattern 不是 `*`）→ 工具保留。如果 `*:deny` 写在白名单**后面**，findLast 找到 deny → 工具移除。
 >
-> 如果需要白名单生效（工具可用），catch-all 用 `ask` 而非 `deny`。SaaS 无交互场景需要配合自动权限回复（`POST /permission/:id/reply`）。
+> 所以 key 顺序同样影响 `disabled()`：`*` 在前 → 工具保留（白名单在后，findLast 取白名单）；`*` 在后 → 工具移除（findLast 取 deny）。
 
 ---
 
