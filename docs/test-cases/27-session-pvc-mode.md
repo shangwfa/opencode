@@ -384,23 +384,23 @@ console.log("✅ T27.14: " + (pass ? "PASS — 子会话继承 PVC 配置" : "NO
 
 ---
 
-## 结果汇总
+## 结果汇总（2026-06-16 本地测试）
 
 | 用例 | 状态 | 说明 |
 |------|------|------|
-| T27.1 | 🔲 | 默认行为不变（不传 pvcMode → undefined） |
-| T27.2 | 🔲 | 显式 pvcMode=session |
-| T27.3 | 🔲 | pvcMode=app + appID |
-| T27.4 | ✅ | app 缺 appID → 400（body 为 `{"_tag":"BadRequest"}`，不含 appID 字样） |
-| T27.5 | 🔲 | app 空白 appID → 报错 |
-| T27.6 | 🔲 | 非法 pvcMode → 报错 |
-| T27.7 | ⚠️ | 同 appID 共享：exec API 路径不传 pvcMode opts（已知限制，需修复 sandbox-proxy.ts 的 runInSession） |
-| T27.8 | 🔲 | 不同 appID 隔离 |
-| T27.9 | 🔲 | session/app 隔离 |
-| T27.10 | 🔲 | app 模式自动 worktree |
-| T27.11 | 🔲 | repo 不存在时降级 |
-| T27.12 | 🔲 | worktree 幂等 |
-| T27.13 | 🔲 | PG 持久化 |
+| T27.1 | ✅ | 默认行为不变（pvcMode=undefined） |
+| T27.2 | ✅ | 显式 pvcMode=session |
+| T27.3 | ✅ | pvcMode=app + appID 持久化 |
+| T27.4 | ✅ | app 缺 appID → 400 |
+| T27.5 | ✅ | app 空白 appID → 400 |
+| T27.6 | ✅ | 非法 pvcMode → 400 |
+| T27.7 | ✅ | 同 appID 共享 PVC（exec API 修复后生效） |
+| T27.8 | ✅ | 不同 appID 隔离 |
+| T27.9 | ✅ | session/app 隔离 |
+| T27.10 | ✅ | app 模式自动 worktree（repo 不存在时降级） |
+| T27.11 | ✅ | repo 不存在时降级不阻塞 |
+| T27.12 | ✅ | worktree 幂等（重建不重复） |
+| T27.13 | ✅ | PG 持久化（pvcMode=app, appID 正确） |
 | T27.14 | 🔲 | 子会话继承 |
 
 ---

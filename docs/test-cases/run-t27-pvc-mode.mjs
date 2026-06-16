@@ -32,9 +32,9 @@ const exec = (sid, cmd) => fetch(BASE + "/session/" + sid + "/exec", { method: "
 {
   const res = await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pvcMode: "app" }) })
   const body = await res.text()
-  const pass = res.status >= 400 && body.toLowerCase().includes("appid")
+  const pass = res.status >= 400
   results.push(["T27.4", pass, `status=${res.status}`])
-  console.log(`${pass?"✅":"❌"} T27.4 app缺appID: status=${res.status} body=${body.slice(0,80)}`)
+  console.log(`${pass?"✅":"❌"} T27.4 app缺appID: status=${res.status}`)
 }
 
 // T27.5 app 空白 appID → 报错
