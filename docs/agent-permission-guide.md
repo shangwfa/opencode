@@ -140,36 +140,55 @@ analysis/.../spec/*.md          ❌ ... 是字面点，不匹配 UUID
 
 ---
 
-## 四、权限工具映射
+## 四、工具与权限 key 的对应关系
 
-### write/edit/apply_patch
+每个工具调用权限检查时，用固定的 key 去匹配 ruleset。**配置里的 key 决定了哪个工具受控**：
 
-三个工具的 `ctx.ask` 都用 `permission: "edit"`，传入 pattern 为 `path.relative(instance.directory, filepath)`。
+```
+write 工具（写文件）     → 查 "edit" 权限
+edit 工具（编辑文件）     → 查 "edit" 权限
+apply_patch 工具（打补丁）→ 查 "edit" 权限
+read 工具（读文件）       → 查 "read" 权限
+bash 工具（跑命令）       → 查 "bash" 权限
+task 工具（调度子 agent） → 查 "task" 权限
+skill 工具（加载技能）    → 查 "skill" 权限
+```
 
-| 工具 | ask permission | pattern 基准 |
-|------|---------------|-------------|
-| write | `"edit"` | `instance.directory`（修复后，原为 worktree） |
-| edit | `"edit"` | `instance.directory` |
-| apply_patch | `"edit"` | `instance.directory` |
-| read | `"read"` | `instance.directory` |
-| bash | `"bash"` | 命令字符串（如 `git status`） |
-| task | `"task"` | subagent 名称 |
-| skill | `"skill"` | skill 名称 |
+> ⚠️ **最容易搞混的点**：`write` 工具查的是 `"edit"` 权限，不是 `"write"`。所以配置里写 `"edit": "deny"` 就能禁止 write/edit/apply_patch 三个工具。写 `"write": "deny"` 不生效。
+
+配置示例：
+
+```json
+{
+  "edit": { "*": "deny", "docs/*.md": "allow" },
+  "read": "allow",
+  "bash": "deny"
+}
+```
+
+- write/edit/apply_patch → 查 `edit` → `docs/*.md` 放行，其他拒绝
+- read → 查 `read` → 全部放行
+- bash → 查 `bash` → 全部拒绝
 
 ### disabled() 工具级粗开关
+
+`disabled()` 决定工具是否出现在 LLM 的工具列表里。它检查 ruleset 中该权限 key 最后一条匹配 `*` 的规则：
 
 ```typescript
 // permission.ts:37
 EDIT_TOOLS = ["edit", "write", "apply_patch"]
-// 如果 edit:*:deny → write/edit/apply_patch 全部从工具列表移除
-// 如果 edit:*:ask  → 工具保留（ask ≠ deny）
+// 如果 edit 的最后一条 * 规则是 deny → write/edit/apply_patch 全部从工具列表移除
 ```
 
-- `edit: { "*": "deny" }` → write/edit/apply_patch **全部不可用**
-- `edit: { "*": "deny", "docs/*.md": "allow" }` → **仍然全部不可用**（disabled 只看 `*:deny`，不看白名单）
-- `edit: { "*": "ask", "docs/*.md": "allow" }` → 工具保留，白名单路径 allow，其他 ask
+| 配置 | disabled 结果 | LLM 能看到 write 工具？ |
+|------|-------------|----------------------|
+| `edit: { "*": "deny" }` | write/edit/apply_patch 移除 | ❌ 看不到 |
+| `edit: { "*": "deny", "docs/*.md": "allow" }` | **仍然移除**（只看 `*:deny`） | ❌ 看不到 |
+| `edit: { "*": "ask", "docs/*.md": "allow" }` | 工具保留（ask ≠ deny） | ✅ 能看到 |
 
-> 如果需要白名单生效（工具可用），catch-all 用 `ask` 而非 `deny`。但 SaaS 无交互场景 ask 会卡住，需要 `POST /permission/:id/reply` 自动回复。
+> **关键**：`disabled()` 只看 `*:deny`，不看白名单。如果 catch-all 是 `deny`，即使配了白名单，工具也被完全移除——白名单没机会在运行时生效。
+>
+> 如果需要白名单生效（工具可用），catch-all 用 `ask` 而非 `deny`。SaaS 无交互场景需要配合自动权限回复（`POST /permission/:id/reply`）。
 
 ---
 
