@@ -257,7 +257,7 @@ export const ReadTool = Tool.define<
 
       yield* ctx.ask({
         permission: "read",
-        patterns: [path.relative(instance.worktree, filepath)],
+        patterns: [path.relative(instance.directory, filepath)],
         always: ["*"],
         metadata: {},
       })

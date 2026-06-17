@@ -32,6 +32,7 @@ import { ProjectTable } from "@opencode-ai/core/project/sql"
 import { MessageV2 } from "./message-v2"
 import type { InstanceContext } from "../project/instance-context"
 import { InstanceState } from "@/effect/instance-state"
+import { resolveSandboxOpts } from "@/session/sandbox-opts"
 import { Snapshot } from "@/snapshot"
 import { ProjectV2 } from "@opencode-ai/core/project"
 import { WorkspaceV2 } from "@opencode-ai/core/workspace"
@@ -78,6 +79,8 @@ export function fromRow(row: SessionRow): Info {
     slug: row.slug,
     projectID: row.project_id,
     workspaceID: row.workspace_id ?? undefined,
+    pvcMode: row.pvc_mode ?? undefined,
+    appId: row.app_id ?? undefined,
     directory: row.directory,
     path: row.path ?? undefined,
     parentID: row.parent_id ?? undefined,
@@ -122,6 +125,8 @@ export function toRow(info: Info) {
     workspace_id: info.workspaceID,
     parent_id: info.parentID,
     slug: info.slug,
+    pvc_mode: info.pvcMode,
+    app_id: info.appId,
     directory: info.directory,
     path: info.path,
     title: info.title,
@@ -212,11 +217,16 @@ const Model = Schema.Struct({
 
 export const Metadata = Schema.Record(Schema.String, Schema.Any)
 
+export const PvcMode = Schema.Literals(["session", "app"])
+export type PvcMode = Schema.Schema.Type<typeof PvcMode>
+
 export const Info = Schema.Struct({
   id: SessionID,
   slug: Schema.String,
   projectID: ProjectV2.ID,
   workspaceID: optionalOmitUndefined(WorkspaceV2.ID),
+  pvcMode: optionalOmitUndefined(PvcMode),
+  appId: optionalOmitUndefined(Schema.String),
   directory: Schema.String,
   path: optionalOmitUndefined(Schema.String),
   parentID: optionalOmitUndefined(SessionID),
@@ -257,6 +267,8 @@ export const CreateInput = Schema.optional(
     metadata: Schema.optional(Metadata),
     permission: Schema.optional(PermissionV1.Ruleset),
     workspaceID: Schema.optional(WorkspaceV2.ID),
+    pvcMode: Schema.optional(PvcMode),
+    appId: Schema.optional(Schema.String),
   }),
 )
 export type CreateInput = Types.DeepMutable<Schema.Schema.Type<typeof CreateInput>>
@@ -458,6 +470,13 @@ export class BusyError extends Schema.TaggedErrorClass<BusyError>()("SessionBusy
   sessionID: SessionID,
 }) {}
 
+export class InvalidPvcConfigError extends Schema.TaggedErrorClass<InvalidPvcConfigError>()(
+  "SessionInvalidPvcConfigError",
+  {
+    message: Schema.String,
+  },
+) {}
+
 export type NotFound = NotFoundError
 
 export interface Interface {
@@ -471,7 +490,9 @@ export interface Interface {
     metadata?: typeof Metadata.Type
     permission?: PermissionV1.Ruleset
     workspaceID?: WorkspaceV2.ID
-  }) => Effect.Effect<Info>
+    pvcMode?: PvcMode
+    appId?: string
+  }) => Effect.Effect<Info, InvalidPvcConfigError>
   readonly fork: (input: { sessionID: SessionID; messageID?: MessageID }) => Effect.Effect<Info, NotFound>
   readonly touch: (sessionID: SessionID) => Effect.Effect<void>
   readonly get: (id: SessionID) => Effect.Effect<Info, NotFound>
@@ -552,6 +573,8 @@ export const layer: Layer.Layer<
       path?: string
       metadata?: typeof Metadata.Type
       permission?: PermissionV1.Ruleset
+      pvcMode?: PvcMode
+      appId?: string
     }) {
       const ctx = yield* InstanceState.context
       const result: Info = {
@@ -562,6 +585,8 @@ export const layer: Layer.Layer<
         directory: input.directory,
         path: input.path,
         workspaceID: input.workspaceID,
+        pvcMode: input.pvcMode,
+        appId: input.appId,
         parentID: input.parentID,
         title: input.title ?? (input.parentID ? childTitlePrefix : parentTitlePrefix) + new Date().toISOString(),
         agent: input.agent,
@@ -717,7 +742,27 @@ export const layer: Layer.Layer<
       metadata?: typeof Metadata.Type
       permission?: PermissionV1.Ruleset
       workspaceID?: WorkspaceV2.ID
+      pvcMode?: PvcMode
+      appId?: string
     }) {
+      if (input?.pvcMode === "app" && !input.appId?.trim()) {
+        return yield* new InvalidPvcConfigError({ message: "appId is required when pvcMode is app" })
+      }
+      if (input?.appId && !/^[\w\-.]{1,128}$/.test(input.appId)) {
+        return yield* new InvalidPvcConfigError({ message: "appId must be 1-128 chars of [a-zA-Z0-9_-\\.]" })
+      }
+      // 子会话自动继承父会话的 app 模式配置（session 模式不影响，保持原行为）
+      let pvcMode = input?.pvcMode
+      let appId = input?.appId?.trim()
+      if (input?.parentID && !pvcMode) {
+        const parent = yield* Effect.tryPromise(() => resolveSandboxOpts(input.parentID!)).pipe(
+          Effect.catch(() => Effect.succeed(undefined)),
+        )
+        if (parent?.pvcMode === "app") {
+          pvcMode = parent.pvcMode
+          appId = parent.appId
+        }
+      }
       const ctx = yield* InstanceState.context
       const workspace = yield* InstanceState.workspaceID
       return yield* createNext({
@@ -730,6 +775,8 @@ export const layer: Layer.Layer<
         metadata: input?.metadata,
         permission: input?.permission,
         workspaceID: input?.workspaceID ?? workspace,
+        pvcMode,
+        appId,
       })
     })
 
@@ -738,9 +785,12 @@ export const layer: Layer.Layer<
       const original = yield* get(input.sessionID)
       const title = getForkedTitle(original.title)
       const session = yield* createNext({
+        parentID: original.id,
         directory: ctx.directory,
         path: sessionPath(ctx.worktree, ctx.directory),
         workspaceID: original.workspaceID,
+        pvcMode: original.pvcMode === "app" ? "app" : undefined,
+        appId: original.pvcMode === "app" ? original.appId : undefined,
         title,
         metadata: structuredClone(original.metadata),
       })

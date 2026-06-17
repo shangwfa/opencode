@@ -50,10 +50,18 @@ type Entry =
   | { state: "running"; sb: Sandbox; sandboxID: string; lastActive: number }
   | { state: "killed"; sandboxID: string; lastActive: number }
 
-export function buildVolumes(sessionID: string, config: SandboxConfig.Interface): Volume[] {
+export interface VolumeScope {
+  readonly sessionID: string
+  readonly pvcMode?: "session" | "app"
+  readonly appId?: string
+}
+
+export function buildVolumes(scope: VolumeScope, config: SandboxConfig.Interface): Volume[] {
   if (config.volumeType === "none") return []
 
-  const prefix = `sessions/${sessionID}`
+  // app 模式仅在 pvc 卷类型下生效，且必须有 appId，否则安全回退到 session 前缀
+  const useApp = config.volumeType === "pvc" && scope.pvcMode === "app" && !!scope.appId?.trim()
+  const prefix = useApp ? `apps/${scope.appId!.trim()}` : `sessions/${scope.sessionID}`
   const mounts = [
     { name: "workspace", mountPath: "/workspace", sub: `${prefix}/workspace` },
     { name: "home", mountPath: "/home/sandbox", sub: `${prefix}/home` },
@@ -68,7 +76,7 @@ export function buildVolumes(sessionID: string, config: SandboxConfig.Interface)
     if (config.volumeType === "pvc") {
       base.pvc = { claimName: config.pvcClaimName }
     } else {
-      base.host = { path: `/var/opencode/sessions/${sessionID}/${m.name}` }
+      base.host = { path: `/var/opencode/sessions/${scope.sessionID}/${m.name}` }
     }
     return base
   })
@@ -122,7 +130,10 @@ export namespace SandboxProvider {
   }
 
   export interface Interface {
-    readonly getOrCreate: (sessionID: SessionID) => Effect.Effect<Sandbox>
+    readonly getOrCreate: (
+      sessionID: SessionID,
+      opts?: { pvcMode?: "session" | "app"; appId?: string },
+    ) => Effect.Effect<Sandbox>
     readonly get: (sessionID: SessionID) => Effect.Effect<Sandbox | null>
     readonly destroy: (sessionID: SessionID) => Effect.Effect<void>
     readonly destroyById: (sandboxID: string) => Effect.Effect<void>
@@ -206,11 +217,11 @@ export namespace SandboxProvider {
         return Ref.modify(entries, (m) => { m.delete(sessionID); return [undefined, m] as const })
       }
 
-      function createSandbox(sessionID: SessionID) {
+      function createSandbox(sessionID: SessionID, opts?: { pvcMode?: "session" | "app"; appId?: string }) {
         return Effect.gen(function* () {
           const timeoutSeconds = hasVolume ? config.maxTtlSeconds : config.timeoutSeconds
-          log.info("creating sandbox", { sessionID, volumeType: config.volumeType, timeoutSeconds })
-          const volumes = buildVolumes(sessionID, config)
+          log.info("creating sandbox", { sessionID, volumeType: config.volumeType, timeoutSeconds, pvcMode: opts?.pvcMode })
+          const volumes = buildVolumes({ sessionID, pvcMode: opts?.pvcMode, appId: opts?.appId }, config)
           const sb = yield* Effect.tryPromise({
             try: () =>
               Sandbox.create({
@@ -263,7 +274,7 @@ export namespace SandboxProvider {
 
       const sandboxes = new Map<string, Sandbox>()
 
-      const getOrCreate: Interface["getOrCreate"] = (sessionID) =>
+      const getOrCreate: Interface["getOrCreate"] = (sessionID, opts) =>
         Effect.gen(function* () {
           const myToken = yield* Deferred.make<Sandbox, Error>()
           const winner = yield* claim(createRef, sessionID, myToken)
@@ -272,7 +283,7 @@ export namespace SandboxProvider {
           const entry = yield* Ref.modify(entries, (m) => [m.get(sessionID) ?? null, m] as const)
 
           const sb = yield* Effect.gen(function* () {
-            if (!entry) return yield* createSandbox(sessionID)
+            if (!entry) return yield* createSandbox(sessionID, opts)
             if (entry.state === "running") {
               const healthy = yield* Effect.tryPromise(() => entry.sb.isHealthy()).pipe(
                 Effect.catch(() => Effect.succeed(false)),
@@ -280,10 +291,10 @@ export namespace SandboxProvider {
               if (healthy) return entry.sb
               log.warn("sandbox unhealthy, rebuilding", { sessionID })
               yield* destroySandbox(entry.sb, sessionID)
-              return yield* createSandbox(sessionID)
+              return yield* createSandbox(sessionID, opts)
             }
             log.info("recreating killed sandbox", { sessionID, sandboxID: entry.sandboxID })
-            return yield* createSandbox(sessionID)
+            return yield* createSandbox(sessionID, opts)
           }).pipe(
             Effect.catchCause((cause) =>
               Effect.gen(function* () {
@@ -682,15 +693,15 @@ export namespace SandboxProvider {
         }).pipe(Effect.catchCause(() => Effect.void))
       }
 
-      function createSandbox(sessionID: SessionID) {
+      function createSandbox(sessionID: SessionID, opts?: { pvcMode?: "session" | "app"; appId?: string }) {
         return Effect.gen(function* () {
           const existingRow = yield* dbGet(sessionID).pipe(Effect.orElseSucceed(() => null))
           const isKept = existingRow?.keep_alive === true
           const baseTtl = hasVolume ? config.maxTtlSeconds : config.timeoutSeconds
           // keepAlive sandbox 使用 10x TTL，确保远程 sandbox 不会在保活期间自杀
           const timeoutSeconds = isKept ? Math.max(baseTtl, config.maxTtlSeconds) * 10 : baseTtl
-          log.info("creating sandbox", { sessionID, volumeType: config.volumeType, timeoutSeconds, keepAlive: isKept })
-          const volumes = buildVolumes(sessionID, config)
+          log.info("creating sandbox", { sessionID, volumeType: config.volumeType, timeoutSeconds, keepAlive: isKept, pvcMode: opts?.pvcMode })
+          const volumes = buildVolumes({ sessionID, pvcMode: opts?.pvcMode, appId: opts?.appId }, config)
           const sb = yield* Effect.tryPromise({
             try: () =>
               Sandbox.create({
@@ -762,7 +773,7 @@ export namespace SandboxProvider {
 
       // ── Interface 实装 ────────────────────────────────────────────────
 
-      function getOrCreateUnlocked(sessionID: SessionID) {
+      function getOrCreateUnlocked(sessionID: SessionID, opts?: { pvcMode?: "session" | "app"; appId?: string }) {
         return Effect.gen(function* () {
           // pod 内去重
           const myToken = yield* Deferred.make<Sandbox, Error>()
@@ -792,7 +803,7 @@ export namespace SandboxProvider {
             if (row?.state === "killed") {
               log.info("recreating killed sandbox", { sessionID, sandboxID: row.id })
             }
-            return yield* createSandbox(sessionID)
+            return yield* createSandbox(sessionID, opts)
           }).pipe(
             Effect.catchCause((cause) =>
               Effect.gen(function* () {
@@ -814,8 +825,8 @@ export namespace SandboxProvider {
         })
       }
 
-      const getOrCreate: Interface["getOrCreate"] = (sessionID) =>
-        lock(sessionID, getOrCreateUnlocked(sessionID)).pipe(Effect.orDie, Effect.withSpan("SandboxProvider.getOrCreate"))
+      const getOrCreate: Interface["getOrCreate"] = (sessionID, opts) =>
+        lock(sessionID, getOrCreateUnlocked(sessionID, opts)).pipe(Effect.orDie, Effect.withSpan("SandboxProvider.getOrCreate"))
 
       const get: Interface["get"] = (sessionID) =>
         Effect.gen(function* () {

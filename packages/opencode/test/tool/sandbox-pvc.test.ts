@@ -19,12 +19,12 @@ const baseConfig: SandboxConfigType.Interface = {
 
 describe("buildVolumes", () => {
   test("none returns empty", () => {
-    expect(buildVolumes("ses_1", baseConfig)).toEqual([])
+    expect(buildVolumes({ sessionID: "ses_1" }, baseConfig)).toEqual([])
   })
 
   test("pvc: 7 volumes (6 session + 1 shared cache), same claimName, different subPaths", () => {
     const cfg = { ...baseConfig, volumeType: "pvc" as const, pvcClaimName: "my-pvc" }
-    const vols = buildVolumes("ses_abc", cfg)
+    const vols = buildVolumes({ sessionID: "ses_abc" }, cfg)
     expect(vols.length).toBe(7)
     for (const v of vols) {
       expect(v.pvc!.claimName).toBe("my-pvc")
@@ -43,7 +43,7 @@ describe("buildVolumes", () => {
 
   test("host: 6 volumes with different host paths", () => {
     const cfg = { ...baseConfig, volumeType: "host" as const }
-    const vols = buildVolumes("ses_xyz", cfg)
+    const vols = buildVolumes({ sessionID: "ses_xyz" }, cfg)
     expect(vols.length).toBe(6)
     for (const v of vols) {
       expect(v.host!.path.startsWith("/var/opencode/sessions/ses_xyz/")).toBe(true)
@@ -53,8 +53,8 @@ describe("buildVolumes", () => {
 
   test("sessions are isolated by subPath", () => {
     const cfg = { ...baseConfig, volumeType: "pvc" as const, pvcClaimName: "pvc" }
-    const a = buildVolumes("aaa", cfg)
-    const b = buildVolumes("bbb", cfg)
+    const a = buildVolumes({ sessionID: "aaa" }, cfg)
+    const b = buildVolumes({ sessionID: "bbb" }, cfg)
     expect(a[0].subPath).toBe("sessions/aaa/workspace")
     expect(b[0].subPath).toBe("sessions/bbb/workspace")
     expect(a[0].pvc).toEqual(b[0].pvc)
@@ -62,7 +62,7 @@ describe("buildVolumes", () => {
 
   test("all volume names are valid DNS labels (max 63 chars)", () => {
     const cfg = { ...baseConfig, volumeType: "pvc" as const, pvcClaimName: "pvc" }
-    const vols = buildVolumes("ses_x", cfg)
+    const vols = buildVolumes({ sessionID: "ses_x" }, cfg)
     for (const v of vols) {
       expect(v.name.length).toBeLessThanOrEqual(63)
       expect(v.name).toMatch(/^[a-z0-9][a-z0-9-]*$/)
@@ -71,7 +71,7 @@ describe("buildVolumes", () => {
 
   test("all mount paths are absolute", () => {
     const cfg = { ...baseConfig, volumeType: "pvc" as const, pvcClaimName: "pvc" }
-    const vols = buildVolumes("ses_1", cfg)
+    const vols = buildVolumes({ sessionID: "ses_1" }, cfg)
     for (const v of vols) {
       expect(v.mountPath.startsWith("/")).toBe(true)
     }
@@ -79,7 +79,7 @@ describe("buildVolumes", () => {
 
   test("no duplicate mount paths or names", () => {
     const cfg = { ...baseConfig, volumeType: "pvc" as const, pvcClaimName: "pvc" }
-    const vols = buildVolumes("ses_1", cfg)
+    const vols = buildVolumes({ sessionID: "ses_1" }, cfg)
     const paths = vols.map((v) => v.mountPath)
     const names = vols.map((v) => v.name)
     expect(new Set(paths).size).toBe(paths.length)
@@ -88,7 +88,7 @@ describe("buildVolumes", () => {
 
   test("subPath prefix matches sessionID (session-scoped volumes only)", () => {
     const cfg = { ...baseConfig, volumeType: "pvc" as const, pvcClaimName: "pvc" }
-    const vols = buildVolumes("my-session-123", cfg)
+    const vols = buildVolumes({ sessionID: "my-session-123" }, cfg)
     const sessionVols = vols.filter((v) => v.name !== "package-cache")
     for (const v of sessionVols) {
       expect(v.subPath!.startsWith("sessions/my-session-123/")).toBe(true)
@@ -257,8 +257,8 @@ describe("Full PVC lifecycle (kill/recreate)", () => {
 
   test("volume data persists across kill/recreate", () => {
     const cfg = { ...baseConfig, volumeType: "pvc" as const, pvcClaimName: "shared-pvc" }
-    const v1 = buildVolumes("ses_survive", cfg)
-    const v2 = buildVolumes("ses_survive", cfg)
+    const v1 = buildVolumes({ sessionID: "ses_survive" }, cfg)
+    const v2 = buildVolumes({ sessionID: "ses_survive" }, cfg)
 
     expect(v1[0].subPath).toBe(v2[0].subPath)
     expect(v1[0].pvc!.claimName).toBe("shared-pvc")
@@ -269,7 +269,7 @@ describe("shared package cache", () => {
   const cfg = { ...baseConfig, volumeType: "pvc" as const, pvcClaimName: "my-pvc" }
 
   test("PVC mode includes shared package-cache volume", () => {
-    const vols = buildVolumes("ses_1", cfg)
+    const vols = buildVolumes({ sessionID: "ses_1" }, cfg)
     const cache = vols.find((v) => v.name === "package-cache")
     expect(cache).toBeDefined()
     expect(cache!.mountPath).toBe("/xybot-front/cache")
@@ -278,8 +278,8 @@ describe("shared package cache", () => {
   })
 
   test("all sessions share the same package-cache subPath", () => {
-    const a = buildVolumes("ses_aaa", cfg)
-    const b = buildVolumes("ses_bbb", cfg)
+    const a = buildVolumes({ sessionID: "ses_aaa" }, cfg)
+    const b = buildVolumes({ sessionID: "ses_bbb" }, cfg)
     const cacheA = a.find((v) => v.name === "package-cache")!
     const cacheB = b.find((v) => v.name === "package-cache")!
     expect(cacheA.subPath).toBe(cacheB.subPath)
@@ -287,38 +287,38 @@ describe("shared package cache", () => {
   })
 
   test("volumeType=none does not mount package-cache", () => {
-    const vols = buildVolumes("ses_1", baseConfig)
+    const vols = buildVolumes({ sessionID: "ses_1" }, baseConfig)
     expect(vols.find((v) => v.name === "package-cache")).toBeUndefined()
   })
 
   test("volumeType=host does not mount package-cache", () => {
     const cfg = { ...baseConfig, volumeType: "host" as const }
-    const vols = buildVolumes("ses_1", cfg)
+    const vols = buildVolumes({ sessionID: "ses_1" }, cfg)
     expect(vols.find((v) => v.name === "package-cache")).toBeUndefined()
   })
 
   test("custom packageCacheMount", () => {
     const customCfg = { ...cfg, packageCacheMount: "/custom/cache" }
-    const vols = buildVolumes("ses_1", customCfg)
+    const vols = buildVolumes({ sessionID: "ses_1" }, customCfg)
     const cache = vols.find((v) => v.name === "package-cache")!
     expect(cache.mountPath).toBe("/custom/cache")
   })
 
   test("custom packageCacheMount strips trailing slash", () => {
     const customCfg = { ...cfg, packageCacheMount: "/custom/cache/" }
-    const vols = buildVolumes("ses_1", customCfg)
+    const vols = buildVolumes({ sessionID: "ses_1" }, customCfg)
     const cache = vols.find((v) => v.name === "package-cache")!
     expect(cache.mountPath).toBe("/custom/cache")
   })
 
   test("invalid packageCacheMount is rejected", () => {
     for (const packageCacheMount of ["", "cache", "/", "/workspace", "/workspace/cache", "/home", "/home/sandbox/.cache/npm"]) {
-      expect(() => buildVolumes("ses_1", { ...cfg, packageCacheMount })).toThrow()
+      expect(() => buildVolumes({ sessionID: "ses_1" }, { ...cfg, packageCacheMount })).toThrow()
     }
   })
 
   test("package-cache uses the same PVC claim as session volumes", () => {
-    const vols = buildVolumes("ses_1", cfg)
+    const vols = buildVolumes({ sessionID: "ses_1" }, cfg)
     const cache = vols.find((v) => v.name === "package-cache")!
     const workspace = vols.find((v) => v.name === "workspace")!
     expect(cache.pvc!.claimName).toBe(workspace.pvc!.claimName)

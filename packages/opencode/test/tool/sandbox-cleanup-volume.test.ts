@@ -99,7 +99,7 @@ describe("cleanupSessionVolume session isolation", () => {
 
   test("cleanup subPath differs from normal mount subPaths", () => {
     const sid = "ses_isolate"
-    const normalVols = buildVolumes(sid, pvcConfig)
+    const normalVols = buildVolumes({ sessionID: sid }, pvcConfig)
     for (const v of normalVols) {
       expect(v.subPath).toContain("/")
       expect(v.subPath).not.toBe(`sessions/${sid}`)
@@ -122,7 +122,7 @@ describe("cleanupSessionVolume session isolation", () => {
 describe("cleanupSessionVolume vs buildVolumes", () => {
   test("cleanup mount has single volume, buildVolumes has 6", () => {
     const sid = "ses_compare"
-    const normalVols = buildVolumes(sid, pvcConfig)
+    const normalVols = buildVolumes({ sessionID: sid }, pvcConfig)
     const cleanupVols = [
       { name: "cleanup-root", mountPath: "/cleanup", pvc: { claimName: pvcConfig.pvcClaimName } },
     ]
@@ -132,7 +132,7 @@ describe("cleanupSessionVolume vs buildVolumes", () => {
 
   test("cleanup mount uses PVC root (no subPath), normal mounts use subPaths", () => {
     const sid = "ses_subpath"
-    const normalVols = buildVolumes(sid, pvcConfig)
+    const normalVols = buildVolumes({ sessionID: sid }, pvcConfig)
     const cleanupMount = {
       name: "cleanup-root",
       mountPath: "/cleanup",
@@ -148,7 +148,7 @@ describe("cleanupSessionVolume vs buildVolumes", () => {
 
   test("cleanup deletes entire session tree that buildVolumes creates", () => {
     const sid = "ses_tree"
-    const normalVols = buildVolumes(sid, pvcConfig)
+    const normalVols = buildVolumes({ sessionID: sid }, pvcConfig)
     const sessionVols = normalVols.filter((v) => v.name !== "package-cache")
     const subDirs = sessionVols.map((v) => {
       const parts = v.subPath!.split("/")

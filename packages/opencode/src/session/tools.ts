@@ -21,10 +21,9 @@ import { EffectBridge } from "@/effect/bridge"
 import { ProviderV2 } from "@opencode-ai/core/provider"
 import { ModelV2 } from "@opencode-ai/core/model"
 import { SandboxProvider } from "@/tool/sandbox-provider"
-import { Database } from "@/storage/db"
-import { SessionTable } from "@opencode-ai/core/session/sql"
-import { eq } from "drizzle-orm"
-import type { SessionID } from "./schema"
+import { resolveSandboxOpts, worktreeScript } from "@/session/sandbox-opts"
+import { InstanceRef } from "@/effect/instance-ref"
+import { InstanceState } from "@/effect/instance-state"
 
 export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
   agent: Agent.Info
@@ -44,27 +43,32 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
   const truncate = yield* Truncate.Service
 
   const maybeSandboxProvider = Option.getOrUndefined(yield* Effect.serviceOption(SandboxProvider.Service))
-  async function findRootSessionID(sessionID: SessionID): Promise<SessionID> {
-    let current = sessionID
-    let visited = 0
-    while (visited < 10) {
-      visited++
-      const row = await Database.use((db) =>
-        db.select({ parent_id: SessionTable.parent_id }).from(SessionTable).where(eq(SessionTable.id, current)).get(),
-      )
-      if (!row?.parent_id) break
-      current = row.parent_id as SessionID
-    }
-    return current
+  const root = maybeSandboxProvider
+    ? yield* Effect.promise(() => resolveSandboxOpts(input.session.id))
+    : { id: input.session.id }
+  const sandboxSessionID = root.id
+  const useApp = root.pvcMode === "app" && !!root.appId?.trim()
+
+  async function ensureWorktree(): Promise<void> {
+    if (!useApp || !maybeSandboxProvider) return
+    await maybeSandboxProvider
+      .runInSession(sandboxSessionID, worktreeScript(sandboxSessionID))
+      .pipe(Effect.runPromise)
+      .catch((err) => console.error("[session.tools] app worktree ensure failed", { sandboxSessionID, err: String(err) }))
   }
-  const sandboxSessionID = maybeSandboxProvider
-    ? yield* Effect.promise(() => findRootSessionID(input.session.id))
-    : input.session.id
+
   function getSandbox(): Promise<unknown> | null {
     if (!maybeSandboxProvider) {
       return null
     }
-    return maybeSandboxProvider.getOrCreate(sandboxSessionID).pipe(Effect.runPromise).catch(() => null)
+    return maybeSandboxProvider
+      .getOrCreate(sandboxSessionID, useApp ? { pvcMode: root.pvcMode, appId: root.appId } : undefined)
+      .pipe(Effect.runPromise)
+      .then(async (sb) => {
+        await ensureWorktree()
+        return sb
+      })
+      .catch(() => null)
   }
 
   const context = (args: Record<string, unknown>, options: ToolExecutionOptions): Tool.Context => ({
@@ -121,7 +125,14 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
               { tool: item.id, sessionID: ctx.sessionID, callID: ctx.callID },
               { args },
             )
-            const result = yield* item.execute(args, ctx)
+            const result = yield* (useApp
+              ? item.execute(args, ctx).pipe(
+                  Effect.provideService(InstanceRef, {
+                    ...(yield* InstanceState.context),
+                    directory: `/workspace/worktrees/${sandboxSessionID}`,
+                  }),
+                )
+              : item.execute(args, ctx))
             const output = {
               ...result,
               attachments: result.attachments?.map((attachment) => ({

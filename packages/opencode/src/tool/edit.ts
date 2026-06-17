@@ -119,7 +119,7 @@ export const EditTool = Tool.define(
                   const diff = trimDiff(createTwoFilesPatch(filePath, filePath, contentOld, contentNew))
                   yield* ctx.ask({
                     permission: "edit",
-                    patterns: [path.relative(instance.worktree, filePath)],
+                    patterns: [path.relative(instance.directory, filePath)],
                     always: ["*"],
                     metadata: { filepath: filePath, diff },
                   })
@@ -204,7 +204,7 @@ export const EditTool = Tool.define(
                 )
                 yield* ctx.ask({
                   permission: "edit",
-                  patterns: [path.relative(instance.worktree, filePath)],
+                  patterns: [path.relative(instance.directory, filePath)],
                   always: ["*"],
                   metadata: { filepath: filePath, diff },
                 })
@@ -294,7 +294,7 @@ export const EditTool = Tool.define(
                 diff = trimDiff(createTwoFilesPatch(filePath, filePath, contentOld, contentNew))
                 yield* ctx.ask({
                   permission: "edit",
-                  patterns: [path.relative(instance.worktree, filePath)],
+                  patterns: [path.relative(instance.directory, filePath)],
                   always: ["*"],
                   metadata: {
                     filepath: filePath,
@@ -337,7 +337,7 @@ export const EditTool = Tool.define(
               )
               yield* ctx.ask({
                 permission: "edit",
-                patterns: [path.relative(instance.worktree, filePath)],
+                patterns: [path.relative(instance.directory, filePath)],
                 always: ["*"],
                 metadata: {
                   filepath: filePath,

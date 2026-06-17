@@ -12,6 +12,7 @@ import { SessionTable } from "@/session/session.pg"
 import { eq } from "drizzle-orm"
 import { WebSocketTracker } from "./routes/instance/httpapi/websocket-tracker"
 import { ProxyUtil } from "@/server/proxy-util"
+import { resolveSandboxOpts, worktreeScript } from "@/session/sandbox-opts"
 
 type ProxyError = {
   type: "runtime" | "network" | "compile"
@@ -150,6 +151,7 @@ const ExecBody = Schema.Struct({
 })
 const KeepAliveBody = Schema.Struct({
   enabled: Schema.optional(Schema.Boolean),
+  boot: Schema.optional(Schema.Boolean),
 })
 
 type ExecSseEvent =
@@ -288,9 +290,29 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
         )
         if (!body.command) return HttpServerResponse.jsonUnsafe({ error: "command is required" }, { status: 400 })
 
+        // 查 root session 的 pvcMode/appId（app 模式需正确 PVC subPath）
+        const root = yield* Effect.promise(() => resolveSandboxOpts(params.sessionID))
+        const useApp = root.pvcMode === "app" && !!root.appId?.trim()
+
+        // 确保 sandbox 用正确的 PVC 前缀创建（幂等：已存在则跳过）
+        if (useApp) {
+          yield* sandbox.getOrCreate(root.id, { pvcMode: root.pvcMode, appId: root.appId }).pipe(
+            Effect.catch(() => Effect.void),
+          )
+          // app 模式：确保 worktree 存在（幂等 + repo 不存在时降级）
+          // 使用 root.id 与 AI 工具路径（tools.ts）保持一致
+          yield* sandbox.runInSession(root.id, worktreeScript(root.id), { timeoutSeconds: 30 }, {}).pipe(
+            Effect.catch(() => Effect.void),
+          )
+        }
+
+        const wtDir = `/workspace/worktrees/${root.id}`
+        const command = useApp && !body.workingDirectory
+          ? `[ -d ${wtDir} ] && cd ${wtDir}; ${body.command}`
+          : body.command
         const result = yield* sandbox.runInSession(
-          params.sessionID,
-          body.command,
+          root.id,
+          command,
           { workingDirectory: body.workingDirectory, timeoutSeconds: body.timeoutSeconds },
           {},
         ).pipe(Effect.catch((err) => Effect.succeed(null as any)))
@@ -317,7 +339,22 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
         )
         if (!body.command) return HttpServerResponse.jsonUnsafe({ error: "command is required" }, { status: 400 })
 
-        const sid = params.sessionID
+        // 查 root session 的 pvcMode/appId（app 模式需正确 PVC subPath）
+        const root = yield* Effect.promise(() => resolveSandboxOpts(params.sessionID))
+        const useApp = root.pvcMode === "app" && !!root.appId?.trim()
+
+        // 确保 sandbox 用正确的 PVC 前缀创建（幂等）
+        if (useApp) {
+          yield* sandbox.getOrCreate(root.id, { pvcMode: root.pvcMode, appId: root.appId }).pipe(
+            Effect.catch(() => Effect.void),
+          )
+          // app 模式：确保 worktree 存在（幂等 + repo 不存在时降级）
+          yield* sandbox.runInSession(root.id, worktreeScript(root.id), { timeoutSeconds: 30 }, {}).pipe(
+            Effect.catch(() => Effect.void),
+          )
+        }
+
+        const sid = root.id
         const execId = `exec-${++execCounter}-${Date.now()}`
         const q = yield* Queue.unbounded<ExecSseEvent>()
         const state: ExecState = {
@@ -349,7 +386,10 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
           }
         }
 
-        const cmd = body.command
+        const wtDir = `/workspace/worktrees/${root.id}`
+        const cmd = useApp && !body.workingDirectory
+          ? `[ -d ${wtDir} ] && cd ${wtDir}; ${body.command}`
+          : body.command
         const opts = { workingDirectory: body.workingDirectory, timeoutSeconds: body.timeoutSeconds }
 
         const handlers = {
@@ -489,14 +529,20 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
       Effect.gen(function* () {
         const params = yield* HttpRouter.schemaPathParams(SessionParams)
         const body = yield* HttpServerRequest.schemaBodyJson(KeepAliveBody).pipe(
-          Effect.catch(() => Effect.succeed({ enabled: true })),
+          Effect.catch(() => Effect.succeed({ enabled: true, boot: undefined })),
         )
         if (body.enabled !== false) {
           yield* sandbox.keepAlive(params.sessionID)
         } else {
           yield* sandbox.release(params.sessionID)
         }
-        return HttpServerResponse.jsonUnsafe({ sessionID: params.sessionID, keepAlive: body.enabled })
+        const sandboxId = body.enabled !== false && body.boot === true
+          ? yield* sandbox.getOrCreate(params.sessionID).pipe(
+              Effect.map((s) => s.id),
+              Effect.catchDefect(() => Effect.succeed(null)),
+            )
+          : null
+        return HttpServerResponse.jsonUnsafe({ sessionID: params.sessionID, keepAlive: body.enabled, sandboxId })
       }),
     )
 

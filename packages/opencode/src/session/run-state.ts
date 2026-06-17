@@ -3,12 +3,15 @@ import { InstanceState } from "@/effect/instance-state"
 import { SessionV1 } from "@opencode-ai/core/v1/session"
 import { Runner } from "@/effect/runner"
 import { BackgroundJob } from "@/background/job"
-import { Effect, Latch, Layer, Scope, Context } from "effect"
+import { Effect, Latch, Layer, Scope, Context, Cause } from "effect"
+import * as Log from "@opencode-ai/core/util/log"
 import { Session } from "./session"
 import { SessionID } from "./schema"
 import { SessionStatus } from "./status"
 import { SandboxProvider } from "@/tool/sandbox-provider"
 import { MCP } from "@/mcp"
+
+const log = Log.create({ service: "run-state" })
 
 export interface Interface {
   readonly assertNotBusy: (sessionID: SessionID) => Effect.Effect<void, Session.BusyError>
@@ -67,7 +70,12 @@ export const layer = Layer.effect(
           if (sandbox._tag === "Some") {
             const keep = yield* sandbox.value.isKeepAlive(sessionID).pipe(Effect.orDie)
             if (!keep) {
-              yield* sandbox.value.destroy(sessionID).pipe(Effect.catchCause(() => Effect.void))
+              yield* sandbox.value.destroy(sessionID).pipe(
+                Effect.catchCause((cause) => {
+                  log.error("sandbox destroy failed on idle", { sessionID, cause: Cause.pretty(cause) })
+                  return Effect.void
+                }),
+              )
               destroyed = true
             }
           }
