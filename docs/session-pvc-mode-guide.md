@@ -133,16 +133,16 @@ curl -s -X POST http://localhost:14096/session/$SID/exec \
 
 > clone 后，opencode 自动在后续 exec / AI 消息时创建 worktree。
 
-#### Step 3：在 worktree 中工作
+#### Step 3：开发工作（exec 自动 cd 到 worktree）
 
 ```bash
-# 进入自己的 worktree 目录
+# app 模式下 exec 自动 cd 到当前会话的 worktree，无需手动指定路径
 curl -s -X POST http://localhost:14096/session/$SID/exec \
   -H 'Content-Type: application/json' \
-  -d '{"command":"cd /workspace/worktrees/'$SID' && git checkout -b feature-A && echo hello > new-file.txt && git add . && git commit -m \"feat: add file\""}'
+  -d '{"command":"git checkout -b feature-A && echo hello > new-file.txt && git add . && git commit -m \"feat: add file\""}'
 ```
 
-每个会话有自己的 worktree 目录（`/workspace/worktrees/{sessionID}`），独立切分支、提交。
+app 模式下，每次 exec 自动定位到当前会话的独立工作目录。多个同 appId 会话各自独立切分支、提交，互不影响。
 
 #### Step 4：创建第二个同 appId 会话
 
