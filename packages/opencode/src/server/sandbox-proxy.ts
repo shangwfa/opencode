@@ -302,14 +302,19 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
             Effect.catch(() => Effect.void),
           )
           // app 模式：确保 worktree 存在（幂等 + repo 不存在时降级）
-          yield* sandbox.runInSession(root.id, worktreeScript(params.sessionID), { timeoutSeconds: 30 }, {}).pipe(
+          // 使用 root.id 与 AI 工具路径（tools.ts）保持一致
+          yield* sandbox.runInSession(root.id, worktreeScript(root.id), { timeoutSeconds: 30 }, {}).pipe(
             Effect.catch(() => Effect.void),
           )
         }
 
+        const wtDir = `/workspace/worktrees/${root.id}`
+        const command = useApp && !body.workingDirectory
+          ? `[ -d ${wtDir} ] && cd ${wtDir}; ${body.command}`
+          : body.command
         const result = yield* sandbox.runInSession(
           root.id,
-          body.command,
+          command,
           { workingDirectory: body.workingDirectory, timeoutSeconds: body.timeoutSeconds },
           {},
         ).pipe(Effect.catch((err) => Effect.succeed(null as any)))
@@ -346,7 +351,7 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
             Effect.catch(() => Effect.void),
           )
           // app 模式：确保 worktree 存在（幂等 + repo 不存在时降级）
-          yield* sandbox.runInSession(root.id, worktreeScript(params.sessionID), { timeoutSeconds: 30 }, {}).pipe(
+          yield* sandbox.runInSession(root.id, worktreeScript(root.id), { timeoutSeconds: 30 }, {}).pipe(
             Effect.catch(() => Effect.void),
           )
         }
@@ -383,7 +388,10 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
           }
         }
 
-        const cmd = body.command
+        const wtDir = `/workspace/worktrees/${root.id}`
+        const cmd = useApp && !body.workingDirectory
+          ? `[ -d ${wtDir} ] && cd ${wtDir}; ${body.command}`
+          : body.command
         const opts = { workingDirectory: body.workingDirectory, timeoutSeconds: body.timeoutSeconds }
 
         const handlers = {

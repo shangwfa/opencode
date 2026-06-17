@@ -22,6 +22,8 @@ import { SandboxProvider } from "@/tool/sandbox-provider"
 import { Database } from "@/storage/db"
 import { SessionTable } from "@/session/session.sql"
 import { resolveSandboxOpts, worktreeScript } from "@/session/sandbox-opts"
+import { InstanceRef } from "@/effect/instance-ref"
+import { InstanceState } from "@/effect/instance-state"
 import { eq } from "drizzle-orm"
 
 const log = Log.create({ service: "session.tools" })
@@ -127,7 +129,14 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
               { tool: item.id, sessionID: ctx.sessionID, callID: ctx.callID },
               { args },
             )
-            const result = yield* item.execute(args, ctx)
+            const result = yield* (useApp
+              ? item.execute(args, ctx).pipe(
+                  Effect.provideService(InstanceRef, {
+                    ...(yield* InstanceState.context),
+                    directory: `/workspace/worktrees/${sandboxSessionID}`,
+                  }),
+                )
+              : item.execute(args, ctx))
             const output = {
               ...result,
               attachments: result.attachments?.map((attachment) => ({

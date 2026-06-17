@@ -34,7 +34,7 @@ export function worktreeScript(sessionID: string): string {
   return [
     `if [ -d /workspace/repo/.git ]; then`,
     `  if [ ! -d ${wt} ]; then`,
-    `    git -C /workspace/repo worktree add --detach ${wt} HEAD;`,
+    `    mkdir -p /workspace/worktrees && git -C /workspace/repo worktree add --detach ${wt} HEAD;`,
     `  fi;`,
     `fi`,
   ].join(" ")

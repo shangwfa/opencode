@@ -28,6 +28,7 @@ import * as Log from "@opencode-ai/core/util/log"
 import { MessageV2 } from "./message-v2"
 import type { InstanceContext } from "../project/instance-context"
 import { InstanceState } from "@/effect/instance-state"
+import { resolveSandboxOpts } from "@/session/sandbox-opts"
 import { Snapshot } from "@/snapshot"
 import { ProjectID } from "../project/schema"
 import { WorkspaceID } from "../control-plane/schema"
@@ -716,6 +717,16 @@ export const layer: Layer.Layer<
       if (input?.pvcMode === "app" && !input.appId?.trim()) {
         return yield* new InvalidPvcConfigError({ message: "appId is required when pvcMode is app" })
       }
+      if (input?.appId && !/^[\w\-.]{1,128}$/.test(input.appId)) {
+        return yield* new InvalidPvcConfigError({ message: "appId must be 1-128 chars of [a-zA-Z0-9_-\\.]" })
+      }
+      // 子会话自动继承父会话的 app 模式配置（session 模式不影响，保持原行为）
+      let pvcMode = input?.pvcMode
+      let appId = input?.appId?.trim()
+      if (input?.parentID && !pvcMode) {
+        const parent = yield* Effect.tryPromise(() => resolveSandboxOpts(input.parentID!)).pipe(Effect.catch(() => Effect.succeed(undefined)))
+        if (parent?.pvcMode === "app") { pvcMode = parent.pvcMode; appId = parent.appId }
+      }
       const ctx = yield* InstanceState.context
       const workspace = yield* InstanceState.workspaceID
       return yield* createNext({
@@ -727,8 +738,8 @@ export const layer: Layer.Layer<
         model: input?.model,
         permission: input?.permission,
         workspaceID: input?.workspaceID ?? workspace,
-        pvcMode: input?.pvcMode,
-        appId: input?.appId?.trim(),
+        pvcMode,
+        appId,
       })
     })
 
@@ -737,9 +748,12 @@ export const layer: Layer.Layer<
       const original = yield* get(input.sessionID)
       const title = getForkedTitle(original.title)
       const session = yield* createNext({
+        parentID: original.id,
         directory: ctx.directory,
         path: sessionPath(ctx.worktree, ctx.directory),
         workspaceID: original.workspaceID,
+        pvcMode: original.pvcMode === "app" ? "app" : undefined,
+        appId: original.pvcMode === "app" ? original.appId : undefined,
         title,
       })
       const msgs = yield* messages({ sessionID: input.sessionID })
