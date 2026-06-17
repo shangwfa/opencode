@@ -411,6 +411,11 @@ curl -s -X POST http://localhost:14096/session/$SID/keep-alive \
   -H 'Content-Type: application/json' \
   -d '{"enabled":true}' | python3 -m json.tool
 
+# 设置 keepAlive + 立即启动沙箱（boot:true 无需先发 AI 消息即可创建沙箱）
+curl -s -X POST http://localhost:14096/session/$SID/keep-alive \
+  -H 'Content-Type: application/json' \
+  -d '{"enabled":true,"boot":true}' | python3 -m json.tool
+
 # 通过 exec 启动 dev server（nohup 放后台）
 curl -s --max-time 10 -X POST http://localhost:14096/session/$SID/exec \
   -H 'Content-Type: application/json' \
@@ -423,7 +428,8 @@ curl -s http://localhost:14096/session/$SID/proxy/5173/ -o /dev/null -w "Vite: %
 
 期望：
 - exec 返回 `{exitCode: 0, stdout: "hello-from-exec\n"}`
-- keep-alive 返回 `{keepAlive: true}`
+- keep-alive（无 boot）返回 `{keepAlive: true, sandboxId: null}`
+- keep-alive（`boot:true`）返回 `{keepAlive: true, sandboxId: "xxx"}`
 - Vite proxy 返回 HTTP 200
 
 ---
@@ -481,12 +487,17 @@ POST /session/:sessionID/keep-alive {"enabled":true}
   → sandboxProvider.keepAlive(sessionID)
   → 后续可通过 exec API 随时在沙箱中执行命令
 
+POST /session/:sessionID/keep-alive {"enabled":true,"boot":true}
+  → sandboxProvider.keepAlive(sessionID) + getOrCreate(sessionID)
+  → 立即创建沙箱，无需先发 AI 消息或 exec
+
 POST /session/:sessionID/exec {"command":"nohup npx vite ... &"}
   → 直接在沙箱中执行命令，启动 dev server 等
   → 配合 keepAlive 保证沙箱不被回收
 ```
 
 > 方式二不依赖 AI 模型是否正确传递 `background:true`，更适合自动化测试和程序化控制。
+> `boot:true` 适合需要预热情景——调用后沙箱立即可用，`sandboxId` 返回在响应中；boot 失败不影响 keepAlive 设置，`sandboxId` 返回 `null`。
 
 ---
 

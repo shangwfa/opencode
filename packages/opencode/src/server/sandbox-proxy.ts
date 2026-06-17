@@ -150,6 +150,7 @@ const ExecBody = Schema.Struct({
 })
 const KeepAliveBody = Schema.Struct({
   enabled: Schema.optional(Schema.Boolean),
+  boot: Schema.optional(Schema.Boolean),
 })
 
 type ExecSseEvent =
@@ -492,14 +493,20 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
       Effect.gen(function* () {
         const params = yield* HttpRouter.schemaPathParams(SessionParams)
         const body = yield* HttpServerRequest.schemaBodyJson(KeepAliveBody).pipe(
-          Effect.catch(() => Effect.succeed({ enabled: true })),
+          Effect.catch(() => Effect.succeed({ enabled: true, boot: undefined })),
         )
         if (body.enabled !== false) {
           yield* sandbox.keepAlive(params.sessionID)
         } else {
           yield* sandbox.release(params.sessionID)
         }
-        return HttpServerResponse.jsonUnsafe({ sessionID: params.sessionID, keepAlive: body.enabled })
+        const sandboxId = body.enabled !== false && body.boot === true
+          ? yield* sandbox.getOrCreate(params.sessionID).pipe(
+              Effect.map((s) => s.id),
+              Effect.catchDefect(() => Effect.succeed(null)),
+            )
+          : null
+        return HttpServerResponse.jsonUnsafe({ sessionID: params.sessionID, keepAlive: body.enabled, sandboxId })
       }),
     )
 

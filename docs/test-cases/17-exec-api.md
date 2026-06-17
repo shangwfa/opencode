@@ -317,6 +317,95 @@ curl -s -X POST "$BASE/session/$SID_ASYNC/kill-sandbox" > /dev/null
 - 长驻 dev server 场景优先用 `/exec/async`；同步 `/exec` 只用于短命令或显式 `nohup ... & echo $!` 的兼容路径。
 - 测试结束调用 `/exec/:execId/kill` 或 `/session/:sessionID/kill-sandbox` 清理。
 
+### T19.13 keep-alive boot 参数：立即启动沙箱
+
+> 验证 `boot:true` 不仅设置 keepAlive，还立即创建沙箱。无需先通过 AI 消息或 exec 触发沙箱创建。
+
+```bash
+SID_BOOT=$(curl -s -X POST "$BASE/session" \
+  -H 'Content-Type: application/json' -d '{}' \
+  | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+echo "SID_BOOT: $SID_BOOT"
+
+# boot=true：设置 keepAlive + 立即启动沙箱
+curl -s -X POST "$BASE/session/$SID_BOOT/keep-alive" \
+  -H 'Content-Type: application/json' \
+  -d '{"enabled":true,"boot":true}' | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+sb=d.get('sandboxId')
+print(f'keepAlive={d.get(\"keepAlive\")} sandboxId={sb}')
+print(f'PASS sandboxId non-null: {sb is not None}')
+"
+
+# 验证沙箱确实已启动（GET sandbox）
+curl -s "$BASE/session/$SID_BOOT/sandbox" | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+print(f'sandboxId={d.get(\"sandboxId\")}')
+print(f'PASS sandbox exists: {d.get(\"sandboxId\") is not None}')
+"
+
+# 验证沙箱可执行命令
+curl -s -X POST "$BASE/session/$SID_BOOT/exec" \
+  -H 'Content-Type: application/json' \
+  -d '{"command":"echo boot-ok"}' | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+print(f'exitCode={d.get(\"exitCode\")} stdout={d.get(\"stdout\",\"\").strip()}')
+print(f'PASS exec: {d.get(\"exitCode\")==0}')
+"
+
+# 清理
+curl -s -X POST "$BASE/session/$SID_BOOT/kill-sandbox" > /dev/null
+```
+**期望**：
+- 响应包含 `keepAlive: true` 和非 null 的 `sandboxId`
+- GET sandbox 返回相同的 `sandboxId`
+- exec 返回 `exitCode: 0`
+
+### T19.14 keep-alive 不传 boot：不启动沙箱
+
+> 验证不传 `boot`（或 `boot:false`）时只设置 keepAlive 标记，不主动创建沙箱。
+
+```bash
+SID_NOBOOT=$(curl -s -X POST "$BASE/session" \
+  -H 'Content-Type: application/json' -d '{}' \
+  | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+echo "SID_NOBOOT: $SID_NOBOOT"
+
+# 不传 boot：只设置 keepAlive，sandboxId 应为 null
+curl -s -X POST "$BASE/session/$SID_NOBOOT/keep-alive" \
+  -H 'Content-Type: application/json' \
+  -d '{"enabled":true}' | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+print(f'keepAlive={d.get(\"keepAlive\")} sandboxId={d.get(\"sandboxId\")}')
+print(f'PASS sandboxId null: {d.get(\"sandboxId\") is None}')
+"
+
+# 验证沙箱不存在
+curl -s "$BASE/session/$SID_NOBOOT/sandbox" | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+print(f'sandboxId={d.get(\"sandboxId\")}')
+print(f'PASS no sandbox: {d.get(\"sandboxId\") is None}')
+"
+
+# boot:false 同样不启动沙箱
+curl -s -X POST "$BASE/session/$SID_NOBOOT/keep-alive" \
+  -H 'Content-Type: application/json' \
+  -d '{"enabled":true,"boot":false}' | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+print(f'boot=false sandboxId={d.get(\"sandboxId\")}')
+print(f'PASS sandboxId null: {d.get(\"sandboxId\") is None}')
+"
+```
+**期望**：
+- 不传 `boot` 和 `boot:false` 都返回 `sandboxId: null`
+- GET sandbox 返回 `sandboxId: null`
+
 ---
 
 ### API 接口详情
@@ -392,18 +481,28 @@ data: {"execId":"exec-1-...","status":"completed","exitCode":0,"stdout":"...","s
 
 #### `POST /session/:sessionID/keep-alive`
 
-设置或释放 keepAlive。keepAlive=true 时，sandbox 在 session idle 后不会被自动销毁。
+设置或释放 keepAlive。`keepAlive=true` 时 sandbox 在 session idle 后不会被自动销毁。`boot=true` 时额外立即创建沙箱。
 
 **请求体**：
 ```json
-{"enabled": true}   // 设置 keepAlive
-{"enabled": false}  // 释放 keepAlive
+{"enabled": true}                  // 设置 keepAlive（默认）
+{"enabled": true, "boot": true}    // 设置 keepAlive + 立即启动沙箱
+{"enabled": false}                 // 释放 keepAlive
 ```
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `enabled` | boolean | `true` | keepAlive 开关。`true`=保活，`false`=释放 |
+| `boot` | boolean | `false` | 是否立即启动沙箱。仅在 `enabled:true` 时生效 |
+
+> `boot:true` 先设置 keepAlive（写入 DB），再调用 `getOrCreate` 创建沙箱，确保沙箱使用 10x TTL。boot 失败不影响 keepAlive 设置，返回 `sandboxId: null`。
 
 **响应**：
 ```json
-{"sessionID": "ses_xxx", "keepAlive": true}
+{"sessionID": "ses_xxx", "keepAlive": true, "sandboxId": null}
 ```
+
+- `sandboxId`：`boot:true` 且沙箱创建成功时返回沙箱 ID；其余情况为 `null`
 
 #### `GET /session/:sessionID/keep-alive`
 
@@ -433,6 +532,8 @@ data: {"execId":"exec-1-...","status":"completed","exitCode":0,"stdout":"...","s
 | T19.10 | ⚠️ | `timeoutSeconds=5` 透传后，`sleep 30 && echo done` 约 30.2s 后返回 `exitCode=null`；execd 未在 5s 强制中止，仍按已知 opensandbox execd 行为记录为 warning |
 | T19.11 | ✅ | 补跑显式 `workingDirectory=/workspace` 后返回 `node=v22.2.0 npm=10.7.0 pwd=/workspace` |
 | T19.12 | ✅ | session `ses_15bbdc427ffekQUGtCGGPnKzFZ`，execId `exec-1-1780872265127`；`/exec/async` 立即返回 `running`，`/stream` 依次收到 `stdout×4` 和 `done`，最终状态 `completed exitCode=0`，sandbox 已清理为 `destroyed` |
+| T19.13 | ✅ | session `ses_12ccef5ccffe9N4sbDwQ179Or5`；`boot:true` 返回 `sandboxId=60d502b8-ccf0-4863-8365-0b25f8b08147`，GET sandbox 一致，exec `exitCode=0 stdout=boot-ok` |
+| T19.14 | ✅ | session `ses_12ccef4f6ffe5fGbpM7tNhBFaM`；不传 `boot` 返回 `sandboxId=null`，GET sandbox 确认无沙箱；`boot:false` 同样返回 `sandboxId=null` |
 
 **本轮全量回归环境**：宿主机 opencode server `127.0.0.1:14097`，PG auth，OpenSandbox Docker runtime `127.0.0.1:8080`，sandbox image `opencode-opensandbox:local`，`OPENCODE_SANDBOX_USE_SERVER_PROXY=false`。
 
