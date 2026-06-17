@@ -160,7 +160,9 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
     })
 
     const create = Effect.fn("SessionHttpApi.create")(function* (ctx: { payload?: Session.CreateInput }) {
-      return yield* shareSvc.create(ctx.payload).pipe(Effect.mapError(() => new HttpApiError.BadRequest({})))
+      return yield* shareSvc.create(ctx.payload).pipe(
+        Effect.catchTag("SessionInvalidPvcConfigError", () => Effect.fail(new HttpApiError.BadRequest({}))),
+      )
     })
 
     const createRaw = Effect.fn("SessionHttpApi.createRaw")(function* (ctx: {
