@@ -7,7 +7,7 @@
  * module is the main-process side that starts the daemon and proxies requests.
  */
 
-import { Context, Duration, Effect, Layer, Schema } from "effect"
+import { Context, Duration, Effect, Layer, Schedule, Schema } from "effect"
 import { HttpClient, HttpClientRequest, HttpClientResponse } from "effect/unstable/http"
 import { SandboxProvider } from "@/tool/sandbox-provider"
 import { toSandboxPath } from "@/tool/sandbox-path"
@@ -18,7 +18,20 @@ const HTTP_TIMEOUT = Duration.seconds(30)
 const PROBE_TIMEOUT = Duration.seconds(5)
 const STARTUP_WAIT_ATTEMPTS = 15
 
+// GC: in SaaS the main process is long-lived; daemonStates is a per-pod
+// cache that grows unbounded as sessions come and go. The GC coroutine
+// reclaims entries idle beyond GC_MAX_IDLE so the Map stays bounded.
+// Daemon processes themselves live in sandbox containers and are reclaimed
+// separately by sandbox idle eviction — GC only clears the local cache.
+const GC_INTERVAL = Duration.minutes(1)
+const GC_MAX_IDLE_MS = 10 * 60_000
+
 type DaemonState = "starting" | "running" | "error"
+
+interface LifecycleEntry {
+  state: DaemonState
+  lastActive: number
+}
 
 const BodySchema = Schema.Struct({ path: Schema.String })
 
@@ -299,11 +312,33 @@ export class Service extends Context.Service<Service, Interface>()("@opencode/Ls
 export const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
-    const sandbox = yield* SandboxProvider.Service
-    const http = HttpClient.filterStatusOk(yield* HttpClient.HttpClient)
-    const daemonStates = new Map<SessionID, DaemonState>()
+    const daemonStates = new Map<SessionID, LifecycleEntry>()
+
+    const touchActive = (sessionID: SessionID) => {
+      const entry = daemonStates.get(sessionID)
+      if (entry) entry.lastActive = Date.now()
+    }
+
+    // SandboxProvider and HttpClient are resolved per-call, not at construction time.
+    // The layer system may not have these services ready during initial build.
+    const getSandbox = () =>
+      Effect.serviceOption(SandboxProvider.Service).pipe(
+        Effect.map((opt) => (opt._tag === "Some" ? opt.value : null)),
+      )
+    const getHttp = () =>
+      Effect.gen(function* () {
+        return HttpClient.filterStatusOk(yield* HttpClient.HttpClient)
+      })
+
+    const execHttp = (req: any) =>
+      Effect.gen(function* () {
+        const http = yield* getHttp()
+        return yield* http.execute(req)
+      })
 
     const probe = Effect.fn("LspAgent.probe")(function* (sessionID: SessionID) {
+      const sandbox = yield* getSandbox()
+      if (!sandbox) return false
       const base = yield* sandbox.getEndpoint(sessionID, DAEMON_PORT).pipe(
         Effect.orElseSucceed(() => ""),
       )
@@ -311,7 +346,7 @@ export const layer = Layer.effect(
       const req = HttpClientRequest.get(`${base}/lsp/status`).pipe(
         HttpClientRequest.acceptJson,
       )
-      return yield* http.execute(req).pipe(
+      return yield* execHttp(req).pipe(
         Effect.timeout(PROBE_TIMEOUT),
         Effect.as(true),
         Effect.catch(() => Effect.succeed(false)),
@@ -319,14 +354,32 @@ export const layer = Layer.effect(
     })
 
     const ensureDaemon = Effect.fn("LspAgent.ensureDaemon")(function* (sessionID: SessionID) {
-      const state = daemonStates.get(sessionID)
-      if (state === "running" || state === "starting") return
+      const entry = daemonStates.get(sessionID)
+      if (entry?.state === "running" || entry?.state === "starting") return
 
-      daemonStates.set(sessionID, "starting")
+      // Atomically claim the "starting" slot BEFORE any yield. Effect's
+      // cooperative scheduler only yields at `yield*`, so this synchronous
+      // check-then-set prevents concurrent callers from each proceeding to
+      // runDetached and spawning duplicate daemons (port conflict storm).
+      daemonStates.set(sessionID, { state: "starting", lastActive: Date.now() })
 
-      yield* sandbox.runDetached(sessionID, "opencode-lsp-agent", {
-        workingDirectory: "/workspace",
-      })
+      const sandbox = yield* getSandbox()
+      if (!sandbox) {
+        daemonStates.delete(sessionID)
+        return
+      }
+
+      // Fork the daemon launch into the background. runDetached (underlying
+      // runInSession) resolves its Promise only when the command process
+      // exits; a long-lived HTTP daemon never exits, so awaiting it inline
+      // would deadlock ensureDaemon -> getBaseUrl -> every LSP call.
+      // forkDetach lets the daemon fiber run independently while we probe
+      // for readiness below.
+      yield* sandbox
+        .runDetached(sessionID, "LSP_AGENT_PORT=20877 node /opt/opencode-lsp-daemon/index.js", {
+          workingDirectory: "/workspace",
+        })
+        .pipe(Effect.forkDetach)
 
       const ready = yield* Effect.gen(function* () {
         for (let i = 0; i < STARTUP_WAIT_ATTEMPTS; i++) {
@@ -337,31 +390,34 @@ export const layer = Layer.effect(
       })
 
       if (ready) {
-        daemonStates.set(sessionID, "running")
+        daemonStates.set(sessionID, { state: "running", lastActive: Date.now() })
         yield* Effect.logDebug("LSP daemon ready", { sessionID })
       } else {
-        daemonStates.set(sessionID, "error")
+        daemonStates.set(sessionID, { state: "error", lastActive: Date.now() })
         yield* Effect.logWarning("LSP daemon failed to start", { sessionID })
       }
     })
 
     const getBaseUrl = Effect.fn("LspAgent.getBaseUrl")(function* (sessionID: SessionID) {
-      const state = daemonStates.get(sessionID)
-      if (state === "running") {
+      const sandbox = yield* getSandbox()
+      if (!sandbox) return yield* Effect.fail(new Error("SandboxProvider not available"))
+      const entry = daemonStates.get(sessionID)
+      if (entry?.state === "running") {
         const ok = yield* probe(sessionID)
         if (!ok) {
-          daemonStates.set(sessionID, "error")
+          daemonStates.set(sessionID, { state: "error", lastActive: entry.lastActive })
           yield* Effect.logWarning("LSP daemon unresponsive, restarting", { sessionID })
         }
       }
 
       yield* ensureDaemon(sessionID)
 
-      const finalState = daemonStates.get(sessionID)
-      if (finalState !== "running") {
+      const final = daemonStates.get(sessionID)
+      if (final?.state !== "running") {
         return yield* Effect.fail(new Error("LSP daemon is not available"))
       }
 
+      final.lastActive = Date.now()
       return yield* sandbox.getEndpoint(sessionID, DAEMON_PORT)
     })
 
@@ -376,7 +432,7 @@ export const layer = Layer.effect(
         HttpClientRequest.acceptJson,
         HttpClientRequest.schemaBodyJson(BodySchema)({ path: sandboxPath }),
       )
-      const response = yield* http.execute(req).pipe(
+      const response = yield* execHttp(req).pipe(
         Effect.timeout(HTTP_TIMEOUT),
         Effect.catch((e) =>
           Effect.fail(new Error(`LSP agent touch failed: ${String(e)}`)),
@@ -400,7 +456,7 @@ export const layer = Layer.effect(
         HttpClientRequest.acceptJson,
         HttpClientRequest.schemaBodyJson(BodySchema)({ path: sandboxPath }),
       )
-      const response = yield* http.execute(req).pipe(
+      const response = yield* execHttp(req).pipe(
         Effect.timeout(HTTP_TIMEOUT),
         Effect.catch((e) =>
           Effect.fail(new Error(`LSP agent diagnostics failed: ${String(e)}`)),
@@ -418,7 +474,7 @@ export const layer = Layer.effect(
       const req = HttpClientRequest.get(`${base}/lsp/status`).pipe(
         HttpClientRequest.acceptJson,
       )
-      const response = yield* http.execute(req).pipe(
+      const response = yield* execHttp(req).pipe(
         Effect.timeout(HTTP_TIMEOUT),
         Effect.catch((e) =>
           Effect.fail(new Error(`LSP agent status failed: ${String(e)}`)),
@@ -432,20 +488,25 @@ export const layer = Layer.effect(
     })
 
     const shutdown = Effect.fn("LspAgent.shutdown")(function* (sessionID: SessionID) {
-      const state = daemonStates.get(sessionID)
-      if (!state) return
+      const entry = daemonStates.get(sessionID)
+      if (!entry) return
+      // Delete first to prevent re-entry (GC, idle callback) from queuing
+      // a second shutdown for the same session while the HTTP request is
+      // still in flight.
+      daemonStates.delete(sessionID)
+      const sandbox = yield* getSandbox()
+      if (!sandbox) return
       const base = yield* sandbox.getEndpoint(sessionID, DAEMON_PORT).pipe(
         Effect.orElseSucceed(() => ""),
       )
       if (!base) return
       const req = HttpClientRequest.post(`${base}/lsp/shutdown`)
-      yield* http.execute(req).pipe(
+      yield* execHttp(req).pipe(
         Effect.timeout(HTTP_TIMEOUT),
         Effect.catch((e) =>
           Effect.logWarning("LSP agent shutdown request failed", { error: String(e) }),
         ),
       )
-      daemonStates.delete(sessionID)
     })
 
     const hover = Effect.fn("LspAgent.hover")(function* (
@@ -461,7 +522,7 @@ export const layer = Layer.effect(
         HttpClientRequest.acceptJson,
         HttpClientRequest.schemaBodyJson(PositionBodySchema)({ path: sandboxPath, line, character }),
       )
-      const response = yield* http.execute(req).pipe(
+      const response = yield* execHttp(req).pipe(
         Effect.timeout(HTTP_TIMEOUT),
         Effect.catch((e) =>
           Effect.fail(new Error(`LSP agent hover failed: ${String(e)}`)),
@@ -487,7 +548,7 @@ export const layer = Layer.effect(
         HttpClientRequest.acceptJson,
         HttpClientRequest.schemaBodyJson(PositionBodySchema)({ path: sandboxPath, line, character }),
       )
-      const response = yield* http.execute(req).pipe(
+      const response = yield* execHttp(req).pipe(
         Effect.timeout(HTTP_TIMEOUT),
         Effect.catch((e) =>
           Effect.fail(new Error(`LSP agent definition failed: ${String(e)}`)),
@@ -513,7 +574,7 @@ export const layer = Layer.effect(
         HttpClientRequest.acceptJson,
         HttpClientRequest.schemaBodyJson(PositionBodySchema)({ path: sandboxPath, line, character }),
       )
-      const response = yield* http.execute(req).pipe(
+      const response = yield* execHttp(req).pipe(
         Effect.timeout(HTTP_TIMEOUT),
         Effect.catch((e) =>
           Effect.fail(new Error(`LSP agent references failed: ${String(e)}`)),
@@ -539,7 +600,7 @@ export const layer = Layer.effect(
         HttpClientRequest.acceptJson,
         HttpClientRequest.schemaBodyJson(PositionBodySchema)({ path: sandboxPath, line, character }),
       )
-      const response = yield* http.execute(req).pipe(
+      const response = yield* execHttp(req).pipe(
         Effect.timeout(HTTP_TIMEOUT),
         Effect.catch((e) =>
           Effect.fail(new Error(`LSP agent implementation failed: ${String(e)}`)),
@@ -563,7 +624,7 @@ export const layer = Layer.effect(
         HttpClientRequest.acceptJson,
         HttpClientRequest.schemaBodyJson(BodySchema)({ path: sandboxPath }),
       )
-      const response = yield* http.execute(req).pipe(
+      const response = yield* execHttp(req).pipe(
         Effect.timeout(HTTP_TIMEOUT),
         Effect.catch((e) =>
           Effect.fail(new Error(`LSP agent documentSymbol failed: ${String(e)}`)),
@@ -585,7 +646,7 @@ export const layer = Layer.effect(
         HttpClientRequest.acceptJson,
         HttpClientRequest.schemaBodyJson(WorkspaceSymbolBodySchema)({ query }),
       )
-      const response = yield* http.execute(req).pipe(
+      const response = yield* execHttp(req).pipe(
         Effect.timeout(HTTP_TIMEOUT),
         Effect.catch((e) =>
           Effect.fail(new Error(`LSP agent workspaceSymbol failed: ${String(e)}`)),
@@ -611,7 +672,7 @@ export const layer = Layer.effect(
         HttpClientRequest.acceptJson,
         HttpClientRequest.schemaBodyJson(PositionBodySchema)({ path: sandboxPath, line, character }),
       )
-      const response = yield* http.execute(req).pipe(
+      const response = yield* execHttp(req).pipe(
         Effect.timeout(HTTP_TIMEOUT),
         Effect.catch((e) =>
           Effect.fail(new Error(`LSP agent prepareCallHierarchy failed: ${String(e)}`)),
@@ -637,7 +698,7 @@ export const layer = Layer.effect(
         HttpClientRequest.acceptJson,
         HttpClientRequest.schemaBodyJson(PositionBodySchema)({ path: sandboxPath, line, character }),
       )
-      const response = yield* http.execute(req).pipe(
+      const response = yield* execHttp(req).pipe(
         Effect.timeout(HTTP_TIMEOUT),
         Effect.catch((e) =>
           Effect.fail(new Error(`LSP agent incomingCalls failed: ${String(e)}`)),
@@ -663,7 +724,7 @@ export const layer = Layer.effect(
         HttpClientRequest.acceptJson,
         HttpClientRequest.schemaBodyJson(PositionBodySchema)({ path: sandboxPath, line, character }),
       )
-      const response = yield* http.execute(req).pipe(
+      const response = yield* execHttp(req).pipe(
         Effect.timeout(HTTP_TIMEOUT),
         Effect.catch((e) =>
           Effect.fail(new Error(`LSP agent outgoingCalls failed: ${String(e)}`)),
@@ -674,6 +735,24 @@ export const layer = Layer.effect(
           Effect.fail(new Error(`LSP agent outgoingCalls decode failed: ${String(e)}`)),
         ),
       ) as Effect.Effect<OutgoingCallsResponse, Error>
+    })
+
+    // GC coroutine: periodically reclaim daemon cache entries idle beyond
+    // GC_MAX_IDLE. Each pod GCs its own local Map; daemon processes live in
+    // sandbox containers and are reclaimed by sandbox idle eviction.
+    // Pattern mirrors sandbox-provider.ts pgLayer zombie cleanup.
+    yield* Effect.gen(function* () {
+      yield* Effect.repeat(
+        Effect.gen(function* () {
+          const threshold = Date.now() - GC_MAX_IDLE_MS
+          for (const [sid, entry] of [...daemonStates]) {
+            if (entry.lastActive < threshold) {
+              yield* shutdown(sid).pipe(Effect.catchCause(() => Effect.void))
+            }
+          }
+        }),
+        { schedule: Schedule.spaced(GC_INTERVAL) },
+      ).pipe(Effect.forkScoped, Effect.interruptible)
     })
 
     return Service.of({ touch, diagnostics, status, shutdown, hover, definition, references, implementation, documentSymbol, workspaceSymbol, prepareCallHierarchy, incomingCalls, outgoingCalls })

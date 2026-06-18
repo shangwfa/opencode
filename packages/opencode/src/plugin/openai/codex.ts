@@ -368,6 +368,7 @@ export async function CodexAuthPlugin(input: PluginInput, options: CodexAuthPlug
         return Object.fromEntries(
           Object.entries(provider.models)
             .filter(([, model]) => {
+              if (model.api.id.includes("-pro")) return false
               if (ALLOWED_MODELS.has(model.api.id)) return true
               const match = model.api.id.match(/^gpt-(\d+\.\d+)/)
               return match ? parseFloat(match[1]) > 5.4 : false

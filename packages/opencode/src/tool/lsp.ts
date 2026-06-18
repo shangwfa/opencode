@@ -77,10 +77,10 @@ export const LspTool = Tool.define(
                   : `${sandboxRelPath}:${args.line}:${args.character}`
               const sandboxTitle = `${args.operation} ${sandboxDetail}`
 
-              yield* agent.touch(sid, file, instance.directory).pipe(
-                Effect.catchCause(() => Effect.void),
-              )
-
+              // Note: no explicit agent.touch here — the daemon's hover/
+              // definition/references/etc. endpoints all call touchFile
+              // internally before performing the LSP request, so an outer
+              // touch would be redundant (double readFile + double didChange).
               switch (args.operation) {
                 case "hover": {
                   const result = yield* agent.hover(sid, file, instance.directory, args.line - 1, args.character - 1).pipe(

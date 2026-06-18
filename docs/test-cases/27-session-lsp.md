@@ -228,7 +228,8 @@ curl -s http://localhost:20877/lsp/status
 
 **预期**：
 - HTTP 200
-- `{"servers":[]}`
+- 若 `WORKSPACE` 下无 `tsconfig.json`：`{"servers":[]}`（无 warmup）
+- 若 `WORKSPACE` 下有 `tsconfig.json`：`{"servers":[{"id":"typescript","status":"running"}]}`（warmup 预启动）
 
 ---
 
@@ -409,6 +410,8 @@ curl -s -X POST http://localhost:20877/lsp/workspaceSymbol \
 
 **目标**：准备调用层级，获取指定位置符号的 CallHierarchyItem。
 
+> ⚠️ **character 位置依赖文件内容**：以下 `line/character` 基于路径 A 单元测试的特定文件内容标定（模板字符串）。不同文件内容（如字符串拼接 vs 模板字符串）会导致行长度偏移。实际测试时需根据文件实际内容调整 character 值——精确指向目标符号名（如 `greet` 方法名的首字母位置）。
+
 ```bash
 # 复用 impl.ts 中的 greet 方法
 curl -s -X POST http://localhost:20877/lsp/prepareCallHierarchy \
@@ -425,6 +428,8 @@ curl -s -X POST http://localhost:20877/lsp/prepareCallHierarchy \
 ### T27.7.5 Incoming Calls
 
 **目标**：查找谁调用了目标函数（调用方）。
+
+> ⚠️ character 位置需精确指向函数/方法名（见 T27.7.4 说明）。
 
 ```bash
 # 先创建一个调用 greet 的文件
@@ -451,6 +456,8 @@ curl -s -X POST http://localhost:20877/lsp/incomingCalls \
 ### T27.7.6 Outgoing Calls
 
 **目标**：查找目标函数调用了哪些函数（被调用方）。
+
+> ⚠️ character 位置需精确指向函数/方法名（见 T27.7.4 说明）。
 
 ```bash
 curl -s -X POST http://localhost:20877/lsp/outgoingCalls \
@@ -793,6 +800,434 @@ docker run --rm -p 20878:20877 node:24-bookworm sh -c \
 
 ---
 
+## 四（续）、健壮性与回归测试
+
+> 以下用例（T27.17–T27.22）针对 2026-06-18 代码审查发现的问题补充，覆盖 LspAgent 死锁回归、并发去重、daemon 输入校验、路径越界防护与状态自愈。其中 T27.17 是 **P0 回归**——历史实现用 `runDetached`（底层 `runInSession`）启动 daemon，对永不退出的 daemon 进程会永久阻塞，导致 `ensureDaemon` 死锁、所有 LSP 沙箱操作挂起。
+
+### T27.17 LspAgent ensureDaemon 非阻塞（死锁回归）⚠️ P0
+
+**目标**：验证 `ensureDaemon` 启动 daemon 后**立即返回**，不会阻塞在 daemon 进程的生命周期上。
+
+**根因回顾**：`sandbox-provider.ts` 的 `runDetached` 内部调用 SDK 的 `sb.commands.runInSession()`，该方法返回的 `Promise` 通过 `consumeExecutionStream` 遍历 SSE 流直到**命令进程退出**才 resolve（见 `@alibaba-group/opensandbox` chunk-IXP4MG7A.js:373-389）。daemon 是 `http.createServer().listen()`，永不退出 → Promise 永不 resolve → `ensureDaemon` 在 `yield* sandbox.runDetached(...)` 处永久阻塞 → `getBaseUrl` / `touch` / `diagnostics` / `hover` 全部挂起。
+
+**修复**：`ensureDaemon` 用 `Effect.forkDetach` 把 `runDetached` fork 到后台，不 await 其结果；daemon 就绪靠 probe 轮询判定（原有 15s 轮询不变）。
+
+**测试方法**（单元测试，不依赖真实沙箱）：
+
+```ts
+// 用 mock SandboxProvider + 假 runDetached（永不 resolve 的 Promise）模拟 daemon
+// 调用 agent.touch(sid, file, dir)，验证在 HTTP_TIMEOUT（30s）内返回
+// 而非永久挂起。关键断言：ensureDaemon 不阻塞 → touch 能拿到 probe/HTTP 结果
+```
+
+**预期**：
+- `ensureDaemon` 在 daemon 启动命令发出后**立即继续**执行 probe 轮询
+- 首次 `touch`/`diagnostics` 请求的总耗时 ≈ daemon 启动时间 + probe 间隔（≤ 15s + HTTP 超时），**不会无限挂起**
+- daemon fiber 在后台运行，不持有 `ensureDaemon` 的执行权
+
+**反例（修复前）**：`ensureDaemon` 永久阻塞，`daemonStates` 停在 `"starting"`，后续并发请求因 `state === "starting"` 直接 return，`getBaseUrl` 判定 `finalState !== "running"` 立即失败。
+
+---
+
+### T27.18 ensureDaemon 并发去重
+
+**目标**：同一 sessionID 的多个并发 LSP 请求，只触发**一次** `runDetached`（daemon 启动），其余请求等待或复用。
+
+**根因**：历史实现 `ensureDaemon` 在 `daemonStates.get` 与 `daemonStates.set("starting")` 之间隔着 `yield* getSandbox()`（异步让出点），并发 fiber 可同时通过 `state === undefined` 检查后各自 `runDetached`，导致重复启动 daemon（端口冲突 → 第二个 daemon 崩溃 → 日志噪声 + 启动风暴）。
+
+**修复**：把 `daemonStates.set(sessionID, "starting")` 提前到 `getSandbox()` 之前，使「检查→置 starting」成为无 yield 的原子步骤（Effect 协作式调度只在 `yield*` 让出）。
+
+**测试方法**：
+
+```ts
+// 用 Promise.all 同时发起 5 个 agent.touch(sid, ...)
+// 计数 mock runDetached 被调用的次数
+```
+
+**预期**：
+- `runDetached` 对同一 sessionID **仅被调用 1 次**
+- 其余 4 个并发请求在 `ensureDaemon` 入口看到 `state === "starting"` 直接返回，随后由 `getBaseUrl` 的 probe 轮询等待 daemon 就绪
+- daemon 就绪后所有请求正常返回
+
+---
+
+### T27.19 daemon 工作区路径越界拒绝
+
+**目标**：daemon 拒绝 `/workspace` 之外的路径（如 `../../../etc/passwd`、`/etc/shadow`），返回 HTTP 400。
+
+**根因**：历史 `daemon/index.ts` 与 `lsp-manager.ts` 仅校验 `body.path` 为 string，未限制路径必须位于 `WORKSPACE` 内。`touchFile` 会 `fs.readFile` 任意路径（虽然非 `.ts` 文件因 `isTsFile` 直接返回、读取内容也不回传调用者，实际无法直接读取文件内容，但路径越界本身违反最小权限原则）。
+
+**修复**：
+- `daemon/index.ts` 增加路径校验：`path.normalize(p)` 后必须 `=== WORKSPACE` 或 `startsWith(WORKSPACE + "/")`
+- 校验失败返回 HTTP 400 `{ error: "path outside workspace" }`
+
+**测试**（路径 A 单元测试可覆盖）：
+
+```bash
+# 越界路径（相对路径逃逸）
+curl -s -o /dev/null -w "%{http_code}" -X POST http://localhost:20877/lsp/touch \
+  -H 'Content-Type: application/json' \
+  -d '{"path": "../../../etc/passwd"}'
+# 期望 400
+
+# 合法路径
+curl -s -o /dev/null -w "%{http_code}" -X POST http://localhost:20877/lsp/touch \
+  -H 'Content-Type: application/json' \
+  -d '{"path": "/tmp/lsp-test/test.ts"}'
+# 期望 200（路径 A 下 WORKSPACE=/tmp/lsp-test）
+```
+
+**预期**：
+- `../../../etc/passwd`、`/etc/shadow`、`/root/.ssh/id_rsa` 等越界路径返回 400
+- `/workspace/*.ts`（或本地测试的 `/tmp/lsp-test/*.ts`）正常 200
+- 防御层位于 daemon，即使主进程 `toSandboxPath` 对目录外路径透传（见 T27.x 路径映射），daemon 仍是最后一道闸
+
+---
+
+### T27.20 daemon 请求体大小限制
+
+**目标**：daemon 拒绝超过大小上限的请求体，防止内存耗尽。
+
+**根因**：历史 `daemon/index.ts` 的 `readBody` 无限制地 `chunks.push(chunk)` 累积，恶意/异常大请求可耗尽容器内存。
+
+**修复**：`readBody` 累计字节数超过 `MAX_BODY_BYTES`（1 MiB）时中断读取并返回 HTTP 413。
+
+**测试**：
+
+```bash
+# 生成 2MB payload
+head -c 2097152 /dev/urandom | base64 > /tmp/big.json
+printf '{"path":"' > /tmp/payload.json; cat /tmp/big.json >> /tmp/payload.json; printf '"}' >> /tmp/payload.json
+
+curl -s -o /dev/null -w "%{http_code}" -X POST http://localhost:20877/lsp/touch \
+  -H 'Content-Type: application/json' \
+  --data-binary @/tmp/payload.json
+# 期望 413
+```
+
+**预期**：
+- 请求体 > 1 MiB 返回 413
+- 正常 LSP 请求体（< 1 KiB）不受影响
+
+---
+
+### T27.21 daemon 非法 JSON 返回 400
+
+**目标**：daemon 对格式错误的 JSON 请求体返回 HTTP 400，而非 500。
+
+**根因**：历史 `daemon/index.ts` 各路由的 `JSON.parse(await readBody(req))` 未单独 try/catch，异常被外层 `try/catch` 捕获统一返回 500（internal error），不利于调用方区分「客户端错误」与「服务端错误」。
+
+**修复**：`readBody` 后立即 try/catch `JSON.parse`，失败返回 400 `{ error: "invalid JSON" }`。
+
+**测试**：
+
+```bash
+curl -s -o /dev/null -w "%{http_code}" -X POST http://localhost:20877/lsp/touch \
+  -H 'Content-Type: application/json' \
+  -d 'not a json'
+# 期望 400
+
+curl -s -X POST http://localhost:20877/lsp/touch \
+  -H 'Content-Type: application/json' \
+  -d 'not a json'
+# 期望 {"error":"invalid JSON"}（非 "internal error"）
+```
+
+**预期**：
+- 非 JSON 请求体返回 400 + `{"error":"invalid JSON"}`
+- 缺字段（`path` 不是 string）仍返回 400 + 具体字段错误
+- 仅 daemon 内部异常（LspManager 抛错）才返回 500
+
+---
+
+### T27.22 沙箱重建后 daemon 状态自愈
+
+**目标**：验证沙箱被外部销毁并重建（sandboxID 变化）后，LspAgent 能检测到 daemon 失活并自动重启，不会因 `daemonStates` 缓存的 `"running"` 状态而连到错误/不存在的 daemon。
+
+**机制**：`getBaseUrl` 在 `state === "running"` 时主动 probe（5s 超时）；probe 失败→置 `"error"`→`ensureDaemon` 重新启动。daemon 重启期间首次请求有 ~5s probe + ~15s 启动延迟（性能影响，非正确性问题）。
+
+**测试**（路径 B 端到端）：
+
+```bash
+# 1. 触发 daemon 启动并验证正常工作
+send_and_verify $SID 'Create /workspace/recover.ts with: const x: number = 1' "T27.22 setup"
+
+# 2. 销毁并重建沙箱（通过 kill-sandbox API）
+curl -s -X POST "$BASE/session/$SID/kill-sandbox"
+sleep 2
+
+# 3. 再次发起 LSP 请求，验证自愈
+START=$(date +%s)
+send_and_verify $SID 'Create /workspace/recover2.ts with: const y: string = 2' "T27.22 recover"
+END=$(date +%s)
+echo "恢复耗时: $((END - START))s"
+
+# 4. 验证 LSP 诊断恢复正常
+curl -s "$BASE/session/$SID/message" | python3 -c "
+import json, sys
+msgs = json.load(sys.stdin)
+for m in msgs[-3:]:
+    for p in m.get('parts', []):
+        if p.get('type') == 'tool' and p.get('tool') == 'write':
+            output = p.get('state', {}).get('output', '')
+            if 'LSP errors detected' in output:
+                print('✅ LSP 自愈成功，诊断恢复')
+            else:
+                print('⚠️  无诊断（可能是 TS2322，y:string=2 应报错）')
+"
+```
+
+**预期**：
+- kill-sandbox 后 `daemonStates[sid]` 仍为 `"running"`（缓存过期）
+- 下一次 LSP 请求的 `getBaseUrl` probe 失败（新沙箱无 daemon）→ 置 `"error"` → `ensureDaemon` 重启
+- 恢复耗时 ≤ 20s（5s probe 超时 + 15s 启动轮询）
+- 恢复后 LSP 诊断正常返回
+
+---
+
+## 四（续 II）、PVC 模式 LSP 测试（session / app）
+
+> 前置条件：SaaS + PVC 环境（`OPENCODE_SANDBOX_VOLUME_TYPE=pvc`），搭建见 [`27-session-pvc-mode.md`](./27-session-pvc-mode.md) 与 [`local-test-env.md`](../local-test-env.md)。
+>
+> **为何单独成章**：app 模式下沙箱内文件位于 `/workspace/worktrees/<rootSessionID>/...`（git worktree），而非 session 模式的 `/workspace/...`。LSP daemon 的 `WORKSPACE` 默认仍是 `/workspace`，而 `agent.ts` 通过 `toSandboxPath` 的 `isSandboxPath` 提前返回把 worktree 完整路径透传给 daemon。这一路径链路（host → `instance.directory=/workspace/worktrees/<sid>` → `toSandboxPath` → daemon `readFile` → LSP server `detectRoot`）此前**完全无测试覆盖**，是代码审查中多次误判「app 模式路径错位」的根因。以下用例补齐该盲区。
+
+### T27.23 app 模式 write 工具触发 LSP 诊断（worktree 路径正确性）⚠️ P0
+
+**目标**：app 模式下，write 工具向 worktree 内写入含类型错误的 TS 文件，验证 LSP 诊断正确返回——证明 `toSandboxPath` 对 `/workspace/worktrees/<sid>/foo.ts` 不剥离 worktree 前缀、daemon 能读到真实文件、LSP server 能分析。
+
+**关键链路**：
+```
+instance.directory = /workspace/worktrees/<sid>
+  → write.ts: toSandboxPath(filePath, instance.directory)
+    → isSandboxPath("/workspace/worktrees/<sid>/foo.ts") === true → 原样返回
+  → agent.touch/diagnostics(sid, filePath, instance.directory)
+    → daemon 收到 /workspace/worktrees/<sid>/foo.ts
+    → fs.readFile 成功（文件真实存在）
+    → LSP server 分析 → 诊断返回
+```
+
+**前置**：app 模式 session 已创建，`/workspace/repo/.git` 已 init + commit，worktree 已自动创建（参见 `27-session-pvc-mode.md` T27.13）。
+
+```bash
+BASE="http://localhost:14096"
+MODEL='{"providerID":"zhipuai","modelID":"glm-5.1"}'
+APP_ID="lsp-app-$(date +%s)"
+
+# 1. 创建 app 模式 session
+SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' \
+  -d "{\"pvcMode\":\"app\",\"appId\":\"$APP_ID\"}" | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+echo "SID: $SID (app=$APP_ID)"
+
+# 2. 初始化 repo（worktree 创建前提）
+curl -s -X POST "$BASE/session/$SID/exec" -H 'Content-Type: application/json' \
+  -d '{"command":"git config --global user.email t@t.com && git config --global user.name T && mkdir -p /workspace/repo && cd /workspace/repo && git init && echo x > R.md && git add . && git commit -m init"}' >/dev/null
+sleep 3
+
+# 3. 确认 worktree 已创建
+curl -s -X POST "$BASE/session/$SID/exec" -H 'Content-Type: application/json' \
+  -d '{"command":"ls -d /workspace/worktrees/*/"}' | python3 -c "import json,sys;print('worktree:', json.load(sys.stdin).get('stdout','').strip())"
+
+# 4. 通过 write 工具写入含错误的 TS 文件（触发 LSP）
+send_and_verify $SID \
+  'Create a file called broken.ts with: const y: number = "not a number"' \
+  "T27.23 app-mode write LSP diagnostics"
+
+# 5. 验证诊断返回
+curl -s "$BASE/session/$SID/message" | python3 -c "
+import json, sys
+msgs = json.load(sys.stdin)
+for m in msgs[-3:]:
+    for p in m.get('parts', []):
+        if p.get('type') == 'tool' and p.get('tool') == 'write':
+            output = p.get('state', {}).get('output', '')
+            if 'LSP errors detected' in output and 'not assignable' in output:
+                print('✅ T27.23 PASS — app 模式 worktree 下 LSP 诊断正常')
+            elif 'Wrote file successfully' in output and 'LSP errors' not in output:
+                print('❌ T27.23 FAIL — 文件已写但无 LSP 诊断（路径链路断裂）')
+            else:
+                print('⚠️  T27.23 不确定:', output[:120])
+"
+```
+
+**预期**：
+- write 输出包含 `LSP errors detected in this file`
+- 诊断信息包含 `Type 'string' is not assignable to type 'number'`
+- 证明 daemon 收到 `/workspace/worktrees/<sid>/broken.ts` 并成功读取、分析
+
+**反例（若有 bug）**：若 `toSandboxPath` 错误剥离 worktree 前缀，daemon 收到 `/workspace/broken.ts`（不存在），`readFile` 读空，LSP 无诊断 → write 输出仅 `Wrote file successfully.` 无 LSP 错误。
+
+---
+
+### T27.24 app 模式 LSP 项目根检测（worktree 下 tsconfig）
+
+**目标**：app 模式下，worktree 内存在 `tsconfig.json` 时，LSP server 的 `detectRoot`（`lsp-manager.ts:248-259`）应停在 worktree 目录（`/workspace/worktrees/<sid>`），而非上溯到 `/workspace`。项目根决定 `compilerOptions`、`include` 等配置来源，错误的项目根会导致诊断不一致。
+
+**前置**：T27.23 的 session + worktree 已建立。
+
+```bash
+# 在 worktree 内放 tsconfig.json（strict 模式，用于验证根检测）
+curl -s -X POST "$BASE/session/$SID/exec" -H 'Content-Type: application/json' \
+  -d '{"command":"printf %s \"{\\\"compilerOptions\\\":{\\\"strict\\\":true,\\\"noImplicitAny\\\":true}}\" > /workspace/worktrees/'"$SID"'/tsconfig.json"}' >/dev/null
+
+# 写入会触发 noImplicitAny 错误的文件（依赖 tsconfig 的 strict 配置）
+send_and_verify $SID \
+  'Create a file called implicit.ts with: function f(x) { return x }' \
+  "T27.24 app-mode project root detection"
+
+curl -s "$BASE/session/$SID/message" | python3 -c "
+import json, sys
+msgs = json.load(sys.stdin)
+for m in msgs[-3:]:
+    for p in m.get('parts', []):
+        if p.get('type') == 'tool' and p.get('tool') == 'write':
+            output = p.get('state', {}).get('output', '')
+            # noImplicitAny 是 tsconfig strict 配置触发的，证明 LSP 读到了 worktree 的 tsconfig
+            if 'LSP errors detected' in output and ('implicit' in output.lower() or '7006' in output):
+                print('✅ T27.24 PASS — worktree tsconfig 生效，项目根正确')
+            else:
+                print('⚠️  T27.24 输出:', output[:150])
+"
+```
+
+**预期**：
+- write 输出包含 `LSP errors detected`，诊断含 `Parameter 'x' implicitly has an 'any' type`（TS7006，由 `noImplicitAny` 触发）
+- 证明 LSP server 的 `detectRoot` 从 `/workspace/worktrees/<sid>/implicit.ts` 向上找到 `/workspace/worktrees/<sid>/tsconfig.json` 并以其为项目根
+
+**反例**：若 `detectRoot` 错误停在 `/workspace`（无 tsconfig 或读到错误配置），则不会触发 `noImplicitAny`（tsserver 默认配置不开启 strict）。
+
+---
+
+### T27.25 app 模式 lsp 工具操作 + 路径不泄露
+
+**目标**：app 模式下通过 `lsp` 工具调用 hover/definition，验证：(1) 操作正常返回；(2) 返回给 LLM 的路径不泄露宿主机路径，且 worktree 路径以 `/workspace/worktrees/<sid>/...` 形式呈现（符合路径泄露防护）。
+
+```bash
+# 先创建可 hover 的文件
+send_and_verify $SID \
+  'Create a file called symbol.ts with: const greeting: string = "hello"' \
+  "T27.25 setup"
+
+# 调 lsp 工具 hover
+send_and_verify $SID \
+  'Use the lsp tool to hover over the variable greeting in symbol.ts' \
+  "T27.25 app-mode lsp hover"
+
+# 验证工具输出
+curl -s "$BASE/session/$SID/message" | python3 -c "
+import json, sys
+msgs = json.load(sys.stdin)
+for m in msgs[-3:]:
+    for p in m.get('parts', []):
+        if p.get('type') == 'tool' and p.get('tool') == 'lsp':
+            output = p.get('state', {}).get('output', '')
+            meta = p.get('state', {}).get('metadata', {})
+            has_hover = 'const greeting: string' in output
+            # 关键：输出中不应出现宿主机路径，worktree 路径应保留 /workspace 前缀
+            host_leak = any(seg in output for seg in ['/Users/', '/home/', 'worktrees/' + ''])
+            print('hover 内容:', '✅' if has_hover else '❌', output[:80] if output else '(空)')
+            print('路径泄露:', '❌ 泄露' if host_leak else '✅ 无泄露')
+            print('✅ T27.25 PASS' if has_hover and not host_leak else '❌ T27.25 FAIL')
+"
+```
+
+**预期**：
+- hover 返回 `const greeting: string` 类型信息
+- 输出路径为 `/workspace/worktrees/<sid>/symbol.ts`（沙箱内路径），不含宿主机路径
+- 与 session 模式行为一致（路径泄露防护对两种模式均生效）
+
+---
+
+### T27.26 app 模式 repo 不存在时 LSP 降级到 /workspace
+
+**目标**：app 模式但 `/workspace/repo/.git` 不存在 → `worktreeScript` 不创建 worktree → 文件直接写在 `/workspace`（`instance.directory` 回退）→ LSP 应正常工作，等价于 session 模式行为。
+
+```bash
+APP_ID2="lsp-norepo-$(date +%s)"
+SID2=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' \
+  -d "{\"pvcMode\":\"app\",\"appId\":\"$APP_ID2\"}" | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+sleep 3
+
+# 确认无 worktree
+curl -s -X POST "$BASE/session/$SID2/exec" -H 'Content-Type: application/json' \
+  -d '{"command":"ls -d /workspace/worktrees/*/ 2>/dev/null | wc -l"}' | python3 -c "import json,sys;print('worktree count:', json.load(sys.stdin).get('stdout','').strip())"
+# 期望：0
+
+# 写入 TS 文件（应落在 /workspace/，因 instance.directory 回退）
+send_and_verify $SID2 \
+  'Create a file called fallback.ts with: const z: number = "bad"' \
+  "T27.26 app-mode no-repo LSP fallback"
+
+curl -s "$BASE/session/$SID2/message" | python3 -c "
+import json, sys
+msgs = json.load(sys.stdin)
+for m in msgs[-3:]:
+    for p in m.get('parts', []):
+        if p.get('type') == 'tool' and p.get('tool') == 'write':
+            output = p.get('state', {}).get('output', '')
+            if 'LSP errors detected' in output:
+                print('✅ T27.26 PASS — 无 repo 降级，LSP 仍工作（/workspace 根）')
+            else:
+                print('❌ T27.26 FAIL — 降级后 LSP 失效:', output[:100])
+"
+```
+
+**预期**：
+- worktree 数量为 0（repo 不存在，`worktreeScript` 跳过）
+- write 输出仍包含 `LSP errors detected`（文件在 `/workspace/fallback.ts`，daemon 默认 `WORKSPACE=/workspace` 正确读取）
+- 证明 app 模式降级路径与 session 模式 LSP 行为一致
+
+---
+
+### T27.27 session 模式与 app 模式 LSP daemon 隔离
+
+**目标**：session 模式 session 和 app 模式 session 各自启动独立 daemon（不同 sandbox 容器），LSP 诊断互不干扰。
+
+```bash
+# session 模式 session
+SID_S=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' \
+  -d '{"pvcMode":"session"}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+
+# app 模式 session（复用 T27.23 的 $SID）
+sleep 3
+
+# 两个 session 各写不同错误的文件
+send_and_verify $SID_S \
+  'Create a file called sess.ts with: const a: string = 1' \
+  "T27.27 session-mode"
+send_and_verify $SID \
+  'Create a file called app.ts with: const b: number = "two"' \
+  "T27.27 app-mode"
+
+# 验证各自诊断独立
+curl -s "$BASE/session/$SID_S/message" | python3 -c "
+import json, sys
+msgs = json.load(sys.stdin)
+for m in msgs[-2:]:
+    for p in m.get('parts', []):
+        if p.get('type') == 'tool' and p.get('tool') == 'write':
+            out = p.get('state', {}).get('output', '')
+            ok = 'number' in out and 'not assignable' in out and 'string' in out
+            print('session 模式诊断:', '✅' if ok else '❌', out[:80])
+"
+curl -s "$BASE/session/$SID/message" | python3 -c "
+import json, sys
+msgs = json.load(sys.stdin)
+for m in msgs[-2:]:
+    for p in m.get('parts', []):
+        if p.get('type') == 'tool' and p.get('tool') == 'write':
+            out = p.get('state', {}).get('output', '')
+            ok = 'string' in out and 'not assignable' in out and 'number' in out
+            print('app 模式诊断:', '✅' if ok else '❌', out[:80])
+"
+```
+
+**预期**：
+- session 模式 session 诊断 `Type 'number' is not assignable to type 'string'`
+- app 模式 session 诊断 `Type 'string' is not assignable to type 'number'`
+- 两者错误类型不同，证明 daemon 在各自容器独立运行、LSP 状态隔离
+
+---
+
 ## 五、验收标准
 
 ### P0 核心验收
@@ -805,6 +1240,8 @@ docker run --rm -p 20878:20877 node:24-bookworm sh -c \
 | T27.7 | P0 | Daemon 优雅关闭 |
 | T27.8 | P0 | Write 工具沙箱分支诊断 |
 | T27.13 | P0 | Bundle 自包含验证 |
+| **T27.17** | **P0** | **LspAgent ensureDaemon 非阻塞（死锁回归）** |
+| **T27.23** | **P0** | **app 模式 write 触发 LSP 诊断（worktree 路径正确性）** |
 
 ### P1 稳定性验收
 
@@ -828,6 +1265,15 @@ docker run --rm -p 20878:20877 node:24-bookworm sh -c \
 | T27.14 | P1 | Dockerfile 集成验证 |
 | T27.15 | P1 | 启动失败优雅降级 |
 | T27.16 | P1 | 请求超时处理 |
+| T27.18 | P1 | ensureDaemon 并发去重 |
+| T27.19 | P1 | daemon 工作区路径越界拒绝 |
+| T27.20 | P1 | daemon 请求体大小限制 |
+| T27.21 | P1 | daemon 非法 JSON 返回 400 |
+| T27.22 | P1 | 沙箱重建后 daemon 状态自愈 |
+| **T27.24** | **P1** | **app 模式 LSP 项目根检测（worktree tsconfig）** |
+| **T27.25** | **P1** | **app 模式 lsp 工具操作 + 路径不泄露** |
+| **T27.26** | **P1** | **app 模式 repo 不存在时 LSP 降级到 /workspace** |
+| **T27.27** | **P1** | **session 模式与 app 模式 LSP daemon 隔离** |
 
 ### P2 边界验收
 
@@ -896,3 +1342,4 @@ docker run --rm -p 20878:20877 node:24-bookworm sh -c \
 8. **apply_patch.ts format 修复**：行 276-281 的 `format.file(edited)` / `Bom.syncFile(afs, edited, ...)` 原会在 sandbox 模式下尝试操作宿主路径（文件不存在，静默失败）。已修复为 `svc._tag === "None"`（仅本地模式）时才执行，与 write/edit sandbox 分支保持一致
 9. **edit.ts sandbox 并发锁**：sandbox 分支已加 per-file 锁，与本地分支一致，防止并发编辑同一文件的竞争条件
 10. **lsp.ts 工具能力全接入**：sandbox 分支已接入全部 9 个 LSP 操作 —— `hover` / `goToDefinition` / `findReferences` / `goToImplementation` / `documentSymbol` / `workspaceSymbol` / `prepareCallHierarchy` / `incomingCalls` / `outgoingCalls`，与本地分支 100% 对齐，不再有 "not yet supported" 降级路径
+11. **app 模式（worktree）LSP 路径链路（T27.23–T27.27 覆盖）**：app 模式下沙箱内文件位于 `/workspace/worktrees/<rootSessionID>/...`（git worktree），而非 session 模式的 `/workspace/...`。LSP 链路依赖 `toSandboxPath`（`sandbox-path.ts:33`）的 `isSandboxPath` 提前返回——当传入路径已是 `/workspace/...` 前缀时，**原样透传不剥离 worktree 段**，daemon 收到完整 worktree 路径并成功 `readFile`。daemon 的 `LSP_WORKSPACE_ROOT` 默认 `/workspace`，`detectRoot`（`lsp-manager.ts:248-259`）从 worktree 文件向上查找 root marker，停在含 `tsconfig.json` 的 worktree 目录。该路径链路此前无测试覆盖（代码审查中多次误判「app 模式路径错位」），已由 T27.23–T27.27 补齐。注意：app 模式需 PVC 环境（`OPENCODE_SANDBOX_VOLUME_TYPE=pvc`）+ repo 已 init+commit，否则 `worktreeScript` 跳过 worktree 创建、文件落在 `/workspace`（T27.26 降级场景）

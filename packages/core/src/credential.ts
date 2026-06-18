@@ -157,7 +157,7 @@ export const legacyImportLayer = Layer.effectDiscard(
             label: "Imported",
             value: item.value,
             active: true,
-          })
+          }).run()
         }
         yield* tx.insert(DataMigrationTable).values({ name, time_completed: Date.now() }).onConflictDoNothing().run()
       }),

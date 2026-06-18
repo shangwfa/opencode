@@ -190,6 +190,26 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
         Effect.flatMap((row) => row ? Effect.void : Effect.fail({ _tag: "NotFound" as const, sessionID })),
       )
 
+    // Retry worktree creation — newly created sandboxes may need a few
+    // seconds for execd to become ready (especially under QEMU). The old
+    // code silently swallowed the error (Effect.catch(() => Effect.void)),
+    // so worktree never got created on the first exec after sandbox boot.
+    // worktreeScript is idempotent so retries are safe.
+    const ensureWorktree = (sessionID: SessionID) =>
+      Effect.gen(function* () {
+        for (let i = 0; i < 3; i++) {
+          const ok = yield* sandbox
+            .runInSession(sessionID, worktreeScript(sessionID), { timeoutSeconds: 30 }, {})
+            .pipe(
+              Effect.as(true),
+              Effect.catch(() => Effect.succeed(false)),
+            )
+          if (ok) return
+          yield* Effect.sleep("2 seconds")
+        }
+        yield* Effect.logWarning("worktree creation failed after 3 attempts", { sessionID })
+      })
+
     yield* router.add("GET", "/session/:sessionID/proxy/:port/__errors",
       Effect.gen(function* () {
         const params = yield* HttpRouter.schemaPathParams(PathParams)
@@ -299,11 +319,7 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
           yield* sandbox.getOrCreate(root.id, { pvcMode: root.pvcMode, appId: root.appId }).pipe(
             Effect.catch(() => Effect.void),
           )
-          // app 模式：确保 worktree 存在（幂等 + repo 不存在时降级）
-          // 使用 root.id 与 AI 工具路径（tools.ts）保持一致
-          yield* sandbox.runInSession(root.id, worktreeScript(root.id), { timeoutSeconds: 30 }, {}).pipe(
-            Effect.catch(() => Effect.void),
-          )
+          yield* ensureWorktree(root.id)
         }
 
         const wtDir = `/workspace/worktrees/${root.id}`
@@ -348,10 +364,7 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
           yield* sandbox.getOrCreate(root.id, { pvcMode: root.pvcMode, appId: root.appId }).pipe(
             Effect.catch(() => Effect.void),
           )
-          // app 模式：确保 worktree 存在（幂等 + repo 不存在时降级）
-          yield* sandbox.runInSession(root.id, worktreeScript(root.id), { timeoutSeconds: 30 }, {}).pipe(
-            Effect.catch(() => Effect.void),
-          )
+          yield* ensureWorktree(root.id)
         }
 
         const sid = root.id
@@ -573,7 +586,7 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
       }),
     )
 
-    yield* router.add("*", "/session/:sessionID/proxy/:port",
+    yield* router.add("*", "/session/:sessionID/proxy/:port/*",
       Effect.gen(function* () {
         const request = yield* HttpServerRequest.HttpServerRequest
         const isWs = request.headers["upgrade"]?.toLowerCase() === "websocket"

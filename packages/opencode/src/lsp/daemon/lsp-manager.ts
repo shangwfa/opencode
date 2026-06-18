@@ -273,6 +273,13 @@ export class LspManager {
 
     if (server.crashed && !server.spawnFailed) {
       server.crashed = false
+      // Clear stale document state so the restarted server gets fresh
+      // didOpen notifications instead of didChange against documents it
+      // has never seen (which tsserver silently ignores or errors on).
+      server.documents = {}
+      server.pushDiagnostics.clear()
+      server.pullDiagnostics.clear()
+      server.published.clear()
       server.initPromise = this.initializeServer(server)
     }
 
@@ -689,7 +696,9 @@ export class LspManager {
       }
     })
 
-    child.stderr?.resume()
+    child.stderr?.on("data", (d: Buffer) => {
+      process.stderr.write(`[tsserver] ${d.toString()}`)
+    })
 
     try {
       await this.runInitializeHandshake(server, child, initialization)

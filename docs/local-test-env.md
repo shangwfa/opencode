@@ -505,8 +505,151 @@ POST /session/:sessionID/exec {"command":"nohup npx vite ... &"}
 | ProviderModelNotFoundError | AI provider 未配置 | 确认容器连的是远端 PG（含 account 数据） |
 | pg_advisory_lock 启动失败 | 远端 PG 被另一个 opencode 实例占用 | 等另一个实例退出，或停掉远端 SaaS |
 | dev server 进程消失 | 容器重启后 sandbox map 清空 | PVC 文件还在，重新发消息启动进程即可 |
+| psql 连接报 `role "app" does not exist` | TCP 转发的远端 PG 实例 role 配置与文档记录的 `app` 不一致 | 用 `\du` 查看 PG 实际 role 列表：`PGPASSWORD=xxx psql -h 127.0.0.1 -p 15432 -U postgres -d postgres -c '\du'`。或从 SaaS 容器内查：`docker exec opencode-saas-test env | grep DATABASE_URL` 获取实际连接串 |
 | write/edit/bash 工具一直 `running` | 未配置权限，默认 `"ask"` 模式等待确认 | 执行 Step 3.5 配置权限，或通过 SSE 监听 `permission.asked` 事件后调用 `POST /session/{SID}/permission/{requestID}` 回复 |
 | subagent write/edit 卡在 `running`，主 agent 正常 | **subagent session 继承的权限中 `edit` 默认为 `"ask"`，触发 `permission.asked` 事件发给 subagent sessionID，HTTP API 模式下无人应答**。主 agent 的 write 可能走不同权限路径不触发询问，但 subagent 内部调用 write 时会触发 `edit` 权限请求，反复重试无人应答后永远卡住。 | 执行 Step 3.5 配置全局权限（必须包含 `edit:allow` 和 `write:allow`），或在 subagent 创建时显式设置 permission |
 | write 写 `/tmp/` 路径触发 `external_directory` 权限 | `/tmp/` 不在项目目录（`/workspace`）下，触发外部目录权限 | 写文件时使用项目目录内的路径，如 `/workspace/test.txt` |
 | sandbox 健康检查超时 30s | `OPENCODE_SANDBOX_USE_SERVER_PROXY=true` 时 SDK 健康检查走 Pod 直连 | 属于 SDK 限制，重试通常能成功 |
 | Local MCP 启动慢（npx 下载 supergateway） | sandbox 镜像未预装 supergateway，每次 `npx -y` 下载 | **待优化**：sandbox 镜像预装 `npm install -g supergateway`，后续 `connectSandboxLocal` 可去掉 `npx -y` 前缀 |
+
+---
+
+## 七、本地测试环境已知限制与解法
+
+> 以下问题在 **Linux + 远端 PG + 远端 Sandbox API** 环境中不存在，均为 macOS 本地开发环境特有。
+
+### 7.1 macOS Docker 容器 IP 不可达（proxy 502）
+
+**症状**：SaaS 容器用 `OPENCODE_SANDBOX_USE_SERVER_PROXY=true` 时，OpenSandbox server proxy 返回 502。
+
+**根因**：Docker Desktop for Mac 的固有限制——宿主机进程（OpenSandbox server）无法 TCP 路由到 Docker bridge 网络的容器 IP（`172.17.x.x`）。proxy 尝试直接连接容器 IP，失败。
+
+**解法**：不用 proxy 模式。SaaS 容器用 `OPENCODE_SANDBOX_USE_SERVER_PROXY=false`，通过 endpoint rewrite 绕过（见 7.2）。
+
+### 7.2 SaaS 容器无法访问 sandbox endpoint（地址不匹配）
+
+**症状**：`useServerProxy=false` 时 OpenSandbox 返回 endpoint `127.0.0.1:mapped_port/proxy/44772`，但 SaaS 容器内 `127.0.0.1` 指向容器自身。
+
+**根因**：OpenSandbox `direct` ingress 模式做 Docker 端口映射（`-p 0.0.0.0:mapped_port:44772`），返回宿主机视角的 `127.0.0.1:mapped_port`。SaaS 容器需要通过 `host.docker.internal:mapped_port` 才能访问宿主机的映射端口。
+
+**解法**：SaaS 容器启动时设 `-e OPENCODE_SANDBOX_ENDPOINT_REWRITE='127.0.0.1:host.docker.internal'`。代码中的 fetch 拦截会将 endpoint URL 中的 `127.0.0.1` 重写为 `host.docker.internal`。
+
+```bash
+docker run -d --name opencode-saas-test \
+  -e OPENCODE_SANDBOX_USE_SERVER_PROXY=false \
+  -e OPENCODE_SANDBOX_ENDPOINT_REWRITE='127.0.0.1:host.docker.internal' \
+  ...
+```
+
+### 7.3 本地 PG 端口转发
+
+**症状**：Docker 容器无法通过 `host.docker.internal:5432` 访问 macOS 上的本地 PG。
+
+**根因**：Homebrew 安装的 PostgreSQL 默认只监听 `127.0.0.1`，Docker 容器通过 `host.docker.internal` 访问的是宿主机的网络接口，不是 localhost。
+
+**解法**：手动 TCP 转发 `0.0.0.0:15432 → 127.0.0.1:5432`，SaaS 容器通过 `host.docker.internal:15432` 访问。
+
+```bash
+nohup node -e "
+const net = require('net');
+net.createServer(c => {
+  const r = net.connect(5432, '127.0.0.1');
+  c.pipe(r); r.pipe(c);
+  c.on('error', () => r.destroy()); r.on('error', () => c.destroy());
+}).listen(15432, '0.0.0.0', () => console.log('PG forward ready on :15432'));
+" > /tmp/pg-local-forward.log 2>&1 &
+```
+
+### 7.4 AI provider API key 无法从 PG credential 加载
+
+**症状**：发送 AI 消息返回 `ProviderModelNotFoundError`。
+
+**根因**：credential 表有 API key（从 `~/.local/share/opencode/auth.json` 导入），但 provider 需要 `ZHIPU_API_KEY` 等环境变量。SaaS 容器内 PG credential → 环境变量的映射链路不完整。
+
+**解法**：容器启动时直接设环境变量。
+
+```bash
+docker run -e ZHIPU_API_KEY='your-api-key' ...
+```
+
+> 查看已有 credential：`psql -h localhost -U ruomu -d opencode -c "SELECT connector_id, active FROM credential WHERE active = true"`
+
+### 7.5 本地 PG 缺 account / auth 数据
+
+**症状**：远端 PG 有 provider 配置、模型列表等历史数据；本地 PG 全空。
+
+**根因**：本地 PG 是全新数据库，远端 PG 有长期积累的 account、auth、模型配置。credential 表数据来自 `legacyImportLayer` 从 `~/.local/share/opencode/auth.json` 导入，但 account / auth 表不会被导入。
+
+**解法**：手动激活 credential（`UPDATE credential SET active = true WHERE connector_id = 'zhipuai'`）+ 设环境变量 API key（见 7.4）。
+
+### 7.6 私有 registry 不可达 + 镜像重建
+
+**症状**：构建 sandbox 镜像时 `FROM registry.shadow-rpa.net/...` 超时失败。
+
+**根因**：内网 registry 需 VPN，当前网络环境无法访问。
+
+**解法**：用 Docker Hub 公共镜像替代。
+
+```bash
+cd packages/opencode
+
+# 创建临时 Dockerfile，替换 FROM 行
+sed 's|registry.shadow-rpa.net/infra/opensandbox:2026-06-09|opensandbox/code-interpreter:latest|g' docker/Dockerfile > /tmp/Dockerfile.sandbox
+
+docker build -t opencode-opensandbox:local -f /tmp/Dockerfile.sandbox .
+```
+
+> 公共镜像 `opensandbox/code-interpreter:latest` 与私有镜像功能一致，但可能缺少 `opencode-lsp-agent` symlink。LSP daemon 启动命令已改为直接 `node /opt/opencode-lsp-daemon/index.js`，不依赖 symlink。
+
+### 7.7 Docker 磁盘空间不足
+
+**症状**：容器启动报 `ENOSPC`。
+
+**根因**：多次构建 SaaS/sandbox 镜像 + sandbox 容器堆积，Docker Desktop 磁盘满。
+
+**解法**：
+
+```bash
+# 清理（注意：会删除所有未使用镜像，包括基础镜像！）
+docker system prune -af
+
+# 谨慎清理：只删停止的容器和 dangling 镜像
+docker container prune
+docker image prune -f
+```
+
+> ⚠️ `docker system prune -af` 会删除所有未 tag 的镜像。如果基础镜像（如 `opensandbox/code-interpreter`）是从私有 registry 拉取的，prune 后需要重新拉取。
+
+### 7.8 权限 PATCH 导致 session 失效
+
+**症状**：配置权限 `PATCH /global/config` 后，之前创建的 session 返回 404。
+
+**根因**：`PATCH /global/config` 触发实例 dispose + 重新加载，所有 session 失效。
+
+**解法**：调整操作顺序——先配权限，再创建 session。
+
+```bash
+# 1. 先配权限
+curl -X PATCH "$BASE/global/config" -d '{"permission":{...}}'
+sleep 3
+
+# 2. 再创建 session（dispose 后新建）
+SID=$(curl -X POST "$BASE/session" -d '{}')
+```
+
+### 7.9 LSP 诊断首次返回空
+
+**症状**：首次对 `.ts` 文件调用 diagnostics 或 documentSymbol，返回空结果。等待 5-15 秒后重试才能得到正确结果。
+
+**根因**：`typescript-language-server` 的 `textDocument/didOpen` 是异步通知。TS server 收到通知后需要时间解析文件、构建索引。请求-响应类 API（hover / definition / workspaceSymbol）立即工作；推送类 API（diagnostics / documentSymbol）需要等待索引完成。
+
+**解法**：测试脚本对首次调用加重试（5 秒间隔，最多 3 次）。这不是代码 bug，是 LSP 协议的异步特性。
+
+```javascript
+// 重试模式示例
+for (let i = 0; i < 3; i++) {
+  const result = await callLSP("documentSymbol", { path })
+  if (result.symbols?.length > 0) break
+  await sleep(5000)
+}
+```

@@ -14,7 +14,7 @@
 
 ```bash
 BASE="http://localhost:14096"
-PG_URL="postgresql://postgres:postgres@127.0.0.1:5432/opencode"
+PG_URL="postgresql://ruomu@127.0.0.1:15432/opencode"
 MODEL='{"providerID":"zhipuai","modelID":"glm-5.1"}'
 ```
 
@@ -159,7 +159,7 @@ CONTENT_B=$(curl -s -X POST "$BASE/session/$SID_B/exec" \
 echo "  Session A 内容: $CONTENT_A"
 echo "  Session B 内容: $CONTENT_B"
 ISOLATED=$( [ "$CONTENT_A" = "AAA" ] && [ "$CONTENT_B" = "BBB" ] && echo "true" || echo "false" )
-echo "✅ T6.5 PASS" if [ "$ISOLATED" = "true" ]; echo "❌ T6.5 FAIL" if [ "$ISOLATED" = "false" ]
+[ "$ISOLATED" = "true" ] && echo "✅ T6.5 PASS" || echo "❌ T6.5 FAIL"
 ```
 
 **期望**：A 读到 AAA，B 读到 BBB，内容互不影响
@@ -291,7 +291,9 @@ done
 
 # 销毁所有 sandbox
 echo "--- 销毁所有 sandbox ---"
-curl -s -X POST "$BASE/instance/dispose" > /dev/null
+for sid in "${SIDS[@]}"; do
+  curl -s -X POST "$BASE/session/$sid/kill-sandbox" > /dev/null
+done
 sleep 3
 
 # 并发触发重建

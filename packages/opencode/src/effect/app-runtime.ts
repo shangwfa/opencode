@@ -15,8 +15,30 @@ import { Bus } from "@/bus"
 // The bridge wraps our PG drizzle instance to match core's Effect-based
 // SQLite drizzle API (.get/.run/.all return Effect instead of Promise).
 if (Flag.OPENCODE_DATABASE_URL) {
-  const { pgDatabaseLayer } = require("@/storage/db-core-bridge") as typeof import("@/storage/db-core-bridge")
+  const { pgDatabaseLayer } = await import("@/storage/db-core-bridge")
   Database.setDefaultLayer(pgDatabaseLayer)
+  const { Database: SaasDb } = await import("@/storage/db")
+  await SaasDb.initialize()
+}
+
+// Docker container mode: OpenSandbox server returns 127.0.0.1 endpoints
+// (port-mapped on the host), but inside a container 127.0.0.1 points to
+// the container itself. Rewrite to host.docker.internal so the container
+// can reach the host's mapped ports.
+if (process.env.OPENCODE_SANDBOX_ENDPOINT_REWRITE) {
+  const [from, to] = process.env.OPENCODE_SANDBOX_ENDPOINT_REWRITE.split(":")
+  if (from && to) {
+    const originalFetch = globalThis.fetch
+    globalThis.fetch = ((input: any, init?: any) => {
+      const url = typeof input === "string" ? input : input?.url ?? ""
+      if (url.includes(from)) {
+        const rewritten = url.replace(new RegExp(from.replace(/\./g, "\\."), "g"), to)
+        const newInput = typeof input === "string" ? rewritten : new Request(rewritten, input)
+        return originalFetch(newInput, init)
+      }
+      return originalFetch(input, init)
+    }) as typeof globalThis.fetch
+  }
 }
 import { Auth } from "@/auth"
 import { Account } from "@/account/account"

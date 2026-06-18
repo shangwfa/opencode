@@ -10,6 +10,7 @@ import { SessionID } from "./schema"
 import { SessionStatus } from "./status"
 import { SandboxProvider } from "@/tool/sandbox-provider"
 import { MCP } from "@/mcp"
+import { Agent as LspAgent } from "@/lsp/agent"
 
 const log = Log.create({ service: "run-state" })
 
@@ -70,6 +71,15 @@ export const layer = Layer.effect(
           if (sandbox._tag === "Some") {
             const keep = yield* sandbox.value.isKeepAlive(sessionID).pipe(Effect.orDie)
             if (!keep) {
+              // Shut down the LSP daemon before destroying the sandbox so
+              // the daemon's HTTP server can exit gracefully. Best-effort:
+              // if LspAgent is unavailable (local mode) or the daemon is
+              // already gone, this is a no-op. Other pods' daemonStates
+              // entries are reclaimed by their own GC coroutine.
+              const agent = yield* Effect.serviceOption(LspAgent.Service)
+              if (agent._tag === "Some") {
+                yield* agent.value.shutdown(sessionID).pipe(Effect.catchCause(() => Effect.void))
+              }
               yield* sandbox.value.destroy(sessionID).pipe(
                 Effect.catchCause((cause) => {
                   log.error("sandbox destroy failed on idle", { sessionID, cause: Cause.pretty(cause) })

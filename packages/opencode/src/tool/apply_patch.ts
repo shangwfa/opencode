@@ -308,13 +308,8 @@ export const ApplyPatchTool = Tool.define(
         const agentOpt = yield* Effect.serviceOption(LspAgent.Service)
         if (agentOpt._tag === "Some") {
           const sid = ctx.sandboxSessionID ?? ctx.sessionID
-          for (const change of fileChanges) {
-            if (change.type === "delete") continue
-            const target = change.movePath ?? change.filePath
-            yield* agentOpt.value.touch(sid, target, instance.directory).pipe(
-              Effect.catchCause(() => Effect.void),
-            )
-          }
+          // No explicit touch loop — daemon's getDiagnostics(wait=true)
+          // calls touchFile internally for each file.
           const diagnostics: Record<string, LSPClient.Diagnostic[]> = {}
           for (const change of fileChanges) {
             if (change.type === "delete") continue

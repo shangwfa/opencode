@@ -89,9 +89,8 @@ export const WriteTool = Tool.define(
             const agentOpt = yield* Effect.serviceOption(LspAgent.Service)
             if (agentOpt._tag === "Some") {
               const sid = ctx.sandboxSessionID ?? ctx.sessionID
-              yield* agentOpt.value.touch(sid, filepath, instance.directory).pipe(
-                Effect.catchCause(() => Effect.void),
-              )
+              // daemon's getDiagnostics(wait=true) calls touchFile internally,
+              // so an outer touch is redundant.
               const result = yield* agentOpt.value.diagnostics(sid, filepath, instance.directory).pipe(
                 Effect.catchCause(() => Effect.succeed(null)),
               )

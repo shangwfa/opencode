@@ -134,9 +134,6 @@ export const EditTool = Tool.define(
                   const agentOpt = yield* Effect.serviceOption(LspAgent.Service)
                   if (agentOpt._tag === "Some") {
                     const sid = ctx.sandboxSessionID ?? ctx.sessionID
-                    yield* agentOpt.value.touch(sid, filePath, instance.directory).pipe(
-                      Effect.catchCause(() => Effect.void),
-                    )
                     const result = yield* agentOpt.value.diagnostics(sid, filePath, instance.directory).pipe(
                       Effect.catchCause(() => Effect.succeed(null)),
                     )
@@ -221,9 +218,6 @@ export const EditTool = Tool.define(
                 const agentOpt = yield* Effect.serviceOption(LspAgent.Service)
                 if (agentOpt._tag === "Some") {
                   const sid = ctx.sandboxSessionID ?? ctx.sessionID
-                  yield* agentOpt.value.touch(sid, filePath, instance.directory).pipe(
-                    Effect.catchCause(() => Effect.void),
-                  )
                   const result = yield* agentOpt.value.diagnostics(sid, filePath, instance.directory).pipe(
                     Effect.catchCause(() => Effect.succeed(null)),
                   )

@@ -58,6 +58,7 @@ import { Bus } from "@/bus"
 // Database.defaultLayer is overridden via setDefaultLayer in app-runtime.ts for PG mode
 import { Skill } from "@/skill"
 import { Snapshot } from "@/snapshot"
+import { Agent as LspAgent } from "@/lsp/agent"
 import { ToolRegistry } from "@/tool/registry"
 import { lazy } from "@/util/lazy"
 import { Vcs } from "@/project/vcs"
@@ -251,6 +252,7 @@ export function createRoutes(
       Question.defaultLayer,
       RuntimeFlags.defaultLayer,
       SandboxProvider.defaultLayer,
+      LspAgent.layer,
       Session.defaultLayer,
       SessionCompaction.defaultLayer,
       SessionPrompt.defaultLayer,

@@ -4,12 +4,12 @@
 
 ## 测试环境
 
-- **容器镜像**：`opencode-saas-sandbox-test:v11`
+- **容器镜像**：`opencode-saas-sandbox-test:v2fix`（SaaS 服务）+ `opencode-opensandbox:local`（sandbox 容器）
 - **容器名**：`opencode-saas-test`
 - **本地端口映射**：`localhost:14096 → 容器 4096`
-- **本地 PG 数据库**：`postgresql://postgres:postgres@127.0.0.1:5432/opencode`（容器通过 `host.docker.internal:5432` 访问）
+- **本地 PG 数据库**：`postgresql://ruomu@127.0.0.1:15432/opencode`（TCP 转发 15432 → 远端 5432，容器通过 `host.docker.internal:15432` 访问）
 - **测试模型**：`zhipuai/glm-5.1`（`{"providerID":"zhipuai","modelID":"glm-5.1"}`）
-- **Sandbox API**：`host.docker.internal:30040`（需外部 Sandbox 服务）
+- **Sandbox**：本地 OpenSandbox server `localhost:8080`（Docker runtime），PVC 模式（`OPENCODE_SANDBOX_VOLUME_TYPE=pvc`）
 
 
 ## 回归测试结果摘要

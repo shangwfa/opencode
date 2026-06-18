@@ -57,11 +57,9 @@ function wrapTransaction(pgDb: any) {
   return (fn: (tx: any) => any) => {
     return Effect.promise(() =>
       SaasDb.transaction(async (tx: any) => {
-        const effect = fn(wrap(tx))
-        if (effect && typeof effect === "object" && Effect.EffectTypeId in effect) {
-          return Effect.runPromise(effect)
-        }
-        return effect
+        const result = fn(wrap(tx))
+        if (Effect.isEffect(result)) return await Effect.runPromise(result)
+        return result
       }),
     )
   }

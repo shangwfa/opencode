@@ -140,6 +140,24 @@ describe("plugin.codex", () => {
     await enabled.dispose?.()
   })
 
+  test("filters Pro models for ChatGPT Codex accounts", async () => {
+    const hooks = await CodexAuthPlugin({} as never)
+
+    const models = await hooks.provider!.models!(
+      {
+        models: {
+          "gpt-5.5": { id: "gpt-5.5", api: { id: "gpt-5.5" } },
+          "gpt-5.5-pro": { id: "gpt-5.5-pro", api: { id: "gpt-5.5-pro" } },
+          "gpt-5.4-mini": { id: "gpt-5.4-mini", api: { id: "gpt-5.4-mini" } },
+          "gpt-5.3-codex-spark": { id: "gpt-5.3-codex-spark", api: { id: "gpt-5.3-codex-spark" } },
+        },
+      } as never,
+      { auth: { type: "oauth" } } as never,
+    )
+
+    expect(Object.keys(models)).toEqual(["gpt-5.5", "gpt-5.4-mini", "gpt-5.3-codex-spark"])
+  })
+
   test("deduplicates concurrent Codex token refreshes", async () => {
     let auth = {
       type: "oauth" as const,

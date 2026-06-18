@@ -60,7 +60,7 @@ print('✅ T1.3 PASS' if d.get('directory') == '/workspace' else '❌ T1.3 FAIL'
 
 ```bash
 BASE="http://localhost:14096"
-PG_URL="postgresql://postgres:postgres@127.0.0.1:5432/opencode"
+PG_URL="postgresql://ruomu@127.0.0.1:15432/opencode"
 ```
 
 ### T2.1 创建空 session
@@ -113,6 +113,7 @@ psql "$PG_URL" -t -c "SELECT COUNT(*) FROM session"
 **期望**：
 - HTTP：返回数组，包含刚创建的 session
 - PG：总数 > 0
+- HTTP 计数可能 ≤ PG 总数（list API 按 project/workspace 过滤，PG 全表含其他 project 的 session）
 
 ### T2.4 获取单个 session
 
