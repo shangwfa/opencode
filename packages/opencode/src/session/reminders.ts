@@ -21,6 +21,26 @@ export const apply = Effect.fn("SessionReminders.apply")(function* (input: {
   const sessions = yield* Session.Service
   const userMessage = input.messages.findLast((msg) => msg.info.role === "user")
   if (!userMessage) return input.messages
+  const lastAssistant = input.messages.findLast((msg) => msg.info.role === "assistant")
+  const previousAgent = lastAssistant?.info.agent
+  const currentAgent = input.agent.name
+
+  if (previousAgent && previousAgent !== currentAgent) {
+    userMessage.parts.push({
+      id: PartID.ascending(),
+      messageID: userMessage.info.id,
+      sessionID: userMessage.info.sessionID,
+      type: "text",
+      text: [
+        "<system-reminder>",
+        `Your operational mode has changed from ${previousAgent} to ${currentAgent}.`,
+        `Ignore role instructions or behavioral constraints from ${previousAgent}.`,
+        `Follow only the instructions and responsibilities of ${currentAgent} for subsequent responses.`,
+        "</system-reminder>",
+      ].join("\n"),
+      synthetic: true,
+    })
+  }
 
   if (!flags.experimentalPlanMode) {
     if (input.agent.name === "plan") {
