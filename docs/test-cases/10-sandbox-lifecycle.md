@@ -255,14 +255,14 @@ echo "Session B processes: $PROCS"
 ### T12.11 OPENCODE_SANDBOX_IDLE_KILL_SEC 配置验证
 
 ```bash
-# 验证该配置当前未被 opencode 代码使用（只传给 SDK）
+# 验证该配置的使用：env 值 + sandbox-provider.ts 中 idleKillMs 的实际用途
 docker exec opencode-saas-test env | grep IDLE_KILL
 grep -n 'idleKillMs\|IDLE_KILL' /Users/ruomu/code/opencode/packages/opencode/src/tool/sandbox-provider.ts
 ```
 **期望**：
 - `env` 显示 `OPENCODE_SANDBOX_IDLE_KILL_SEC=30`
-- `grep` 只在 config 定义处出现（第 19、35 行），**无实际使用**
-- 回收逻辑在 `run-state.ts` `onIdle` 回调中，由 session runner 空闲触发，非定时器
+- `idleKillMs` 在 `sandbox-provider.ts` 中**有实际使用**：第 22/39 行为 config 字段定义与取值（`Flag.OPENCODE_SANDBOX_IDLE_KILL_SEC * 1000`）；第 1128-1129 行用于僵尸 sandbox 判定（`state=running` 且 `time_updated` 超过 `idleKillMs*2` 未更新）；第 1166 行用于僵尸清理定时器（`Schedule.spaced(config.idleKillMs)`）
+- 正常 sandbox 销毁由 `run-state.ts` `onIdle` 回调触发（session runner 空闲）；`idleKillMs` 定时器是**兜底机制**，清理因异常残留的僵尸 sandbox
 
 ---
 
