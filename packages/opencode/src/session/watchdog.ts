@@ -80,8 +80,9 @@ function runningToolCondition(startBefore: number) {
 const scan = Effect.fn("SessionWatchdog.scan")(function* (config: Config) {
   const db = Database.Client() as WatchdogDb
   const tools = yield* SessionTools.Service
-  const now = Date.now()
-  const startBefore = now - config.timeoutMs
+  const t0 = Date.now()
+  const startBefore = t0 - config.timeoutMs
+  const span = yield* Effect.currentSpan
 
   const rows = yield* Effect.tryPromise({
     try: () =>
@@ -109,19 +110,30 @@ const scan = Effect.fn("SessionWatchdog.scan")(function* (config: Config) {
       return { row, start }
     })
     .filter((item) => item !== undefined)
-  log.info("watchdog scan completed", { scanned: rows.length, stuck: stuck.length })
-  if (stuck.length === 0) return
 
-  log.warn("watchdog stuck tools detected", { count: stuck.length })
-
-  yield* Effect.forEach(
+  const results = yield* Effect.forEach(
     stuck,
     (item) =>
       tools
-        .markTimedOut({ partID: item.row.id, expectedStart: item.start, timeoutMs: config.timeoutMs, now })
+        .markTimedOut({ partID: item.row.id, expectedStart: item.start, timeoutMs: config.timeoutMs })
         .pipe(Effect.catchCause(() => Effect.succeed(false))),
     { concurrency: 4 },
   )
+  const marked = results.filter(Boolean).length
+  const durationMs = Date.now() - t0
+
+  span.attribute("watchdog.scanned", rows.length)
+  span.attribute("watchdog.stuck", stuck.length)
+  span.attribute("watchdog.marked", marked)
+  span.attribute("watchdog.duration_ms", durationMs)
+
+  if (stuck.length > 0) log.warn("watchdog stuck tools detected", { count: stuck.length, marked })
+  log.info("watchdog scan completed", {
+    scanned: rows.length,
+    stuck: stuck.length,
+    marked,
+    durationMs,
+  })
 })
 
 export const layerWithConfig = (config: Config) =>

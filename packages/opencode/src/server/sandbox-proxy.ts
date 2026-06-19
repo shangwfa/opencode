@@ -438,7 +438,7 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
         const params = yield* HttpRouter.schemaPathParams(ExecIdParams)
         const state = execStore.get(params.execId)
         if (!state) return HttpServerResponse.jsonUnsafe({ error: "execId not found" }, { status: 404 })
-        const { queue: _, seq: __, ...rest } = state
+        const { queue: _, seq: __, fiber: ___, ...rest } = state
         return HttpServerResponse.jsonUnsafe({ execId: params.execId, ...rest })
       }),
     )
