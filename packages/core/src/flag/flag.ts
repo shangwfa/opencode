@@ -71,7 +71,7 @@ export const Flag = {
   OPENCODE_SANDBOX_IMAGE: process.env["OPENCODE_SANDBOX_IMAGE"] ?? "registry.shadow-rpa.net/infra/opensandboxinfra/opencode-saas-sandbox:latest",
   OPENCODE_SANDBOX_API_KEY: process.env["OPENCODE_SANDBOX_API_KEY"] ?? "",
   OPENCODE_SANDBOX_USE_SERVER_PROXY: truthy("OPENCODE_SANDBOX_USE_SERVER_PROXY"),
-  OPENCODE_SANDBOX_VOLUME_TYPE: (process.env["OPENCODE_SANDBOX_VOLUME_TYPE"] ?? "none") as "none" | "pvc" | "host",
+  OPENCODE_SANDBOX_VOLUME_TYPE: (process.env["OPENCODE_SANDBOX_VOLUME_TYPE"] ?? "pvc") as "none" | "pvc" | "host",
   OPENCODE_SANDBOX_PVC_CLAIM: process.env["OPENCODE_SANDBOX_PVC_CLAIM"] ?? "sandbox-test",
   OPENCODE_DISABLE_EMBEDDED_WEB_UI: truthy("OPENCODE_DISABLE_EMBEDDED_WEB_UI"),
   OPENCODE_ENABLE_QUESTION_TOOL: truthy("OPENCODE_ENABLE_QUESTION_TOOL"),
