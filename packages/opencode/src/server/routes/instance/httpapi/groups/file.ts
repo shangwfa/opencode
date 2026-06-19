@@ -2,7 +2,7 @@ import { FileSystem } from "@opencode-ai/core/filesystem"
 import { NonNegativeInt } from "@opencode-ai/core/schema"
 import { LSP } from "@/lsp/lsp"
 import { Schema } from "effect"
-import { HttpApi, HttpApiEndpoint, HttpApiGroup, OpenApi } from "effect/unstable/httpapi"
+import { HttpApi, HttpApiEndpoint, HttpApiError, HttpApiGroup, OpenApi } from "effect/unstable/httpapi"
 import { Authorization } from "../middleware/authorization"
 import { InstanceContextMiddleware } from "../middleware/instance-context"
 import {
@@ -109,6 +109,7 @@ export const FileApi = HttpApi.make("file")
         HttpApiEndpoint.get("findText", FilePaths.findText, {
           query: FindTextQuery,
           success: described(Schema.Array(LegacyMatch), "Matches"),
+          error: [HttpApiError.BadRequest],
         }).annotateMerge(
           OpenApi.annotations({
             identifier: "find.text",
@@ -119,6 +120,7 @@ export const FileApi = HttpApi.make("file")
         HttpApiEndpoint.get("findFile", FilePaths.findFile, {
           query: FindFileQuery,
           success: described(Schema.Array(Schema.String), "File paths"),
+          error: [HttpApiError.BadRequest],
         }).annotateMerge(
           OpenApi.annotations({
             identifier: "find.files",

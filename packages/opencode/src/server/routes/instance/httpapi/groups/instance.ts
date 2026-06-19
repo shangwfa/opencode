@@ -6,7 +6,7 @@ import { Vcs } from "@/project/vcs"
 import { SessionID } from "@/session/schema"
 import { Skill } from "@/skill"
 import { Schema } from "effect"
-import { HttpApi, HttpApiEndpoint, HttpApiGroup, HttpApiSchema, OpenApi } from "effect/unstable/httpapi"
+import { HttpApi, HttpApiEndpoint, HttpApiError, HttpApiGroup, HttpApiSchema, OpenApi } from "effect/unstable/httpapi"
 import { Authorization } from "../middleware/authorization"
 import { InstanceContextMiddleware } from "../middleware/instance-context"
 import {
@@ -85,6 +85,7 @@ export const InstanceApi = HttpApi.make("instance")
         HttpApiEndpoint.get("vcs", InstancePaths.vcs, {
           query: WorkspaceRoutingQuery,
           success: described(Vcs.Info, "VCS info"),
+          error: [HttpApiError.BadRequest],
         }).annotateMerge(
           OpenApi.annotations({
             identifier: "vcs.get",

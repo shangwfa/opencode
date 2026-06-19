@@ -11,7 +11,7 @@ import { SandboxProvider } from "@/tool/sandbox-provider"
 import { toSandboxPath } from "@/tool/sandbox-path"
 import { Flag } from "@opencode-ai/core/flag/flag"
 import { Effect } from "effect"
-import { HttpApiBuilder } from "effect/unstable/httpapi"
+import { HttpApiBuilder, HttpApiError } from "effect/unstable/httpapi"
 import { InstanceHttpApi } from "../api"
 import { ApiVcsApplyError } from "../groups/instance"
 import { markInstanceForDisposal } from "../lifecycle"
@@ -157,6 +157,10 @@ export const instanceHandlers = HttpApiBuilder.group(InstanceHttpApi, "instance"
     })
 
     const getVcs = Effect.fn("InstanceHttpApi.vcs")(function* () {
+      if (Flag.OPENCODE_SANDBOX_ENABLED) {
+        yield* Effect.logWarning("getVcs not supported in sandbox mode; use session-scoped vcsDiff instead")
+        return yield* new HttpApiError.BadRequest({})
+      }
       const [branch, default_branch] = yield* Effect.all([vcs.branch(), vcs.defaultBranch()], {
         concurrency: "unbounded",
       })

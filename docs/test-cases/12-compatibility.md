@@ -80,14 +80,15 @@ curl -s "$BASE/find/file?query=diff-test&limit=10" | python3 -m json.tool
 curl -s "$BASE/find?pattern=diff-test" | python3 -m json.tool
 curl -s "$BASE/find/symbol?query=main" | python3 -m json.tool
 ```
-**期望**：文件搜索和文本搜索返回匹配；symbol 当前可为空数组但不能报错
+**期望**：sandbox 模式下 find/file 和 find(pattern) 返回 400 BadRequest（需 session-scoped 路由，server-local ripgrep/filesystem 无法访问 sandbox 容器）；find/symbol 返回空数组（LSP 未实现）
 
 ### T14.9 VCS API
 ```bash
 curl -s "$BASE/vcs" | python3 -m json.tool
-curl -s "$BASE/vcs/diff?mode=working" | python3 -m json.tool
+curl -s "$BASE/vcs/diff?mode=git" | python3 -m json.tool
+curl -s "$BASE/vcs/status" | python3 -m json.tool
 ```
-**期望**：返回当前分支/default branch；diff 返回数组
+**期望**：sandbox 模式下 vcs info 返回 400 BadRequest（需 session-scoped vcsDiff）；vcs/diff mode 需为 git/branch；vcs/status 返回空数组
 
 ### T14.10 agent/skill/command 列表
 ```bash
@@ -110,7 +111,7 @@ curl -s "$BASE/command" | python3 -m json.tool | head -80
 | T14.5 | ✅ | share 返回 url（https://opncd.ai/share/Vvf06RXx），unshare 移除 |
 | T14.6 | ✅ | diff 返回空数组（sandbox 内无 git），revert/unrevert 均正常返回 session |
 | T14.7 | ✅ | file 列表空（sandbox 未运行）、content 读取、status 均正常 |
-| T14.8 | ✅ | find file/pattern/symbol 均返回空数组（无匹配），不报错 |
-| T14.9 | ✅ | vcs 返回 branch=null/default_branch=null，diff mode=working 报错（只支持 git/branch） |
+| T14.8 | ✅ | sandbox 模式 find file/pattern 返回 400（方案 A 修复），symbol 返回空数组 |
+| T14.9 | ✅ | sandbox 模式 vcs info 返回 400（方案 A 修复），vcs/diff 需 git/branch mode，vcs/status 返回空 |
 | T14.10 | ✅ | agent 1 项、skill 多项、command 多项，均返回数组 |
 

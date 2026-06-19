@@ -11,7 +11,7 @@ import { Flag } from "@opencode-ai/core/flag/flag"
 import { Effect, Duration, Layer, Option } from "effect"
 import ignore from "ignore"
 import path from "path"
-import { HttpApiBuilder } from "effect/unstable/httpapi"
+import { HttpApiBuilder, HttpApiError } from "effect/unstable/httpapi"
 import { InstanceHttpApi } from "../api"
 import type { SessionID } from "@/session/schema"
 
@@ -29,6 +29,10 @@ export const fileHandlers = HttpApiBuilder.group(InstanceHttpApi, "file", (handl
     })
 
     const findText = Effect.fn("FileHttpApi.findText")(function* (ctx: { query: { pattern: string } }) {
+      if (Flag.OPENCODE_SANDBOX_ENABLED) {
+        yield* Effect.logWarning("findText not supported in sandbox mode; use session-scoped search instead")
+        return yield* new HttpApiError.BadRequest({})
+      }
       return (yield* ripgrep
         .grep({ cwd: (yield* InstanceState.context).directory, pattern: ctx.query.pattern, limit: 10 })
         .pipe(Effect.orDie)).map((match) => ({
@@ -47,6 +51,10 @@ export const fileHandlers = HttpApiBuilder.group(InstanceHttpApi, "file", (handl
     const findFile = Effect.fn("FileHttpApi.findFile")(function* (ctx: {
       query: { query: string; dirs?: "true" | "false"; type?: "file" | "directory"; limit?: number }
     }) {
+      if (Flag.OPENCODE_SANDBOX_ENABLED) {
+        yield* Effect.logWarning("findFile not supported in sandbox mode; use session-scoped search instead")
+        return yield* new HttpApiError.BadRequest({})
+      }
       const directory = (yield* InstanceState.context).directory
       const limit = ctx.query.limit ?? 10
       const type = ctx.query.type ?? (ctx.query.dirs === "false" ? "file" : undefined)
