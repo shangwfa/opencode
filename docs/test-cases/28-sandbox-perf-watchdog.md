@@ -569,6 +569,25 @@ psql "$PG_URL" -c "DELETE FROM session WHERE id='ses_test_watchdog_fresh'" >/dev
 
 ---
 
+### T28.13 Watchdog scan 可观测性输出
+
+**验证点**：每次 scan 在日志输出 `marked`（实际标记成功数）和 `durationMs`（本轮耗时），并写入 span attributes，便于定位"扫描到候选但没标记""扫描过慢"等问题。复用 T28.5 的 stuck part 场景。
+
+```bash
+# 前置：先执行 T28.5，插入 stuck part 并等到 status=error
+
+docker logs opencode-saas-test 2>&1 | grep "watchdog scan completed" | tail -1
+docker logs opencode-saas-test 2>&1 | grep "watchdog stuck tools detected" | tail -1
+```
+
+**期望**：
+- `watchdog scan completed` 日志含 `marked=1`（T28.5 的 stuck part 被标记）和 `durationMs=<正整数>`。
+- `watchdog stuck tools detected` 日志含 `count=1`、`marked=1`。
+- 若开启 OpenTelemetry（`OTEL_EXPORTER_OTLP_ENDPOINT`），`SessionWatchdog.scan` span 上携带 `watchdog.scanned/stuck/marked/duration_ms` 四个属性。
+- 若 `marked=0` 但 `stuck>0`，说明 `markTimedOut` 的 CAS 全未命中或全失败，需进一步排查。
+
+---
+
 ## 排查场景对照表
 
 | 现象 | 可能原因 | 验证用例 | 日志关键字 |
@@ -578,11 +597,13 @@ psql "$PG_URL" -c "DELETE FROM session WHERE id='ses_test_watchdog_fresh'" >/dev
 | 多实例重复标记同一 part | watchdog 幂等性不足 | T28.10 | 并发 `markTimedOut` 只有一个 true |
 | watchdog 测试耗时过长 | timeout / schedule 不可注入 | T28.11 | `layerWithConfig` + `scanOnce` |
 | 新 running tool 被误杀 | timeout 判断过宽 | T28.12 | start 未超过 timeout 不应处理 |
+| 踩边界的 stuck part 延迟一轮才标记 | scan 复用过时 now 判断超时 | T28.11 | scan 不传 now，`markTimedOut` 内部用即时 `Date.now()` |
 | 单次调用慢（> 5s）| getOrCreate 卡某阶段 | T28.8 | `reconnect done ms=` / `isHealthy done ms=` |
 | 文件接口并发请求变串行 | 缓存失效或被清 | T28.2 | `getOrCreate start` 出现多次（应该只有 1 次）|
 | 沙箱销毁后调用失败 | 缓存返回陈旧对象 | T28.6 | kill-sandbox 后立刻调用应该 > 0.5s |
 | 错误看不到原因 | tools.ts 静默吞错 | T28.7 | `ERROR ... sandbox init failed` |
 | 卡 90s+ 才报错 | getOrCreate 超时生效 | T28.4 | `Sandbox getOrCreate timeout after 90s` |
+| scan 标记数/耗时不可见 | 结果丢弃或未记日志 | T28.13 | `watchdog scan completed ... marked= durationMs=` |
 
 ## 改动文件清单
 

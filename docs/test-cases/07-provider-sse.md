@@ -902,6 +902,14 @@ console.log(bGotEvents && bGotIdle ? '✅ late joiner received events' : '⏭️
 ```
 **期望**：客户端 B 中途加入后仍能收到 `server.connected` 和后续事件（`session.idle` 等）
 
+> **实测结论（有据）**：B 中途加入能收到完整事件流（含 `message.part.*`、`tool`、`session.idle`），多次受控实验验证通过。
+>
+> **偶发现象（未复现）**：测试中曾出现 2 次"B 只收到 `server.connected` + `server.heartbeat`、无任何 `message` 事件"。随后 **28 轮多角度压力复现**（常规 dispose+中途订阅 / 激进 dispose+0.5s+B 1s / T9.14 3并发SSE+T9.15 完整序列）**全部 0 失败**，无法稳定复现。统计上若真实失败率 ≥10%，28 轮全过的概率仅 5%，故失败率大概率 <10%。
+>
+> **根因未定位**：在无稳定复现路径前，不对根因下任何结论。曾推测的 takeUntil 终止 / dispose 重建窗口 / T9.14 累积状态，均**未被复现验证支持，已撤回**。
+>
+> **再次出现时的抓取方法**：给 `packages/opencode/src/bus/index.ts` 的 `subscribing`/`publishing` 日志补 `directory` 字段（`yield* InstanceState.directory`），即可判断失败 SSE 流的"订阅实例"与"message publish 实例"是否错位。
+
 ---
 
 ## 测试结果
@@ -922,6 +930,6 @@ console.log(bGotEvents && bGotIdle ? '✅ late joiner received events' : '⏭️
 | T9.12 | ✅ | 收到 server.instance.disposed 事件 |
 | T9.13 | ✅ | 断开重连均收到 server.connected |
 | T9.14 | ✅ | 3 个 SSE 客户端同时监听，均收到相同 10 种事件类型 |
-| T9.15 | ✅ | 中途加入的客户端收到后续事件（不回放历史，后续事件正常广播） |
+| T9.15 | ✅ | 中途加入收到完整事件流；曾现偶发"B 只收 connected+heartbeat"（28 轮未复现，详见用例备注） |
 
 ---

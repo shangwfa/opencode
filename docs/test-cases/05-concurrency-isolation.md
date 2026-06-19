@@ -315,7 +315,9 @@ done
 
 **期望**：3 个 sandbox 全部重建成功
 
-### T6.10 消息队列压力
+### T6.10 消息队列压力（⛔ 已废弃）
+
+> **废弃原因**：单 session 连续发送 20 条消息属于人造场景，真实用户不会如此操作。opencode 对同一 session 的消息**串行处理**，该用例实际测的是"慢模型 + 串行队列"的吞吐延迟，而非并发隔离能力。并发验证应聚焦 **session 级别**，见 [T7.1](#t71-20-会话--混合任务并发)（20 会话真并发）。保留脚本仅作历史记录，无需执行。
 
 ```bash
 SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys; print(json.load(sys.stdin)['id'])")
@@ -430,6 +432,6 @@ echo "  - assistant: $TOTAL_ASSISTANT (期望>=20)"
 | T6.7 | 同 session 并发 exec | 5 个成功 | — | — | ✅ |
 | T6.8 | 并发删除+写入 | A 删除, B 成功 | — | B 文件完整 | ✅ |
 | T6.9 | sandbox 重建并发 | 3 个重建成功 | state=running | — | ✅ |
-| T6.10 | 消息队列压力 | 20 条 204 | 消息数 >= 40 | — | ✅ |
+| T6.10 | 消息队列压力（⛔ 已废弃） | — | — | 单 session 串行连发，非真实场景 | ⛔ |
 | T7.1 | 20 会话混合任务 | 20 条 204 | user=20, assistant>=20 | — | ✅ |
 
