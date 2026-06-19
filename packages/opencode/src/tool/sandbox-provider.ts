@@ -753,7 +753,15 @@ export namespace SandboxProvider {
             )
           }
           yield* Effect.tryPromise(() => sb.kill()).pipe(
-            Effect.catchCause(() => { log.error("sandbox kill failed", { sessionID }); return Effect.void }),
+            Effect.catchCause((cause) =>
+              Effect.gen(function* () {
+                log.error("sandbox kill failed", { sessionID, cause: String(cause) })
+                const info = yield* Effect.tryPromise(() => sb.getInfo()).pipe(Effect.orElseSucceed(() => null))
+                if (info?.status) {
+                  log.warn("sandbox status on kill failure", { sessionID, sandboxID: sb.id, state: info.status.state, reason: info.status.reason, message: info.status.message })
+                }
+              }),
+            ),
           )
           yield* Effect.tryPromise(() => sb.close()).pipe(
             Effect.catchCause(() => { log.error("sandbox close failed", { sessionID }); return Effect.void }),
@@ -1070,6 +1078,15 @@ export namespace SandboxProvider {
                 if (current.time_updated > threshold) return
                 const sb = yield* reconnect(row).pipe(Effect.orElseSucceed(() => null))
                 if (sb) {
+                  // reconcile：用 getInfo 验证 sandbox 实际状态，已终止的跳过 kill 直接回收 DB
+                  const info = yield* Effect.tryPromise(() => sb.getInfo()).pipe(Effect.orElseSucceed(() => null))
+                  const state = info?.status?.state
+                  if (state && state !== "Running" && state !== "Creating" && state !== "Resuming") {
+                    log.info("zombie sandbox already terminated", { sessionID: row.session_id, sandboxID: row.id, state, reason: info?.status?.reason })
+                    yield* Effect.tryPromise(() => sb.close()).pipe(Effect.catchCause(() => Effect.void))
+                    yield* dbMarkDestroyed(row.session_id, row.id).pipe(Effect.catchCause(() => Effect.void))
+                    return
+                  }
                   yield* destroySandbox(sb, row.session_id).pipe(
                     Effect.catchCause(() => Effect.void),
                   )
