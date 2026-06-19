@@ -36,6 +36,7 @@
 | [`25-session-user-fields.md`](./25-session-user-fields.md) | 二十五 | T25.x | Session 用户标识字段：userName/userId 传递、持久化、向后兼容、多轮独立标识 |
 | [`26-session-agent-permissions.md`](./26-session-agent-permissions.md) | 二十六 | T26.x | Session Agent 权限：字符串简写、对象语法白名单、bash 粒度命令、last matching rule wins、worktree 影响权限 pattern（directory 基准修复）、`**/`/`*` 前缀匹配、`...` 字面点限制 |
 | [`27-session-pvc-mode.md`](./27-session-pvc-mode.md) | 二十七 | T27.x | Session PVC 模式：session/app 模式创建、appId 校验、PVC 共享/隔离、自动 worktree（detach+幂等+降级）、PG 持久化、子会话继承 |
+| [`28-sandbox-perf-watchdog.md`](./28-sandbox-perf-watchdog.md) | 二十八 | T28.x | 沙箱性能优化与 Watchdog 兜底：对象缓存（30s TTL）、getOrCreate 90s 超时、`SessionTools.markTimedOut` lifecycle 超时标记、CAS 幂等、配置注入、各阶段耗时日志 |
 | [`sandbox-shared-test.mjs`](./sandbox-shared-test.mjs) | 十六 | T16.29 | 主子 agent 沙箱共享验证：主→子写读、子→主写读、exec 独立验证 |
 | [`vcs-diff-sandbox-test.mjs`](./vcs-diff-sandbox-test.mjs) | 十六 | T16.30 | VCS Diff 沙箱重建验证：销毁后自动重建 PVC 恢复，两次 diff 一致 |
 
@@ -67,6 +68,7 @@ T24.x → 24-preload-cache.md
 T25.x → 25-session-user-fields.md
 T26.x → 26-session-agent-permissions.md
 T27.x → 27-session-pvc-mode.md
+T28.x → 28-sandbox-perf-watchdog.md
 
 沙箱工具（apply_patch/ls/错误泄露）→ 18-sandbox-tool-test.md
 路径泄露防护（PL-x）→ 20-path-leak-test.md

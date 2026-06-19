@@ -1,6 +1,6 @@
-import { Schema } from "effect"
+import { Duration, Effect, Option, Schema } from "effect"
 import * as path from "path"
-import { Effect } from "effect"
+import fs from "fs/promises"
 import * as Tool from "./tool"
 import { createTwoFilesPatch } from "diff"
 import DESCRIPTION from "./write.txt"
@@ -12,8 +12,11 @@ import { trimDiff } from "./edit"
 import { assertExternalDirectoryEffect } from "./external-directory"
 import { toSandboxPath } from "./sandbox-path"
 import * as Log from "@opencode-ai/core/util/log"
+import { SandboxProvider } from "./sandbox-provider"
+import type { Sandbox } from "@alibaba-group/opensandbox"
 
 const writeLog = Log.create({ service: "write-tool" })
+const FILE_WRITE_TIMEOUT = Duration.seconds(60)
 
 export const Parameters = Schema.Struct({
   content: Schema.String.annotate({ description: "The content to write to the file" }),
@@ -37,15 +40,23 @@ export const WriteTool = Tool.define(
             ? params.filePath
             : path.join(instance.directory, params.filePath)
           yield* assertExternalDirectoryEffect(ctx, filepath)
-
-          const sb: any = yield* Effect.tryPromise({ try: () => ctx.sandbox!, catch: (e) => new Error(`Failed to initialize: ${e instanceof Error ? e.message : String(e)}`) })
           const sandboxPath = toSandboxPath(filepath, instance.directory)
 
-          let contentOld = ""
-          const readResult = yield* Effect.tryPromise(() => sb.files.readFile(sandboxPath)).pipe(
+          const maybeSandbox = ctx.sandbox ? (yield* Effect.promise(() => ctx.sandbox!)) as Sandbox | null : null
+          if (maybeSandbox === null && ctx.sandbox) {
+            return yield* Effect.fail(new Error("Sandbox initialization failed"))
+          }
+          if (!maybeSandbox) {
+            return yield* Effect.fail(new Error("Sandbox is not available"))
+          }
+
+          const contentOld = (yield* Effect.tryPromise(() => maybeSandbox.files.readFile(sandboxPath)).pipe(
+            Effect.timeoutOrElse({
+              duration: FILE_WRITE_TIMEOUT,
+              orElse: () => Effect.succeed(""),
+            }),
             Effect.catch(() => Effect.succeed("")),
-          )
-          contentOld = readResult as string
+          )) as string
 
           const diff = trimDiff(createTwoFilesPatch(filepath, filepath, contentOld, params.content))
           yield* ctx.ask({
@@ -55,14 +66,23 @@ export const WriteTool = Tool.define(
             metadata: { filepath, diff },
           })
 
-          yield* Effect.tryPromise({
-            try: () => sb.files.writeFiles([{ path: sandboxPath, data: params.content }]),
-            catch: (e) => {
-              const msg = e instanceof Error ? e.message : String(e)
-              writeLog.warn("writeFiles failed, retrying once", { sandboxPath, error: msg })
-              return sb.files.writeFiles([{ path: sandboxPath, data: params.content }])
-            },
-          })
+          yield* Effect.tryPromise(() => maybeSandbox.files.writeFiles([{ path: sandboxPath, data: params.content }])).pipe(
+            Effect.catch((error) => {
+              writeLog.warn("writeFiles failed, retrying once", { sandboxPath, error: error.message })
+              return Effect.tryPromise(() => maybeSandbox.files.writeFiles([{ path: sandboxPath, data: params.content }]))
+            }),
+            Effect.timeoutOrElse({
+              duration: FILE_WRITE_TIMEOUT,
+              orElse: () =>
+                Effect.gen(function* () {
+                  const sandboxProvider = Option.getOrUndefined(yield* Effect.serviceOption(SandboxProvider.Service))
+                  if (sandboxProvider) {
+                    yield* sandboxProvider.destroy(ctx.sandboxSessionID ?? ctx.sessionID).pipe(Effect.catchCause(() => Effect.void))
+                  }
+                  return yield* Effect.fail(new Error(`Write timed out: ${sandboxPath}`))
+                }),
+            }),
+          )
 
           yield* bus.publish(File.Event.Edited, { file: filepath })
           yield* bus.publish(FileWatcher.Event.Updated, { file: filepath, event: contentOld ? "change" : "add" })

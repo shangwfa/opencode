@@ -1,4 +1,4 @@
-import { Effect, Schema } from "effect"
+import { Duration, Effect, Option, Schema } from "effect"
 import { NonNegativeInt } from "@opencode-ai/core/schema"
 import * as path from "path"
 import * as Tool from "./tool"
@@ -14,9 +14,10 @@ import type { Sandbox } from "@alibaba-group/opensandbox"
 const DEFAULT_READ_LIMIT = 2000
 const MAX_LINE_LENGTH = 2000
 const MAX_LINE_SUFFIX = `... (line truncated to ${MAX_LINE_LENGTH} chars)`
+const FILE_OP_TIMEOUT = Duration.seconds(60)
 
 export const Parameters = Schema.Struct({
-  filePath: Schema.String.annotate({ description: "The absolute path to the file or directory to read" }),
+  filePath: Schema.String.annotate({ description: "The absolute path to the file to read" }),
   offset: Schema.optional(NonNegativeInt).annotate({
     description: "The line number to start reading from (1-indexed)",
   }),
@@ -30,7 +31,7 @@ export const ReadTool = Tool.define(
   Effect.gen(function* () {
     const instruction = yield* Instruction.Service
     const reference = yield* Reference.Service
-    const sandboxProvider = yield* SandboxProvider.Service
+    const sandboxProvider = Option.getOrUndefined(yield* Effect.serviceOption(SandboxProvider.Service))
 
     const run = Effect.fn("ReadTool.execute")(function* (
       params: Schema.Schema.Type<typeof Parameters>,
@@ -44,6 +45,15 @@ export const ReadTool = Tool.define(
       yield* reference.ensure(filepath)
       const title = path.relative(instance.worktree, filepath)
 
+      const sandboxPath = toSandboxPath(filepath, instance.directory)
+
+      const maybeSandbox = ctx.sandbox ? (yield* Effect.promise(() => ctx.sandbox!)) as Sandbox | null : null
+      if (!maybeSandbox || !sandboxProvider) {
+        return yield* Effect.fail(new Error("Sandbox is not available"))
+      }
+
+      const sb = maybeSandbox
+
       yield* assertExternalDirectoryEffect(ctx, filepath, {
         bypass: Boolean(ctx.extra?.["bypassCwdCheck"]) || (yield* reference.contains(filepath)),
         kind: "file",
@@ -56,56 +66,20 @@ export const ReadTool = Tool.define(
         metadata: {},
       })
 
-      const sb = (yield* Effect.tryPromise({
-        try: () => ctx.sandbox!,
-        catch: (e) => new Error(`Initialization failed: ${e instanceof Error ? e.message : String(e)}`),
-      }).pipe(Effect.orDie)) as unknown as Sandbox
-      const sandboxPath = toSandboxPath(filepath, instance.directory)
-
-      const dirCheck = yield* sandboxProvider.runInSession(
-        ctx.sandboxSessionID ?? ctx.sessionID,
-        `test -d "${sandboxPath}" && echo "DIR" || echo "FILE"`,
-        { timeoutSeconds: 5 },
-      ).pipe(Effect.catch(() => Effect.succeed({ logs: { stdout: [], stderr: [] }, exitCode: 1 } as any)))
-      const isDirOutput = (dirCheck as any).logs?.stdout?.map((l: { text: string }) => l.text).join("").trim()
-      const isDirectory = isDirOutput.includes("DIR")
-
-      if (isDirectory) {
-        const lsResult = yield* sandboxProvider.runInSession(
-          ctx.sandboxSessionID ?? ctx.sessionID,
-          `ls -1 "${sandboxPath}"`,
-          { timeoutSeconds: 10 },
-        ).pipe(Effect.catch(() => Effect.succeed({ logs: { stdout: [], stderr: [] }, exitCode: 1 } as any)))
-        const items = ((lsResult as any).logs?.stdout ?? [])
-          .map((l: { text: string }) => l.text.trim())
-          .filter(Boolean)
-          .sort()
-        const limit = params.limit ?? DEFAULT_READ_LIMIT
-        const offset = params.offset || 1
-        const start = offset - 1
-        const sliced = items.slice(start, start + limit)
-        const truncated = start + sliced.length < items.length
-
-        return {
-          title,
-          output: [
-            `<path>${sandboxPath}</path>`,
-            `<type>directory</type>`,
-            `<entries>`,
-            sliced.join("\n"),
-            truncated
-              ? `\n(Showing ${sliced.length} of ${items.length} entries)`
-              : `\n(${items.length} entries)`,
-            `</entries>`,
-          ].join("\n"),
-          metadata: { preview: sliced.slice(0, 20).join("\n"), truncated, loaded: [] as string[] },
-        }
-      }
-
       const content = yield* Effect.tryPromise({
         try: () => sb.files.readFile(sandboxPath),
         catch: () => new Error(`File not found: ${sandboxPath}`),
-      })
+      }).pipe(
+        Effect.timeoutOrElse({
+          duration: FILE_OP_TIMEOUT,
+          orElse: () =>
+            sandboxProvider.destroy(ctx.sandboxSessionID ?? ctx.sessionID).pipe(
+              Effect.catchCause(() => Effect.void),
+              Effect.andThen(Effect.fail(new Error(`Read timed out: ${sandboxPath}`))),
+            ),
+        }),
+      )
+
       const allLines = (content as string).split("\n")
       const start = (params.offset ?? 1) - 1
       const limit = params.limit ?? DEFAULT_READ_LIMIT

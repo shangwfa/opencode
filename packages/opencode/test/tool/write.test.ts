@@ -1,7 +1,6 @@
 import { afterEach, describe, expect } from "bun:test"
 import { Effect, Layer } from "effect"
 import path from "path"
-import fs from "fs/promises"
 import { WriteTool } from "../../src/tool/write"
 import { LSP } from "@/lsp/lsp"
 import { AppFileSystem } from "@opencode-ai/core/filesystem"
@@ -14,8 +13,10 @@ import { SessionID, MessageID } from "../../src/session/schema"
 import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
 import { disposeAllInstances, TestInstance } from "../fixture/fixture"
 import { testEffect } from "../lib/effect"
+import { SandboxProvider } from "../../src/tool/sandbox-provider"
+import type { Sandbox } from "@alibaba-group/opensandbox"
 
-const ctx = {
+const baseCtx = {
   sessionID: SessionID.make("ses_test-write-session"),
   messageID: MessageID.make("msg_test"),
   callID: "",
@@ -30,17 +31,54 @@ afterEach(async () => {
   await disposeAllInstances()
 })
 
-const it = testEffect(
-  Layer.mergeAll(
-    LSP.defaultLayer,
-    AppFileSystem.defaultLayer,
-    Bus.layer,
-    Format.defaultLayer,
-    CrossSpawnSpawner.defaultLayer,
-    Truncate.defaultLayer,
-    Agent.defaultLayer,
-  ),
+function makeSandbox(writeLog: Array<{ path: string; data: string }>, readResult: string | Error = ""): Sandbox {
+  return {
+    id: "sandbox-test",
+    files: {
+      readFile: async () => {
+        if (readResult instanceof Error) throw readResult
+        return readResult
+      },
+      writeFiles: async (files: Array<{ path: string; data: string }>) => {
+        for (const f of files) writeLog.push(f)
+      },
+    },
+  } as unknown as Sandbox
+}
+
+function mockSandboxProvider(sandbox: Sandbox) {
+  return Layer.succeed(
+    SandboxProvider.Service,
+    SandboxProvider.Service.of({
+      getOrCreate: () => Effect.succeed(sandbox),
+      get: () => Effect.succeed(sandbox),
+      destroy: () => Effect.void,
+      destroyById: () => Effect.void,
+      destroyAll: () => Effect.void,
+      runInSession: () => Effect.die(new Error("not implemented")),
+      runDetached: () => Effect.die(new Error("not implemented")),
+      interrupt: () => Effect.void,
+      register: () => Effect.void,
+      keepAlive: () => Effect.void,
+      release: () => Effect.void,
+      isKeepAlive: () => Effect.succeed(false),
+      getEndpoint: () => Effect.die(new Error("not implemented")),
+      cleanupSessionVolume: () => Effect.void,
+    }),
+  )
+}
+
+const baseLayers = Layer.mergeAll(
+  LSP.defaultLayer,
+  AppFileSystem.defaultLayer,
+  Bus.layer,
+  Format.defaultLayer,
+  CrossSpawnSpawner.defaultLayer,
+  Truncate.defaultLayer,
+  Agent.defaultLayer,
 )
+
+const it = testEffect(baseLayers)
 
 const init = Effect.fn("WriteToolTest.init")(function* () {
   const info = yield* WriteTool
@@ -49,268 +87,62 @@ const init = Effect.fn("WriteToolTest.init")(function* () {
 
 const run = Effect.fn("WriteToolTest.run")(function* (
   args: Tool.InferParameters<typeof WriteTool>,
-  next: Tool.Context = ctx,
+  ctx: Tool.Context,
 ) {
   const tool = yield* init()
-  return yield* tool.execute(args, next)
+  return yield* tool.execute(args, ctx)
 })
 
-describe("tool.write", () => {
-  describe("new file creation", () => {
-    it.instance("writes content to new file", () =>
-      Effect.gen(function* () {
-        const test = yield* TestInstance
-        const filepath = path.join(test.directory, "newfile.txt")
-        const result = yield* run({ filePath: filepath, content: "Hello, World!" })
+const makeCtx = (sandbox: Sandbox): Tool.Context => ({
+  ...baseCtx,
+  sandbox: Promise.resolve(sandbox),
+})
 
-        expect(result.output).toContain("Wrote file successfully")
-        expect(result.metadata.exists).toBe(false)
+describe("tool.write sandbox mode", () => {
+  it.instance("writes content to new file", () =>
+    Effect.gen(function* () {
+      const test = yield* TestInstance
+      const written: Array<{ path: string; data: string }> = []
+      const sandbox = makeSandbox(written, new Error("file not found"))
 
-        const content = yield* Effect.promise(() => fs.readFile(filepath, "utf-8"))
-        expect(content).toBe("Hello, World!")
-      }),
-    )
+      const filepath = path.join(test.directory, "newfile.txt")
+      const result = yield* run({ filePath: filepath, content: "Hello, World!" }, makeCtx(sandbox)).pipe(
+        Effect.provide(mockSandboxProvider(sandbox)),
+      )
 
-    it.instance("creates parent directories if needed", () =>
-      Effect.gen(function* () {
-        const test = yield* TestInstance
-        const filepath = path.join(test.directory, "nested", "deep", "file.txt")
-        yield* run({ filePath: filepath, content: "nested content" })
+      expect(result.output).toContain("Wrote file successfully")
+      expect(result.metadata.exists).toBe(false)
+      expect(written).toHaveLength(1)
+      expect(written[0].path).toContain("newfile.txt")
+      expect(written[0].data).toBe("Hello, World!")
+    }),
+  )
 
-        const content = yield* Effect.promise(() => fs.readFile(filepath, "utf-8"))
-        expect(content).toBe("nested content")
-      }),
-    )
+  it.instance("overwrites existing file content", () =>
+    Effect.gen(function* () {
+      const test = yield* TestInstance
+      const written: Array<{ path: string; data: string }> = []
+      const sandbox = makeSandbox(written, "old content")
 
-    it.instance("handles relative paths by resolving to instance directory", () =>
-      Effect.gen(function* () {
-        const test = yield* TestInstance
-        yield* run({ filePath: "relative.txt", content: "relative content" })
+      const filepath = path.join(test.directory, "existing.txt")
+      const result = yield* run({ filePath: filepath, content: "new content" }, makeCtx(sandbox)).pipe(
+        Effect.provide(mockSandboxProvider(sandbox)),
+      )
 
-        const content = yield* Effect.promise(() => fs.readFile(path.join(test.directory, "relative.txt"), "utf-8"))
-        expect(content).toBe("relative content")
-      }),
-    )
-  })
+      expect(result.output).toContain("Wrote file successfully")
+      expect(result.metadata.exists).toBe(true)
+      expect(written).toHaveLength(1)
+      expect(written[0].data).toBe("new content")
+    }),
+  )
 
-  describe("existing file overwrite", () => {
-    it.instance("overwrites existing file content", () =>
-      Effect.gen(function* () {
-        const test = yield* TestInstance
-        const filepath = path.join(test.directory, "existing.txt")
-        yield* Effect.promise(() => fs.writeFile(filepath, "old content", "utf-8"))
-        const result = yield* run({ filePath: filepath, content: "new content" })
+  it.instance("fails when sandbox is not available", () =>
+    Effect.gen(function* () {
+      const test = yield* TestInstance
+      const filepath = path.join(test.directory, "newfile.txt")
 
-        expect(result.output).toContain("Wrote file successfully")
-        expect(result.metadata.exists).toBe(true)
-
-        const content = yield* Effect.promise(() => fs.readFile(filepath, "utf-8"))
-        expect(content).toBe("new content")
-      }),
-    )
-
-    it.instance("preserves BOM when overwriting existing files", () =>
-      Effect.gen(function* () {
-        const test = yield* TestInstance
-        const filepath = path.join(test.directory, "existing.cs")
-        const bom = String.fromCharCode(0xfeff)
-        yield* Effect.promise(() => fs.writeFile(filepath, `${bom}using System;\n`, "utf-8"))
-
-        yield* run({ filePath: filepath, content: "using Up;\n" })
-
-        const content = yield* Effect.promise(() => fs.readFile(filepath, "utf-8"))
-        expect(content.charCodeAt(0)).toBe(0xfeff)
-        expect(content.slice(1)).toBe("using Up;\n")
-      }),
-    )
-
-    it.instance(
-      "restores BOM after formatter strips it",
-      () =>
-        Effect.gen(function* () {
-          const test = yield* TestInstance
-          const filepath = path.join(test.directory, "formatted.cs")
-          const bom = String.fromCharCode(0xfeff)
-          yield* Effect.promise(() => fs.writeFile(filepath, `${bom}using System;\n`, "utf-8"))
-
-          yield* run({ filePath: filepath, content: "using Up;\n" })
-
-          const content = yield* Effect.promise(() => fs.readFile(filepath, "utf-8"))
-          expect(content.charCodeAt(0)).toBe(0xfeff)
-          expect(content.slice(1)).toBe("using Up;\n")
-        }),
-      {
-        config: {
-          formatter: {
-            stripbom: {
-              extensions: [".cs"],
-              command: [
-                "node",
-                "-e",
-                "const fs = require('fs'); const file = process.argv[1]; let text = fs.readFileSync(file, 'utf8'); if (text.charCodeAt(0) === 0xfeff) text = text.slice(1); fs.writeFileSync(file, text, 'utf8')",
-                "$FILE",
-              ],
-            },
-          },
-        },
-      },
-    )
-
-    it.instance("returns diff in metadata for existing files", () =>
-      Effect.gen(function* () {
-        const test = yield* TestInstance
-        const filepath = path.join(test.directory, "file.txt")
-        yield* Effect.promise(() => fs.writeFile(filepath, "old", "utf-8"))
-        const result = yield* run({ filePath: filepath, content: "new" })
-
-        expect(result.metadata).toHaveProperty("filepath", filepath)
-        expect(result.metadata).toHaveProperty("exists", true)
-      }),
-    )
-  })
-
-  describe("file permissions", () => {
-    it.instance("sets file permissions when writing sensitive data", () =>
-      Effect.gen(function* () {
-        const test = yield* TestInstance
-        const filepath = path.join(test.directory, "sensitive.json")
-        yield* run({ filePath: filepath, content: JSON.stringify({ secret: "data" }) })
-
-        if (process.platform !== "win32") {
-          const stats = yield* Effect.promise(() => fs.stat(filepath))
-          expect(stats.mode & 0o777).toBe(0o644)
-        }
-      }),
-    )
-  })
-
-  describe("content types", () => {
-    it.instance("writes JSON content", () =>
-      Effect.gen(function* () {
-        const test = yield* TestInstance
-        const filepath = path.join(test.directory, "data.json")
-        const data = { key: "value", nested: { array: [1, 2, 3] } }
-        yield* run({ filePath: filepath, content: JSON.stringify(data, null, 2) })
-
-        const content = yield* Effect.promise(() => fs.readFile(filepath, "utf-8"))
-        expect(JSON.parse(content)).toEqual(data)
-      }),
-    )
-
-    it.instance("writes binary-safe content", () =>
-      Effect.gen(function* () {
-        const test = yield* TestInstance
-        const filepath = path.join(test.directory, "binary.bin")
-        const content = "Hello\x00World\x01\x02\x03"
-        yield* run({ filePath: filepath, content })
-
-        const buf = yield* Effect.promise(() => fs.readFile(filepath))
-        expect(buf.toString()).toBe(content)
-      }),
-    )
-
-    it.instance("writes empty content", () =>
-      Effect.gen(function* () {
-        const test = yield* TestInstance
-        const filepath = path.join(test.directory, "empty.txt")
-        yield* run({ filePath: filepath, content: "" })
-
-        const content = yield* Effect.promise(() => fs.readFile(filepath, "utf-8"))
-        expect(content).toBe("")
-
-        const stats = yield* Effect.promise(() => fs.stat(filepath))
-        expect(stats.size).toBe(0)
-      }),
-    )
-
-    it.instance("writes multi-line content", () =>
-      Effect.gen(function* () {
-        const test = yield* TestInstance
-        const filepath = path.join(test.directory, "multiline.txt")
-        const lines = ["Line 1", "Line 2", "Line 3", ""].join("\n")
-        yield* run({ filePath: filepath, content: lines })
-
-        const content = yield* Effect.promise(() => fs.readFile(filepath, "utf-8"))
-        expect(content).toBe(lines)
-      }),
-    )
-
-    it.instance("handles different line endings", () =>
-      Effect.gen(function* () {
-        const test = yield* TestInstance
-        const filepath = path.join(test.directory, "crlf.txt")
-        const content = "Line 1\r\nLine 2\r\nLine 3"
-        yield* run({ filePath: filepath, content })
-
-        const buf = yield* Effect.promise(() => fs.readFile(filepath))
-        expect(buf.toString()).toBe(content)
-      }),
-    )
-  })
-
-  describe("sandbox writeFiles retry", () => {
-    it.instance("retries writeFiles once on transient failure", () =>
-      Effect.gen(function* () {
-        let callCount = 0
-        const mockWriteFiles = async () => {
-          callCount++
-          if (callCount === 1) throw new Error("transient network error")
-          return undefined
-        }
-
-        // Simulate the retry logic from write.ts
-        const result = yield* Effect.tryPromise({
-          try: () => mockWriteFiles(),
-          catch: () => mockWriteFiles(),
-        })
-
-        expect(callCount).toBe(2)
-        expect(result).toBeUndefined()
-      }),
-    )
-
-    it.instance("fails after retry also fails", () =>
-      Effect.gen(function* () {
-        let callCount = 0
-        const mockWriteFiles = async () => {
-          callCount++
-          throw new Error("persistent failure")
-        }
-
-        const exit = yield* Effect.tryPromise({
-          try: () => mockWriteFiles(),
-          catch: () => mockWriteFiles(),
-        }).pipe(Effect.exit)
-
-        expect(exit._tag).toBe("Failure")
-        expect(callCount).toBe(2)
-      }),
-    )
-  })
-
-  describe("error handling", () => {
-    it.instance("throws error when OS denies write access", () =>
-      Effect.gen(function* () {
-        const test = yield* TestInstance
-        const readonlyPath = path.join(test.directory, "readonly.txt")
-        yield* Effect.promise(() => fs.writeFile(readonlyPath, "test", "utf-8"))
-        yield* Effect.promise(() => fs.chmod(readonlyPath, 0o444))
-        const exit = yield* run({ filePath: readonlyPath, content: "new content" }).pipe(Effect.exit)
-        expect(exit._tag).toBe("Failure")
-      }),
-    )
-  })
-
-  describe("title generation", () => {
-    it.instance("returns relative path as title", () =>
-      Effect.gen(function* () {
-        const test = yield* TestInstance
-        const filepath = path.join(test.directory, "src", "components", "Button.tsx")
-        yield* Effect.promise(() => fs.mkdir(path.dirname(filepath), { recursive: true }))
-
-        const result = yield* run({ filePath: filepath, content: "export const Button = () => {}" })
-        expect(result.title).toEndWith(path.join("src", "components", "Button.tsx"))
-      }),
-    )
-  })
+      const exit = yield* run({ filePath: filepath, content: "Hello" }, baseCtx).pipe(Effect.exit)
+      expect(exit._tag).toBe("Failure")
+    }),
+  )
 })

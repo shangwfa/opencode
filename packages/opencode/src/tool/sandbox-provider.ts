@@ -1,4 +1,4 @@
-import { Effect, Context, Layer, Cause, Deferred, Ref, Semaphore, Schedule } from "effect"
+import { Effect, Context, Layer, Cause, Deferred, Ref, Semaphore, Schedule, Duration } from "effect"
 import { Sandbox, ConnectionConfig } from "@alibaba-group/opensandbox"
 import type { CommandExecution, Volume } from "@alibaba-group/opensandbox"
 import { and, eq, lt } from "drizzle-orm"
@@ -182,7 +182,6 @@ export namespace SandboxProvider {
       const entries = yield* Ref.make(new Map<string, Entry>())
       const commandSessions = new Map<string, string>()
       const commandSemaphores = new Map<string, Semaphore.Semaphore>()
-      const leases = new Set<string>()
       const createRef = yield* Ref.make(new Map<string, Deferred.Deferred<Sandbox, Error>>())
       const sessionRef = yield* Ref.make(new Map<string, Deferred.Deferred<string, Error>>())
 
@@ -403,7 +402,7 @@ export namespace SandboxProvider {
             }
           }
           let sem = commandSemaphores.get(sessionID)
-          if (!sem) { sem = yield* Semaphore.make(1); commandSemaphores.set(sessionID, sem) }
+          if (!sem) { sem = Effect.runSync(Semaphore.make(1)); commandSemaphores.set(sessionID, sem) }
           return yield* sem.withPermit(
             Effect.tryPromise({
               try: () => sb.commands.runInSession(sessionId!, command, options, handlers, signal),
@@ -491,6 +490,26 @@ export namespace SandboxProvider {
       const config = yield* SandboxConfig.Service
       const commandSemaphores = new Map<string, Semaphore.Semaphore>()
       const createRef = yield* Ref.make(new Map<string, Deferred.Deferred<Sandbox, Error>>())
+      const sbCache = new Map<string, { sb: Sandbox; cachedAt: number; sandboxID: string }>()
+      const SB_CACHE_TTL_MS = 30_000
+
+      function getCachedSandbox(sessionID: string): Sandbox | null {
+        const hit = sbCache.get(sessionID)
+        if (!hit) return null
+        if (Date.now() - hit.cachedAt > SB_CACHE_TTL_MS) {
+          sbCache.delete(sessionID)
+          return null
+        }
+        return hit.sb
+      }
+
+      function invalidateCachedSandbox(sessionID: string) {
+        sbCache.delete(sessionID)
+      }
+
+      function cacheSandbox(sessionID: string, sb: Sandbox) {
+        sbCache.set(sessionID, { sb, cachedAt: Date.now(), sandboxID: sb.id })
+      }
 
       const connectionConfig = new ConnectionConfig({
         domain: config.domain,
@@ -653,7 +672,7 @@ export namespace SandboxProvider {
         return Effect.gen(function* () {
           let sem = lockSemaphores.get(sessionID)
           if (!sem) {
-            sem = yield* Semaphore.make(1)
+            sem = Effect.runSync(Semaphore.make(1))
             lockSemaphores.set(sessionID, sem)
           }
           return yield* sem.withPermits(1)(effect)
@@ -739,6 +758,7 @@ export namespace SandboxProvider {
 
       function destroySandbox(sb: Sandbox, sessionID: string) {
         return Effect.gen(function* () {
+          invalidateCachedSandbox(sessionID)
           log.info("destroying sandbox", { sessionID, sandboxID: sb.id })
           commandSemaphores.delete(sessionID)
           const row = yield* dbGet(sessionID).pipe(Effect.orElseSucceed(() => null))
@@ -770,58 +790,119 @@ export namespace SandboxProvider {
 
       function getOrCreateUnlocked(sessionID: SessionID, opts?: { pvcMode?: "session" | "app"; appId?: string }) {
         return Effect.gen(function* () {
+          const cached = getCachedSandbox(sessionID)
+          if (cached) return cached
+
+          const t0 = Date.now()
+          log.info("getOrCreate start", { sessionID })
+
           // pod 内去重
           const myToken = yield* Deferred.make<Sandbox, Error>()
           const winner = yield* claim(createRef, sessionID, myToken)
-          if (winner !== myToken) return yield* Deferred.await(winner).pipe(Effect.orDie)
+          if (winner !== myToken) {
+            log.info("getOrCreate awaiting winner", { sessionID, ms: Date.now() - t0 })
+            return yield* Deferred.await(winner).pipe(Effect.orDie)
+          }
 
-          const row = yield* dbGet(sessionID).pipe(Effect.orElseSucceed(() => null))
+          return yield* Effect.gen(function* () {
+            const row = yield* dbGet(sessionID).pipe(Effect.orElseSucceed(() => null))
 
-          const sb = yield* Effect.gen(function* () {
-            if (row?.state === "running") {
-              // 尝试重连已有沙箱
-              const existing = yield* reconnect(row).pipe(Effect.orElseSucceed(() => null))
-              if (existing) {
-                const healthy = yield* Effect.tryPromise(() => existing.isHealthy()).pipe(
-                  Effect.catch(() => Effect.succeed(false)),
-                )
-                if (healthy) {
-                  log.info("reconnected to existing sandbox", { sessionID, sandboxID: row.id })
-                  return existing
+            const sb = yield* Effect.gen(function* () {
+              if (row?.state === "running") {
+                const tReconnect = Date.now()
+                const existing = yield* reconnect(row).pipe(Effect.orElseSucceed(() => null))
+                log.info("reconnect done", {
+                  sessionID,
+                  sandboxID: row.id,
+                  ms: Date.now() - tReconnect,
+                  success: !!existing,
+                })
+
+                if (existing) {
+                  const tHealth = Date.now()
+                  const healthy = yield* Effect.tryPromise(() => existing.isHealthy()).pipe(
+                    Effect.catch(() => Effect.succeed(false)),
+                  )
+                  log.info("isHealthy done", {
+                    sessionID,
+                    sandboxID: row.id,
+                    ms: Date.now() - tHealth,
+                    healthy,
+                  })
+
+                  if (healthy) {
+                    log.info("reconnected to existing sandbox", {
+                      sessionID,
+                      sandboxID: row.id,
+                      totalMs: Date.now() - t0,
+                    })
+                    return existing
+                  }
+                  log.warn("sandbox unhealthy after reconnect, rebuilding", { sessionID })
+                  yield* destroySandbox(existing, sessionID).pipe(Effect.catchCause(() => Effect.void))
+                } else {
+                  invalidateCachedSandbox(sessionID)
+                  log.warn("sandbox reconnect returned null, rebuilding", { sessionID, sandboxID: row.id })
                 }
-                log.warn("sandbox unhealthy after reconnect, rebuilding", { sessionID })
-                yield* destroySandbox(existing, sessionID).pipe(Effect.catchCause(() => Effect.void))
-              } else {
-                log.warn("sandbox reconnect returned null, rebuilding", { sessionID, sandboxID: row.id })
               }
+              if (row?.state === "killed") {
+                log.info("recreating killed sandbox", { sessionID, sandboxID: row.id })
+              }
+              const tCreate = Date.now()
+              const result = yield* createSandbox(sessionID, opts)
+              log.info("createSandbox done", {
+                sessionID,
+                sandboxID: result.id,
+                ms: Date.now() - tCreate,
+                totalMs: Date.now() - t0,
+              })
+              return result
+            }).pipe(
+              Effect.catchCause((cause) =>
+                Effect.gen(function* () {
+                  yield* Deferred.fail(myToken, new Error("Sandbox creation failed")).pipe(Effect.catchCause(() => Effect.void))
+                  return yield* Effect.failCause(cause)
+                }),
+              ),
+            )
+
+            const owner = yield* Ref.modify(createRef, (m) => [m.get(sessionID) === myToken, m] as const)
+            if (!owner) {
+              yield* destroySandbox(sb, sessionID).pipe(Effect.catchCause(() => Effect.void))
+              return yield* Effect.fail(new Error(`Sandbox creation cancelled: ${sessionID}`))
             }
-            if (row?.state === "killed") {
-              log.info("recreating killed sandbox", { sessionID, sandboxID: row.id })
-            }
-            return yield* createSandbox(sessionID, opts)
+            yield* Ref.modify(createRef, (m) => { m.delete(sessionID); return [undefined, m] as const })
+            yield* Deferred.succeed(myToken, sb)
+            cacheSandbox(sessionID, sb)
+            log.info("getOrCreate done", { sessionID, sandboxID: sb.id, totalMs: Date.now() - t0 })
+            return sb
           }).pipe(
-            Effect.catchCause((cause) =>
+            Effect.ensuring(
               Effect.gen(function* () {
-                yield* Ref.modify(createRef, (m) => { m.delete(sessionID); return [undefined, m] as const })
-                yield* Deferred.fail(myToken, new Error("Sandbox creation failed")).pipe(Effect.catchCause(() => Effect.void))
-                return yield* Effect.failCause(cause)
+                const removed = yield* Ref.modify(createRef, (m) => {
+                  if (m.get(sessionID) !== myToken) return [false, m] as const
+                  m.delete(sessionID)
+                  return [true, m] as const
+                })
+                if (removed) yield* Deferred.fail(myToken, new Error(`Sandbox creation interrupted: ${sessionID}`)).pipe(Effect.catchCause(() => Effect.void))
               }),
             ),
           )
-
-          const owner = yield* Ref.modify(createRef, (m) => [m.get(sessionID) === myToken, m] as const)
-          if (!owner) {
-            yield* destroySandbox(sb, sessionID).pipe(Effect.catchCause(() => Effect.void))
-            return yield* Effect.fail(new Error(`Sandbox creation cancelled: ${sessionID}`))
-          }
-          yield* Ref.modify(createRef, (m) => { m.delete(sessionID); return [undefined, m] as const })
-          yield* Deferred.succeed(myToken, sb)
-          return sb
         })
       }
 
       const getOrCreate: Interface["getOrCreate"] = (sessionID, opts) =>
-        lock(sessionID, getOrCreateUnlocked(sessionID, opts)).pipe(Effect.orDie, Effect.withSpan("SandboxProvider.getOrCreate"))
+        Effect.gen(function* () {
+          const cached = getCachedSandbox(sessionID)
+          if (cached) return cached
+          return yield* lock(sessionID, getOrCreateUnlocked(sessionID, opts)).pipe(
+            Effect.timeoutOrElse({
+              duration: Duration.seconds(90),
+              orElse: () => Effect.fail(new Error(`Sandbox getOrCreate timeout after 90s: ${sessionID}`)),
+            }),
+            Effect.orDie,
+          )
+        }).pipe(Effect.withSpan("SandboxProvider.getOrCreate"))
 
       const get: Interface["get"] = (sessionID) =>
         Effect.gen(function* () {
@@ -837,6 +918,7 @@ export namespace SandboxProvider {
 
       const destroy: Interface["destroy"] = (sessionID) =>
         lock(sessionID, Effect.gen(function* () {
+          invalidateCachedSandbox(sessionID)
           const inFlight = yield* Ref.modify(createRef, (m) => {
             const d = m.get(sessionID)
             if (d) m.delete(sessionID)
@@ -848,6 +930,7 @@ export namespace SandboxProvider {
             const sb = yield* reconnect(row).pipe(Effect.orElseSucceed(() => null))
             if (sb) yield* destroySandbox(sb, sessionID).pipe(Effect.catchCause(() => Effect.void))
             else {
+              invalidateCachedSandbox(sessionID)
               yield* bestEffortKill(row.id, sessionID)
               yield* dbMarkDestroyed(sessionID, row.id)
             }
@@ -862,6 +945,7 @@ export namespace SandboxProvider {
         Effect.gen(function* () {
           const row = yield* dbGetById(sandboxID).pipe(Effect.orElseSucceed(() => null))
           if (!row || row.state !== "running") return
+          invalidateCachedSandbox(row.session_id)
           yield* lock(row.session_id, Effect.gen(function* () {
             const current = yield* dbGetById(sandboxID).pipe(Effect.orElseSucceed(() => null))
             if (!current || current.id !== sandboxID || current.state !== "running") return
@@ -875,6 +959,7 @@ export namespace SandboxProvider {
               yield* destroySandbox(sb, current.session_id).pipe(Effect.catchCause(() => Effect.void))
               return
             }
+            invalidateCachedSandbox(current.session_id)
             yield* bestEffortKill(sandboxID, current.session_id)
             yield* dbDeleteFor(current.session_id, sandboxID).pipe(Effect.catchCause(() => Effect.void))
           }))
@@ -883,6 +968,7 @@ export namespace SandboxProvider {
 
       const destroyAll: Interface["destroyAll"] = () =>
         Effect.gen(function* () {
+          sbCache.clear()
           const inFlightCreates = yield* Ref.modify(createRef, (m) => { const e = Array.from(m.entries()); m.clear(); return [e, m] as const })
           for (const [, d] of inFlightCreates) yield* Deferred.fail(d, new Error("Sandbox destroyed during shutdown"))
           const rows = yield* dbAll().pipe(Effect.orElseSucceed(() => [] as any[]))
@@ -898,6 +984,7 @@ export namespace SandboxProvider {
                 )
                 return
               }
+              invalidateCachedSandbox(row.session_id)
               yield* bestEffortKill(row.id, row.session_id)
               yield* dbDeleteFor(row.session_id, row.id).pipe(Effect.catchCause(() => Effect.void))
             }))
@@ -938,13 +1025,14 @@ export namespace SandboxProvider {
         })
 
       const runInSession: Interface["runInSession"] = (sessionID, command, options, handlers, signal) =>
-        lock(sessionID, Effect.gen(function* () {
-          const sb = yield* getOrCreateUnlocked(sessionID)
+        Effect.gen(function* () {
+          const cached = getCachedSandbox(sessionID)
+          const sb = cached ?? (yield* lock(sessionID, getOrCreateUnlocked(sessionID)))
 
           // Semaphore 提前初始化，保护 createSession + runInSession 全流程
           // 防止并发请求同时发现 command_session_id=null 而重复创建 shell session
           let sem = commandSemaphores.get(sessionID)
-          if (!sem) { sem = yield* Semaphore.make(1); commandSemaphores.set(sessionID, sem) }
+          if (!sem) { sem = Effect.runSync(Semaphore.make(1)); commandSemaphores.set(sessionID, sem) }
 
           return yield* sem.withPermit(Effect.gen(function* () {
             const row = yield* dbGet(sessionID).pipe(Effect.orElseSucceed(() => null))
@@ -966,7 +1054,7 @@ export namespace SandboxProvider {
               catch: (e) => new Error(`runInSession failed: ${String(e)}`),
             })
           }))
-        })).pipe(Effect.withSpan("SandboxProvider.runInSession"))
+        }).pipe(Effect.withSpan("SandboxProvider.runInSession"))
 
       const runDetached: Interface["runDetached"] = (sessionID, command, options, handlers, signal) =>
         Effect.gen(function* () {

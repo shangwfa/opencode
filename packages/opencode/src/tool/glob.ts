@@ -50,7 +50,7 @@ export const GlobTool = Tool.define(
           const sandboxSearchPath = toSandboxPath(search, ins.directory)
           const escapedPattern = params.pattern.replace(/'/g, "'\\''")
           const cmd = `rg --files --glob '${escapedPattern}' --sortr modified '${sandboxSearchPath}' 2>/dev/null | head -${limit + 1}`
-          const result = yield* sandboxProvider.runInSession(ctx.sandboxSessionID ?? ctx.sessionID, cmd, { timeoutSeconds: 30 })
+          const result = yield* sandboxProvider.runDetached(ctx.sandboxSessionID ?? ctx.sessionID, cmd, { timeoutSeconds: 30 })
           const stdout = result.logs.stdout.map((l: { text: string }) => l.text).join("\n").trim()
           const lines = stdout ? stdout.split("\n").filter((line: string) => line.length > 0) : []
 
