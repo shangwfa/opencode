@@ -29,7 +29,7 @@
 | T8.1 | ✅ | provider 列表与 connected 状态 |
 | T8.2 | ✅ | 同 session 切换模型 |
 | T9.1 | ✅ | SSE 事件流可收到 session/message 事件 |
-| T10.1 | | 完整开发流程 + PVC 持久化 |
+| T10.1 | ✅ | 完整开发流程 + PVC 持久化 |
 | T11.1 | ✅ | Vite 5 + glm-5.1 |
 | T11.2 | ✅ | HTML 注入验证 |
 | T11.3 | ✅ | HTML src/href 路径重写 |
@@ -58,11 +58,11 @@
 | T12.5 | ✅ | keepAlive 阻止 idle 销毁（T19.8: 15s 后 exec 仍成功） |
 
 | T17.1 | ✅ | 无沙箱时 endpoint API 返回 502 |
-| T17.2 | | endpoint API 端口参数校验 |
+| T17.2 | ✅ | endpoint API 端口参数校验（0/99999/abc → 400） |
 | T17.3 | ✅ | Vite 项目 endpoint API 返回直连 IP |
 | T17.4 | ✅ | 通过直连 IP 访问 Vite 页面 HTTP 200 |
 | T17.5 | ✅ | Proxy 模式有注入，直连模式无注入 |
-| T17.6 | | 沙箱销毁后 endpoint API 返回 502 |
+| T17.6 | ✅ | 沙箱销毁后 endpoint API 返回 502 |
 | T18.1 | ✅ | 7 种工具调用场景全部验证通过 |
 | T18.2 | ✅ | 消息流结构正确（prompt → tool → summary） |
 | T19.1 | ✅ | exec API：简单命令执行（exitCode=0, stdout=hello-from-exec） |
@@ -224,5 +224,65 @@
 | T22.13 | ✅ | Remote MCP 工具执行验证：ev_echo 调用成功，输出 Echo: hello |
 | T22.14 | ⏳ | Local MCP 在 Sandbox 中执行验证（需沙箱 + supergateway） |
 | T22.15 | ✅ | Session MCP 工具多轮对话持续可用：3 轮 3 次 MCP 调用全部成功 |
+
+### Session PVC 模式（session/app）
+
+| 用例 | 状态 | 备注 |
+|---|---|---|
+| T27.1 | ✅ | 默认 session 模式，dir=/workspace |
+| T27.2 | ✅ | 显式 pvcMode=session |
+| T27.3 | ✅ | app 模式（pvcMode=app + appId），dir 不暴露 worktree |
+| T27.4 | ✅ | app 缺少 appId → 400 |
+| T27.5 | ✅ | appId 空白 → 400 |
+| T27.6 | ✅ | 非法 pvcMode → 400 |
+| T27.7 | ✅ | 路径穿越（../、;等）→ 400 |
+| T27.10 | ⚠️ NOTE | 同 appId 共享 PVC：本地 Docker 环境 PVC bind mount 不支持跨 sandbox 共享，K8s 环境下应支持 |
+| T27.11 | ✅ | 不同 appId PVC 隔离 |
+| T27.12 | ✅ | session 模式与 app 模式隔离 |
+
+### Session LSP（沙箱内 LSP daemon）
+
+| 用例 | 状态 | 备注 |
+|---|---|---|
+| T27.LSP.1 | ✅ | write 工具触发 LSP diagnostics（检测出类型错误） |
+| T27.LSP.2 | ✅ | edit 工具触发 LSP diagnostics（修复后剩余错误） |
+| T27.LSP.3 | ✅ | daemon 自动启动（runInSession + nohup + probe schema 验证） |
+
+### Session User Fields（用户标识持久化）
+
+| 用例 | 状态 | 备注 |
+|---|---|---|
+| T25.1 | ✅ | prompt_async 携带 userName/userId → 204 |
+| T25.2 | ✅ | 消息列表包含 userName=alice, userId=user-123 |
+| T25.3 | ✅ | 不传时 userName/userId 为 null（向后兼容） |
+| T25.4 | ✅ | 同步接口 message 也支持 userName/userId |
+
+### Compose Agent（编排工作流）
+
+| 用例 | 状态 | 备注 |
+|---|---|---|
+| T26.C.1 | ✅ | 创建 compose agent + 3 编排技能，CRUD + PG 持久化 |
+
+### 沙箱镜像环境
+
+| 用例 | 状态 | 备注 |
+|---|---|---|
+| T24.1 | ✅ | mise 2026.6.11，node 18/20/22/24 + pnpm 8/9/10/11 预装 |
+| T24.2 | ✅ | 默认 node v24.16.0, pnpm 10.34.3, registry=npmmirror |
+| T28.1 | ✅ | 沙箱对象缓存命中：首次 0.94s → 后续 ~0.13s（7x 加速） |
+
+### Agent 权限（会话级动态配置）
+
+| 用例 | 状态 | 备注 |
+|---|---|---|
+| T26.P.1 | ✅ | permission deny：edit/write 被 deny 后工具列表移除，AI 只能用 bash |
+
+### 代码修复验证（feat/session-lsp 分支）
+
+| 修复 | 状态 | 备注 |
+|---|---|---|
+| Auth PG | ✅ | 恢复 pgLayer，PUT auth 写 PG，重启后 connected 持久化 |
+| LSP daemon | ✅ | runDetached→runInSession（避免 deleteSession kill daemon）+ probe schema 验证 |
+| userName/userId | ✅ | SessionV1.User schema 加字段 + prompt 传递值 |
 
 ---
