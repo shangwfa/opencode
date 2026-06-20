@@ -44,6 +44,8 @@
 | T9.6 | ✅ | session fork 返回新 ID |
 | T9.7 | ✅ | session share 返回 share slug |
 | T10.1 | ✅ | 完整开发流程 + PVC 持久化 |
+| T10.2 | ✅ | E2E：创建 app.py + 运行输出 Hello World |
+| T10.4 | ✅ | session 删除后查询返回 404 |
 | T11.1 | ✅ | Vite 5 + glm-5.1 |
 | T11.2 | ✅ | HTML 注入验证 |
 | T11.3 | ✅ | HTML src/href 路径重写 |
@@ -82,6 +84,9 @@
 | T18.3 | ✅ | read 工具：读取 /workspace/t18.txt completed |
 | T18.4 | ✅ | glob 工具：搜索 .ts 文件找到 2 个 completed |
 | T18.5 | ✅ | grep 工具：搜索 hello completed |
+| T18.6 | ✅ | edit 工具：line2 → CHANGED completed |
+| T18.7 | ✅ | write 工具：创建 t18-new.ts completed |
+| T18.9 | ✅ | skill 工具：加载 test-skill 内容 completed |
 | T19.1 | ✅ | exec API：简单命令执行（exitCode=0, stdout=hello-from-exec） |
 | T19.2 | ✅ | exec API：多行输出（stdout 含 line1/line2）。⚠️ NOTE：stderr 被合并到 stdout，stderr 字段为空 |
 | T19.3 | ✅ | exec API：指定工作目录（pwd=/tmp） |
@@ -270,6 +275,12 @@
 | T27.LSP.1 | ✅ | write 工具触发 LSP diagnostics（检测出类型错误） |
 | T27.LSP.2 | ✅ | edit 工具触发 LSP diagnostics（修复后剩余错误） |
 | T27.LSP.3 | ✅ | daemon 自动启动（runInSession + nohup + probe schema 验证） |
+| T27.7.1 | ✅ | hover：返回 const x: string |
+| T27.7.2 | ✅ | documentSymbol：返回 foo(kind=12) + x(kind=14) |
+| T27.7.3 | ✅ | workspaceSymbol：搜索 foo 返回结果 |
+| T27.7.4 | ✅ | definition：指向 lsp-test.ts:0:6 |
+| T27.7.5 | ✅ | references：返回位置数组 |
+| T27.7.6 | ✅ | diagnostics：检测到类型错误 |
 
 ### Session User Fields（用户标识持久化）
 
@@ -329,12 +340,18 @@
 | T28.3 | ✅ | 缓存 TTL 过期：首次 0.91s → 缓存 0.17s → 过期后 0.18s → 重新缓存 0.20s |
 | T28.5 | ✅ | Watchdog 标记超时工具：25s 内 stuck part 标记 error |
 | T28.6 | ✅ | 沙箱销毁后缓存失效：kill 后重建 0.85s → 重新缓存 0.12s |
+| T28.9 | ✅ | CAS 防覆盖：completed 状态未被 watchdog 覆盖 |
 
 ### Agent 权限（会话级动态配置）
 
 | 用例 | 状态 | 备注 |
 |---|---|---|
 | T26.P.1 | ✅ | permission deny：edit/write 被 deny 后工具列表移除，AI 只能用 bash |
+| T26.21 | ✅ | 字符串简写 {edit:"deny",bash:"allow"} → 2 rules |
+| T26.22 | ✅ | 对象语法白名单 {edit:{"*":"deny","docs/*.md":"allow"}} → 3 rules |
+| T26.25 | ✅ | 字符串简写 "allow"/"deny" 各转为 1 rule |
+| T26.26 | ✅ | last matching rule wins：deny* + allow src/*.ts |
+| T26.28 | ✅ | task 权限：safe:allow + danger:deny → 2 rules |
 | T26.29/30 | ✅ | specer 配置 **/ 前缀 vs 无前缀：permission 持久化正确（各 3 rules） |
 | T26.36 | ✅ | subagent 独立权限配置已持久化（sub-worker: 2 rules） |
 | T26.39 | ✅ | write deny 生效（工具从列表移除） |
