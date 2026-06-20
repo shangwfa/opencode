@@ -239,6 +239,7 @@
 | T27.10 | ⚠️ NOTE | 同 appId 共享 PVC：本地 Docker 环境 PVC bind mount 不支持跨 sandbox 共享，K8s 环境下应支持 |
 | T27.11 | ✅ | 不同 appId PVC 隔离 |
 | T27.12 | ✅ | session 模式与 app 模式隔离 |
+| T27.13 | ⚠️ NOTE | worktree 自动创建未触发（exec 路由可能走 HttpApi 端点而非 sandbox-proxy.ts 的 worktree 逻辑），K8s 环境需进一步验证 |
 
 ### Session LSP（沙箱内 LSP daemon）
 
@@ -264,6 +265,7 @@
 | 用例 | 状态 | 备注 |
 |---|---|---|
 | T26.C.1 | ✅ | 创建 compose agent + 3 编排技能，CRUD + PG 持久化 |
+| T26.C.2 | ⚠️ NOTE | AI 加载了 3 个编排技能（skill×3 completed），但未执行实际代码编写——AI 能力限制，非系统 bug |
 
 ### 沙箱镜像环境
 
