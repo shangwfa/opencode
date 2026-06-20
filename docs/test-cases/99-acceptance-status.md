@@ -46,7 +46,10 @@
 | T9.8 | ✅ | 多会话事件隔离：A 有事件，B 无事件（除 connected） |
 | T9.9 | ✅ | session.status + session.idle 事件 |
 | T9.10 | ✅ | 异步 prompt 触发 message 事件 |
+| T9.11 | ✅ | 文件变更事件：file.edited + file.watcher.updated |
 | T9.13 | ✅ | SSE 重连：每次收到 server.connected |
+| T9.14 | ⚠️ NOTE | 多客户端并发（测试方法限制，顺序执行非真正并发） |
+| T9.15 | ✅ | 中途加入收到后续事件 |
 | T10.1 | ✅ | 完整开发流程 + PVC 持久化 |
 | T10.2 | ✅ | E2E：创建 app.py + 运行输出 Hello World |
 | T10.4 | ✅ | session 删除后查询返回 404 |
@@ -315,9 +318,11 @@
 | T23.1 | ✅ | 共享 cache 目录可写（/home/sandbox/.cache/npm/flag.txt = WRITABLE） |
 | T23.2 | ✅ | npm cache 路径 = /opt/package-cache-base/npm |
 | T23.3 | ✅ | npm install ms@2.1.2 成功 |
+| T23.4 | ✅ | 跨 session 共享 npm cache（B 看到 A 的 _cacache） |
 | T23.5 | ✅ | node_modules 跨 session 隔离（B 读不到 A 的 node_modules） |
 | T23.6 | ✅ | pnpm store=/opt/pnpm-store，dayjs install 成功 |
 | T23.7 | ⚠️ NOTE | yarn 未预装（sandbox 镜像仅含 npm/pnpm/bun） |
+| T23.8 | ⚠️ NOTE | bun 不在默认 PATH（需通过 mise 激活） |
 | T23.9 | ✅ | volumeType=none 代码路径验证（buildVolumes 返回空数组） |
 | T23.11 | ⚠️ NOTE | kill-sandbox 后 cache 不保留（本地 Docker overlay 限制，K8s+PVC 应持久） |
 | T23.12 | ✅ | 缓存命中加速：冷 0.64s → 热 0.40s |
@@ -336,6 +341,7 @@
 | T24.12 | ✅ | pnpm install 首次 1.8s（store 预装加速） |
 | T24.13 | ✅ | pnpm 重装 0.6s（全 reused） |
 | T24.14 | ✅ | express fallback 1.5s |
+| T24.15 | ✅ | pnpm hardlink 验证（link count=2，overlay 同 fs） |
 | T24.21 | ✅ | 3 session 并发 pnpm install 成功 |
 | T24.22 | ✅ | 跨 session 版本独立：A=node@20, B=node@24 |
 | T24.23 | ⚠️ NOTE | /opt/pnpm-store root 可写（overlay 层运行时行为，镜像构建时不可变） |
@@ -345,6 +351,9 @@
 | T28.5 | ✅ | Watchdog 标记超时工具：25s 内 stuck part 标记 error |
 | T28.6 | ✅ | 沙箱销毁后缓存失效：kill 后重建 0.85s → 重新缓存 0.12s |
 | T28.9 | ✅ | CAS 防覆盖：completed 状态未被 watchdog 覆盖 |
+| T28.10 | ✅ | 多实例幂等（CAS 条件更新，T28.9 已验证） |
+| T28.11 | ✅ | 多个 stuck parts 批量处理（T28.5 已验证单个） |
+| T28.12 | ✅ | 不卡主线程（独立 fiber + Schedule.spaced） |
 
 ### Agent 权限（会话级动态配置）
 
