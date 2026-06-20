@@ -1,30 +1,21 @@
-import { Schema } from "effect"
+import { Duration, Effect, Option, Schema } from "effect"
 import * as path from "path"
-import { Effect } from "effect"
 import * as Tool from "./tool"
-import { LSP } from "@/lsp/lsp"
 import { createTwoFilesPatch } from "diff"
 import DESCRIPTION from "./write.txt"
 import { EventV2Bridge } from "@/event-v2-bridge"
 import { FileSystem } from "@opencode-ai/core/filesystem"
 import { Watcher } from "@opencode-ai/core/filesystem/watcher"
-import { Format } from "../format"
-import { FSUtil } from "@opencode-ai/core/fs-util"
 import { InstanceState } from "@/effect/instance-state"
 import { trimDiff } from "./edit"
 import { assertExternalDirectoryEffect } from "./external-directory"
-import * as Bom from "@/util/bom"
 import { toSandboxPath } from "./sandbox-path"
+import * as Log from "@opencode-ai/core/util/log"
 import { SandboxProvider } from "./sandbox-provider"
-import { Agent as LspAgent } from "@/lsp/agent"
-import * as LSPClient from "@/lsp/client"
-import { toHostPath } from "./sandbox-path"
+import type { Sandbox } from "@alibaba-group/opensandbox"
 
-const writeLog = {
-  warn(msg: string, data?: Record<string, unknown>) { console.warn(`[write-tool] ${msg}`, data ?? "") },
-}
-
-const MAX_PROJECT_DIAGNOSTICS_FILES = 5
+const writeLog = Log.create({ service: "write-tool" })
+const FILE_WRITE_TIMEOUT = Duration.seconds(60)
 
 export const Parameters = Schema.Struct({
   content: Schema.String.annotate({ description: "The content to write to the file" }),
@@ -36,10 +27,7 @@ export const Parameters = Schema.Struct({
 export const WriteTool = Tool.define(
   "write",
   Effect.gen(function* () {
-    const lsp = yield* LSP.Service
-    const fs = yield* FSUtil.Service
     const events = yield* EventV2Bridge.Service
-    const format = yield* Format.Service
 
     return {
       description: DESCRIPTION,
@@ -51,133 +39,57 @@ export const WriteTool = Tool.define(
             ? params.filePath
             : path.join(instance.directory, params.filePath)
           yield* assertExternalDirectoryEffect(ctx, filepath)
+          const sandboxPath = toSandboxPath(filepath, instance.directory)
 
-          // Sandbox branch: if a sandbox is available, write through it
-          const sandboxProviderOpt = yield* Effect.serviceOption(SandboxProvider.Service)
-          if (sandboxProviderOpt._tag === "Some") {
-            const sb: any = yield* Effect.tryPromise({ try: () => ctx.sandbox!, catch: (e) => new Error(`Failed to initialize: ${e instanceof Error ? e.message : String(e)}`) })
-            const sandboxPath = toSandboxPath(filepath, instance.directory)
-
-            let contentOld = ""
-            const readResult = yield* Effect.tryPromise(() => sb.files.readFile(sandboxPath)).pipe(
-              Effect.catch(() => Effect.succeed("")),
-            )
-            contentOld = readResult as string
-
-            const diff = trimDiff(createTwoFilesPatch(filepath, filepath, contentOld, params.content))
-            yield* ctx.ask({
-              permission: "edit",
-              patterns: [path.relative(instance.directory, filepath)],
-              always: ["*"],
-              metadata: { filepath, diff },
-            })
-
-            yield* Effect.tryPromise({
-              try: () => sb.files.writeFiles([{ path: sandboxPath, data: params.content }]),
-              catch: (e) => {
-                const msg = e instanceof Error ? e.message : String(e)
-                writeLog.warn("writeFiles failed, retrying once", { sandboxPath, error: msg })
-                return sb.files.writeFiles([{ path: sandboxPath, data: params.content }])
-              },
-            })
-
-            yield* events.publish(FileSystem.Event.Edited, { file: filepath })
-            yield* events.publish(Watcher.Event.Updated, { file: filepath, event: contentOld ? "change" : "add" })
-
-            let output = "Wrote file successfully."
-            const diagnostics: Record<string, LSPClient.Diagnostic[]> = {}
-            const agentOpt = yield* Effect.serviceOption(LspAgent.Service)
-            if (agentOpt._tag === "Some") {
-              const sid = ctx.sandboxSessionID ?? ctx.sessionID
-              // daemon's getDiagnostics(wait=true) calls touchFile internally,
-              // so an outer touch is redundant.
-              const result = yield* agentOpt.value.diagnostics(sid, filepath, instance.directory).pipe(
-                Effect.catchCause(() => Effect.succeed(null)),
-              )
-              if (result) {
-                for (const [sandboxPath, diags] of Object.entries(result.diagnostics)) {
-                  const hostPath = toHostPath(sandboxPath, instance.directory)
-                  const normalizedFilepath = FSUtil.normalizePath(hostPath)
-                  diagnostics[normalizedFilepath] = diags as LSPClient.Diagnostic[]
-                }
-                const normalizedFilepath = FSUtil.normalizePath(filepath)
-                let projectDiagnosticsCount = 0
-                for (const [file, issues] of Object.entries(diagnostics)) {
-                  const current = file === normalizedFilepath
-                  if (!current && projectDiagnosticsCount >= MAX_PROJECT_DIAGNOSTICS_FILES) continue
-                  const block = LSP.Diagnostic.report(current ? filepath : file, issues)
-                  if (!block) continue
-                  if (current) {
-                    output += `\n\nLSP errors detected in this file, please fix:\n${block}`
-                    continue
-                  }
-                  projectDiagnosticsCount++
-                  output += `\n\nLSP errors detected in other files:\n${block}`
-                }
-              }
-            }
-
-            return {
-              title: path.relative(instance.worktree, filepath),
-              metadata: { diagnostics, filepath, exists: !!contentOld },
-              output,
-            }
+          const maybeSandbox = ctx.sandbox ? (yield* Effect.promise(() => ctx.sandbox!)) as Sandbox | null : null
+          if (maybeSandbox === null && ctx.sandbox) {
+            return yield* Effect.fail(new Error("Sandbox initialization failed"))
+          }
+          if (!maybeSandbox) {
+            return yield* Effect.fail(new Error("Sandbox is not available"))
           }
 
-          const exists = yield* fs.existsSafe(filepath)
-          const source = exists ? yield* Bom.readFile(fs, filepath) : { bom: false, text: "" }
-          const next = Bom.split(params.content)
-          const desiredBom = source.bom || next.bom
-          const contentOld = source.text
-          const contentNew = next.text
+          const contentOld = (yield* Effect.tryPromise(() => maybeSandbox.files.readFile(sandboxPath)).pipe(
+            Effect.timeoutOrElse({
+              duration: FILE_WRITE_TIMEOUT,
+              orElse: () => Effect.succeed(""),
+            }),
+            Effect.catch(() => Effect.succeed("")),
+          )) as string
 
-          const diff = trimDiff(createTwoFilesPatch(filepath, filepath, contentOld, contentNew))
+          const diff = trimDiff(createTwoFilesPatch(filepath, filepath, contentOld, params.content))
           yield* ctx.ask({
             permission: "edit",
             patterns: [path.relative(instance.directory, filepath)],
             always: ["*"],
-            metadata: {
-              filepath,
-              diff,
-            },
+            metadata: { filepath, diff },
           })
 
-          yield* fs.writeWithDirs(filepath, Bom.join(contentNew, desiredBom))
-          if (yield* format.file(filepath)) {
-            yield* Bom.syncFile(fs, filepath, desiredBom)
-          }
+          yield* Effect.tryPromise(() => maybeSandbox.files.writeFiles([{ path: sandboxPath, data: params.content }])).pipe(
+            Effect.catch((error) => {
+              writeLog.warn("writeFiles failed, retrying once", { sandboxPath, error: error.message })
+              return Effect.tryPromise(() => maybeSandbox.files.writeFiles([{ path: sandboxPath, data: params.content }]))
+            }),
+            Effect.timeoutOrElse({
+              duration: FILE_WRITE_TIMEOUT,
+              orElse: () =>
+                Effect.gen(function* () {
+                  const sandboxProvider = Option.getOrUndefined(yield* Effect.serviceOption(SandboxProvider.Service))
+                  if (sandboxProvider) {
+                    yield* sandboxProvider.destroy(ctx.sandboxSessionID ?? ctx.sessionID).pipe(Effect.catchCause(() => Effect.void))
+                  }
+                  return yield* Effect.fail(new Error(`Write timed out: ${sandboxPath}`))
+                }),
+            }),
+          )
+
           yield* events.publish(FileSystem.Event.Edited, { file: filepath })
-          yield* events.publish(Watcher.Event.Updated, {
-            file: filepath,
-            event: exists ? "change" : "add",
-          })
-
-          let output = "Wrote file successfully."
-          yield* lsp.touchFile(filepath, "document")
-          const diagnostics = yield* lsp.diagnostics()
-          const normalizedFilepath = FSUtil.normalizePath(filepath)
-          let projectDiagnosticsCount = 0
-          for (const [file, issues] of Object.entries(diagnostics)) {
-            const current = file === normalizedFilepath
-            if (!current && projectDiagnosticsCount >= MAX_PROJECT_DIAGNOSTICS_FILES) continue
-            const block = LSP.Diagnostic.report(current ? filepath : file, issues)
-            if (!block) continue
-            if (current) {
-              output += `\n\nLSP errors detected in this file, please fix:\n${block}`
-              continue
-            }
-            projectDiagnosticsCount++
-            output += `\n\nLSP errors detected in other files:\n${block}`
-          }
+          yield* events.publish(Watcher.Event.Updated, { file: filepath, event: contentOld ? "change" : "add" })
 
           return {
             title: path.relative(instance.worktree, filepath),
-            metadata: {
-              diagnostics,
-              filepath,
-              exists: exists,
-            },
-            output,
+            metadata: { filepath, exists: !!contentOld },
+            output: "Wrote file successfully.",
           }
         }).pipe(Effect.orDie),
     }

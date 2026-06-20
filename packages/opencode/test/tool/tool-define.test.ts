@@ -17,6 +17,7 @@ function makeCtx(): Tool.Context {
     agent: "build",
     abort: new AbortController().signal,
     messages: [],
+    sandbox: null,
     metadata() {
       return Effect.void
     },

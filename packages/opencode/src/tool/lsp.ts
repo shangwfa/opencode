@@ -1,13 +1,10 @@
 import { Effect, Schema } from "effect"
 import * as Tool from "./tool"
 import path from "path"
-import { LSP } from "@/lsp/lsp"
 import { Agent as LspAgent } from "@/lsp/agent"
 import DESCRIPTION from "./lsp.txt"
 import { InstanceState } from "@/effect/instance-state"
-import { pathToFileURL } from "url"
 import { assertExternalDirectoryEffect } from "./external-directory"
-import { FSUtil } from "@opencode-ai/core/fs-util"
 import { toSandboxPath } from "./sandbox-path"
 import { SandboxProvider } from "./sandbox-provider"
 
@@ -40,8 +37,6 @@ export const Parameters = Schema.Struct({
 export const LspTool = Tool.define(
   "lsp",
   Effect.gen(function* () {
-    const lsp = yield* LSP.Service
-    const fs = yield* FSUtil.Service
     return {
       description: DESCRIPTION,
       parameters: Parameters,
@@ -177,58 +172,7 @@ export const LspTool = Tool.define(
             }
           }
 
-          // ── Local branch ──
-          const uri = pathToFileURL(file).href
-          const position = { file, line: args.line - 1, character: args.character - 1 }
-          const relPath = path.relative(instance.worktree, file)
-          const detail =
-            args.operation === "workspaceSymbol"
-              ? ""
-              : args.operation === "documentSymbol"
-                ? relPath
-                : `${relPath}:${args.line}:${args.character}`
-          const title = detail ? `${args.operation} ${detail}` : args.operation
-
-          const exists = yield* fs.existsSafe(file)
-          if (!exists) throw new Error(`File not found: ${displayPath}`)
-
-          const available = yield* lsp.hasClients(file)
-          if (!available) throw new Error("No LSP server available for this file type.")
-
-          yield* lsp.touchFile(file, "document")
-
-          const result: unknown[] = yield* (() => {
-            switch (args.operation) {
-              case "goToDefinition":
-                return lsp.definition(position)
-              case "findReferences":
-                return lsp.references(position)
-              case "hover":
-                return lsp.hover(position)
-              case "documentSymbol":
-                return lsp.documentSymbol(uri)
-              case "workspaceSymbol":
-                return lsp.workspaceSymbol(args.query ?? "")
-              case "goToImplementation":
-                return lsp.implementation(position)
-              case "prepareCallHierarchy":
-                return lsp.prepareCallHierarchy(position)
-              case "incomingCalls":
-                return lsp.incomingCalls(position)
-              case "outgoingCalls":
-                return lsp.outgoingCalls(position)
-            }
-          })()
-
-          const worktree = instance.worktree === "/" ? instance.directory : instance.worktree
-          const mappedOutput = result.length === 0
-            ? `No results found for ${args.operation}`
-            : JSON.stringify(result, null, 2).replaceAll(worktree, "/workspace")
-          return {
-            title,
-            metadata: { result },
-            output: mappedOutput,
-          }
+          return { title: `${args.operation} not available`, metadata: { result: [] }, output: `${args.operation} requires sandbox mode.` }
         }).pipe(Effect.orDie),
     }
   }),

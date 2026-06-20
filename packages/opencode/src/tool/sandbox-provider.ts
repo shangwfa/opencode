@@ -2,8 +2,7 @@ import { Effect, Context, Layer, Cause, Deferred, Ref, Semaphore, Schedule, Dura
 import { Sandbox, ConnectionConfig } from "@alibaba-group/opensandbox"
 import type { CommandExecution, Volume } from "@alibaba-group/opensandbox"
 import { and, eq, lt } from "drizzle-orm"
-
-
+import * as Log from "@opencode-ai/core/util/log"
 import { Flag } from "@/flag/flag"
 import { Database } from "../storage/db"
 import { SandboxTable } from "./sandbox.pg"
@@ -123,11 +122,7 @@ export function cleanupSessionVolume(
 }
 
 export namespace SandboxProvider {
-  const log = {
-    info(msg: string, data?: Record<string, unknown>) { console.info(`[sandbox-provider] ${msg}`, data ?? "") },
-    warn(msg: string, data?: Record<string, unknown>) { console.warn(`[sandbox-provider] ${msg}`, data ?? "") },
-    error(msg: string, data?: Record<string, unknown>) { console.error(`[sandbox-provider] ${msg}`, data ?? "") },
-  }
+  const log = Log.create({ service: "sandbox-provider" })
 
   export interface Interface {
     readonly getOrCreate: (
@@ -187,7 +182,6 @@ export namespace SandboxProvider {
       const entries = yield* Ref.make(new Map<string, Entry>())
       const commandSessions = new Map<string, string>()
       const commandSemaphores = new Map<string, Semaphore.Semaphore>()
-      const leases = new Set<string>()
       const createRef = yield* Ref.make(new Map<string, Deferred.Deferred<Sandbox, Error>>())
       const sessionRef = yield* Ref.make(new Map<string, Deferred.Deferred<string, Error>>())
 
@@ -321,7 +315,6 @@ export namespace SandboxProvider {
 
       const destroy: Interface["destroy"] = (sessionID) =>
         Effect.gen(function* () {
-          leases.delete(sessionID)
           const sb = sandboxes.get(sessionID)
           sandboxes.delete(sessionID)
           yield* removeEntry(sessionID)
@@ -350,7 +343,6 @@ export namespace SandboxProvider {
       const destroyAll: Interface["destroyAll"] = () =>
         Effect.gen(function* () {
           log.info("destroying all sandboxes", { count: sandboxes.size })
-          leases.clear()
           const inFlightCreates = yield* Ref.modify(createRef, (m) => { const e = Array.from(m.entries()); m.clear(); return [e, m] as const })
           for (const [, d] of inFlightCreates) yield* Deferred.fail(d, new Error("Sandbox destroyed during shutdown"))
           const inFlightSessions = yield* Ref.modify(sessionRef, (m) => { const e = Array.from(m.entries()); m.clear(); return [e, m] as const })
@@ -367,12 +359,12 @@ export namespace SandboxProvider {
         }).pipe(Effect.withSpan("SandboxProvider.destroyAll"))
 
       const keepAlive: Interface["keepAlive"] = (sessionID) =>
-        Effect.sync(() => { leases.add(sessionID); log.info("sandbox keep alive enabled", { sessionID }) })
+        Effect.sync(() => { log.info("sandbox keep alive enabled", { sessionID }) })
 
       const release: Interface["release"] = (sessionID) =>
-        Effect.sync(() => { leases.delete(sessionID); log.info("sandbox keep alive released", { sessionID }) })
+        Effect.sync(() => { log.info("sandbox keep alive released", { sessionID }) })
 
-      const isKeepAlive: Interface["isKeepAlive"] = (sessionID) => Effect.sync(() => leases.has(sessionID))
+      const isKeepAlive: Interface["isKeepAlive"] = (sessionID) => Effect.sync(() => false)
 
       const runInSession: Interface["runInSession"] = (sessionID, command, options, handlers, signal) =>
         Effect.gen(function* () {
@@ -408,7 +400,7 @@ export namespace SandboxProvider {
             }
           }
           let sem = commandSemaphores.get(sessionID)
-          if (!sem) { sem = yield* Semaphore.make(1); commandSemaphores.set(sessionID, sem) }
+          if (!sem) { sem = Effect.runSync(Semaphore.make(1)); commandSemaphores.set(sessionID, sem) }
           return yield* sem.withPermit(
             Effect.tryPromise({
               try: () => sb.commands.runInSession(sessionId!, command, options, handlers, signal),
@@ -678,7 +670,7 @@ export namespace SandboxProvider {
         return Effect.gen(function* () {
           let sem = lockSemaphores.get(sessionID)
           if (!sem) {
-            sem = yield* Semaphore.make(1)
+            sem = Effect.runSync(Semaphore.make(1))
             lockSemaphores.set(sessionID, sem)
           }
           return yield* sem.withPermits(1)(effect)
@@ -971,6 +963,7 @@ export namespace SandboxProvider {
               yield* destroySandbox(sb, current.session_id).pipe(Effect.catchCause(() => Effect.void))
               return
             }
+            invalidateCachedSandbox(current.session_id)
             yield* bestEffortKill(sandboxID, current.session_id)
             yield* dbDeleteFor(current.session_id, sandboxID).pipe(Effect.catchCause(() => Effect.void))
           }))
@@ -995,6 +988,7 @@ export namespace SandboxProvider {
                 )
                 return
               }
+              invalidateCachedSandbox(row.session_id)
               yield* bestEffortKill(row.id, row.session_id)
               yield* dbDeleteFor(row.session_id, row.id).pipe(Effect.catchCause(() => Effect.void))
             }))
@@ -1042,7 +1036,7 @@ export namespace SandboxProvider {
           // Semaphore 提前初始化，保护 createSession + runInSession 全流程
           // 防止并发请求同时发现 command_session_id=null 而重复创建 shell session
           let sem = commandSemaphores.get(sessionID)
-          if (!sem) { sem = yield* Semaphore.make(1); commandSemaphores.set(sessionID, sem) }
+          if (!sem) { sem = Effect.runSync(Semaphore.make(1)); commandSemaphores.set(sessionID, sem) }
 
           return yield* sem.withPermit(Effect.gen(function* () {
             const row = yield* dbGet(sessionID).pipe(Effect.orElseSucceed(() => null))
