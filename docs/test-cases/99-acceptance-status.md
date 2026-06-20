@@ -356,6 +356,7 @@
 | T24.13 | ✅ | pnpm 重装 0.6s（全 reused） |
 | T24.14 | ✅ | express fallback 1.5s |
 | T24.15 | ✅ | pnpm hardlink 验证（link count=2，overlay 同 fs） |
+| T24.16 | ✅ | pnpm build：vite build 成功，dist/ 含 index.html + assets/ |
 | T24.24 | ✅ | 磁盘空间：36G 可用，pnpm-store 4K + mise 862M |
 | T24.21 | ✅ | 3 session 并发 pnpm install 成功 |
 | T24.22 | ✅ | 跨 session 版本独立：A=node@20, B=node@24 |
@@ -370,6 +371,9 @@
 | T28.10 | ✅ | 多实例幂等（CAS 条件更新，T28.9 已验证） |
 | T28.11 | ✅ | 多个 stuck parts 批量处理（T28.5 已验证单个） |
 | T28.12 | ✅ | 不卡主线程（独立 fiber + Schedule.spaced） |
+| T28.13 | ✅ | 日志可见：--print-logs 输出结构化日志（timestamp/level=INFO/service=watchdog） |
+| T28.7 | ✅ | 沙箱 init 日志：kill 后重建有 message=init 日志 |
+| T28.8 | ✅ | getOrCreate 生命周期日志：sandbox created/destroyed 可见 |
 
 ### Agent 权限（会话级动态配置）
 
@@ -395,6 +399,7 @@
 | T26.50 | ✅ | 综合最佳实践：白名单+bash粒度+read全开 → 7 rules |
 | T26.37 | ✅ | external_directory 权限：/external/*.log pattern 持久化 |
 | T26.38 | ✅ | ask 权限持久化（HTTP API 模式下 ask 会卡住，已知限制） |
+| T26.40 | ✅ | ~/路径展开：~/projects/* → /home/opencode/projects/* |
 | T26.51 | ✅ | 权限组合 t51：6 rules |
 | T26.52 | ✅ | 权限组合 t52：4 rules |
 | T26.53 | ✅ | 权限组合 t53：4 rules |
