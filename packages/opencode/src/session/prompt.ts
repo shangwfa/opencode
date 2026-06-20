@@ -675,6 +675,8 @@ export const layer = Layer.effect(
         },
         system: input.system,
         format: input.format,
+        userName: input.userName,
+        userId: input.userId,
       }
 
       if (current?.agent !== info.agent) {

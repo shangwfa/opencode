@@ -346,8 +346,13 @@ export const layer = Layer.effect(
       const req = HttpClientRequest.get(`${base}/lsp/status`).pipe(
         HttpClientRequest.acceptJson,
       )
+      // Validate the response body against StatusResponseSchema, not just the
+      // HTTP status code. OpenSandbox's port proxy can return 200 with a
+      // non-daemon body when the target port has no listener, so a bare
+      // status-code check would falsely report readiness.
       return yield* execHttp(req).pipe(
         Effect.timeout(PROBE_TIMEOUT),
+        Effect.flatMap((response) => HttpClientResponse.schemaBodyJson(StatusResponseSchema)(response)),
         Effect.as(true),
         Effect.catch(() => Effect.succeed(false)),
       )
@@ -369,16 +374,16 @@ export const layer = Layer.effect(
         return
       }
 
-      // Fork the daemon launch into the background. runDetached (underlying
-      // runInSession) resolves its Promise only when the command process
-      // exits; a long-lived HTTP daemon never exits, so awaiting it inline
-      // would deadlock ensureDaemon -> getBaseUrl -> every LSP call.
-      // forkDetach lets the daemon fiber run independently while we probe
-      // for readiness below.
+      // Launch the daemon via nohup+& so the shell returns immediately while
+      // the HTTP daemon keeps running in the background. Using runInSession
+      // (not runDetached) avoids the detached session's deleteSession cleanup
+      // in finally, which would kill the daemon process.
       yield* sandbox
-        .runDetached(sessionID, "LSP_AGENT_PORT=20877 node /opt/opencode-lsp-daemon/index.js", {
-          workingDirectory: "/workspace",
-        })
+        .runInSession(
+          sessionID,
+          "nohup sh -c 'node /opt/opencode-lsp-daemon/index.js' </dev/null > /tmp/opencode-lsp-daemon.log 2>&1 &",
+          { workingDirectory: "/workspace" },
+        )
         .pipe(Effect.forkDetach)
 
       const ready = yield* Effect.gen(function* () {
