@@ -224,6 +224,11 @@
 | T22.13 | ✅ | Remote MCP 工具执行验证：ev_echo 调用成功，输出 Echo: hello |
 | T22.14 | ✅ | Local MCP 在 Sandbox 中执行验证：sandbox-everything_echo 工具成功调用，输出 Echo: hello-sandbox-mcp |
 | T22.15 | ✅ | Session MCP 工具多轮对话持续可用：3 轮 3 次 MCP 调用全部成功 |
+| T22.16 | ✅ | 严格输入校验：local command 必填、remote url 必填 → 400 |
+| T22.17 | ⚠️ NOTE | local MCP environment 注入验证（MCP 启动时序，pid/log 已确认存在） |
+| T22.18 | ✅ | shell 安全：恶意 name/env/command 不产生注入 |
+| T22.19 | ✅ | local MCP pid/log 生命周期：pid-test-9100.pid + .log 存在 |
+| T22.20 | ✅ | 不存在 session：list=200([]), create=500(FK), delete=200 |
 
 ### Session PVC 模式（session/app）
 
@@ -273,6 +278,9 @@
 |---|---|---|
 | T24.1 | ✅ | mise 2026.6.11，node 18/20/22/24 + pnpm 8/9/10/11 预装 |
 | T24.2 | ✅ | 默认 node v24.16.0, pnpm 10.34.3, registry=npmmirror |
+| T24.21 | ✅ | 3 session 并发 pnpm install 成功 |
+| T24.22 | ✅ | 跨 session 版本独立：A=node@20, B=node@24 |
+| T24.23 | ⚠️ NOTE | /opt/pnpm-store root 可写（overlay 层运行时行为，镜像构建时不可变） |
 | T28.1 | ✅ | 沙箱对象缓存命中：首次 0.94s → 后续 ~0.13s（7x 加速） |
 | T28.2 | ✅ | 并发请求绕过 lock：5 个并发 554ms |
 | T28.3 | ✅ | 缓存 TTL 过期：首次 0.91s → 缓存 0.17s → 过期后 0.18s → 重新缓存 0.20s |
@@ -284,6 +292,18 @@
 | 用例 | 状态 | 备注 |
 |---|---|---|
 | T26.P.1 | ✅ | permission deny：edit/write 被 deny 后工具列表移除，AI 只能用 bash |
+| T26.29/30 | ✅ | specer 配置 **/ 前缀 vs 无前缀：permission 持久化正确（各 3 rules） |
+| T26.36 | ✅ | subagent 独立权限配置已持久化（sub-worker: 2 rules） |
+| T26.39 | ✅ | write deny 生效（工具从列表移除） |
+
+### 工具沙箱执行验证（代码审查 + 运行时）
+
+| 用例 | 状态 | 备注 |
+|---|---|---|
+| T19.1 | ✅ | 8 个工具文件全部无本地 I/O 和条件分支 |
+| T19.2-T19.9 | ✅ | write/read/bash/edit/glob/grep/ls/patch 运行时全部在沙箱内执行 |
+| T19.10 | ✅ | PG sandbox 表 state=running |
+| T19.11 | ✅ | 环境隔离：sandbox hostname 独立于宿主机 |
 
 ### 代码修复验证（feat/session-lsp 分支）
 
