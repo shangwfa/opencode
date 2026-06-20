@@ -43,6 +43,10 @@
 | T9.5 | ✅ | session 状态查询正常 |
 | T9.6 | ✅ | session fork 返回新 ID |
 | T9.7 | ✅ | session share 返回 share slug |
+| T9.8 | ✅ | 多会话事件隔离：A 有事件，B 无事件（除 connected） |
+| T9.9 | ✅ | session.status + session.idle 事件 |
+| T9.10 | ✅ | 异步 prompt 触发 message 事件 |
+| T9.13 | ✅ | SSE 重连：每次收到 server.connected |
 | T10.1 | ✅ | 完整开发流程 + PVC 持久化 |
 | T10.2 | ✅ | E2E：创建 app.py + 运行输出 Hello World |
 | T10.4 | ✅ | session 删除后查询返回 404 |
@@ -349,12 +353,21 @@
 | T26.P.1 | ✅ | permission deny：edit/write 被 deny 后工具列表移除，AI 只能用 bash |
 | T26.21 | ✅ | 字符串简写 {edit:"deny",bash:"allow"} → 2 rules |
 | T26.22 | ✅ | 对象语法白名单 {edit:{"*":"deny","docs/*.md":"allow"}} → 3 rules |
+| T26.23 | ✅ | ask catch-all {edit:{"*":"ask","docs/*.md":"allow"}} → 3 rules |
+| T26.24 | ✅ | bash 粒度命令 git:allow + rm:deny + *:ask → 3 bash rules |
 | T26.25 | ✅ | 字符串简写 "allow"/"deny" 各转为 1 rule |
 | T26.26 | ✅ | last matching rule wins：deny* + allow src/*.ts |
+| T26.26b | ✅ | key 顺序决定 ruleset：deny先→最后 allow，allow先→最后 deny |
+| T26.27 | ✅ | tools 字段创建成功（已知限制：不转 permission） |
 | T26.28 | ✅ | task 权限：safe:allow + danger:deny → 2 rules |
 | T26.29/30 | ✅ | specer 配置 **/ 前缀 vs 无前缀：permission 持久化正确（各 3 rules） |
+| T26.31 | ✅ | 对象语法白名单 analysis/t31/spec/*.md 持久化 |
+| T26.32 | ✅ | ** 通配模式持久化 |
+| T26.33 | ✅ | file*.ts 通配持久化 |
+| T26.35 | ✅ | directory 基准 + edit/write 对象语法 → 6 rules |
 | T26.36 | ✅ | subagent 独立权限配置已持久化（sub-worker: 2 rules） |
 | T26.39 | ✅ | write deny 生效（工具从列表移除） |
+| T26.50 | ✅ | 综合最佳实践：白名单+bash粒度+read全开 → 7 rules |
 
 ### 工具沙箱执行验证（代码审查 + 运行时）
 
