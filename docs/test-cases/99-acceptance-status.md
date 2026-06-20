@@ -256,6 +256,8 @@
 | T25.2 | ✅ | 消息列表包含 userName=alice, userId=user-123 |
 | T25.3 | ✅ | 不传时 userName/userId 为 null（向后兼容） |
 | T25.4 | ✅ | 同步接口 message 也支持 userName/userId |
+| T25.5 | ✅ | 多轮对话每条 user 消息独立携带标识（alice→bob） |
+| T25.6 | ✅ | 三人协作讨论（alice/bob/carol 各自标识正确） |
 
 ### Compose Agent（编排工作流）
 
@@ -270,6 +272,10 @@
 | T24.1 | ✅ | mise 2026.6.11，node 18/20/22/24 + pnpm 8/9/10/11 预装 |
 | T24.2 | ✅ | 默认 node v24.16.0, pnpm 10.34.3, registry=npmmirror |
 | T28.1 | ✅ | 沙箱对象缓存命中：首次 0.94s → 后续 ~0.13s（7x 加速） |
+| T28.2 | ✅ | 并发请求绕过 lock：5 个并发 554ms |
+| T28.3 | ✅ | 缓存 TTL 过期：首次 0.91s → 缓存 0.17s → 过期后 0.18s → 重新缓存 0.20s |
+| T28.5 | ✅ | Watchdog 标记超时工具：25s 内 stuck part 标记 error |
+| T28.6 | ✅ | 沙箱销毁后缓存失效：kill 后重建 0.85s → 重新缓存 0.12s |
 
 ### Agent 权限（会话级动态配置）
 
