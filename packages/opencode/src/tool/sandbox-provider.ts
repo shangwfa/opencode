@@ -1,4 +1,4 @@
-import { Effect, Context, Layer, Cause, Deferred, Ref, Semaphore, Schedule } from "effect"
+import { Effect, Context, Layer, Cause, Deferred, Ref, Semaphore, Schedule, Duration } from "effect"
 import { Sandbox, ConnectionConfig } from "@alibaba-group/opensandbox"
 import type { CommandExecution, Volume } from "@alibaba-group/opensandbox"
 import { and, eq, lt } from "drizzle-orm"
@@ -496,6 +496,26 @@ export namespace SandboxProvider {
       const config = yield* SandboxConfig.Service
       const commandSemaphores = new Map<string, Semaphore.Semaphore>()
       const createRef = yield* Ref.make(new Map<string, Deferred.Deferred<Sandbox, Error>>())
+      const sbCache = new Map<string, { sb: Sandbox; cachedAt: number; sandboxID: string }>()
+      const SB_CACHE_TTL_MS = 30_000
+
+      function getCachedSandbox(sessionID: string): Sandbox | null {
+        const hit = sbCache.get(sessionID)
+        if (!hit) return null
+        if (Date.now() - hit.cachedAt > SB_CACHE_TTL_MS) {
+          sbCache.delete(sessionID)
+          return null
+        }
+        return hit.sb
+      }
+
+      function invalidateCachedSandbox(sessionID: string) {
+        sbCache.delete(sessionID)
+      }
+
+      function cacheSandbox(sessionID: string, sb: Sandbox) {
+        sbCache.set(sessionID, { sb, cachedAt: Date.now(), sandboxID: sb.id })
+      }
 
       const connectionConfig = new ConnectionConfig({
         domain: config.domain,
@@ -744,8 +764,8 @@ export namespace SandboxProvider {
 
       function destroySandbox(sb: Sandbox, sessionID: string) {
         return Effect.gen(function* () {
+          invalidateCachedSandbox(sessionID)
           log.info("destroying sandbox", { sessionID, sandboxID: sb.id })
-          commandSemaphores.delete(sessionID)
           const row = yield* dbGet(sessionID).pipe(Effect.orElseSucceed(() => null))
           if (row?.id === sb.id && row.command_session_id) {
             yield* Effect.tryPromise(() => sb.commands.deleteSession(row.command_session_id!)).pipe(
@@ -783,6 +803,12 @@ export namespace SandboxProvider {
 
       function getOrCreateUnlocked(sessionID: SessionID, opts?: { pvcMode?: "session" | "app"; appId?: string }) {
         return Effect.gen(function* () {
+          const cached = getCachedSandbox(sessionID)
+          if (cached) return cached
+
+          const t0 = Date.now()
+          log.info("getOrCreate start", { sessionID })
+
           // pod 内去重
           const myToken = yield* Deferred.make<Sandbox, Error>()
           const winner = yield* claim(createRef, sessionID, myToken)
@@ -829,12 +855,24 @@ export namespace SandboxProvider {
           }
           yield* Ref.modify(createRef, (m) => { m.delete(sessionID); return [undefined, m] as const })
           yield* Deferred.succeed(myToken, sb)
+          cacheSandbox(sessionID, sb)
+          log.info("getOrCreate done", { sessionID, sandboxID: sb.id, totalMs: Date.now() - t0 })
           return sb
         })
       }
 
       const getOrCreate: Interface["getOrCreate"] = (sessionID, opts) =>
-        lock(sessionID, getOrCreateUnlocked(sessionID, opts)).pipe(Effect.orDie, Effect.withSpan("SandboxProvider.getOrCreate"))
+        Effect.gen(function* () {
+          const cached = getCachedSandbox(sessionID)
+          if (cached) return cached
+          return yield* lock(sessionID, getOrCreateUnlocked(sessionID, opts)).pipe(
+            Effect.timeoutOrElse({
+              duration: Duration.seconds(90),
+              orElse: () => Effect.fail(new Error(`Sandbox getOrCreate timeout after 90s: ${sessionID}`)),
+            }),
+            Effect.orDie,
+          )
+        }).pipe(Effect.withSpan("SandboxProvider.getOrCreate"))
 
       const get: Interface["get"] = (sessionID) =>
         Effect.gen(function* () {
@@ -850,6 +888,7 @@ export namespace SandboxProvider {
 
       const destroy: Interface["destroy"] = (sessionID) =>
         lock(sessionID, Effect.gen(function* () {
+          invalidateCachedSandbox(sessionID)
           const inFlight = yield* Ref.modify(createRef, (m) => {
             const d = m.get(sessionID)
             if (d) m.delete(sessionID)
@@ -875,6 +914,7 @@ export namespace SandboxProvider {
         Effect.gen(function* () {
           const row = yield* dbGetById(sandboxID).pipe(Effect.orElseSucceed(() => null))
           if (!row || row.state !== "running") return
+          invalidateCachedSandbox(row.session_id)
           yield* lock(row.session_id, Effect.gen(function* () {
             const current = yield* dbGetById(sandboxID).pipe(Effect.orElseSucceed(() => null))
             if (!current || current.id !== sandboxID || current.state !== "running") return
@@ -896,6 +936,7 @@ export namespace SandboxProvider {
 
       const destroyAll: Interface["destroyAll"] = () =>
         Effect.gen(function* () {
+          sbCache.clear()
           const inFlightCreates = yield* Ref.modify(createRef, (m) => { const e = Array.from(m.entries()); m.clear(); return [e, m] as const })
           for (const [, d] of inFlightCreates) yield* Deferred.fail(d, new Error("Sandbox destroyed during shutdown"))
           const rows = yield* dbAll().pipe(Effect.orElseSucceed(() => [] as any[]))
@@ -951,8 +992,9 @@ export namespace SandboxProvider {
         })
 
       const runInSession: Interface["runInSession"] = (sessionID, command, options, handlers, signal) =>
-        lock(sessionID, Effect.gen(function* () {
-          const sb = yield* getOrCreateUnlocked(sessionID)
+        Effect.gen(function* () {
+          const cached = getCachedSandbox(sessionID)
+          const sb = cached ?? (yield* lock(sessionID, getOrCreateUnlocked(sessionID)))
 
           // Semaphore 提前初始化，保护 createSession + runInSession 全流程
           // 防止并发请求同时发现 command_session_id=null 而重复创建 shell session
@@ -979,7 +1021,7 @@ export namespace SandboxProvider {
               catch: (e) => new Error(`runInSession failed: ${String(e)}`),
             })
           }))
-        })).pipe(Effect.withSpan("SandboxProvider.runInSession"))
+        }).pipe(Effect.withSpan("SandboxProvider.runInSession"))
 
       const runDetached: Interface["runDetached"] = (sessionID, command, options, handlers, signal) =>
         Effect.gen(function* () {
@@ -1104,7 +1146,14 @@ export namespace SandboxProvider {
         )
       })
 
-      yield* Effect.addFinalizer(() => Effect.sync(() => commandSemaphores.clear()))
+      yield* Effect.addFinalizer(() =>
+        destroyAll().pipe(
+          Effect.catchCause((cause) => {
+            log.error("sandbox cleanup on scope exit failed", { cause: Cause.pretty(cause) })
+            return Effect.void
+          }),
+        ),
+      )
 
       return Service.of({
         getOrCreate, get, destroy, destroyById, destroyAll, keepAlive, release, isKeepAlive,
