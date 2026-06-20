@@ -272,10 +272,7 @@ export namespace Billing {
         },
         payment_method_options: {
           card: {
-            setup_future_usage: "off_session",
-          },
-          link: {
-            setup_future_usage: "off_session",
+            setup_future_usage: "on_session",
           },
         },
         //payment_method_data: {

@@ -1,5 +1,4 @@
 import { Binary } from "@opencode-ai/core/util/binary"
-import { createMemo } from "solid-js"
 import { useServerSync } from "./server-sync"
 import { useSDK } from "./sdk"
 import type { Message, Part } from "@opencode-ai/sdk/v2/client"
@@ -113,7 +112,5 @@ export const useSync = () => {
   const serverSync = useServerSync()
   const sdk = useSDK()
 
-  return createMemo(() => serverSync().createDirSyncContext(sdk().directory))
+  return serverSync.createDirSyncContext(sdk.directory)
 }
-
-export type DirectorySync = ReturnType<ReturnType<typeof useSync>>

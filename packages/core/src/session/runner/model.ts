@@ -8,9 +8,6 @@ import { Auth, type AnyRoute } from "@opencode-ai/llm/route"
 import { Context, Effect, Layer, Option, Schema } from "effect"
 import { produce } from "immer"
 import { Catalog } from "../../catalog"
-import { Credential } from "../../credential"
-import { Integration } from "../../integration"
-import { IntegrationConnection } from "../../integration/connection"
 import { ModelV2 } from "../../model"
 import { ModelRequest } from "../../model-request"
 import { PluginBoot } from "../../plugin/boot"
@@ -48,12 +45,10 @@ export class Service extends Context.Service<Service, Interface>()("@opencode/v2
 /** Test or embedding seam for supplying a model resolver directly. */
 export const layerWith = (resolve: Interface["resolve"]) => Layer.succeed(Service, Service.of({ resolve }))
 
-const apiKey = (model: ModelV2.Info, connection?: IntegrationConnection.Info, credential?: Credential.Stored) => {
-  if (credential?.value.type === "key") return Auth.value(credential.value.key)
-  if (credential?.value.type === "oauth") return Auth.value(credential.value.access)
+const apiKey = (model: ModelV2.Info, provider?: ProviderV2.Info) => {
   const value = model.request.body.apiKey ?? model.api.settings?.apiKey
   if (typeof value === "string") return Auth.value(value)
-  return connection?.type === "env" ? Auth.config(connection.name) : undefined
+  return provider?.enabled !== false && provider?.enabled.via === "env" ? Auth.config(provider.enabled.name) : undefined
 }
 
 const withDefaults = (model: ModelV2.Info, route: AnyRoute) => {
@@ -88,48 +83,41 @@ const apiName = (model: ModelV2.Info) =>
 
 export const fromCatalogModel = (
   model: ModelV2.Info,
-  connection?: IntegrationConnection.Info,
-  credential?: Credential.Stored,
+  provider?: ProviderV2.Info,
 ): Effect.Effect<Model, UnsupportedApiError> => {
-  const resolved =
-    credential?.value.metadata === undefined
-      ? model
-      : produce(model, (draft) => {
-          Object.assign(draft.request.body, credential.value.metadata)
-        })
-  const key = apiKey(resolved, connection, credential)
-  if (resolved.api.type === "aisdk" && resolved.api.package === "@ai-sdk/openai") {
+  const key = apiKey(model, provider)
+  if (model.api.type === "aisdk" && model.api.package === "@ai-sdk/openai") {
     return Effect.succeed(
-      withDefaults(resolved, OpenAIResponses.route)
+      withDefaults(model, OpenAIResponses.route)
         .with({ auth: key === undefined ? Auth.none : Auth.bearer(key) })
-        .model({ id: resolved.api.id }),
+        .model({ id: model.api.id }),
     )
   }
-  if (resolved.api.type === "aisdk" && resolved.api.package === "@ai-sdk/anthropic") {
+  if (model.api.type === "aisdk" && model.api.package === "@ai-sdk/anthropic") {
     return Effect.succeed(
-      withDefaults(resolved, AnthropicMessages.route)
+      withDefaults(model, AnthropicMessages.route)
         .with({ auth: key === undefined ? Auth.none : Auth.header("x-api-key", key) })
-        .model({ id: resolved.api.id }),
+        .model({ id: model.api.id }),
     )
   }
-  if (resolved.api.type === "aisdk" && resolved.api.package === "@ai-sdk/openai-compatible" && resolved.api.url) {
+  if (model.api.type === "aisdk" && model.api.package === "@ai-sdk/openai-compatible" && model.api.url) {
     return Effect.succeed(
-      withDefaults(resolved, OpenAICompatibleChat.route)
+      withDefaults(model, OpenAICompatibleChat.route)
         .with({ auth: key === undefined ? Auth.none : Auth.bearer(key) })
-        .model({ id: resolved.api.id }),
+        .model({ id: model.api.id }),
     )
   }
   return Effect.fail(
     new UnsupportedApiError({
-      providerID: resolved.providerID,
-      modelID: resolved.id,
-      api: apiName(resolved),
+      providerID: model.providerID,
+      modelID: model.id,
+      api: apiName(model),
     }),
   )
 }
 
-export const resolve = (session: SessionSchema.Info, model: ModelV2.Info) =>
-  fromCatalogModel(withVariant(model, session.model?.variant))
+export const resolve = (session: SessionSchema.Info, model: ModelV2.Info, provider?: ProviderV2.Info) =>
+  fromCatalogModel(withVariant(model, session.model?.variant), provider)
 
 export const supported = (model: ModelV2.Info) =>
   model.api.type === "aisdk" &&
@@ -142,8 +130,6 @@ export const locationLayer = Layer.effect(
   Service,
   Effect.gen(function* () {
     const catalog = yield* Catalog.Service
-    const credentials = yield* Credential.Service
-    const integrations = yield* Integration.Service
     const boot = yield* PluginBoot.Service
     return Service.of({
       resolve: Effect.fn("SessionRunnerModel.resolve")(function* (session) {
@@ -154,12 +140,7 @@ export const locationLayer = Layer.effect(
           : (Option.getOrUndefined((yield* catalog.model.default()).pipe(Option.filter(supported))) ??
             (yield* catalog.model.available()).find(supported))
         if (!selected) return yield* new ModelNotSelectedError({ sessionID: session.id })
-        const connection = yield* integrations.connection.forIntegration(Integration.ID.make(selected.providerID))
-        return yield* fromCatalogModel(
-          withVariant(selected, session.model?.variant),
-          connection,
-          connection?.type === "credential" ? yield* credentials.get(connection.id) : undefined,
-        )
+        return yield* resolve(session, selected, yield* catalog.provider.get(selected.providerID))
       }),
     })
   }),

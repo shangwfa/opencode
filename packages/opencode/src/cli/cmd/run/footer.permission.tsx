@@ -96,6 +96,7 @@ export function RejectField(props: {
 
   return (
     <textarea
+      id="run-direct-footer-permission-reject"
       width="100%"
       minHeight={1}
       maxHeight={3}
@@ -257,8 +258,15 @@ export function RunPermissionBody(props: {
   })
 
   return (
-    <box width="100%" height="100%" flexDirection="column" backgroundColor={props.theme.surface}>
+    <box
+      id="run-direct-footer-permission-body"
+      width="100%"
+      height="100%"
+      flexDirection="column"
+      backgroundColor={props.theme.surface}
+    >
       <box
+        id="run-direct-footer-permission-head"
         flexDirection="column"
         gap={1}
         paddingLeft={1}
@@ -295,6 +303,7 @@ export function RunPermissionBody(props: {
         fallback={
           <box width="100%" flexGrow={1} flexShrink={1} justifyContent="flex-end">
             <box
+              id="run-direct-footer-permission-reject-bar"
               flexDirection={narrow() ? "column" : "row"}
               flexShrink={0}
               backgroundColor={props.theme.line}
@@ -424,6 +433,7 @@ export function RunPermissionBody(props: {
         </box>
 
         <box
+          id="run-direct-footer-permission-actions"
           flexDirection={narrow() ? "column" : "row"}
           flexShrink={0}
           backgroundColor={props.theme.pane}

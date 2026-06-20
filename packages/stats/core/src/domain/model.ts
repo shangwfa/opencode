@@ -74,14 +74,7 @@ export class ModelStatRepo extends Context.Service<ModelStatRepo, ModelStatRepo.
                 totalCostMicrocents: modelStat.total_cost_microcents,
               })
               .from(modelStat)
-              .where(
-                and(
-                  eq(modelStat.grain, "day"),
-                  eq(modelStat.client, "all"),
-                  eq(modelStat.source, "all"),
-                  inArray(modelStat.tier, ["Go", "go"]),
-                ),
-              )
+              .where(and(eq(modelStat.grain, "day"), eq(modelStat.client, "all"), eq(modelStat.source, "all")))
               .orderBy(asc(modelStat.period_key)),
           catch: (cause) => DatabaseError.make({ cause }),
         })

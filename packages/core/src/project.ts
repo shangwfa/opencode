@@ -2,41 +2,60 @@ export * as ProjectV2 from "./project"
 export * as Project from "./project"
 
 import { Context, Effect, Layer, Schema } from "effect"
+import { asc, desc, eq } from "drizzle-orm"
 import path from "path"
-import { AbsolutePath } from "./schema"
+import { AbsolutePath, withStatics } from "./schema"
 import { FSUtil } from "./fs-util"
+import { Database } from "./database/database"
 import { Git } from "./git"
 import { LayerNode } from "./effect/layer-node"
 import { Hash } from "./util/hash"
-import { ProjectDirectories } from "./project/directories"
-import { ProjectSchema } from "./project/schema"
+import { ProjectDirectoryTable } from "./project/sql"
 
-export const ID = ProjectSchema.ID
-export type ID = ProjectSchema.ID
+export const ID = Schema.String.pipe(
+  Schema.brand("Project.ID"),
+  withStatics((schema) => ({
+    global: schema.make("global"),
+  })),
+)
+export type ID = typeof ID.Type
 
-export const Vcs = ProjectSchema.Vcs
-export type Vcs = ProjectSchema.Vcs
+export const Vcs = Schema.Union([
+  Schema.Struct({
+    type: Schema.Literal("git"),
+    store: AbsolutePath,
+  }),
+])
+export type Vcs = typeof Vcs.Type
 
 export class Info extends Schema.Class<Info>("Project.Info")({
   id: ID,
 }) {}
 
-export const DirectoriesInput = ProjectDirectories.ListInput
+export const DirectoriesInput = Schema.Struct({
+  projectID: ID,
+}).annotate({ identifier: "Project.DirectoriesInput" })
 export type DirectoriesInput = typeof DirectoriesInput.Type
 
-export const Directories = ProjectDirectories.ListOutput
+export const Directories = Schema.Array(
+  Schema.Struct({
+    directory: AbsolutePath,
+    type: Schema.Literals(["main", "root", "git_worktree"]),
+  }),
+).annotate({ identifier: "Project.Directories" })
 export type Directories = typeof Directories.Type
-
-export interface Resolved {
-  readonly previous?: ID
-  readonly id: ID
-  readonly directory: AbsolutePath
-  readonly vcs?: Vcs
-}
 
 export interface Interface {
   readonly directories: (input: DirectoriesInput) => Effect.Effect<Directories>
-  readonly resolve: (input: AbsolutePath) => Effect.Effect<Resolved>
+  readonly resolve: (input: AbsolutePath) => Effect.Effect<
+    {
+      previous?: ID
+      id: ID
+      directory: AbsolutePath
+      vcs?: Vcs
+    },
+    never
+  >
   /**
    * Temporary bridge method for writing the resolved project ID to the repo-local cache.
    *
@@ -54,12 +73,19 @@ export class Service extends Context.Service<Service, Interface>()("@opencode/Pr
 export const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
+    const db = (yield* Database.Service).db
     const fs = yield* FSUtil.Service
     const git = yield* Git.Service
-    const projectDirectories = yield* ProjectDirectories.Service
 
     const directories = Effect.fn("Project.directories")(function* (input: DirectoriesInput) {
-      return yield* projectDirectories.list(input.projectID)
+      const rows = yield* db
+        .select({ directory: ProjectDirectoryTable.directory, type: ProjectDirectoryTable.type })
+        .from(ProjectDirectoryTable)
+        .where(eq(ProjectDirectoryTable.project_id, input.projectID))
+        .orderBy(desc(ProjectDirectoryTable.time_created), asc(ProjectDirectoryTable.directory))
+        .all()
+        .pipe(Effect.orDie)
+      return rows.map((row) => ({ directory: AbsolutePath.make(row.directory), type: row.type }))
     })
 
     const cached = Effect.fnUntraced(function* (dir: string) {
@@ -130,8 +156,8 @@ export const layer = Layer.effect(
 )
 
 export const defaultLayer = layer.pipe(
+  Layer.provide(Database.defaultLayer),
   Layer.provide(FSUtil.defaultLayer),
   Layer.provide(Git.defaultLayer),
-  Layer.provideMerge(ProjectDirectories.defaultLayer),
 )
-export const node = LayerNode.make(layer, [FSUtil.node, Git.node, ProjectDirectories.node])
+export const node = LayerNode.make(layer, [Database.node, FSUtil.node, Git.node])

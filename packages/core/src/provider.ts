@@ -2,6 +2,7 @@ export * as ProviderV2 from "./provider"
 
 import { withStatics } from "./schema"
 import { Schema } from "effect"
+import { Credential } from "./credential"
 
 export const ID = Schema.String.pipe(
   Schema.brand("ProviderV2.ID"),
@@ -47,7 +48,22 @@ export type Request = typeof Request.Type
 export class Info extends Schema.Class<Info>("ProviderV2.Info")({
   id: ID,
   name: Schema.String,
-  disabled: Schema.Boolean.pipe(Schema.optional),
+  enabled: Schema.Union([
+    Schema.Literal(false),
+    Schema.Struct({
+      via: Schema.Literal("env"),
+      name: Schema.String,
+    }),
+    Schema.Struct({
+      via: Schema.Literal("credential"),
+      credentialID: Credential.ID,
+    }),
+    Schema.Struct({
+      via: Schema.Literal("custom"),
+      data: Schema.Record(Schema.String, Schema.Any),
+    }),
+  ]),
+  env: Schema.String.pipe(Schema.Array),
   api: Api,
   request: Request,
 }) {
@@ -55,6 +71,8 @@ export class Info extends Schema.Class<Info>("ProviderV2.Info")({
     return new Info({
       id: providerID,
       name: providerID,
+      enabled: false,
+      env: [],
       api: {
         type: "native",
         settings: {},

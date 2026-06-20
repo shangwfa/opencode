@@ -4,7 +4,6 @@ import {
   parseJwtClaims,
   extractAccountIdFromClaims,
   extractAccountId,
-  renderOAuthError,
   type IdTokenClaims,
 } from "../../src/plugin/openai/codex"
 
@@ -15,14 +14,6 @@ function createTestJwt(payload: object): string {
 }
 
 describe("plugin.codex", () => {
-  test("escapes provider errors in callback HTML", () => {
-    const error = `</div><script>alert("xss" & 'more')</script>`
-    const html = renderOAuthError(error)
-
-    expect(html).toContain("&lt;/div&gt;&lt;script&gt;alert(&quot;xss&quot; &amp; &#39;more&#39;)&lt;/script&gt;")
-    expect(html).not.toContain(error)
-  })
-
   describe("parseJwtClaims", () => {
     test("parses valid JWT with claims", () => {
       const payload = { email: "test@example.com", chatgpt_account_id: "acc-123" }

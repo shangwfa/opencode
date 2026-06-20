@@ -11,10 +11,6 @@ export function useNavigate() {
   return () => undefined
 }
 
-export function useSearchParams<T extends Record<string, string>>() {
-  return [{} as Partial<T>, () => undefined] as const
-}
-
 export function useLocation() {
   return {
     pathname: "/story/session/story-session",

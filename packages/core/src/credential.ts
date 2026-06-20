@@ -1,12 +1,17 @@
 export * as Credential from "./credential"
 
-import { asc, eq } from "drizzle-orm"
-import { Context, Effect, Layer, Schema } from "effect"
+import { and, asc, eq, ne } from "drizzle-orm"
+import { Context, Effect, Layer, Option, Schema } from "effect"
 import { Database } from "./database/database"
-import { IntegrationSchema } from "./integration/schema"
+import { ConnectorSchema } from "./connector/schema"
+import { EventV2 } from "./event"
 import { NonNegativeInt, withStatics } from "./schema"
-import { Identifier } from "./util/identifier"
 import { CredentialTable } from "./credential/sql"
+import { Identifier } from "./util/identifier"
+import { FSUtil } from "./fs-util"
+import { Global } from "./global"
+import { DataMigrationTable } from "./data-migration.sql"
+import path from "path"
 
 export const ID = Schema.String.pipe(
   Schema.brand("Credential.ID"),
@@ -16,7 +21,6 @@ export type ID = typeof ID.Type
 
 export class OAuth extends Schema.Class<OAuth>("Credential.OAuth")({
   type: Schema.Literal("oauth"),
-  methodID: IntegrationSchema.MethodID,
   refresh: Schema.String,
   access: Schema.String,
   expires: NonNegativeInt,
@@ -29,35 +33,70 @@ export class Key extends Schema.Class<Key>("Credential.Key")({
   metadata: Schema.optional(Schema.Record(Schema.String, Schema.String)),
 }) {}
 
-export const Info = Schema.Union([OAuth, Key])
+export const Value = Schema.Union([OAuth, Key])
   .pipe(Schema.toTaggedUnion("type"))
-  .annotate({ identifier: "Credential.Info" })
-export type Info = Schema.Schema.Type<typeof Info>
+  .annotate({ identifier: "Credential.Value" })
+export type Value = Schema.Schema.Type<typeof Value>
 
-export class Stored extends Schema.Class<Stored>("Credential.Stored")({
+const LegacyOAuth = Schema.Struct({
+  type: Schema.Literal("oauth"),
+  refresh: Schema.String,
+  access: Schema.String,
+  expires: NonNegativeInt,
+  accountId: Schema.optional(Schema.String),
+  enterpriseUrl: Schema.optional(Schema.String),
+})
+
+const LegacyKey = Schema.Struct({
+  type: Schema.Literal("api"),
+  key: Schema.String,
+  metadata: Schema.optional(Schema.Record(Schema.String, Schema.String)),
+})
+
+const LegacyValue = Schema.Union([LegacyOAuth, LegacyKey])
+
+export class Info extends Schema.Class<Info>("Credential.Info")({
   id: ID,
-  integrationID: IntegrationSchema.ID,
+  connectorID: ConnectorSchema.ID,
+  methodID: ConnectorSchema.MethodID,
   label: Schema.String,
-  value: Info,
+  value: Value,
 }) {}
 
+export const Event = {
+  Added: EventV2.define({
+    type: "credential.added",
+    schema: { credential: Info },
+  }),
+  Removed: EventV2.define({
+    type: "credential.removed",
+    schema: { credential: Info },
+  }),
+  Switched: EventV2.define({
+    type: "credential.switched",
+    schema: {
+      connectorID: ConnectorSchema.ID,
+      from: Schema.optional(ID),
+      to: Schema.optional(ID),
+    },
+  }),
+}
+
 export interface Interface {
-  /** Returns every stored credential. */
-  readonly all: () => Effect.Effect<Stored[]>
-  /** Returns stored credentials belonging to one integration. */
-  readonly list: (integrationID: IntegrationSchema.ID) => Effect.Effect<Stored[]>
-  /** Returns one stored credential by ID. */
-  readonly get: (id: ID) => Effect.Effect<Stored | undefined>
-  /** Replaces any credential for an integration and returns the new record. */
+  readonly get: (id: ID) => Effect.Effect<Info | undefined>
+  readonly all: () => Effect.Effect<Info[]>
   readonly create: (input: {
-    readonly integrationID: IntegrationSchema.ID
-    readonly value: Info
-    readonly label?: string
-  }) => Effect.Effect<Stored>
-  /** Updates the label or secret value of a stored credential. */
-  readonly update: (id: ID, updates: Partial<Pick<Stored, "label" | "value">>) => Effect.Effect<void>
-  /** Removes a stored credential. */
+    connectorID: ConnectorSchema.ID
+    methodID: ConnectorSchema.MethodID
+    value: Value
+    label?: string
+  }) => Effect.Effect<Info>
+  readonly update: (id: ID, updates: Partial<Pick<Info, "label" | "value">>) => Effect.Effect<void>
   readonly remove: (id: ID) => Effect.Effect<void>
+  readonly activate: (id: ID) => Effect.Effect<void>
+  readonly active: (connectorID: ConnectorSchema.ID) => Effect.Effect<Info | undefined>
+  readonly activeAll: () => Effect.Effect<Map<ConnectorSchema.ID, Info>>
+  readonly forConnector: (connectorID: ConnectorSchema.ID) => Effect.Effect<Info[]>
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/v2/Credential") {}
@@ -130,71 +169,119 @@ export const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
     const { db } = yield* Database.Service
-    const decode = Schema.decodeUnknownSync(Info)
-    const stored = (row: typeof CredentialTable.$inferSelect) => {
-      if (!row.integration_id) return
-      return new Stored({
+    const events = yield* EventV2.Service
+    const decodeValue = Schema.decodeUnknownSync(Value)
+    const info = (row: typeof CredentialTable.$inferSelect) =>
+      new Info({
         id: row.id,
-        integrationID: row.integration_id,
+        connectorID: row.connector_id,
+        methodID: row.method_id,
         label: row.label,
-        value: decode(row.value),
+        value: decodeValue(row.value),
       })
-    }
+
+    const activate = Effect.fn("Credential.activate")(function* (id: ID) {
+      const switched = yield* db
+        .transaction((tx) =>
+          Effect.gen(function* () {
+            const credential = yield* tx.select().from(CredentialTable).where(eq(CredentialTable.id, id)).get()
+            if (!credential || credential.active) return
+            const current = yield* tx
+              .select({ id: CredentialTable.id })
+              .from(CredentialTable)
+              .where(and(eq(CredentialTable.connector_id, credential.connector_id), eq(CredentialTable.active, true)))
+              .get()
+            yield* tx
+              .update(CredentialTable)
+              .set({ active: false })
+              .where(eq(CredentialTable.connector_id, credential.connector_id))
+              .run()
+            yield* tx.update(CredentialTable).set({ active: true }).where(eq(CredentialTable.id, id)).run()
+            return { connectorID: credential.connector_id, from: current?.id, to: id }
+          }),
+        )
+        .pipe(Effect.orDie)
+      if (switched) yield* events.publish(Event.Switched, switched)
+    })
 
     return Service.of({
+      get: Effect.fn("Credential.get")(function* (id) {
+        const row = yield* db.select().from(CredentialTable).where(eq(CredentialTable.id, id)).get().pipe(Effect.orDie)
+        return row ? info(row) : undefined
+      }),
       all: Effect.fn("Credential.all")(function* () {
         return (yield* db
           .select()
           .from(CredentialTable)
           .orderBy(asc(CredentialTable.time_created))
           .all()
-          .pipe(Effect.orDie)).flatMap((row) => {
-          const credential = stored(row)
-          return credential ? [credential] : []
-        })
+          .pipe(Effect.orDie)).map(info)
       }),
-      list: Effect.fn("Credential.list")(function* (integrationID) {
+      active: Effect.fn("Credential.active")(function* (connectorID) {
+        const row = yield* db
+          .select()
+          .from(CredentialTable)
+          .where(and(eq(CredentialTable.connector_id, connectorID), eq(CredentialTable.active, true)))
+          .get()
+          .pipe(Effect.orDie)
+        return row ? info(row) : undefined
+      }),
+      activeAll: Effect.fn("Credential.activeAll")(function* () {
+        const rows = yield* db
+          .select()
+          .from(CredentialTable)
+          .where(eq(CredentialTable.active, true))
+          .all()
+          .pipe(Effect.orDie)
+        return new Map(rows.map((row) => [row.connector_id, info(row)]))
+      }),
+      forConnector: Effect.fn("Credential.forConnector")(function* (connectorID) {
         return (yield* db
           .select()
           .from(CredentialTable)
-          .where(eq(CredentialTable.integration_id, integrationID))
+          .where(eq(CredentialTable.connector_id, connectorID))
           .orderBy(asc(CredentialTable.time_created))
           .all()
-          .pipe(Effect.orDie)).flatMap((row) => {
-          const credential = stored(row)
-          return credential ? [credential] : []
-        })
-      }),
-      get: Effect.fn("Credential.get")(function* (id) {
-        const row = yield* db.select().from(CredentialTable).where(eq(CredentialTable.id, id)).get().pipe(Effect.orDie)
-        return row ? stored(row) : undefined
+          .pipe(Effect.orDie)).map(info)
       }),
       create: Effect.fn("Credential.create")(function* (input) {
-        const credential = new Stored({
+        const credential = new Info({
           id: ID.create(),
-          integrationID: input.integrationID,
+          connectorID: input.connectorID,
+          methodID: input.methodID,
           label: input.label ?? "default",
           value: input.value,
         })
-        yield* db
+        const from = yield* db
           .transaction((tx) =>
             Effect.gen(function* () {
+              const current = yield* tx
+                .select({ id: CredentialTable.id })
+                .from(CredentialTable)
+                .where(and(eq(CredentialTable.connector_id, input.connectorID), eq(CredentialTable.active, true)))
+                .get()
               yield* tx
-                .delete(CredentialTable)
-                .where(eq(CredentialTable.integration_id, credential.integrationID))
+                .update(CredentialTable)
+                .set({ active: false })
+                .where(eq(CredentialTable.connector_id, input.connectorID))
                 .run()
               yield* tx
                 .insert(CredentialTable)
                 .values({
                   id: credential.id,
-                  integration_id: credential.integrationID,
+                  connector_id: credential.connectorID,
+                  method_id: credential.methodID,
                   label: credential.label,
                   value: credential.value,
+                  active: true,
                 })
                 .run()
+              return current?.id
             }),
           )
           .pipe(Effect.orDie)
+        yield* events.publish(Event.Added, { credential })
+        yield* events.publish(Event.Switched, { connectorID: credential.connectorID, from, to: credential.id })
         return credential
       }),
       update: Effect.fn("Credential.update")(function* (id, updates) {
@@ -207,10 +294,50 @@ export const layer = Layer.effect(
           .pipe(Effect.orDie)
       }),
       remove: Effect.fn("Credential.remove")(function* (id) {
-        yield* db.delete(CredentialTable).where(eq(CredentialTable.id, id)).run().pipe(Effect.orDie)
+        const removed = yield* db
+          .transaction((tx) =>
+            Effect.gen(function* () {
+              const row = yield* tx.select().from(CredentialTable).where(eq(CredentialTable.id, id)).get()
+              if (!row) return
+              yield* tx.delete(CredentialTable).where(eq(CredentialTable.id, id)).run()
+              if (!row.active) return { credential: info(row) }
+              const replacement = yield* tx
+                .select()
+                .from(CredentialTable)
+                .where(and(eq(CredentialTable.connector_id, row.connector_id), ne(CredentialTable.id, id)))
+                .orderBy(asc(CredentialTable.time_created))
+                .get()
+              if (replacement) {
+                yield* tx
+                  .update(CredentialTable)
+                  .set({ active: true })
+                  .where(eq(CredentialTable.id, replacement.id))
+                  .run()
+              }
+              return {
+                credential: info(row),
+                switched: { connectorID: row.connector_id, from: id, to: replacement?.id },
+              }
+            }),
+          )
+          .pipe(Effect.orDie)
+        if (!removed) return
+        yield* events.publish(Event.Removed, { credential: removed.credential })
+        if (removed.switched) yield* events.publish(Event.Switched, removed.switched)
       }),
+      activate,
     })
   }),
 )
 
-export const defaultLayer = layer.pipe(Layer.provide(Database.defaultLayer))
+export const defaultLayer = layer.pipe(
+  Layer.provide(Database.defaultLayer),
+  Layer.provide(EventV2.defaultLayer),
+  Layer.provideMerge(
+    legacyImportLayer.pipe(
+      Layer.provide(Database.defaultLayer),
+      Layer.provide(FSUtil.defaultLayer),
+      Layer.provide(Global.defaultLayer),
+    ),
+  ),
+)

@@ -362,8 +362,7 @@ export function Autocomplete(props: {
       const text = `${res.name} (${res.uri})`
       options.push({
         display: Locale.truncateMiddle(text, width),
-        // Match the name only; matching the URI caused unrelated fuzzy hits.
-        value: res.name,
+        value: text,
         description: res.description,
         onSelect: () => {
           insertPart(res.name, {
@@ -493,8 +492,7 @@ export function Autocomplete(props: {
       .go(removeLineRange(searchValue), nonFileOptions, {
         keys: [
           (obj) => removeLineRange((obj.value ?? obj.display).trimEnd()),
-          // Match description for slash commands only; for "@" it surfaced unrelated items.
-          ...(store.visible === "/" ? ["description" as const] : []),
+          "description",
           (obj) => obj.aliases?.join(" ") ?? "",
         ],
         limit: 10,

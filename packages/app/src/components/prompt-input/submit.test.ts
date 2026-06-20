@@ -26,22 +26,6 @@ let selected = "/repo/worktree-a"
 let variant: string | undefined
 
 const promptValue: Prompt = [{ type: "text", content: "ls", start: 0, end: 2 }]
-const prompt = {
-  ready: () => Object.assign(() => true, { promise: Promise.resolve(true) }),
-  current: () => promptValue,
-  cursor: () => 0,
-  dirty: () => true,
-  reset: () => undefined,
-  set: () => undefined,
-  context: {
-    add: () => undefined,
-    remove: () => undefined,
-    removeComment: () => undefined,
-    updateComment: () => undefined,
-    replaceComments: () => undefined,
-    items: () => [],
-  },
-}
 
 const clientFor = (directory: string) => {
   createdClients.push(directory)
@@ -89,7 +73,6 @@ beforeAll(async () => {
   }))
 
   mock.module("@opencode-ai/ui/toast", () => ({
-    Toast: { Region: () => null },
     showToast: () => 0,
   }))
 
@@ -133,7 +116,16 @@ beforeAll(async () => {
   }))
 
   mock.module("@/context/prompt", () => ({
-    usePrompt: () => prompt,
+    usePrompt: () => ({
+      current: () => promptValue,
+      reset: () => undefined,
+      set: () => undefined,
+      context: {
+        add: () => undefined,
+        remove: () => undefined,
+        items: () => [],
+      },
+    }),
   }))
 
   mock.module("@/context/layout", () => ({
@@ -155,12 +147,12 @@ beforeAll(async () => {
           return clientFor(opts.directory)
         },
       }
-      return () => sdk
+      return sdk
     },
   }))
 
   mock.module("@/context/sync", () => ({
-    useSync: () => () => ({
+    useSync: () => ({
       data: { command: [] },
       session: {
         optimistic: {
@@ -184,7 +176,7 @@ beforeAll(async () => {
   }))
 
   mock.module("@/context/server-sync", () => ({
-    useServerSync: () => () => ({
+    useServerSync: () => ({
       child: (directory: string) => {
         syncedDirectories.push(directory)
         storedSessions[directory] ??= []
@@ -240,7 +232,6 @@ beforeEach(() => {
 describe("prompt submit worktree selection", () => {
   test("reads the latest worktree accessor value per submit", async () => {
     const submit = createPromptSubmit({
-      prompt,
       info: () => undefined,
       imageAttachments: () => [],
       commentCount: () => 0,
@@ -278,7 +269,6 @@ describe("prompt submit worktree selection", () => {
 
   test("applies auto-accept to newly created sessions", async () => {
     const submit = createPromptSubmit({
-      prompt,
       info: () => undefined,
       imageAttachments: () => [],
       commentCount: () => 0,
@@ -309,7 +299,6 @@ describe("prompt submit worktree selection", () => {
     variant = "high"
 
     const submit = createPromptSubmit({
-      prompt,
       info: () => ({ id: "session-1" }),
       imageAttachments: () => [],
       commentCount: () => 0,
@@ -341,7 +330,6 @@ describe("prompt submit worktree selection", () => {
 
   test("seeds new sessions before optimistic prompts are added", async () => {
     const submit = createPromptSubmit({
-      prompt,
       info: () => undefined,
       imageAttachments: () => [],
       commentCount: () => 0,

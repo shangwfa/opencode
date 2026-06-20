@@ -3,7 +3,6 @@ import { DateTime, Effect, Layer, Option } from "effect"
 import { Catalog } from "@opencode-ai/core/catalog"
 import { Credential } from "@opencode-ai/core/credential"
 import { EventV2 } from "@opencode-ai/core/event"
-import { Integration } from "@opencode-ai/core/integration"
 import { Location } from "@opencode-ai/core/location"
 import { ModelV2 } from "@opencode-ai/core/model"
 import { PluginV2 } from "@opencode-ai/core/plugin"
@@ -19,18 +18,13 @@ const locationLayer = Layer.succeed(
   Location.Service.of(location({ directory: AbsolutePath.make("test") })),
 )
 
-const pluginWithIntegrations = (integrations: Integration.Interface) => ({
-  ...OpencodePlugin,
-  effect: OpencodePlugin.effect.pipe(Effect.provideService(Integration.Service, integrations)),
-})
-
 describe("OpencodePlugin", () => {
   it.effect("uses a public key and disables paid models without credentials", () =>
     withEnv({ OPENCODE_API_KEY: undefined }, () =>
       Effect.gen(function* () {
         const plugin = yield* PluginV2.Service
         const catalog = yield* Catalog.Service
-        yield* plugin.add(pluginWithIntegrations(yield* Integration.Service))
+        yield* plugin.add(OpencodePlugin)
         const transform = yield* catalog.transform()
         yield* transform((catalog) => {
           const item = provider("opencode")
@@ -51,7 +45,7 @@ describe("OpencodePlugin", () => {
       Effect.gen(function* () {
         const plugin = yield* PluginV2.Service
         const catalog = yield* Catalog.Service
-        yield* plugin.add(pluginWithIntegrations(yield* Integration.Service))
+        yield* plugin.add(OpencodePlugin)
         const transform = yield* catalog.transform()
         yield* transform((catalog) => {
           const item = provider("opencode")
@@ -72,7 +66,7 @@ describe("OpencodePlugin", () => {
       Effect.gen(function* () {
         const plugin = yield* PluginV2.Service
         const catalog = yield* Catalog.Service
-        yield* plugin.add(pluginWithIntegrations(yield* Integration.Service))
+        yield* plugin.add(OpencodePlugin)
         const transform = yield* catalog.transform()
         yield* transform((catalog) => {
           const item = provider("opencode")
@@ -93,7 +87,7 @@ describe("OpencodePlugin", () => {
       Effect.gen(function* () {
         const plugin = yield* PluginV2.Service
         const catalog = yield* Catalog.Service
-        yield* plugin.add(pluginWithIntegrations(yield* Integration.Service))
+        yield* plugin.add(OpencodePlugin)
         const transform = yield* catalog.transform()
         yield* transform((catalog) => {
           const item = provider("opencode")
@@ -114,18 +108,13 @@ describe("OpencodePlugin", () => {
       Effect.gen(function* () {
         const plugin = yield* PluginV2.Service
         const catalog = yield* Catalog.Service
-        const integrations = yield* Integration.Service
-        yield* plugin.add(pluginWithIntegrations(integrations))
-        yield* integrations.update((editor) => {
-          editor.method.update({
-            integrationID: Integration.ID.make("opencode"),
-            method: { type: "env", names: ["CUSTOM_OPENCODE_API_KEY"] },
-          })
-        })
+        yield* plugin.add(OpencodePlugin)
         const transform = yield* catalog.transform()
         yield* transform((catalog) => {
-          const item = provider("opencode")
-          catalog.provider.update(item.id, () => {})
+          const item = provider("opencode", { env: ["CUSTOM_OPENCODE_API_KEY"] })
+          catalog.provider.update(item.id, (draft) => {
+            draft.env = [...item.env]
+          })
           const paid = model("opencode", "paid", { cost: cost(1) })
           catalog.model.update(item.id, paid.id, (draft) => {
             draft.cost = [...paid.cost]
@@ -142,7 +131,7 @@ describe("OpencodePlugin", () => {
       Effect.gen(function* () {
         const plugin = yield* PluginV2.Service
         const catalog = yield* Catalog.Service
-        yield* plugin.add(pluginWithIntegrations(yield* Integration.Service))
+        yield* plugin.add(OpencodePlugin)
         const transform = yield* catalog.transform()
         yield* transform((catalog) => {
           const item = provider("opencode", {
@@ -165,12 +154,37 @@ describe("OpencodePlugin", () => {
     ),
   )
 
+  it.effect("uses auth-enabled providers as credentials", () =>
+    withEnv({ OPENCODE_API_KEY: undefined }, () =>
+      Effect.gen(function* () {
+        const plugin = yield* PluginV2.Service
+        const catalog = yield* Catalog.Service
+        yield* plugin.add(OpencodePlugin)
+        const transform = yield* catalog.transform()
+        yield* transform((catalog) => {
+          const item = provider("opencode", {
+            enabled: { via: "credential", credentialID: Credential.ID.make("credential") },
+          })
+          catalog.provider.update(item.id, (draft) => {
+            draft.enabled = item.enabled
+          })
+          const paid = model("opencode", "paid", { cost: cost(1) })
+          catalog.model.update(item.id, paid.id, (draft) => {
+            draft.cost = [...paid.cost]
+          })
+        })
+        expect((yield* catalog.provider.get(ProviderV2.ID.opencode)).request.body.apiKey).toBeUndefined()
+        expect((yield* catalog.model.get(ProviderV2.ID.opencode, ModelV2.ID.make("paid"))).enabled).toBe(true)
+      }),
+    ),
+  )
+
   it.effect("ignores non-opencode providers and models", () =>
     withEnv({ OPENCODE_API_KEY: undefined }, () =>
       Effect.gen(function* () {
         const plugin = yield* PluginV2.Service
         const catalog = yield* Catalog.Service
-        yield* plugin.add(pluginWithIntegrations(yield* Integration.Service))
+        yield* plugin.add(OpencodePlugin)
         const transform = yield* catalog.transform()
         yield* transform((catalog) => {
           const item = provider("openai")

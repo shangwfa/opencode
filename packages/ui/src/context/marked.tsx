@@ -6,378 +6,375 @@ import { bundledLanguages, type BundledLanguage } from "shiki"
 import { createSimpleContext } from "./helper"
 import { getSharedHighlighter, registerCustomTheme, ThemeRegistrationResolved } from "@pierre/diffs"
 
-export const OpenCodeTheme = {
-  name: "OpenCode",
-  bg: "var(--color-background-stronger)",
-  fg: "var(--text-base)",
-  colors: {
-    "editor.background": "var(--color-background-stronger)",
-    "editor.foreground": "var(--text-base)",
-    "gitDecoration.addedResourceForeground": "var(--syntax-diff-add)",
-    "gitDecoration.deletedResourceForeground": "var(--syntax-diff-delete)",
-    "gitDecoration.modifiedResourceForeground": "var(--syntax-diff-unknown)",
-    // "gitDecoration.conflictingResourceForeground": "#ffca00",
-    // "gitDecoration.modifiedResourceForeground": "#1a76d4",
-    // "gitDecoration.untrackedResourceForeground": "#00cab1",
-    // "gitDecoration.ignoredResourceForeground": "#84848A",
-    // "terminal.titleForeground": "#adadb1",
-    // "terminal.titleInactiveForeground": "#84848A",
-    // "terminal.background": "#141415",
-    // "terminal.foreground": "#adadb1",
-    // "terminal.ansiBlack": "#141415",
-    // "terminal.ansiRed": "#ff2e3f",
-    // "terminal.ansiGreen": "#0dbe4e",
-    // "terminal.ansiYellow": "#ffca00",
-    // "terminal.ansiBlue": "#008cff",
-    // "terminal.ansiMagenta": "#c635e4",
-    // "terminal.ansiCyan": "#08c0ef",
-    // "terminal.ansiWhite": "#c6c6c8",
-    // "terminal.ansiBrightBlack": "#141415",
-    // "terminal.ansiBrightRed": "#ff2e3f",
-    // "terminal.ansiBrightGreen": "#0dbe4e",
-    // "terminal.ansiBrightYellow": "#ffca00",
-    // "terminal.ansiBrightBlue": "#008cff",
-    // "terminal.ansiBrightMagenta": "#c635e4",
-    // "terminal.ansiBrightCyan": "#08c0ef",
-    // "terminal.ansiBrightWhite": "#c6c6c8",
-  },
-  tokenColors: [
-    {
-      scope: ["comment", "punctuation.definition.comment", "string.comment"],
-      settings: {
-        foreground: "var(--syntax-comment)",
-      },
+registerCustomTheme("OpenCode", () => {
+  return Promise.resolve({
+    name: "OpenCode",
+    colors: {
+      "editor.background": "var(--color-background-stronger)",
+      "editor.foreground": "var(--text-base)",
+      "gitDecoration.addedResourceForeground": "var(--syntax-diff-add)",
+      "gitDecoration.deletedResourceForeground": "var(--syntax-diff-delete)",
+      // "gitDecoration.conflictingResourceForeground": "#ffca00",
+      // "gitDecoration.modifiedResourceForeground": "#1a76d4",
+      // "gitDecoration.untrackedResourceForeground": "#00cab1",
+      // "gitDecoration.ignoredResourceForeground": "#84848A",
+      // "terminal.titleForeground": "#adadb1",
+      // "terminal.titleInactiveForeground": "#84848A",
+      // "terminal.background": "#141415",
+      // "terminal.foreground": "#adadb1",
+      // "terminal.ansiBlack": "#141415",
+      // "terminal.ansiRed": "#ff2e3f",
+      // "terminal.ansiGreen": "#0dbe4e",
+      // "terminal.ansiYellow": "#ffca00",
+      // "terminal.ansiBlue": "#008cff",
+      // "terminal.ansiMagenta": "#c635e4",
+      // "terminal.ansiCyan": "#08c0ef",
+      // "terminal.ansiWhite": "#c6c6c8",
+      // "terminal.ansiBrightBlack": "#141415",
+      // "terminal.ansiBrightRed": "#ff2e3f",
+      // "terminal.ansiBrightGreen": "#0dbe4e",
+      // "terminal.ansiBrightYellow": "#ffca00",
+      // "terminal.ansiBrightBlue": "#008cff",
+      // "terminal.ansiBrightMagenta": "#c635e4",
+      // "terminal.ansiBrightCyan": "#08c0ef",
+      // "terminal.ansiBrightWhite": "#c6c6c8",
     },
-    {
-      scope: ["entity.other.attribute-name"],
-      settings: {
-        foreground: "var(--syntax-property)", // maybe attribute
+    tokenColors: [
+      {
+        scope: ["comment", "punctuation.definition.comment", "string.comment"],
+        settings: {
+          foreground: "var(--syntax-comment)",
+        },
       },
-    },
-    {
-      scope: ["constant", "entity.name.constant", "variable.other.constant", "variable.language", "entity"],
-      settings: {
-        foreground: "var(--syntax-constant)",
+      {
+        scope: ["entity.other.attribute-name"],
+        settings: {
+          foreground: "var(--syntax-property)", // maybe attribute
+        },
       },
-    },
-    {
-      scope: ["entity.name", "meta.export.default", "meta.definition.variable"],
-      settings: {
-        foreground: "var(--syntax-type)",
+      {
+        scope: ["constant", "entity.name.constant", "variable.other.constant", "variable.language", "entity"],
+        settings: {
+          foreground: "var(--syntax-constant)",
+        },
       },
-    },
-    {
-      scope: ["meta.object.member"],
-      settings: {
-        foreground: "var(--syntax-primitive)",
+      {
+        scope: ["entity.name", "meta.export.default", "meta.definition.variable"],
+        settings: {
+          foreground: "var(--syntax-type)",
+        },
       },
-    },
-    {
-      scope: [
-        "variable.parameter.function",
-        "meta.jsx.children",
-        "meta.block",
-        "meta.tag.attributes",
-        "entity.name.constant",
-        "meta.embedded.expression",
-        "meta.template.expression",
-        "string.other.begin.yaml",
-        "string.other.end.yaml",
-      ],
-      settings: {
-        foreground: "var(--syntax-punctuation)",
+      {
+        scope: ["meta.object.member"],
+        settings: {
+          foreground: "var(--syntax-primitive)",
+        },
       },
-    },
-    {
-      scope: ["entity.name.function", "support.type.primitive"],
-      settings: {
-        foreground: "var(--syntax-primitive)",
+      {
+        scope: [
+          "variable.parameter.function",
+          "meta.jsx.children",
+          "meta.block",
+          "meta.tag.attributes",
+          "entity.name.constant",
+          "meta.embedded.expression",
+          "meta.template.expression",
+          "string.other.begin.yaml",
+          "string.other.end.yaml",
+        ],
+        settings: {
+          foreground: "var(--syntax-punctuation)",
+        },
       },
-    },
-    {
-      scope: ["support.class.component"],
-      settings: {
-        foreground: "var(--syntax-type)",
+      {
+        scope: ["entity.name.function", "support.type.primitive"],
+        settings: {
+          foreground: "var(--syntax-primitive)",
+        },
       },
-    },
-    {
-      scope: "keyword",
-      settings: {
-        foreground: "var(--syntax-keyword)",
+      {
+        scope: ["support.class.component"],
+        settings: {
+          foreground: "var(--syntax-type)",
+        },
       },
-    },
-    {
-      scope: [
-        "keyword.operator",
-        "storage.type.function.arrow",
-        "punctuation.separator.key-value.css",
-        "entity.name.tag.yaml",
-        "punctuation.separator.key-value.mapping.yaml",
-      ],
-      settings: {
-        foreground: "var(--syntax-operator)",
+      {
+        scope: "keyword",
+        settings: {
+          foreground: "var(--syntax-keyword)",
+        },
       },
-    },
-    {
-      scope: ["storage", "storage.type"],
-      settings: {
-        foreground: "var(--syntax-keyword)",
+      {
+        scope: [
+          "keyword.operator",
+          "storage.type.function.arrow",
+          "punctuation.separator.key-value.css",
+          "entity.name.tag.yaml",
+          "punctuation.separator.key-value.mapping.yaml",
+        ],
+        settings: {
+          foreground: "var(--syntax-operator)",
+        },
       },
-    },
-    {
-      scope: ["storage.modifier.package", "storage.modifier.import", "storage.type.java"],
-      settings: {
-        foreground: "var(--syntax-primitive)",
+      {
+        scope: ["storage", "storage.type"],
+        settings: {
+          foreground: "var(--syntax-keyword)",
+        },
       },
-    },
-    {
-      scope: [
-        "string",
-        "punctuation.definition.string",
-        "string punctuation.section.embedded source",
-        "entity.name.tag",
-      ],
-      settings: {
-        foreground: "var(--syntax-string)",
+      {
+        scope: ["storage.modifier.package", "storage.modifier.import", "storage.type.java"],
+        settings: {
+          foreground: "var(--syntax-primitive)",
+        },
       },
-    },
-    {
-      scope: "support",
-      settings: {
-        foreground: "var(--syntax-primitive)",
+      {
+        scope: [
+          "string",
+          "punctuation.definition.string",
+          "string punctuation.section.embedded source",
+          "entity.name.tag",
+        ],
+        settings: {
+          foreground: "var(--syntax-string)",
+        },
       },
-    },
-    {
-      scope: ["support.type.object.module", "variable.other.object", "support.type.property-name.css"],
-      settings: {
-        foreground: "var(--syntax-object)",
+      {
+        scope: "support",
+        settings: {
+          foreground: "var(--syntax-primitive)",
+        },
       },
-    },
-    {
-      scope: "meta.property-name",
-      settings: {
-        foreground: "var(--syntax-property)",
+      {
+        scope: ["support.type.object.module", "variable.other.object", "support.type.property-name.css"],
+        settings: {
+          foreground: "var(--syntax-object)",
+        },
       },
-    },
-    {
-      scope: "variable",
-      settings: {
-        foreground: "var(--syntax-variable)",
+      {
+        scope: "meta.property-name",
+        settings: {
+          foreground: "var(--syntax-property)",
+        },
       },
-    },
-    {
-      scope: "variable.other",
-      settings: {
-        foreground: "var(--syntax-variable)",
+      {
+        scope: "variable",
+        settings: {
+          foreground: "var(--syntax-variable)",
+        },
       },
-    },
-    {
-      scope: [
-        "invalid.broken",
-        "invalid.illegal",
-        "invalid.unimplemented",
-        "invalid.deprecated",
-        "message.error",
-        "markup.deleted",
-        "meta.diff.header.from-file",
-        "punctuation.definition.deleted",
-        "brackethighlighter.unmatched",
-        "token.error-token",
-      ],
-      settings: {
-        foreground: "var(--syntax-critical)",
+      {
+        scope: "variable.other",
+        settings: {
+          foreground: "var(--syntax-variable)",
+        },
       },
-    },
-    {
-      scope: "carriage-return",
-      settings: {
-        foreground: "var(--syntax-keyword)",
+      {
+        scope: [
+          "invalid.broken",
+          "invalid.illegal",
+          "invalid.unimplemented",
+          "invalid.deprecated",
+          "message.error",
+          "markup.deleted",
+          "meta.diff.header.from-file",
+          "punctuation.definition.deleted",
+          "brackethighlighter.unmatched",
+          "token.error-token",
+        ],
+        settings: {
+          foreground: "var(--syntax-critical)",
+        },
       },
-    },
-    {
-      scope: "string source",
-      settings: {
-        foreground: "var(--syntax-variable)",
+      {
+        scope: "carriage-return",
+        settings: {
+          foreground: "var(--syntax-keyword)",
+        },
       },
-    },
-    {
-      scope: "string variable",
-      settings: {
-        foreground: "var(--syntax-constant)",
+      {
+        scope: "string source",
+        settings: {
+          foreground: "var(--syntax-variable)",
+        },
       },
-    },
-    {
-      scope: [
-        "source.regexp",
-        "string.regexp",
-        "string.regexp.character-class",
-        "string.regexp constant.character.escape",
-        "string.regexp source.ruby.embedded",
-        "string.regexp string.regexp.arbitrary-repitition",
-        "string.regexp constant.character.escape",
-      ],
-      settings: {
-        foreground: "var(--syntax-regexp)",
+      {
+        scope: "string variable",
+        settings: {
+          foreground: "var(--syntax-constant)",
+        },
       },
-    },
-    {
-      scope: "support.constant",
-      settings: {
-        foreground: "var(--syntax-primitive)",
+      {
+        scope: [
+          "source.regexp",
+          "string.regexp",
+          "string.regexp.character-class",
+          "string.regexp constant.character.escape",
+          "string.regexp source.ruby.embedded",
+          "string.regexp string.regexp.arbitrary-repitition",
+          "string.regexp constant.character.escape",
+        ],
+        settings: {
+          foreground: "var(--syntax-regexp)",
+        },
       },
-    },
-    {
-      scope: "support.variable",
-      settings: {
-        foreground: "var(--syntax-variable)",
+      {
+        scope: "support.constant",
+        settings: {
+          foreground: "var(--syntax-primitive)",
+        },
       },
-    },
-    {
-      scope: "meta.module-reference",
-      settings: {
-        foreground: "var(--syntax-info)",
+      {
+        scope: "support.variable",
+        settings: {
+          foreground: "var(--syntax-variable)",
+        },
       },
-    },
-    {
-      scope: "punctuation.definition.list.begin.markdown",
-      settings: {
-        foreground: "var(--syntax-punctuation)",
+      {
+        scope: "meta.module-reference",
+        settings: {
+          foreground: "var(--syntax-info)",
+        },
       },
-    },
-    {
-      scope: ["markup.heading", "markup.heading entity.name"],
-      settings: {
-        fontStyle: "bold",
-        foreground: "var(--syntax-info)",
+      {
+        scope: "punctuation.definition.list.begin.markdown",
+        settings: {
+          foreground: "var(--syntax-punctuation)",
+        },
       },
-    },
-    {
-      scope: "markup.quote",
-      settings: {
-        foreground: "var(--syntax-info)",
+      {
+        scope: ["markup.heading", "markup.heading entity.name"],
+        settings: {
+          fontStyle: "bold",
+          foreground: "var(--syntax-info)",
+        },
       },
-    },
-    {
-      scope: "markup.italic",
-      settings: {
-        fontStyle: "italic",
-        // foreground: "",
+      {
+        scope: "markup.quote",
+        settings: {
+          foreground: "var(--syntax-info)",
+        },
       },
-    },
-    {
-      scope: "markup.bold",
-      settings: {
-        fontStyle: "bold",
-        foreground: "var(--text-strong)",
+      {
+        scope: "markup.italic",
+        settings: {
+          fontStyle: "italic",
+          // foreground: "",
+        },
       },
-    },
-    {
-      scope: [
-        "markup.raw",
-        "markup.inserted",
-        "meta.diff.header.to-file",
-        "punctuation.definition.inserted",
-        "markup.changed",
-        "punctuation.definition.changed",
-        "markup.ignored",
-        "markup.untracked",
-      ],
-      settings: {
-        foreground: "var(--text-base)",
+      {
+        scope: "markup.bold",
+        settings: {
+          fontStyle: "bold",
+          foreground: "var(--text-strong)",
+        },
       },
-    },
-    {
-      scope: "meta.diff.range",
-      settings: {
-        fontStyle: "bold",
-        foreground: "var(--syntax-unknown)",
+      {
+        scope: [
+          "markup.raw",
+          "markup.inserted",
+          "meta.diff.header.to-file",
+          "punctuation.definition.inserted",
+          "markup.changed",
+          "punctuation.definition.changed",
+          "markup.ignored",
+          "markup.untracked",
+        ],
+        settings: {
+          foreground: "var(--text-base)",
+        },
       },
-    },
-    {
-      scope: "meta.diff.header",
-      settings: {
-        foreground: "var(--syntax-unknown)",
+      {
+        scope: "meta.diff.range",
+        settings: {
+          fontStyle: "bold",
+          foreground: "var(--syntax-unknown)",
+        },
       },
-    },
-    {
-      scope: "meta.separator",
-      settings: {
-        fontStyle: "bold",
-        foreground: "var(--syntax-unknown)",
+      {
+        scope: "meta.diff.header",
+        settings: {
+          foreground: "var(--syntax-unknown)",
+        },
       },
-    },
-    {
-      scope: "meta.output",
-      settings: {
-        foreground: "var(--syntax-unknown)",
+      {
+        scope: "meta.separator",
+        settings: {
+          fontStyle: "bold",
+          foreground: "var(--syntax-unknown)",
+        },
       },
-    },
-    {
-      scope: "meta.export.default",
-      settings: {
-        foreground: "var(--syntax-unknown)",
+      {
+        scope: "meta.output",
+        settings: {
+          foreground: "var(--syntax-unknown)",
+        },
       },
-    },
-    {
-      scope: [
-        "brackethighlighter.tag",
-        "brackethighlighter.curly",
-        "brackethighlighter.round",
-        "brackethighlighter.square",
-        "brackethighlighter.angle",
-        "brackethighlighter.quote",
-      ],
-      settings: {
-        foreground: "var(--syntax-unknown)",
+      {
+        scope: "meta.export.default",
+        settings: {
+          foreground: "var(--syntax-unknown)",
+        },
       },
-    },
-    {
-      scope: ["constant.other.reference.link", "string.other.link"],
-      settings: {
-        fontStyle: "underline",
-        foreground: "var(--syntax-unknown)",
+      {
+        scope: [
+          "brackethighlighter.tag",
+          "brackethighlighter.curly",
+          "brackethighlighter.round",
+          "brackethighlighter.square",
+          "brackethighlighter.angle",
+          "brackethighlighter.quote",
+        ],
+        settings: {
+          foreground: "var(--syntax-unknown)",
+        },
       },
-    },
-    {
-      scope: "token.info-token",
-      settings: {
-        foreground: "var(--syntax-info)",
+      {
+        scope: ["constant.other.reference.link", "string.other.link"],
+        settings: {
+          fontStyle: "underline",
+          foreground: "var(--syntax-unknown)",
+        },
       },
-    },
-    {
-      scope: "token.warn-token",
-      settings: {
-        foreground: "var(--syntax-warning)",
+      {
+        scope: "token.info-token",
+        settings: {
+          foreground: "var(--syntax-info)",
+        },
       },
-    },
-    {
-      scope: "token.debug-token",
-      settings: {
-        foreground: "var(--syntax-info)",
+      {
+        scope: "token.warn-token",
+        settings: {
+          foreground: "var(--syntax-warning)",
+        },
       },
+      {
+        scope: "token.debug-token",
+        settings: {
+          foreground: "var(--syntax-info)",
+        },
+      },
+    ],
+    semanticTokenColors: {
+      comment: "var(--syntax-comment)",
+      string: "var(--syntax-string)",
+      number: "var(--syntax-constant)",
+      regexp: "var(--syntax-regexp)",
+      keyword: "var(--syntax-keyword)",
+      variable: "var(--syntax-variable)",
+      parameter: "var(--syntax-variable)",
+      property: "var(--syntax-property)",
+      function: "var(--syntax-primitive)",
+      method: "var(--syntax-primitive)",
+      type: "var(--syntax-type)",
+      class: "var(--syntax-type)",
+      namespace: "var(--syntax-type)",
+      enumMember: "var(--syntax-primitive)",
+      "variable.constant": "var(--syntax-constant)",
+      "variable.defaultLibrary": "var(--syntax-unknown)",
     },
-  ],
-  semanticTokenColors: {
-    comment: "var(--syntax-comment)",
-    string: "var(--syntax-string)",
-    number: "var(--syntax-constant)",
-    regexp: "var(--syntax-regexp)",
-    keyword: "var(--syntax-keyword)",
-    variable: "var(--syntax-variable)",
-    parameter: "var(--syntax-variable)",
-    property: "var(--syntax-property)",
-    function: "var(--syntax-primitive)",
-    method: "var(--syntax-primitive)",
-    type: "var(--syntax-type)",
-    class: "var(--syntax-type)",
-    namespace: "var(--syntax-type)",
-    enumMember: "var(--syntax-primitive)",
-    "variable.constant": "var(--syntax-constant)",
-    "variable.defaultLibrary": "var(--syntax-unknown)",
-  },
-} as unknown as ThemeRegistrationResolved
-
-registerCustomTheme("OpenCode", () => Promise.resolve(OpenCodeTheme))
+  } as unknown as ThemeRegistrationResolved)
+})
 
 function renderMathInText(text: string): string {
   let result = text

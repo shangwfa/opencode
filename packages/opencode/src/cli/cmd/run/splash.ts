@@ -45,6 +45,8 @@ type Cell = {
   mark: "text" | "full" | "mix" | "top"
 }
 
+let id = 0
+
 function cells(line: string): Cell[] {
   const list: Cell[] = []
   for (const char of line) {
@@ -115,6 +117,7 @@ function write(
 
   root.add(
     new TextRenderable(ctx.renderContext, {
+      id: `run-direct-splash-line-${id++}`,
       position: "absolute",
       left: line.left,
       top: line.top,
@@ -243,6 +246,7 @@ function build(input: SplashWriterInput, kind: "entry" | "exit", ctx: Scrollback
   }
 
   const root = new BoxRenderable(ctx.renderContext, {
+    id: `run-direct-splash-${kind}-${id++}`,
     position: "absolute",
     left: 0,
     top: 0,

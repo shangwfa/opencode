@@ -517,7 +517,7 @@ describe("acp event routing", () => {
     expect(harness.updates).toHaveLength(0)
   })
 
-  it("exposes the shell command on the synthetic pending tool call", async () => {
+  it("emits synthetic pending before the first running tool update", async () => {
     const harness = createHarness()
     await Effect.runPromise(harness.session.create({ id: "ses_tool", cwd: "/workspace" }))
 
@@ -527,14 +527,7 @@ describe("acp event routing", () => {
       "tool_call",
       "tool_call_update",
     ])
-    expect(harness.updates[0]?.update).toMatchObject({
-      status: "pending",
-      toolCallId: "call_1",
-      title: "printf hello",
-      kind: "execute",
-      locations: [{ path: "/workspace" }],
-      rawInput: { cmd: "printf hello", cwd: "/workspace" },
-    })
+    expect(harness.updates[0]?.update).toMatchObject({ status: "pending", toolCallId: "call_1" })
     expect(harness.updates[1]?.update).toMatchObject({ status: "in_progress", toolCallId: "call_1" })
   })
 

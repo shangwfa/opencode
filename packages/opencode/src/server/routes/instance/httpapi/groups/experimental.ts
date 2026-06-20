@@ -25,10 +25,6 @@ const ConsoleStateResponse = Schema.Struct({
   switchableOrgCount: NonNegativeInt,
 }).annotate({ identifier: "ConsoleState" })
 
-const CapabilitiesResponse = Schema.Struct({
-  backgroundSubagents: Schema.Boolean,
-}).annotate({ identifier: "ExperimentalCapabilities" })
-
 const ConsoleOrgOption = Schema.Struct({
   accountID: Schema.String,
   accountEmail: Schema.String,
@@ -88,7 +84,6 @@ export const SessionListQuery = Schema.Struct({
 })
 
 export const ExperimentalPaths = {
-  capabilities: "/experimental/capabilities",
   console: "/experimental/console",
   consoleOrgs: "/experimental/console/orgs",
   consoleSwitch: "/experimental/console/switch",
@@ -105,16 +100,6 @@ export const ExperimentalApi = HttpApi.make("experimental")
   .add(
     HttpApiGroup.make("experimental")
       .add(
-        HttpApiEndpoint.get("capabilities", ExperimentalPaths.capabilities, {
-          query: WorkspaceRoutingQuery,
-          success: described(CapabilitiesResponse, "Experimental capabilities"),
-        }).annotateMerge(
-          OpenApi.annotations({
-            identifier: "experimental.capabilities.get",
-            summary: "Get experimental capabilities",
-            description: "Get experimental features enabled on the OpenCode server.",
-          }),
-        ),
         HttpApiEndpoint.get("console", ExperimentalPaths.console, {
           query: WorkspaceRoutingQuery,
           success: described(ConsoleStateResponse, "Active Console provider metadata"),

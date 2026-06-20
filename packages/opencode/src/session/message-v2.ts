@@ -30,6 +30,7 @@ import { inArray } from "drizzle-orm"
 import { lt } from "drizzle-orm"
 import { or } from "drizzle-orm"
 import { MessageTable, PartTable, SessionTable } from "@opencode-ai/core/session/sql"
+import { Database as SaasDb } from "@/storage/db"
 import { ProviderError } from "@/provider/error"
 import { iife } from "@/util/iife"
 import { errorMessage } from "@/util/error"
@@ -443,7 +444,7 @@ export const page = Effect.fn("MessageV2.page")(function* (input: {
   const where = before
     ? and(eq(MessageTable.session_id, input.sessionID), older(before))
     : eq(MessageTable.session_id, input.sessionID)
-  const rows = yield* db
+  let rows = yield* db
     .select()
     .from(MessageTable)
     .where(where)
@@ -451,6 +452,18 @@ export const page = Effect.fn("MessageV2.page")(function* (input: {
     .limit(input.limit + 1)
     .all()
     .pipe(Effect.orDie)
+  // Fallback: if drizzle query returned empty, try raw PG query directly.
+  // The sqliteTable→PG bridge sometimes loses rows due to SQL dialect mismatch.
+  if (rows.length === 0) {
+    const pgClient = (SaasDb.Client() as any).$client
+    const rawRows: any[] = yield* Effect.tryPromise({
+      try: () => pgClient`SELECT * FROM message WHERE session_id = ${input.sessionID} ORDER BY time_created DESC, id DESC LIMIT ${input.limit + 1}`,
+      catch: () => [] as any[],
+    })
+    if (rawRows.length > 0) {
+      rows = rawRows as any
+    }
+  }
   if (rows.length === 0) {
     const row = yield* db
       .select({ id: SessionTable.id })

@@ -1,6 +1,6 @@
 import { createServer } from "node:http"
 import { Deferred, Effect } from "effect"
-import { Integration } from "../../integration"
+import { Connector } from "../../connector"
 import { Credential } from "../../credential"
 import { InstallationVersion } from "../../installation/version"
 
@@ -27,16 +27,13 @@ type Claims = {
   "https://api.openai.com/auth"?: { chatgpt_account_id?: string }
 }
 
-const browserMethodID = Integration.MethodID.make("chatgpt-browser")
-const headlessMethodID = Integration.MethodID.make("chatgpt-headless")
-
 export const browser = {
-  integrationID: Integration.ID.make("openai"),
-  method: {
-    id: browserMethodID,
+  connectorID: Connector.ID.make("openai"),
+  method: new Connector.OAuthMethod({
+    id: Connector.MethodID.make("chatgpt-browser"),
     type: "oauth",
     label: "ChatGPT Pro/Plus (browser)",
-  },
+  }),
   authorize: () =>
     Effect.gen(function* () {
       const pkce = yield* Effect.promise(generatePKCE)
@@ -80,20 +77,20 @@ export const browser = {
         instructions: "Complete authorization in your browser. This window will close automatically.",
         callback: Deferred.await(code).pipe(
           Effect.flatMap((value) => exchange(value, redirect, pkce)),
-          Effect.map((tokens) => credential(browserMethodID, tokens)),
+          Effect.map(credential),
         ),
       }
     }),
   refresh: (value) => refresh(value),
-} satisfies Integration.OAuthImplementation
+} satisfies Connector.OAuthImplementation
 
 export const headless = {
-  integrationID: Integration.ID.make("openai"),
-  method: {
-    id: headlessMethodID,
+  connectorID: Connector.ID.make("openai"),
+  method: new Connector.OAuthMethod({
+    id: Connector.MethodID.make("chatgpt-headless"),
     type: "oauth",
     label: "ChatGPT Pro/Plus (headless)",
-  },
+  }),
   authorize: () =>
     Effect.gen(function* () {
       const device = yield* request<{ device_auth_id: string; user_code: string; interval: string }>(
@@ -127,7 +124,6 @@ export const headless = {
                 code_verifier: string
               }
               return credential(
-                headlessMethodID,
                 yield* exchange(data.authorization_code, `${issuer}/deviceauth/callback`, {
                   verifier: data.code_verifier,
                   challenge: "",
@@ -143,7 +139,7 @@ export const headless = {
       }
     }),
   refresh: (value) => refresh(value),
-} satisfies Integration.OAuthImplementation
+} satisfies Connector.OAuthImplementation
 
 function headers(contentType: string) {
   return { "Content-Type": contentType, "User-Agent": `opencode/${InstallationVersion}` }
@@ -174,7 +170,7 @@ function refresh(value: Credential.OAuth) {
     }).toString(),
   }).pipe(
     Effect.map((tokens) => {
-      const next = credential(value.methodID, tokens)
+      const next = credential(tokens)
       return new Credential.OAuth({
         ...next,
         metadata: next.metadata ?? value.metadata,
@@ -194,11 +190,10 @@ function request<A>(url: string, init: RequestInit) {
   })
 }
 
-function credential(methodID: Integration.MethodID, tokens: TokenResponse) {
+function credential(tokens: TokenResponse) {
   const accountID = extractAccountID(tokens)
   return new Credential.OAuth({
     type: "oauth",
-    methodID,
     refresh: tokens.refresh_token,
     access: tokens.access_token,
     expires: Date.now() + (tokens.expires_in ?? 3600) * 1000,

@@ -13,6 +13,7 @@ import {
   on,
   onMount,
   untrack,
+  createResource,
 } from "solid-js"
 import { makeEventListener } from "@solid-primitives/event-listener"
 import { createMediaQuery } from "@solid-primitives/media"
@@ -32,6 +33,7 @@ import { checksum } from "@opencode-ai/core/util/encode"
 import { useLocation, useSearchParams } from "@solidjs/router"
 import { NewSessionView, SessionHeader } from "@/components/session"
 import { useComments } from "@/context/comments"
+import { getSessionPrefetch, SESSION_PREFETCH_TTL } from "@/context/global-sync/session-prefetch"
 import { useServerSync } from "@/context/server-sync"
 import { useLanguage } from "@/context/language"
 import { useLayout } from "@/context/layout"
@@ -42,6 +44,7 @@ import { useServerSDK } from "@/context/server-sdk"
 import { useSettings } from "@/context/settings"
 import { useSync } from "@/context/sync"
 import { useTerminal } from "@/context/terminal"
+import { usePlatform } from "@/context/platform"
 import { type FollowupDraft, sendFollowupDraft } from "@/components/prompt-input/submit"
 import { createSessionComposerState, SessionComposerRegion } from "@/pages/session/composer"
 import {
@@ -52,8 +55,7 @@ import {
   shouldFocusTerminalOnKeyDown,
   shouldShowFileTree,
 } from "@/pages/session/helpers"
-import { MessageTimeline } from "@/pages/session/timeline/message-timeline"
-import { createTimelineModel } from "@/pages/session/timeline/model"
+import { MessageTimeline } from "@/pages/session/message-timeline"
 import { type DiffStyle, SessionReviewTab, type SessionReviewTabProps } from "@/pages/session/review-tab"
 import { useSessionLayout } from "@/pages/session/session-layout"
 import { useServer } from "@/context/server"
@@ -66,15 +68,122 @@ import { Identifier } from "@/utils/id"
 import { diffs as list } from "@/utils/diffs"
 import { Persist, persisted } from "@/utils/persist"
 import { extractPromptFromParts } from "@/utils/prompt"
+import { same } from "@/utils/same"
+import { authTokenFromCredentials } from "@/utils/server"
 import { formatServerError } from "@/utils/server-errors"
 import { useUsageExceededDialogs } from "./session/usage-exceeded-dialogs"
 
+const emptyUserMessages: UserMessage[] = []
 type FollowupItem = FollowupDraft & { id: string }
 type FollowupEdit = Pick<FollowupItem, "id" | "prompt" | "context">
 const emptyFollowups: FollowupItem[] = []
 
 type ChangeMode = "git" | "branch" | "turn"
 type VcsMode = "git" | "branch"
+
+type SessionHistoryWindowInput = {
+  sessionID: () => string | undefined
+  loaded: () => number
+  visibleUserMessages: () => UserMessage[]
+  historyMore: () => boolean
+  historyLoading: () => boolean
+  loadMore: (sessionID: string) => Promise<void>
+  userScrolled: () => boolean
+  scroller: () => HTMLDivElement | undefined
+}
+
+function createSessionHistoryLoader(input: SessionHistoryWindowInput) {
+  const historyScrollThreshold = 200
+  let shiftFrame: number | undefined
+
+  const [state, setState] = createStore({
+    shift: false,
+  })
+
+  const userMessages = createMemo(() => input.visibleUserMessages(), emptyUserMessages, {
+    equals: same,
+  })
+
+  const cancelShiftReset = () => {
+    if (shiftFrame === undefined) return
+    cancelAnimationFrame(shiftFrame)
+    shiftFrame = undefined
+  }
+
+  const scheduleShiftReset = () => {
+    cancelShiftReset()
+    shiftFrame = requestAnimationFrame(() => {
+      shiftFrame = undefined
+      setState("shift", false)
+    })
+  }
+
+  const fetchOlderMessages = async () => {
+    const id = input.sessionID()
+    if (!id) return
+    if (!input.historyMore() || input.historyLoading()) return
+
+    // TODO(session-timeline): switch this to core cursor-based part pagination when that API lands.
+    const beforeVisible = input.visibleUserMessages().length
+    let loaded = input.loaded()
+    let growth = 0
+
+    cancelShiftReset()
+    setState("shift", true)
+
+    while (true) {
+      await input.loadMore(id)
+      if (input.sessionID() !== id) return
+
+      const nextLoaded = input.loaded()
+      const raw = nextLoaded - loaded
+      loaded = nextLoaded
+      growth = input.visibleUserMessages().length - beforeVisible
+
+      if (growth > 0) break
+      if (raw <= 0) break
+      if (!input.historyMore()) break
+    }
+
+    if (growth > 0) {
+      scheduleShiftReset()
+      return
+    }
+
+    setState("shift", false)
+  }
+
+  const loadAndReveal = () => fetchOlderMessages()
+
+  const onScrollerScroll = () => {
+    if (!input.userScrolled()) return
+    const el = input.scroller()
+    if (!el) return
+    if (el.scrollTop >= historyScrollThreshold) return
+
+    void fetchOlderMessages()
+  }
+
+  createEffect(
+    on(
+      input.sessionID,
+      () => {
+        cancelShiftReset()
+        setState({ shift: false })
+      },
+      { defer: true },
+    ),
+  )
+
+  onCleanup(cancelShiftReset)
+
+  return {
+    userMessages,
+    shift: () => state.shift,
+    loadAndReveal,
+    onScrollerScroll,
+  }
+}
 
 export default function Page() {
   const serverSync = useServerSync()
@@ -168,7 +277,8 @@ export default function Page() {
     () =>
       isDesktop() &&
       shouldShowFileTree({
-        visible: settings.visibility.fileTree(),
+        desktopV2: platform.platform === "desktop" && settings.general.newLayoutDesigns(),
+        showFileTree: settings.general.showFileTree(),
         opened: layout.fileTree.opened(),
       }),
   )
@@ -201,10 +311,10 @@ export default function Page() {
     if (!view().reviewPanel.opened()) view().reviewPanel.open()
   }
 
-  const info = createMemo(() => (params.id ? sync().session.get(params.id) : undefined))
+  const info = createMemo(() => (params.id ? sync.session.get(params.id) : undefined))
   const isChildSession = createMemo(() => !!info()?.parentID)
-  const diffs = createMemo(() => (params.id ? list(sync().data.session_diff[params.id]) : []))
-  const canReview = createMemo(() => !!sync().project)
+  const diffs = createMemo(() => (params.id ? list(sync.data.session_diff[params.id]) : []))
+  const canReview = createMemo(() => !!sync.project)
   const reviewTab = createMemo(() => isDesktop())
   const tabState = createSessionTabs({
     tabs,
@@ -216,15 +326,39 @@ export default function Page() {
   const activeTab = tabState.activeTab
   const activeFileTab = tabState.activeFileTab
   const revertMessageID = createMemo(() => info()?.revert?.messageID)
-  const timeline = createTimelineModel({ sessionID: () => params.id, revertMessageID })
-  const historyLoading = timeline.history.loading
-  const historyMore = timeline.history.more
-  const lastUserMessage = timeline.lastUserMessage
-  const messages = timeline.messages
-  const messagesReady = timeline.ready
-  const sessionSync = timeline.resource
-  const userMessages = timeline.userMessages
-  const visibleUserMessages = timeline.visibleUserMessages
+  const messages = createMemo(() => (params.id ? (sync.data.message[params.id] ?? []) : []))
+  const messagesReady = createMemo(() => {
+    const id = params.id
+    if (!id) return true
+    return sync.data.message[id] !== undefined
+  })
+  const historyMore = createMemo(() => {
+    const id = params.id
+    if (!id) return false
+    return sync.session.history.more(id)
+  })
+  const historyLoading = createMemo(() => {
+    const id = params.id
+    if (!id) return false
+    return sync.session.history.loading(id)
+  })
+  const userMessages = createMemo(
+    () => messages().filter((m) => m.role === "user") as UserMessage[],
+    emptyUserMessages,
+    { equals: same },
+  )
+  const visibleUserMessages = createMemo(
+    () => {
+      const revert = revertMessageID()
+      if (!revert) return userMessages()
+      return userMessages().filter((m) => m.id < revert)
+    },
+    emptyUserMessages,
+    {
+      equals: same,
+    },
+  )
+  const lastUserMessage = createMemo(() => visibleUserMessages().at(-1))
 
   createEffect(() => {
     const tab = activeFileTab()
@@ -266,7 +400,7 @@ export default function Page() {
   })
 
   const [followup, setFollowup] = persisted(
-    Persist.serverWorkspace(serverSDK().scope, sdk().directory, "followup", ["followup.v1"]),
+    Persist.serverWorkspace(serverSDK.scope, sdk.directory, "followup", ["followup.v1"]),
     createStore<{
       items: Record<string, FollowupItem[] | undefined>
       failed: Record<string, string | undefined>
@@ -292,6 +426,8 @@ export default function Page() {
   }, sessionKey())
 
   let reviewFrame: number | undefined
+  let refreshFrame: number | undefined
+  let refreshTimer: number | undefined
   let todoFrame: number | undefined
   let todoTimer: number | undefined
   let diffFrame: number | undefined
@@ -311,16 +447,16 @@ export default function Page() {
   }, desktopReviewOpen())
 
   const turnDiffs = createMemo(() => list(lastUserMessage()?.summary?.diffs))
-  const nogit = createMemo(() => {
-    const project = sync().project
-    return !!project && project.vcs !== "git"
-  })
+  const nogit = createMemo(() => !!sync.project && sync.project.vcs !== "git")
   const changesOptions = createMemo<ChangeMode[]>(() => {
     const list: ChangeMode[] = []
-    const project = sync().project
-    const vcs = sync().data.vcs
-    if (project?.vcs === "git") list.push("git")
-    if (project?.vcs === "git" && vcs?.branch && vcs?.default_branch && vcs.branch !== vcs.default_branch) {
+    if (sync.project?.vcs === "git") list.push("git")
+    if (
+      sync.project?.vcs === "git" &&
+      sync.data.vcs?.branch &&
+      sync.data.vcs?.default_branch &&
+      sync.data.vcs.branch !== sync.data.vcs.default_branch
+    ) {
       list.push("branch")
     }
     list.push("turn")
@@ -336,21 +472,37 @@ export default function Page() {
     if (store.changes === "git" || store.changes === "branch") return store.changes
   })
   const vcsKey = createMemo(
-    () =>
-      ["session-vcs", sdk().directory, sync().data.vcs?.branch ?? "", sync().data.vcs?.default_branch ?? ""] as const,
+    () => ["session-vcs", sdk.directory, params.id ?? "", sync.data.vcs?.branch ?? "", sync.data.vcs?.default_branch ?? ""] as const,
   )
+  const fetchVcsDiff = async (mode: VcsMode) => {
+    const url = new URL("/vcs/diff", sdk.url)
+    url.searchParams.set("directory", sdk.directory)
+    url.searchParams.set("mode", mode)
+    if (params.id) url.searchParams.set("sessionID", params.id)
+
+    const response = await (platform.fetch ?? fetch)(url, {
+      headers: server.current?.http.password
+        ? {
+            Authorization: `Basic ${authTokenFromCredentials({
+              username: server.current.http.username,
+              password: server.current.http.password,
+            })}`,
+          }
+        : undefined,
+    })
+    if (!response.ok) throw new Error(`Failed to load VCS diff: ${response.status}`)
+    return list(await response.json())
+  }
   const vcsQuery = createQuery(() => {
     const mode = vcsMode()
-    const enabled = wantsReview() && sync().project?.vcs === "git"
+    const enabled = wantsReview() && sync.project?.vcs === "git"
 
     return {
       queryKey: [...vcsKey(), mode] as const,
       enabled,
       queryFn: mode
         ? () =>
-            sdk()
-              .client.vcs.diff({ mode })
-              .then((result) => list(result.data))
+            fetchVcsDiff(mode)
               .catch((error) => {
                 console.debug("[session-review] failed to load vcs diff", { mode, error })
                 return []
@@ -374,8 +526,8 @@ export default function Page() {
 
   const newSessionWorktree = createMemo(() => {
     if (store.newSessionWorktree === "create") return "create"
-    const project = sync().project
-    if (project && sdk().directory !== project.worktree) return sdk().directory
+    const project = sync.project
+    if (project && sdk.directory !== project.worktree) return sdk.directory
     return "main"
   })
 
@@ -437,11 +589,11 @@ export default function Page() {
   }
 
   function upsert(next: Project) {
-    const list = serverSync().data.project
-    sync().set("project", next.id)
+    const list = serverSync.data.project
+    sync.set("project", next.id)
     const idx = list.findIndex((item) => item.id === next.id)
     if (idx >= 0) {
-      serverSync().set(
+      serverSync.set(
         "project",
         list.map((item, i) => (i === idx ? { ...item, ...next } : item)),
       )
@@ -449,14 +601,14 @@ export default function Page() {
     }
     const at = list.findIndex((item) => item.id > next.id)
     if (at >= 0) {
-      serverSync().set("project", [...list.slice(0, at), next, ...list.slice(at)])
+      serverSync.set("project", [...list.slice(0, at), next, ...list.slice(at)])
       return
     }
-    serverSync().set("project", [...list, next])
+    serverSync.set("project", [...list, next])
   }
 
   const gitMutation = useMutation(() => ({
-    mutationFn: () => sdk().client.project.initGit(),
+    mutationFn: () => sdk.client.project.initGit(),
     onSuccess: (x) => {
       if (!x.data) return
       upsert(x.data)
@@ -481,7 +633,6 @@ export default function Page() {
   let scroller: HTMLDivElement | undefined
   let content: HTMLDivElement | undefined
   let revealMessage = (_id: string) => {}
-  let scrollToEnd = () => {}
   let scrollMark = 0
   let messageMark = 0
 
@@ -500,14 +651,47 @@ export default function Page() {
 
   const hasScrollGesture = () => Date.now() - ui.scrollGesture < scrollGestureWindowMs
 
+  const [sessionSync] = createResource(
+    () => [sdk.directory, params.id] as const,
+    ([directory, id]) => {
+      if (refreshFrame !== undefined) cancelAnimationFrame(refreshFrame)
+      if (refreshTimer !== undefined) window.clearTimeout(refreshTimer)
+      refreshFrame = undefined
+      refreshTimer = undefined
+      if (!id) return
+
+      const cached = untrack(() => sync.data.message[id] !== undefined)
+      const stale = !cached
+        ? false
+        : (() => {
+            const info = getSessionPrefetch(serverSDK.scope, directory, id)
+            if (!info) return true
+            return Date.now() - info.at > SESSION_PREFETCH_TTL
+          })()
+
+      refreshFrame = requestAnimationFrame(() => {
+        refreshFrame = undefined
+        refreshTimer = window.setTimeout(() => {
+          refreshTimer = undefined
+          if (params.id !== id) return
+          untrack(() => {
+            if (stale) void sync.session.sync(id, { force: true })
+          })
+        }, 0)
+      })
+
+      return sync.session.sync(id)
+    },
+  )
+
   createEffect(
     on(
       () => {
         const id = params.id
         return [
-          sdk().directory,
+          sdk.directory,
           id,
-          id ? (sync().data.session_status[id]?.type ?? "idle") : "idle",
+          id ? (sync.data.session_status[id]?.type ?? "idle") : "idle",
           id ? composer.blocked() : false,
         ] as const
       },
@@ -518,17 +702,15 @@ export default function Page() {
         todoTimer = undefined
         if (!id) return
         if (status === "idle" && !blocked) return
-        const cached = untrack(
-          () => sync().data.todo[id] !== undefined || serverSync().data.session_todo[id] !== undefined,
-        )
+        const cached = untrack(() => sync.data.todo[id] !== undefined || serverSync.data.session_todo[id] !== undefined)
 
         todoFrame = requestAnimationFrame(() => {
           todoFrame = undefined
           todoTimer = window.setTimeout(() => {
             todoTimer = undefined
-            if (sdk().directory !== dir || params.id !== id) return
+            if (sdk.directory !== dir || params.id !== id) return
             untrack(() => {
-              void sync().session.todo(id, cached ? { force: true } : undefined)
+              void sync.session.todo(id, cached ? { force: true } : undefined)
             })
           }, 0)
         })
@@ -561,7 +743,7 @@ export default function Page() {
     ),
   )
 
-  const stopVcs = sdk().event.listen((evt) => {
+  const stopVcs = sdk.event.listen((evt) => {
     if (evt.details.type !== "file.watcher.updated") return
     const props =
       typeof evt.details.properties === "object" && evt.details.properties
@@ -704,7 +886,7 @@ export default function Page() {
 
   createEffect(
     on(
-      () => sync().data.session_status[params.id ?? ""]?.type,
+      () => sync.data.session_status[params.id ?? ""]?.type,
       (next, prev) => {
         if (next !== "idle" || prev === undefined || prev === "idle") return
         refreshVcs()
@@ -975,10 +1157,10 @@ export default function Page() {
     if (!id) return
 
     if (!wantsReview()) return
-    if (sync().data.session_diff[id] !== undefined) return
-    if (sync().status === "loading") return
+    if (sync.data.session_diff[id] !== undefined) return
+    if (sync.status === "loading") return
 
-    void sync().session.diff(id)
+    void sync.session.diff(id)
   })
 
   createEffect(
@@ -993,14 +1175,14 @@ export default function Page() {
 
         const id = params.id
         if (!id) return
-        if (!untrack(() => sync().data.session_diff[id] !== undefined)) return
+        if (!untrack(() => sync.data.session_diff[id] !== undefined)) return
 
         diffFrame = requestAnimationFrame(() => {
           diffFrame = undefined
           diffTimer = window.setTimeout(() => {
             diffTimer = undefined
             if (sessionKey() !== key) return
-            void sync().session.diff(id, { force: true })
+            void sync.session.diff(id, { force: true })
           }, 0)
         })
       },
@@ -1010,10 +1192,10 @@ export default function Page() {
 
   let treeDir: string | undefined
   createEffect(() => {
-    const dir = sdk().directory
+    const dir = sdk.directory
     if (!isDesktop()) return
     if (!layout.fileTree.opened()) return
-    if (sync().status === "loading") return
+    if (sync.status === "loading") return
 
     fileTreeTab()
     const refresh = treeDir !== dir
@@ -1023,7 +1205,7 @@ export default function Page() {
 
   createEffect(
     on(
-      () => sdk().directory,
+      () => sdk.directory,
       () => {
         const tab = activeFileTab()
         if (!tab) return
@@ -1037,18 +1219,8 @@ export default function Page() {
 
   const autoScroll = createAutoScroll({
     working: () => true,
-    overflowAnchor: "none",
+    overflowAnchor: "dynamic",
   })
-  createEffect(
-    on(
-      () => params.id,
-      (id, previous) => {
-        if (!id || !previous || id === previous) return
-        if (location.hash || store.messageId || ui.pendingMessage) return
-        autoScroll.resume()
-      },
-    ),
-  )
 
   let scrollStateFrame: number | undefined
   let scrollStateTarget: HTMLDivElement | undefined
@@ -1084,8 +1256,7 @@ export default function Page() {
 
   const resumeScroll = () => {
     setStore("messageId", undefined)
-    autoScroll.resume()
-    scrollToEnd()
+    autoScroll.forceScrollToBottom()
     clearMessageHash()
 
     const el = scroller
@@ -1128,14 +1299,16 @@ export default function Page() {
     },
   )
 
-  let captureHistoryAnchor = () => {}
-  let restoreHistoryAnchor = (_done: boolean) => {}
-  const loadOlder = () =>
-    timeline.history.loadOlder({ before: () => captureHistoryAnchor(), after: restoreHistoryAnchor })
-  const onHistoryScroll = () => {
-    if (!autoScroll.userScrolled() || !scroller || scroller.scrollTop >= 200) return
-    void loadOlder()
-  }
+  const historyLoader = createSessionHistoryLoader({
+    sessionID: () => params.id,
+    loaded: () => messages().length,
+    visibleUserMessages,
+    historyMore,
+    historyLoading,
+    loadMore: (sessionID) => sync.session.history.loadMore(sessionID),
+    userScrolled: autoScroll.userScrolled,
+    scroller: () => scroller,
+  })
 
   fill = () => {
     if (fillFrame !== undefined) return
@@ -1151,7 +1324,7 @@ export default function Page() {
       if (el.scrollHeight > el.clientHeight + 1) return
       if (!historyMore()) return
 
-      void loadOlder()
+      void historyLoader.loadAndReveal()
     })
   }
 
@@ -1176,8 +1349,8 @@ export default function Page() {
   )
 
   const draft = (id: string) =>
-    extractPromptFromParts(sync().data.part[id] ?? [], {
-      directory: sdk().directory,
+    extractPromptFromParts(sync.data.part[id] ?? [], {
+      directory: sdk.directory,
       attachmentName: language.t("common.attachment"),
     })
 
@@ -1200,7 +1373,7 @@ export default function Page() {
   }
 
   const merge = (next: NonNullable<ReturnType<typeof info>>) =>
-    sync().set("session", (list) => {
+    sync.set("session", (list) => {
       const idx = list.findIndex((item) => item.id === next.id)
       if (idx < 0) return list
       const out = list.slice()
@@ -1209,7 +1382,7 @@ export default function Page() {
     })
 
   const roll = (sessionID: string, next: NonNullable<ReturnType<typeof info>>["revert"]) =>
-    sync().set("session", (list) => {
+    sync.set("session", (list) => {
       const idx = list.findIndex((item) => item.id === sessionID)
       if (idx < 0) return list
       const out = list.slice()
@@ -1217,7 +1390,7 @@ export default function Page() {
       return out
     })
 
-  const busy = (sessionID: string) => sync().data.session_working(sessionID)
+  const busy = (sessionID: string) => sync.data.session_working(sessionID)
 
   const queuedFollowups = createMemo(() => {
     const id = params.id
@@ -1240,11 +1413,11 @@ export default function Page() {
       setFollowup("failed", input.sessionID, undefined)
 
       const ok = await sendFollowupDraft({
-        client: sdk().client,
-        sync: sync(),
-        serverSync: serverSync(),
+        client: sdk.client,
+        sync,
+        serverSync,
         draft: item,
-        optimisticBusy: item.sessionDirectory === sdk().directory,
+        optimisticBusy: item.sessionDirectory === sdk.directory,
       }).catch((err) => {
         setFollowup("failed", input.sessionID, input.id)
         fail(err)
@@ -1302,7 +1475,7 @@ export default function Page() {
   const followupDock = createMemo(() => queuedFollowups().map((item) => ({ id: item.id, text: followupText(item) })))
 
   const sendFollowup = (sessionID: string, id: string, opts?: { manual?: boolean }) => {
-    if (sync().session.get(sessionID)?.parentID) return Promise.resolve()
+    if (sync.session.get(sessionID)?.parentID) return Promise.resolve()
     const item = (followup.items[sessionID] ?? []).find((entry) => entry.id === id)
     if (!item) return Promise.resolve()
     if (followupBusy(sessionID)) return Promise.resolve()
@@ -1334,11 +1507,7 @@ export default function Page() {
   }
 
   const halt = (sessionID: string) =>
-    busy(sessionID)
-      ? sdk()
-          .client.session.abort({ sessionID })
-          .catch(() => {})
-      : Promise.resolve()
+    busy(sessionID) ? sdk.client.session.abort({ sessionID }).catch(() => {}) : Promise.resolve()
 
   const revertMutation = useMutation(() => ({
     mutationFn: async (input: { sessionID: string; messageID: string }) => {
@@ -1350,7 +1519,7 @@ export default function Page() {
         prompt.set(value)
       })
       await halt(input.sessionID)
-        .then(() => sdk().client.session.revert(input))
+        .then(() => sdk.client.session.revert(input))
         .then((result) => {
           if (result.data) merge(result.data)
         })
@@ -1383,9 +1552,9 @@ export default function Page() {
       })
 
       const task = !next
-        ? halt(sessionID).then(() => sdk().client.session.unrevert({ sessionID }))
+        ? halt(sessionID).then(() => sdk.client.session.unrevert({ sessionID }))
         : halt(sessionID).then(() =>
-            sdk().client.session.revert({
+            sdk.client.session.revert({
               sessionID,
               messageID: next.id,
             }),
@@ -1459,7 +1628,7 @@ export default function Page() {
 
       dockHeight = next
 
-      if (stick) scrollToEnd()
+      if (stick) autoScroll.forceScrollToBottom()
 
       if (el) scheduleScrollState(el)
       fill()
@@ -1473,18 +1642,12 @@ export default function Page() {
     visibleUserMessages,
     historyMore,
     historyLoading,
-    loadMore: (sessionID) => sync().session.history.loadMore(sessionID),
+    loadMore: (sessionID) => sync.session.history.loadMore(sessionID),
     currentMessageId: () => store.messageId,
     pendingMessage: () => ui.pendingMessage,
     setPendingMessage: (value) => setUi("pendingMessage", value),
     setActiveMessage,
-    autoScroll: {
-      pause: autoScroll.pause,
-      forceScrollToBottom: () => {
-        autoScroll.resume()
-        scrollToEnd()
-      },
-    },
+    autoScroll,
     scroller: () => scroller,
     anchor,
     revealMessage: (id) => revealMessage(id),
@@ -1507,6 +1670,8 @@ export default function Page() {
 
   onCleanup(() => {
     if (reviewFrame !== undefined) cancelAnimationFrame(reviewFrame)
+    if (refreshFrame !== undefined) cancelAnimationFrame(refreshFrame)
+    if (refreshTimer !== undefined) window.clearTimeout(refreshTimer)
     if (todoFrame !== undefined) cancelAnimationFrame(todoFrame)
     if (todoTimer !== undefined) window.clearTimeout(todoTimer)
     if (diffFrame !== undefined) cancelAnimationFrame(diffFrame)
@@ -1639,45 +1804,37 @@ export default function Page() {
                   </div>
                 </Match>
                 <Match when={params.id}>
-                  <Show when={messagesReady() ? params.id : undefined} keyed>
-                    {(_id) => (
-                      <MessageTimeline
-                        actions={actions}
-                        scroll={ui.scroll}
-                        onResumeScroll={resumeScroll}
-                        setScrollRef={setScrollRef}
-                        onScheduleScrollState={scheduleScrollState}
-                        onAutoScrollHandleScroll={autoScroll.handleScroll}
-                        onMarkScrollGesture={markScrollGesture}
-                        hasScrollGesture={hasScrollGesture}
-                        onUserScroll={markUserScroll}
-                        onHistoryScroll={onHistoryScroll}
-                        onAutoScrollInteraction={autoScroll.handleInteraction}
-                        shouldAnchorBottom={() =>
-                          !location.hash && !store.messageId && !ui.pendingMessage && !autoScroll.userScrolled()
-                        }
-                        centered={centered()}
-                        setContentRef={(el) => {
-                          content = el
-                          autoScroll.contentRef(el)
+                  <Show when={messagesReady()}>
+                    <MessageTimeline
+                      actions={actions}
+                      scroll={ui.scroll}
+                      onResumeScroll={resumeScroll}
+                      setScrollRef={setScrollRef}
+                      onScheduleScrollState={scheduleScrollState}
+                      onAutoScrollHandleScroll={autoScroll.handleScroll}
+                      onMarkScrollGesture={markScrollGesture}
+                      hasScrollGesture={hasScrollGesture}
+                      onUserScroll={markUserScroll}
+                      onHistoryScroll={historyLoader.onScrollerScroll}
+                      onAutoScrollInteraction={autoScroll.handleInteraction}
+                      shouldAnchorBottom={() =>
+                        !location.hash && !store.messageId && !ui.pendingMessage && !autoScroll.userScrolled()
+                      }
+                      centered={centered()}
+                      setContentRef={(el) => {
+                        content = el
+                        autoScroll.contentRef(el)
 
-                          const root = scroller
-                          if (root) scheduleScrollState(root)
-                        }}
-                        userMessages={visibleUserMessages()}
-                        setHistoryAnchor={(handlers) => {
-                          captureHistoryAnchor = handlers.capture
-                          restoreHistoryAnchor = handlers.restore
-                        }}
-                        anchor={anchor}
-                        setRevealMessage={(fn) => {
-                          revealMessage = fn
-                        }}
-                        setScrollToEnd={(fn) => {
-                          scrollToEnd = fn
-                        }}
-                      />
-                    )}
+                        const root = scroller
+                        if (root) scheduleScrollState(root)
+                      }}
+                      historyShift={historyLoader.shift()}
+                      userMessages={historyLoader.userMessages()}
+                      anchor={anchor}
+                      setRevealMessage={(fn) => {
+                        revealMessage = fn
+                      }}
+                    />
                   </Show>
                 </Match>
                 <Match when={true}>

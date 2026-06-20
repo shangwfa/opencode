@@ -27,21 +27,6 @@ export const scrollKey = (event: Pick<KeyboardEvent, "key" | "altKey" | "ctrlKey
   }
 }
 
-export function scrollTopFromThumbPointer(input: {
-  pointer: number
-  viewportTop: number
-  grabOffset: number
-  clientHeight: number
-  scrollHeight: number
-  thumbHeight: number
-}) {
-  const padding = 8
-  const maxThumbTop = input.clientHeight - padding * 2 - input.thumbHeight
-  if (maxThumbTop <= 0) return 0
-  const thumbTop = Math.max(0, Math.min(input.pointer - input.viewportTop - padding - input.grabOffset, maxThumbTop))
-  return (thumbTop / maxThumbTop) * Math.max(0, input.scrollHeight - input.clientHeight)
-}
-
 export function ScrollView(props: ScrollViewProps) {
   const i18n = useI18n()
   const merged = mergeProps({ orientation: "vertical" }, props)
@@ -118,37 +103,39 @@ export function ScrollView(props: ScrollViewProps) {
     updateThumb()
   })
 
+  let startY = 0
+  let startScrollTop = 0
+
   const onThumbPointerDown = (e: PointerEvent) => {
     e.preventDefault()
     e.stopPropagation()
     setState("isDragging", true)
-    const grabOffset = e.clientY - thumbRef.getBoundingClientRect().top
+    startY = e.clientY
+    startScrollTop = viewportRef.scrollTop
 
     thumbRef.setPointerCapture(e.pointerId)
 
     const onPointerMove = (e: PointerEvent) => {
+      const deltaY = e.clientY - startY
       const { scrollHeight, clientHeight } = viewportRef
-      viewportRef.scrollTop = scrollTopFromThumbPointer({
-        pointer: e.clientY,
-        viewportTop: viewportRef.getBoundingClientRect().top,
-        grabOffset,
-        clientHeight,
-        scrollHeight,
-        thumbHeight: thumbHeight(),
-      })
+      const maxScrollTop = scrollHeight - clientHeight
+      const maxThumbTop = clientHeight - thumbHeight()
+
+      if (maxThumbTop > 0) {
+        const scrollDelta = deltaY * (maxScrollTop / maxThumbTop)
+        viewportRef.scrollTop = startScrollTop + scrollDelta
+      }
     }
 
-    const done = (e: PointerEvent) => {
+    const onPointerUp = (e: PointerEvent) => {
       setState("isDragging", false)
       thumbRef.releasePointerCapture(e.pointerId)
       thumbRef.removeEventListener("pointermove", onPointerMove)
-      thumbRef.removeEventListener("pointerup", done)
-      thumbRef.removeEventListener("pointercancel", done)
+      thumbRef.removeEventListener("pointerup", onPointerUp)
     }
 
     thumbRef.addEventListener("pointermove", onPointerMove)
-    thumbRef.addEventListener("pointerup", done)
-    thumbRef.addEventListener("pointercancel", done)
+    thumbRef.addEventListener("pointerup", onPointerUp)
   }
 
   // Keybinds implementation

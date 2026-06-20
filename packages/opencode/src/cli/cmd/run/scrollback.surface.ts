@@ -34,6 +34,8 @@ type ActiveEntry = {
   rendered: boolean
 }
 
+let nextId = 0
+
 function commitMarkdownBlocks(input: {
   surface: ScrollbackSurface
   renderable: MarkdownRenderable
@@ -150,10 +152,12 @@ export class RunScrollbackStream {
     const surface = this.renderer.createScrollbackSurface({
       startOnNewLine: entryFlags(commit).startOnNewLine,
     })
+    const id = `run-scrollback-entry-${nextId++}`
     const style = entryLook(commit, this.theme.entry)
     const renderable =
       body.type === "text"
         ? new TextRenderable(surface.renderContext, {
+            id,
             content: "",
             width: "100%",
             wrapMode: "word",
@@ -162,6 +166,7 @@ export class RunScrollbackStream {
           })
         : body.type === "code"
           ? new CodeRenderable(surface.renderContext, {
+              id,
               content: "",
               filetype: body.filetype,
               syntaxStyle: entrySyntax(commit, this.theme),
@@ -173,6 +178,7 @@ export class RunScrollbackStream {
               treeSitterClient: this.treeSitterClient,
             })
           : new MarkdownRenderable(surface.renderContext, {
+              id,
               content: "",
               syntaxStyle: entrySyntax(commit, this.theme),
               width: "100%",

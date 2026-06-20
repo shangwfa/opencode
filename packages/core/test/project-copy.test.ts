@@ -12,27 +12,22 @@ import { EventV2 } from "@opencode-ai/core/event"
 import { Project } from "@opencode-ai/core/project"
 import { ProjectDirectoryTable, ProjectTable } from "@opencode-ai/core/project/sql"
 import { ProjectCopy } from "@opencode-ai/core/project/copy"
-import { ProjectDirectories } from "@opencode-ai/core/project/directories"
 import { tmpdir } from "./fixture/tmpdir"
 import { testEffect } from "./lib/effect"
 
 const databaseLayer = Database.layerFromPath(":memory:")
 const eventLayer = EventV2.layer.pipe(Layer.provide(databaseLayer))
-const directoriesLayer = ProjectDirectories.layer.pipe(Layer.provide(databaseLayer))
 const copyLayer = ProjectCopy.layer.pipe(
   Layer.provide(databaseLayer),
-  Layer.provide(directoriesLayer),
   Layer.provide(eventLayer),
   Layer.provide(FSUtil.defaultLayer),
   Layer.provide(Git.defaultLayer),
 )
-const it = testEffect(Layer.mergeAll(copyLayer, databaseLayer, eventLayer, directoriesLayer))
+const it = testEffect(Layer.mergeAll(copyLayer, databaseLayer, eventLayer))
 
 function abs(input: string) {
   return AbsolutePath.make(input)
 }
-
-const gitWorktree = ProjectCopy.StrategyID.make("git_worktree")
 
 async function initRepo(directory: string) {
   await $`git init`.cwd(directory).quiet()
@@ -60,7 +55,7 @@ function setup() {
       .pipe(Effect.orDie)
     yield* db
       .insert(ProjectDirectoryTable)
-      .values({ project_id: projectID, directory: sourceDirectory })
+      .values({ project_id: projectID, directory: sourceDirectory, type: "main" })
       .run()
       .pipe(Effect.orDie)
     return { root, sourceDirectory, projectID, db }
@@ -70,7 +65,7 @@ function setup() {
 function stored(projectID: Project.ID) {
   return Database.Service.use(({ db }) =>
     db
-      .select({ directory: ProjectDirectoryTable.directory, strategy: ProjectDirectoryTable.strategy })
+      .select({ directory: ProjectDirectoryTable.directory, type: ProjectDirectoryTable.type })
       .from(ProjectDirectoryTable)
       .where(eq(ProjectDirectoryTable.project_id, projectID))
       .all()
@@ -82,40 +77,18 @@ function stored(projectID: Project.ID) {
 }
 
 describe("ProjectCopy", () => {
-  it.effect("accepts arbitrary non-empty strategy ids", () =>
-    Effect.sync(() => {
-      expect(String(ProjectCopy.StrategyID.make("acme/snapshot"))).toBe("acme/snapshot")
-      expect(() => ProjectCopy.StrategyID.make("  acme/snapshot  ")).toThrow()
-      expect(() => ProjectCopy.StrategyID.make("   ")).toThrow()
-    }),
-  )
-
-  it.effect("rejects duplicate strategies and reports unavailable ids", () =>
+  it.live("detects linked git worktrees but not root checkouts", () =>
     Effect.gen(function* () {
       const input = yield* setup()
       const copy = yield* ProjectCopy.Service
-      const strategy: ProjectCopy.Strategy = {
-        id: ProjectCopy.StrategyID.make("test/duplicate"),
-        create: () => Effect.die("unused"),
-        remove: () => Effect.die("unused"),
-        list: () => Effect.succeed([]),
-      }
+      const target = abs(`${input.root.path}-copy-detected`)
+      yield* Effect.addFinalizer(() =>
+        Effect.promise(() => fs.rm(target, { recursive: true, force: true })).pipe(Effect.ignore),
+      )
+      yield* Effect.promise(() => $`git worktree add --detach ${target} HEAD`.cwd(input.root.path).quiet())
 
-      yield* copy.register(strategy)
-      expect(yield* copy.register(strategy).pipe(Effect.flip)).toBeInstanceOf(ProjectCopy.DuplicateStrategyError)
-
-      const unavailable = ProjectCopy.StrategyID.make("acme/missing")
-      const error = yield* copy
-        .create({
-          projectID: input.projectID,
-          strategy: unavailable,
-          sourceDirectory: input.sourceDirectory,
-          directory: abs(`${input.root.path}-missing-strategy`),
-          name: "copy",
-        })
-        .pipe(Effect.flip)
-      expect(error).toBeInstanceOf(ProjectCopy.StrategyUnavailableError)
-      if (error instanceof ProjectCopy.StrategyUnavailableError) expect(error.strategy).toBe(unavailable)
+      expect(yield* copy.detect({ directory: input.sourceDirectory })).toBeUndefined()
+      expect(yield* copy.detect({ directory: target })).toBe("git_worktree")
     }),
   )
 
@@ -137,7 +110,7 @@ describe("ProjectCopy", () => {
 
       const created = yield* copy.create({
         projectID: input.projectID,
-        strategy: gitWorktree,
+        strategy: "git_worktree",
         sourceDirectory: input.sourceDirectory,
         directory: parent,
         name: "copy",
@@ -145,15 +118,15 @@ describe("ProjectCopy", () => {
       expect(created.directory).toBe(target)
       expect(yield* stored(input.projectID)).toEqual(
         [
-          { directory: input.sourceDirectory, strategy: null },
-          { directory: created.directory, strategy: "git_worktree" },
+          { directory: input.sourceDirectory, type: "main" as const },
+          { directory: created.directory, type: "git_worktree" as const },
         ].toSorted((a, b) => a.directory.localeCompare(b.directory)),
       )
       expect(Array.from(yield* Fiber.join(fiber))[0]?.data).toEqual({ projectID: input.projectID })
 
       yield* copy.remove({ projectID: input.projectID, directory: created.directory, force: false })
 
-      expect(yield* stored(input.projectID)).toEqual([{ directory: input.sourceDirectory, strategy: null }])
+      expect(yield* stored(input.projectID)).toEqual([{ directory: input.sourceDirectory, type: "main" as const }])
       expect(yield* Effect.promise(() => Bun.file(target).exists())).toBe(false)
     }),
   )
@@ -169,7 +142,7 @@ describe("ProjectCopy", () => {
       )
       const created = yield* copy.create({
         projectID: input.projectID,
-        strategy: gitWorktree,
+        strategy: "git_worktree",
         sourceDirectory: input.sourceDirectory,
         directory: parent,
         name: "copy",
@@ -185,33 +158,11 @@ describe("ProjectCopy", () => {
         expect(error.operation).toBe("remove")
         expect(error.forceRequired).toBe(true)
       }
-      expect(yield* stored(input.projectID)).toContainEqual({ directory: created.directory, strategy: "git_worktree" })
+      expect(yield* stored(input.projectID)).toContainEqual({ directory: created.directory, type: "git_worktree" })
       expect(yield* Effect.promise(() => Bun.file(path.join(created.directory, "dirty.txt")).exists())).toBe(true)
 
       yield* copy.remove({ projectID: input.projectID, directory: created.directory, force: true })
       expect(yield* Effect.promise(() => Bun.file(created.directory).exists())).toBe(false)
-    }),
-  )
-
-  it.live("preserves copies whose stored strategy is unavailable", () =>
-    Effect.gen(function* () {
-      const input = yield* setup()
-      const copy = yield* ProjectCopy.Service
-      const unavailable = abs(`${input.root.path}-copy-unavailable`)
-      yield* Effect.promise(() => fs.mkdir(unavailable))
-      yield* Effect.addFinalizer(() => Effect.promise(() => fs.rm(unavailable, { recursive: true, force: true })))
-      yield* input.db
-        .insert(ProjectDirectoryTable)
-        .values({ project_id: input.projectID, directory: unavailable, strategy: "acme/missing" })
-        .run()
-        .pipe(Effect.orDie)
-
-      const error = yield* copy
-        .remove({ projectID: input.projectID, directory: unavailable, force: false })
-        .pipe(Effect.flip)
-
-      expect(error).toBeInstanceOf(ProjectCopy.StrategyUnavailableError)
-      expect(yield* stored(input.projectID)).toContainEqual({ directory: unavailable, strategy: "acme/missing" })
     }),
   )
 
@@ -230,7 +181,7 @@ describe("ProjectCopy", () => {
 
       const created = yield* copy.create({
         projectID: input.projectID,
-        strategy: gitWorktree,
+        strategy: "git_worktree",
         sourceDirectory: input.sourceDirectory,
         directory: parent,
         name: "copy",
@@ -268,7 +219,7 @@ describe("ProjectCopy", () => {
       const error = yield* copy
         .create({
           projectID: input.projectID,
-          strategy: gitWorktree,
+          strategy: "git_worktree",
           sourceDirectory: input.sourceDirectory,
           directory: parent,
           name: "copy",
@@ -276,8 +227,7 @@ describe("ProjectCopy", () => {
         .pipe(Effect.flip)
 
       expect(error).toBeInstanceOf(ProjectCopy.DestinationExistsError)
-      if (error instanceof ProjectCopy.DestinationExistsError)
-        expect(error.directory).toBe(abs(path.join(parent, "copy-10")))
+      expect(error.directory).toBe(abs(path.join(parent, "copy-10")))
     }),
   )
 
@@ -313,30 +263,25 @@ describe("ProjectCopy", () => {
         Effect.promise(() => fs.rm(target, { recursive: true, force: true })).pipe(Effect.ignore),
       )
       yield* Effect.promise(() => $`git worktree add --detach ${target} HEAD`.cwd(input.root.path).quiet())
-      yield* input.db
-        .insert(ProjectDirectoryTable)
-        .values({ project_id: input.projectID, directory: target })
-        .run()
-        .pipe(Effect.orDie)
       const fiber = yield* events
         .subscribe(ProjectCopy.Event.Updated)
         .pipe(Stream.take(1), Stream.runCollect, Effect.forkScoped)
       yield* Effect.yieldNow
 
-      const discovered = abs(yield* Effect.promise(() => fs.realpath(target)))
-      expect(yield* copy.refresh({ projectID: input.projectID })).toEqual({ updated: [discovered], removed: [] })
+      yield* copy.refresh({ projectID: input.projectID })
 
+      const discovered = abs(yield* Effect.promise(() => fs.realpath(target)))
       expect(yield* stored(input.projectID)).toEqual(
         [
-          { directory: input.sourceDirectory, strategy: null },
-          { directory: discovered, strategy: "git_worktree" },
+          { directory: input.sourceDirectory, type: "main" as const },
+          { directory: discovered, type: "git_worktree" as const },
         ].toSorted((a, b) => a.directory.localeCompare(b.directory)),
       )
       expect(Array.from(yield* Fiber.join(fiber))[0]?.data).toEqual({ projectID: input.projectID })
 
       yield* Effect.promise(() => $`git worktree remove --force ${target}`.cwd(input.root.path).quiet())
-      expect(yield* copy.refresh({ projectID: input.projectID })).toEqual({ updated: [], removed: [discovered] })
-      expect(yield* stored(input.projectID)).toEqual([{ directory: input.sourceDirectory, strategy: null }])
+      yield* copy.refresh({ projectID: input.projectID })
+      expect(yield* stored(input.projectID)).toEqual([{ directory: input.sourceDirectory, type: "main" as const }])
     }),
   )
 
@@ -358,22 +303,10 @@ describe("ProjectCopy", () => {
       const discovered = abs(yield* Effect.promise(() => fs.realpath(target)))
       expect(yield* stored(input.projectID)).toEqual(
         [
-          { directory: input.sourceDirectory, strategy: null },
-          { directory: discovered, strategy: "git_worktree" },
+          { directory: input.sourceDirectory, type: "main" as const },
+          { directory: discovered, type: "git_worktree" as const },
         ].toSorted((a, b) => a.directory.localeCompare(b.directory)),
       )
-    }),
-  )
-
-  it.live("refresh ignores existing directories that are no longer git checkouts", () =>
-    Effect.gen(function* () {
-      const input = yield* setup()
-      yield* Effect.promise(() => fs.rm(path.join(input.sourceDirectory, ".git"), { recursive: true }))
-      const copy = yield* ProjectCopy.Service
-
-      yield* copy.refresh({ projectID: input.projectID })
-
-      expect(yield* stored(input.projectID)).toEqual([{ directory: input.sourceDirectory, strategy: null }])
     }),
   )
 
@@ -381,27 +314,7 @@ describe("ProjectCopy", () => {
     Effect.gen(function* () {
       const copy = yield* ProjectCopy.Service
 
-      expect(yield* copy.refresh({ projectID: Project.ID.make("missing-project") })).toEqual({
-        updated: [],
-        removed: [],
-      })
-    }),
-  )
-
-  it.live("refresh removes missing ordinary checkouts", () =>
-    Effect.gen(function* () {
-      const input = yield* setup()
-      const missing = abs(`${input.root.path}-missing-checkout`)
-      yield* input.db
-        .insert(ProjectDirectoryTable)
-        .values({ project_id: input.projectID, directory: missing })
-        .run()
-        .pipe(Effect.orDie)
-      const copy = yield* ProjectCopy.Service
-
-      expect(yield* copy.refresh({ projectID: input.projectID })).toEqual({ updated: [], removed: [missing] })
-
-      expect(yield* stored(input.projectID)).not.toContainEqual({ directory: missing, strategy: null })
+      yield* copy.refresh({ projectID: Project.ID.make("missing-project") })
     }),
   )
 })

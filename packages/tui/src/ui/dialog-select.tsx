@@ -25,7 +25,6 @@ export interface DialogSelectProps<T> {
   titleView?: JSX.Element
   placeholder?: string
   footer?: JSX.Element
-  emptyView?: JSX.Element
   options: DialogSelectOption<T>[]
   flat?: boolean
   ref?: (ref: DialogSelectRef<T>) => void
@@ -239,19 +238,9 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
     const option = selected()
     if (option) props.onMove?.(option)
     if (!scroll) return
-    let remaining = store.selected
-    let index = 0
-    // Locate the row by position because a unique renderable ID cannot currently be ensured.
-    for (const [category, options] of grouped()) {
-      if (category) index++
-      if (remaining < options.length) {
-        index += remaining
-        break
-      }
-      index += options.length
-      remaining -= options.length
-    }
-    const target = scroll.getChildren()[index]
+    const target = scroll.getChildren().find((child: { id?: string }) => {
+      return child.id === JSON.stringify(selected()?.value)
+    })
     if (!target) return
     const y = target.y - scroll.y
     if (center) {
@@ -528,11 +517,9 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
         <Show
           when={grouped().length > 0}
           fallback={
-            props.emptyView ?? (
-              <box paddingLeft={4} paddingRight={4} paddingTop={1}>
-                <text fg={theme.textMuted}>No results found</text>
-              </box>
-            )
+            <box paddingLeft={4} paddingRight={4} paddingTop={1}>
+              <text fg={theme.textMuted}>No results found</text>
+            </box>
           }
         >
           <scrollbox
@@ -566,6 +553,7 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
                       const current = createMemo(() => isDeepEqual(option.value, props.current))
                       return (
                         <box
+                          id={JSON.stringify(option.value)}
                           flexDirection="column"
                           position="relative"
                           onMouseMove={() => {
