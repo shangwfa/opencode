@@ -38,6 +38,11 @@
 | T8.2 | ✅ | 同 session 切换模型 |
 | T9.1 | ✅ | SSE 事件流可收到 session/message 事件 |
 | T9.2 | ✅ | SSE 收到 13 种事件（message.part.delta/updated, session.idle/diff/status 等） |
+| T9.3 | ✅ | SSE 事件类型验证（8 种：message.part.delta/updated, session.idle/diff/status/updated） |
+| T9.4 | ✅ | message API 结构完整（user=1 assistant=1, finish=stop） |
+| T9.5 | ✅ | session 状态查询正常 |
+| T9.6 | ✅ | session fork 返回新 ID |
+| T9.7 | ✅ | session share 返回 share slug |
 | T10.1 | ✅ | 完整开发流程 + PVC 持久化 |
 | T11.1 | ✅ | Vite 5 + glm-5.1 |
 | T11.2 | ✅ | HTML 注入验证 |
@@ -292,8 +297,30 @@
 
 | 用例 | 状态 | 备注 |
 |---|---|---|
+| T23.1 | ✅ | 共享 cache 目录可写（/home/sandbox/.cache/npm/flag.txt = WRITABLE） |
+| T23.2 | ✅ | npm cache 路径 = /opt/package-cache-base/npm |
+| T23.3 | ✅ | npm install ms@2.1.2 成功 |
+| T23.5 | ✅ | node_modules 跨 session 隔离（B 读不到 A 的 node_modules） |
+| T23.6 | ✅ | pnpm store=/opt/pnpm-store，dayjs install 成功 |
+| T23.7 | ⚠️ NOTE | yarn 未预装（sandbox 镜像仅含 npm/pnpm/bun） |
+| T23.9 | ✅ | volumeType=none 代码路径验证（buildVolumes 返回空数组） |
+| T23.11 | ⚠️ NOTE | kill-sandbox 后 cache 不保留（本地 Docker overlay 限制，K8s+PVC 应持久） |
+| T23.12 | ✅ | 缓存命中加速：冷 0.64s → 热 0.40s |
+| T23.13 | ✅ | 3 并发 npm install 全部成功 |
 | T24.1 | ✅ | mise 2026.6.11，node 18/20/22/24 + pnpm 8/9/10/11 预装 |
 | T24.2 | ✅ | 默认 node v24.16.0, pnpm 10.34.3, registry=npmmirror |
+| T24.3 | ✅ | mise use node@20：v24→v20 |
+| T24.4 | ✅ | mise use pnpm@9：10→9.15.9 |
+| T24.5 | ✅ | .nvmrc 自动检测：v20.20.2 |
+| T24.6 | ⚠️ NOTE | .node-version 不生效（mise.toml 优先级更高） |
+| T24.7 | ✅ | mise.toml 自动检测：node@18 |
+| T24.8 | ✅ | 切换版本后 pnpm install 成功（node@20+pnpm@9） |
+| T24.9 | ✅ | 不同 session 版本独立：A=v20, B=v24 |
+| T24.10 | ✅ | supergateway 3.4.3 + rg 14.1.0 可用 |
+| T24.11 | ✅ | pnpm store-dir=/opt/pnpm-store, virtual-store=/tmp/pnpm-vs |
+| T24.12 | ✅ | pnpm install 首次 1.8s（store 预装加速） |
+| T24.13 | ✅ | pnpm 重装 0.6s（全 reused） |
+| T24.14 | ✅ | express fallback 1.5s |
 | T24.21 | ✅ | 3 session 并发 pnpm install 成功 |
 | T24.22 | ✅ | 跨 session 版本独立：A=node@20, B=node@24 |
 | T24.23 | ⚠️ NOTE | /opt/pnpm-store root 可写（overlay 层运行时行为，镜像构建时不可变） |
