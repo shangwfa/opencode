@@ -13,6 +13,8 @@
 | T3.1 | ✅ | provider 凭据写入 |
 | T3.2 | ✅ | provider 凭据删除 |
 | T3.3 | ✅ | provider 凭据重启持久化（生产库验证） |
+| T3.4 | ✅ | 删除凭据 → PG COUNT=0 |
+| T3.5 | ✅ | 重启后 connected 仍含 moonshotai-cn |
 | T4.3 | ✅ | 写文件工具可用 |
 | T4.4 | ✅ | 读文件工具可用 |
 | T4.5 | ✅ | bash 工具可用 |
@@ -26,9 +28,12 @@
 | T6.1 | ✅ | 并发创建 session，5 个全部成功 |
 | T6.2 | ✅ | 不同 session 文件隔离，B 看不到 A 文件 |
 | T6.3 | ✅ | 同一 session 并发消息排队或串行处理，全部 204 |
+| T6.4 | ✅ | 不同 session 文件隔离：B 读 A 文件 → No such file |
+| T6.5 | ✅ | 3 条并发 prompt_async 全部 204 |
 | T8.1 | ✅ | provider 列表与 connected 状态 |
 | T8.2 | ✅ | 同 session 切换模型 |
 | T9.1 | ✅ | SSE 事件流可收到 session/message 事件 |
+| T9.2 | ✅ | SSE 收到 13 种事件（message.part.delta/updated, session.idle/diff/status 等） |
 | T10.1 | ✅ | 完整开发流程 + PVC 持久化 |
 | T11.1 | ✅ | Vite 5 + glm-5.1 |
 | T11.2 | ✅ | HTML 注入验证 |
@@ -65,6 +70,9 @@
 | T17.6 | ✅ | 沙箱销毁后 endpoint API 返回 502 |
 | T18.1 | ✅ | 7 种工具调用场景全部验证通过 |
 | T18.2 | ✅ | 消息流结构正确（prompt → tool → summary） |
+| T18.3 | ✅ | read 工具：读取 /workspace/t18.txt completed |
+| T18.4 | ✅ | glob 工具：搜索 .ts 文件找到 2 个 completed |
+| T18.5 | ✅ | grep 工具：搜索 hello completed |
 | T19.1 | ✅ | exec API：简单命令执行（exitCode=0, stdout=hello-from-exec） |
 | T19.2 | ✅ | exec API：多行输出（stdout 含 line1/line2）。⚠️ NOTE：stderr 被合并到 stdout，stderr 字段为空 |
 | T19.3 | ✅ | exec API：指定工作目录（pwd=/tmp） |
