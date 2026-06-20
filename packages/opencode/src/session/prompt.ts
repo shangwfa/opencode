@@ -3,6 +3,9 @@ import { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import path from "path"
 import { SessionV1 } from "@opencode-ai/core/v1/session"
 import os from "os"
+import * as Log from "@opencode-ai/core/util/log"
+
+const log = Log.create({ service: "session.prompt" })
 import { SessionID, MessageID, PartID } from "./schema"
 import { MessageV2 } from "./message-v2"
 import { SessionRevert } from "./revert"

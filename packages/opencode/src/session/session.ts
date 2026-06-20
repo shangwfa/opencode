@@ -3,6 +3,7 @@ import { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import { Slug } from "@opencode-ai/core/util/slug"
 import { SessionV1 } from "@opencode-ai/core/v1/session"
 import { serviceUse } from "@opencode-ai/core/effect/service-use"
+import * as Log from "@opencode-ai/core/util/log"
 import path from "path"
 import { BackgroundJob } from "@/background/job"
 import { Decimal } from "decimal.js"
@@ -548,6 +549,8 @@ export type Patch = Omit<Partial<Info>, "time" | "share" | "summary" | "revert" 
   revert?: Info["revert"] | null
   permission?: Info["permission"] | null
 }
+
+const log = Log.create({ service: "session" })
 
 export const layer: Layer.Layer<
   Service,

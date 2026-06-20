@@ -812,52 +812,95 @@ export namespace SandboxProvider {
           // pod 内去重
           const myToken = yield* Deferred.make<Sandbox, Error>()
           const winner = yield* claim(createRef, sessionID, myToken)
-          if (winner !== myToken) return yield* Deferred.await(winner).pipe(Effect.orDie)
+          if (winner !== myToken) {
+            log.info("getOrCreate awaiting winner", { sessionID, ms: Date.now() - t0 })
+            return yield* Deferred.await(winner).pipe(Effect.orDie)
+          }
 
-          const row = yield* dbGet(sessionID).pipe(Effect.orElseSucceed(() => null))
+          return yield* Effect.gen(function* () {
+            const row = yield* dbGet(sessionID).pipe(Effect.orElseSucceed(() => null))
 
-          const sb = yield* Effect.gen(function* () {
-            if (row?.state === "running") {
-              // 尝试重连已有沙箱
-              const existing = yield* reconnect(row).pipe(Effect.orElseSucceed(() => null))
-              if (existing) {
-                const healthy = yield* Effect.tryPromise(() => existing.isHealthy()).pipe(
-                  Effect.catch(() => Effect.succeed(false)),
-                )
-                if (healthy) {
-                  log.info("reconnected to existing sandbox", { sessionID, sandboxID: row.id })
-                  return existing
+            const sb = yield* Effect.gen(function* () {
+              if (row?.state === "running") {
+                const tReconnect = Date.now()
+                const existing = yield* reconnect(row).pipe(Effect.orElseSucceed(() => null))
+                log.info("reconnect done", {
+                  sessionID,
+                  sandboxID: row.id,
+                  ms: Date.now() - tReconnect,
+                  success: !!existing,
+                })
+
+                if (existing) {
+                  const tHealth = Date.now()
+                  const healthy = yield* Effect.tryPromise(() => existing.isHealthy()).pipe(
+                    Effect.catch(() => Effect.succeed(false)),
+                  )
+                  log.info("isHealthy done", {
+                    sessionID,
+                    sandboxID: row.id,
+                    ms: Date.now() - tHealth,
+                    healthy,
+                  })
+
+                  if (healthy) {
+                    log.info("reconnected to existing sandbox", {
+                      sessionID,
+                      sandboxID: row.id,
+                      totalMs: Date.now() - t0,
+                    })
+                    return existing
+                  }
+                  log.warn("sandbox unhealthy after reconnect, rebuilding", { sessionID })
+                  yield* destroySandbox(existing, sessionID).pipe(Effect.catchCause(() => Effect.void))
+                } else {
+                  invalidateCachedSandbox(sessionID)
+                  log.warn("sandbox reconnect returned null, rebuilding", { sessionID, sandboxID: row.id })
                 }
-                log.warn("sandbox unhealthy after reconnect, rebuilding", { sessionID })
-                yield* destroySandbox(existing, sessionID).pipe(Effect.catchCause(() => Effect.void))
-              } else {
-                log.warn("sandbox reconnect returned null, rebuilding", { sessionID, sandboxID: row.id })
               }
+              if (row?.state === "killed") {
+                log.info("recreating killed sandbox", { sessionID, sandboxID: row.id })
+              }
+              const tCreate = Date.now()
+              const result = yield* createSandbox(sessionID, opts)
+              log.info("createSandbox done", {
+                sessionID,
+                sandboxID: result.id,
+                ms: Date.now() - tCreate,
+                totalMs: Date.now() - t0,
+              })
+              return result
+            }).pipe(
+              Effect.catchCause((cause) =>
+                Effect.gen(function* () {
+                  yield* Deferred.fail(myToken, new Error("Sandbox creation failed")).pipe(Effect.catchCause(() => Effect.void))
+                  return yield* Effect.failCause(cause)
+                }),
+              ),
+            )
+
+            const owner = yield* Ref.modify(createRef, (m) => [m.get(sessionID) === myToken, m] as const)
+            if (!owner) {
+              yield* destroySandbox(sb, sessionID).pipe(Effect.catchCause(() => Effect.void))
+              return yield* Effect.fail(new Error(`Sandbox creation cancelled: ${sessionID}`))
             }
-            if (row?.state === "killed") {
-              log.info("recreating killed sandbox", { sessionID, sandboxID: row.id })
-            }
-            return yield* createSandbox(sessionID, opts)
+            yield* Ref.modify(createRef, (m) => { m.delete(sessionID); return [undefined, m] as const })
+            yield* Deferred.succeed(myToken, sb)
+            cacheSandbox(sessionID, sb)
+            log.info("getOrCreate done", { sessionID, sandboxID: sb.id, totalMs: Date.now() - t0 })
+            return sb
           }).pipe(
-            Effect.catchCause((cause) =>
+            Effect.ensuring(
               Effect.gen(function* () {
-                yield* Ref.modify(createRef, (m) => { m.delete(sessionID); return [undefined, m] as const })
-                yield* Deferred.fail(myToken, new Error("Sandbox creation failed")).pipe(Effect.catchCause(() => Effect.void))
-                return yield* Effect.failCause(cause)
+                const removed = yield* Ref.modify(createRef, (m) => {
+                  if (m.get(sessionID) !== myToken) return [false, m] as const
+                  m.delete(sessionID)
+                  return [true, m] as const
+                })
+                if (removed) yield* Deferred.fail(myToken, new Error(`Sandbox creation interrupted: ${sessionID}`)).pipe(Effect.catchCause(() => Effect.void))
               }),
             ),
           )
-
-          const owner = yield* Ref.modify(createRef, (m) => [m.get(sessionID) === myToken, m] as const)
-          if (!owner) {
-            yield* destroySandbox(sb, sessionID).pipe(Effect.catchCause(() => Effect.void))
-            return yield* Effect.fail(new Error(`Sandbox creation cancelled: ${sessionID}`))
-          }
-          yield* Ref.modify(createRef, (m) => { m.delete(sessionID); return [undefined, m] as const })
-          yield* Deferred.succeed(myToken, sb)
-          cacheSandbox(sessionID, sb)
-          log.info("getOrCreate done", { sessionID, sandboxID: sb.id, totalMs: Date.now() - t0 })
-          return sb
         })
       }
 

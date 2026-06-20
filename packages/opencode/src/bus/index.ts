@@ -1,4 +1,4 @@
-import { Effect, Exit, Layer, PubSub, Scope, Context, Stream, Schema } from "effect"
+import { Effect, Exit, Layer, PubSub, Scope, Context, Stream, Schema, Cause } from "effect"
 import { EffectBridge } from "@/effect/bridge"
 import { BusEvent } from "./bus-event"
 import { GlobalBus } from "./global"
@@ -8,6 +8,12 @@ import { serviceUse } from "@opencode-ai/core/effect/service-use"
 import { Identifier } from "@/id/id"
 import type { InstanceContext } from "@/project/instance-context"
 import { InstanceRef } from "@/effect/instance-ref"
+
+const log = {
+  info(msg: string, data?: Record<string, unknown>) { console.info(`[bus] ${msg}`, data ?? "") },
+  warn(msg: string, data?: Record<string, unknown>) { console.warn(`[bus] ${msg}`, data ?? "") },
+  error(msg: string, data?: Record<string, unknown>) { console.error(`[bus] ${msg}`, data ?? "") },
+}
 
 type BusProperties<D extends BusEvent.Definition<string, Schema.Top>> = Schema.Schema.Type<D["properties"]>
 
@@ -137,7 +143,9 @@ export const layer = Layer.effect(
             Stream.runForEach((msg) =>
               Effect.tryPromise({
                 try: () => Promise.resolve().then(() => callback(msg)),
-                catch: () => {},
+                catch: (cause) => {
+                  log.error("subscriber failed", { type, cause: Cause.pretty(cause) })
+                },
               }).pipe(Effect.ignore),
             ),
             Effect.forkScoped,

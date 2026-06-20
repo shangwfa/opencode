@@ -1,6 +1,9 @@
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { and, eq, sql } from "drizzle-orm"
 import { Database } from "@opencode-ai/core/database/database"
+import * as Log from "@opencode-ai/core/util/log"
+
+const log = Log.create({ service: "project" })
 import { ProjectDirectoryTable, ProjectTable } from "@opencode-ai/core/project/sql"
 import { SessionTable } from "@opencode-ai/core/session/sql"
 import { PermissionTable } from "@opencode-ai/core/permission/sql"
