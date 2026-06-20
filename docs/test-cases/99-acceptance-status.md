@@ -288,6 +288,11 @@
 | T27.7.4 | ✅ | definition：指向 lsp-test.ts:0:6 |
 | T27.7.5 | ✅ | references：返回位置数组 |
 | T27.7.6 | ✅ | diagnostics：检测到类型错误 |
+| T27.8 | ✅ | appId 超长(>128) → 400 |
+| T27.9 | ✅ | appId 合法边界字符（-_.）全部通过 → 200 |
+| T27.9.1 | ✅ | implementation：返回 HelloGreeter 位置 |
+| T27.9.2 | ✅ | prepareCallHierarchy：返回 caller 函数 item |
+| T27.9.3 | ✅ | incomingCalls（空）+ outgoingCalls（greet 方法） |
 
 ### Session User Fields（用户标识持久化）
 
@@ -377,6 +382,13 @@
 | T26.36 | ✅ | subagent 独立权限配置已持久化（sub-worker: 2 rules） |
 | T26.39 | ✅ | write deny 生效（工具从列表移除） |
 | T26.50 | ✅ | 综合最佳实践：白名单+bash粒度+read全开 → 7 rules |
+| T26.37 | ✅ | external_directory 权限：/external/*.log pattern 持久化 |
+| T26.38 | ✅ | ask 权限持久化（HTTP API 模式下 ask 会卡住，已知限制） |
+| T26.51 | ✅ | 权限组合 t51：6 rules |
+| T26.52 | ✅ | 权限组合 t52：4 rules |
+| T26.53 | ✅ | 权限组合 t53：4 rules |
+| T26.54 | ✅ | 权限组合 t54：4 rules |
+| T26.55 | ✅ | 权限组合 t55：5 rules |
 
 ### 工具沙箱执行验证（代码审查 + 运行时）
 
