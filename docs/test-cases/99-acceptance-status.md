@@ -30,6 +30,10 @@
 | T6.3 | ✅ | 同一 session 并发消息排队或串行处理，全部 204 |
 | T6.4 | ✅ | 不同 session 文件隔离：B 读 A 文件 → No such file |
 | T6.5 | ✅ | 3 条并发 prompt_async 全部 204 |
+| T6.6 | ✅ | 并发创建 10 个 session 全部成功 |
+| T6.7 | ✅ | 同 session 5 并发 exec 全部正确返回 |
+| T6.8 | ✅ | 3 个不同 session 并发 prompt_async 全部 204 |
+| T6.9 | ✅ | session 列表正常返回 |
 | T8.1 | ✅ | provider 列表与 connected 状态 |
 | T8.2 | ✅ | 同 session 切换模型 |
 | T9.1 | ✅ | SSE 事件流可收到 session/message 事件 |
@@ -272,6 +276,8 @@
 | T25.4 | ✅ | 同步接口 message 也支持 userName/userId |
 | T25.5 | ✅ | 多轮对话每条 user 消息独立携带标识（alice→bob） |
 | T25.6 | ✅ | 三人协作讨论（alice/bob/carol 各自标识正确） |
+| T25.7 | ✅ | 按用户筛选消息：alice=2 条, bob=1 条 |
+| T25.8 | ✅ | 交叉发言 alice→bob→alice 时序和标识正确 |
 
 ### Compose Agent（编排工作流）
 
@@ -279,6 +285,8 @@
 |---|---|---|
 | T26.C.1 | ✅ | 创建 compose agent + 3 编排技能，CRUD + PG 持久化 |
 | T26.C.2 | ⚠️ NOTE | AI 加载了 3 个编排技能（skill×3 completed），但未执行实际代码编写——AI 能力限制，非系统 bug |
+| T26.C.4 | ✅ | compose agent/skill session 隔离：B 无 compose agent/skill |
+| T26.C.5 | ✅ | 重启后 compose agent/skill 从 PG 恢复 |
 
 ### 沙箱镜像环境
 
