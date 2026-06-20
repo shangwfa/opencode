@@ -97,6 +97,12 @@
 | T18.7 | ✅ | write 工具：创建 t18-new.ts completed |
 | T18.8 | ⚠️ NOTE | ls 工具：AI 用 bash 替代（AI 行为选择，非系统限制） |
 | T18.9 | ✅ | skill 工具：加载 test-skill 内容 completed |
+
+### Sandbox Proxy 扩展
+
+| 用例 | 状态 | 备注 |
+|---|---|---|
+| T11.3b | ✅ | SSE stream async exec：收到 line1/line2/line3 实时输出 |
 | T19.1 | ✅ | exec API：简单命令执行（exitCode=0, stdout=hello-from-exec） |
 | T19.2 | ✅ | exec API：多行输出（stdout 含 line1/line2）。⚠️ NOTE：stderr 被合并到 stdout，stderr 字段为空 |
 | T19.3 | ✅ | exec API：指定工作目录（pwd=/tmp） |
@@ -350,6 +356,7 @@
 | T24.13 | ✅ | pnpm 重装 0.6s（全 reused） |
 | T24.14 | ✅ | express fallback 1.5s |
 | T24.15 | ✅ | pnpm hardlink 验证（link count=2，overlay 同 fs） |
+| T24.24 | ✅ | 磁盘空间：36G 可用，pnpm-store 4K + mise 862M |
 | T24.21 | ✅ | 3 session 并发 pnpm install 成功 |
 | T24.22 | ✅ | 跨 session 版本独立：A=node@20, B=node@24 |
 | T24.23 | ⚠️ NOTE | /opt/pnpm-store root 可写（overlay 层运行时行为，镜像构建时不可变） |
@@ -357,6 +364,7 @@
 | T28.2 | ✅ | 并发请求绕过 lock：5 个并发 554ms |
 | T28.3 | ✅ | 缓存 TTL 过期：首次 0.91s → 缓存 0.17s → 过期后 0.18s → 重新缓存 0.20s |
 | T28.5 | ✅ | Watchdog 标记超时工具：25s 内 stuck part 标记 error |
+| T28.5b | ✅ | event 表有 6 种事件类型（message.part.updated 等），事件同步可见 |
 | T28.6 | ✅ | 沙箱销毁后缓存失效：kill 后重建 0.85s → 重新缓存 0.12s |
 | T28.9 | ✅ | CAS 防覆盖：completed 状态未被 watchdog 覆盖 |
 | T28.10 | ✅ | 多实例幂等（CAS 条件更新，T28.9 已验证） |
