@@ -47,11 +47,13 @@
 | T9.9 | ✅ | session.status + session.idle 事件 |
 | T9.10 | ✅ | 异步 prompt 触发 message 事件 |
 | T9.11 | ✅ | 文件变更事件：file.edited + file.watcher.updated |
+| T9.12 | ✅ | dispose 事件：收到 server.instance.disposed |
 | T9.13 | ✅ | SSE 重连：每次收到 server.connected |
 | T9.14 | ⚠️ NOTE | 多客户端并发（测试方法限制，顺序执行非真正并发） |
 | T9.15 | ✅ | 中途加入收到后续事件 |
 | T10.1 | ✅ | 完整开发流程 + PVC 持久化 |
 | T10.2 | ✅ | E2E：创建 app.py + 运行输出 Hello World |
+| T10.3 | ✅ | diff API 返回（无 git repo 时空数组） |
 | T10.4 | ✅ | session 删除后查询返回 404 |
 | T11.1 | ✅ | Vite 5 + glm-5.1 |
 | T11.2 | ✅ | HTML 注入验证 |
@@ -93,6 +95,7 @@
 | T18.5 | ✅ | grep 工具：搜索 hello completed |
 | T18.6 | ✅ | edit 工具：line2 → CHANGED completed |
 | T18.7 | ✅ | write 工具：创建 t18-new.ts completed |
+| T18.8 | ⚠️ NOTE | ls 工具：AI 用 bash 替代（AI 行为选择，非系统限制） |
 | T18.9 | ✅ | skill 工具：加载 test-skill 内容 completed |
 | T19.1 | ✅ | exec API：简单命令执行（exitCode=0, stdout=hello-from-exec） |
 | T19.2 | ✅ | exec API：多行输出（stdout 含 line1/line2）。⚠️ NOTE：stderr 被合并到 stdout，stderr 字段为空 |
