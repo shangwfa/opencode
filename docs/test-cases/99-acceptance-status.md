@@ -143,7 +143,7 @@
 | T7.3 | ✅ | 无效 JSON 返回 400 |
 | T7.4 | ⚠️ NOTE | 缺失必填字段（空 parts）返回 200（非 400），服务端宽松处理 |
 | T7.5 | ✅ | 超长消息不 hang |
-| T12.11 | | OPENCODE_SANDBOX_IDLE_KILL_SEC 当前不参与实际回收逻辑 |
+| T12.11 | ✅ | OPENCODE_SANDBOX_IDLE_KILL_SEC=30，zombie 清理定时器在 ~60s 后回收 idle sandbox |
 | T13.1 | ✅ | kill-sandbox 返回 200，sandbox 被销毁 |
 | T13.2 | ✅ | kill 后 PVC 保留，新 sandbox 可读 kill-test.txt |
 | T13.3 | ✅ | 并发 prompt_async × 3，sandbox 创建不重复（日志验证） |
@@ -222,7 +222,7 @@
 | T22.11 | ✅ | 完整字段持久化（url/env/headers/enabled） |
 | T22.12 | ✅ | disabled MCP 的 enabled=false 持久化 |
 | T22.13 | ✅ | Remote MCP 工具执行验证：ev_echo 调用成功，输出 Echo: hello |
-| T22.14 | ⏳ | Local MCP 在 Sandbox 中执行验证（需沙箱 + supergateway） |
+| T22.14 | ✅ | Local MCP 在 Sandbox 中执行验证：sandbox-everything_echo 工具成功调用，输出 Echo: hello-sandbox-mcp |
 | T22.15 | ✅ | Session MCP 工具多轮对话持续可用：3 轮 3 次 MCP 调用全部成功 |
 
 ### Session PVC 模式（session/app）
