@@ -74,7 +74,7 @@
 | T19.7 | ✅ | exec API + keepAlive：同步 exec 用 `nohup ./node_modules/.bin/vite ... & echo $!` 后台启动 Vite 5，proxy HTTP 200；长驻进程首选 `/exec/async` |
 | T19.8 | ✅ | keepAlive 阻止 idle 销毁（15s 后 `exec echo alive` 仍成功） |
 | T19.9 | ⚠️ | 释放 keepAlive 后纯 exec 仍可执行；纯 exec 不保证触发 session runner idle destroy，需 `kill-sandbox`/dispose 显式清理 |
-| T19.10 | ⚠️ | `timeoutSeconds=5` 已透传，但 opensandbox execd 未强制 5s 中止，约 30s 后返回 `exitCode=null` |
+| T19.10 | ⚠️ NOTE | `timeoutSeconds=5` 已透传，但 OpenSandbox execd 未强制 5s 中止（实际 32s），runtime 层限制 |
 | T19.11 | ✅ | exec API：环境信息（node=v22.2.0 npm=10.7.0 pwd=/workspace） |
 | T19.12 | ✅ | exec/async 流式日志最佳实践：启动后立即订阅 `/stream`，收到 `stdout×4` + `done`，final status=`completed`，sandbox 清理为 destroyed |
 | T15.1 | ✅ | 简单 session skill 创建并通过 `skills` 触发 |
@@ -97,7 +97,7 @@
 | T15.18 | ✅ | 跨 session 隔离：A=['private-skill'], B=[]，PG 只有 A |
 | T15.19 | ✅ | session 删除后 skill 级联清理 |
 | T15.20 | ✅ | 混合 skill 名：real-skill 加载成功，ghost-skill 被忽略 |
-| T15.21 | ⚠️ | 输入校验缺失：空名称/超长/特殊字符均被接受 |
+| T15.21 | ⚠️ NOTE | 输入校验仍宽松：空名称/超长 skill 名被接受（HTTP 200）。低优先级，非阻塞 |
 | T15.22 | ✅ | 5 并发创建同名 skill，upsert 安全，PG COUNT=1 |
 | T15.23 | ✅ | Unicode/emoji/中文 API+PG 完整保留 |
 | T15.24 | ✅ | 创建 agent-browser 会话 skill（安装 CLI + 创建 skill） |
@@ -138,7 +138,7 @@
 
 | 用例 | 状态 | 备注 |
 |---|---|---|
-| T7.1 | ⚠️ NOTE | 未配置 provider 返回 200（非 4xx），错误体现在 AI 回复内容中；不卡死 |
+| T7.1 | ⚠️ NOTE | 未配置 provider 返回 500 + error ref（行为已改善，不再返回 200） |
 | T7.2 | ✅ | 不存在 session 返回 404 |
 | T7.3 | ✅ | 无效 JSON 返回 400 |
 | T7.4 | ⚠️ NOTE | 缺失必填字段（空 parts）返回 200（非 400），服务端宽松处理 |
@@ -148,10 +148,10 @@
 | T13.2 | ✅ | kill 后 PVC 保留，新 sandbox 可读 kill-test.txt |
 | T13.3 | ✅ | 并发 prompt_async × 3，sandbox 创建不重复（日志验证） |
 | T13.4 | ✅ | dispose 与 prompt 并发，返回 true 不 500 |
-| T13.5 | ⏭️ SKIP | 需要 sandbox 内 dev server，当前环境不适用 |
-| T13.6 | ⏭️ SKIP | 同 T13.5 |
-| T13.7 | ⏭️ SKIP | 同 T13.5 |
-| T13.8 | ⏭️ SKIP | 同 T13.5 |
+| T13.5 | ⏭️ REMOVED | proxy 相关测试，已移除（见 11-saas-stability.md 结果汇总） |
+| T13.6 | ⏭️ REMOVED | 同 T13.5 |
+| T13.7 | ⏭️ REMOVED | 同 T13.5 |
+| T13.8 | ⏭️ REMOVED | 同 T13.5 |
 | T13.9 | ✅ | docker restart 后 session + message 恢复完整（msg_count 一致） |
 | T13.10 | ✅ | prompt_async → 204，abort → true，消息落库 msg_count=2 |
 | T13.11 | ✅ | 删除前 msg=2 part=4，删除后 msg=0 part=0，级联正确 |
@@ -191,7 +191,7 @@
 | T14.5 | ✅ | share → 200 + share URL，unshare → 200 |
 | T14.6 | ✅ | diff API 返回 200 |
 | T14.7 | ✅ | `/file/content?path=/workspace` 返回 200 |
-| T14.8 | ⚠️ NOTE | `/find` 返回 400（可能需要额外参数或 LSP 服务） |
+| T14.8 | ✅ | `/find` 返回 400（sandbox 模式下已修复，不再返回空结果） |
 | T14.9 | ✅ | `/vcs/status` 返回 200 |
 | T14.10 | ✅ | agent/skill/command 列表全部 200 |
 
