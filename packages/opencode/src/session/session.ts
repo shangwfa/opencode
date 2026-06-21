@@ -38,6 +38,8 @@ import { Snapshot } from "@/snapshot"
 import { ProjectV2 } from "@opencode-ai/core/project"
 import { WorkspaceV2 } from "@opencode-ai/core/workspace"
 import { SessionID, MessageID, PartID } from "./schema"
+import { SessionRunState } from "./run-state"
+import { SandboxProvider } from "@/tool/sandbox-provider"
 
 import type { Provider } from "@/provider/provider"
 import { Permission } from "@/permission"
@@ -679,14 +681,23 @@ export const layer: Layer.Layer<
     const remove: Interface["remove"] = Effect.fnUntraced(function* (sessionID: SessionID) {
       const session = yield* get(sessionID)
       try {
-        // `remove` needs to work in all cases, such as broken sessions that
-        // run cleanup without instance state.
         const hasInstance = yield* InstanceState.directory.pipe(
           Effect.as(true),
           Effect.catchCause(() => Effect.succeed(false)),
         )
 
-        if (hasInstance) yield* cancelBackgroundJobs(background, sessionID)
+        if (hasInstance) {
+          yield* cancelBackgroundJobs(background, sessionID)
+
+          const runState = yield* Effect.serviceOption(SessionRunState.Service)
+          if (runState._tag === "Some") yield* runState.value.cancel(sessionID)
+
+          const sandboxProvider = yield* Effect.serviceOption(SandboxProvider.Service)
+          if (sandboxProvider._tag === "Some") {
+            yield* sandboxProvider.value.destroy(sessionID).pipe(Effect.catchCause(() => Effect.void))
+          }
+        }
+
         const kids = yield* children(sessionID)
         for (const child of kids) {
           yield* remove(child.id)

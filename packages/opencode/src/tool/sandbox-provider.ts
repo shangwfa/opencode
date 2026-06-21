@@ -1,7 +1,7 @@
 import { Effect, Context, Layer, Cause, Deferred, Ref, Semaphore, Schedule, Duration } from "effect"
 import { Sandbox, ConnectionConfig } from "@alibaba-group/opensandbox"
 import type { CommandExecution, Volume } from "@alibaba-group/opensandbox"
-import { and, eq, lt } from "drizzle-orm"
+import { and, eq, lt, sql } from "drizzle-orm"
 import * as Log from "@opencode-ai/core/util/log"
 import { Flag } from "@/flag/flag"
 import { Database } from "../storage/db"
@@ -240,7 +240,6 @@ export namespace SandboxProvider {
       function destroySandbox(sb: Sandbox, sessionID: string) {
         return Effect.gen(function* () {
           log.info("destroying sandbox", { sessionID, sandboxID: sb.id })
-          commandSemaphores.delete(sessionID)
           const cmdSession = commandSessions.get(sessionID)
           if (cmdSession) {
             yield* Effect.tryPromise(() => sb.commands.deleteSession(cmdSession)).pipe(
@@ -440,7 +439,6 @@ export namespace SandboxProvider {
         }).pipe(
           Effect.ensuring(Effect.sync(() => {
             commandSessions.delete(sessionID)
-            commandSemaphores.delete(sessionID)
           })),
           Effect.catch(() => Effect.void),
           Effect.withSpan("SandboxProvider.interrupt"),
@@ -449,7 +447,6 @@ export namespace SandboxProvider {
       const register: Interface["register"] = (sessionID, sb) =>
         Effect.sync(() => {
           commandSessions.delete(sessionID)
-          commandSemaphores.delete(sessionID)
           sandboxes.set(sessionID, sb)
         })
 
@@ -853,8 +850,20 @@ export namespace SandboxProvider {
               if (row?.state === "killed") {
                 log.info("recreating killed sandbox", { sessionID, sandboxID: row.id })
               }
+              // P0-3: cross-pod mutex — prevent duplicate sandbox creation
+              yield* Effect.tryPromise({
+                try: () => pgDb.execute(sql`SELECT pg_advisory_lock(hashtext(${sessionID}))`),
+                catch: (e) => new Error(`advisory_lock failed: ${String(e)}`),
+              }).pipe(Effect.orDie)
               const tCreate = Date.now()
-              const result = yield* createSandbox(sessionID, opts)
+              const result = yield* createSandbox(sessionID, opts).pipe(
+                Effect.ensuring(
+                  Effect.tryPromise({
+                    try: () => pgDb.execute(sql`SELECT pg_advisory_unlock(hashtext(${sessionID}))`),
+                    catch: () => {},
+                  }).pipe(Effect.ignore),
+                ),
+              )
               log.info("createSandbox done", {
                 sessionID,
                 sandboxID: result.id,
@@ -897,17 +906,13 @@ export namespace SandboxProvider {
       }
 
       const getOrCreate: Interface["getOrCreate"] = (sessionID, opts) =>
-        Effect.gen(function* () {
-          const cached = getCachedSandbox(sessionID)
-          if (cached) return cached
-          return yield* lock(sessionID, getOrCreateUnlocked(sessionID, opts)).pipe(
-            Effect.timeoutOrElse({
-              duration: Duration.seconds(90),
-              orElse: () => Effect.fail(new Error(`Sandbox getOrCreate timeout after 90s: ${sessionID}`)),
-            }),
-            Effect.orDie,
-          )
-        }).pipe(Effect.withSpan("SandboxProvider.getOrCreate"))
+        lock(sessionID, getOrCreateUnlocked(sessionID, opts)).pipe(
+          Effect.timeoutOrElse({
+            duration: Duration.seconds(90),
+            orElse: () => Effect.fail(new Error(`Sandbox getOrCreate timeout after 90s: ${sessionID}`)),
+          }),
+          Effect.orDie,
+        ).pipe(Effect.withSpan("SandboxProvider.getOrCreate"))
 
       const get: Interface["get"] = (sessionID) =>
         Effect.gen(function* () {
@@ -939,18 +944,16 @@ export namespace SandboxProvider {
               yield* dbMarkDestroyed(sessionID, row.id)
             }
           } else if (row) {
-            // 非 running 状态（killed/destroyed）：保留 keep_alive 字段，标记为 destroyed
             yield* dbMarkDestroyed(sessionID, row.id)
           }
-          commandSemaphores.delete(sessionID)
         })).pipe(Effect.withSpan("SandboxProvider.destroy"))
 
       const destroyById: Interface["destroyById"] = (sandboxID) =>
         Effect.gen(function* () {
           const row = yield* dbGetById(sandboxID).pipe(Effect.orElseSucceed(() => null))
           if (!row || row.state !== "running") return
-          invalidateCachedSandbox(row.session_id)
           yield* lock(row.session_id, Effect.gen(function* () {
+            invalidateCachedSandbox(row.session_id)
             const current = yield* dbGetById(sandboxID).pipe(Effect.orElseSucceed(() => null))
             if (!current || current.id !== sandboxID || current.state !== "running") return
             yield* Ref.modify(createRef, (m) => {
@@ -967,7 +970,6 @@ export namespace SandboxProvider {
             yield* bestEffortKill(sandboxID, current.session_id)
             yield* dbDeleteFor(current.session_id, sandboxID).pipe(Effect.catchCause(() => Effect.void))
           }))
-          commandSemaphores.delete(row.session_id)
         }).pipe(Effect.withSpan("SandboxProvider.destroyById"))
 
       const destroyAll: Interface["destroyAll"] = () =>
@@ -1030,8 +1032,7 @@ export namespace SandboxProvider {
 
       const runInSession: Interface["runInSession"] = (sessionID, command, options, handlers, signal) =>
         Effect.gen(function* () {
-          const cached = getCachedSandbox(sessionID)
-          const sb = cached ?? (yield* lock(sessionID, getOrCreateUnlocked(sessionID)))
+          const sb = yield* lock(sessionID, getOrCreateUnlocked(sessionID))
 
           // Semaphore 提前初始化，保护 createSession + runInSession 全流程
           // 防止并发请求同时发现 command_session_id=null 而重复创建 shell session
@@ -1089,8 +1090,7 @@ export namespace SandboxProvider {
           log.info("sandbox command interrupted", { sessionID })
         }).pipe(
           Effect.ensuring(Effect.gen(function* () {
-            commandSemaphores.delete(sessionID)
-            yield* Effect.tryPromise({
+          yield* Effect.tryPromise({
               try: () => pgDb
                 .update(SandboxTable)
                 .set({ command_session_id: null, time_updated: Date.now() })
@@ -1104,7 +1104,6 @@ export namespace SandboxProvider {
 
       const register: Interface["register"] = (sessionID, sb) =>
         lock(sessionID, Effect.gen(function* () {
-          commandSemaphores.delete(sessionID)
           yield* dbUpsert({
             id: sb.id,
             session_id: sessionID,
