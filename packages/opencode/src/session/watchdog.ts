@@ -5,6 +5,7 @@ import { Database } from "../storage/db"
 import { PartTable } from "./session.sql"
 import type { PartID } from "./schema"
 import { SessionTools } from "./tools"
+import { runningToolCondition } from "./watchdog-sql"
 
 const log = Log.create({ service: "watchdog" })
 
@@ -62,21 +63,6 @@ function runningStart(data: unknown): number | undefined {
   return value.state.time.start
 }
 
-function runningToolCondition(startBefore: number) {
-  if (Database.dialect === "pg") {
-    return and(
-      sql`${PartTable.data}->>'type' = 'tool'`,
-      sql`${PartTable.data}->'state'->>'status' = 'running'`,
-      sql`(${PartTable.data}->'state'->'time'->>'start')::bigint < ${startBefore}`,
-    )
-  }
-  return and(
-    sql`json_extract(${PartTable.data}, '$.type') = 'tool'`,
-    sql`json_extract(${PartTable.data}, '$.state.status') = 'running'`,
-    sql`json_extract(${PartTable.data}, '$.state.time.start') < ${startBefore}`,
-  )
-}
-
 const scan = Effect.fn("SessionWatchdog.scan")(function* (config: Config) {
   const db = Database.Client() as WatchdogDb
   const tools = yield* SessionTools.Service
@@ -93,7 +79,7 @@ const scan = Effect.fn("SessionWatchdog.scan")(function* (config: Config) {
           data: PartTable.data,
         })
         .from(PartTable)
-        .where(runningToolCondition(startBefore))
+        .where(runningToolCondition(startBefore, Database.dialect))
         .all(),
     catch: (error) => new Error(`watchdog scan query failed: ${String(error)}`),
   }).pipe(
