@@ -401,14 +401,10 @@ export namespace SandboxProvider {
               )
             }
           }
-          let sem = commandSemaphores.get(sessionID)
-          if (!sem) { sem = Effect.runSync(Semaphore.make(1)); commandSemaphores.set(sessionID, sem) }
-          return yield* sem.withPermit(
-            Effect.tryPromise({
-              try: () => sb.commands.runInSession(sessionId!, command, options, handlers, signal),
-              catch: (e) => new Error(`runInSession failed: ${String(e)}`),
-            }),
-          )
+          return yield* Effect.tryPromise({
+            try: () => sb.commands.runInSession(sessionId!, command, options, handlers, signal),
+            catch: (e) => new Error(`runInSession failed: ${String(e)}`),
+          })
         }).pipe(Effect.withSpan("SandboxProvider.runInSession"))
 
       const runDetached: Interface["runDetached"] = (sessionID, command, options, handlers, signal) =>
@@ -491,7 +487,7 @@ export namespace SandboxProvider {
       const commandSemaphores = new Map<string, Semaphore.Semaphore>()
       const createRef = yield* Ref.make(new Map<string, Deferred.Deferred<Sandbox, Error>>())
       const sbCache = new Map<string, { sb: Sandbox; cachedAt: number; sandboxID: string }>()
-      const SB_CACHE_TTL_MS = 30_000
+      const SB_CACHE_TTL_MS = 300_000
 
       function getCachedSandbox(sessionID: string): Sandbox | null {
         const hit = sbCache.get(sessionID)
@@ -1036,33 +1032,37 @@ export namespace SandboxProvider {
       const runInSession: Interface["runInSession"] = (sessionID, command, options, handlers, signal) =>
         Effect.gen(function* () {
           const cached = getCachedSandbox(sessionID)
-          const sb = cached ?? (yield* lock(sessionID, getOrCreateUnlocked(sessionID)))
+          const sb = cached ?? (yield* lock(sessionID, getOrCreateUnlocked(sessionID)).pipe(
+            Effect.timeoutOrElse({
+              duration: Duration.seconds(30),
+              orElse: () => Effect.fail(new Error(`runInSession: getOrCreate timeout after 30s`)),
+            }),
+          ))
 
-          // Semaphore 提前初始化，保护 createSession + runInSession 全流程
-          // 防止并发请求同时发现 command_session_id=null 而重复创建 shell session
-          let sem = commandSemaphores.get(sessionID)
-          if (!sem) { sem = Effect.runSync(Semaphore.make(1)); commandSemaphores.set(sessionID, sem) }
+          const row = yield* dbGet(sessionID).pipe(Effect.orElseSucceed(() => null))
+          let cmdSessionID = (row?.id === sb.id ? row?.command_session_id : null) ?? null
 
-          return yield* sem.withPermit(Effect.gen(function* () {
-            const row = yield* dbGet(sessionID).pipe(Effect.orElseSucceed(() => null))
+          if (!cmdSessionID) {
+            let sem = commandSemaphores.get(sessionID)
+            if (!sem) { sem = Effect.runSync(Semaphore.make(1)); commandSemaphores.set(sessionID, sem) }
+            cmdSessionID = yield* sem.withPermit(Effect.gen(function* () {
+              const row2 = yield* dbGet(sessionID).pipe(Effect.orElseSucceed(() => null))
+              const existing = (row2?.id === sb.id ? row2?.command_session_id : null) ?? null
+              if (existing) return existing
 
-            // command_session_id 必须属于当前沙箱（sandbox ID 一致才复用）
-            // 沙箱重建后 DB 里的 command_session_id 已被 createSandbox 置 null
-            let cmdSessionID = (row?.id === sb.id ? row?.command_session_id : null) ?? null
-
-            if (!cmdSessionID) {
-              cmdSessionID = yield* Effect.tryPromise({
+              const newSession = yield* Effect.tryPromise({
                 try: () => sb.commands.createSession({ workingDirectory: "/workspace" }),
                 catch: (e) => new Error(`Failed to create command session: ${String(e)}`),
               })
-              yield* dbSetCommandSession(sessionID, sb.id, cmdSessionID).pipe(Effect.catchCause(() => Effect.void))
-            }
+              yield* dbSetCommandSession(sessionID, sb.id, newSession).pipe(Effect.catchCause(() => Effect.void))
+              return newSession
+            }))
+          }
 
-            return yield* Effect.tryPromise({
-              try: () => sb.commands.runInSession(cmdSessionID!, command, options, handlers, signal),
-              catch: (e) => new Error(`runInSession failed: ${String(e)}`),
-            })
-          }))
+          return yield* Effect.tryPromise({
+            try: () => sb.commands.runInSession(cmdSessionID!, command, options, handlers, signal),
+            catch: (e) => new Error(`runInSession failed: ${String(e)}`),
+          })
         }).pipe(Effect.withSpan("SandboxProvider.runInSession"))
 
       const runDetached: Interface["runDetached"] = (sessionID, command, options, handlers, signal) =>
