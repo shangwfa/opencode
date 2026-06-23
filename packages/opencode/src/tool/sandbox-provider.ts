@@ -121,6 +121,97 @@ export function cleanupSessionVolume(
   )
 }
 
+type CommandHandlers = {
+  onStdout?: (msg: { text: string }) => void | Promise<void>
+  onStderr?: (msg: { text: string }) => void | Promise<void>
+  onEvent?: (ev: unknown) => void | Promise<void>
+  onResult?: (res: unknown) => void | Promise<void>
+  onExecutionComplete?: (c: unknown) => void | Promise<void>
+  onError?: (err: unknown) => void | Promise<void>
+  onInit?: (init: unknown) => void | Promise<void>
+}
+
+// SSE early-exit: consume runInSessionStream and return immediately on
+// execution_complete/error instead of waiting for the HTTP connection to
+// close. SDK's consumeExecutionStream keeps reader.read() blocked after
+// execution_complete — multi-layer proxies (K8s ingress) can hold the
+// connection open for 60-300s+, inflating every command's wall time.
+async function runCommandEarlyExit(
+  sb: Sandbox,
+  sessionId: string,
+  command: string,
+  options: { workingDirectory?: string; timeoutSeconds?: number } | undefined,
+  handlers: CommandHandlers | undefined,
+  signal?: AbortSignal,
+): Promise<CommandExecution> {
+  const execution: CommandExecution = {
+    logs: { stdout: [], stderr: [] },
+    result: [],
+  }
+  let errorValue: string | undefined
+
+  const commands = sb.commands as unknown as {
+    runInSessionStream: (
+      sessionId: string,
+      command: string,
+      opts?: { workingDirectory?: string; timeoutSeconds?: number },
+      signal?: AbortSignal,
+    ) => AsyncIterable<{
+      type: string
+      text?: string
+      execution_time?: number
+      error?: { ename?: string; evalue?: string; name?: string; value?: string; traceback?: unknown[] }
+      results?: unknown[]
+    }>
+  }
+
+  for await (const ev of commands.runInSessionStream(sessionId, command, options, signal)) {
+    await handlers?.onEvent?.(ev)
+    switch (ev.type) {
+      case "init":
+        execution.id = ev.text ?? ""
+        await handlers?.onInit?.({ id: ev.text ?? "" })
+        break
+      case "stdout": {
+        const msg = { text: ev.text ?? "", isError: false, timestamp: Date.now() }
+        execution.logs.stdout.push(msg)
+        await handlers?.onStdout?.(msg)
+        break
+      }
+      case "stderr": {
+        const msg = { text: ev.text ?? "", isError: true, timestamp: Date.now() }
+        execution.logs.stderr.push(msg)
+        await handlers?.onStderr?.(msg)
+        break
+      }
+      case "execution_complete": {
+        execution.complete = { executionTimeMs: ev.execution_time ?? 0, timestamp: Date.now() }
+        await handlers?.onExecutionComplete?.(execution.complete)
+        execution.exitCode = execution.error
+          ? errorValue && /^-?\d+$/.test(errorValue.trim()) ? Number(errorValue.trim()) : null
+          : 0
+        return execution
+      }
+      case "error": {
+        const e = ev.error
+        if (e) {
+          errorValue = String(e.evalue ?? e.value ?? "")
+          execution.error = {
+            name: String(e.ename ?? e.name ?? ""),
+            value: errorValue,
+            timestamp: Date.now(),
+            traceback: Array.isArray(e.traceback) ? e.traceback.map(String) : [],
+          }
+          await handlers?.onError?.(execution.error)
+        }
+        execution.exitCode = errorValue && /^-?\d+$/.test(errorValue.trim()) ? Number(errorValue.trim()) : null
+        return execution
+      }
+    }
+  }
+  return execution
+}
+
 export namespace SandboxProvider {
   const log = Log.create({ service: "sandbox-provider" })
 
@@ -402,7 +493,7 @@ export namespace SandboxProvider {
             }
           }
           return yield* Effect.tryPromise({
-            try: () => sb.commands.runInSession(sessionId!, command, options, handlers, signal),
+            try: () => runCommandEarlyExit(sb, sessionId!, command, options, handlers, signal),
             catch: (e) => new Error(`runInSession failed: ${String(e)}`),
           })
         }).pipe(Effect.withSpan("SandboxProvider.runInSession"))
@@ -416,7 +507,7 @@ export namespace SandboxProvider {
           })
           try {
             return yield* Effect.tryPromise({
-              try: () => sb.commands.runInSession(detachedSessionId, command, options, handlers, signal),
+              try: () => runCommandEarlyExit(sb, detachedSessionId, command, options, handlers, signal),
               catch: (e) => new Error(`runDetached failed: ${String(e)}`),
             })
           } finally {
@@ -1060,9 +1151,15 @@ export namespace SandboxProvider {
           }
 
           return yield* Effect.tryPromise({
-            try: () => sb.commands.runInSession(cmdSessionID!, command, options, handlers, signal),
+            try: () => runCommandEarlyExit(sb, cmdSessionID!, command, options, handlers, signal),
             catch: (e) => new Error(`runInSession failed: ${String(e)}`),
-          })
+          }).pipe(
+            Effect.tapError((err) =>
+              String(err).includes("not found")
+                ? Effect.sync(() => { invalidateCachedSandbox(sessionID); log.warn("sandbox invalidated after command failure", { sessionID }) })
+                : Effect.void,
+            ),
+          )
         }).pipe(Effect.withSpan("SandboxProvider.runInSession"))
 
       const runDetached: Interface["runDetached"] = (sessionID, command, options, handlers, signal) =>
@@ -1074,9 +1171,15 @@ export namespace SandboxProvider {
           })
           try {
             return yield* Effect.tryPromise({
-              try: () => sb.commands.runInSession(detachedSessionId, command, options, handlers, signal),
+              try: () => runCommandEarlyExit(sb, detachedSessionId, command, options, handlers, signal),
               catch: (e) => new Error(`runDetached failed: ${String(e)}`),
-            })
+            }).pipe(
+              Effect.tapError((err) =>
+                String(err).includes("not found")
+                  ? Effect.sync(() => { invalidateCachedSandbox(sessionID); log.warn("sandbox invalidated after detached failure", { sessionID }) })
+                  : Effect.void,
+              ),
+            )
           } finally {
             yield* Effect.tryPromise(() => sb.commands.deleteSession(detachedSessionId)).pipe(Effect.ignore)
           }

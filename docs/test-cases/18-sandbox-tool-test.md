@@ -631,3 +631,286 @@ fi
 | bash 命令永久卡住 | getOrCreateUnlocked 无超时 | T18.S3 | `getOrCreate timeout after 30s` |
 | 持续命令执行中频繁重连 | sbCache TTL 过短 | T18.S4 | `reconnect done` 频繁出现 |
 | bash 比 read 慢 100x | 锁串行化 + SSE 延迟叠加 | T18.S5 | 对比 read/bash 各自延迟 |
+
+---
+
+## 十二、SSE 早退优化测试（2026-06-23）
+
+> 对应改动：`sandbox-provider.ts` 新增 `runCommandEarlyExit`，用 `runInSessionStream` 替代 `runInSession`
+
+### 12.0 背景
+
+SDK 的 `consumeExecutionStream` 在收到 `execution_complete` 事件后**继续 `reader.read()` 等 SSE 流关闭**。本地单层 proxy 环境下 gap ~1 秒，远端 K8s + `useServerProxy=true` 多层 proxy 下 gap 被放大到 **60-3539 秒**（ingress idle timeout）。
+
+**根因链**：
+
+```
+execd 执行 ls (<1s) → 发送 execution_complete → SDK 不 break
+  → reader.read() 等 HTTP 连接关闭
+  → K8s ingress idle timeout (60-300s) 才关闭
+  → Promise resolve → 总耗时 60-3539s
+```
+
+**修复**：新增 `runCommandEarlyExit` 函数，用 SDK 的 `runInSessionStream` 获取事件流，收到 `execution_complete` 或 `error` 后**立即返回**，不等待 SSE 流关闭。exitCode 按 SDK 原始逻辑推断（有 error → 解析 value 数字；有 complete 无 error → 0）。
+
+### 12.1 通用变量
+
+```bash
+BASE="http://localhost:14096"
+PG_URL="postgresql://ruomu@127.0.0.1:5432/opencode"
+```
+
+---
+
+### T18.E1 bash 命令延迟大幅下降（SSE 早退核心验证）
+
+**验证点**：所有通过 `runInSession` 执行的 bash 命令不再等待 SSE 流关闭，延迟降至命令本身执行时间。
+
+```bash
+SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' \
+  | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+echo "SID: $SID"
+
+# warmup
+curl -s -X POST "$BASE/session/$SID/exec" \
+  -H 'Content-Type: application/json' -d '{"command":"echo warmup"}' >/dev/null
+
+# 5 种不同命令的延迟
+echo "--- bash 命令延迟 ---"
+for cmd in "ls /workspace/" "echo hello" "cat /workspace/package.json | head -5" "pwd" "whoami"; do
+  T=$(curl -s -o /dev/null -w '%{time_total}' --max-time 10 \
+    -X POST "$BASE/session/$SID/exec" \
+    -H 'Content-Type: application/json' -d "{\"command\":\"$cmd\"}")
+  printf "  %-45s %ss\n" "$cmd" "$T"
+done
+```
+
+**期望**：
+- 本地环境（单层 proxy）：每条命令 < 0.2s（修复前 ~1s）
+- 远端 K8s 环境（多层 proxy）：每条命令 < 1s（修复前 60-3539s）
+- 速度提升 > 10x（本地）或 > 100x（远端）
+
+---
+
+### T18.E2 exitCode 推断正确性（成功/失败/命令不存在）
+
+**验证点**：`runCommandEarlyExit` 在 `execution_complete` 或 `error` 事件时推断的 exitCode 与 SDK 原始行为完全一致。
+
+```bash
+SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' \
+  | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+
+# warmup
+curl -s -X POST "$BASE/session/$SID/exec" \
+  -H 'Content-Type: application/json' -d '{"command":"echo warmup"}' >/dev/null
+
+echo "--- exitCode 验证 ---"
+# 成功 (exit 0)
+R0=$(curl -s -X POST "$BASE/session/$SID/exec" -H 'Content-Type: application/json' \
+  -d '{"command":"ls /workspace/"}' | python3 -c "import json,sys;print(json.load(sys.stdin).get('exitCode'))")
+echo "  ls /workspace/      exit=$R0  expect=0  $([ '$R0' = '0' ] && echo '✅' || echo '❌')"
+
+# 失败 exit 42
+R42=$(curl -s -X POST "$BASE/session/$SID/exec" -H 'Content-Type: application/json' \
+  -d '{"command":"exit 42"}' | python3 -c "import json,sys;print(json.load(sys.stdin).get('exitCode'))")
+echo "  exit 42             exit=$R42  expect=42 $([ '$R42' = '42' ] && echo '✅' || echo '❌')"
+
+# 命令不存在 exit 127
+R127=$(curl -s -X POST "$BASE/session/$SID/exec" -H 'Content-Type: application/json' \
+  -d '{"command":"nonexistent-cmd-xyz"}' | python3 -c "import json,sys;print(json.load(sys.stdin).get('exitCode'))")
+echo "  nonexistent-cmd     exit=$R127 expect=127 $([ '$R127' = '127' ] && echo '✅' || echo '❌')"
+```
+
+**期望**：
+- `ls /workspace/` → exitCode=0 ✅
+- `exit 42` → exitCode=42 ✅（从 error.value 解析）
+- `nonexistent-cmd-xyz` → exitCode=127 ✅（command not found 的标准码）
+- 推断逻辑：有 error → `/^-?\d+$/` 匹配 error.value；有 complete 无 error → 0
+
+---
+
+### T18.E3 stdout/stderr 输出完整性
+
+**验证点**：早退不影响输出数据收集 —— 所有 stdout/stderr 事件在 `execution_complete` 之前发送。
+
+```bash
+SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' \
+  | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+
+# warmup
+curl -s -X POST "$BASE/session/$SID/exec" \
+  -H 'Content-Type: application/json' -d '{"command":"echo warmup"}' >/dev/null
+
+# 多行 stdout
+echo "--- 多行 stdout ---"
+curl -s -X POST "$BASE/session/$SID/exec" -H 'Content-Type: application/json' \
+  -d '{"command":"echo line1 && echo line2 && echo line3"}' \
+  | python3 -c "import json,sys;d=json.load(sys.stdin);lines=d.get('stdout','').strip().split('\n');print(f'  行数: {len(lines)} (期望 3)');[print(f'  {l}') for l in lines]"
+
+# stderr 混合
+echo "--- stderr 混合 ---"
+curl -s -X POST "$BASE/session/$SID/exec" -H 'Content-Type: application/json' \
+  -d '{"command":"echo to-stdout && echo to-stderr >&2"}' \
+  | python3 -c "import json,sys;d=json.load(sys.stdin);print(f'  stdout: {d.get(\"stdout\",\"\").strip()}');print(f'  stderr: {d.get(\"stderr\",\"\").strip()}')"
+```
+
+**期望**：
+- 多行 stdout：完整 3 行，无截断
+- stderr 混合：stdout 含 "to-stdout"，stderr 含 "to-stderr"
+- 输出内容与 SDK 原始 `runInSession` 完全一致
+
+---
+
+### T18.E4 并发 bash 命令不受 SSE 等待影响
+
+**验证点**：多个并发 bash 命令各自独立早退，不因 SSE 流等待而串行排队。
+
+```bash
+SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' \
+  | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+
+# warmup
+curl -s -X POST "$BASE/session/$SID/exec" \
+  -H 'Content-Type: application/json' -d '{"command":"echo warmup"}' >/dev/null
+
+# 3 个并发 ls
+echo "--- 3 个并发 bash ---"
+START=$(date +%s%N)
+for i in 1 2 3; do
+  curl -s -o /dev/null -w "  #$i: %{time_total}s\n" --max-time 10 \
+    -X POST "$BASE/session/$SID/exec" \
+    -H 'Content-Type: application/json' -d '{"command":"ls /workspace/src/"}' &
+done
+wait
+END=$(date +%s%N)
+TOTAL_MS=$(( (END - START) / 1000000 ))
+echo "  总耗时: ${TOTAL_MS}ms"
+
+if [ "$TOTAL_MS" -lt 1000 ]; then
+  echo "✅ T18.E4 PASS: 并发执行（${TOTAL_MS}ms）"
+else
+  echo "❌ T18.E4 FAIL: 可能仍串行（${TOTAL_MS}ms）"
+fi
+```
+
+**期望**：
+- 3 个并发 ls 总耗时 < 500ms（每个 ~50-150ms，并发执行）
+- 不出现串行排队（修复前 + SSE gap 可达 180-900s）
+
+---
+
+### T18.E5 SDK 直接 A/B 对比（runInSession vs runInSessionStream 早退）
+
+**验证点**：直接用 SDK 对比 `run()`（等 SSE 关闭）和 `runStream() + early exit`（收到 complete 立即返回），量化 SSE gap。
+
+```typescript
+// 在 packages/opencode 目录下运行：bun verify-sse-ab.ts
+import { Sandbox, ConnectionConfig } from "@alibaba-group/opensandbox"
+
+const cfg = new ConnectionConfig({
+  domain: "localhost:8080",
+  protocol: "http",
+  useServerProxy: true,
+})
+
+const sb = await Sandbox.create({ connectionConfig: cfg, image: "opencode-opensandbox:local", timeoutSeconds: 120 })
+console.log("sandbox:", sb.id)
+
+const CMD = "ls /workspace/"
+
+// A: SDK run()（等 SSE 流关闭）
+console.log("\n=== A: run()（SDK 原始）===")
+for (let i = 1; i <= 3; i++) {
+  let completeAt = 0
+  const t0 = Date.now()
+  await sb.commands.run(CMD, { timeoutSeconds: 30 }, {
+    onExecutionComplete: () => { completeAt = Date.now() - t0 },
+  })
+  const resolvedAt = Date.now() - t0
+  console.log(`  #${i}: complete=${completeAt}ms  resolved=${resolvedAt}ms  gap=${resolvedAt - completeAt}ms`)
+}
+
+// B: runStream() + 早退
+console.log("\n=== B: runStream() + early exit ===")
+for (let i = 1; i <= 3; i++) {
+  const t0 = Date.now()
+  for await (const ev of sb.commands.runStream(CMD, { timeoutSeconds: 30 })) {
+    if (ev.type === "execution_complete" || ev.type === "error") break
+  }
+  console.log(`  #${i}: returned=${Date.now() - t0}ms`)
+}
+
+await sb.kill().catch(() => {})
+await sb.close().catch(() => {})
+```
+
+```bash
+cd /Users/ruomu/code/opencode/packages/opencode
+bun verify-sse-ab.ts
+```
+
+**期望**：
+- A 组 `gap` > 500ms（SSE 流等待）
+- B 组 `returned` ≈ A 组 `complete`（命令执行时间，无等待）
+- 比值 A/B > 10x（本地单层 proxy）；远端 K8s 环境 > 100x
+
+> **注**：本地环境 SSE gap ~1 秒，远端 K8s + `useServerProxy=true` 多层 proxy 环境 gap 60-300 秒。
+
+---
+
+### T18.E6 远端 K8s 环境验证（部署后回归）
+
+**验证点**：部署新镜像到远端 SaaS 后，确认 `ls` 等快命令从 92-3539 秒降至 <1 秒。
+
+```bash
+PG_URL="postgresql://app:8zuhlMLd4gaeUG5k@127.0.0.1:15432/opencode"
+BASE="http://<远端 SaaS 地址>"
+
+# 1. 通过 AI 消息触发 ls 命令
+SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' \
+  | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+
+curl -s --max-time 60 -X POST "$BASE/session/$SID/message" \
+  -H 'Content-Type: application/json' \
+  -d '{"parts":[{"type":"text","text":"用 bash 执行 ls /workspace/src/"}],"model":{"providerID":"zhipuai","modelID":"glm-5.1"}}' \
+  | python3 -c "import json,sys;[print(p['text'][:100]) for p in json.load(sys.stdin).get('parts',[]) if p.get('type')=='text']"
+
+# 2. 从 PG 查询该 bash part 的耗时
+psql "$PG_URL" -c "
+SELECT p.data->>'tool' as tool,
+  p.data->'state'->>'status' as status,
+  ((p.data->'state'->'time'->>'end')::bigint - (p.data->'state'->'time'->>'start')::bigint)/1000 as dur_s,
+  substring(p.data->'state'->'input'->>'command',1,50) as cmd
+FROM part p WHERE p.session_id='$SID' AND p.data->>'tool'='bash'
+ORDER BY p.time_created DESC LIMIT 5;"
+
+# 3. 判定
+DUR=$(psql "$PG_URL" -t -c "
+SELECT ((p.data->'state'->'time'->>'end')::bigint - (p.data->'state'->'time'->>'start')::bigint)/1000
+FROM part p WHERE p.session_id='$SID' AND p.data->'state'->'input'->>'command' LIKE 'ls %'
+ORDER BY p.time_created DESC LIMIT 1" | tr -d '[:space:]')
+
+if [ "$DUR" -lt 5 ]; then
+  echo "✅ T18.E6 PASS: ls 命令 ${DUR}s（< 5s，SSE 早退生效）"
+else
+  echo "❌ T18.E6 FAIL: ls 命令 ${DUR}s（仍然慢，SSE 早退可能未生效）"
+fi
+```
+
+**期望**：
+- 修复前：`ls` 命令 92-3539 秒
+- 修复后：`ls` 命令 < 5 秒
+- exitCode 正确（0 表示成功）
+- stdout 完整（包含目录列表）
+
+---
+
+### 12.x 排查对照表（SSE 早退补充）
+
+| 现象 | 可能原因 | 验证用例 | 日志关键字 |
+|---|---|---|---|
+| bash 命令 >60s 但 read 正常 | SSE 流不关闭（ingress idle timeout）| T18.E1, T18.E5 | 无错误日志，只是耗时长 |
+| exitCode=null 导致误判超时 | 早退推断逻辑缺失 | T18.E2 | `metadata.exit=null` |
+| stdout 截断或丢失 | 早退过早 break | T18.E3 | 输出行数少于预期 |
+| 并发 bash 总耗时 = N × 单命令 | SSE 流串行化（未修复时）| T18.E4 | 3 个并发 ~3x 单命令耗时 |
+| runInSessionStream 不存在 | SDK 版本过低 | T18.E5 | `runInSessionStream is not a function` |
