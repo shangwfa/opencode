@@ -361,3 +361,273 @@ FROM part WHERE type='tool';
 ### 10.4 环境问题记录
 
 复测期间发现 sandbox 转发（宿主机 :30040 → 172.18.32.15:30040）断开，导致首次 bash 报 `Sandbox.create failed: Unable to connect`。重启转发后恢复正常。转发命令见 `local-test-env.md`。
+
+---
+
+## 十一、Shell 执行性能优化测试（2026-06-23）
+
+> 对应提交 `fix(tool): unblock concurrent bash commands and harden sandbox shell execution`
+
+### 11.0 背景
+
+`sandbox-provider.ts` 的 `runInSession` 存在三个性能/稳定性问题：
+
+| 问题 | 根因 | 影响 |
+|---|---|---|
+| **P0** 锁范围过大 | `commandSemaphores` permits=1 包裹了 `dbGet + createSession + runInSession` | 同一 session 的所有 bash 命令**完全串行**；LLM 一轮回复中并发提交的多个 bash 调用排队等待 |
+| **P1** 无超时保护 | `runInSession` 内部调用 `getOrCreateUnlocked` 绕过了外层 `getOrCreate` 的 90s 超时 | 缓存过期后 reconnect 网络挂起时**无限期阻塞**，sem permits=1 导致后续所有命令被永久排队 |
+| **P2** 缓存 TTL 过短 | `SB_CACHE_TTL_MS = 30_000`（30 秒） | 持续执行 bash 时每分钟至少触发 2 次完整 reconnect（`Sandbox.connect` + `isHealthy`），无谓网络开销 |
+
+### 11.1 通用变量
+
+```bash
+BASE="http://localhost:14096"
+
+# 启动容器时务必加 --print-logs 才能看到 log.info 输出
+# docker run ... opencode-saas-sandbox-test:v2fix serve --hostname 0.0.0.0 --port 4096 --print-logs --pure
+```
+
+---
+
+### T18.S1 并发 bash 命令不再串行化（P0 核心验证）
+
+**验证点**：`runInSession` 的 `commandSemaphores` 锁范围缩小到只保护 `createSession`（带双重检查），`runInSession` 命令执行移到锁外。同一 session 的多个 bash 命令可以并发执行，不再因 permits=1 排队。
+
+```bash
+SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' \
+  | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+echo "SID: $SID"
+
+# warmup 沙箱（确保后续 exec 不含建沙箱时间）
+curl -s -X POST "$BASE/session/$SID/exec" \
+  -H 'Content-Type: application/json' \
+  -d '{"command":"echo warmup"}' >/dev/null
+echo "warmup 完成"
+
+# 3 个并发 exec 命令（每个 sleep 2s）
+START=$(date +%s%N)
+for i in 1 2 3; do
+  curl -s -X POST "$BASE/session/$SID/exec" \
+    -H 'Content-Type: application/json' \
+    -d "{\"command\":\"sleep 2 && echo cmd-$i-done\"}" >/dev/null &
+done
+wait
+END=$(date +%s%N)
+TOTAL_MS=$(( (END - START) / 1000000 ))
+echo "3 个并发（各 sleep 2s）总耗时: ${TOTAL_MS}ms"
+
+# 判定
+if [ "$TOTAL_MS" -lt 5000 ]; then
+  echo "✅ T18.S1 PASS: 并发执行（${TOTAL_MS}ms ≈ 单命令耗时）"
+elif [ "$TOTAL_MS" -lt 8000 ]; then
+  echo "⚠️ T18.S1 WARN: 部分串行"
+else
+  echo "❌ T18.S1 FAIL: 仍然串行（${TOTAL_MS}ms ≈ 3x 单命令）"
+fi
+```
+
+**期望**：
+- 修复前：~6000ms（3 × 2s 串行）
+- 修复后：< 5000ms（3 个并发 ≈ 2s + 少量 overhead）
+- 容器日志只有 1 次 createSession（复用 command session）
+
+---
+
+### T18.S2 createSession 双重检查（P0 并发安全）
+
+**验证点**：并发请求发现 `command_session_id=null` 时，只有一个请求执行 `createSession`，其余通过双重检查（sem 内二次查 DB）复用已创建的 session。
+
+```bash
+SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' \
+  | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+
+# warmup 建 sandbox 但不建 command session（用 file API 而非 bash）
+curl -s -o /dev/null "$BASE/file/content?path=/workspace&sessionID=$SID&directory=/workspace"
+echo "warmup（file API，未触发 createSession）"
+
+# 并发发 3 个 bash 命令 — 都会发现 command_session_id=null，竞争 createSession
+for i in 1 2 3; do
+  curl -s -X POST "$BASE/session/$SID/exec" \
+    -H 'Content-Type: application/json' \
+    -d "{\"command\":\"echo concurrent-$i\"}" &
+done
+wait
+echo "3 个并发 bash 完成"
+
+# 验证日志只有 1 次 createSession
+echo "--- 容器日志 ---"
+docker logs opencode-saas-test 2>&1 | grep "createSession\|createSession done\|commands.createSession" | grep "$SID" | tail -5
+
+# 验证 DB 中只有 1 个 command_session_id
+PG_URL="postgresql://ruomu@127.0.0.1:5432/opencode"
+COUNT=$(psql "$PG_URL" -t -c "SELECT count(*) FROM sandbox WHERE session_id='$SID' AND command_session_id IS NOT NULL" | tr -d '[:space:]')
+echo "DB command_session_id 记录数: $COUNT"
+if [ "$COUNT" = "1" ]; then
+  echo "✅ T18.S2 PASS: 只创建了 1 个 command session"
+else
+  echo "❌ T18.S2 FAIL: command session 数量异常 ($COUNT)"
+fi
+```
+
+**期望**：
+- 容器日志只出现 1 次 `createSession`
+- DB 中 `command_session_id` 只有 1 条非空记录
+- 3 个 bash 命令全部成功（exitCode=0）
+
+---
+
+### T18.S3 runInSession getOrCreate 超时保护（P1）
+
+**验证点**：缓存过期后 `getOrCreateUnlocked` 挂起时，30s 超时生效，不会无限阻塞后续命令。
+
+```bash
+# 此用例需要模拟"沙箱不可达 + 缓存过期"场景
+docker rm -f opencode-saas-test-timeout 2>/dev/null
+docker run -d --name opencode-saas-test-timeout \
+  -p 14097:4096 \
+  -e OPENCODE_DATABASE_URL=postgresql://ruomu@host.docker.internal:5432/opencode \
+  -e OPENCODE_AUTH_PROVIDER=pg \
+  -e OPENCODE_SANDBOX_DOMAIN=host.docker.internal:39999 \
+  -e OPENCODE_SANDBOX_USE_SERVER_PROXY=true \
+  opencode-saas-sandbox-test:v2fix \
+  serve --hostname 0.0.0.0 --port 4096 --print-logs --pure
+sleep 10
+
+SID=$(curl -s -X POST "http://localhost:14097/session" -H 'Content-Type: application/json' -d '{}' \
+  | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+
+START=$(date +%s)
+RESP=$(curl -s -o /dev/null -w '%{http_code} %{time_total}' --max-time 60 \
+  "http://localhost:14097/file/content?path=/workspace&sessionID=$SID&directory=/workspace")
+END=$(date +%s)
+ELAPSED=$((END - START))
+echo "首次 file API: $RESP, 耗时: ${ELAPSED}s"
+
+# 缓存已写入但沙箱不可达 → 触发 runInSession 内部的 getOrCreateUnlocked
+START2=$(date +%s)
+RESP2=$(curl -s -o /dev/null -w '%{http_code} %{time_total}' --max-time 60 \
+  "http://localhost:14097/session/$SID/exec" \
+  -H 'Content-Type: application/json' -d '{"command":"echo test"}')
+END2=$(date +%s)
+ELAPSED2=$((END2 - START2))
+echo "exec（缓存 miss，getOrCreateUnlocked）: $RESP2, 耗时: ${ELAPSED2}s"
+
+if [ "$ELAPSED2" -lt 45 ]; then
+  echo "✅ T18.S3 PASS: 在 30s 超时内返回（${ELAPSED2}s）"
+else
+  echo "❌ T18.S3 FAIL: 超时未生效（${ELAPSED2}s）"
+fi
+
+docker logs opencode-saas-test-timeout 2>&1 | grep -iE "getOrCreate|timeout" | tail -5
+docker rm -f opencode-saas-test-timeout >/dev/null
+```
+
+**期望**：
+- exec 请求在 30-35s 内返回错误（非 200）
+- 容器日志含 `getOrCreate timeout after 30s` 或连接失败错误
+- 修复前：无限期阻塞（TCP 默认超时可达 300s+）
+
+---
+
+### T18.S4 sbCache TTL 延长 — 5 分钟内无 reconnect（P2）
+
+**验证点**：缓存 TTL 从 30s 延长到 300s（5 分钟），持续执行命令时不再每 30s 触发 reconnect。
+
+```bash
+SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' \
+  | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+
+# 首次建沙箱 + 命令 session
+curl -s -X POST "$BASE/session/$SID/exec" \
+  -H 'Content-Type: application/json' \
+  -d '{"command":"echo initial"}' >/dev/null
+echo "首次 exec 完成"
+
+# 在 5 分钟内每 20s 执行一次命令，观察是否有 reconnect
+for i in $(seq 1 6); do
+  sleep 20
+  curl -s -X POST "$BASE/session/$SID/exec" \
+    -H 'Content-Type: application/json' \
+    -d "{\"command\":\"echo tick-$i\"}" >/dev/null
+  echo "  [${i}00s] exec 完成"
+done
+
+echo "--- reconnect 日志（期望为空或仅首次）---"
+docker logs opencode-saas-test 2>&1 | grep "reconnect done" | grep "$SID" | tail -5
+
+# 统计 getOrCreate 调用次数（期望 1 次 — 首次建沙箱）
+RECONNECT_COUNT=$(docker logs opencode-saas-test 2>&1 | grep "getOrCreate done" | grep -c "$SID")
+echo "getOrCreate done 次数: $RECONNECT_COUNT"
+
+if [ "$RECONNECT_COUNT" -le 1 ]; then
+  echo "✅ T18.S4 PASS: 2 分钟内无多余 reconnect（TTL=300s 生效）"
+else
+  echo "❌ T18.S4 FAIL: 出现 $RECONNECT_COUNT 次 getOrCreate（TTL 可能未生效）"
+fi
+```
+
+**期望**：
+- 2 分钟内 7 次 exec，`getOrCreate done` 日志只有 1 次（首次建沙箱）
+- `reconnect done` 日志为空
+- 修复前（TTL=30s）：2 分钟内至少触发 4 次 getOrCreate（每 30s 过期一次）
+
+---
+
+### T18.S5 交叉对比 — read（无锁）vs bash（优化后）延迟
+
+**验证点**：bash 工具经过 `runInSession` 路径优化后，延迟应接近 read 工具（直接文件 API），不再因锁排队导致数量级差异。
+
+```bash
+SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' \
+  | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+
+# warmup
+curl -s -o /dev/null "$BASE/file/content?path=/workspace&sessionID=$SID&directory=/workspace"
+
+# read 延迟（file API，无锁）
+T_READ=0
+for i in 1 2 3; do
+  T=$(curl -s -o /dev/null -w '%{time_total}' --max-time 10 \
+    "$BASE/file/content?path=/workspace&sessionID=$SID&directory=/workspace")
+  T_READ=$(python3 -c "print(round($T_READ + $T, 3))")
+done
+AVG_READ=$(python3 -c "print(round($T_READ / 3, 3))")
+echo "read 平均延迟: ${AVG_READ}s"
+
+# bash 延迟（runInSession，优化后无锁 on runInSession）
+T_BASH=0
+for i in 1 2 3; do
+  T=$(curl -s -o /dev/null -w '%{time_total}' --max-time 10 \
+    -X POST "$BASE/session/$SID/exec" \
+    -H 'Content-Type: application/json' -d '{"command":"ls /workspace/"}')
+  T_BASH=$(python3 -c "print(round($T_BASH + $T, 3))")
+done
+AVG_BASH=$(python3 -c "print(round($T_BASH / 3, 3))")
+echo "bash 平均延迟: ${AVG_BASH}s"
+
+RATIO=$(python3 -c "print(round($AVG_BASH / $AVG_READ, 1)) if $AVG_READ > 0 else print('N/A')")
+echo "bash/read 比值: ${RATIO}x"
+
+if python3 -c "exit(0 if $AVG_BASH < 2.0 else 1)"; then
+  echo "✅ T18.S5 PASS: bash 延迟正常（${AVG_BASH}s）"
+else
+  echo "❌ T18.S5 FAIL: bash 延迟过高（${AVG_BASH}s）"
+fi
+```
+
+**期望**：
+- read 平均延迟 < 0.3s（文件 API，无 SSE 开销）
+- bash 平均延迟 < 2.0s（含 SSE 流建立 + 命令执行 + 流关闭）
+- bash/read 比值 < 10x（修复前因锁排队可达 100x+）
+
+---
+
+### 11.x 排查对照表
+
+| 现象 | 可能原因 | 验证用例 | 日志关键字 |
+|---|---|---|---|
+| 并发 bash 命令排队等待 | sem permits=1 锁范围过大 | T18.S1 | `getOrCreate start` 多次出现（应只有 1 次）|
+| createSession 重复创建 | 双重检查未生效 | T18.S2 | `createSession` 出现多次 |
+| bash 命令永久卡住 | getOrCreateUnlocked 无超时 | T18.S3 | `getOrCreate timeout after 30s` |
+| 持续命令执行中频繁重连 | sbCache TTL 过短 | T18.S4 | `reconnect done` 频繁出现 |
+| bash 比 read 慢 100x | 锁串行化 + SSE 延迟叠加 | T18.S5 | 对比 read/bash 各自延迟 |
