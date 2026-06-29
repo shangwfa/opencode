@@ -6,13 +6,14 @@
  *     bun run test/tool/verify-pg-writes.ts
  */
 import { Effect, Layer, ManagedRuntime } from "effect"
-import { Session } from "../../src/session"
-import { Bus } from "../../src/bus"
-import { Database } from "../../src/storage/db"
-import { SessionTable, MessageTable, PartTable } from "../../src/session/session.sql"
-import { ProjectTable } from "../../src/project/project.sql"
-import { SessionID, MessageID, PartID } from "../../src/session/schema"
-import { Instance } from "../../src/project/instance"
+import { Session } from "../../../src/session/session"
+import { Bus } from "../../../src/bus"
+import { Database } from "../../../src/storage/db"
+import { SessionTable, MessageTable, PartTable } from "@opencode-ai/core/session/sql"
+// TODO: merge-upstream — project.sql / ProjectTable location changed
+// import { ProjectTable } from "../../../src/project/project.sql"
+import { SessionID, MessageID, PartID } from "../../../src/session/schema"
+import { provideTestInstance, disposeAllInstances } from "../../fixture/fixture"
 import { eq } from "drizzle-orm"
 
 const PG_URL = process.env["OPENCODE_DATABASE_URL"]

@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { Effect } from "effect"
-import { Instance } from "../../src/project/instance"
+import { provideTestInstance, disposeAllInstances } from "../fixture/fixture"
 import { Server } from "../../src/server/server"
-import { Session as SessionNs } from "../../src/session"
+import { Session as SessionNs } from "../../src/session/session"
 import type { SessionID } from "../../src/session/schema"
 import type { Skill } from "../../src/skill"
-import { Log } from "../../src/util/log"
+import { Log } from "@opencode-ai/core/util/log"
 import { tmpdir } from "../fixture/fixture"
 
 Log.init({ print: false })
@@ -24,13 +24,13 @@ const svc = {
 }
 
 afterEach(async () => {
-  await Instance.disposeAll()
+  await disposeAllInstances()
 })
 
 describe("session skills routes", () => {
   test("create, list, unload and clear session skills", async () => {
     await using tmp = await tmpdir({ git: true })
-    await Instance.provide({
+    await provideTestInstance({
       directory: tmp.path,
       fn: async () => {
         const session = await svc.create({})
@@ -81,7 +81,7 @@ describe("session skills routes", () => {
 
   test("returns 404 for missing session", async () => {
     await using tmp = await tmpdir({ git: true })
-    await Instance.provide({
+    await provideTestInstance({
       directory: tmp.path,
       fn: async () => {
         const app = Server.Default().app

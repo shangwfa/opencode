@@ -92,7 +92,7 @@ function buildFakeLayer() {
           return sb
         })
 
-      const runInSession: typeof SandboxProvider.Service.of.runInSession = (sessionID, command, options, handlers, signal) =>
+      const runInSession: SandboxProvider.Interface["runInSession"] = (sessionID, command, options, handlers, signal) =>
         Effect.gen(function* () {
           const sb = sandboxes.get(sessionID)
           if (!sb) return yield* Effect.fail(new Error(`Sandbox not found for session ${sessionID}`))
@@ -164,6 +164,8 @@ function buildFakeLayer() {
         isKeepAlive: () => Effect.succeed(false),
         getEndpoint: () => Effect.die(new Error("not implemented")),
         cleanupSessionVolume: () => Effect.void,
+        interrupt: () => Effect.void,
+        runDetached: () => Effect.die(new Error("not implemented")),
       })
     }),
   )

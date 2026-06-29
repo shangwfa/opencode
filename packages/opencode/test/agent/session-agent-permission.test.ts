@@ -1,10 +1,10 @@
 import { test, expect, describe } from "bun:test"
 import path from "path"
 import { Permission } from "../../src/permission"
-import { ConfigPermission } from "../../src/config/permission"
+import { ConfigPermissionV1 } from "@opencode-ai/core/v1/config/permission"
 import { Effect } from "effect"
 
-function fromConfig(permission: ConfigPermission.Info) {
+function fromConfig(permission: ConfigPermissionV1.Info) {
   return Permission.fromConfig(permission)
 }
 
@@ -20,7 +20,7 @@ describe("session-agent permission: worktree='/' 路径匹配", () => {
   test("*analysis/ 前缀 — worktree=/ 匹配", () => {
     const ruleset = fromConfig({
       edit: { "*": "deny", "*analysis/test-id/spec/*.md": "allow" },
-    } as ConfigPermission.Info)
+    } as ConfigPermissionV1.Info)
     expect(Permission.evaluate("edit", worktreeRoot, ruleset).action).toBe("allow")
     expect(Permission.evaluate("edit", worktreeWorkspace, ruleset).action).toBe("allow")
     expect(Permission.evaluate("edit", "src/index.tsx", ruleset).action).toBe("deny")
@@ -29,7 +29,7 @@ describe("session-agent permission: worktree='/' 路径匹配", () => {
   test("analysis/ 前缀（无 *） — worktree=/ 不匹配", () => {
     const ruleset = fromConfig({
       edit: { "*": "deny", "analysis/test-id/spec/*.md": "allow" },
-    } as ConfigPermission.Info)
+    } as ConfigPermissionV1.Info)
     expect(Permission.evaluate("edit", worktreeRoot, ruleset).action).toBe("deny")
     expect(Permission.evaluate("edit", worktreeWorkspace, ruleset).action).toBe("allow")
   })
@@ -37,7 +37,7 @@ describe("session-agent permission: worktree='/' 路径匹配", () => {
   test("workspace/analysis/ 前缀 — 仅 worktree=/ 匹配", () => {
     const ruleset = fromConfig({
       edit: { "*": "deny", "workspace/analysis/test-id/spec/*.md": "allow" },
-    } as ConfigPermission.Info)
+    } as ConfigPermissionV1.Info)
     expect(Permission.evaluate("edit", worktreeRoot, ruleset).action).toBe("allow")
     expect(Permission.evaluate("edit", worktreeWorkspace, ruleset).action).toBe("deny")
   })
@@ -45,7 +45,7 @@ describe("session-agent permission: worktree='/' 路径匹配", () => {
   test("**/analysis/ 前缀 — worktree=/ 匹配（** → .*.* 匹配 workspace/）", () => {
     const ruleset = fromConfig({
       edit: { "*": "deny", "**/analysis/test-id/spec/*.md": "allow" },
-    } as ConfigPermission.Info)
+    } as ConfigPermissionV1.Info)
     // ** → .*.*, 匹配 workspace 后接 /analysis/
     expect(Permission.evaluate("edit", worktreeRoot, ruleset).action).toBe("allow")
     // 但 **/ 不能匹配 analysis/...（无前导 /）
@@ -64,7 +64,7 @@ describe("session-agent permission: worktree='/' 路径匹配", () => {
       grep: "allow",
       list: "allow",
       bash: "deny",
-    } as ConfigPermission.Info)
+    } as ConfigPermissionV1.Info)
 
     // worktree=/ 场景
     expect(Permission.evaluate("edit", "workspace/analysis/test-id/spec/spec.md", ruleset).action).toBe("allow")
@@ -85,7 +85,7 @@ describe("权限 pattern 基准 directory vs worktree (SaaS worktree=/)", () => 
   // 编排系统按工作目录下发的白名单（相对 directory，不带 workspace/ 前缀）
   const ruleset = fromConfig({
     edit: { "*": "deny", "analysis/test-id/spec/*.md": "allow" },
-  } as ConfigPermission.Info)
+  } as ConfigPermissionV1.Info)
 
   test("修复前(基准=worktree): input 带 workspace/ 前缀 → DENY", () => {
     const input = path.relative(worktree, filepath) // = workspace/analysis/test-id/spec/spec.md
@@ -103,7 +103,7 @@ describe("权限 pattern 基准 directory vs worktree (SaaS worktree=/)", () => 
     // 本地非 SaaS: worktree=directory=仓库根，两者相同
     const localDir = "/repo"
     const localFile = "/repo/src/a.ts"
-    const localRuleset = fromConfig({ edit: { "*": "deny", "src/*.ts": "allow" } } as ConfigPermission.Info)
+    const localRuleset = fromConfig({ edit: { "*": "deny", "src/*.ts": "allow" } } as ConfigPermissionV1.Info)
     const inputDir = path.relative(localDir, localFile)
     const inputWt = path.relative(localDir, localFile) // worktree==directory
     expect(inputDir).toBe(inputWt)

@@ -4,7 +4,7 @@ import { Effect } from "effect"
 import type { SessionID } from "../../src/session/schema"
 import path from "path"
 import { provideInstance, tmpdir } from "../fixture/fixture"
-import { Instance } from "../../src/project/instance"
+import { provideTestInstance, disposeAllInstances } from "../fixture/fixture"
 import { Agent } from "../../src/agent/agent"
 import { Permission } from "../../src/permission"
 
@@ -18,13 +18,13 @@ function load<A>(dir: string, fn: (svc: Agent.Interface) => Effect.Effect<A>) {
 }
 
 afterEach(async () => {
-  await Instance.disposeAll()
+  await disposeAllInstances()
 })
 
 describe("Agent.sessionGet", () => {
   test("sessionGet without session returns global agent", async () => {
     await using tmp = await tmpdir()
-    await Instance.provide({
+    await provideTestInstance({
       directory: tmp.path,
       fn: async () => {
         const build = await load(tmp.path, (svc) => svc.sessionGet("build"))
@@ -37,7 +37,7 @@ describe("Agent.sessionGet", () => {
 
   test("sessionGet with non-PG mode falls back to global agent", async () => {
     await using tmp = await tmpdir()
-    await Instance.provide({
+    await provideTestInstance({
       directory: tmp.path,
       fn: async () => {
         const build = await load(tmp.path, (svc) => svc.sessionGet("build", fakeSession))
@@ -49,7 +49,7 @@ describe("Agent.sessionGet", () => {
 
   test("sessionGet returns undefined for non-existent agent without session", async () => {
     await using tmp = await tmpdir()
-    await Instance.provide({
+    await provideTestInstance({
       directory: tmp.path,
       fn: async () => {
         const agent = await load(tmp.path, (svc) => svc.sessionGet("does_not_exist"))
@@ -62,7 +62,7 @@ describe("Agent.sessionGet", () => {
 describe("Agent.sessionList", () => {
   test("sessionList returns global agents in non-PG mode", async () => {
     await using tmp = await tmpdir()
-    await Instance.provide({
+    await provideTestInstance({
       directory: tmp.path,
       fn: async () => {
         const list = await load(tmp.path, (svc) => svc.sessionList(fakeSession))
@@ -77,7 +77,7 @@ describe("Agent.sessionList", () => {
 describe("Agent.sessionCreate in non-PG mode", () => {
   test.skipIf(isPg)("sessionCreate throws in non-PG mode", async () => {
     await using tmp = await tmpdir()
-    await Instance.provide({
+    await provideTestInstance({
       directory: tmp.path,
       fn: async () => {
         await expect(
@@ -98,7 +98,7 @@ describe("Agent.sessionCreate in non-PG mode", () => {
 describe("Agent.sessionUnload/sessionClear in non-PG mode", () => {
   test.skipIf(isPg)("sessionUnload throws in non-PG mode", async () => {
     await using tmp = await tmpdir()
-    await Instance.provide({
+    await provideTestInstance({
       directory: tmp.path,
       fn: async () => {
         await expect(
@@ -110,7 +110,7 @@ describe("Agent.sessionUnload/sessionClear in non-PG mode", () => {
 
   test.skipIf(isPg)("sessionClear throws in non-PG mode", async () => {
     await using tmp = await tmpdir()
-    await Instance.provide({
+    await provideTestInstance({
       directory: tmp.path,
       fn: async () => {
         await expect(
@@ -179,7 +179,7 @@ describe("Agent.CreateInput schema", () => {
 describe("Agent.sessionGet preserves global agent properties", () => {
   test("sessionGet returns correct permissions for global agents", async () => {
     await using tmp = await tmpdir()
-    await Instance.provide({
+    await provideTestInstance({
       directory: tmp.path,
       fn: async () => {
         const explore = await load(tmp.path, (svc) => svc.sessionGet("explore"))
@@ -202,7 +202,7 @@ describe("Agent.sessionGet preserves global agent properties", () => {
         },
       },
     })
-    await Instance.provide({
+    await provideTestInstance({
       directory: tmp.path,
       fn: async () => {
         const build = await load(tmp.path, (svc) => svc.sessionGet("build"))

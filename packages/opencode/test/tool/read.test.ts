@@ -41,6 +41,7 @@ const ctx = {
   messages: [],
   metadata: () => Effect.void,
   ask: () => Effect.void,
+  sandbox: null,
 }
 
 const readLayer = (flags: Partial<RuntimeFlags.Info> = {}) =>

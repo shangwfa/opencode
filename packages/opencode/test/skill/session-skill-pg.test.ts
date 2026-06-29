@@ -2,8 +2,8 @@ import { beforeAll, beforeEach, afterEach, describe, expect, test } from "bun:te
 import { Effect, Layer, ManagedRuntime } from "effect"
 import { Database, eq } from "../../src/storage/db"
 import { Bus } from "../../src/bus"
-import { Instance } from "../../src/project/instance"
-import { Session } from "../../src/session"
+import { provideTestInstance, disposeAllInstances } from "../fixture/fixture"
+import { Session } from "../../src/session/session"
 import { SessionSkill } from "../../src/skill/session-skill"
 import { SessionSkillTable } from "../../src/skill/skill.pg"
 import type { SessionID } from "../../src/session/schema"
@@ -43,7 +43,7 @@ describe("SessionSkill PG", () => {
 
   async function make() {
     const tmp = await tmpdir({ git: true })
-    const session = await Instance.provide({
+    const session = await provideTestInstance({
       directory: tmp.path,
       fn: () => run(Session.Service.use((svc) => svc.create({ title: "session skill test" }))),
     })
@@ -135,7 +135,7 @@ describe("SessionSkill PG", () => {
 
   test("删除 session 时 cascade 清理 session skills", async () => {
     await using tmp = await tmpdir({ git: true })
-    await Instance.provide({
+    await provideTestInstance({
       directory: tmp.path,
       fn: async () => {
         const session = await run(Session.Service.use((svc) => svc.create({ title: "session skill cleanup" })))

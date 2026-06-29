@@ -43,6 +43,7 @@ const ctx = {
   messages: [],
   metadata: () => Effect.void,
   ask: () => Effect.void,
+  sandbox: null,
 }
 
 const root = path.join(__dirname, "../..")

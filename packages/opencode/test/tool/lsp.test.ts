@@ -27,6 +27,7 @@ const ctx = {
   messages: [],
   metadata: () => Effect.void,
   ask: () => Effect.void,
+  sandbox: null,
 }
 
 const workspaceSymbolQueries: string[] = []

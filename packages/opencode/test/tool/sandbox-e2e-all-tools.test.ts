@@ -3,7 +3,7 @@ import { expect, test, describe, beforeAll, afterAll } from "bun:test"
 import { Effect, Layer, ManagedRuntime } from "effect"
 import { GlobTool } from "../../src/tool/glob"
 import { GrepTool } from "../../src/tool/grep"
-import { BashTool } from "../../src/tool/bash"
+import { BashTool } from "@opencode-ai/core/tool/bash"
 import { ReadTool } from "../../src/tool/read"
 import { WriteTool } from "../../src/tool/write"
 import { EditTool } from "../../src/tool/edit"
@@ -11,17 +11,20 @@ import { Truncate } from "../../src/tool/truncate"
 import { Agent } from "../../src/agent/agent"
 import { Plugin } from "../../src/plugin"
 import { AppFileSystem } from "@opencode-ai/shared/filesystem"
-import * as CrossSpawnSpawner from "../../src/effect/cross-spawn-spawner"
-import { Ripgrep } from "../../src/file/ripgrep"
+import * as CrossSpawnSpawner from "@opencode-ai/core/cross-spawn-spawner"
+import { Ripgrep } from "@opencode-ai/core/ripgrep"
 import { SandboxProvider } from "../../src/tool/sandbox-provider"
-import { LSP } from "../../src/lsp"
-import { FileTime } from "../../src/file/time"
-import { FileWatcher } from "../../src/file/watcher"
+// TODO: merge-upstream — LSP namespace removed; use named imports from ../../src/lsp/lsp
+// import { LSP } from "../../src/lsp"
+// TODO: merge-upstream — FileTime module removed
+// import { FileTime } from "../../src/file/time"
+// TODO: merge-upstream — FileWatcher module removed
+// import { FileWatcher } from "../../src/file/watcher"
 import { Bus } from "../../src/bus"
 import { Format } from "../../src/format"
 import { Instruction } from "../../src/session/instruction"
 import { SessionID, MessageID } from "../../src/session/schema"
-import { Instance } from "../../src/project/instance"
+import { provideTestInstance, disposeAllInstances } from "../fixture/fixture"
 import { ConnectionConfig, Sandbox } from "@alibaba-group/opensandbox"
 
 const runtime = ManagedRuntime.make(
@@ -33,9 +36,12 @@ const runtime = ManagedRuntime.make(
     Agent.defaultLayer,
     Ripgrep.defaultLayer,
     SandboxProvider.defaultLayer,
-    LSP.defaultLayer,
-    FileTime.defaultLayer,
-    FileWatcher.defaultLayer,
+    // TODO: LSP removed
+//     LSP.defaultLayer,
+    // TODO: FileTime removed
+//     FileTime.defaultLayer,
+    // TODO: FileWatcher removed
+//     FileWatcher.defaultLayer,
     Bus.layer,
     Format.defaultLayer,
     Instruction.defaultLayer,
@@ -87,7 +93,7 @@ beforeAll(async () => {
     }) as any,
   )
 
-  await Instance.provide({
+  await provideTestInstance({
     directory: process.cwd(),
     fn: async () => {
       const init = (tool: any) => runtime.runPromise(Effect.scoped(tool.pipe(Effect.flatMap((info: any) => info.init()))) as any)
@@ -114,7 +120,7 @@ const run = (effect: any) => runtime.runPromise(Effect.scoped(effect) as any)
 describe("Sandbox E2E — all 6 tools in one sandbox", () => {
   test("1. bash — runs inside container", async () => {
     const ctx = makeCtx(sb)
-    await Instance.provide({
+    await provideTestInstance({
       directory: process.cwd(),
       fn: async () => {
         const result: any = await run(
@@ -130,7 +136,7 @@ describe("Sandbox E2E — all 6 tools in one sandbox", () => {
 
   test("2. write — creates file in sandbox", async () => {
     const ctx = makeCtx(sb)
-    await Instance.provide({
+    await provideTestInstance({
       directory: process.cwd(),
       fn: async () => {
         const result: any = await run(
@@ -143,7 +149,7 @@ describe("Sandbox E2E — all 6 tools in one sandbox", () => {
 
   test("3. read — reads back the written file", async () => {
     const ctx = makeCtx(sb)
-    await Instance.provide({
+    await provideTestInstance({
       directory: process.cwd(),
       fn: async () => {
         const result: any = await run(
@@ -156,7 +162,7 @@ describe("Sandbox E2E — all 6 tools in one sandbox", () => {
 
   test("4. edit — replaces content in sandbox", async () => {
     const ctx = makeCtx(sb)
-    await Instance.provide({
+    await provideTestInstance({
       directory: process.cwd(),
       fn: async () => {
         const result: any = await run(
@@ -172,7 +178,7 @@ describe("Sandbox E2E — all 6 tools in one sandbox", () => {
 
   test("5. glob — finds .txt files in sandbox", async () => {
     const ctx = makeCtx(sb)
-    await Instance.provide({
+    await provideTestInstance({
       directory: process.cwd(),
       fn: async () => {
         const result: any = await run(
@@ -186,7 +192,7 @@ describe("Sandbox E2E — all 6 tools in one sandbox", () => {
 
   test("6. grep — searches content in sandbox", async () => {
     const ctx = makeCtx(sb)
-    await Instance.provide({
+    await provideTestInstance({
       directory: process.cwd(),
       fn: async () => {
         const result: any = await run(

@@ -9,6 +9,7 @@ import { Git } from "../git"
 import { makeLocationNode } from "../effect/app-node"
 import { Project } from "../project"
 import { ProjectDirectoryTable } from "./sql"
+import { ProjectDirectories } from "./directories"
 import { makeStrategies } from "./copy-strategies"
 import { Slug } from "../util/slug"
 import { EventV2 } from "../event"
@@ -39,6 +40,11 @@ export type RefreshResult = typeof RefreshResult.Type
 
 export const Copy = ProjectCopy.Copy
 export type Copy = typeof Copy.Type
+
+export const DetectInput = Schema.Struct({
+  directory: AbsolutePath,
+}).annotate({ identifier: "ProjectCopy.DetectInput" })
+export type DetectInput = typeof DetectInput.Type
 
 export type DirectoryType = "main" | "root" | StrategyID
 
@@ -89,7 +95,7 @@ export interface Interface {
   readonly detect: (input: DetectInput) => Effect.Effect<StrategyID | undefined>
   readonly create: (input: CreateInput) => Effect.Effect<Copy, Error>
   readonly remove: (input: RemoveInput) => Effect.Effect<void, Error>
-  readonly refresh: (input: RefreshInput) => Effect.Effect<void, Error>
+  readonly refresh: (input: RefreshInput) => Effect.Effect<RefreshResult, Error>
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/ProjectCopy") {}
@@ -160,7 +166,7 @@ export const layer = Layer.effect(
               if (row) return false
               yield* tx
                 .insert(ProjectDirectoryTable)
-                .values({ project_id: projectID, directory: copyDirectory, type })
+                .values({ project_id: projectID, directory: copyDirectory, type: type as "git_worktree" })
                 .run()
               return true
             }),
@@ -255,19 +261,27 @@ export const layer = Layer.effect(
         .where(eq(ProjectDirectoryTable.project_id, input.projectID))
         .all()
         .pipe(Effect.orDie)
-      const inserted = yield* Effect.forEach(discovered, (item) =>
-        insert(input.projectID, item.directory, item.type),
-      ).pipe(Effect.map((items) => items.some(Boolean)))
-      const removed = yield* Effect.forEach(stored, (item) =>
-        fs
-          .isDir(item.directory)
+      const updated = yield* Effect.forEach(discovered, (item) =>
+        insert(input.projectID, item.directory, item.type).pipe(
+          Effect.map((result) => (result ? item.directory : undefined)),
+        ),
+      ).pipe(Effect.map((items) => items.filter((item): item is AbsolutePath => item !== undefined)))
+      const removed = yield* Effect.forEach(stored, (item) => {
+        const directory = AbsolutePath.make(item.directory)
+        return fs
+          .isDir(directory)
           .pipe(
             Effect.flatMap((exists) =>
-              exists ? Effect.succeed(false) : removeStored(input.projectID, AbsolutePath.make(item.directory)),
+              exists
+                ? Effect.succeed(undefined)
+                : removeStored(input.projectID, directory).pipe(
+                    Effect.map((result) => (result ? directory : undefined)),
+                  ),
             ),
-          ),
-      ).pipe(Effect.map((items) => items.some(Boolean)))
-      yield* changed(input.projectID, inserted || removed)
+          )
+      }).pipe(Effect.map((items) => items.filter((item): item is AbsolutePath => item !== undefined)))
+      yield* changed(input.projectID, updated.length > 0 || removed.length > 0)
+      return { updated, removed }
     })
 
     return Service.of({ detect, create, remove, refresh })

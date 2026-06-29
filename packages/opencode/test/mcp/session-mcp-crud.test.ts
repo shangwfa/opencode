@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { Effect, Layer } from "effect"
 import { SessionMcp } from "../../src/mcp/session-mcp"
+import { SessionID } from "../../src/session/schema"
 import { testEffect } from "../lib/effect"
 
 const memoryLayer = Layer.effect(
@@ -54,7 +55,7 @@ const memoryLayer = Layer.effect(
 
 const it = testEffect(memoryLayer)
 
-const SESSION = "ses_mcp_crud_01"
+const SESSION = SessionID.make("ses_mcp_crud_01")
 
 describe("SessionMcp list", () => {
   it.effect("returns empty array for new session", () =>
@@ -243,19 +244,19 @@ describe("SessionMcp session isolation", () => {
   it.effect("different sessions have independent mcps", () =>
     Effect.gen(function* () {
       const mcp = yield* SessionMcp.Service
-      yield* mcp.upsert("sess-a", {
+      yield* mcp.upsert(SessionID.make("sess-a"), {
         name: "only-a",
         type: "local",
         command: ["cmd-a"],
       })
-      yield* mcp.upsert("sess-b", {
+      yield* mcp.upsert(SessionID.make("sess-b"), {
         name: "only-b",
         type: "remote",
         url: "https://b.example.com/mcp",
       })
 
-      const listA = yield* mcp.list("sess-a")
-      const listB = yield* mcp.list("sess-b")
+      const listA = yield* mcp.list(SessionID.make("sess-a"))
+      const listB = yield* mcp.list(SessionID.make("sess-b"))
 
       expect(listA.map((r) => r.name)).toContain("only-a")
       expect(listA.map((r) => r.name)).not.toContain("only-b")
@@ -267,19 +268,19 @@ describe("SessionMcp session isolation", () => {
   it.effect("same name in different sessions is independent", () =>
     Effect.gen(function* () {
       const mcp = yield* SessionMcp.Service
-      yield* mcp.upsert("sess-x", {
+      yield* mcp.upsert(SessionID.make("sess-x"), {
         name: "shared",
         type: "local",
         command: ["x"],
       })
-      yield* mcp.upsert("sess-y", {
+      yield* mcp.upsert(SessionID.make("sess-y"), {
         name: "shared",
         type: "remote",
         url: "https://y.example.com/mcp",
       })
 
-      const findX = yield* mcp.get("sess-x", "shared")
-      const findY = yield* mcp.get("sess-y", "shared")
+      const findX = yield* mcp.get(SessionID.make("sess-x"), "shared")
+      const findY = yield* mcp.get(SessionID.make("sess-y"), "shared")
 
       expect(findX!.type).toBe("local")
       expect(findX!.command).toEqual(["x"])
@@ -291,42 +292,42 @@ describe("SessionMcp session isolation", () => {
   it.effect("removing from one session does not affect another", () =>
     Effect.gen(function* () {
       const mcp = yield* SessionMcp.Service
-      yield* mcp.upsert("sess-1", {
+      yield* mcp.upsert(SessionID.make("sess-1"), {
         name: "cross-mcp",
         type: "local",
         command: ["cross"],
       })
-      yield* mcp.upsert("sess-2", {
+      yield* mcp.upsert(SessionID.make("sess-2"), {
         name: "cross-mcp",
         type: "local",
         command: ["cross"],
       })
 
-      yield* mcp.remove("sess-1", "cross-mcp")
+      yield* mcp.remove(SessionID.make("sess-1"), "cross-mcp")
 
-      expect(yield* mcp.get("sess-1", "cross-mcp")).toBeUndefined()
-      expect(yield* mcp.get("sess-2", "cross-mcp")).toBeDefined()
+      expect(yield* mcp.get(SessionID.make("sess-1"), "cross-mcp")).toBeUndefined()
+      expect(yield* mcp.get(SessionID.make("sess-2"), "cross-mcp")).toBeDefined()
     }),
   )
 
   it.effect("clearing one session does not affect another", () =>
     Effect.gen(function* () {
       const mcp = yield* SessionMcp.Service
-      yield* mcp.upsert("sess-a", {
+      yield* mcp.upsert(SessionID.make("sess-a"), {
         name: "mcp-1",
         type: "local",
         command: ["1"],
       })
-      yield* mcp.upsert("sess-b", {
+      yield* mcp.upsert(SessionID.make("sess-b"), {
         name: "mcp-2",
         type: "remote",
         url: "https://2.example.com",
       })
 
-      yield* mcp.removeAll("sess-a")
+      yield* mcp.removeAll(SessionID.make("sess-a"))
 
-      expect(yield* mcp.list("sess-a")).toEqual([])
-      const listB = yield* mcp.list("sess-b")
+      expect(yield* mcp.list(SessionID.make("sess-a"))).toEqual([])
+      const listB = yield* mcp.list(SessionID.make("sess-b"))
       expect(listB.map((r) => r.name)).toContain("mcp-2")
     }),
   )

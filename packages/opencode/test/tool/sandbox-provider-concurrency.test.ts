@@ -210,6 +210,7 @@ const fakeProvider = Layer.effect(
       isKeepAlive: () => Effect.succeed(false),
       getEndpoint: () => Effect.die(new Error("not implemented")),
       cleanupSessionVolume: () => Effect.void,
+      runDetached: () => Effect.die(new Error("not implemented")),
     })
   }),
 )

@@ -151,6 +151,8 @@ export const layer = Layer.effect(
     const skill = yield* Skill.Service
     const provider = yield* Provider.Service
     const locations = yield* LocationServiceMap.Service
+    const flags = yield* RuntimeFlags.Service
+    const sessionAgent = yield* SessionAgent.Service
 
     const state = yield* InstanceState.make<State>(
       Effect.fn("Agent.state")(function* (ctx) {
@@ -587,6 +589,8 @@ export const defaultLayer = layer.pipe(
   Layer.provide(Config.defaultLayer),
   Layer.provide(Skill.defaultLayer),
   Layer.provide(locationServiceMapLayer),
+  Layer.provide(RuntimeFlags.defaultLayer),
+  Layer.provide(Flag.OPENCODE_DATABASE_URL ? SessionAgent.pgLayer : SessionAgent.noopLayer),
 )
 
 const locationServiceMapNode = LayerNode.make({
@@ -595,10 +599,16 @@ const locationServiceMapNode = LayerNode.make({
   deps: [],
 })
 
+const sessionAgentNode = LayerNode.make({
+  service: SessionAgent.Service,
+  layer: Flag.OPENCODE_DATABASE_URL ? SessionAgent.pgLayer : SessionAgent.noopLayer,
+  deps: [],
+})
+
 export const node = LayerNode.make({
   service: Service,
   layer: layer,
-  deps: [Config.node, Auth.node, Plugin.node, Skill.node, Provider.node, locationServiceMapNode],
+  deps: [Config.node, Auth.node, Plugin.node, Skill.node, Provider.node, locationServiceMapNode, RuntimeFlags.node, sessionAgentNode],
 })
 
 export * as Agent from "./agent"

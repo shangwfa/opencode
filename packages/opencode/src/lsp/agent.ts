@@ -223,21 +223,21 @@ export interface Interface {
     sessionID: SessionID,
     hostPath: string,
     hostWorkdir: string,
-  ) => Effect.Effect<TouchResponse, Error>
+  ) => Effect.Effect<TouchResponse, Error, HttpClient.HttpClient>
 
   readonly diagnostics: (
     sessionID: SessionID,
     hostPath: string,
     hostWorkdir: string,
-  ) => Effect.Effect<DiagnosticsResponse, Error>
+  ) => Effect.Effect<DiagnosticsResponse, Error, HttpClient.HttpClient>
 
   readonly status: (
     sessionID: SessionID,
-  ) => Effect.Effect<StatusResponse, Error>
+  ) => Effect.Effect<StatusResponse, Error, HttpClient.HttpClient>
 
   readonly shutdown: (
     sessionID: SessionID,
-  ) => Effect.Effect<void, Error>
+  ) => Effect.Effect<void, Error, HttpClient.HttpClient>
 
   readonly hover: (
     sessionID: SessionID,
@@ -245,7 +245,7 @@ export interface Interface {
     hostWorkdir: string,
     line: number,
     character: number,
-  ) => Effect.Effect<HoverResponse, Error>
+  ) => Effect.Effect<HoverResponse, Error, HttpClient.HttpClient>
 
   readonly definition: (
     sessionID: SessionID,
@@ -253,7 +253,7 @@ export interface Interface {
     hostWorkdir: string,
     line: number,
     character: number,
-  ) => Effect.Effect<LocationResponse, Error>
+  ) => Effect.Effect<LocationResponse, Error, HttpClient.HttpClient>
 
   readonly references: (
     sessionID: SessionID,
@@ -261,7 +261,7 @@ export interface Interface {
     hostWorkdir: string,
     line: number,
     character: number,
-  ) => Effect.Effect<LocationResponse, Error>
+  ) => Effect.Effect<LocationResponse, Error, HttpClient.HttpClient>
 
   readonly implementation: (
     sessionID: SessionID,
@@ -269,18 +269,18 @@ export interface Interface {
     hostWorkdir: string,
     line: number,
     character: number,
-  ) => Effect.Effect<LocationResponse, Error>
+  ) => Effect.Effect<LocationResponse, Error, HttpClient.HttpClient>
 
   readonly documentSymbol: (
     sessionID: SessionID,
     hostPath: string,
     hostWorkdir: string,
-  ) => Effect.Effect<DocumentSymbolResponse, Error>
+  ) => Effect.Effect<DocumentSymbolResponse, Error, HttpClient.HttpClient>
 
   readonly workspaceSymbol: (
     sessionID: SessionID,
     query: string,
-  ) => Effect.Effect<WorkspaceSymbolResponse, Error>
+  ) => Effect.Effect<WorkspaceSymbolResponse, Error, HttpClient.HttpClient>
 
   readonly prepareCallHierarchy: (
     sessionID: SessionID,
@@ -288,7 +288,7 @@ export interface Interface {
     hostWorkdir: string,
     line: number,
     character: number,
-  ) => Effect.Effect<PrepareCallHierarchyResponse, Error>
+  ) => Effect.Effect<PrepareCallHierarchyResponse, Error, HttpClient.HttpClient>
 
   readonly incomingCalls: (
     sessionID: SessionID,
@@ -296,7 +296,7 @@ export interface Interface {
     hostWorkdir: string,
     line: number,
     character: number,
-  ) => Effect.Effect<IncomingCallsResponse, Error>
+  ) => Effect.Effect<IncomingCallsResponse, Error, HttpClient.HttpClient>
 
   readonly outgoingCalls: (
     sessionID: SessionID,
@@ -304,7 +304,7 @@ export interface Interface {
     hostWorkdir: string,
     line: number,
     character: number,
-  ) => Effect.Effect<OutgoingCallsResponse, Error>
+  ) => Effect.Effect<OutgoingCallsResponse, Error, HttpClient.HttpClient>
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/LspAgent") {}

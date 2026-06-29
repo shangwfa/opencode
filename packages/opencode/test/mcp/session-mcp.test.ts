@@ -129,6 +129,7 @@ function recordingSandboxLayer() {
           Effect.andThen(() => Effect.succeed("10.0.0.1:9999")),
         ) as any,
       cleanupSessionVolume: () => Effect.void,
+      runDetached: () => Effect.die(new Error("not implemented")),
     }),
   )
 }

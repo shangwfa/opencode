@@ -1,16 +1,17 @@
 import { afterEach, describe, expect } from "bun:test"
 import { Effect, Layer } from "effect"
 import { SandboxProvider } from "../../src/tool/sandbox-provider"
-import { Instance } from "../../src/project/instance"
+import { provideTestInstance, disposeAllInstances } from "../fixture/fixture"
 import { toSandboxPath } from "../../src/tool/sandbox-path"
+import { SessionID } from "../../src/session/schema"
 import path from "path"
 import { testEffect } from "../lib/effect"
 
 afterEach(async () => {
-  await Instance.disposeAll()
+  await disposeAllInstances()
 })
 
-function mockProvider(runInSessionFn: (sessionID: string, command: string) => Effect.Effect<any, Error>) {
+function mockProvider(runInSessionFn: (sessionID: SessionID, command: string) => Effect.Effect<any, Error>) {
   return Layer.succeed(
     SandboxProvider.Service,
     SandboxProvider.Service.of({
@@ -27,6 +28,7 @@ function mockProvider(runInSessionFn: (sessionID: string, command: string) => Ef
       isKeepAlive: () => Effect.succeed(false),
       getEndpoint: () => Effect.die(new Error("not implemented")),
       cleanupSessionVolume: () => Effect.void,
+      runDetached: () => Effect.die(new Error("not implemented")),
     }),
   )
 }
@@ -35,7 +37,7 @@ const it = testEffect(Layer.empty)
 
 describe("file sandbox proxy - list directory", () => {
   it.live("parses ls output into structured entries", () => {
-    const provider = mockProvider((_sid: string, command: string) =>
+    const provider = mockProvider((_sid: SessionID, command: string) =>
       Effect.gen(function* () {
         if (command.includes("while read")) {
           return {
@@ -56,10 +58,10 @@ describe("file sandbox proxy - list directory", () => {
     )
     return Effect.gen(function* () {
       const sp = yield* SandboxProvider.Service
-      const sb = yield* sp.getOrCreate("ses_test")
+      const sb = yield* sp.getOrCreate(SessionID.make("ses_test"))
       const sandboxPath = toSandboxPath("/workspace", "/workspace")
       const lsResult = yield* sp.runInSession(
-        "ses_test",
+        SessionID.make("ses_test"),
         `ls -1a --color=never "${sandboxPath}" | while read f; do if [ -d "${sandboxPath}/$f" ]; then echo "D $f"; else echo "F $f"; fi; done`,
         { timeoutSeconds: 10 },
       ).pipe(
@@ -85,7 +87,7 @@ describe("file sandbox proxy - list directory", () => {
   })
 
   it.live("filters . and .. entries", () => {
-    const provider = mockProvider((_sid: string, command: string) =>
+    const provider = mockProvider((_sid: SessionID, command: string) =>
       Effect.gen(function* () {
         if (command.includes("while read")) {
           return {
@@ -101,10 +103,10 @@ describe("file sandbox proxy - list directory", () => {
     )
     return Effect.gen(function* () {
       const sp = yield* SandboxProvider.Service
-      const sb = yield* sp.getOrCreate("ses_test")
+      const sb = yield* sp.getOrCreate(SessionID.make("ses_test"))
       const sandboxPath = toSandboxPath("/workspace", "/workspace")
       const lsResult = yield* sp.runInSession(
-        "ses_test",
+        SessionID.make("ses_test"),
         `ls -1a --color=never "${sandboxPath}" | while read f; do if [ -d "${sandboxPath}/$f" ]; then echo "D $f"; else echo "F $f"; fi; done`,
         { timeoutSeconds: 10 },
       ).pipe(
@@ -126,7 +128,7 @@ describe("file sandbox proxy - list directory", () => {
     const failProvider = mockProvider(() => Effect.fail(new Error("sandbox not found")))
     return Effect.gen(function* () {
       const sp = yield* SandboxProvider.Service
-      const lsResult = yield* sp.runInSession("ses_test", "ls", { timeoutSeconds: 10 }).pipe(
+      const lsResult = yield* sp.runInSession(SessionID.make("ses_test"), "ls", { timeoutSeconds: 10 }).pipe(
         Effect.catch(() => Effect.succeed({ logs: { stdout: [], stderr: [] }, exitCode: 1 } as any)),
       )
       const items = lsResult.logs.stdout
@@ -161,7 +163,7 @@ describe("file sandbox proxy - read file", () => {
     )
     return Effect.gen(function* () {
       const sp = yield* SandboxProvider.Service
-      const sb = yield* sp.getOrCreate("ses_test")
+      const sb = yield* sp.getOrCreate(SessionID.make("ses_test"))
       const content = yield* Effect.tryPromise({
         try: () => sb.files.readFile("/workspace/test.txt"),
         catch: () => "",

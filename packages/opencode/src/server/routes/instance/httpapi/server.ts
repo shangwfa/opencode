@@ -55,25 +55,17 @@ import { Storage } from "@/storage/storage"
 import { ToolRegistry } from "@/tool/registry"
 import { Truncate } from "@/tool/truncate"
 import { Worktree } from "@/worktree"
-import { RuntimeFlags } from "@/effect/runtime-flags"
-import { MoveSession } from "@opencode-ai/core/control-plane/move-session"
 import { Database } from "@opencode-ai/core/database/database"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { httpClient } from "@opencode-ai/core/effect/app-node-platform"
 import { EventV2 } from "@opencode-ai/core/event"
-import { ModelsDev } from "@opencode-ai/core/models-dev"
 import { Npm } from "@opencode-ai/core/npm"
 import { PermissionSaved } from "@opencode-ai/core/permission/saved"
-import { ProjectV2 } from "@opencode-ai/core/project"
-import { ProjectCopy } from "@opencode-ai/core/project/copy"
-import { PtyTicket } from "@opencode-ai/core/pty/ticket"
-import { Ripgrep } from "@opencode-ai/core/ripgrep"
 import { SessionProjector } from "@opencode-ai/core/session/projector"
 import { SessionV2 } from "@opencode-ai/core/session"
 import * as SessionExecutionLocal from "@opencode-ai/core/session/execution/local"
 import { lazy } from "@/util/lazy"
 import { Vcs } from "@/project/vcs"
-import { Worktree } from "@/worktree"
 import { Workspace } from "@/control-plane/workspace"
 import { CorsConfig, type CorsOptions } from "@/server/cors"
 import { serveUIEffect } from "@/server/shared/ui"
@@ -291,7 +283,6 @@ const app = LayerNode.group([
 export function createRoutes(
   corsOptions?: CorsOptions,
 ): Layer.Layer<never, EffectConfig.ConfigError, RouteRequirements> {
-  // @ts-expect-error — upstream defaultLayer dependencies leak through; all services are wired at runtime
   return Layer.mergeAll(
     rootApiRoutes,
     eventApiRoutes,
@@ -326,7 +317,7 @@ export function createRoutes(
       Plugin.defaultLayer,
       Project.defaultLayer,
       ProjectV2.defaultLayer,
-      ProjectCopy.defaultLayer,
+      ProjectCopy.locationLayer,
       MoveSession.defaultLayer,
       ProviderAuth.defaultLayer,
       Provider.defaultLayer,

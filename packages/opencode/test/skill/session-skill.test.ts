@@ -6,7 +6,7 @@ import { RuntimeFlags } from "../../src/effect/runtime-flags"
 import { Bus } from "../../src/bus"
 import { Config } from "../../src/config/config"
 import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
-import { AppFileSystem } from "@opencode-ai/core/filesystem"
+import { FileSystem } from "@opencode-ai/core/filesystem"
 import { Global } from "@opencode-ai/core/global"
 import { testEffect } from "../lib/effect"
 
@@ -15,7 +15,7 @@ const testLayer = Layer.mergeAll(
     Layer.provide(Discovery.defaultLayer),
     Layer.provide(Config.defaultLayer),
     Layer.provide(Bus.layer),
-    Layer.provide(AppFileSystem.defaultLayer),
+    Layer.provide(FileSystem.defaultLayer),
     Layer.provide(Global.layer),
     Layer.provide(RuntimeFlags.layer({})),
   ),
@@ -235,7 +235,7 @@ describe("Skill.available merges session skills", () => {
         description: "Session",
         content: "session",
       })
-      const agent = { name: "build", mode: "primary" as const, permission: [] as never[] }
+      const agent = { name: "build", mode: "primary" as const, permission: [] as never[], options: {} }
       const without = yield* skill.available(agent)
       expect(without.find((s) => s.name === "session-only")).toBeUndefined()
     }),
@@ -249,7 +249,7 @@ describe("Skill.available merges session skills", () => {
         description: "Merged",
         content: "merged",
       })
-      const agent = { name: "build", mode: "primary" as const, permission: [] as never[] }
+      const agent = { name: "build", mode: "primary" as const, permission: [] as never[], options: {} }
       const withSession = yield* skill.available(agent, SESSION)
       const names = withSession.map((s) => s.name)
       expect(names).toContain("merged-skill")

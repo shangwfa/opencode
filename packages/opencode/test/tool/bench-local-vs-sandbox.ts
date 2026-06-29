@@ -7,7 +7,7 @@
 import { Effect, Layer, ManagedRuntime } from "effect"
 import { GlobTool } from "../../src/tool/glob"
 import { GrepTool } from "../../src/tool/grep"
-import { BashTool } from "../../src/tool/bash"
+import { BashTool } from "@opencode-ai/core/tool/bash"
 import { ReadTool } from "../../src/tool/read"
 import { WriteTool } from "../../src/tool/write"
 import { EditTool } from "../../src/tool/edit"
@@ -15,17 +15,20 @@ import { Truncate } from "../../src/tool/truncate"
 import { Agent } from "../../src/agent/agent"
 import { Plugin } from "../../src/plugin"
 import { AppFileSystem } from "@opencode-ai/shared/filesystem"
-import * as CrossSpawnSpawner from "../../src/effect/cross-spawn-spawner"
-import { Ripgrep } from "../../src/file/ripgrep"
+import * as CrossSpawnSpawner from "@opencode-ai/core/cross-spawn-spawner"
+import { Ripgrep } from "@opencode-ai/core/ripgrep"
 import { SandboxProvider, NoopSandboxProvider } from "../../src/tool/sandbox-provider"
-import { LSP } from "../../src/lsp"
-import { FileTime } from "../../src/file/time"
-import { FileWatcher } from "../../src/file/watcher"
+// TODO: merge-upstream — LSP namespace removed; use named imports from ../../src/lsp/lsp
+// import { LSP } from "../../src/lsp"
+// TODO: merge-upstream — FileTime module removed
+// import { FileTime } from "../../src/file/time"
+// TODO: merge-upstream — FileWatcher module removed
+// import { FileWatcher } from "../../src/file/watcher"
 import { Bus } from "../../src/bus"
 import { Format } from "../../src/format"
 import { Instruction } from "../../src/session/instruction"
 import { SessionID, MessageID } from "../../src/session/schema"
-import { Instance } from "../../src/project/instance"
+import { provideTestInstance, disposeAllInstances } from "../fixture/fixture"
 import { ConnectionConfig, Sandbox } from "@alibaba-group/opensandbox"
 import path from "path"
 import fs from "fs"
@@ -45,9 +48,12 @@ const sharedLayers = Layer.mergeAll(
   Truncate.defaultLayer,
   Agent.defaultLayer,
   Ripgrep.defaultLayer,
-  LSP.defaultLayer,
-  FileTime.defaultLayer,
-  FileWatcher.defaultLayer,
+  // TODO: LSP removed
+//   LSP.defaultLayer,
+  // TODO: FileTime removed
+//   FileTime.defaultLayer,
+  // TODO: FileWatcher removed
+//   FileWatcher.defaultLayer,
   Bus.layer,
   Format.defaultLayer,
   Instruction.defaultLayer,
@@ -100,7 +106,7 @@ async function time(label: string, fn: () => Promise<any>): Promise<number> {
 type ToolDef = { execute: (args: any, ctx: any) => Effect.Effect<any> }
 
 async function initTools(rt: any): Promise<Record<string, ToolDef>> {
-  return Instance.provide({
+  return provideTestInstance({
     directory: process.cwd(),
     fn: async () => {
       const init = (tool: any) =>
@@ -226,11 +232,11 @@ for (const step of steps) {
     if (step.tool === "edit") {
       fs.writeFileSync(path.join(localTmpDir, editFile), editContent)
       await sb.files.writeFiles([{ path: `/workspace/${editFile}`, data: editContent }])
-      await Instance.provide({
+      await provideTestInstance({
         directory: localTmpDir,
         fn: () => runEffect(localRuntime, (localTools as any).read.execute({ filePath: path.join(localTmpDir, editFile) }, localCtx())),
       })
-      await Instance.provide({
+      await provideTestInstance({
         directory: process.cwd(),
         fn: () => runEffect(sandboxRuntime, (sandboxTools as any).read.execute({ filePath: editFile }, sandboxCtx(sb))),
       })
@@ -239,7 +245,7 @@ for (const step of steps) {
     }
 
     const localMs = await time(`local:${step.name}`, () =>
-      Instance.provide({
+      provideTestInstance({
         directory: localTmpDir,
         fn: () => runEffect(localRuntime, (localTools as any)[step.tool].execute(step.localArgs, localCtx())),
       }),
@@ -247,7 +253,7 @@ for (const step of steps) {
     localTimes.push(localMs)
 
     const sandboxMs = await time(`sandbox:${step.name}`, () =>
-      Instance.provide({
+      provideTestInstance({
         directory: process.cwd(),
         fn: () => runEffect(sandboxRuntime, (sandboxTools as any)[step.tool].execute(step.sandboxArgs, sandboxCtx(sb))),
       }),

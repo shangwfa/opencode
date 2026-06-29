@@ -2,13 +2,14 @@ import { beforeAll, afterEach, describe, expect, test } from "bun:test"
 import { Effect, Layer, ManagedRuntime } from "effect"
 import { Database, eq } from "../../src/storage/db"
 import { Bus } from "../../src/bus"
-import { Instance } from "../../src/project/instance"
-import { Session } from "../../src/session"
+import { provideTestInstance, disposeAllInstances } from "../fixture/fixture"
+import { Session } from "../../src/session/session"
 import { SessionAgent } from "../../src/agent/session-agent"
 import { SessionAgentTable } from "../../src/agent/agent.pg"
 import type { SessionID } from "../../src/session/schema"
 import { tmpdir } from "../fixture/fixture"
-import { ProviderID, ModelID } from "../../src/provider/schema"
+import { ProviderV2 } from "@opencode-ai/core/provider"
+import { ModelV2 } from "@opencode-ai/core/model"
 
 const DB_URL = process.env.OPENCODE_DATABASE_URL
 if (!DB_URL) {
@@ -44,7 +45,7 @@ describe("SessionAgent PG", () => {
 
   async function make() {
     const tmp = await tmpdir({ git: true })
-    const session = await Instance.provide({
+    const session = await provideTestInstance({
       directory: tmp.path,
       fn: () => run(Session.Service.use((svc) => svc.create({ title: "session agent test" }))),
     })
@@ -88,7 +89,7 @@ describe("SessionAgent PG", () => {
             { permission: "bash", pattern: "*", action: "deny" },
             { permission: "read", pattern: "*", action: "allow" },
           ],
-          model: { providerID: ProviderID.make("openai"), modelID: ModelID.make("gpt-4") },
+          model: { providerID: ProviderV2.ID.make("openai"), modelID: ModelV2.ID.make("gpt-4") },
           temperature: 0.7,
           topP: 0.9,
           steps: 20,
@@ -204,7 +205,7 @@ describe("SessionAgent PG", () => {
 
   test("cascade delete when session is removed", async () => {
     await using tmp = await tmpdir({ git: true })
-    await Instance.provide({
+    await provideTestInstance({
       directory: tmp.path,
       fn: async () => {
         const session = await run(

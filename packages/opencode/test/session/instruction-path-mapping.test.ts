@@ -4,7 +4,7 @@ import { Effect, FileSystem, Layer } from "effect"
 import { FetchHttpClient } from "effect/unstable/http"
 import { NodeFileSystem } from "@effect/platform-node"
 import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
-import { AppFileSystem } from "@opencode-ai/core/filesystem"
+import { FileSystem } from "@opencode-ai/core/filesystem"
 import { Instruction } from "../../src/session/instruction"
 import { MessageID } from "../../src/session/schema"
 import { Global } from "@opencode-ai/core/global"
@@ -21,7 +21,7 @@ const configLayer = TestConfig.layer()
 const instructionLayer = (global: Partial<Global.Interface>, flags: Partial<RuntimeFlags.Info> = {}) =>
   Instruction.layer.pipe(
     Layer.provide(configLayer),
-    Layer.provide(AppFileSystem.defaultLayer),
+    Layer.provide(FileSystem.defaultLayer),
     Layer.provide(FetchHttpClient.layer),
     Layer.provide(Global.layerWith(global)),
     Layer.provide(RuntimeFlags.layer(flags)),

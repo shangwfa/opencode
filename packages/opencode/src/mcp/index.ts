@@ -1077,7 +1077,7 @@ export const layer = Layer.effect(
 
       return yield* Effect.tryPromise({
         try: () => {
-          const client = createClient(directory)
+          const client = new Client({ name: "opencode", version: InstallationVersion })
           return client.connect(transport).then(async () => {
             await authProvider.commit()
             return { authorizationUrl: "", oauthState, client } satisfies AuthResult

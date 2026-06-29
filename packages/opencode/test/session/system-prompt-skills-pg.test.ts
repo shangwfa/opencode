@@ -2,21 +2,22 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import { Effect, Exit, Layer } from "effect"
 import postgres from "postgres"
 import path from "path"
-import { Instance } from "../../src/project/instance"
-import { Session } from "../../src/session"
+import { provideTestInstance, disposeAllInstances } from "../fixture/fixture"
+import { Session } from "../../src/session/session"
 import { SessionSkill } from "../../src/skill/session-skill"
 import { Skill } from "../../src/skill"
 import { SystemPrompt } from "../../src/session/system"
 import { Database } from "../../src/storage/db"
 import { provideTmpdirInstance } from "../fixture/fixture"
 import { testEffect } from "../lib/effect"
-import * as CrossSpawnSpawner from "../../src/effect/cross-spawn-spawner"
+import * as CrossSpawnSpawner from "@opencode-ai/core/cross-spawn-spawner"
 import { Config } from "../../src/config/config"
 import { Agent } from "../../src/agent/agent"
 import { Project } from "../../src/project/project"
 import { Truncate } from "../../src/tool/truncate"
 import { ToolRegistry } from "../../src/tool/registry"
 import { Permission } from "../../src/permission"
+import { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import type { Agent as AgentType } from "../../src/agent/agent"
 
 const url = process.env["OPENCODE_DATABASE_URL"]
@@ -42,7 +43,7 @@ async function reset() {
 const mockAgent: AgentType.Info = {
   name: "test",
   mode: "primary",
-  permission: [] as Permission.Ruleset,
+  permission: [] as PermissionV1.Ruleset,
 } as AgentType.Info
 
 const it = testEffect(

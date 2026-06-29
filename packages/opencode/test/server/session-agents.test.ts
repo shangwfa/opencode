@@ -1,11 +1,11 @@
 import { afterAll, beforeAll, afterEach, describe, expect, test } from "bun:test"
 import { Effect } from "effect"
-import { Instance } from "../../src/project/instance"
+import { provideTestInstance, disposeAllInstances } from "../fixture/fixture"
 import { Server } from "../../src/server/server"
-import { Session as SessionNs } from "../../src/session"
+import { Session as SessionNs } from "../../src/session/session"
 import type { SessionID } from "../../src/session/schema"
 import type { Agent as AgentType } from "../../src/agent/agent"
-import { Log } from "../../src/util/log"
+import { Log } from "@opencode-ai/core/util/log"
 import { Database } from "../../src/storage/db"
 import { tmpdir } from "../fixture/fixture"
 
@@ -33,13 +33,13 @@ const svc = {
 }
 
 afterEach(async () => {
-  await Instance.disposeAll()
+  await disposeAllInstances()
 })
 
 describe("session agents routes (PG)", () => {
   test("create, list, unload and clear session agents", async () => {
     await using tmp = await tmpdir({ git: true })
-    await Instance.provide({
+    await provideTestInstance({
       directory: tmp.path,
       fn: async () => {
         const session = await svc.create({ title: "agent-routes-test" })
@@ -110,7 +110,7 @@ describe("session agents routes (PG)", () => {
 
   test("upsert updates existing agent", async () => {
     await using tmp = await tmpdir({ git: true })
-    await Instance.provide({
+    await provideTestInstance({
       directory: tmp.path,
       fn: async () => {
         const session = await svc.create({ title: "upsert-test" })
@@ -143,7 +143,7 @@ describe("session agents routes (PG)", () => {
 
   test("different sessions are isolated", async () => {
     await using tmp = await tmpdir({ git: true })
-    await Instance.provide({
+    await provideTestInstance({
       directory: tmp.path,
       fn: async () => {
         const sA = await svc.create({ title: "iso-A" })
@@ -175,7 +175,7 @@ describe("session agents routes (PG)", () => {
 
   test("returns 404 for missing session", async () => {
     await using tmp = await tmpdir({ git: true })
-    await Instance.provide({
+    await provideTestInstance({
       directory: tmp.path,
       fn: async () => {
         const app = Server.Default().app
@@ -191,7 +191,7 @@ describe("session agents routes (PG)", () => {
 
   test("cascade delete when session is removed", async () => {
     await using tmp = await tmpdir({ git: true })
-    await Instance.provide({
+    await provideTestInstance({
       directory: tmp.path,
       fn: async () => {
         const session = await svc.create({ title: "cascade-test" })
@@ -216,7 +216,7 @@ describe("session agents routes (PG)", () => {
 
   test("agent with full config persists all fields", async () => {
     await using tmp = await tmpdir({ git: true })
-    await Instance.provide({
+    await provideTestInstance({
       directory: tmp.path,
       fn: async () => {
         const session = await svc.create({ title: "full-config" })
@@ -269,7 +269,7 @@ describe("session agents routes (PG)", () => {
 
   test("rejects invalid agent names", async () => {
     await using tmp = await tmpdir({ git: true })
-    await Instance.provide({
+    await provideTestInstance({
       directory: tmp.path,
       fn: async () => {
         const session = await svc.create({ title: "invalid-name" })
@@ -291,7 +291,7 @@ describe("session agents routes (PG)", () => {
 
   test("session agent override preserves native metadata", async () => {
     await using tmp = await tmpdir({ git: true })
-    await Instance.provide({
+    await provideTestInstance({
       directory: tmp.path,
       fn: async () => {
         const session = await svc.create({ title: "native-override" })

@@ -62,6 +62,7 @@ const AGENT: Agent.Info = {
   name: "build",
   mode: "primary",
   permission: [],
+  options: {},
 }
 
 const SESSION = "ses_test_prompt_001"
@@ -74,6 +75,7 @@ describe("SystemPrompt.skills", () => {
         name: "build",
         mode: "primary",
         permission: [{ permission: "skill", pattern: "*", action: "deny" }],
+        options: {},
       }
       const result = yield* sys.skills(agent)
       expect(result).toBeUndefined()

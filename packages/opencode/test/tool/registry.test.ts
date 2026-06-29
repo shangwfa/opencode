@@ -374,6 +374,7 @@ describe("tool.registry", () => {
         messages: [],
         metadata: () => Effect.void,
         ask: () => Effect.void,
+        sandbox: null,
       } satisfies Tool.Context)
 
       expect(result.output).toBe("here is an image")

@@ -16,13 +16,15 @@ import { Effect, Exit, Layer } from "effect"
 import postgres from "postgres"
 import { Agent } from "../../src/agent/agent"
 import { Config } from "../../src/config/config"
-import * as CrossSpawnSpawner from "../../src/effect/cross-spawn-spawner"
+import * as CrossSpawnSpawner from "@opencode-ai/core/cross-spawn-spawner"
 import { Project } from "../../src/project/project"
-import { Instance } from "../../src/project/instance"
-import { Session } from "../../src/session"
+import { provideTestInstance, disposeAllInstances } from "../fixture/fixture"
+import { Session } from "../../src/session/session"
 import { MessageV2 } from "../../src/session/message-v2"
+import { Assistant } from "@opencode-ai/core/v1/session"
 import { MessageID } from "../../src/session/schema"
-import { ModelID, ProviderID } from "../../src/provider/schema"
+import { ProviderV2 } from "@opencode-ai/core/provider"
+import { ModelV2 } from "@opencode-ai/core/model"
 import { Truncate } from "../../src/tool/truncate"
 import { ToolRegistry } from "../../src/tool/registry"
 import { Database } from "../../src/storage/db"
@@ -50,8 +52,8 @@ async function reset() {
 }
 
 const ref = {
-  providerID: ProviderID.make("test"),
-  modelID: ModelID.make("test-model"),
+  providerID: ProviderV2.ID.make("test"),
+  modelID: ModelV2.ID.make("test-model"),
 }
 
 const it = testEffect(
@@ -74,7 +76,7 @@ describe.skipIf(!enabled)("PG business logic e2e", () => {
   })
 
   afterEach(async () => {
-    await Instance.disposeAll().catch(() => undefined)
+    await disposeAllInstances().catch(() => undefined)
   })
 
   afterAll(async () => {
@@ -128,7 +130,7 @@ describe.skipIf(!enabled)("PG business logic e2e", () => {
         })
         expect(user.role).toBe("user")
 
-        const assistant: MessageV2.Assistant = {
+        const assistant: Assistant = {
           id: MessageID.ascending(),
           role: "assistant",
           parentID: user.id,
@@ -149,7 +151,7 @@ describe.skipIf(!enabled)("PG business logic e2e", () => {
 
         const asst = msgs.find((m) => m.info.role === "assistant")
         expect(asst).toBeDefined()
-        const asstInfo = asst!.info as MessageV2.Assistant
+        const asstInfo = asst!.info as Assistant
         expect(asstInfo.cost).toBe(0.00125)
         expect(asstInfo.tokens.input).toBe(100)
         expect(asstInfo.path.cwd).toBe("/tmp")
@@ -330,7 +332,7 @@ describe.skipIf(!enabled)("PG business logic e2e", () => {
           model: ref,
           time: { created: Date.now() },
         })
-        const msg: MessageV2.Assistant = {
+        const msg: Assistant = {
           id: MessageID.ascending(),
           role: "assistant",
           parentID: parentMsg.id,
@@ -350,7 +352,7 @@ describe.skipIf(!enabled)("PG business logic e2e", () => {
         const msgs = yield* svc.messages({ sessionID: session.id })
         const asst = msgs.find((m) => m.info.role === "assistant")
         expect(asst).toBeDefined()
-        const info = asst!.info as MessageV2.Assistant
+        const info = asst!.info as Assistant
         expect(info.tokens.input).toBe(1_000_000)
         expect(info.path.cwd).toHaveLength(100)
       }),

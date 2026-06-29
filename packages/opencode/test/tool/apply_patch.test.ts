@@ -32,6 +32,7 @@ const baseCtx = {
   abort: AbortSignal.any([]),
   messages: [],
   metadata: () => Effect.void,
+  sandbox: null,
 }
 
 type AskInput = {

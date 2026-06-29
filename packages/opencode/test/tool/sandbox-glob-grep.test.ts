@@ -6,11 +6,11 @@ import { Truncate } from "../../src/tool/truncate"
 import { Agent } from "../../src/agent/agent"
 import { Plugin } from "../../src/plugin"
 import { AppFileSystem } from "@opencode-ai/shared/filesystem"
-import * as CrossSpawnSpawner from "../../src/effect/cross-spawn-spawner"
-import { Ripgrep } from "../../src/file/ripgrep"
+import * as CrossSpawnSpawner from "@opencode-ai/core/cross-spawn-spawner"
+import { Ripgrep } from "@opencode-ai/core/ripgrep"
 import { SandboxProvider } from "../../src/tool/sandbox-provider"
 import { SessionID, MessageID } from "../../src/session/schema"
-import { Instance } from "../../src/project/instance"
+import { provideTestInstance, disposeAllInstances } from "../fixture/fixture"
 import { ConnectionConfig, Sandbox } from "@alibaba-group/opensandbox"
 
 const runtime = ManagedRuntime.make(
@@ -70,7 +70,7 @@ test("glob executes in sandbox and returns sandbox paths", async () => {
   try {
     const glob = await initTool(GlobTool)
     const ctx = makeCtx(sb)
-    await Instance.provide({
+    await provideTestInstance({
       directory: process.cwd(),
       fn: async () => {
         const result: any = await runtime.runPromise(glob.execute({ pattern: "*.txt", path: "/workspace" }, ctx))
@@ -89,7 +89,7 @@ test("grep executes in sandbox and finds text", async () => {
   try {
     const grep = await initTool(GrepTool)
     const ctx = makeCtx(sb)
-    await Instance.provide({
+    await provideTestInstance({
       directory: process.cwd(),
       fn: async () => {
         const result: any = await runtime.runPromise(grep.execute({ pattern: "hello", path: "/workspace" }, ctx))

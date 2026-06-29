@@ -2,11 +2,13 @@ import { afterEach, describe, expect } from "bun:test"
 import { Cause, Effect, Exit, Layer, Duration } from "effect"
 import path from "path"
 import { Agent } from "../../src/agent/agent"
-import * as CrossSpawnSpawner from "../../src/effect/cross-spawn-spawner"
+import * as CrossSpawnSpawner from "@opencode-ai/core/cross-spawn-spawner"
 import { AppFileSystem } from "@opencode-ai/shared/filesystem"
-import { FileTime } from "../../src/file/time"
-import { LSP } from "../../src/lsp"
-import { Instance } from "../../src/project/instance"
+// TODO: merge-upstream — FileTime module removed
+// import { FileTime } from "../../src/file/time"
+// TODO: merge-upstream — LSP namespace removed; use named imports from ../../src/lsp/lsp
+// import { LSP } from "../../src/lsp"
+import { provideTestInstance, disposeAllInstances } from "../fixture/fixture"
 import { SessionID, MessageID } from "../../src/session/schema"
 import { Instruction } from "../../src/session/instruction"
 import { ReadTool } from "../../src/tool/read"
@@ -17,7 +19,7 @@ import { provideInstance, tmpdirScoped } from "../fixture/fixture"
 import { testEffect } from "../lib/effect"
 
 afterEach(async () => {
-  await Instance.disposeAll()
+  await disposeAllInstances()
 })
 
 const makeCtx = (sandbox: Promise<any>): Tool.Context => ({
@@ -56,9 +58,11 @@ const baseLayers = Layer.mergeAll(
   Agent.defaultLayer,
   AppFileSystem.defaultLayer,
   CrossSpawnSpawner.defaultLayer,
-  FileTime.defaultLayer,
+  // TODO: FileTime removed
+//   FileTime.defaultLayer,
   Instruction.defaultLayer,
-  LSP.defaultLayer,
+  // TODO: LSP removed
+//   LSP.defaultLayer,
   Truncate.defaultLayer,
 )
 
