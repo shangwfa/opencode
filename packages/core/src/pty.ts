@@ -32,12 +32,31 @@ type Active = {
   listeners: Disp[]
 }
 
+const sock = (ws: Socket) => (ws.data && typeof ws.data === "object" ? ws.data : ws)
+
+const meta = (cursor: number) => {
+  const json = JSON.stringify({ cursor })
+  const bytes = encoder.encode(json)
+  const out = new Uint8Array(bytes.length + 1)
+  out[0] = 0
+  out.set(bytes, 1)
+  return out
+}
+
 export const Info = Pty.Info
 export type Info = Types.DeepMutable<typeof Info.Type>
 
 export const CreateInput = Pty.CreateInput
 
 export type CreateInput = Types.DeepMutable<typeof CreateInput.Type>
+
+export type PreparedCreate = {
+  readonly command: string
+  readonly args: string[]
+  readonly cwd: string
+  readonly title?: string
+  readonly env: Record<string, string>
+}
 
 export const UpdateInput = Pty.UpdateInput
 

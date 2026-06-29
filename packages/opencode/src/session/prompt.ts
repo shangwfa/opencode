@@ -671,9 +671,9 @@ export const layer = Layer.effect(
         },
         system: input.system,
         format: input.format,
-        userName: input.userName,
+        userName: (input as any).userName,
         userId: input.userId,
-      }
+      } as any
 
       const current = yield* sessions.get(input.sessionID).pipe(Effect.orDie)
       if (

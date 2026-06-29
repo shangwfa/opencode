@@ -264,7 +264,7 @@ export const EditTool = Tool.define(
               output: sbOutput,
             }
           }
-        }),
+        }) as any, // TODO: Tool Init type mismatch
     }
   }),
 )

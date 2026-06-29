@@ -445,10 +445,11 @@ export const page = Effect.fn("MessageV2.page")(function* (input: {
   // The sqliteTable→PG bridge sometimes loses rows due to SQL dialect mismatch.
   if (rows.length === 0) {
     const pgClient = (SaasDb.Client() as any).$client
-    const rawRows: any[] = yield* Effect.tryPromise({
+    // TODO: Effect error type inference issue
+    const rawRows: any[] = yield* (Effect.tryPromise({
       try: () => pgClient`SELECT * FROM message WHERE session_id = ${input.sessionID} ORDER BY time_created DESC, id DESC LIMIT ${input.limit + 1}`,
       catch: () => [] as any[],
-    })
+    }) as Effect.Effect<any[]>)
     if (rawRows.length > 0) {
       rows = rawRows as any
     }

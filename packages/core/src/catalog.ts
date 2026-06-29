@@ -8,8 +8,6 @@ import { ProviderV2 } from "./provider"
 import { EventV2 } from "./event"
 import { Policy } from "./policy"
 import { State } from "./state"
-import { Credential } from "./credential"
-import { ConnectorSchema } from "./connector/schema"
 import { Integration } from "./integration"
 
 export type ProviderRecord = {
@@ -77,7 +75,7 @@ export const layer = Layer.effect(
       return provider.integrationID === undefined && !integration
     }
 
-    const resolve = (model: ModelV2.Info, provider: ProviderV2.Info) => {
+    const projectModel = (model: ModelV2.Info, provider: ProviderV2.Info) => {
       const api =
         model.api.type === "native" && !model.api.url && Object.keys(model.api.settings).length === 0
           ? { ...provider.api, id: model.api.id }
@@ -167,6 +165,7 @@ export const layer = Layer.effect(
             }
           }
         }
+        yield* events.publish(Event.Updated, {})
       }),
     })
     const result: Interface = {
@@ -179,10 +178,7 @@ export const layer = Layer.effect(
         }),
 
         all: Effect.fn("CatalogV2.provider.all")(function* () {
-          const credentials = yield* active()
-          return Array.fromIterable(state.get().providers.values()).map((record) =>
-            project(record.provider, credentials),
-          )
+          return Array.fromIterable(state.get().providers.values()).map((record) => record.provider)
         }),
 
         available: Effect.fn("CatalogV2.provider.available")(function* () {
@@ -202,22 +198,18 @@ export const layer = Layer.effect(
         }),
 
         all: Effect.fn("CatalogV2.model.all")(function* () {
-          const credentials = yield* active()
           return pipe(
             Array.fromIterable(state.get().providers.values()),
             Array.flatMap((record) => {
-              const provider = project(record.provider, credentials)
-              return Array.fromIterable(record.models.values()).map((model) => resolve(model, provider))
+              return Array.fromIterable(record.models.values()).map((model) => projectModel(model, record.provider))
             }),
             Array.sortWith((item) => item.time.released, Order.flip(Order.Number)),
           )
         }),
 
         available: Effect.fn("CatalogV2.model.available")(function* () {
-          const providers = new Map((yield* result.provider.all()).map((provider) => [provider.id, provider]))
-          return (yield* result.model.all()).filter(
-            (model) => providers.get(model.providerID)?.enabled !== false && model.enabled,
-          )
+          const providers = new Set((yield* result.provider.available()).map((provider) => provider.id))
+          return (yield* result.model.all()).filter((model) => providers.has(model.providerID) && model.enabled)
         }),
 
         default: Effect.fn("CatalogV2.model.default")(function* () {
@@ -279,7 +271,7 @@ export const layer = Layer.effect(
             return pipe(
               items,
               Array.sortWith((item) => (item.cost / maxCost) * 0.8 + (item.age / maxAge) * 0.2, Order.Number),
-              Array.map((item) => resolve(item.model, provider)),
+              Array.map((item) => projectModel(item.model, provider)),
               Array.head,
             )
           }

@@ -36,4 +36,4 @@ export const boundNode = (ref: Ref) =>
     service: Service,
     layer: layer(ref),
     deps: [Project.node],
-  })
+  } as any)

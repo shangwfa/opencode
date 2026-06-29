@@ -12,6 +12,7 @@ import { EventID } from "./schema"
 import { Context, Effect, Layer, Schema as EffectSchema } from "effect"
 import type { DeepMutable } from "@opencode-ai/core/schema"
 import { EventV2 } from "@opencode-ai/core/event"
+import { Durable } from "@opencode-ai/schema/durable-event-manifest"
 import { serviceUse } from "@opencode-ai/core/effect/service-use"
 import { InstanceState } from "@/effect/instance-state"
 import { RuntimeFlags } from "@/effect/runtime-flags"
@@ -234,12 +235,12 @@ export function reset() {
 
 export function init(input: { projectors: Array<[Definition, ProjectorFunc]>; convertEvent?: ConvertEvent }) {
   projectors = new Map(input.projectors.map(([def, func]) => [versionedType(def.type, def.version), func]))
-  for (const entry of EventV2.registry.values()) {
-    if (!entry.sync?.version || !entry.sync?.aggregate) continue
+  for (const entry of Durable.values()) {
+    if (!entry.durable?.version || !entry.durable?.aggregate) continue
     register({
       type: entry.type,
-      version: entry.sync.version,
-      aggregate: entry.sync.aggregate,
+      version: entry.durable.version,
+      aggregate: entry.durable.aggregate,
       properties: entry.data,
       schema: entry.data,
     })
@@ -405,19 +406,19 @@ export function effectPayloads() {
         }).annotate({ identifier: `SyncEvent.${type}` }),
       )
       .toArray(),
-    ...EventV2.registry
+    ...Durable
       .values()
       .filter(
         (definition) =>
-          definition.sync?.version !== undefined && !registry.has(versionedType(definition.type, definition.sync.version)),
+          definition.durable?.version !== undefined && !registry.has(versionedType(definition.type, definition.durable.version)),
       )
       .map((definition) =>
         EffectSchema.Struct({
           type: EffectSchema.Literal("sync"),
-          name: EffectSchema.Literal(versionedType(definition.type, definition.sync!.version)),
+          name: EffectSchema.Literal(versionedType(definition.type, definition.durable!.version)),
           id: EffectSchema.String,
           seq: EffectSchema.Finite,
-          aggregateID: EffectSchema.Literal(definition.sync!.aggregate),
+          aggregateID: EffectSchema.Literal(definition.durable!.aggregate),
           data: definition.data,
         }).annotate({ identifier: `SyncEvent.${definition.type}` }),
       )

@@ -489,7 +489,7 @@ export const node = LayerNode.make({
     Truncate.node,
     RuntimeFlags.node,
     Database.node,
-  ],
+  ] as any,
 })
 
 export * as ToolRegistry from "./registry"

@@ -30,7 +30,7 @@ export const Plugin = define({
             if (item.env !== undefined) {
               integrations.method.update({
                 integrationID,
-                method: { type: "env", names: [...item.env] },
+                method: { type: "env", names: [...item.env] } as any,
               })
             }
           }

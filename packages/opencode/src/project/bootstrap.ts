@@ -49,7 +49,7 @@ export const layer = Layer.effect(
   }),
 )
 
-export const defaultLayer: Layer.Layer<Service> = layer.pipe(
+export const defaultLayer: Layer.Layer<Service> = (layer.pipe(
   Layer.provide([
     Config.defaultLayer,
     Format.defaultLayer,
@@ -60,7 +60,7 @@ export const defaultLayer: Layer.Layer<Service> = layer.pipe(
     Snapshot.defaultLayer,
     Vcs.defaultLayer,
   ]),
-)
+) as any) // TODO: Layer has unsatisfied service dependencies
 
 export const node = LayerNode.make({
   service: Service,

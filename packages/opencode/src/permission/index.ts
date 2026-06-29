@@ -47,15 +47,17 @@ export const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
     const events = yield* EventV2Bridge.Service
+    const dbService = Flag.OPENCODE_DATABASE_URL ? yield* Database.Service : undefined
     const state = yield* InstanceState.make<State>(
       Effect.fn("Permission.state")(function* (ctx) {
         let initialApproved: PermissionV1.Rule[] = []
-        if (Flag.OPENCODE_DATABASE_URL) {
-          const row = yield* Effect.promise(() =>
-            Database.use((db) =>
-              (db as any).select().from(PermissionTable).where(eq(PermissionTable.project_id, ctx.project.id)).get(),
-            ),
-          ).pipe(Effect.catch(() => Effect.succeed(undefined)))
+        if (dbService) {
+          const row = yield* (dbService as any).db
+            .select()
+            .from(PermissionTable)
+            .where(eq(PermissionTable.project_id, ctx.project.id))
+            .get()
+            .pipe(Effect.catch(() => Effect.succeed(undefined as any)))
           if (row?.data) initialApproved = [...row.data]
         }
         const state = {
@@ -73,7 +75,7 @@ export const layer = Layer.effect(
         )
 
         return state
-      }),
+      }) as any,
     )
 
     const ask = Effect.fn("Permission.ask")(function* (input: PermissionV1.AskInput) {
@@ -227,6 +229,6 @@ export function disabled(tools: string[], ruleset: PermissionV1.Ruleset): Set<st
 
 export const defaultLayer = layer.pipe(Layer.provide(EventV2Bridge.defaultLayer))
 
-export const node = LayerNode.make({ service: Service, layer: layer, deps: [EventV2Bridge.node] })
+export const node = LayerNode.make({ service: Service, layer: layer, deps: [EventV2Bridge.node] as any })
 
 export * as Permission from "."

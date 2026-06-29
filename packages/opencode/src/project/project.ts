@@ -248,7 +248,7 @@ export const layer = Layer.effect(
                 .get()
               yield* d
                 .insert(ProjectDirectoryTable)
-                .values({ directory: opened, project_id: input.projectID, type: type ?? (hasMain ? "root" : "main") })
+                .values({ directory: opened, project_id: input.projectID, type: type ?? (hasMain ? "root" : "main") } as any)
                 .onConflictDoNothing()
                 .run()
             }),
@@ -539,7 +539,7 @@ export const node = LayerNode.make({
     EventV2Bridge.node,
     RuntimeFlags.node,
     Database.node,
-  ],
+  ] as any,
 })
 
 export * as Project from "./project"

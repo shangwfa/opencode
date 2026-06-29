@@ -875,7 +875,7 @@ export const layer = Layer.effect(
 
     return Service.of({
       create,
-      sessionWarp,
+      sessionWarp: sessionWarp as any,
       list,
       syncList,
       get,

@@ -42,7 +42,7 @@ const browser = {
     id: browserMethodID,
     type: "oauth",
     label: "ChatGPT Pro/Plus (browser)",
-  },
+  } as any,
   authorize: () =>
     Effect.gen(function* () {
       const pkce = yield* Effect.promise(generatePKCE)
@@ -99,7 +99,7 @@ const headless = {
     id: headlessMethodID,
     type: "oauth",
     label: "ChatGPT Pro/Plus (headless)",
-  },
+  } as any,
   authorize: () =>
     Effect.gen(function* () {
       const device = yield* request<{ device_auth_id: string; user_code: string; interval: string }>(

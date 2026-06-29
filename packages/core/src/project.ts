@@ -86,7 +86,7 @@ export const layer = Layer.effect(
         .orderBy(desc(ProjectDirectoryTable.time_created), asc(ProjectDirectoryTable.directory))
         .all()
         .pipe(Effect.orDie)
-      return rows.map((row) => ({ directory: AbsolutePath.make(row.directory), type: row.type }))
+      return rows.map((row) => ({ directory: AbsolutePath.make(row.directory), type: row.type ?? "main" }))
     })
 
     const cached = Effect.fnUntraced(function* (dir: string) {
@@ -165,4 +165,4 @@ export const node = makeGlobalNode({
   service: Service,
   layer: layer,
   deps: [FSUtil.node, Git.node, ProjectDirectories.node],
-})
+} as any)

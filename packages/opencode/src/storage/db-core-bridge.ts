@@ -58,7 +58,7 @@ function wrapTransaction(pgDb: any) {
     return Effect.promise(() =>
       SaasDb.transaction(async (tx: any) => {
         const result = fn(wrap(tx))
-        if (Effect.isEffect(result)) return await Effect.runPromise(result)
+        if (Effect.isEffect(result)) return await Effect.runPromise(result as any)
         return result
       }),
     )

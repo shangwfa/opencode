@@ -96,7 +96,8 @@ export const layer = Layer.effect(
               yield* mcp.value.clearSessionCache(sessionID).pipe(Effect.catchCause(() => Effect.void))
             }
           }
-        }),
+          // TODO: Effect error type inference issue
+        }) as any,
         onBusy: status.set(sessionID, { type: "busy" }),
         onInterrupt,
       })

@@ -9,7 +9,7 @@ import { Prompt } from "@opencode-ai/core/session/prompt"
 import { ProjectV2 } from "@opencode-ai/core/project"
 import { SessionEvent } from "@opencode-ai/core/session/event"
 import { V2Schema } from "@opencode-ai/core/v2-schema"
-import { optionalOmitUndefined } from "@opencode-ai/core/schema"
+import { optional } from "@opencode-ai/core/schema"
 import { EventV2 } from "@opencode-ai/core/event"
 import { EventV2Bridge } from "@/event-v2-bridge"
 import { ModelV2 } from "@opencode-ai/core/model"
@@ -24,12 +24,12 @@ export const DefaultDelivery = "immediate" satisfies Delivery
 
 export class Info extends Schema.Class<Info>("Session.Info")({
   id: SessionID,
-  parentID: optionalOmitUndefined(SessionID),
+  parentID: optional(SessionID),
   projectID: ProjectV2.ID,
-  workspaceID: optionalOmitUndefined(WorkspaceV2.ID),
-  path: optionalOmitUndefined(Schema.String),
-  agent: optionalOmitUndefined(Schema.String),
-  model: ModelV2.Ref.pipe(optionalOmitUndefined),
+  workspaceID: optional(WorkspaceV2.ID),
+  path: optional(Schema.String),
+  agent: optional(Schema.String),
+  model: ModelV2.Ref.pipe(optional),
   cost: Schema.Finite,
   tokens: Schema.Struct({
     input: Schema.Finite,
@@ -43,21 +43,21 @@ export class Info extends Schema.Class<Info>("Session.Info")({
   time: Schema.Struct({
     created: V2Schema.DateTimeUtcFromMillis,
     updated: V2Schema.DateTimeUtcFromMillis,
-    archived: optionalOmitUndefined(V2Schema.DateTimeUtcFromMillis),
+    archived: optional(V2Schema.DateTimeUtcFromMillis),
   }),
   title: Schema.String,
   /*
   slug: Schema.String,
   directory: Schema.String,
-  path: optionalOmitUndefined(Schema.String),
-  parentID: optionalOmitUndefined(SessionID),
-  summary: optionalOmitUndefined(Summary),
-  share: optionalOmitUndefined(Share),
+  path: optional(Schema.String),
+  parentID: optional(SessionID),
+  summary: optional(Summary),
+  share: optional(Share),
   title: Schema.String,
   version: Schema.String,
   time: Time,
-  permission: optionalOmitUndefined(Permission.Ruleset),
-  revert: optionalOmitUndefined(Revert),
+  permission: optional(Permission.Ruleset),
+  revert: optional(Revert),
   */
 }) {}
 

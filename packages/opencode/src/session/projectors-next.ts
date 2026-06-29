@@ -14,8 +14,8 @@ import { Schema } from "effect"
 function toSyncDefinition<D extends EventV2.Definition>(def: D): SyncEvent.Definition<D["type"]> {
   return {
     type: def.type,
-    version: def.sync?.version ?? 0,
-    aggregate: def.sync?.aggregate ?? "sessionID",
+    version: def.durable?.version ?? 0,
+    aggregate: def.durable?.aggregate ?? "sessionID",
     schema: def.data,
     properties: def.data,
   }

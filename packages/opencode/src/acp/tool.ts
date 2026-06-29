@@ -1,4 +1,5 @@
 import type { ToolCall, ToolCallContent, ToolCallLocation, ToolCallUpdate, ToolKind } from "@agentclientprotocol/sdk"
+import { isAbsolute, resolve } from "node:path"
 
 export type ToolInput = Record<string, unknown>
 

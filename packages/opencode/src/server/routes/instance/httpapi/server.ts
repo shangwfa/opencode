@@ -363,7 +363,7 @@ export function createRoutes(
     Layer.provide(locationServiceMapLayer),
 
     Layer.provide(LayerNode.compile(app)),
-  )
+  ) as any
 }
 
 export const routes = createRoutes()

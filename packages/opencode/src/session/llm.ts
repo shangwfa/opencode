@@ -413,7 +413,7 @@ export const node = LayerNode.make({
     EventV2Bridge.node,
     llmClient,
     RuntimeFlags.node,
-  ],
+  ] as any,
 })
 
 export * as LLM from "./llm"

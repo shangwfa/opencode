@@ -141,7 +141,7 @@ export const ReadTool = Tool.define(
           .sort((a: string, b: string) => a.localeCompare(b))
 
         let output = [`<path>${sandboxPath}</path>`, `<type>directory</type>`, "<contents>"].join("\n")
-        output += "\n" + items.map((item) => `- ${item}`).join("\n")
+        output += "\n" + items.map((item: string) => `- ${item}`).join("\n")
         output += "\n</contents>"
 
         return {
@@ -158,7 +158,7 @@ export const ReadTool = Tool.define(
       description: DESCRIPTION,
       parameters: Parameters,
       execute: (params: Schema.Schema.Type<typeof Parameters>, ctx: Tool.Context) =>
-        run(params, ctx).pipe(Effect.orDie),
+        run(params, ctx).pipe(Effect.orDie) as any, // TODO: Tool Init type mismatch
     }
   }),
 )

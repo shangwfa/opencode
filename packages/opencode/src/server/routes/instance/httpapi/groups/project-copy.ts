@@ -20,7 +20,7 @@ export const CreatePayload = Schema.Struct({
   strategy: ProjectCopy.StrategyID,
   directory: ProjectCopy.CreateInput.fields.directory,
   name: ProjectCopy.CreateInput.fields.name,
-  context: ProjectCopy.CreateInput.fields.context,
+  context: Schema.optional(Schema.String),
 })
 export const RemovePayload = Schema.Struct({
   directory: ProjectCopy.RemoveInput.fields.directory,

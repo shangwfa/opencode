@@ -24,8 +24,9 @@ export const ProjectDirectoryTable = sqliteTable(
       .$type<ProjectV2.ID>()
       .notNull()
       .references(() => ProjectTable.id, { onDelete: "cascade" }),
-    directory: text().notNull(),
-    type: text().$type<"main" | "root" | "git_worktree">().notNull(),
+    directory: DatabasePath.absoluteColumn().notNull(),
+    type: text().$type<"main" | "root" | "git_worktree">(),
+    strategy: text(),
     time_created: integer()
       .notNull()
       .$default(() => Date.now()),

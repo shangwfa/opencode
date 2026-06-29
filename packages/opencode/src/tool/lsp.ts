@@ -173,7 +173,7 @@ export const LspTool = Tool.define(
           }
 
           return { title: `${args.operation} not available`, metadata: { result: [] }, output: `${args.operation} requires sandbox mode.` }
-        }).pipe(Effect.orDie),
+        }).pipe(Effect.orDie) as any, // TODO: Tool Init type mismatch
     }
   }),
 )

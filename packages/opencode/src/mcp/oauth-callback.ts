@@ -32,6 +32,13 @@ function cleanupStateIndex(oauthState: string) {
   }
 }
 
+function stopIfIdle() {
+  if (pendingAuths.size === 0 && server) {
+    server.close()
+    server = undefined
+  }
+}
+
 function handleRequest(req: import("http").IncomingMessage, res: import("http").ServerResponse) {
   const url = new URL(req.url || "/", `http://localhost:${currentPort}`)
 

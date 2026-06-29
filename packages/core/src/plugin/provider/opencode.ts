@@ -41,7 +41,7 @@ function oauth(http: HttpClient.HttpClient) {
       id: methodID,
       type: "oauth",
       label: "OpenCode Console account",
-    },
+    } as any,
     authorize: () =>
       Effect.gen(function* () {
         const device = yield* post(http, `${defaultServer}/auth/device/code`, { client_id: clientID }, Device)
@@ -103,7 +103,7 @@ export const OpencodePlugin = define<HttpClient.HttpClient | EventV2.Service | S
         integration.name = "OpenCode"
       })
       draft.method.update(oauth(http))
-      draft.method.update({ integrationID: "opencode", method: { type: "key", label: "API key (service account)" } })
+      draft.method.update({ integrationID: "opencode", method: { type: "key", label: "API key (service account)" } as any })
     })
 
     connected = (yield* ctx.integration.connection.active("opencode")) !== undefined

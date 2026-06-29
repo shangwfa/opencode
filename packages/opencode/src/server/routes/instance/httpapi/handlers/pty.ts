@@ -1,6 +1,7 @@
 import * as InstanceState from "@/effect/instance-state"
 import { registerDisposer } from "@/effect/instance-registry"
 import { InstanceRef, WorkspaceRef } from "@/effect/instance-ref"
+import { Plugin } from "@/plugin"
 import { PtyPreparation } from "@/pty-preparation"
 import { Pty } from "@opencode-ai/core/pty"
 import { handlePtyInput } from "@opencode-ai/core/pty/input"

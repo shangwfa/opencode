@@ -640,7 +640,7 @@ export const ShellTool = Tool.define(
                   )
                   const scan = yield* collect(tree.rootNode, cwd, ps, shell, instanceCtx)
                   if (!containsPath(cwd, instanceCtx)) scan.dirs.add(cwd)
-                  yield* ask(ctx, scan, params)
+                  yield* ask(ctx, scan, params as any)
                 }),
               )
 
@@ -654,7 +654,7 @@ export const ShellTool = Tool.define(
                   command: params.command,
                   cwd: sandboxCwd,
                   timeout,
-                  description: params.description,
+                  description: (params as any).description ?? params.command,
                   background: params.background,
                 },
                 ctx,

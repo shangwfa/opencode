@@ -143,7 +143,7 @@ export const layer = Layer.effect(
             Stream.runForEach((msg) =>
               Effect.tryPromise({
                 try: () => Promise.resolve().then(() => callback(msg)),
-                catch: (cause) => {
+                catch: (cause: any) => {
                   log.error("subscriber failed", { type, cause: Cause.pretty(cause) })
                 },
               }).pipe(Effect.ignore),

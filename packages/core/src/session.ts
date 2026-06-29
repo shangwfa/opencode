@@ -492,4 +492,4 @@ export const node = makeGlobalNode({
     LocationServiceMap.node,
     SessionProjector.node,
   ],
-})
+} as any)

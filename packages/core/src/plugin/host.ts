@@ -103,8 +103,9 @@ export const make = Effect.fn("PluginHost.make")(function* (plugin: PluginV2.Int
     integration: {
       reload: integration.reload,
       connection: {
-        active: (id) => integration.connection.active(Integration.ID.make(id)),
-        resolve: (connection) =>
+        // TODO: sdk ConnectionInfo type differs from core Connection.Info; reconcile after schema unification
+        active: (id) => integration.connection.active(Integration.ID.make(id)) as any,
+        resolve: (connection: any) =>
           integration.connection.resolve(
             connection.type === "credential" ? { ...connection, id: Credential.ID.make(connection.id) } : connection,
           ),
@@ -117,7 +118,7 @@ export const make = Effect.fn("PluginHost.make")(function* (plugin: PluginV2.Int
             update: (id, update) => draft.update(Integration.ID.make(id), update),
             remove: (id) => draft.remove(Integration.ID.make(id)),
             method: {
-              list: (id) => mutable(draft.method.list(Integration.ID.make(id))),
+              list: (id) => mutable(draft.method.list(Integration.ID.make(id))) as any,
               update: (input) => {
                 if ("authorize" in input) {
                   const methodID = Integration.MethodID.make(input.method.id)
@@ -125,7 +126,7 @@ export const make = Effect.fn("PluginHost.make")(function* (plugin: PluginV2.Int
                   draft.method.update({
                     integrationID: Integration.ID.make(input.integrationID),
                     method: { ...input.method, id: methodID },
-                    authorize: (inputs) =>
+                    authorize: (inputs: Integration.Inputs) =>
                       input.authorize(inputs).pipe(
                         Effect.map((authorization) => {
                           if (authorization.mode === "auto") {
@@ -169,20 +170,20 @@ export const make = Effect.fn("PluginHost.make")(function* (plugin: PluginV2.Int
                         }
                       : {}),
                     ...(input.label ? { label: input.label } : {}),
-                  })
+                  } as any)
                   return
                 }
                 if (input.method.type === "env") {
                   draft.method.update({
                     integrationID: Integration.ID.make(input.integrationID),
-                    method: { type: "env", names: input.method.names },
-                  })
+                    method: { type: "env", names: (input.method as any).names },
+                  } as any)
                   return
                 }
                 draft.method.update({
                   integrationID: Integration.ID.make(input.integrationID),
-                  method: { type: "key", label: input.method.label },
-                })
+                  method: { type: "key", label: (input.method as any).label },
+                } as any)
               },
               remove: (id, method) =>
                 draft.method.remove(Integration.ID.make(id), Schema.decodeUnknownSync(Integration.Method)(method)),

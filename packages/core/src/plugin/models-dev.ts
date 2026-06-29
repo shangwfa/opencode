@@ -59,11 +59,11 @@ export const ModelsDevPlugin = define({
           integrations.update(integrationID, (integration) => (integration.name = item.name))
           integrations.method.update({
             integrationID,
-            method: { type: "key" },
+            method: { type: "key" } as any,
           })
           integrations.method.update({
             integrationID,
-            method: { type: "env", names: [...item.env] },
+            method: { type: "env", names: [...item.env] } as any,
           })
         }
       }),
@@ -75,7 +75,7 @@ export const ModelsDevPlugin = define({
           const providerID = ProviderV2.ID.make(item.id)
           catalog.provider.update(providerID, (provider) => {
             provider.name = item.name
-            provider.env = [...item.env]
+            ;(provider as any).env = [...item.env]
             provider.api = item.npm
               ? {
                   type: "aisdk",
