@@ -16,6 +16,14 @@ export class UnauthorizedError extends Schema.TaggedErrorClass<UnauthorizedError
   { httpApiStatus: 401 },
 ) {}
 
+export class ForbiddenError extends Schema.TaggedErrorClass<ForbiddenError>()(
+  "ForbiddenError",
+  {
+    message: Schema.String,
+  },
+  { httpApiStatus: 403 },
+) {}
+
 export class ConflictError extends Schema.TaggedErrorClass<ConflictError>()(
   "ConflictError",
   {
@@ -90,6 +98,15 @@ export class QuestionNotFoundError extends Schema.TaggedErrorClass<QuestionNotFo
   "QuestionNotFoundError",
   {
     requestID: Schema.String,
+    message: Schema.String,
+  },
+  { httpApiStatus: 404 },
+) {}
+
+export class PtyNotFoundError extends Schema.TaggedErrorClass<PtyNotFoundError>()(
+  "PtyNotFoundError",
+  {
+    id: Schema.String,
     message: Schema.String,
   },
   { httpApiStatus: 404 },

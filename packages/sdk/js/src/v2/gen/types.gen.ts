@@ -2947,14 +2947,6 @@ export type ForbiddenError = {
   message: string
 }
 
-export type ProjectCopyError = {
-  name: "ProjectCopyError"
-  data: {
-    message: string
-    forceRequired?: boolean
-  }
-}
-
 export type EffectHttpApiErrorForbidden = {
   _tag: "Forbidden"
 }
@@ -13552,3 +13544,37 @@ export type PtyConnectResponses = {
 }
 
 export type PtyConnectResponse = PtyConnectResponses[keyof PtyConnectResponses]
+
+export type IntegrationOAuthMethod = {
+  type: "oauth"
+  id: string
+  name: string
+}
+
+export type IntegrationKeyMethod = {
+  type: "key"
+  id: string
+  name: string
+}
+
+export type IntegrationEnvMethod = {
+  type: "env"
+  id: string
+  name: string
+  env: string
+}
+
+export type ConnectionInfo = {
+  id: string
+  integrationID: string
+  methodID?: string
+  label?: string
+  active?: boolean
+}
+
+export type ModelV2Info1 = ModelV2Info
+
+export type ProjectCopyCopy = {
+  id: string
+  path: string
+}

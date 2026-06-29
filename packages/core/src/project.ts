@@ -11,6 +11,7 @@ import { Git } from "./git"
 import { makeGlobalNode } from "./effect/app-node"
 import { Hash } from "./util/hash"
 import { ProjectDirectoryTable } from "./project/sql"
+import { ProjectDirectories } from "./project/directories"
 
 export const ID = Schema.String.pipe(
   Schema.brand("Project.ID"),
