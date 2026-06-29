@@ -141,7 +141,7 @@ describe("acp tool conversion", () => {
             newString: "after",
           },
           output: "Edit applied successfully.",
-        },
+        } as any,
       }),
     ).toEqual({
       toolCallId: "tool-1",

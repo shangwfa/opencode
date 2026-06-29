@@ -1,9 +1,9 @@
 import { afterEach, test, expect, describe } from "bun:test"
 import { Database } from "../../src/storage/db"
-import { Effect } from "effect"
+import { Effect, Schema } from "effect"
 import type { SessionID } from "../../src/session/schema"
 import path from "path"
-import { provideInstance, tmpdir } from "../fixture/fixture"
+import { provideInstance, tmpdir, testInstanceStoreLayer } from "../fixture/fixture"
 import { provideTestInstance, disposeAllInstances } from "../fixture/fixture"
 import { Agent } from "../../src/agent/agent"
 import { Permission } from "../../src/permission"
@@ -11,10 +11,22 @@ import { Permission } from "../../src/permission"
 const isPg = Database.dialect === "pg"
 const fakeSession = "fake-session-id" as unknown as SessionID
 
-function load<A>(dir: string, fn: (svc: Agent.Interface) => Effect.Effect<A>) {
+function load<A = any, E = unknown>(dir: string, fn: (svc: Agent.Interface) => Effect.Effect<A, E>): Promise<any> {
   return Effect.runPromise(
-    provideInstance(dir)(Agent.Service.use(fn)).pipe(Effect.provide(Agent.defaultLayer)),
+    provideInstance(dir)(Agent.Service.use(fn)).pipe(
+      Effect.provide(Agent.defaultLayer),
+      Effect.provide(testInstanceStoreLayer),
+    ) as any,
   )
+}
+
+const safeParse = (_schema: any, input: unknown): { success: true; data: any } | { success: false } => {
+  try {
+    const data = Schema.decodeUnknownSync(_schema)(input)
+    return { success: true, data }
+  } catch {
+    return { success: false }
+  }
 }
 
 afterEach(async () => {
@@ -65,8 +77,8 @@ describe("Agent.sessionList", () => {
     await provideTestInstance({
       directory: tmp.path,
       fn: async () => {
-        const list = await load(tmp.path, (svc) => svc.sessionList(fakeSession))
-        const names = list.map((a) => a.name)
+        const list: any[] = await load(tmp.path, (svc) => svc.sessionList(fakeSession))
+        const names = list.map((a: any) => a.name)
         expect(names).toContain("build")
         expect(names).toContain("plan")
       },
@@ -87,7 +99,7 @@ describe("Agent.sessionCreate in non-PG mode", () => {
               description: "Test",
               mode: "all",
               prompt: "Test prompt",
-            }),
+            }) as any,
           ),
         ).rejects.toThrow("only available in SaaS mode")
       },
@@ -123,7 +135,7 @@ describe("Agent.sessionUnload/sessionClear in non-PG mode", () => {
 
 describe("Agent.CreateInput schema", () => {
   test("CreateInput parses valid input with defaults", () => {
-    const parsed = Agent.CreateInput.safeParse({
+    const parsed = safeParse(Agent.CreateInput, {
       name: "my-agent",
     })
     expect(parsed.success).toBe(true)
@@ -134,7 +146,7 @@ describe("Agent.CreateInput schema", () => {
   })
 
   test("CreateInput parses full input", () => {
-    const parsed = Agent.CreateInput.safeParse({
+    const parsed = safeParse(Agent.CreateInput, {
       name: "full-agent",
       description: "Full agent",
       mode: "subagent",
@@ -155,7 +167,7 @@ describe("Agent.CreateInput schema", () => {
   })
 
   test("CreateInput rejects invalid mode", () => {
-    const parsed = Agent.CreateInput.safeParse({
+    const parsed = safeParse(Agent.CreateInput, {
       name: "bad-agent",
       mode: "invalid",
     })
@@ -164,15 +176,15 @@ describe("Agent.CreateInput schema", () => {
 
   test("CreateInput rejects invalid name", () => {
     for (const value of ["", " ", "1bad", "bad/name", "bad name"]) {
-      expect(Agent.CreateInput.safeParse({ name: value }).success).toBe(false)
+      expect(safeParse(Agent.CreateInput, { name: value }).success).toBe(false)
     }
   })
 
   test("CreateInput rejects invalid sampling values", () => {
-    expect(Agent.CreateInput.safeParse({ name: "bad", temperature: -0.1 }).success).toBe(false)
-    expect(Agent.CreateInput.safeParse({ name: "bad", temperature: 2.1 }).success).toBe(false)
-    expect(Agent.CreateInput.safeParse({ name: "bad", topP: -0.1 }).success).toBe(false)
-    expect(Agent.CreateInput.safeParse({ name: "bad", topP: 1.1 }).success).toBe(false)
+    expect(safeParse(Agent.CreateInput, { name: "bad", temperature: -0.1 }).success).toBe(false)
+    expect(safeParse(Agent.CreateInput, { name: "bad", temperature: 2.1 }).success).toBe(false)
+    expect(safeParse(Agent.CreateInput, { name: "bad", topP: -0.1 }).success).toBe(false)
+    expect(safeParse(Agent.CreateInput, { name: "bad", topP: 1.1 }).success).toBe(false)
   })
 })
 

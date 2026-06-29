@@ -10,8 +10,7 @@ import { Session } from "../../../src/session/session"
 import { Bus } from "../../../src/bus"
 import { Database } from "../../../src/storage/db"
 import { SessionTable, MessageTable, PartTable } from "@opencode-ai/core/session/sql"
-// TODO: merge-upstream — project.sql / ProjectTable location changed
-// import { ProjectTable } from "../../../src/project/project.sql"
+import { ProjectTable } from "@opencode-ai/core/project/sql"
 import { SessionID, MessageID, PartID } from "../../../src/session/schema"
 import { provideTestInstance, disposeAllInstances } from "../../fixture/fixture"
 import { eq } from "drizzle-orm"
@@ -48,7 +47,7 @@ section("Step 1: 确保 project 行存在")
 const projectID = "proj_verify_test"
 const now = Date.now()
 await Database.use(async (db: any) => {
-  const existing = await db.select().from(ProjectTable).where(eq(ProjectTable.id, projectID))
+  const existing = await db.select().from(ProjectTable).where(eq(ProjectTable.id as any, projectID))
   if (existing.length === 0) {
     await db.insert(ProjectTable).values({
       id: projectID,

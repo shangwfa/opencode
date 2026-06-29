@@ -22,7 +22,7 @@ const env = Layer.mergeAll(
   CrossSpawnSpawner.defaultLayer,
 )
 
-const it = testEffect(env)
+const it = testEffect(env as any)
 
 const user = Effect.fn("test.user")(function* (sessionID: SessionID, agent = "default") {
   const session = yield* Session.Service

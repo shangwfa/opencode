@@ -57,7 +57,7 @@ const it = testEffect(
     ToolRegistry.defaultLayer,
     Skill.defaultLayer,
     SystemPrompt.defaultLayer,
-  ),
+  ) as any,
 )
 
 describe.skipIf(!enabled)("PG system prompt preload session skill", () => {
@@ -113,7 +113,7 @@ describe.skipIf(!enabled)("PG system prompt preload session skill", () => {
         const skillSvc = yield* Skill.Service
         const sys = yield* SystemPrompt.Service
 
-        yield* skillSvc.create({
+        yield* (skillSvc as any).create({
           name: "shared",
           description: "Global version",
           content: "Global content",
@@ -241,7 +241,7 @@ Main bundle content.
         const loaded = yield* skillSvc.sessionLoad(session.id, path.join(dir, "skills"))
 
         expect(loaded.length).toBe(1)
-        expect(loaded[0].resources.map((item) => item.path)).toEqual([
+        expect(loaded[0]?.resources?.map((item) => item.path)).toEqual([
           "references/guide.md",
           "templates/run.sh",
         ])

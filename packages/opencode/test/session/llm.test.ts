@@ -52,7 +52,7 @@ const openAIConfig = (model: ModelsDev.Provider["models"][string], baseURL: stri
   }
 }
 
-const it = testEffect(Layer.mergeAll(LLM.defaultLayer, Provider.defaultLayer))
+const it = testEffect(Layer.mergeAll(LLM.defaultLayer, Provider.defaultLayer) as any)
 
 // LLM.stream returns a Stream, not an Effect, so we can't use the serviceUse proxy.
 const drain = (input: LLM.StreamInput) => LLM.Service.use((svc) => svc.stream(input).pipe(Stream.runDrain))
@@ -61,18 +61,18 @@ const drain = (input: LLM.StreamInput) => LLM.Service.use((svc) => svc.stream(in
 // its transitive deps — `Effect.provide(layer)` over an existing runtime layers
 // the new services on top, but transitive Service overrides (e.g. RequestExecutor)
 // resolved through the outer LLM.defaultLayer leak through.
-const drainWith = (layer: Layer.Layer<LLM.Service>, input: LLM.StreamInput) =>
+const drainWith = (layer: Layer.Layer<LLM.Service, never, any>, input: LLM.StreamInput) =>
   Effect.gen(function* () {
     const ctx = yield* InstanceRef
     if (!ctx) return yield* Effect.die("InstanceRef not provided")
     return yield* Effect.promise(() =>
       Effect.runPromise(
-        LLM.Service.use((svc) => svc.stream(input).pipe(Stream.runDrain)).pipe(
+        (LLM.Service.use((svc) => svc.stream(input).pipe(Stream.runDrain)) as any).pipe(
           Effect.provide(layer),
           Effect.provideService(InstanceRef, ctx),
         ),
       ),
-    )
+    ) as any
   })
 
 function llmLayerWithExecutor(executor: Layer.Layer<RequestExecutor.Service>, flags: Partial<RuntimeFlags.Info> = {}) {

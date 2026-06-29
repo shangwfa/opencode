@@ -2,7 +2,7 @@ import { Connector } from "@opencode-ai/core/connector"
 import { Effect } from "effect"
 import { HttpApiBuilder, HttpApiSchema } from "effect/unstable/httpapi"
 import { Api } from "../api"
-import { InvalidRequestError } from "../errors"
+import { InvalidRequestError } from "@opencode-ai/protocol/errors"
 import { response } from "../groups/location"
 
 const authorize = <A, R>(effect: Effect.Effect<A, Connector.AuthorizationError, R>) =>

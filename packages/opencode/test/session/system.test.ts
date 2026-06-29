@@ -66,8 +66,8 @@ const it = testEffect(
       Layer.succeed(
         Skill.Service,
         Skill.Service.of({
-          get: (name) => Effect.succeed(skills.find((skill) => skill.name === name)),
-          require: (name) => {
+          get: (name: string) => Effect.succeed(skills.find((skill) => skill.name === name)),
+          require: (name: string) => {
             const info = skills.find((skill) => skill.name === name)
             if (info) return Effect.succeed(info)
             return Effect.fail(new Skill.NotFoundError({ name, available: skills.map((skill) => skill.name) }))
@@ -75,7 +75,12 @@ const it = testEffect(
           all: () => Effect.succeed(skills),
           dirs: () => Effect.succeed([]),
           available: () => Effect.succeed(skills),
-        }),
+          sessionList: () => Effect.succeed([]),
+          sessionCreate: () => Effect.succeed({} as any),
+          sessionLoad: () => Effect.succeed([]),
+          sessionUnload: () => Effect.void,
+          sessionClear: () => Effect.void,
+        } as any),
       ),
     ),
   ),

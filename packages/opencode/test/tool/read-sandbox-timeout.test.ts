@@ -50,6 +50,8 @@ function mockSandboxProvider(runInSessionFn: (sessionID: string, command: string
       isKeepAlive: () => Effect.succeed(false),
       getEndpoint: () => Effect.die(new Error("not implemented")),
       cleanupSessionVolume: () => Effect.void,
+      runDetached: () => Effect.succeed({} as any),
+      interrupt: () => Effect.void,
     }),
   )
 }
@@ -66,7 +68,7 @@ const baseLayers = Layer.mergeAll(
   Truncate.defaultLayer,
 )
 
-const it = testEffect(baseLayers)
+const it = testEffect(baseLayers as any)
 
 const init = Effect.fn("ReadSandboxTimeoutTest.init")(function* () {
   const info = yield* ReadTool
@@ -101,7 +103,7 @@ describe("tool.read sandbox mode - test -d failure handling", () => {
       const exit = yield* Effect.exit(exec(dir, { filePath: path.join(dir, "test.txt") }, ctx, provider))
 
       expect(Exit.isSuccess(exit)).toBe(false)
-      const err = Cause.squash(exit.cause)
+      const err = Cause.squash((exit as any).cause)
       const errMsg = err instanceof Error ? err.message : String(err)
       expect(errMsg).toContain("Failed to check path type in sandbox")
     }),
@@ -181,7 +183,7 @@ describe("tool.read sandbox mode - readFile failure with timeout", () => {
       )
 
       expect(Exit.isSuccess(exit)).toBe(false)
-      const err = Cause.squash(exit.cause)
+      const err = Cause.squash((exit as any).cause)
       const errMsg = err instanceof Error ? err.message : String(err)
       // tryPromise catch throws "File not found in sandbox"
       // timeoutOrElse triggers "Timeout reading file in sandbox" on hang

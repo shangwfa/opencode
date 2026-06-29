@@ -92,46 +92,50 @@ const git = Effect.fn("GlobToolTest.git")(function* (cwd: string, args: string[]
 
 describe("tool.glob", () => {
   it.instance("matches files from a directory path", () =>
-    Effect.gen(function* () {
-      const test = yield* TestInstance
-      yield* Effect.promise(() => Bun.write(path.join(test.directory, "a.ts"), "export const a = 1\n"))
-      yield* Effect.promise(() => Bun.write(path.join(test.directory, "b.txt"), "hello\n"))
-      const info = yield* GlobTool
-      const glob = yield* info.init()
-      const result = yield* glob.execute(
-        {
-          pattern: "*.ts",
-          path: test.directory,
-        },
-        ctx,
-      )
-      expect(result.metadata.count).toBe(1)
-      expect(result.output).toContain(path.join(test.directory, "a.ts"))
-      expect(result.output).not.toContain(path.join(test.directory, "b.txt"))
-    }),
-  )
-
-  it.instance("rejects exact file paths", () =>
-    Effect.gen(function* () {
-      const test = yield* TestInstance
-      const file = path.join(test.directory, "a.ts")
-      yield* Effect.promise(() => Bun.write(file, "export const a = 1\n"))
-      const info = yield* GlobTool
-      const glob = yield* info.init()
-      const exit = yield* glob
-        .execute(
+    (
+      Effect.gen(function* () {
+        const test = yield* TestInstance
+        yield* Effect.promise(() => Bun.write(path.join(test.directory, "a.ts"), "export const a = 1\n"))
+        yield* Effect.promise(() => Bun.write(path.join(test.directory, "b.txt"), "hello\n"))
+        const info = yield* GlobTool
+        const glob = yield* info.init()
+        const result = yield* glob.execute(
           {
             pattern: "*.ts",
-            path: file,
+            path: test.directory,
           },
           ctx,
         )
-        .pipe(Effect.exit)
-      expect(Exit.isFailure(exit)).toBe(true)
-      if (Exit.isFailure(exit)) {
-        const err = Cause.squash(exit.cause)
-        expect(err instanceof Error ? err.message : String(err)).toContain("glob path must be a directory")
-      }
-    }),
+        expect(result.metadata.count).toBe(1)
+        expect(result.output).toContain(path.join(test.directory, "a.ts"))
+        expect(result.output).not.toContain(path.join(test.directory, "b.txt"))
+      })
+    ) as any,
+  )
+
+  it.instance("rejects exact file paths", () =>
+    (
+      Effect.gen(function* () {
+        const test = yield* TestInstance
+        const file = path.join(test.directory, "a.ts")
+        yield* Effect.promise(() => Bun.write(file, "export const a = 1\n"))
+        const info = yield* GlobTool
+        const glob = yield* info.init()
+        const exit = yield* glob
+          .execute(
+            {
+              pattern: "*.ts",
+              path: file,
+            },
+            ctx,
+          )
+          .pipe(Effect.exit)
+        expect(Exit.isFailure(exit)).toBe(true)
+        if (Exit.isFailure(exit)) {
+          const err = Cause.squash(exit.cause)
+          expect(err instanceof Error ? err.message : String(err)).toContain("glob path must be a directory")
+        }
+      })
+    ) as any,
   )
 })

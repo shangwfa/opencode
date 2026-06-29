@@ -15,7 +15,7 @@ export function useEvent() {
         return
       }
 
-      handler(event.payload, { directory: event.directory, workspace: event.workspace })
+      handler(event.payload as Event, { directory: event.directory, workspace: event.workspace })
     })
   }
 

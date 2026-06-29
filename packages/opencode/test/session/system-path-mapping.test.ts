@@ -11,11 +11,11 @@ const mockSkillLayer = Layer.succeed(
   Skill.Service,
   Skill.Service.of({
     get: () => Effect.succeed(undefined),
-    require: (name) => Effect.fail(new Skill.NotFoundError({ name, available: [] })),
+    require: (name: string) => Effect.fail(new Skill.NotFoundError({ name, available: [] })),
     all: () => Effect.succeed([]),
     dirs: () => Effect.succeed([]),
     available: () => Effect.succeed([]),
-  }),
+  } as any),
 )
 
 const mockModel = {
@@ -28,7 +28,7 @@ const it = testEffect(
   SystemPrompt.layer.pipe(
     Layer.provide(mockSkillLayer),
     Layer.merge(Layer.mergeAll(CrossSpawnSpawner.defaultLayer, NodeFileSystem.layer)),
-  ),
+  ) as any,
 )
 
 function makeInstanceCtx(directory: string, worktree: string, vcs: "git" | "none" = "git") {
@@ -36,7 +36,7 @@ function makeInstanceCtx(directory: string, worktree: string, vcs: "git" | "none
     directory,
     worktree,
     project: { id: "test", name: "test", path: worktree, vcs },
-  }
+  } as any
 }
 
 describe("SystemPrompt.environment - sandbox path mapping", () => {

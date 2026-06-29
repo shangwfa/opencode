@@ -37,7 +37,7 @@ const mcp = Layer.succeed(
   MCP.Service.of({
     status: () => Effect.succeed({}),
     clients: () => Effect.succeed({}),
-    instructions: () => Effect.succeed([]),
+    instructions: (() => Effect.succeed([])) as any,
     tools: () => Effect.succeed({}),
     prompts: () => Effect.succeed({}),
     resources: () => Effect.succeed({}),
@@ -54,6 +54,8 @@ const mcp = Layer.succeed(
     supportsOAuth: () => Effect.succeed(false),
     hasStoredTokens: () => Effect.succeed(false),
     getAuthStatus: () => Effect.succeed("not_authenticated" as const),
+    toolsForSession: (() => Effect.succeed([])) as any,
+    clearSessionCache: () => Effect.void,
   }),
 )
 

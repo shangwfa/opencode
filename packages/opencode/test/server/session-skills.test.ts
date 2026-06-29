@@ -49,13 +49,13 @@ describe("session skills routes", () => {
         expect(created.status).toBe(200)
         const json = (await created.json()) as Skill.Info
         expect(json.location).toContain("route-skill")
-        expect(json.resources[0].path).toBe("references/route.md")
+        expect(json.resources![0].path).toBe("references/route.md")
 
         const listed = await app.request(`/session/${session.id}/skills`)
         expect(listed.status).toBe(200)
         const items = (await listed.json()) as Skill.Info[]
         expect(items.map((item) => item.name)).toContain("route-skill")
-        expect(items[0].resources[0].content).toBe("route docs")
+        expect(items[0]!.resources![0].content).toBe("route docs")
 
         const unloaded = await app.request(`/session/${session.id}/skills/route-skill`, { method: "DELETE" })
         expect(unloaded.status).toBe(204)

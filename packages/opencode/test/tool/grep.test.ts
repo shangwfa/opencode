@@ -31,8 +31,8 @@ const toolLayer = (flags: Partial<RuntimeFlags.Info> = {}) =>
     Git.defaultLayer,
   )
 
-const it = testEffect(toolLayer())
-const rooted = testEffect(Layer.mergeAll(toolLayer(), testInstanceStoreLayer))
+const it = testEffect(toolLayer() as any)
+const rooted = testEffect(Layer.mergeAll(toolLayer(), testInstanceStoreLayer) as any)
 
 const ctx = {
   sessionID: SessionID.make("ses_test"),

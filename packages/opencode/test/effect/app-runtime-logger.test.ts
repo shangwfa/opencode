@@ -46,7 +46,7 @@ it.live("AppLayer also installs the observability logger", () =>
     const current = yield* Effect.map(Effect.service(Logger.CurrentLoggers), check).pipe(Effect.provide(AppLayer))
 
     expect(current.size).toBeGreaterThan(0)
-  }),
+  }) as any,
 )
 
 it.instance(

@@ -1,7 +1,8 @@
 import type {
   AgentV2Info,
   CommandV2Info,
-  IntegrationInfo,
+  ConnectorInfo,
+  IntegrationRef,
   LocationRef,
   ModelV2Info,
   PermissionSavedInfo,
@@ -28,6 +29,7 @@ type LocationData = {
   agent?: AgentV2Info[]
   command?: CommandV2Info[]
   connector?: ConnectorInfo[]
+  integration?: IntegrationRef[]
   model?: ModelV2Info[]
   provider?: ProviderV2Info[]
   reference?: ReferenceInfo[]
@@ -394,7 +396,7 @@ export const { use: useData, provider: DataProvider } = createSimpleContext({
           break
         case "integration.updated":
           void Promise.all([
-            result.location.integration.refresh(event.location),
+            result.location.connector.refresh(event.location),
             result.location.model.refresh(event.location),
             result.location.provider.refresh(event.location),
           ])

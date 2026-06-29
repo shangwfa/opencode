@@ -65,7 +65,7 @@ const testServerLayer = Layer.mergeAll(
   SessionNs.defaultLayer,
   Database.defaultLayer,
 )
-const it = testEffect(testServerLayer)
+const it = testEffect(testServerLayer as any)
 
 type RecordedCreate = {
   info: WorkspaceInfo
@@ -132,7 +132,7 @@ async function initGitRepo(dir: string) {
 
 const startWorkspaceSyncingWithFlag = (projectID: ProjectV2.ID, experimentalWorkspaces: boolean) =>
   Effect.runPromise(
-    Workspace.use.startWorkspaceSyncing(projectID).pipe(Effect.provide(workspaceLayer(experimentalWorkspaces))),
+    Workspace.use.startWorkspaceSyncing(projectID).pipe(Effect.provide(workspaceLayer(experimentalWorkspaces))) as any,
   )
 
 function captureGlobalEvents() {

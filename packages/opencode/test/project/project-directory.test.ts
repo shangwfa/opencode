@@ -13,7 +13,7 @@ import { Project } from "@/project/project"
 import { tmpdirScoped } from "../fixture/fixture"
 import { testEffect } from "../lib/effect"
 
-const it = testEffect(Layer.mergeAll(Project.defaultLayer, Database.defaultLayer, CrossSpawnSpawner.defaultLayer))
+const it = testEffect(Layer.mergeAll(Project.defaultLayer, Database.defaultLayer, CrossSpawnSpawner.defaultLayer) as any)
 
 function directories(projectID: ProjectV2.ID) {
   return Database.Service.use(({ db }) =>
@@ -24,11 +24,11 @@ function directories(projectID: ProjectV2.ID) {
       .all()
       .pipe(
         Effect.orDie,
-        Effect.map((rows) =>
-          rows
-            .map((row) => ({ directory: row.directory, type: row.type }))
-            .toSorted((a, b) => a.directory.localeCompare(b.directory)),
-        ),
+      Effect.map((rows) =>
+        rows
+          .map((row) => ({ directory: row.directory as string, type: row.type as string }))
+          .toSorted((a, b) => a.directory.localeCompare(b.directory)),
+      ),
       ),
   )
 }

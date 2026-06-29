@@ -117,8 +117,8 @@ const configLayer = (
 
 const layer = configLayer()
 
-const it = testEffect(layer)
-const configIt = (options?: Parameters<typeof configLayer>[0]) => testEffect(configLayer(options))
+const it = testEffect(layer as any)
+const configIt = (options?: Parameters<typeof configLayer>[0]) => testEffect(configLayer(options) as any)
 
 const schemaConfig = (config: object) => ({ $schema: "https://opencode.ai/config.json", ...config })
 
@@ -1544,9 +1544,9 @@ test("remote well-known config can use FetchHttpClient layer", async () => {
             Layer.provide(FetchHttpClient.layer),
           ),
           testInstanceStoreLayer,
-        ),
+        ) as any,
       ),
-      Effect.runPromise,
+      Effect.runPromise as any,
     )
   } finally {
     await server.stop(true)

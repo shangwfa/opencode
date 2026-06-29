@@ -132,6 +132,8 @@ function makeMcp(instructions: MCP.ServerInstructions[] = []) {
       supportsOAuth: () => Effect.succeed(false),
       hasStoredTokens: () => Effect.succeed(false),
       getAuthStatus: () => Effect.succeed("not_authenticated" as const),
+      toolsForSession: () => Effect.succeed({}),
+      clearSessionCache: () => Effect.void,
     }),
   )
 }
@@ -248,9 +250,9 @@ function makeHttpNoLLMServer(input?: { mcpInstructions?: MCP.ServerInstructions[
   return makePrompt(input)
 }
 
-const it = testEffect(makeHttp())
-const noLLMServer = testEffect(makeHttpNoLLMServer())
-const raceNoLLMServer = testEffect(makeHttpNoLLMServer({ processor: "blocking" }))
+const it = testEffect(makeHttp() as any)
+const noLLMServer = testEffect(makeHttpNoLLMServer() as any)
+const raceNoLLMServer = testEffect(makeHttpNoLLMServer({ processor: "blocking" }) as any)
 const withMcpInstructions = testEffect(
   makeHttp({
     mcpInstructions: [
@@ -260,7 +262,7 @@ const withMcpInstructions = testEffect(
         tools: ["guide-server_lookup"],
       },
     ],
-  }),
+  }) as any,
 )
 const unix = process.platform !== "win32" ? it.instance : it.instance.skip
 const unixNoLLMServer = process.platform !== "win32" ? noLLMServer.instance : noLLMServer.instance.skip

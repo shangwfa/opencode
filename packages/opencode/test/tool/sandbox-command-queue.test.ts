@@ -92,14 +92,14 @@ function buildFakeLayer() {
           return sb
         })
 
-      const runInSession: SandboxProvider.Interface["runInSession"] = (sessionID, command, options, handlers, signal) =>
+      const runInSession = (sessionID: SessionID, command: string, options?: any, handlers?: any, signal?: any) =>
         Effect.gen(function* () {
           const sb = sandboxes.get(sessionID)
           if (!sb) return yield* Effect.fail(new Error(`Sandbox not found for session ${sessionID}`))
 
           let sessionId = commandSessions.get(sessionID)
           if (!sessionId) {
-            sessionId = yield* Effect.tryPromise(() => sb.commands.createSession({ workingDirectory: "/workspace" }))
+            sessionId = (yield* Effect.tryPromise(() => sb.commands.createSession({ workingDirectory: "/workspace" }))) as string
             commandSessions.set(sessionID, sessionId)
           }
 
@@ -115,7 +115,7 @@ function buildFakeLayer() {
               catch: (e) => new Error(`runInSession failed: ${String(e)}`),
             }),
           )
-        })
+        }) as any
 
       const destroy = (sessionID: SessionID) =>
         Effect.gen(function* () {
@@ -195,8 +195,8 @@ describe("SandboxProvider command queue", () => {
       }
 
       const sb = yield* svc.get(sid("ses-serial"))
-      expect(sb.state.maxConcurrent).toBeLessThanOrEqual(1)
-      expect(sb.state.runCalls.length).toBe(5)
+      expect((sb as any)?.state.maxConcurrent).toBeLessThanOrEqual(1)
+      expect((sb as any)?.state.runCalls.length).toBe(5)
     }),
   )
 
@@ -213,8 +213,8 @@ describe("SandboxProvider command queue", () => {
       )
 
       const sb = yield* svc.get(sid("ses-dedup"))
-      expect(sb.state.runCalls.length).toBe(10)
-      expect(sb.state.maxConcurrent).toBeLessThanOrEqual(1)
+      expect((sb as any)?.state.runCalls.length).toBe(10)
+      expect((sb as any)?.state.maxConcurrent).toBeLessThanOrEqual(1)
     }),
   )
 

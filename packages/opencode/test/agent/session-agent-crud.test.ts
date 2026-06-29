@@ -149,18 +149,18 @@ describe("Agent sessionCreate", () => {
   it.instance("session agents are isolated between sessions", () =>
     Effect.gen(function* () {
       const agent = yield* Agent.Service
-      yield* agent.sessionCreate("session-x", {
+      yield* agent.sessionCreate(SessionID.make("session-x"), {
         name: "only-x",
         description: "X",
         mode: "primary",
       })
-      yield* agent.sessionCreate("session-y", {
+      yield* agent.sessionCreate(SessionID.make("session-y"), {
         name: "only-y",
         description: "Y",
         mode: "primary",
       })
-      const x = yield* agent.sessionList("session-x")
-      const y = yield* agent.sessionList("session-y")
+      const x = yield* agent.sessionList(SessionID.make("session-x"))
+      const y = yield* agent.sessionList(SessionID.make("session-y"))
       expect(x.map((a) => a.name)).toContain("only-x")
       expect(x.map((a) => a.name)).not.toContain("only-y")
       expect(y.map((a) => a.name)).toContain("only-y")

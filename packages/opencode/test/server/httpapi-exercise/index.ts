@@ -1733,7 +1733,7 @@ const main = Effect.gen(function* () {
   return undefined
 })
 
-Effect.runPromise(main.pipe(Effect.provide(TestLLMServer.layer), Effect.scoped)).then(
+Effect.runPromise(main.pipe(Effect.provide(TestLLMServer.layer), Effect.scoped) as any).then(
   () => process.exit(0),
   (error: unknown) => {
     console.error(`${color.red}${message(error)}${color.reset}`)

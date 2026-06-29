@@ -27,7 +27,7 @@ import { RuntimeFlags } from "@/effect/runtime-flags"
 const encoder = new TextEncoder()
 
 const layer = Layer.mergeAll(Project.defaultLayer, Database.defaultLayer, CrossSpawnSpawner.defaultLayer)
-const it = testEffect(layer)
+const it = testEffect(layer as any)
 
 function remoteProjectID(remote: string) {
   return ProjectV2.ID.make(Hash.fast(`git-remote:${remote}`))
@@ -73,7 +73,7 @@ function projectLayerWithFailure(failArg: string) {
     Layer.provide(AppProcess.layer.pipe(Layer.provide(mockGitFailure(failArg)))),
     Layer.provide(mockGitFailure(failArg)),
     Layer.provide(ProjectV2.defaultLayer),
-    Layer.provide(ProjectCopy.defaultLayer),
+    Layer.provide(ProjectCopy.layer),
     Layer.provide(EventV2Bridge.defaultLayer),
     Layer.provide(FSUtil.defaultLayer),
     Layer.provide(NodePath.layer),
@@ -86,7 +86,7 @@ function projectLayerWithRuntimeFlags(flags: Parameters<typeof RuntimeFlags.laye
   return Project.layer.pipe(
     Layer.provide(EventV2Bridge.defaultLayer),
     Layer.provide(ProjectV2.defaultLayer),
-    Layer.provide(ProjectCopy.defaultLayer),
+    Layer.provide(ProjectCopy.layer),
     Layer.provide(AppProcess.defaultLayer),
     Layer.provide(FSUtil.defaultLayer),
     Layer.provide(NodePath.layer),
@@ -96,10 +96,10 @@ function projectLayerWithRuntimeFlags(flags: Parameters<typeof RuntimeFlags.laye
 }
 
 const failureIt = (failArg: string) =>
-  testEffect(Layer.mergeAll(projectLayerWithFailure(failArg), CrossSpawnSpawner.defaultLayer))
+  testEffect(Layer.mergeAll(projectLayerWithFailure(failArg), CrossSpawnSpawner.defaultLayer) as any)
 
 const iconDiscoveryIt = testEffect(
-  Layer.provideMerge(projectLayerWithRuntimeFlags({ experimentalIconDiscovery: true }), CrossSpawnSpawner.defaultLayer),
+  Layer.provideMerge(projectLayerWithRuntimeFlags({ experimentalIconDiscovery: true }), CrossSpawnSpawner.defaultLayer) as any,
 )
 
 function waitForProjectIcon(id: ProjectV2.ID, attempts = 50): Effect.Effect<Project.Info, never, Project.Service> {

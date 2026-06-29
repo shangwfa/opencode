@@ -157,7 +157,7 @@ describe("Idle timer kill logic", () => {
 describe("getOrCreate state routing", () => {
   test("no entry → create", () => {
     const actions: string[] = []
-    const entry = null
+    const entry: any = null
     if (!entry) actions.push("create")
     else if (entry.state === "running") actions.push("renew")
     else if (entry.state === "killed") actions.push("recreate")
@@ -177,7 +177,7 @@ describe("getOrCreate state routing", () => {
     const actions: string[] = []
     const entry = { state: "killed" as const }
     if (!entry) actions.push("create")
-    else if (entry.state === "running") actions.push("renew")
+    else if ((entry.state as any) === "running") actions.push("renew")
     else if (entry.state === "killed") actions.push("recreate")
     expect(actions).toEqual(["recreate"])
   })
@@ -213,7 +213,7 @@ describe("Destroy handling by state", () => {
   test("destroying killed entry is a no-op", () => {
     let sandboxActionTaken = false
     const entry = { state: "killed" as const }
-    if (entry.state === "running") {
+    if ((entry.state as any) === "running") {
       sandboxActionTaken = true
     }
     expect(sandboxActionTaken).toBe(false)

@@ -152,14 +152,14 @@ describe("file sandbox proxy - read file", () => {
         destroy: () => Effect.void,
         destroyById: () => Effect.void,
         destroyAll: () => Effect.void,
-        runInSession: () => Effect.succeed({ logs: { stdout: [], stderr: [] }, exitCode: 0 }),
+        runInSession: (() => Effect.succeed({ logs: { stdout: [], stderr: [] }, exitCode: 0 })) as any,
         register: () => Effect.void,
         keepAlive: () => Effect.void,
         release: () => Effect.void,
         isKeepAlive: () => Effect.succeed(false),
         getEndpoint: () => Effect.die(new Error("not implemented")),
         cleanupSessionVolume: () => Effect.void,
-      }),
+      } as any),
     )
     return Effect.gen(function* () {
       const sp = yield* SandboxProvider.Service

@@ -363,7 +363,7 @@ function child(id: string): SessionChild {
   }
 }
 
-function globalEvent(payload: GlobalEvent["payload"]): GlobalEvent {
+function globalEvent(payload: any): GlobalEvent {
   return {
     directory: "/tmp",
     project: "project-1",

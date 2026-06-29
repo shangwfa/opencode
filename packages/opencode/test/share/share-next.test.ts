@@ -20,7 +20,7 @@ import { resetDatabase } from "../fixture/db"
 import { pollWithTimeout, testEffect } from "../lib/effect"
 
 const env = LayerNode.compile(LayerNode.group([CrossSpawnSpawner.node]))
-const it = testEffect(env)
+const it = testEffect(env as any)
 
 const json = (req: Parameters<typeof HttpClientResponse.fromWeb>[0], body: unknown, status = 200) =>
   HttpClientResponse.fromWeb(

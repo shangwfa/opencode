@@ -15,7 +15,7 @@ import fs from "fs/promises"
 
 const node = CrossSpawnSpawner.defaultLayer
 
-const it = testEffect(Layer.mergeAll(Skill.defaultLayer, node, testInstanceStoreLayer))
+const it = testEffect(Layer.mergeAll(Skill.defaultLayer, node, testInstanceStoreLayer) as any)
 const itWithoutClaudeCodeSkills = testEffect(
   Layer.mergeAll(
     Skill.layer.pipe(
@@ -28,7 +28,7 @@ const itWithoutClaudeCodeSkills = testEffect(
     ),
     node,
     testInstanceStoreLayer,
-  ),
+  ) as any,
 )
 const itWithoutExternalSkills = testEffect(
   Layer.mergeAll(
@@ -42,7 +42,7 @@ const itWithoutExternalSkills = testEffect(
     ),
     node,
     testInstanceStoreLayer,
-  ),
+  ) as any,
 )
 
 async function createGlobalSkill(homeDir: string) {
@@ -328,7 +328,7 @@ description: A skill in the .claude/skills directory.
           expect(error._tag).toBe("Skill.NotFoundError")
           expect(error.name).toBe("missing-skill")
           expect(error.message).toContain('Skill "missing-skill" not found.')
-        }),
+        }) as any,
       { git: true },
     ),
   )

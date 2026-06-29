@@ -46,7 +46,7 @@ const it = testEffect(
     ToolRegistry.defaultLayer,
     Skill.defaultLayer,
     SessionSkill.layer,
-  ),
+  ) as any,
 )
 
 describe.skipIf(!enabled)("PG Session.remove() session_skill cleanup", () => {

@@ -15,7 +15,7 @@ const testLayer = Layer.mergeAll(
     Layer.provide(Discovery.defaultLayer),
     Layer.provide(Config.defaultLayer),
     Layer.provide(Bus.layer),
-    Layer.provide(FileSystem.defaultLayer),
+    Layer.provide(FileSystem.layer),
     Layer.provide(Global.layer),
     Layer.provide(RuntimeFlags.layer({})),
   ),

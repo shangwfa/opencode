@@ -68,11 +68,23 @@ export class StrategyNotFoundError extends Schema.TaggedErrorClass<StrategyNotFo
   { directory: AbsolutePath },
 ) {}
 
+export class InvalidDirectoryError extends Schema.TaggedErrorClass<InvalidDirectoryError>()(
+  "ProjectCopy.InvalidDirectoryError",
+  { directory: AbsolutePath },
+) {}
+
+export class StrategyUnavailableError extends Schema.TaggedErrorClass<StrategyUnavailableError>()(
+  "ProjectCopy.StrategyUnavailableError",
+  { strategy: Schema.String },
+) {}
+
 export type Error =
   | SourceDirectoryNotFoundError
   | DestinationExistsError
   | DirectoryUnavailableError
   | StrategyNotFoundError
+  | InvalidDirectoryError
+  | StrategyUnavailableError
   | Git.WorktreeError
 
 export interface Strategy {

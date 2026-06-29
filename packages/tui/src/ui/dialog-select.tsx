@@ -50,6 +50,7 @@ export interface DialogSelectProps<T> {
   }[]
   bindings?: readonly Binding<Renderable, KeyEvent>[]
   current?: T
+  emptyView?: JSX.Element
 }
 
 export interface DialogSelectOption<T = any> {

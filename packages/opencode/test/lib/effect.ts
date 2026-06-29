@@ -33,7 +33,7 @@ function instanceArgs<E, R>(
 
 const body = <A, E, R>(value: Body<A, E, R>) => Effect.suspend(() => (typeof value === "function" ? value() : value))
 
-type Runner = <A, E, R, E2>(value: Body<A, E, R | Scope.Scope>, layer: Layer.Layer<R, E2>) => Promise<A>
+type Runner = <A, E, R, E2>(value: Body<A, E, R | Scope.Scope>, layer: Layer.Layer<R, E2, any>) => Promise<A>
 
 const isolatedRun: Runner = (value, layer) =>
   Effect.gen(function* () {
@@ -44,7 +44,7 @@ const isolatedRun: Runner = (value, layer) =>
       }
     }
     return yield* exit
-  }).pipe(Effect.runPromise)
+  }).pipe(Effect.runPromise as any)
 
 // Builds the test layer through the shared process-wide memoMap so cached
 // services (Bus, Session, …) match Server.Default's instances. Use for tests
@@ -62,9 +62,9 @@ const sharedRun: Runner = (value, layer) =>
       }
     }
     return yield* exit
-  }).pipe(Effect.runPromise)
+  }).pipe(Effect.runPromise as any)
 
-const make = <R, E>(testLayer: Layer.Layer<R, E>, liveLayer: Layer.Layer<R, E>, run: Runner = isolatedRun) => {
+const make = <R, E>(testLayer: Layer.Layer<R, E, any>, liveLayer: Layer.Layer<R, E, any>, run: Runner = isolatedRun) => {
   const effect = <A, E2>(name: string, value: Body<A, E2, R | Scope.Scope>, opts?: number | TestOptions) =>
     test(name, () => run(value, testLayer), opts)
 
@@ -92,7 +92,11 @@ const make = <R, E>(testLayer: Layer.Layer<R, E>, liveLayer: Layer.Layer<R, E>, 
     const args = instanceArgs(options, opts)
     return test(
       name,
-      () => run(body(value).pipe(withTmpdirInstance(args.instanceOptions)), liveLayer),
+      () =>
+        run(
+          body(value).pipe(withTmpdirInstance(args.instanceOptions)) as Body<A, E2 | E3, R | Scope.Scope>,
+          liveLayer,
+        ),
       args.testOptions,
     )
   }
@@ -106,7 +110,11 @@ const make = <R, E>(testLayer: Layer.Layer<R, E>, liveLayer: Layer.Layer<R, E>, 
     const args = instanceArgs(options, opts)
     return test.only(
       name,
-      () => run(body(value).pipe(withTmpdirInstance(args.instanceOptions)), liveLayer),
+      () =>
+        run(
+          body(value).pipe(withTmpdirInstance(args.instanceOptions)) as Body<A, E2 | E3, R | Scope.Scope>,
+          liveLayer,
+        ),
       args.testOptions,
     )
   }
@@ -120,7 +128,11 @@ const make = <R, E>(testLayer: Layer.Layer<R, E>, liveLayer: Layer.Layer<R, E>, 
     const args = instanceArgs(options, opts)
     return test.skip(
       name,
-      () => run(body(value).pipe(withTmpdirInstance(args.instanceOptions)), liveLayer),
+      () =>
+        run(
+          body(value).pipe(withTmpdirInstance(args.instanceOptions)) as Body<A, E2 | E3, R | Scope.Scope>,
+          liveLayer,
+        ),
       args.testOptions,
     )
   }
@@ -136,14 +148,14 @@ const liveEnv = TestConsole.layer
 
 export const it = make<never, never>(testEnv, liveEnv)
 
-export const testEffect = <R, E>(layer: Layer.Layer<R, E>) =>
+export const testEffect = <R, E>(layer: Layer.Layer<R, E, any>) =>
   make<R, E>(Layer.provideMerge(layer, testEnv), Layer.provideMerge(layer, liveEnv))
 
 // Variant of `testEffect` that builds the test layer through the shared
 // process-wide memoMap so services like Bus/Session resolve to the same
 // instances Server.Default uses. Use when a test needs pub/sub identity with
 // an in-process HTTP server — most tests should stick with `testEffect`.
-export const testEffectShared = <R, E>(layer: Layer.Layer<R, E>) =>
+export const testEffectShared = <R, E>(layer: Layer.Layer<R, E, any>) =>
   make<R, E>(Layer.provideMerge(layer, testEnv), Layer.provideMerge(layer, liveEnv), sharedRun)
 
 export const awaitWithTimeout = <A, E, R>(

@@ -73,7 +73,7 @@ describe("LspAgent ensureDaemon — T27.17 deadlock regression", () => {
           expect(result.version).toBe(0)
           // runDetached was actually invoked (daemon launch was attempted).
           yield* Effect.sync(() => expect(runDetachedCount).toBe(1))
-        }).pipe(Effect.provide(buildLayer(true))),
+        }).pipe(Effect.provide(buildLayer(true))) as any,
         "ensureDaemon deadlocked: touch never returned",
         "10 seconds",
       ),
@@ -107,7 +107,7 @@ describe("LspAgent ensureDaemon — T27.18 concurrent dedup", () => {
           // fix, concurrent fibers could each pass the `state === undefined`
           // check and each invoke runDetached.
           yield* Effect.sync(() => expect(runDetachedCount).toBe(1))
-        }).pipe(Effect.provide(buildLayer(true))),
+        }).pipe(Effect.provide(buildLayer(true))) as any,
         "concurrent dedup test timed out",
         "15 seconds",
       ),
@@ -133,7 +133,7 @@ describe("LspAgent shutdown — cache entry reclamation", () => {
           // Second touch: cache entry was deleted, ensureDaemon runs again.
           yield* agent.touch(SessionID.make("ses-gc"), "/workspace/foo.ts", "/workspace")
           expect(runDetachedCount).toBe(2)
-        }).pipe(Effect.provide(buildLayer(true))),
+        }).pipe(Effect.provide(buildLayer(true))) as any,
         "shutdown reclamation test timed out",
         "15 seconds",
       ),

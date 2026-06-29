@@ -65,7 +65,7 @@ const it = testEffect(
     Session.defaultLayer,
     Truncate.defaultLayer,
     ToolRegistry.defaultLayer,
-  ),
+  ) as any,
 )
 
 describe.skipIf(!enabled)("PG business logic e2e", () => {
@@ -219,7 +219,7 @@ describe.skipIf(!enabled)("PG business logic e2e", () => {
           const { project } = yield* svc.fromDirectory(dir)
           expect(project.id).toBeDefined()
 
-          const fetched = yield* Effect.promise(() => Project.get(project.id))
+          const fetched = yield* svc.get(project.id)
           expect(fetched).toBeDefined()
           expect(fetched!.id).toBe(project.id)
           expect(fetched!.worktree).toBe(dir)
@@ -235,7 +235,7 @@ describe.skipIf(!enabled)("PG business logic e2e", () => {
           const svc = yield* Project.Service
           yield* svc.fromDirectory(dir)
 
-          const all = yield* Effect.promise(() => Project.list())
+          const all = yield* svc.list()
           expect(all.length).toBeGreaterThan(0)
           expect(all.some((p: any) => p.worktree === dir)).toBe(true)
         }),

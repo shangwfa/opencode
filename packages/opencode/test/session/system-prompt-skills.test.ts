@@ -20,7 +20,7 @@ const mockSkillLayer = Layer.succeed(
         if (session) return getStore(session).get(name)
         return undefined
       }),
-    require: (name: string) => Effect.fail(new Error(`Skill not found: ${name}`)),
+    require: ((name: string) => Effect.fail(new Error(`Skill not found: ${name}`))) as any,
     all: () => Effect.succeed([]),
     dirs: () => Effect.succeed([]),
     available: (_agent?: Agent.Info, session?: string) =>
