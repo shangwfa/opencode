@@ -125,6 +125,14 @@ import { corsVaryFix } from "./middleware/cors-vary"
 import { errorLayer } from "./middleware/error"
 import { fenceLayer } from "./middleware/fence"
 import { schemaErrorLayer } from "./middleware/schema-error"
+import { EventV2Bridge } from "@/event-v2-bridge"
+import { Agent as LspAgent } from "@/lsp/agent"
+import { InstanceStore } from "@/project/instance-store"
+import { McpAuth } from "@/mcp/auth"
+import { Instruction } from "@/session/instruction"
+import { SessionProcessor } from "@/session/processor"
+import { Git } from "@/git"
+import { Env } from "@/env"
 
 export const context = Context.makeUnsafe<unknown>(new Map())
 

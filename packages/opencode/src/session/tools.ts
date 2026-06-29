@@ -21,6 +21,10 @@ import { EffectBridge } from "@/effect/bridge"
 import { ProviderV2 } from "@opencode-ai/core/provider"
 import { ModelV2 } from "@opencode-ai/core/model"
 import { isRecord } from "@/util/record"
+import { SandboxProvider } from "@/tool/sandbox-provider"
+import { InstanceRef } from "@/effect/instance-ref"
+import { InstanceState } from "@/effect/instance-state"
+import { resolveSandboxOpts, worktreeScript } from "@/session/sandbox-opts"
 
 const MCP_RESOURCE_TOOLS = {
   list: "list_mcp_resources",

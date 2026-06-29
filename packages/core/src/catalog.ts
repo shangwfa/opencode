@@ -10,6 +10,7 @@ import { Policy } from "./policy"
 import { State } from "./state"
 import { Credential } from "./credential"
 import { ConnectorSchema } from "./connector/schema"
+import { Integration } from "./integration"
 
 export type ProviderRecord = {
   provider: ProviderV2.MutableInfo
