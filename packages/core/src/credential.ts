@@ -1,11 +1,11 @@
 export * as Credential from "./credential"
 
-import { and, asc, eq, ne } from "drizzle-orm"
-import { Context, Effect, Layer, Option, Schema } from "effect"
+import { asc, eq } from "drizzle-orm"
+import { Context, Effect, Layer, Schema } from "effect"
+import { Credential } from "@opencode-ai/schema/credential"
+import { Integration } from "@opencode-ai/schema/integration"
 import { Database } from "./database/database"
-import { ConnectorSchema } from "./connector/schema"
-import { EventV2 } from "./event"
-import { NonNegativeInt, withStatics } from "./schema"
+import { makeGlobalNode } from "./effect/app-node"
 import { CredentialTable } from "./credential/sql"
 import { Identifier } from "./util/identifier"
 import { FSUtil } from "./fs-util"
@@ -13,52 +13,21 @@ import { Global } from "./global"
 import { DataMigrationTable } from "./data-migration.sql"
 import path from "path"
 
-export const ID = Schema.String.pipe(
-  Schema.brand("Credential.ID"),
-  withStatics((schema) => ({ create: () => schema.make("cred_" + Identifier.ascending()) })),
-)
-export type ID = typeof ID.Type
+export const ID = Credential.ID
+export type ID = Credential.ID
 
-export class OAuth extends Schema.Class<OAuth>("Credential.OAuth")({
-  type: Schema.Literal("oauth"),
-  refresh: Schema.String,
-  access: Schema.String,
-  expires: NonNegativeInt,
-  metadata: Schema.optional(Schema.Record(Schema.String, Schema.String)),
-}) {}
+export const OAuth = Credential.OAuth
+export type OAuth = Credential.OAuth
 
-export class Key extends Schema.Class<Key>("Credential.Key")({
-  type: Schema.Literal("key"),
-  key: Schema.String,
-  metadata: Schema.optional(Schema.Record(Schema.String, Schema.String)),
-}) {}
+export const Key = Credential.Key
+export type Key = Credential.Key
 
-export const Value = Schema.Union([OAuth, Key])
-  .pipe(Schema.toTaggedUnion("type"))
-  .annotate({ identifier: "Credential.Value" })
-export type Value = Schema.Schema.Type<typeof Value>
-
-const LegacyOAuth = Schema.Struct({
-  type: Schema.Literal("oauth"),
-  refresh: Schema.String,
-  access: Schema.String,
-  expires: NonNegativeInt,
-  accountId: Schema.optional(Schema.String),
-  enterpriseUrl: Schema.optional(Schema.String),
-})
-
-const LegacyKey = Schema.Struct({
-  type: Schema.Literal("api"),
-  key: Schema.String,
-  metadata: Schema.optional(Schema.Record(Schema.String, Schema.String)),
-})
-
-const LegacyValue = Schema.Union([LegacyOAuth, LegacyKey])
+export const Value = Credential.Value
+export type Value = Credential.Value
 
 export class Info extends Schema.Class<Info>("Credential.Info")({
   id: ID,
-  connectorID: ConnectorSchema.ID,
-  methodID: ConnectorSchema.MethodID,
+  integrationID: Integration.ID,
   label: Schema.String,
   value: Value,
 }) {}
@@ -83,15 +52,21 @@ export const Event = {
 }
 
 export interface Interface {
-  readonly get: (id: ID) => Effect.Effect<Info | undefined>
+  /** Returns every stored credential. */
   readonly all: () => Effect.Effect<Info[]>
+  /** Returns stored credentials belonging to one integration. */
+  readonly list: (integrationID: Integration.ID) => Effect.Effect<Info[]>
+  /** Returns one stored credential by ID. */
+  readonly get: (id: ID) => Effect.Effect<Info | undefined>
+  /** Replaces any credential for an integration and returns the new record. */
   readonly create: (input: {
-    connectorID: ConnectorSchema.ID
-    methodID: ConnectorSchema.MethodID
-    value: Value
-    label?: string
+    readonly integrationID: Integration.ID
+    readonly value: Value
+    readonly label?: string
   }) => Effect.Effect<Info>
+  /** Updates the label or secret value of a stored credential. */
   readonly update: (id: ID, updates: Partial<Pick<Info, "label" | "value">>) => Effect.Effect<void>
+  /** Removes a stored credential. */
   readonly remove: (id: ID) => Effect.Effect<void>
   readonly activate: (id: ID) => Effect.Effect<void>
   readonly active: (connectorID: ConnectorSchema.ID) => Effect.Effect<Info | undefined>
@@ -169,10 +144,10 @@ export const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
     const { db } = yield* Database.Service
-    const events = yield* EventV2.Service
-    const decodeValue = Schema.decodeUnknownSync(Value)
-    const info = (row: typeof CredentialTable.$inferSelect) =>
-      new Info({
+    const decode = Schema.decodeUnknownSync(Value)
+    const stored = (row: typeof CredentialTable.$inferSelect) => {
+      if (!row.integration_id) return
+      return new Info({
         id: row.id,
         connectorID: row.connector_id,
         methodID: row.method_id,
@@ -330,14 +305,6 @@ export const layer = Layer.effect(
   }),
 )
 
-export const defaultLayer = layer.pipe(
-  Layer.provide(Database.defaultLayer),
-  Layer.provide(EventV2.defaultLayer),
-  Layer.provideMerge(
-    legacyImportLayer.pipe(
-      Layer.provide(Database.defaultLayer),
-      Layer.provide(FSUtil.defaultLayer),
-      Layer.provide(Global.defaultLayer),
-    ),
-  ),
-)
+export const defaultLayer = layer.pipe(Layer.provide(Database.defaultLayer))
+
+export const node = makeGlobalNode({ service: Service, layer, deps: [Database.node] })

@@ -185,10 +185,8 @@ export function completedToolUpdate(input: {
   return {
     toolCallId: input.toolCallId,
     status: "completed",
-    kind: toToolKind(input.toolName),
-    title: input.state.title,
+    ...(input.state.title ? { title: input.state.title } : {}),
     content: completedToolContent(input.toolName, input.state),
-    rawInput: input.state.input,
     rawOutput: completedToolRawOutput(input.state),
   }
 }
@@ -251,6 +249,42 @@ export function extractImageAttachments(attachments: ReadonlyArray<ToolAttachmen
 export function shellOutputSnapshot(state: { readonly metadata?: unknown }) {
   if (!state.metadata || typeof state.metadata !== "object") return undefined
   return stringValue((state.metadata as Record<string, unknown>).output)
+}
+
+// For shell tools, surface the actual command as the title so it stays visible
+// before output lands; non-shell tools keep their model-provided title.
+function toolTitle(toolName: string, input: ToolInput, fallback: string | undefined) {
+  if (isShell(toolName)) return shellCommand(input) ?? fallback ?? toolName
+  return fallback || toolName
+}
+
+// Enrich shell rawInput with the resolved working directory so clients can show
+// where the command runs, unless the model already specified one.
+function rawInput(toolName: string, input: ToolInput, cwd?: string): ToolInput {
+  if (!isShell(toolName)) return input
+  if (input.cwd || input.workdir) return input
+  const workdir = shellWorkdir(input, cwd)
+  return workdir ? { ...input, cwd: workdir } : input
+}
+
+function shellWorkdir(input: ToolInput, cwd?: string) {
+  const explicit = stringValue(input.workdir) ?? stringValue(input.cwd)
+  return resolvePath(explicit, cwd) ?? cwd
+}
+
+function resolvePath(value: string | undefined, cwd?: string) {
+  if (!value) return undefined
+  if (isAbsolute(value)) return value
+  return resolve(cwd ?? process.cwd(), value)
+}
+
+function shellCommand(input: ToolInput) {
+  return stringValue(input.command) ?? stringValue(input.cmd)
+}
+
+function isShell(toolName: string) {
+  const tool = toolName.toLocaleLowerCase()
+  return tool === "bash" || tool === "shell"
 }
 
 export const mapToolKind = toToolKind

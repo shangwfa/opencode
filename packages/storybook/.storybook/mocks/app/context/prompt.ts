@@ -65,17 +65,11 @@ const [prompt, setPrompt] = createSignal<Prompt>(clonePrompt(DEFAULT_PROMPT))
 const [cursor, setCursor] = createSignal<number>(0)
 const [items, setItems] = createSignal<ContextItem[]>([])
 
-const withKey = (item: Omit<ContextItem, "key"> & { key?: string }): ContextItem => ({
-  ...item,
-  key: item.key ?? `ctx:${++index}`,
-})
-
-export function usePrompt() {
-  return {
-    ready: () => true,
-    current: prompt,
-    cursor,
-    dirty: () => !isPromptEqual(prompt(), DEFAULT_PROMPT),
+  const value = {
+    ready,
+    current: () => store.prompt,
+    cursor: () => store.cursor,
+    dirty: () => !isPromptEqual(store.prompt, DEFAULT_PROMPT),
     set(next: Prompt, cursorPosition?: number) {
       setPrompt(clonePrompt(next))
       if (cursorPosition !== undefined) setCursor(cursorPosition)
@@ -85,6 +79,7 @@ export function usePrompt() {
       setCursor(0)
       setItems((current) => current.filter((item) => !!item.comment?.trim()))
     },
+    capture: () => value,
     context: {
       items,
       add(item: Omit<ContextItem, "key"> & { key?: string }) {
@@ -114,4 +109,5 @@ export function usePrompt() {
       },
     },
   }
+  return value
 }

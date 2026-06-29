@@ -33,12 +33,28 @@ const sqlMigrations = (await Array.fromAsync(new Bun.Glob("*/migration.sql").sca
   .filter((name) => name !== undefined)
   .sort()
 
-for (const name of sqlMigrations) {
-  if (await Bun.file(path.join(tsDir, `${name}.ts`)).exists()) continue
-  await Bun.write(
-    path.join(tsDir, `${name}.ts`),
-    renderMigration(name, await Bun.file(path.join(sqlDir, name, "migration.sql")).text()),
-  )
+    const generated = await generatedMigrations(incremental)
+    if (generated.length > 1) throw new Error(`Expected one generated migration, found ${generated.length}.`)
+    const name = generated[0]
+    if (name) {
+      const target = path.join(tsDir, `${name}.ts`)
+      if (await Bun.file(target).exists()) throw new Error(`Database migration already exists: ${name}`)
+      await Bun.write(
+        target,
+        await formatTypescript(
+          renderMigration(name, await Bun.file(path.join(incremental, name, "migration.sql")).text()),
+        ),
+      )
+      await fs.copyFile(path.join(incremental, name, "snapshot.json"), snapshot)
+    }
+
+    await fs.mkdir(full)
+    await drizzle(temporary, full, "schema")
+    await Bun.write(schema, await formatTypescript(renderSchema(await generatedSql(full))))
+    await Bun.write(registry, await formatTypescript(renderRegistry(await typescriptMigrations())))
+  } finally {
+    await fs.rm(temporary, { recursive: true, force: true })
+  }
 }
 
 await Bun.write(registry, renderRegistry(sqlMigrations))
@@ -65,17 +81,14 @@ export default { ...config, out: ${JSON.stringify(output)} }
       )
     }
 
-    const migrations = before
-      .map((entry) => entry.path.split("/")[0])
-      .filter((name, index, all) => name !== undefined && all.indexOf(name) === index)
-      .sort()
-    for (const name of migrations) {
-      if (await Bun.file(path.join(tsDir, `${name}.ts`)).exists()) continue
-      throw new Error(
-        `Database migration TypeScript wrapper is missing for ${name}. Run \`bun script/migration.ts\` from packages/core.`,
-      )
+    await fs.mkdir(full)
+    await drizzle(temporary, full, "schema")
+    if ((await Bun.file(schema).text()) !== (await formatTypescript(renderSchema(await generatedSql(full))))) {
+      throw new Error("Current database schema is stale. Run `bun script/migration.ts` from packages/core.")
     }
-    if ((await Bun.file(registry).text()) !== renderRegistry(migrations)) {
+
+    const migrations = await typescriptMigrations()
+    if ((await Bun.file(registry).text()) !== (await formatTypescript(renderRegistry(migrations)))) {
       throw new Error("Database migration registry is stale. Run `bun script/migration.ts` from packages/core.")
     }
   } finally {
@@ -118,6 +131,18 @@ function renderRun(statement: string) {
 
 function escapeTemplate(line: string) {
   return line.replaceAll("\\", "\\\\").replaceAll("`", "\\`").replaceAll("${", "\\${")
+}
+
+async function formatTypescript(input: string) {
+  const prettier = await import("prettier")
+  const typescript = await import("prettier/plugins/typescript")
+  const estree = await import("prettier/plugins/estree")
+  return prettier.format(input, {
+    parser: "typescript",
+    plugins: [typescript.default, estree.default],
+    semi: false,
+    printWidth: 120,
+  })
 }
 
 function renderRegistry(names: string[]) {

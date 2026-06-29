@@ -244,7 +244,7 @@ function useDirectorySearch(args: { sdk: ServerSDK; start: () => string | undefi
 
 export function DialogSelectDirectory(props: DialogSelectDirectoryProps) {
   const global = useGlobal()
-  const { sync, sdk, ...serverCtx } = global.createServerCtx(props.server)
+  const { sync, sdk, ...serverCtx } = global.ensureServerCtx(props.server)
   const dialog = useDialog()
   const language = useLanguage()
 

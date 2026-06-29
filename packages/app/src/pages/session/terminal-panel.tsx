@@ -15,6 +15,7 @@ import { useCommand } from "@/context/command"
 import { useLanguage } from "@/context/language"
 import { useLayout } from "@/context/layout"
 import { useTerminal } from "@/context/terminal"
+import { useSDK } from "@/context/sdk"
 import { terminalTabLabel } from "@/pages/session/terminal-label"
 import { createSizing, focusTerminalById } from "@/pages/session/helpers"
 import { getTerminalHandoff, setTerminalHandoff } from "@/pages/session/handoff"
@@ -24,9 +25,11 @@ export function TerminalPanel() {
   const delays = [120, 240]
   const layout = useLayout()
   const terminal = useTerminal()
+  const sdk = useSDK()
   const language = useLanguage()
   const command = useCommand()
-  const { params, workspaceKey, view } = useSessionLayout()
+  const settings = useSettings()
+  const { workspaceKey, view } = useSessionLayout()
 
   const opened = createMemo(() => view().terminal.opened())
   const size = createSizing()
@@ -120,7 +123,7 @@ export function TerminalPanel() {
   })
 
   createEffect(() => {
-    const dir = params.dir
+    const dir = sdk().directory
     if (!dir) return
     if (!terminal.ready()) return
     language.locale()
@@ -138,7 +141,7 @@ export function TerminalPanel() {
   })
 
   const handoff = createMemo(() => {
-    const dir = params.dir
+    const dir = sdk().directory
     if (!dir) return []
     return getTerminalHandoff(workspaceKey()) ?? []
   })
@@ -286,7 +289,7 @@ export function TerminalPanel() {
                 </Tabs.List>
               </Tabs>
               <div class="flex-1 min-h-0 relative">
-                <Show when={terminal.active()} keyed>
+                <Show when={opened() && terminal.active()} keyed>
                   {(id) => {
                     const ops = terminal.bind()
                     return (

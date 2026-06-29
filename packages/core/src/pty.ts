@@ -1,10 +1,12 @@
 export * as Pty from "./pty"
 
+import { makeLocationNode } from "./effect/app-node"
 import type { Disp, Proc } from "#pty"
 import { Context, Effect, Layer, Schema, Types } from "effect"
+import { Pty } from "@opencode-ai/schema/pty"
+import { Config } from "./config"
 import { EventV2 } from "./event"
 import { Location } from "./location"
-import { NonNegativeInt, PositiveInt } from "./schema"
 import { PtyID } from "./pty/schema"
 import { lazy } from "./util/lazy"
 
@@ -30,71 +32,46 @@ type Active = {
   listeners: Disp[]
 }
 
-const sock = (ws: Socket) => (ws.data && typeof ws.data === "object" ? ws.data : ws)
-
-// WebSocket control frame: 0x00 + UTF-8 JSON.
-const meta = (cursor: number) => {
-  const json = JSON.stringify({ cursor })
-  const bytes = encoder.encode(json)
-  const out = new Uint8Array(bytes.length + 1)
-  out[0] = 0
-  out.set(bytes, 1)
-  return out
-}
-
-export const Info = Schema.Struct({
-  id: PtyID,
-  title: Schema.String,
-  command: Schema.String,
-  args: Schema.Array(Schema.String),
-  cwd: Schema.String,
-  status: Schema.Literals(["running", "exited"]),
-  // Windows ConPTY assigns the child pid asynchronously, so 0 is valid at spawn time.
-  pid: NonNegativeInt,
-}).annotate({ identifier: "Pty" })
-
+export const Info = Pty.Info
 export type Info = Types.DeepMutable<typeof Info.Type>
 
-export const CreateInput = Schema.Struct({
-  command: Schema.optional(Schema.String),
-  args: Schema.optional(Schema.Array(Schema.String)),
-  cwd: Schema.optional(Schema.String),
-  title: Schema.optional(Schema.String),
-  env: Schema.optional(Schema.Record(Schema.String, Schema.String)),
-})
+export const CreateInput = Pty.CreateInput
 
 export type CreateInput = Types.DeepMutable<typeof CreateInput.Type>
 
-export type PreparedCreate = {
-  readonly command: string
-  readonly args: string[]
-  readonly cwd: string
-  readonly title?: string
-  readonly env: Record<string, string>
-}
-
-export const UpdateInput = Schema.Struct({
-  title: Schema.optional(Schema.String),
-  size: Schema.optional(
-    Schema.Struct({
-      rows: PositiveInt,
-      cols: PositiveInt,
-    }),
-  ),
-})
+export const UpdateInput = Pty.UpdateInput
 
 export type UpdateInput = Types.DeepMutable<typeof UpdateInput.Type>
+
+export const Event = Pty.Event
+
+export type AttachInput = {
+  // Absolute output cursor to replay from. -1 tails from the current end; omitted replays the full retained buffer.
+  readonly cursor?: number
+  // Callbacks fire synchronously from the native PTY data path; keep them non-blocking.
+  readonly onData: (chunk: string) => void
+  // Fired once when the session stops producing output: process exit (exitCode set), removal, or service teardown.
+  readonly onEnd: (event: { exitCode?: number }) => void
+}
+
+export type Attachment = {
+  // Retained output from the requested cursor to the current end.
+  readonly replay: string
+  // Absolute output cursor after replay.
+  readonly cursor: number
+  readonly write: (data: string) => void
+  // Starts live delivery after the caller has applied replay and cursor metadata.
+  readonly activate: () => void
+  readonly detach: () => void
+}
 
 export class NotFoundError extends Schema.TaggedErrorClass<NotFoundError>()("Pty.NotFoundError", {
   ptyID: PtyID,
 }) {}
 
-export const Event = {
-  Created: EventV2.define({ type: "pty.created", schema: { info: Info } }),
-  Updated: EventV2.define({ type: "pty.updated", schema: { info: Info } }),
-  Exited: EventV2.define({ type: "pty.exited", schema: { id: PtyID, exitCode: NonNegativeInt } }),
-  Deleted: EventV2.define({ type: "pty.deleted", schema: { id: PtyID } }),
-}
+export class ExitedError extends Schema.TaggedErrorClass<ExitedError>()("Pty.ExitedError", {
+  ptyID: PtyID,
+}) {}
 
 export interface Interface {
   readonly list: () => Effect.Effect<Info[]>
@@ -306,4 +283,6 @@ export const layer = Layer.effect(
   }),
 )
 
-export const locationLayer = layer
+export const locationLayer = layer.pipe(Layer.provide(Config.locationLayer))
+
+export const node = makeLocationNode({ service: Service, layer, deps: [EventV2.node, Location.node, Config.node] })

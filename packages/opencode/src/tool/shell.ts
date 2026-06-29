@@ -261,11 +261,7 @@ const parse = Effect.fn("ShellTool.parse")(function* (command: string, ps: boole
   return tree
 })
 
-const ask = Effect.fn("ShellTool.ask")(function* (
-  ctx: Tool.Context,
-  scan: Scan,
-  input: { command: string; description: string },
-) {
+const ask = Effect.fn("ShellTool.ask")(function* (ctx: Tool.Context, scan: Scan, input: { command: string }) {
   if (scan.dirs.size > 0) {
     const directories = Array.from(scan.dirs)
     const globs = directories.map((dir) => {
@@ -278,7 +274,6 @@ const ask = Effect.fn("ShellTool.ask")(function* (
       always: globs,
       metadata: {
         command: input.command,
-        description: input.description,
         directories,
         patterns: globs,
       },
@@ -292,7 +287,6 @@ const ask = Effect.fn("ShellTool.ask")(function* (
     always: Array.from(scan.always),
     metadata: {
       command: input.command,
-      description: input.description,
     },
   })
 })
@@ -537,8 +531,6 @@ export const ShellTool = Tool.define(
         command: string
         cwd: string
         timeout: number
-        description: string
-        background?: boolean | undefined
       },
       ctx: Tool.Context,
     ) {
@@ -546,31 +538,60 @@ export const ShellTool = Tool.define(
       let expired = false
 
       yield* ctx.metadata({
-        metadata: { output: "", description: input.description },
+        metadata: {
+          output: "",
+        },
       })
 
       const fullCommand = input.background
         ? `cd ${input.cwd} && ( nohup sh -c '${input.command.replace(/'/g, "'\\''")}' </dev/null > /tmp/opencode-bg-${ctx.callID ?? Date.now()}.log 2>&1 & ) && echo "started background"`
         : `cd ${input.cwd} && ${input.command}`
 
-      const result = input.background
-        ? yield* sandboxProvider.runDetached(
-            ctx.sandboxSessionID ?? ctx.sessionID,
-            fullCommand,
-            { timeoutSeconds: Math.ceil((input.timeout + 5000) / 1000) },
-            {
-              onStdout: (msg: { text: string }) => {
-                output += msg.text
-                ctx.metadata({ metadata: { output: output.slice(-MAX_METADATA_LENGTH), description: input.description } })
-              },
-              onStderr: (msg: { text: string }) => {
-                const cmdErr = checkCommandNotFound(msg.text)
-                if (cmdErr) throw new Error(`Command failed: ${cmdErr}`)
-                output += msg.text
-                ctx.metadata({ metadata: { output: output.slice(-MAX_METADATA_LENGTH), description: input.description } })
-              },
-            },
-            ctx.abort,
+          yield* Effect.forkScoped(
+            Stream.runForEach(Stream.decodeText(handle.all), (chunk) => {
+              const size = Buffer.byteLength(chunk, "utf-8")
+              list.push({ text: chunk, size })
+              used += size
+              while (used > keep && list.length > 1) {
+                const item = list.shift()
+                if (!item) break
+                used -= item.size
+                cut = true
+              }
+
+              last = preview(last + chunk)
+
+              if (file) {
+                sink?.write(chunk)
+              } else {
+                full += chunk
+                if (Buffer.byteLength(full, "utf-8") > limits.maxBytes) {
+                  return trunc.write(full).pipe(
+                    Effect.andThen((next) =>
+                      Effect.sync(() => {
+                        file = next
+                        cut = true
+                        sink = createWriteStream(next, { flags: "a" })
+                        full = ""
+                      }),
+                    ),
+                    Effect.andThen(
+                      ctx.metadata({
+                        metadata: {
+                          output: last,
+                        },
+                      }),
+                    ),
+                  )
+                }
+              }
+
+              return ctx.metadata({
+                metadata: {
+                  output: last,
+                },
+              })
+            }),
           )
         : yield* Effect.gen(function* () {
             const sb = yield* Effect.tryPromise({ try: () => ctx.sandbox!, catch: (e) => new Error(`Initialization failed: ${e instanceof Error ? e.message : String(e)}`) })
@@ -604,8 +625,13 @@ export const ShellTool = Tool.define(
       if (meta.length > 0) output += "\n\n<bash_metadata>\n" + meta.join("\n") + "\n</bash_metadata>"
 
       return {
-        title: input.description,
-        metadata: { output: output.slice(-MAX_METADATA_LENGTH), exit: exitCode, description: input.description },
+        title: input.command,
+        metadata: {
+          output: last || preview(output),
+          exit: code,
+          truncated: cut,
+          ...(cut && file ? { outputPath: file } : {}),
+        },
         output,
       }
     })
@@ -654,8 +680,6 @@ export const ShellTool = Tool.define(
                   command: params.command,
                   cwd: sandboxCwd,
                   timeout,
-                  description: params.description,
-                  background: params.background,
                 },
                 ctx,
               ).pipe(Effect.orDie)

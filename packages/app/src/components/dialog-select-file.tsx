@@ -14,6 +14,8 @@ import { useServerSync } from "@/context/server-sync"
 import { useLayout } from "@/context/layout"
 import { useFile } from "@/context/file"
 import { useLanguage } from "@/context/language"
+import { usePlatform } from "@/context/platform"
+import { useSettings } from "@/context/settings"
 import { useSessionLayout } from "@/pages/session/session-layout"
 import { createSessionTabs } from "@/pages/session/helpers"
 import { decode64 } from "@/utils/base64"
@@ -264,6 +266,8 @@ function createSessionEntries(props: {
 export function DialogSelectFile(props: { mode?: DialogSelectFileMode; onOpenFile?: (path: string) => void }) {
   const command = useCommand()
   const language = useLanguage()
+  const platform = usePlatform()
+  const settings = useSettings()
   const layout = useLayout()
   const file = useFile()
   const dialog = useDialog()
@@ -382,6 +386,21 @@ export function DialogSelectFile(props: { mode?: DialogSelectFileMode; onOpenFil
     if (state.committed) return
     state.cleanup?.()
   })
+
+  if (filesOnly() && platform.platform === "desktop" && settings.general.newLayoutDesigns()) {
+    return (
+      <DialogSelectFileV2
+        server={serverSDK().server}
+        mode="file"
+        start={projectDirectory()}
+        title={language.t("session.header.searchFiles")}
+        onSelect={(result) => {
+          if (typeof result !== "string") return
+          open(result)
+        }}
+      />
+    )
+  }
 
   return (
     <Dialog class="pt-3 pb-0 !max-h-[480px]" transition>
