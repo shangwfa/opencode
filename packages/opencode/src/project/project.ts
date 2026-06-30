@@ -517,7 +517,7 @@ export const layer = Layer.effect(
 export const defaultLayer = layer.pipe(
   Layer.provide(EventV2Bridge.defaultLayer),
   Layer.provide(ProjectV2.defaultLayer),
-  Layer.provide(ProjectCopy.layer),
+  Layer.provide(ProjectCopy.defaultLayer),
   Layer.provide(AppProcess.defaultLayer),
   Layer.provide(CrossSpawnSpawner.defaultLayer),
   Layer.provide(FSUtil.defaultLayer),

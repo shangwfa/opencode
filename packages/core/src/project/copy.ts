@@ -301,6 +301,12 @@ export const layer = Layer.effect(
 )
 
 export const locationLayer = layer
+export const defaultLayer = layer.pipe(
+  Layer.provide(Database.defaultLayer),
+  Layer.provide(FSUtil.defaultLayer),
+  Layer.provide(Git.defaultLayer),
+  Layer.provide(EventV2.defaultLayer),
+)
 export const node = makeLocationNode({
   service: Service,
   layer: layer,
