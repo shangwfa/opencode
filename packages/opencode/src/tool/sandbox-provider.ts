@@ -1,12 +1,12 @@
-import { Effect, Context, Layer, Cause, Deferred, Ref, Semaphore, Schedule, Duration } from "effect"
-import { Sandbox, ConnectionConfig } from "@alibaba-group/opensandbox"
-import type { CommandExecution, Volume } from "@alibaba-group/opensandbox"
-import { and, eq, lt } from "drizzle-orm"
-import * as Log from "@opencode-ai/core/util/log"
 import { Flag } from "@/flag/flag"
+import type { CommandExecution, Volume } from "@alibaba-group/opensandbox"
+import { ConnectionConfig, Sandbox } from "@alibaba-group/opensandbox"
+import * as Log from "@opencode-ai/core/util/log"
+import { and, eq, lt } from "drizzle-orm"
+import { Cause, Context, Deferred, Duration, Effect, Layer, Ref, Schedule, Semaphore } from "effect"
+import type { SessionID } from "../session/schema"
 import { Database } from "../storage/db"
 import { SandboxTable } from "./sandbox.pg"
-import type { SessionID } from "../session/schema"
 
 export namespace SandboxConfig {
   export interface Interface {
@@ -33,7 +33,7 @@ export namespace SandboxConfig {
     useServerProxy: Flag.OPENCODE_SANDBOX_USE_SERVER_PROXY,
     image: Flag.OPENCODE_SANDBOX_IMAGE,
     timeoutSeconds: Flag.OPENCODE_SANDBOX_TIMEOUT,
-    resourceLimits: { cpu: "1", memory: "2Gi" },
+    resourceLimits: { cpu: "1", memory: "4Gi" },
     volumeType: Flag.OPENCODE_SANDBOX_VOLUME_TYPE,
     pvcClaimName: Flag.OPENCODE_SANDBOX_PVC_CLAIM,
     idleKillMs: Flag.OPENCODE_SANDBOX_IDLE_KILL_SEC * 1000,
