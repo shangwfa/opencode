@@ -44,6 +44,7 @@ import { SessionPrompt } from "@/session/prompt"
 import { SessionRevert } from "@/session/revert"
 import { SessionRunState } from "@/session/run-state"
 import { SessionStatus } from "@/session/status"
+import { Bus } from "@/bus"
 import { SessionSummary } from "@/session/summary"
 import { Todo } from "@/session/todo"
 import { SessionShare } from "@/share/session"
@@ -372,6 +373,11 @@ export function createRoutes(
         Layer.provideMerge(locationServiceMapLayer),
         Layer.provideMerge(ProjectCopy.defaultLayer),
         Layer.provideMerge(RepositoryCache.defaultLayer),
+        Layer.provideMerge(Bus.defaultLayer),
+        Layer.provideMerge(SessionStatus.defaultLayer),
+        Layer.provideMerge(Git.defaultLayer),
+        Layer.provideMerge(Database.defaultLayer),
+        Layer.provideMerge(Ripgrep.defaultLayer),
       ),
     ),
   ) as any

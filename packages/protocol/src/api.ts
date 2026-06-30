@@ -54,7 +54,8 @@ const makeApiFromGroup = <
     .add(PtyGroup.middleware(locationMiddleware))
     .add(makeQuestionGroup(locationMiddleware, sessionLocationMiddleware))
     .add(ReferenceGroup.middleware(locationMiddleware))
-    .add(ProjectCopyGroup.middleware(locationMiddleware))
+    // ProjectCopyGroup removed — opencode's ProjectCopyApi handles this route
+    // .add(ProjectCopyGroup.middleware(locationMiddleware))
     .annotateMerge(
       OpenApi.annotations({
         title: "opencode HttpApi",
