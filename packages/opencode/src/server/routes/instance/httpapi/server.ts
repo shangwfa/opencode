@@ -319,7 +319,6 @@ export function createRoutes(
       Plugin.defaultLayer,
       Project.defaultLayer,
       ProjectV2.defaultLayer,
-      ProjectCopy.defaultLayer,
       MoveSession.defaultLayer,
       ProviderAuth.defaultLayer,
       Provider.defaultLayer,
@@ -365,7 +364,16 @@ export function createRoutes(
     Layer.provide(locationServiceMapLayer),
     Layer.provideMerge(RepositoryCache.defaultLayer),
 
-    Layer.provide(LayerNode.compile(app)),
+    Layer.provideMerge(
+      LayerNode.compile(app).pipe(
+        Layer.provide(locationLayer),
+        Layer.provideMerge(locationLayer),
+        Layer.provide(locationServiceMapLayer),
+        Layer.provideMerge(locationServiceMapLayer),
+        Layer.provideMerge(ProjectCopy.defaultLayer),
+        Layer.provideMerge(RepositoryCache.defaultLayer),
+      ),
+    ),
   ) as any
 }
 

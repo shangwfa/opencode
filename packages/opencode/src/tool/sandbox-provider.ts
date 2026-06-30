@@ -1208,7 +1208,7 @@ export namespace SandboxProvider {
   export const node = LayerNode.make({
     service: Service,
     layer: defaultLayer,
-    deps: [Database.node],
+    deps: [],
   })
 }
 
