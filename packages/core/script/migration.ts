@@ -8,9 +8,10 @@ import { pathToFileURL } from "url"
 import { parseArgs } from "util"
 
 const root = path.resolve(import.meta.dirname, "../../..")
-const sqlDir = path.join(root, "packages/core/migration")
+const snapshot = path.join(root, "packages/core/schema.json")
 const tsDir = path.join(root, "packages/core/src/database/migration")
 const registry = path.join(root, "packages/core/src/database/migration.gen.ts")
+const schema = path.join(root, "packages/core/src/database/schema.gen.ts")
 const args = parseArgs({
   args: process.argv.slice(2),
   options: {
@@ -24,14 +25,17 @@ if (args.values.check) {
   process.exit(0)
 }
 
-await $`bun drizzle-kit generate ${args.values.name ? ["--name", args.values.name] : []}`.cwd(
-  path.join(root, "packages/core"),
-)
+await generate()
 
-const sqlMigrations = (await Array.fromAsync(new Bun.Glob("*/migration.sql").scan({ cwd: sqlDir })))
-  .map((file) => file.split("/")[0])
-  .filter((name) => name !== undefined)
-  .sort()
+async function generate() {
+  const temporary = await fs.mkdtemp(path.join(os.tmpdir(), "opencode-core-migration-"))
+  const incremental = path.join(temporary, "incremental")
+  const full = path.join(temporary, "full")
+  try {
+    await fs.mkdir(incremental)
+    await fs.mkdir(path.join(incremental, "baseline"))
+    await fs.copyFile(snapshot, path.join(incremental, "baseline/snapshot.json"))
+    await drizzle(temporary, incremental, args.values.name)
 
     const generated = await generatedMigrations(incremental)
     if (generated.length > 1) throw new Error(`Expected one generated migration, found ${generated.length}.`)
@@ -57,25 +61,16 @@ const sqlMigrations = (await Array.fromAsync(new Bun.Glob("*/migration.sql").sca
   }
 }
 
-await Bun.write(registry, renderRegistry(sqlMigrations))
-
 async function check() {
   const temporary = await fs.mkdtemp(path.join(os.tmpdir(), "opencode-core-migration-check-"))
-  const output = path.join(temporary, "migration")
+  const incremental = path.join(temporary, "incremental")
+  const full = path.join(temporary, "full")
   try {
-    await fs.cp(sqlDir, output, { recursive: true })
-    const config = path.join(temporary, "drizzle.config.ts")
-    await Bun.write(
-      config,
-      `import config from ${JSON.stringify(pathToFileURL(path.join(root, "packages/core/drizzle.config.ts")).href)}
-
-export default { ...config, out: ${JSON.stringify(output)} }
-`,
-    )
-    const before = await snapshot(output)
-    await $`bun drizzle-kit generate --config ${config}`.cwd(path.join(root, "packages/core"))
-    const after = await snapshot(output)
-    if (JSON.stringify(after) !== JSON.stringify(before)) {
+    await fs.mkdir(incremental)
+    await fs.mkdir(path.join(incremental, "baseline"))
+    await fs.copyFile(snapshot, path.join(incremental, "baseline/snapshot.json"))
+    await drizzle(temporary, incremental)
+    if ((await generatedMigrations(incremental)).length > 0) {
       throw new Error(
         "Core schema has ungenerated database migrations. Run `bun script/migration.ts` from packages/core.",
       )
@@ -96,11 +91,37 @@ export default { ...config, out: ${JSON.stringify(output)} }
   }
 }
 
-async function snapshot(directory: string) {
-  const files = await Array.fromAsync(new Bun.Glob("**/*").scan({ cwd: directory, onlyFiles: true }))
-  return Promise.all(
-    files.sort().map(async (file) => ({ path: file, contents: await Bun.file(path.join(directory, file)).text() })),
+async function drizzle(temporary: string, output: string, name?: string) {
+  const config = path.join(temporary, `${path.basename(output)}.config.ts`)
+  await Bun.write(
+    config,
+    `import config from ${JSON.stringify(pathToFileURL(path.join(root, "packages/core/drizzle.config.ts")).href)}
+
+export default { ...config, out: ${JSON.stringify(output)} }
+`,
   )
+  await $`bun drizzle-kit generate --config ${config} ${name ? ["--name", name] : []}`.cwd(
+    path.join(root, "packages/core"),
+  )
+}
+
+async function generatedMigrations(directory: string) {
+  return (await Array.fromAsync(new Bun.Glob("*/migration.sql").scan({ cwd: directory })))
+    .map((file) => file.split("/")[0])
+    .filter((name): name is string => name !== undefined)
+    .sort()
+}
+
+async function generatedSql(directory: string) {
+  const generated = await generatedMigrations(directory)
+  if (generated.length !== 1) throw new Error(`Expected one full schema migration, found ${generated.length}.`)
+  return Bun.file(path.join(directory, generated[0]!, "migration.sql")).text()
+}
+
+async function typescriptMigrations() {
+  return (await Array.fromAsync(new Bun.Glob("*.ts").scan({ cwd: tsDir })))
+    .map((file) => path.basename(file, ".ts"))
+    .sort()
 }
 
 function renderMigration(name: string, sql: string) {
@@ -111,16 +132,34 @@ export default {
   id: ${JSON.stringify(name)},
   up(tx) {
     return Effect.gen(function* () {
-${sql
-  .split("--> statement-breakpoint")
-  .map((statement) => statement.trim())
-  .filter((statement) => statement.length > 0)
-  .map(renderRun)
-  .join("\n")}
+${renderStatements(sql)}
     })
   },
 } satisfies DatabaseMigration.Migration
 `
+}
+
+function renderSchema(sql: string) {
+  return `import { Effect } from "effect"
+import type { DatabaseMigration } from "./migration"
+
+export default {
+  up(tx) {
+    return Effect.gen(function* () {
+${renderStatements(sql)}
+    })
+  },
+} satisfies Omit<DatabaseMigration.Migration, "id">
+`
+}
+
+function renderStatements(sql: string) {
+  return sql
+    .split("--> statement-breakpoint")
+    .map((statement) => statement.trim())
+    .filter((statement) => statement.length > 0)
+    .map(renderRun)
+    .join("\n")
 }
 
 function renderRun(statement: string) {

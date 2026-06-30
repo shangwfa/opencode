@@ -3,7 +3,7 @@ import { describe, expect } from "bun:test"
 import type { LanguageModelV3 } from "@ai-sdk/provider"
 import { Effect } from "effect"
 import { Catalog } from "@opencode-ai/core/catalog"
-import { Connector } from "@opencode-ai/core/connector"
+import { Integration } from "@opencode-ai/core/integration"
 import { ModelV2 } from "@opencode-ai/core/model"
 import { PluginV2 } from "@opencode-ai/core/plugin"
 import { PluginHost } from "@opencode-ai/core/plugin/host"
@@ -49,12 +49,12 @@ describe("OpenAIPlugin", () => {
           id: Integration.MethodID.make("chatgpt-browser"),
           type: "oauth",
           label: "ChatGPT Pro/Plus (browser)",
-        }),
-        new Connector.OAuthMethod({
-          id: Connector.MethodID.make("chatgpt-headless"),
+        },
+        {
+          id: Integration.MethodID.make("chatgpt-headless"),
           type: "oauth",
           label: "ChatGPT Pro/Plus (headless)",
-        }),
+        },
       ])
     }),
   )
