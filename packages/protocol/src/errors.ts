@@ -106,7 +106,7 @@ export class QuestionNotFoundError extends Schema.TaggedErrorClass<QuestionNotFo
 export class PtyNotFoundError extends Schema.TaggedErrorClass<PtyNotFoundError>()(
   "PtyNotFoundError",
   {
-    id: Schema.String,
+    ptyID: Schema.String,
     message: Schema.String,
   },
   { httpApiStatus: 404 },

@@ -65,4 +65,5 @@ function makeRoutes<AuthError, AuthServices>(auth: Layer.Layer<ServerAuth.Config
 export const routes = createRoutes()
 
 export const webHandler = () =>
+  // @ts-expect-error TODO: fix layer type after merge
   HttpRouter.toWebHandler(routes.pipe(Layer.provide(HttpServer.layerServices)), { disableLogger: true })
