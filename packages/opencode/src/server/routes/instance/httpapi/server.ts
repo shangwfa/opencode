@@ -83,6 +83,7 @@ import {
 } from "./middleware/authorization"
 import { EventApi } from "./groups/event"
 import { PtyConnectApi } from "./groups/pty"
+import { RepositoryCache } from "@opencode-ai/core/repository-cache"
 import { eventHandlers } from "./handlers/event"
 import { configHandlers } from "./handlers/config"
 import { controlHandlers } from "./handlers/control"
@@ -277,6 +278,7 @@ const app = LayerNode.group([
   EventV2.node,
   ProjectV2.node,
   ProjectCopy.node,
+  RepositoryCache.node,
   PtyTicket.node,
 ])
 
@@ -317,7 +319,7 @@ export function createRoutes(
       Plugin.defaultLayer,
       Project.defaultLayer,
       ProjectV2.defaultLayer,
-      ProjectCopy.locationLayer,
+      ProjectCopy.defaultLayer,
       MoveSession.defaultLayer,
       ProviderAuth.defaultLayer,
       Provider.defaultLayer,
@@ -361,6 +363,7 @@ export function createRoutes(
       ),
     ),
     Layer.provide(locationServiceMapLayer),
+    Layer.provideMerge(RepositoryCache.defaultLayer),
 
     Layer.provide(LayerNode.compile(app)),
   ) as any

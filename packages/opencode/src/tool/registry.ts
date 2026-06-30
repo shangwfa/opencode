@@ -59,6 +59,7 @@ import { RuntimeFlags } from "@/effect/runtime-flags"
 import { ProviderV2 } from "@opencode-ai/core/provider"
 import { ModelV2 } from "@opencode-ai/core/model"
 import { SandboxProvider } from "./sandbox-provider"
+import { RepositoryCache } from "@opencode-ai/core/repository-cache"
 
 export function webSearchEnabled(providerID: ProviderV2.ID, flags = { exa: false, parallel: false }) {
   return providerID === ProviderV2.ID.opencode || flags.exa || flags.parallel
@@ -489,6 +490,8 @@ export const node = LayerNode.make({
     Truncate.node,
     RuntimeFlags.node,
     Database.node,
+    RepositoryCache.node,
+    SandboxProvider.node,
   ] as any,
 })
 

@@ -3,6 +3,8 @@ import { Sandbox, ConnectionConfig } from "@alibaba-group/opensandbox"
 import type { CommandExecution, Volume } from "@alibaba-group/opensandbox"
 import { and, eq, lt, sql } from "drizzle-orm"
 import * as Log from "@opencode-ai/core/util/log"
+import { LayerNode } from "@opencode-ai/core/effect/layer-node"
+import { Database } from "@opencode-ai/core/database/database"
 import { Flag } from "@/flag/flag"
 import { Database } from "../storage/db"
 import { SandboxTable } from "./sandbox.pg"
@@ -1202,6 +1204,12 @@ export namespace SandboxProvider {
   export const defaultLayer = (process.env["OPENCODE_DATABASE_URL"] ? pgLayer : layer).pipe(
     Layer.provide(SandboxConfig.defaultLayer),
   )
+
+  export const node = LayerNode.make({
+    service: Service,
+    layer: defaultLayer,
+    deps: [Database.node],
+  })
 }
 
 export namespace NoopSandboxProvider {
