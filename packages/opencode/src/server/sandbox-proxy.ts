@@ -1,4 +1,4 @@
-import { Effect, Schema, Queue, Stream, Fiber, Duration } from "effect"
+import { Effect, Schema, Queue, Stream, Fiber, Duration, Option } from "effect"
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
 import * as Socket from "effect/unstable/socket/Socket"
 import * as Sse from "effect/unstable/encoding/Sse"
@@ -274,9 +274,7 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
         const sb = yield* sandbox.get(params.sessionID).pipe(Effect.catch(() => Effect.succeed(undefined)))
         if (!sb) return HttpServerResponse.jsonUnsafe({ error: "sandbox unreachable" }, { status: 502 })
 
-        const domain = process.env.OPENCODE_SANDBOX_DOMAIN ?? "localhost:8080"
         const protocol = (process.env.OPENCODE_SANDBOX_PROTOCOL as "http" | "https") ?? "http"
-        const apiKey = process.env.OPENCODE_SANDBOX_API_KEY
 
         const directUrl = yield* Effect.tryPromise({
           try: async () => {
@@ -291,12 +289,21 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
           catch: () => undefined as string | undefined,
         })
 
+        const req = yield* HttpServerRequest.HttpServerRequest
+        const reqMode = new URL(Option.getOrElse(HttpServerRequest.toURL(req), () => new URL(req.url, "http://localhost"))).searchParams.get("mode")
+
+        const fallback = `/session/${params.sessionID}/proxy/${port}/`
+        const mode = reqMode === "proxy" ? "proxy" : reqMode === "direct" ? "direct" : directUrl ? "direct" : "proxy"
+        const url = mode === "proxy" ? (proxyUrl ?? fallback) : (directUrl ?? proxyUrl ?? fallback)
+
         return HttpServerResponse.jsonUnsafe({
-          mode: directUrl ? "direct" : "proxy",
-          url: directUrl ?? proxyUrl,
+          mode,
+          url,
+          directUrl,
+          proxyUrl,
           port,
           sandboxId: sb.id,
-          fallback: `/session/${params.sessionID}/proxy/${port}/`,
+          fallback,
         })
       }),
     )
