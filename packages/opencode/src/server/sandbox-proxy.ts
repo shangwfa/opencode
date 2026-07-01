@@ -13,6 +13,7 @@ import { eq } from "drizzle-orm"
 import { WebSocketTracker } from "./routes/instance/httpapi/websocket-tracker"
 import { ProxyUtil } from "@/server/proxy-util"
 import { resolveSandboxOpts } from "@/session/sandbox-opts"
+import { insertExecLog, updateExecLog, queryExecLogsBySession, queryExecLog, type ExecLog } from "@/session/exec-log"
 
 type ProxyError = {
   type: "runtime" | "network" | "compile"
@@ -178,6 +179,12 @@ const sessionExecIndex = new Map<string, Set<string>>()
 const MAX_EXEC_STORE = 200
 let execCounter = 0
 
+const MAX_OUTPUT = 64 * 1024
+function truncateOutput(s: string | undefined): string | undefined {
+  if (!s) return s
+  return s.length > MAX_OUTPUT ? s.slice(0, MAX_OUTPUT) + "\n...[truncated]" : s
+}
+
 export const sandboxProxyRoute = HttpRouter.use((router) =>
   Effect.gen(function* () {
     const sandbox = yield* SandboxProvider.Service
@@ -304,6 +311,8 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
         }
 
         const command = body.command
+        const t0 = Date.now()
+        const execId = `exec-${++execCounter}-${t0}`
         const result = yield* sandbox.runInSession(
           root.id,
           command,
@@ -311,13 +320,31 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
           {},
         ).pipe(Effect.catch((err) => Effect.succeed(null as any)))
 
+        const stdout = result?.logs.stdout.map((m: any) => m.text).join("\n") ?? ""
+        const stderr = result?.logs.stderr.map((m: any) => m.text).join("\n") ?? ""
+
+        yield* Effect.promise(() => insertExecLog({
+          id: execId,
+          session_id: params.sessionID,
+          command,
+          working_directory: body.workingDirectory ?? null,
+          status: result ? "completed" : "failed",
+          exit_code: result?.exitCode ?? null,
+          stdout: truncateOutput(stdout),
+          stderr: truncateOutput(stderr),
+          error: result?.error ? JSON.stringify({ name: result.error.name, value: result.error.value }) : null,
+          source: "exec",
+          time_started: t0,
+          time_finished: Date.now(),
+        })).pipe(Effect.catch(() => Effect.void))
+
         if (!result) return HttpServerResponse.jsonUnsafe({ error: "execution failed" }, { status: 502 })
 
         return HttpServerResponse.jsonUnsafe({
-          id: result.id,
+          id: execId,
           exitCode: result.exitCode,
-          stdout: result.logs.stdout.map((m: any) => m.text).join("\n"),
-          stderr: result.logs.stderr.map((m: any) => m.text).join("\n"),
+          stdout,
+          stderr,
           error: result.error ? { name: result.error.name, value: result.error.value, traceback: result.error.traceback } : undefined,
         })
       }),
@@ -360,6 +387,15 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
           fiber: null,
         }
         execStore.set(execId, state)
+        yield* Effect.promise(() => insertExecLog({
+          id: execId,
+          session_id: params.sessionID,
+          command: body.command,
+          working_directory: body.workingDirectory ?? null,
+          status: "running",
+          source: "exec-async",
+          time_started: state.startedAt,
+        })).pipe(Effect.catch(() => Effect.void))
         const idx = sessionExecIndex.get(sid)
         if (idx) idx.add(execId)
         else sessionExecIndex.set(sid, new Set([execId]))
@@ -398,12 +434,24 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
             state.status = "failed"
           }
           state.finishedAt = Date.now()
+          yield* Effect.promise(() => updateExecLog(execId, {
+            status: state.status,
+            exit_code: state.exitCode,
+            stdout: truncateOutput(state.stdout),
+            stderr: truncateOutput(state.stderr),
+            error: state.error ? JSON.stringify({ name: state.error.name, value: state.error.value }) : null,
+            time_finished: state.finishedAt,
+          })).pipe(Effect.catch(() => Effect.void))
           Queue.offerUnsafe(q, { _tag: "done" as const, exitCode: state.exitCode, stdout: state.stdout, stderr: state.stderr })
           Queue.endUnsafe(q as any)
-        }).pipe(Effect.catch(() => Effect.sync(() => {
+        }).pipe(Effect.catch(() => Effect.gen(function* () {
           if (state.status === "killed") return
           state.status = "failed"
           state.finishedAt = Date.now()
+          yield* Effect.promise(() => updateExecLog(execId, {
+            status: "failed",
+            time_finished: state.finishedAt,
+          })).pipe(Effect.catch(() => Effect.void))
           Queue.offerUnsafe(q, { _tag: "done" as const, exitCode: null, stdout: "", stderr: "" })
           Queue.endUnsafe(q as any)
         })))
@@ -420,9 +468,13 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
       Effect.gen(function* () {
         const params = yield* HttpRouter.schemaPathParams(ExecIdParams)
         const state = execStore.get(params.execId)
-        if (!state) return HttpServerResponse.jsonUnsafe({ error: "execId not found" }, { status: 404 })
-        const { queue: _, seq: __, fiber: ___, ...rest } = state
-        return HttpServerResponse.jsonUnsafe({ execId: params.execId, ...rest })
+        if (state) {
+          const { queue: _, seq: __, fiber: ___, ...rest } = state
+          return HttpServerResponse.jsonUnsafe({ execId: params.execId, ...rest })
+        }
+        const log = yield* Effect.promise(() => queryExecLog(params.execId))
+        if (!log) return HttpServerResponse.jsonUnsafe({ error: "execId not found" }, { status: 404 })
+        return HttpServerResponse.jsonUnsafe({ execId: log.id, sessionID: log.session_id, status: log.status, exitCode: log.exit_code, stdout: log.stdout, stderr: log.stderr, command: log.command, startedAt: log.time_started, finishedAt: log.time_finished })
       }),
     )
 
@@ -477,6 +529,10 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
         state.status = "killed"
         state.finishedAt = Date.now()
         state.exitCode = null
+        yield* Effect.promise(() => updateExecLog(params.execId, {
+          status: "killed",
+          time_finished: state.finishedAt,
+        })).pipe(Effect.catch(() => Effect.void))
         Queue.offerUnsafe(state.queue, { _tag: "done" as const, exitCode: null, stdout: state.stdout, stderr: state.stderr })
         Queue.endUnsafe(state.queue as any)
 
@@ -500,14 +556,8 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
     yield* router.add("GET", "/session/:sessionID/execs",
       Effect.gen(function* () {
         const params = yield* HttpRouter.schemaPathParams(SessionParams)
-        const ids = sessionExecIndex.get(params.sessionID)
-        if (!ids || !ids.size) return HttpServerResponse.jsonUnsafe({ execs: [] })
-        const execs = [...ids].map((id) => {
-          const s = execStore.get(id)
-          if (!s) return null
-          return { execId: id, command: s.command, status: s.status, startedAt: s.startedAt, finishedAt: s.finishedAt, exitCode: s.exitCode }
-        }).filter(Boolean)
-        return HttpServerResponse.jsonUnsafe({ execs })
+        const logs = yield* Effect.promise(() => queryExecLogsBySession(params.sessionID))
+        return HttpServerResponse.jsonUnsafe({ execs: logs.map((l: ExecLog) => ({ execId: l.id, command: l.command, status: l.status, startedAt: l.time_started, finishedAt: l.time_finished, exitCode: l.exit_code })) })
       }),
     )
 
