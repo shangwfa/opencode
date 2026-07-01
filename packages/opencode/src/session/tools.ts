@@ -22,9 +22,10 @@ import { ProviderV2 } from "@opencode-ai/core/provider"
 import { ModelV2 } from "@opencode-ai/core/model"
 import { isRecord } from "@/util/record"
 import { SandboxProvider } from "@/tool/sandbox-provider"
-import { InstanceRef } from "@/effect/instance-ref"
+import { Database } from "@/storage/db"
+import { PartTable } from "@/session/session.sql"
 import { InstanceState } from "@/effect/instance-state"
-import { resolveSandboxOpts, worktreeScript } from "@/session/sandbox-opts"
+import { resolveSandboxOpts } from "@/session/sandbox-opts"
 
 const MCP_RESOURCE_TOOLS = {
   list: "list_mcp_resources",
@@ -64,14 +65,6 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
   const sandboxSessionID = root.id
   const useApp = root.pvcMode === "app" && !!root.appId?.trim()
 
-  async function ensureWorktree(): Promise<void> {
-    if (!useApp || !maybeSandboxProvider) return
-    await maybeSandboxProvider
-      .runInSession(sandboxSessionID, worktreeScript(sandboxSessionID))
-      .pipe(Effect.runPromise)
-      .catch((err) => console.error("[session.tools] app worktree ensure failed", { sandboxSessionID, err: String(err) }))
-  }
-
   function getSandbox(): Promise<unknown> | null {
     if (!maybeSandboxProvider) {
       return null
@@ -79,8 +72,8 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
     return maybeSandboxProvider
       .getOrCreate(sandboxSessionID, useApp ? { pvcMode: root.pvcMode, appId: root.appId } : undefined)
       .pipe(Effect.runPromise)
-      .then(async (sb) => {
-        await ensureWorktree()
+      .then((sb) => {
+        log.info("sandbox ready", { sandboxSessionID, ms: Date.now() - t0 })
         return sb
       })
       .catch(() => null)
@@ -140,14 +133,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
               { tool: item.id, sessionID: ctx.sessionID, callID: ctx.callID },
               { args },
             )
-            const result = yield* (useApp
-              ? item.execute(args, ctx).pipe(
-                  Effect.provideService(InstanceRef, {
-                    ...(yield* InstanceState.context),
-                    directory: `/workspace/worktrees/${sandboxSessionID}`,
-                  }),
-                )
-              : item.execute(args, ctx))
+            const result = yield* item.execute(args, ctx)
             const output = {
               ...result,
               attachments: result.attachments?.map((attachment) => ({

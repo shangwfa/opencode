@@ -12,7 +12,7 @@ import { SessionTable } from "@/session/session.pg"
 import { eq } from "drizzle-orm"
 import { WebSocketTracker } from "./routes/instance/httpapi/websocket-tracker"
 import { ProxyUtil } from "@/server/proxy-util"
-import { resolveSandboxOpts, worktreeScript } from "@/session/sandbox-opts"
+import { resolveSandboxOpts } from "@/session/sandbox-opts"
 
 type ProxyError = {
   type: "runtime" | "network" | "compile"
@@ -192,24 +192,6 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
 
     // Retry worktree creation — newly created sandboxes may need a few
     // seconds for execd to become ready (especially under QEMU). The old
-    // code silently swallowed the error (Effect.catch(() => Effect.void)),
-    // so worktree never got created on the first exec after sandbox boot.
-    // worktreeScript is idempotent so retries are safe.
-    const ensureWorktree = (sessionID: SessionID) =>
-      Effect.gen(function* () {
-        for (let i = 0; i < 3; i++) {
-          const ok = yield* sandbox
-            .runInSession(sessionID, worktreeScript(sessionID), { timeoutSeconds: 30 }, {})
-            .pipe(
-              Effect.as(true),
-              Effect.catch(() => Effect.succeed(false)),
-            )
-          if (ok) return
-          yield* Effect.sleep("2 seconds")
-        }
-        yield* Effect.logWarning("worktree creation failed after 3 attempts", { sessionID })
-      })
-
     yield* router.add("GET", "/session/:sessionID/proxy/:port/__errors",
       Effect.gen(function* () {
         const params = yield* HttpRouter.schemaPathParams(PathParams)
@@ -321,18 +303,13 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
         const root = yield* Effect.promise(() => resolveSandboxOpts(params.sessionID))
         const useApp = root.pvcMode === "app" && !!root.appId?.trim()
 
-        // 确保 sandbox 用正确的 PVC 前缀创建（幂等：已存在则跳过）
         if (useApp) {
           yield* sandbox.getOrCreate(root.id, { pvcMode: root.pvcMode, appId: root.appId }).pipe(
             Effect.catch(() => Effect.void),
           )
-          yield* ensureWorktree(root.id)
         }
 
-        const wtDir = `/workspace/worktrees/${root.id}`
-        const command = useApp && !body.workingDirectory
-          ? `[ -d ${wtDir} ] && cd ${wtDir}; ${body.command}`
-          : body.command
+        const command = body.command
         const result = yield* sandbox.runInSession(
           root.id,
           command,
@@ -366,12 +343,10 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
         const root = yield* Effect.promise(() => resolveSandboxOpts(params.sessionID))
         const useApp = root.pvcMode === "app" && !!root.appId?.trim()
 
-        // 确保 sandbox 用正确的 PVC 前缀创建（幂等）
         if (useApp) {
           yield* sandbox.getOrCreate(root.id, { pvcMode: root.pvcMode, appId: root.appId }).pipe(
             Effect.catch(() => Effect.void),
           )
-          yield* ensureWorktree(root.id)
         }
 
         const sid = root.id
@@ -406,10 +381,7 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
           }
         }
 
-        const wtDir = `/workspace/worktrees/${root.id}`
-        const cmd = useApp && !body.workingDirectory
-          ? `[ -d ${wtDir} ] && cd ${wtDir}; ${body.command}`
-          : body.command
+        const cmd = body.command
         const opts = { workingDirectory: body.workingDirectory, timeoutSeconds: body.timeoutSeconds }
 
         const handlers = {
