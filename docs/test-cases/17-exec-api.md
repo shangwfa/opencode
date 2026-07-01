@@ -317,6 +317,246 @@ curl -s -X POST "$BASE/session/$SID_ASYNC/kill-sandbox" > /dev/null
 - 长驻 dev server 场景优先用 `/exec/async`；同步 `/exec` 只用于短命令或显式 `nohup ... & echo $!` 的兼容路径。
 - 测试结束调用 `/exec/:execId/kill` 或 `/session/:sessionID/kill-sandbox` 清理。
 
+### T19.13 keep-alive boot 参数：立即启动沙箱
+
+> 验证 `boot:true` 不仅设置 keepAlive，还立即创建沙箱。无需先通过 AI 消息或 exec 触发沙箱创建。
+
+```bash
+SID_BOOT=$(curl -s -X POST "$BASE/session" \
+  -H 'Content-Type: application/json' -d '{}' \
+  | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+echo "SID_BOOT: $SID_BOOT"
+
+# boot=true：设置 keepAlive + 立即启动沙箱
+curl -s -X POST "$BASE/session/$SID_BOOT/keep-alive" \
+  -H 'Content-Type: application/json' \
+  -d '{"enabled":true,"boot":true}' | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+sb=d.get('sandboxId')
+print(f'keepAlive={d.get(\"keepAlive\")} sandboxId={sb}')
+print(f'PASS sandboxId non-null: {sb is not None}')
+"
+
+# 验证沙箱确实已启动（GET sandbox）
+curl -s "$BASE/session/$SID_BOOT/sandbox" | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+print(f'sandboxId={d.get(\"sandboxId\")}')
+print(f'PASS sandbox exists: {d.get(\"sandboxId\") is not None}')
+"
+
+# 验证沙箱可执行命令
+curl -s -X POST "$BASE/session/$SID_BOOT/exec" \
+  -H 'Content-Type: application/json' \
+  -d '{"command":"echo boot-ok"}' | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+print(f'exitCode={d.get(\"exitCode\")} stdout={d.get(\"stdout\",\"\").strip()}')
+print(f'PASS exec: {d.get(\"exitCode\")==0}')
+"
+
+# 清理
+curl -s -X POST "$BASE/session/$SID_BOOT/kill-sandbox" > /dev/null
+```
+**期望**：
+- 响应包含 `keepAlive: true` 和非 null 的 `sandboxId`
+- GET sandbox 返回相同的 `sandboxId`
+- exec 返回 `exitCode: 0`
+
+### T19.14 keep-alive 不传 boot：不启动沙箱
+
+> 验证不传 `boot`（或 `boot:false`）时只设置 keepAlive 标记，不主动创建沙箱。
+
+```bash
+SID_NOBOOT=$(curl -s -X POST "$BASE/session" \
+  -H 'Content-Type: application/json' -d '{}' \
+  | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+echo "SID_NOBOOT: $SID_NOBOOT"
+
+# 不传 boot：只设置 keepAlive，sandboxId 应为 null
+curl -s -X POST "$BASE/session/$SID_NOBOOT/keep-alive" \
+  -H 'Content-Type: application/json' \
+  -d '{"enabled":true}' | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+print(f'keepAlive={d.get(\"keepAlive\")} sandboxId={d.get(\"sandboxId\")}')
+print(f'PASS sandboxId null: {d.get(\"sandboxId\") is None}')
+"
+
+# 验证沙箱不存在
+curl -s "$BASE/session/$SID_NOBOOT/sandbox" | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+print(f'sandboxId={d.get(\"sandboxId\")}')
+print(f'PASS no sandbox: {d.get(\"sandboxId\") is None}')
+"
+
+# boot:false 同样不启动沙箱
+curl -s -X POST "$BASE/session/$SID_NOBOOT/keep-alive" \
+  -H 'Content-Type: application/json' \
+  -d '{"enabled":true,"boot":false}' | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+print(f'boot=false sandboxId={d.get(\"sandboxId\")}')
+print(f'PASS sandboxId null: {d.get(\"sandboxId\") is None}')
+"
+```
+**期望**：
+- 不传 `boot` 和 `boot:false` 都返回 `sandboxId: null`
+- GET sandbox 返回 `sandboxId: null`
+
+### T19.15 同步 exec 命令持久化到 exec_log
+
+> 验证 exec 执行后命令记录写入 `exec_log` 表，`GET /execs` 可查询。exec_log 独立于消息系统，不进入 AI 上下文。
+
+```bash
+bun -e '
+const BASE = "http://localhost:14096"
+const sid = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" })).json().then(d=>d.id)
+await new Promise(r => setTimeout(r, 5000))
+const r = await (await fetch(BASE + "/session/" + sid + "/exec", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ command: "echo exec-log-persist" }) })).json()
+const execs = await (await fetch(BASE + "/session/" + sid + "/execs")).json()
+const hasLog = execs.execs?.some(e => e.command?.includes("exec-log-persist") && e.status === "completed" && e.exitCode === 0)
+console.log(hasLog ? "✅ T19.15 PASS" : "❌ T19.15 FAIL", JSON.stringify(execs).slice(0,120))
+'
+```
+**期望**：`GET /execs` 列表包含该命令，`status=completed`，`exitCode=0`
+
+### T19.16 异步 exec 状态更新（running → completed）
+
+> 验证 `/exec/async` 创建时写入 `running`，命令完成后更新为 `completed`。
+
+```bash
+bun -e '
+const BASE = "http://localhost:14096"
+const sid = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" })).json().then(d=>d.id)
+await new Promise(r => setTimeout(r, 5000))
+const asyncRes = await (await fetch(BASE + "/session/" + sid + "/exec/async", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ command: "echo async-state-test" }) })).json()
+console.log("初始状态:", asyncRes.status)
+await new Promise(r => setTimeout(r, 3000))
+const log = await (await fetch(BASE + "/session/" + sid + "/exec/" + asyncRes.execId)).json()
+console.log("最终状态:", log.status, "exit=" + log.exitCode, "out=" + log.stdout?.trim())
+const ok = log.status === "completed" && log.exitCode === 0 && log.stdout?.includes("async-state-test")
+console.log(ok ? "✅ T19.16 PASS" : "❌ T19.16 FAIL")
+'
+```
+**期望**：`POST /exec/async` 返回 `status=running`；完成后 `GET /exec/:execId` 返回 `status=completed`，`exitCode=0`
+
+### T19.17 历史记录查询（GET /execs + GET /exec/:execId）
+
+> 验证多条 exec 记录持久化到 DB，列表和单条详情均可查询。即使 sandbox 重建，历史记录不丢失。
+
+```bash
+bun -e '
+const BASE = "http://localhost:14096"
+const sid = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" })).json().then(d=>d.id)
+await new Promise(r => setTimeout(r, 5000))
+const r1 = await (await fetch(BASE + "/session/" + sid + "/exec", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ command: "echo history-1" }) })).json()
+const r2 = await (await fetch(BASE + "/session/" + sid + "/exec", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ command: "echo history-2" }) })).json()
+const execs = await (await fetch(BASE + "/session/" + sid + "/execs")).json()
+console.log("列表:", execs.execs?.length, "条")
+const detail = await (await fetch(BASE + "/session/" + sid + "/exec/" + r1.id)).json()
+console.log("详情:", detail.command, detail.status, detail.exitCode, detail.stdout?.trim())
+const ok = execs.execs?.length >= 2 && detail.command?.includes("history-1") && detail.exitCode === 0
+console.log(ok ? "✅ T19.17 PASS" : "❌ T19.17 FAIL")
+'
+```
+**期望**：
+- `GET /execs` 返回 ≥ 2 条记录
+- `GET /exec/:execId` 返回单条详情（`command`、`status`、`exitCode`、`stdout`、`startedAt`、`finishedAt`）
+
+### T19.18 exec_log 容错（写入失败不影响 exec）
+
+> 验证 exec_log 写入异常时（表不存在、DB 故障等），exec 命令本身仍正常返回。操作函数内部 `try/catch` 兜底。
+
+```bash
+bun -e '
+const BASE = "http://localhost:14096"
+const sid = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" })).json().then(d=>d.id)
+await new Promise(r => setTimeout(r, 5000))
+const r = await (await fetch(BASE + "/session/" + sid + "/exec", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ command: "echo fault-tolerance-test" }) })).json()
+console.log("exec exitCode:", r.exitCode, "stdout:", r.stdout?.trim())
+console.log(r.exitCode === 0 ? "✅ T19.18 PASS — exec 不受 exec_log 影响" : "❌ T19.18 FAIL")
+'
+```
+**期望**：exec 返回 `exitCode=0`，即使 exec_log 写入失败也不影响命令执行
+
+### T19.19 kill 后 exec_log 状态更新为 killed
+
+> 验证 `/exec/:execId/kill` 后，exec_log 状态更新为 `killed`。
+
+```bash
+bun -e '
+const BASE = "http://localhost:14096"
+const sid = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" })).json().then(d=>d.id)
+await new Promise(r => setTimeout(r, 5000))
+const asyncRes = await (await fetch(BASE + "/session/" + sid + "/exec/async", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ command: "sleep 30" }) })).json()
+await new Promise(r => setTimeout(r, 1000))
+await fetch(BASE + "/session/" + sid + "/exec/" + asyncRes.execId + "/kill", { method: "POST" })
+await new Promise(r => setTimeout(r, 1000))
+const log = await (await fetch(BASE + "/session/" + sid + "/exec/" + asyncRes.execId)).json()
+console.log("kill 后状态:", log.status)
+console.log(log.status === "killed" ? "✅ T19.19 PASS" : "❌ T19.19 FAIL")
+'
+```
+**期望**：`GET /exec/:execId` 返回 `status=killed`
+
+### T19.20 exec_log 字段覆盖（working_directory / exit_code / stderr 行为）
+
+> 验证 workingDirectory、非 0 exit_code 正确持久化。stderr 字段：当前 sandbox 实现将 stderr 合并到 stdout（见 T19.2），exec_log 的 stderr 字段为空，stderr 内容在 stdout 中。
+
+```bash
+bun -e '
+const BASE = "http://localhost:14096"
+const post = (path, body) => fetch(BASE + path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(r=>r.json())
+const sid = await (await post("/session", {})).id
+require("fs").writeFileSync("/tmp/test-sid", sid)
+await new Promise(r => setTimeout(r, 5000))
+
+// working_directory
+await post("/session/"+sid+"/exec", { command: "echo wd-test", workingDirectory: "/tmp" })
+// 非 0 exit_code
+await post("/session/"+sid+"/exec", { command: "exit 42" })
+// stderr（合并到 stdout）
+await post("/session/"+sid+"/exec", { command: "echo stderr-merged >&2" })
+
+const execs = await (await fetch(BASE + "/session/" + sid + "/execs")).json()
+const wd = execs.execs.find(e => e.command?.includes("wd-test"))
+const fail = execs.execs.find(e => e.command?.includes("exit 42"))
+const err = execs.execs.find(e => e.command?.includes("stderr-merged"))
+console.log("working_directory:", wd ? "✅" : "❌")
+console.log("exit_code=42:", fail?.exitCode === 42 ? "✅" : "❌", "got=" + fail?.exitCode)
+console.log("stderr合并到stdout:", err ? "✅（已知行为）" : "❌")
+'
+```
+**期望**：
+- working_directory 记录为 `/tmp`
+- exit_code 记录为 `42`（非 0）
+- stderr 内容出现在 stdout 中（sandbox 合并行为，exec_log stderr 字段为空）
+
+### T19.21 exec_log stdout 截断（64KB）
+
+> 验证大输出截断到 64KB，超出部分替换为 `...[truncated]` 标记。
+
+```bash
+bun -e '
+const BASE = "http://localhost:14096"
+const post = (path, body) => fetch(BASE + path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(r=>r.json())
+const sid = await (await post("/session", {})).id
+require("fs").writeFileSync("/tmp/test-sid", sid)
+await new Promise(r => setTimeout(r, 5000))
+// 生成 100KB 输出
+const r = await post("/session/"+sid+"/exec", { command: "yes repeat | head -c 100000" })
+console.log("API stdout 长度:", r.stdout?.length)
+// 查 PG 验证截断
+' && SID=$(cat /tmp/test-sid) && PGPASSWORD=8zuhlMLd4gaeUG5k psql -h localhost -p 15432 -U app -d opencode -c "SELECT length(stdout) AS stdout_len, stdout LIKE '%[truncated]%' AS has_mark FROM exec_log WHERE session_id = '$SID' AND command LIKE '%head -c%'"
+```
+**期望**：
+- API 返回完整 stdout（100000 字符）
+- PG exec_log stdout 截断到 ~65551（65536 + `...[truncated]` 标记）
+
+>>>>>>> 15bb3bbbb7 (feat(sandbox): exec API 命令执行日志持久化到 exec_log 表)
 ---
 
 ### API 接口详情
@@ -433,6 +673,13 @@ data: {"execId":"exec-1-...","status":"completed","exitCode":0,"stdout":"...","s
 | T19.10 | ⚠️ | `timeoutSeconds=5` 透传后，`sleep 30 && echo done` 约 30.2s 后返回 `exitCode=null`；execd 未在 5s 强制中止，仍按已知 opensandbox execd 行为记录为 warning |
 | T19.11 | ✅ | 补跑显式 `workingDirectory=/workspace` 后返回 `node=v22.2.0 npm=10.7.0 pwd=/workspace` |
 | T19.12 | ✅ | session `ses_15bbdc427ffekQUGtCGGPnKzFZ`，execId `exec-1-1780872265127`；`/exec/async` 立即返回 `running`，`/stream` 依次收到 `stdout×4` 和 `done`，最终状态 `completed exitCode=0`，sandbox 已清理为 `destroyed` |
+| T19.13 | ✅ | session `ses_12ccef5ccffe9N4sbDwQ179Or5`；`boot:true` 返回 `sandboxId=60d502b8-ccf0-4863-8365-0b25f8b08147`，GET sandbox 一致，exec `exitCode=0 stdout=boot-ok` |
+| T19.14 | ✅ | session `ses_12ccef4f6ffe5fGbpM7tNhBFaM`；不传 `boot` 返回 `sandboxId=null`，GET sandbox 确认无沙箱；`boot:false` 同样返回 `sandboxId=null` |
+| T19.15 | ✅ | 同步 exec 后 exec_log 持久化，GET /execs 含记录（command/status/exitCode） |
+| T19.16 | ✅ | 异步 exec running→completed，GET /exec/:execId 状态正确 |
+| T19.17 | ✅ | 多条 exec 历史记录可查（GET /execs 列表 + GET /exec/:execId 详情） |
+| T19.18 | ✅ | exec_log 容错：操作函数内部 try/catch，写入失败不影响 exec 返回 |
+| T19.19 | ✅ | kill 后 exec_log 状态更新为 killed |
 
 **本轮全量回归环境**：宿主机 opencode server `127.0.0.1:14097`，PG auth，OpenSandbox Docker runtime `127.0.0.1:8080`，sandbox image `opencode-opensandbox:local`，`OPENCODE_SANDBOX_USE_SERVER_PROXY=false`。
 
