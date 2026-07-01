@@ -12,7 +12,7 @@ import { SessionTable } from "@/session/session.pg"
 import { eq } from "drizzle-orm"
 import { WebSocketTracker } from "./routes/instance/httpapi/websocket-tracker"
 import { ProxyUtil } from "@/server/proxy-util"
-import { resolveSandboxOpts, worktreeScript } from "@/session/sandbox-opts"
+import { resolveSandboxOpts } from "@/session/sandbox-opts"
 
 type ProxyError = {
   type: "runtime" | "network" | "compile"
@@ -297,22 +297,13 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
         const root = yield* Effect.promise(() => resolveSandboxOpts(params.sessionID))
         const useApp = root.pvcMode === "app" && !!root.appId?.trim()
 
-        // 确保 sandbox 用正确的 PVC 前缀创建（幂等：已存在则跳过）
         if (useApp) {
           yield* sandbox.getOrCreate(root.id, { pvcMode: root.pvcMode, appId: root.appId }).pipe(
             Effect.catch(() => Effect.void),
           )
-          // app 模式：确保 worktree 存在（幂等 + repo 不存在时降级）
-          // 使用 root.id 与 AI 工具路径（tools.ts）保持一致
-          yield* sandbox.runInSession(root.id, worktreeScript(root.id), { timeoutSeconds: 30 }, {}).pipe(
-            Effect.catch(() => Effect.void),
-          )
         }
 
-        const wtDir = `/workspace/worktrees/${root.id}`
-        const command = useApp && !body.workingDirectory
-          ? `[ -d ${wtDir} ] && cd ${wtDir}; ${body.command}`
-          : body.command
+        const command = body.command
         const result = yield* sandbox.runInSession(
           root.id,
           command,
@@ -346,13 +337,8 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
         const root = yield* Effect.promise(() => resolveSandboxOpts(params.sessionID))
         const useApp = root.pvcMode === "app" && !!root.appId?.trim()
 
-        // 确保 sandbox 用正确的 PVC 前缀创建（幂等）
         if (useApp) {
           yield* sandbox.getOrCreate(root.id, { pvcMode: root.pvcMode, appId: root.appId }).pipe(
-            Effect.catch(() => Effect.void),
-          )
-          // app 模式：确保 worktree 存在（幂等 + repo 不存在时降级）
-          yield* sandbox.runInSession(root.id, worktreeScript(root.id), { timeoutSeconds: 30 }, {}).pipe(
             Effect.catch(() => Effect.void),
           )
         }
@@ -389,10 +375,7 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
           }
         }
 
-        const wtDir = `/workspace/worktrees/${root.id}`
-        const cmd = useApp && !body.workingDirectory
-          ? `[ -d ${wtDir} ] && cd ${wtDir}; ${body.command}`
-          : body.command
+        const cmd = body.command
         const opts = { workingDirectory: body.workingDirectory, timeoutSeconds: body.timeoutSeconds }
 
         const handlers = {
