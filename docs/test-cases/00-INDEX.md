@@ -34,7 +34,10 @@
 | [`23-package-cache.md`](./23-package-cache.md) | 二十三 | T23.x | 共享 Package Cache：标准 exec 使用流程、跨 session 缓存共享、npm/pnpm/yarn/bun、加速/并发、mountPath 校验 |
 | [`24-preload-cache.md`](./24-preload-cache-switch-env.md) | 二十四 | T24.x | 环境切换与预装依赖缓存：mise 多版本 Node/pnpm 切换、shims 自动检测、npm cache/node_modules 预装、跨版本缓存共享、隔离性 |
 | [`25-session-user-fields.md`](./25-session-user-fields.md) | 二十五 | T25.x | Session 用户标识字段：userName/userId 传递、持久化、向后兼容、多轮独立标识 |
+| [`26-session-agent-permissions.md`](./26-session-agent-permissions.md) | 二十六 | T26.x | Session Agent 权限：字符串简写、对象语法白名单、bash 粒度命令、last matching rule wins、worktree 影响权限 pattern（directory 基准修复）、`**/`/`*` 前缀匹配、`...` 字面点限制 |
 | [`27-session-lsp.md`](./27-session-lsp.md) | 二十七 | T27.x | Session LSP：容器内 daemon、TS 诊断、hover、definition、references、implementation、documentSymbol、workspaceSymbol、apply_patch/lsp sandbox 分支、健康检查、自动恢复 |
+| [`27-session-pvc-mode.md`](./27-session-pvc-mode.md) | 二十七 | T27.x | Session PVC 模式：session/app 模式创建、appId 校验、PVC 共享/隔离、自动 worktree（detach+幂等+降级）、PG 持久化、子会话继承 |
+| [`28-sandbox-perf-watchdog.md`](./28-sandbox-perf-watchdog.md) | 二十八 | T28.x | 沙箱性能优化与 Watchdog 兜底：对象缓存（30s TTL）、getOrCreate 90s 超时、`SessionTools.markTimedOut` lifecycle 超时标记、CAS 幂等、配置注入、各阶段耗时日志 |
 | [`lsp-daemon-unit-test.mjs`](./lsp-daemon-unit-test.mjs) | 二十七 | T27.1-7.6 | LSP daemon 单元测试：宿主机直跑 daemon bundle，自动验证全部 13 个端点（诊断/hover/definition/references/implementation/documentSymbol/workspaceSymbol/callHierarchy）。实测 14/14 |
 | [`lsp-sandbox-e2e-test.mjs`](./lsp-sandbox-e2e-test.mjs) | 二十七 | T27.8+ | LSP sandbox 端到端：OpenSandbox SDK 直连建真实 sandbox 容器，容器内启 daemon 验证 status/documentSymbol/callHierarchy/diagnostics。实测 6/6 |
 | [`sandbox-shared-test.mjs`](./sandbox-shared-test.mjs) | 十六 | T16.29 | 主子 agent 沙箱共享验证：主→子写读、子→主写读、exec 独立验证 |
@@ -58,7 +61,7 @@ T12.x → 10-sandbox-lifecycle.md
 T13.x → 11-saas-stability.md
 T14.x → 12-compatibility.md
 T15.x → 13-session-skills.md
-T16.x → 14-session-agents.md
+T16.x → 14-session-agents.md（基础 CRUD/隔离）+ 26-session-agent-permissions.md（权限 T26.x）
 T17.x → 15-sandbox-endpoint.md
 T18.x → 16-tool-calls.md
 T19.x → 17-exec-api.md
@@ -66,7 +69,9 @@ T22.x → 22-session-mcp.md
 T23.x → 23-package-cache.md
 T24.x → 24-preload-cache.md
 T25.x → 25-session-user-fields.md
-T27.x → 27-session-lsp.md
+T26.x → 26-session-agent-permissions.md
+T27.x → 27-session-lsp.md / 27-session-pvc-mode.md
+T28.x → 28-sandbox-perf-watchdog.md
 
 沙箱工具（apply_patch/ls/错误泄露）→ 18-sandbox-tool-test.md
 路径泄露防护（PL-x）→ 20-path-leak-test.md

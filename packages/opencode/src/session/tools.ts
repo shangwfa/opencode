@@ -22,8 +22,6 @@ import { ProviderV2 } from "@opencode-ai/core/provider"
 import { ModelV2 } from "@opencode-ai/core/model"
 import { isRecord } from "@/util/record"
 import { SandboxProvider } from "@/tool/sandbox-provider"
-import { Database } from "@/storage/db"
-import { PartTable } from "@/session/session.sql"
 import { InstanceState } from "@/effect/instance-state"
 import { resolveSandboxOpts } from "@/session/sandbox-opts"
 
@@ -72,10 +70,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
     return maybeSandboxProvider
       .getOrCreate(sandboxSessionID, useApp ? { pvcMode: root.pvcMode, appId: root.appId } : undefined)
       .pipe(Effect.runPromise)
-      .then((sb) => {
-        log.info("sandbox ready", { sandboxSessionID, ms: Date.now() - t0 })
-        return sb
-      })
+      .then((sb) => sb)
       .catch(() => null)
   }
 

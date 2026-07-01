@@ -4,11 +4,10 @@ import type { CommandExecution, Volume } from "@alibaba-group/opensandbox"
 import { and, eq, lt, sql } from "drizzle-orm"
 import * as Log from "@opencode-ai/core/util/log"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
-import { Database } from "@opencode-ai/core/database/database"
 import { Flag } from "@/flag/flag"
+import type { SessionID } from "../session/schema"
 import { Database } from "../storage/db"
 import { SandboxTable } from "./sandbox.pg"
-import type { SessionID } from "../session/schema"
 
 export namespace SandboxConfig {
   export interface Interface {
@@ -35,7 +34,7 @@ export namespace SandboxConfig {
     useServerProxy: Flag.OPENCODE_SANDBOX_USE_SERVER_PROXY,
     image: Flag.OPENCODE_SANDBOX_IMAGE,
     timeoutSeconds: Flag.OPENCODE_SANDBOX_TIMEOUT,
-    resourceLimits: { cpu: "1", memory: "2Gi" },
+    resourceLimits: { cpu: "1", memory: "4Gi" },
     volumeType: Flag.OPENCODE_SANDBOX_VOLUME_TYPE,
     pvcClaimName: Flag.OPENCODE_SANDBOX_PVC_CLAIM,
     idleKillMs: Flag.OPENCODE_SANDBOX_IDLE_KILL_SEC * 1000,
@@ -121,6 +120,97 @@ export function cleanupSessionVolume(
   return Effect.logDebug("sandbox volume cleanup skipped", { sessionID, volumeType: config.volumeType }).pipe(
     Effect.withSpan("cleanupSessionVolume"),
   )
+}
+
+type CommandHandlers = {
+  onStdout?: (msg: { text: string }) => void | Promise<void>
+  onStderr?: (msg: { text: string }) => void | Promise<void>
+  onEvent?: (ev: unknown) => void | Promise<void>
+  onResult?: (res: unknown) => void | Promise<void>
+  onExecutionComplete?: (c: unknown) => void | Promise<void>
+  onError?: (err: unknown) => void | Promise<void>
+  onInit?: (init: unknown) => void | Promise<void>
+}
+
+// SSE early-exit: consume runInSessionStream and return immediately on
+// execution_complete/error instead of waiting for the HTTP connection to
+// close. SDK's consumeExecutionStream keeps reader.read() blocked after
+// execution_complete — multi-layer proxies (K8s ingress) can hold the
+// connection open for 60-300s+, inflating every command's wall time.
+async function runCommandEarlyExit(
+  sb: Sandbox,
+  sessionId: string,
+  command: string,
+  options: { workingDirectory?: string; timeoutSeconds?: number } | undefined,
+  handlers: CommandHandlers | undefined,
+  signal?: AbortSignal,
+): Promise<CommandExecution> {
+  const execution: CommandExecution = {
+    logs: { stdout: [], stderr: [] },
+    result: [],
+  }
+  let errorValue: string | undefined
+
+  const commands = sb.commands as unknown as {
+    runInSessionStream: (
+      sessionId: string,
+      command: string,
+      opts?: { workingDirectory?: string; timeoutSeconds?: number },
+      signal?: AbortSignal,
+    ) => AsyncIterable<{
+      type: string
+      text?: string
+      execution_time?: number
+      error?: { ename?: string; evalue?: string; name?: string; value?: string; traceback?: unknown[] }
+      results?: unknown[]
+    }>
+  }
+
+  for await (const ev of commands.runInSessionStream(sessionId, command, options, signal)) {
+    await handlers?.onEvent?.(ev)
+    switch (ev.type) {
+      case "init":
+        execution.id = ev.text ?? ""
+        await handlers?.onInit?.({ id: ev.text ?? "" })
+        break
+      case "stdout": {
+        const msg = { text: ev.text ?? "", isError: false, timestamp: Date.now() }
+        execution.logs.stdout.push(msg)
+        await handlers?.onStdout?.(msg)
+        break
+      }
+      case "stderr": {
+        const msg = { text: ev.text ?? "", isError: true, timestamp: Date.now() }
+        execution.logs.stderr.push(msg)
+        await handlers?.onStderr?.(msg)
+        break
+      }
+      case "execution_complete": {
+        execution.complete = { executionTimeMs: ev.execution_time ?? 0, timestamp: Date.now() }
+        await handlers?.onExecutionComplete?.(execution.complete)
+        execution.exitCode = execution.error
+          ? errorValue && /^-?\d+$/.test(errorValue.trim()) ? Number(errorValue.trim()) : null
+          : 0
+        return execution
+      }
+      case "error": {
+        const e = ev.error
+        if (e) {
+          errorValue = String(e.evalue ?? e.value ?? "")
+          execution.error = {
+            name: String(e.ename ?? e.name ?? ""),
+            value: errorValue,
+            timestamp: Date.now(),
+            traceback: Array.isArray(e.traceback) ? e.traceback.map(String) : [],
+          }
+          await handlers?.onError?.(execution.error)
+        }
+        execution.exitCode = errorValue && /^-?\d+$/.test(errorValue.trim()) ? Number(errorValue.trim()) : null
+        return execution
+      }
+    }
+  }
+  return execution
 }
 
 export namespace SandboxProvider {
@@ -420,7 +510,7 @@ export namespace SandboxProvider {
           })
           try {
             return yield* Effect.tryPromise({
-              try: () => sb.commands.runInSession(detachedSessionId, command, options, handlers, signal),
+              try: () => runCommandEarlyExit(sb, detachedSessionId, command, options, handlers, signal),
               catch: (e) => new Error(`runDetached failed: ${String(e)}`),
             })
           } finally {
@@ -768,6 +858,7 @@ export namespace SandboxProvider {
             Effect.catchCause((cause) =>
               Effect.gen(function* () {
                 log.error("sandbox kill failed", { sessionID, cause: String(cause) })
+                // 诊断：获取 sandbox 实际状态/reason（SDK 已暴露，替代完整 diagnostic logs）
                 const info = yield* Effect.tryPromise(() => sb.getInfo()).pipe(Effect.orElseSucceed(() => null))
                 if (info?.status) {
                   log.warn("sandbox status on kill failure", { sessionID, sandboxID: sb.id, state: info.status.state, reason: info.status.reason, message: info.status.message })
@@ -944,6 +1035,7 @@ export namespace SandboxProvider {
             const sb = yield* reconnect(row).pipe(Effect.orElseSucceed(() => null))
             if (sb) yield* destroySandbox(sb, sessionID).pipe(Effect.catchCause(() => Effect.void))
             else {
+              invalidateCachedSandbox(sessionID)
               yield* bestEffortKill(row.id, sessionID)
               yield* dbMarkDestroyed(sessionID, row.id)
             }
@@ -956,6 +1048,7 @@ export namespace SandboxProvider {
         Effect.gen(function* () {
           const row = yield* dbGetById(sandboxID).pipe(Effect.orElseSucceed(() => null))
           if (!row || row.state !== "running") return
+          invalidateCachedSandbox(row.session_id)
           yield* lock(row.session_id, Effect.gen(function* () {
             invalidateCachedSandbox(row.session_id)
             const current = yield* dbGetById(sandboxID).pipe(Effect.orElseSucceed(() => null))
@@ -1038,31 +1131,36 @@ export namespace SandboxProvider {
         Effect.gen(function* () {
           const sb = yield* lock(sessionID, getOrCreateUnlocked(sessionID))
 
-          // Semaphore 提前初始化，保护 createSession + runInSession 全流程
-          // 防止并发请求同时发现 command_session_id=null 而重复创建 shell session
-          let sem = commandSemaphores.get(sessionID)
-          if (!sem) { sem = Effect.runSync(Semaphore.make(1)); commandSemaphores.set(sessionID, sem) }
+          const row = yield* dbGet(sessionID).pipe(Effect.orElseSucceed(() => null))
+          let cmdSessionID = (row?.id === sb.id ? row?.command_session_id : null) ?? null
 
-          return yield* sem.withPermit(Effect.gen(function* () {
-            const row = yield* dbGet(sessionID).pipe(Effect.orElseSucceed(() => null))
+          if (!cmdSessionID) {
+            let sem = commandSemaphores.get(sessionID)
+            if (!sem) { sem = Effect.runSync(Semaphore.make(1)); commandSemaphores.set(sessionID, sem) }
+            cmdSessionID = yield* sem.withPermit(Effect.gen(function* () {
+              const row2 = yield* dbGet(sessionID).pipe(Effect.orElseSucceed(() => null))
+              const existing = (row2?.id === sb.id ? row2?.command_session_id : null) ?? null
+              if (existing) return existing
 
-            // command_session_id 必须属于当前沙箱（sandbox ID 一致才复用）
-            // 沙箱重建后 DB 里的 command_session_id 已被 createSandbox 置 null
-            let cmdSessionID = (row?.id === sb.id ? row?.command_session_id : null) ?? null
-
-            if (!cmdSessionID) {
-              cmdSessionID = yield* Effect.tryPromise({
+              const newSession = yield* Effect.tryPromise({
                 try: () => sb.commands.createSession({ workingDirectory: "/workspace" }),
                 catch: (e) => new Error(`Failed to create command session: ${String(e)}`),
               })
-              yield* dbSetCommandSession(sessionID, sb.id, cmdSessionID).pipe(Effect.catchCause(() => Effect.void))
-            }
+              yield* dbSetCommandSession(sessionID, sb.id, newSession).pipe(Effect.catchCause(() => Effect.void))
+              return newSession
+            }))
+          }
 
-            return yield* Effect.tryPromise({
-              try: () => sb.commands.runInSession(cmdSessionID!, command, options, handlers, signal),
-              catch: (e) => new Error(`runInSession failed: ${String(e)}`),
-            })
-          }))
+          return yield* Effect.tryPromise({
+            try: () => runCommandEarlyExit(sb, cmdSessionID!, command, options, handlers, signal),
+            catch: (e) => new Error(`runInSession failed: ${String(e)}`),
+          }).pipe(
+            Effect.tapError((err) =>
+              String(err).includes("not found")
+                ? Effect.sync(() => { invalidateCachedSandbox(sessionID); log.warn("sandbox invalidated after command failure", { sessionID }) })
+                : Effect.void,
+            ),
+          )
         }).pipe(Effect.withSpan("SandboxProvider.runInSession"))
 
       const runDetached: Interface["runDetached"] = (sessionID, command, options, handlers, signal) =>
@@ -1074,9 +1172,15 @@ export namespace SandboxProvider {
           })
           try {
             return yield* Effect.tryPromise({
-              try: () => sb.commands.runInSession(detachedSessionId, command, options, handlers, signal),
+              try: () => runCommandEarlyExit(sb, detachedSessionId, command, options, handlers, signal),
               catch: (e) => new Error(`runDetached failed: ${String(e)}`),
-            })
+            }).pipe(
+              Effect.tapError((err) =>
+                String(err).includes("not found")
+                  ? Effect.sync(() => { invalidateCachedSandbox(sessionID); log.warn("sandbox invalidated after detached failure", { sessionID }) })
+                  : Effect.void,
+              ),
+            )
           } finally {
             yield* Effect.tryPromise(() => sb.commands.deleteSession(detachedSessionId)).pipe(Effect.ignore)
           }

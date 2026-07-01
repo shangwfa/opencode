@@ -63,8 +63,6 @@ export const ReadTool = Tool.define(
         metadata: {},
       })
 
-      // Step 1: Try readFile first (90%+ calls are files — 1 HTTP call for the common case).
-      // readFile on a directory rejects immediately — no timeout waste.
       const fileContent = yield* Effect.promise(async () => {
         try {
           return await sb.files.readFile(sandboxPath)

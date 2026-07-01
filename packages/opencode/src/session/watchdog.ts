@@ -81,7 +81,6 @@ function runningToolCondition(startBefore: number) {
     sql`json_extract(${PartTable.data}, '$.state.time.start') < ${startBefore}`,
   )
 }
-
 const scan = Effect.fn("SessionWatchdog.scan")(function* (config: Config) {
   const db = Database.Client() as WatchdogDb
   const tools = yield* SessionTools.Service

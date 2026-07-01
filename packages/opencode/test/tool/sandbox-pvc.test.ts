@@ -98,6 +98,71 @@ describe("buildVolumes", () => {
   })
 })
 
+describe("buildVolumes app mode (pvcMode=app)", () => {
+  const appCfg = { ...baseConfig, volumeType: "pvc" as const, pvcClaimName: "shared-pvc" }
+
+  test("app mode: subPath prefix is apps/{appId}, 7 volumes, same claimName", () => {
+    const vols = buildVolumes({ sessionID: "ses_x", pvcMode: "app", appId: "app-42" }, appCfg)
+    expect(vols.length).toBe(7)
+    for (const v of vols) {
+      expect(v.pvc!.claimName).toBe("shared-pvc")
+      expect(v.host).toBeUndefined()
+    }
+    const sessionVols = vols.filter((v) => v.name !== "package-cache")
+    for (const v of sessionVols) {
+      expect(v.subPath!.startsWith("apps/app-42/")).toBe(true)
+    }
+    // package-cache 仍为跨 app 共享
+    expect(vols.find((v) => v.name === "package-cache")!.subPath).toBe("shared/package-cache")
+  })
+
+  test("app mode: same appId different sessions share identical subPaths", () => {
+    const a = buildVolumes({ sessionID: "ses_a", pvcMode: "app", appId: "app-1" }, appCfg)
+    const b = buildVolumes({ sessionID: "ses_b", pvcMode: "app", appId: "app-1" }, appCfg)
+    const sessionNames = a.filter((v) => v.name !== "package-cache").map((v) => v.name)
+    for (const name of sessionNames) {
+      expect(a.find((v) => v.name === name)!.subPath).toBe(b.find((v) => v.name === name)!.subPath)
+    }
+  })
+
+  test("app mode: different appIds are isolated by subPath", () => {
+    const a = buildVolumes({ sessionID: "ses_x", pvcMode: "app", appId: "app-1" }, appCfg)
+    const b = buildVolumes({ sessionID: "ses_x", pvcMode: "app", appId: "app-2" }, appCfg)
+    expect(a[0].subPath).toBe("apps/app-1/workspace")
+    expect(b[0].subPath).toBe("apps/app-2/workspace")
+  })
+
+  test("app mode missing appId falls back to session prefix", () => {
+    const vols = buildVolumes({ sessionID: "ses_x", pvcMode: "app" }, appCfg)
+    expect(vols[0].subPath).toBe("sessions/ses_x/workspace")
+  })
+
+  test("app mode empty appId falls back to session prefix", () => {
+    const vols = buildVolumes({ sessionID: "ses_x", pvcMode: "app", appId: "  " }, appCfg)
+    expect(vols[0].subPath).toBe("sessions/ses_x/workspace")
+  })
+
+  test("pvcMode=session uses session prefix (explicit)", () => {
+    const vols = buildVolumes({ sessionID: "ses_x", pvcMode: "session", appId: "app-1" }, appCfg)
+    expect(vols[0].subPath).toBe("sessions/ses_x/workspace")
+  })
+
+  test("app mode ignored when volumeType=host", () => {
+    const cfg = { ...baseConfig, volumeType: "host" as const }
+    const vols = buildVolumes({ sessionID: "ses_x", pvcMode: "app", appId: "app-1" }, cfg)
+    expect(vols.length).toBe(6)
+    for (const v of vols) {
+      expect(v.host!.path.startsWith("/var/opencode/sessions/ses_x/")).toBe(true)
+      expect(v.pvc).toBeUndefined()
+    }
+  })
+
+  test("app mode ignored when volumeType=none", () => {
+    const cfg = { ...baseConfig, volumeType: "none" as const }
+    expect(buildVolumes({ sessionID: "ses_x", pvcMode: "app", appId: "app-1" }, cfg)).toEqual([])
+  })
+})
+
 describe("Entry state machine (running / killed)", () => {
   test("running entry has sb reference", () => {
     const entry = { state: "running" as const, sb: {}, sandboxID: "sb1", lastActive: Date.now() }

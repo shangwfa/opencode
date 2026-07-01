@@ -631,18 +631,28 @@ data: {"execId":"exec-1-...","status":"completed","exitCode":0,"stdout":"...","s
 
 #### `POST /session/:sessionID/keep-alive`
 
-设置或释放 keepAlive。keepAlive=true 时，sandbox 在 session idle 后不会被自动销毁。
+设置或释放 keepAlive。`keepAlive=true` 时 sandbox 在 session idle 后不会被自动销毁。`boot=true` 时额外立即创建沙箱。
 
 **请求体**：
 ```json
-{"enabled": true}   // 设置 keepAlive
-{"enabled": false}  // 释放 keepAlive
+{"enabled": true}                  // 设置 keepAlive（默认）
+{"enabled": true, "boot": true}    // 设置 keepAlive + 立即启动沙箱
+{"enabled": false}                 // 释放 keepAlive
 ```
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `enabled` | boolean | `true` | keepAlive 开关。`true`=保活，`false`=释放 |
+| `boot` | boolean | `false` | 是否立即启动沙箱。仅在 `enabled:true` 时生效 |
+
+> `boot:true` 先设置 keepAlive（写入 DB），再调用 `getOrCreate` 创建沙箱，确保沙箱使用 10x TTL。boot 失败不影响 keepAlive 设置，返回 `sandboxId: null`。
 
 **响应**：
 ```json
-{"sessionID": "ses_xxx", "keepAlive": true}
+{"sessionID": "ses_xxx", "keepAlive": true, "sandboxId": null}
 ```
+
+- `sandboxId`：`boot:true` 且沙箱创建成功时返回沙箱 ID；其余情况为 `null`
 
 #### `GET /session/:sessionID/keep-alive`
 

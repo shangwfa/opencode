@@ -200,9 +200,314 @@ send_and_verify "$SID" "项目是 Vite + React 应用，运行在沙箱的 /work
 - T18.9d 的 PG 中每个 bash 工具调用耗时不应超过 30 秒；AI 最终应完成任务（找到端口状态），而非卡在 `command not found` 上无限重试。
 - PG 中 T18.9a/T18.9c 的 tool 耗时不应超过 30 秒。
 
-### PG 验证（推荐）
+### T18.10 sandbox 生命周期与文件 I/O 健壮性
 
-> 解析 `POST /message` 响应只能看到 user message。验证 assistant 的 tool 调用应直接查 PG `part` 表：
+> 该组用例覆盖 sandbox 不可用时的快速失败、文件 I/O 超时销毁、stuck tool watchdog、以及权限等待阻塞等问题。这些问题会导致会话永久卡在 `running` 状态。
+
+#### T18.10a sandbox 不可用时 read/write 直接报错
+
+> **背景**：SaaS 模式下 read/write 必须通过 sandbox 访问文件。当 sandbox 初始化失败或不可用时，工具应立即返回错误，不得 fallback 到本地文件系统。
+
+```bash
+# 模拟 sandbox 不可用：通过 DB 将 sandbox 标记为 destroyed，再发 read/write 请求
+psql "$PGURL" -c "
+UPDATE sandbox SET state='destroyed', time_updated=$(date +%s%3N)
+WHERE session_id='$SID';
+"
+
+send_and_verify "$SID" "读取 /workspace/test.txt 的内容" "T18.10a-1: sandbox destroyed 后 read"
+
+# 期望：read 工具 status=error，错误信息包含 "Sandbox is not available" 或 "Failed to check path type"
+
+send_and_verify "$SID" "把 /workspace/test.txt 的内容改为 no-sandbox" "T18.10a-2: sandbox destroyed 后 write"
+
+# 期望：write 工具 status=error，错误信息包含 "Sandbox is not available" 或 "Sandbox initialization failed"
+
+# 恢复：删除 sandbox 记录，让下次工具调用自动重建
+psql "$PGURL" -c "DELETE FROM sandbox WHERE session_id='$SID';"
+```
+
+**期望**：
+- read/write 在 sandbox 不可用时 `status=error`，不出现 `running` 卡死。
+- 错误信息明确指出 sandbox 不可用，而不是 `undefined is not an object`。
+- 恢复 sandbox 记录后，后续工具调用能正常重建 sandbox 并 completed。
+
+#### T18.10b read/write 文件 I/O 超时销毁
+
+> **背景**：opensandbox 文件通道偶发 hung，`sb.files.readFile()` 或 `sb.files.writeFiles()` 的 Promise 永久 pending。工具层增加了 60s timeout，timeout 后 destroy 当前 sandbox，下次调用自动重建。
+
+```bash
+# 1. 确认当前 sandbox 正常工作
+send_and_verify "$SID" "读取 /workspace/test.txt" "T18.10b-1: 正常 read（基线）"
+
+# 2. 记录当前 sandbox ID
+OLD_SB_ID=$(psql "$PGURL" -t -A -c "SELECT id FROM sandbox WHERE session_id='$SID' AND state='running' LIMIT 1;")
+echo "OLD_SB_ID: $OLD_SB_ID"
+
+# 3. 模拟文件通道 hung（如果 sandbox 支持 network policy 或手动 hang）：
+#    方式 A：在 sandbox 内执行一个占用文件锁的死循环
+#    方式 B：直接通过 sandbox API 断开文件通道
+#    这里用方式 A：
+send_and_verify "$SID" "用 bash 执行，background 必须为 true: while true; do sleep 3600; done" "T18.10b-2: 占用 sandbox"
+
+# 4. 在 PG 中确认旧 sandbox 被 destroy 后重建
+sleep 5
+NEW_SB_ID=$(psql "$PGURL" -t -A -c "SELECT id FROM sandbox WHERE session_id='$SID' AND state='running' LIMIT 1;")
+echo "NEW_SB_ID: $NEW_SB_ID"
+
+# 期望：如果 timeout destroy 生效，NEW_SB_ID 可能与 OLD_SB_ID 不同（重建后）
+# 或 OLD_SB_ID 的记录被标记为 destroyed 后重新 upsert
+```
+
+**期望**：
+- 正常 read completed（基线确认）。
+- 如果文件 I/O 真正 hung（需要真实 sandbox 环境），60s 后工具返回 `status=error`，错误信息包含 `Read timed out` 或 `Write timed out`。
+- timeout 后 sandbox 被 destroy，日志中出现 `sandbox-provider ... destroying sandbox` 和 `sandbox destroyed`。
+- 后续工具调用能自动重建 sandbox 并 completed。
+
+#### T18.10c stuck tool watchdog 自动恢复
+
+> **背景**：session watchdog 每 60s 扫描最近 1 小时的 tool part，将 `status=running` 且 `time.start` 超过 5 分钟的工具标记为 `status=error`。用于兜底所有未被工具层 timeout 捕获的卡死场景。
+
+```bash
+# 1. 构造一个 stuck tool：手动在 PG 插入一个 running 状态、start 时间为 6 分钟前的 tool part
+STUCK_PART_ID="prt_test_stuck_$(date +%s)"
+MSG_ID=$(psql "$PGURL" -t -A -c "SELECT id FROM message WHERE session_id='$SID' ORDER BY time_created DESC LIMIT 1;")
+SIX_MIN_AGO=$(($(date +%s%3N) - 360000))
+
+psql "$PGURL" -c "
+INSERT INTO part (id, session_id, message_id, time_created, time_updated, data)
+VALUES (
+  '$STUCK_PART_ID',
+  '$SID',
+  '$MSG_ID',
+  $(date +%s%3N),
+  $(date +%s%3N),
+  '{\"type\":\"tool\",\"tool\":\"read\",\"callID\":\"call_stuck_test\",\"state\":{\"status\":\"running\",\"input\":{\"filePath\":\"/workspace/test.txt\"},\"time\":{\"start\":$SIX_MIN_AGO}}}'::jsonb
+);
+"
+
+echo "Inserted stuck part: $STUCK_PART_ID (start=$((SIX_MIN_AGO)))"
+
+# 2. 等待 watchdog 扫描（最多 70s）
+echo "Waiting for watchdog scan (up to 70s)..."
+for i in $(seq 1 14); do
+  sleep 5
+  STATUS=$(psql "$PGURL" -t -A -c "SELECT data->'state'->>'status' FROM part WHERE id='$STUCK_PART_ID';")
+  echo "  [$((i*5))s] status=$STATUS"
+  if [ "$STATUS" = "error" ]; then
+    echo "Watchdog recovered stuck tool after ~$((i*5))s"
+    break
+  fi
+done
+
+# 3. 验证 watchdog 标记
+RESULT=$(psql "$PGURL" -t -A -c "
+SELECT data->'state'->>'status', data->'state'->>'error'
+FROM part WHERE id='$STUCK_PART_ID';
+")
+echo "Final: $RESULT"
+```
+
+**期望**：
+- 插入的 stuck tool part 初始 `status=running`。
+- watchdog 在 60-70s 内将其标记为 `status=error`。
+- `error` 字段包含 `timed out after 5min (watchdog)`。
+- 容器日志中出现 `service=watchdog ... stuck=1 ... watchdog scan completed`。
+
+#### T18.10d 权限等待不阻塞会话
+
+> **背景**：HTTP API 模式下没有 UI 回答权限请求。如果全局权限未配置为 allow，`write/edit/bash` 等工具会在 `Permission.ask` 中永久 pending。需提前配置全局权限。
+
+```bash
+# 1. 确认全局权限已配置
+curl -s "$BASE/global/config" | python3 -c "
+import json, sys
+cfg = json.load(sys.stdin)
+perm = cfg.get('permission', {})
+required = ['bash', 'edit', 'write', 'read', 'glob', 'grep', 'list']
+missing = [k for k in required if perm.get(k) != 'allow']
+if missing:
+    print(f'❌ Missing permissions: {missing}')
+    sys.exit(1)
+print('✅ All required permissions are allow')
+"
+
+# 2. 发送一个 write 请求，验证不被权限阻塞
+TIME_START=$(date +%s)
+send_and_verify "$SID" "用 write 工具创建 /workspace/perm-test.txt 内容是 ok" "T18.10d: 权限不阻塞 write"
+TIME_END=$(date +%s)
+DURATION=$((TIME_END - TIME_START))
+echo "  耗时: ${DURATION}s"
+
+# 3. PG 验证 write 状态
+WRITE_STATUS=$(psql "$PGURL" -t -A -c "
+SELECT data->'state'->>'status'
+FROM part
+WHERE session_id='$SID' AND data->>'tool'='write'
+  AND data->'state'->'input'->>'filePath' LIKE '%perm-test.txt%'
+ORDER BY time_created DESC LIMIT 1;
+")
+echo "  write status: $WRITE_STATUS"
+```
+
+**期望**：
+- 全局权限配置检查通过。
+- write 请求在 30s 内 completed（不被权限 ask 阻塞）。
+- PG 中 write `status=completed`，不出现 `status=running`。
+
+#### T18.10e sandbox cache invalidate 一致性
+
+> **背景**：sandbox provider 维护内存缓存（`sbCache`，TTL 30s）。destroy 操作必须 invalidate 缓存，否则后续 getOrCreate 返回已销毁的 sandbox 对象。PG 层的 `destroy`/`destroyById`/`destroyAll` 均已补齐 `invalidateCachedSandbox`。
+
+```bash
+# 1. 正常创建文件
+send_and_verify "$SID" "用 write 创建 /workspace/cache-test.txt 内容是 v1" "T18.10e-1: 写入 v1"
+
+# 2. 手动 destroy sandbox（触发 cache invalidate）
+curl -s -X POST "$BASE/session/$SID/sandbox/destroy" > /dev/null 2>&1 || true
+# 如果没有 destroy 端点，通过 DB 标记 + 等待 cache TTL 过期
+psql "$PGURL" -c "UPDATE sandbox SET state='destroyed' WHERE session_id='$SID';" 2>/dev/null || true
+sleep 31  # 等 cache TTL 过期
+
+# 3. 再次写入，验证 sandbox 重建
+send_and_verify "$SID" "用 write 创建 /workspace/cache-test2.txt 内容是 v2" "T18.10e-2: cache invalidate 后重建"
+
+# 4. PG 验证
+SB_COUNT=$(psql "$PGURL" -t -A -c "SELECT count(*) FROM sandbox WHERE session_id='$SID' AND state='running';")
+echo "Running sandbox count: $SB_COUNT"
+```
+
+**期望**：
+- destroy 后 cache 被 invalidate，不返回旧 sandbox 对象。
+- 后续工具调用触发 sandbox 重建（新 sandboxID 或旧 ID 重新 connect）。
+- 容器日志中出现 `sandbox-provider ... getOrCreate start` → `reconnect done` 或 `createSandbox done`。
+- 最终 `SB_COUNT=1`（不会出现两个 running sandbox）。
+
+### T18.11 并发工具调用竞态验证
+
+> **背景**：AI SDK 在 LLM 返回同一 step 的多个 tool call 时会**并发**调用各工具的 `execute()`。当前实现中 read/write/edit 走 `sb.files` API 不经过 semaphore → 可以并发；bash/grep/glob 走 `runInSession` 受 `Semaphore(1)` 约束 → 串行。**竞态控制由模型实现**——模型自行决定是否在同一 step 对同一文件发起多个操作。本节测试目的是观察模型实际行为和系统在并发下的表现，而非判定系统 BUG。
+
+#### T18.11a 不同文件并发 write（安全基线）
+
+```bash
+send_and_verify "$SID" "一次性创建 3 个文件：/workspace/concurrent-x.txt 内容 XXX，/workspace/concurrent-y.txt 内容 YYY，/workspace/concurrent-z.txt 内容 ZZZ。不要一个一个创建，同时创建" "T18.11a: 不同文件并发 write"
+```
+
+**PG 时间线验证**：
+```bash
+psql "$PGURL" -c "
+SELECT data->>'tool',
+  data->'state'->'input'->>'filePath' AS file_path,
+  to_timestamp((data->'state'->'time'->>'start')::bigint/1000)::time AS start_t,
+  (data->'state'->'time'->>'end')::bigint - (data->'state'->'time'->>'start')::bigint AS dur_ms
+FROM part
+WHERE session_id='$SID' AND data->>'tool'='write'
+  AND data->'state'->'input'->>'filePath' LIKE '/workspace/concurrent-%'
+ORDER BY (data->'state'->'time'->>'start')::bigint;
+"
+```
+
+**期望**：3 个 write 的 `start_t` 在同一秒或相邻秒 → 确认并发。三个文件最终内容各自正确。
+
+#### T18.11b 同一文件并发 write（竞态场景）
+
+```bash
+# 先创建目标文件
+send_and_verify "$SID" "用 write 创建 /workspace/race.txt，内容是 3 行：line1-alpha、line2-alpha、line3-alpha" "T18.11b-0: 准备 race.txt"
+
+# 让 LLM 同时修改同一文件的两处
+send_and_verify "$SID" "同时执行两个操作：1) 把 /workspace/race.txt 第一行改成 line1-beta  2) 把 /workspace/race.txt 第三行改成 line3-beta。两个操作必须同时发起，不要等第一个完成再做第二个" "T18.11b: 同一文件并发 write"
+```
+
+**PG 时间线 + 内容验证**：
+```bash
+psql "$PGURL" -c "
+SELECT data->>'tool',
+  data->'state'->'input'->>'filePath' AS file_path,
+  substring(data->'state'->'input'->>'content', 1, 50) AS content_preview,
+  to_timestamp((data->'state'->'time'->>'start')::bigint/1000)::time AS start_t,
+  to_timestamp((data->'state'->'time'->>'end')::bigint/1000)::time AS end_t
+FROM part
+WHERE session_id='$SID' AND data->>'tool' IN ('write','edit')
+  AND data->'state'->'input'->>'filePath' LIKE '%race.txt'
+  AND data->'state'->'time'->>'start' IS NOT NULL
+ORDER BY (data->'state'->'time'->>'start')::bigint;
+"
+
+send_and_verify "$SID" "用 bash 执行: cat /workspace/race.txt" "T18.11b-verify: 检查最终内容"
+```
+
+**观察点**：
+- 记录模型是否在同一 step 发起两个 tool call（并发），还是分两步串行。
+- 如果并发：后完成的覆盖先完成的，只有一处修改生效 → 记录为"模型选择并发，系统未拦截，结果丢失一处修改"。
+- 如果串行：两处修改都生效 → 记录为"模型选择串行"。
+- **注意**：系统层不做竞态拦截，并发下的结果由模型行为决定。
+
+#### T18.11c write + read 同一文件并发
+
+```bash
+send_and_verify "$SID" "同时做两件事：1) 把 /workspace/race.txt 的内容改成 OVERWRITTEN  2) 读取 /workspace/race.txt 的内容。两件事同时发起" "T18.11c: write+read 同一文件并发"
+```
+
+**PG 时间线验证**：
+```bash
+psql "$PGURL" -c "
+SELECT data->>'tool',
+  to_timestamp((data->'state'->'time'->>'start')::bigint/1000)::time AS start_t,
+  to_timestamp((data->'state'->'time'->>'end')::bigint/1000)::time AS end_t,
+  substring(coalesce(data->'state'->>'output',''), 1, 60) AS output_preview
+FROM part
+WHERE session_id='$SID' AND data->>'tool' IN ('write','read')
+  AND data->'state'->'input'->>'filePath' LIKE '%race.txt'
+  AND data->'state'->'time'->>'start' IS NOT NULL
+ORDER BY (data->'state'->'time'->>'start')::bigint DESC LIMIT 5;
+"
+```
+
+**观察点**：
+- 如果 write 和 read 并发 → read 可能读到旧内容而非 `OVERWRITTEN` → 记录为"模型选择并发，read 读到旧内容"。
+- 如果串行 → read 读到 `OVERWRITTEN` → 记录为"模型选择串行"。
+- **注意**：系统层不做读写一致性保证，结果由模型行为决定。
+
+#### T18.11d 多 bash 命令串行化验证
+
+```bash
+send_and_verify "$SID" "同时执行 3 个独立的 bash 工具调用（不要用 && 或 ; 连接，用三个独立的 bash 工具调用）：第一个执行 echo CMD1 && sleep 2，第二个执行 echo CMD2 && sleep 2，第三个执行 echo CMD3 && sleep 2" "T18.11d: 多 bash 命令并发"
+```
+
+**PG 时间线验证**：
+```bash
+psql "$PGURL" -c "
+SELECT data->>'tool',
+  substring(data->'state'->'input'->>'command', 1, 40) AS cmd,
+  to_timestamp((data->'state'->'time'->>'start')::bigint/1000)::time AS start_t,
+  to_timestamp((data->'state'->'time'->>'end')::bigint/1000)::time AS end_t,
+  (data->'state'->'time'->>'end')::bigint - (data->'state'->'time'->>'start')::bigint AS dur_ms
+FROM part
+WHERE session_id='$SID' AND data->>'tool'='bash'
+  AND data->'state'->'input'->>'command' LIKE '%CMD%'
+  AND data->'state'->'time'->>'start' IS NOT NULL
+ORDER BY (data->'state'->'time'->>'start')::bigint;
+"
+```
+
+**期望**：
+- 3 个 bash 的 `start_t`/`end_t` **不重叠**（第二个 start ≥ 第一个 end）→ 确认 semaphore(1) 生效。
+- 总耗时 ≈ 3 × 单个耗时（串行累加），而非并发 max。
+
+#### T18.11 竞态判定标准
+
+| 现象 | 判定 | 说明 |
+|------|------|------|
+| T18.11a：3 个 write start 在同一秒 | 并发确认 | 文件 API 无锁，不同文件安全 |
+| T18.11b：模型在同一 step 对同一文件发起两个操作 | 行为记录 | 系统正确执行并发请求，结果由模型行为决定 |
+| T18.11b：模型分两步串行执行 | 行为记录 | 模型自行选择了串行 |
+| T18.11c：read 在 write 完成前启动 | 行为记录 | 系统正确执行并发请求，read 可能读到旧内容 |
+| T18.11d：3 个 bash 的 start/end 有重叠 | **semaphore 失效** | command session 并发会致 shell 输出混乱，这是系统层约束 |
+| T18.11d：3 个 bash 串行（无重叠） | 正常 | semaphore(1) 生效 |
+
+
 
 ```bash
 # 验证各工具调用次数和状态（按实际 OPENCODE_DATABASE_URL 调整连接方式）
@@ -280,6 +585,11 @@ ORDER BY p.time_created;
 | `write /workspace/app/src/App.tsx` completed，但 `bash cat /workspace/app/src/App.tsx` 仍是旧内容 | FAIL | `/workspace/app` 被路径映射折叠成 `/workspace`，实际写到 `/workspace/src/App.tsx` |
 | `workdir=/workspace/app` 执行 `npm run build` 报 `/workspace/package.json` 不存在 | FAIL | `toSandboxCwd` 把已在 sandbox 内的 cwd 二次映射成 `/workspace` |
 | `bash ss -tlnp` 挂起 28 分钟才返回 `command not found` | FAIL | stderr 中 `command not found` 未触发快速失败，shell tool 等到 timeout 才返回 |
+| read/write 在 sandbox 不可用时返回 `undefined is not an object` | FAIL | 工具层未检查 sandbox resolve 值是否为 null |
+| read/write `status=running` 超过 60s 且无 timeout 日志 | FAIL | sandbox 文件 I/O Promise 永久 pending，工具层缺少 timeout |
+| tool `status=running` 超过 5 分钟未恢复 | FAIL | watchdog 未扫描到 stuck tool，或扫描间隔/窗口配置错误 |
+| write `status=running` 且容器日志无 `permission ... evaluated` | FAIL | HTTP API 模式下全局权限未配置 allow，Permission.ask 永久 pending |
+| destroy sandbox 后 getOrCreate 返回旧对象导致 `sb.files is undefined` | FAIL | destroy 未 invalidate 内存缓存（sbCache） |
 | 只有最终 assistant 文本，没有 tool part | FAIL | 模型未调用工具或工具注册失败 |
 | PG 中 tool status=error | FAIL | 需要查看 `state.output` 和 sandbox/server 日志 |
 
@@ -304,6 +614,11 @@ ORDER BY p.time_created;
 | T18.7 | ✅ | 完整消息流验证通过：父 session 共 66 条消息，结构按 `user text → tool → assistant text` 交替出现，所有 tool part 状态为 completed |
 | T18.8 | ✅ | 子项目路径映射回归通过：write/edit/read 正确写入 `/workspace/app/src/App.tsx`，sentinel 未泄露到 `/workspace/src`；bash workdir 正确保留 `/workspace/app` |
 | T18.9 | ✅ | bash 命令不存在快速失败：`ss: command not found` 在 2 秒内返回而非等待 28 分钟；`lsof` 失败后 AI 自动尝试 `netstat` → `ps aux | grep` → 完成端口检查任务，全程 < 10 秒 |
+| T18.10a | ⏳ | sandbox 不可用时 read/write 直接报错，不 fallback 到本地文件系统 |
+| T18.10b | ⏳ | read/write 文件 I/O 60s timeout 后 destroy sandbox 并自动重建 |
+| T18.10c | ⏳ | watchdog 检测 stuck tool（running > 5min）并标记为 error |
+| T18.10d | ⏳ | 全局权限配置 allow，write 不被权限 ask 阻塞 |
+| T18.10e | ⏳ | sandbox cache invalidate 后 destroy → 重建一致性 |
 
 **本轮全量回归环境**：宿主机 opencode server `127.0.0.1:14097`，PG auth，OpenSandbox Docker runtime `127.0.0.1:8080`，sandbox image `opencode-opensandbox:local`，`OPENCODE_SANDBOX_USE_SERVER_PROXY=false`，`OPENCODE_EXPERIMENTAL_BACKGROUND_SUBAGENTS=true`，session `ses_15d763272ffeVyMjgYRDGWX3bu`。
 

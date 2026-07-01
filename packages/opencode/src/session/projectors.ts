@@ -112,8 +112,10 @@ export function toPartialRow(info: DeepPartial<Session.Info>) {
 
 export default [
   SyncEvent.project(toSyncDefinition(Session.Event.Created), async (db, data: any) => {
+    const row = Session.toRow(data.info as Session.Info)
     await db.insert(SessionTable)
-      .values(Session.toRow(data.info as Session.Info))
+      .values(row)
+      .onConflictDoUpdate({ target: SessionTable.id, set: row })
       .run()
 
     if (data.info.workspaceID) {

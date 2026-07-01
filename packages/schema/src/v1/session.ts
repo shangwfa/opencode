@@ -540,11 +540,15 @@ const SessionModel = Schema.Struct({
   variant: optional(Schema.String),
 })
 
+const PvcMode = Schema.Literals(["session", "app"])
+
 export const SessionInfo = Schema.Struct({
   id: SessionID,
   slug: Schema.String,
   projectID: Project.ID,
   workspaceID: optional(WorkspaceID),
+  pvcMode: optional(PvcMode),
+  appId: optional(Schema.String),
   directory: Schema.String,
   path: optional(Schema.String),
   parentID: optional(SessionID),
