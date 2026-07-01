@@ -275,6 +275,7 @@ export namespace SandboxProvider {
       const commandSemaphores = new Map<string, Semaphore.Semaphore>()
       const createRef = yield* Ref.make(new Map<string, Deferred.Deferred<Sandbox, Error>>())
       const sessionRef = yield* Ref.make(new Map<string, Deferred.Deferred<string, Error>>())
+      const leases = new Set<string>()
 
       const connectionConfig = new ConnectionConfig({
         domain: config.domain,
