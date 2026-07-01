@@ -556,7 +556,6 @@ console.log("API stdout 长度:", r.stdout?.length)
 - API 返回完整 stdout（100000 字符）
 - PG exec_log stdout 截断到 ~65551（65536 + `...[truncated]` 标记）
 
->>>>>>> 15bb3bbbb7 (feat(sandbox): exec API 命令执行日志持久化到 exec_log 表)
 ---
 
 ### API 接口详情
