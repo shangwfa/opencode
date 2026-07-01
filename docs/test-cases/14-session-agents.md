@@ -2004,3 +2004,192 @@ console.log("═".repeat(50))
 | T16.30 | ✅ | VCS Diff 沙箱重建：销毁后自动重建，两次 diff 结果一致（src/App.tsx +1） |
 
 **结论**：路径泄露修复（11 文件 + session-lock + PATCH directory）对 Session Agent 功能无影响，T16.1–T16.30 全部通过。
+
+---
+
+## 子任务（subagent task）专项测试
+
+> 验证 watchdog MONITORED_TOOLS 修复、background.start+wait 新模式、keepAlive destroy 清理对 subagent 执行链路的影响。
+
+### T-SUB-1 单 subagent 基础调用
+
+```bash
+BASE="http://localhost:14096"
+SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+curl -s -X POST "$BASE/session/$SID/agents/create" -H 'Content-Type: application/json' \
+  -d '{"name":"translator","mode":"subagent","prompt":"翻译成英文，只输出翻译结果","description":"translator"}'
+
+curl -s --max-time 120 -X POST "$BASE/session/$SID/message" \
+  -H 'Content-Type: application/json' \
+  -d '{"parts":[{"type":"text","text":"@translator 翻译：你好世界"}],"model":{"providerID":"zhipuai","modelID":"glm-5.1"}}' > /dev/null
+
+curl -s "$BASE/session/$SID/message" | python3 -c "
+import json,sys
+msgs=json.load(sys.stdin)
+tools=[]
+texts=[]
+for m in msgs:
+    for p in m.get('parts',[]):
+        if p.get('type')=='tool':
+            tools.append({'tool':p.get('tool',''),'status':p.get('state',{}).get('status','')})
+        elif p.get('type')=='text' and m.get('info',{}).get('role')=='assistant':
+            texts.append(p.get('text',''))
+full=' '.join(texts)
+has_task=any(t['tool']=='task' for t in tools)
+all_done=all(t['status']=='completed' for t in tools if t['tool']=='task')
+has_eng=any(w in full.lower() for w in ['hello','world'])
+print(f'tools: {tools}')
+print(f'text: {full[:200]}')
+print('✅ T-SUB-1 PASS' if has_task and all_done and has_eng else '❌ FAIL')
+"
+```
+**期望**：task 工具 status=completed，回复包含英文翻译
+
+---
+
+### T-SUB-2 子 session PG 持久化验证
+
+```bash
+BASE="http://localhost:14096"
+PG_URL="postgresql://ruomu@127.0.0.1:15432/opencode"
+
+CHILDREN=$(curl -s "$BASE/session/$SID/children" | python3 -c "import json,sys;print(len(json.load(sys.stdin)))")
+CSID=$(curl -s "$BASE/session/$SID/children" | python3 -c "import json,sys;print(json.load(sys.stdin)[0]['id'])")
+CMSG=$(curl -s "$BASE/session/$CSID/message" | python3 -c "import json,sys;print(len(json.load(sys.stdin)))")
+PG_PARENT=$(psql "$PG_URL" -t -A -c "SELECT parent_id FROM session WHERE id='$CSID'")
+PG_AGENT=$(psql "$PG_URL" -t -A -c "SELECT agent FROM session WHERE id='$CSID'")
+PG_MSG=$(psql "$PG_URL" -t -A -c "SELECT COUNT(*) FROM message WHERE session_id='$CSID'")
+echo "children: $CHILDREN, child msg: $CMSG, parent: $PG_PARENT, agent: $PG_AGENT, pg_msg: $PG_MSG"
+```
+**期望**：children=1，child 有 ≥2 条消息，PG parent_id 正确，agent=translator
+
+---
+
+### T-SUB-3 双 subagent 并行调用
+
+```bash
+BASE="http://localhost:14096"
+SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+curl -s -X POST "$BASE/session/$SID/agents/create" -H 'Content-Type: application/json' \
+  -d '{"name":"translator","mode":"subagent","prompt":"翻译成英文","description":"t"}' > /dev/null
+curl -s -X POST "$BASE/session/$SID/agents/create" -H 'Content-Type: application/json' \
+  -d '{"name":"coder","mode":"subagent","prompt":"写Python代码","description":"c"}' > /dev/null
+
+curl -s -o /dev/null -X POST "$BASE/session/$SID/prompt_async" \
+  -H 'Content-Type: application/json' \
+  -d '{"parts":[{"type":"text","text":"1. @translator 翻译「你好」 2. @coder 写 def add(a,b)"}],"model":{"providerID":"zhipuai","modelID":"glm-5.1"}}'
+
+# 轮询等待完成
+for i in $(seq 1 18); do
+  sleep 10
+  R=$(curl -s --max-time 5 "$BASE/session/$SID/message" | python3 -c "
+import json,sys
+try:
+    msgs=json.load(sys.stdin)
+    finish=msgs[-1].get('info',{}).get('finish','') if msgs else ''
+    if finish:
+        tools=[p.get('state',{}).get('status','') for m in msgs for p in m.get('parts',[]) if p.get('type')=='tool']
+        text=' '.join(p.get('text','') for m in msgs for p in m.get('parts',[]) if p.get('type')=='text')
+        print(f'DONE|statuses={tools}|text={text[:200]}')
+    else: print('running')
+except: print('running')
+")
+  echo "[$((i*10))s] $R" | head -1
+  echo "$R" | grep -q "^DONE" && break
+done
+```
+**期望**：两个 task 均 completed，回复包含英文翻译和 Python 代码
+
+---
+
+### T-SUB-4 watchdog 不误杀 task 工具
+
+```bash
+BASE="http://localhost:14096"
+SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+curl -s -X POST "$BASE/session/$SID/agents/create" -H 'Content-Type: application/json' \
+  -d '{"name":"slow","mode":"subagent","prompt":"思考后回复","description":"s"}'
+
+curl -s --max-time 180 -X POST "$BASE/session/$SID/message" \
+  -H 'Content-Type: application/json' \
+  -d '{"parts":[{"type":"text","text":"@slow 1+1=?"}],"model":{"providerID":"zhipuai","modelID":"glm-5.1"}}' > /dev/null
+
+curl -s "$BASE/session/$SID/message" | python3 -c "
+import json,sys
+msgs=json.load(sys.stdin)
+tools=[]
+for m in msgs:
+    for p in m.get('parts',[]):
+        if p.get('type')=='tool':
+            st=p.get('state',{})
+            tools.append({'tool':p.get('tool',''),'status':st.get('status',''),'error':str(st.get('error',''))[:100]})
+task_tools=[t for t in tools if t['tool']=='task']
+no_watchdog=not any('watchdog' in t.get('error','').lower() for t in task_tools)
+all_completed=all(t['status']=='completed' for t in task_tools)
+print(f'task tools: {task_tools}')
+print(f'no watchdog kill: {no_watchdog}, all completed: {all_completed}')
+print('✅ PASS' if no_watchdog else '❌ FAIL (watchdog killed task)')
+"
+```
+**期望**：task 工具不被 watchdog 误杀（无 "timed out after 300s (watchdog)" 错误）
+
+> **背景**：合并 upstream/dev 后，watchdog 的 `runningToolCondition` 缺少 `MONITORED_TOOLS` 过滤，导致 `task` 工具被纳入超时监控。task 执行时间通常 >60s（subagent AI 调用），而 watchdog 超时阈值为 `config.timeoutMs`（5min）。修复后 watchdog 只监控 `read/write/edit/apply_patch/glob/grep/ls` 等短工具。
+
+---
+
+### T-SUB-5 destroy 清理 keepAlive
+
+```bash
+BASE="http://localhost:14096"
+PG_URL="postgresql://ruomu@127.0.0.1:15432/opencode"
+
+SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+curl -s -m 60 -X POST "$BASE/session/$SID/exec" -H 'Content-Type: application/json' -d '{"command":"echo ok"}' > /dev/null
+curl -s -X POST "$BASE/session/$SID/keep-alive" -H 'Content-Type: application/json' -d '{"enabled":true}' > /dev/null
+
+KA_BEFORE=$(psql "$PG_URL" -t -A -c "SELECT keep_alive FROM sandbox WHERE session_id='$SID'")
+curl -s -X POST "$BASE/session/$SID/kill-sandbox" > /dev/null 2>&1
+sleep 2
+KA_AFTER=$(psql "$PG_URL" -t -A -c "SELECT keep_alive FROM sandbox WHERE session_id='$SID'")
+echo "before=$KA_BEFORE after=$KA_AFTER"
+```
+**期望**：destroy 前 keep_alive=t（true），destroy 后 keep_alive=f（false）
+
+> **背景**：pvc-mode 的 destroy 通过 `leases.delete(sessionID)` 清理内存 keepAlive 状态。合并后 PG 模式的 destroy 缺少 `dbSetKeepAlive(sessionID, false)` 调用，导致 sandbox 销毁后 PG 中 keep_alive 仍为 true。修复后在 destroy 中添加 `dbSetKeepAlive(sessionID, false)`。
+
+---
+
+### T-SUB-6 task 失败后主 agent 正常恢复
+
+```bash
+BASE="http://localhost:14096"
+SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+curl -s -X POST "$BASE/session/$SID/agents/create" -H 'Content-Type: application/json' \
+  -d '{"name":"broken","mode":"subagent","prompt":"总是回复 ERROR","description":"b"}'
+
+curl -s --max-time 120 -X POST "$BASE/session/$SID/message" \
+  -H 'Content-Type: application/json' \
+  -d '{"parts":[{"type":"text","text":"@broken 帮我写代码"}],"model":{"providerID":"zhipuai","modelID":"glm-5.1"}}' > /dev/null
+
+curl -s "$BASE/session/$SID/message" | python3 -c "
+import json,sys
+msgs=json.load(sys.stdin)
+finish=msgs[-1].get('info',{}).get('finish','') if msgs else ''
+print(f'finish: {finish}')
+print('✅ PASS' if finish else '❌ FAIL (session stuck)')
+"
+```
+**期望**：session 最终进入 idle/stop 状态，不永久 running
+
+---
+
+### 子任务专项测试结果
+
+| 用例 | 结果 | 说明 |
+|------|------|------|
+| T-SUB-1 单 subagent 调用 | ✅ | task(completed) → "Hello World" 翻译正确 |
+| T-SUB-2 子 session PG 持久化 | ✅ | child session 2 条消息，parent_id/agent 正确 |
+| T-SUB-3 双 subagent 并行 | ✅ | 两个 task 均 completed，翻译+代码，30s 完成 |
+| T-SUB-4 watchdog 不误杀 | ✅ | task 无 watchdog 超时错误 |
+| T-SUB-5 destroy 清理 keepAlive | ✅ | destroy 后 PG keep_alive 从 t→f |
+| T-SUB-6 失败后恢复 | ✅ | session finish=stop，不卡死 |

@@ -4,6 +4,10 @@
 
 也可以只连接远端 PG，使用本机 OpenSandbox server + Docker runtime 创建 sandbox 容器，避免依赖远端 K8s Sandbox API。
 
+第三种组合：本地 PG（Homebrew PostgreSQL）+ 远端 Sandbox API。适用于本地已有 PG 数据、但沙箱依赖远端 K8s 的场景。
+
+> **Docker runtime**：推荐使用 [OrbStack](https://orbstack.dev/) 替代 Docker Desktop——更轻量、启动快、镜像存储稳定。如果 Docker Desktop 出现 blob I/O error，切换到 OrbStack 即可（`docker context use orbstack`）。
+
 ---
 
 ## 一、基础设施架构
@@ -112,15 +116,27 @@ timeout 3 nc -z 172.18.32.15 30040 && echo "Sandbox API OK" || echo "Sandbox API
 lsof -i :15432 | grep LISTEN && echo "PG forward running" || echo "PG forward NOT running"
 lsof -i :30040 | grep LISTEN && echo "Sandbox forward running" || echo "Sandbox forward NOT running"
 
-# 启动 PG 转发（15432 → 172.18.32.14:5432）
+# ── 方案 A：本地 PG（Homebrew PostgreSQL on 127.0.0.1:5432）──
+# 适用于本地已有 PG 数据、只连远端 Sandbox API 的场景。
+kill $(lsof -ti :15432) 2>/dev/null  # 先停掉可能存在的远端 PG 转发
 nohup node -e "
 const net = require('net');
 net.createServer(c => {
-  const r = net.connect(5432, '172.18.32.14');
+  const r = net.connect(5432, '127.0.0.1');
   c.pipe(r); r.pipe(c);
   c.on('error', () => r.destroy()); r.on('error', () => c.destroy());
-}).listen(15432, '0.0.0.0', () => console.log('PG forward ready on :15432'));
-" > /tmp/pg-forward.log 2>&1 &
+}).listen(15432, '0.0.0.0', () => console.log('Local PG forward ready on :15432 -> 127.0.0.1:5432'));
+" > /tmp/pg-local-forward.log 2>&1 &
+
+# ── 方案 B：远端 PG（172.18.32.14:5432）──
+# nohup node -e "
+# const net = require('net');
+# net.createServer(c => {
+#   const r = net.connect(5432, '172.18.32.14');
+#   c.pipe(r); r.pipe(c);
+#   c.on('error', () => r.destroy()); r.on('error', () => c.destroy());
+# }).listen(15432, '0.0.0.0', () => console.log('PG forward ready on :15432'));
+# " > /tmp/pg-forward.log 2>&1 &
 
 # 启动 Sandbox API 转发（30040 → 172.18.32.15:30040）
 nohup node -e "
@@ -220,6 +236,7 @@ try {
 ```bash
 docker rm -f opencode-saas-test 2>/dev/null
 
+# 远端 PG + 远端 Sandbox（原始方案）
 docker run -d --name opencode-saas-test \
   -p 14096:4096 \
   -e OPENCODE_DATABASE_URL=postgresql://app:8zuhlMLd4gaeUG5k@host.docker.internal:15432/opencode \
@@ -232,6 +249,28 @@ sleep 10 && docker logs opencode-saas-test 2>&1 | tail -3
 # 期望：Warning: OPENCODE_SERVER_PASSWORD is not set
 #        opencode server listening on http://0.0.0.0:4096
 ```
+
+本地 PG + 远端 Sandbox（Step 1 方案 A 的配套）：
+
+```bash
+docker rm -f opencode-saas-test 2>/dev/null
+
+docker run -d --name opencode-saas-test \
+  -p 14096:4096 \
+  -e OPENCODE_DATABASE_URL=postgresql://app:8zuhlMLd4gaeUG5k@host.docker.internal:15432/opencode \
+  -e OPENCODE_SANDBOX_DOMAIN=host.docker.internal:30040 \
+  -e OPENCODE_SANDBOX_USE_SERVER_PROXY=true \
+  -e ZHIPU_API_KEY \
+  opencode-saas-sandbox-test:v2fix
+
+sleep 10 && docker logs opencode-saas-test 2>&1 | tail -3
+```
+
+> 本地 PG 场景需要：
+> - Step 1 方案 A（PG 转发到 127.0.0.1:5432）
+> - 本地 PG 有 `app` 用户（密码 `8zuhlMLd4gaeUG5k`）和 `opencode` 数据库
+> - `-e ZHIPU_API_KEY` 传递 API key（本地 PG 的 credential 表可能为空）
+> - 首次创建 session 前需要修复 SQLite schema（见常见问题表）
 
 如果使用本地 OpenSandbox server，改用：
 
@@ -274,20 +313,22 @@ env \
   bun run --conditions=browser ./src/index.ts serve --hostname 127.0.0.1 --port 14097 --print-logs --pure
 ```
 
+> ⚠️ **HTTP 代理注意**：如果宿主机设置了 `http_proxy`/`https_proxy`（如 clash、v2ray），curl 请求会被代理拦截导致所有 API 返回 500。所有 curl 命令必须加 `--noproxy '*'`，或设置 `export NO_PROXY=localhost,127.0.0.1`。
+
 ### Step 3：验证服务可用
 
 ```bash
-# 服务健康
-curl -s http://localhost:14096/ -o /dev/null -w "HTTP %{http_code}\n"  # 期望 200
+# 服务健康（注意 --noproxy 绕过本地代理）
+curl -s --noproxy '*' http://localhost:14096/ -o /dev/null -w "HTTP %{http_code}\n"  # 期望 200
 
 # 创建 session
-SID=$(curl -s -X POST http://localhost:14096/session \
+SID=$(curl -s --noproxy '*' -X POST http://localhost:14096/session \
   -H 'Content-Type: application/json' -d '{}' \
   | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
 echo "SID: $SID"
 
 # 验证 AI provider（期望看到 AI 文字回复）
-curl -s --max-time 30 -X POST "http://localhost:14096/session/$SID/message" \
+curl -s --noproxy '*' --max-time 30 -X POST "http://localhost:14096/session/$SID/message" \
   -H 'Content-Type: application/json' \
   -d '{"parts":[{"type":"text","text":"hello"}],"model":{"providerID":"zhipuai","modelID":"glm-5.1"}}' \
   | python3 -c "
@@ -298,24 +339,7 @@ for p in d.get('parts',[]):
 "
 ```
 
-### Step 3.5：配置权限（必须）
-
-> ⚠️ **如果不配置权限，所有工具调用（write/edit/bash 等）都会卡在权限等待状态**（默认 `"ask"`），HTTP API 模式下没有 UI 回复权限请求，工具永远 `running`。
-
-```bash
-# 通过全局 config API 配置权限（触发实例 dispose + 重新加载）
-curl -s -X PATCH http://localhost:14096/global/config \
-  -H 'Content-Type: application/json' \
-  -d '{"permission":{"bash":"allow","edit":"allow","write":"allow","glob":"allow","grep":"allow","list":"allow","read":"allow","webfetch":"allow"}}' \
-  | python3 -c "import json,sys;c=json.load(sys.stdin);print('permission:',json.dumps(c.get('permission')))"
-
-# 验证配置生效
-sleep 2
-curl -s http://localhost:14096/config | python3 -c "import json,sys;c=json.load(sys.stdin);print(c.get('permission'))"
-# 期望：{'read': 'allow', 'edit': 'allow', ...}
-```
-
-> 注意：`PATCH /global/config` 会触发实例 dispose，之前的 session 会失效。需要重新创建 session。
+> **权限配置**：当前版本默认权限已包含 `allow`，无需手动配置。如果遇到工具调用卡在 `running`，再通过 `PATCH /global/config` 配置权限（会触发实例 dispose，需重建 session）。
 
 ### Step 4：在沙箱中启动 dev server
 
@@ -502,7 +526,9 @@ POST /session/:sessionID/exec {"command":"nohup npx vite ... &"}
 | opencode 二进制 `required file not found` | Ubuntu/glibc 基础镜像复制了 `*-musl` 二进制 | `packages/opencode/docker/Dockerfile` 应复制 `dist/opencode-linux-arm64/bin/opencode` 或 `dist/opencode-linux-x64-baseline/bin/opencode` |
 | 本地 OpenSandbox 找不到镜像 | SaaS 容器指定的 image 名称不是 Docker daemon 中的本地镜像名 | 先 `docker images | grep opencode-opensandbox`，并设置 `OPENCODE_SANDBOX_IMAGE=opencode-opensandbox:local` |
 | 401 MISSING_API_KEY | proxy fetch 未带 API key | 检查代码是否有 `Flag.OPENCODE_SANDBOX_API_KEY` header 注入 |
-| ProviderModelNotFoundError | AI provider 未配置 | 确认容器连的是远端 PG（含 account 数据） |
+| ProviderModelNotFoundError | AI provider 未配置 | 确认容器连的是远端 PG（含 account 数据），或设置 `ZHIPU_API_KEY` 环境变量 |
+| 所有 API 返回 500 UnknownError | 宿主机 HTTP 代理（`http_proxy`）拦截 curl 请求 | curl 加 `--noproxy '*'`，或 `export NO_PROXY=localhost,127.0.0.1` |
+| POST /session 返回 500，错误 `table session has no column named pvc_mode` | SQLite migration 缺少合并后新增的 `pvc_mode`/`app_id` 列 | 手动添加列：`docker exec -u 0 <container> bun -e 'const {Database}=require("bun:sqlite");const d=new Database("/home/opencode/.local/share/opencode/opencode-local.db");d.run("ALTER TABLE session ADD COLUMN pvc_mode TEXT");d.run("ALTER TABLE session ADD COLUMN app_id TEXT");d.close()'` |
 | pg_advisory_lock 启动失败 | 远端 PG 被另一个 opencode 实例占用 | 等另一个实例退出，或停掉远端 SaaS |
 | dev server 进程消失 | 容器重启后 sandbox map 清空 | PVC 文件还在，重新发消息启动进程即可 |
 | psql 连接报 `role "app" does not exist` | TCP 转发的远端 PG 实例 role 配置与文档记录的 `app` 不一致 | 用 `\du` 查看 PG 实际 role 列表：`PGPASSWORD=xxx psql -h 127.0.0.1 -p 15432 -U postgres -d postgres -c '\du'`。或从 SaaS 容器内查：`docker exec opencode-saas-test env | grep DATABASE_URL` 获取实际连接串 |
