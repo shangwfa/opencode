@@ -931,6 +931,7 @@ export namespace SandboxProvider {
       const destroy: Interface["destroy"] = (sessionID) =>
         lock(sessionID, Effect.gen(function* () {
           invalidateCachedSandbox(sessionID)
+          yield* dbSetKeepAlive(sessionID, false).pipe(Effect.orElseSucceed(() => null))
           const inFlight = yield* Ref.modify(createRef, (m) => {
             const d = m.get(sessionID)
             if (d) m.delete(sessionID)

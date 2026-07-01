@@ -1472,18 +1472,7 @@ export const layer = Layer.effect(
           database[providerID] = parsed
         }
 
-        // load env
-        const envs = yield* env.all()
-        for (const [id, provider] of Object.entries(database)) {
-          const providerID = ProviderV2.ID.make(id)
-          if (disabled.has(providerID)) continue
-          const apiKey = provider.env.map((item) => envs[item]).find(Boolean)
-          if (!apiKey) continue
-          mergeProvider(providerID, {
-            source: "env",
-            key: provider.env.length === 1 ? apiKey : undefined,
-          })
-        }
+        // provider keys are read ONLY from the database (auth table), not from environment variables.
 
         // load apikeys
         const auths = yield* auth.all().pipe(Effect.orDie)

@@ -424,7 +424,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
     })
   }
 
-  for (const [key, item] of Object.entries(yield* mcp.tools())) {
+  for (const [key, item] of Object.entries(yield* mcp.toolsForSession(input.session.id))) {
     const execute = item.execute
     if (!execute) continue
 

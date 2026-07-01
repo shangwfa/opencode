@@ -146,6 +146,6 @@ export const defaultLayer = process.env["OPENCODE_DATABASE_URL"]
   ? pgLayer
   : layer.pipe(Layer.provide(FSUtil.defaultLayer))
 
-export const node = LayerNode.make({ service: Service, layer: layer, deps: [FSUtil.node] })
+export const node = LayerNode.make({ service: Service, layer: defaultLayer, deps: [FSUtil.node] })
 
 export * as Auth from "."

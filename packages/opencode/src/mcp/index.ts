@@ -1251,7 +1251,7 @@ export const defaultLayer = layer.pipe(
 
 export const node = LayerNode.make({
   service: Service,
-  layer: layer,
+  layer: defaultLayer,
   deps: [CrossSpawnSpawner.node, McpAuth.node, EventV2Bridge.node, Config.node],
 })
 

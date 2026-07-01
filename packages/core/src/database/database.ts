@@ -66,4 +66,4 @@ export const defaultLayer: Layer.Layer<Service> = Layer.suspend(() => {
   return layerFromPath(path()).pipe(Layer.provide(Global.defaultLayer))
 })
 
-export const node = makeGlobalNode({ service: Service, layer: layerFromPath(path()), deps: [] })
+export const node = makeGlobalNode({ service: Service, layer: defaultLayer, deps: [] })
