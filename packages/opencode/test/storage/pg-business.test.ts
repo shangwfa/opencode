@@ -17,6 +17,7 @@ import postgres from "postgres"
 import { Agent } from "../../src/agent/agent"
 import { Config } from "../../src/config/config"
 import * as CrossSpawnSpawner from "@opencode-ai/core/cross-spawn-spawner"
+import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { Project } from "../../src/project/project"
 import { provideTestInstance, disposeAllInstances } from "../fixture/fixture"
 import { Session } from "../../src/session/session"
@@ -59,11 +60,11 @@ const ref = {
 const it = testEffect(
   Layer.mergeAll(
     Agent.defaultLayer,
-    Config.defaultLayer,
-    CrossSpawnSpawner.defaultLayer,
+    LayerNode.compile(Config.node),
+    LayerNode.compile(CrossSpawnSpawner.node),
     Project.defaultLayer,
-    Session.defaultLayer,
-    Truncate.defaultLayer,
+    LayerNode.compile(Session.node),
+    LayerNode.compile(Truncate.node),
     ToolRegistry.defaultLayer,
   ) as any,
 )

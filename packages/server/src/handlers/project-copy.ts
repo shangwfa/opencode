@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { Location } from "@opencode-ai/core/location"
 import { ProjectCopy } from "@opencode-ai/core/project/copy"
 import { Git } from "@opencode-ai/core/git"

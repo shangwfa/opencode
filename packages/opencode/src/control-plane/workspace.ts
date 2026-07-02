@@ -34,8 +34,8 @@ import { waitEvent } from "./util"
 import { WorkspaceRef } from "@/effect/instance-ref"
 import { Vcs } from "@/project/vcs"
 import { InstanceStore } from "@/project/instance-store"
-import { InstanceBootstrap } from "@/project/bootstrap"
 import { WorkspaceAdapterRuntime } from "./workspace-adapter-runtime"
+import { AppNodeBuilderV1 } from "@/effect/app-node-builder-v1"
 import { WorkspaceEvent } from "@opencode-ai/schema/workspace-event"
 
 export const Info = Schema.Struct({
@@ -153,7 +153,7 @@ export class Service extends Context.Service<Service, Interface>()("@opencode/Wo
 
 export const use = serviceUse(Service)
 
-export const layer = Layer.effect(
+const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
     const auth = yield* Auth.Service
@@ -604,7 +604,7 @@ export const layer = Layer.effect(
                   }),
                 fallback: "",
                 response: "text",
-              }).pipe(Effect.provide(InstanceStore.defaultLayer.pipe(Layer.provide(InstanceBootstrap.defaultLayer))))
+              }).pipe(Effect.provide(AppNodeBuilderV1.build(InstanceStore.node)))
             : ""
 
         if (sourcePatch) {
@@ -620,7 +620,7 @@ export const layer = Layer.effect(
                 body: HttpBody.jsonUnsafe({ patch: sourcePatch }),
               }),
             fallback: { applied: false },
-          }).pipe(Effect.provide(InstanceStore.defaultLayer.pipe(Layer.provide(InstanceBootstrap.defaultLayer))))
+          }).pipe(Effect.provide(AppNodeBuilderV1.build(InstanceStore.node)))
         }
 
         if (input.workspaceID === null) {
@@ -886,19 +886,6 @@ export const layer = Layer.effect(
       startWorkspaceSyncing,
     })
   }),
-)
-
-export const defaultLayer = layer.pipe(
-  Layer.provide(Auth.defaultLayer),
-  Layer.provide(Session.defaultLayer),
-  Layer.provide(SessionPrompt.defaultLayer),
-  Layer.provide(Project.defaultLayer),
-  Layer.provide(Vcs.defaultLayer),
-  Layer.provide(FSUtil.defaultLayer),
-  Layer.provide(Database.defaultLayer),
-  Layer.provide(EventV2Bridge.defaultLayer),
-  Layer.provide(FetchHttpClient.layer),
-  Layer.provide(RuntimeFlags.defaultLayer),
 )
 
 const TIMEOUT = 5000

@@ -7,19 +7,21 @@ import { Effect, Context, Layer } from "effect"
 import type * as PlatformError from "effect/PlatformError"
 import type * as Scope from "effect/Scope"
 import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
+import { AppNodeBuilder } from "@opencode-ai/core/effect/app-node-builder"
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process"
-import { NodeFileSystem, NodePath } from "@effect/platform-node"
 import type { Config } from "@/config/config"
+import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { InstanceRef } from "../../src/effect/instance-ref"
 import { InstanceBootstrap } from "../../src/project/bootstrap-service"
 import type { InstanceContext } from "../../src/project/instance-context"
-import { InstanceRuntime } from "@/project/instance-runtime"
+import { InstanceRuntime } from "../../src/project/instance-runtime"
 import { InstanceStore } from "../../src/project/instance-store"
 import { TestLLMServer } from "../lib/llm-server"
 
-const infra = Layer.mergeAll(NodeFileSystem.layer, NodePath.layer)
 const noopBootstrap = Layer.succeed(InstanceBootstrap.Service, InstanceBootstrap.Service.of({ run: Effect.void }))
-export const testInstanceStoreLayer = InstanceStore.defaultLayer.pipe(Layer.provide(noopBootstrap), Layer.provide(infra))
+export const testInstanceStoreLayer = LayerNode.compile(InstanceStore.node, [
+  [InstanceStore.bootstrapNode, noopBootstrap],
+])
 
 export async function provideTestInstance<R>(input: {
   directory: string
@@ -181,11 +183,11 @@ export const disposeAllInstancesEffect = InstanceStore.Service.use((store) => st
 export function provideTmpdirInstance<A, E, R>(
   self: (path: string) => Effect.Effect<A, E, R>,
   options?: { git?: boolean; config?: Partial<ConfigV1.Info> | (() => Partial<ConfigV1.Info>) },
-): Effect.Effect<A, E, R | ChildProcessSpawner.ChildProcessSpawner | Scope.Scope> {
+) {
   return Effect.gen(function* () {
     const path = yield* tmpdirScoped(options)
     return yield* self(path).pipe(provideInstance(path))
-  }).pipe(Effect.provide(testInstanceStoreLayer)) as any
+  }).pipe(Effect.provide(testInstanceStoreLayer))
 }
 
 export class TestInstance extends Context.Service<TestInstance, { readonly directory: string }>()("@test/Instance") {}
@@ -202,18 +204,18 @@ export const withTmpdirInstance =
     config?: Partial<ConfigV1.Info> | (() => Partial<ConfigV1.Info>)
     init?: (directory: string) => Effect.Effect<void, E2, R2>
   }) =>
-  <A, E, R>(self: Effect.Effect<A, E, R>): Effect.Effect<A, E, R | TestInstance | ChildProcessSpawner.ChildProcessSpawner | Scope.Scope> =>
+  <A, E, R>(self: Effect.Effect<A, E, R>) =>
     Effect.gen(function* () {
       const directory = yield* tmpdirScoped(options)
       return yield* self.pipe(Effect.provideService(TestInstance, { directory }), provideInstanceEffect(directory))
-    }).pipe(Effect.provide(testInstanceStoreLayer), Effect.provide(CrossSpawnSpawner.defaultLayer)) as any
+    }).pipe(Effect.provide(testInstanceStoreLayer), Effect.provide(AppNodeBuilder.build(CrossSpawnSpawner.node)))
 
 export function provideTmpdirServer<A, E, R>(
   self: (input: { dir: string; llm: TestLLMServer["Service"] }) => Effect.Effect<A, E, R>,
   options?: { git?: boolean; config?: (url: string) => Partial<ConfigV1.Info> },
 ): Effect.Effect<
   A,
-  E | PlatformError.PlatformError,
+  unknown,
   R | TestLLMServer | ChildProcessSpawner.ChildProcessSpawner | Scope.Scope
 > {
   return Effect.gen(function* () {

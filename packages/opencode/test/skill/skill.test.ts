@@ -1,4 +1,5 @@
 import { describe, expect } from "bun:test"
+import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { Effect, Layer } from "effect"
 import { Skill } from "../../src/skill"
 import { Discovery } from "../../src/skill/discovery"
@@ -13,36 +14,22 @@ import { testEffect } from "../lib/effect"
 import path from "path"
 import fs from "fs/promises"
 
-const node = CrossSpawnSpawner.defaultLayer
+const node = LayerNode.compile(CrossSpawnSpawner.node)
 
-const it = testEffect(Layer.mergeAll(Skill.defaultLayer, node, testInstanceStoreLayer) as any)
+const it = testEffect(Layer.mergeAll(LayerNode.compile(Skill.node), node, testInstanceStoreLayer))
 const itWithoutClaudeCodeSkills = testEffect(
   Layer.mergeAll(
-    Skill.layer.pipe(
-      Layer.provide(Discovery.defaultLayer),
-      Layer.provide(Config.defaultLayer),
-      Layer.provide(EventV2Bridge.defaultLayer),
-      Layer.provide(FSUtil.defaultLayer),
-      Layer.provide(Global.layer),
-      Layer.provide(RuntimeFlags.layer({ disableClaudeCodeSkills: true })),
-    ),
+    LayerNode.compile(Skill.node, [[RuntimeFlags.node, RuntimeFlags.layer({ disableClaudeCodeSkills: true })]]),
     node,
     testInstanceStoreLayer,
-  ) as any,
+  ),
 )
 const itWithoutExternalSkills = testEffect(
   Layer.mergeAll(
-    Skill.layer.pipe(
-      Layer.provide(Discovery.defaultLayer),
-      Layer.provide(Config.defaultLayer),
-      Layer.provide(EventV2Bridge.defaultLayer),
-      Layer.provide(FSUtil.defaultLayer),
-      Layer.provide(Global.layer),
-      Layer.provide(RuntimeFlags.layer({ disableExternalSkills: true })),
-    ),
+    LayerNode.compile(Skill.node, [[RuntimeFlags.node, RuntimeFlags.layer({ disableExternalSkills: true })]]),
     node,
     testInstanceStoreLayer,
-  ) as any,
+  ),
 )
 
 async function createGlobalSkill(homeDir: string) {
@@ -328,7 +315,7 @@ description: A skill in the .claude/skills directory.
           expect(error._tag).toBe("Skill.NotFoundError")
           expect(error.name).toBe("missing-skill")
           expect(error.message).toContain('Skill "missing-skill" not found.')
-        }) as any,
+        }),
       { git: true },
     ),
   )

@@ -11,7 +11,6 @@ import { Git } from "./git"
 import { makeGlobalNode } from "./effect/app-node"
 import { Hash } from "./util/hash"
 import { ProjectDirectoryTable } from "./project/sql"
-import { ProjectDirectories } from "./project/directories"
 
 export const ID = Schema.String.pipe(
   Schema.brand("Project.ID"),
@@ -71,7 +70,7 @@ export interface Interface {
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/ProjectV2") {}
 
-export const layer = Layer.effect(
+const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
     const db = (yield* Database.Service).db
@@ -156,13 +155,8 @@ export const layer = Layer.effect(
   }),
 )
 
-export const defaultLayer = layer.pipe(
-  Layer.provide(Database.defaultLayer),
-  Layer.provide(FSUtil.defaultLayer),
-  Layer.provide(Git.defaultLayer),
-)
 export const node = makeGlobalNode({
   service: Service,
   layer: layer,
-  deps: [FSUtil.node, Git.node, ProjectDirectories.node],
-} as any)
+  deps: [FSUtil.node, Git.node, Database.node],
+})

@@ -12,6 +12,7 @@ import { Agent } from "../../src/agent/agent"
 import { Plugin } from "../../src/plugin"
 import { AppFileSystem } from "@opencode-ai/shared/filesystem"
 import * as CrossSpawnSpawner from "@opencode-ai/core/cross-spawn-spawner"
+import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { Ripgrep } from "@opencode-ai/core/ripgrep"
 import { SandboxProvider } from "../../src/tool/sandbox-provider"
 // TODO: merge-upstream — LSP namespace removed; use named imports from ../../src/lsp/lsp
@@ -29,12 +30,12 @@ import { ConnectionConfig, Sandbox } from "@alibaba-group/opensandbox"
 
 const runtime = ManagedRuntime.make(
   Layer.mergeAll(
-    CrossSpawnSpawner.defaultLayer,
+    LayerNode.compile(CrossSpawnSpawner.node),
     AppFileSystem.defaultLayer,
-    Plugin.defaultLayer,
-    Truncate.defaultLayer,
+    LayerNode.compile(Plugin.node),
+    LayerNode.compile(Truncate.node),
     Agent.defaultLayer,
-    Ripgrep.defaultLayer,
+    LayerNode.compile(Ripgrep.node),
     SandboxProvider.defaultLayer,
     // TODO: LSP removed
 //     LSP.defaultLayer,
@@ -43,9 +44,9 @@ const runtime = ManagedRuntime.make(
     // TODO: FileWatcher removed
 //     FileWatcher.defaultLayer,
     Bus.layer,
-    Format.defaultLayer,
-    Instruction.defaultLayer,
-  ),
+    LayerNode.compile(Format.node),
+    LayerNode.compile(Instruction.node),
+  ) as any,
 )
 
 const TEST_IMAGE = process.env["OPENCODE_SANDBOX_IMAGE"] || "opensandbox/code-interpreter-rg"

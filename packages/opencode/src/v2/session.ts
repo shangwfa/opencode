@@ -11,6 +11,7 @@ import { SessionEvent } from "@opencode-ai/core/session/event"
 import { V2Schema } from "@opencode-ai/core/v2-schema"
 import { optional } from "@opencode-ai/core/schema"
 import { EventV2 } from "@opencode-ai/core/event"
+import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { EventV2Bridge } from "@/event-v2-bridge"
 import { ModelV2 } from "@opencode-ai/core/model"
 import { ProviderV2 } from "@opencode-ai/core/provider"
@@ -377,6 +378,6 @@ export const layer = Layer.effect(
   }),
 )
 
-export const defaultLayer = layer.pipe(Layer.provide(EventV2Bridge.defaultLayer))
+export const defaultLayer = layer.pipe(Layer.provide(LayerNode.compile(EventV2Bridge.node)))
 
 export * as SessionV2 from "./session"

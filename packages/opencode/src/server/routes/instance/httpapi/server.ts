@@ -26,7 +26,6 @@ import { SessionMcp } from "@/mcp/session-mcp"
 import { Flag } from "@/flag/flag"
 import { Permission } from "@/permission"
 import { Installation } from "@/installation"
-import { InstanceLayer } from "@/project/instance-layer"
 import { Plugin } from "@/plugin"
 import { Project } from "@/project/project"
 import { ProjectV2 } from "@opencode-ai/core/project"
@@ -57,6 +56,7 @@ import { ToolRegistry } from "@/tool/registry"
 import { Truncate } from "@/tool/truncate"
 import { Worktree } from "@/worktree"
 import { Database } from "@opencode-ai/core/database/database"
+import { AppNodeBuilderV1 } from "@/effect/app-node-builder-v1"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { httpClient } from "@opencode-ai/core/effect/app-node-platform"
 import { EventV2 } from "@opencode-ai/core/event"
@@ -64,6 +64,7 @@ import { Npm } from "@opencode-ai/core/npm"
 import { PermissionSaved } from "@opencode-ai/core/permission/saved"
 import { SessionProjector } from "@opencode-ai/core/session/projector"
 import { SessionV2 } from "@opencode-ai/core/session"
+import { SessionExecution } from "@opencode-ai/core/session/execution"
 import * as SessionExecutionLocal from "@opencode-ai/core/session/execution/local"
 import { lazy } from "@/util/lazy"
 import { Vcs } from "@/project/vcs"
@@ -104,7 +105,7 @@ import { sessionHandlers } from "./handlers/session"
 import { syncHandlers } from "./handlers/sync"
 import { tuiHandlers } from "./handlers/tui"
 import { handlers } from "@opencode-ai/server/handlers"
-import { locationServiceMapLayer } from "@opencode-ai/core/location-services"
+import { buildLocationServiceMap, LocationServiceMap } from "@opencode-ai/core/location-services"
 import { layer as locationLayer } from "@opencode-ai/server/location"
 import { sessionLocationLayer } from "@opencode-ai/server/middleware/session-location"
 import { PtyEnvironment } from "@opencode-ai/server/pty-environment"
@@ -148,10 +149,10 @@ const cors = (_corsOptions?: CorsOptions) =>
 // - ptyConnectApiRoutes: typed WebSocket upgrade route with ticket-aware auth.
 // - instanceApiRoutes: remaining typed instance routes.
 // - uiRoute: raw catch-all fallback; auth is router middleware so public static assets can bypass it.
-const authOnlyRouterLayer = authorizationRouterMiddleware.layer.pipe(Layer.provide(ServerAuth.Config.defaultLayer))
-const httpApiAuthLayer = authorizationLayer.pipe(Layer.provide(ServerAuth.Config.defaultLayer))
-const ptyConnectHttpApiAuthLayer = ptyConnectAuthorizationLayer.pipe(Layer.provide(ServerAuth.Config.defaultLayer))
-const serverHttpApiAuthLayer = serverAuthorizationLayer.pipe(Layer.provide(ServerAuth.Config.defaultLayer))
+const authOnlyRouterLayer = authorizationRouterMiddleware.layer.pipe(Layer.provide(ServerAuth.Config.layer))
+const httpApiAuthLayer = authorizationLayer.pipe(Layer.provide(ServerAuth.Config.layer))
+const ptyConnectHttpApiAuthLayer = ptyConnectAuthorizationLayer.pipe(Layer.provide(ServerAuth.Config.layer))
+const serverHttpApiAuthLayer = serverAuthorizationLayer.pipe(Layer.provide(ServerAuth.Config.layer))
 const workspaceRoutingLive = workspaceRoutingLayer.pipe(Layer.provide(Socket.layerWebSocketConstructorGlobal))
 const rootApiRoutes = HttpApiBuilder.layer(RootHttpApi).pipe(
   Layer.provide([controlHandlers, controlPlaneHandlers, globalHandlers]),
@@ -286,6 +287,8 @@ const app = LayerNode.group([
 export function createRoutes(
   corsOptions?: CorsOptions,
 ): Layer.Layer<never, EffectConfig.ConfigError, RouteRequirements> {
+  const locationServiceMapV2 = buildLocationServiceMap()
+
   return Layer.mergeAll(
     rootApiRoutes,
     eventApiRoutes,
@@ -303,51 +306,12 @@ export function createRoutes(
       fenceLayer.pipe(Layer.provide(Database.defaultLayer)),
       cors(corsOptions),
       Database.defaultLayer,
-      Account.defaultLayer,
-      Agent.defaultLayer,
-      Auth.defaultLayer,
-      BackgroundJob.defaultLayer,
-      Command.defaultLayer,
-      Config.defaultLayer,
-      Format.defaultLayer,
-      LSP.defaultLayer,
-      LLM.defaultLayer,
-      Installation.defaultLayer,
-      MCP.defaultLayer,
+      Bus.defaultLayer,
       Flag.OPENCODE_DATABASE_URL ? SessionMcp.pgLayer : SessionMcp.noopLayer,
-      ModelsDev.defaultLayer,
-      Permission.defaultLayer,
-      Plugin.defaultLayer,
-      Project.defaultLayer,
-      ProjectV2.defaultLayer,
-      MoveSession.defaultLayer,
-      ProviderAuth.defaultLayer,
-      Provider.defaultLayer,
-      PtyTicket.defaultLayer,
-      Question.defaultLayer,
-      RuntimeFlags.defaultLayer,
       SandboxProvider.defaultLayer,
       LspAgent.layer,
-      Session.defaultLayer,
-      SessionCompaction.defaultLayer,
-      SessionPrompt.defaultLayer,
-      SessionRevert.defaultLayer,
-      SessionShare.defaultLayer,
-      SessionRunState.defaultLayer,
-      SessionStatus.defaultLayer,
-      SessionSummary.defaultLayer,
-      ShareNext.defaultLayer,
-      Snapshot.defaultLayer,
-      EventV2Bridge.defaultLayer,
-      EventV2.defaultLayer,
-      Skill.defaultLayer,
-      Todo.defaultLayer,
-      ToolRegistry.defaultLayer,
-      Vcs.defaultLayer,
-      Workspace.defaultLayer,
-      Worktree.appLayer,
-      FSUtil.defaultLayer,
       FetchHttpClient.layer,
+      AppNodeBuilderV1.build(MoveSession.node, [[LocationServiceMap.node, locationServiceMapV2]]),
       HttpServer.layerServices,
     ]),
     Layer.provide(Layer.succeed(CorsConfig)(corsOptions)),
@@ -357,29 +321,14 @@ export function createRoutes(
     Layer.provide(locationLayer),
     Layer.provide(PtyEnvironment.layer),
     Layer.provide(
-      SessionV2.defaultLayer.pipe(
-        Layer.provide(SessionExecutionLocal.defaultLayer),
-        Layer.provide(locationServiceMapLayer),
-      ),
+      AppNodeBuilderV1.build(SessionV2.node, [
+        [LocationServiceMap.node, locationServiceMapV2],
+        [SessionExecution.node, SessionExecutionLocal.node],
+      ]),
     ),
-    Layer.provide(locationServiceMapLayer),
-    Layer.provideMerge(RepositoryCache.defaultLayer),
+    Layer.provide(locationServiceMapV2),
 
-    Layer.provideMerge(
-      LayerNode.compile(app).pipe(
-        Layer.provide(locationLayer),
-        Layer.provideMerge(locationLayer),
-        Layer.provide(locationServiceMapLayer),
-        Layer.provideMerge(locationServiceMapLayer),
-        Layer.provideMerge(ProjectCopy.defaultLayer),
-        Layer.provideMerge(RepositoryCache.defaultLayer),
-        Layer.provideMerge(Bus.defaultLayer),
-        Layer.provideMerge(SessionStatus.defaultLayer),
-        Layer.provideMerge(Git.defaultLayer),
-        Layer.provideMerge(Database.defaultLayer),
-        Layer.provideMerge(Ripgrep.defaultLayer),
-      ),
-    ),
+    Layer.provide(AppNodeBuilderV1.build(app)),
   ) as any
 }
 

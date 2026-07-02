@@ -4,12 +4,13 @@ import { Config } from "../../src/config/config"
 import { Plugin } from "../../src/plugin"
 import { PtyPreparation } from "../../src/pty-preparation"
 import { Pty } from "@opencode-ai/core/pty"
+import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { Shell } from "../../src/shell/shell"
 import { testEffect } from "../lib/effect"
 
 Shell.preferred.reset()
 
-const it = testEffect(Layer.mergeAll(Config.defaultLayer, Plugin.defaultLayer))
+const it = testEffect(Layer.mergeAll(LayerNode.compile(Config.node), LayerNode.compile(Plugin.node)))
 const preparationIt = testEffect(
   Layer.mergeAll(
     Layer.mock(Config.Service)({ get: () => Effect.succeed({}) }),

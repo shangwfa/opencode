@@ -142,7 +142,7 @@ function mergeInfo(row: SessionAgent.Row, base?: Info): Info {
   return { ...info, native: base.native, hidden: base.hidden }
 }
 
-export const layer = Layer.effect(
+const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
     const config = yield* Config.Service
@@ -583,15 +583,16 @@ export const layer = Layer.effect(
 )
 
 export const defaultLayer = layer.pipe(
-  Layer.provide(Plugin.defaultLayer),
-  Layer.provide(Provider.defaultLayer),
+  Layer.provide(LayerNode.compile(Plugin.node)),
+  Layer.provide(LayerNode.compile(Provider.node)),
   Layer.provide(Auth.defaultLayer),
-  Layer.provide(Config.defaultLayer),
+  Layer.provide(LayerNode.compile(Config.node)),
   Layer.provide(Skill.defaultLayer),
   Layer.provide(locationServiceMapLayer),
-  Layer.provide(RuntimeFlags.defaultLayer),
+  Layer.provide(RuntimeFlags.layer()),
   Layer.provide(Flag.OPENCODE_DATABASE_URL ? SessionAgent.pgLayer : SessionAgent.noopLayer),
 )
+
 
 const locationServiceMapNode = LayerNode.make({
   service: LocationServiceMap.Service,

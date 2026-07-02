@@ -6,20 +6,21 @@ import { RuntimeFlags } from "../../src/effect/runtime-flags"
 import { Bus } from "../../src/bus"
 import { Config } from "../../src/config/config"
 import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
+import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { FileSystem } from "@opencode-ai/core/filesystem"
 import { Global } from "@opencode-ai/core/global"
 import { testEffect } from "../lib/effect"
 
 const testLayer = Layer.mergeAll(
   Skill.layer.pipe(
-    Layer.provide(Discovery.defaultLayer),
-    Layer.provide(Config.defaultLayer),
+    Layer.provide(LayerNode.compile(Discovery.node)),
+    Layer.provide(LayerNode.compile(Config.node)),
     Layer.provide(Bus.layer),
-    Layer.provide(FileSystem.layer),
-    Layer.provide(Global.layer),
+    Layer.provide(LayerNode.compile(FileSystem.node)),
+    Layer.provide(LayerNode.compile(Global.node)),
     Layer.provide(RuntimeFlags.layer({})),
   ),
-  CrossSpawnSpawner.defaultLayer,
+  LayerNode.compile(CrossSpawnSpawner.node),
 )
 
 const it = testEffect(testLayer)

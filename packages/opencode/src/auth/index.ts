@@ -50,7 +50,7 @@ export interface Interface {
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/Auth") {}
 
-export const layer = Layer.effect(
+const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
     const fsys = yield* FSUtil.Service
@@ -144,7 +144,7 @@ export const pgLayer = Layer.effect(
 
 export const defaultLayer = process.env["OPENCODE_DATABASE_URL"]
   ? pgLayer
-  : layer.pipe(Layer.provide(FSUtil.defaultLayer))
+  : layer.pipe(Layer.provide(LayerNode.compile(FSUtil.node)))
 
 export const node = LayerNode.make({ service: Service, layer: defaultLayer, deps: [FSUtil.node] })
 

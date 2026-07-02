@@ -3,6 +3,7 @@ import { Cause, Effect, Exit, Layer, Duration } from "effect"
 import path from "path"
 import { Agent } from "../../src/agent/agent"
 import * as CrossSpawnSpawner from "@opencode-ai/core/cross-spawn-spawner"
+import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { AppFileSystem } from "@opencode-ai/shared/filesystem"
 // TODO: merge-upstream — FileTime module removed
 // import { FileTime } from "../../src/file/time"
@@ -59,13 +60,13 @@ function mockSandboxProvider(runInSessionFn: (sessionID: string, command: string
 const baseLayers = Layer.mergeAll(
   Agent.defaultLayer,
   AppFileSystem.defaultLayer,
-  CrossSpawnSpawner.defaultLayer,
+  LayerNode.compile(CrossSpawnSpawner.node),
   // TODO: FileTime removed
 //   FileTime.defaultLayer,
-  Instruction.defaultLayer,
+  LayerNode.compile(Instruction.node),
   // TODO: LSP removed
 //   LSP.defaultLayer,
-  Truncate.defaultLayer,
+  LayerNode.compile(Truncate.node),
 )
 
 const it = testEffect(baseLayers as any)

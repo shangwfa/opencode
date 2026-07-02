@@ -27,6 +27,10 @@ export type DraftTab = {
 
 export type Tab = SessionTab | DraftTab
 
+type RecentTab = {
+  key?: string
+}
+
 export const draftHref = (draftID: string) => `/new-session?draftId=${encodeURIComponent(draftID)}`
 
 export const tabHref = (tab: Tab) =>
@@ -47,7 +51,7 @@ export const { use: useTabs, provider: TabsProvider } = createSimpleContext({
     const fallback = server.key
     const [store, setStore, _, ready] = persisted(
       {
-        ...Persist.global("tabs"),
+        ...Persist.window("tabs"),
         migrate: (value: unknown) => {
           if (!Array.isArray(value)) return value
           return value.map((tab) => {
@@ -58,6 +62,7 @@ export const { use: useTabs, provider: TabsProvider } = createSimpleContext({
       },
       createStore<Tab[]>([]),
     )
+    const [recent, setRecent, , recentReady] = persisted(Persist.window("tabs.recent"), createStore<RecentTab>({}))
 
     const params = useParams()
     const navigate = useNavigate()
@@ -65,6 +70,22 @@ export const { use: useTabs, provider: TabsProvider } = createSimpleContext({
     const memory = createTabMemory(getOwner())
 
     const closing = new Set<string>()
+    let recentWrite = 0
+    let recentValue: string | undefined
+
+    const recentKey = () => (recentWrite ? recentValue : recent.key)
+
+    const setRecentKey = (key: string | undefined) => {
+      const write = ++recentWrite
+      recentValue = key
+      if (recentReady()) {
+        setRecent("key", key)
+        return
+      }
+      void recentReady.promise?.then(() => {
+        if (write === recentWrite) setRecent("key", key)
+      })
+    }
 
     const removeDraftPersisted = (draftID: string) => {
       for (const key of draftPersistedKeys()) removePersisted(Persist.draft(draftID, key), platform)
@@ -73,7 +94,7 @@ export const { use: useTabs, provider: TabsProvider } = createSimpleContext({
     onCleanup(memory.dispose)
 
     createEffect(() => {
-      if (!ready()) return
+      if (!ready() || !recentReady()) return
       const servers = new Set(server.list.map(ServerConnection.key))
       const next = store.filter((tab) => servers.has(tab.server))
       if (next.length !== store.length) {
@@ -170,10 +191,11 @@ export const { use: useTabs, provider: TabsProvider } = createSimpleContext({
           setStore(
             produce((tabs) => {
               const index = tabs.findIndex((tab) => tab.type === "draft" && tab.draftID === draftID)
-              if (index !== -1) tabs[index] = { type: "session", ...session }
+              if (index !== -1) tabs[index] = next
             }),
           )
-          if (active) navigateTab({ type: "session", ...session })
+          if (recent.key === `draft:${draftID}`) setRecentKey(tabKey(next))
+          if (active) navigateTab(next)
         })
         memory.remove(`draft:${draftID}`)
         removeDraftPersisted(draftID)
@@ -187,6 +209,7 @@ export const { use: useTabs, provider: TabsProvider } = createSimpleContext({
       },
       removeServer(key: ServerConnection.Key) {
         const drafts = store.flatMap((tab) => (tab.type === "draft" && tab.server === key ? [tab.draftID] : []))
+        const removed = store.filter((tab) => tab.server === key).map(tabKey)
         setStore((tabs) => tabs.filter((tab) => tab.server !== key))
         for (const key of removed) memory.remove(key)
         if (recent.key && removed.includes(recent.key)) setRecentKey(undefined)
@@ -239,6 +262,7 @@ export const { use: useTabs, provider: TabsProvider } = createSimpleContext({
               else navigate("/")
             }),
           )
+          if (recent.key && removed.includes(recent.key)) setRecentKey(undefined)
         })
         for (const key of removed) memory.remove(key)
       },
@@ -265,6 +289,6 @@ export const { use: useTabs, provider: TabsProvider } = createSimpleContext({
       },
     }
 
-    return { ...actions, store, ready }
+    return { ...actions, store, ready, recentReady }
   },
 })

@@ -10,6 +10,7 @@ import type { SessionID } from "../../src/session/schema"
 import { tmpdir } from "../fixture/fixture"
 import { ProviderV2 } from "@opencode-ai/core/provider"
 import { ModelV2 } from "@opencode-ai/core/model"
+import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 
 const DB_URL = process.env.OPENCODE_DATABASE_URL
 if (!DB_URL) {
@@ -17,7 +18,7 @@ if (!DB_URL) {
   process.exit(0)
 }
 
-const runtime = ManagedRuntime.make(Layer.mergeAll(SessionAgent.layer, Session.defaultLayer, Bus.layer))
+const runtime = ManagedRuntime.make(Layer.mergeAll(SessionAgent.layer, LayerNode.compile(Session.node), Bus.layer) as any)
 const db = Database.Client()
 
 async function cleanup(sessionID: string) {

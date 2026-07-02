@@ -1,4 +1,8 @@
+import { makeGlobalNode } from "@opencode-ai/core/effect/app-node"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
+import { buildLocationServiceMap } from "@opencode-ai/core/location-services"
+import { LocationServiceMap } from "@opencode-ai/core/location-service-map"
+import { Location } from "@opencode-ai/core/location"
 import { Plugin } from "../plugin"
 import { Format } from "../format"
 import { LSP } from "@/lsp/lsp"
@@ -14,7 +18,7 @@ import { Service } from "./bootstrap-service"
 export { Service } from "./bootstrap-service"
 export type { Interface } from "./bootstrap-service"
 
-export const layer = Layer.effect(
+const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
     // Yield each bootstrap dep at layer init so `run` itself has R = never.
@@ -49,20 +53,26 @@ export const layer = Layer.effect(
   }),
 )
 
+const defaultLocationRef = { directory: "/workspace" } as Location.Ref
+const locationReplacements: LayerNode.Replacements = [
+  [LocationServiceMap.node, makeGlobalNode({ service: LocationServiceMap.Service, layer: buildLocationServiceMap(), deps: [] })],
+  [Location.node, Location.boundNode(defaultLocationRef)],
+]
+
 export const defaultLayer: Layer.Layer<Service> = (layer.pipe(
   Layer.provide([
-    Config.defaultLayer,
-    Format.defaultLayer,
-    LSP.defaultLayer,
-    Plugin.defaultLayer,
+    LayerNode.compile(Config.node, locationReplacements),
+    LayerNode.compile(Format.node, locationReplacements),
+    LayerNode.compile(LSP.node, locationReplacements),
+    LayerNode.compile(Plugin.node, locationReplacements),
     Project.defaultLayer,
-    ShareNext.defaultLayer,
-    Snapshot.defaultLayer,
-    Vcs.defaultLayer,
+    LayerNode.compile(ShareNext.node, locationReplacements),
+    LayerNode.compile(Snapshot.node, locationReplacements),
+    LayerNode.compile(Vcs.node, locationReplacements),
   ]),
-) as any) // TODO: Layer has unsatisfied service dependencies
+) as any)
 
-export const node = LayerNode.make({
+export const node = makeGlobalNode({
   service: Service,
   layer: layer,
   deps: [Config.node, Format.node, LSP.node, Plugin.node, Project.node, ShareNext.node, Snapshot.node, Vcs.node],

@@ -6,6 +6,7 @@ import { Session as SessionNs } from "../../src/session/session"
 import type { SessionID } from "../../src/session/schema"
 import type { Agent as AgentType } from "../../src/agent/agent"
 import { Log } from "@opencode-ai/core/util/log"
+import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { Database } from "../../src/storage/db"
 import { tmpdir } from "../fixture/fixture"
 
@@ -20,7 +21,7 @@ if (!enabled) {
 }
 
 function run<A, E>(fx: Effect.Effect<A, E, SessionNs.Service>) {
-  return Effect.runPromise(fx.pipe(Effect.provide(SessionNs.defaultLayer)))
+  return Effect.runPromise(fx.pipe(Effect.provide(LayerNode.compile(SessionNs.node))))
 }
 
 const svc = {

@@ -2,6 +2,7 @@ import { beforeAll, beforeEach, afterEach, describe, expect, test } from "bun:te
 import { Effect, Layer, ManagedRuntime } from "effect"
 import { Database, eq } from "../../src/storage/db"
 import { Bus } from "../../src/bus"
+import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { provideTestInstance, disposeAllInstances } from "../fixture/fixture"
 import { Session } from "../../src/session/session"
 import { SessionSkill } from "../../src/skill/session-skill"
@@ -15,7 +16,7 @@ if (!DB_URL) {
   process.exit(0)
 }
 
-const runtime = ManagedRuntime.make(Layer.mergeAll(SessionSkill.layer, Session.defaultLayer, Bus.layer))
+const runtime = ManagedRuntime.make(Layer.mergeAll(SessionSkill.layer, LayerNode.compile(Session.node), Bus.layer) as any)
 const db = Database.Client()
 
 async function cleanup(sessionID: string) {

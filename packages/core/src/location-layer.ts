@@ -32,7 +32,6 @@ import { SkillGuidance } from "./skill/guidance"
 import { BuiltInTools } from "./tool/builtins"
 import { Image } from "./image"
 import { ToolRegistry } from "./tool/registry"
-import { ApplicationTools } from "./tool/application-tools"
 import { ToolOutputStore } from "./tool-output-store"
 import { AppProcess } from "./process"
 import { SessionStore } from "./session/store"
@@ -44,14 +43,15 @@ import * as SessionRunnerLLM from "./session/runner/llm"
 import { SessionRunnerModel } from "./session/runner/model"
 import { SystemContextBuiltIns } from "./system-context/builtins"
 import { FetchHttpClient } from "effect/unstable/http"
+import { LayerNode } from "./effect/layer-node"
 
 export class LocationServiceMap extends LayerMap.Service<LocationServiceMap>()("@opencode/example/LocationServiceMap", {
   lookup: (ref: Location.Ref) => {
     const boot = Layer.effectDiscard(
       Effect.logInfo("booting location services", { directory: ref.directory, workspaceID: ref.workspaceID }),
     )
-    const location = Location.layer(ref)
-    const systemContext = SystemContextBuiltIns.locationLayer
+    const location = LayerNode.compile(Location.boundNode(ref))
+    const systemContext = LayerNode.compile(SystemContextBuiltIns.node)
     const base = Layer.mergeAll(
       location,
       Policy.locationLayer,
@@ -63,27 +63,27 @@ export class LocationServiceMap extends LayerMap.Service<LocationServiceMap>()("
       CommandV2.locationLayer,
       AgentV2.locationLayer,
       PluginBoot.locationLayer,
-      FileSystem.locationLayer,
-      Watcher.locationLayer,
+      LayerNode.compile(FileSystem.node),
+      LayerNode.compile(Watcher.node),
       Pty.locationLayer,
-      SkillV2.locationLayer,
+      LayerNode.compile(SkillV2.node),
       systemContext,
       LocationMutation.locationLayer.pipe(Layer.orDie),
     ).pipe(Layer.provideMerge(location))
-    const resources = ToolOutputStore.layer.pipe(Layer.provide(base))
-    const permissionsAndTools = ToolRegistry.layer.pipe(
+    const resources = LayerNode.compile(ToolOutputStore.node).pipe(Layer.provide(base))
+    const permissionsAndTools = LayerNode.compile(ToolRegistry.node).pipe(
       Layer.provideMerge(PermissionV2.locationLayer),
       Layer.provide(resources),
       Layer.provide(base),
     )
     const services = Layer.mergeAll(base, resources, permissionsAndTools)
-    const image = Image.layer.pipe(Layer.provide(services))
+    const image = LayerNode.compile(Image.node).pipe(Layer.provide(services))
     const mutation = FileMutation.locationLayer.pipe(Layer.provide(services))
     const skillGuidance = SkillGuidance.locationLayer.pipe(Layer.provide(services))
     const referenceGuidance = ReferenceGuidance.locationLayer.pipe(Layer.provide(services))
-    const todos = SessionTodo.layer.pipe(Layer.provide(services))
+    const todos = LayerNode.compile(SessionTodo.node).pipe(Layer.provide(services))
     const questions = QuestionV2.locationLayer.pipe(Layer.provide(services))
-    const builtInTools = BuiltInTools.locationLayer.pipe(
+    const builtInTools = LayerNode.compile(BuiltInTools.node).pipe(
       Layer.provide(services),
       Layer.provide(mutation),
       Layer.provide(resources),
@@ -92,7 +92,7 @@ export class LocationServiceMap extends LayerMap.Service<LocationServiceMap>()("
       Layer.provide(image),
     )
     const model = SessionRunnerModel.locationLayer.pipe(Layer.provide(services))
-    const runner = SessionRunnerLLM.defaultLayer.pipe(
+    const runner = LayerNode.compile(SessionRunnerLLM.node).pipe(
       Layer.provide(services),
       Layer.provide(model),
       Layer.provide(skillGuidance),
@@ -114,22 +114,20 @@ export class LocationServiceMap extends LayerMap.Service<LocationServiceMap>()("
   },
   idleTimeToLive: "60 minutes",
   dependencies: [
-    Project.defaultLayer,
-    EventV2.defaultLayer,
-    Credential.defaultLayer,
-    Npm.defaultLayer,
-    ModelsDev.defaultLayer,
-    FSUtil.defaultLayer,
-    AppProcess.defaultLayer,
-    Global.defaultLayer,
-    Ripgrep.defaultLayer,
+    LayerNode.compile(Project.node),
+    LayerNode.compile(EventV2.node),
+    LayerNode.compile(Credential.node),
+    LayerNode.compile(Npm.node),
+    LayerNode.compile(ModelsDev.node),
+    LayerNode.compile(FSUtil.node),
+    LayerNode.compile(AppProcess.node),
+    LayerNode.compile(Global.node),
+    LayerNode.compile(Ripgrep.node),
     Database.defaultLayer,
-    SessionStore.layer.pipe(Layer.provide(Database.defaultLayer)),
-    PermissionSaved.defaultLayer,
-    RepositoryCache.defaultLayer,
-    LLMClient.layer.pipe(Layer.provide(RequestExecutor.defaultLayer)),
+    LayerNode.compile(SessionStore.node).pipe(Layer.provide(Database.defaultLayer)),
+    LayerNode.compile(PermissionSaved.node),
+    LayerNode.compile(RepositoryCache.node),
+    LLMClient.layer.pipe(Layer.provide(RequestExecutor.layer)),
     FetchHttpClient.layer,
-    ToolOutputStore.defaultCleanupLayer,
-    ApplicationTools.layer,
   ],
 }) {}

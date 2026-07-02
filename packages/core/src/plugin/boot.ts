@@ -1,6 +1,7 @@
 export * as PluginBoot from "./boot"
 
 import { Context, Deferred, Effect, Layer } from "effect"
+import { LayerNode } from "../effect/layer-node"
 import { Credential } from "../credential"
 import { Connector } from "../connector"
 import { AgentV2 } from "../agent"
@@ -118,6 +119,6 @@ export const locationLayer = layer.pipe(
   Layer.provideMerge(CommandV2.locationLayer),
   Layer.provideMerge(Config.locationLayer),
   Layer.provideMerge(AgentV2.locationLayer),
-  Layer.provideMerge(SkillV2.locationLayer),
+  Layer.provideMerge(LayerNode.compile(SkillV2.node)),
   Layer.provideMerge(Reference.locationLayer),
 )

@@ -3,6 +3,7 @@ import { Effect, Layer, Context } from "effect"
 import { SystemPrompt } from "../../src/session/system"
 import { Skill } from "../../src/skill"
 import { testEffect } from "../lib/effect"
+import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import type { Agent } from "../../src/agent/agent"
 
 const store = new Map<string, Map<string, Skill.Info>>()
@@ -54,7 +55,7 @@ const mockSkillLayer = Layer.succeed(
 )
 
 const it = testEffect(Layer.mergeAll(
-  SystemPrompt.layer.pipe(Layer.provide(mockSkillLayer)),
+  LayerNode.compile(SystemPrompt.node).pipe(Layer.provide(mockSkillLayer)),
   mockSkillLayer,
 ))
 

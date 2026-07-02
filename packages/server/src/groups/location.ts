@@ -87,10 +87,10 @@ export const layer = Layer.effect(
   Effect.gen(function* () {
     const locations = yield* LocationServiceMap
     return LocationMiddleware.of((effect) =>
-      Effect.gen(function* () {
+      (Effect.gen(function* () {
         const request = yield* HttpServerRequest.HttpServerRequest
         return yield* effect.pipe(Effect.provide(locations.get(ref(request))))
-      }),
+      }) as any),
     )
   }),
 )

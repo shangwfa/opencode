@@ -217,7 +217,7 @@ export const layer = Layer.effect(Service)(
   }),
 )
 
-export const defaultLayer = layer.pipe(Layer.provide([ProjectBus.defaultLayer, RuntimeFlags.defaultLayer]))
+export const defaultLayer = layer.pipe(Layer.provide([ProjectBus.defaultLayer, RuntimeFlags.layer()]))
 
 export const use = serviceUse(Service)
 

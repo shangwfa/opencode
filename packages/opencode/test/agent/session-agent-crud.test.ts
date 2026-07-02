@@ -12,6 +12,7 @@ import { FileSystem } from "@opencode-ai/core/filesystem"
 import { Bus } from "../../src/bus"
 import { Discovery } from "../../src/skill/discovery"
 import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
+import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { SessionAgent } from "../../src/agent/session-agent"
 import { SessionID } from "../../src/session/schema"
 import { locationServiceMapLayer } from "@opencode-ai/core/location-services"
@@ -66,18 +67,18 @@ const memoryLayer = Layer.effect(
   }),
 )
 
-const agentLayer = Agent.layer.pipe(
-  Layer.provide(Plugin.defaultLayer),
-  Layer.provide(Provider.defaultLayer),
+const agentLayer = Agent.defaultLayer.pipe(
+  Layer.provide(LayerNode.compile(Plugin.node)),
+  Layer.provide(LayerNode.compile(Provider.node)),
   Layer.provide(Auth.defaultLayer),
-  Layer.provide(Config.defaultLayer),
+  Layer.provide(LayerNode.compile(Config.node)),
   Layer.provide(Skill.defaultLayer),
   Layer.provide(RuntimeFlags.layer({})),
   Layer.provide(memoryLayer),
   Layer.provide(locationServiceMapLayer),
 )
 
-const it = testEffect(Layer.mergeAll(agentLayer, CrossSpawnSpawner.defaultLayer))
+const it = testEffect(Layer.mergeAll(agentLayer, LayerNode.compile(CrossSpawnSpawner.node)))
 
 const SESSION = SessionID.make("ses_test_agent_001")
 

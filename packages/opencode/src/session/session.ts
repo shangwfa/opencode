@@ -46,6 +46,7 @@ import { Global } from "@opencode-ai/core/global"
 import { Effect, Layer, Option, Context, Schema, Types } from "effect"
 import { NonNegativeInt, optional } from "@opencode-ai/core/schema"
 import { RuntimeFlags } from "@/effect/runtime-flags"
+import { LocationServiceMap } from "@opencode-ai/core/location-service-map"
 
 import { ProviderV2 } from "@opencode-ai/core/provider"
 import { ModelV2 } from "@opencode-ai/core/model"
@@ -1014,19 +1015,6 @@ export const layer: Layer.Layer<
   }),
 )
 
-export const defaultLayer = layer.pipe(
-  Layer.provide(BackgroundJob.defaultLayer),
-  Layer.provide(Database.defaultLayer),
-  Layer.provide(EventV2Bridge.defaultLayer),
-  Layer.provide(
-    SessionV2.defaultLayer.pipe(
-      Layer.provide(SessionExecutionLocal.defaultLayer),
-      Layer.provide(locationServiceMapLayer),
-    ),
-  ),
-  Layer.provide(RuntimeFlags.defaultLayer),
-)
-
 const cancelBackgroundJobs = Effect.fn("Session.cancelBackgroundJobs")(function* (
   background: BackgroundJob.Interface,
   sessionID: SessionID,
@@ -1172,7 +1160,7 @@ export async function* listGlobal(input?: {
 export const node = LayerNode.make({
   service: Service,
   layer: layer,
-  deps: [BackgroundJob.node, RuntimeFlags.node, Database.node, EventV2Bridge.node],
+  deps: [BackgroundJob.node, RuntimeFlags.node, Database.node, EventV2Bridge.node, LocationServiceMap.node],
 })
 
 export * as Session from "./session"

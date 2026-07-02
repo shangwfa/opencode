@@ -2,6 +2,7 @@ import { describe, expect } from "bun:test"
 import { Effect, Layer } from "effect"
 import { NodeFileSystem } from "@effect/platform-node"
 import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
+import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { InstanceRef } from "../../src/effect/instance-ref"
 import { SystemPrompt } from "../../src/session/system"
 import { Skill } from "../../src/skill"
@@ -25,9 +26,9 @@ const mockModel = {
 } as any
 
 const it = testEffect(
-  SystemPrompt.layer.pipe(
+  LayerNode.compile(SystemPrompt.node).pipe(
     Layer.provide(mockSkillLayer),
-    Layer.merge(Layer.mergeAll(CrossSpawnSpawner.defaultLayer, NodeFileSystem.layer)),
+    Layer.merge(Layer.mergeAll(LayerNode.compile(CrossSpawnSpawner.node), NodeFileSystem.layer)),
   ) as any,
 )
 

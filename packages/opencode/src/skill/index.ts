@@ -13,6 +13,7 @@ import { Config } from "@/config/config"
 import { FrontmatterError } from "@opencode-ai/core/v1/config/error"
 import { ConfigMarkdown } from "@/config/markdown"
 import { RuntimeFlags } from "@/effect/runtime-flags"
+import { Database } from "@opencode-ai/core/database/database"
 import { Glob } from "@opencode-ai/core/util/glob"
 import { Discovery } from "./discovery"
 import { SessionSkill } from "./session-skill"
@@ -507,12 +508,12 @@ const layerImpl = Layer.effect(
 export const layer = layerImpl.pipe(Layer.provide(SessionSkill.layer))
 
 export const defaultLayer = layer.pipe(
-  Layer.provide(Discovery.defaultLayer),
-  Layer.provide(Config.defaultLayer),
-  Layer.provide(EventV2Bridge.defaultLayer),
-  Layer.provide(FSUtil.defaultLayer),
-  Layer.provide(Global.layer),
-  Layer.provide(RuntimeFlags.defaultLayer),
+  Layer.provide(LayerNode.compile(Discovery.node)),
+  Layer.provide(LayerNode.compile(Config.node)),
+  Layer.provide(LayerNode.compile(EventV2Bridge.node)),
+  Layer.provide(LayerNode.compile(FSUtil.node)),
+  Layer.provide(LayerNode.compile(Global.node)),
+  Layer.provide(RuntimeFlags.layer()),
 )
 
 export function fmt(list: Info[], opts: { verbose: boolean }) {
@@ -545,7 +546,7 @@ export function fmt(list: Info[], opts: { verbose: boolean }) {
 export const node = LayerNode.make({
   service: Service,
   layer: layer,
-  deps: [Discovery.node, Config.node, EventV2Bridge.node, FSUtil.node, Global.node, RuntimeFlags.node],
+  deps: [Discovery.node, Config.node, EventV2Bridge.node, FSUtil.node, Global.node, RuntimeFlags.node, Database.node],
 })
 
 export * as Skill from "."

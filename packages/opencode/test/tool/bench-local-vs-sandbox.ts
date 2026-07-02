@@ -16,6 +16,7 @@ import { Agent } from "../../src/agent/agent"
 import { Plugin } from "../../src/plugin"
 import { AppFileSystem } from "@opencode-ai/shared/filesystem"
 import * as CrossSpawnSpawner from "@opencode-ai/core/cross-spawn-spawner"
+import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { Ripgrep } from "@opencode-ai/core/ripgrep"
 import { SandboxProvider, NoopSandboxProvider } from "../../src/tool/sandbox-provider"
 // TODO: merge-upstream — LSP namespace removed; use named imports from ../../src/lsp/lsp
@@ -42,12 +43,12 @@ const TEST_DOMAIN = process.env["OPENCODE_SANDBOX_DOMAIN"] || "localhost:8080"
 // ── Runtimes ──
 
 const sharedLayers = Layer.mergeAll(
-  CrossSpawnSpawner.defaultLayer,
+  LayerNode.compile(CrossSpawnSpawner.node),
   AppFileSystem.defaultLayer,
-  Plugin.defaultLayer,
-  Truncate.defaultLayer,
+  LayerNode.compile(Plugin.node),
+  LayerNode.compile(Truncate.node),
   Agent.defaultLayer,
-  Ripgrep.defaultLayer,
+  LayerNode.compile(Ripgrep.node),
   // TODO: LSP removed
 //   LSP.defaultLayer,
   // TODO: FileTime removed
@@ -55,15 +56,15 @@ const sharedLayers = Layer.mergeAll(
   // TODO: FileWatcher removed
 //   FileWatcher.defaultLayer,
   Bus.layer,
-  Format.defaultLayer,
-  Instruction.defaultLayer,
+  LayerNode.compile(Format.node),
+  LayerNode.compile(Instruction.node),
 )
 
 const localRuntime = ManagedRuntime.make(
-  Layer.mergeAll(sharedLayers, NoopSandboxProvider.layer),
+  Layer.mergeAll(sharedLayers, NoopSandboxProvider.layer) as any,
 )
 const sandboxRuntime = ManagedRuntime.make(
-  Layer.mergeAll(sharedLayers, SandboxProvider.defaultLayer),
+  Layer.mergeAll(sharedLayers, SandboxProvider.defaultLayer) as any,
 )
 
 // ── helpers ──

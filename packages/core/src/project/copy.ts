@@ -7,6 +7,7 @@ import { AbsolutePath } from "../schema"
 import { FSUtil } from "../fs-util"
 import { Git } from "../git"
 import { makeLocationNode } from "../effect/app-node"
+import { LayerNode } from "../effect/layer-node"
 import { Project } from "../project"
 import { ProjectDirectoryTable } from "./sql"
 import { ProjectDirectories } from "./directories"
@@ -130,7 +131,7 @@ export const refreshAfterBoot = Effect.gen(function* () {
   )
 })
 
-export const layer = Layer.effect(
+const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
     const fs = yield* FSUtil.Service
@@ -303,9 +304,9 @@ export const layer = Layer.effect(
 export const locationLayer = layer
 export const defaultLayer = layer.pipe(
   Layer.provide(Database.defaultLayer),
-  Layer.provide(FSUtil.defaultLayer),
-  Layer.provide(Git.defaultLayer),
-  Layer.provide(EventV2.defaultLayer),
+  Layer.provide(LayerNode.compile(FSUtil.node)),
+  Layer.provide(LayerNode.compile(Git.node)),
+  Layer.provide(LayerNode.compile(EventV2.node)),
 )
 export const node = makeLocationNode({
   service: Service,

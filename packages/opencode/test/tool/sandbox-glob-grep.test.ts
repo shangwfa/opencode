@@ -7,6 +7,7 @@ import { Agent } from "../../src/agent/agent"
 import { Plugin } from "../../src/plugin"
 import { AppFileSystem } from "@opencode-ai/shared/filesystem"
 import * as CrossSpawnSpawner from "@opencode-ai/core/cross-spawn-spawner"
+import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { Ripgrep } from "@opencode-ai/core/ripgrep"
 import { SandboxProvider } from "../../src/tool/sandbox-provider"
 import { SessionID, MessageID } from "../../src/session/schema"
@@ -15,14 +16,14 @@ import { ConnectionConfig, Sandbox } from "@alibaba-group/opensandbox"
 
 const runtime = ManagedRuntime.make(
   Layer.mergeAll(
-    CrossSpawnSpawner.defaultLayer,
+    LayerNode.compile(CrossSpawnSpawner.node),
     AppFileSystem.defaultLayer,
-    Plugin.defaultLayer,
-    Truncate.defaultLayer,
+    LayerNode.compile(Plugin.node),
+    LayerNode.compile(Truncate.node),
     Agent.defaultLayer,
-    Ripgrep.defaultLayer,
+    LayerNode.compile(Ripgrep.node),
     SandboxProvider.defaultLayer,
-  ),
+  ) as any,
 )
 
 const TEST_IMAGE = process.env["OPENCODE_SANDBOX_IMAGE"] || "opensandbox/code-interpreter-rg"

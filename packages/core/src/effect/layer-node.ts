@@ -223,7 +223,7 @@ export function hoist<A, E, T extends Tag, const Items extends Replacements = re
     root,
     (node, context) => {
       if (node.kind === "group") {
-        return { ...node, dependencies: node.dependencies.map(context.visit) }
+        return { ...node, dependencies: (node.dependencies ?? []).map(context.visit) }
       }
       if (node.tag === tag) {
         const existing = hoisted.get(node.name)
@@ -236,7 +236,7 @@ export function hoist<A, E, T extends Tag, const Items extends Replacements = re
       if (node.kind === "unbound") {
         return node
       }
-      return { ...node, dependencies: node.dependencies.map(context.visit) }
+      return { ...node, dependencies: (node.dependencies ?? []).map(context.visit) }
     },
     { resolve: (node) => replacementMap.get(node.name) ?? node },
   )
@@ -258,7 +258,7 @@ export function compile<A, E, const Items extends Replacements = readonly []>(
       node,
       (node, context) => {
         if (node.kind === "unbound") throw new Error(`Unbound layer node: ${node.name}`)
-        const dependencies = node.dependencies.flatMap(flatten).map(context.visit)
+        const dependencies = (node.dependencies ?? []).flatMap(flatten).map(context.visit)
         const implementation = node.implementation! as RuntimeLayer
         return dependencies.length === 0
           ? implementation
@@ -272,14 +272,57 @@ export function compile<A, E, const Items extends Replacements = readonly []>(
 }
 
 function replacementMapFrom(replacements?: Replacements) {
-  return new Map(replacements?.map(([source, replacement]) => [source.name, replacementNode(source, replacement)]))
+  return (
+    replacements?.reduce((map, [source, replacement]) => {
+      const normalized = rewriteReplacementDependencies(replacementNode(source, replacement), map)
+      const current = new Map([[source.name, normalized]])
+      for (const [name, node] of map) map.set(name, rewriteReplacementDependencies(node, current))
+      map.set(source.name, normalized)
+      return map
+    }, new Map<string, AnyNode>()) ?? new Map<string, AnyNode>()
+  )
+}
+
+function rewriteReplacementDependencies(root: AnyNode, replacements: ReadonlyMap<string, AnyNode>) {
+  if (replacements.size === 0) return root
+  const cache = new Map<AnyNode, AnyNode>()
+  const visiting = new Set<AnyNode>()
+  const stack: AnyNode[] = []
+
+  const recur = (node: AnyNode, isRoot = false): AnyNode => {
+    const target = isRoot ? node : (replacements.get(node.name) ?? node)
+    const cached = cache.get(target)
+    if (cached !== undefined || cache.has(target)) return cached!
+    if (visiting.has(target)) {
+      const start = stack.indexOf(target)
+      throw new Error(
+        `Cycle detected in layer tree: ${[...stack.slice(start), target].map((item) => item.name).join(" -> ")}`,
+      )
+    }
+
+    visiting.add(target)
+    stack.push(target)
+    try {
+      const dependencies = target.dependencies.map((dependency) => recur(dependency))
+      const result = dependencies.every((dependency, index) => dependency === target.dependencies[index])
+        ? target
+        : { ...target, dependencies }
+      cache.set(target, result)
+      return result
+    } finally {
+      stack.pop()
+      visiting.delete(target)
+    }
+  }
+
+  return recur(root, true)
 }
 
 export function hasUnbound(root: Node<unknown, unknown, any>, source: AnyNode): boolean {
   if (source.kind !== "unbound") throw new Error(`Cannot check non-unbound layer node: ${source.name}`)
   return walk<boolean>(root, (node, context) => {
     if (node === source) return true
-    return node.dependencies.some(context.visit)
+    return (node.dependencies ?? []).some(context.visit)
   })
 }
 

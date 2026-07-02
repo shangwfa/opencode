@@ -6,12 +6,13 @@ import { Session as SessionNs } from "../../src/session/session"
 import type { SessionID } from "../../src/session/schema"
 import type { Skill } from "../../src/skill"
 import { Log } from "@opencode-ai/core/util/log"
+import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { tmpdir } from "../fixture/fixture"
 
 Log.init({ print: false })
 
 function run<A, E>(fx: Effect.Effect<A, E, SessionNs.Service>) {
-  return Effect.runPromise(fx.pipe(Effect.provide(SessionNs.defaultLayer)))
+  return Effect.runPromise(fx.pipe(Effect.provide(LayerNode.compile(SessionNs.node))))
 }
 
 const svc = {

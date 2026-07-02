@@ -112,13 +112,14 @@ export class Service extends Context.Service<Service, Interface>()("@opencode/Pr
 
 type GitResult = { code: number; text: string; stderr: string }
 
-export const layer = Layer.effect(
+const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
     const fs = yield* FSUtil.Service
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
     const projectV2 = yield* ProjectV2.Service
-    const projectCopy = yield* ProjectCopy.Service
+    const projectCopy = yield* Effect.serviceOption(ProjectCopy.Service)
+    const projectCopyService = projectCopy._tag === "Some" ? projectCopy.value : null
     const events = yield* EventV2Bridge.Service
     const flags = yield* RuntimeFlags.Service
     const { db } = yield* Database.Service
@@ -232,8 +233,9 @@ export const layer = Layer.effect(
       directory: string
     }) {
       if (input.projectID === ProjectV2.ID.global) return
+      if (!projectCopyService) return
       const opened = AbsolutePath.make(FSUtil.resolve(input.directory))
-      const type = yield* projectCopy.detect({ directory: opened })
+      const type = yield* projectCopyService.detect({ directory: opened })
 
       yield* db
         .transaction(
@@ -515,14 +517,13 @@ export const layer = Layer.effect(
 )
 
 export const defaultLayer = layer.pipe(
-  Layer.provide(EventV2Bridge.defaultLayer),
-  Layer.provide(ProjectV2.defaultLayer),
-  Layer.provide(ProjectCopy.defaultLayer),
-  Layer.provide(AppProcess.defaultLayer),
-  Layer.provide(CrossSpawnSpawner.defaultLayer),
-  Layer.provide(FSUtil.defaultLayer),
+  Layer.provide(LayerNode.compile(EventV2Bridge.node)),
+  Layer.provide(LayerNode.compile(ProjectV2.node)),
+  Layer.provide(LayerNode.compile(AppProcess.node)),
+  Layer.provide(LayerNode.compile(CrossSpawnSpawner.node)),
+  Layer.provide(LayerNode.compile(FSUtil.node)),
   Layer.provide(Database.defaultLayer),
-  Layer.provide(RuntimeFlags.defaultLayer),
+  Layer.provide(RuntimeFlags.layer()),
 )
 
 export const use = serviceUse(Service)

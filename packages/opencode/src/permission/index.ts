@@ -6,10 +6,6 @@ import { Deferred, Effect, Layer, Context } from "effect"
 import os from "os"
 import { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import { EventV2Bridge } from "@/event-v2-bridge"
-import { Flag } from "@opencode-ai/core/flag/flag"
-import { Database } from "@opencode-ai/core/database/database"
-import { PermissionTable } from "@opencode-ai/core/permission/sql"
-import { eq } from "drizzle-orm"
 
 export const Event = PermissionV1.Event
 
@@ -43,26 +39,16 @@ export function evaluate(permission: string, pattern: string, ...rulesets: Permi
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/Permission") {}
 
-export const layer = Layer.effect(
+const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
     const events = yield* EventV2Bridge.Service
-    const dbService = Flag.OPENCODE_DATABASE_URL ? yield* Database.Service : undefined
     const state = yield* InstanceState.make<State>(
       Effect.fn("Permission.state")(function* (ctx) {
-        let initialApproved: PermissionV1.Rule[] = []
-        if (dbService) {
-          const row = yield* (dbService as any).db
-            .select()
-            .from(PermissionTable)
-            .where(eq(PermissionTable.project_id, ctx.project.id))
-            .get()
-            .pipe(Effect.catch(() => Effect.succeed(undefined as any)))
-          if (row?.data) initialApproved = [...row.data]
-        }
+        void ctx
         const state = {
           pending: new Map<PermissionV1.ID, PendingEntry>(),
-          approved: initialApproved,
+          approved: [],
         }
 
         yield* Effect.addFinalizer(() =>
@@ -75,7 +61,7 @@ export const layer = Layer.effect(
         )
 
         return state
-      }) as any,
+      }),
     )
 
     const ask = Effect.fn("Permission.ask")(function* (input: PermissionV1.AskInput) {
@@ -227,8 +213,6 @@ export function disabled(tools: string[], ruleset: PermissionV1.Ruleset): Set<st
   )
 }
 
-export const defaultLayer = layer.pipe(Layer.provide(EventV2Bridge.defaultLayer))
-
-export const node = LayerNode.make({ service: Service, layer: layer, deps: [EventV2Bridge.node] as any })
+export const node = LayerNode.make({ service: Service, layer: layer, deps: [EventV2Bridge.node] })
 
 export * as Permission from "."

@@ -11,6 +11,7 @@ import { Database } from "../../src/storage/db"
 import { provideTmpdirInstance } from "../fixture/fixture"
 import { testEffect } from "../lib/effect"
 import * as CrossSpawnSpawner from "@opencode-ai/core/cross-spawn-spawner"
+import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { Config } from "../../src/config/config"
 import { Agent } from "../../src/agent/agent"
 import { Project } from "../../src/project/project"
@@ -49,14 +50,14 @@ const mockAgent: AgentType.Info = {
 const it = testEffect(
   Layer.mergeAll(
     Agent.defaultLayer,
-    Config.defaultLayer,
-    CrossSpawnSpawner.defaultLayer,
+    LayerNode.compile(Config.node),
+    LayerNode.compile(CrossSpawnSpawner.node),
     Project.defaultLayer,
-    Session.defaultLayer,
-    Truncate.defaultLayer,
+    LayerNode.compile(Session.node),
+    LayerNode.compile(Truncate.node),
     ToolRegistry.defaultLayer,
     Skill.defaultLayer,
-    SystemPrompt.defaultLayer,
+    LayerNode.compile(SystemPrompt.node),
   ) as any,
 )
 
