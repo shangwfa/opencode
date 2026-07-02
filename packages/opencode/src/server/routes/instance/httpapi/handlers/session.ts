@@ -13,6 +13,7 @@ import { MessageV2 } from "@/session/message-v2"
 import { SessionPrompt } from "@/session/prompt"
 import { SessionRevert } from "@/session/revert"
 import { SessionRunState } from "@/session/run-state"
+import { insertExecLog } from "@/session/exec-log"
 import { SessionStatus } from "@/session/status"
 import { SessionSummary } from "@/session/summary"
 import { Todo } from "@/session/todo"
@@ -211,6 +212,15 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       if (ctx.payload.time?.archived !== undefined) {
         yield* session.setArchived({ sessionID: ctx.params.sessionID, time: ctx.payload.time.archived })
       }
+      yield* Effect.promise(() => insertExecLog({
+        id: `action-${Date.now()}`,
+        session_id: ctx.params.sessionID,
+        command: JSON.stringify(ctx.payload),
+        status: "completed",
+        source: "patch",
+        time_started: Date.now(),
+        time_finished: Date.now(),
+      })).pipe(Effect.catch(() => Effect.void))
       return yield* requireSession(ctx.params.sessionID)
     })
 
