@@ -320,8 +320,8 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
           {},
         ).pipe(Effect.catch((err) => Effect.succeed(null as any)))
 
-        const stdout = result?.logs.stdout.map((m: any) => m.text).join("\n") ?? ""
-        const stderr = result?.logs.stderr.map((m: any) => m.text).join("\n") ?? ""
+        const stdout = result?.logs?.stdout.map((m: any) => m.text).join("\n") ?? ""
+        const stderr = result?.logs?.stderr.map((m: any) => m.text).join("\n") ?? ""
 
         yield* Effect.promise(() => insertExecLog({
           id: execId,
