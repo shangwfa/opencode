@@ -326,8 +326,8 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
           {},
         ).pipe(Effect.catch((err) => Effect.succeed(null as any)))
 
-        const stdout = result?.logs.stdout.map((m: any) => m.text).join("\n") ?? ""
-        const stderr = result?.logs.stderr.map((m: any) => m.text).join("\n") ?? ""
+        const stdout = result?.logs?.stdout.map((m: any) => m.text).join("\n") ?? ""
+        const stderr = result?.logs?.stderr.map((m: any) => m.text).join("\n") ?? ""
 
         yield* Effect.promise(() => insertExecLog({
           id: execId,
@@ -584,6 +584,15 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
               Effect.catchDefect(() => Effect.succeed(null)),
             )
           : null
+        yield* Effect.promise(() => insertExecLog({
+          id: `action-${++execCounter}-${Date.now()}`,
+          session_id: params.sessionID,
+          command: JSON.stringify({ enabled: body.enabled !== false, boot: body.boot ?? false }),
+          status: "completed",
+          source: "keep-alive",
+          time_started: Date.now(),
+          time_finished: Date.now(),
+        })).pipe(Effect.catch(() => Effect.void))
         return HttpServerResponse.jsonUnsafe({ sessionID: params.sessionID, keepAlive: body.enabled, sandboxId })
       }),
     )
@@ -611,6 +620,15 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
       Effect.gen(function* () {
         const params = yield* HttpRouter.schemaPathParams(SessionParams)
         yield* sandbox.destroy(params.sessionID).pipe(Effect.catch(() => Effect.void))
+        yield* Effect.promise(() => insertExecLog({
+          id: `action-${++execCounter}-${Date.now()}`,
+          session_id: params.sessionID,
+          command: "destroy sandbox",
+          status: "completed",
+          source: "kill-sandbox",
+          time_started: Date.now(),
+          time_finished: Date.now(),
+        })).pipe(Effect.catch(() => Effect.void))
         return HttpServerResponse.jsonUnsafe({ sessionID: params.sessionID, destroyed: true })
       }),
     )

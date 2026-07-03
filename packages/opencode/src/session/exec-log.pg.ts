@@ -20,7 +20,7 @@ export const ExecLogTable = pgTable(
     stdout: text(),
     stderr: text(),
     error: text(),
-    source: text().$type<"exec" | "exec-async">().notNull(),
+    source: text().$type<"exec" | "exec-async" | "keep-alive" | "kill-sandbox" | "patch">().notNull(),
     time_started: bigint({ mode: "number" }).notNull(),
     time_finished: bigint({ mode: "number" }),
     ...Timestamps,

@@ -6,6 +6,7 @@ import * as Log from "@opencode-ai/core/util/log"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { Flag } from "@/flag/flag"
 import type { SessionID } from "../session/schema"
+import { resolveSandboxOpts } from "../session/sandbox-opts"
 import { Database } from "../storage/db"
 import { SandboxTable } from "./sandbox.pg"
 
@@ -59,8 +60,10 @@ export interface VolumeScope {
 export function buildVolumes(scope: VolumeScope, config: SandboxConfig.Interface): Volume[] {
   if (config.volumeType === "none") return []
 
-  // app 模式仅在 pvc 卷类型下生效，且必须有 appId，否则安全回退到 session 前缀
-  const useApp = config.volumeType === "pvc" && scope.pvcMode === "app" && !!scope.appId?.trim()
+  if (scope.pvcMode === "app" && !scope.appId?.trim()) {
+    throw new Error(`app 模式缺少 appId，拒绝创建 sandbox（sessionID=${scope.sessionID}）`)
+  }
+  const useApp = config.volumeType === "pvc" && scope.pvcMode === "app"
   const prefix = useApp ? `apps/${scope.appId!.trim()}` : `sessions/${scope.sessionID}`
   const mounts = [
     { name: "workspace", mountPath: "/workspace", sub: `${prefix}/workspace` },
@@ -306,9 +309,10 @@ export namespace SandboxProvider {
 
       function createSandbox(sessionID: SessionID, opts?: { pvcMode?: "session" | "app"; appId?: string }) {
         return Effect.gen(function* () {
+          const resolved = opts ?? (yield* Effect.promise(() => resolveSandboxOpts(sessionID)))
           const timeoutSeconds = hasVolume ? config.maxTtlSeconds : config.timeoutSeconds
-          log.info("creating sandbox", { sessionID, volumeType: config.volumeType, timeoutSeconds, pvcMode: opts?.pvcMode })
-          const volumes = buildVolumes({ sessionID, pvcMode: opts?.pvcMode, appId: opts?.appId }, config)
+          log.info("creating sandbox", { sessionID, volumeType: config.volumeType, timeoutSeconds, pvcMode: resolved.pvcMode })
+          const volumes = buildVolumes({ sessionID, pvcMode: resolved.pvcMode, appId: resolved.appId }, config)
           const sb = yield* Effect.tryPromise({
             try: () =>
               Sandbox.create({
@@ -802,8 +806,9 @@ export namespace SandboxProvider {
           const baseTtl = hasVolume ? config.maxTtlSeconds : config.timeoutSeconds
           // keepAlive sandbox 使用 10x TTL，确保远程 sandbox 不会在保活期间自杀
           const timeoutSeconds = isKept ? Math.max(baseTtl, config.maxTtlSeconds) * 10 : baseTtl
-          log.info("creating sandbox", { sessionID, volumeType: config.volumeType, timeoutSeconds, keepAlive: isKept, pvcMode: opts?.pvcMode })
-          const volumes = buildVolumes({ sessionID, pvcMode: opts?.pvcMode, appId: opts?.appId }, config)
+          const resolved = opts ?? (yield* Effect.promise(() => resolveSandboxOpts(sessionID)))
+          log.info("creating sandbox", { sessionID, volumeType: config.volumeType, timeoutSeconds, keepAlive: isKept, pvcMode: resolved.pvcMode })
+          const volumes = buildVolumes({ sessionID, pvcMode: resolved.pvcMode, appId: resolved.appId }, config)
           const sb = yield* Effect.tryPromise({
             try: () =>
               Sandbox.create({
