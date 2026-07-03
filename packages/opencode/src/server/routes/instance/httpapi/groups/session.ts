@@ -84,6 +84,12 @@ export const SkillLoadPayload = Schema.Struct({
 })
 export const AgentCreatePayload = Agent.CreateInput
 
+export const ToolCreatePayload = Schema.Struct({
+  name: Schema.String,
+  description: Schema.String,
+  code: Schema.String,
+})
+
 export const McpCreatePayload = Schema.Union([
   Schema.Struct({
     name: Schema.String,
@@ -138,6 +144,9 @@ export const SessionPaths = {
   mcps: `${root}/:sessionID/mcps`,
   mcpsCreate: `${root}/:sessionID/mcps/create`,
   mcpsDelete: `${root}/:sessionID/mcps/:name`,
+  tools: `${root}/:sessionID/tools`,
+  toolsCreate: `${root}/:sessionID/tools/create`,
+  toolsDelete: `${root}/:sessionID/tools/:name`,
 } as const
 
 export const SessionApi = HttpApi.make("session")
@@ -625,6 +634,52 @@ export const SessionApi = HttpApi.make("session")
             identifier: "session.mcps.clear",
             summary: "Clear session MCPs",
             description: "Remove all MCP servers attached to a specific OpenCode session.",
+          }),
+        ),
+        HttpApiEndpoint.get("tools", SessionPaths.tools, {
+          params: { sessionID: SessionID },
+          query: WorkspaceRoutingQuery,
+          success: described(Schema.Array(Schema.Unknown), "Session tools"),
+          error: [HttpApiError.BadRequest, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.tools",
+            summary: "List session tools",
+            description: "Get custom tools attached to a specific OpenCode session.",
+          }),
+        ),
+        HttpApiEndpoint.post("toolsCreate", SessionPaths.toolsCreate, {
+          params: { sessionID: SessionID },
+          query: WorkspaceRoutingQuery,
+          payload: ToolCreatePayload,
+          success: described(Schema.Unknown, "Created session tool"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.tools.create",
+            summary: "Create session tool",
+            description: "Create or update a custom tool attached to a specific OpenCode session. Only available in SaaS mode.",
+          }),
+        ),
+        HttpApiEndpoint.delete("toolsDelete", SessionPaths.toolsDelete, {
+          params: { sessionID: SessionID, name: Schema.String },
+          query: WorkspaceRoutingQuery,
+          success: described(Schema.Void, "Session tool removed"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.tools.delete",
+            summary: "Delete session tool",
+            description: "Remove a custom tool from a specific OpenCode session.",
+          }),
+        ),
+        HttpApiEndpoint.delete("toolsClear", SessionPaths.tools, {
+          params: { sessionID: SessionID },
+          query: WorkspaceRoutingQuery,
+          success: described(Schema.Void, "Session tools cleared"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.tools.clear",
+            summary: "Clear session tools",
+            description: "Remove all custom tools attached to a specific OpenCode session.",
           }),
         ),
       )

@@ -1,6 +1,7 @@
 import { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import { Agent } from "@/agent/agent"
 import { SessionMcp } from "@/mcp/session-mcp"
+import { SessionTool } from "@/tool/session-tool"
 import { SessionV1 } from "@opencode-ai/core/v1/session"
 import { EventV2Bridge } from "@/event-v2-bridge"
 import { Command } from "@/command"
@@ -41,6 +42,7 @@ import {
   SkillCreatePayload,
   SkillLoadPayload,
   AgentCreatePayload,
+  ToolCreatePayload,
   SummarizePayload,
   UpdatePayload,
 } from "../groups/session"
@@ -67,6 +69,7 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
     const statusSvc = yield* SessionStatus.Service
     const todoSvc = yield* Todo.Service
     const mcpSessionSvc = Option.getOrUndefined(yield* Effect.serviceOption(SessionMcp.Service))
+    const toolSessionSvc = Option.getOrUndefined(yield* Effect.serviceOption(SessionTool.Service))
     const skillSvc = yield* Skill.Service
     const summary = yield* SessionSummary.Service
     const events = yield* EventV2Bridge.Service
@@ -527,6 +530,36 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       yield* mcpSessionSvc.removeAll(ctx.params.sessionID)
     })
 
+    const listTools = Effect.fn("SessionHttpApi.tools")(function* (ctx: {
+      params: { sessionID: SessionID }
+    }) {
+      yield* requireSession(ctx.params.sessionID)
+      if (!toolSessionSvc) return []
+      return yield* toolSessionSvc.list(ctx.params.sessionID).pipe(Effect.catch(() => Effect.succeed([])))
+    })
+
+    const createTool = Effect.fn("SessionHttpApi.toolsCreate")(function* (ctx: {
+      params: { sessionID: SessionID }
+      payload: { name: string; description: string; code: string }
+    }) {
+      if (!toolSessionSvc) throw new Error("Session tools are only available in SaaS mode")
+      return yield* toolSessionSvc.upsert(ctx.params.sessionID, ctx.payload)
+    })
+
+    const deleteTool = Effect.fn("SessionHttpApi.toolsDelete")(function* (ctx: {
+      params: { sessionID: SessionID; name: string }
+    }) {
+      if (!toolSessionSvc) throw new Error("Session tools are only available in SaaS mode")
+      yield* toolSessionSvc.remove(ctx.params.sessionID, ctx.params.name)
+    })
+
+    const clearTools = Effect.fn("SessionHttpApi.toolsClear")(function* (ctx: {
+      params: { sessionID: SessionID }
+    }) {
+      if (!toolSessionSvc) throw new Error("Session tools are only available in SaaS mode")
+      yield* toolSessionSvc.removeAll(ctx.params.sessionID)
+    })
+
     return handlers
       .handle("list", list)
       .handle("status", status)
@@ -568,5 +601,9 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       .handle("mcpsCreate", createMcp)
       .handle("mcpsDelete", deleteMcp)
       .handle("mcpsClear", clearMcps)
+      .handle("tools", listTools)
+      .handle("toolsCreate", createTool)
+      .handle("toolsDelete", deleteTool)
+      .handle("toolsClear", clearTools)
   }),
 )

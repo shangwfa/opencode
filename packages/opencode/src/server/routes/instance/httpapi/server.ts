@@ -23,6 +23,7 @@ import { RuntimeFlags } from "@/effect/runtime-flags"
 import { LSP } from "@/lsp/lsp"
 import { MCP } from "@/mcp"
 import { SessionMcp } from "@/mcp/session-mcp"
+import { SessionTool } from "@/tool/session-tool"
 import { Flag } from "@/flag/flag"
 import { Permission } from "@/permission"
 import { Installation } from "@/installation"
@@ -308,6 +309,7 @@ export function createRoutes(
       Database.defaultLayer,
       Bus.defaultLayer,
       Flag.OPENCODE_DATABASE_URL ? SessionMcp.pgLayer : SessionMcp.noopLayer,
+      Flag.OPENCODE_DATABASE_URL ? SessionTool.pgLayer : SessionTool.noopLayer,
       SandboxProvider.defaultLayer,
       LspAgent.layer,
       FetchHttpClient.layer,

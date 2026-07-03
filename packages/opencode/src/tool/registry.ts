@@ -38,7 +38,7 @@ import { ApplyPatchTool } from "./apply_patch"
 import { Glob } from "@opencode-ai/core/util/glob"
 import path from "path"
 import { pathToFileURL } from "url"
-import { Effect, Layer, Context } from "effect"
+import { Effect, Layer, Context, Option } from "effect"
 import { ChildProcessSpawner } from "effect/unstable/process/ChildProcessSpawner"
 import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
 import { Format } from "../format"
@@ -59,6 +59,7 @@ import { ProviderV2 } from "@opencode-ai/core/provider"
 import { ModelV2 } from "@opencode-ai/core/model"
 import { SandboxProvider } from "./sandbox-provider"
 import { RepositoryCache } from "@opencode-ai/core/repository-cache"
+import { SessionTool, importToolCode } from "./session-tool"
 
 export function webSearchEnabled(
   providerID: ProviderV2.ID,
@@ -121,6 +122,7 @@ const layer = Layer.effect(
     const patchtool = yield* ApplyPatchTool
     const skilltool = yield* SkillTool
     const agent = yield* Agent.Service
+    const sessionToolSvc = Option.getOrUndefined(yield* Effect.serviceOption(SessionTool.Service))
 
     const state = yield* InstanceState.make<State>(
       Effect.fn("ToolRegistry.state")(function* (ctx) {
@@ -312,6 +314,63 @@ const layer = Layer.effect(
       ].join("\n")
     })
 
+    function fromSessionToolDef(
+      id: string,
+      def: ToolDefinition,
+      directory: string,
+      worktree: string | undefined,
+    ): Tool.Def {
+      const args = def.args ?? {}
+      const entries = Object.entries(args)
+      const allZod = entries.every((entry) => isZodType(entry[1]))
+      const zodParams = allZod ? z.object(args) : undefined
+      const jsonSchema = zodParams ? zodJsonSchema(zodParams) : legacyJsonSchema(entries)
+      const parameters = zodParams
+        ? Schema.declare<unknown>((u): u is unknown => zodParams.safeParse(u).success)
+        : Schema.Unknown
+      return {
+        id,
+        parameters,
+        jsonSchema,
+        description: def.description,
+        execute: (args, toolCtx) =>
+          Effect.gen(function* () {
+            const bridge = yield* EffectBridge.make()
+            const pluginCtx: PluginToolContext = {
+              ...toolCtx,
+              ask: (req) => bridge.promise(toolCtx.ask(req)),
+              directory,
+              worktree: worktree ?? "",
+            }
+            const result = yield* Effect.promise(() => def.execute(args as any, pluginCtx))
+            const output = typeof result === "string" ? result : result.output
+            const metadata = typeof result === "string" ? {} : (result.metadata ?? {})
+            const attachments = typeof result === "string" ? undefined : result.attachments
+            const info = yield* agent.get(toolCtx.agent)
+            const out = yield* truncate.output(output, {}, info)
+            return {
+              title: typeof result === "string" ? "" : (result.title ?? ""),
+              output: out.truncated ? out.content : output,
+              attachments,
+              metadata: {
+                ...metadata,
+                truncated: out.truncated,
+                ...(out.truncated && { outputPath: out.outputPath }),
+              },
+            }
+          }).pipe(
+            Effect.withSpan("Tool.execute", {
+              attributes: {
+                "tool.name": id,
+                "session.id": toolCtx.sessionID,
+                "message.id": toolCtx.messageID,
+                ...(toolCtx.callID ? { "tool.call_id": toolCtx.callID } : {}),
+              },
+            }),
+          ),
+      }
+    }
+
     const tools: Interface["tools"] = Effect.fn("ToolRegistry.tools")(function* (input) {
       const filtered = (yield* all()).filter((tool) => {
         if (tool.id === WebSearchTool.id) {
@@ -330,8 +389,35 @@ const layer = Layer.effect(
         return true
       })
 
+      const sessionDefs: Tool.Def[] = []
+      if (input.sessionID && sessionToolSvc && Flag.OPENCODE_DATABASE_URL) {
+        const ictx = yield* InstanceState.context.pipe(
+          Effect.catch(() => Effect.succeed(undefined)),
+        )
+
+        const rows = yield* sessionToolSvc.list(input.sessionID).pipe(
+          Effect.catch(() => Effect.succeed([] as SessionTool.Row[])),
+        )
+        for (const row of rows) {
+          const mod = yield* Effect.tryPromise({
+            try: () => importToolCode(row.code),
+            catch: () => null as any,
+          }).pipe(Effect.catch(() => Effect.succeed(null)))
+          if (!mod) continue
+          const def = (mod.default ?? mod) as ToolDefinition
+          if (!isPluginTool(def)) continue
+          sessionDefs.push(
+            fromSessionToolDef(row.name, def, ictx?.directory ?? "", ictx?.worktree),
+          )
+        }
+      }
+
+      const merged = new Map<string, Tool.Def>()
+      for (const def of filtered) merged.set(def.id, def)
+      for (const def of sessionDefs) merged.set(def.id, def)
+
       return yield* Effect.forEach(
-        filtered,
+        [...merged.values()],
         Effect.fnUntraced(function* (tool: Tool.Def) {
           const output = {
             description: tool.description,
@@ -391,6 +477,7 @@ export const defaultLayer = Layer.suspend(() =>
       Layer.provide(LayerNode.compile(Format.node)),
       Layer.provide(LayerNode.compile(CrossSpawnSpawner.node)),
       Layer.provide(LayerNode.compile(Truncate.node)),
+      Layer.provide(Flag.OPENCODE_DATABASE_URL ? SessionTool.pgLayer : SessionTool.noopLayer),
       Layer.provide(SandboxProvider.defaultLayer),
     )
     .pipe(
@@ -476,6 +563,12 @@ function isJsonSchemaObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
 }
 
+const sessionToolNode = LayerNode.make({
+  service: SessionTool.Service,
+  layer: Flag.OPENCODE_DATABASE_URL ? SessionTool.pgLayer : SessionTool.noopLayer,
+  deps: [],
+})
+
 export const node = LayerNode.make({
   service: Service,
   layer,
@@ -502,6 +595,7 @@ export const node = LayerNode.make({
     RepositoryCache.node,
     SandboxProvider.node,
     Ripgrep.node,
+    sessionToolNode,
   ] as any,
 })
 
