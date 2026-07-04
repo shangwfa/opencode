@@ -90,6 +90,16 @@ export const ToolCreatePayload = Schema.Struct({
   code: Schema.String,
 })
 
+export const CommandCreatePayload = Schema.Struct({
+  name: Schema.String,
+  template: Schema.String,
+  description: Schema.optional(Schema.String),
+  agent: Schema.optional(Schema.String),
+  model: Schema.optional(Schema.String),
+  subtask: Schema.optional(Schema.Boolean),
+  hints: Schema.optional(Schema.Array(Schema.String)),
+})
+
 export const McpCreatePayload = Schema.Union([
   Schema.Struct({
     name: Schema.String,
@@ -147,6 +157,9 @@ export const SessionPaths = {
   tools: `${root}/:sessionID/tools`,
   toolsCreate: `${root}/:sessionID/tools/create`,
   toolsDelete: `${root}/:sessionID/tools/:name`,
+  commands: `${root}/:sessionID/commands`,
+  commandsCreate: `${root}/:sessionID/commands/create`,
+  commandsDelete: `${root}/:sessionID/commands/:name`,
 } as const
 
 export const SessionApi = HttpApi.make("session")
@@ -680,6 +693,52 @@ export const SessionApi = HttpApi.make("session")
             identifier: "session.tools.clear",
             summary: "Clear session tools",
             description: "Remove all custom tools attached to a specific OpenCode session.",
+          }),
+        ),
+        HttpApiEndpoint.get("commands", SessionPaths.commands, {
+          params: { sessionID: SessionID },
+          query: WorkspaceRoutingQuery,
+          success: described(Schema.Array(Schema.Unknown), "Session commands"),
+          error: [HttpApiError.BadRequest, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.commands",
+            summary: "List session commands",
+            description: "Get custom commands attached to a specific OpenCode session, merged with instance-level commands.",
+          }),
+        ),
+        HttpApiEndpoint.post("commandsCreate", SessionPaths.commandsCreate, {
+          params: { sessionID: SessionID },
+          query: WorkspaceRoutingQuery,
+          payload: CommandCreatePayload,
+          success: described(Schema.Unknown, "Created session command"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.commands.create",
+            summary: "Create session command",
+            description: "Create or update a custom command attached to a specific OpenCode session. Only available in SaaS mode.",
+          }),
+        ),
+        HttpApiEndpoint.delete("commandsDelete", SessionPaths.commandsDelete, {
+          params: { sessionID: SessionID, name: Schema.String },
+          query: WorkspaceRoutingQuery,
+          success: described(Schema.Void, "Session command removed"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.commands.delete",
+            summary: "Delete session command",
+            description: "Remove a custom command from a specific OpenCode session.",
+          }),
+        ),
+        HttpApiEndpoint.delete("commandsClear", SessionPaths.commands, {
+          params: { sessionID: SessionID },
+          query: WorkspaceRoutingQuery,
+          success: described(Schema.Void, "Session commands cleared"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.commands.clear",
+            summary: "Clear session commands",
+            description: "Remove all custom commands attached to a specific OpenCode session.",
           }),
         ),
       )

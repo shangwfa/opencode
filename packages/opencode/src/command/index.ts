@@ -3,7 +3,7 @@ import path from "path"
 import { InstanceState } from "@/effect/instance-state"
 import { EffectBridge } from "@/effect/bridge"
 import type { InstanceContext } from "@/project/instance-context"
-import { Effect, Layer, Context, Schema } from "effect"
+import { Effect, Layer, Context, Schema, Option } from "effect"
 import { Config } from "@/config/config"
 import { MCP } from "../mcp"
 import { Skill } from "../skill"
@@ -11,6 +11,9 @@ import PROMPT_INITIALIZE from "./template/initialize.txt"
 import PROMPT_REVIEW from "./template/review.txt"
 import PROMPT_CODEX_REVIEW from "./template/codex-review.txt"
 import { LegacyEvent } from "@opencode-ai/schema/legacy-event"
+import { SessionCommand } from "./session-command"
+import { Flag } from "@/flag/flag"
+import type { SessionID } from "@/session/schema"
 
 type State = {
   commands: Record<string, Info>
@@ -44,6 +47,19 @@ export function hints(template: string) {
   return result
 }
 
+function rowToInfo(row: SessionCommand.Row): Info {
+  return {
+    name: row.name,
+    description: row.description ?? undefined,
+    agent: row.agent ?? undefined,
+    model: row.model ?? undefined,
+    source: "command",
+    template: row.template,
+    subtask: row.subtask ?? undefined,
+    hints: row.hints,
+  }
+}
+
 export const Default = {
   INIT: "init",
   REVIEW: "review",
@@ -53,6 +69,11 @@ export const Default = {
 export interface Interface {
   readonly get: (name: string) => Effect.Effect<Info | undefined>
   readonly list: () => Effect.Effect<Info[]>
+  readonly sessionList: (session: SessionID) => Effect.Effect<Info[]>
+  readonly sessionGet: (name: string, session?: SessionID) => Effect.Effect<Info | undefined>
+  readonly sessionCreate: (session: SessionID, input: SessionCommand.Input) => Effect.Effect<Info>
+  readonly sessionRemove: (session: SessionID, name: string) => Effect.Effect<void>
+  readonly sessionClear: (session: SessionID) => Effect.Effect<void>
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/Command") {}
@@ -63,6 +84,7 @@ const layer = Layer.effect(
     const config = yield* Config.Service
     const mcp = yield* MCP.Service
     const skill = yield* Skill.Service
+    const sessionCommandSvc = Option.getOrUndefined(yield* Effect.serviceOption(SessionCommand.Service))
 
     const init = Effect.fn("Command.state")(function* (ctx: InstanceContext) {
       const cfg = yield* config.get()
@@ -180,10 +202,68 @@ const layer = Layer.effect(
       return Object.values(s.commands)
     })
 
-    return Service.of({ get, list })
+    const sessionList = Effect.fn("Command.sessionList")(function* (session: SessionID) {
+      const s = yield* InstanceState.get(state)
+      const base = Object.values(s.commands)
+      if (!sessionCommandSvc || !Flag.OPENCODE_DATABASE_URL) return base
+      const rows = yield* sessionCommandSvc.list(session).pipe(Effect.catch(() => Effect.succeed([])))
+      if (rows.length === 0) return base
+      const overlay = new Map(rows.map((r) => [r.name, rowToInfo(r)]))
+      return base
+        .map((c) => overlay.get(c.name) ?? c)
+        .concat([...overlay.values()].filter((c) => !base.some((b) => b.name === c.name)))
+    }, Effect.orDie)
+
+    const sessionGet = Effect.fn("Command.sessionGet")(function* (name: string, session?: SessionID) {
+      const s = yield* InstanceState.get(state)
+      if (!session || !sessionCommandSvc || !Flag.OPENCODE_DATABASE_URL) return s.commands[name]
+      const row = yield* sessionCommandSvc
+        .get(session, name)
+        .pipe(Effect.catch(() => Effect.succeed(undefined)))
+      if (row) return rowToInfo(row)
+      return s.commands[name]
+    }, Effect.orDie)
+
+    const sessionCreate = Effect.fn("Command.sessionCreate")(
+      function* (session: SessionID, input: SessionCommand.Input) {
+        if (!sessionCommandSvc || !Flag.OPENCODE_DATABASE_URL) {
+          throw new Error("Session commands are only available in SaaS mode")
+        }
+        const computedHints = input.hints ?? hints(input.template)
+        const row = yield* sessionCommandSvc.upsert(session, { ...input, hints: computedHints })
+        return rowToInfo(row)
+      },
+      Effect.orDie,
+    )
+
+    const sessionRemove = Effect.fn("Command.sessionRemove")(function* (session: SessionID, name: string) {
+      if (!sessionCommandSvc || !Flag.OPENCODE_DATABASE_URL) {
+        throw new Error("Session commands are only available in SaaS mode")
+      }
+      yield* sessionCommandSvc.remove(session, name)
+    }, Effect.orDie)
+
+    const sessionClear = Effect.fn("Command.sessionClear")(function* (session: SessionID) {
+      if (!sessionCommandSvc || !Flag.OPENCODE_DATABASE_URL) {
+        throw new Error("Session commands are only available in SaaS mode")
+      }
+      yield* sessionCommandSvc.removeAll(session)
+    }, Effect.orDie)
+
+    return Service.of({ get, list, sessionList, sessionGet, sessionCreate, sessionRemove, sessionClear })
   }),
 )
 
-export const node = LayerNode.make({ service: Service, layer: layer, deps: [Config.node, MCP.node, Skill.node] })
+const sessionCommandNode = LayerNode.make({
+  service: SessionCommand.Service,
+  layer: Flag.OPENCODE_DATABASE_URL ? SessionCommand.pgLayer : SessionCommand.noopLayer,
+  deps: [],
+})
+
+export const node = LayerNode.make({
+  service: Service,
+  layer: layer,
+  deps: [Config.node, MCP.node, Skill.node, sessionCommandNode],
+})
 
 export * as Command from "."

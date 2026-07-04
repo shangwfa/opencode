@@ -1383,9 +1383,9 @@ const layer = Layer.effect(
         command: input.command,
         agent: input.agent,
       })
-      const cmd = yield* commands.get(input.command)
+      const cmd = yield* commands.sessionGet(input.command, input.sessionID)
       if (!cmd) {
-        const available = (yield* commands.list()).map((c) => c.name)
+        const available = (yield* commands.sessionList(input.sessionID)).map((c) => c.name)
         const hint = available.length ? ` Available commands: ${available.join(", ")}` : ""
         const error = new NamedError.Unknown({ message: `Command not found: "${input.command}".${hint}` })
         yield* events.publish(Session.Event.Error, { sessionID: input.sessionID, error: error.toObject() })

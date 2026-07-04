@@ -24,6 +24,7 @@ import { LSP } from "@/lsp/lsp"
 import { MCP } from "@/mcp"
 import { SessionMcp } from "@/mcp/session-mcp"
 import { SessionTool } from "@/tool/session-tool"
+import { SessionCommand } from "@/command/session-command"
 import { Flag } from "@/flag/flag"
 import { Permission } from "@/permission"
 import { Installation } from "@/installation"
@@ -310,6 +311,7 @@ export function createRoutes(
       Bus.defaultLayer,
       Flag.OPENCODE_DATABASE_URL ? SessionMcp.pgLayer : SessionMcp.noopLayer,
       Flag.OPENCODE_DATABASE_URL ? SessionTool.pgLayer : SessionTool.noopLayer,
+      Flag.OPENCODE_DATABASE_URL ? SessionCommand.pgLayer : SessionCommand.noopLayer,
       SandboxProvider.defaultLayer,
       LspAgent.layer,
       FetchHttpClient.layer,

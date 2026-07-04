@@ -43,6 +43,7 @@ import {
   SkillLoadPayload,
   AgentCreatePayload,
   ToolCreatePayload,
+  CommandCreatePayload,
   SummarizePayload,
   UpdatePayload,
 } from "../groups/session"
@@ -70,6 +71,7 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
     const todoSvc = yield* Todo.Service
     const mcpSessionSvc = Option.getOrUndefined(yield* Effect.serviceOption(SessionMcp.Service))
     const toolSessionSvc = Option.getOrUndefined(yield* Effect.serviceOption(SessionTool.Service))
+    const commandSvc = yield* Command.Service
     const skillSvc = yield* Skill.Service
     const summary = yield* SessionSummary.Service
     const events = yield* EventV2Bridge.Service
@@ -560,6 +562,50 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       yield* toolSessionSvc.removeAll(ctx.params.sessionID)
     })
 
+    const stripUndefined = (obj: Record<string, unknown>) => {
+      const r: Record<string, unknown> = {}
+      for (const [k, v] of Object.entries(obj)) if (v !== undefined) r[k] = v
+      return r
+    }
+
+    const listCommands = Effect.fn("SessionHttpApi.commands")(function* (ctx: {
+      params: { sessionID: SessionID }
+    }) {
+      yield* requireSession(ctx.params.sessionID)
+      const cmds = yield* commandSvc.sessionList(ctx.params.sessionID).pipe(
+        Effect.catch(() => Effect.succeed([])),
+      )
+      return cmds.map((c) => stripUndefined(c as unknown as Record<string, unknown>))
+    })
+
+    const createCommand = Effect.fn("SessionHttpApi.commandsCreate")(function* (ctx: {
+      params: { sessionID: SessionID }
+      payload: {
+        name: string
+        template: string
+        description?: string
+        agent?: string
+        model?: string
+        subtask?: boolean
+        hints?: readonly string[]
+      }
+    }) {
+      const info = yield* commandSvc.sessionCreate(ctx.params.sessionID, ctx.payload)
+      return stripUndefined(info as unknown as Record<string, unknown>)
+    })
+
+    const deleteCommand = Effect.fn("SessionHttpApi.commandsDelete")(function* (ctx: {
+      params: { sessionID: SessionID; name: string }
+    }) {
+      yield* commandSvc.sessionRemove(ctx.params.sessionID, ctx.params.name)
+    })
+
+    const clearCommands = Effect.fn("SessionHttpApi.commandsClear")(function* (ctx: {
+      params: { sessionID: SessionID }
+    }) {
+      yield* commandSvc.sessionClear(ctx.params.sessionID)
+    })
+
     return handlers
       .handle("list", list)
       .handle("status", status)
@@ -605,5 +651,9 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       .handle("toolsCreate", createTool)
       .handle("toolsDelete", deleteTool)
       .handle("toolsClear", clearTools)
+      .handle("commands", listCommands)
+      .handle("commandsCreate", createCommand)
+      .handle("commandsDelete", deleteCommand)
+      .handle("commandsClear", clearCommands)
   }),
 )
