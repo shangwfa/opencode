@@ -30,9 +30,7 @@
 | POST | `/session/:id/kill-sandbox` | 销毁 sandbox |
 | GET | `/session/:id/endpoint/:port` | 获取端口直连地址 |
 
-```bash
-BASE="http://localhost:14096"
-```
+> 运行前先全局加载环境：`source test-env.sh [1|2|3]`（见 [`00-preamble.md`](./00-preamble.md)）。以下用例直接用 `$BASE` `$PG_URL`，不重复定义。
 
 ### 最佳实践：Dev Server 完整生命周期
 
@@ -372,7 +370,7 @@ import json,sys;d=json.load(sys.stdin);print('bad port:', d.get('error') or d)"
 > 自包含用例，独立创建 session，演示从零到访问前端的全流程。
 
 ```bash
-BASE="http://localhost:14096"
+# 环境变量 $BASE $PG_URL $MODEL 由 test-env.sh 全局提供（source test-env.sh [1|2|3]）
 PNPM="pnpm"  # sandbox 中通过 mise shims 提供，直接用 pnpm 即可
 
 # 1. 创建独立 session
@@ -742,7 +740,7 @@ lines = [l.strip() for l in sys.stdin if l.strip()]
 text = ' '.join(lines)
 ok = 'VITE' in text and 'ready' in text and 'Local' in text and 'Network' in text
 print(ok)
-")
+" || true)
 check "T11.12d SSE stream 含 VITE ready/Local/Network" [ "$T12_SSE_OK" = "True" ]
 
 # endpoint + 访问前端

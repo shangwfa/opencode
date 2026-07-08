@@ -1,18 +1,20 @@
 # Provider 与模型、SSE 事件流
 
-> 本文档从 `saas-test-cases.md` 拆分而来。公共测试环境和配置请参考 [`00-INDEX.md`](./00-INDEX.md)。
+> 本文档从 `saas-test-cases.md` 拆分而来。公共测试环境和配置请参考 [`00-preamble.md`](./00-preamble.md)。
 
 ## 八、Provider 与模型
 
+> 运行前先全局加载环境：`source test-env.sh [1|2|3]`（见 [`00-preamble.md`](./00-preamble.md)）。以下用例直接用 `$BASE` `$PG_URL`，不重复定义。
+
 ### T8.1 列出所有 provider
 ```bash
-bun -e "fetch('http://127.0.0.1:4096/provider').then(r=>r.json()).then(d=>console.log('providers:',d.all?.length,'connected:',d.connected))"
+bun -e "fetch('http://localhost:14096/provider').then(r=>r.json()).then(d=>console.log('providers:',d.all?.length,'connected:',d.connected))"
 ```
 
 ### T8.2 切换模型
 ```bash
 # 用同一 session 在两轮里切换不同模型
-bun -e "fetch('http://127.0.0.1:4096/session/$SID/message',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({parts:[{type:'text',text:'你是哪个模型？'}],model:{providerID:'zhipuai',modelID:'glm-5.1'}})}).then(r=>r.json()).then(d=>console.log('m1:',d.info.modelID))"
+bun -e "fetch('http://localhost:14096/session/$SID/message',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({parts:[{type:'text',text:'你是哪个模型？'}],model:{providerID:'zhipuai',modelID:'glm-5.1'}})}).then(r=>r.json()).then(d=>console.log('m1:',d.info.modelID))"
 ```
 
 ---
@@ -51,7 +53,7 @@ function parseSSE(buf) {
 timeout 5 bun -e "
 const ctrl = new AbortController()
 const timer = setTimeout(() => ctrl.abort(), 4000)
-const r = await fetch('http://127.0.0.1:4096/global/event', { signal: ctrl.signal })
+const r = await fetch('http://localhost:14096/global/event', { signal: ctrl.signal })
 console.log('content-type:', r.headers.get('content-type'))
 console.log('cache-control:', r.headers.get('cache-control'))
 
@@ -85,7 +87,7 @@ timeout 15 bun -e "
 const ctrl = new AbortController()
 const timer = setTimeout(() => { ctrl.abort(); process.exit(1) }, 12000)
 
-const r = await fetch('http://127.0.0.1:4096/global/event', { signal: ctrl.signal })
+const r = await fetch('http://localhost:14096/global/event', { signal: ctrl.signal })
 const reader = r.body.getReader()
 const decoder = new TextDecoder()
 
@@ -95,7 +97,7 @@ const chunk0 = first.value ? decoder.decode(first.value) : ''
 console.log('initial:', (JSON.parse(chunk0.split('data: ')[1].split('\n')[0])).payload?.type)
 
 // 创建 session
-const sess = await (await fetch('http://127.0.0.1:4096/session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })).json()
+const sess = await (await fetch('http://localhost:14096/session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })).json()
 console.log('created:', sess.id)
 
 // 读后续事件
@@ -134,7 +136,7 @@ const start = Date.now()
 const ctrl = new AbortController()
 const timer = setTimeout(() => { ctrl.abort(); console.log('❌ no heartbeat'); process.exit(1) }, 14000)
 
-const r = await fetch('http://127.0.0.1:4096/global/event', { signal: ctrl.signal })
+const r = await fetch('http://localhost:14096/global/event', { signal: ctrl.signal })
 const reader = r.body.getReader()
 const decoder = new TextDecoder()
 
@@ -165,13 +167,13 @@ while (true) {
 ```bash
 timeout 5 bun -e "
 // 创建 session 获取 directory
-const sess = await (await fetch('http://127.0.0.1:4096/session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })).json()
-const info = await (await fetch('http://127.0.0.1:4096/session/' + sess.id)).json()
+const sess = await (await fetch('http://localhost:14096/session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })).json()
+const info = await (await fetch('http://localhost:14096/session/' + sess.id)).json()
 const DIR = info.directory
 
 const ctrl = new AbortController()
 const timer = setTimeout(() => ctrl.abort(), 4000)
-const r = await fetch('http://127.0.0.1:4096/event', {
+const r = await fetch('http://localhost:14096/event', {
   headers: { 'x-opencode-directory': DIR },
   signal: ctrl.signal
 })
@@ -204,8 +206,8 @@ clearTimeout(timer)
 
 ```bash
 timeout 60 bun -e "
-const sess = await (await fetch('http://127.0.0.1:4096/session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })).json()
-const info = await (await fetch('http://127.0.0.1:4096/session/' + sess.id)).json()
+const sess = await (await fetch('http://localhost:14096/session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })).json()
+const info = await (await fetch('http://localhost:14096/session/' + sess.id)).json()
 const DIR = info.directory
 const SID = sess.id
 console.log('session:', SID)
@@ -213,7 +215,7 @@ console.log('session:', SID)
 const ctrl = new AbortController()
 const timer = setTimeout(() => { ctrl.abort(); console.log('❌ timeout'); process.exit(1) }, 50000)
 
-const r = await fetch('http://127.0.0.1:4096/event', { headers: { 'x-opencode-directory': DIR }, signal: ctrl.signal })
+const r = await fetch('http://localhost:14096/event', { headers: { 'x-opencode-directory': DIR }, signal: ctrl.signal })
 const reader = r.body.getReader()
 const decoder = new TextDecoder()
 const types = new Set()
@@ -221,7 +223,7 @@ let count = 0
 let gotMessageEvent = false
 
 setTimeout(async () => {
-  await fetch('http://127.0.0.1:4096/session/' + SID + '/message', {
+  await fetch('http://localhost:14096/session/' + SID + '/message', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ parts: [{ type: 'text', text: '说一个字' }], model: { providerID: 'zhipuai', modelID: 'glm-5.1' } })
   })
@@ -262,21 +264,21 @@ while (true) {
 
 ```bash
 timeout 90 bun -e "
-const sess = await (await fetch('http://127.0.0.1:4096/session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })).json()
-const info = await (await fetch('http://127.0.0.1:4096/session/' + sess.id)).json()
+const sess = await (await fetch('http://localhost:14096/session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })).json()
+const info = await (await fetch('http://localhost:14096/session/' + sess.id)).json()
 const DIR = info.directory
 const SID = sess.id
 
 const ctrl = new AbortController()
 const timer = setTimeout(() => { ctrl.abort(); console.log('❌ timeout'); process.exit(1) }, 80000)
 
-const r = await fetch('http://127.0.0.1:4096/event', { headers: { 'x-opencode-directory': DIR }, signal: ctrl.signal })
+const r = await fetch('http://localhost:14096/event', { headers: { 'x-opencode-directory': DIR }, signal: ctrl.signal })
 const reader = r.body.getReader()
 const decoder = new TextDecoder()
 const toolEvents = []
 
 setTimeout(async () => {
-  await fetch('http://127.0.0.1:4096/session/' + SID + '/message', {
+  await fetch('http://localhost:14096/session/' + SID + '/message', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ parts: [{ type: 'text', text: '用 bash 执行 echo hello_sse_test' }], model: { providerID: 'zhipuai', modelID: 'glm-5.1' } })
   })
@@ -321,7 +323,7 @@ while (true) {
 
 > **前提**：不要在全局 config 中配 `permission.edit: allow`（否则不会触发 `permission.asked`）。如果已配，可临时移除：
 > ```bash
-> curl -s -X PATCH http://127.0.0.1:4096/global/config \
+> curl -s -X PATCH http://localhost:14096/global/config \
 >   -H 'Content-Type: application/json' \
 >   -d '{"permission":{"bash":"allow","edit":"ask","write":"ask","glob":"allow","grep":"allow","list":"allow","read":"allow","webfetch":"allow"}}'
 > ```
@@ -330,7 +332,7 @@ while (true) {
 
 ```bash
 timeout 90 bun -e "
-const BASE = 'http://127.0.0.1:4096'
+const BASE = 'http://localhost:14096'
 const sess = await (await fetch(BASE + '/session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })).json()
 const info = await (await fetch(BASE + '/session/' + sess.id)).json()
 const DIR = info.directory
@@ -395,9 +397,9 @@ while (true) {
 
 ```bash
 timeout 90 bun -e "
-const sA = await (await fetch('http://127.0.0.1:4096/session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })).json()
-const sB = await (await fetch('http://127.0.0.1:4096/session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })).json()
-const infoA = await (await fetch('http://127.0.0.1:4096/session/' + sA.id)).json()
+const sA = await (await fetch('http://localhost:14096/session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })).json()
+const sB = await (await fetch('http://localhost:14096/session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })).json()
+const infoA = await (await fetch('http://localhost:14096/session/' + sA.id)).json()
 const DIR = infoA.directory
 console.log('session A:', sA.id)
 console.log('session B:', sB.id)
@@ -405,7 +407,7 @@ console.log('session B:', sB.id)
 const ctrl = new AbortController()
 const timer = setTimeout(() => { ctrl.abort(); process.exit(1) }, 80000)
 
-const r = await fetch('http://127.0.0.1:4096/event', { headers: { 'x-opencode-directory': DIR }, signal: ctrl.signal })
+const r = await fetch('http://localhost:14096/event', { headers: { 'x-opencode-directory': DIR }, signal: ctrl.signal })
 const reader = r.body.getReader()
 const decoder = new TextDecoder()
 const counts = {}
@@ -413,11 +415,11 @@ counts[sA.id] = 0
 counts[sB.id] = 0
 
 setTimeout(() => {
-  fetch('http://127.0.0.1:4096/session/' + sA.id + '/message', {
+  fetch('http://localhost:14096/session/' + sA.id + '/message', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ parts: [{ type: 'text', text: '说A' }], model: { providerID: 'zhipuai', modelID: 'glm-5.1' } })
   })
-  fetch('http://127.0.0.1:4096/session/' + sB.id + '/message', {
+  fetch('http://localhost:14096/session/' + sB.id + '/message', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ parts: [{ type: 'text', text: '说B' }], model: { providerID: 'zhipuai', modelID: 'glm-5.1' } })
   })
@@ -457,21 +459,21 @@ while (true) {
 
 ```bash
 timeout 60 bun -e "
-const sess = await (await fetch('http://127.0.0.1:4096/session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })).json()
-const info = await (await fetch('http://127.0.0.1:4096/session/' + sess.id)).json()
+const sess = await (await fetch('http://localhost:14096/session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })).json()
+const info = await (await fetch('http://localhost:14096/session/' + sess.id)).json()
 const DIR = info.directory
 const SID = sess.id
 
 const ctrl = new AbortController()
 const timer = setTimeout(() => { ctrl.abort(); process.exit(1) }, 50000)
 
-const r = await fetch('http://127.0.0.1:4096/event', { headers: { 'x-opencode-directory': DIR }, signal: ctrl.signal })
+const r = await fetch('http://localhost:14096/event', { headers: { 'x-opencode-directory': DIR }, signal: ctrl.signal })
 const reader = r.body.getReader()
 const decoder = new TextDecoder()
 const statusEvents = []
 
 setTimeout(async () => {
-  await fetch('http://127.0.0.1:4096/session/' + SID + '/message', {
+  await fetch('http://localhost:14096/session/' + SID + '/message', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ parts: [{ type: 'text', text: '说一个字' }], model: { providerID: 'zhipuai', modelID: 'glm-5.1' } })
   })
@@ -509,21 +511,21 @@ while (true) {
 
 ```bash
 timeout 60 bun -e "
-const sess = await (await fetch('http://127.0.0.1:4096/session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })).json()
-const info = await (await fetch('http://127.0.0.1:4096/session/' + sess.id)).json()
+const sess = await (await fetch('http://localhost:14096/session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })).json()
+const info = await (await fetch('http://localhost:14096/session/' + sess.id)).json()
 const DIR = info.directory
 const SID = sess.id
 
 const ctrl = new AbortController()
 const timer = setTimeout(() => { ctrl.abort(); process.exit(1) }, 50000)
 
-const r = await fetch('http://127.0.0.1:4096/event', { headers: { 'x-opencode-directory': DIR }, signal: ctrl.signal })
+const r = await fetch('http://localhost:14096/event', { headers: { 'x-opencode-directory': DIR }, signal: ctrl.signal })
 const reader = r.body.getReader()
 const decoder = new TextDecoder()
 let gotMessageEvent = false
 
 setTimeout(async () => {
-  const resp = await fetch('http://127.0.0.1:4096/session/' + SID + '/prompt_async', {
+  const resp = await fetch('http://localhost:14096/session/' + SID + '/prompt_async', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ parts: [{ type: 'text', text: '说一个字' }], model: { providerID: 'zhipuai', modelID: 'glm-5.1' } })
   })
@@ -568,7 +570,7 @@ while (true) {
 
 ```bash
 timeout 90 bun -e "
-const BASE = 'http://127.0.0.1:4096'
+const BASE = 'http://localhost:14096'
 const sess = await (await fetch(BASE + '/session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })).json()
 const info = await (await fetch(BASE + '/session/' + sess.id)).json()
 const DIR = info.directory
@@ -645,14 +647,14 @@ timeout 10 bun -e "
 const ctrl = new AbortController()
 const timer = setTimeout(() => { ctrl.abort(); console.log('❌ no dispose event'); process.exit(1) }, 8000)
 
-const r = await fetch('http://127.0.0.1:4096/global/event', { signal: ctrl.signal })
+const r = await fetch('http://localhost:14096/global/event', { signal: ctrl.signal })
 const reader = r.body.getReader()
 const decoder = new TextDecoder()
 
 await reader.read() // consume server.connected
 
 setTimeout(() => {
-  fetch('http://127.0.0.1:4096/global/dispose', { method: 'POST' }).then(r => console.log('dispose status:', r.status))
+  fetch('http://localhost:14096/global/dispose', { method: 'POST' }).then(r => console.log('dispose status:', r.status))
 }, 300)
 
 while (true) {
@@ -679,15 +681,15 @@ clearTimeout(timer)
 
 ```bash
 timeout 10 bun -e "
-const sess = await (await fetch('http://127.0.0.1:4096/session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })).json()
-const info = await (await fetch('http://127.0.0.1:4096/session/' + sess.id)).json()
+const sess = await (await fetch('http://localhost:14096/session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })).json()
+const info = await (await fetch('http://localhost:14096/session/' + sess.id)).json()
 const DIR = info.directory
 const decoder = new TextDecoder()
 
 async function connectAndRead(dir) {
   const ctrl = new AbortController()
   const timer = setTimeout(() => ctrl.abort(), 3000)
-  const r = await fetch('http://127.0.0.1:4096/event', { headers: { 'x-opencode-directory': dir }, signal: ctrl.signal })
+  const r = await fetch('http://localhost:14096/event', { headers: { 'x-opencode-directory': dir }, signal: ctrl.signal })
   const reader = r.body.getReader()
   try {
     const { value } = await reader.read()
@@ -720,7 +722,7 @@ console.log(pass ? '✅ reconnection works' : '❌ reconnection failed')
 
 ```bash
 timeout 60 bun -e "
-const BASE = 'http://127.0.0.1:4096'
+const BASE = 'http://localhost:14096'
 const sess = await (await fetch(BASE + '/session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })).json()
 const info = await (await fetch(BASE + '/session/' + sess.id)).json()
 const DIR = info.directory
@@ -813,7 +815,7 @@ console.log(allConnected && allIdle && allGotMessage ? '✅ multi-client SSE wor
 
 ```bash
 timeout 60 bun -e "
-const BASE = 'http://127.0.0.1:4096'
+const BASE = 'http://localhost:14096'
 const sess = await (await fetch(BASE + '/session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })).json()
 const info = await (await fetch(BASE + '/session/' + sess.id)).json()
 const DIR = info.directory

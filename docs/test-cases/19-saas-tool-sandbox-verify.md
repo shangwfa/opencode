@@ -12,10 +12,7 @@
 
 ## 前置条件
 
-```bash
-BASE="http://localhost:14096"
-MODEL='{"providerID":"zhipuai","modelID":"glm-5.1"}'
-```
+> 运行前先全局加载环境：`source test-env.sh [1|2|3]`（见 [`00-preamble.md`](./00-preamble.md)）。以下用例直接用 `$BASE` `$PG_URL` `$MODEL`，不重复定义。
 
 容器需通过 `local-test-env.md` 启动，连接远端 PG + Sandbox API。
 
@@ -209,7 +206,7 @@ print('    ✅ patch 成功' if len(lines) >= 3 else '    ❌ patch 失败')
 
 ```bash
 echo "=== T19.10 PG 记录 ==="
-psql postgresql://postgres:postgres@127.0.0.1:5432/opencode -c \
+psql "$PG_URL" -c \
   "SELECT id, session_id, host, state, keep_alive FROM sandbox WHERE session_id='$SID'"
 ```
 

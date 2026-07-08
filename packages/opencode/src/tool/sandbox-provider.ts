@@ -115,6 +115,29 @@ function requirePackageCacheMount(mountPath: string, reservedPaths: string[]) {
   return normalized
 }
 
+function withExecTimeout(
+  effect: Effect.Effect<CommandExecution, Error>,
+  timeoutSeconds: number | undefined,
+): Effect.Effect<CommandExecution, Error> {
+  if (!timeoutSeconds) return effect
+  return effect.pipe(
+    Effect.timeoutOrElse({
+      duration: Duration.seconds(timeoutSeconds),
+      orElse: () => Effect.succeed({
+        logs: { stdout: [], stderr: [] },
+        result: [],
+        exitCode: null,
+        error: {
+          name: "TimeoutError",
+          value: `Command timed out after ${timeoutSeconds}s`,
+          timestamp: Date.now(),
+          traceback: [],
+        },
+      } as CommandExecution),
+    }),
+  )
+}
+
 export function cleanupSessionVolume(
   sessionID: string,
   config: SandboxConfig.Interface,
@@ -331,7 +354,14 @@ export namespace SandboxProvider {
           }
           log.info("sandbox created", { sessionID, sandboxID: sb.id, volumes: volumes.length })
           return sb
-        }).pipe(Effect.orDie, Effect.withSpan("SandboxProvider.createSandbox"))
+        }).pipe(
+          Effect.timeoutOrElse({
+            duration: Duration.seconds(60),
+            orElse: () => Effect.fail(new Error(`Sandbox create timed out after 60s: ${sessionID}`)),
+          }),
+          Effect.orDie,
+          Effect.withSpan("SandboxProvider.createSandbox"),
+        )
       }
 
       function destroySandbox(sb: Sandbox, sessionID: string) {
@@ -498,10 +528,13 @@ export namespace SandboxProvider {
           let sem = commandSemaphores.get(sessionID)
           if (!sem) { sem = Effect.runSync(Semaphore.make(1)); commandSemaphores.set(sessionID, sem) }
           return yield* sem.withPermit(
-            Effect.tryPromise({
-              try: () => sb.commands.runInSession(sessionId!, command, options, handlers, signal),
-              catch: (e) => new Error(`runInSession failed: ${String(e)}`),
-            }),
+            withExecTimeout(
+              Effect.tryPromise({
+                try: () => sb.commands.runInSession(sessionId!, command, options, handlers, signal),
+                catch: (e) => new Error(`runInSession failed: ${String(e)}`),
+              }),
+              options?.timeoutSeconds,
+            ),
           )
         }).pipe(Effect.withSpan("SandboxProvider.runInSession"))
 
@@ -846,7 +879,14 @@ export namespace SandboxProvider {
           )
           log.info("sandbox created", { sessionID, sandboxID: sb.id })
           return sb
-        }).pipe(Effect.orDie, Effect.withSpan("SandboxProvider.createSandbox"))
+        }).pipe(
+          Effect.timeoutOrElse({
+            duration: Duration.seconds(60),
+            orElse: () => Effect.fail(new Error(`Sandbox create timed out after 60s: ${sessionID}`)),
+          }),
+          Effect.orDie,
+          Effect.withSpan("SandboxProvider.createSandbox"),
+        )
       }
 
       function destroySandbox(sb: Sandbox, sessionID: string) {
@@ -1139,9 +1179,10 @@ export namespace SandboxProvider {
           const row = yield* dbGet(sessionID).pipe(Effect.orElseSucceed(() => null))
           let cmdSessionID = (row?.id === sb.id ? row?.command_session_id : null) ?? null
 
+          let sem = commandSemaphores.get(sessionID)
+          if (!sem) { sem = Effect.runSync(Semaphore.make(1)); commandSemaphores.set(sessionID, sem) }
+
           if (!cmdSessionID) {
-            let sem = commandSemaphores.get(sessionID)
-            if (!sem) { sem = Effect.runSync(Semaphore.make(1)); commandSemaphores.set(sessionID, sem) }
             cmdSessionID = yield* sem.withPermit(Effect.gen(function* () {
               const row2 = yield* dbGet(sessionID).pipe(Effect.orElseSucceed(() => null))
               const existing = (row2?.id === sb.id ? row2?.command_session_id : null) ?? null
@@ -1156,14 +1197,19 @@ export namespace SandboxProvider {
             }))
           }
 
-          return yield* Effect.tryPromise({
-            try: () => runCommandEarlyExit(sb, cmdSessionID!, command, options, handlers, signal),
-            catch: (e) => new Error(`runInSession failed: ${String(e)}`),
-          }).pipe(
-            Effect.tapError((err) =>
-              String(err).includes("not found")
-                ? Effect.sync(() => { invalidateCachedSandbox(sessionID); log.warn("sandbox invalidated after command failure", { sessionID }) })
-                : Effect.void,
+          return yield* sem.withPermit(
+            withExecTimeout(
+              Effect.tryPromise({
+                try: () => runCommandEarlyExit(sb, cmdSessionID!, command, options, handlers, signal),
+                catch: (e) => new Error(`runInSession failed: ${String(e)}`),
+              }).pipe(
+                Effect.tapError((err) =>
+                  String(err).includes("not found")
+                    ? Effect.sync(() => { invalidateCachedSandbox(sessionID); log.warn("sandbox invalidated after command failure", { sessionID }) })
+                    : Effect.void,
+                ),
+              ),
+              options?.timeoutSeconds,
             ),
           )
         }).pipe(Effect.withSpan("SandboxProvider.runInSession"))

@@ -12,11 +12,7 @@
 
 ## 通用变量
 
-```bash
-BASE="http://localhost:14096"
-PG_URL="postgresql://ruomu@127.0.0.1:15432/opencode"
-MODEL='{"providerID":"zhipuai","modelID":"glm-5.1"}'
-```
+> 运行前先全局加载环境：`source test-env.sh [1|2|3]`（见 [`00-preamble.md`](./00-preamble.md)）。以下用例直接用 `$BASE` `$PG_URL`，不重复定义。
 
 ---
 

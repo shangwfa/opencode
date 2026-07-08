@@ -4,7 +4,7 @@
 
 ## 公共环境
 
-同 `00-INDEX.md`。`BASE=http://localhost:14096`。
+> 运行前先全局加载环境：`source test-env.sh [1|2|3]`（见 [`00-preamble.md`](./00-preamble.md)）。用例直接用 `$BASE` `$PG_URL`，不重复定义。
 
 ---
 
@@ -39,7 +39,7 @@ SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}
 curl -s -X POST "$BASE/session/$SID/message" -H 'Content-Type: application/json' \
   -d '{"parts":[{"type":"text","text":"用 bash 执行 echo warmup"}],"model":{"providerID":"zhipuai","modelID":"glm-5.1"}}' > /dev/null
 # 获取 sandbox ID
-SB_ID=$(psql -h 127.0.0.1 -U ruomu -d opencode -t -A -c "SELECT id FROM sandbox WHERE session_id='$SID' AND state='running'")
+SB_ID=$(psql "$PG_URL" -t -A -c "SELECT id FROM sandbox WHERE session_id='$SID' AND state='running'")
 # 并发：destroyById + 工具调用
 curl -s -X POST "$BASE/session/$SID/kill-sandbox" &
 curl -s -X POST "$BASE/session/$SID/message" -H 'Content-Type: application/json' \
@@ -107,7 +107,7 @@ done
 wait
 sleep 30
 # PG 验证：sandbox 只有 1 条 running 记录
-COUNT=$(psql -h 127.0.0.1 -U ruomu -d opencode -t -A -c "SELECT count(*) FROM sandbox WHERE session_id='$SID' AND state='running'")
+COUNT=$(psql "$PG_URL" -t -A -c "SELECT count(*) FROM sandbox WHERE session_id='$SID' AND state='running'")
 echo "sandbox running count: $COUNT"
 ```
 
@@ -126,7 +126,7 @@ done
 wait
 sleep 30
 for S in "${SIDS[@]}"; do
-  COUNT=$(psql -h 127.0.0.1 -U ruomu -d opencode -t -A -c "SELECT count(*) FROM sandbox WHERE session_id='$S' AND state='running'")
+  COUNT=$(psql "$PG_URL" -t -A -c "SELECT count(*) FROM sandbox WHERE session_id='$S' AND state='running'")
   echo "$S: sandbox=$COUNT"
 done
 ```
@@ -144,7 +144,7 @@ SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}
 # 创建 sandbox
 curl -s -X POST "$BASE/session/$SID/message" -H 'Content-Type: application/json' \
   -d '{"parts":[{"type":"text","text":"用 bash 执行 echo create"}],"model":{"providerID":"zhipuai","modelID":"glm-5.1"}}' > /dev/null
-SB_ID=$(psql -h 127.0.0.1 -U ruomu -d opencode -t -A -c "SELECT id FROM sandbox WHERE session_id='$SID' AND state='running'")
+SB_ID=$(psql "$PG_URL" -t -A -c "SELECT id FROM sandbox WHERE session_id='$SID' AND state='running'")
 # 并发 destroyById + 消息
 curl -s -X POST "$BASE/session/$SID/kill-sandbox" &
 sleep 1
@@ -167,12 +167,12 @@ SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}
 curl -s -X POST "$BASE/session/$SID/message" -H 'Content-Type: application/json' \
   -d '{"parts":[{"type":"text","text":"用 bash 执行 echo create-sandbox"}],"model":{"providerID":"zhipuai","modelID":"glm-5.1"}}' > /dev/null
 sleep 2
-STATE_BEFORE=$(psql -h 127.0.0.1 -U ruomu -d opencode -t -A -c "SELECT state FROM sandbox WHERE session_id='$SID'")
+STATE_BEFORE=$(psql "$PG_URL" -t -A -c "SELECT state FROM sandbox WHERE session_id='$SID'")
 echo "before delete: sandbox state=$STATE_BEFORE"
 # 删除 session
 curl -s -X DELETE "$BASE/session/$SID" | jq -r .id
 sleep 3
-STATE_AFTER=$(psql -h 127.0.0.1 -U ruomu -d opencode -t -A -c "SELECT state FROM sandbox WHERE session_id='$SID'")
+STATE_AFTER=$(psql "$PG_URL" -t -A -c "SELECT state FROM sandbox WHERE session_id='$SID'")
 echo "after delete: sandbox state=$STATE_AFTER"
 ```
 
@@ -186,12 +186,12 @@ SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}
 curl -s -X POST "$BASE/session/$SID/prompt_async" -H 'Content-Type: application/json' \
   -d '{"parts":[{"type":"text","text":"写一首 500 字的诗"}],"model":{"providerID":"zhipuai","modelID":"glm-5.1"}}'
 sleep 2
-MSG_BEFORE=$(psql -h 127.0.0.1 -U ruomu -d opencode -t -A -c "SELECT count(*) FROM message WHERE session_id='$SID'")
+MSG_BEFORE=$(psql "$PG_URL" -t -A -c "SELECT count(*) FROM message WHERE session_id='$SID'")
 # 立即删除
 curl -s -X DELETE "$BASE/session/$SID" > /dev/null
 sleep 20
 # 检查是否有新消息写入已删 session
-MSG_AFTER=$(psql -h 127.0.0.1 -U ruomu -d opencode -t -A -c "SELECT count(*) FROM message WHERE session_id='$SID'")
+MSG_AFTER=$(psql "$PG_URL" -t -A -c "SELECT count(*) FROM message WHERE session_id='$SID'")
 echo "messages: before_delete=$MSG_BEFORE after_20s=$MSG_AFTER"
 ```
 
@@ -206,7 +206,7 @@ curl -s -X POST "$BASE/session/$SID/message" -H 'Content-Type: application/json'
 sleep 3
 curl -s -X DELETE "$BASE/session/$SID" > /dev/null
 sleep 5
-RUNNING=$(psql -h 127.0.0.1 -U ruomu -d opencode -t -A -c "SELECT count(*) FROM sandbox WHERE session_id='$SID' AND state='running'")
+RUNNING=$(psql "$PG_URL" -t -A -c "SELECT count(*) FROM sandbox WHERE session_id='$SID' AND state='running'")
 echo "orphan running sandbox: $RUNNING"
 ```
 

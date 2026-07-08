@@ -1,16 +1,26 @@
 # 本地测试环境指南
 
-本地运行 opencode SaaS 容器，连接远端基础设施（PG + Sandbox API），用于开发调试。
+本地运行 opencode SaaS 容器，PG 与 Sandbox 可各自选择本地或远端，组合成三种推荐配置：
 
-也可以只连接远端 PG，使用本机 OpenSandbox server + Docker runtime 创建 sandbox 容器，避免依赖远端 K8s Sandbox API。
+1. **远端 PG + 远端 Sandbox（K8s）**：原始方案，完全依赖远端基础设施。
+2. **远端 PG + 本地 OpenSandbox（Docker runtime）**：PG 用远端，沙箱在本机 Docker 创建，避免依赖远端 K8s。
+3. **本地 PG（Homebrew）+ 本地 OpenSandbox（Docker runtime）**：PG 与沙箱均在本地，完全离线可用。
 
-第三种组合：本地 PG（Homebrew PostgreSQL）+ 远端 Sandbox API。适用于本地已有 PG 数据、但沙箱依赖远端 K8s 的场景。
+> **PG 连接配置（本地与远端区分）**：
+>
+> | | 远端 PG | 本地 PG |
+> |---|---|---|
+> | 用户 / 密码 | `app` / `8zuhlMLd4gaeUG5k` | `local` / 无密码 |
+> | 连接串 | `postgresql://app:8zuhlMLd4gaeUG5k@host.docker.internal:15432/opencode` | `postgresql://local@host.docker.internal:15432/opencode` |
+> | 数据完整度 | account/auth/provider 历史数据完整 | 全空，需手动补 credential + `ZHIPU_API_KEY` |
 
 > **Docker runtime**：推荐使用 [OrbStack](https://orbstack.dev/) 替代 Docker Desktop——更轻量、启动快、镜像存储稳定。如果 Docker Desktop 出现 blob I/O error，切换到 OrbStack 即可（`docker context use orbstack`）。
 
 ---
 
 ## 一、基础设施架构
+
+远端模式（组合 1）：
 
 ```
 本机（macOS）
@@ -23,12 +33,12 @@
   └─ 浏览器访问 http://localhost:14096/...
 ```
 
-本地 OpenSandbox 模式：
+本地 OpenSandbox 模式（组合 2 远端 PG / 组合 3 本地 PG）：
 
 ```
 本机（macOS）
   ├─ Docker 容器 opencode-saas-test（localhost:14096）
-  │    ├─ 通过 host.docker.internal:15432 → 宿主机转发 → 172.18.32.14:5432（远端 PG）
+  │    ├─ 通过 host.docker.internal:15432 → 宿主机转发 → 远端 PG 172.18.32.14:5432（组合 2）或本地 PG 127.0.0.1:5432（组合 3）
   │    └─ 通过 host.docker.internal:8080 → 本地 OpenSandbox server
   ├─ OpenSandbox server（localhost:8080）
   │    └─ Docker runtime 创建 sandbox 容器
@@ -48,50 +58,63 @@
 
 ## 二、首次准备
 
-### 2.1 构建镜像
+本环境涉及**两个不同的镜像**，务必区分清楚：
+
+| | SaaS 服务镜像 | OpenSandbox 沙箱镜像 |
+|---|---|---|
+| 用途 | 运行 opencode SaaS server（监听 `:4096`），即 `docker run` 启动的主容器 | 沙箱内执行 AI 工具/用户代码的容器，由 OpenSandbox server 按需拉起 |
+| Dockerfile | 根目录 `Dockerfile` | `packages/opencode/docker/Dockerfile` |
+| 镜像 tag | `opencode-saas-sandbox-test:v2fix` | `opencode-opensandbox:local` |
+| 哪些组合需要 | **三种组合都需要** | 仅组合 2、3（本地 OpenSandbox） |
+| 重新构建时机 | 根目录 `Dockerfile` 或 SaaS 代码改动时 | sandbox 内 ripgrep / Node 版本 / LSP daemon 改动时 |
+
+> ⚠️ SaaS 镜像 tag 名 `opencode-saas-sandbox-test` 虽含 "sandbox"，但它是**服务镜像**（跑 server），不是沙箱镜像。沙箱镜像是 `opencode-opensandbox:local`，别被名字误导。
+
+### 2.1 构建 SaaS 服务镜像（三种组合都需要）
+
+构建组合流程中 `docker run` 使用的主容器（运行 opencode SaaS server，监听容器内 `:4096`）：
 
 ```bash
 cd /Users/ruomu/code/opencode
 docker build -t opencode-saas-sandbox-test:v2fix -f Dockerfile .
 ```
 
-> 代码有改动时才需要重新构建。
+> 首次必须构建；后续仅当根目录 `Dockerfile` 或 SaaS 代码改动时才需重新构建。
 
-### 2.1.1 构建本地 OpenSandbox sandbox 镜像（可选）
+### 2.1.1 构建 OpenSandbox 沙箱镜像（组合 2、3 需要）
 
-如果要使用本地 OpenSandbox server + Docker runtime，不走远端 K8s Sandbox API，需要先构建 OpenSandbox 使用的 sandbox 镜像。
+组合 2、3 使用本地 OpenSandbox server + Docker runtime 创建沙箱，需要本节构建沙箱镜像（组合 1 走远端 K8s 沙箱，可跳过）。沙箱镜像基于 `opensandbox/code-interpreter:latest`，内置 `ripgrep`、多版本 Node.js（mise 管理）和 LSP daemon，**不含 opencode 主二进制**（opencode server 跑在 SaaS 容器，不在沙箱内）。与上方 SaaS 服务镜像是**完全不同的两个镜像**（见总览表）。
 
-> 注意区分两个 Dockerfile：
-> - 根目录 `Dockerfile`：opencode SaaS 服务容器。
-> - `packages/opencode/docker/Dockerfile`：OpenSandbox sandbox 镜像，基于 `opensandbox/code-interpreter:latest`，内置 `opencode` 二进制和 `ripgrep`。
+> 私有 registry `registry.shadow-rpa.net` 不可达时，用公共镜像替代构建（见 7.6）：
+> ```bash
+> sed 's|registry.shadow-rpa.net/infra/opensandbox:2026-06-09|opensandbox/code-interpreter:latest|g' \
+>   packages/opencode/docker/Dockerfile > /tmp/Dockerfile.sandbox
+> docker buildx build --platform linux/arm64 -t opencode-opensandbox:local -f /tmp/Dockerfile.sandbox --load packages/opencode
+> ```
 
 ```bash
 cd /Users/ruomu/code/opencode/packages/opencode
 
-# 先生成 Dockerfile 需要复制的 opencode 二进制。
-# 如果已经有 dist/opencode-linux-arm64/bin/opencode，可跳过。
-bun run script/build.ts --skip-install --skip-embed-web-ui
-
-# 本地 macOS Apple Silicon 用 arm64。
+# Apple Silicon（M 系列）用 arm64；Intel Mac 改为 linux/amd64
 docker buildx build --platform linux/arm64 \
   -t opencode-opensandbox:local \
   --load .
 
-# 验证镜像继承了 code-interpreter 入口，且 opencode/rg 可用。
+# 验证镜像继承了 code-interpreter 入口，且 rg/node 可用。
 docker image inspect opencode-opensandbox:local \
   --format 'entrypoint={{json .Config.Entrypoint}} workdir={{json .Config.WorkingDir}}'
 
 docker run --rm --entrypoint /bin/bash opencode-opensandbox:local -lc \
-  'opencode --version && rg --version | head -1 && node --version && python3 --version'
+  'rg --version | head -1 && node --version && python3 --version'
 ```
 
 期望：
-- `entrypoint=["/opt/opensandbox/code-interpreter.sh"]`
+- `entrypoint` 为 `code-interpreter.sh`（私有镜像 `/opt/opensandbox/...`，公共镜像 `/opt/code-interpreter/...`）
 - `workdir=/workspace`
-- `opencode --version` 正常输出
 - `ripgrep 14.1.0` 或兼容版本正常输出
+- `node` / `python3` 正常输出
 
-> 不要在 `packages/opencode/docker/Dockerfile` 里设置 `ENTRYPOINT ["opencode"]`。OpenSandbox 需要继承 `code-interpreter` 的入口脚本以便注入并启动 execd；覆盖入口会导致 `commands.run()` 返回 502。
+> 不要在 `packages/opencode/docker/Dockerfile` 里覆盖 `ENTRYPOINT`。OpenSandbox 需要继承 `code-interpreter` 的入口脚本以便注入并启动 execd；覆盖入口会导致 `commands.run()` 返回 502。
 
 ### 2.2 确认远端连通性
 
@@ -105,40 +128,42 @@ timeout 3 nc -z 172.18.32.15 30040 && echo "Sandbox API OK" || echo "Sandbox API
 
 ---
 
-## 三、每次测试启动流程
+## 三、组合启动流程
 
-### Step 1：启动 TCP 转发
+每个组合是一个完整的、可照做的端到端流程：连通性检查 →（可选）本地 OpenSandbox server → TCP 转发 → 启动容器 → 基础验证。完成任一组合后，进行高级操作（dev server、exec、proxy、LSP）见本节末尾「通用验证与使用」。
+
+> 通用前置：先按 2.1 构建 SaaS 服务镜像（三种组合都需要）；组合 2、3 还需按 2.1.1 构建 sandbox 沙箱镜像。
+
+---
+
+### 组合 1：远端 PG + 远端 Sandbox（K8s）
+
+**Step 1：确认远端连通性**
+
+```bash
+timeout 3 nc -z 172.18.32.14 5432 && echo "PG OK" || echo "PG unreachable"
+timeout 3 nc -z 172.18.32.15 30040 && echo "Sandbox API OK" || echo "Sandbox API unreachable"
+```
+
+**Step 2：启动 TCP 转发**（远端 PG + 远端 Sandbox）
 
 > 每次开机或转发进程死掉后需要重新执行。
 
 ```bash
-# 检查是否已在运行
-lsof -i :15432 | grep LISTEN && echo "PG forward running" || echo "PG forward NOT running"
-lsof -i :30040 | grep LISTEN && echo "Sandbox forward running" || echo "Sandbox forward NOT running"
+kill $(lsof -ti :15432) 2>/dev/null
+kill $(lsof -ti :30040) 2>/dev/null
 
-# ── 方案 A：本地 PG（Homebrew PostgreSQL on 127.0.0.1:5432）──
-# 适用于本地已有 PG 数据、只连远端 Sandbox API 的场景。
-kill $(lsof -ti :15432) 2>/dev/null  # 先停掉可能存在的远端 PG 转发
+# 远端 PG 转发（15432 → 172.18.32.14:5432）
 nohup node -e "
 const net = require('net');
 net.createServer(c => {
-  const r = net.connect(5432, '127.0.0.1');
+  const r = net.connect(5432, '172.18.32.14');
   c.pipe(r); r.pipe(c);
   c.on('error', () => r.destroy()); r.on('error', () => c.destroy());
-}).listen(15432, '0.0.0.0', () => console.log('Local PG forward ready on :15432 -> 127.0.0.1:5432'));
-" > /tmp/pg-local-forward.log 2>&1 &
+}).listen(15432, '0.0.0.0', () => console.log('PG forward ready on :15432'));
+" > /tmp/pg-forward.log 2>&1 &
 
-# ── 方案 B：远端 PG（172.18.32.14:5432）──
-# nohup node -e "
-# const net = require('net');
-# net.createServer(c => {
-#   const r = net.connect(5432, '172.18.32.14');
-#   c.pipe(r); r.pipe(c);
-#   c.on('error', () => r.destroy()); r.on('error', () => c.destroy());
-# }).listen(15432, '0.0.0.0', () => console.log('PG forward ready on :15432'));
-# " > /tmp/pg-forward.log 2>&1 &
-
-# 启动 Sandbox API 转发（30040 → 172.18.32.15:30040）
+# Sandbox API 转发（30040 → 172.18.32.15:30040）
 nohup node -e "
 const net = require('net');
 net.createServer(c => {
@@ -153,14 +178,66 @@ lsof -i :15432 | grep LISTEN && echo "PG forward OK"
 lsof -i :30040 | grep LISTEN && echo "Sandbox forward OK"
 ```
 
-### Step 1.5：启动本地 OpenSandbox server（可选）
+**Step 3：启动容器**
 
-如果使用远端 Sandbox API，可跳过本节，继续使用 `localhost:30040` 转发。
+```bash
+docker rm -f opencode-saas-test 2>/dev/null
+
+docker run -d --name opencode-saas-test \
+  -p 14096:4096 \
+  -e OPENCODE_DATABASE_URL=postgresql://app:8zuhlMLd4gaeUG5k@host.docker.internal:15432/opencode \
+  -e OPENCODE_SANDBOX_DOMAIN=host.docker.internal:30040 \
+  -e OPENCODE_SANDBOX_USE_SERVER_PROXY=true \
+  opencode-saas-sandbox-test:v2fix
+
+sleep 10 && docker logs opencode-saas-test 2>&1 | tail -3
+# 期望：Warning: OPENCODE_SERVER_PASSWORD is not set
+#        opencode server listening on http://0.0.0.0:4096
+```
+
+**Step 4：基础验证**
+
+```bash
+# 服务健康（--noproxy 绕过本地代理）
+curl -s --noproxy '*' http://localhost:14096/ -o /dev/null -w "HTTP %{http_code}\n"  # 期望 200
+
+# 创建 session
+SID=$(curl -s --noproxy '*' -X POST http://localhost:14096/session \
+  -H 'Content-Type: application/json' -d '{}' \
+  | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+echo "SID: $SID"
+
+# 验证 AI provider（期望看到 AI 文字回复）
+curl -s --noproxy '*' --max-time 30 -X POST "http://localhost:14096/session/$SID/message" \
+  -H 'Content-Type: application/json' \
+  -d '{"parts":[{"type":"text","text":"hello"}],"model":{"providerID":"zhipuai","modelID":"glm-5.1"}}' \
+  | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+for p in d.get('parts',[]):
+    if p.get('type')=='text': print('AI:', p['text'][:100])
+"
+```
+
+> **权限配置**：当前版本默认权限已包含 `allow`，无需手动配置。如果遇到工具调用卡在 `running`，再通过 `PATCH /global/config` 配置权限（会触发实例 dispose，需重建 session）。
+
+✅ 组合 1 启动完成。进行高级操作见本节末尾「通用验证与使用」。
+
+---
+
+### 组合 2：远端 PG + 本地 OpenSandbox（Docker runtime）
+
+**Step 1：确认远端 PG 连通**
+
+```bash
+timeout 3 nc -z 172.18.32.14 5432 && echo "PG OK" || echo "PG unreachable"
+```
+
+**Step 2：启动本地 OpenSandbox server**
 
 本地 OpenSandbox server 读取 `~/.sandbox.toml`，使用 Docker runtime 创建 sandbox 容器。
 
 ```bash
-# 确保 Docker Desktop 已启动
 docker info >/dev/null && echo "Docker OK"
 
 # 推荐配置：Docker runtime + direct ingress
@@ -197,7 +274,7 @@ done
 {"status":"healthy"}
 ```
 
-本地 OpenSandbox server 验证 sandbox 镜像：
+可选：验证 sandbox 镜像可用：
 
 ```bash
 cd /Users/ruomu/code/opencode/packages/opencode
@@ -225,54 +302,26 @@ try {
 '
 ```
 
-如果这里返回 502，优先检查：
-- `docker image inspect opencode-opensandbox:local` 的 entrypoint 是否为 `/opt/opensandbox/code-interpreter.sh`
-- sandbox 容器内 `/tmp/execd.log`
-- `/tmp/opensandbox-server.log`
-- 本地是否误用了 amd64 镜像导致 QEMU 下 execd 崩溃
+> 返回 502 时检查：`docker image inspect opencode-opensandbox:local` 的 entrypoint 是否为 `/opt/opensandbox/code-interpreter.sh`、sandbox 容器内 `/tmp/execd.log`、`/tmp/opensandbox-server.log`、是否误用 amd64 镜像导致 QEMU 下 execd 崩溃。
 
-### Step 2：启动容器
+**Step 3：启动远端 PG 转发**
 
 ```bash
-docker rm -f opencode-saas-test 2>/dev/null
+kill $(lsof -ti :15432) 2>/dev/null
 
-# 远端 PG + 远端 Sandbox（原始方案）
-docker run -d --name opencode-saas-test \
-  -p 14096:4096 \
-  -e OPENCODE_DATABASE_URL=postgresql://app:8zuhlMLd4gaeUG5k@host.docker.internal:15432/opencode \
-  -e OPENCODE_SANDBOX_DOMAIN=host.docker.internal:30040 \
-  -e OPENCODE_SANDBOX_USE_SERVER_PROXY=true \
-  opencode-saas-sandbox-test:v2fix
+nohup node -e "
+const net = require('net');
+net.createServer(c => {
+  const r = net.connect(5432, '172.18.32.14');
+  c.pipe(r); r.pipe(c);
+  c.on('error', () => r.destroy()); r.on('error', () => c.destroy());
+}).listen(15432, '0.0.0.0', () => console.log('PG forward ready on :15432'));
+" > /tmp/pg-forward.log 2>&1 &
 
-# 等待启动
-sleep 10 && docker logs opencode-saas-test 2>&1 | tail -3
-# 期望：Warning: OPENCODE_SERVER_PASSWORD is not set
-#        opencode server listening on http://0.0.0.0:4096
+sleep 2 && lsof -i :15432 | grep LISTEN && echo "PG forward OK"
 ```
 
-本地 PG + 远端 Sandbox（Step 1 方案 A 的配套）：
-
-```bash
-docker rm -f opencode-saas-test 2>/dev/null
-
-docker run -d --name opencode-saas-test \
-  -p 14096:4096 \
-  -e OPENCODE_DATABASE_URL=postgresql://app:8zuhlMLd4gaeUG5k@host.docker.internal:15432/opencode \
-  -e OPENCODE_SANDBOX_DOMAIN=host.docker.internal:30040 \
-  -e OPENCODE_SANDBOX_USE_SERVER_PROXY=true \
-  -e ZHIPU_API_KEY \
-  opencode-saas-sandbox-test:v2fix
-
-sleep 10 && docker logs opencode-saas-test 2>&1 | tail -3
-```
-
-> 本地 PG 场景需要：
-> - Step 1 方案 A（PG 转发到 127.0.0.1:5432）
-> - 本地 PG 有 `app` 用户（密码 `8zuhlMLd4gaeUG5k`）和 `opencode` 数据库
-> - `-e ZHIPU_API_KEY` 传递 API key（本地 PG 的 credential 表可能为空）
-> - 首次创建 session 前需要修复 SQLite schema（见常见问题表）
-
-如果使用本地 OpenSandbox server，改用：
+**Step 4：启动容器**
 
 ```bash
 docker rm -f opencode-saas-test 2>/dev/null
@@ -288,20 +337,154 @@ docker run -d --name opencode-saas-test \
 sleep 10 && docker logs opencode-saas-test 2>&1 | tail -5
 ```
 
-本地 OpenSandbox Docker runtime 场景下：
-- `OPENCODE_SANDBOX_DOMAIN=host.docker.internal:8080`，因为 SaaS 容器需要从容器内访问宿主机 OpenSandbox server。
-- `OPENCODE_SANDBOX_IMAGE=opencode-opensandbox:local`，指定本地构建的 sandbox 镜像。
-- `OPENCODE_SANDBOX_USE_SERVER_PROXY=true`，因为 SDK 在 SaaS 容器内运行，不能直接访问 OpenSandbox server 返回的宿主机本地 Docker endpoint，必须通过 OpenSandbox server proxy 转发到 execd。
+> 本地 OpenSandbox Docker runtime 场景说明：
+> - `OPENCODE_SANDBOX_DOMAIN=host.docker.internal:8080`，SaaS 容器需从容器内访问宿主机 OpenSandbox server。
+> - `OPENCODE_SANDBOX_IMAGE=opencode-opensandbox:local`，指定本地构建的 sandbox 镜像。
+> - `OPENCODE_SANDBOX_USE_SERVER_PROXY=true`，SDK 在 SaaS 容器内运行，不能直连宿主机 Docker endpoint，必须经 OpenSandbox server proxy 转发到 execd。
 
-> 当前本地 Docker runtime 的稳定回归路径是：在宿主机直接启动 opencode server，使用 `OPENCODE_SANDBOX_DOMAIN=127.0.0.1:8080` 和 `OPENCODE_SANDBOX_USE_SERVER_PROXY=false`。SaaS server 跑在 Docker 容器内时，`useServerProxy=false` 无法访问宿主机 Docker 暴露的 direct endpoint；`useServerProxy=true` 又依赖 OpenSandbox server proxy 转发，遇到 502 时应先改用宿主机 server 路径验证工具链，再单独排查 OpenSandbox proxy。
+**Step 5：基础验证**
 
-宿主机 server 示例：
+```bash
+curl -s --noproxy '*' http://localhost:14096/ -o /dev/null -w "HTTP %{http_code}\n"  # 期望 200
+
+SID=$(curl -s --noproxy '*' -X POST http://localhost:14096/session \
+  -H 'Content-Type: application/json' -d '{}' \
+  | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+echo "SID: $SID"
+
+curl -s --noproxy '*' --max-time 30 -X POST "http://localhost:14096/session/$SID/message" \
+  -H 'Content-Type: application/json' \
+  -d '{"parts":[{"type":"text","text":"hello"}],"model":{"providerID":"zhipuai","modelID":"glm-5.1"}}' \
+  | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+for p in d.get('parts',[]):
+    if p.get('type')=='text': print('AI:', p['text'][:100])
+"
+```
+
+✅ 组合 2 启动完成。进行高级操作见本节末尾「通用验证与使用」。
+
+### 组合 3：本地 PG（Homebrew）+ 本地 OpenSandbox（Docker runtime）
+
+**Step 1：配置本地 PG（首次）**
+
+本地 PG 使用 `local` 用户（无密码），与远端 `app` 用户区分。首次需用超级用户创建用户和数据库：
+
+```bash
+psql postgres -c "CREATE USER local SUPERUSER;" -c "CREATE DATABASE opencode OWNER local;"
+```
+
+> 首次创建 session 前可能需修复 SQLite schema（`pvc_mode`/`app_id` 列），见常见问题表。
+> **credential 激活时机**：opencode server 首次启动时会从 `~/.local/share/opencode/auth.json` 导入 credential 到 PG（默认未激活）。需在 Step 4 容器启动**之后**执行激活：`psql postgresql://local@127.0.0.1:5432/opencode -c "UPDATE credential SET active = true WHERE connector_id = 'zhipuai';"`。若已传 `-e ZHIPU_API_KEY`（Step 4），provider 可直接用环境变量 key，激活非必须。
+
+**Step 2：启动本地 OpenSandbox server**
+
+本地 OpenSandbox server 读取 `~/.sandbox.toml`，使用 Docker runtime 创建 sandbox 容器：
+
+```bash
+docker info >/dev/null && echo "Docker OK"
+
+# 推荐配置：Docker runtime + direct ingress
+cat > ~/.sandbox.toml <<'EOF'
+[runtime]
+type = "docker"
+
+[docker]
+network_mode = "bridge"
+
+[ingress]
+mode = "direct"
+
+[egress]
+image = "opensandbox/egress:v1.0.8"
+mode = "dns"
+EOF
+
+# 启动本地 OpenSandbox server
+kill $(lsof -ti :8080) 2>/dev/null || true
+nohup env OPENSANDBOX_INSECURE_SERVER=YES uvx opensandbox-server \
+  > /tmp/opensandbox-server.log 2>&1 &
+
+# 验证健康状态
+for i in 1 2 3 4 5 6 7 8 9 10; do
+  curl -s http://127.0.0.1:8080/health && break
+  sleep 2
+done
+```
+
+期望：`{"status":"healthy"}`。若返回 502，检查 sandbox 镜像 entrypoint 是否为 `/opt/opensandbox/code-interpreter.sh`（`docker image inspect opencode-opensandbox:local`）、sandbox 容器内 `/tmp/execd.log`、是否误用 amd64 镜像导致 QEMU 下 execd 崩溃。
+
+**Step 3：启动本地 PG 转发**
+
+Homebrew PG 只监听 `127.0.0.1:5432`，Docker 容器需经 `host.docker.internal:15432` 访问，故手动转发：
+
+```bash
+kill $(lsof -ti :15432) 2>/dev/null  # 先停掉可能存在的远端 PG 转发
+
+nohup node -e "
+const net = require('net');
+net.createServer(c => {
+  const r = net.connect(5432, '127.0.0.1');
+  c.pipe(r); r.pipe(c);
+  c.on('error', () => r.destroy()); r.on('error', () => c.destroy());
+}).listen(15432, '0.0.0.0', () => console.log('Local PG forward ready on :15432 -> 127.0.0.1:5432'));
+" > /tmp/pg-local-forward.log 2>&1 &
+
+sleep 2 && lsof -i :15432 | grep LISTEN && echo "PG forward OK"
+```
+
+**Step 4：启动容器**
+
+```bash
+docker rm -f opencode-saas-test 2>/dev/null
+
+docker run -d --name opencode-saas-test \
+  -p 14096:4096 \
+  -e OPENCODE_DATABASE_URL=postgresql://local@host.docker.internal:15432/opencode \
+  -e OPENCODE_SANDBOX_DOMAIN=host.docker.internal:8080 \
+  -e OPENCODE_SANDBOX_USE_SERVER_PROXY=true \
+  -e OPENCODE_SANDBOX_IMAGE=opencode-opensandbox:local \
+  -e ZHIPU_API_KEY \
+  opencode-saas-sandbox-test:v2fix
+
+sleep 10 && docker logs opencode-saas-test 2>&1 | tail -3
+```
+
+> 本地 PG 场景注意：
+> - `-e ZHIPU_API_KEY` 必传（本地 PG credential → 环境变量映射链路不完整，见 7.4）。
+> - 若发消息报 `ProviderModelNotFoundError`，确认 key 已传入容器：`docker exec opencode-saas-test env | grep ZHIPU`。
+
+**Step 5：基础验证**
+
+```bash
+curl -s --noproxy '*' http://localhost:14096/ -o /dev/null -w "HTTP %{http_code}\n"  # 期望 200
+
+SID=$(curl -s --noproxy '*' -X POST http://localhost:14096/session \
+  -H 'Content-Type: application/json' -d '{}' \
+  | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+echo "SID: $SID"
+
+curl -s --noproxy '*' --max-time 30 -X POST "http://localhost:14096/session/$SID/message" \
+  -H 'Content-Type: application/json' \
+  -d '{"parts":[{"type":"text","text":"hello"}],"model":{"providerID":"zhipuai","modelID":"glm-5.1"}}' \
+  | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+for p in d.get('parts',[]):
+    if p.get('type')=='text': print('AI:', p['text'][:100])
+"
+```
+
+✅ 组合 3 启动完成。进行高级操作见下方「通用验证与使用」。
+
+> **备选：宿主机直接跑 server（跳过 SaaS 容器）**。本地 Docker runtime 的稳定回归路径是宿主机直接启动 opencode server，规避容器内外地址转换问题：
 
 ```bash
 cd /Users/ruomu/code/opencode/packages/opencode
 
 env \
-  OPENCODE_DATABASE_URL='postgresql://app:8zuhlMLd4gaeUG5k@127.0.0.1:15432/opencode' \
+  OPENCODE_DATABASE_URL='postgresql://local@127.0.0.1:15432/opencode' \
   OPENCODE_AUTH_PROVIDER=pg \
   OPENCODE_SANDBOX_ENABLED=1 \
   OPENCODE_SANDBOX_DOMAIN=127.0.0.1:8080 \
@@ -315,33 +498,14 @@ env \
 
 > ⚠️ **HTTP 代理注意**：如果宿主机设置了 `http_proxy`/`https_proxy`（如 clash、v2ray），curl 请求会被代理拦截导致所有 API 返回 500。所有 curl 命令必须加 `--noproxy '*'`，或设置 `export NO_PROXY=localhost,127.0.0.1`。
 
-### Step 3：验证服务可用
+### 通用验证与使用
 
-```bash
-# 服务健康（注意 --noproxy 绕过本地代理）
-curl -s --noproxy '*' http://localhost:14096/ -o /dev/null -w "HTTP %{http_code}\n"  # 期望 200
+> 以下操作对三种组合通用。需先完成上方任一组合的启动流程，并拿到 `$SID`（基础验证中创建的 session ID）。若新开 shell，重新设置：
+> ```bash
+> SID="你的 session ID"
+> ```
 
-# 创建 session
-SID=$(curl -s --noproxy '*' -X POST http://localhost:14096/session \
-  -H 'Content-Type: application/json' -d '{}' \
-  | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
-echo "SID: $SID"
-
-# 验证 AI provider（期望看到 AI 文字回复）
-curl -s --noproxy '*' --max-time 30 -X POST "http://localhost:14096/session/$SID/message" \
-  -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"hello"}],"model":{"providerID":"zhipuai","modelID":"glm-5.1"}}' \
-  | python3 -c "
-import json,sys
-d=json.load(sys.stdin)
-for p in d.get('parts',[]):
-    if p.get('type')=='text': print('AI:', p['text'][:100])
-"
-```
-
-> **权限配置**：当前版本默认权限已包含 `allow`，无需手动配置。如果遇到工具调用卡在 `running`，再通过 `PATCH /global/config` 配置权限（会触发实例 dispose，需重建 session）。
-
-### Step 4：在沙箱中启动 dev server
+**在沙箱中启动 dev server**
 
 > ⚠️ **必须使用 `background:true`**，否则 AI 消息完成后沙箱立即被销毁，dev server 进程消失。
 
@@ -380,14 +544,14 @@ sleep 20
 curl -s http://localhost:14096/session/$SID/proxy/3000/ -o /dev/null -w "Next.js: %{http_code}\n"
 ```
 
-### Step 5：浏览器验证
+**浏览器验证**
 
 ```
 Vite (proxy):    http://localhost:14096/session/{SID}/proxy/5173/
 Next.js (proxy): http://localhost:14096/session/{SID}/proxy/3000/
 ```
 
-### Step 6：Endpoint API 验证（直连模式）
+**Endpoint API 验证（直连模式）**
 
 ```bash
 # 获取沙箱直连 IP
@@ -404,7 +568,7 @@ curl -s --max-time 10 "$URL/" -o /dev/null -w "Direct: HTTP %{http_code}\n"
 - 直连访问 HTTP 200
 - 直连模式下无 proxy prefix 注入，是原始 Vite 输出
 
-### Step 7：验证工具调用过程
+**验证工具调用过程**
 
 > `POST /message` 返回的是 AI 的文字总结，工具调用在前一条消息中。验证工具是否真正执行需要查完整消息列表。
 
@@ -420,7 +584,7 @@ for i, m in enumerate(msgs):
 ')
 ```
 
-### Step 8：使用 exec API 程序化控制沙箱
+**使用 exec API 程序化控制沙箱**
 
 > 不依赖 AI 模型是否正确传递 `background:true`，直接通过 HTTP API 在沙箱中执行命令和设置 keepAlive。
 
@@ -530,7 +694,7 @@ POST /session/:sessionID/exec {"command":"nohup npx vite ... &"}
 | 症状 | 原因 | 解决 |
 |---|---|---|
 | 502 sandbox unreachable | sandbox 被回收（没有 keepAlive）| 重新发消息用 `background:true` 启动 dev server |
-| 502 "All connection attempts failed" | TCP 转发进程死了 | 重新执行 Step 1 |
+| 502 "All connection attempts failed" | TCP 转发进程死了 | 重新执行对应组合的 TCP 转发步骤 |
 | 404 from sandbox server proxy | `OPENCODE_SANDBOX_USE_SERVER_PROXY` 未设置 | 重新启动容器加 `-e OPENCODE_SANDBOX_USE_SERVER_PROXY=true` |
 | 本地 OpenSandbox `commands.run()` 502 | sandbox 镜像覆盖了 `code-interpreter` entrypoint，或 execd 崩溃 | 确认 sandbox 镜像继承 `/opt/opensandbox/code-interpreter.sh`，不要设置 `ENTRYPOINT ["opencode"]` |
 | 本地 arm64 上 execd 崩溃 | 使用了 amd64 镜像，Docker 通过 QEMU 运行 | 用 `docker buildx build --platform linux/arm64 --load` 构建本地镜像 |
@@ -543,8 +707,8 @@ POST /session/:sessionID/exec {"command":"nohup npx vite ... &"}
 | pg_advisory_lock 启动失败 | 远端 PG 被另一个 opencode 实例占用 | 等另一个实例退出，或停掉远端 SaaS |
 | dev server 进程消失 | 容器重启后 sandbox map 清空 | PVC 文件还在，重新发消息启动进程即可 |
 | psql 连接报 `role "app" does not exist` | TCP 转发的远端 PG 实例 role 配置与文档记录的 `app` 不一致 | 用 `\du` 查看 PG 实际 role 列表：`PGPASSWORD=xxx psql -h 127.0.0.1 -p 15432 -U postgres -d postgres -c '\du'`。或从 SaaS 容器内查：`docker exec opencode-saas-test env | grep DATABASE_URL` 获取实际连接串 |
-| write/edit/bash 工具一直 `running` | 未配置权限，默认 `"ask"` 模式等待确认 | 执行 Step 3.5 配置权限，或通过 SSE 监听 `permission.asked` 事件后调用 `POST /session/{SID}/permission/{requestID}` 回复 |
-| subagent write/edit 卡在 `running`，主 agent 正常 | **subagent session 继承的权限中 `edit` 默认为 `"ask"`，触发 `permission.asked` 事件发给 subagent sessionID，HTTP API 模式下无人应答**。主 agent 的 write 可能走不同权限路径不触发询问，但 subagent 内部调用 write 时会触发 `edit` 权限请求，反复重试无人应答后永远卡住。 | 执行 Step 3.5 配置全局权限（必须包含 `edit:allow` 和 `write:allow`），或在 subagent 创建时显式设置 permission |
+| write/edit/bash 工具一直 `running` | 未配置权限，默认 `"ask"` 模式等待确认 | 通过 `PATCH /global/config` 配置权限（会触发实例 dispose，需重建 session），或通过 SSE 监听 `permission.asked` 事件后调用 `POST /session/{SID}/permission/{requestID}` 回复 |
+| subagent write/edit 卡在 `running`，主 agent 正常 | **subagent session 继承的权限中 `edit` 默认为 `"ask"`，触发 `permission.asked` 事件发给 subagent sessionID，HTTP API 模式下无人应答**。主 agent 的 write 可能走不同权限路径不触发询问，但 subagent 内部调用 write 时会触发 `edit` 权限请求，反复重试无人应答后永远卡住。 | 通过 `PATCH /global/config` 配置全局权限（必须包含 `edit:allow` 和 `write:allow`，会触发实例 dispose），或在 subagent 创建时显式设置 permission |
 | write 写 `/tmp/` 路径触发 `external_directory` 权限 | `/tmp/` 不在项目目录（`/workspace`）下，触发外部目录权限 | 写文件时使用项目目录内的路径，如 `/workspace/test.txt` |
 | sandbox 健康检查超时 30s | `OPENCODE_SANDBOX_USE_SERVER_PROXY=true` 时 SDK 健康检查走 Pod 直连 | 属于 SDK 限制，重试通常能成功 |
 | Local MCP 启动慢（npx 下载 supergateway） | sandbox 镜像未预装 supergateway，每次 `npx -y` 下载 | **待优化**：sandbox 镜像预装 `npm install -g supergateway`，后续 `connectSandboxLocal` 可去掉 `npx -y` 前缀 |
@@ -609,7 +773,7 @@ net.createServer(c => {
 docker run -e ZHIPU_API_KEY='your-api-key' ...
 ```
 
-> 查看已有 credential：`psql -h localhost -U ruomu -d opencode -c "SELECT connector_id, active FROM credential WHERE active = true"`
+> 查看已有 credential：`psql postgresql://local@127.0.0.1:15432/opencode -c "SELECT connector_id, active FROM credential WHERE active = true"`
 
 ### 7.5 本地 PG 缺 account / auth 数据
 

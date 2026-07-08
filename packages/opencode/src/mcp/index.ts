@@ -693,7 +693,10 @@ const layer = Layer.effect(
 
       // Use supergateway to bridge stdio MCP → StreamableHTTP inside the sandbox
       const paths = sandboxMcpPaths(key, port)
-      const bridgeCommand = `supergateway --stdio ${shellQuote(stdioCommand(mcp))} --outputTransport streamableHttp --port ${port} --logLevel none`
+      const envArg = mcp.environment
+        ? "env " + Object.entries(mcp.environment).map(([k, v]) => `${k}=${shellQuote(String(v))}`).join(" ") + " "
+        : ""
+      const bridgeCommand = `${envArg}supergateway --stdio ${shellQuote(stdioCommand(mcp))} --outputTransport streamableHttp --port ${port} --logLevel none`
       yield* Effect.logInfo("starting MCP in sandbox via supergateway", { key, sessionID, port, command: bridgeCommand })
 
       yield* maybeSandboxProvider.runInSession(

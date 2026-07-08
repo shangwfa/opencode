@@ -7,10 +7,9 @@
 > 前置条件：同第十一节，使用本地测试环境（`docs/local-test-env.md`）。
 
 ```bash
-BASE="http://localhost:14096"
+# 环境变量 $BASE $PG_URL $MODEL 由 test-env.sh 全局提供（source test-env.sh [1|2|3]）
 SID=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
 echo "SID: $SID"
-MODEL='{"providerID":"zhipuai","modelID":"glm-5.1"}'
 ```
 
 ### T12.1 沙箱按需创建（首次 AI 消息时创建）

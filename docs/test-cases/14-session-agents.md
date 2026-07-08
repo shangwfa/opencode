@@ -8,10 +8,7 @@
 
 ### 公共配置
 
-```js
-const BASE = "http://localhost:14096"
-const MODEL = { providerID: "zhipuai", modelID: "glm-5.1" }
-```
+> 运行前先全局加载环境：`source test-env.sh [1|2|3]`（见 [`00-preamble.md`](./00-preamble.md)）。以下用例直接用 `$BASE` `$PG_URL`，不重复定义。下方 `bun -e` 脚本内部仍需自包含声明 `const BASE/MODEL`（JS 字面量，shell 变量无法注入单引号字符串）。
 
 ### 辅助函数
 
@@ -1398,7 +1395,7 @@ console.log("═".repeat(50))
 ### T-SUB-1 单 subagent 基础调用
 
 ```bash
-BASE="http://localhost:14096"
+# 环境变量 $BASE $PG_URL $MODEL 由 test-env.sh 全局提供（source test-env.sh [1|2|3]）
 SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
 curl -s -X POST "$BASE/session/$SID/agents/create" -H 'Content-Type: application/json' \
   -d '{"name":"translator","mode":"subagent","prompt":"翻译成英文，只输出翻译结果","description":"translator"}'
@@ -1434,9 +1431,7 @@ print('✅ T-SUB-1 PASS' if has_task and all_done and has_eng else '❌ FAIL')
 ### T-SUB-2 子 session PG 持久化验证
 
 ```bash
-BASE="http://localhost:14096"
-PG_URL="postgresql://ruomu@127.0.0.1:15432/opencode"
-
+# 环境变量 $BASE $PG_URL $MODEL 由 test-env.sh 全局提供（source test-env.sh [1|2|3]）
 CHILDREN=$(curl -s "$BASE/session/$SID/children" | python3 -c "import json,sys;print(len(json.load(sys.stdin)))")
 CSID=$(curl -s "$BASE/session/$SID/children" | python3 -c "import json,sys;print(json.load(sys.stdin)[0]['id'])")
 CMSG=$(curl -s "$BASE/session/$CSID/message" | python3 -c "import json,sys;print(len(json.load(sys.stdin)))")
@@ -1452,7 +1447,7 @@ echo "children: $CHILDREN, child msg: $CMSG, parent: $PG_PARENT, agent: $PG_AGEN
 ### T-SUB-3 双 subagent 并行调用
 
 ```bash
-BASE="http://localhost:14096"
+# 环境变量 $BASE $PG_URL $MODEL 由 test-env.sh 全局提供（source test-env.sh [1|2|3]）
 SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
 curl -s -X POST "$BASE/session/$SID/agents/create" -H 'Content-Type: application/json' \
   -d '{"name":"translator","mode":"subagent","prompt":"翻译成英文","description":"t"}' > /dev/null
@@ -1489,7 +1484,7 @@ done
 ### T-SUB-4 watchdog 不误杀 task 工具
 
 ```bash
-BASE="http://localhost:14096"
+# 环境变量 $BASE $PG_URL $MODEL 由 test-env.sh 全局提供（source test-env.sh [1|2|3]）
 SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
 curl -s -X POST "$BASE/session/$SID/agents/create" -H 'Content-Type: application/json' \
   -d '{"name":"slow","mode":"subagent","prompt":"思考后回复","description":"s"}'
@@ -1524,9 +1519,7 @@ print('✅ PASS' if no_watchdog else '❌ FAIL (watchdog killed task)')
 ### T-SUB-5 destroy 清理 keepAlive
 
 ```bash
-BASE="http://localhost:14096"
-PG_URL="postgresql://ruomu@127.0.0.1:15432/opencode"
-
+# 环境变量 $BASE $PG_URL $MODEL 由 test-env.sh 全局提供（source test-env.sh [1|2|3]）
 SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
 curl -s -m 60 -X POST "$BASE/session/$SID/exec" -H 'Content-Type: application/json' -d '{"command":"echo ok"}' > /dev/null
 curl -s -X POST "$BASE/session/$SID/keep-alive" -H 'Content-Type: application/json' -d '{"enabled":true}' > /dev/null
@@ -1546,7 +1539,7 @@ echo "before=$KA_BEFORE after=$KA_AFTER"
 ### T-SUB-6 task 失败后主 agent 正常恢复
 
 ```bash
-BASE="http://localhost:14096"
+# 环境变量 $BASE $PG_URL $MODEL 由 test-env.sh 全局提供（source test-env.sh [1|2|3]）
 SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
 curl -s -X POST "$BASE/session/$SID/agents/create" -H 'Content-Type: application/json' \
   -d '{"name":"broken","mode":"subagent","prompt":"总是回复 ERROR","description":"b"}'

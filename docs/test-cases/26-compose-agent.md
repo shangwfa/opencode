@@ -6,10 +6,7 @@
 
 ## 测试环境
 
-```bash
-BASE="http://localhost:14096"
-MODEL='{"providerID":"zhipuai","modelID":"glm-5.1"}'
-```
+> 运行前先全局加载环境：`source test-env.sh [1|2|3]`（见 [`00-preamble.md`](./00-preamble.md)）。以下用例直接用 `$BASE` `$PG_URL`，不重复定义。
 
 ---
 
@@ -18,8 +15,7 @@ MODEL='{"providerID":"zhipuai","modelID":"glm-5.1"}'
 创建一个简化版 compose agent，配合 3 个编排技能（plan → execute → review），验证 CRUD + PG 持久化。
 
 ```bash
-BASE="http://localhost:14096"
-MODEL='{"providerID":"zhipuai","modelID":"glm-5.1"}'
+# 环境变量 $BASE $PG_URL $MODEL 由 test-env.sh 全局提供（source test-env.sh [1|2|3]）
 
 SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' \
   -d '{"title":"compose-agent-test"}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
@@ -64,11 +60,11 @@ curl -s -X POST "$BASE/session/$SID/skills/create" \
 
 # 验证
 echo ">>> PG agents:"
-psql -h 127.0.0.1 -p 5432 -U ruomu -d opencode_saas_test -c \
+psql "$PG_URL" -c \
   "SELECT name, mode FROM session_agents WHERE session_id='$SID';"
 
 echo ">>> PG skills:"
-psql -h 127.0.0.1 -p 5432 -U ruomu -d opencode_saas_test -c \
+psql "$PG_URL" -c \
   "SELECT name, description FROM session_skill WHERE session_id='$SID';"
 
 echo ">>> API agents:"
@@ -119,7 +115,7 @@ for p in d.get('parts',[]):
 "
 
 # PG 验证 skill tool 调用（应有 compose:plan/execute/review 的加载记录）
-psql -h 127.0.0.1 -p 5432 -U ruomu -d opencode_saas_test -c "
+psql "$PG_URL" -c "
 SELECT p.data->>'tool' as tool, p.data->'state'->>'status' as status,
        substring(p.data->'state'->>'output' from 1 for 80) as output
 FROM part p JOIN message m ON p.message_id=m.id
@@ -185,7 +181,7 @@ curl -s --max-time 300 -X POST "$BASE/session/$SID/message" \
   }" > /dev/null
 
 # PG 验证 task 调用
-psql -h 127.0.0.1 -p 5432 -U ruomu -d opencode_saas_test -c "
+psql "$PG_URL" -c "
 SELECT p.data->>'tool' as tool, p.data->'state'->>'status' as status
 FROM part p JOIN message m ON p.message_id=m.id
 WHERE m.session_id='$SID' AND p.data->>'type'='tool' AND p.data->>'tool'='task'
@@ -226,8 +222,8 @@ echo "A skills: $A_SKILLS"
 echo "B skills: $B_SKILLS"
 
 # PG 验证
-PG_A=$(psql -h 127.0.0.1 -p 5432 -U ruomu -d opencode_saas_test -t -A -c "SELECT COUNT(*) FROM session_skill WHERE session_id='$SID_A'")
-PG_B=$(psql -h 127.0.0.1 -p 5432 -U ruomu -d opencode_saas_test -t -A -c "SELECT COUNT(*) FROM session_skill WHERE session_id='$SID_B'")
+PG_A=$(psql "$PG_URL" -t -A -c "SELECT COUNT(*) FROM session_skill WHERE session_id='$SID_A'")
+PG_B=$(psql "$PG_URL" -t -A -c "SELECT COUNT(*) FROM session_skill WHERE session_id='$SID_B'")
 echo "PG A=$PG_A, B=$PG_B"
 ```
 
@@ -248,8 +244,8 @@ curl -s -X POST "$BASE/session/$SID/skills/create" -H 'Content-Type: application
   -d '{"name":"compose:plan","description":"计划","content":"# Plan"}' > /dev/null
 
 # PG 验证（重启前）
-PG_AGENT_BEFORE=$(psql -h 127.0.0.1 -p 5432 -U ruomu -d opencode_saas_test -t -A -c "SELECT COUNT(*) FROM session_agents WHERE session_id='$SID'")
-PG_SKILL_BEFORE=$(psql -h 127.0.0.1 -p 5432 -U ruomu -d opencode_saas_test -t -A -c "SELECT COUNT(*) FROM session_skill WHERE session_id='$SID'")
+PG_AGENT_BEFORE=$(psql "$PG_URL" -t -A -c "SELECT COUNT(*) FROM session_agents WHERE session_id='$SID'")
+PG_SKILL_BEFORE=$(psql "$PG_URL" -t -A -c "SELECT COUNT(*) FROM session_skill WHERE session_id='$SID'")
 echo "重启前: agent=$PG_AGENT_BEFORE, skill=$PG_SKILL_BEFORE"
 
 # 重启
@@ -261,8 +257,8 @@ curl -s -X PATCH "$BASE/global/config" -H 'Content-Type: application/json' \
   -d '{"permission":{"bash":"allow","edit":"allow","write":"allow","glob":"allow","grep":"allow","list":"allow","read":"allow","webfetch":"allow"}}' > /dev/null
 
 # PG 验证（重启后）
-PG_AGENT_AFTER=$(psql -h 127.0.0.1 -p 5432 -U ruomu -d opencode_saas_test -t -A -c "SELECT COUNT(*) FROM session_agents WHERE session_id='$SID'")
-PG_SKILL_AFTER=$(psql -h 127.0.0.1 -p 5432 -U ruomu -d opencode_saas_test -t -A -c "SELECT COUNT(*) FROM session_skill WHERE session_id='$SID'")
+PG_AGENT_AFTER=$(psql "$PG_URL" -t -A -c "SELECT COUNT(*) FROM session_agents WHERE session_id='$SID'")
+PG_SKILL_AFTER=$(psql "$PG_URL" -t -A -c "SELECT COUNT(*) FROM session_skill WHERE session_id='$SID'")
 echo "重启后: agent=$PG_AGENT_AFTER, skill=$PG_SKILL_AFTER"
 
 # API 验证

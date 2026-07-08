@@ -11,10 +11,9 @@
 
 ## 通用变量
 
-```bash
-BASE="http://localhost:14096"
-PG_URL="postgresql://postgres:postgres@127.0.0.1:5432/opencode"
-```
+> 运行前先全局加载环境：`source test-env.sh [1|2|3]`（见 [`00-preamble.md`](./00-preamble.md)）。用例直接用 `$BASE` `$PG_URL`，不重复定义。
+
+> **注意**：`/provider` 响应体积大（~450KB，151+ provider）且部分字段含未转义控制字符，下方 python 解析均用 `json.load(sys.stdin, strict=False)`，否则报 `Invalid control character`。
 
 ---
 
@@ -25,7 +24,7 @@ PG_URL="postgresql://postgres:postgres@127.0.0.1:5432/opencode"
 ```bash
 curl -s "$BASE/provider" | python3 -c "
 import json,sys
-d=json.load(sys.stdin)
+d=json.load(sys.stdin, strict=False)
 all_providers = d.get('all', [])
 print(f'可用 provider 总数: {len(all_providers)}')
 print('前5个:')
@@ -42,7 +41,7 @@ print('✅ T3.1 PASS' if len(all_providers) > 0 else '❌ T3.1 FAIL')
 ```bash
 curl -s "$BASE/provider" | python3 -c "
 import json,sys
-d=json.load(sys.stdin)
+d=json.load(sys.stdin, strict=False)
 connected = d.get('connected', [])
 print(f'已配置 provider: {connected}')
 print('✅ T3.2 PASS' if len(connected) > 0 else '❌ T3.2 FAIL')
@@ -103,7 +102,7 @@ sleep 12
 echo "--- 重启后查询 connected ---"
 curl -s "$BASE/provider" | python3 -c "
 import json,sys
-d=json.load(sys.stdin)
+d=json.load(sys.stdin, strict=False)
 connected = d.get('connected', [])
 has_moonshot = 'moonshotai-cn' in connected
 print(f'connected: {connected}')

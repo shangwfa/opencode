@@ -144,7 +144,7 @@ export function toRow(info: Info) {
     agent: info.agent,
     model: info.model,
     version: info.version,
-    share_url: info.share?.url,
+    share_url: info.share ? info.share.url : null,
     summary_additions: info.summary?.additions,
     summary_deletions: info.summary?.deletions,
     summary_files: info.summary?.files,
@@ -811,7 +811,7 @@ export const layer: Layer.Layer<
           ...current,
           ...info,
           time: info.time ? { ...current.time, ...info.time } : current.time,
-          share: info.share === null ? undefined : info.share ? { ...current.share, ...info.share } : current.share,
+          share: info.share === null ? null : info.share ? { ...current.share, ...info.share } : current.share,
           summary: info.summary === null ? undefined : (info.summary ?? current.summary),
           revert: info.revert === null ? undefined : (info.revert ?? current.revert),
           permission: info.permission === null ? undefined : (info.permission ?? current.permission),
@@ -887,7 +887,15 @@ export const layer: Layer.Layer<
     })
 
     const setShare = Effect.fn("Session.setShare")(function* (input: { sessionID: SessionID; share: Info["share"] }) {
-      yield* patch(input.sessionID, { share: input.share ?? null, time: { updated: Date.now() } }).pipe(Effect.orDie)
+      if (input.share == null) {
+        // unshare: 直接 PG update 清除 share_url，不走 patch/事件投影（事件总线会将 null 还原为旧值）
+        yield* db.update(SessionTable).set({ share_url: null, time_updated: Date.now() }).where(eq(SessionTable.id, input.sessionID)).run().pipe(
+          Effect.provideService(Database.Service, database),
+          Effect.orDie,
+        )
+      } else {
+        yield* patch(input.sessionID, { share: input.share, time: { updated: Date.now() } }).pipe(Effect.orDie)
+      }
     })
 
     const setWorkspace = Effect.fn("Session.setWorkspace")(function* (input: {

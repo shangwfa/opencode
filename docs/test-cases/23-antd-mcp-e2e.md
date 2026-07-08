@@ -194,9 +194,8 @@ curl -s --max-time 120 -X POST "$BASE/session/$SID/message" \
 ## 测试命令汇总
 
 ```bash
-BASE="http://localhost:14096"
+# 环境变量 $BASE $PG_URL $MODEL 由 test-env.sh 全局提供（source test-env.sh [1|2|3]）
 export NO_PROXY=localhost,127.0.0.1
-MODEL='{"providerID":"zhipuai","modelID":"glm-5.1"}'
 
 # 1. 创建 session + keepAlive
 SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
@@ -215,6 +214,6 @@ curl -s --max-time 120 -X POST "$BASE/session/$SID/message" -H 'Content-Type: ap
   -d "{\"parts\":[{\"type\":\"text\",\"text\":\"用 antd_antd_list 列出组件\"}],\"model\":$MODEL}"
 
 # 5. PG 验证
-PGPASSWORD=xxx psql -h 127.0.0.1 -p 5432 -U app -d opencode -t -c \
+psql "$PG_URL" -t -c \
   "SELECT data->>'tool', data->'state'->>'status' FROM part WHERE session_id='$SID' AND data->>'type'='tool'"
 ```

@@ -7,8 +7,7 @@
 > 本节不是 SaaS 主验收，仅用于回归确认原 OpenCode 基础 API 没有被 SaaS 改造间接破坏。
 
 ```bash
-BASE="http://localhost:14096"
-MODEL='{"providerID":"zhipuai","modelID":"glm-5.1"}'
+# 环境变量 $BASE $PG_URL $MODEL 由 test-env.sh 全局提供（source test-env.sh [1|2|3]）
 SID=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -d '{"title":"p2-base-test"}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
 echo "SID: $SID"
 ```

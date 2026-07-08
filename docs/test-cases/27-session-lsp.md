@@ -96,6 +96,30 @@ error → starting (下次请求触发重新 ensure)
 
 ## 三、集成测试用例
 
+### 快速 Smoke Test（30s 验证 LSP 基本可用）
+
+> 最小验证：daemon 启动 + 类型诊断 + hover。**不依赖 AI 模型**，通过 SaaS exec API + curl 直接验证 daemon 端点。适合每次构建后快速回归。
+>
+> 与路径 A/B/C 的区别：路径 A 在宿主机直连；路径 B/C 测 LspAgent 自动启动；Smoke 在沙箱内**手动启动 daemon**，聚焦验证 daemon 功能正确性。首次 diagnostics 可能空（TS server 异步索引），脚本自动重试 3 次。
+
+📜 **可执行脚本**：[`lsp-smoke-test.mjs`](./lsp-smoke-test.mjs)
+
+```bash
+# 前提：SaaS 容器 + OpenSandbox server 已启动（source test-env.sh 3）
+# 运行（30s 完成）：
+bun docs/test-cases/lsp-smoke-test.mjs
+```
+
+**验证 3 个核心端点**：
+
+| 端点 | 验证 | 预期 |
+|---|---|---|
+| `/lsp/status` | daemon 启动 + TS server running | `{"servers":[{"id":"typescript","status":"running"}]}` |
+| `/lsp/diagnostics` | 有类型错误的 .ts 文件 | 含 `TS2322: Type 'string' is not assignable to type 'number'`（首次可能空，自动重试）|
+| `/lsp/hover` | 变量类型信息 | 含 `const x: number` |
+
+---
+
 本章节包含三条测试路径，均已沉淀为**可执行脚本**：
 
 - **路径 A — Daemon 单元测试**（T27.1–T27.7.6）：在宿主机直接用 `node` 跑 daemon bundle，curl 直连 `localhost:20877` 验证每个 LSP 端点。最快、无需 SaaS 栈，用于验证 daemon 本身。
@@ -120,7 +144,7 @@ error → starting (下次请求触发重新 ensure)
 **路径 B（端到端 SaaS）：**
 - 已按 `local-test-env.md` 完成：TCP 转发（PG `:15432`）、本地 OpenSandbox server（`:8080`）、SaaS 容器（`:14096`）
 - **sandbox 镜像 `opencode-opensandbox:local` 已构建且内置 LSP daemon**：`packages/opencode/docker/Dockerfile` 步骤 12 已 COPY daemon + 安装 `typescript-language-server`。重新构建镜像后才会包含最新 daemon bundle
-- 已执行 `local-test-env.md` Step 3.5 配置权限（`edit:allow` / `write:allow`），否则工具卡 `running`
+- 已通过 `PATCH /global/config` 配置权限（`edit:allow` / `write:allow`，见 `local-test-env.md` 常见问题表），否则工具卡 `running`
 
 ### 路径 A：Daemon 单元测试本地命令
 
@@ -156,8 +180,7 @@ curl -s http://localhost:20877/lsp/status
 ### 路径 B：端到端 SaaS 测试准备
 
 ```bash
-BASE="http://localhost:14096"
-MODEL='{"providerID":"zhipuai","modelID":"glm-5.1"}'
+# 环境变量 $BASE $PG_URL $MODEL 由 test-env.sh 全局提供（source test-env.sh [1|2|3]）
 
 # send_and_verify <sessionID> <prompt> <label>
 # 发送一条 AI 消息，打印 AI 文字回复，供后续 curl /message 验证工具调用。
@@ -182,7 +205,7 @@ PY
 # 0. 确认 SaaS 服务可用（参照 local-test-env.md Step 3）
 curl -s "$BASE/" -o /dev/null -w "SaaS HTTP %{http_code}\n"   # 期望 200
 
-# 1. 配置权限（local-test-env.md Step 3.5，必须，否则工具卡 running）
+# 1. 配置权限（PATCH /global/config，必须，否则工具卡 running）
 curl -s -X PATCH "$BASE/global/config" -H 'Content-Type: application/json' \
   -d '{"permission":{"bash":"allow","edit":"allow","write":"allow","read":"allow","glob":"allow","grep":"allow","list":"allow"}}' \
   | python3 -c "import json,sys;print('permission:',json.load(sys.stdin).get('permission'))"
@@ -1009,8 +1032,7 @@ instance.directory = /workspace/worktrees/<sid>
 **前置**：app 模式 session 已创建，`/workspace/repo/.git` 已 init + commit，worktree 已自动创建（参见 `27-session-pvc-mode.md` T27.13）。
 
 ```bash
-BASE="http://localhost:14096"
-MODEL='{"providerID":"zhipuai","modelID":"glm-5.1"}'
+# 环境变量 $BASE $PG_URL $MODEL 由 test-env.sh 全局提供（source test-env.sh [1|2|3]）
 APP_ID="lsp-app-$(date +%s)"
 
 # 1. 创建 app 模式 session

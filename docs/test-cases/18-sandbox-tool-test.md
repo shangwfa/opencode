@@ -381,7 +381,7 @@ FROM part WHERE type='tool';
 ### 11.1 通用变量
 
 ```bash
-BASE="http://localhost:14096"
+# 环境变量 $BASE $PG_URL $MODEL 由 test-env.sh 全局提供（source test-env.sh [1|2|3]）
 
 # 启动容器时务必加 --print-logs 才能看到 log.info 输出
 # docker run ... opencode-saas-sandbox-test:v2fix serve --hostname 0.0.0.0 --port 4096 --print-logs --pure
@@ -459,7 +459,6 @@ echo "--- 容器日志 ---"
 docker logs opencode-saas-test 2>&1 | grep "createSession\|createSession done\|commands.createSession" | grep "$SID" | tail -5
 
 # 验证 DB 中只有 1 个 command_session_id
-PG_URL="postgresql://ruomu@127.0.0.1:5432/opencode"
 COUNT=$(psql "$PG_URL" -t -c "SELECT count(*) FROM sandbox WHERE session_id='$SID' AND command_session_id IS NOT NULL" | tr -d '[:space:]')
 echo "DB command_session_id 记录数: $COUNT"
 if [ "$COUNT" = "1" ]; then
@@ -656,8 +655,7 @@ execd 执行 ls (<1s) → 发送 execution_complete → SDK 不 break
 ### 12.1 通用变量
 
 ```bash
-BASE="http://localhost:14096"
-PG_URL="postgresql://ruomu@127.0.0.1:5432/opencode"
+# 环境变量 $BASE $PG_URL $MODEL 由 test-env.sh 全局提供（source test-env.sh [1|2|3]）
 ```
 
 ---
@@ -863,7 +861,7 @@ bun verify-sse-ab.ts
 **验证点**：部署新镜像到远端 SaaS 后，确认 `ls` 等快命令从 92-3539 秒降至 <1 秒。
 
 ```bash
-PG_URL="postgresql://app:8zuhlMLd4gaeUG5k@127.0.0.1:15432/opencode"
+# 环境变量 $BASE $PG_URL $MODEL 由 test-env.sh 全局提供（source test-env.sh [1|2|3]）
 BASE="http://<远端 SaaS 地址>"
 
 # 1. 通过 AI 消息触发 ls 命令

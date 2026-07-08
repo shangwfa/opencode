@@ -7,8 +7,7 @@
 > 本节验证直接通过 HTTP API 在沙箱中执行命令、设置 keepAlive 的能力。不依赖 AI 模型是否正确传递 `background:true`，可用于程序化控制沙箱。
 
 ```bash
-BASE="http://localhost:14096"
-MODEL='{"providerID":"zhipuai","modelID":"glm-5.1"}'
+# 环境变量 $BASE $PG_URL $MODEL 由 test-env.sh 全局提供（source test-env.sh [1|2|3]）
 SID=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
 echo "SID: $SID"
 ```
@@ -550,7 +549,7 @@ await new Promise(r => setTimeout(r, 5000))
 const r = await post("/session/"+sid+"/exec", { command: "yes repeat | head -c 100000" })
 console.log("API stdout 长度:", r.stdout?.length)
 // 查 PG 验证截断
-' && SID=$(cat /tmp/test-sid) && PGPASSWORD=8zuhlMLd4gaeUG5k psql -h localhost -p 15432 -U app -d opencode -c "SELECT length(stdout) AS stdout_len, stdout LIKE '%[truncated]%' AS has_mark FROM exec_log WHERE session_id = '$SID' AND command LIKE '%head -c%'"
+' && SID=$(cat /tmp/test-sid) && psql "$PG_URL" -c "SELECT length(stdout) AS stdout_len, stdout LIKE '%[truncated]%' AS has_mark FROM exec_log WHERE session_id = '$SID' AND command LIKE '%head -c%'"
 ```
 **期望**：
 - API 返回完整 stdout（100000 字符）

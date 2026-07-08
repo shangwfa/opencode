@@ -78,7 +78,7 @@ RUN cd /tmp/preload \
        done \
      && rm -rf /tmp/preload /tmp/pnpm-vs
 
-# ── 12. Install opencode LSP daemon + typescript-language-server ──
+# ── 12. Install opencode LSP daemon + typescript-language-server + pyright ──
 COPY docker/opt/opencode-lsp-daemon/ /opt/opencode-lsp-daemon/
-RUN npm install -g typescript-language-server typescript \
+RUN npm install -g typescript-language-server typescript pyright \
     && ln -sf /opt/opencode-lsp-daemon/index.js /usr/local/bin/opencode-lsp-agent

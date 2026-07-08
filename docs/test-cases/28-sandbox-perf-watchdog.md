@@ -33,9 +33,7 @@
 ## 通用变量
 
 ```bash
-BASE="http://localhost:14096"
-PG_URL="postgresql://app:8zuhlMLd4gaeUG5k@127.0.0.1:15432/opencode"  # 通过本地转发到远端 PG
-MODEL='{"providerID":"zhipuai","modelID":"glm-5.1"}'
+# 环境变量 $BASE $PG_URL $MODEL 由 test-env.sh 全局提供（source test-env.sh [1|2|3]）
 
 # 启动容器时务必加 --print-logs 才能看到 log.info 输出
 # docker run ... opencode-saas-sandbox-test:v2fix serve --hostname 0.0.0.0 --port 4096 --print-logs

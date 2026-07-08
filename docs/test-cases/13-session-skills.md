@@ -6,10 +6,7 @@
 
 本节验证 SaaS API 中 session 维度的 skills：创建、读取、删除、复杂 bundle、resources 注入，以及从 SkillsMP 拉取真实 skill bundle 后执行。所有请求都打容器服务 `BASE=http://localhost:14096`。
 
-```bash
-BASE="http://localhost:14096"
-MODEL='{"providerID":"zhipuai","modelID":"glm-5.1"}'
-```
+> 运行前先全局加载环境：`source test-env.sh [1|2|3]`（见 [`00-preamble.md`](./00-preamble.md)）。以下用例直接用 `$BASE` `$PG_URL` `$MODEL`，不重复定义。
 
 ### T15.1 简单 session skill 创建与触发
 
@@ -267,8 +264,7 @@ PY
 验证同一 session 内重复创建同名 skill 时，第二次 upsert 覆盖第一次的内容和 resources。
 
 ```bash
-BASE="http://localhost:14096"
-MODEL='{"providerID":"zhipuai","modelID":"glm-5.1"}'
+# 环境变量 $BASE $PG_URL $MODEL 由 test-env.sh 全局提供（source test-env.sh [1|2|3]）
 
 SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{"title":"upsert-test"}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
 
@@ -310,8 +306,7 @@ curl -s --max-time 180 -X POST "$BASE/session/$SID/message" \
 验证 AI 在需要时会主动调用 `skill` tool 加载指定 resource 的完整内容，而非仅看 skill 摘要。
 
 ```bash
-BASE="http://localhost:14096"
-MODEL='{"providerID":"zhipuai","modelID":"glm-5.1"}'
+# 环境变量 $BASE $PG_URL $MODEL 由 test-env.sh 全局提供（source test-env.sh [1|2|3]）
 
 SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{"title":"skill-tool-resource-test"}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
 
@@ -355,8 +350,7 @@ docker exec ai-nova-postgres psql -U postgres -d opencode -c \"
 验证当 AI 被引导使用不存在的 skill 时，能正确识别并给出明确的错误信息。
 
 ```bash
-BASE="http://localhost:14096"
-MODEL='{"providerID":"zhipuai","modelID":"glm-5.1"}'
+# 环境变量 $BASE $PG_URL $MODEL 由 test-env.sh 全局提供（source test-env.sh [1|2|3]）
 
 SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{"title":"skill-not-found-test"}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
 
@@ -385,8 +379,7 @@ for p in d.get('parts',[]):
 验证创建与全局 skill 同名的 session skill 时，AI 优先加载 session 版本。
 
 ```bash
-BASE="http://localhost:14096"
-MODEL='{"providerID":"zhipuai","modelID":"glm-5.1"}'
+# 环境变量 $BASE $PG_URL $MODEL 由 test-env.sh 全局提供（source test-env.sh [1|2|3]）
 
 # 先查看全局 skill 列表
 curl -s "$BASE/skill" | python3 -c "import json,sys;d=json.load(sys.stdin);print([s['name'] for s in d])"
@@ -429,8 +422,7 @@ for p in d.get('parts',[]):
 验证通过 session permission deny `skill` tool 后，AI 无法调用 skill tool。
 
 ```bash
-BASE="http://localhost:14096"
-MODEL='{"providerID":"zhipuai","modelID":"glm-5.1"}'
+# 环境变量 $BASE $PG_URL $MODEL 由 test-env.sh 全局提供（source test-env.sh [1|2|3]）
 
 # 创建带 permission deny skill tool 的 session
 SID=$(curl -s -X POST "$BASE/session" \
@@ -471,7 +463,7 @@ for p in d.get('parts',[]):
 验证单个超大 resource（>256KB）和超多 resources（>64个）能否正常写入 PG。
 
 ```bash
-BASE="http://localhost:14096"
+# 环境变量 $BASE $PG_URL $MODEL 由 test-env.sh 全局提供（source test-env.sh [1|2|3]）
 
 # === T15.11a: 超大 resource (300KB) ===
 SID_A=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{"title":"boundary-large-test"}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
@@ -512,7 +504,7 @@ docker exec ai-nova-postgres psql -U postgres -d opencode -c \
 验证全局 skill 列表端点返回正确的内置 skills。
 
 ```bash
-BASE="http://localhost:14096"
+# 环境变量 $BASE $PG_URL $MODEL 由 test-env.sh 全局提供（source test-env.sh [1|2|3]）
 
 # 列出全局 skills
 curl -s "$BASE/skill" | python3 -c "
@@ -535,8 +527,7 @@ for s in d:
 验证在 `message` 请求中通过 `skills` 参数指定多个 skill 时，AI 能依次加载全部 skill 并综合使用。
 
 ```bash
-BASE="http://localhost:14096"
-MODEL='{"providerID":"zhipuai","modelID":"glm-5.1"}'
+# 环境变量 $BASE $PG_URL $MODEL 由 test-env.sh 全局提供（source test-env.sh [1|2|3]）
 
 SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{"title":"multi-skills-active-test"}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
 
@@ -606,8 +597,7 @@ ORDER BY m.time_created;
 验证不传 `skills` 参数时，AI 能根据消息内容自动从可用 skills 中选择并加载合适的 skill。
 
 ```bash
-BASE="http://localhost:14096"
-MODEL='{"providerID":"zhipuai","modelID":"glm-5.1"}'
+# 环境变量 $BASE $PG_URL $MODEL 由 test-env.sh 全局提供（source test-env.sh [1|2|3]）
 
 SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{"title":"multi-skills-passive-test"}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
 
@@ -668,8 +658,7 @@ ORDER BY m.time_created;
 验证当消息带 `skills` 参数时，system prompt 中注入的 `<preloaded_skills>` 只包含 manifest（name/description/location + resource 元数据），不含 skill 完整 content。
 
 ```bash
-BASE="http://localhost:14096"
-MODEL='{"providerID":"zhipuai","modelID":"glm-5.1"}'
+# 环境变量 $BASE $PG_URL $MODEL 由 test-env.sh 全局提供（source test-env.sh [1|2|3]）
 
 SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{"title":"progressive-disclosure-test"}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
 
@@ -711,8 +700,7 @@ for p in d.get('parts',[]):
 验证 AI 调用 `skill` tool 不指定 `resources` 参数时，返回的 resources 部分只有 path/type/size 元数据，不含实际 content。
 
 ```bash
-BASE="http://localhost:14096"
-MODEL='{"providerID":"zhipuai","modelID":"glm-5.1"}'
+# 环境变量 $BASE $PG_URL $MODEL 由 test-env.sh 全局提供（source test-env.sh [1|2|3]）
 
 SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{"title":"resource-manifest-test"}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
 
@@ -759,8 +747,7 @@ ORDER BY m.time_created;
 2. 不存在的 resource 标记为 `<missing_resource>`，不报错
 
 ```bash
-BASE="http://localhost:14096"
-MODEL='{"providerID":"zhipuai","modelID":"glm-5.1"}'
+# 环境变量 $BASE $PG_URL $MODEL 由 test-env.sh 全局提供（source test-env.sh [1|2|3]）
 
 SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{"title":"resource-content-test"}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
 
@@ -808,7 +795,7 @@ ORDER BY m.time_created;
 验证 session A 创建的 skill 在 session B 不可见。
 
 ```bash
-BASE="http://localhost:14096"
+# 环境变量 $BASE $PG_URL $MODEL 由 test-env.sh 全局提供（source test-env.sh [1|2|3]）
 
 SID_A=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{"title":"isolation-A"}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
 SID_B=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{"title":"isolation-B"}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
@@ -837,7 +824,7 @@ docker exec ai-nova-postgres psql -U postgres -d opencode -t -A -c \
 验证 DELETE session 后，PG 中 session_skill 记录被级联删除。
 
 ```bash
-BASE="http://localhost:14096"
+# 环境变量 $BASE $PG_URL $MODEL 由 test-env.sh 全局提供（source test-env.sh [1|2|3]）
 
 SID_DEL=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{"title":"cascade-delete-test"}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
 
@@ -869,8 +856,7 @@ docker exec ai-nova-postgres psql -U postgres -d opencode -t -A -c \
 验证 message 请求中 `skills` 数组包含不存在的 skill 名称时的行为。
 
 ```bash
-BASE="http://localhost:14096"
-MODEL='{"providerID":"zhipuai","modelID":"glm-5.1"}'
+# 环境变量 $BASE $PG_URL $MODEL 由 test-env.sh 全局提供（source test-env.sh [1|2|3]）
 
 SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{"title":"bad-skills-array-test"}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
 
@@ -906,7 +892,7 @@ print(http)
 验证空名称、超长名称、特殊字符名称的创建行为。
 
 ```bash
-BASE="http://localhost:14096"
+# 环境变量 $BASE $PG_URL $MODEL 由 test-env.sh 全局提供（source test-env.sh [1|2|3]）
 
 SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{"title":"name-boundary-test"}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
 
@@ -948,7 +934,7 @@ curl -s "$BASE/session/$SID/skills" | python3 -c "import json,sys;d=json.load(sy
 验证两个并发 POST 创建同名 skill 时，PG 最终只有一条记录（upsert 安全）。
 
 ```bash
-BASE="http://localhost:14096"
+# 环境变量 $BASE $PG_URL $MODEL 由 test-env.sh 全局提供（source test-env.sh [1|2|3]）
 
 SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{"title":"concurrent-upsert-test"}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
 
@@ -982,7 +968,7 @@ for s in d: print(f'  {s[\"name\"]}: {s[\"description\"]}')
 验证 resource content 中 Unicode、特殊字符、JSON 特殊字符的保真性。
 
 ```bash
-BASE="http://localhost:14096"
+# 环境变量 $BASE $PG_URL $MODEL 由 test-env.sh 全局提供（source test-env.sh [1|2|3]）
 
 SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{"title":"encoding-test"}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
 
@@ -1042,8 +1028,8 @@ docker exec ai-nova-postgres psql -U postgres -d opencode -t -A -c \
 完整流程：创建会话 → 安装 CLI + 下载 Chrome → 创建会话级 skill → 验证技能列表。
 
 ```bash
+# 环境变量 $BASE $PG_URL $MODEL 由 test-env.sh 全局提供（source test-env.sh [1|2|3]）
 unset ALL_PROXY HTTP_PROXY HTTPS_PROXY all_proxy http_proxy https_proxy
-BASE="http://localhost:14096"
 
 # Step 1: 创建会话
 SID=$(curl -s -X POST "$BASE/session" \
@@ -1121,9 +1107,8 @@ else:
 AI 通过 agent-browser session skill 浏览网页，执行 open/snapshot/get url/close 完整流程。
 
 ```bash
+# 环境变量 $BASE $PG_URL $MODEL 由 test-env.sh 全局提供（source test-env.sh [1|2|3]）
 unset ALL_PROXY HTTP_PROXY HTTPS_PROXY all_proxy http_proxy https_proxy
-BASE="http://localhost:14096"
-MODEL='{"providerID":"zhipuai","modelID":"glm-5.1"}'
 
 # 沿用 T15.24 的 session SID
 echo "Session: $SID"
@@ -1165,9 +1150,8 @@ for p in d.get('parts',[]):
 验证 agent-browser 与 page-summarizer 两个 session skill 同时加载时，AI 能正确规划并使用两者。
 
 ```bash
+# 环境变量 $BASE $PG_URL $MODEL 由 test-env.sh 全局提供（source test-env.sh [1|2|3]）
 unset ALL_PROXY HTTP_PROXY HTTPS_PROXY all_proxy http_proxy https_proxy
-BASE="http://localhost:14096"
-MODEL='{"providerID":"zhipuai","modelID":"glm-5.1"}'
 
 # 创建新会话
 SID=$(curl -s -X POST "$BASE/session" \

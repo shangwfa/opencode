@@ -7,8 +7,7 @@
 ### 通用变量
 
 ```bash
-BASE="http://localhost:14096"
-MODEL='{"providerID":"zhipuai","modelID":"glm-5.1"}'
+# 环境变量 $BASE $PG_URL $MODEL 由 test-env.sh 全局提供（source test-env.sh [1|2|3]）
 SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
 echo "SID: $SID"
 ```
@@ -49,7 +48,7 @@ curl -s --max-time 60 -X POST "$BASE/session/$SID/message" \
 # 验证工具调用（POST /message 返回的是文字总结，工具调用在前一条消息中）
 curl -s "$BASE/session/$SID/message" | python3 -c "
 import json, sys
-msgs = json.load(sys.stdin)
+msgs = json.load(sys.stdin, strict=False)
 tools = []
 for m in msgs[-3:]:
     for p in m.get('parts', []):

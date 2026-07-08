@@ -7,9 +7,14 @@
 - **容器镜像**：`opencode-saas-sandbox-test:v2fix`（SaaS 服务）+ `opencode-opensandbox:local`（sandbox 容器）
 - **容器名**：`opencode-saas-test`
 - **本地端口映射**：`localhost:14096 → 容器 4096`
-- **本地 PG 数据库**：`postgresql://ruomu@127.0.0.1:15432/opencode`（TCP 转发 15432 → 远端 5432，容器通过 `host.docker.internal:15432` 访问）
+- **PG 数据库**：经 `127.0.0.1:15432` 转发访问（容器通过 `host.docker.internal:15432`）。PG 用户随组合不同（组合 1/2 远端用 `app`，组合 3 本地用 `local`）。**运行用例前先加载环境 + 测试库**：
+  ```bash
+  source test-env.sh 3     # 组合号 1/2/3，默认 3 → $BASE/$PG_URL/$MODEL/$NO_PROXY
+  source test-lib.sh       # jexec/pass/fail/new_sid/pgval 等测试函数
+  ```
 - **测试模型**：`zhipuai/glm-5.1`（`{"providerID":"zhipuai","modelID":"glm-5.1"}`）
 - **Sandbox**：本地 OpenSandbox server `localhost:8080`（Docker runtime），PVC 模式（`OPENCODE_SANDBOX_VOLUME_TYPE=pvc`）
+- **HTTP 代理**：宿主机若设 `http_proxy`/`https_proxy`，所有 curl 必须绕过本地地址——执行用例前先 `export NO_PROXY=localhost,127.0.0.1`（或每个 curl 加 `--noproxy '*'`）
 
 
 ## 回归测试结果摘要
@@ -35,28 +40,51 @@
 
 ### 通用验证函数
 
-以下 bash 函数可在测试脚本中复用：
+测试库 `test-lib.sh`（`source test-lib.sh` 加载）提供标准函数，所有用例应优先使用，避免重复代码和 JSON 解析踩坑：
+
+| 函数 | 用法 | 说明 |
+|---|---|---|
+| `pass "T1.1"` / `fail "T1.1" "原因"` | 记录结果 | 自动计数 |
+| `summary` | 用例末尾 | 打印汇总，返回码 0=全过 |
+| `cmd \| jexec "表达式(d)"` | 解析 JSON 响应 | **内置 `strict=False`**，兼容含未转义控制字符的响应 |
+| `new_sid` / `new_sid -k` / `new_sid -kb` | 创建 session | `-k`=keepAlive，`-kb`=keepAlive+立即建沙箱 |
+| `pgval "SELECT ..."` | PG 查询单值 | 经 `$PG_URL`，无表头 |
+
+> ⚠️ **JSON 解析必须用 `jexec`**：`/provider`、`/session/:id/message`、`/exec` 等响应可能含未转义控制字符，python 默认 `json.load` 会报 `Invalid control character`。若逻辑复杂必须用原生 python，务必 `json.load(sys.stdin, strict=False)`。
+
+示例：
 
 ```bash
-BASE="http://localhost:14096"
-MODEL='{"providerID":"zhipuai","modelID":"glm-5.1"}'
+source test-env.sh 3 && source test-lib.sh
 
+# T1.1 健康检查
+H=$(curl -s "$BASE/global/health" | jexec "d.get('healthy')")
+[ "$H" = "True" ] && pass "T1.1" || fail "T1.1" "healthy=$H"
+
+# T2.1 创建 session + PG 验证（一行搞定）
+SID=$(new_sid)
+[ "$(pgval "SELECT project_id FROM session WHERE id='$SID'")" = "global" ] && pass "T2.1" || fail "T2.1"
+
+summary
+```
+
+工具调用验证函数（需手动 `source` 定义后使用）：
+
+```bash
 # send_and_verify: 发送消息并验证工具调用过程 + 最终结果
 # 用法: send_and_verify $SID "prompt文本" "测试标签"
 send_and_verify() {
   local sid=$1 prompt=$2 label=$3
   echo "=== $label ==="
 
-  # 发送消息（返回值是最后一条文字总结）
   curl -s --max-time 120 -X POST "$BASE/session/$sid/message" \
     -H 'Content-Type: application/json' \
     -d "{\"parts\":[{\"type\":\"text\",\"text\":\"$prompt\"}],\"model\":$MODEL}" > /dev/null 2>&1
 
-  # 从完整消息列表验证工具调用过程
+  # 注意 strict=False：消息响应可能含未转义控制字符
   curl -s "$BASE/session/$sid/message" | python3 -c "
 import json, sys
-msgs = json.load(sys.stdin)
-# 取最后3条消息（prompt + tool calls + summary）
+msgs = json.load(sys.stdin, strict=False)
 recent = msgs[-3:] if len(msgs) >= 3 else msgs
 tools, texts = [], []
 for m in recent:

@@ -56,7 +56,7 @@ function sessionRow(info: SessionV1.SessionInfo): typeof SessionTable.$inferInse
     agent: info.agent,
     model: info.model,
     version: info.version,
-    share_url: info.share?.url,
+    share_url: info.share ? info.share.url : null,
     summary_additions: info.summary?.additions,
     summary_deletions: info.summary?.deletions,
     summary_files: info.summary?.files,
@@ -237,7 +237,7 @@ const layer = Layer.effectDiscard(
     yield* events.project(SessionV1.Event.Updated, (event) =>
       db
         .update(SessionTable)
-        .set(sessionRow(event.data.info))
+        .set({ ...sessionRow(event.data.info), share_url: event.data.info.share ? event.data.info.share.url : sql`NULL` })
         .where(eq(SessionTable.id, event.data.sessionID))
         .run()
         .pipe(Effect.orDie),

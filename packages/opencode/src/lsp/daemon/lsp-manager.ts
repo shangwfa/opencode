@@ -108,6 +108,7 @@ interface ServerCapabilities {
 
 interface HeldServer {
   id: string
+  languageId: string
   status: ServerStatus
   process: ChildProcess | null
   connection: ReturnType<typeof createMessageConnection> | null
@@ -126,6 +127,7 @@ interface HeldServer {
 }
 
 const TS_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts", ".cts", ".ets"])
+const PY_EXTENSIONS = new Set([".py"])
 
 const LANGUAGE_EXTENSIONS: Record<string, string> = {
   ".ts": "typescript",
@@ -187,6 +189,18 @@ function isTsFile(filePath: string): boolean {
   return TS_EXTENSIONS.has(path.extname(filePath))
 }
 
+function isPyFile(filePath: string): boolean {
+  return PY_EXTENSIONS.has(path.extname(filePath))
+}
+
+function isLspFile(filePath: string): boolean {
+  return isTsFile(filePath) || isPyFile(filePath)
+}
+
+function languageIdForFile(filePath: string): string {
+  return isPyFile(filePath) ? "python" : "typescript"
+}
+
 function log(msg: string) {
   process.stderr.write(`[lsp-manager] ${msg}\n`)
 }
@@ -217,6 +231,19 @@ function findTypescriptLanguageServer(): string | undefined {
   return
 }
 
+function findPyright(): string | undefined {
+  const ext = process.platform === "win32" ? ".cmd" : ""
+  const pathDirs = (process.env.PATH ?? "").split(path.delimiter)
+  for (const dir of pathDirs) {
+    const candidate = path.join(dir, `pyright-langserver${ext}`)
+    try {
+      fs.accessSync(candidate, fs.constants.X_OK)
+      return candidate
+    } catch {}
+  }
+  return
+}
+
 function findTsserverPath(): string | undefined {
   try {
     return require.resolve("typescript/lib/tsserver.js", { paths: [WORKSPACE] })
@@ -243,6 +270,12 @@ const ROOT_MARKERS = [
   "bun.lock",
   "pnpm-lock.yaml",
   "yarn.lock",
+  "pyproject.toml",
+  "setup.py",
+  "setup.cfg",
+  "requirements.txt",
+  "Pipfile",
+  "poetry.lock",
 ]
 
 function detectRoot(filePath: string): string {
@@ -262,12 +295,13 @@ export class LspManager {
   private servers = new Map<string, HeldServer>()
 
   async ensureServer(filePath: string): Promise<string> {
-    if (!isTsFile(filePath)) return ""
-    const id = "typescript"
+    if (!isLspFile(filePath)) return ""
+    const langId = languageIdForFile(filePath)
+    const id = langId
     let server = this.servers.get(id)
 
     if (!server) {
-      server = this.createServer(id, filePath)
+      server = this.createServer(id, filePath, langId)
       this.servers.set(id, server)
     }
 
@@ -630,10 +664,11 @@ export class LspManager {
     this.servers.clear()
   }
 
-  private createServer(id: string, filePath: string): HeldServer {
+  private createServer(id: string, filePath: string, languageId: string = "typescript"): HeldServer {
     const root = detectRoot(filePath)
     const server: HeldServer = {
       id,
+      languageId,
       status: "starting",
       process: null,
       connection: null,
@@ -655,21 +690,32 @@ export class LspManager {
   }
 
   private async initializeServer(server: HeldServer): Promise<void> {
-    const bin = findTypescriptLanguageServer()
-    if (!bin) {
-      log("typescript-language-server not found")
-      server.status = "error"
-      server.spawnFailed = true
-      return
-    }
-
-    const tsserverPath = findTsserverPath()
+    let bin: string | undefined
     const initialization: Record<string, unknown> = {}
-    if (tsserverPath) {
-      initialization.tsserver = { path: tsserverPath }
+
+    if (server.languageId === "python") {
+      bin = findPyright()
+      if (!bin) {
+        log("pyright-langserver not found")
+        server.status = "error"
+        server.spawnFailed = true
+        return
+      }
+    } else {
+      bin = findTypescriptLanguageServer()
+      if (!bin) {
+        log("typescript-language-server not found")
+        server.status = "error"
+        server.spawnFailed = true
+        return
+      }
+      const tsserverPath = findTsserverPath()
+      if (tsserverPath) {
+        initialization.tsserver = { path: tsserverPath }
+      }
     }
 
-    log(`spawning: ${bin} --stdio (root=${server.root})`)
+    log(`spawning: ${bin} --stdio (root=${server.root}, lang=${server.languageId})`)
 
     const child = spawn(bin, ["--stdio"], {
       cwd: server.root,

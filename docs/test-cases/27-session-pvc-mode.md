@@ -7,10 +7,7 @@
 
 ## 测试环境
 
-```bash
-BASE="http://localhost:14096"
-MODEL='{"providerID":"zhipuai","modelID":"glm-5.1"}'
-```
+> 运行前先全局加载环境：`source test-env.sh [1|2|3]`（见 [`00-preamble.md`](./00-preamble.md)）。以下用例直接用 `$BASE` `$PG_URL`，不重复定义。
 
 > **注意**：app 模式需要 PVC volume（`OPENCODE_SANDBOX_VOLUME_TYPE=pvc`）。测试前确认：
 > ```bash

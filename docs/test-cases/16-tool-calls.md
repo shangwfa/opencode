@@ -7,8 +7,7 @@
 > 本节专门验证 AI 工具调用的**过程**而非仅最终结果，确保 `POST /message` 返回的文字总结背后确实执行了工具。
 
 ```bash
-BASE="http://localhost:14096"
-MODEL='{"providerID":"zhipuai","modelID":"glm-5.1"}'
+# 环境变量 $BASE $PG_URL $MODEL 由 test-env.sh 全局提供（source test-env.sh [1|2|3]）
 SID=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
 echo "SID: $SID"
 ```
@@ -210,7 +209,7 @@ send_and_verify "$SID" "项目是 Vite + React 应用，运行在沙箱的 /work
 
 ```bash
 # 模拟 sandbox 不可用：通过 DB 将 sandbox 标记为 destroyed，再发 read/write 请求
-psql "$PGURL" -c "
+psql "$PG_URL" -c "
 UPDATE sandbox SET state='destroyed', time_updated=$(date +%s%3N)
 WHERE session_id='$SID';
 "
@@ -224,7 +223,7 @@ send_and_verify "$SID" "把 /workspace/test.txt 的内容改为 no-sandbox" "T18
 # 期望：write 工具 status=error，错误信息包含 "Sandbox is not available" 或 "Sandbox initialization failed"
 
 # 恢复：删除 sandbox 记录，让下次工具调用自动重建
-psql "$PGURL" -c "DELETE FROM sandbox WHERE session_id='$SID';"
+psql "$PG_URL" -c "DELETE FROM sandbox WHERE session_id='$SID';"
 ```
 
 **期望**：
@@ -241,7 +240,7 @@ psql "$PGURL" -c "DELETE FROM sandbox WHERE session_id='$SID';"
 send_and_verify "$SID" "读取 /workspace/test.txt" "T18.10b-1: 正常 read（基线）"
 
 # 2. 记录当前 sandbox ID
-OLD_SB_ID=$(psql "$PGURL" -t -A -c "SELECT id FROM sandbox WHERE session_id='$SID' AND state='running' LIMIT 1;")
+OLD_SB_ID=$(psql "$PG_URL" -t -A -c "SELECT id FROM sandbox WHERE session_id='$SID' AND state='running' LIMIT 1;")
 echo "OLD_SB_ID: $OLD_SB_ID"
 
 # 3. 模拟文件通道 hung（如果 sandbox 支持 network policy 或手动 hang）：
@@ -252,7 +251,7 @@ send_and_verify "$SID" "用 bash 执行，background 必须为 true: while true;
 
 # 4. 在 PG 中确认旧 sandbox 被 destroy 后重建
 sleep 5
-NEW_SB_ID=$(psql "$PGURL" -t -A -c "SELECT id FROM sandbox WHERE session_id='$SID' AND state='running' LIMIT 1;")
+NEW_SB_ID=$(psql "$PG_URL" -t -A -c "SELECT id FROM sandbox WHERE session_id='$SID' AND state='running' LIMIT 1;")
 echo "NEW_SB_ID: $NEW_SB_ID"
 
 # 期望：如果 timeout destroy 生效，NEW_SB_ID 可能与 OLD_SB_ID 不同（重建后）
@@ -272,10 +271,10 @@ echo "NEW_SB_ID: $NEW_SB_ID"
 ```bash
 # 1. 构造一个 stuck tool：手动在 PG 插入一个 running 状态、start 时间为 6 分钟前的 tool part
 STUCK_PART_ID="prt_test_stuck_$(date +%s)"
-MSG_ID=$(psql "$PGURL" -t -A -c "SELECT id FROM message WHERE session_id='$SID' ORDER BY time_created DESC LIMIT 1;")
+MSG_ID=$(psql "$PG_URL" -t -A -c "SELECT id FROM message WHERE session_id='$SID' ORDER BY time_created DESC LIMIT 1;")
 SIX_MIN_AGO=$(($(date +%s%3N) - 360000))
 
-psql "$PGURL" -c "
+psql "$PG_URL" -c "
 INSERT INTO part (id, session_id, message_id, time_created, time_updated, data)
 VALUES (
   '$STUCK_PART_ID',
@@ -293,7 +292,7 @@ echo "Inserted stuck part: $STUCK_PART_ID (start=$((SIX_MIN_AGO)))"
 echo "Waiting for watchdog scan (up to 70s)..."
 for i in $(seq 1 14); do
   sleep 5
-  STATUS=$(psql "$PGURL" -t -A -c "SELECT data->'state'->>'status' FROM part WHERE id='$STUCK_PART_ID';")
+  STATUS=$(psql "$PG_URL" -t -A -c "SELECT data->'state'->>'status' FROM part WHERE id='$STUCK_PART_ID';")
   echo "  [$((i*5))s] status=$STATUS"
   if [ "$STATUS" = "error" ]; then
     echo "Watchdog recovered stuck tool after ~$((i*5))s"
@@ -302,7 +301,7 @@ for i in $(seq 1 14); do
 done
 
 # 3. 验证 watchdog 标记
-RESULT=$(psql "$PGURL" -t -A -c "
+RESULT=$(psql "$PG_URL" -t -A -c "
 SELECT data->'state'->>'status', data->'state'->>'error'
 FROM part WHERE id='$STUCK_PART_ID';
 ")
@@ -341,7 +340,7 @@ DURATION=$((TIME_END - TIME_START))
 echo "  耗时: ${DURATION}s"
 
 # 3. PG 验证 write 状态
-WRITE_STATUS=$(psql "$PGURL" -t -A -c "
+WRITE_STATUS=$(psql "$PG_URL" -t -A -c "
 SELECT data->'state'->>'status'
 FROM part
 WHERE session_id='$SID' AND data->>'tool'='write'
@@ -367,14 +366,14 @@ send_and_verify "$SID" "用 write 创建 /workspace/cache-test.txt 内容是 v1"
 # 2. 手动 destroy sandbox（触发 cache invalidate）
 curl -s -X POST "$BASE/session/$SID/sandbox/destroy" > /dev/null 2>&1 || true
 # 如果没有 destroy 端点，通过 DB 标记 + 等待 cache TTL 过期
-psql "$PGURL" -c "UPDATE sandbox SET state='destroyed' WHERE session_id='$SID';" 2>/dev/null || true
+psql "$PG_URL" -c "UPDATE sandbox SET state='destroyed' WHERE session_id='$SID';" 2>/dev/null || true
 sleep 31  # 等 cache TTL 过期
 
 # 3. 再次写入，验证 sandbox 重建
 send_and_verify "$SID" "用 write 创建 /workspace/cache-test2.txt 内容是 v2" "T18.10e-2: cache invalidate 后重建"
 
 # 4. PG 验证
-SB_COUNT=$(psql "$PGURL" -t -A -c "SELECT count(*) FROM sandbox WHERE session_id='$SID' AND state='running';")
+SB_COUNT=$(psql "$PG_URL" -t -A -c "SELECT count(*) FROM sandbox WHERE session_id='$SID' AND state='running';")
 echo "Running sandbox count: $SB_COUNT"
 ```
 
@@ -396,7 +395,7 @@ send_and_verify "$SID" "一次性创建 3 个文件：/workspace/concurrent-x.tx
 
 **PG 时间线验证**：
 ```bash
-psql "$PGURL" -c "
+psql "$PG_URL" -c "
 SELECT data->>'tool',
   data->'state'->'input'->>'filePath' AS file_path,
   to_timestamp((data->'state'->'time'->>'start')::bigint/1000)::time AS start_t,
@@ -422,7 +421,7 @@ send_and_verify "$SID" "同时执行两个操作：1) 把 /workspace/race.txt �
 
 **PG 时间线 + 内容验证**：
 ```bash
-psql "$PGURL" -c "
+psql "$PG_URL" -c "
 SELECT data->>'tool',
   data->'state'->'input'->>'filePath' AS file_path,
   substring(data->'state'->'input'->>'content', 1, 50) AS content_preview,
@@ -452,7 +451,7 @@ send_and_verify "$SID" "同时做两件事：1) 把 /workspace/race.txt 的内�
 
 **PG 时间线验证**：
 ```bash
-psql "$PGURL" -c "
+psql "$PG_URL" -c "
 SELECT data->>'tool',
   to_timestamp((data->'state'->'time'->>'start')::bigint/1000)::time AS start_t,
   to_timestamp((data->'state'->'time'->>'end')::bigint/1000)::time AS end_t,
@@ -478,7 +477,7 @@ send_and_verify "$SID" "同时执行 3 个独立的 bash 工具调用（不要�
 
 **PG 时间线验证**：
 ```bash
-psql "$PGURL" -c "
+psql "$PG_URL" -c "
 SELECT data->>'tool',
   substring(data->'state'->'input'->>'command', 1, 40) AS cmd,
   to_timestamp((data->'state'->'time'->>'start')::bigint/1000)::time AS start_t,
