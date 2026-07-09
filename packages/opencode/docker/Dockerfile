@@ -70,13 +70,15 @@ RUN pnpm config set store-dir /opt/pnpm-store --global \
 # ── 11. Pre-populate pnpm store via workspace templates ──
 # pnpm store pre-populated at /opt/pnpm-store (content-addressable).
 # Only pnpm@10 (default version) store is pre-populated.
-COPY . /tmp/preload/
+COPY docker/packages/ /tmp/preload/packages/
+COPY docker/pnpm-workspace.yaml docker/package.json /tmp/preload/
 RUN cd /tmp/preload \
     && mkdir -p /opt/pnpm-store \
     && for dir in packages/*/; do \
-         (cd "$dir" && pnpm install --ignore-scripts 2>/dev/null || true); \
+         echo "==> Pre-populating pnpm store: $dir" \
+         && (cd "$dir" && pnpm install --ignore-scripts || true); \
        done \
-     && rm -rf /tmp/preload /tmp/pnpm-vs
+    && rm -rf /tmp/preload /tmp/pnpm-vs
 
 # ── 12. Install opencode LSP daemon + typescript-language-server + pyright ──
 COPY docker/opt/opencode-lsp-daemon/ /opt/opencode-lsp-daemon/
