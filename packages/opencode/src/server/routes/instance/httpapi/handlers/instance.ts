@@ -11,19 +11,20 @@ import { SandboxProvider } from "@/tool/sandbox-provider"
 import { toSandboxPath } from "@/tool/sandbox-path"
 import { Flag } from "@opencode-ai/core/flag/flag"
 import { Effect } from "effect"
-import { HttpApiBuilder, HttpApiError } from "effect/unstable/httpapi"
+import { HttpApiBuilder } from "effect/unstable/httpapi"
 import { InstanceHttpApi } from "../api"
 import { ApiVcsApplyError } from "../groups/instance"
 import { markInstanceForDisposal } from "../lifecycle"
 
-const sandboxVcsDiffCommand = (mode: Vcs.Mode, context: number | undefined) => `node <<'NODE'
+const sandboxVcsDiffCommand = (mode: Vcs.Mode, context: number | undefined, directory: string) => `node <<'NODE'
 const child = require("child_process")
 const mode = ${JSON.stringify(mode)}
 const context = ${JSON.stringify(context ?? 2_147_483_647)}
+const directory = ${JSON.stringify(directory)}
 const maxBuffer = 10 * 1024 * 1024
 
 function git(args) {
-  return child.spawnSync("git", args, { encoding: "utf8", maxBuffer })
+  return child.spawnSync("git", args, { encoding: "utf8", maxBuffer, cwd: directory || undefined })
 }
 
 function output(args) {
@@ -157,10 +158,6 @@ export const instanceHandlers = HttpApiBuilder.group(InstanceHttpApi, "instance"
     })
 
     const getVcs = Effect.fn("InstanceHttpApi.vcs")(function* () {
-      if (Flag.OPENCODE_SANDBOX_ENABLED) {
-        yield* Effect.logWarning("getVcs not supported in sandbox mode; use session-scoped vcsDiff instead")
-        return yield* new HttpApiError.BadRequest({})
-      }
       const [branch, default_branch] = yield* Effect.all([vcs.branch(), vcs.defaultBranch()], {
         concurrency: "unbounded",
       })
@@ -175,10 +172,11 @@ export const instanceHandlers = HttpApiBuilder.group(InstanceHttpApi, "instance"
       query: { mode: Vcs.Mode; context?: number; sessionID?: SessionID }
     }) {
       if (Flag.OPENCODE_SANDBOX_ENABLED && ctx.query.sessionID) {
+        const instanceCtx = yield* InstanceState.context
         const sandbox = yield* Effect.serviceOption(SandboxProvider.Service)
         if (sandbox._tag === "Some") {
           const result = yield* sandbox.value
-            .runInSession(ctx.query.sessionID, sandboxVcsDiffCommand(ctx.query.mode, ctx.query.context), {
+            .runInSession(ctx.query.sessionID, sandboxVcsDiffCommand(ctx.query.mode, ctx.query.context, instanceCtx.directory), {
               timeoutSeconds: 30,
             })
             .pipe(Effect.catch(() => Effect.succeed(undefined)))
