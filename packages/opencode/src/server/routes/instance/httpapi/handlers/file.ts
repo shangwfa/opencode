@@ -29,10 +29,6 @@ export const fileHandlers = HttpApiBuilder.group(InstanceHttpApi, "file", (handl
     })
 
     const findText = Effect.fn("FileHttpApi.findText")(function* (ctx: { query: { pattern: string } }) {
-      if (Flag.OPENCODE_SANDBOX_ENABLED) {
-        yield* Effect.logWarning("findText not supported in sandbox mode; use session-scoped search instead")
-        return yield* new HttpApiError.BadRequest({})
-      }
       return (yield* ripgrep
         .grep({ cwd: (yield* InstanceState.context).directory, pattern: ctx.query.pattern, limit: 10 })
         .pipe(Effect.orDie)).map((match) => ({
@@ -51,10 +47,6 @@ export const fileHandlers = HttpApiBuilder.group(InstanceHttpApi, "file", (handl
     const findFile = Effect.fn("FileHttpApi.findFile")(function* (ctx: {
       query: { query: string; dirs?: "true" | "false"; type?: "file" | "directory"; limit?: number }
     }) {
-      if (Flag.OPENCODE_SANDBOX_ENABLED) {
-        yield* Effect.logWarning("findFile not supported in sandbox mode; use session-scoped search instead")
-        return yield* new HttpApiError.BadRequest({})
-      }
       const directory = (yield* InstanceState.context).directory
       const limit = ctx.query.limit ?? 10
       const type = ctx.query.type ?? (ctx.query.dirs === "false" ? "file" : undefined)
@@ -91,10 +83,9 @@ export const fileHandlers = HttpApiBuilder.group(InstanceHttpApi, "file", (handl
             .pipe(Effect.orDie)
           const items = result.logs.stdout
             .map((l: any) => (typeof l === "string" ? l : l.text ?? ""))
-            .join("")
+            .join("\n")
             .split("\n")
-            .map((t: string) => t.trim())
-            .filter((t: string) => t.length > 0)
+            .filter((t: string) => t && !t.startsWith("total "))
             .filter((t: string) => t !== "." && t !== ".." && t !== "./" && t !== "../")
             .sort()
           return items.map((entry: string) => {
