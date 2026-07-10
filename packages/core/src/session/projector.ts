@@ -49,6 +49,7 @@ function sessionRow(info: SessionV1.SessionInfo): typeof SessionTable.$inferInse
     parent_id: info.parentID,
     pvc_mode: info.pvcMode,
     app_id: info.appId,
+    sandbox: info.sandbox,
     slug: info.slug,
     directory: info.directory,
     path: info.path,

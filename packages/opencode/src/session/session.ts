@@ -92,6 +92,7 @@ export function fromRow(row: SessionRow): Info {
     workspaceID: row.workspace_id ?? undefined,
     pvcMode: row.pvc_mode ?? undefined,
     appId: row.app_id ?? undefined,
+    sandbox: row.sandbox ?? undefined,
     directory: row.directory,
     path: row.path ?? undefined,
     parentID: row.parent_id ?? undefined,
@@ -138,6 +139,7 @@ export function toRow(info: Info) {
     slug: info.slug,
     pvc_mode: info.pvcMode,
     app_id: info.appId,
+    sandbox: info.sandbox,
     directory: info.directory,
     path: info.path,
     title: info.title,
@@ -238,6 +240,15 @@ export const Metadata = Schema.Record(Schema.String, Schema.Any)
 export const PvcMode = Schema.Literals(["session", "app"])
 export type PvcMode = Schema.Schema.Type<typeof PvcMode>
 
+const CpuPattern = /^\d+(\.\d+)?m?$/
+const MemoryPattern = /^\d+(Ki|Mi|Gi|Ti|K|M|G|T)$/
+
+export const SandboxResource = Schema.Struct({
+  cpu: Schema.String,
+  memory: Schema.String,
+})
+export type SandboxResource = Schema.Schema.Type<typeof SandboxResource>
+
 export const Info = Schema.Struct({
   id: SessionID,
   slug: Schema.String,
@@ -260,6 +271,7 @@ export const Info = Schema.Struct({
   revert: optional(Revert),
   pvcMode: optional(PvcMode),
   appId: optional(Schema.String),
+  sandbox: optional(SandboxResource),
 }).annotate({ identifier: "Session" })
 export type Info = Types.DeepMutable<Schema.Schema.Type<typeof Info>>
 
@@ -287,6 +299,7 @@ export const CreateInput = Schema.optional(
     workspaceID: Schema.optional(WorkspaceV2.ID),
     pvcMode: Schema.optional(PvcMode),
     appId: Schema.optional(Schema.String),
+    sandbox: Schema.optional(SandboxResource),
   }),
 )
 export type CreateInput = Types.DeepMutable<Schema.Schema.Type<typeof CreateInput>>
@@ -544,6 +557,7 @@ export const layer: Layer.Layer<
       permission?: PermissionV1.Ruleset
       pvcMode?: PvcMode
       appId?: string
+      sandbox?: SandboxResource
     }) {
       const ctx = yield* InstanceState.context
       const result: Info = {
@@ -556,6 +570,7 @@ export const layer: Layer.Layer<
         workspaceID: input.workspaceID,
         pvcMode: input.pvcMode,
         appId: input.appId,
+        sandbox: input.sandbox,
         parentID: input.parentID,
         title: input.title ?? (input.parentID ? childTitlePrefix : parentTitlePrefix) + new Date().toISOString(),
         agent: input.agent,
@@ -722,6 +737,7 @@ export const layer: Layer.Layer<
       workspaceID?: WorkspaceV2.ID
       pvcMode?: PvcMode
       appId?: string
+      sandbox?: SandboxResource
     }) {
       if (input?.pvcMode === "app" && !input.appId?.trim()) {
         return yield* new InvalidPvcConfigError({ message: "appId is required when pvcMode is app" })
@@ -729,16 +745,28 @@ export const layer: Layer.Layer<
       if (input?.appId && !/^[\w\-.]{1,128}$/.test(input.appId)) {
         return yield* new InvalidPvcConfigError({ message: "appId must be 1-128 chars of [a-zA-Z0-9_-\\.]" })
       }
+      if (input?.sandbox) {
+        if (!CpuPattern.test(input.sandbox.cpu)) {
+          return yield* new InvalidPvcConfigError({ message: `Invalid sandbox.cpu: "${input.sandbox.cpu}". Must be a number like "1", "0.5", or "500m"` })
+        }
+        if (!MemoryPattern.test(input.sandbox.memory)) {
+          return yield* new InvalidPvcConfigError({ message: `Invalid sandbox.memory: "${input.sandbox.memory}". Must be like "2Gi", "512Mi", or "1G"` })
+        }
+      }
       // 子会话自动继承父会话的 app 模式配置（session 模式不影响，保持原行为）
       let pvcMode = input?.pvcMode
       let appId = input?.appId?.trim()
-      if (input?.parentID && !pvcMode) {
+      let sandbox = input?.sandbox
+      if (input?.parentID) {
         const parent = yield* Effect.tryPromise(() => resolveSandboxOpts(input.parentID!)).pipe(
           Effect.catch(() => Effect.succeed(undefined)),
         )
-        if (parent?.pvcMode === "app") {
+        if (!pvcMode && parent?.pvcMode === "app") {
           pvcMode = parent.pvcMode
           appId = parent.appId
+        }
+        if (!sandbox && parent?.sandbox) {
+          sandbox = parent.sandbox
         }
       }
       const ctx = yield* InstanceState.context
@@ -755,6 +783,7 @@ export const layer: Layer.Layer<
         workspaceID: input?.workspaceID ?? workspace,
         pvcMode,
         appId,
+        sandbox,
       })
     })
 
@@ -769,6 +798,7 @@ export const layer: Layer.Layer<
         workspaceID: original.workspaceID,
         pvcMode: original.pvcMode === "app" ? "app" : undefined,
         appId: original.pvcMode === "app" ? original.appId : undefined,
+        sandbox: original.sandbox,
         title,
         metadata: structuredClone(original.metadata),
       })

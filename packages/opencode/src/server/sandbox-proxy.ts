@@ -311,7 +311,7 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
         const useApp = root.pvcMode === "app" && !!root.appId?.trim()
 
         if (useApp) {
-          yield* sandbox.getOrCreate(root.id, { pvcMode: root.pvcMode, appId: root.appId }).pipe(
+          yield* sandbox.getOrCreate(root.id, { pvcMode: root.pvcMode, appId: root.appId, sandbox: root.sandbox }).pipe(
             Effect.catch(() => Effect.void),
           )
         }
@@ -371,7 +371,7 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
         const useApp = root.pvcMode === "app" && !!root.appId?.trim()
 
         if (useApp) {
-          yield* sandbox.getOrCreate(root.id, { pvcMode: root.pvcMode, appId: root.appId }).pipe(
+          yield* sandbox.getOrCreate(root.id, { pvcMode: root.pvcMode, appId: root.appId, sandbox: root.sandbox }).pipe(
             Effect.catch(() => Effect.void),
           )
         }

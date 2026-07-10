@@ -35,7 +35,7 @@ export namespace SandboxConfig {
     useServerProxy: Flag.OPENCODE_SANDBOX_USE_SERVER_PROXY,
     image: Flag.OPENCODE_SANDBOX_IMAGE,
     timeoutSeconds: Flag.OPENCODE_SANDBOX_TIMEOUT,
-    resourceLimits: { cpu: "1", memory: "4Gi" },
+    resourceLimits: { cpu: "1", memory: "2Gi" },
     volumeType: Flag.OPENCODE_SANDBOX_VOLUME_TYPE,
     pvcClaimName: Flag.OPENCODE_SANDBOX_PVC_CLAIM,
     idleKillMs: Flag.OPENCODE_SANDBOX_IDLE_KILL_SEC * 1000,
@@ -115,7 +115,7 @@ function requirePackageCacheMount(mountPath: string, reservedPaths: string[]) {
   return normalized
 }
 
-function withExecTimeout(
+export function withExecTimeout(
   effect: Effect.Effect<CommandExecution, Error>,
   timeoutSeconds: number | undefined,
 ): Effect.Effect<CommandExecution, Error> {
@@ -245,7 +245,7 @@ export namespace SandboxProvider {
   export interface Interface {
     readonly getOrCreate: (
       sessionID: SessionID,
-      opts?: { pvcMode?: "session" | "app"; appId?: string },
+      opts?: { pvcMode?: "session" | "app"; appId?: string; sandbox?: { cpu: string; memory: string } },
     ) => Effect.Effect<Sandbox>
     readonly get: (sessionID: SessionID) => Effect.Effect<Sandbox | null>
     readonly destroy: (sessionID: SessionID) => Effect.Effect<void>
@@ -330,11 +330,12 @@ export namespace SandboxProvider {
         return Ref.modify(entries, (m) => { m.delete(sessionID); return [undefined, m] as const })
       }
 
-      function createSandbox(sessionID: SessionID, opts?: { pvcMode?: "session" | "app"; appId?: string }) {
+      function createSandbox(sessionID: SessionID, opts?: { pvcMode?: "session" | "app"; appId?: string; sandbox?: { cpu: string; memory: string } }) {
         return Effect.gen(function* () {
           const resolved = opts ?? (yield* Effect.promise(() => resolveSandboxOpts(sessionID)))
           const timeoutSeconds = hasVolume ? config.maxTtlSeconds : config.timeoutSeconds
-          log.info("creating sandbox", { sessionID, volumeType: config.volumeType, timeoutSeconds, pvcMode: resolved.pvcMode })
+          const resource = resolved.sandbox ?? config.resourceLimits
+          log.info("creating sandbox", { sessionID, volumeType: config.volumeType, timeoutSeconds, pvcMode: resolved.pvcMode, resource })
           const volumes = buildVolumes({ sessionID, pvcMode: resolved.pvcMode, appId: resolved.appId }, config)
           const sb = yield* Effect.tryPromise({
             try: () =>
@@ -342,7 +343,7 @@ export namespace SandboxProvider {
                 connectionConfig,
                 image: config.image,
                 timeoutSeconds,
-                resource: config.resourceLimits,
+                resource,
                 ...(volumes.length > 0 ? { volumes } : {}),
               }),
             catch: (e) => new Error(`Sandbox.create failed: ${e instanceof Error ? e.message : String(e)}`),
@@ -546,10 +547,13 @@ export namespace SandboxProvider {
             catch: (e) => new Error(`Failed to create detached session: ${String(e)}`),
           })
           try {
-            return yield* Effect.tryPromise({
-              try: () => runCommandEarlyExit(sb, detachedSessionId, command, options, handlers, signal),
-              catch: (e) => new Error(`runDetached failed: ${String(e)}`),
-            })
+            return yield* withExecTimeout(
+              Effect.tryPromise({
+                try: () => runCommandEarlyExit(sb, detachedSessionId, command, options, handlers, signal),
+                catch: (e) => new Error(`runDetached failed: ${String(e)}`),
+              }),
+              options?.timeoutSeconds,
+            )
           } finally {
             yield* Effect.tryPromise(() => sb.commands.deleteSession(detachedSessionId)).pipe(Effect.ignore)
           }
@@ -832,7 +836,7 @@ export namespace SandboxProvider {
         }).pipe(Effect.catchCause(() => Effect.void))
       }
 
-      function createSandbox(sessionID: SessionID, opts?: { pvcMode?: "session" | "app"; appId?: string }) {
+      function createSandbox(sessionID: SessionID, opts?: { pvcMode?: "session" | "app"; appId?: string; sandbox?: { cpu: string; memory: string } }) {
         return Effect.gen(function* () {
           const existingRow = yield* dbGet(sessionID).pipe(Effect.orElseSucceed(() => null))
           const isKept = existingRow?.keep_alive === true
@@ -840,7 +844,8 @@ export namespace SandboxProvider {
           // keepAlive sandbox 使用 10x TTL，确保远程 sandbox 不会在保活期间自杀
           const timeoutSeconds = isKept ? Math.max(baseTtl, config.maxTtlSeconds) * 10 : baseTtl
           const resolved = opts ?? (yield* Effect.promise(() => resolveSandboxOpts(sessionID)))
-          log.info("creating sandbox", { sessionID, volumeType: config.volumeType, timeoutSeconds, keepAlive: isKept, pvcMode: resolved.pvcMode })
+          const resource = resolved.sandbox ?? config.resourceLimits
+          log.info("creating sandbox", { sessionID, volumeType: config.volumeType, timeoutSeconds, keepAlive: isKept, pvcMode: resolved.pvcMode, resource })
           const volumes = buildVolumes({ sessionID, pvcMode: resolved.pvcMode, appId: resolved.appId }, config)
           const sb = yield* Effect.tryPromise({
             try: () =>
@@ -848,7 +853,7 @@ export namespace SandboxProvider {
                 connectionConfig,
                 image: config.image,
                 timeoutSeconds,
-                resource: config.resourceLimits,
+                resource,
                 ...(volumes.length > 0 ? { volumes } : {}),
               }),
             catch: (e) => new Error(`Sandbox.create failed: ${e instanceof Error ? e.message : String(e)}`),
@@ -929,7 +934,7 @@ export namespace SandboxProvider {
 
       // ── Interface 实装 ────────────────────────────────────────────────
 
-      function getOrCreateUnlocked(sessionID: SessionID, opts?: { pvcMode?: "session" | "app"; appId?: string }) {
+      function getOrCreateUnlocked(sessionID: SessionID, opts?: { pvcMode?: "session" | "app"; appId?: string; sandbox?: { cpu: string; memory: string } }) {
         return Effect.gen(function* () {
           const cached = getCachedSandbox(sessionID)
           if (cached) return cached
@@ -1222,15 +1227,18 @@ export namespace SandboxProvider {
             catch: (e) => new Error(`Failed to create detached session: ${String(e)}`),
           })
           try {
-            return yield* Effect.tryPromise({
-              try: () => runCommandEarlyExit(sb, detachedSessionId, command, options, handlers, signal),
-              catch: (e) => new Error(`runDetached failed: ${String(e)}`),
-            }).pipe(
-              Effect.tapError((err) =>
-                String(err).includes("not found")
-                  ? Effect.sync(() => { invalidateCachedSandbox(sessionID); log.warn("sandbox invalidated after detached failure", { sessionID }) })
-                  : Effect.void,
+            return yield* withExecTimeout(
+              Effect.tryPromise({
+                try: () => runCommandEarlyExit(sb, detachedSessionId, command, options, handlers, signal),
+                catch: (e) => new Error(`runDetached failed: ${String(e)}`),
+              }).pipe(
+                Effect.tapError((err) =>
+                  String(err).includes("not found")
+                    ? Effect.sync(() => { invalidateCachedSandbox(sessionID); log.warn("sandbox invalidated after detached failure", { sessionID }) })
+                    : Effect.void,
+                ),
               ),
+              options?.timeoutSeconds,
             )
           } finally {
             yield* Effect.tryPromise(() => sb.commands.deleteSession(detachedSessionId)).pipe(Effect.ignore)

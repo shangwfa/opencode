@@ -551,6 +551,7 @@ export const SessionInfo = Schema.Struct({
   workspaceID: optional(WorkspaceID),
   pvcMode: optional(PvcMode),
   appId: optional(Schema.String),
+  sandbox: optional(Schema.Struct({ cpu: Schema.String, memory: Schema.String })),
   directory: Schema.String,
   path: optional(Schema.String),
   parentID: optional(SessionID),

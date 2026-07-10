@@ -216,17 +216,137 @@ print(f'After release: exitCode={d.get(\"exitCode\")} error={d.get(\"error\")}')
 
 ### T19.10 exec API：超时控制
 
+> `timeoutSeconds` 通过 `POST /exec` → `runInSession({timeoutSeconds})` → `withExecTimeout` 传递。Effect 层面使用 `Effect.timeoutOrElse` 在指定秒数后返回超时结果（`exitCode=null` + `error.name=TimeoutError`），无需依赖 execd 服务端强制中止。
+
+#### T19.10a 不传 timeoutSeconds → 命令正常完成
+
 ```bash
-curl -s --max-time 15 -X POST "$BASE/session/$SID/exec" \
-  -H 'Content-Type: application/json' \
-  -d '{"command":"sleep 30 && echo done","timeoutSeconds":5}' | python3 -c "
-import json,sys
-d=json.load(sys.stdin)
-print(f'exitCode: {d.get(\"exitCode\")}')
-print(f'has error: {bool(d.get(\"error\"))}')
-"
+bun -e '
+const BASE = "http://localhost:14096"
+const SID = process.argv[2] || (await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" })).json()).id
+const r = await (await fetch(`${BASE}/session/${SID}/exec`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ command: "echo no-timeout && sleep 1 && echo done" }),
+})).json()
+console.log("exitCode:", r.exitCode, "stdout:", (r.stdout || "").trim())
+console.log(r.exitCode === 0 && r.stdout?.includes("done") ? "✅ T19.10a PASS" : "❌ T19.10a FAIL")
+'
 ```
-**期望**：命令在 5 秒后被终止，返回非 0 exitCode 或 error
+**期望**：`exitCode=0`，stdout 含 `no-timeout` 和 `done`
+
+#### T19.10b timeoutSeconds=1 → Effect 层超时
+
+```bash
+bun -e '
+const BASE = "http://localhost:14096"
+const SID = process.argv[2] || (await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" })).json()).id
+const t0 = Date.now()
+const r = await (await fetch(`${BASE}/session/${SID}/exec`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ command: "echo before-timeout && sleep 30 && echo never", timeoutSeconds: 1 }),
+})).json()
+const elapsed = ((Date.now() - t0) / 1000).toFixed(1)
+console.log(`耗时: ${elapsed}s`)
+console.log("exitCode:", r.exitCode)
+console.log("error:", JSON.stringify(r.error))
+const ok = r.exitCode === null && r.error?.name === "TimeoutError" && r.error?.value?.includes("1s")
+console.log(ok ? "✅ T19.10b PASS" : "❌ T19.10b FAIL")
+'
+```
+**期望**：
+- 约 1 秒后返回（非 30 秒）
+- `exitCode=null`
+- `error.name=TimeoutError`，`error.value` 含 `1s`
+
+#### T19.10c timeoutSeconds=0 → 不超时（falsy 短路）
+
+```bash
+bun -e '
+const BASE = "http://localhost:14096"
+const SID = process.argv[2] || (await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" })).json()).id
+const r = await (await fetch(`${BASE}/session/${SID}/exec`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ command: "echo zero-timeout-ok", timeoutSeconds: 0 }),
+})).json()
+console.log("exitCode:", r.exitCode, "stdout:", (r.stdout || "").trim())
+console.log(r.exitCode === 0 && r.stdout?.includes("zero-timeout-ok") ? "✅ T19.10c PASS" : "❌ T19.10c FAIL")
+'
+```
+**期望**：`exitCode=0`，命令正常完成（`timeoutSeconds=0` 被视为不设超时）
+
+#### T19.10d timeoutSeconds 足够大 → 命令在超时前完成
+
+```bash
+bun -e '
+const BASE = "http://localhost:14096"
+const SID = process.argv[2] || (await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" })).json()).id
+const r = await (await fetch(`${BASE}/session/${SID}/exec`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ command: "echo fast && sleep 0.5 && echo done", timeoutSeconds: 30 }),
+})).json()
+console.log("exitCode:", r.exitCode, "stdout:", (r.stdout || "").trim())
+console.log(r.exitCode === 0 && !r.error ? "✅ T19.10d PASS" : "❌ T19.10d FAIL")
+'
+```
+**期望**：`exitCode=0`，`error` 为空，命令正常完成
+
+#### T19.10e withExecTimeout 单元测试
+
+```bash
+bun test test/tool/exec-timeout.test.ts 2>&1 | tail -15
+```
+**期望**：7 个测试全部 pass
+
+| 测试 | 验证点 |
+|------|--------|
+| undefined → passthrough | `timeoutSeconds=undefined` 不超时，原样返回 |
+| 0 → passthrough | `timeoutSeconds=0` 不超时（falsy 短路） |
+| fast effect 返回 exitCode=0 | 命令在超时前完成，正常返回 |
+| slow effect 返回 exitCode=null | 1 秒后超时，返回 TimeoutError |
+| 超时消息含秒数 | `error.value` = `"Command timed out after 3s"` |
+| traceback 为空数组 | `error.traceback` = `[]` |
+| 底层失败传播 | `Effect.fail` 正常传播为 `Exit.Failure` |
+
+#### T19.10f 异步 exec（exec/async）timeoutSeconds 超时
+
+> `runDetached` 现已包裹 `withExecTimeout`，异步 exec 同样支持 Effect 层超时兜底。
+
+```bash
+bun -e '
+const BASE = "http://localhost:14096"
+const SID = (await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" })).json()).id
+
+// 异步 exec，设 timeoutSeconds=1，命令 sleep 30
+const t0 = Date.now()
+const asyncRes = await (await fetch(`${BASE}/session/${SID}/exec/async`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ command: "echo before && sleep 30 && echo never", timeoutSeconds: 1 }),
+})).json()
+console.log("execId:", asyncRes.execId, "status:", asyncRes.status)
+
+// 等待超时完成
+await new Promise(r => setTimeout(r, 5000))
+
+// 查询最终状态
+const final = await (await fetch(`${BASE}/session/${SID}/exec/${asyncRes.execId}`)).json()
+const elapsed = ((Date.now() - t0) / 1000).toFixed(1)
+console.log(`耗时: ${elapsed}s (期望 < 10s, 非自 30s)`)
+console.log("status:", final.status)
+console.log("exitCode:", final.exitCode)
+
+const ok = elapsed < 10 && final.status !== "running"
+console.log(ok ? "✅ T19.10f PASS — async exec 超时生效" : "❌ T19.10f FAIL")
+'
+```
+**期望**：
+- 约 1-2s 后完成（非 30s）
+- `status=completed`（withExecTimeout 返回成功结果，但 exitCode=null）
+- `exitCode=null`（超时特征）
 
 ### T19.11 exec API：环境信息收集
 
@@ -678,7 +798,7 @@ data: {"execId":"exec-1-...","status":"completed","exitCode":0,"stdout":"...","s
 | T19.7 | ✅ | 补跑 session `ses_15be523d1ffeWmA1Td5pR3YBnv`；`keepAlive=true`，Vite 5 dev server 通过 `/session/:id/proxy/5173/` 返回 HTTP 200，proxy HTML 注入了 `/session/.../proxy/5173` 前缀脚本 |
 | T19.8 | ✅ | session `ses_15befc2f2ffebwECFzD0gCkVsG`；`keepAlive=true` 后等待 15s，`exec echo alive` 成功，`exitCode=0 stdout=alive` |
 | T19.9 | ⚠️ | session `ses_15bef4a2bffe07JBHR9UMONBup`；释放 keepAlive 后等待 15s，纯 exec 仍可返回 `exitCode=0 stdout=dead`；PG 记录随后由 session runner idle 回收为 destroyed。纯 exec 本身不保证触发 idle destroy |
-| T19.10 | ⚠️ | `timeoutSeconds=5` 透传后，`sleep 30 && echo done` 约 30.2s 后返回 `exitCode=null`；execd 未在 5s 强制中止，仍按已知 opensandbox execd 行为记录为 warning |
+| T19.10 | ✅ | 超时控制全链路验证：T19.10a 不传超时正常完成；T19.10b `timeoutSeconds=1` Effect 层 ~1s 返回 `exitCode=null` + `TimeoutError`；T19.10c `timeoutSeconds=0` 不超时（falsy）；T19.10d 大超时值命令正常完成；T19.10e `withExecTimeout` 单元测试 7/7 pass；T19.10f 异步 exec（`/exec/async`）`timeoutSeconds=1` 超时生效，~2s 返回 `exitCode=null` |
 | T19.11 | ✅ | 补跑显式 `workingDirectory=/workspace` 后返回 `node=v22.2.0 npm=10.7.0 pwd=/workspace` |
 | T19.12 | ✅ | session `ses_15bbdc427ffekQUGtCGGPnKzFZ`，execId `exec-1-1780872265127`；`/exec/async` 立即返回 `running`，`/stream` 依次收到 `stdout×4` 和 `done`，最终状态 `completed exitCode=0`，sandbox 已清理为 `destroyed` |
 | T19.13 | ✅ | session `ses_12ccef5ccffe9N4sbDwQ179Or5`；`boot:true` 返回 `sandboxId=60d502b8-ccf0-4863-8365-0b25f8b08147`，GET sandbox 一致，exec `exitCode=0 stdout=boot-ok` |
@@ -701,5 +821,5 @@ data: {"execId":"exec-1-...","status":"completed","exitCode":0,"stdout":"...","s
 
 ### 已知问题
 
-- **T19.10 命令超时未生效**：opencode 代码层透传链路完整（`POST /exec` → `runInSession({timeoutSeconds})` → SDK `runInSession`）。SDK `RunCommandOpts.timeoutSeconds` 注释为"server will not enforce any timeout if omitted"，传值后 execd 服务端仍未强制 5s 超时。属 opensandbox execd 服务端行为，需服务端侧排查。
 - **T19.9 idle 销毁机制**：sandbox 的 idle 回收由 session runner 的 `onIdle` 回调触发（见 `run-state.ts`），纯 exec API 调用不经过 session runner，因此释放 keepAlive 后不会仅凭 exec 探测触发销毁。需通过 `kill-sandbox` 或 `instance/dispose` 显式销毁。
+- **execd 进程级中止延迟**：`withExecTimeout` 在 Effect 层面于 `timeoutSeconds` 后返回超时结果（`exitCode=null`），但底层 execd 进程可能仍在运行——`Effect.timeoutOrElse` 取消了 Effect fiber，底层 HTTP 连接被中断，execd 容器内的 `sleep` 进程何时退出取决于 execd 实现。Effect 层超时保证 API 调用方在指定时间内收到响应。

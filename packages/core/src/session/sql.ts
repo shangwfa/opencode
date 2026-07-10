@@ -59,6 +59,7 @@ export const SessionTable = sqliteTable(
     time_archived: integer(),
     pvc_mode: text().$type<"session" | "app">(),
     app_id: text(),
+    sandbox: text({ mode: "json" }).$type<{ cpu: string; memory: string }>(),
   },
   (table) => [
     index("session_project_idx").on(table.project_id),

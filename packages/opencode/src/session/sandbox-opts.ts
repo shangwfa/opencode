@@ -7,6 +7,7 @@ export interface SandboxOpts {
   id: SessionID
   pvcMode?: "session" | "app"
   appId?: string
+  sandbox?: { cpu: string; memory: string }
 }
 
 export async function resolveSandboxOpts(sessionID: SessionID): Promise<SandboxOpts> {
@@ -16,13 +17,15 @@ export async function resolveSandboxOpts(sessionID: SessionID): Promise<SandboxO
     visited++
     const row = await Database.use((db) =>
       db
-        .select({ parent_id: SessionTable.parent_id, pvc_mode: SessionTable.pvc_mode, app_id: SessionTable.app_id })
+        .select({ parent_id: SessionTable.parent_id, pvc_mode: SessionTable.pvc_mode, app_id: SessionTable.app_id, sandbox: SessionTable.sandbox })
         .from(SessionTable)
         .where(eq(SessionTable.id, current))
         .get(),
     )
     if (!row?.parent_id) {
-      return { id: current, pvcMode: (row?.pvc_mode as "session" | "app") ?? undefined, appId: row?.app_id ?? undefined }
+      const raw = row?.sandbox
+      const sandbox = typeof raw === "string" ? safeParse(raw) : raw
+      return { id: current, pvcMode: (row?.pvc_mode as "session" | "app") ?? undefined, appId: row?.app_id ?? undefined, sandbox: sandbox ?? undefined }
     }
     current = row.parent_id as SessionID
   }
@@ -38,4 +41,11 @@ export function worktreeScript(sessionID: string): string {
     `  fi;`,
     `fi`,
   ].join(" ")
+}
+
+function safeParse(s: string): { cpu: string; memory: string } | undefined {
+  try {
+    const v = JSON.parse(s)
+    if (v && typeof v.cpu === "string" && typeof v.memory === "string") return v
+  } catch {}
 }
