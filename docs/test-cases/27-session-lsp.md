@@ -102,6 +102,27 @@ error → starting (下次请求触发重新 ensure)
 >
 > 与路径 A/B/C 的区别：路径 A 在宿主机直连；路径 B/C 测 LspAgent 自动启动；Smoke 在沙箱内**手动启动 daemon**，聚焦验证 daemon 功能正确性。首次 diagnostics 可能空（TS server 异步索引），脚本自动重试 3 次。
 
+### T27.0 Code-Agent 工具可见性（AI 能感知 LSP 能力）
+
+**目标**：验证 SaaS sandbox 模式下 `lsp` tool 已进入服务端工具注册表，模型请求时能看到 LSP 能力。daemon 可用只证明底层能力存在；本用例验证 AI/code-agent 是否能感知并主动调用 `lsp`。
+
+```bash
+# 前提：SaaS 容器使用包含 sandbox 默认启用 lsp tool 的代码启动。
+# 默认应满足：OPENCODE_SANDBOX_ENABLED=1 且未设置 OPENCODE_DISABLE_LSP_TOOL=1。
+
+bun docs/test-cases/lsp-tool-visibility-test.mjs
+```
+
+**期望**：`/experimental/tool/ids` 包含 `lsp`，且 `/experimental/tool?provider=...&model=...` 返回的 provider tool schema 包含 `lsp`，并暴露 9 个 operation enum。
+
+**关闭开关验证**：如果容器设置 `OPENCODE_DISABLE_LSP_TOOL=1` 后重启，`/experimental/tool/ids` 不应包含 `lsp`。
+
+```bash
+EXPECT_LSP_DISABLED=1 BASE=http://localhost:14097 bun docs/test-cases/lsp-tool-visibility-test.mjs
+```
+
+> 说明：`lsp` tool 仍可通过 `OPENCODE_EXPERIMENTAL_LSP_TOOL=1` 在非 sandbox 模式显式开启；SaaS sandbox 模式默认开启是为了让 code-agent 能看到 `hover`、`goToDefinition`、`findReferences`、`goToImplementation`、`documentSymbol`、`workspaceSymbol` 等能力。
+
 📜 **可执行脚本**：[`lsp-smoke-test.mjs`](./lsp-smoke-test.mjs)
 
 ```bash
@@ -130,6 +151,7 @@ bun docs/test-cases/lsp-smoke-test.mjs
 - **路径 C — Code-Agent 端到端测试**：通过 SaaS API 完整模拟 code-agent 在沙箱中的真实开发流程。以"添加日期格式化工具函数"为场景，串联全部 LSP 操作（diagnostics / documentSymbol / workspaceSymbol / hover / goToDefinition / findReferences / goToImplementation / callHierarchy / apply_patch），并全程检查**路径泄露防护**（遵循 [20-path-leak-test.md](./20-path-leak-test.md) 的单向映射原则）。
   - 📜 **可执行脚本**：[`lsp-code-agent-e2e-test.mjs`](./lsp-code-agent-e2e-test.mjs) —— 13 步 AI 对话，覆盖全部 9 个 LSP 操作 + write/edit 的诊断触发 + 非 TS 文件不触发 LSP。自动检查路径泄露和能力缺失。
   - 运行：`node docs/test-cases/lsp-code-agent-e2e-test.mjs`（前提：SaaS 容器 + OpenSandbox + 权限已配置）
+  - 注意：该脚本依赖真实模型响应。HTTP/provider 错误、模型未调用工具、`write`/`edit`/`lsp` 调用缺失都会硬失败，不能用作无模型环境的默认 smoke。
   - 运行（需本地 OpenSandbox server + `opencode-opensandbox:local` 镜像）：`cd packages/opencode && OPENCODE_SANDBOX_DOMAIN=localhost:8080 bun ../../docs/test-cases/lsp-sandbox-e2e-test.mjs`
 
 > 路径 B 的本地环境搭建（TCP 转发、本地 OpenSandbox server、SaaS 容器启动、权限配置）完全遵循 [`docs/local-test-env.md`](../local-test-env.md)。下文仅补充 LSP 专属步骤。

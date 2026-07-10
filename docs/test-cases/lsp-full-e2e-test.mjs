@@ -162,7 +162,7 @@ async function main() {
   record("T27.7.3", "Workspace Symbol", hasWsym, wsymStr.slice(0, 100))
 
   // T27.7.4 Prepare Call Hierarchy
-  const prep = await daemonCall(SID, "/lsp/prepareCallHierarchy", { path: `${WT}/impl.ts`, line: 1, character: 60 })
+  const prep = await daemonCall(SID, "/lsp/prepareCallHierarchy", { path: `${WT}/impl.ts`, line: 1, character: 47 })
   const prepStr = JSON.stringify(prep)
   const hasPrep = prepStr.includes("greet") || (Array.isArray(prep.items) && prep.items.length > 0)
   record("T27.7.4", "Prepare Call Hierarchy", hasPrep, prepStr.slice(0, 100))
@@ -170,13 +170,13 @@ async function main() {
   // T27.7.5 Incoming Calls
   await daemonCall(SID, "/lsp/touch", { path: `${WT}/caller.ts` })
   await sleep(5000)
-  const incoming = await daemonCall(SID, "/lsp/incomingCalls", { path: `${WT}/impl.ts`, line: 1, character: 60 })
+  const incoming = await daemonCall(SID, "/lsp/incomingCalls", { path: `${WT}/impl.ts`, line: 1, character: 47 })
   const incomingStr = JSON.stringify(incoming)
   const hasIncoming = incomingStr.includes("run") || incomingStr.includes("caller")
   record("T27.7.5", "Incoming Calls", hasIncoming, incomingStr.slice(0, 100))
 
   // T27.7.6 Outgoing Calls
-  const outgoing = await daemonCall(SID, "/lsp/outgoingCalls", { path: `${WT}/caller.ts`, line: 2, character: 24 })
+  const outgoing = await daemonCall(SID, "/lsp/outgoingCalls", { path: `${WT}/caller.ts`, line: 2, character: 16 })
   const outgoingStr = JSON.stringify(outgoing)
   const hasOutgoing = outgoingStr.includes("greet")
   record("T27.7.6", "Outgoing Calls", hasOutgoing, outgoingStr.slice(0, 100))

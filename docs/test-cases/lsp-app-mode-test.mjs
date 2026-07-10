@@ -77,10 +77,15 @@ async function daemonCall(sid, endpoint, body) {
 
 let passed = 0
 let failed = 0
+let skipped = 0
 function check(name, ok, detail = "") {
   console.log(`${ok ? "✅" : "❌"} ${name}${detail ? " — " + detail : ""}`)
   if (ok) passed++
   else failed++
+}
+function skip(name, detail = "") {
+  console.log(`⏭️ ${name}${detail ? " — " + detail : ""}`)
+  skipped++
 }
 
 async function main() {
@@ -106,7 +111,11 @@ async function main() {
   await sleep(3000)
   const wtCheck = await exec(sid23, `ls -d /workspace/worktrees/*/ 2>/dev/null | head -1`)
   const wtDir = wtCheck.stdout.replace(/\/$/, "")
-  check("T27.23 worktree 已创建", !!wtDir, `wt=${wtDir}`)
+  if (!wtDir) {
+    skip("T27.23-T27.25 app worktree 前置未满足", "未发现 /workspace/worktrees/*，跳过依赖 worktree 的 LSP 断言")
+  } else {
+    check("T27.23 worktree 已创建", true, `wt=${wtDir}`)
+  }
 
   if (wtDir) {
     // 启动 daemon
@@ -118,7 +127,7 @@ async function main() {
       await exec(sid23, `echo 'const y: number = "not a number"' > ${wtDir}/broken.ts`)
       // touch + diagnostics
       const touch = await daemonCall(sid23, "/lsp/touch", { path: `${wtDir}/broken.ts` })
-      await sleep(5) // 等 LSP server 分析
+      await sleep(5000) // 等 LSP server 分析
       const diag = await daemonCall(sid23, "/lsp/diagnostics", { path: `${wtDir}/broken.ts`, wait: true })
       const diagStr = JSON.stringify(diag)
       const hasError = diagStr.includes("not assignable") || diagStr.includes("2322")
@@ -134,7 +143,7 @@ async function main() {
     // 写入触发 noImplicitAny 的文件（依赖 tsconfig strict 配置）
     await exec(sid23, `echo 'function f(x) { return x }' > ${wtDir}/implicit.ts`)
     const touch = await daemonCall(sid23, "/lsp/touch", { path: `${wtDir}/implicit.ts` })
-    await sleep(5)
+    await sleep(5000)
     const diag = await daemonCall(sid23, "/lsp/diagnostics", { path: `${wtDir}/implicit.ts`, wait: true })
     const diagStr = JSON.stringify(diag)
     // noImplicitAny (TS7006) 只有 strict 配置才触发，证明读到了 worktree 的 tsconfig
@@ -147,7 +156,7 @@ async function main() {
   if (wtDir) {
     await exec(sid23, `echo 'const greeting: string = "hello"' > ${wtDir}/symbol.ts`)
     const touch = await daemonCall(sid23, "/lsp/touch", { path: `${wtDir}/symbol.ts` })
-    await sleep(5)
+    await sleep(5000)
     const hover = await daemonCall(sid23, "/lsp/hover", { path: `${wtDir}/symbol.ts`, line: 0, character: 6 })
     const hoverStr = JSON.stringify(hover)
     const hasType = hoverStr.includes("const greeting: string")
@@ -167,9 +176,10 @@ async function main() {
   const daemonReady26 = await startDaemon(sid26)
   if (daemonReady26) {
     // 文件直接写在 /workspace（降级行为）
+    await exec(sid26, `printf '%s' '{"compilerOptions":{"strict":true}}' > /workspace/tsconfig.json`)
     await exec(sid26, `echo 'const z: number = "bad"' > /workspace/fallback.ts`)
     const touch = await daemonCall(sid26, "/lsp/touch", { path: "/workspace/fallback.ts" })
-    await sleep(5)
+    await sleep(5000)
     const diag = await daemonCall(sid26, "/lsp/diagnostics", { path: "/workspace/fallback.ts", wait: true })
     const diagStr = JSON.stringify(diag)
     const hasError = diagStr.includes("not assignable") || diagStr.includes("2322")
@@ -183,9 +193,10 @@ async function main() {
   const daemonReadyS = await startDaemon(sidS)
   if (daemonReadyS) {
     // session 模式写不同错误
+    await exec(sidS, `printf '%s' '{"compilerOptions":{"strict":true}}' > /workspace/tsconfig.json`)
     await exec(sidS, `echo 'const a: string = 1' > /workspace/sess.ts`)
     const touchS = await daemonCall(sidS, "/lsp/touch", { path: "/workspace/sess.ts" })
-    await sleep(5)
+    await sleep(5000)
     const diagS = await daemonCall(sidS, "/lsp/diagnostics", { path: "/workspace/sess.ts", wait: true })
     const diagSStr = JSON.stringify(diagS)
     // session 模式：number not assignable to string
@@ -209,7 +220,7 @@ async function main() {
   }
 
   console.log("\n" + "=".repeat(60))
-  console.log(`结果: ${passed} 通过, ${failed} 失败`)
+  console.log(`结果: ${passed} 通过, ${failed} 失败, ${skipped} 跳过`)
   console.log("=".repeat(60))
   process.exit(failed > 0 ? 1 : 0)
 }

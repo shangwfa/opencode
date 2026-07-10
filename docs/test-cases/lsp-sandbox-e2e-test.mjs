@@ -31,6 +31,7 @@ const { ConnectionConfig, Sandbox } = await import(require.resolve("@alibaba-gro
 
 const DOMAIN = process.env.OPENCODE_SANDBOX_DOMAIN ?? "localhost:8080"
 const IMAGE = process.env.OPENCODE_SANDBOX_IMAGE ?? "opencode-opensandbox:local"
+const USE_SERVER_PROXY = process.env.OPENCODE_SANDBOX_USE_SERVER_PROXY === "true"
 
 let pass = 0
 let fail = 0
@@ -41,7 +42,7 @@ function check(name, ok, detail = "") {
 }
 
 const sb = await Sandbox.create({
-  connectionConfig: new ConnectionConfig({ domain: DOMAIN, protocol: "http", useServerProxy: false }),
+  connectionConfig: new ConnectionConfig({ domain: DOMAIN, protocol: "http", useServerProxy: USE_SERVER_PROXY }),
   image: IMAGE,
   // 显式 amd64：本地镜像基于 amd64 的 opensandbox 基础镜像，避免 SDK 按宿主 arm64 拉远端
   platform: { os: "linux", arch: "amd64", entrypoint: ["/opt/opensandbox/code-interpreter.sh"] },

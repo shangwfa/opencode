@@ -205,6 +205,8 @@ const layer = Layer.effect(
 
         yield* config.get()
         const questionEnabled = ["app", "cli", "desktop"].includes(flags.client) || flags.enableQuestionTool
+        const lspToolEnabled =
+          !Flag.OPENCODE_DISABLE_LSP_TOOL && (flags.experimentalLspTool || Flag.OPENCODE_SANDBOX_ENABLED)
 
         const tool = yield* Effect.all({
           invalid: Tool.init(invalid),
@@ -247,7 +249,7 @@ const layer = Layer.effect(
             ...(flags.experimentalScout ? [tool.repo_clone, tool.repo_overview] : []),
             tool.skill,
             tool.patch,
-            ...(flags.experimentalLspTool ? [tool.lsp] : []),
+            ...(lspToolEnabled ? [tool.lsp] : []),
             ...(flags.experimentalPlanMode && flags.client === "cli" ? [tool.plan] : []),
           ],
           task: tool.task,

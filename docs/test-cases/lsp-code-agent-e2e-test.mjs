@@ -79,7 +79,13 @@ async function api(path, method = "GET", body = null) {
   if (body) opts.body = JSON.stringify(body)
   const resp = await fetch(`${BASE}${path}`, opts)
   const text = await resp.text()
-  try { return JSON.parse(text) } catch { return text }
+  const data = (() => {
+    try { return JSON.parse(text) } catch { return text }
+  })()
+  if (!resp.ok) {
+    throw new Error(`${method} ${path} failed: HTTP ${resp.status} ${typeof data === "string" ? data : JSON.stringify(data)}`)
+  }
+  return data
 }
 
 function sleep(ms) { return new Promise((r) => setTimeout(r, ms)) }
@@ -112,6 +118,10 @@ async function sendMsg(sid, text, label) {
     model: MODEL,
   })
   const elapsed = ((Date.now() - start) / 1000).toFixed(1)
+
+  if (!Array.isArray(result.parts)) {
+    throw new Error(`/message returned no parts for ${label}: ${JSON.stringify(result).slice(0, 500)}`)
+  }
 
   countTools(result)
 
@@ -173,7 +183,7 @@ async function main() {
 
     // 0.1 健康检查
     console.log("  🔍 SaaS 服务健康检查...")
-    const health = await fetch(`${BASE}/`).then((r) => r.status)
+    const health = await fetch(`${BASE}/global/health`).then((r) => r.status)
     if (health !== 200) throw new Error(`SaaS 服务不可用: HTTP ${health}`)
     console.log("  ✅ SaaS 服务正常")
 
@@ -352,6 +362,20 @@ async function main() {
 
     const messages = await api(`/session/${sid}/message`)
     console.log(`  📊 共 ${messages.length} 条消息`)
+
+    // Re-count tools from the full message list — the synchronous /message
+    // response may only include the final text parts, not intermediate tool calls.
+    totalToolCalls = 0
+    for (const key of Object.keys(toolSummary)) delete toolSummary[key]
+    for (const msg of messages) {
+      for (const part of msg.parts || []) {
+        if (part.type === "tool") {
+          totalToolCalls++
+          const t = part.tool || "?"
+          toolSummary[t] = (toolSummary[t] || 0) + 1
+        }
+      }
+    }
     console.log(`  🔧 工具调用: ${totalToolCalls} 次 — ${Object.entries(toolSummary).map(([k, v]) => `${k}×${v}`).join(", ")}`)
 
     // 路径泄露全量扫描
@@ -381,7 +405,6 @@ async function main() {
     const lspTools = toolSummary["lsp"] || 0
     const writeTools = toolSummary["write"] || 0
     const editTools = toolSummary["edit"] || 0
-    const expectedLspOps = lspTools
     console.log(`\n  📋 LSP 能力统计:`)
     console.log(`     lsp 工具调用: ${lspTools} 次`)
     console.log(`     write 工具调用: ${writeTools} 次（含 diagnostics）`)
@@ -400,7 +423,13 @@ async function main() {
 
     // ── 最终结论 ──────────────────────────────────────────────
     console.log("\n" + "═".repeat(70))
-    const passed = uniqueLeaks.length === 0 && unsupportedCount === 0
+    const missing = []
+    if (totalToolCalls === 0) missing.push("expected at least one tool call")
+    if (writeTools === 0) missing.push("expected write tool to be used")
+    if (editTools === 0) missing.push("expected edit tool to be used")
+    if (lspTools === 0) missing.push("expected lsp tool to be used")
+
+    const passed = uniqueLeaks.length === 0 && unsupportedCount === 0 && missing.length === 0
     if (passed) {
       console.log("  ✅ 测试通过")
       console.log(`     路径泄露: 0 处`)
@@ -410,6 +439,7 @@ async function main() {
       console.log("  ❌ 测试失败")
       if (uniqueLeaks.length > 0) console.log(`     路径泄露: ${uniqueLeaks.length} 处`)
       if (unsupportedCount > 0) console.log(`     LSP 能力缺失: ${unsupportedCount} 处`)
+      if (missing.length > 0) console.log(`     缺少断言: ${missing.join("; ")}`)
       process.exit(1)
     }
     console.log("═".repeat(70))

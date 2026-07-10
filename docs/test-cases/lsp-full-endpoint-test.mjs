@@ -108,19 +108,19 @@ console.log(`workspaceSymbol: ${ws.slice(0, 100)}`)
 ws.includes('Greeter') || ws.includes('HelloGreeter') ? ok('T27.7.3 workspaceSymbol') : no('T27.7.3 workspaceSymbol', ws)
 
 // T27.7.4 prepareCallHierarchy
-const prep = await daemonPost(sid, '/lsp/prepareCallHierarchy', { path: '/workspace/src/impl.ts', line: 1, character: 3 })
+const prep = await daemonPost(sid, '/lsp/prepareCallHierarchy', { path: '/workspace/src/impl.ts', line: 2, character: 3 })
 console.log(`prepare: ${prep.slice(0, 100)}`)
-prep.includes('greet') || prep.includes('item') || prep.includes('[]') ? ok('T27.7.4 prepareCallHierarchy') : no('T27.7.4 prepareCallHierarchy', prep)
+prep.includes('greet') ? ok('T27.7.4 prepareCallHierarchy') : no('T27.7.4 prepareCallHierarchy', prep)
 
 // T27.7.5 incoming calls
-const inc = await daemonPost(sid, '/lsp/incomingCalls', { path: '/workspace/src/impl.ts', line: 1, character: 3 })
+const inc = await daemonPost(sid, '/lsp/incomingCalls', { path: '/workspace/src/impl.ts', line: 2, character: 3 })
 console.log(`incoming: ${inc.slice(0, 80)}`)
-inc.includes('run') || inc.includes('from') || inc.includes('[]') ? ok('T27.7.5 incomingCalls') : no('T27.7.5 incomingCalls', inc)
+inc.includes('run') ? ok('T27.7.5 incomingCalls') : no('T27.7.5 incomingCalls', inc)
 
 // T27.7.6 outgoing calls
-const out = await daemonPost(sid, '/lsp/outgoingCalls', { path: '/workspace/src/impl.ts', line: 1, character: 3 })
+const out = await daemonPost(sid, '/lsp/outgoingCalls', { path: '/workspace/src/run.ts', line: 1, character: 9 })
 console.log(`outgoing: ${out.slice(0, 80)}`)
-out.includes('[]') || out.includes('to') ? ok('T27.7.6 outgoingCalls') : no('T27.7.6 outgoingCalls', out)
+out.includes('greet') ? ok('T27.7.6 outgoingCalls') : no('T27.7.6 outgoingCalls', out)
 
 // T27.7 shutdown (POST)
 const sd = await daemonPost(sid, '/lsp/shutdown', {})
