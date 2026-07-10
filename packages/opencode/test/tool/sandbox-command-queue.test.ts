@@ -69,6 +69,8 @@ function buildFakeLayer() {
     volumeType: "none" as const,
     pvcClaimName: "",
     idleKillMs: 30000,
+    idleReapMs: 1800000,
+    idleReapIntervalMs: 60_000,
     maxTtlSeconds: 3600,
     packageCacheMount: "/xybot-front/cache",
   }))

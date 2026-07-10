@@ -22,8 +22,11 @@ export namespace SandboxConfig {
     readonly volumeType: "none" | "pvc" | "host"
     readonly pvcClaimName: string
     readonly idleKillMs: number
+    readonly idleReapMs: number
+    readonly idleReapIntervalMs: number
     readonly maxTtlSeconds: number
     readonly packageCacheMount: string
+    readonly cleanupOnScopeExit?: boolean
   }
 
   export class Service extends Context.Service<Service, Interface>()("@opencode/SandboxConfig") {}
@@ -39,8 +42,11 @@ export namespace SandboxConfig {
     volumeType: Flag.OPENCODE_SANDBOX_VOLUME_TYPE,
     pvcClaimName: Flag.OPENCODE_SANDBOX_PVC_CLAIM,
     idleKillMs: Flag.OPENCODE_SANDBOX_IDLE_KILL_SEC * 1000,
+    idleReapMs: Flag.OPENCODE_SANDBOX_IDLE_REAP_SEC * 1000,
+    idleReapIntervalMs: 60_000,
     maxTtlSeconds: Flag.OPENCODE_SANDBOX_MAX_TTL_SEC,
     packageCacheMount: Flag.OPENCODE_SANDBOX_PACKAGE_CACHE_MOUNT,
+    cleanupOnScopeExit: true,
   }
 
   export const layer = Layer.succeed(Service, Service.of(defaultConfig))
@@ -595,14 +601,16 @@ export namespace SandboxProvider {
           return url
         }).pipe(Effect.orDie, Effect.withSpan("SandboxProvider.getEndpoint"))
 
-      yield* Effect.addFinalizer(() =>
-        destroyAll().pipe(
-          Effect.catchCause((cause) => {
-            log.error("sandbox cleanup on scope exit failed", { cause: Cause.pretty(cause) })
-            return Effect.void
-          }),
-        ),
-      )
+      if (config.cleanupOnScopeExit !== false) {
+        yield* Effect.addFinalizer(() =>
+          destroyAll().pipe(
+            Effect.catchCause((cause) => {
+              log.error("sandbox cleanup on scope exit failed", { cause: Cause.pretty(cause) })
+              return Effect.void
+            }),
+          ),
+        )
+      }
 
       return Service.of({
         getOrCreate, get, destroy, destroyById, destroyAll, keepAlive, release, isKeepAlive,
@@ -655,7 +663,7 @@ export namespace SandboxProvider {
         id: string
         session_id: string
         host: string
-        state: "running" | "killed"
+        state: "running" | "killed" | "destroyed"
         keep_alive: boolean
         command_session_id: string | null
         time_created: number
@@ -748,6 +756,21 @@ export namespace SandboxProvider {
             .where(and(eq(SandboxTable.session_id, sessionID), eq(SandboxTable.id, id)))
             .run(),
           catch: (e) => new Error(`db.setCommandSession failed: ${String(e)}`),
+        }).pipe(Effect.orDie)
+      }
+
+      function dbTouchSandbox(sessionID: string, id: string) {
+        return Effect.tryPromise({
+          try: () => pgDb
+            .update(SandboxTable)
+            .set({ time_updated: Date.now() })
+            .where(and(
+              eq(SandboxTable.session_id, sessionID),
+              eq(SandboxTable.id, id),
+              eq(SandboxTable.state, "running"),
+            ))
+            .run(),
+          catch: (e) => new Error(`db.touchSandbox failed: ${String(e)}`),
         }).pipe(Effect.orDie)
       }
 
@@ -937,7 +960,10 @@ export namespace SandboxProvider {
       function getOrCreateUnlocked(sessionID: SessionID, opts?: { pvcMode?: "session" | "app"; appId?: string; sandbox?: { cpu: string; memory: string } }) {
         return Effect.gen(function* () {
           const cached = getCachedSandbox(sessionID)
-          if (cached) return cached
+          if (cached) {
+            yield* dbTouchSandbox(sessionID, cached.id).pipe(Effect.catchCause(() => Effect.void))
+            return cached
+          }
 
           const t0 = Date.now()
           log.info("getOrCreate start", { sessionID })
@@ -977,6 +1003,7 @@ export namespace SandboxProvider {
                   })
 
                   if (healthy) {
+                    yield* dbTouchSandbox(sessionID, row.id).pipe(Effect.catchCause(() => Effect.void))
                     log.info("reconnected to existing sandbox", {
                       sessionID,
                       sandboxID: row.id,
@@ -1067,6 +1094,7 @@ export namespace SandboxProvider {
             yield* dbSetStateFor(sessionID, row.id, "killed").pipe(Effect.catchCause(() => Effect.void))
             return null
           }
+          yield* dbTouchSandbox(sessionID, row.id).pipe(Effect.catchCause(() => Effect.void))
           return sb
         }).pipe(Effect.withSpan("SandboxProvider.get"))
 
@@ -1180,6 +1208,7 @@ export namespace SandboxProvider {
       const runInSession: Interface["runInSession"] = (sessionID, command, options, handlers, signal) =>
         Effect.gen(function* () {
           const sb = yield* lock(sessionID, getOrCreateUnlocked(sessionID))
+          yield* dbTouchSandbox(sessionID, sb.id).pipe(Effect.catchCause(() => Effect.void))
 
           const row = yield* dbGet(sessionID).pipe(Effect.orElseSucceed(() => null))
           let cmdSessionID = (row?.id === sb.id ? row?.command_session_id : null) ?? null
@@ -1222,6 +1251,7 @@ export namespace SandboxProvider {
       const runDetached: Interface["runDetached"] = (sessionID, command, options, handlers, signal) =>
         Effect.gen(function* () {
           const sb = yield* lock(sessionID, getOrCreateUnlocked(sessionID))
+          yield* dbTouchSandbox(sessionID, sb.id).pipe(Effect.catchCause(() => Effect.void))
           const detachedSessionId = yield* Effect.tryPromise({
             try: () => sb.commands.createSession({ workingDirectory: options?.workingDirectory ?? "/workspace" }),
             catch: (e) => new Error(`Failed to create detached session: ${String(e)}`),
@@ -1349,14 +1379,59 @@ export namespace SandboxProvider {
         )
       })
 
-      yield* Effect.addFinalizer(() =>
-        destroyAll().pipe(
-          Effect.catchCause((cause) => {
-            log.error("sandbox cleanup on scope exit failed", { cause: Cause.pretty(cause) })
-            return Effect.void
+      // 周期性回收空闲 sandbox（含 keep_alive=true，idleReapMs 阈值）
+      // 判定：state=running 且 time_updated 超过 idleReapMs 未更新
+      const idleReapMs = config.idleReapMs
+      yield* Effect.gen(function* () {
+        yield* Effect.repeat(
+          Effect.gen(function* () {
+            const threshold = Date.now() - idleReapMs
+            const rows = yield* Effect.tryPromise({
+              try: () => pgDb
+                .select()
+                .from(SandboxTable)
+                .where(and(
+                  eq(SandboxTable.state, "running"),
+                  lt(SandboxTable.time_updated, threshold),
+                ))
+                .all() as Promise<Row[]>,
+              catch: () => [] as Row[],
+            }).pipe(Effect.orElseSucceed(() => [] as Row[]))
+
+            if (rows.length === 0) return
+            log.info("idle sandbox reap scan", { count: rows.length })
+            for (const row of rows) {
+              yield* lock(row.session_id, Effect.gen(function* () {
+                const current = yield* dbGet(row.session_id).pipe(Effect.orElseSucceed(() => null))
+                if (!current || current.id !== row.id || current.state !== "running") return
+                if (current.time_updated > threshold) return
+                const sb = yield* reconnect(row).pipe(Effect.orElseSucceed(() => null))
+                if (sb) {
+                  yield* destroySandbox(sb, row.session_id).pipe(Effect.catchCause(() => Effect.void))
+                  return
+                }
+                yield* bestEffortKill(row.id, row.session_id)
+                yield* dbMarkDestroyed(row.session_id, row.id).pipe(Effect.catchCause(() => Effect.void))
+              }))
+            }
           }),
-        ),
-      )
+          { schedule: Schedule.spaced(Duration.millis(config.idleReapIntervalMs)) },
+        ).pipe(
+          Effect.forkScoped,
+          Effect.interruptible,
+        )
+      })
+
+      if (config.cleanupOnScopeExit !== false) {
+        yield* Effect.addFinalizer(() =>
+          destroyAll().pipe(
+            Effect.catchCause((cause) => {
+              log.error("sandbox cleanup on scope exit failed", { cause: Cause.pretty(cause) })
+              return Effect.void
+            }),
+          ),
+        )
+      }
 
       return Service.of({
         getOrCreate, get, destroy, destroyById, destroyAll, keepAlive, release, isKeepAlive,

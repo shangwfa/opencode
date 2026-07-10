@@ -39,6 +39,7 @@
 | [`27-session-pvc-mode.md`](./27-session-pvc-mode.md) | 二十七 | T27.x | Session PVC 模式：session/app 模式创建、appId 校验、PVC 共享/隔离、自动 worktree（detach+幂等+降级）、PG 持久化、子会话继承 |
 | [`28-sandbox-perf-watchdog.md`](./28-sandbox-perf-watchdog.md) | 二十八 | T28.x | 沙箱性能优化与 Watchdog 兜底：对象缓存（30s TTL）、getOrCreate 90s 超时、`SessionTools.markTimedOut` lifecycle 超时标记、CAS 幂等、配置注入、各阶段耗时日志 |
 | [`29-session-sandbox-resource.md`](./29-session-sandbox-resource.md) | 二十九 | T29.x | 会话级沙箱资源配置：创建会话时设置 sandbox {cpu,memory}、PG 持久化、格式校验、SDK cgroup 验证、子会话/fork 继承、默认 {cpu:1,memory:2Gi} |
+| [`30-sandbox-idle-reap.md`](./30-sandbox-idle-reap.md) | 三十 | T30.x | 空闲沙箱定期回收：30 分钟无活跃即销毁（含 keep_alive=true）、CAS 保护、可配置阈值、扫描日志 |
 | [`lsp-daemon-unit-test.mjs`](./lsp-daemon-unit-test.mjs) | 二十七 | T27.1-7.6 | LSP daemon 单元测试：宿主机直跑 daemon bundle，自动验证全部 13 个端点（诊断/hover/definition/references/implementation/documentSymbol/workspaceSymbol/callHierarchy）。实测 14/14 |
 | [`lsp-sandbox-e2e-test.mjs`](./lsp-sandbox-e2e-test.mjs) | 二十七 | T27.8+ | LSP sandbox 端到端：OpenSandbox SDK 直连建真实 sandbox 容器，容器内启 daemon 验证 status/documentSymbol/callHierarchy/diagnostics。实测 6/6 |
 | [`sandbox-shared-test.mjs`](./sandbox-shared-test.mjs) | 十六 | T16.29 | 主子 agent 沙箱共享验证：主→子写读、子→主写读、exec 独立验证 |
@@ -74,6 +75,7 @@ T26.x → 26-session-agent-permissions.md
 T27.x → 27-session-lsp.md / 27-session-pvc-mode.md
 T28.x → 28-sandbox-perf-watchdog.md
 T29.x → 29-session-sandbox-resource.md
+T30.x → 30-sandbox-idle-reap.md
 
 沙箱工具（apply_patch/ls/错误泄露）→ 18-sandbox-tool-test.md
 路径泄露防护（PL-x）→ 20-path-leak-test.md

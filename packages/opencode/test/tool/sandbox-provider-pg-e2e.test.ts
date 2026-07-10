@@ -53,6 +53,8 @@ const configLayer = Layer.succeed(
     volumeType: "none" as const,
     pvcClaimName: "",
     idleKillMs: 30_000,
+    idleReapMs: 1_800_000,
+    idleReapIntervalMs: 60_000,
     maxTtlSeconds: 3600,
     packageCacheMount: "/xybot-front/cache",
   }),

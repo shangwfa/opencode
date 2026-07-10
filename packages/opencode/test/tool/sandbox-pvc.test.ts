@@ -13,6 +13,8 @@ const baseConfig: SandboxConfigType.Interface = {
   volumeType: "none",
   pvcClaimName: "",
   idleKillMs: 3_600_000,
+  idleReapMs: 1_800_000,
+  idleReapIntervalMs: 60_000,
   maxTtlSeconds: 3600,
   packageCacheMount: "/xybot-front/cache",
 }
