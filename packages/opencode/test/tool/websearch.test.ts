@@ -23,6 +23,9 @@ describe("websearch provider", () => {
 
       process.env.OPENCODE_WEBSEARCH_PROVIDER = "exa"
       expect(selectWebSearchProvider(SESSION_ID)).toBe("exa")
+
+      process.env.OPENCODE_WEBSEARCH_PROVIDER = "zhipu"
+      expect(selectWebSearchProvider(SESSION_ID)).toBe("zhipu")
     } finally {
       if (original === undefined) delete process.env.OPENCODE_WEBSEARCH_PROVIDER
       else process.env.OPENCODE_WEBSEARCH_PROVIDER = original
@@ -30,23 +33,29 @@ describe("websearch provider", () => {
   })
 
   test("routes to Exa when the Exa flag is enabled", () => {
-    expect(selectWebSearchProvider(SESSION_ID, { exa: true, parallel: false })).toBe("exa")
+    expect(selectWebSearchProvider(SESSION_ID, { exa: true, parallel: false, zhipu: false })).toBe("exa")
   })
 
   test("routes to Parallel when the Parallel flag is enabled", () => {
-    expect(selectWebSearchProvider(SESSION_ID, { exa: false, parallel: true })).toBe("parallel")
+    expect(selectWebSearchProvider(SESSION_ID, { exa: false, parallel: true, zhipu: false })).toBe("parallel")
   })
 
-  test("is only enabled for opencode or explicit websearch provider flags", () => {
-    expect(webSearchEnabled(ProviderV2.ID.opencode, { exa: false, parallel: false })).toBe(true)
-    expect(webSearchEnabled(ProviderV2.ID.openai, { exa: false, parallel: false })).toBe(false)
-    expect(webSearchEnabled(ProviderV2.ID.openai, { exa: true, parallel: false })).toBe(true)
-    expect(webSearchEnabled(ProviderV2.ID.openai, { exa: false, parallel: true })).toBe(true)
+  test("routes to Zhipu when the Zhipu flag is enabled", () => {
+    expect(selectWebSearchProvider(SESSION_ID, { exa: false, parallel: false, zhipu: true })).toBe("zhipu")
+  })
+
+  test("is only enabled for opencode, zhipu, or explicit websearch provider flags", () => {
+    expect(webSearchEnabled(ProviderV2.ID.opencode, { exa: false, parallel: false, zhipu: false })).toBe(true)
+    expect(webSearchEnabled(ProviderV2.ID.openai, { exa: false, parallel: false, zhipu: false })).toBe(false)
+    expect(webSearchEnabled(ProviderV2.ID.openai, { exa: true, parallel: false, zhipu: false })).toBe(true)
+    expect(webSearchEnabled(ProviderV2.ID.openai, { exa: false, parallel: true, zhipu: false })).toBe(true)
+    expect(webSearchEnabled(ProviderV2.ID.make("zhipuai"), { exa: false, parallel: false, zhipu: false })).toBe(true)
   })
 
   test("uses branded labels", () => {
     expect(webSearchProviderLabel("parallel")).toBe("Parallel Web Search")
     expect(webSearchProviderLabel("exa")).toBe("Exa Web Search")
+    expect(webSearchProviderLabel("zhipu")).toBe("Zhipu Web Search")
     expect(webSearchProviderLabel(undefined)).toBe("Web Search")
   })
 

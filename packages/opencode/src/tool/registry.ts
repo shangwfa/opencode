@@ -60,7 +60,11 @@ import { ModelV2 } from "@opencode-ai/core/model"
 import { SandboxProvider } from "./sandbox-provider"
 import { RepositoryCache } from "@opencode-ai/core/repository-cache"
 
-export function webSearchEnabled(providerID: ProviderV2.ID, flags = { exa: false, parallel: false }) {
+export function webSearchEnabled(
+  providerID: ProviderV2.ID,
+  flags = { exa: false, parallel: false, zhipu: false },
+) {
+  if (String(providerID).includes("zhipu")) return true
   return providerID === ProviderV2.ID.opencode || flags.exa || flags.parallel
 }
 
@@ -311,7 +315,11 @@ const layer = Layer.effect(
     const tools: Interface["tools"] = Effect.fn("ToolRegistry.tools")(function* (input) {
       const filtered = (yield* all()).filter((tool) => {
         if (tool.id === WebSearchTool.id) {
-          return webSearchEnabled(input.providerID, { exa: flags.enableExa, parallel: flags.enableParallel })
+          return webSearchEnabled(input.providerID, {
+            exa: flags.enableExa,
+            parallel: flags.enableParallel,
+            zhipu: flags.enableZhipu,
+          })
         }
 
         const usePatch =

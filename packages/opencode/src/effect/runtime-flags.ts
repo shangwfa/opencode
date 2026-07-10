@@ -37,6 +37,7 @@ export class Service extends ConfigService.Service<Service>()("@opencode/Runtime
     enabled: bool("OPENCODE_ENABLE_PARALLEL"),
     legacy: bool("OPENCODE_EXPERIMENTAL_PARALLEL"),
   }).pipe(Config.map((flags) => flags.enabled || flags.legacy)),
+  enableZhipu: bool("OPENCODE_ENABLE_ZHIPU"),
   enableExperimentalModels: bool("OPENCODE_ENABLE_EXPERIMENTAL_MODELS"),
   enableQuestionTool: bool("OPENCODE_ENABLE_QUESTION_TOOL"),
   experimentalReferences: enabledByExperimental("OPENCODE_EXPERIMENTAL_REFERENCES"),
