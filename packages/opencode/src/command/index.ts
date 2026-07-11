@@ -9,6 +9,7 @@ import { MCP } from "../mcp"
 import { Skill } from "../skill"
 import PROMPT_INITIALIZE from "./template/initialize.txt"
 import PROMPT_REVIEW from "./template/review.txt"
+import PROMPT_CODEX_REVIEW from "./template/codex-review.txt"
 import { LegacyEvent } from "@opencode-ai/schema/legacy-event"
 
 type State = {
@@ -46,6 +47,7 @@ export function hints(template: string) {
 export const Default = {
   INIT: "init",
   REVIEW: "review",
+  CODEX_REVIEW: "codex-review",
 } as const
 
 export interface Interface {
@@ -85,6 +87,16 @@ const layer = Layer.effect(
         },
         subtask: true,
         hints: hints(PROMPT_REVIEW),
+      }
+      commands[Default.CODEX_REVIEW] = {
+        name: Default.CODEX_REVIEW,
+        description: "structured code review with priority levels and merge verdict (codex-style)",
+        source: "command",
+        get template() {
+          return PROMPT_CODEX_REVIEW.replace("${path}", ctx.worktree)
+        },
+        subtask: true,
+        hints: hints(PROMPT_CODEX_REVIEW),
       }
 
       for (const [name, command] of Object.entries(cfg.command ?? {})) {
