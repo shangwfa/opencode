@@ -64,6 +64,7 @@ export const Default = {
   INIT: "init",
   REVIEW: "review",
   CODEX_REVIEW: "codex-review",
+  GOAL: "goal",
 } as const
 
 export interface Interface {
@@ -119,6 +120,16 @@ const layer = Layer.effect(
         },
         subtask: true,
         hints: hints(PROMPT_CODEX_REVIEW),
+      }
+      commands[Default.GOAL] = {
+        name: Default.GOAL,
+        description: "set a stop-condition goal; runs until a judge says it's met. /goal clear to abort",
+        source: "command",
+        subtask: false,
+        get template() {
+          return "$ARGUMENTS"
+        },
+        hints: ["$ARGUMENTS"],
       }
 
       for (const [name, command] of Object.entries(cfg.command ?? {})) {

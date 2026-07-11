@@ -43,6 +43,7 @@
 | [`31-code-review-commands.md`](./31-code-review-commands.md) | 三十一 | T31.x | Code Review 命令：`/review`（自由文本）与 `/codex-review`（Codex 结构化 JSON + 优先级 + 合并裁决）对比测试 |
 | [`30-session-tools.md`](./30-session-tools.md) | 三十二 | T32.x | Session 自定义工具：CRUD、动态加载（importToolCode）、隔离、级联、registry 合并 |
 | [`31-session-commands.md`](./31-session-commands.md) | 三十三 | T33.x | Session 自定义命令：CRUD、overlay 合并（session 覆盖 instance）、隔离、级联、模板占位符、hints 自动推导 |
+| [`32-session-goal.md`](./32-session-goal.md) | 三十四 | T34.x | Session Goal 停止条件：`/goal` 命令路由、状态机、judge 模型评估、runLoop 集成、fail-open、多 session 隔离、PG 持久化 |
 | [`lsp-daemon-unit-test.mjs`](./lsp-daemon-unit-test.mjs) | 二十七 | T27.1-7.6 | LSP daemon 单元测试：宿主机直跑 daemon bundle，自动验证全部 13 个端点（诊断/hover/definition/references/implementation/documentSymbol/workspaceSymbol/callHierarchy）。实测 14/14 |
 | [`lsp-sandbox-e2e-test.mjs`](./lsp-sandbox-e2e-test.mjs) | 二十七 | T27.8+ | LSP sandbox 端到端：OpenSandbox SDK 直连建真实 sandbox 容器，容器内启 daemon 验证 status/documentSymbol/callHierarchy/diagnostics。实测 6/6 |
 | [`sandbox-shared-test.mjs`](./sandbox-shared-test.mjs) | 十六 | T16.29 | 主子 agent 沙箱共享验证：主→子写读、子→主写读、exec 独立验证 |
@@ -82,6 +83,7 @@ T30.x → 30-sandbox-idle-reap.md
 T31.x → 31-code-review-commands.md
 T32.x → 30-session-tools.md
 T33.x → 31-session-commands.md
+T34.x → 32-session-goal.md
 
 沙箱工具（apply_patch/ls/错误泄露）→ 18-sandbox-tool-test.md
 路径泄露防护（PL-x）→ 20-path-leak-test.md

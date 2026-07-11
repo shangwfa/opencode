@@ -37,6 +37,7 @@ import { SessionProcessor } from "./processor"
 import { Tool } from "@/tool/tool"
 import { Permission } from "@/permission"
 import { SessionStatus } from "./status"
+import { Goal } from "./goal"
 import { LLM } from "./llm"
 import { Shell } from "@/shell/shell"
 import { ShellID } from "@/tool/shell/id"
@@ -66,6 +67,7 @@ globalThis.AI_SDK_LOG_WARNINGS = false
 const decodeMessageInfo = Schema.decodeUnknownExit(SessionV1.Info)
 const decodeMessagePart = Schema.decodeUnknownExit(SessionV1.Part)
 const MAX_MCP_RESOURCE_BLOB_BYTES = 10 * 1024 * 1024
+const MAX_GOAL_REACT = 12
 const SUPPORTED_MCP_RESOURCE_ATTACHMENT_MIMES = new Set([
   "application/pdf",
   "image/gif",
@@ -117,6 +119,7 @@ const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
     const status = yield* SessionStatus.Service
+    const goal = yield* Goal.Service
     const sessions = yield* Session.Service
     const agents = yield* Agent.Service
     const provider = yield* Provider.Service
@@ -1092,6 +1095,88 @@ const layer = Layer.effect(
         let step = 0
         const session = yield* sessions.get(sessionID).pipe(Effect.orDie)
 
+        const goalGate = Effect.fn("SessionPrompt.goalGate")(function* (lastUser: SessionV1.User) {
+          const active = yield* goal.get(sessionID)
+          if (!active) return false
+
+          const transcriptMsgs = yield* MessageV2.filterCompactedEffect(sessionID).pipe(
+            Effect.provideService(Database.Service, database),
+          )
+          const judgedMessageID = transcriptMsgs.findLast((m) => m.info.role === "assistant")?.info.id
+          const verdict = yield* goal
+            .evaluate({
+              condition: active.condition,
+              msgs: transcriptMsgs,
+              model: lastUser.model,
+            })
+            .pipe(
+              Effect.catch((err) =>
+                Effect.gen(function* () {
+                  yield* Effect.logWarning("goal judge failed; allowing stop", { error: String(err) })
+                  return { ok: true, reason: "judge error", judgeFailed: true } as Goal.Verdict & {
+                    judgeFailed: true
+                  }
+                }),
+              ),
+            )
+
+          if (verdict.ok || ("impossible" in verdict && verdict.impossible)) {
+            yield* Effect.logInfo("goal satisfied; allowing stop", {
+              sessionID,
+              impossible: ("impossible" in verdict && verdict.impossible) || false,
+              reason: verdict.reason,
+              attempt: active.react,
+              messageID: judgedMessageID,
+            })
+            yield* goal.clear(sessionID)
+            return false
+          }
+
+          const count = yield* goal.bumpReact(sessionID)
+          if (count > MAX_GOAL_REACT) {
+            yield* Effect.logWarning("goal hit MAX_GOAL_REACT cap; allowing stop", {
+              sessionID,
+              condition: active.condition,
+              count,
+              reason: verdict.reason,
+            })
+            yield* goal.clear(sessionID)
+            return false
+          }
+
+          yield* Effect.logInfo("goal not satisfied; re-entering", {
+            sessionID,
+            attempt: count,
+            reason: verdict.reason,
+          })
+          const reentry = yield* sessions.updateMessage({
+            id: MessageID.ascending(),
+            role: "user" as const,
+            sessionID,
+            agent: lastUser.agent,
+            model: lastUser.model,
+            tools: lastUser.tools,
+            format: lastUser.format,
+            time: { created: Date.now() },
+          })
+          yield* sessions.updatePart({
+            id: PartID.ascending(),
+            messageID: reentry.id,
+            sessionID,
+            type: "text",
+            synthetic: true,
+            text: [
+              "<system-reminder>",
+              `Your goal is not yet satisfied: "${active.condition}".`,
+              "A judge reviewed the transcript and reported what is still missing:",
+              verdict.reason,
+              "Keep working toward the goal. Do not stop until it is genuinely met or impossible.",
+              "</system-reminder>",
+            ].join("\n"),
+          } satisfies SessionV1.TextPart)
+          return true
+        })
+
         while (true) {
           yield* status.set(sessionID, { type: "busy" })
           yield* Effect.logInfo("loop", { "session.id": sessionID, step })
@@ -1132,6 +1217,7 @@ const layer = Layer.effect(
                 callID: orphan.callID,
               })
             }
+            if (yield* goalGate(lastUser)) continue
             yield* Effect.logInfo("exiting loop", { "session.id": sessionID })
             break
           }
@@ -1355,7 +1441,10 @@ const layer = Layer.effect(
             Effect.ensuring(instruction.clear(handle.message.id)),
             Effect.onInterrupt(() => finalizeInterruptedAssistant),
           )
-          if (outcome === "break") break
+          if (outcome === "break") {
+            if (yield* goalGate(lastUser)) continue
+            break
+          }
           continue
         }
 
@@ -1392,6 +1481,21 @@ const layer = Layer.effect(
         throw error
       }
       const agentName = cmd.agent ?? input.agent
+
+      if (input.command === Command.Default.GOAL) {
+        const condition = input.arguments.trim()
+        if (condition === "" || condition === "clear" || condition === "reset") {
+          yield* goal.clear(input.sessionID)
+          return yield* prompt({
+            sessionID: input.sessionID,
+            messageID: input.messageID,
+            agent: agentName,
+            parts: [{ type: "text", text: "Goal cleared.", synthetic: true }],
+            noReply: true,
+          })
+        }
+        yield* goal.set(input.sessionID, condition)
+      }
 
       const raw = input.arguments.match(argsRegex) ?? []
       const args = raw.map((arg) => arg.replace(quoteTrimRegex, ""))
@@ -1649,6 +1753,7 @@ export const node = LayerNode.make({
     EventV2Bridge.node,
     RuntimeFlags.node,
     Database.node,
+    Goal.node,
   ],
 })
 
