@@ -179,7 +179,7 @@ function planRequest(
     }
 
     return RequestPlan.Local({
-      directory: session?.directory || defaultDirectory(request, url),
+      directory: defaultDirectory(request, url, session?.directory),
       workspaceID: envWorkspaceID ?? workspaceID,
     })
   })
