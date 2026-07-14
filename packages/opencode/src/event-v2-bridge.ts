@@ -15,6 +15,29 @@ const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
     const events = yield* EventV2.Service
+    const sessionDirectories = new Map<string, string>()
+
+    const sessionID = (data: unknown) => {
+      if (!data || typeof data !== "object") return
+      const record = data as Record<string, unknown>
+      if (typeof record.sessionID === "string") return record.sessionID
+      const info = record.info
+      if (info && typeof info === "object" && typeof (info as Record<string, unknown>).sessionID === "string") {
+        return (info as Record<string, unknown>).sessionID as string
+      }
+      const part = record.part
+      if (part && typeof part === "object" && typeof (part as Record<string, unknown>).sessionID === "string") {
+        return (part as Record<string, unknown>).sessionID as string
+      }
+    }
+
+    const sessionDirectory = (data: unknown) => {
+      if (!data || typeof data !== "object") return
+      const info = (data as Record<string, unknown>).info
+      if (!info || typeof info !== "object") return
+      const directory = (info as Record<string, unknown>).directory
+      return typeof directory === "string" ? directory : undefined
+    }
 
     const publish: EventV2.Interface["publish"] = (definition, data, options) =>
       Effect.gen(function* () {
@@ -36,15 +59,19 @@ const layer = Layer.effect(
       Effect.gen(function* () {
         const ctx = yield* InstanceRef
         const workspaceID = (yield* WorkspaceRef) ?? event.location?.workspaceID
+        const sid = sessionID(event.data)
+        const directory = sessionDirectory(event.data)
+        if (sid && directory) sessionDirectories.set(sid, directory)
+        const eventDirectory = (sid ? sessionDirectories.get(sid) : undefined) ?? event.location?.directory ?? ctx?.directory
         GlobalBus.emit("event", {
-          directory: event.location?.directory ?? ctx?.directory,
+          directory: eventDirectory,
           project: ctx?.project.id,
           workspace: workspaceID,
           payload: { id: event.id, type: event.type, properties: event.data },
         })
         if (event.durable === undefined) return
         GlobalBus.emit("event", {
-          directory: event.location?.directory ?? ctx?.directory,
+          directory: eventDirectory,
           project: ctx?.project.id,
           workspace: workspaceID,
           payload: {
