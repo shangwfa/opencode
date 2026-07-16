@@ -152,7 +152,7 @@ export const SessionItem = (props: SessionItemProps): JSX.Element => {
   const serverSync = useServerSync()
   const unseenCount = createMemo(() => notification.session.unseenCount(props.session.id))
   const hasError = createMemo(() => notification.session.unseenHasError(props.session.id))
-  const [sessionStore] = serverSync.child(props.session.directory)
+  const [sessionStore] = serverSync().child(props.session.directory)
   const hasPermissions = createMemo(() => {
     return !!sessionPermissionRequest(
       sessionStore.session,

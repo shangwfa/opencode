@@ -22,7 +22,7 @@ const sessionFields = new Set([
 export const createDirSyncContext = (
   directory: string,
   serverSync: ReturnType<typeof createServerSyncContextInner>,
-  serverSDK: ReturnType<typeof createServerSdkContext> = useServerSDK(),
+  serverSDK: ReturnType<typeof createServerSdkContext>,
 ) => {
   const client = serverSDK.createClient({ directory, throwOnError: true })
   const current = createMemo(() => serverSync.child(directory, { mcp: true }))

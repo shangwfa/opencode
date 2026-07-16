@@ -9,9 +9,6 @@ import { useSDK } from "./sdk"
 import { useSync } from "./sync"
 import { useLanguage } from "@/context/language"
 import { useLayout } from "@/context/layout"
-import { useServer } from "./server"
-import { usePlatform } from "./platform"
-import { authTokenFromCredentials } from "@/utils/server"
 import { createPathHelpers } from "./file/path"
 import {
   approxBytes,
@@ -65,44 +62,12 @@ export const { use: useFile, provider: FileProvider } = createSimpleContext({
     const serverSDK = useServerSDK()
     const language = useLanguage()
     const layout = useLayout()
-    const server = useServer()
-    const platform = usePlatform()
 
-    const scope = createMemo(() => sdk.directory)
+    const scope = createMemo(() => sdk().directory)
     const path = createPathHelpers(scope)
     const tabs = layout.tabs(() =>
       SessionStateKey.from(serverSDK().scope, SessionRouteKey.fromRoute(base64Encode(sdk().directory), params.id)),
     )
-
-    const fileAuthHeaders = (): HeadersInit | undefined =>
-      server.current?.http.password
-        ? {
-            Authorization: `Basic ${authTokenFromCredentials({
-              username: server.current.http.username,
-              password: server.current.http.password,
-            })}`,
-          }
-        : undefined
-
-    const fetchFileList = async (dir: string) => {
-      const url = new URL("/file", sdk.url)
-      url.searchParams.set("path", dir)
-      url.searchParams.set("directory", sdk.directory)
-      if (params.id) url.searchParams.set("sessionID", params.id)
-      const response = await (platform.fetch ?? fetch)(url, { headers: fileAuthHeaders() })
-      if (!response.ok) throw new Error(`Failed to list files: ${response.status}`)
-      return (await response.json()) as Awaited<ReturnType<typeof sdk.client.file.list>>["data"]
-    }
-
-    const fetchFileRead = async (filePath: string) => {
-      const url = new URL("/file/content", sdk.url)
-      url.searchParams.set("path", filePath)
-      url.searchParams.set("directory", sdk.directory)
-      if (params.id) url.searchParams.set("sessionID", params.id)
-      const response = await (platform.fetch ?? fetch)(url, { headers: fileAuthHeaders() })
-      if (!response.ok) throw new Error(`Failed to read file: ${response.status}`)
-      return (await response.json()) as Awaited<ReturnType<typeof sdk.client.file.read>>["data"]
-    }
 
     const inflight = new Map<string, Promise<void>>()
     const [store, setStore] = createStore<{
@@ -114,7 +79,10 @@ export const { use: useFile, provider: FileProvider } = createSimpleContext({
     const tree = createFileTreeStore({
       scope,
       normalizeDir: path.normalizeDir,
-      list: (dir) => fetchFileList(dir).then((x) => x ?? []),
+      list: (dir) =>
+        sdk()
+          .client.file.list({ path: dir })
+          .then((x) => x.data ?? []),
       onError: (message) => {
         showToast({
           variant: "error",
@@ -148,7 +116,7 @@ export const { use: useFile, provider: FileProvider } = createSimpleContext({
       })
     })
 
-    const viewCache = createFileViewCache(serverSDK.scope)
+    const viewCache = createFileViewCache(serverSDK().scope)
     const view = createMemo(() => viewCache.load(scope(), params.id))
 
     const ensure = (file: string) => {
@@ -212,9 +180,11 @@ export const { use: useFile, provider: FileProvider } = createSimpleContext({
 
       setLoading(file)
 
-      const promise = fetchFileRead(file)
-        .then((content) => {
+      const promise = sdk()
+        .client.file.read({ path: file })
+        .then((x) => {
           if (scope() !== directory) return
+          const content = x.data
           setLoaded(file, content)
 
           if (!content) return
@@ -233,13 +203,18 @@ export const { use: useFile, provider: FileProvider } = createSimpleContext({
       return promise
     }
 
-    const search = (query: string, dirs: "true" | "false") =>
-      sdk.client.find.files({ query, dirs }).then(
-        (x) => (x.data ?? []).map(path.normalize),
-        () => [],
-      )
+    const search = (query: string, dirs: "true" | "false", options?: { limit?: number; signal?: AbortSignal }) =>
+      sdk()
+        .client.find.files({ query, dirs, limit: options?.limit }, { signal: options?.signal })
+        .then(
+          (x) => (x.data ?? []).map(path.normalize),
+          (error) => {
+            if (options?.signal?.aborted) throw error
+            return []
+          },
+        )
 
-    const stop = sdk.event.listen((e) => {
+    const stop = sdk().event.listen((e) => {
       invalidateFromWatcher(e.details, {
         normalize: path.normalize,
         hasFile: (file) => Boolean(store.file[file]),
@@ -312,7 +287,8 @@ export const { use: useFile, provider: FileProvider } = createSimpleContext({
       setScrollLeft,
       selectedLines,
       setSelectedLines,
-      searchFiles: (query: string) => search(query, "false"),
+      searchFiles: (query: string, options?: { limit?: number; signal?: AbortSignal }) =>
+        search(query, "false", options),
       searchFilesAndDirectories: (query: string) => search(query, "true"),
     }
   },

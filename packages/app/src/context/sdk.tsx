@@ -6,7 +6,8 @@ export type DirectorySDK = ReturnType<ServerSDK["ensureDirSdkContext"]>
 
 export const { use: useSDK, provider: SDKProvider } = createSimpleContext({
   name: "SDK",
-  init: (props: { directory: string }) => {
+  // Resolves the directory-scoped SDK reactively from the (possibly changing) server.
+  init: (props: { directory: string | Accessor<string> }) => {
     const serverSDK = useServerSDK()
     return createMemo(() => {
       const directory = typeof props.directory === "function" ? props.directory() : props.directory

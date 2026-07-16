@@ -2,7 +2,7 @@ import { createStore, produce } from "solid-js/store"
 import { createSimpleContext } from "@opencode-ai/ui/context"
 import { batch, createEffect, createMemo, createRoot, on, onCleanup } from "solid-js"
 import { useParams } from "@solidjs/router"
-import { useSDK } from "./sdk"
+import { useSDK, type DirectorySDK } from "./sdk"
 import type { Platform } from "./platform"
 import { useServerSDK } from "./server-sdk"
 import { base64Encode } from "@opencode-ai/core/util/encode"
@@ -144,7 +144,7 @@ export function clearWorkspaceTerminals(
 }
 
 function createWorkspaceTerminalSession(
-  sdk: ReturnType<typeof useSDK>,
+  sdk: DirectorySDK,
   dir: string,
   scope: ServerScopeValue,
   legacySessionID?: string,
@@ -203,7 +203,7 @@ function createWorkspaceTerminalSession(
   })
   onCleanup(unsub)
 
-  const update = (client: ReturnType<typeof useSDK>["client"], pty: Partial<LocalPTY> & { id: string }) => {
+  const update = (client: DirectorySDK["client"], pty: Partial<LocalPTY> & { id: string }) => {
     const index = store.all.findIndex((x) => x.id === pty.id)
     const previous = index >= 0 ? store.all[index] : undefined
     if (index >= 0) {
@@ -224,7 +224,7 @@ function createWorkspaceTerminalSession(
       })
   }
 
-  const clone = async (client: ReturnType<typeof useSDK>["client"], id: string) => {
+  const clone = async (client: DirectorySDK["client"], id: string) => {
     const index = store.all.findIndex((x) => x.id === id)
     const pty = store.all[index]
     if (!pty) return
@@ -414,7 +414,7 @@ export const { use: useTerminal, provider: TerminalProvider } = createSimpleCont
       }
 
       const entry = createRoot((dispose) => ({
-        value: createWorkspaceTerminalSession(sdk, dir, serverScope, legacySessionID),
+        value: createWorkspaceTerminalSession(sdk(), dir, serverScope, legacySessionID),
         dispose,
       }))
 

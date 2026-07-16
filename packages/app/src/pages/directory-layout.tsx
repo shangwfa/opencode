@@ -44,7 +44,10 @@ export function DirectoryDataProvider(
 
   createResource(
     () => params.id,
-    (id) => sync.session.sync(id).catch(() => {}),
+    (id) =>
+      sync()
+        .session.sync(id)
+        .catch(() => {}),
   )
 
   createEffect(() => {

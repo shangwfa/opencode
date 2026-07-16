@@ -1,7 +1,7 @@
 import { onMount } from "solid-js"
 import { makeEventListener } from "@solid-primitives/event-listener"
 import { showToast } from "@/utils/toast"
-import { usePrompt, type ContentPart, type ImageAttachmentPart } from "@/context/prompt"
+import { type ContentPart, type ImageAttachmentPart, type usePrompt } from "@/context/prompt"
 import { useLanguage } from "@/context/language"
 import { uuid } from "@/utils/uuid"
 import { getCursorPosition } from "./editor-dom"
@@ -39,12 +39,14 @@ type PromptAttachmentsCoreInput = {
 }
 
 type PromptAttachmentsInput = {
+  prompt: ReturnType<typeof usePrompt>
   editor: () => HTMLDivElement | undefined
   isDialogActive: () => boolean
   setDraggingType: (type: "image" | "@mention" | null) => void
   focusEditor: () => void
   addPart: (part: ContentPart) => boolean
   readClipboardImage?: () => Promise<File | null>
+  getPathForFile?: (file: File) => string
 }
 
 export function createPromptAttachmentsCore(input: PromptAttachmentsCoreInput) {
@@ -70,6 +72,7 @@ export function createPromptAttachmentsCore(input: PromptAttachmentsCoreInput) {
       type: "image",
       id: uuid(),
       filename: file.name,
+      sourcePath: input.getPathForFile?.(file) || undefined,
       mime,
       dataUrl: url,
     }

@@ -19,9 +19,9 @@ export function StatusPopover() {
   const global = useGlobal()
   const sync = useSync()
   const [shown, setShown] = createSignal(false)
-  const ready = createMemo(() => global.servers.health[server.key]?.healthy === false || sync.data.mcp_ready)
+  const ready = createMemo(() => global.servers.health[server.key]?.healthy === false || sync().data.mcp_ready)
   const mcpIssue = createMemo(() => {
-    const mcp = Object.values(sync.data.mcp ?? {})
+    const mcp = Object.values(sync().data.mcp ?? {})
     const failed = mcp.some((item) => item.status === "failed" || item.status === "needs_client_registration")
     const warn = mcp.some((item) => item.status === "needs_auth")
     if (failed) return "critical" as const
@@ -89,7 +89,7 @@ function DirectoryStatusPopover() {
   const serverHealth = () => global.servers.health[ServerConnection.key(server().server)]?.healthy
   const ready = createMemo(() => serverHealth() === false || sync().data.mcp_ready)
   const mcpIssue = createMemo(() => {
-    const mcp = Object.values(sync.data.mcp ?? {})
+    const mcp = Object.values(sync().data.mcp ?? {})
     const failed = mcp.some((item) => item.status === "failed" || item.status === "needs_client_registration")
     const warn = mcp.some((item) => item.status === "needs_auth")
     if (failed) return "critical" as const

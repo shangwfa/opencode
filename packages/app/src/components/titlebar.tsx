@@ -1,6 +1,6 @@
-import { createEffect, createMemo, createResource, createSignal, Match, Show, Switch, untrack } from "solid-js"
+import { createEffect, createMemo, createResource, createSignal, Match, onMount, Show, Switch, untrack } from "solid-js"
 import { createStore } from "solid-js/store"
-import { useLocation, useMatch, useNavigate, useParams } from "@solidjs/router"
+import { useLocation, useNavigate, useParams } from "@solidjs/router"
 import { IconButton } from "@opencode-ai/ui/icon-button"
 import { Icon } from "@opencode-ai/ui/icon"
 import { Button } from "@opencode-ai/ui/button"
@@ -8,6 +8,8 @@ import { Tooltip, TooltipKeybind } from "@opencode-ai/ui/tooltip"
 import { useTheme } from "@opencode-ai/ui/theme/context"
 import { IconButtonV2 } from "@opencode-ai/ui/v2/icon-button-v2"
 import { Icon as IconV2 } from "@opencode-ai/ui/v2/icon"
+import { KeybindV2 } from "@opencode-ai/ui/v2/keybind-v2"
+import { TooltipV2 } from "@opencode-ai/ui/v2/tooltip-v2"
 
 import { LayoutRoute, useLayout } from "@/context/layout"
 import { usePlatform } from "@/context/platform"
@@ -23,6 +25,7 @@ import { readSessionTabsRemovedDetail, SESSION_TABS_REMOVED_EVENT } from "@/comp
 import { useGlobal } from "@/context/global"
 import { ServerConnection, useServer } from "@/context/server"
 import { tabKey, useTabs } from "@/context/tabs"
+import type { PromptSession } from "@/context/prompt"
 import "./titlebar.css"
 import { newTabTooltipKeybind } from "./command-tooltip-keybind"
 
@@ -56,6 +59,12 @@ export type TitlebarUpdate = {
   version: () => string | undefined
   installing: () => boolean
   install: () => void
+}
+
+export function useTitlebarRightMount() {
+  const [mount, setMount] = createSignal<HTMLElement | null>(null)
+  onMount(() => setMount(document.getElementById("opencode-titlebar-right")))
+  return mount
 }
 
 export function Titlebar(props: { update?: TitlebarUpdate }) {
@@ -292,7 +301,10 @@ export function Titlebar(props: { update?: TitlebarUpdate }) {
               const route = layout.route()
               if (!tabs.ready()) return
               const tab = currentTab()
-              if (tab) return
+              if (tab) {
+                tabs.remember(tab)
+                return
+              }
 
               if (route.type === "session") {
                 const s = session()
@@ -313,14 +325,36 @@ export function Titlebar(props: { update?: TitlebarUpdate }) {
               const route = layout.route()
               const activeSession = session()
               if (route.type === "session" && activeSession) {
-                tabs.newDraft({ server: route.server ?? server.key, directory: activeSession.directory }, "")
+                const sessionTab = {
+                  type: "session" as const,
+                  server: route.server ?? server.key,
+                  sessionId: activeSession.id,
+                }
+                const model = tabs.stateValue<PromptSession>(sessionTab, "prompt")?.model.current()
+                tabs.newDraft({ server: sessionTab.server, directory: activeSession.directory }, "", model)
                 return
               }
 
               const activeTab = currentTab()
               if (activeTab?.type === "draft") {
-                tabs.newDraft({ server: activeTab.server, directory: activeTab.directory }, "")
+                const model = tabs.stateValue<PromptSession>(activeTab, "prompt")?.model.current()
+                tabs.newDraft({ server: activeTab.server, directory: activeTab.directory }, "", model)
                 return
+              }
+
+              if (route.type === "home") {
+                const selection = layout.home.selection()
+                const conn = global.servers.list().find((item) => ServerConnection.key(item) === selection.server)
+                const project = conn
+                  ? global
+                      .ensureServerCtx(conn)
+                      .projects.list()
+                      .find((item) => item.worktree === selection.directory)
+                  : undefined
+                if (conn && project) {
+                  tabs.newDraft({ server: ServerConnection.key(conn), directory: project.worktree }, "")
+                  return
+                }
               }
 
               const current = layout.projects.list()[0]
@@ -369,8 +403,15 @@ export function Titlebar(props: { update?: TitlebarUpdate }) {
                   keybind: "mod+w",
                   hidden: true,
                   onSelect: () => {
-                    tabsStoreActions.removeTab(tabsStore.findIndex((tab) => current === tab))
+                    tabsStoreActions.closeTab(tabsStore.findIndex((tab) => current === tab))
                   },
+                },
+                {
+                  id: "tab.reopenClosed",
+                  category: language.t("command.category.file"),
+                  title: language.t("command.tab.reopenClosed"),
+                  keybind: "mod+shift+t",
+                  onSelect: () => tabsStoreActions.reopenClosedTab(),
                 },
                 {
                   id: `tab.prev`,
@@ -386,7 +427,7 @@ export function Titlebar(props: { update?: TitlebarUpdate }) {
                     if (index === -1) index = tabsStore.length - 1
 
                     const next = tabsStore[index]
-                    if (next) navigateTab(next)
+                    if (next) tabs.select(next)
                   },
                 },
                 {
@@ -403,7 +444,7 @@ export function Titlebar(props: { update?: TitlebarUpdate }) {
                     if (index === tabsStore.length) index = 0
 
                     const next = tabsStore[index]
-                    if (next) navigateTab(next)
+                    if (next) tabs.select(next)
                   },
                 },
               ].filter((v) => v !== undefined)
@@ -425,24 +466,28 @@ export function Titlebar(props: { update?: TitlebarUpdate }) {
                 <Show when={windows() || linux()}>
                   <WindowsAppMenu command={command} platform={platform} variant="v2" />
                 </Show>
-                <IconButtonV2
-                  variant="ghost-muted"
-                  size="large"
-                  as="a"
-                  href="/"
-                  class="!w-9 shrink-0"
-                  icon={<IconV2 name="grid-plus" />}
-                  state={!!homeMatch() ? "pressed" : undefined}
-                />
-
-                <div
-                  class="flex min-w-0 flex-row items-center gap-1.5 overflow-x-auto no-scrollbar [app-region:no-drag]"
-                  ref={tabScrollRef}
+                <TooltipV2
+                  placement="bottom"
+                  value={
+                    <>
+                      {language.t("home.title")}
+                      <KeybindV2 keys={command.keybindParts("home.toggle")} variant="neutral" />
+                    </>
+                  }
+                  class="shrink-0"
                 >
-                  <div class="flex min-w-0 flex-row items-center gap-1.5">
-                    <For each={tabsStore}>
-                      {(tab, i) => {
-                        let ref!: HTMLDivElement
+                  <IconButtonV2
+                    type="button"
+                    variant="ghost-muted"
+                    size="large"
+                    class="!w-9 shrink-0"
+                    icon={<IconV2 name="grid-plus" />}
+                    state={layout.route().type === "home" ? "pressed" : undefined}
+                    onClick={toggleHome}
+                    aria-label={language.t("home.title")}
+                    aria-pressed={layout.route().type === "home"}
+                  />
+                </TooltipV2>
 
                 <TitlebarTabStrip
                   tabs={tabsStore}
@@ -455,7 +500,7 @@ export function Titlebar(props: { update?: TitlebarUpdate }) {
                   }}
                   onClose={(tab) => {
                     const index = tabsStore.findIndex((item) => tabKey(item) === tabKey(tab))
-                    if (index !== -1) tabsStoreActions.removeTab(index)
+                    if (index !== -1) tabsStoreActions.closeTab(index)
                   }}
                   onReorder={(keys) => tabsStoreActions.reorder(keys)}
                 />

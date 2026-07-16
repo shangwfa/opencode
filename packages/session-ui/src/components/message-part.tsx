@@ -62,6 +62,7 @@ import { animate } from "motion"
 import { useLocation } from "@solidjs/router"
 import { attached, inline, kind } from "./message-file"
 import { readPartText } from "./message-part-text"
+import { SessionProgressIndicatorV2 } from "../v2/components/session-progress-indicator-v2"
 
 async function writeClipboard(text: string): Promise<boolean> {
   const body = typeof document === "undefined" ? undefined : document.body
@@ -184,6 +185,7 @@ export interface MessagePartProps {
   onToolOpenChange?: (open: boolean) => void
   deferToolContent?: boolean
   virtualizeDiff?: boolean
+  onContentRendered?: () => void
   showAssistantCopyPartID?: string | null
   turnDurationMs?: number
   useV2Actions?: boolean
@@ -234,13 +236,14 @@ export type PartComponent = Component<MessagePartProps>
 export const PART_MAPPING: Record<string, PartComponent | undefined> = {}
 
 const TEXT_RENDER_PACE_MS = 24
+const TEXT_RENDER_IMMEDIATE = 512
 const TEXT_RENDER_SNAP = /[\s.,!?;:)\]]/
 
 function step(size: number) {
   if (size <= 12) return 2
   if (size <= 48) return 4
   if (size <= 96) return 8
-  return Math.min(24, Math.ceil(size / 8))
+  return Math.min(256, Math.ceil(size / 4))
 }
 
 function next(text: string, start: number) {
@@ -279,6 +282,10 @@ function createPacedValue(getValue: () => string, live?: () => boolean) {
       sync(text)
       return
     }
+    if (text.length - shown.length <= TEXT_RENDER_IMMEDIATE) {
+      sync(text)
+      return
+    }
     const end = next(text, shown.length)
     sync(text.slice(0, end))
     if (end < text.length) timeout = setTimeout(run, TEXT_RENDER_PACE_MS)
@@ -292,6 +299,11 @@ function createPacedValue(getValue: () => string, live?: () => boolean) {
       return
     }
     if (!text.startsWith(shown) || text.length < shown.length) {
+      clear()
+      sync(text)
+      return
+    }
+    if (text.length - shown.length <= TEXT_RENDER_IMMEDIATE) {
       clear()
       sync(text)
       return
@@ -359,6 +371,34 @@ const agentTones: Record<string, string> = {
   plan: "var(--icon-agent-plan-base)",
 }
 
+const v2AgentTones: Record<string, string> = {
+  build: "var(--v2-agent-build-solid)",
+  explore: "var(--v2-agent-explore-solid)",
+  plan: "var(--v2-agent-plan-solid)",
+  review: "var(--v2-agent-review-solid)",
+  writer: "var(--v2-agent-writer-solid)",
+}
+
+const agentThemeColors: Record<string, string> = {
+  primary: "var(--text-interactive-base)",
+  secondary: "var(--text-base)",
+  accent: "var(--icon-info-base)",
+  success: "var(--icon-success-base)",
+  warning: "var(--icon-warning-base)",
+  error: "var(--icon-critical-base)",
+  info: "var(--icon-info-base)",
+}
+
+const v2AgentThemeColors: Record<string, string> = {
+  primary: "var(--v2-text-text-accent)",
+  secondary: "var(--v2-text-text-muted)",
+  accent: "var(--v2-icon-icon-accent)",
+  success: "var(--v2-state-fg-success)",
+  warning: "var(--v2-state-fg-warning)",
+  error: "var(--v2-state-fg-danger)",
+  info: "var(--v2-state-fg-info)",
+}
+
 const agentPalette = [
   "var(--icon-agent-ask-base)",
   "var(--icon-agent-build-base)",
@@ -383,14 +423,27 @@ function tone(name: string) {
 function taskAgent(
   raw: unknown,
   list?: readonly { name: string; color?: string }[],
-): { name?: string; color?: string } {
+): { name?: string; color?: string; v2Color?: string } {
   if (typeof raw !== "string" || !raw) return {}
   const key = raw.toLowerCase()
   const item = list?.find((entry) => entry.name === raw || entry.name.toLowerCase() === key)
+  const v2Tone = item?.color ? undefined : v2AgentTones[key]
+  const color = agentColor(item?.color, agentThemeColors) ?? agentTones[key] ?? tone(key)
+  const v2Color = agentColor(item?.color, v2AgentThemeColors) ?? v2Tone ?? color
   return {
     name: item?.name ?? `${raw[0]!.toUpperCase()}${raw.slice(1)}`,
-    color: item?.color ?? agentTones[key] ?? tone(key),
+    color,
+    v2Color,
   }
+}
+
+function agentColor(value: string | undefined, themeColors: Record<string, string>) {
+  if (!value) return
+  return themeColors[value] ?? value
+}
+
+function newLayout() {
+  return typeof document !== "undefined" && document.body.hasAttribute("data-new-layout")
 }
 
 function webSearchProviderLabel(provider: unknown) {
@@ -1333,6 +1386,7 @@ export function Part(props: MessagePartProps) {
         onToolOpenChange={props.onToolOpenChange}
         deferToolContent={props.deferToolContent}
         virtualizeDiff={props.virtualizeDiff}
+        onContentRendered={props.onContentRendered}
         showAssistantCopyPartID={props.showAssistantCopyPartID}
         turnDurationMs={props.turnDurationMs}
         useV2Actions={props.useV2Actions}
@@ -1354,6 +1408,7 @@ export interface ToolProps {
   onOpenChange?: (open: boolean) => void
   deferContent?: boolean
   virtualizeDiff?: boolean
+  onContentRendered?: () => void
   forceOpen?: boolean
   locked?: boolean
 }
@@ -1500,6 +1555,7 @@ PART_MAPPING["tool"] = function ToolPartDisplay(props) {
               onOpenChange={props.onToolOpenChange ? handleToolOpenChange : undefined}
               deferContent={props.deferToolContent}
               virtualizeDiff={props.virtualizeDiff}
+              onContentRendered={props.onContentRendered}
             />
           </Match>
         </Switch>
@@ -1868,6 +1924,7 @@ ToolRegistry.register({
     const agent = createMemo(() => taskAgent(props.input.subagent_type, data.store.agent))
     const title = createMemo(() => agent().name ?? i18n.t("ui.tool.agent.default"))
     const tone = createMemo(() => agent().color)
+    const v2Tone = createMemo(() => agent().v2Color)
     const subtitle = createMemo(() => {
       const value =
         typeof props.input.description === "string" && props.input.description
@@ -1907,20 +1964,39 @@ ToolRegistry.register({
     }
 
     const trigger = () => (
-      <div data-component="task-tool-card">
-        <div data-slot="basic-tool-tool-info-structured">
-          <div data-slot="basic-tool-tool-info-main">
-            <Show when={running()}>
-              <span data-component="task-tool-spinner" style={{ color: tone() ?? "var(--icon-interactive-base)" }}>
-                <Spinner />
-              </span>
-            </Show>
-            <span data-component="task-tool-title" style={{ color: tone() ?? "var(--text-strong)" }}>
-              {title()}
-            </span>
-            <Show when={subtitle()}>
-              <span data-slot="basic-tool-tool-subtitle">{subtitle()}</span>
-            </Show>
+      <div
+        data-component="task-tool-card"
+        style={{
+          "--task-agent-color": v2Tone(),
+          "--task-agent-legacy-color": tone(),
+        }}
+      >
+        <div data-component="task-tool-surface">
+          <div data-slot="basic-tool-tool-info-structured">
+            <div data-slot="basic-tool-tool-info-main">
+              <Show
+                when={running()}
+                fallback={
+                  <Show when={newLayout()}>
+                    <span data-component="task-tool-icon">
+                      <Icon name="subagent" size="small" />
+                    </span>
+                  </Show>
+                }
+              >
+                <span data-component="task-tool-spinner" style={{ color: tone() ?? "var(--icon-interactive-base)" }}>
+                  <Show when={newLayout()} fallback={<Spinner />}>
+                    <SessionProgressIndicatorV2
+                      style={{ color: v2Tone() ?? "light-dark(var(--v2-text-text-base), #ffffff)" }}
+                    />
+                  </Show>
+                </span>
+              </Show>
+              <span data-component="task-tool-title">{title()}</span>
+              <Show when={subtitle()}>
+                <span data-slot="basic-tool-tool-subtitle">{subtitle()}</span>
+              </Show>
+            </div>
           </div>
         </div>
         <Show when={clickable()}>
@@ -2105,7 +2181,13 @@ ToolRegistry.register({
               }
             >
               <div data-component="edit-content">
-                <Dynamic component={fileComponent} mode="diff" virtualize={props.virtualizeDiff} {...fileCompProps()} />
+                <Dynamic
+                  component={fileComponent}
+                  mode="diff"
+                  virtualize={props.virtualizeDiff}
+                  onRendered={props.onContentRendered}
+                  {...fileCompProps()}
+                />
               </div>
             </ToolFileAccordion>
           </Show>
@@ -2164,6 +2246,7 @@ ToolRegistry.register({
                     cacheKey: checksum(props.input.content),
                   }}
                   overflow="scroll"
+                  onRendered={props.onContentRendered}
                 />
               </div>
             </ToolFileAccordion>
@@ -2292,6 +2375,7 @@ ToolRegistry.register({
                                   virtualize={props.virtualizeDiff}
                                   fileDiff={file.view.fileDiff}
                                   hunkSeparators={file.view.fileDiff.isPartial ? "simple" : "line-info-basic"}
+                                  onRendered={props.onContentRendered}
                                 />
                               </div>
                             </Show>
@@ -2367,6 +2451,7 @@ ToolRegistry.register({
                   mode="diff"
                   virtualize={props.virtualizeDiff}
                   fileDiff={single()!.view.fileDiff}
+                  onRendered={props.onContentRendered}
                 />
               </div>
             </ToolFileAccordion>

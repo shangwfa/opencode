@@ -24,6 +24,7 @@ import { focusTerminalById } from "@/pages/session/helpers"
 import { useSessionLayout } from "@/pages/session/session-layout"
 import { messageAgentColor } from "@/utils/agent"
 import { decode64 } from "@/utils/base64"
+import { fileManagerApp } from "@/utils/file-manager"
 import { Persist, persisted } from "@/utils/persist"
 import { StatusPopover, StatusPopoverV2 } from "../status-popover"
 import { IconButtonV2 } from "@opencode-ai/ui/v2/icon-button-v2"
@@ -31,6 +32,7 @@ import { Icon as IconV2 } from "@opencode-ai/ui/v2/icon"
 import { KeybindV2 } from "@opencode-ai/ui/v2/keybind-v2"
 import { TooltipV2 } from "@opencode-ai/ui/v2/tooltip-v2"
 import { reviewTooltipKeybind } from "../command-tooltip-keybind"
+import { useTitlebarRightMount } from "../titlebar"
 
 const OPEN_APPS = [
   "vscode",
@@ -174,11 +176,7 @@ export function SessionHeader() {
     return LINUX_APPS
   })
 
-  const fileManager = createMemo(() => {
-    if (os() === "macos") return { label: "session.header.open.finder", icon: "finder" as const }
-    if (os() === "windows") return { label: "session.header.open.fileExplorer", icon: "file-explorer" as const }
-    return { label: "session.header.open.fileManager", icon: "finder" as const }
-  })
+  const fileManager = createMemo(() => fileManagerApp(os()))
 
   createEffect(() => {
     if (platform.platform !== "desktop") return
@@ -234,7 +232,7 @@ export function SessionHeader() {
   )
   const opening = createMemo(() => openRequest.app !== undefined)
   const tint = createMemo(() =>
-    messageAgentColor(params.id ? sync.data.message[params.id] : undefined, sync.data.agent),
+    messageAgentColor(params.id ? sync().data.message[params.id] : undefined, sync().data.agent),
   )
   const v2ActionsState = createMemo<SessionHeaderV2ActionsState>(() => ({
     statusVisible: status(),
@@ -284,10 +282,9 @@ export function SessionHeader() {
   }
 
   const [centerMount, setCenterMount] = createSignal<HTMLElement | null>(null)
-  const [rightMount, setRightMount] = createSignal<HTMLElement | null>(null)
+  const rightMount = useTitlebarRightMount()
   onMount(() => {
     setCenterMount(document.getElementById("opencode-titlebar-center"))
-    setRightMount(document.getElementById("opencode-titlebar-right"))
   })
 
   return (
@@ -326,7 +323,7 @@ export function SessionHeader() {
         {(mount) => (
           <Portal mount={mount()}>
             <Show
-              when={isDesktopV2}
+              when={isV2}
               fallback={
                 <div class="flex items-center gap-2">
                   <Show when={projectDirectory()}>
@@ -448,23 +445,21 @@ export function SessionHeader() {
                         <StatusPopover />
                       </Tooltip>
                     </Show>
-                    <Show when={term()}>
-                      <TooltipKeybind
-                        title={language.t("command.terminal.toggle")}
-                        keybind={command.keybind("terminal.toggle")}
+                    <TooltipKeybind
+                      title={language.t("command.terminal.toggle")}
+                      keybind={command.keybind("terminal.toggle")}
+                    >
+                      <Button
+                        variant="ghost"
+                        class="group/terminal-toggle titlebar-icon w-8 h-6 p-0 box-border shrink-0"
+                        onClick={toggleTerminal}
+                        aria-label={language.t("command.terminal.toggle")}
+                        aria-expanded={view().terminal.opened()}
+                        aria-controls="terminal-panel"
                       >
-                        <Button
-                          variant="ghost"
-                          class="group/terminal-toggle titlebar-icon w-8 h-6 p-0 box-border shrink-0"
-                          onClick={toggleTerminal}
-                          aria-label={language.t("command.terminal.toggle")}
-                          aria-expanded={view().terminal.opened()}
-                          aria-controls="terminal-panel"
-                        >
-                          <Icon size="small" name={view().terminal.opened() ? "terminal-active" : "terminal"} />
-                        </Button>
-                      </TooltipKeybind>
-                    </Show>
+                        <Icon size="small" name={view().terminal.opened() ? "terminal-active" : "terminal"} />
+                      </Button>
+                    </TooltipKeybind>
 
                     <div class="hidden md:flex items-center gap-1 shrink-0">
                       <TooltipKeybind
@@ -483,32 +478,30 @@ export function SessionHeader() {
                         </Button>
                       </TooltipKeybind>
 
-                      <Show when={tree()}>
-                        <TooltipKeybind
-                          title={language.t("command.fileTree.toggle")}
-                          keybind={command.keybind("fileTree.toggle")}
+                      <TooltipKeybind
+                        title={language.t("command.fileTree.toggle")}
+                        keybind={command.keybind("fileTree.toggle")}
+                      >
+                        <Button
+                          variant="ghost"
+                          class="titlebar-icon w-8 h-6 p-0 box-border"
+                          onClick={() => layout.fileTree.toggle()}
+                          aria-label={language.t("command.fileTree.toggle")}
+                          aria-expanded={layout.fileTree.opened()}
+                          aria-controls="file-tree-panel"
                         >
-                          <Button
-                            variant="ghost"
-                            class="titlebar-icon w-8 h-6 p-0 box-border"
-                            onClick={() => layout.fileTree.toggle()}
-                            aria-label={language.t("command.fileTree.toggle")}
-                            aria-expanded={layout.fileTree.opened()}
-                            aria-controls="file-tree-panel"
-                          >
-                            <div class="relative flex items-center justify-center size-4">
-                              <Icon
-                                size="small"
-                                name={layout.fileTree.opened() ? "file-tree-active" : "file-tree"}
-                                classList={{
-                                  "text-icon-strong": layout.fileTree.opened(),
-                                  "text-icon-weak": !layout.fileTree.opened(),
-                                }}
-                              />
-                            </div>
-                          </Button>
-                        </TooltipKeybind>
-                      </Show>
+                          <div class="relative flex items-center justify-center size-4">
+                            <Icon
+                              size="small"
+                              name={layout.fileTree.opened() ? "file-tree-active" : "file-tree"}
+                              classList={{
+                                "text-icon-strong": layout.fileTree.opened(),
+                                "text-icon-weak": !layout.fileTree.opened(),
+                              }}
+                            />
+                          </div>
+                        </Button>
+                      </TooltipKeybind>
                     </div>
                   </div>
                 </div>

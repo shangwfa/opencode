@@ -7,7 +7,6 @@ import { useLanguage } from "@/context/language"
 import { useLayout } from "@/context/layout"
 import { useLocal } from "@/context/local"
 import { usePermission } from "@/context/permission"
-import { usePlatform } from "@/context/platform"
 import { usePrompt } from "@/context/prompt"
 import { useSDK } from "@/context/sdk"
 import { useSettings } from "@/context/settings"
@@ -19,8 +18,6 @@ import { createSessionTabs } from "@/pages/session/helpers"
 import { extractPromptFromParts } from "@/utils/prompt"
 import { UserMessage } from "@opencode-ai/sdk/v2"
 import { useSessionLayout } from "@/pages/session/session-layout"
-import { useTabs } from "@/context/tabs"
-import { requireServerKey } from "@/utils/session-route"
 import { createSessionOwnership } from "./session-ownership"
 
 export type SessionCommandContext = {
@@ -28,6 +25,7 @@ export type SessionCommandContext = {
   setActiveMessage: (message: UserMessage | undefined) => void
   focusInput: () => void
   review?: () => boolean
+  fileBrowser?: () => boolean
 }
 
 const withCategory = (category: string) => {
@@ -44,13 +42,11 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
   const language = useLanguage()
   const local = useLocal()
   const permission = usePermission()
-  const platform = usePlatform()
   const prompt = usePrompt()
   const sdk = useSDK()
   const settings = useSettings()
   const sync = useSync()
   const terminal = useTerminal()
-  const sessionTabs = useTabs()
   const layout = useLayout()
   const navigate = useNavigate()
   const { params, sessionKey, tabs, view } = useSessionLayout()
@@ -75,7 +71,7 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
   const info = () => {
     const id = params.id
     if (!id) return
-    return sync.session.get(id)
+    return sync().session.get(id)
   }
   const hasReview = () => !!params.id
   const normalizeTab = (tab: string) => {
@@ -88,16 +84,16 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
     normalizeTab,
     review: actions.review,
     hasReview,
+    fileBrowser: actions.fileBrowser,
   })
   const activeFileTab = tabState.activeFileTab
   const closableTab = tabState.closableTab
-  const desktopV2 = () => platform.platform === "desktop" && settings.general.newLayoutDesigns()
-  const shown = () => (desktopV2() ? settings.general.showFileTree() : true)
+  const shown = settings.visibility.fileTree
 
   const messages = () => {
     const id = params.id
     if (!id) return []
-    return sync.data.message[id] ?? []
+    return sync().data.message[id] ?? []
   }
   const userMessages = () => messages().filter((m) => m.role === "user") as UserMessage[]
   const visibleUserMessages = () => {
@@ -144,8 +140,8 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
 
   const isAutoAcceptActive = () => {
     const sessionID = params.id
-    if (sessionID) return permission.isAutoAccepting(sessionID, sdk.directory)
-    return permission.isAutoAcceptingDirectory(sdk.directory)
+    if (sessionID) return permission.isAutoAccepting(sessionID, sdk().directory)
+    return permission.isAutoAcceptingDirectory(sdk().directory)
   }
   const write = async (value: string) => {
     const body = typeof document === "undefined" ? undefined : document.body
@@ -197,8 +193,8 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
       return
     }
 
-    const url = await sdk.client.session
-      .share({ sessionID })
+    const url = await sdk()
+      .client.session.share({ sessionID })
       .then((res) => res.data?.share?.url)
       .catch(() => undefined)
     if (!url) {
@@ -217,8 +213,8 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
     const sessionID = params.id
     if (!sessionID) return
 
-    await sdk.client.session
-      .unshare({ sessionID })
+    await sdk()
+      .client.session.unshare({ sessionID })
       .then(() =>
         showToast({
           title: language.t("toast.session.unshare.success.title"),
@@ -272,6 +268,14 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
     view().terminal.open()
   }
 
+  const closeTerminal = () => {
+    const id = terminal.active()
+    if (!id) return
+    const last = terminal.all().length === 1
+    void terminal.close(id)
+    if (last) view().terminal.close()
+  }
+
   const chooseMcp = () => {
     void openDialog(
       () => import("@/components/dialog-select-mcp"),
@@ -281,12 +285,12 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
 
   const toggleAutoAccept = () => {
     const sessionID = params.id
-    if (sessionID) permission.toggleAutoAccept(sessionID, sdk.directory)
-    else permission.toggleAutoAcceptDirectory(sdk.directory)
+    if (sessionID) permission.toggleAutoAccept(sessionID, sdk().directory)
+    else permission.toggleAutoAcceptDirectory(sdk().directory)
 
     const active = sessionID
-      ? permission.isAutoAccepting(sessionID, sdk.directory)
-      : permission.isAutoAcceptingDirectory(sdk.directory)
+      ? permission.isAutoAccepting(sessionID, sdk().directory)
+      : permission.isAutoAcceptingDirectory(sdk().directory)
     showToast({
       title: active
         ? language.t("toast.permissions.autoaccept.on.title")
@@ -370,7 +374,7 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
       return
     }
 
-    await sdk.client.session.summarize({
+    await sdk().client.session.summarize({
       sessionID,
       modelID: model.id,
       providerID: model.provider.id,
@@ -385,7 +389,7 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
   }
 
   const shareCmds = () => {
-    if (sync.data.config.share === "disabled") return []
+    if (sync().data.config.share === "disabled") return []
     return [
       sessionCommand({
         id: "session.share",
@@ -414,9 +418,9 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
       title: language.t("command.session.new"),
       keybind: "mod+shift+s",
       slash: "new",
-      onSelect: () => {
-        if (params.serverKey) {
-          sessionTabs.newDraft({ server: requireServerKey(params.serverKey), directory: sdk().directory })
+      onSelect: (source) => {
+        if (settings.general.newLayoutDesigns()) {
+          command.trigger("tab.new", source)
           return
         }
         navigate(`/${params.dir}/session`)
@@ -521,6 +525,14 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
   ]
 
   const terminalCmds = () => [
+    terminalCommand({
+      id: "terminal.close",
+      title: language.t("terminal.close"),
+      keybind: "mod+w",
+      hidden: true,
+      when: (event) => event.target instanceof Element && !!event.target.closest('[data-component="terminal"]'),
+      onSelect: closeTerminal,
+    }),
     terminalCommand({
       id: "terminal.new",
       title: language.t("command.terminal.new"),
