@@ -1021,19 +1021,14 @@ export namespace SandboxProvider {
               if (row?.state === "killed") {
                 log.info("recreating killed sandbox", { sessionID, sandboxID: row.id })
               }
-              // P0-3: cross-pod mutex — prevent duplicate sandbox creation
-              yield* Effect.tryPromise({
-                try: () => pgDb.execute(sql`SELECT pg_advisory_lock(hashtext(${sessionID}))`),
-                catch: (e) => new Error(`advisory_lock failed: ${String(e)}`),
-              }).pipe(Effect.orDie)
+              // P0-3: cross-pod mutex — transaction-level locks are released with
+              // the same pooled connection that acquired them.
               const tCreate = Date.now()
-              const result = yield* createSandbox(sessionID, opts).pipe(
-                Effect.ensuring(
-                  Effect.tryPromise({
-                    try: () => pgDb.execute(sql`SELECT pg_advisory_unlock(hashtext(${sessionID}))`),
-                    catch: () => {},
-                  }).pipe(Effect.ignore),
-                ),
+              const result = yield* Effect.promise(() =>
+                pgDb.transaction(async (tx: any) => {
+                  await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${sessionID}))`)
+                  return Effect.runPromise(createSandbox(sessionID, opts))
+                }) as Promise<Sandbox>,
               )
               log.info("createSandbox done", {
                 sessionID,
