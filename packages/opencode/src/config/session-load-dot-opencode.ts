@@ -151,7 +151,7 @@ export const layer = Layer.effect(
       if (!sp) return yield* loadFromDirectory(sessionID, directory)
 
       const tar = yield* sp
-        .runInSession(sessionID, `cd "${directory}" && tar cf - .opencode 2>/dev/null | base64 | tr -d '\\n'`, {
+        .runInSession(sessionID, `cd "${directory}" && tar cf - --exclude='._*' .opencode 2>/dev/null | base64 | tr -d '\\n'`, {
           timeoutSeconds: 30,
         })
         .pipe(Effect.orDie)
