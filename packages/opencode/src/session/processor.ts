@@ -25,6 +25,7 @@ import { isRecord } from "@/util/record"
 import { EventV2Bridge } from "@/event-v2-bridge"
 import { Database } from "@opencode-ai/core/database/database"
 import { Usage, type LLMEvent } from "@opencode-ai/llm"
+import { SessionPluginRuntime } from "@/plugin/session-plugin-runtime"
 
 const DOOM_LOOP_THRESHOLD = 3
 export type Result = "compact" | "stop" | "continue"
@@ -94,6 +95,7 @@ const layer = Layer.effect(
     const image = yield* Image.Service
     const events = yield* EventV2Bridge.Service
     const database = yield* Database.Service
+    const sessionPlugins = yield* SessionPluginRuntime.Service
 
     const create = Effect.fn("SessionProcessor.create")(function* (input: Input) {
       // Pre-capture snapshot before the LLM stream starts. The AI SDK
@@ -112,6 +114,7 @@ const layer = Layer.effect(
         currentText: undefined,
         reasoningMap: {},
       }
+      const sessionPluginRuntime = yield* sessionPlugins.acquire(input.sessionID)
       let aborted = false
 
       const parse = (e: unknown) =>
@@ -520,6 +523,15 @@ const layer = Layer.effect(
               },
               { text: ctx.currentText.text },
             )).text
+            ctx.currentText.text = (yield* sessionPluginRuntime.trigger(
+              "experimental.text.complete",
+              {
+                sessionID: ctx.sessionID,
+                messageID: ctx.assistantMessage.id,
+                partID: ctx.currentText.id,
+              },
+              { text: ctx.currentText.text },
+            )).text
             {
               const end = Date.now()
               ctx.currentText.time = { start: ctx.currentText.time?.start ?? end, end }
@@ -710,6 +722,7 @@ export const node = LayerNode.make({
     Image.node,
     EventV2Bridge.node,
     Database.node,
+    SessionPluginRuntime.node,
   ],
 })
 

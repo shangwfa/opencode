@@ -82,7 +82,7 @@ export type PermissionNotFoundError = {
 export const isPermissionNotFoundError = (value: unknown): value is PermissionNotFoundError =>
   typeof value === "object" && value !== null && "_tag" in value && value["_tag"] === "PermissionNotFoundError"
 
-export type PtyNotFoundError = { readonly _tag: "PtyNotFoundError"; readonly id: string; readonly message: string }
+export type PtyNotFoundError = { readonly _tag: "PtyNotFoundError"; readonly ptyID: string; readonly message: string }
 export const isPtyNotFoundError = (value: unknown): value is PtyNotFoundError =>
   typeof value === "object" && value !== null && "_tag" in value && value["_tag"] === "PtyNotFoundError"
 
@@ -93,13 +93,6 @@ export type QuestionNotFoundError = {
 }
 export const isQuestionNotFoundError = (value: unknown): value is QuestionNotFoundError =>
   typeof value === "object" && value !== null && "_tag" in value && value["_tag"] === "QuestionNotFoundError"
-
-export type ProjectCopyError = {
-  readonly name: "ProjectCopyError"
-  readonly data: { readonly message: string; readonly forceRequired?: boolean | undefined }
-}
-export const isProjectCopyError = (value: unknown): value is ProjectCopyError =>
-  typeof value === "object" && value !== null && "name" in value && value["name"] === "ProjectCopyError"
 
 export type HealthGetOutput = { readonly healthy: true }
 
@@ -2269,6 +2262,284 @@ export type IntegrationsAttemptCancelInput = {
 
 export type IntegrationsAttemptCancelOutput = void
 
+export type ServerConnectorListInput = {
+  readonly location?: {
+    readonly location?: { readonly directory?: string | undefined; readonly workspace?: string | undefined } | undefined
+  }["location"]
+}
+
+export type ServerConnectorListOutput = {
+  readonly location: {
+    readonly directory: string
+    readonly workspaceID?: string
+    readonly project: { readonly id: string; readonly directory: string }
+  }
+  readonly data: ReadonlyArray<{
+    readonly id: string
+    readonly name: string
+    readonly methods: ReadonlyArray<
+      | {
+          readonly id: string
+          readonly type: "oauth"
+          readonly label: string
+          readonly prompts?: ReadonlyArray<
+            | {
+                readonly type: "text"
+                readonly key: string
+                readonly message: string
+                readonly placeholder?: string
+                readonly when?: { readonly key: string; readonly op: "eq" | "neq"; readonly value: string }
+              }
+            | {
+                readonly type: "select"
+                readonly key: string
+                readonly message: string
+                readonly options: ReadonlyArray<{
+                  readonly label: string
+                  readonly value: string
+                  readonly hint?: string
+                }>
+                readonly when?: { readonly key: string; readonly op: "eq" | "neq"; readonly value: string }
+              }
+          >
+        }
+      | {
+          readonly id: string
+          readonly type: "key"
+          readonly label: string
+          readonly prompts?: ReadonlyArray<
+            | {
+                readonly type: "text"
+                readonly key: string
+                readonly message: string
+                readonly placeholder?: string
+                readonly when?: { readonly key: string; readonly op: "eq" | "neq"; readonly value: string }
+              }
+            | {
+                readonly type: "select"
+                readonly key: string
+                readonly message: string
+                readonly options: ReadonlyArray<{
+                  readonly label: string
+                  readonly value: string
+                  readonly hint?: string
+                }>
+                readonly when?: { readonly key: string; readonly op: "eq" | "neq"; readonly value: string }
+              }
+          >
+        }
+    >
+  }>
+}
+
+export type ServerConnectorGetInput = {
+  readonly connectorID: { readonly connectorID: string }["connectorID"]
+  readonly location?: {
+    readonly location?: { readonly directory?: string | undefined; readonly workspace?: string | undefined } | undefined
+  }["location"]
+}
+
+export type ServerConnectorGetOutput = {
+  readonly location: {
+    readonly directory: string
+    readonly workspaceID?: string
+    readonly project: { readonly id: string; readonly directory: string }
+  }
+  readonly data: {
+    readonly id: string
+    readonly name: string
+    readonly methods: ReadonlyArray<
+      | {
+          readonly id: string
+          readonly type: "oauth"
+          readonly label: string
+          readonly prompts?: ReadonlyArray<
+            | {
+                readonly type: "text"
+                readonly key: string
+                readonly message: string
+                readonly placeholder?: string
+                readonly when?: { readonly key: string; readonly op: "eq" | "neq"; readonly value: string }
+              }
+            | {
+                readonly type: "select"
+                readonly key: string
+                readonly message: string
+                readonly options: ReadonlyArray<{
+                  readonly label: string
+                  readonly value: string
+                  readonly hint?: string
+                }>
+                readonly when?: { readonly key: string; readonly op: "eq" | "neq"; readonly value: string }
+              }
+          >
+        }
+      | {
+          readonly id: string
+          readonly type: "key"
+          readonly label: string
+          readonly prompts?: ReadonlyArray<
+            | {
+                readonly type: "text"
+                readonly key: string
+                readonly message: string
+                readonly placeholder?: string
+                readonly when?: { readonly key: string; readonly op: "eq" | "neq"; readonly value: string }
+              }
+            | {
+                readonly type: "select"
+                readonly key: string
+                readonly message: string
+                readonly options: ReadonlyArray<{
+                  readonly label: string
+                  readonly value: string
+                  readonly hint?: string
+                }>
+                readonly when?: { readonly key: string; readonly op: "eq" | "neq"; readonly value: string }
+              }
+          >
+        }
+    >
+  } | null
+}
+
+export type ServerConnectorKeyInput = {
+  readonly connectorID: { readonly connectorID: string }["connectorID"]
+  readonly location?: {
+    readonly location?: { readonly directory?: string | undefined; readonly workspace?: string | undefined } | undefined
+  }["location"]
+  readonly methodID: {
+    readonly methodID: string
+    readonly key: string
+    readonly inputs: { readonly [x: string]: string }
+    readonly label?: string | undefined
+  }["methodID"]
+  readonly key: {
+    readonly methodID: string
+    readonly key: string
+    readonly inputs: { readonly [x: string]: string }
+    readonly label?: string | undefined
+  }["key"]
+  readonly inputs: {
+    readonly methodID: string
+    readonly key: string
+    readonly inputs: { readonly [x: string]: string }
+    readonly label?: string | undefined
+  }["inputs"]
+  readonly label?: {
+    readonly methodID: string
+    readonly key: string
+    readonly inputs: { readonly [x: string]: string }
+    readonly label?: string | undefined
+  }["label"]
+}
+
+export type ServerConnectorKeyOutput = void
+
+export type ServerConnectorBeginInput = {
+  readonly connectorID: { readonly connectorID: string }["connectorID"]
+  readonly location?: {
+    readonly location?: { readonly directory?: string | undefined; readonly workspace?: string | undefined } | undefined
+  }["location"]
+  readonly methodID: {
+    readonly methodID: string
+    readonly inputs: { readonly [x: string]: string }
+    readonly label?: string | undefined
+  }["methodID"]
+  readonly inputs: {
+    readonly methodID: string
+    readonly inputs: { readonly [x: string]: string }
+    readonly label?: string | undefined
+  }["inputs"]
+  readonly label?: {
+    readonly methodID: string
+    readonly inputs: { readonly [x: string]: string }
+    readonly label?: string | undefined
+  }["label"]
+}
+
+export type ServerConnectorBeginOutput = {
+  readonly location: {
+    readonly directory: string
+    readonly workspaceID?: string
+    readonly project: { readonly id: string; readonly directory: string }
+  }
+  readonly data: {
+    readonly attemptID: string
+    readonly url: string
+    readonly instructions: string
+    readonly mode: "auto" | "code"
+    readonly time: {
+      readonly created: number | "Infinity" | "-Infinity" | "NaN"
+      readonly expires: number | "Infinity" | "-Infinity" | "NaN"
+    }
+  }
+}
+
+export type ServerConnectorStatusInput = {
+  readonly attemptID: { readonly attemptID: string }["attemptID"]
+  readonly location?: {
+    readonly location?: { readonly directory?: string | undefined; readonly workspace?: string | undefined } | undefined
+  }["location"]
+}
+
+export type ServerConnectorStatusOutput = {
+  readonly location: {
+    readonly directory: string
+    readonly workspaceID?: string
+    readonly project: { readonly id: string; readonly directory: string }
+  }
+  readonly data:
+    | {
+        readonly status: "pending"
+        readonly time: {
+          readonly created: number | "Infinity" | "-Infinity" | "NaN"
+          readonly expires: number | "Infinity" | "-Infinity" | "NaN"
+        }
+      }
+    | {
+        readonly status: "complete"
+        readonly time: {
+          readonly created: number | "Infinity" | "-Infinity" | "NaN"
+          readonly expires: number | "Infinity" | "-Infinity" | "NaN"
+        }
+      }
+    | {
+        readonly status: "failed"
+        readonly message: string
+        readonly time: {
+          readonly created: number | "Infinity" | "-Infinity" | "NaN"
+          readonly expires: number | "Infinity" | "-Infinity" | "NaN"
+        }
+      }
+    | {
+        readonly status: "expired"
+        readonly time: {
+          readonly created: number | "Infinity" | "-Infinity" | "NaN"
+          readonly expires: number | "Infinity" | "-Infinity" | "NaN"
+        }
+      }
+}
+
+export type ServerConnectorCompleteInput = {
+  readonly attemptID: { readonly attemptID: string }["attemptID"]
+  readonly location?: {
+    readonly location?: { readonly directory?: string | undefined; readonly workspace?: string | undefined } | undefined
+  }["location"]
+  readonly code?: { readonly code?: string | undefined }["code"]
+}
+
+export type ServerConnectorCompleteOutput = void
+
+export type ServerConnectorCancelInput = {
+  readonly attemptID: { readonly attemptID: string }["attemptID"]
+  readonly location?: {
+    readonly location?: { readonly directory?: string | undefined; readonly workspace?: string | undefined } | undefined
+  }["location"]
+}
+
+export type ServerConnectorCancelOutput = void
+
 export type CredentialsUpdateInput = {
   readonly credentialID: { readonly credentialID: string }["credentialID"]
   readonly location?: {
@@ -2773,35 +3044,3 @@ export type ReferencesListOutput = {
         }
   }>
 }
-
-export type ProjectCopiesCreateInput = {
-  readonly projectID: { readonly projectID: string }["projectID"]
-  readonly location?: {
-    readonly location?: { readonly directory?: string | undefined; readonly workspace?: string | undefined } | undefined
-  }["location"]
-  readonly strategy: { readonly strategy: string; readonly directory: string; readonly name?: string }["strategy"]
-  readonly directory: { readonly strategy: string; readonly directory: string; readonly name?: string }["directory"]
-  readonly name?: { readonly strategy: string; readonly directory: string; readonly name?: string }["name"]
-}
-
-export type ProjectCopiesCreateOutput = { readonly directory: string }
-
-export type ProjectCopiesRemoveInput = {
-  readonly projectID: { readonly projectID: string }["projectID"]
-  readonly location?: {
-    readonly location?: { readonly directory?: string | undefined; readonly workspace?: string | undefined } | undefined
-  }["location"]
-  readonly directory: { readonly directory: string; readonly force: boolean }["directory"]
-  readonly force: { readonly directory: string; readonly force: boolean }["force"]
-}
-
-export type ProjectCopiesRemoveOutput = void
-
-export type ProjectCopiesRefreshInput = {
-  readonly projectID: { readonly projectID: string }["projectID"]
-  readonly location?: {
-    readonly location?: { readonly directory?: string | undefined; readonly workspace?: string | undefined } | undefined
-  }["location"]
-}
-
-export type ProjectCopiesRefreshOutput = void

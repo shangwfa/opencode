@@ -19,6 +19,7 @@ import { SessionCompaction } from "./compaction"
 import { SystemPrompt } from "./system"
 import { Instruction } from "./instruction"
 import { Plugin } from "../plugin"
+import { SessionPluginRuntime } from "../plugin/session-plugin-runtime"
 import { MAX_STEPS_PROMPT } from "@opencode-ai/core/session/runner/max-steps"
 import { ToolRegistry } from "@/tool/registry"
 import { MCP } from "../mcp"
@@ -126,6 +127,7 @@ const layer = Layer.effect(
     const processor = yield* SessionProcessor.Service
     const compaction = yield* SessionCompaction.Service
     const plugin = yield* Plugin.Service
+    const sessionPlugins = yield* SessionPluginRuntime.Service
     const commands = yield* Command.Service
     const config = yield* Config.Service
     const permission = yield* Permission.Service
@@ -1005,8 +1007,20 @@ const layer = Layer.effect(
       const resolvedParts = yield* Effect.forEach(input.parts, resolvePart, { concurrency: "unbounded" }).pipe(
         Effect.map((x) => x.flat().map(assign)),
       )
+      const sessionPluginRuntime = yield* sessionPlugins.acquire(input.sessionID)
 
       yield* plugin.trigger(
+        "chat.message",
+        {
+          sessionID: input.sessionID,
+          agent: input.agent,
+          model: input.model,
+          messageID: input.messageID,
+          variant: input.variant,
+        },
+        { message: info, parts: resolvedParts },
+      )
+      yield* sessionPluginRuntime.trigger(
         "chat.message",
         {
           sessionID: input.sessionID,
@@ -1088,9 +1102,10 @@ const layer = Layer.effect(
       throw new Error("Impossible")
     })
 
-    const runLoop: (sessionID: SessionID, skills?: string[]) => Effect.Effect<SessionV1.WithParts> = Effect.fn("SessionPrompt.run")(
+    const runLoop = Effect.fn("SessionPrompt.run")(
       function* (sessionID: SessionID, skills?: string[]) {
         const ctx = yield* InstanceState.context
+        const sessionPluginRuntime = yield* sessionPlugins.acquire(sessionID)
         let structured: unknown
         let step = 0
         const session = yield* sessions.get(sessionID).pipe(Effect.orDie)
@@ -1363,6 +1378,7 @@ const layer = Layer.effect(
             }
 
             yield* plugin.trigger("experimental.chat.messages.transform", {}, { messages: msgs })
+            yield* sessionPluginRuntime.trigger("experimental.chat.messages.transform", {}, { messages: msgs })
 
             const [skillsPrompt, env, instructions, mcpInstructions, modelMsgs] = yield* Effect.all([
               sys.skills(agent, skills, sessionID),
@@ -1456,7 +1472,13 @@ const layer = Layer.effect(
     const loop: (input: LoopInput) => Effect.Effect<SessionV1.WithParts> = Effect.fn("SessionPrompt.loop")(function* (
       input: LoopInput,
     ) {
-      return yield* state.ensureRunning(input.sessionID, lastAssistant(input.sessionID), runLoop(input.sessionID, input.skills ? [...input.skills] : undefined))
+      return yield* state.ensureRunning(
+         input.sessionID,
+         lastAssistant(input.sessionID),
+         runLoop(input.sessionID, input.skills ? [...input.skills] : undefined).pipe(
+           Effect.provideService(SessionPluginRuntime.Service, sessionPlugins),
+         ),
+       )
     })
 
     const shell: (input: ShellInput) => Effect.Effect<SessionV1.WithParts, Session.BusyError> = Effect.fn(
@@ -1580,6 +1602,12 @@ const layer = Layer.effect(
         : taskModel
 
       yield* plugin.trigger(
+        "command.execute.before",
+        { command: input.command, sessionID: input.sessionID, arguments: input.arguments },
+        { parts },
+      )
+      const sessionPluginRuntime = yield* sessionPlugins.acquire(input.sessionID)
+      yield* sessionPluginRuntime.trigger(
         "command.execute.before",
         { command: input.command, sessionID: input.sessionID, arguments: input.arguments },
         { parts },
@@ -1734,6 +1762,7 @@ export const node = LayerNode.make({
     SessionProcessor.node,
     SessionCompaction.node,
     Plugin.node,
+    SessionPluginRuntime.node,
     Command.node,
     Config.node,
     Permission.node,

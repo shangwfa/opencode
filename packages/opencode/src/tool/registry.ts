@@ -25,6 +25,7 @@ import type { JSONSchema7, JSONSchema7Definition } from "@ai-sdk/provider"
 import { Schema } from "effect"
 import z from "zod"
 import { Plugin } from "../plugin"
+import { SessionPluginRuntime } from "../plugin/session-plugin-runtime"
 import { Provider } from "@/provider/provider"
 
 import { WebSearchTool } from "./websearch"
@@ -98,6 +99,7 @@ const layer = Layer.effect(
   Effect.gen(function* () {
     const config = yield* Config.Service
     const plugin = yield* Plugin.Service
+    const sessionPlugins = yield* Effect.serviceOption(SessionPluginRuntime.Service)
     const agents = yield* Agent.Service
     const truncate = yield* Truncate.Service
     const flags = yield* RuntimeFlags.Service
@@ -390,6 +392,14 @@ const layer = Layer.effect(
       })
 
       const sessionDefs: Tool.Def[] = []
+      const sessionPluginRuntime = input.sessionID && Option.isSome(sessionPlugins)
+        ? yield* sessionPlugins.value.acquire(input.sessionID)
+        : undefined
+      const sessionPluginTools = sessionPluginRuntime ? yield* sessionPluginRuntime.tools() : {}
+      const sessionContext = yield* InstanceState.context.pipe(Effect.catch(() => Effect.succeed(undefined)))
+      for (const [name, def] of Object.entries(sessionPluginTools)) {
+        sessionDefs.push(fromSessionToolDef(name, def, sessionContext?.directory ?? "", sessionContext?.worktree))
+      }
       if (input.sessionID && sessionToolSvc && Flag.OPENCODE_DATABASE_URL) {
         const ictx = yield* InstanceState.context.pipe(
           Effect.catch(() => Effect.succeed(undefined)),
@@ -425,6 +435,9 @@ const layer = Layer.effect(
             jsonSchema: tool.jsonSchema,
           }
           yield* plugin.trigger("tool.definition", { toolID: tool.id }, output)
+          if (sessionPluginRuntime) {
+            yield* sessionPluginRuntime.trigger("tool.definition", { toolID: tool.id }, output)
+          }
           const jsonSchema =
             output.parameters === tool.parameters || output.jsonSchema !== tool.jsonSchema
               ? output.jsonSchema

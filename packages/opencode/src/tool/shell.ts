@@ -1,4 +1,4 @@
-import { Effect } from "effect"
+import { Effect, Option } from "effect"
 import os from "os"
 import * as Tool from "./tool"
 import path from "path"
@@ -18,6 +18,7 @@ import { ShellID } from "./shell/id"
 
 import * as Truncate from "./truncate"
 import { Plugin } from "@/plugin"
+import { SessionPluginRuntime } from "@/plugin/session-plugin-runtime"
 import { ShellPrompt, type Parameters } from "./shell/prompt"
 import { BashArity } from "@/permission/arity"
 import { toSandboxCwd } from "./sandbox-path"
@@ -518,6 +519,7 @@ export const ShellTool = Tool.define(
     })
 
     const plugin = yield* Plugin.Service
+    const sessionPlugins = yield* Effect.serviceOption(SessionPluginRuntime.Service)
 
     const shellEnv = Effect.fn("ShellTool.shellEnv")(function* (ctx: Tool.Context, cwd: string) {
       const extra = yield* plugin.trigger(
@@ -525,9 +527,15 @@ export const ShellTool = Tool.define(
         { cwd, sessionID: ctx.sessionID, callID: ctx.callID },
         { env: {} },
       )
+      const sessionExtra = Option.isSome(sessionPlugins)
+        ? yield* sessionPlugins.value.acquire(ctx.sessionID).pipe(
+            Effect.flatMap((runtime) => runtime.trigger("shell.env", { cwd, sessionID: ctx.sessionID, callID: ctx.callID }, { env: {} })),
+          )
+        : { env: {} }
       return {
         ...process.env,
         ...extra.env,
+        ...sessionExtra.env,
       }
     })
 

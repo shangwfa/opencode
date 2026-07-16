@@ -25,6 +25,8 @@ import { MCP } from "@/mcp"
 import { SessionMcp } from "@/mcp/session-mcp"
 import { SessionTool } from "@/tool/session-tool"
 import { SessionCommand } from "@/command/session-command"
+import { SessionPlugin } from "@/plugin/session-plugin"
+import { SessionPluginRuntime } from "@/plugin/session-plugin-runtime"
 import { Flag } from "@/flag/flag"
 import { Permission } from "@/permission"
 import { Installation } from "@/installation"
@@ -238,7 +240,9 @@ const app = LayerNode.group([
   Ripgrep.node,
   Storage.node,
   Snapshot.node,
-  Plugin.node,
+   Plugin.node,
+   SessionPlugin.node,
+   SessionPluginRuntime.node,
   ModelsDev.node,
   Provider.node,
   ProviderAuth.node,
@@ -312,6 +316,7 @@ export function createRoutes(
       Flag.OPENCODE_DATABASE_URL ? SessionMcp.pgLayer : SessionMcp.noopLayer,
       Flag.OPENCODE_DATABASE_URL ? SessionTool.pgLayer : SessionTool.noopLayer,
       Flag.OPENCODE_DATABASE_URL ? SessionCommand.pgLayer : SessionCommand.noopLayer,
+      Flag.OPENCODE_DATABASE_URL ? SessionPlugin.pgLayer : SessionPlugin.noopLayer,
       SandboxProvider.defaultLayer,
       LspAgent.layer,
       FetchHttpClient.layer,

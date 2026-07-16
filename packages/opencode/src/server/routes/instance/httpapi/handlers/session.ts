@@ -2,6 +2,8 @@ import { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import { Agent } from "@/agent/agent"
 import { SessionMcp } from "@/mcp/session-mcp"
 import { SessionTool } from "@/tool/session-tool"
+import { SessionPlugin } from "@/plugin/session-plugin"
+import { SessionPluginRuntime } from "@/plugin/session-plugin-runtime"
 import { SessionV1 } from "@opencode-ai/core/v1/session"
 import { EventV2Bridge } from "@/event-v2-bridge"
 import { Command } from "@/command"
@@ -43,6 +45,7 @@ import {
   SkillLoadPayload,
   AgentCreatePayload,
   ToolCreatePayload,
+  PluginCreatePayload,
   CommandCreatePayload,
   SummarizePayload,
   UpdatePayload,
@@ -71,6 +74,8 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
     const todoSvc = yield* Todo.Service
     const mcpSessionSvc = Option.getOrUndefined(yield* Effect.serviceOption(SessionMcp.Service))
     const toolSessionSvc = Option.getOrUndefined(yield* Effect.serviceOption(SessionTool.Service))
+    const pluginSessionSvc = yield* SessionPlugin.Service
+    const pluginRuntime = yield* SessionPluginRuntime.Service
     const commandSvc = yield* Command.Service
     const skillSvc = yield* Skill.Service
     const summary = yield* SessionSummary.Service
@@ -195,6 +200,7 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
 
     const remove = Effect.fn("SessionHttpApi.remove")(function* (ctx: { params: { sessionID: SessionID } }) {
       yield* SessionError.mapStorageNotFound(session.remove(ctx.params.sessionID))
+      yield* pluginRuntime.dispose(ctx.params.sessionID)
       return true
     })
 
@@ -606,6 +612,37 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       yield* commandSvc.sessionClear(ctx.params.sessionID)
     })
 
+    const listPlugins = Effect.fn("SessionHttpApi.plugins")(function* (ctx: { params: { sessionID: SessionID } }) {
+      yield* requireSession(ctx.params.sessionID)
+      const rows = yield* pluginSessionSvc.list(ctx.params.sessionID)
+      return rows.map(({ code: _code, ...row }) => row)
+    })
+
+    const createPlugin = Effect.fn("SessionHttpApi.pluginsCreate")(function* (ctx: {
+      params: { sessionID: SessionID }
+      payload: typeof PluginCreatePayload.Type
+    }) {
+      yield* requireSession(ctx.params.sessionID)
+      const row = yield* pluginSessionSvc.upsert(ctx.params.sessionID, ctx.payload)
+      yield* pluginRuntime.invalidate(ctx.params.sessionID)
+      const { code: _code, ...safe } = row
+      return safe
+    })
+
+    const deletePlugin = Effect.fn("SessionHttpApi.pluginsDelete")(function* (ctx: {
+      params: { sessionID: SessionID; name: string }
+    }) {
+      yield* requireSession(ctx.params.sessionID)
+      yield* pluginSessionSvc.remove(ctx.params.sessionID, ctx.params.name)
+      yield* pluginRuntime.invalidate(ctx.params.sessionID)
+    })
+
+    const clearPlugins = Effect.fn("SessionHttpApi.pluginsClear")(function* (ctx: { params: { sessionID: SessionID } }) {
+      yield* requireSession(ctx.params.sessionID)
+      yield* pluginSessionSvc.removeAll(ctx.params.sessionID)
+      yield* pluginRuntime.invalidate(ctx.params.sessionID)
+    })
+
     return handlers
       .handle("list", list)
       .handle("status", status)
@@ -655,5 +692,9 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       .handle("commandsCreate", createCommand)
       .handle("commandsDelete", deleteCommand)
       .handle("commandsClear", clearCommands)
+      .handle("plugins", listPlugins)
+      .handle("pluginsCreate", createPlugin)
+      .handle("pluginsDelete", deletePlugin)
+      .handle("pluginsClear", clearPlugins)
   }),
 )

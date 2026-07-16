@@ -33,6 +33,7 @@ import { InstallationChannel } from "@opencode-ai/core/installation/version"
 
 type State = {
   hooks: Hooks[]
+  input: PluginInput
 }
 
 // Hook names that follow the (input, output) => Promise<void> trigger pattern
@@ -51,6 +52,7 @@ export interface Interface {
     output: Output,
   ) => Effect.Effect<Output>
   readonly list: () => Effect.Effect<Hooks[]>
+  readonly context?: () => Effect.Effect<PluginInput>
   readonly init: () => Effect.Effect<void>
 }
 
@@ -270,7 +272,7 @@ const layer = Layer.effect(
           ),
         )
 
-        return { hooks }
+        return { hooks, input }
       }),
     )
 
@@ -294,11 +296,16 @@ const layer = Layer.effect(
       return s.hooks
     })
 
+    const context = Effect.fn("Plugin.context")(function* () {
+      const s = yield* InstanceState.get(state)
+      return s.input
+    })
+
     const init = Effect.fn("Plugin.init")(function* () {
       yield* InstanceState.get(state)
     })
 
-    return Service.of({ trigger, list, init })
+    return Service.of({ trigger, list, context, init })
   }),
 )
 

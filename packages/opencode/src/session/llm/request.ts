@@ -13,6 +13,7 @@ import { InstallationVersion } from "@opencode-ai/core/installation/version"
 import { Effect, Record } from "effect"
 import { jsonSchema, tool as aiTool, type ModelMessage, type Tool } from "ai"
 import type { Plugin } from "@/plugin"
+import type { Runtime as SessionPluginRuntime } from "@/plugin/session-plugin-runtime"
 import { mergeDeep } from "remeda"
 
 const USER_AGENT = `opencode/${InstallationVersion}`
@@ -31,6 +32,7 @@ type PrepareInput = {
   readonly provider: Provider.Info
   readonly auth: Auth.Info | undefined
   readonly plugin: Plugin.Interface
+  readonly sessionPluginRuntime?: SessionPluginRuntime
   readonly flags: RuntimeFlags.Info
   readonly isWorkflow: boolean
 }
@@ -71,6 +73,13 @@ export const prepare = Effect.fn("LLMRequestPrep.prepare")(function* (input: Pre
     { sessionID: input.sessionID, model: input.model },
     { system },
   )
+  if (input.sessionPluginRuntime) {
+    yield* input.sessionPluginRuntime.trigger(
+      "experimental.chat.system.transform",
+      { sessionID: input.sessionID, model: input.model },
+      { system },
+    )
+  }
   if (system.length > 2 && system[0] === header) {
     const rest = system.slice(1)
     system.length = 0
@@ -88,7 +97,17 @@ export const prepare = Effect.fn("LLMRequestPrep.prepare")(function* (input: Pre
         sessionID: input.sessionID,
         providerOptions: input.provider.options,
       })
-  const options = mergeOptions(mergeOptions(mergeOptions(base, input.model.options), input.agent.options), variant)
+  const sessionAuthOptions = input.sessionPluginRuntime
+    ? yield* input.sessionPluginRuntime.auth({
+        providerID: input.provider.id,
+        provider: input.provider,
+        auth: input.auth,
+      })
+    : {}
+  const options = mergeOptions(
+    mergeOptions(mergeOptions(mergeOptions(base, input.model.options), input.agent.options), variant),
+    sessionAuthOptions,
+  )
   if (
     input.model.api.npm === "@ai-sdk/azure" &&
     (input.provider.options.useCompletionUrls || input.model.options.useCompletionUrls || options.useCompletionUrls)
@@ -130,6 +149,15 @@ export const prepare = Effect.fn("LLMRequestPrep.prepare")(function* (input: Pre
       options,
     },
   )
+  if (input.sessionPluginRuntime) {
+    yield* input.sessionPluginRuntime.trigger("chat.params", {
+      sessionID: input.sessionID,
+      agent: input.agent.name,
+      model: input.model,
+      provider: input.provider,
+      message: input.user,
+    }, params)
+  }
 
   const { headers } = yield* input.plugin.trigger(
     "chat.headers",
@@ -144,6 +172,15 @@ export const prepare = Effect.fn("LLMRequestPrep.prepare")(function* (input: Pre
       headers: {},
     },
   )
+  if (input.sessionPluginRuntime) {
+    yield* input.sessionPluginRuntime.trigger("chat.headers", {
+      sessionID: input.sessionID,
+      agent: input.agent.name,
+      model: input.model,
+      provider: input.provider,
+      message: input.user,
+    }, { headers })
+  }
 
   const tools = resolveTools(input)
   // Codex parity: OpenAI Responses-family providers hardcode `strict: false`

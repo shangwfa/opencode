@@ -33,6 +33,15 @@ export const errorLayer = HttpRouter.middleware<{ handles: unknown }>()((effect)
           return Effect.succeed(HttpServerResponse.jsonUnsafe(error.toObject(), { status: 400 }))
         }
 
+        if (error instanceof SyntaxError) {
+          return Effect.succeed(
+            HttpServerResponse.jsonUnsafe(
+              { name: "BadRequest", data: { message: "Invalid JSON body" } },
+              { status: 400 },
+            ),
+          )
+        }
+
         const ref = `err_${crypto.randomUUID().slice(0, 8)}`
 
         return Effect.logError("failed", { ref, ...(sessionID ? { sessionID } : {}), error, cause: Cause.pretty(cause) }).pipe(

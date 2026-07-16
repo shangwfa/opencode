@@ -59,6 +59,20 @@ import type {
   IntegrationsAttemptCompleteOutput,
   IntegrationsAttemptCancelInput,
   IntegrationsAttemptCancelOutput,
+  ServerConnectorListInput,
+  ServerConnectorListOutput,
+  ServerConnectorGetInput,
+  ServerConnectorGetOutput,
+  ServerConnectorKeyInput,
+  ServerConnectorKeyOutput,
+  ServerConnectorBeginInput,
+  ServerConnectorBeginOutput,
+  ServerConnectorStatusInput,
+  ServerConnectorStatusOutput,
+  ServerConnectorCompleteInput,
+  ServerConnectorCompleteOutput,
+  ServerConnectorCancelInput,
+  ServerConnectorCancelOutput,
   CredentialsUpdateInput,
   CredentialsUpdateOutput,
   CredentialsRemoveInput,
@@ -106,12 +120,6 @@ import type {
   QuestionsRejectOutput,
   ReferencesListInput,
   ReferencesListOutput,
-  ProjectCopiesCreateInput,
-  ProjectCopiesCreateOutput,
-  ProjectCopiesRemoveInput,
-  ProjectCopiesRemoveOutput,
-  ProjectCopiesRefreshInput,
-  ProjectCopiesRefreshOutput,
 } from "./types"
 import { ClientError } from "./client-error"
 
@@ -636,6 +644,95 @@ export function make(options: ClientOptions) {
           requestOptions,
         ),
     },
+    "server.connector": {
+      list: (input?: ServerConnectorListInput, requestOptions?: RequestOptions) =>
+        request<ServerConnectorListOutput>(
+          {
+            method: "GET",
+            path: `/api/connector`,
+            query: { location: input?.["location"] },
+            successStatus: 200,
+            declaredStatuses: [401, 400],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      get: (input: ServerConnectorGetInput, requestOptions?: RequestOptions) =>
+        request<ServerConnectorGetOutput>(
+          {
+            method: "GET",
+            path: `/api/connector/${encodeURIComponent(input.connectorID)}`,
+            query: { location: input["location"] },
+            successStatus: 200,
+            declaredStatuses: [401, 400],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      key: (input: ServerConnectorKeyInput, requestOptions?: RequestOptions) =>
+        request<ServerConnectorKeyOutput>(
+          {
+            method: "POST",
+            path: `/api/connector/${encodeURIComponent(input.connectorID)}/connect/key`,
+            query: { location: input["location"] },
+            body: { methodID: input["methodID"], key: input["key"], inputs: input["inputs"], label: input["label"] },
+            successStatus: 204,
+            declaredStatuses: [400, 401],
+            empty: true,
+          },
+          requestOptions,
+        ),
+      begin: (input: ServerConnectorBeginInput, requestOptions?: RequestOptions) =>
+        request<ServerConnectorBeginOutput>(
+          {
+            method: "POST",
+            path: `/api/connector/${encodeURIComponent(input.connectorID)}/connect/oauth`,
+            query: { location: input["location"] },
+            body: { methodID: input["methodID"], inputs: input["inputs"], label: input["label"] },
+            successStatus: 200,
+            declaredStatuses: [400, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      status: (input: ServerConnectorStatusInput, requestOptions?: RequestOptions) =>
+        request<ServerConnectorStatusOutput>(
+          {
+            method: "GET",
+            path: `/api/connector/oauth/${encodeURIComponent(input.attemptID)}`,
+            query: { location: input["location"] },
+            successStatus: 200,
+            declaredStatuses: [401, 400],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      complete: (input: ServerConnectorCompleteInput, requestOptions?: RequestOptions) =>
+        request<ServerConnectorCompleteOutput>(
+          {
+            method: "POST",
+            path: `/api/connector/oauth/${encodeURIComponent(input.attemptID)}/complete`,
+            query: { location: input["location"] },
+            body: { code: input["code"] },
+            successStatus: 204,
+            declaredStatuses: [400, 401],
+            empty: true,
+          },
+          requestOptions,
+        ),
+      cancel: (input: ServerConnectorCancelInput, requestOptions?: RequestOptions) =>
+        request<ServerConnectorCancelOutput>(
+          {
+            method: "DELETE",
+            path: `/api/connector/oauth/${encodeURIComponent(input.attemptID)}`,
+            query: { location: input["location"] },
+            successStatus: 204,
+            declaredStatuses: [401, 400],
+            empty: true,
+          },
+          requestOptions,
+        ),
+    },
     credentials: {
       update: (input: CredentialsUpdateInput, requestOptions?: RequestOptions) =>
         request<CredentialsUpdateOutput>(
@@ -943,46 +1040,6 @@ export function make(options: ClientOptions) {
             successStatus: 200,
             declaredStatuses: [401, 400],
             empty: false,
-          },
-          requestOptions,
-        ),
-    },
-    projectCopies: {
-      create: (input: ProjectCopiesCreateInput, requestOptions?: RequestOptions) =>
-        request<ProjectCopiesCreateOutput>(
-          {
-            method: "POST",
-            path: `/experimental/project/${encodeURIComponent(input.projectID)}/copy`,
-            query: { location: input["location"] },
-            body: { strategy: input["strategy"], directory: input["directory"], name: input["name"] },
-            successStatus: 200,
-            declaredStatuses: [400, 401],
-            empty: false,
-          },
-          requestOptions,
-        ),
-      remove: (input: ProjectCopiesRemoveInput, requestOptions?: RequestOptions) =>
-        request<ProjectCopiesRemoveOutput>(
-          {
-            method: "DELETE",
-            path: `/experimental/project/${encodeURIComponent(input.projectID)}/copy`,
-            query: { location: input["location"] },
-            body: { directory: input["directory"], force: input["force"] },
-            successStatus: 204,
-            declaredStatuses: [400, 401],
-            empty: true,
-          },
-          requestOptions,
-        ),
-      refresh: (input: ProjectCopiesRefreshInput, requestOptions?: RequestOptions) =>
-        request<ProjectCopiesRefreshOutput>(
-          {
-            method: "POST",
-            path: `/experimental/project/${encodeURIComponent(input.projectID)}/copy/refresh`,
-            query: { location: input["location"] },
-            successStatus: 204,
-            declaredStatuses: [400, 401],
-            empty: true,
           },
           requestOptions,
         ),

@@ -29,6 +29,7 @@ import * as OtelTracer from "@effect/opentelemetry/Tracer"
 import { LLMAISDK } from "./llm/ai-sdk"
 import { LLMNativeRuntime } from "./llm/native-runtime"
 import { LLMRequestPrep } from "./llm/request"
+import { SessionPluginRuntime } from "@/plugin/session-plugin-runtime"
 
 export const OUTPUT_TOKEN_MAX = ProviderTransform.OUTPUT_TOKEN_MAX
 
@@ -66,6 +67,7 @@ const live: Layer.Layer<
   | Config.Service
   | Provider.Service
   | Plugin.Service
+  | SessionPluginRuntime.Service
   | Permission.Service
   | EventV2Bridge.Service
   | LLMClientService
@@ -77,6 +79,7 @@ const live: Layer.Layer<
     const config = yield* Config.Service
     const provider = yield* Provider.Service
     const plugin = yield* Plugin.Service
+    const sessionPlugins = yield* SessionPluginRuntime.Service
     const perm = yield* Permission.Service
     const events = yield* EventV2Bridge.Service
     const llmClient = yield* LLMClient.Service
@@ -110,6 +113,7 @@ const live: Layer.Layer<
         plugin,
         flags,
         isWorkflow,
+        sessionPluginRuntime: yield* sessionPlugins.acquire(SessionID.make(input.sessionID)),
       })
 
       // Wire up toolExecutor for DWS workflow models so that tool calls
@@ -394,6 +398,7 @@ export const node = LayerNode.make({
     Config.node,
     Provider.node,
     Plugin.node,
+    SessionPluginRuntime.node,
     Permission.node,
     EventV2Bridge.node,
     llmClient,

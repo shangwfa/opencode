@@ -10,6 +10,7 @@ import { ToolRegistry } from "@/tool/registry"
 import { Truncate } from "@/tool/truncate"
 
 import { Plugin } from "@/plugin"
+import { SessionPluginRuntime } from "@/plugin/session-plugin-runtime"
 import type { TaskPromptOps } from "@/tool/task"
 import { type Tool as AITool, tool, jsonSchema, type ToolExecutionOptions, asSchema } from "ai"
 import { Effect, Option } from "effect"
@@ -51,6 +52,8 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
   const tools: Record<string, AITool> = {}
   const run = yield* EffectBridge.make()
   const plugin = yield* Plugin.Service
+  const sessionPlugins = yield* SessionPluginRuntime.Service
+  const sessionPluginRuntime = yield* sessionPlugins.acquire(input.session.id)
   const permission = yield* Permission.Service
   const registry = yield* ToolRegistry.Service
   const mcp = yield* MCP.Service
@@ -128,6 +131,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
               { tool: item.id, sessionID: ctx.sessionID, callID: ctx.callID },
               { args },
             )
+            yield* sessionPluginRuntime.trigger("tool.execute.before", { tool: item.id, sessionID: ctx.sessionID, callID: ctx.callID }, { args })
             const result = yield* item.execute(args, ctx)
             const output = {
               ...result,
@@ -143,6 +147,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
               { tool: item.id, sessionID: ctx.sessionID, callID: ctx.callID, args },
               output,
             )
+            yield* sessionPluginRuntime.trigger("tool.execute.after", { tool: item.id, sessionID: ctx.sessionID, callID: ctx.callID, args }, output)
             if (options.abortSignal?.aborted) {
               yield* input.processor.completeToolCall(options.toolCallId, output)
             }

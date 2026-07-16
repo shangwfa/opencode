@@ -90,6 +90,23 @@ export const ToolCreatePayload = Schema.Struct({
   code: Schema.String,
 })
 
+export const PluginCreatePayload = Schema.Union([
+  Schema.Struct({
+    name: Schema.NonEmptyString,
+    source: Schema.optional(Schema.Literal("code")),
+    description: Schema.optional(Schema.String),
+    code: Schema.String,
+    enabled: Schema.optional(Schema.Boolean),
+  }),
+  Schema.Struct({
+    name: Schema.NonEmptyString,
+    source: Schema.Literal("npm"),
+    spec: Schema.NonEmptyString,
+    description: Schema.optional(Schema.String),
+    enabled: Schema.optional(Schema.Boolean),
+  }),
+])
+
 export const CommandCreatePayload = Schema.Struct({
   name: Schema.String,
   template: Schema.String,
@@ -160,6 +177,9 @@ export const SessionPaths = {
   commands: `${root}/:sessionID/commands`,
   commandsCreate: `${root}/:sessionID/commands/create`,
   commandsDelete: `${root}/:sessionID/commands/:name`,
+  plugins: `${root}/:sessionID/plugins`,
+  pluginsCreate: `${root}/:sessionID/plugins/create`,
+  pluginsDelete: `${root}/:sessionID/plugins/:name`,
 } as const
 
 export const SessionApi = HttpApi.make("session")
@@ -739,6 +759,55 @@ export const SessionApi = HttpApi.make("session")
             identifier: "session.commands.clear",
             summary: "Clear session commands",
             description: "Remove all custom commands attached to a specific OpenCode session.",
+          }),
+        ),
+        HttpApiEndpoint.get("plugins", SessionPaths.plugins, {
+          params: { sessionID: SessionID },
+          query: WorkspaceRoutingQuery,
+          success: described(Schema.Array(Schema.Unknown), "Session plugins"),
+          error: [HttpApiError.BadRequest, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.plugins",
+            summary: "List session plugins",
+            description: "List custom plugins attached to a specific OpenCode session.",
+          }),
+        ),
+        HttpApiEndpoint.post("pluginsCreate", SessionPaths.pluginsCreate, {
+          params: { sessionID: SessionID },
+          query: WorkspaceRoutingQuery,
+          payload: PluginCreatePayload,
+          success: described(Schema.Unknown, "Created session plugin"),
+          error: [HttpApiError.BadRequest, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.plugins.create",
+            summary: "Create session plugin",
+            description: "Create or update a plugin attached to a specific OpenCode session.",
+          }),
+        ),
+        HttpApiEndpoint.delete("pluginsDelete", SessionPaths.pluginsDelete, {
+          params: { sessionID: SessionID, name: Schema.String },
+          query: WorkspaceRoutingQuery,
+          success: described(Schema.Void, "Session plugin removed"),
+          error: [HttpApiError.BadRequest, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.plugins.delete",
+            summary: "Delete session plugin",
+            description: "Remove a plugin from a specific OpenCode session.",
+          }),
+        ),
+        HttpApiEndpoint.delete("pluginsClear", SessionPaths.plugins, {
+          params: { sessionID: SessionID },
+          query: WorkspaceRoutingQuery,
+          success: described(Schema.Void, "Session plugins cleared"),
+          error: [HttpApiError.BadRequest, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.plugins.clear",
+            summary: "Clear session plugins",
+            description: "Remove all plugins from a specific OpenCode session.",
           }),
         ),
       )
