@@ -5,6 +5,7 @@ import { Database, and, asc, eq } from "../storage/db"
 import { SessionToolTable } from "./session-tool.pg"
 import type { SessionID } from "../session/schema"
 import path from "path"
+import os from "os"
 import { pathToFileURL } from "url"
 
 const codeCache = new Map<string, Promise<any>>()
@@ -15,11 +16,17 @@ export async function importToolCode(code: string): Promise<any> {
 
   const promise = (async () => {
     const fs = await import("fs/promises")
-    const file = path.join(
-      import.meta.dir,
-      `.opencode-stl-${Date.now()}-${Math.random().toString(36).slice(2)}.ts`,
-    )
-    await fs.writeFile(file, code)
+    const name = `.opencode-stl-${Date.now()}-${Math.random().toString(36).slice(2)}.ts`
+    let file: string | undefined
+    for (const dir of [import.meta.dir, os.tmpdir()]) {
+      const candidate = path.join(dir, name)
+      try {
+        await fs.writeFile(candidate, code)
+        file = candidate
+        break
+      } catch {}
+    }
+    if (!file) throw new Error("Failed to write temp file for session tool import")
     try {
       return await import(pathToFileURL(file).href)
     } finally {
