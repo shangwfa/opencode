@@ -3,7 +3,7 @@ import { Effect, Layer } from "effect"
 import path from "path"
 import fs from "fs/promises"
 import os from "os"
-import { LoadDotOpencode } from "@/config/load-dot-opencode"
+import { SessionLoadDotOpencode } from "@/config/session-load-dot-opencode"
 import { SessionAgentsMd } from "@/session/agents-md"
 import { SessionAgent } from "@/agent/session-agent"
 import { SessionSkill } from "@/skill/session-skill"
@@ -14,7 +14,7 @@ import { SessionPlugin } from "@/plugin/session-plugin"
 import { SessionID } from "@/session/schema"
 
 const testLayer = Layer.mergeAll(
-  LoadDotOpencode.layer,
+  SessionLoadDotOpencode.layer,
   SessionAgentsMd.noopLayer,
   SessionAgent.noopLayer,
   SessionSkill.noopLayer,
@@ -40,7 +40,7 @@ async function writeFile(file: string, content: string) {
 function runLoad(dir: string) {
   return Effect.runPromise(
     Effect.gen(function* () {
-      const svc = yield* LoadDotOpencode.Service
+      const svc = yield* SessionLoadDotOpencode.Service
       return yield* svc.load(SID, dir)
     }).pipe(Effect.provide(testLayer)),
   )
@@ -52,7 +52,7 @@ async function withDir(fn: (dir: string) => Promise<void>) {
   await fs.rm(dir, { recursive: true, force: true })
 }
 
-describe("LoadDotOpencode", () => {
+describe("SessionLoadDotOpencode", () => {
   test("returns empty when .opencode is missing", async () => {
     await withDir(async (dir) => {
       const result = await runLoad(dir)
@@ -163,7 +163,7 @@ describe("LoadDotOpencode", () => {
       let agentInput: SessionAgent.Input | undefined
       let mcpInput: SessionMcp.Input | undefined
       const captureLayer = Layer.mergeAll(
-        LoadDotOpencode.layer,
+        SessionLoadDotOpencode.layer,
         SessionAgentsMd.noopLayer,
         Layer.mock(SessionAgent.Service, {
           upsert: (_sessionID, input) =>
@@ -187,7 +187,7 @@ describe("LoadDotOpencode", () => {
 
       const result = await Effect.runPromise(
         Effect.gen(function* () {
-          const svc = yield* LoadDotOpencode.Service
+          const svc = yield* SessionLoadDotOpencode.Service
           return yield* svc.load(SID, dir)
         }).pipe(Effect.provide(captureLayer)),
       )
@@ -359,7 +359,7 @@ describe("LoadDotOpencode", () => {
       const dot = await mkDotDir(dir)
       await writeFile(path.join(dot, "AGENTS.md"), "# Rules")
       const partialLayer = Layer.mergeAll(
-        LoadDotOpencode.layer,
+        SessionLoadDotOpencode.layer,
         SessionAgentsMd.noopLayer,
         SessionAgent.noopLayer,
         SessionSkill.noopLayer,
@@ -369,7 +369,7 @@ describe("LoadDotOpencode", () => {
       )
       const result = await Effect.runPromise(
         Effect.gen(function* () {
-          const svc = yield* LoadDotOpencode.Service
+          const svc = yield* SessionLoadDotOpencode.Service
           return yield* svc.load(SID, dir)
         }).pipe(Effect.provide(partialLayer)),
       )
@@ -418,6 +418,290 @@ describe("LoadDotOpencode", () => {
       }
       const result = await runLoad(dir)
       expect(result.loaded).toContain("skills/my-skill")
+    })
+  })
+
+  // ── Local MCP type ──
+
+  test("loads local MCP with command and environment", async () => {
+    await withDir(async (dir) => {
+      const dot = await mkDotDir(dir)
+      await writeFile(
+        path.join(dot, "opencode.json"),
+        JSON.stringify({
+          mcp: {
+            local: {
+              type: "local",
+              command: ["bun", "run", "server.ts"],
+              environment: { API_KEY: "secret" },
+            },
+          },
+        }),
+      )
+      let mcpInput: SessionMcp.Input | undefined
+      const captureLayer = Layer.mergeAll(
+        SessionLoadDotOpencode.layer,
+        SessionAgentsMd.noopLayer,
+        SessionAgent.noopLayer,
+        SessionSkill.noopLayer,
+        Layer.mock(SessionMcp.Service, {
+          upsert: (_sid, input) =>
+            Effect.sync(() => {
+              mcpInput = input
+              return {} as SessionMcp.Row
+            }),
+        }),
+        SessionTool.noopLayer,
+        SessionCommand.noopLayer,
+        SessionPlugin.noopLayer,
+      )
+      await Effect.runPromise(
+        Effect.gen(function* () {
+          const svc = yield* SessionLoadDotOpencode.Service
+          return yield* svc.load(SID, dir)
+        }).pipe(Effect.provide(captureLayer)),
+      )
+      expect(mcpInput).toEqual({
+        name: "local",
+        type: "local",
+        command: ["bun", "run", "server.ts"],
+        environment: { API_KEY: "secret" },
+        enabled: undefined,
+      })
+    })
+  })
+
+  // ── Plural directory names ──
+
+  test("loads agents from plural agents/ directory", async () => {
+    await withDir(async (dir) => {
+      const dot = await mkDotDir(dir)
+      await writeFile(
+        path.join(dot, "agents/reviewer.md"),
+        "---\ndescription: Review\n---\nReview code.",
+      )
+      await writeFile(
+        path.join(dot, "agents/tester.md"),
+        "---\ndescription: Test\n---\nTest code.",
+      )
+      const result = await runLoad(dir)
+      expect(result.loaded).toContain("agents/reviewer")
+      expect(result.loaded).toContain("agents/tester")
+    })
+  })
+
+  test("loads commands from plural commands/ directory", async () => {
+    await withDir(async (dir) => {
+      const dot = await mkDotDir(dir)
+      await writeFile(
+        path.join(dot, "commands/deploy.md"),
+        "---\ndescription: Deploy\n---\nDeploy the app.",
+      )
+      const result = await runLoad(dir)
+      expect(result.loaded).toContain("commands/deploy")
+    })
+  })
+
+  test("loads plugins from plural plugins/ directory", async () => {
+    await withDir(async (dir) => {
+      const dot = await mkDotDir(dir)
+      await writeFile(path.join(dot, "plugins/audit.ts"), "export default { name: 'audit' }")
+      const result = await runLoad(dir)
+      expect(result.loaded).toContain("plugins/audit")
+    })
+  })
+
+  // ── Agent full field mapping ──
+
+  test("maps all agent fields correctly", async () => {
+    await withDir(async (dir) => {
+      const dot = await mkDotDir(dir)
+      await writeFile(
+        path.join(dot, "agents/full.md"),
+        [
+          "---",
+          "description: Full agent",
+          "mode: subagent",
+          "model: openai/gpt-4.1",
+          "temperature: 0.7",
+          "top_p: 0.9",
+          "steps: 25",
+          "color: \"#FF5733\"",
+          "variant: fast",
+          'options:',
+          '  reasoning: true',
+          'permission:',
+          '  edit: allow',
+          '  bash:',
+          '    "*": allow',
+          "---",
+          "You are a full agent.",
+        ].join("\n"),
+      )
+      let agentInput: SessionAgent.Input | undefined
+      const captureLayer = Layer.mergeAll(
+        SessionLoadDotOpencode.layer,
+        SessionAgentsMd.noopLayer,
+        Layer.mock(SessionAgent.Service, {
+          upsert: (_sid, input) =>
+            Effect.sync(() => {
+              agentInput = input
+              return {} as SessionAgent.Row
+            }),
+        }),
+        SessionSkill.noopLayer,
+        SessionMcp.noopLayer,
+        SessionTool.noopLayer,
+        SessionCommand.noopLayer,
+        SessionPlugin.noopLayer,
+      )
+      await Effect.runPromise(
+        Effect.gen(function* () {
+          const svc = yield* SessionLoadDotOpencode.Service
+          return yield* svc.load(SID, dir)
+        }).pipe(Effect.provide(captureLayer)),
+      )
+      expect(agentInput?.name).toBe("full")
+      expect(agentInput?.description).toBe("Full agent")
+      expect(agentInput?.mode).toBe("subagent")
+      expect(agentInput?.model).toEqual({ providerID: "openai", modelID: "gpt-4.1" })
+      expect(agentInput?.temperature).toBe(0.7)
+      expect(agentInput?.topP).toBe(0.9)
+      expect(agentInput?.steps).toBe(25)
+      expect(agentInput?.color).toBe("#FF5733")
+      expect(agentInput?.variant).toBe("fast")
+      expect(agentInput?.options).toEqual({ reasoning: true })
+    })
+  })
+
+  // ── MCP headers ──
+
+  test("loads remote MCP with headers", async () => {
+    await withDir(async (dir) => {
+      const dot = await mkDotDir(dir)
+      await writeFile(
+        path.join(dot, "opencode.json"),
+        JSON.stringify({
+          mcp: {
+            github: {
+              type: "remote",
+              url: "https://example.com/mcp",
+              headers: { Authorization: "Bearer token123", "X-Custom": "val" },
+            },
+          },
+        }),
+      )
+      let mcpInput: SessionMcp.Input | undefined
+      const captureLayer = Layer.mergeAll(
+        SessionLoadDotOpencode.layer,
+        SessionAgentsMd.noopLayer,
+        SessionAgent.noopLayer,
+        SessionSkill.noopLayer,
+        Layer.mock(SessionMcp.Service, {
+          upsert: (_sid, input) =>
+            Effect.sync(() => {
+              mcpInput = input
+              return {} as SessionMcp.Row
+            }),
+        }),
+        SessionTool.noopLayer,
+        SessionCommand.noopLayer,
+        SessionPlugin.noopLayer,
+      )
+      await Effect.runPromise(
+        Effect.gen(function* () {
+          const svc = yield* SessionLoadDotOpencode.Service
+          return yield* svc.load(SID, dir)
+        }).pipe(Effect.provide(captureLayer)),
+      )
+      expect(mcpInput?.headers).toEqual({ Authorization: "Bearer token123", "X-Custom": "val" })
+    })
+  })
+
+  // ── Command nested path ──
+
+  test("extracts command name from nested directory path", async () => {
+    await withDir(async (dir) => {
+      const dot = await mkDotDir(dir)
+      await writeFile(
+        path.join(dot, "commands/category/deploy.md"),
+        "---\ndescription: Deploy\n---\nDeploy the app.",
+      )
+      const result = await runLoad(dir)
+      expect(result.loaded).toContain("commands/category/deploy")
+    })
+  })
+
+  // ── opencode.json without mcp field ──
+
+  test("handles opencode.json without mcp field gracefully", async () => {
+    await withDir(async (dir) => {
+      const dot = await mkDotDir(dir)
+      await writeFile(
+        path.join(dot, "opencode.json"),
+        JSON.stringify({ command: { greet: { template: "hello" } } }),
+      )
+      await writeFile(path.join(dot, "AGENTS.md"), "# Rules")
+      const result = await runLoad(dir)
+      expect(result.loaded).toContain("AGENTS.md")
+      expect(result.loaded.filter((l) => l.startsWith("mcp/"))).toHaveLength(0)
+      expect(result.skipped.filter((s) => s.path.startsWith("opencode.json"))).toHaveLength(0)
+    })
+  })
+
+  // ── Empty frontmatter ──
+
+  test("loads agent with empty frontmatter", async () => {
+    await withDir(async (dir) => {
+      const dot = await mkDotDir(dir)
+      await writeFile(path.join(dot, "agents/minimal.md"), "---\n---\nJust a prompt.")
+      let agentInput: SessionAgent.Input | undefined
+      const captureLayer = Layer.mergeAll(
+        SessionLoadDotOpencode.layer,
+        SessionAgentsMd.noopLayer,
+        Layer.mock(SessionAgent.Service, {
+          upsert: (_sid, input) =>
+            Effect.sync(() => {
+              agentInput = input
+              return {} as SessionAgent.Row
+            }),
+        }),
+        SessionSkill.noopLayer,
+        SessionMcp.noopLayer,
+        SessionTool.noopLayer,
+        SessionCommand.noopLayer,
+        SessionPlugin.noopLayer,
+      )
+      const result = await Effect.runPromise(
+        Effect.gen(function* () {
+          const svc = yield* SessionLoadDotOpencode.Service
+          return yield* svc.load(SID, dir)
+        }).pipe(Effect.provide(captureLayer)),
+      )
+      expect(result.loaded).toContain("agents/minimal")
+      expect(agentInput?.name).toBe("minimal")
+      expect(agentInput?.mode).toBe("all")
+      expect(agentInput?.prompt).toBe("Just a prompt.")
+    })
+  })
+
+  // ── Same-name resource conflict ──
+
+  test("handles same-name agent from different paths (last wins)", async () => {
+    await withDir(async (dir) => {
+      const dot = await mkDotDir(dir)
+      await writeFile(
+        path.join(dot, "agents/reviewer.md"),
+        "---\ndescription: File reviewer\n---\nReview A.",
+      )
+      await fs.mkdir(path.join(dot, "agents", "reviewer"), { recursive: true })
+      await writeFile(
+        path.join(dot, "agents/reviewer/index.md"),
+        "---\ndescription: Dir reviewer\n---\nReview B.",
+      )
+      const result = await runLoad(dir)
+      const reviewerLoaded = result.loaded.filter((l) => l.startsWith("agents/reviewer"))
+      expect(reviewerLoaded.length).toBeGreaterThanOrEqual(1)
     })
   })
 })

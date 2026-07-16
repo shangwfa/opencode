@@ -1,7 +1,7 @@
 import { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import { Agent } from "@/agent/agent"
 import { SessionMcp } from "@/mcp/session-mcp"
-import { LoadDotOpencode } from "@/config/load-dot-opencode"
+import { SessionLoadDotOpencode } from "@/config/session-load-dot-opencode"
 import { SessionTool } from "@/tool/session-tool"
 import { SessionPlugin } from "@/plugin/session-plugin"
 import { SessionPluginRuntime } from "@/plugin/session-plugin-runtime"
@@ -83,7 +83,7 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
     const commandSvc = yield* Command.Service
     const skillSvc = yield* Skill.Service
     const summary = yield* SessionSummary.Service
-    const loadDotOpencodeSvc = yield* LoadDotOpencode.Service
+    const sessionLoadDotOpencodeSvc = yield* SessionLoadDotOpencode.Service
     const events = yield* EventV2Bridge.Service
     const scope = yield* Scope.Scope
 
@@ -300,7 +300,7 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
     }) {
       yield* requireSession(ctx.params.sessionID)
       const directory = ctx.query.directory ?? (yield* InstanceState.directory)
-      return yield* loadDotOpencodeSvc.load(ctx.params.sessionID, directory)
+      return yield* sessionLoadDotOpencodeSvc.load(ctx.params.sessionID, directory)
     })
 
     // share/unshare errors aren't all client-induced — storage and network

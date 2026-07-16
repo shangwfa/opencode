@@ -1,6 +1,9 @@
-export * as LoadDotOpencode from "./load-dot-opencode"
+export * as SessionLoadDotOpencode from "./session-load-dot-opencode"
 
 import path from "path"
+import os from "os"
+import { execSync } from "child_process"
+import { mkdtempSync, rmSync } from "fs"
 import { realpath, lstat } from "fs/promises"
 import { Effect, Context, Layer, Option, Schema, Exit } from "effect"
 import { Glob } from "@opencode-ai/core/util/glob"
@@ -12,6 +15,7 @@ import type { SessionID } from "@/session/schema"
 import { Filesystem } from "@/util/filesystem"
 import { Permission } from "@/permission"
 import { Provider } from "@/provider/provider"
+import { SandboxProvider } from "@/tool/sandbox-provider"
 import * as ConfigMarkdown from "./markdown"
 import { ConfigParse } from "./parse"
 import { configEntryNameFromPath } from "./entry-name"
@@ -31,7 +35,7 @@ export interface Interface {
   readonly load: (sessionID: SessionID, directory: string) => Effect.Effect<Result>
 }
 
-export class Service extends Context.Service<Service, Interface>()("@opencode/LoadDotOpencode") {}
+export class Service extends Context.Service<Service, Interface>()("@opencode/SessionLoadDotOpencode") {}
 
 const INTERNAL_AGENTS = new Set(["compaction", "title", "summary"])
 
@@ -142,7 +146,33 @@ function toMcpInput(name: string, value: ConfigMCPV1.Info): SessionMcp.Input {
 export const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
-    const load = Effect.fn("LoadDotOpencode.load")(function* (sessionID: SessionID, directory: string) {
+    const load = Effect.fn("SessionLoadDotOpencode.load")(function* (sessionID: SessionID, directory: string) {
+      const sp = Option.getOrUndefined(yield* Effect.serviceOption(SandboxProvider.Service))
+      if (!sp) return yield* loadFromDirectory(sessionID, directory)
+
+      const tar = yield* sp
+        .runInSession(sessionID, `cd "${directory}" && tar cf - .opencode 2>/dev/null | base64 | tr -d '\\n'`, {
+          timeoutSeconds: 30,
+        })
+        .pipe(Effect.orDie)
+      const b64 = tar.logs.stdout.map((l: any) => (typeof l === "string" ? l : l.text)).join("").trim()
+      if (!b64) return { loaded: [], skipped: [] }
+      const tempDir = mkdtempSync(path.join(os.tmpdir(), "ldo-sandbox-"))
+      try {
+        execSync(`tar xf - -C "${tempDir}"`, {
+          input: Buffer.from(b64, "base64"),
+          stdio: ["pipe", "ignore", "ignore"],
+        })
+        return yield* loadFromDirectory(sessionID, tempDir)
+      } finally {
+        rmSync(tempDir, { recursive: true, force: true })
+      }
+    })
+
+    const loadFromDirectory = Effect.fn("SessionLoadDotOpencode.loadFromDirectory")(function* (
+      sessionID: SessionID,
+      directory: string,
+    ) {
       const agentsMdSvc = Option.getOrUndefined(yield* Effect.serviceOption(SessionAgentsMd.Service))
       const agentSvc = Option.getOrUndefined(yield* Effect.serviceOption(SessionAgent.Service))
       const skillSvc = Option.getOrUndefined(yield* Effect.serviceOption(SessionSkill.Service))

@@ -15,7 +15,7 @@ import { Agent } from "@/agent/agent"
 import { Auth } from "@/auth"
 import { BackgroundJob } from "@/background/job"
 import { Config } from "@/config/config"
-import { LoadDotOpencode } from "@/config/load-dot-opencode"
+import { SessionLoadDotOpencode } from "@/config/session-load-dot-opencode"
 import { Command } from "@/command"
 import * as Observability from "@opencode-ai/core/observability"
 import { Ripgrep } from "@opencode-ai/core/ripgrep"
@@ -239,7 +239,7 @@ const app = LayerNode.group([
   Auth.node,
   Account.node,
   Config.node,
-  LoadDotOpencode.node,
+  SessionLoadDotOpencode.node,
   Env.node,
   Git.node,
   Ripgrep.node,

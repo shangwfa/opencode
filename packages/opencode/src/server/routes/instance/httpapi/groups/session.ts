@@ -14,7 +14,7 @@ import { Snapshot } from "@/snapshot"
 import { Skill } from "@/skill"
 import { Agent } from "@/agent/agent"
 import { SessionMcp } from "@/mcp/session-mcp"
-import { LoadDotOpencode } from "@/config/load-dot-opencode"
+import { SessionLoadDotOpencode } from "@/config/session-load-dot-opencode"
 import { Schema, Struct } from "effect"
 import { HttpApi, HttpApiEndpoint, HttpApiError, HttpApiGroup, HttpApiSchema, OpenApi } from "effect/unstable/httpapi"
 import { Authorization } from "../middleware/authorization"
@@ -87,7 +87,7 @@ export const AgentCreatePayload = Agent.CreateInput
 export const AgentsMdCreatePayload = Schema.Struct({
   content: Schema.String,
 })
-export const LoadDotOpencodeResult = Schema.Struct({
+export const SessionLoadDotOpencodeResult = Schema.Struct({
   loaded: Schema.Array(Schema.String),
   skipped: Schema.Array(
     Schema.Struct({
@@ -373,7 +373,7 @@ export const SessionApi = HttpApi.make("session")
         HttpApiEndpoint.post("loadDotOpencode", SessionPaths.loadDotOpencode, {
           params: { sessionID: SessionID },
           query: WorkspaceRoutingQuery,
-          success: described(LoadDotOpencodeResult, "Loaded project .opencode configuration"),
+          success: described(SessionLoadDotOpencodeResult, "Loaded project .opencode configuration"),
           error: [HttpApiError.BadRequest, ApiNotFoundError],
         }).annotateMerge(
           OpenApi.annotations({
