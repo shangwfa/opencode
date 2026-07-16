@@ -278,4 +278,146 @@ describe("LoadDotOpencode", () => {
       expect(second.skipped).toEqual(first.skipped)
     })
   })
+
+  test("skips agent file reached via symlink outside worktree", async () => {
+    await withDir(async (dir) => {
+      const dot = await mkDotDir(dir)
+      const agentsDir = path.join(dot, "agents")
+      await fs.mkdir(agentsDir, { recursive: true })
+      const escape = await fs.mkdtemp(path.join(os.tmpdir(), "ldo-escape-"))
+      await fs.writeFile(path.join(escape, "secret.md"), "---\n---\nEscaped.", "utf-8")
+      await fs.symlink(path.join(escape, "secret.md"), path.join(agentsDir, "escape.md"))
+      const result = await runLoad(dir)
+      expect(result.loaded).not.toContain("agents/escape")
+      expect(result.skipped.some((s) => s.path === "agents/escape.md" && s.reason.includes("outside worktree"))).toBe(true)
+      await fs.rm(escape, { recursive: true, force: true })
+    })
+  })
+
+  test("skills ignore resources reached via symlink outside worktree", async () => {
+    await withDir(async (dir) => {
+      const dot = await mkDotDir(dir)
+      const escape = await fs.mkdtemp(path.join(os.tmpdir(), "ldo-escape-"))
+      await fs.writeFile(path.join(escape, "secret.md"), "# Escaped", "utf-8")
+      const skillDir = path.join(dot, "skills", "my-skill")
+      await fs.mkdir(skillDir, { recursive: true })
+      await fs.symlink(path.join(escape, "secret.md"), path.join(skillDir, "escape.md"))
+      await writeFile(path.join(skillDir, "SKILL.md"), "---\nname: my-skill\n---\nSkill.")
+      const result = await runLoad(dir)
+      expect(result.loaded).toContain("skills/my-skill")
+      await fs.rm(escape, { recursive: true, force: true })
+    })
+  })
+
+  test("skips AGENTS.md when it is not a regular file", async () => {
+    await withDir(async (dir) => {
+      const dot = await mkDotDir(dir)
+      await fs.mkdir(path.join(dot, "AGENTS.md"), { recursive: true })
+      const result = await runLoad(dir)
+      expect(result.loaded).not.toContain("AGENTS.md")
+    })
+  })
+
+  test("skips invalid agent frontmatter", async () => {
+    await withDir(async (dir) => {
+      const dot = await mkDotDir(dir)
+      await writeFile(path.join(dot, "agents/bad.md"), "---\nmode: invalid-mode\n---\nPrompt.")
+      await writeFile(path.join(dot, "agents/good.md"), "---\n---\nPrompt.")
+      const result = await runLoad(dir)
+      expect(result.loaded).toContain("agents/good")
+      expect(result.loaded).not.toContain("agents/bad")
+      expect(result.skipped.some((s) => s.path === "agents/bad.md")).toBe(true)
+    })
+  })
+
+  test("skips invalid command frontmatter", async () => {
+    await withDir(async (dir) => {
+      const dot = await mkDotDir(dir)
+      await writeFile(path.join(dot, "commands/bad.md"), "---\nsubtask: not-a-boolean\n---\nTemplate.")
+      await writeFile(path.join(dot, "commands/good.md"), "---\n---\nTemplate.")
+      const result = await runLoad(dir)
+      expect(result.loaded).toContain("commands/good")
+      expect(result.loaded).not.toContain("commands/bad")
+      expect(result.skipped.some((s) => s.path === "commands/bad.md")).toBe(true)
+    })
+  })
+
+  test("skips empty plugin files", async () => {
+    await withDir(async (dir) => {
+      const dot = await mkDotDir(dir)
+      await writeFile(path.join(dot, "plugins/empty.ts"), "")
+      await writeFile(path.join(dot, "plugins/audit.ts"), "export default { name: 'audit' }")
+      const result = await runLoad(dir)
+      expect(result.loaded).toContain("plugins/audit")
+      expect(result.loaded).not.toContain("plugins/empty")
+      expect(result.skipped.some((s) => s.path === "plugins/empty.ts")).toBe(true)
+    })
+  })
+
+  test("reports unavailable services in skipped", async () => {
+    await withDir(async (dir) => {
+      const dot = await mkDotDir(dir)
+      await writeFile(path.join(dot, "AGENTS.md"), "# Rules")
+      const partialLayer = Layer.mergeAll(
+        LoadDotOpencode.layer,
+        SessionAgentsMd.noopLayer,
+        SessionAgent.noopLayer,
+        SessionSkill.noopLayer,
+        SessionMcp.noopLayer,
+        SessionTool.noopLayer,
+        SessionCommand.noopLayer,
+      )
+      const result = await Effect.runPromise(
+        Effect.gen(function* () {
+          const svc = yield* LoadDotOpencode.Service
+          return yield* svc.load(SID, dir)
+        }).pipe(Effect.provide(partialLayer)),
+      )
+      expect(result.skipped.some((s) => s.path === "plugins" && s.reason === "Session service unavailable")).toBe(true)
+    })
+  })
+
+  test("loads MCP from opencode.jsonc", async () => {
+    await withDir(async (dir) => {
+      const dot = await mkDotDir(dir)
+      await writeFile(
+        path.join(dot, "opencode.jsonc"),
+        `{
+          // comment
+          "mcp": {
+            "github": { "type": "remote", "url": "https://example.com/mcp" },
+          },
+        }`,
+      )
+      const result = await runLoad(dir)
+      expect(result.loaded).toContain("mcp/github")
+    })
+  })
+
+  test("skips skill resources exceeding size limit", async () => {
+    await withDir(async (dir) => {
+      const dot = await mkDotDir(dir)
+      const skillDir = path.join(dot, "skills", "my-skill")
+      await fs.mkdir(path.join(skillDir, "references"), { recursive: true })
+      await writeFile(path.join(skillDir, "SKILL.md"), "---\nname: my-skill\n---\nSkill.")
+      await writeFile(path.join(skillDir, "references", "huge.md"), "x".repeat(300 * 1024))
+      await writeFile(path.join(skillDir, "references", "small.md"), "# Small")
+      const result = await runLoad(dir)
+      expect(result.loaded).toContain("skills/my-skill")
+    })
+  })
+
+  test("limits skill resource count", async () => {
+    await withDir(async (dir) => {
+      const dot = await mkDotDir(dir)
+      const skillDir = path.join(dot, "skills", "my-skill")
+      await fs.mkdir(path.join(skillDir, "references"), { recursive: true })
+      await writeFile(path.join(skillDir, "SKILL.md"), "---\nname: my-skill\n---\nSkill.")
+      for (let i = 0; i < 80; i++) {
+        await writeFile(path.join(skillDir, "references", `ref${i}.md`), `# Ref ${i}`)
+      }
+      const result = await runLoad(dir)
+      expect(result.loaded).toContain("skills/my-skill")
+    })
+  })
 })
