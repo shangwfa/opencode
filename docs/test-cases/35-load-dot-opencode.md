@@ -384,7 +384,194 @@ curl -i -X POST "$BASE/session/ses_NOT_FOUND/dot-opencode/load"
 - 不返回虚假的 loaded 成功结果
 - 不执行 MCP、Plugin 或 Tool 代码
 
-## 七、验收标准
+## 七、端到端模拟测试（实际执行）
+
+> 以下用例在 Docker SaaS 容器 + 本地 PG + 远程 Sandbox 环境下实际执行通过。
+>
+> 环境：`opencode-saas-test` 容器，API `http://127.0.0.1:14096`，PG `postgresql://local@127.0.0.1:5432/opencode`。
+
+### T37.15 环境准备与项目创建
+
+```bash
+# 宿主机本地 PG 转发（Docker 容器通过 host.docker.internal:15432 访问）
+kill $(lsof -ti :15432) 2>/dev/null || true
+nohup node -e "const net=require('net');net.createServer(c=>{const r=net.connect(5432,'127.0.0.1');c.pipe(r);r.pipe(c);c.on('error',()=>r.destroy());r.on('error',()=>c.destroy())}).listen(15432,'0.0.0.0')" &
+sleep 2 && lsof -i :15432 | grep LISTEN
+
+# 启动 SaaS 容器（本地 PG + 远程 Sandbox）
+docker rm -f opencode-saas-test 2>/dev/null
+docker run -d --name opencode-saas-test \
+  -p 14096:4096 \
+  -e OPENCODE_DATABASE_URL=postgresql://local@host.docker.internal:15432/opencode \
+  -e OPENCODE_SANDBOX_DOMAIN=host.docker.internal:30040 \
+  -e OPENCODE_SANDBOX_USE_SERVER_PROXY=true \
+  -e ZHIPU_API_KEY \
+  opencode-saas-sandbox-test:v2fix serve --hostname 0.0.0.0 --port 4096 --print-logs
+
+sleep 12 && docker inspect --format '{{.State.Health.Status}}' opencode-saas-test
+# 期望: healthy
+```
+
+在容器内创建测试项目和 `.opencode` 配置：
+
+```bash
+# 创建项目目录
+docker exec -u 0 opencode-saas-test mkdir -p /workspace/dot-opencode-vite/.opencode/{agents,skills/reviewer,tool,commands,plugins}
+
+# 逐个写入配置文件（用 printf + docker exec -i 避免 shell 变量展开）
+printf '%s' '---
+description: Review agent
+mode: subagent
+permission:
+  "*": allow
+---
+Include DOT_OPENCODE_AGENT_ACTIVE.' | docker exec -i -u 0 opencode-saas-test sh -c 'cat > /workspace/dot-opencode-vite/.opencode/agents/reviewer.md'
+
+printf '%s' '---
+name: reviewer
+description: Review skill
+---
+Include DOT_OPENCODE_SKILL_ACTIVE.' | docker exec -i -u 0 opencode-saas-test sh -c 'cat > /workspace/dot-opencode-vite/.opencode/skills/reviewer/SKILL.md'
+
+printf '%s' 'export default {
+  description: "Return marker",
+  args: {},
+  async execute() { return "DOT_OPENCODE_TOOL_ACTIVE" },
+}' | docker exec -i -u 0 opencode-saas-test sh -c 'cat > /workspace/dot-opencode-vite/.opencode/tool/marker.ts'
+
+printf '%s' '---
+description: Review command
+agent: reviewer
+---
+Include DOT_OPENCODE_COMMAND_ACTIVE.' | docker exec -i -u 0 opencode-saas-test sh -c 'cat > /workspace/dot-opencode-vite/.opencode/commands/review.md'
+
+printf '%s' 'export default { name: "marker-plugin" }' | docker exec -i -u 0 opencode-saas-test sh -c 'cat > /workspace/dot-opencode-vite/.opencode/plugins/marker.ts'
+
+# AGENTS.md 和 opencode.json（注意 $schema 需要 printf 转义）
+echo 'Always mention DOT_OPENCODE_AGENTS_ACTIVE.' | docker exec -i -u 0 opencode-saas-test sh -c 'cat > /workspace/dot-opencode-vite/.opencode/AGENTS.md'
+
+printf '%s' '{"$schema":"https://opencode.ai/config.json","mcp":{"disabled-mcp":{"type":"remote","url":"https://example.invalid/mcp","enabled":false}}}' | docker exec -i -u 0 opencode-saas-test sh -c 'cat > /workspace/dot-opencode-vite/.opencode/opencode.json'
+
+# 修正文件权限
+docker exec -u 0 opencode-saas-test chown -R opencode:opencode /workspace/dot-opencode-vite
+
+# 验证文件数量（期望 7）
+docker exec opencode-saas-test find /workspace/dot-opencode-vite/.opencode -type f | wc -l
+```
+
+### T37.16 创建 Session 并加载全部配置
+
+```bash
+BASE="http://127.0.0.1:14096"
+DIR="/workspace/dot-opencode-vite"
+
+# 创建 Session
+SID=$(curl -s -X POST "$BASE/session?directory=$DIR" \
+  -H 'Content-Type: application/json' \
+  -d '{"title":"dot-opencode-e2e"}' | jq -r '.id')
+echo "SID: $SID"
+
+# 调用加载接口
+curl -s -X POST "$BASE/session/$SID/dot-opencode/load?directory=$DIR" | jq
+```
+
+期望：
+
+```json
+{
+  "loaded": ["AGENTS.md", "agents/reviewer", "skills/reviewer", "mcp/disabled-mcp", "tool/marker", "commands/review", "plugins/marker"],
+  "skipped": []
+}
+```
+
+### T37.17 PG 持久化验证
+
+```bash
+psql postgresql://local@127.0.0.1:5432/opencode -Atc "SELECT count(*) FROM session_agents WHERE session_id='$SID'"
+psql postgresql://local@127.0.0.1:5432/opencode -Atc "SELECT count(*) FROM session_skill WHERE session_id='$SID'"
+psql postgresql://local@127.0.0.1:5432/opencode -Atc "SELECT count(*) FROM session_mcps WHERE session_id='$SID'"
+psql postgresql://local@127.0.0.1:5432/opencode -Atc "SELECT count(*) FROM session_tools WHERE session_id='$SID'"
+psql postgresql://local@127.0.0.1:5432/opencode -Atc "SELECT count(*) FROM session_commands WHERE session_id='$SID'"
+psql postgresql://local@127.0.0.1:5432/opencode -Atc "SELECT count(*) FROM session_plugins WHERE session_id='$SID'"
+psql postgresql://local@127.0.0.1:5432/opencode -Atc "SELECT count(*) FROM session_agents_md WHERE session_id='$SID'"
+```
+
+期望：每张表各返回 `1`。MCP 验证 `enabled=false`：
+
+```bash
+psql postgresql://local@127.0.0.1:5432/opencode -Atc "SELECT name,enabled FROM session_mcps WHERE session_id='$SID'"
+# 期望: disabled-mcp|false
+```
+
+### T37.18 Agent / Skill / AGENTS.md 运行时生效
+
+```bash
+curl -s -X POST "$BASE/session/$SID/prompt_async" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "parts": [{"type": "text", "text": "加载 reviewer skill，返回你看到的配置标记。"}],
+    "model": {"providerID": "zhipuai", "modelID": "glm-5.1"},
+    "agent": "reviewer"
+  }'
+```
+
+轮询消息直到 `finish: "stop"`，检查 AI 回复是否包含：
+
+```text
+DOT_OPENCODE_AGENT_ACTIVE    ← Agent prompt 生效
+DOT_OPENCODE_SKILL_ACTIVE    ← Skill 加载成功
+DOT_OPENCODE_AGENTS_ACTIVE   ← AGENTS.md 指令生效
+```
+
+### T37.19 Command 运行时生效
+
+```bash
+curl -s -X POST "$BASE/session/$SID/command" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "command": "review",
+    "arguments": "",
+    "agent": "reviewer",
+    "model": "zhipuai/glm-5.1"
+  }' | jq '.parts[] | select(.type=="text") | .text'
+```
+
+期望：命令以 `reviewer` agent 执行，返回包含 `DOT_OPENCODE_COMMAND_ACTIVE`。
+
+### T37.20 Tool 运行时生效
+
+```bash
+curl -s -X POST "$BASE/session/$SID/prompt_async" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "parts": [{"type": "text", "text": "请调用 marker 工具并返回结果。"}],
+    "model": {"providerID": "zhipuai", "modelID": "glm-5.1"},
+    "agent": "reviewer"
+  }'
+```
+
+轮询消息直到完成，期望 AI 成功调用 `marker` 工具，返回 `DOT_OPENCODE_TOOL_ACTIVE`。
+
+> **容器环境修复**：`importToolCode` 在容器内写入临时文件时，`import.meta.dir`（`/app/packages/opencode/src/tool/`）对 `opencode` 用户只读。代码已修复为优先尝试 `import.meta.dir`，失败后 fallback 到 `os.tmpdir()`。无 bare import 的简单工具（如 `marker.ts`）可通过 fallback 正常加载。
+
+### T37.21 `.opencode` 覆盖接口注入
+
+```bash
+# 先通过接口注入同名 Agent
+curl -s -X POST "$BASE/session/$SID/agents/create" \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"reviewer","mode":"subagent","description":"API_OVERRIDE","prompt":"API_OVERRIDE_PROMPT"}'
+
+# 再次加载 .opencode
+curl -s -X POST "$BASE/session/$SID/dot-opencode/load?directory=$DIR" | jq
+
+# 验证 PG 中 reviewer 被覆盖回 .opencode 的内容
+psql postgresql://local@127.0.0.1:5432/opencode -Atc \
+  "SELECT prompt FROM session_agents WHERE session_id='$SID' AND name='reviewer'"
+# 期望: 包含 .opencode/agents/reviewer.md 的内容，不是 API_OVERRIDE_PROMPT
+```
+
+## 八、验收标准
 
 - 用户可以通过公开接口主动触发 `.opencode` 加载。
 - Agent、Skill、MCP、Tool、Command、Plugin、AGENTS.md 均可加载。
