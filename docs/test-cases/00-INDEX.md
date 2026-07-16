@@ -45,6 +45,7 @@
 | [`31-session-commands.md`](./31-session-commands.md) | 三十三 | T33.x | Session 自定义命令：CRUD、overlay 合并（session 覆盖 instance）、隔离、级联、模板占位符、hints 自动推导 |
 | [`32-session-goal.md`](./32-session-goal.md) | 三十四 | T34.x | Session Goal 停止条件：`/goal` 命令路由、状态机、judge 模型评估、runLoop 集成、fail-open、多 session 隔离、PG 持久化 |
 | [`33-session-plugins.md`](./33-session-plugins.md) | 三十五 | T35.x | Session Plugins：PG CRUD、9 个已接入 Runtime Hook、未接入 hook 状态、缓存/生命周期/并发、错误隔离、API 脱敏、输入边界、动态代码安全、PluginInput 上下文、官方插件文档兼容性、全工具/transform 路径矩阵、V2 API 边界、npm 包安装与真实功能验证（T35.1-T35.62） |
+| [`35-load-dot-opencode.md`](./35-load-dot-opencode.md) | 三十七 | T37.x | 用户通过公开接口触发项目 `.opencode` 配置加载：资源扫描、PG 持久化、优先级、隔离、幂等、错误诊断和权限 |
 | [`lsp-daemon-unit-test.mjs`](./lsp-daemon-unit-test.mjs) | 二十七 | T27.1-7.6 | LSP daemon 单元测试：宿主机直跑 daemon bundle，自动验证全部 13 个端点（诊断/hover/definition/references/implementation/documentSymbol/workspaceSymbol/callHierarchy）。实测 14/14 |
 | [`lsp-sandbox-e2e-test.mjs`](./lsp-sandbox-e2e-test.mjs) | 二十七 | T27.8+ | LSP sandbox 端到端：OpenSandbox SDK 直连建真实 sandbox 容器，容器内启 daemon 验证 status/documentSymbol/callHierarchy/diagnostics。实测 6/6 |
 | [`sandbox-shared-test.mjs`](./sandbox-shared-test.mjs) | 十六 | T16.29 | 主子 agent 沙箱共享验证：主→子写读、子→主写读、exec 独立验证 |
@@ -87,6 +88,7 @@ T33.x → 31-session-commands.md
 T34.x → 32-session-goal.md
 T35.x → 33-session-plugins.md
 T36.x → 34-session-agents-md.md
+T37.x → 35-load-dot-opencode.md
 
 沙箱工具（apply_patch/ls/错误泄露）→ 18-sandbox-tool-test.md
 路径泄露防护（PL-x）→ 20-path-leak-test.md

@@ -15,6 +15,7 @@ import { Agent } from "@/agent/agent"
 import { Auth } from "@/auth"
 import { BackgroundJob } from "@/background/job"
 import { Config } from "@/config/config"
+import { LoadDotOpencode } from "@/config/load-dot-opencode"
 import { Command } from "@/command"
 import * as Observability from "@opencode-ai/core/observability"
 import { Ripgrep } from "@opencode-ai/core/ripgrep"
@@ -23,6 +24,8 @@ import { RuntimeFlags } from "@/effect/runtime-flags"
 import { LSP } from "@/lsp/lsp"
 import { MCP } from "@/mcp"
 import { SessionMcp } from "@/mcp/session-mcp"
+import { SessionAgent } from "@/agent/session-agent"
+import { SessionSkill } from "@/skill/session-skill"
 import { SessionTool } from "@/tool/session-tool"
 import { SessionCommand } from "@/command/session-command"
 import { SessionPlugin } from "@/plugin/session-plugin"
@@ -236,6 +239,7 @@ const app = LayerNode.group([
   Auth.node,
   Account.node,
   Config.node,
+  LoadDotOpencode.node,
   Env.node,
   Git.node,
   Ripgrep.node,
@@ -315,6 +319,8 @@ export function createRoutes(
       cors(corsOptions),
       Database.defaultLayer,
       Bus.defaultLayer,
+      Flag.OPENCODE_DATABASE_URL ? SessionAgent.pgLayer : SessionAgent.noopLayer,
+      SessionSkill.layer,
       Flag.OPENCODE_DATABASE_URL ? SessionMcp.pgLayer : SessionMcp.noopLayer,
       Flag.OPENCODE_DATABASE_URL ? SessionTool.pgLayer : SessionTool.noopLayer,
       Flag.OPENCODE_DATABASE_URL ? SessionCommand.pgLayer : SessionCommand.noopLayer,

@@ -14,6 +14,7 @@ import { Snapshot } from "@/snapshot"
 import { Skill } from "@/skill"
 import { Agent } from "@/agent/agent"
 import { SessionMcp } from "@/mcp/session-mcp"
+import { LoadDotOpencode } from "@/config/load-dot-opencode"
 import { Schema, Struct } from "effect"
 import { HttpApi, HttpApiEndpoint, HttpApiError, HttpApiGroup, HttpApiSchema, OpenApi } from "effect/unstable/httpapi"
 import { Authorization } from "../middleware/authorization"
@@ -86,6 +87,15 @@ export const AgentCreatePayload = Agent.CreateInput
 export const AgentsMdCreatePayload = Schema.Struct({
   content: Schema.String,
 })
+export const LoadDotOpencodeResult = Schema.Struct({
+  loaded: Schema.Array(Schema.String),
+  skipped: Schema.Array(
+    Schema.Struct({
+      path: Schema.String,
+      reason: Schema.String,
+    }),
+  ),
+})
 
 export const ToolCreatePayload = Schema.Struct({
   name: Schema.String,
@@ -153,6 +163,7 @@ export const SessionPaths = {
   abort: `${root}/:sessionID/abort`,
   share: `${root}/:sessionID/share`,
   init: `${root}/:sessionID/init`,
+  loadDotOpencode: `${root}/:sessionID/dot-opencode/load`,
   summarize: `${root}/:sessionID/summarize`,
   prompt: `${root}/:sessionID/message`,
   promptAsync: `${root}/:sessionID/prompt_async`,
@@ -357,6 +368,18 @@ export const SessionApi = HttpApi.make("session")
             summary: "Initialize session",
             description:
               "Analyze the current application and create an AGENTS.md file with project-specific agent configurations.",
+          }),
+        ),
+        HttpApiEndpoint.post("loadDotOpencode", SessionPaths.loadDotOpencode, {
+          params: { sessionID: SessionID },
+          query: WorkspaceRoutingQuery,
+          success: described(LoadDotOpencodeResult, "Loaded project .opencode configuration"),
+          error: [HttpApiError.BadRequest, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.load_dot_opencode",
+            summary: "Load project .opencode configuration",
+            description: "Load the current project's .opencode configuration into the session.",
           }),
         ),
         HttpApiEndpoint.post("share", SessionPaths.share, {
