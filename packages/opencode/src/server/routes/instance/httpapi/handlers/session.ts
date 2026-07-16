@@ -617,7 +617,7 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
 
     const getAgentsMd = Effect.fn("SessionHttpApi.agentsMd")(function* (ctx: { params: { sessionID: SessionID } }) {
       yield* requireSession(ctx.params.sessionID)
-      return yield* agentsMdSvc.get(ctx.params.sessionID)
+      return (yield* agentsMdSvc.get(ctx.params.sessionID)) ?? null
     })
 
     const createAgentsMd = Effect.fn("SessionHttpApi.agentsMdCreate")(function* (ctx: {

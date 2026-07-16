@@ -86,6 +86,7 @@ T32.x → 30-session-tools.md
 T33.x → 31-session-commands.md
 T34.x → 32-session-goal.md
 T35.x → 33-session-plugins.md
+T36.x → 34-session-agents-md.md
 
 沙箱工具（apply_patch/ls/错误泄露）→ 18-sandbox-tool-test.md
 路径泄露防护（PL-x）→ 20-path-leak-test.md
