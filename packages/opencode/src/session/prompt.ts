@@ -1383,7 +1383,7 @@ const layer = Layer.effect(
             const [skillsPrompt, env, instructions, mcpInstructions, modelMsgs] = yield* Effect.all([
               sys.skills(agent, skills, sessionID),
               sys.environment(model),
-              instruction.system().pipe(Effect.orDie),
+              instruction.system(sessionID).pipe(Effect.orDie),
               sys.mcp(agent, session.permission),
               MessageV2.toModelMessagesEffect(msgs, model),
             ])

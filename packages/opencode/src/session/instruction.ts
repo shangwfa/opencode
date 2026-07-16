@@ -13,7 +13,8 @@ import { withTransientReadRetry } from "@/util/effect-http-client"
 import { Global } from "@opencode-ai/core/global"
 import { toSandboxPath } from "@/tool/sandbox-path"
 import type { MessageV2 } from "./message-v2"
-import type { MessageID } from "./schema"
+import type { MessageID, SessionID } from "./schema"
+import { SessionAgentsMd } from "./agents-md"
 
 function extract(messages: SessionV1.WithParts[]) {
   const paths = new Set<string>()
@@ -35,7 +36,7 @@ function extract(messages: SessionV1.WithParts[]) {
 export interface Interface {
   readonly clear: (messageID: MessageID) => Effect.Effect<void>
   readonly systemPaths: () => Effect.Effect<Set<string>, FSUtil.Error>
-  readonly system: () => Effect.Effect<string[], FSUtil.Error>
+  readonly system: (sessionID?: SessionID) => Effect.Effect<string[], FSUtil.Error>
   readonly find: (dir: string) => Effect.Effect<string | undefined, FSUtil.Error>
   readonly resolve: (
     messages: SessionV1.WithParts[],
@@ -49,13 +50,14 @@ export class Service extends Context.Service<Service, Interface>()("@opencode/In
 const layer: Layer.Layer<
   Service,
   never,
-  FSUtil.Service | Config.Service | Global.Service | HttpClient.HttpClient | RuntimeFlags.Service
+  FSUtil.Service | Config.Service | Global.Service | HttpClient.HttpClient | RuntimeFlags.Service | SessionAgentsMd.Service
 > = Layer.effect(
   Service,
   Effect.gen(function* () {
     const cfg = yield* Config.Service
     const fs = yield* FSUtil.Service
     const global = yield* Global.Service
+    const sessionAgentsMd = yield* SessionAgentsMd.Service
     const flags = yield* RuntimeFlags.Service
     const http = HttpClient.filterStatusOk(withTransientReadRetry(yield* HttpClient.HttpClient))
     const globalFiles = [
@@ -156,10 +158,11 @@ const layer: Layer.Layer<
       return paths
     })
 
-    const system = Effect.fn("Instruction.system")(function* () {
+    const system = Effect.fn("Instruction.system")(function* (sessionID?: SessionID) {
       const config = yield* cfg.get()
       const ctx = yield* InstanceState.context
       const paths = yield* systemPaths()
+      const sessionInstruction = sessionID ? yield* sessionAgentsMd.get(sessionID) : undefined
       const urls = (config.instructions ?? []).filter(
         (item) => item.startsWith("https://") || item.startsWith("http://"),
       )
@@ -168,6 +171,9 @@ const layer: Layer.Layer<
       const remote = yield* Effect.forEach(urls, fetch, { concurrency: 4 })
 
       return [
+        ...(sessionInstruction?.content
+          ? [`Instructions from: session/${sessionID}/AGENTS.md\n${sessionInstruction.content}`]
+          : []),
         ...Array.from(paths).flatMap((item, i) =>
           files[i] ? [`Instructions from: ${sandboxDisplayPath(item, ctx.worktree)}\n${files[i]}`] : [],
         ),
@@ -242,7 +248,7 @@ export function loaded(messages: SessionV1.WithParts[]) {
 export const node = LayerNode.make({
   service: Service,
   layer: layer,
-  deps: [Config.node, FSUtil.node, Global.node, RuntimeFlags.node, httpClient],
+  deps: [Config.node, FSUtil.node, Global.node, RuntimeFlags.node, httpClient, SessionAgentsMd.node],
 })
 
 export * as Instruction from "./instruction"

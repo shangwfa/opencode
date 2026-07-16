@@ -83,6 +83,9 @@ export const SkillLoadPayload = Schema.Struct({
   path: Schema.String,
 })
 export const AgentCreatePayload = Agent.CreateInput
+export const AgentsMdCreatePayload = Schema.Struct({
+  content: Schema.String,
+})
 
 export const ToolCreatePayload = Schema.Struct({
   name: Schema.String,
@@ -168,6 +171,8 @@ export const SessionPaths = {
   agents: `${root}/:sessionID/agents`,
   agentsCreate: `${root}/:sessionID/agents/create`,
   agentsDelete: `${root}/:sessionID/agents/:name`,
+  agentsMd: `${root}/:sessionID/agents-md`,
+  agentsMdCreate: `${root}/:sessionID/agents-md/create`,
   mcps: `${root}/:sessionID/mcps`,
   mcpsCreate: `${root}/:sessionID/mcps/create`,
   mcpsDelete: `${root}/:sessionID/mcps/:name`,
@@ -575,6 +580,43 @@ export const SessionApi = HttpApi.make("session")
             identifier: "session.skills.clear",
             summary: "Clear session skills",
             description: "Remove all skills attached to a specific OpenCode session.",
+          }),
+        ),
+        HttpApiEndpoint.get("agentsMd", SessionPaths.agentsMd, {
+          params: { sessionID: SessionID },
+          query: WorkspaceRoutingQuery,
+          success: described(Schema.NullOr(Schema.Unknown), "Session AGENTS.md"),
+          error: [HttpApiError.BadRequest, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.agents-md",
+            summary: "Get session AGENTS.md",
+            description: "Get the AGENTS.md instructions attached to a specific OpenCode session.",
+          }),
+        ),
+        HttpApiEndpoint.post("agentsMdCreate", SessionPaths.agentsMdCreate, {
+          params: { sessionID: SessionID },
+          query: WorkspaceRoutingQuery,
+          payload: AgentsMdCreatePayload,
+          success: described(Schema.Unknown, "Created session AGENTS.md"),
+          error: [HttpApiError.BadRequest, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.agents-md.create",
+            summary: "Create session AGENTS.md",
+            description: "Create or replace the AGENTS.md instructions attached to a specific session.",
+          }),
+        ),
+        HttpApiEndpoint.delete("agentsMdDelete", SessionPaths.agentsMd, {
+          params: { sessionID: SessionID },
+          query: WorkspaceRoutingQuery,
+          success: described(Schema.Void, "Session AGENTS.md cleared"),
+          error: [HttpApiError.BadRequest, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.agents-md.clear",
+            summary: "Clear session AGENTS.md",
+            description: "Remove the AGENTS.md instructions attached to a specific session.",
           }),
         ),
         HttpApiEndpoint.get("agents", SessionPaths.agents, {

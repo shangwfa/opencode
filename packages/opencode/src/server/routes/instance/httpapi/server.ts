@@ -27,6 +27,7 @@ import { SessionTool } from "@/tool/session-tool"
 import { SessionCommand } from "@/command/session-command"
 import { SessionPlugin } from "@/plugin/session-plugin"
 import { SessionPluginRuntime } from "@/plugin/session-plugin-runtime"
+import { SessionAgentsMd } from "@/session/agents-md"
 import { Flag } from "@/flag/flag"
 import { Permission } from "@/permission"
 import { Installation } from "@/installation"
@@ -240,9 +241,10 @@ const app = LayerNode.group([
   Ripgrep.node,
   Storage.node,
   Snapshot.node,
-   Plugin.node,
-   SessionPlugin.node,
-   SessionPluginRuntime.node,
+  Plugin.node,
+  SessionPlugin.node,
+  SessionPluginRuntime.node,
+  SessionAgentsMd.node,
   ModelsDev.node,
   Provider.node,
   ProviderAuth.node,

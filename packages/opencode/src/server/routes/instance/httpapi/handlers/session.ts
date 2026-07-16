@@ -4,6 +4,7 @@ import { SessionMcp } from "@/mcp/session-mcp"
 import { SessionTool } from "@/tool/session-tool"
 import { SessionPlugin } from "@/plugin/session-plugin"
 import { SessionPluginRuntime } from "@/plugin/session-plugin-runtime"
+import { SessionAgentsMd } from "@/session/agents-md"
 import { SessionV1 } from "@opencode-ai/core/v1/session"
 import { EventV2Bridge } from "@/event-v2-bridge"
 import { Command } from "@/command"
@@ -44,6 +45,7 @@ import {
   SkillCreatePayload,
   SkillLoadPayload,
   AgentCreatePayload,
+  AgentsMdCreatePayload,
   ToolCreatePayload,
   PluginCreatePayload,
   CommandCreatePayload,
@@ -69,6 +71,7 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
     const compactSvc = yield* SessionCompaction.Service
     const runState = yield* SessionRunState.Service
     const agentSvc = yield* Agent.Service
+    const agentsMdSvc = yield* SessionAgentsMd.Service
     const permissionSvc = yield* Permission.Service
     const statusSvc = yield* SessionStatus.Service
     const todoSvc = yield* Todo.Service
@@ -612,6 +615,24 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       yield* commandSvc.sessionClear(ctx.params.sessionID)
     })
 
+    const getAgentsMd = Effect.fn("SessionHttpApi.agentsMd")(function* (ctx: { params: { sessionID: SessionID } }) {
+      yield* requireSession(ctx.params.sessionID)
+      return yield* agentsMdSvc.get(ctx.params.sessionID)
+    })
+
+    const createAgentsMd = Effect.fn("SessionHttpApi.agentsMdCreate")(function* (ctx: {
+      params: { sessionID: SessionID }
+      payload: typeof AgentsMdCreatePayload.Type
+    }) {
+      yield* requireSession(ctx.params.sessionID)
+      return yield* agentsMdSvc.upsert(ctx.params.sessionID, ctx.payload)
+    })
+
+    const clearAgentsMd = Effect.fn("SessionHttpApi.agentsMdDelete")(function* (ctx: { params: { sessionID: SessionID } }) {
+      yield* requireSession(ctx.params.sessionID)
+      yield* agentsMdSvc.remove(ctx.params.sessionID)
+    })
+
     const listPlugins = Effect.fn("SessionHttpApi.plugins")(function* (ctx: { params: { sessionID: SessionID } }) {
       yield* requireSession(ctx.params.sessionID)
       const rows = yield* pluginSessionSvc.list(ctx.params.sessionID)
@@ -692,6 +713,9 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       .handle("commandsCreate", createCommand)
       .handle("commandsDelete", deleteCommand)
       .handle("commandsClear", clearCommands)
+      .handle("agentsMd", getAgentsMd)
+      .handle("agentsMdCreate", createAgentsMd)
+      .handle("agentsMdDelete", clearAgentsMd)
       .handle("plugins", listPlugins)
       .handle("pluginsCreate", createPlugin)
       .handle("pluginsDelete", deletePlugin)
