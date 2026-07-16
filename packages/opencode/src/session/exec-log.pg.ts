@@ -15,7 +15,7 @@ export const ExecLogTable = pgTable(
       .references(() => SessionTable.id, { onDelete: "cascade" }),
     command: text().notNull(),
     working_directory: text(),
-    status: text().$type<"running" | "completed" | "failed" | "killed">().notNull(),
+    status: text().$type<"running" | "completed" | "failed" | "killed" | "timed_out">().notNull(),
     exit_code: integer(),
     stdout: text(),
     stderr: text(),

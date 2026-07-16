@@ -626,6 +626,7 @@ export namespace SandboxProvider {
     Effect.gen(function* () {
       const config = yield* SandboxConfig.Service
       const commandSemaphores = new Map<string, Semaphore.Semaphore>()
+      const detachedCommandSessions = new Map<string, Set<string>>()
       const createRef = yield* Ref.make(new Map<string, Deferred.Deferred<Sandbox, Error>>())
       const sbCache = new Map<string, { sb: Sandbox; cachedAt: number; sandboxID: string }>()
       const SB_CACHE_TTL_MS = 30_000
@@ -1166,6 +1167,7 @@ export namespace SandboxProvider {
             }))
           }
           commandSemaphores.clear()
+          detachedCommandSessions.clear()
         }).pipe(Effect.withSpan("SandboxProvider.destroyAll"))
 
       const keepAlive: Interface["keepAlive"] = (sessionID) =>
@@ -1251,8 +1253,12 @@ export namespace SandboxProvider {
             try: () => sb.commands.createSession({ workingDirectory: options?.workingDirectory ?? "/workspace" }),
             catch: (e) => new Error(`Failed to create detached session: ${String(e)}`),
           })
+          const detached = detachedCommandSessions.get(sessionID) ?? new Set<string>()
+          detached.add(detachedSessionId)
+          detachedCommandSessions.set(sessionID, detached)
+          let completed = false
           try {
-            return yield* withExecTimeout(
+            const result = yield* withExecTimeout(
               Effect.tryPromise({
                 try: () => runCommandEarlyExit(sb, detachedSessionId, command, options, handlers, signal),
                 catch: (e) => new Error(`runDetached failed: ${String(e)}`),
@@ -1265,20 +1271,38 @@ export namespace SandboxProvider {
               ),
               options?.timeoutSeconds,
             )
+            if (result.error?.name === "TimeoutError") {
+              yield* Effect.tryPromise(() => sb.commands.interrupt(detachedSessionId)).pipe(Effect.ignore)
+            }
+            completed = true
+            return result
           } finally {
+            if (!completed) yield* Effect.tryPromise(() => sb.commands.interrupt(detachedSessionId)).pipe(Effect.ignore)
             yield* Effect.tryPromise(() => sb.commands.deleteSession(detachedSessionId)).pipe(Effect.ignore)
+            detached.delete(detachedSessionId)
+            if (detached.size === 0) detachedCommandSessions.delete(sessionID)
           }
         }).pipe(Effect.withSpan("SandboxProvider.runDetached"))
 
       const interrupt: Interface["interrupt"] = (sessionID) =>
         Effect.gen(function* () {
           const row = yield* dbGet(sessionID).pipe(Effect.orElseSucceed(() => null))
-          if (!row?.command_session_id) return
+          const detached = detachedCommandSessions.get(sessionID)
+          if (!row?.command_session_id && !detached?.size) return
           const sb = yield* getOrCreate(sessionID)
-          yield* Effect.tryPromise({
-            try: () => sb.commands.interrupt(row.command_session_id!),
-            catch: () => {},
-          }).pipe(Effect.catch(() => Effect.void))
+          const sessions = [
+            ...(row?.command_session_id ? [row.command_session_id] : []),
+            ...(detached ? [...detached] : []),
+          ]
+          yield* Effect.all(
+            sessions.map((commandSessionID) =>
+              Effect.tryPromise({
+                try: () => sb.commands.interrupt(commandSessionID),
+                catch: () => {},
+              }).pipe(Effect.catch(() => Effect.void)),
+            ),
+            { concurrency: "unbounded", discard: true },
+          )
           log.info("sandbox command interrupted", { sessionID })
         }).pipe(
           Effect.ensuring(Effect.gen(function* () {
