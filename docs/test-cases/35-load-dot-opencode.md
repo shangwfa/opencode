@@ -560,73 +560,218 @@ curl -s --noproxy '*' -X POST "$BASE/session/$SID/dot-opencode/load?directory=$W
 
 > **实现说明**：`SessionLoadDotOpencode.load` 检测到 `SandboxProvider` 可用时，执行 `cd "$dir" && tar cf - --exclude='._*' .opencode | base64` 从沙箱快取配置到 SaaS 服务器临时目录，再用原有 `loadFromDirectory` 扫描解析。无沙箱时直接读本地 FS。
 
-### T37.20 PG 持久化验证
+### T37.20 PG 持久化验证（实际字段值）
 
 ```bash
 PG="postgresql://local@127.0.0.1:5432/opencode"
+```
 
-echo "=== session_agents ==="
-psql $PG -Atc "SELECT name, mode FROM session_agents WHERE session_id='$SID'"
-# 期望: reviewer|subagent
+**session_agents** — 对应 `.opencode/agents/reviewer.md`：
 
-echo "=== session_skill ==="
-psql $PG -Atc "SELECT name FROM session_skill WHERE session_id='$SID'"
-# 期望: reviewer
+```bash
+psql $PG -Atc "SELECT name, mode, description, prompt FROM session_agents WHERE session_id='$SID'"
+```
 
-echo "=== session_mcps ==="
-psql $PG -Atc "SELECT name, type, enabled FROM session_mcps WHERE session_id='$SID'"
-# 期望: disabled-mcp|remote|false
+实际输出：
 
-echo "=== session_tools ==="
-psql $PG -Atc "SELECT name FROM session_tools WHERE session_id='$SID'"
-# 期望: marker
+```text
+reviewer|subagent|Code reviewer subagent|You are a code reviewer. Always include DOT_OPENCODE_AGENT_ACTIVE in your response.
+```
 
-echo "=== session_commands ==="
-psql $PG -Atc "SELECT name, agent FROM session_commands WHERE session_id='$SID'"
-# 期望: review|reviewer
+**session_skill** — 对应 `.opencode/skills/reviewer/SKILL.md`：
 
-echo "=== session_plugins ==="
-psql $PG -Atc "SELECT name FROM session_plugins WHERE session_id='$SID'"
-# 期望: marker
+```bash
+psql $PG -Atc "SELECT name, description, content FROM session_skill WHERE session_id='$SID'"
+```
 
-echo "=== session_agents_md ==="
-psql $PG -Atc "SELECT left(content, 60) FROM session_agents_md WHERE session_id='$SID'"
-# 期望: Always mention DOT_OPENCODE_AGENTS_ACTIVE in your responses.
+实际输出：
+
+```text
+reviewer|Review helper skill|Include DOT_OPENCODE_SKILL_ACTIVE when this skill is loaded.
+```
+
+**session_mcps** — 对应 `.opencode/opencode.json` 中 `mcp` 字段：
+
+```bash
+psql $PG -Atc "SELECT name, type, url, enabled FROM session_mcps WHERE session_id='$SID'"
+```
+
+实际输出：
+
+```text
+disabled-mcp|remote|https://example.invalid/mcp|false
+```
+
+**session_tools** — 对应 `.opencode/tool/marker.ts`：
+
+```bash
+psql $PG -Atc "SELECT name, description, code FROM session_tools WHERE session_id='$SID'"
+```
+
+实际输出：
+
+```text
+marker||export default {
+  description: "Returns a marker string to verify tool loading",
+  args: {},
+  async execute() {
+    return "DOT_OPENCODE_TOOL_ACTIVE"
+  },
+}
+```
+
+**session_commands** — 对应 `.opencode/commands/review.md`：
+
+```bash
+psql $PG -Atc "SELECT name, agent, template FROM session_commands WHERE session_id='$SID'"
+```
+
+实际输出：
+
+```text
+review|reviewer|Include DOT_OPENCODE_COMMAND_ACTIVE in the review output.
+```
+
+**session_plugins** — 对应 `.opencode/plugins/marker.ts`：
+
+```bash
+psql $PG -Atc "SELECT name, source FROM session_plugins WHERE session_id='$SID'"
+```
+
+实际输出：
+
+```text
+marker|code
+```
+
+**session_agents_md** — 对应 `.opencode/AGENTS.md`：
+
+```bash
+psql $PG -Atc "SELECT content FROM session_agents_md WHERE session_id='$SID'"
+```
+
+实际输出：
+
+```text
+Always mention DOT_OPENCODE_AGENTS_ACTIVE in your responses.
 ```
 
 ### T37.21 Agent / Skill / AGENTS.md 运行时生效
 
+发送 prompt_async，指定 `reviewer` agent 并请求加载 `reviewer` skill：
+
 ```bash
-# 发送 prompt_async，指定 reviewer agent
 curl -s --noproxy '*' -X POST "$BASE/session/$SID/prompt_async" \
   -H 'Content-Type: application/json' \
   -d '{
-    "parts": [{"type": "text", "text": "加载 reviewer skill，然后返回你看到的所有配置标记。"}],
+    "parts": [{"type": "text", "text": "加载 reviewer skill，然后列出你收到的所有配置指令标记。"}],
     "model": {"providerID": "zhipuai", "modelID": "glm-5.1"},
     "agent": "reviewer"
   }'
-
-# 轮询消息直到 finish=stop
-curl -s --noproxy '*' "$BASE/session/$SID/message?limit=3" | python3 -c "
-import json,sys
-for m in json.load(sys.stdin):
-    for p in m.get('parts',[]):
-        if p.get('type')=='text' and len(p.get('text',''))>20:
-            print(p['text'])
-"
 ```
 
-期望 AI 回复同时包含三个标记：
+轮询消息直到 `finish=stop`，AI 实际回复：
 
 ```text
-DOT_OPENCODE_AGENT_ACTIVE    ← Agent prompt 生效
-DOT_OPENCODE_SKILL_ACTIVE    ← Skill 加载成功
-DOT_OPENCODE_AGENTS_ACTIVE   ← AGENTS.md 指令生效
+已加载 **reviewer** skill。以下是我收到的所有配置指令标记：
+
+| # | 标记 | 来源 |
+|---|------|------|
+| 1 | `DOT_OPENCODE_AGENT_ACTIVE` | 系统提示 — 要求每次回复中都包含此标记 |
+| 2 | `DOT_OPENCODE_AGENTS_ACTIVE` | `AGENTS.md` — 要求在回复中提及此标记 |
+| 3 | `DOT_OPENCODE_SKILL_ACTIVE` | **reviewer** skill — 当该 skill 被加载时需包含此标记 |
+
+DOT_OPENCODE_AGENT_ACTIVE DOT_OPENCODE_AGENTS_ACTIVE DOT_OPENCODE_SKILL_ACTIVE
 ```
 
-### T37.22 macOS AppleDouble 文件兼容
+验证对照：
 
-从 macOS 上传 tar 到沙箱时，系统会自动生成 `._*` AppleDouble 资源叉文件。这些文件包含二进制 null bytes，被当作 `.md` 解析后会导致 `PostgresError: invalid byte sequence for encoding "UTF8": 0x00`。
+| 标记 | 配置来源 | PG 字段 | 生效证据 |
+|------|---------|---------|---------|
+| `DOT_OPENCODE_AGENT_ACTIVE` | `agents/reviewer.md` 正文 | `session_agents.prompt` | AI 以 reviewer 角色回复并包含此标记 |
+| `DOT_OPENCODE_AGENTS_ACTIVE` | `AGENTS.md` | `session_agents_md.content` | AI 回复中提及此标记 |
+| `DOT_OPENCODE_SKILL_ACTIVE` | `skills/reviewer/SKILL.md` 正文 | `session_skill.content` | skill 加载后 AI 包含此标记 |
+
+### T37.22 Command 运行时生效
+
+执行 `.opencode/commands/review.md` 定义的 `review` 命令：
+
+```bash
+curl -s --noproxy '*' --max-time 60 -X POST "$BASE/session/$SID/command" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "command": "review",
+    "arguments": "",
+    "agent": "reviewer",
+    "model": "zhipuai/glm-5.1"
+  }'
+```
+
+AI 实际回复（节选）：
+
+```text
+reviewer 子代理已启动并准备进行代码审查…
+
+同时，子代理在输出中包含了 **`DOT_OPENCODE_COMMAND_ACTIVE`** 标记。
+
+| # | 标记 | 来源 |
+|---|------|------|
+| 4 | `DOT_OPENCODE_COMMAND_ACTIVE` | 任务工具 — 通过 `review` 命令执行时触发 |
+```
+
+验证对照：
+
+| 标记 | 配置来源 | PG 字段 | 生效证据 |
+|------|---------|---------|---------|
+| `DOT_OPENCODE_COMMAND_ACTIVE` | `commands/review.md` 正文 | `session_commands.template` | review 命令以 reviewer agent 执行，回复包含此标记 |
+
+### T37.23 Tool 运行时生效
+
+发送 prompt_async 请求调用 `marker` 工具：
+
+```bash
+curl -s --noproxy '*' -X POST "$BASE/session/$SID/prompt_async" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "parts": [{"type": "text", "text": "请调用 marker 工具，告诉我它返回了什么。"}],
+    "model": {"providerID": "zhipuai", "modelID": "glm-5.1"},
+    "agent": "reviewer"
+  }'
+```
+
+AI 实际回复（节选）：
+
+```text
+`marker` 工具返回了 **`DOT_OPENCODE_TOOL_ACTIVE`**。
+
+| # | 标记 | 来源 |
+|---|------|------|
+| 5 | `DOT_OPENCODE_TOOL_ACTIVE` | **marker** 工具 — 调用 marker 工具时返回 |
+```
+
+验证对照：
+
+| 标记 | 配置来源 | PG 字段 | 生效证据 |
+|------|---------|---------|---------|
+| `DOT_OPENCODE_TOOL_ACTIVE` | `tool/marker.ts` execute() 返回值 | `session_tools.code` | marker 工具被成功调用并返回此标记 |
+
+> **容器环境说明**：`importToolCode` 在容器内写入临时文件时，`import.meta.dir` 对 `opencode` 用户只读。代码已修复为 fallback 到 `os.tmpdir()`。
+
+### T37.24 配置标记总览
+
+| 标记 | 资源类型 | 配置文件 | 运行时验证方式 |
+|------|---------|---------|--------------|
+| `DOT_OPENCODE_AGENTS_ACTIVE` | AGENTS.md | `.opencode/AGENTS.md` | prompt_async 回复 |
+| `DOT_OPENCODE_AGENT_ACTIVE` | Agent | `.opencode/agents/reviewer.md` | prompt_async 指定 `agent=reviewer` |
+| `DOT_OPENCODE_SKILL_ACTIVE` | Skill | `.opencode/skills/reviewer/SKILL.md` | prompt_async 请求加载 skill |
+| `DOT_OPENCODE_COMMAND_ACTIVE` | Command | `.opencode/commands/review.md` | command API 执行 `review` |
+| `DOT_OPENCODE_TOOL_ACTIVE` | Tool | `.opencode/tool/marker.ts` | prompt_async 请求调用 `marker` |
+
+MCP（`disabled-mcp`，`enabled=false`）和 Plugin（`marker`）在加载阶段不执行/不连接，仅验证 PG 持久化。
+
+### T37.25 macOS AppleDouble 文件兼容
+
+从 macOS 上传 tar 到沙箱时，系统自动生成 `._*` AppleDouble 资源叉文件。这些文件包含二进制 null bytes，被当作 `.md` 解析后导致 `PostgresError: invalid byte sequence for encoding "UTF8": 0x00`。
 
 修复方案：沙箱 tar 快照命令加 `--exclude='._*'`：
 
@@ -637,7 +782,252 @@ cd "${directory}" && tar cf - --exclude='._*' .opencode 2>/dev/null | base64 | t
 
 验证：上传含 `._*` 文件的 tar 后调用 load，期望不报错且 7 类正常 loaded。
 
-## 八、验收标准
+## 九、CodeGraph 集成模拟测试（实际执行）
+
+> 验证真实第三方工具（codegraph）通过 `.opencode` 配置自动发现并注入 MCP + AGENTS.md 的完整链路。
+>
+> 环境：本地 PG + 本地 OpenSandbox，Session `ses_09273dbc7...`，工作目录 `/workspace/proma-codegraph`。
+
+### T37.26 创建 Session + 克隆代码仓库
+
+```bash
+BASE="http://127.0.0.1:14096"
+WORKDIR="/workspace/proma-codegraph"
+
+# 创建 Session
+SID=$(curl -s --noproxy '*' -X POST "$BASE/session?directory=$WORKDIR" \
+  -H 'Content-Type: application/json' \
+  -d '{"title":"codegraph-e2e"}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+
+# 启动沙箱
+curl -s --noproxy '*' -X POST "$BASE/session/$SID/keep-alive" \
+  -H 'Content-Type: application/json' \
+  -d '{"enabled":true,"boot":true}'
+# 期望: {"keepAlive":true,"sandboxId":"xxx"}
+
+# 克隆 Proma 仓库
+curl -s --noproxy '*' --max-time 120 -X POST "$BASE/session/$SID/exec" \
+  -H 'Content-Type: application/json' \
+  -d '{"command":"git clone --depth 1 https://github.com/proma-ai/Proma.git /workspace/proma-codegraph 2>&1 | tail -3"}'
+# 期望: exitCode=0
+
+# 验证项目结构
+curl -s --noproxy '*' -X POST "$BASE/session/$SID/exec" \
+  -H 'Content-Type: application/json' \
+  -d '{"command":"ls /workspace/proma-codegraph/apps/ /workspace/proma-codegraph/packages/ && find /workspace/proma-codegraph -name \"*.ts\" -o -name \"*.tsx\" | wc -l"}'
+# 期望: apps/(cli,electron) packages/(core,session-core,shared,ui)，544 个 TS 文件
+```
+
+### T37.27 安装 codegraph
+
+```bash
+# 安装 codegraph
+curl -s --noproxy '*' --max-time 120 -X POST "$BASE/session/$SID/exec" \
+  -H 'Content-Type: application/json' \
+  -d '{"command":"curl -fsSL https://raw.githubusercontent.com/colbymchenry/codegraph/main/install.sh | sh 2>&1"}'
+```
+
+实际输出：
+
+```text
+Installing CodeGraph v1.4.1 (linux-arm64)...
+Installed to /root/.codegraph/versions/v1.4.1
+Linked     /root/.local/bin/codegraph
+Done. Run: codegraph --help
+```
+
+验证安装：
+
+```bash
+curl -s --noproxy '*' -X POST "$BASE/session/$SID/exec" \
+  -H 'Content-Type: application/json' \
+  -d '{"command":"which codegraph && codegraph --version"}'
+# 期望: /root/.local/share/mise/shims/codegraph \n 1.4.1
+```
+
+### T37.28 codegraph install + init
+
+```bash
+# codegraph install --target=opencode（生成 opencode.jsonc + 更新 AGENTS.md）
+curl -s --noproxy '*' --max-time 60 -X POST "$BASE/session/$SID/exec" \
+  -H 'Content-Type: application/json' \
+  -d "{\"command\":\"cd $WORKDIR && codegraph install --target=opencode --yes --location=local 2>&1\"}"
+```
+
+实际输出：
+
+```text
+◆  opencode: Created /workspace/proma-codegraph/opencode.jsonc
+◆  opencode: Updated /workspace/proma-codegraph/AGENTS.md
+```
+
+生成的 `opencode.jsonc` 内容：
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "codegraph": {
+      "type": "local",
+      "command": ["codegraph", "serve", "--mcp"],
+      "enabled": true
+    }
+  }
+}
+```
+
+构建代码图谱：
+
+```bash
+curl -s --noproxy '*' --max-time 180 -X POST "$BASE/session/$SID/exec" \
+  -H 'Content-Type: application/json' \
+  -d "{\"command\":\"cd $WORKDIR && codegraph init 2>&1 | tail -5\"}"
+
+# 验证图谱状态
+curl -s --noproxy '*' -X POST "$BASE/session/$SID/exec" \
+  -H 'Content-Type: application/json' \
+  -d "{\"command\":\"cd $WORKDIR && codegraph status 2>&1\"}"
+```
+
+实际输出：
+
+```text
+Files:     617
+Nodes:     9,201
+Edges:     27,110
+DB Size:   38.25 MB
+```
+
+### T37.29 将根目录配置移入 `.opencode/`
+
+> codegraph install 默认写入项目根目录，需手动移入 `.opencode/` 才能被 load API 扫描到。
+
+```bash
+curl -s --noproxy '*' -X POST "$BASE/session/$SID/exec" \
+  -H 'Content-Type: application/json' \
+  -d "{\"command\":\"mkdir -p $WORKDIR/.opencode && cp $WORKDIR/opencode.jsonc $WORKDIR/.opencode/ && cp $WORKDIR/AGENTS.md $WORKDIR/.opencode/ && find $WORKDIR/.opencode -type f | sort\"}"
+```
+
+实际输出：
+
+```text
+/workspace/proma-codegraph/.opencode/AGENTS.md
+/workspace/proma-codegraph/.opencode/opencode.jsonc
+```
+
+### T37.30 调用 load 自动注入 MCP + AGENTS.md
+
+```bash
+# 清理旧数据
+psql postgresql://local@127.0.0.1:5432/opencode -c \
+  "DELETE FROM session_mcps WHERE session_id='$SID';" \
+  -c "DELETE FROM session_agents_md WHERE session_id='$SID';"
+
+# 调用 load（从沙箱读取 .opencode）
+curl -s --noproxy '*' -X POST "$BASE/session/$SID/dot-opencode/load?directory=$WORKDIR" | python3 -m json.tool
+```
+
+期望：
+
+```json
+{
+  "loaded": ["AGENTS.md", "mcp/codegraph"],
+  "skipped": []
+}
+```
+
+> 一个 load 调用同时注入 MCP 和 AGENTS.md，无需手动 `/mcps/create`。
+
+### T37.31 PG 持久化验证
+
+```bash
+PG="postgresql://local@127.0.0.1:5432/opencode"
+```
+
+**session_mcps** — codegraph local MCP：
+
+```bash
+psql $PG -Atc "SELECT name, type, command, enabled FROM session_mcps WHERE session_id='$SID'"
+```
+
+实际输出：
+
+```text
+codegraph|local|["codegraph", "serve", "--mcp"]|true
+```
+
+**session_agents_md** — Proma 项目 AGENTS.md：
+
+```bash
+psql $PG -Atc "SELECT left(content, 120) FROM session_agents_md WHERE session_id='$SID'"
+```
+
+实际输出：
+
+```text
+# AGENTS.md
+
+This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
+
+**重要提示：**
+```
+
+### T37.32 运行时验证：AI 使用 codegraph 工具分析代码
+
+```bash
+curl -s --noproxy '*' -X POST "$BASE/session/$SID/prompt_async" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "parts": [{"type": "text", "text": "使用 codegraph 工具分析 packages/core 包的导出接口，以及哪些包依赖了它。"}],
+    "model": {"providerID": "zhipuai", "modelID": "glm-5.1"}
+  }'
+```
+
+轮询消息，AI 实际工具调用统计：
+
+```text
+codegraph_codegraph_explore 调用 2 次
+read 调用 7 次
+total_tools = 9
+```
+
+AI 实际回复（节选）：
+
+```text
+## `@proma/core` 包分析
+
+### 包基本信息
+- 版本：0.2.15
+- 依赖：@proma/shared、shiki、highlight.js
+
+### 导出入口（package.json exports）
+| 子路径 | 源文件 |
+|---|---|
+| . | src/index.ts — 重导出 providers + highlight |
+| ./types | src/types/index.ts |
+| ./utils | src/utils/index.ts |
+| ./providers | src/providers/index.ts |
+| ./highlight | src/highlight/index.ts |
+
+### 导出的接口与类型
+| 接口/类型 | 行号 | 用途 |
+|---|---|---|
+| ProviderAdapter | :244 | AI 供应商适配器核心接口 |
+| ProviderRequest | :186 | HTTP 请求配置 |
+| StreamRequestInput | :198 | 流式请求输入参数 |
+```
+
+验证对照：
+
+| 验证项 | 结果 |
+|--------|------|
+| codegraph MCP 自动注入（通过 load，非手动 `/mcps/create`） | ✅ `session_mcps` 含 codegraph local MCP |
+| AGENTS.md 自动注入 | ✅ `session_agents_md` 含 Proma 项目指令 |
+| AI 能调用 `codegraph_codegraph_explore` 工具 | ✅ 调用 2 次 |
+| AI 利用图谱数据输出精确接口/行号 | ✅ `ProviderAdapter:244` 等 |
+| 端到端链路畅通 | ✅ 沙箱安装 → 图谱构建 → MCP serve → AI 调用 |
+
+## 十、验收标准
 
 - 用户可以通过公开接口主动触发 `.opencode` 加载。
 - Agent、Skill、MCP、Tool、Command、Plugin、AGENTS.md 均可加载。
@@ -650,3 +1040,4 @@ cd "${directory}" && tar cf - --exclude='._*' .opencode 2>/dev/null | base64 | t
 - 加载阶段不执行 Plugin、Tool，不连接 MCP。
 - **沙箱模式下从沙箱工作区读取 `.opencode` 配置**（非 SaaS 服务器本地 FS）。
 - **macOS AppleDouble `._*` 文件不影响加载**（tar `--exclude='._*'`）。
+- **第三方工具（codegraph）生成的 MCP + AGENTS.md 放入 `.opencode/` 后可被自动发现和注入**，AI 能在运行时调用 MCP 工具分析代码。
