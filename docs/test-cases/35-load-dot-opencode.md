@@ -1162,6 +1162,400 @@ codegraph_codegraph_explore
 
 > **修复前**：沙箱被复用时，上一个 session 的 antd supergateway 进程残留在 port 9100，新 session 的 codegraph supergateway 无法绑定端口，SaaS 连到了残留的 antd MCP server，返回 `codegraph_antd_doc` 等错误工具名。
 
+## 十、配置字段完整性测试
+
+> 验证 `.opencode` 各资源类型的全部 frontmatter / 配置字段正确映射到 PG。
+>
+> 以下用例使用单元测试验证（`packages/opencode/test/config/session-load-dot-opencode.test.ts`），并通过 mock Session 服务捕获写入的 Input 对象。
+
+### T37.36 Agent 全字段映射
+
+验证 Agent frontmatter 的所有字段正确写入 `SessionAgent.Input`：
+
+```yaml
+---
+description: Full agent
+mode: subagent
+model: openai/gpt-4.1
+temperature: 0.7
+top_p: 0.9
+steps: 25
+color: "#FF5733"
+variant: fast
+options:
+  reasoning: true
+permission:
+  edit: allow
+  bash:
+    "*": allow
+---
+You are a full agent.
+```
+
+验证 `SessionAgent.Input` 各字段：
+
+| 字段 | 期望值 | 来源 |
+|------|--------|------|
+| `name` | `full` | 文件名 |
+| `description` | `Full agent` | frontmatter |
+| `mode` | `subagent` | frontmatter |
+| `model` | `{ providerID: "openai", modelID: "gpt-4.1" }` | frontmatter `model` 解析 |
+| `temperature` | `0.7` | frontmatter |
+| `topP` | `0.9` | frontmatter `top_p` |
+| `steps` | `25` | frontmatter |
+| `color` | `#FF5733` | frontmatter |
+| `variant` | `fast` | frontmatter |
+| `options` | `{ reasoning: true }` | frontmatter |
+| `permission` | `{ edit: "allow", bash: { "*": "allow" } }` | frontmatter `permission` → `Permission.fromConfig` |
+| `prompt` | `You are a full agent.` | markdown 正文 |
+
+> 单测用例 `maps all agent fields correctly` 已覆盖。
+
+### T37.37 Agent permission 字段
+
+验证 `permission` frontmatter 正确映射为 `Permission.Ruleset`：
+
+```yaml
+---
+permission:
+  edit: allow
+  write: deny
+  bash:
+    "npm test": allow
+    "*": ask
+---
+Agent prompt.
+```
+
+期望 `SessionAgent.Input.permission` 包含：
+
+```json
+[
+  { "permission": "edit", "pattern": "*", "action": "allow" },
+  { "permission": "write", "pattern": "*", "action": "deny" },
+  { "permission": "bash", "pattern": "npm test", "action": "allow" },
+  { "permission": "bash", "pattern": "*", "action": "ask" }
+]
+```
+
+### T37.38 Agent disable 字段
+
+验证 `disable: true` 的 Agent 被跳过：
+
+```yaml
+---
+disable: true
+---
+Should not load.
+```
+
+期望：
+
+- `loaded` 不包含此 Agent
+- `skipped` 中出现 `{ path: "agents/xxx", reason: "disabled" }`
+- 不写入 `session_agents`
+
+> 单测用例 `skips disabled agents` 已覆盖。
+
+### T37.39 Agent 内部名称保护
+
+验证 `compaction`、`title`、`summary` 等内部 Agent 名称不被覆盖：
+
+```yaml
+---
+description: Override compaction
+---
+Should not load.
+```
+
+期望：
+
+- `loaded` 不包含 `agents/compaction`
+- `skipped` 中出现 `{ path: "agents/compaction", reason: "internal agent" }`
+
+> 单测用例 `skips internal agent names` 已覆盖。
+
+### T37.40 MCP local 类型 + environment
+
+验证 local MCP 的 `command` + `environment` 字段正确持久化：
+
+```json
+{
+  "mcp": {
+    "local-server": {
+      "type": "local",
+      "command": ["bun", "run", "server.ts"],
+      "environment": { "API_KEY": "secret", "DEBUG": "true" },
+      "enabled": true
+    }
+  }
+}
+```
+
+期望 `SessionMcp.Input`：
+
+```json
+{
+  "name": "local-server",
+  "type": "local",
+  "command": ["bun", "run", "server.ts"],
+  "environment": { "API_KEY": "secret", "DEBUG": "true" },
+  "enabled": true
+}
+```
+
+> 单测用例 `loads local MCP with command and environment` 已覆盖。
+
+### T37.41 MCP remote 类型 + headers
+
+验证 remote MCP 的 `url` + `headers` 字段正确持久化：
+
+```json
+{
+  "mcp": {
+    "github": {
+      "type": "remote",
+      "url": "https://api.github.com/mcp",
+      "headers": {
+        "Authorization": "Bearer token123",
+        "X-Custom": "val"
+      }
+    }
+  }
+}
+```
+
+期望 `SessionMcp.Input.headers`：
+
+```json
+{ "Authorization": "Bearer token123", "X-Custom": "val" }
+```
+
+> 单测用例 `loads remote MCP with headers` 已覆盖。
+
+### T37.42 MCP 多条目
+
+验证一个 `opencode.json` 中多个 MCP 同时加载：
+
+```json
+{
+  "mcp": {
+    "remote-server": { "type": "remote", "url": "https://a.com/mcp" },
+    "local-server": { "type": "local", "command": ["node", "srv.js"] },
+    "disabled-server": { "type": "remote", "url": "https://b.com/mcp", "enabled": false }
+  }
+}
+```
+
+期望 `loaded` 包含全部 3 个：
+
+```text
+mcp/remote-server
+mcp/local-server
+mcp/disabled-server
+```
+
+### T37.43 opencode.jsonc 注释和尾逗号
+
+验证 JSONC 格式（注释 + 尾逗号）正确解析：
+
+```jsonc
+{
+  // MCP 服务器配置
+  "mcp": {
+    "github": {
+      "type": "remote",
+      "url": "https://example.com/mcp", // 生产环境
+    }, // 尾逗号
+  },
+}
+```
+
+期望：`loaded` 包含 `mcp/github`，JSONC 注释和尾逗号不影响解析。
+
+> 单测用例 `loads MCP from opencode.jsonc` 已覆盖。
+
+### T37.44 单数 vs 复数目录名
+
+验证 opencode 同时支持单数和复数目录名：
+
+```text
+.opencode/
+├── agent/reviewer.md      ← 单数
+├── agents/tester.md       ← 复数
+├── skill/helper/SKILL.md  ← 单数
+├── skills/reviewer/SKILL.md ← 复数
+├── command/deploy.md      ← 单数
+├── commands/review.md     ← 复数
+├── plugin/audit.ts        ← 单数
+├── plugins/marker.ts      ← 复数
+└── tool/format.ts         ← 官方单数
+```
+
+期望：全部 9 个文件被加载（`agent/` 和 `agents/` 的文件都出现在 `loaded` 中）。
+
+> 单测用例 `loads agents from plural agents/ directory` 等已覆盖。
+
+### T37.45 嵌套目录路径
+
+验证 Agent 和 Command 支持嵌套子目录：
+
+```text
+.opencode/
+├── agents/category/deploy.md     ← 嵌套路径
+├── commands/category/review.md   ← 嵌套路径
+```
+
+期望：
+
+- `agents/category/deploy`（名称包含路径前缀）
+- `commands/category/deploy`（名称包含路径前缀）
+
+> 单测用例 `extracts command name from nested directory path` 已覆盖。
+
+### T37.46 Command model 和 subtask 字段
+
+验证 Command 的 `model` 和 `subtask` 字段：
+
+```yaml
+---
+description: Deploy command
+agent: build
+model: anthropic/claude-sonnet-4
+subtask: true
+---
+Deploy the application.
+```
+
+期望 `SessionCommand.Input`：
+
+```json
+{
+  "name": "deploy",
+  "description": "Deploy command",
+  "agent": "build",
+  "model": "anthropic/claude-sonnet-4",
+  "subtask": true
+}
+```
+
+### T37.47 Plugin enabled/disabled
+
+验证 Plugin 可以通过 Session API 启用/禁用：
+
+```bash
+# 加载 Plugin（默认启用）
+curl -s -X POST "$BASE/session/$SID/dot-opencode/load"
+
+# 禁用 Plugin
+curl -s -X DELETE "$BASE/session/$SID/plugins/marker"
+
+# 验证已从 session_plugins 删除
+psql $PG -Atc "SELECT count(*) FROM session_plugins WHERE session_id='$SID' AND name='marker'"
+# 期望: 0
+```
+
+### T37.48 Skill resources 内容验证
+
+验证 Skill 的 `resources` 字段正确收集附加文件内容：
+
+```text
+.opencode/
+└── skills/my-skill/
+    ├── SKILL.md          ← 主文件
+    ├── references/guide.md   ← 资源文件
+    └── templates/todo.md     ← 资源文件
+```
+
+期望 `SessionSkill.Input.resources` 包含 2 个资源条目：
+
+```json
+[
+  { "path": "references/guide.md", "type": "doc", "content": "# Guide\n..." },
+  { "path": "templates/todo.md", "type": "template", "content": "..." }
+]
+```
+
+资源限制：
+
+- 单个资源文件 > 256KB → 跳过
+- 总资源 > 1MB → 截断
+- 资源数量 > 64 → 截断
+
+> 单测用例 `skips skill resources exceeding size limit`、`limits skill resource count` 已覆盖。
+
+### T37.49 opencode.json 无 mcp 字段
+
+验证 `opencode.json` 中没有 `mcp` 字段时不报错：
+
+```json
+{
+  "command": { "greet": { "template": "hello" } }
+}
+```
+
+期望：
+
+- 不加载任何 MCP
+- 不在 `skipped` 中出现 MCP 相关条目
+- 其他资源（AGENTS.md 等）正常加载
+
+> 单测用例 `handles opencode.json without mcp field gracefully` 已覆盖。
+
+### T37.50 空 frontmatter Agent
+
+验证空 frontmatter 的 Agent 使用默认值：
+
+```markdown
+---
+---
+Just a prompt.
+```
+
+期望 `SessionAgent.Input`：
+
+```json
+{
+  "name": "minimal",
+  "mode": "all",
+  "prompt": "Just a prompt."
+}
+```
+
+> 单测用例 `loads agent with empty frontmatter` 已覆盖。
+
+### T37.51 同名资源路径冲突
+
+验证同名 Agent 从不同路径加载（后加载覆盖先加载）：
+
+```text
+.opencode/
+├── agents/reviewer.md         ← 文件
+├── agents/reviewer/index.md   ← 目录形式同名
+```
+
+期望：`loaded` 中至少出现一个 `agents/reviewer`，不报错。
+
+> 单测用例 `handles same-name agent from different paths (last wins)` 已覆盖。
+
+### T37.52 并发 load 调用
+
+验证同一 Session 并发调用 load 不会产生重复或冲突：
+
+```bash
+# 并发发起 3 次 load
+for i in 1 2 3; do
+  curl -s -X POST "$BASE/session/$SID/dot-opencode/load" &
+done
+wait
+```
+
+期望：
+
+- 3 次调用都返回 `200`
+- PG 中同名资源仍只有 1 条（upsert 幂等）
+- 不产生重复 AGENTS.md 内容
+
 ## 十一、验收标准
 
 - 用户可以通过公开接口主动触发 `.opencode` 加载。
@@ -1179,3 +1573,16 @@ codegraph_codegraph_explore
 - **同一 Session 多个 MCP 工具不互相串台**（antd 8 工具 + codegraph 1 工具各自正确）。
 - **不同 Session 同名 MCP 完全隔离**（多个 antd/codegraph session 并发不串台）。
 - **沙箱复用时 stale MCP 进程被清理**，不导致工具名错误（`pkill` 端口级清理）。
+- **Agent 全字段正确映射**（description/mode/model/temperature/top_p/steps/color/variant/options/permission/prompt）。
+- **Agent permission 字段正确解析**为 Permission.Ruleset（edit/write/bash + allow/deny/ask）。
+- **Agent disable 和内部名称保护**（disable=true 跳过，compaction/title/summary 不覆盖）。
+- **MCP local 类型支持 command + environment**，MCP remote 类型支持 url + headers。
+- **MCP 多条目同时加载**（一个 opencode.json 中多个 MCP 全部写入）。
+- **opencode.jsonc 格式兼容**（注释、尾逗号不影响解析）。
+- **单数和复数目录名都支持**（agent/ 和 agents/ 均可）。
+- **嵌套目录路径正确解析**（agents/category/deploy.md → name="category/deploy"）。
+- **Command model 和 subtask 字段持久化**。
+- **Skill resources 收集和限制**（256KB/1MB/64 个限制）。
+- **opencode.json 无 mcp 字段时不报错**，其他资源正常加载。
+- **空 frontmatter Agent 使用默认值**（mode=all）。
+- **并发 load 调用幂等**（不产生重复记录）。
