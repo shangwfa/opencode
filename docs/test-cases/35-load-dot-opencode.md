@@ -1556,6 +1556,81 @@ wait
 - PG 中同名资源仍只有 1 条（upsert 幂等）
 - 不产生重复 AGENTS.md 内容
 
+> 当前单元测试只验证 loader 并发执行不会失败；PG 唯一约束和真实请求竞态必须通过下面的数据库 e2e 用例验证。
+
+### T37.53 源文件删除后的陈旧 PG 记录
+
+验证加载后的源文件被删除，再次 load 时的同步语义。此用例必须先明确以下产品约定：
+
+- **完全同步**：`.opencode` 中已不存在的资源由本次 load 删除；或
+- **增量覆盖**：load 只 upsert 当前存在的资源，历史 PG 记录保留，删除由 Session API 完成。
+
+推荐测试步骤：
+
+```bash
+# 首次加载 agents/a.md、skills/a/SKILL.md、tool/a.ts、commands/a.md、plugins/a.ts 和 mcp/a
+curl -s -X POST "$BASE/session/$SID/dot-opencode/load"
+
+# 删除所有对应源文件，只保留 .opencode 目录
+curl -s -X POST "$BASE/session/$SID/exec" \
+  -H 'Content-Type: application/json' \
+  -d '{"command":"rm -rf .opencode/agents/a.md .opencode/skills/a .opencode/tool/a.ts .opencode/commands/a.md .opencode/plugins/a.ts"}'
+
+# 再次加载并查询六类 Session 资源表
+curl -s -X POST "$BASE/session/$SID/dot-opencode/load"
+```
+
+验收要求：
+
+- 记录实际采用的同步语义，不能只断言 `loaded`。
+- 如果采用完全同步，所有由 `.opencode` 产生的陈旧记录必须删除。
+- 如果采用增量覆盖，陈旧记录必须明确保留，并在 API 文档中说明不会自动删除。
+- 通过 API 注入的同名资源不能被项目配置清理逻辑误删。
+
+### T37.54 禁用资源已有 PG 记录时的清理
+
+验证资源先成功加载，再改为禁用，避免只覆盖“首次加载禁用资源”的场景。
+
+```bash
+# 首次加载 enabled agent/plugin 和 enabled MCP
+curl -s -X POST "$BASE/session/$SID/dot-opencode/load"
+
+# 将 Agent 设置 disable: true，MCP 设置 enabled: false；Plugin 使用项目约定的禁用方式
+curl -s -X POST "$BASE/session/$SID/dot-opencode/load"
+```
+
+验收要求：
+
+- `disable: true` 的 Agent 是否删除已有 `session_agents` 记录，必须有明确约定。
+- `enabled: false` 的 MCP 应保留记录并持久化 `enabled=false`，不能被误删。
+- Plugin 当前 DELETE API 是删除，不是 enabled toggle；T37.47 不得称为“启用/禁用”，除非新增真正的 toggle API。
+- 禁用 `.opencode` 资源不能影响其它 Session，也不能影响通过 Session API 注入的资源。
+
+### T37.55 真实 PG 并发 load 竞态
+
+在真实 PostgreSQL 和 HTTP 服务上验证 T37.52 的数据库部分：
+
+```bash
+for i in 1 2 3; do
+  curl -s -X POST "$BASE/session/$SID/dot-opencode/load" > "/tmp/load-$i.json" &
+done
+wait
+
+for i in 1 2 3; do
+  jq -e '.loaded and (.skipped | length == 0)' "/tmp/load-$i.json"
+done
+
+psql "$PG" -Atc \
+  "SELECT name, count(*) FROM session_agents WHERE session_id='$SID' GROUP BY name HAVING count(*) <> 1;"
+```
+
+期望：
+
+- 三个请求均返回 HTTP `200`。
+- 每个资源名称在对应 PG 表中最多一条。
+- 不出现唯一键冲突、部分 JSON 写入或重复 AGENTS.md 内容。
+- 失败请求必须返回明确错误，不能返回部分 `loaded` 成功结果。
+
 ## 十一、验收标准
 
 - 用户可以通过公开接口主动触发 `.opencode` 加载。

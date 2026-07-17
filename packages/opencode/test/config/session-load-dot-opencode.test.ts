@@ -704,4 +704,60 @@ describe("SessionLoadDotOpencode", () => {
       expect(reviewerLoaded.length).toBeGreaterThanOrEqual(1)
     })
   })
+
+  test("supports concurrent load calls without loader failures", async () => {
+    await withDir(async (dir) => {
+      const dot = await mkDotDir(dir)
+      await writeFile(path.join(dot, "agents/concurrent.md"), "---\n---\nConcurrent prompt.")
+
+      let upsertCount = 0
+      const captureLayer = Layer.mergeAll(
+        SessionLoadDotOpencode.layer,
+        SessionAgentsMd.noopLayer,
+        Layer.mock(SessionAgent.Service, {
+          upsert: (_sessionID, input) =>
+            Effect.promise(async () => {
+              await new Promise((resolve) => setTimeout(resolve, 10))
+              upsertCount += 1
+              return {
+                id: `agent-${upsertCount}`,
+                session_id: SID,
+                name: input.name,
+                description: input.description ?? null,
+                mode: input.mode ?? "all",
+                prompt: input.prompt ?? null,
+                permission: [...(input.permission ?? [])],
+                model: input.model ?? null,
+                temperature: input.temperature ?? null,
+                top_p: input.topP ?? null,
+                steps: input.steps ?? null,
+                color: input.color ?? null,
+                variant: input.variant ?? null,
+                options: input.options ?? {},
+                time_created: Date.now(),
+                time_updated: Date.now(),
+              } as SessionAgent.Row
+            }),
+        }),
+        SessionSkill.noopLayer,
+        SessionMcp.noopLayer,
+        SessionTool.noopLayer,
+        SessionCommand.noopLayer,
+        SessionPlugin.noopLayer,
+      )
+
+      const load = () =>
+        Effect.runPromise(
+          Effect.gen(function* () {
+            const svc = yield* SessionLoadDotOpencode.Service
+            return yield* svc.load(SID, dir)
+          }).pipe(Effect.provide(captureLayer)),
+        )
+
+      const results = await Promise.all([load(), load(), load()])
+      expect(results.every((result) => result.loaded.includes("agents/concurrent"))).toBe(true)
+      expect(results.every((result) => result.skipped.length === 0)).toBe(true)
+      expect(upsertCount).toBe(3)
+    })
+  })
 })

@@ -7,7 +7,7 @@ import { SandboxProvider } from "../../src/tool/sandbox-provider"
 
 let _saasMode = true
 
-mock.module("@/flag/flag", () => {
+mock.module("@opencode-ai/core/flag/flag", () => {
   const flags: Record<string, any> = {
     OPENCODE_SANDBOX_ENABLED: false,
     OPENCODE_SANDBOX_DOMAIN: "localhost",
@@ -92,6 +92,8 @@ mock.module("@modelcontextprotocol/sdk/client/index.js", () => ({
     async callTool(p: any) { return { content: [{ type: "text" as const, text: `ok:${p.name}` }] } }
     async listPrompts() { return { prompts: [] } }
     async listResources() { return { resources: [] } }
+    getServerCapabilities() { return { tools: {} } }
+    getInstructions() { return undefined }
     setNotificationHandler() {}
   },
 }))
@@ -126,7 +128,7 @@ function recordingSandboxLayer() {
       isKeepAlive: () => Effect.succeed(false),
       getEndpoint: (sid: string, port: number) =>
         Effect.sync(() => { sandboxEndpointCalls.push({ sessionID: sid, port }) }).pipe(
-          Effect.andThen(() => Effect.succeed("10.0.0.1:9999")),
+          Effect.andThen(() => Effect.succeed("http://10.0.0.1:9999")),
         ) as any,
       cleanupSessionVolume: () => Effect.void,
       runDetached: () => Effect.die(new Error("not implemented")),
@@ -137,7 +139,7 @@ function recordingSandboxLayer() {
 // ─── Import after mocks ───
 
 const { MCP } = await import("../../src/mcp/index")
-const it = testEffect(MCP.defaultLayer.pipe(Layer.provide(recordingSandboxLayer())))
+const it = testEffect(MCP.defaultLayer.pipe(Layer.provideMerge(recordingSandboxLayer())))
 
 // ─── Fixture data ───
 
