@@ -1027,7 +1027,142 @@ AI 实际回复（节选）：
 | AI 利用图谱数据输出精确接口/行号 | ✅ `ProviderAdapter:244` 等 |
 | 端到端链路畅通 | ✅ 沙箱安装 → 图谱构建 → MCP serve → AI 调用 |
 
-## 十、验收标准
+## 十、MCP 进程隔离测试（实际执行）
+
+> 验证沙箱被复用时 stale MCP 进程不会导致工具串台。
+>
+> 修复内容：`connectSandboxLocal` 启动新 supergateway 前，先清理目标端口的残留进程（`pkill -f "supergateway.*--port ${port}"`），确保端口可用。
+
+### T37.33 单会话双 MCP 不互相干扰
+
+同一 Session 同时注入 antd MCP + codegraph MCP：
+
+```bash
+BASE="http://127.0.0.1:14096"
+
+SID=$(curl -s --noproxy '*' -X POST "$BASE/session?directory=/workspace/dual-mcp" \
+  -H 'Content-Type: application/json' \
+  -d '{"title":"dual-mcp"}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+
+curl -s --noproxy '*' -X POST "$BASE/session/$SID/keep-alive" \
+  -H 'Content-Type: application/json' -d '{"enabled":true,"boot":true}' > /dev/null
+sleep 5
+
+# 安装两个工具
+curl -s --noproxy '*' --max-time 60 -X POST "$BASE/session/$SID/exec" \
+  -H 'Content-Type: application/json' \
+  -d '{"command":"npm install -g @ant-design/cli @colbymchenry/codegraph 2>&1 | tail -1 && mkdir -p /workspace/dual-mcp/src && echo \"export function test() {}\" > /workspace/dual-mcp/src/index.ts && cd /workspace/dual-mcp && codegraph init 2>&1 | tail -1"}'
+
+# 注入两个 MCP
+curl -s --noproxy '*' -X POST "$BASE/session/$SID/mcps/create" \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"antd","type":"local","command":["npx","-y","@ant-design/cli","mcp"],"enabled":true}'
+
+curl -s --noproxy '*' -X POST "$BASE/session/$SID/mcps/create" \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"codegraph","type":"local","command":["codegraph","serve","--mcp"],"enabled":true}'
+
+# 问 AI 有哪些工具
+curl -s --noproxy '*' -X POST "$BASE/session/$SID/prompt_async" \
+  -H 'Content-Type: application/json' \
+  -d '{"parts":[{"type":"text","text":"列出你所有 antd_ 和 codegraph_ 开头的工具名称，每行一个。"}],"model":{"providerID":"zhipuai","modelID":"glm-5.1"}}'
+```
+
+AI 实际回复：
+
+```text
+antd_antd_changelog
+antd_antd_demo
+antd_antd_design_md
+antd_antd_doc
+antd_antd_info
+antd_antd_list
+antd_antd_semantic
+antd_antd_token
+codegraph_codegraph_explore
+```
+
+验证项：
+
+| MCP 名称 | 预期工具 | 实际工具 | 结果 |
+|---------|---------|---------|------|
+| `antd` | `antd_antd_doc`, `antd_antd_demo` 等 8 个 | 8 个 antd 工具，**无 codegraph 混入** | ✅ |
+| `codegraph` | `codegraph_codegraph_explore` | 1 个 codegraph 工具，**无 antd 混入** | ✅ |
+
+> **修复前**：antd MCP 返回了 `codegraph_explore`（名称变成 `antd_codegraph_explore`），因为 port 9100 被残留的 codegraph 进程占用，antd supergateway 启动失败后 SaaS 连到了错误的 MCP server。
+
+### T37.34 多会话交叉 MCP 不串台
+
+4 个 Session 同时活跃：A/C 用 antd，B/D 用 codegraph：
+
+```bash
+# 创建 4 个 session
+SID_A=$(curl -s --noproxy '*' -X POST "$BASE/session?directory=/workspace/cross-a" -H 'Content-Type: application/json' -d '{"title":"cross-a-antd"}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+SID_B=$(curl -s --noproxy '*' -X POST "$BASE/session?directory=/workspace/cross-b" -H 'Content-Type: application/json' -d '{"title":"cross-b-codegraph"}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+SID_C=$(curl -s --noproxy '*' -X POST "$BASE/session?directory=/workspace/cross-c" -H 'Content-Type: application/json' -d '{"title":"cross-c-antd"}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+SID_D=$(curl -s --noproxy '*' -X POST "$BASE/session?directory=/workspace/cross-d" -H 'Content-Type: application/json' -d '{"title":"cross-d-codegraph"}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+
+# 全部 boot 沙箱 + 安装工具 + 注入 MCP
+# A, C → antd MCP
+# B, D → codegraph MCP
+# （具体命令见 T37.33 模式，每个 session 独立安装和注入）
+
+# 分别问每个 session 有哪些工具
+```
+
+实际结果：
+
+| Session | MCP | 预期 | 实际 | 结果 |
+|---------|-----|------|------|------|
+| A | antd | 8 个 `antd_antd_*` | `antd_antd_changelog\|demo\|design_md\|doc\|info\|list\|semantic\|token` | ✅ |
+| B | codegraph | 1 个 `codegraph_codegraph_explore` | `codegraph_codegraph_explore` | ✅ |
+| C | antd | 8 个 `antd_antd_*` | 同 A（8 个 antd 工具） | ✅ |
+| D | codegraph | 1 个 `codegraph_codegraph_explore` | `codegraph_codegraph_explore` | ✅ |
+
+验证项：
+
+- 2 个 antd session 各自返回 8 个 antd 工具，**没有 codegraph 工具混入** ✅
+- 2 个 codegraph session 各自返回 1 个 codegraph 工具，**没有 antd 工具混入** ✅
+- 不同 session 同名 MCP（A 和 C 都用 antd，B 和 D 都用 codegraph）**完全隔离** ✅
+- 4 个沙箱各自独立，port 9100 互不干扰 ✅
+
+### T37.35 沙箱复用时 stale MCP 进程清理
+
+> 验证场景：Session A 连接 antd MCP 后销毁，OpenSandbox 复用沙箱容器给 Session B，Session B 连接 codegraph MCP。
+
+```bash
+# Step 1: Session A 连接 antd MCP
+SID_A=$(curl -s ... | python3 -c "...")
+curl -s ... -X POST "$BASE/session/$SID_A/mcps/create" -d '{"name":"antd",...}'
+
+# Step 2: 触发 antd MCP 连接（发一条消息）
+curl -s ... -X POST "$BASE/session/$SID_A/prompt_async" -d '...'
+
+# Step 3: 销毁 Session A 的沙箱
+curl -s ... -X POST "$BASE/session/$SID_A/keep-alive" -d '{"enabled":false}'
+
+# Step 4: Session B 连接 codegraph MCP（沙箱可能复用）
+SID_B=$(curl -s ... | python3 -c "...")
+curl -s ... -X POST "$BASE/session/$SID_B/mcps/create" -d '{"name":"codegraph",...}'
+
+# Step 5: 问 Session B 有哪些工具
+curl -s ... -X POST "$BASE/session/$SID_B/prompt_async" -d '{"parts":[{"type":"text","text":"列出你所有 codegraph 和 antd 开头的工具名称"}]}'
+```
+
+实际结果：
+
+```text
+codegraph_codegraph_explore
+```
+
+验证项：
+
+- Session B 正确返回 `codegraph_codegraph_explore`，**没有 antd 工具串台** ✅
+- 沙箱复用后 stale antd supergateway 进程被清理，端口释放 ✅
+
+> **修复前**：沙箱被复用时，上一个 session 的 antd supergateway 进程残留在 port 9100，新 session 的 codegraph supergateway 无法绑定端口，SaaS 连到了残留的 antd MCP server，返回 `codegraph_antd_doc` 等错误工具名。
+
+## 十一、验收标准
 
 - 用户可以通过公开接口主动触发 `.opencode` 加载。
 - Agent、Skill、MCP、Tool、Command、Plugin、AGENTS.md 均可加载。
@@ -1039,5 +1174,8 @@ AI 实际回复（节选）：
 - 不同 Session 之间相互隔离。
 - 加载阶段不执行 Plugin、Tool，不连接 MCP。
 - **沙箱模式下从沙箱工作区读取 `.opencode` 配置**（非 SaaS 服务器本地 FS）。
-- **macOS AppleDouble `._*` 文件不影响加载**（tar `--exclude='._*'`）。
+- **macOS AppleDouble `._*` 文件不影响加载**（find `-not -name '._*'`）。
 - **第三方工具（codegraph）生成的 MCP + AGENTS.md 放入 `.opencode/` 后可被自动发现和注入**，AI 能在运行时调用 MCP 工具分析代码。
+- **同一 Session 多个 MCP 工具不互相串台**（antd 8 工具 + codegraph 1 工具各自正确）。
+- **不同 Session 同名 MCP 完全隔离**（多个 antd/codegraph session 并发不串台）。
+- **沙箱复用时 stale MCP 进程被清理**，不导致工具名错误（`pkill` 端口级清理）。

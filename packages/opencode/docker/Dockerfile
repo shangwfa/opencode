@@ -43,12 +43,19 @@ RUN mise install npm:pnpm@8 npm:pnpm@9 npm:pnpm@10 npm:pnpm@11
 RUN mise use -g npm:pnpm@10 && mise reshim
 
 # ── 8. Install global npm tools + ripgrep ──
-RUN npm install -g supergateway
+RUN npm install -g supergateway agent-browser
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     apt-get update \
   && apt-get install -y --no-install-recommends ripgrep \
   && rm -rf /var/lib/apt/lists/*
+
+# ── 8a. Install Chromium via Playwright (supports arm64 + x86_64) ──
+# agent-browser requires Chrome; Playwright bundles a real Chromium binary
+# that works in containers (unlike Ubuntu snap chromium).
+RUN npx playwright install --with-deps chromium \
+  && ln -sf /root/.cache/ms-playwright/chromium-*/chrome-linux/chrome /usr/local/bin/chromium
+ENV CHROME_PATH=/usr/local/bin/chromium
 
 # ── 9. Symlink mise-managed binaries to OpenSandbox's expected PATH ──
 # OpenSandbox bootstrap may reset PATH; ensure node/pnpm/npm are always findable.

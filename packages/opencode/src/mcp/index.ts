@@ -405,6 +405,7 @@ const layer = Layer.effect(
 
     type SandboxMcpEntry = { client: MCPClient; defs: MCPToolDef[]; port: number }
     const sandboxMcpRef = yield* Ref.make(new Map<string, Map<string, SandboxMcpEntry>>())
+    const mcpCleanedSessions = yield* Ref.make(new Set<string>())
 
     const SANDBOX_MCP_BASE_PORT = 9100
     const SANDBOX_MCP_PORT_STEP = 100
@@ -699,9 +700,17 @@ const layer = Layer.effect(
       const bridgeCommand = `${envArg}supergateway --stdio ${shellQuote(stdioCommand(mcp))} --outputTransport streamableHttp --port ${port} --logLevel none`
       yield* Effect.logInfo("starting MCP in sandbox via supergateway", { key, sessionID, port, command: bridgeCommand })
 
+      // Clean up stale MCP processes from previous sandbox usage (once per session)
+      const needCleanup = yield* Ref.modify(mcpCleanedSessions, (s) => {
+        if (s.has(sessionID)) return [false, s] as const
+        const next = new Set(s)
+        next.add(sessionID)
+        return [true, next] as const
+      })
+
       yield* maybeSandboxProvider.runInSession(
         sessionID,
-        `mkdir -p /tmp/opencode-mcp; nohup ${bridgeCommand} > ${shellQuote(paths.log)} 2>&1 & echo $! > ${shellQuote(paths.pid)}`,
+        `mkdir -p /tmp/opencode-mcp${needCleanup ? "; for pidfile in /tmp/opencode-mcp/*.pid; do [ -f \"$pidfile\" ] && kill $(cat \"$pidfile\") 2>/dev/null; done; rm -f /tmp/opencode-mcp/*.pid" : ""}; pkill -f \"supergateway.*--port ${port}\" 2>/dev/null; sleep 0.5; nohup ${bridgeCommand} > ${shellQuote(paths.log)} 2>&1 & echo $! > ${shellQuote(paths.pid)}`,
       ).pipe(
         Effect.catch((err) =>
           Effect.logError("sandbox MCP start failed", { key, sessionID, error: String(err) }),
@@ -893,6 +902,12 @@ const layer = Layer.effect(
     })
 
     const clearSessionCache = Effect.fn("MCP.clearSessionCache")(function* (sessionID: SessionID) {
+      yield* Ref.modify(mcpCleanedSessions, (s) => {
+        const next = new Set(s)
+        next.delete(sessionID)
+        return [undefined, next] as const
+      })
+
       const sessionMap = yield* Ref.modify(sandboxMcpRef, (m) => {
         const existing = m.get(sessionID) ?? null
         m.delete(sessionID)

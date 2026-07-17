@@ -1,9 +1,6 @@
 export * as SessionLoadDotOpencode from "./session-load-dot-opencode"
 
 import path from "path"
-import os from "os"
-import { execSync } from "child_process"
-import { mkdtempSync, rmSync } from "fs"
 import { realpath, lstat } from "fs/promises"
 import { Effect, Context, Layer, Option, Schema, Exit } from "effect"
 import { Glob } from "@opencode-ai/core/util/glob"
@@ -16,7 +13,7 @@ import { Filesystem } from "@/util/filesystem"
 import { Permission } from "@/permission"
 import { Provider } from "@/provider/provider"
 import { SandboxProvider } from "@/tool/sandbox-provider"
-import * as ConfigMarkdown from "./markdown"
+import { ConfigMarkdown as ConfigMarkdownCore } from "@opencode-ai/core/config/markdown"
 import { ConfigParse } from "./parse"
 import { configEntryNameFromPath } from "./entry-name"
 import { SessionAgentsMd } from "@/session/agents-md"
@@ -44,25 +41,100 @@ const BUNDLE_MAX = 1024 * 1024
 const RESOURCE_COUNT_MAX = 64
 const SKIP_DIRS = new Set([".git", "node_modules", ".DS_Store", "__pycache__", ".cache"])
 
-async function resolveReal(p: string): Promise<string | undefined> {
-  try {
-    return await realpath(p)
-  } catch {
-    return undefined
+// ── FileSource: abstracts local FS vs sandbox file access ──
+
+interface FileSource {
+  exists(p: string): Effect.Effect<boolean>
+  readText(p: string): Effect.Effect<string>
+  scan(pattern: string, cwd: string): Effect.Effect<string[]>
+  validateFile(worktree: string, file: string): Effect.Effect<string | undefined>
+  size(p: string): Effect.Effect<number>
+}
+
+function localSource(): FileSource {
+  const resolveReal = (p: string) => realpath(p).catch(() => undefined)
+
+  const validate = async (worktree: string, file: string): Promise<string | undefined> => {
+    const [resolvedFile, resolvedWorktree] = await Promise.all([
+      resolveReal(file),
+      resolveReal(worktree).catch(() => worktree),
+    ])
+    if (!resolvedFile || !resolvedWorktree) return undefined
+    if (!Filesystem.contains(resolvedWorktree, resolvedFile)) return undefined
+    const info = await lstat(resolvedFile).catch(() => undefined)
+    if (!info?.isFile()) return undefined
+    return resolvedFile
+  }
+
+  return {
+    exists: (p) => Effect.promise(() => Filesystem.exists(p)),
+    readText: (p) => Effect.promise(() => Filesystem.readText(p).catch(() => "")),
+    scan: (pattern, cwd) =>
+      Effect.tryPromise({
+        try: () => Glob.scan(pattern, { cwd, absolute: true, include: "file", symlink: true, dot: true }),
+        catch: () => new Error("scan failed"),
+      }).pipe(Effect.catch(() => Effect.succeed([] as string[]))),
+    validateFile: (worktree, file) => Effect.promise(() => validate(worktree, file)),
+    size: (p) => Effect.promise(() => Filesystem.size(p)),
   }
 }
 
-async function validateFile(worktree: string, file: string): Promise<string | undefined> {
-  const [resolvedFile, resolvedWorktree] = await Promise.all([
-    resolveReal(file),
-    resolveReal(worktree).catch(() => worktree),
-  ])
-  if (!resolvedFile || !resolvedWorktree) return undefined
-  if (!Filesystem.contains(resolvedWorktree, resolvedFile)) return undefined
-  const info = await lstat(resolvedFile).catch(() => undefined)
-  if (!info?.isFile()) return undefined
-  return resolvedFile
+function sandboxSource(sp: NonNullable<SandboxProvider.Interface>, sessionID: SessionID): FileSource {
+  const stdout = (r: { logs: { stdout: Array<{ text: string } | string> } }) =>
+    r.logs.stdout.map((l) => (typeof l === "string" ? l : l.text)).join("\n")
+
+  const run = (cmd: string, timeoutSeconds = 10) =>
+    sp.runInSession(sessionID, cmd, { timeoutSeconds }).pipe(
+      Effect.catch(() => Effect.succeed({ logs: { stdout: [] as any[], stderr: [] }, exitCode: 1 } as any)),
+    )
+
+  return {
+    exists: (p) =>
+      Effect.gen(function* () {
+        const r = yield* run(`test -e "${p}" && echo YES`, 5)
+        return stdout(r).includes("YES")
+      }),
+
+    readText: (p) =>
+      Effect.gen(function* () {
+        const sb = yield* sp.getOrCreate(sessionID).pipe(
+          Effect.catch(() => Effect.succeed(null as any)),
+        )
+        if (!sb) return ""
+        return yield* Effect.promise(() => sb.files.readFile(p).catch(() => "") as Promise<string>)
+      }),
+
+    scan: (pattern, cwd) =>
+      Effect.gen(function* () {
+        const r = yield* run(
+          `find '${cwd}' -type f -not -path '*/.git/*' -not -path '*/node_modules/*' -not -name '._*' 2>/dev/null`,
+          15,
+        )
+        return stdout(r)
+          .split("\n")
+          .filter((line) => line.trim().length > 0)
+          .filter((file) => Glob.match(pattern, path.relative(cwd, file).split(path.sep).join("/")))
+      }),
+
+    validateFile: (worktree, file) =>
+      Effect.gen(function* () {
+        const r = yield* run(`rp=$(realpath "${file}" 2>/dev/null) && wt=$(realpath "${worktree}" 2>/dev/null) && test -f "$rp" && echo "OK $rp $wt"`, 5)
+        const out = stdout(r).trim()
+        if (!out.startsWith("OK ")) return undefined
+        const [, real, realWt] = out.split(" ")
+        if (!Filesystem.contains(realWt || worktree, real)) return undefined
+        return file
+      }),
+
+    size: (p) =>
+      Effect.gen(function* () {
+        const r = yield* run(`wc -c < "${p}" 2>/dev/null`, 5)
+        return parseInt(stdout(r).trim()) || 0
+      }),
+  }
 }
+
+// ── Helpers ──
 
 type SkillResource = { path: string; type: "doc" | "script" | "template" | "asset"; content: string }
 
@@ -77,35 +149,32 @@ function resourceKind(file: string): SkillResource["type"] {
 
 const isSkipPath = (rel: string) => rel.split("/").some((seg) => SKIP_DIRS.has(seg))
 
-async function collectSkillResources(worktree: string, skillRoot: string): Promise<SkillResource[]> {
-  const files = await Glob.scan("**/*", {
-    cwd: skillRoot,
-    absolute: true,
-    include: "file",
-    dot: true,
-  }).catch(() => [] as string[])
+function collectSkillResources(fs: FileSource, worktree: string, skillRoot: string): Effect.Effect<SkillResource[]> {
+  return Effect.gen(function* () {
+    const files = yield* fs.scan("**/*", skillRoot).pipe(Effect.catch(() => Effect.succeed([] as string[])))
 
-  const candidates = files
-    .filter((file) => path.basename(file) !== "SKILL.md")
-    .map((file) => path.relative(skillRoot, file).split(path.sep).join("/"))
-    .filter((rel) => !isSkipPath(rel))
-    .toSorted()
+    const candidates = files
+      .filter((file) => path.basename(file) !== "SKILL.md")
+      .map((file) => path.relative(skillRoot, file).split(path.sep).join("/"))
+      .filter((rel) => !isSkipPath(rel))
+      .toSorted()
 
-  const resources: SkillResource[] = []
-  let total = 0
-  for (const rel of candidates) {
-    const absolute = path.join(skillRoot, rel)
-    const validPath = await validateFile(worktree, absolute)
-    if (!validPath) continue
-    const size = await Filesystem.size(validPath)
-    if (size > RESOURCE_MAX) continue
-    const content = await Filesystem.readText(validPath).catch(() => "")
-    if (!content) continue
-    resources.push({ path: rel, type: resourceKind(rel), content })
-    total += Buffer.byteLength(content)
-    if (total > BUNDLE_MAX || resources.length >= RESOURCE_COUNT_MAX) break
-  }
-  return resources
+    const resources: SkillResource[] = []
+    let total = 0
+    for (const rel of candidates) {
+      const absolute = path.join(skillRoot, rel)
+      const validPath = yield* fs.validateFile(worktree, absolute)
+      if (!validPath) continue
+      const size = yield* fs.size(validPath)
+      if (size > RESOURCE_MAX) continue
+      const content = yield* fs.readText(validPath)
+      if (!content) continue
+      resources.push({ path: rel, type: resourceKind(rel), content })
+      total += Buffer.byteLength(content)
+      if (total > BUNDLE_MAX || resources.length >= RESOURCE_COUNT_MAX) break
+    }
+    return resources
+  })
 }
 
 function toAgentInput(name: string, value: ConfigAgentV1.Info): SessionAgent.Input {
@@ -143,35 +212,21 @@ function toMcpInput(name: string, value: ConfigMCPV1.Info): SessionMcp.Input {
   return { name, type: "remote", url: value.url, headers: value.headers, enabled: value.enabled }
 }
 
+// ── Layer ──
+
 export const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
     const load = Effect.fn("SessionLoadDotOpencode.load")(function* (sessionID: SessionID, directory: string) {
       const sp = Option.getOrUndefined(yield* Effect.serviceOption(SandboxProvider.Service))
-      if (!sp) return yield* loadFromDirectory(sessionID, directory)
-
-      const tar = yield* sp
-        .runInSession(sessionID, `cd "${directory}" && tar cf - --exclude='._*' .opencode 2>/dev/null | base64 | tr -d '\\n'`, {
-          timeoutSeconds: 30,
-        })
-        .pipe(Effect.orDie)
-      const b64 = tar.logs.stdout.map((l: any) => (typeof l === "string" ? l : l.text)).join("").trim()
-      if (!b64) return { loaded: [], skipped: [] }
-      const tempDir = mkdtempSync(path.join(os.tmpdir(), "ldo-sandbox-"))
-      try {
-        execSync(`tar xf - -C "${tempDir}"`, {
-          input: Buffer.from(b64, "base64"),
-          stdio: ["pipe", "ignore", "ignore"],
-        })
-        return yield* loadFromDirectory(sessionID, tempDir)
-      } finally {
-        rmSync(tempDir, { recursive: true, force: true })
-      }
+      const fs = sp ? sandboxSource(sp, sessionID) : localSource()
+      return yield* loadFromDirectory(sessionID, directory, fs)
     })
 
     const loadFromDirectory = Effect.fn("SessionLoadDotOpencode.loadFromDirectory")(function* (
       sessionID: SessionID,
       directory: string,
+      fs: FileSource,
     ) {
       const agentsMdSvc = Option.getOrUndefined(yield* Effect.serviceOption(SessionAgentsMd.Service))
       const agentSvc = Option.getOrUndefined(yield* Effect.serviceOption(SessionAgent.Service))
@@ -185,7 +240,7 @@ export const layer = Layer.effect(
       const loaded: string[] = []
       const skipped: Diagnostic[] = []
 
-      if (!(yield* Effect.promise(() => Filesystem.exists(dotDir)))) return { loaded, skipped }
+      if (!(yield* fs.exists(dotDir))) return { loaded, skipped }
 
       for (const [service, resource] of [
         [agentsMdSvc, "AGENTS.md"],
@@ -202,9 +257,9 @@ export const layer = Layer.effect(
       // AGENTS.md
       if (agentsMdSvc) {
         const agentsMdPath = path.join(dotDir, "AGENTS.md")
-        const validPath = yield* Effect.promise(() => validateFile(directory, agentsMdPath))
+        const validPath = yield* fs.validateFile(directory, agentsMdPath)
         if (validPath) {
-          const content = yield* Effect.promise(() => Filesystem.readText(validPath).catch(() => ""))
+          const content = yield* fs.readText(validPath)
           if (content.trim()) {
             yield* agentsMdSvc.upsert(sessionID, { content })
             loaded.push("AGENTS.md")
@@ -214,10 +269,7 @@ export const layer = Layer.effect(
 
       // agents
       if (agentSvc) {
-        const agentFiles = yield* Effect.tryPromise({
-          try: () => Glob.scan("{agent,agents}/**/*.md", { cwd: dotDir, absolute: true, include: "file", symlink: true, dot: true }),
-          catch: (error) => error,
-        }).pipe(
+        const agentFiles = yield* fs.scan("{agent,agents}/**/*.md", dotDir).pipe(
           Effect.catch((error) =>
             Effect.sync(() => {
               skipped.push({ path: "agents", reason: `failed to scan agents: ${String(error)}` })
@@ -227,12 +279,13 @@ export const layer = Layer.effect(
         )
         for (const agentFile of agentFiles) {
           const rel = path.relative(dotDir, agentFile)
-          const validPath = yield* Effect.promise(() => validateFile(directory, agentFile))
+          const validPath = yield* fs.validateFile(directory, agentFile)
           if (!validPath) {
             skipped.push({ path: rel, reason: "path outside worktree or not a regular file" })
             continue
           }
-          const md = yield* Effect.tryPromise({ try: () => ConfigMarkdown.parse(validPath), catch: (error) => error }).pipe(
+          const raw = yield* fs.readText(validPath)
+          const md = yield* Effect.try({ try: () => ConfigMarkdownCore.parse(raw), catch: () => undefined as any }).pipe(
             Effect.catch(() => Effect.succeed(undefined)),
           )
           if (!md) {
@@ -267,10 +320,7 @@ export const layer = Layer.effect(
 
       // skills
       if (skillSvc) {
-        const skillFiles = yield* Effect.tryPromise({
-          try: () => Glob.scan("{skill,skills}/**/SKILL.md", { cwd: dotDir, absolute: true, include: "file", symlink: true, dot: true }),
-          catch: (error) => error,
-        }).pipe(
+        const skillFiles = yield* fs.scan("{skill,skills}/**/SKILL.md", dotDir).pipe(
           Effect.catch((error) =>
             Effect.sync(() => {
               skipped.push({ path: "skills", reason: `failed to scan skills: ${String(error)}` })
@@ -280,12 +330,13 @@ export const layer = Layer.effect(
         )
         for (const skillFile of skillFiles) {
           const rel = path.relative(dotDir, skillFile)
-          const validPath = yield* Effect.promise(() => validateFile(directory, skillFile))
+          const validPath = yield* fs.validateFile(directory, skillFile)
           if (!validPath) {
             skipped.push({ path: rel, reason: "path outside worktree or not a regular file" })
             continue
           }
-          const md = yield* Effect.tryPromise({ try: () => ConfigMarkdown.parse(validPath), catch: (error) => error }).pipe(
+          const raw = yield* fs.readText(validPath)
+          const md = yield* Effect.try({ try: () => ConfigMarkdownCore.parse(raw), catch: () => undefined as any }).pipe(
             Effect.catch(() => Effect.succeed(undefined)),
           )
           if (!md || typeof md.data !== "object" || md.data === null || typeof (md.data as { name?: unknown }).name !== "string") {
@@ -293,7 +344,7 @@ export const layer = Layer.effect(
             continue
           }
           const data = md.data as { name: string; description?: string }
-          const resources = yield* Effect.promise(() => collectSkillResources(directory, path.dirname(validPath)))
+          const resources = yield* collectSkillResources(fs, directory, path.dirname(validPath))
           yield* skillSvc.upsert(sessionID, {
             name: data.name,
             description: data.description ?? "",
@@ -308,9 +359,9 @@ export const layer = Layer.effect(
       if (mcpSvc) {
         for (const file of ["opencode.json", "opencode.jsonc"]) {
           const mcpPath = path.join(dotDir, file)
-          const validPath = yield* Effect.promise(() => validateFile(directory, mcpPath))
+          const validPath = yield* fs.validateFile(directory, mcpPath)
           if (!validPath) continue
-          const raw = yield* Effect.promise(() => Filesystem.readText(validPath).catch(() => ""))
+          const raw = yield* fs.readText(validPath)
           if (!raw) continue
           const data = yield* Effect.try({ try: () => ConfigParse.jsonc(raw, validPath), catch: (error) => error }).pipe(
             Effect.catch((error) =>
@@ -337,10 +388,7 @@ export const layer = Layer.effect(
 
       // tools
       if (toolSvc) {
-        const toolFiles = yield* Effect.tryPromise({
-          try: () => Glob.scan("tool/*.{ts,js}", { cwd: dotDir, absolute: true, include: "file", symlink: true, dot: true }),
-          catch: (error) => error,
-        }).pipe(
+        const toolFiles = yield* fs.scan("tool/*.{ts,js}", dotDir).pipe(
           Effect.catch((error) =>
             Effect.sync(() => {
               skipped.push({ path: "tools", reason: `failed to scan tools: ${String(error)}` })
@@ -350,13 +398,13 @@ export const layer = Layer.effect(
         )
         for (const toolFile of toolFiles) {
           const rel = path.relative(dotDir, toolFile)
-          const validPath = yield* Effect.promise(() => validateFile(directory, toolFile))
+          const validPath = yield* fs.validateFile(directory, toolFile)
           if (!validPath) {
             skipped.push({ path: rel, reason: "path outside worktree or not a regular file" })
             continue
           }
           const name = path.basename(validPath, path.extname(validPath))
-          const raw = yield* Effect.promise(() => Filesystem.readText(validPath).catch(() => ""))
+          const raw = yield* fs.readText(validPath)
           if (!raw.trim()) {
             skipped.push({ path: rel, reason: "empty tool file" })
             continue
@@ -368,10 +416,7 @@ export const layer = Layer.effect(
 
       // commands
       if (commandSvc) {
-        const commandFiles = yield* Effect.tryPromise({
-          try: () => Glob.scan("{command,commands}/**/*.md", { cwd: dotDir, absolute: true, include: "file", symlink: true, dot: true }),
-          catch: (error) => error,
-        }).pipe(
+        const commandFiles = yield* fs.scan("{command,commands}/**/*.md", dotDir).pipe(
           Effect.catch((error) =>
             Effect.sync(() => {
               skipped.push({ path: "commands", reason: `failed to scan commands: ${String(error)}` })
@@ -381,12 +426,13 @@ export const layer = Layer.effect(
         )
         for (const commandFile of commandFiles) {
           const rel = path.relative(dotDir, commandFile)
-          const validPath = yield* Effect.promise(() => validateFile(directory, commandFile))
+          const validPath = yield* fs.validateFile(directory, commandFile)
           if (!validPath) {
             skipped.push({ path: rel, reason: "path outside worktree or not a regular file" })
             continue
           }
-          const md = yield* Effect.tryPromise({ try: () => ConfigMarkdown.parse(validPath), catch: (error) => error }).pipe(
+          const raw = yield* fs.readText(validPath)
+          const md = yield* Effect.try({ try: () => ConfigMarkdownCore.parse(raw), catch: () => undefined as any }).pipe(
             Effect.catch(() => Effect.succeed(undefined)),
           )
           if (!md) {
@@ -413,10 +459,7 @@ export const layer = Layer.effect(
 
       // plugins
       if (pluginSvc) {
-        const pluginFiles = yield* Effect.tryPromise({
-          try: () => Glob.scan("{plugin,plugins}/*.{ts,js}", { cwd: dotDir, absolute: true, include: "file", symlink: true, dot: true }),
-          catch: (error) => error,
-        }).pipe(
+        const pluginFiles = yield* fs.scan("{plugin,plugins}/*.{ts,js}", dotDir).pipe(
           Effect.catch((error) =>
             Effect.sync(() => {
               skipped.push({ path: "plugins", reason: `failed to scan plugins: ${String(error)}` })
@@ -426,13 +469,13 @@ export const layer = Layer.effect(
         )
         for (const pluginFile of pluginFiles) {
           const rel = path.relative(dotDir, pluginFile)
-          const validPath = yield* Effect.promise(() => validateFile(directory, pluginFile))
+          const validPath = yield* fs.validateFile(directory, pluginFile)
           if (!validPath) {
             skipped.push({ path: rel, reason: "path outside worktree or not a regular file" })
             continue
           }
           const name = path.basename(validPath, path.extname(validPath))
-          const code = yield* Effect.promise(() => Filesystem.readText(validPath).catch(() => ""))
+          const code = yield* fs.readText(validPath)
           if (!code.trim()) {
             skipped.push({ path: rel, reason: "empty plugin file" })
             continue
