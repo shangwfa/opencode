@@ -44,8 +44,8 @@ function check(name, ok, detail = "") {
 const sb = await Sandbox.create({
   connectionConfig: new ConnectionConfig({ domain: DOMAIN, protocol: "http", useServerProxy: USE_SERVER_PROXY }),
   image: IMAGE,
-  // 远端沙箱用 amd64（QEMU 模拟）；本地直跑单元测试见 lsp-daemon-unit-test.mjs
-  platform: { os: "linux", arch: "amd64", entrypoint: ["/opt/opensandbox/code-interpreter.sh"] },
+  // platform 跟随宿主 arch（本地 arm64 镜像不触发 pull；amd64 走 QEMU 模拟）
+  platform: { os: "linux", arch: process.arch === "arm64" ? "arm64" : "amd64", entrypoint: ["/opt/opensandbox/code-interpreter.sh"] },
   timeoutSeconds: 360,
 })
 console.log("sandbox 已创建")
@@ -66,11 +66,11 @@ async function run(cmd, tries = 8) {
 try {
   await run("echo execd-ready")
 
-  // ── 镜像内 daemon + TLS ──
-  console.log("\n[B.1] 镜像内 daemon bundle + typescript-language-server")
-  const files = await run("ls -la /opt/opencode-lsp-daemon/index.js && which typescript-language-server")
+  // ── 镜像内 daemon + tsc LSP ──
+  console.log("\n[B.1] 镜像内 daemon bundle + tsc")
+  const files = await run("ls -la /opt/opencode-lsp-daemon/index.js && which tsc")
   check("daemon bundle 存在", files.includes("/opt/opencode-lsp-daemon/index.js"), files.split("\n")[0]?.trim())
-  check("typescript-language-server 可用", files.includes("typescript-language-server"))
+  check("tsc 可用", files.includes("tsc"), "TS 7.x native LSP")
 
   // ── 建测试 TS 项目 ──
   console.log("\n[B.2] 在 /workspace 建 TS 项目")

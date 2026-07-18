@@ -541,11 +541,11 @@ def batch8():
         r = req("GET", endpoint)
         check(f"T14.10{endpoint}", r["ok"], f"GET {endpoint}: {r['status']}")
 
-    # T15.1 session skill 创建
+    # T15.1 session skill 创建 (Skill.CreateInput: name + content)
     r = req("POST", f"/session/{sid}/skills/create", {
         "name": "test-skill",
         "description": "A test skill",
-        "prompt": "You are a test assistant."
+        "content": "You are a test assistant."
     })
     check("T15.1", r["ok"], f"skill created: {r['status']}")
 
@@ -686,12 +686,11 @@ def batch11():
 
     sid = create_session()
 
-    # T22.1 创建 local MCP
+    # T22.1 创建 local MCP (command 是字符串数组，非 command+args 分开)
     r = req("POST", f"/session/{sid}/mcps/create", {
         "name": "test-local-mcp",
         "type": "local",
-        "command": "npx",
-        "args": ["-y", "@modelcontextprotocol/server-everything"],
+        "command": ["npx", "-y", "@modelcontextprotocol/server-everything"],
         "environment": {}
     })
     check("T22.1", r["ok"], f"local MCP created: {r['status']}")
