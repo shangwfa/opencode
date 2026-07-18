@@ -1,6 +1,8 @@
 # Session Skills
 
-> 本文档从 `saas-test-cases.md` 拆分而来。公共测试环境和配置请参考 [`00-INDEX.md`](./00-INDEX.md)。
+> 本文档从 `saas-test-cases.md` 拆分而来。公共测试环境和配置请参考 [`00-preamble.md`](./00-preamble.md)。
+>
+> **通用清单映射**：T15.1(G1/G2)、T15.3(G4/G5)、T15.6(G3)、T15.18(G6)、T15.19(G7)、T15.22(G10) 遵循 [`00-preamble.md` 附录 A](./00-preamble.md) 通用 CRUD 清单；其余为 skill 特有场景（bundle/resources/触发/permission）。
 
 ## 十五、Session Skills
 

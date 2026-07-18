@@ -10,7 +10,9 @@
 
 ---
 
-## T26.1 创建 Compose Agent + 编排技能
+## T42.1 编排环境搭建：创建 Compose Agent + 编排技能
+
+> **定位**：本节是 T42.2/T42.3 的**前置 fixture**（compose agent + 3 个编排技能的定义）。agent/skill 的 CRUD 通用验证由 T15.x/T16.x 覆盖（见 [`00-preamble.md` 附录 A](./00-preamble.md)），此处只验证 fixture 创建成功 + PG 落库。
 
 创建一个简化版 compose agent，配合 3 个编排技能（plan → execute → review），验证 CRUD + PG 持久化。
 
@@ -89,12 +91,12 @@ print(f'  skills: {[s[\"name\"] for s in d]}')"
 
 ---
 
-## T26.2 Compose Agent 编排执行（plan → execute → review）
+## T42.2 Compose Agent 编排执行（plan → execute → review）
 
 用 compose agent 执行一个简单的编程任务，验证 LLM 按编排流程调用 compose 技能。
 
 ```bash
-# 使用 T26.1 创建的 SID
+# 使用 T42.1 创建的 SID
 curl -s --max-time 300 -X POST "$BASE/session/$SID/message" \
   -H 'Content-Type: application/json' \
   -d "{
@@ -144,7 +146,7 @@ python3 -c "import json;d=json.loads(open('/tmp/t262_test.json').read(),strict=F
 
 ---
 
-## T26.3 Compose Agent 子 agent 分发（parallel）
+## T42.3 Compose Agent 子 agent 分发（parallel）
 
 验证 compose agent 通过 task 工具分发子 agent 并行执行独立任务。
 
@@ -202,36 +204,15 @@ python3 -c "import json;d=json.loads(open('/tmp/t263_exec.json').read(),strict=F
 
 ---
 
-## T26.4 编排隔离：compose 技能仅在 compose session 可见
+## T42.4 编排隔离：compose 技能仅在 compose session 可见
 
-验证 compose 技能不会泄漏到其他 session。
-
-```bash
-SID_A=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
-SID_B=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
-
-# A 创建 compose 技能
-curl -s -X POST "$BASE/session/$SID_A/skills/create" \
-  -H 'Content-Type: application/json' \
-  -d '{"name":"compose:plan","description":"A的编排技能","content":"# Plan"}' > /dev/null
-
-# B 看不到 A 的技能
-A_SKILLS=$(curl -s "$BASE/session/$SID_A/skills" | python3 -c "import json,sys;print([s['name'] for s in json.load(sys.stdin)])")
-B_SKILLS=$(curl -s "$BASE/session/$SID_B/skills" | python3 -c "import json,sys;print([s['name'] for s in json.load(sys.stdin)])")
-echo "A skills: $A_SKILLS"
-echo "B skills: $B_SKILLS"
-
-# PG 验证
-PG_A=$(psql "$PG_URL" -t -A -c "SELECT COUNT(*) FROM session_skill WHERE session_id='$SID_A'")
-PG_B=$(psql "$PG_URL" -t -A -c "SELECT COUNT(*) FROM session_skill WHERE session_id='$SID_B'")
-echo "PG A=$PG_A, B=$PG_B"
-```
+> **去重说明**（2026-07-17）：session skill 跨 session 隔离的通用验证见 T15.18（附录 A G6）。本节仅需确认 compose 技能无特殊泄露路径——按 G6 模式：A 创建 `compose:plan`，B 的 skills 列表为 `[]`，PG `session_skill` 按 `session_id` 隔离。
 
 **期望**：A 有 `compose:plan`，B 为 `[]`，PG 确认隔离
 
 ---
 
-## T26.5 编排状态持久化：重启后 compose agent + skills 恢复
+## T42.5 编排状态持久化：重启后 compose agent + skills 恢复
 
 验证 compose agent 和 skills 在服务重启后仍可查询。
 
@@ -275,8 +256,8 @@ curl -s "$BASE/session/$SID/skills" | python3 -c "import json,sys;d=json.load(sy
 
 | 用例 | 场景 | 验证层 | 结果 |
 |------|------|--------|------|
-| T26.1 | 创建 compose agent + 3 个编排技能 | HTTP + PG + API | |
-| T26.2 | plan→execute→review 编排执行 | PG skill/tool 调用 + exec 验证文件 | |
-| T26.3 | 子 agent 并行分发 | PG task 调用 + exec 验证 | |
-| T26.4 | 编排技能 session 隔离 | PG + API | |
-| T26.5 | 重启后持久化恢复 | PG + docker restart + API | |
+| T42.1 | 创建 compose agent + 3 个编排技能 | HTTP + PG + API | |
+| T42.2 | plan→execute→review 编排执行 | PG skill/tool 调用 + exec 验证文件 | |
+| T42.3 | 子 agent 并行分发 | PG task 调用 + exec 验证 | |
+| T42.4 | 编排技能 session 隔离 | PG + API | |
+| T42.5 | 重启后持久化恢复 | PG + docker restart + API | |

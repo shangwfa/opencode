@@ -22,7 +22,7 @@
 
 ---
 
-### T23a.1 创建 local MCP
+### T41.1 创建 local MCP
 
 ```bash
 SID=$(new_sid)
@@ -37,7 +37,7 @@ psql "$PG_URL" -t -A -c "SELECT name, type FROM session_mcps WHERE session_id='$
 
 ---
 
-### T23a.2 AI 感知 MCP 工具
+### T41.2 AI 感知 MCP 工具
 
 ```bash
 curl -s --max-time 120 -X POST "$BASE/session/$SID/message" \
@@ -55,7 +55,7 @@ for p in d.get('parts',[]):
 
 ---
 
-### T23a.3 AI 调用 MCP 工具查询文档
+### T41.3 AI 调用 MCP 工具查询文档
 
 ```bash
 curl -s --max-time 120 -X POST "$BASE/session/$SID/message" \
@@ -71,7 +71,7 @@ psql "$PG_URL" -t -c "SELECT data->>'tool', data->'state'->>'status' FROM part W
 
 ---
 
-### T23a.4 AI 基于 MCP 文档生成代码
+### T41.4 AI 基于 MCP 文档生成代码
 
 ```bash
 curl -s --max-time 300 -X POST "$BASE/session/$SID/message" \
@@ -96,10 +96,10 @@ curl -s -X POST "$BASE/session/$SID/exec" \
 
 | 用例 | 结果 | 验证详情 |
 |------|------|---------|
-| T23a.1 创建 MCP | ✅ | PG `mastra\|local` |
-| T23a.2 AI 感知工具 | ✅ | AI 列出 mastra 工具表 |
-| T23a.3 AI 查询文档 | ✅ | `mastra_mastraDocs(completed)`，返回 agent 示例 |
-| T23a.4 AI 生成代码 | ✅ | 多个 mastra 工具 + write → my-agent.ts |
+| T41.1 创建 MCP | ✅ | PG `mastra\|local` |
+| T41.2 AI 感知工具 | ✅ | AI 列出 mastra 工具表 |
+| T41.3 AI 查询文档 | ✅ | `mastra_mastraDocs(completed)`，返回 agent 示例 |
+| T41.4 AI 生成代码 | ✅ | 多个 mastra 工具 + write → my-agent.ts |
 
 **验证层级**：
 

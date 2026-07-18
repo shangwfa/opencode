@@ -10,251 +10,21 @@ const BASE = "http://localhost:14096"
 
 ---
 
-### T22.1 创建会话级 local MCP
+### T22.1-T22.9 通用 CRUD 生命周期（按附录 A 清单）
 
-```bash
-bun -e '
-const BASE = "http://localhost:14096"
-const SID = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "mcp-create-local" }) })).json()
-console.log("SID:", SID.id)
+> 本节按 [`00-preamble.md` 附录 A](./00-preamble.md) 的 G1-G9 通用清单执行（含通用脚本模板），资源为 `mcps`（`/session/:id/mcps[/create]`），PG 表 `session_mcps`。原始逐步脚本见 git 历史。
 
-const res = await (await fetch(BASE + "/session/" + SID.id + "/mcps/create", {
-  method: "POST", headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({
-    name: "sandbox-shadcn",
-    type: "local",
-    command: ["npx", "shadcn@latest", "mcp"],
-    environment: { NODE_ENV: "production" },
-  }),
-})).json()
-console.log("name:", res.name, "type:", res.type, "command:", JSON.stringify(res.command))
-console.log("enabled:", res.enabled)
-'
-```
-**期望**：`name=sandbox-shadcn`，`type=local`，`command=["npx","shadcn@latest","mcp"]`，`enabled=true`
-
-> **PG 验证**：`docker exec ai-nova-postgres psql -U postgres -d opencode -c "SELECT name, type, command FROM session_mcps WHERE session_id='$SID' AND name='sandbox-shadcn';"`
-> 期望：name=sandbox-shadcn, type=local, command=["npx","shadcn@latest","mcp"]
-
-### T22.2 创建会话级 remote MCP
-
-```bash
-bun -e '
-const BASE = "http://localhost:14096"
-const SID = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "mcp-create-remote" }) })).json()
-console.log("SID:", SID.id)
-
-const res = await (await fetch(BASE + "/session/" + SID.id + "/mcps/create", {
-  method: "POST", headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({
-    name: "search-api",
-    type: "remote",
-    url: "https://search.example.com/mcp",
-    headers: { Authorization: "Bearer test-token" },
-  }),
-})).json()
-console.log("name:", res.name, "type:", res.type, "url:", res.url)
-console.log("headers:", JSON.stringify(res.headers))
-'
-```
-**期望**：`name=search-api`，`type=remote`，`url=https://search.example.com/mcp`，headers 包含 `Authorization`
-
-> **PG 验证**：`docker exec ai-nova-postgres psql -U postgres -d opencode -c "SELECT name, type, url, headers FROM session_mcps WHERE session_id='$SID' AND name='search-api';"`
-> 期望：name=search-api, type=remote, url=https://search.example.com/mcp
-
-### T22.3 列出会话 MCP
-
-```bash
-bun -e '
-const BASE = "http://localhost:14096"
-const SID = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "mcp-list" }) })).json()
-console.log("SID:", SID.id)
-
-await fetch(BASE + "/session/" + SID.id + "/mcps/create", {
-  method: "POST", headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ name: "mcp-a", type: "local", command: ["echo", "a"] }),
-})
-await fetch(BASE + "/session/" + SID.id + "/mcps/create", {
-  method: "POST", headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ name: "mcp-b", type: "remote", url: "https://b.example.com/mcp" }),
-})
-
-const list = await (await fetch(BASE + "/session/" + SID.id + "/mcps")).json()
-list.forEach(m => console.log(m.name + ": type=" + m.type))
-console.log("count:", list.length, "(expect 2)")
-console.log("mcp-a in list:", list.some(m => m.name === "mcp-a"))
-console.log("mcp-b in list:", list.some(m => m.name === "mcp-b"))
-'
-```
-**期望**：列表包含 `mcp-a`（local）和 `mcp-b`（remote），count=2
-
-> **PG 验证**：`docker exec ai-nova-postgres psql -U postgres -d opencode -t -A -c "SELECT COUNT(*) FROM session_mcps WHERE session_id='$SID';"`
-> 期望：COUNT=2
-
-### T22.4 Upsert 更新同名 MCP
-
-```bash
-bun -e '
-const BASE = "http://localhost:14096"
-const SID = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "mcp-upsert" }) })).json()
-console.log("SID:", SID.id)
-
-await fetch(BASE + "/session/" + SID.id + "/mcps/create", {
-  method: "POST", headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ name: "my-mcp", type: "local", command: ["cmd", "v1"] }),
-})
-
-const updated = await (await fetch(BASE + "/session/" + SID.id + "/mcps/create", {
-  method: "POST", headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ name: "my-mcp", type: "remote", url: "https://v2.example.com/mcp" }),
-})).json()
-console.log("type:", updated.type, "(expect remote)")
-console.log("url:", updated.url, "(expect https://v2.example.com/mcp)")
-
-const list = await (await fetch(BASE + "/session/" + SID.id + "/mcps")).json()
-console.log("count:", list.filter(m => m.name === "my-mcp").length, "(expect 1)")
-'
-```
-**期望**：type 更新为 remote，command 变为 null，列表中仍只有 1 个 my-mcp
-
-> **PG 验证**：`docker exec ai-nova-postgres psql -U postgres -d opencode -c "SELECT type, url, command FROM session_mcps WHERE session_id='$SID' AND name='my-mcp';"`
-> 期望：type=remote, url=https://v2.example.com/mcp, command=NULL
-
-### T22.5 删除单个 MCP
-
-```bash
-bun -e '
-const BASE = "http://localhost:14096"
-const SID = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "mcp-delete" }) })).json()
-console.log("SID:", SID.id)
-
-await fetch(BASE + "/session/" + SID.id + "/mcps/create", {
-  method: "POST", headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ name: "to-delete", type: "local", command: ["rm"] }),
-})
-
-const delRes = await fetch(BASE + "/session/" + SID.id + "/mcps/to-delete", { method: "DELETE" })
-console.log("DELETE status:", delRes.status, "(expect 200)")
-
-const list = await (await fetch(BASE + "/session/" + SID.id + "/mcps")).json()
-console.log("to-delete gone:", !list.some(m => m.name === "to-delete"))
-'
-```
-**期望**：DELETE 返回 200，to-delete 已从列表中消失
-
-> **PG 验证**：`docker exec ai-nova-postgres psql -U postgres -d opencode -t -A -c "SELECT COUNT(*) FROM session_mcps WHERE session_id='$SID' AND name='to-delete';"`
-> 期望：COUNT=0
-
-### T22.6 清空所有会话级 MCP
-
-```bash
-bun -e '
-const BASE = "http://localhost:14096"
-const SID = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "mcp-clear" }) })).json()
-console.log("SID:", SID.id)
-
-await fetch(BASE + "/session/" + SID.id + "/mcps/create", {
-  method: "POST", headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ name: "m1", type: "local", command: ["1"] }),
-})
-await fetch(BASE + "/session/" + SID.id + "/mcps/create", {
-  method: "POST", headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ name: "m2", type: "local", command: ["2"] }),
-})
-
-const clearRes = await fetch(BASE + "/session/" + SID.id + "/mcps", { method: "DELETE" })
-console.log("clear status:", clearRes.status, "(expect 200)")
-
-const list = await (await fetch(BASE + "/session/" + SID.id + "/mcps")).json()
-console.log("leftover:", list.length, "(expect 0)")
-'
-```
-**期望**：HTTP 200，列表为空
-
-> **PG 验证**：`docker exec ai-nova-postgres psql -U postgres -d opencode -t -A -c "SELECT COUNT(*) FROM session_mcps WHERE session_id='$SID';"`
-> 期望：COUNT=0
-
-### T22.7 不同 session 的 MCP 互相隔离
-
-```bash
-bun -e '
-const BASE = "http://localhost:14096"
-const SID_A = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "mcp-iso-A" }) })).json()
-const SID_B = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "mcp-iso-B" }) })).json()
-
-await fetch(BASE + "/session/" + SID_A.id + "/mcps/create", {
-  method: "POST", headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ name: "shared", type: "local", command: ["cmd-a"] }),
-})
-await fetch(BASE + "/session/" + SID_B.id + "/mcps/create", {
-  method: "POST", headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ name: "shared", type: "remote", url: "https://b.example.com/mcp" }),
-})
-
-const listA = await (await fetch(BASE + "/session/" + SID_A.id + "/mcps")).json()
-const listB = await (await fetch(BASE + "/session/" + SID_B.id + "/mcps")).json()
-console.log("A shared type:", listA.find(m => m.name === "shared")?.type, "(expect local)")
-console.log("B shared type:", listB.find(m => m.name === "shared")?.type, "(expect remote)")
-'
-```
-**期望**：A 显示 type=local，B 显示 type=remote
-
-> **PG 验证**：`docker exec ai-nova-postgres psql -U postgres -d opencode -c "SELECT session_id, type FROM session_mcps WHERE name='shared' ORDER BY session_id;"`
-> 期望：两条记录
-
-### T22.8 删除 session 后 MCP 级联清理
-
-```bash
-bun -e '
-const BASE = "http://localhost:14096"
-const SID = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "mcp-cascade" }) })).json()
-
-await fetch(BASE + "/session/" + SID.id + "/mcps/create", {
-  method: "POST", headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ name: "cascade-mcp", type: "local", command: ["cascade"] }),
-})
-
-const before = await (await fetch(BASE + "/session/" + SID.id + "/mcps")).json()
-console.log("Before delete:", before.some(m => m.name === "cascade-mcp"), "(expect true)")
-
-await fetch(BASE + "/session/" + SID.id, { method: "DELETE" })
-
-const after = await fetch(BASE + "/session/" + SID.id + "/mcps")
-const afterList = await after.json().catch(() => undefined)
-console.log("After delete status:", after.status, "(expect 200)")
-console.log("After delete list length:", Array.isArray(afterList) ? afterList.length : "n/a", "(expect 0)")
-'
-```
-**期望**：删除 session 后 GET mcps 返回 200 且列表为空；PG 级联删除 session MCP 记录
-
-> **PG 验证**：`docker exec ai-nova-postgres psql -U postgres -d opencode -t -A -c "SELECT COUNT(*) FROM session_mcps WHERE session_id='$SID';"`
-> 期望：COUNT=0
-
-### T22.9 不存在的 session 操作 MCP → 404
-
-```bash
-bun -e '
-const BASE = "http://localhost:14096"
-
-const createRes = await fetch(BASE + "/session/ses_NOTEXIST/mcps/create", {
-  method: "POST", headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ name: "ghost", type: "local", command: ["ghost"] }),
-})
-console.log("create status:", createRes.status, "(expect 500 due FK)")
-
-const listRes = await fetch(BASE + "/session/ses_NOTEXIST/mcps")
-const list = await listRes.json().catch(() => undefined)
-console.log("list status:", listRes.status, "(expect 200)")
-console.log("list length:", Array.isArray(list) ? list.length : "n/a", "(expect 0)")
-
-const delRes = await fetch(BASE + "/session/ses_NOTEXIST/mcps/ghost", { method: "DELETE" })
-console.log("delete status:", delRes.status, "(expect 200)")
-'
-```
-**期望**：create 返回 500（FK 约束），list 返回 200 空数组，delete 返回 200
-
-> **PG 验证**：`docker exec ai-nova-postgres psql -U postgres -d opencode -t -A -c "SELECT COUNT(*) FROM session_mcps WHERE session_id='ses_NOTEXIST';"`
-> 期望：COUNT=0
+| 用例 | 清单 | 资源参数 | 特有期望 |
+|---|---|---|---|
+| T22.1 | G1 | local：`{name:"sandbox-shadcn", type:"local", command:["npx","shadcn@latest","mcp"], environment:{NODE_ENV:"production"}}` | 返回 `type=local`、command 数组、`enabled=true`；PG 字段一致 |
+| T22.2 | G1 | remote：`{name:"search-api", type:"remote", url:"https://search.example.com/mcp", headers:{Authorization:"Bearer test-token"}}` | 返回 `type=remote`、url、headers 完整；PG 一致 |
+| T22.3 | G2 | 建 mcp-a(local) + mcp-b(remote) | local/remote 同列表，count=2 |
+| T22.4 | G3 | my-mcp：local v1 → remote v2 | type→remote，command→NULL，列表 count=1 |
+| T22.5 | G4 | 删 to-delete | DELETE 200，列表/PG 移除 |
+| T22.6 | G5 | 建 m1/m2 后清空 | DELETE 200，列表/PG 空 |
+| T22.7 | G6 | A/B 各建同名 shared（A=local，B=remote） | A 显示 local，B 显示 remote；PG 两条 |
+| T22.8 | G7 | 删除 session | ⚠️ mcps 特例：删 session 后 GET mcps 仍 200 空列表（mcps list 无 `requireSession`，见附录 A G8）；PG 级联 COUNT=0 |
+| T22.9 | G8 | ses_NOTEXIST create/list/delete | create=500（FK）；list=200 空数组（mcps 特例）；delete=200（幂等） |
 
 ### T22.10 输入校验：缺少必填字段
 
@@ -675,35 +445,9 @@ console.log("after cleanup:", check.stdout || "")
 
 **期望**：启动后存在 pid/log；session sandbox 回收后 pid/log 被删除，supergateway 进程不再存在。
 
-### T22.20 不存在 session 当前语义
-
-> 当前实现未在 session MCP handler 中前置校验 session 存在性：list/delete 是幂等操作，create 依赖数据库 FK 失败。
-
-```bash
-bun -e '
-const BASE = "http://localhost:14096"
-const SID = "ses_NOTEXIST_MCP"
-
-const list = await fetch(BASE + "/session/" + SID + "/mcps")
-const create = await fetch(BASE + "/session/" + SID + "/mcps/create", {
-  method: "POST", headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ name: "ghost", type: "local", command: ["echo", "ghost"] }),
-})
-const del = await fetch(BASE + "/session/" + SID + "/mcps/ghost", { method: "DELETE" })
-
-const rows = await list.json().catch(() => undefined)
-console.log("list:", list.status, "(expect 200)")
-console.log("list length:", Array.isArray(rows) ? rows.length : "n/a", "(expect 0)")
-console.log("create:", create.status, "(expect 500 due FK)")
-console.log("delete:", del.status, "(expect 200)")
-'
-```
-
-**期望**：list 返回 200 空数组，create 返回 500（FK 约束），delete 返回 200。
-
----
-
 ## 结果汇总
+
+> **编号说明**：T22.20 与 T22.9 完全重复（不存在 session 语义），2026-07-17 去重删除，编号保留断档。
 
 | 用例 | 状态 | 备注 |
 |---|---|---|
@@ -726,7 +470,6 @@ console.log("delete:", del.status, "(expect 200)")
 | T22.17 | ⬜ | local MCP environment 实际注入 sandbox 进程 |
 | T22.18 | ⬜ | shell 安全：恶意 name/env/command 不产生注入 |
 | T22.19 | ⬜ | local MCP pid/log 生命周期与清理 |
-| T22.20 | ⬜ | 不存在 session 当前语义：create=500(FK), list=200([]), delete=200 |
 
 ## 单元测试覆盖
 

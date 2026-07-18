@@ -10,7 +10,7 @@
 
 ## P0-1: sbCache TOCTOU 竞态 — getCachedSandbox 在 lock 内
 
-### T29.1.1 并发 destroy + runInSession 不崩溃
+### T39.1.1 并发 destroy + runInSession 不崩溃
 
 **场景**：Fiber A 执行 runInSession（长命令），Fiber B 调用 destroy。A 应得到错误而非使用已死 sandbox。
 
@@ -29,7 +29,7 @@ curl -s -X POST "$BASE/session/$SID/message" -H 'Content-Type: application/json'
 
 **期望**：第二条消息正常返回 `rebuilt-ok`，无 "runInSession failed" 或进程崩溃。
 
-### T29.1.2 连续 destroyById + 工具调用
+### T39.1.2 连续 destroyById + 工具调用
 
 **场景**：zombie cleanup 调 destroyById 时，正好有工具在使用缓存 sandbox。
 
@@ -53,7 +53,7 @@ wait
 
 ## P0-2: commandSemaphores 永不删除 — 串行化不失效
 
-### T29.2.1 abort 后立即发新命令，命令串行执行
+### T39.2.1 abort 后立即发新命令，命令串行执行
 
 **场景**：abort 中断长命令后，立即发新命令。新命令应等待旧命令的 semaphore 释放（而非绕过）。
 
@@ -72,7 +72,7 @@ curl -s --max-time 60 -X POST "$BASE/session/$SID/message" -H 'Content-Type: app
 
 **期望**：`after-abort` 正常返回，无输出混乱或 execd panic。
 
-### T29.2.2 多次 kill-sandbox 后命令仍串行
+### T39.2.2 多次 kill-sandbox 后命令仍串行
 
 ```bash
 SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jq -r .id)
@@ -93,7 +93,7 @@ curl -s -X POST "$BASE/session/$SID/message" -H 'Content-Type: application/json'
 
 ## P0-3: PG advisory lock — 跨进程 sandbox 创建互斥
 
-### T29.3.1 同 session 并发创建只有一个 sandbox
+### T39.3.1 同 session 并发创建只有一个 sandbox
 
 **场景**：同一 session 并发发送 3 条消息，只创建一个 sandbox 容器。
 
@@ -113,7 +113,7 @@ echo "sandbox running count: $COUNT"
 
 **期望**：`COUNT=1`，不产生孤儿容器。
 
-### T29.3.2 不同 session 并发创建各自独立
+### T39.3.2 不同 session 并发创建各自独立
 
 ```bash
 SIDS=()
@@ -137,7 +137,7 @@ done
 
 ## P0-4: destroyById invalidate 在 lock 内
 
-### T29.4.1 destroyById + 并发 getOrCreate 不使用已死 sandbox
+### T39.4.1 destroyById + 并发 getOrCreate 不使用已死 sandbox
 
 ```bash
 SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jq -r .id)
@@ -159,7 +159,7 @@ wait
 
 ## P0-5: session.remove 联动 cancel + destroy
 
-### T29.5.1 删除 session 后 sandbox 被销毁
+### T39.5.1 删除 session 后 sandbox 被销毁
 
 ```bash
 SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jq -r .id)
@@ -178,7 +178,7 @@ echo "after delete: sandbox state=$STATE_AFTER"
 
 **期望**：`before=running`，`after=destroyed`。
 
-### T29.5.2 删除正在 LLM 调用的 session，不再写入新消息
+### T39.5.2 删除正在 LLM 调用的 session，不再写入新消息
 
 ```bash
 SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jq -r .id)
@@ -197,7 +197,7 @@ echo "messages: before_delete=$MSG_BEFORE after_20s=$MSG_AFTER"
 
 **期望**：`after_20s=0`（session 级联删除了所有消息），或 `after_20s <= before_delete`（LLM 被取消，未产生新消息）。
 
-### T29.5.3 删除 session 后 PG 无孤儿 sandbox
+### T39.5.3 删除 session 后 PG 无孤儿 sandbox
 
 ```bash
 SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jq -r .id)

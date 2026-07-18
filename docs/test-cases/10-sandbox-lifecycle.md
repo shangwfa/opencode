@@ -50,9 +50,11 @@ curl -s --max-time 60 -X POST "$BASE/session/$SID/message" \
 SB2=$(docker exec opencode-saas-test grep "sandbox.*$SID" /home/opencode/.local/share/opencode/log/dev.log 2>/dev/null | grep -o 'sandboxID=[^ ]*' | tail -1)
 echo "Second sandboxID: $SB2"
 
-[ "$SB1" = "$SB2" ] && echo "PASS: same sandbox reused" || echo "FAIL: different sandboxes"
+# 无 keepAlive 时两次 sandboxID 相同（复用）或不同（idle 销毁后重建）均为预期；
+# 本用例只验证第二条消息正常执行（上一步 curl 未报错即视为通过）
+[ -n "$SB2" ] && echo "PASS: second message executed (sandboxID=$SB2)" || echo "FAIL: no sandbox for second message"
 ```
-**期望**：无 keepAlive 时两次 `sandboxID` 可能不同（idle 后 sandbox 被销毁，下次消息自动重建新 sandbox）。有 keepAlive 时（`background:true` 启动了长后台进程）sandbox 保持存活，`sandboxID` 不变。这是预期行为，非 bug
+**期望**：两条消息都能正常执行。**无 keepAlive** 时两次 `sandboxID` 可能相同（复用）也可能不同（idle 销毁后自动重建），均为预期行为；**有 keepAlive** 时（`background:true` 启动了长后台进程）sandbox 保持存活，`sandboxID` 不变。判 PASS 的标准是消息正常执行，而非 sandboxID 相等
 
 ---
 
@@ -112,6 +114,8 @@ docker exec opencode-saas-test grep "sandbox destroyed\|destroy.*$SID2" /home/op
 ---
 
 ### T12.5 keepAlive 阻止 idle 销毁
+
+> **交叉引用**：等价验证见 T19.8（17 文档，纯 exec API 可控路径）；本条走 AI 消息路径。
 
 ```bash
 SID3=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
@@ -174,6 +178,8 @@ curl -s --max-time 60 -X POST "$BASE/session/$SID/message" \
 ---
 
 ### T12.8 PVC 数据在 sandbox 重建后恢复
+
+> **交叉引用**：同类验证见 T5.3（04 文档）与 T13.2（11 文档，kill-sandbox 场景）；本条覆盖容器重启场景。
 
 ```bash
 SID8=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
@@ -260,7 +266,7 @@ grep -n 'idleKillMs\|IDLE_KILL' /Users/ruomu/code/opencode/packages/opencode/src
 ```
 **期望**：
 - `env` 显示 `OPENCODE_SANDBOX_IDLE_KILL_SEC=30`
-- `idleKillMs` 在 `sandbox-provider.ts` 中**有实际使用**：第 22/39 行为 config 字段定义与取值（`Flag.OPENCODE_SANDBOX_IDLE_KILL_SEC * 1000`）；第 1128-1129 行用于僵尸 sandbox 判定（`state=running` 且 `time_updated` 超过 `idleKillMs*2` 未更新）；第 1166 行用于僵尸清理定时器（`Schedule.spaced(config.idleKillMs)`）
+- `idleKillMs` 在 `sandbox-provider.ts` 中**有实际使用**（2026-07-18 核对）：第 24 行为 config 字段定义、第 44 行取值（`Flag.OPENCODE_SANDBOX_IDLE_KILL_SEC * 1000`）；第 1348-1352 行用于僵尸 sandbox 判定（`zombieThresholdMs = idleKillMs*2`，`state=running` 且 `time_updated` 超过阈值未更新）；第 1394 行用于僵尸清理定时器（`Schedule.spaced(config.idleKillMs)`）
 - 正常 sandbox 销毁由 `run-state.ts` `onIdle` 回调触发（session runner 空闲）；`idleKillMs` 定时器是**兜底机制**，清理因异常残留的僵尸 sandbox
 
 ---

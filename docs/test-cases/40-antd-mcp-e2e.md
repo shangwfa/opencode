@@ -23,7 +23,7 @@
 
 ## 一、CRUD 基础验证
 
-### T23.1 创建 local MCP
+### T40.1 创建 local MCP
 
 ```bash
 SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
@@ -39,7 +39,7 @@ SELECT name, type, enabled FROM session_mcps WHERE session_id='$SID';
 
 **结果**：✅ PG 持久化正确
 
-### T23.2 列出/删除/隔离/级联
+### T40.2 列出/删除/隔离/级联
 
 | 用例 | 结果 | PG 验证 |
 |------|------|---------|
@@ -52,7 +52,7 @@ SELECT name, type, enabled FROM session_mcps WHERE session_id='$SID';
 
 ## 二、AI 感知 MCP 工具
 
-### T23.3 AI 列出可用 MCP 工具
+### T40.3 AI 列出可用 MCP 工具
 
 ```bash
 curl -s --max-time 120 -X POST "$BASE/session/$SID/message" \
@@ -79,7 +79,7 @@ curl -s --max-time 120 -X POST "$BASE/session/$SID/message" \
 
 ## 三、AI 实际调用 MCP 工具
 
-### T23.4 调用 antd_list 列出组件
+### T40.4 调用 antd_list 列出组件
 
 ```bash
 curl -s --max-time 120 -X POST "$BASE/session/$SID/message" \
@@ -97,7 +97,7 @@ SELECT data->>'tool', data->'state'->>'status' FROM part WHERE session_id='$SID'
 
 **结果**：✅ `antd_antd_list(completed)`，返回真实组件数据
 
-### T23.5 调用 antd_info 获取 Button API
+### T40.5 调用 antd_info 获取 Button API
 
 ```bash
 curl -s --max-time 120 -X POST "$BASE/session/$SID/message" \
@@ -118,7 +118,7 @@ curl -s --max-time 120 -X POST "$BASE/session/$SID/message" \
 
 ## 四、完整开发流程：AI 用 MCP 设计数据看板
 
-### T23.6 AI 调用多个 MCP 工具生成完整页面
+### T40.6 AI 调用多个 MCP 工具生成完整页面
 
 **Prompt**：
 
@@ -171,12 +171,12 @@ curl -s --max-time 120 -X POST "$BASE/session/$SID/message" \
 
 | 用例 | 结果 | 验证详情 |
 |------|------|---------|
-| T23.1 创建 MCP | ✅ | PG `antd\|local\|enabled=t` |
-| T23.2 CRUD | ✅ | 列出/删除/隔离/级联全通过 |
-| T23.3 AI 感知工具 | ✅ | 列出 8 个 antd_ 工具 |
-| T23.4 antd_list 调用 | ✅ | PG `antd_antd_list(completed)`，返回 50+ 组件 |
-| T23.5 antd_info 调用 | ✅ | PG `antd_antd_info(completed)`，返回 Button API |
-| T23.6 完整开发流程 | ✅ | 18 次工具调用全 completed，生成 495 行 Dashboard.tsx |
+| T40.1 创建 MCP | ✅ | PG `antd\|local\|enabled=t` |
+| T40.2 CRUD | ✅ | 列出/删除/隔离/级联全通过 |
+| T40.3 AI 感知工具 | ✅ | 列出 8 个 antd_ 工具 |
+| T40.4 antd_list 调用 | ✅ | PG `antd_antd_list(completed)`，返回 50+ 组件 |
+| T40.5 antd_info 调用 | ✅ | PG `antd_antd_info(completed)`，返回 Button API |
+| T40.6 完整开发流程 | ✅ | 18 次工具调用全 completed，生成 495 行 Dashboard.tsx |
 
 **验证层级**：
 

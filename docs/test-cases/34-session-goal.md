@@ -34,29 +34,29 @@
 
 > 已实现，使用 `testEffect` + `it.instance` + `Layer.mock` 模式。
 
-### T32.1 状态机基本流程
+### T34.1 状态机基本流程
 
 | 用例 | 操作 | 期望 |
 |------|------|------|
-| T32.1.1 | `set(ses, "tests pass")` → `get(ses)` | `condition = "tests pass"`, `react = 0` |
-| T32.1.2 | `get(ses)`（无 goal） | `undefined` |
-| T32.1.3 | `set` → `clear` → `get` | `undefined` |
-| T32.1.4 | `set` → `bumpReact` × 2 → `get` | `react = 2`，返回值 `1, 2` |
-| T32.1.5 | `bumpReact`（无 goal） | 返回 `0` |
-| T32.1.6 | `set("a")` → `bumpReact` → `set("b")` → `get` | `condition = "b"`, `react = 0`（重置） |
+| T34.1.1 | `set(ses, "tests pass")` → `get(ses)` | `condition = "tests pass"`, `react = 0` |
+| T34.1.2 | `get(ses)`（无 goal） | `undefined` |
+| T34.1.3 | `set` → `clear` → `get` | `undefined` |
+| T34.1.4 | `set` → `bumpReact` × 2 → `get` | `react = 2`，返回值 `1, 2` |
+| T34.1.5 | `bumpReact`（无 goal） | 返回 `0` |
+| T34.1.6 | `set("a")` → `bumpReact` → `set("b")` → `get` | `condition = "b"`, `react = 0`（重置） |
 
-### T32.2 多 Session 隔离
+### T34.2 多 Session 隔离
 
 | 用例 | 操作 | 期望 |
 |------|------|------|
-| T32.2.1 | `set(ses1, "A")` + `set(ses2, "B")` → 分别 `get` | 各自独立 |
-| T32.2.2 | `clear(ses1)` → `get(ses1)` + `get(ses2)` | ses1=`undefined`，ses2 保留 |
+| T34.2.1 | `set(ses1, "A")` + `set(ses2, "B")` → 分别 `get` | 各自独立 |
+| T34.2.2 | `clear(ses1)` → `get(ses1)` + `get(ses2)` | ses1=`undefined`，ses2 保留 |
 
 ---
 
 ## 四、命令路由测试
 
-### T32.3 `/goal` 命令注册
+### T34.3 `/goal` 命令注册
 
 ```bash
 # 验证命令出现在命令列表中
@@ -73,7 +73,7 @@ print('description:', goal[0].get('description','') if goal else 'N/A')
 
 ---
 
-### T32.4 `/goal <condition>` 设置 goal
+### T34.4 `/goal <condition>` 设置 goal
 
 ```bash
 SID=$(new_sid -k)
@@ -98,7 +98,7 @@ print('Response:', texts[:1] or '(empty)')
 
 ---
 
-### T32.5 `/goal clear` 清除 goal
+### T34.5 `/goal clear` 清除 goal
 
 ```bash
 # 先设置 goal
@@ -124,7 +124,7 @@ print('Goal cleared:', has_cleared)
 
 ---
 
-### T32.6 `/goal` 无参数同 clear
+### T34.6 `/goal` 无参数同 clear
 
 ```bash
 # 设置后直接 /goal 无参数
@@ -144,11 +144,11 @@ print('Cleared:', any('cleared' in t.lower() for t in texts))
 "
 ```
 
-**期望**：同 T32.5。
+**期望**：同 T34.5。
 
 ---
 
-### T32.7 `/goal reset` 同 clear
+### T34.7 `/goal reset` 同 clear
 
 ```bash
 RESP=$(curl -s --noproxy '*' --max-time 30 -X POST "$BASE/session/$SID/message" \
@@ -162,7 +162,7 @@ RESP=$(curl -s --noproxy '*' --max-time 30 -X POST "$BASE/session/$SID/message" 
 
 ## 五、Judge 模型评估测试
 
-### T32.8 Goal 未满足 → 自动继续
+### T34.8 Goal 未满足 → 自动继续
 
 ```bash
 SID=$(new_sid -k)
@@ -188,7 +188,7 @@ docker logs opencode-saas-test 2>&1 | grep "goal" | tail -5
 
 ---
 
-### T32.9 Goal 已满足 → 允许停止
+### T34.9 Goal 已满足 → 允许停止
 
 ```bash
 # 设置一个简单 goal（模型一次性完成）
@@ -209,7 +209,7 @@ docker logs opencode-saas-test 2>&1 | grep "goal satisfied" | tail -3
 
 ---
 
-### T32.10 Goal 不可能完成 → 允许停止
+### T34.10 Goal 不可能完成 → 允许停止
 
 ```bash
 # 设置一个不可能的 goal
@@ -228,7 +228,7 @@ docker logs opencode-saas-test 2>&1 | grep -E "goal (satisfied|impossible)" | ta
 
 ## 六、重入上限测试
 
-### T32.11 MAX_GOAL_REACT 上限保护
+### T34.11 MAX_GOAL_REACT 上限保护
 
 ```bash
 SID=$(new_sid -k)
@@ -254,7 +254,7 @@ docker logs opencode-saas-test 2>&1 | grep "MAX_GOAL_REACT" | tail -3
 
 ## 七、Fail-Open 测试
 
-### T32.12 Judge 模型出错 → 允许停止
+### T34.12 Judge 模型出错 → 允许停止
 
 > 此测试模拟 judge 模型调用失败（如 provider 不可用、网络超时）。
 
@@ -276,7 +276,7 @@ docker logs opencode-saas-test 2>&1 | grep -E "judge (failed|error)" | tail -3
 
 ## 八、隔离性测试
 
-### T32.13 Goal 不影响其他 Session
+### T34.13 Goal 不影响其他 Session
 
 ```bash
 SID1=$(new_sid -k)
@@ -304,7 +304,7 @@ print('SID2 normal:', bool(texts))
 
 ---
 
-### T32.14 Subagent 不触发 goalGate
+### T34.14 Subagent 不触发 goalGate
 
 ```bash
 SID=$(new_sid -k)
@@ -329,7 +329,7 @@ docker logs opencode-saas-test 2>&1 | grep "goalGate" | grep -v "main" | head -3
 
 ## 九、PG 持久化测试
 
-### T32.15 PG 写入
+### T34.15 PG 写入
 
 ```bash
 SID=$(new_sid -k)
@@ -349,7 +349,7 @@ psql "$PG_URL" -c "SELECT session_id, condition, react, status FROM session_goal
 
 ---
 
-### T32.16 PG 清除
+### T34.16 PG 清除
 
 ```bash
 # 清除 goal
@@ -367,7 +367,7 @@ psql "$PG_URL" -c "SELECT count(*) FROM session_goal WHERE session_id = '$SID';"
 
 ---
 
-### T32.17 PG bumpReact 更新
+### T34.17 PG bumpReact 更新
 
 ```bash
 SID=$(new_sid -k)
@@ -387,7 +387,7 @@ psql "$PG_URL" -c "SELECT session_id, react FROM session_goal WHERE session_id =
 
 ---
 
-### T32.18 PG 容器重启后恢复
+### T34.18 PG 容器重启后恢复
 
 ```bash
 SID=$(new_sid -k)
@@ -413,7 +413,7 @@ psql "$PG_URL" -c "SELECT condition FROM session_goal WHERE session_id = '$SID';
 
 ## 十、边界条件测试
 
-### T32.19 空 condition
+### T34.19 空 condition
 
 ```bash
 # /goal 无参数 → 等同 clear
@@ -426,7 +426,7 @@ RESP=$(curl -s --noproxy '*' --max-time 30 -X POST "$BASE/session/$SID/message" 
 
 ---
 
-### T32.20 超长 condition
+### T34.20 超长 condition
 
 ```bash
 LONG_COND=$(python3 -c "print('A' * 10000)")
@@ -439,7 +439,7 @@ RESP=$(curl -s --noproxy '*' --max-time 60 -X POST "$BASE/session/$SID/message" 
 
 ---
 
-### T32.21 重复设置 goal（覆盖）
+### T34.21 重复设置 goal（覆盖）
 
 ```bash
 curl -s --noproxy '*' --max-time 60 -X POST "$BASE/session/$SID/message" \
@@ -458,7 +458,7 @@ psql "$PG_URL" -c "SELECT condition FROM session_goal WHERE session_id = '$SID';
 
 ---
 
-### T32.22 Goal 中含特殊字符
+### T34.22 Goal 中含特殊字符
 
 ```bash
 RESP=$(curl -s --noproxy '*' --max-time 60 -X POST "$BASE/session/$SID/message" \
@@ -472,7 +472,7 @@ RESP=$(curl -s --noproxy '*' --max-time 60 -X POST "$BASE/session/$SID/message" 
 
 ## 十一、端到端完整流程
 
-### T32.23 完整 Goal 生命周期
+### T34.23 完整 Goal 生命周期
 
 ```bash
 SID=$(new_sid -k)
@@ -506,7 +506,7 @@ psql "$PG_URL" -c "SELECT count(*) as remaining FROM session_goal WHERE session_
 
 ---
 
-### T32.24 Goal + 工具调用交互
+### T34.24 Goal + 工具调用交互
 
 ```bash
 SID=$(new_sid -k)
@@ -547,7 +547,7 @@ print(f'Has system-reminder: {has_reminder}')
 > 以下场景在 **本地 PG + 远程沙箱** 环境下执行，模型 `zhipuai/glm-5.1`。
 > 使用 `POST /session/:id/command`（非 `message`），`model` 字段为字符串格式 `"provider/model"`。
 
-### T32.25 Bug 修复（TS 编译错误）
+### T34.25 Bug 修复（TS 编译错误）
 
 ```bash
 SID=$(new_sid -k)
@@ -572,7 +572,7 @@ curl -s --max-time 180 -X POST "$BASE/session/$SID/command" \
 
 ---
 
-### T32.26 多文件创建 + 测试验证
+### T34.26 多文件创建 + 测试验证
 
 ```bash
 SID=$(new_sid -k)
@@ -588,7 +588,7 @@ curl -s --max-time 300 -X POST "$BASE/session/$SID/command" \
 
 ---
 
-### T32.27 调试迭代（算法 bug 修复）
+### T34.27 调试迭代（算法 bug 修复）
 
 ```bash
 SID=$(new_sid -k)
@@ -612,7 +612,7 @@ curl -s --max-time 300 -X POST "$BASE/session/$SID/command" \
 
 ---
 
-### T32.28 /goal clear 中途中止
+### T34.28 /goal clear 中途中止
 
 ```bash
 SID=$(new_sid -k)
@@ -634,7 +634,7 @@ curl -s -X POST "$BASE/session/$SID/command" \
 
 ---
 
-### T32.29 Node.js 项目构建验证
+### T34.29 Node.js 项目构建验证
 
 ```bash
 SID=$(new_sid -k)
@@ -662,34 +662,34 @@ curl -s --max-time 300 -X POST "$BASE/session/$SID/command" \
 
 | 编号 | 用例 | 类型 | 状态 | 备注 |
 |------|------|------|------|------|
-| T32.1.1-T32.1.6 | 状态机基本流程 | 单元测试 | ✅ PASS | 7 pass / 0 fail |
-| T32.2.1-T32.2.2 | 多 Session 隔离 | 单元测试 | ✅ PASS | |
-| T32.3 | 命令注册 | E2E | ✅ PASS | |
-| T32.4 | `/goal <condition>` 设置 | E2E | ✅ PASS | PG 写入正确 |
-| T32.5 | `/goal clear` 清除 | E2E | ✅ PASS | PG 删除正确 |
-| T32.6 | `/goal`（空）同 clear | E2E | ✅ PASS | |
-| T32.7 | `/goal reset` 同 clear | E2E | ✅ PASS | |
-| T32.8 | Goal 未满足 → 继续 | E2E | ⚠️ 代码已实现 | glm-5.1 一次完成，未自然触发 system-reminder 路径 |
-| T32.9 | Goal 已满足 → 停止 | E2E | ✅ PASS | 5 个真实场景验证 |
-| T32.10 | Goal 不可能 → 停止 | E2E | ✅ PASS | 模型解释不可能性后 judge 判定 satisfied |
-| T32.11 | MAX_GOAL_REACT 上限 | E2E | ⚠️ 代码已实现 | 需 12 次 judge not-ok，耗时极长 |
-| T32.12 | Judge fail-open | E2E | ⚠️ 代码已实现 | 需模拟 judge 模型故障 |
-| T32.13 | 跨 Session 隔离 | E2E | ✅ PASS | |
-| T32.14 | Subagent 不触发 | E2E | ✅ PASS | subagent session 无 goal → `goal.get` 返回 undefined |
-| T32.15 | PG 写入 | E2E | ✅ PASS | |
-| T32.16 | PG 清除 | E2E | ✅ PASS | |
-| T32.17 | PG bumpReact 更新 | E2E | ✅ PASS | |
-| T32.18 | PG 持久化 | E2E | ✅ PASS | |
-| T32.19 | 空 condition | E2E | ✅ PASS | |
-| T32.20 | 超长 condition | E2E | ✅ PASS | 6500 字符成功设置 |
-| T32.21 | 重复设置覆盖 | E2E | ✅ PASS | condition 覆盖 + react 重置 |
-| T32.22 | 特殊字符 | E2E | ✅ PASS | 引号/括号/感叹号正确存储 |
-| T32.23 | 端到端完整流程 | E2E | ✅ PASS | |
-| T32.24 | 工具调用交互 | E2E | ✅ PASS | |
-| T32.25 | Bug 修复场景 | E2E | ✅ PASS | TS 编译错误修复 |
-| T32.26 | 多文件创建+测试 | E2E | ✅ PASS | |
-| T32.27 | 调试迭代 | E2E | ✅ PASS | fib 函数修复 |
-| T32.28 | 中途中止 | E2E | ✅ PASS | |
-| T32.29 | Node.js 构建验证 | E2E | ✅ PASS | |
+| T34.1.1-T34.1.6 | 状态机基本流程 | 单元测试 | ✅ PASS | 7 pass / 0 fail |
+| T34.2.1-T34.2.2 | 多 Session 隔离 | 单元测试 | ✅ PASS | |
+| T34.3 | 命令注册 | E2E | ✅ PASS | |
+| T34.4 | `/goal <condition>` 设置 | E2E | ✅ PASS | PG 写入正确 |
+| T34.5 | `/goal clear` 清除 | E2E | ✅ PASS | PG 删除正确 |
+| T34.6 | `/goal`（空）同 clear | E2E | ✅ PASS | |
+| T34.7 | `/goal reset` 同 clear | E2E | ✅ PASS | |
+| T34.8 | Goal 未满足 → 继续 | E2E | ⚠️ 代码已实现 | glm-5.1 一次完成，未自然触发 system-reminder 路径 |
+| T34.9 | Goal 已满足 → 停止 | E2E | ✅ PASS | 5 个真实场景验证 |
+| T34.10 | Goal 不可能 → 停止 | E2E | ✅ PASS | 模型解释不可能性后 judge 判定 satisfied |
+| T34.11 | MAX_GOAL_REACT 上限 | E2E | ⚠️ 代码已实现 | 需 12 次 judge not-ok，耗时极长 |
+| T34.12 | Judge fail-open | E2E | ⚠️ 代码已实现 | 需模拟 judge 模型故障 |
+| T34.13 | 跨 Session 隔离 | E2E | ✅ PASS | |
+| T34.14 | Subagent 不触发 | E2E | ✅ PASS | subagent session 无 goal → `goal.get` 返回 undefined |
+| T34.15 | PG 写入 | E2E | ✅ PASS | |
+| T34.16 | PG 清除 | E2E | ✅ PASS | |
+| T34.17 | PG bumpReact 更新 | E2E | ✅ PASS | |
+| T34.18 | PG 持久化 | E2E | ✅ PASS | |
+| T34.19 | 空 condition | E2E | ✅ PASS | |
+| T34.20 | 超长 condition | E2E | ✅ PASS | 6500 字符成功设置 |
+| T34.21 | 重复设置覆盖 | E2E | ✅ PASS | condition 覆盖 + react 重置 |
+| T34.22 | 特殊字符 | E2E | ✅ PASS | 引号/括号/感叹号正确存储 |
+| T34.23 | 端到端完整流程 | E2E | ✅ PASS | |
+| T34.24 | 工具调用交互 | E2E | ✅ PASS | |
+| T34.25 | Bug 修复场景 | E2E | ✅ PASS | TS 编译错误修复 |
+| T34.26 | 多文件创建+测试 | E2E | ✅ PASS | |
+| T34.27 | 调试迭代 | E2E | ✅ PASS | fib 函数修复 |
+| T34.28 | 中途中止 | E2E | ✅ PASS | |
+| T34.29 | Node.js 构建验证 | E2E | ✅ PASS | |
 
 **统计**：26/29 PASS，3/29 代码已实现但受限于模型能力/环境未自然触发。

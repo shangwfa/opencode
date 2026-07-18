@@ -2,7 +2,7 @@
 
 > 适用版本：`feat/session-pvc-mode` 分支
 > 技术方案见 [session-pvc-mode.md](./session-pvc-mode.md)
-> 测试用例见 [27-session-pvc-mode.md](./test-cases/27-session-pvc-mode.md)
+> 测试用例见 [38-session-pvc-mode.md](./test-cases/38-session-pvc-mode.md)
 
 ---
 

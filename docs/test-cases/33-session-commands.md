@@ -76,243 +76,23 @@ async function sendAndWait(sid, body, timeout = 60000) {
 
 ---
 
-### T31.1 创建会话级 command
+### T33.1-T33.9 通用 CRUD 生命周期（按附录 A 清单）
 
-```bash
-bun -e '
-const BASE = "http://localhost:14096"
-const SID = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "cmd-create" }) })).json()
+> 本节按 [`00-preamble.md` 附录 A](./00-preamble.md) 的 G1-G9 通用清单执行（含通用脚本模板），资源为 `commands`（`/session/:id/commands[/create]`），PG 表 `session_commands`。原始逐步脚本见 git 历史。
 
-const res = await (await fetch(BASE + "/session/" + SID.id + "/commands/create", {
-  method: "POST", headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ name: "test-cmd", template: "Run tests for $ARGUMENTS", description: "Custom test command", agent: "build" }),
-})).json()
-console.log("name:", res.name)
-console.log("description:", res.description)
-console.log("template:", res.template)
-console.log("agent:", res.agent)
-console.log("source:", res.source)
-console.log("hints:", JSON.stringify(res.hints))
-console.log("SID:", SID.id)
-'
-```
-**期望**：`name=test-cmd`，`description` / `template` / `agent` 正确，`source=command`，`hints=["$ARGUMENTS"]`
+| 用例 | 清单 | 资源参数 | 特有期望 |
+|---|---|---|---|
+| T33.1 | G1 | `{name, template}`（可含 `$ARGUMENTS`/占位符） | 返回对象字段完整；PG 一致 |
+| T33.2 | G2 | 建 session command | 与 instance 级命令合并列表，同名时 session 在前 |
+| T33.3 | G3 | 同名更新 template | 列表 count=1，template 已更新 |
+| T33.4 | G4 | 删单个 | DELETE 200，列表/PG 移除 |
+| T33.5 | G5 | 建 2 个后清空 | DELETE 200，session 项清空、instance 项保留 |
+| T33.6 | G6 | A/B 各建同名 command | 列表互相隔离 |
+| T33.7 | G7 | 删除 session | GET commands → 404（`requireSession`）；PG 级联 COUNT=0 |
+| T33.8 | G9 | 缺 name / template | 均 400 |
+| T33.9 | G8 | ses_NOTEXIST create/list | create=500（FK）；list=404（`requireSession`） |
 
-> **PG 验证**：`psql -h 127.0.0.1 -U app -d opencode -c "SELECT name, description, agent, hints::text FROM session_commands WHERE session_id='$SID' AND name='test-cmd';"`
-> 期望：name=test-cmd, description=Custom test command, agent=build, hints 含 `$ARGUMENTS`
-
-### T31.2 列出会话 commands（合并列表）
-
-```bash
-bun -e '
-const BASE = "http://localhost:14096"
-const SID = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "cmd-list" }) })).json()
-
-// 初始列表（instance 级内置命令）
-const initial = await (await fetch(BASE + "/session/" + SID.id + "/commands")).json()
-console.log("initial count:", initial.length)
-console.log("has init:", initial.some(c => c.name === "init"))
-console.log("has review:", initial.some(c => c.name === "review"))
-
-// 创建 session command
-await fetch(BASE + "/session/" + SID.id + "/commands/create", {
-  method: "POST", headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ name: "my-cmd", template: "Do something" }),
-})
-
-const merged = await (await fetch(BASE + "/session/" + SID.id + "/commands")).json()
-console.log("merged count:", merged.length, "(expect initial + 1)")
-console.log("my-cmd in list:", merged.some(c => c.name === "my-cmd"))
-console.log("init still in list:", merged.some(c => c.name === "init"))
-console.log("SID:", SID.id)
-'
-```
-**期望**：初始列表非空（含 `init` / `review`），创建 session command 后总数 +1，`my-cmd` 出现在列表中，内置命令仍在
-
-> **PG 验证**：`psql -h 127.0.0.1 -U app -d opencode -t -A -c "SELECT COUNT(*) FROM session_commands WHERE session_id='$SID';"`
-> 期望：COUNT=1（只有 session 级的 my-cmd，instance 级命令不在此表）
-
-### T31.3 Upsert 更新同名 command
-
-```bash
-bun -e '
-const BASE = "http://localhost:14096"
-const SID = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) })).json()
-
-await fetch(BASE + "/session/" + SID.id + "/commands/create", {
-  method: "POST", headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ name: "upsert-cmd", template: "v1", description: "Version 1" }),
-})
-
-const updated = await (await fetch(BASE + "/session/" + SID.id + "/commands/create", {
-  method: "POST", headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ name: "upsert-cmd", template: "v2 with $ARGUMENTS", description: "Version 2", agent: "plan" }),
-})).json()
-console.log("description:", updated.description, "(expect Version 2)")
-console.log("template:", updated.template, "(expect v2 with $ARGUMENTS)")
-console.log("agent:", updated.agent, "(expect plan)")
-console.log("hints:", JSON.stringify(updated.hints), "(expect [$ARGUMENTS])")
-
-const list = await (await fetch(BASE + "/session/" + SID.id + "/commands")).json()
-console.log("upsert-cmd count:", list.filter(c => c.name === "upsert-cmd").length, "(expect 1)")
-'
-```
-**期望**：字段更新为 v2，hints 重新计算，列表仍只有 1 条 upsert-cmd
-
-> **PG 验证**：`psql -h 127.0.0.1 -U app -d opencode -c "SELECT description, template, agent FROM session_commands WHERE session_id='$SID' AND name='upsert-cmd';"`
-> 期望：description=Version 2, template=v2 with $ARGUMENTS, agent=plan
-
-### T31.4 删除单个 command
-
-```bash
-bun -e '
-const BASE = "http://localhost:14096"
-const SID = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) })).json()
-
-await fetch(BASE + "/session/" + SID.id + "/commands/create", {
-  method: "POST", headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ name: "to-delete", template: "Will be deleted" }),
-})
-
-const delRes = await fetch(BASE + "/session/" + SID.id + "/commands/to-delete", { method: "DELETE" })
-console.log("DELETE status:", delRes.status)
-
-const list = await (await fetch(BASE + "/session/" + SID.id + "/commands")).json()
-console.log("to-delete gone:", !list.some(c => c.name === "to-delete"))
-'
-```
-**期望**：DELETE 返回 200，to-delete 从列表中消失
-
-> **PG 验证**：`psql -h 127.0.0.1 -U app -d opencode -t -A -c "SELECT COUNT(*) FROM session_commands WHERE session_id='$SID' AND name='to-delete';"`
-> 期望：COUNT=0
-
-### T31.5 清空所有会话级 commands
-
-```bash
-bun -e '
-const BASE = "http://localhost:14096"
-const SID = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) })).json()
-
-await fetch(BASE + "/session/" + SID.id + "/commands/create", {
-  method: "POST", headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ name: "c1", template: "One" }),
-})
-await fetch(BASE + "/session/" + SID.id + "/commands/create", {
-  method: "POST", headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ name: "c2", template: "Two" }),
-})
-
-const beforeCount = (await (await fetch(BASE + "/session/" + SID.id + "/commands")).json()).length
-const clearRes = await fetch(BASE + "/session/" + SID.id + "/commands", { method: "DELETE" })
-console.log("clear status:", clearRes.status)
-
-const afterList = await (await fetch(BASE + "/session/" + SID.id + "/commands")).json()
-console.log("before:", beforeCount, "after:", afterList.length)
-console.log("c1 gone:", !afterList.some(c => c.name === "c1"))
-console.log("c2 gone:", !afterList.some(c => c.name === "c2"))
-console.log("init still present:", afterList.some(c => c.name === "init"))
-'
-```
-**期望**：清空后 c1/c2 消失，但内置命令 `init` 仍在（只清 session 级）
-
-> **PG 验证**：`psql -h 127.0.0.1 -U app -d opencode -t -A -c "SELECT COUNT(*) FROM session_commands WHERE session_id='$SID';"`
-> 期望：COUNT=0
-
-### T31.6 不同 session 的 commands 互相隔离
-
-```bash
-bun -e '
-const BASE = "http://localhost:14096"
-const SID_A = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "iso-A" }) })).json()
-const SID_B = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "iso-B" }) })).json()
-
-await fetch(BASE + "/session/" + SID_A.id + "/commands/create", {
-  method: "POST", headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ name: "shared", template: "Belongs to A" }),
-})
-await fetch(BASE + "/session/" + SID_B.id + "/commands/create", {
-  method: "POST", headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ name: "shared", template: "Belongs to B" }),
-})
-
-const listA = await (await fetch(BASE + "/session/" + SID_A.id + "/commands")).json()
-const listB = await (await fetch(BASE + "/session/" + SID_B.id + "/commands")).json()
-console.log("A:", listA.find(c => c.name === "shared")?.template)
-console.log("B:", listB.find(c => c.name === "shared")?.template)
-console.log("PASS:", listA.find(c => c.name === "shared")?.template === "Belongs to A" && listB.find(c => c.name === "shared")?.template === "Belongs to B")
-'
-```
-**期望**：A 显示"Belongs to A"，B 显示"Belongs to B"
-
-> **PG 验证**：`psql -h 127.0.0.1 -U app -d opencode -c "SELECT session_id, template FROM session_commands WHERE name='shared' ORDER BY session_id;"`
-> 期望：两条记录，分属不同 session
-
-### T31.7 删除 session 后 commands 级联清理
-
-```bash
-bun -e '
-const BASE = "http://localhost:14096"
-const SID = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "cascade-test" }) })).json()
-
-await fetch(BASE + "/session/" + SID.id + "/commands/create", {
-  method: "POST", headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ name: "cascade-cmd", template: "Will cascade" }),
-})
-
-const before = await (await fetch(BASE + "/session/" + SID.id + "/commands")).json()
-console.log("Before delete:", before.some(c => c.name === "cascade-cmd"))
-
-await fetch(BASE + "/session/" + SID.id, { method: "DELETE" })
-console.log("SID:", SID.id)
-'
-```
-**期望**：删除 session 后 session_commands 中该 session 的行全部消失
-
-> **PG 验证**：`psql -h 127.0.0.1 -U app -d opencode -t -A -c "SELECT COUNT(*) FROM session_commands WHERE session_id='$SID';"`
-> 期望：COUNT=0（ON DELETE cascade）
-
-### T31.8 缺少必填字段 → 400
-
-```bash
-bun -e '
-const BASE = "http://localhost:14096"
-const SID = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) })).json()
-
-// 缺 name
-const noName = await fetch(BASE + "/session/" + SID.id + "/commands/create", {
-  method: "POST", headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ template: "test" }),
-})
-console.log("no name:", noName.status, "(expect 400)")
-
-// 缺 template
-const noTemplate = await fetch(BASE + "/session/" + SID.id + "/commands/create", {
-  method: "POST", headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ name: "test" }),
-})
-console.log("no template:", noTemplate.status, "(expect 400)")
-'
-```
-**期望**：缺 `name` / `template` 均返回 400
-
-### T31.9 不存在的 session 创建 command → 500（FK 约束）
-
-```bash
-bun -e '
-const BASE = "http://localhost:14096"
-const res = await fetch(BASE + "/session/ses_NOTEXIST/commands/create", {
-  method: "POST", headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ name: "ghost", template: "ghost" }),
-})
-console.log("create status:", res.status, "(expect 500 due FK)")
-
-const listRes = await fetch(BASE + "/session/ses_NOTEXIST/commands")
-console.log("list status:", listRes.status)
-'
-```
-**期望**：create 返回 500（FK 约束），list 返回 200 空数组或错误
-
-### T31.10 session command 覆盖同名 instance 命令（overlay 合并）
+### T33.10 session command 覆盖同名 instance 命令（overlay 合并）
 
 > 验证 session command 与 instance 级 config 命令同名时，session 版本覆盖 instance 版本，且列表中不出现重复。
 
@@ -339,7 +119,7 @@ console.log("init template:", inits[0]?.template, "(expect SESSION OVERRIDE)")
 > **PG 验证**：`psql -h 127.0.0.1 -U app -d opencode -c "SELECT description, template FROM session_commands WHERE session_id='$SID' AND name='init';"`
 > 期望：description=Overridden by session, template=SESSION OVERRIDE
 
-### T31.11 删除覆盖后恢复原 instance 命令
+### T33.11 删除覆盖后恢复原 instance 命令
 
 > 验证删除 session 级覆盖命令后，instance 级原命令恢复。
 
@@ -374,7 +154,7 @@ console.log("restored matches original:", restoredInit?.description === origInit
 > **PG 验证**：`psql -h 127.0.0.1 -U app -d opencode -t -A -c "SELECT COUNT(*) FROM session_commands WHERE session_id='$SID' AND name='init';"`
 > 期望：COUNT=0（session 级 init 已删除，instance 级 init 不在此表）
 
-### T31.12 hints 自动推导
+### T33.12 hints 自动推导
 
 > 验证 template 中 `$ARGUMENTS` / `$1` / `$2` 占位符自动推导为 hints。
 
@@ -407,7 +187,7 @@ console.log("no placeholder hints:", JSON.stringify(r3.hints), "(expect [])")
 ```
 **期望**：`$ARGUMENTS` → `["$ARGUMENTS"]`；`$1 $2` → `["$1","$2"]`；无占位符 → `[]`
 
-### T31.13 显式 hints 优先于自动推导
+### T33.13 显式 hints 优先于自动推导
 
 ```bash
 bun -e '
@@ -423,7 +203,7 @@ console.log("hints:", JSON.stringify(res.hints), "(expect [\"custom\"])")
 ```
 **期望**：显式传入 `hints: ["custom"]` 时不自动推导
 
-### T31.14 命令执行（模板替换）
+### T33.14 命令执行（模板替换）
 
 > 验证通过 `POST /session/:id/command` 执行 session command，`$ARGUMENTS` 替换为全部参数，`$1` 取第一个参数，`$2`（last position）吸收剩余参数。
 
@@ -451,7 +231,7 @@ console.log("ALL=alpha beta gamma:", text.includes("ALL=alpha beta gamma"))
 ```
 **期望**：`$1`→alpha，`$2`→"beta gamma"（last position 吸收剩余），`$ARGUMENTS`→"alpha beta gamma"
 
-### T31.15 不存在的命令 → Command not found
+### T33.15 不存在的命令 → Command not found
 
 ```bash
 bun -e '
@@ -469,7 +249,7 @@ console.log("error name:", body.name)
 ```
 **期望**：返回 500 UnknownError（内部为 `Command not found: "no-such-cmd"`，附可用命令列表提示）
 
-### T31.16 time_created / time_updated 行为
+### T33.16 time_created / time_updated 行为
 
 > 验证创建时 time_created ≈ time_updated；upsert 更新后 time_updated 变大，time_created 不变。API 不返回时间戳，需 PG 验证。
 
@@ -505,7 +285,7 @@ console.log("请再次执行 PG 查询对比时间戳")
 > -- 期望：time_created 不变，time_updated > time_created
 > ```
 
-### T31.17 删除不存在的 command name（幂等）
+### T33.17 删除不存在的 command name（幂等）
 
 ```bash
 bun -e '
@@ -518,7 +298,7 @@ console.log("DELETE nonexistent:", res.status, "(expect 200)")
 ```
 **期望**：返回 200，不报错（幂等删除）
 
-### T31.18 清空空 session 的 commands（幂等）
+### T33.18 清空空 session 的 commands（幂等）
 
 ```bash
 bun -e '
@@ -534,7 +314,7 @@ console.log("still has init:", list.some(c => c.name === "init"))
 ```
 **期望**：返回 200，不报错；清空后内置命令仍在（只清 session 级）
 
-### T31.19 PG 直接验证（CRUD 用例的数据库层断言）
+### T33.19 PG 直接验证（CRUD 用例的数据库层断言）
 
 > 对 CRUD 操作做 PG 直接验证，确认数据库记录与 API 返回一致。
 
@@ -571,7 +351,7 @@ console.log("期望: 0")
 ```
 **期望**：API 返回与 PG 直接查询一致；每步后附 PG 验证 SQL
 
-### T31.20 完整工作流（创建 → 执行 → 验证 → 清理）
+### T33.20 完整工作流（创建 → 执行 → 验证 → 清理）
 
 ```bash
 bun -e '
@@ -617,7 +397,7 @@ await fetch(BASE + "/session/" + SID.id, { method: "DELETE" })
 ```
 **期望**：完整流程：创建→执行返回 "Hello World"→列表存在→删除后消失→再执行报 not found
 
-### T31.21 清空后 instance 级命令恢复
+### T33.21 清空后 instance 级命令恢复
 
 > 验证 `commandsClear` 清空所有 session 级命令后，instance 级命令（init/review 等）恢复原样。
 
@@ -664,7 +444,7 @@ console.log("temp1 gone:", !restored.some(c => c.name === "temp1"))
 
 > 以下用例模拟 opencode 官方文档中的典型命令场景（[https://opencode.ai/docs/commands/](https://opencode.ai/docs/commands/)），覆盖参数传递、agent 指定、subtask、model 覆盖、shell 注入、文件引用。
 
-### T31.22 创建组件命令（$ARGUMENTS 单参数场景）
+### T33.22 创建组件命令（$ARGUMENTS 单参数场景）
 
 > 模拟官方文档 `/component Button` 场景：用户传入组件名，AI 生成对应的 React 组件代码。
 
@@ -697,7 +477,7 @@ console.log("response snippet:", text.slice(0, 200))
 ```
 **期望**：AI 生成包含 `UserProfile` 的 React 组件代码（含 `export`/`function`/`const`），hints=`["$ARGUMENTS"]`
 
-### T31.23 创建文件命令（$1/$2/$3 多位置参数场景）
+### T33.23 创建文件命令（$1/$2/$3 多位置参数场景）
 
 > 模拟官方文档 `/create-file config.json src "{ key: value }"` 场景。
 
@@ -728,7 +508,7 @@ console.log("$3 -> {key:value}:", text.includes("CONTENT={key:value}"))
 ```
 **期望**：`$1`→config.json，`$2`→src，`$3`→{key:value}（last position 吸收剩余）
 
-### T31.24 指定 agent 执行命令
+### T33.24 指定 agent 执行命令
 
 > 模拟官方文档 `"agent": "plan"` 场景。
 
@@ -749,7 +529,7 @@ console.log("list agent:", list.find(c => c.name === "plan-review")?.agent, "(ex
 ```
 **期望**：创建返回和列表中 `agent=plan`
 
-### T31.25 subtask 模式命令
+### T33.25 subtask 模式命令
 
 > 模拟官方文档 `"subtask": true` 场景。
 
@@ -770,7 +550,7 @@ console.log("list subtask:", list.find(c => c.name === "analyze")?.subtask, "(ex
 ```
 **期望**：创建返回和列表中 `subtask=true`
 
-### T31.26 model 覆盖命令
+### T33.26 model 覆盖命令
 
 > 模拟官方文档 `"model": "anthropic/claude-3-5-sonnet-20241022"` 场景。
 
@@ -791,7 +571,7 @@ console.log("list model:", list.find(c => c.name === "smart-analysis")?.model, "
 ```
 **期望**：创建返回和列表中 `model=zhipuai/glm-5.1`
 
-### T31.27 Shell 输出注入命令（!`cmd`）
+### T33.27 Shell 输出注入命令（!`cmd`）
 
 > 模拟官方文档 `/review-changes` 场景：模板中 `` !`git log --oneline -5` `` 注入 shell 命令输出。
 >
@@ -822,7 +602,7 @@ console.log("template:", cmd?.template?.slice(0, 80))
 > **PG 验证**：`psql -h 127.0.0.1 -U app -d opencode -c "SELECT template FROM session_commands WHERE session_id='$SID' AND name='review-changes';"`
 > 期望：template 含 `!`git log --oneline-5``
 
-### T31.28 文件引用命令（@filename）
+### T33.28 文件引用命令（@filename）
 
 > 模拟官方文档 `/review-component` 场景：模板中 `@README.md` 引用文件内容。
 >

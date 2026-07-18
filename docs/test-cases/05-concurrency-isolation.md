@@ -98,6 +98,8 @@ psql "$PG_URL" -t -c "SELECT COUNT(*) as part_count FROM part WHERE session_id='
 
 **期望**：全部 204，PG 消息数 > 0
 
+> **定位说明**：同 session 消息为串行处理（见已废弃的 T6.10），本用例验证的是 **prompt_async 的 204 接纳语义**（快速连续提交均被接受且不丢消息），而非并发执行能力。
+
 ### T6.4 并发 sandbox 创建
 
 ```bash
@@ -315,38 +317,13 @@ done
 
 ### T6.10 消息队列压力（⛔ 已废弃）
 
-> **废弃原因**：单 session 连续发送 20 条消息属于人造场景，真实用户不会如此操作。opencode 对同一 session 的消息**串行处理**，该用例实际测的是"慢模型 + 串行队列"的吞吐延迟，而非并发隔离能力。并发验证应聚焦 **session 级别**，见 [T7.1](#t71-20-会话--混合任务并发)（20 会话真并发）。保留脚本仅作历史记录，无需执行。
-
-```bash
-SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys; print(json.load(sys.stdin)['id'])")
-echo "SID: $SID"
-
-# 快速发送 20 条异步消息
-echo "--- 快速发送 20 条异步消息 ---"
-for i in {1..20}; do
-  curl -s -o /dev/null -w "msg-$i: %{http_code}\n" --max-time 5 -X POST "$BASE/session/$SID/prompt_async" \
-    -H 'Content-Type: application/json' \
-    -d "{\"parts\":[{\"type\":\"text\",\"text\":\"消息编号 $i\"}],\"model\":$MODEL}" &
-done
-wait
-
-echo "--- 等待处理 ---"
-sleep 60
-
-echo "--- PG 验证 ---"
-MSG_COUNT=$(psql "$PG_URL" -t -c "SELECT COUNT(*) FROM message WHERE session_id='$SID'" | tr -d '[:space:]')
-PART_COUNT=$(psql "$PG_URL" -t -c "SELECT COUNT(*) FROM part WHERE session_id='$SID'" | tr -d '[:space:]')
-echo "消息数: $MSG_COUNT, 部分数: $PART_COUNT"
-echo "期望: >= 40 (20 user + 20 assistant)"
-```
-
-**期望**：消息数 >= 40，无丢失
+> **废弃原因**：单 session 连续发送 20 条消息属于人造场景，真实用户不会如此操作。opencode 对同一 session 的消息**串行处理**，该用例实际测的是"慢模型 + 串行队列"的吞吐延迟，而非并发隔离能力。并发验证应聚焦 **session 级别**，见 [T6.11](#t611-20-会话--混合任务并发)（20 会话真并发）。原脚本已移除（历史版本见 git 历史），无需执行。
 
 ---
 
 ## 七、负载压测
 
-### T7.1 20 会话 × 混合任务并发
+### T6.11 20 会话 × 混合任务并发
 
 ```bash
 # 创建 20 个会话
@@ -431,5 +408,5 @@ echo "  - assistant: $TOTAL_ASSISTANT (期望>=20)"
 | T6.8 | 并发删除+写入 | A 删除, B 成功 | — | B 文件完整 | ✅ |
 | T6.9 | sandbox 重建并发 | 3 个重建成功 | state=running | — | ✅ |
 | T6.10 | 消息队列压力（⛔ 已废弃） | — | — | 单 session 串行连发，非真实场景 | ⛔ |
-| T7.1 | 20 会话混合任务 | 20 条 204 | user=20, assistant>=20 | — | ✅ |
+| T6.11 | 20 会话混合任务 | 20 条 204 | user=20, assistant>=20 | — | ✅ |
 

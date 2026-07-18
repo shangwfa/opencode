@@ -58,9 +58,9 @@ console.log("\n━━ Step 6: 查看沙箱状态 ━━")
 const sandboxInfo = await api(`/session/${sid}/sandbox`)
 console.log("沙箱状态:", JSON.stringify(sandboxInfo).slice(0, 200))
 
-// Step 7: 关闭沙箱
+// Step 7: 关闭沙箱（kill-sandbox；无 DELETE /session/:id/sandbox 路由）
 console.log("\n━━ Step 7: 关闭/销毁沙箱 ━━")
-const disposeRes = await fetch(`${BASE}/session/${sid}/sandbox`, { method: "DELETE", headers: { "Content-Type": "application/json" } })
+const disposeRes = await fetch(`${BASE}/session/${sid}/kill-sandbox`, { method: "POST", headers: { "Content-Type": "application/json" } })
 console.log("dispose status:", disposeRes.status)
 const disposeBody = await disposeRes.text()
 console.log("dispose response:", disposeBody.slice(0, 200))

@@ -12,7 +12,7 @@
  *   step-start / step-finish / reasoning: 其他辅助 part
  *
  * 用法:
- *   node docs/test-cases/path-leak-e2e-test.mjs
+ *   node docs/test-cases/scripts/path-leak-e2e-test.mjs
  *
  * 前提: 本地测试环境已启动（容器 + TCP 转发）
  */

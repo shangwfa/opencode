@@ -31,7 +31,7 @@ opencode 本地模式下，LSP 通过直接管理本地 language server 进程�
     /lsp/hover, /lsp/definition, /lsp/references
     /lsp/implementation, /lsp/documentSymbol, /lsp/workspaceSymbol
         ↓
-  LspManager → typescript-language-server --stdio
+  LspManager → tsc --lsp --stdio（TS 7.x 原生 Go binary）
 ```
 
 ### 1.3 关键文件
@@ -42,11 +42,11 @@ opencode 本地模式下，LSP 通过直接管理本地 language server 进程�
 | `src/lsp/daemon/index.ts` | 容器内 HTTP daemon 入口（10 个路由） |
 | `src/lsp/daemon/lsp-manager.ts` | LSP server 进程管理（spawn、initialize、diagnostics、hover、definition、references、implementation、documentSymbol、workspaceSymbol） |
 | `src/lsp/daemon/bundle.ts` | esbuild 打包脚本（CJS 格式，内联 vscode-jsonrpc） |
-| `src/tool/write.ts` | sandbox 分支通过 LspAgent 获取编辑后诊断 |
+| `src/tool/write.ts` | sandbox 分支通过 LspAgent 获取编辑后诊断（2026-07-18 已补齐，对齐 edit.ts/apply_patch.ts） |
 | `src/tool/edit.ts` | sandbox 分支通过 LspAgent 获取编辑后诊断（含 MAX_PROJECT_DIAGNOSTICS_FILES） |
 | `src/tool/apply_patch.ts` | sandbox 分支通过 LspAgent 获取 patch 后诊断 |
 | `src/tool/lsp.ts` | sandbox 分支通过 LspAgent 代理 hover/definition/references |
-| `docker/Dockerfile` | 步骤 12：安装 daemon + typescript-language-server |
+| `docker/Dockerfile` | 步骤 12：安装 daemon + TypeScript 7.x + pyright（daemon 通过 `tsc --lsp --stdio` 原生 LSP） |
 
 ### 1.4 设计约束
 
@@ -64,7 +64,7 @@ opencode 本地模式下，LSP 通过直接管理本地 language server 进程�
 
 ### 2.1 路径映射验证
 
-daemon 内部不做宿主路径映射。主进程侧 `agent.ts` 通过 `toSandboxPath()` 转换后再发送给 daemon。daemon 返回的 `/workspace/...` 路径直接透传给 LLM，不做 `toHostPath` 反向映射（遵循路径泄露防护原则，参见 [20-path-leak-test.md](./20-path-leak-test.md)）。
+daemon 内部不做宿主路径映射。主进程侧 `agent.ts` 通过 `toSandboxPath()` 转换后再发送给 daemon。daemon 返回的 `/workspace/...` 路径直接透传给 LLM，不做 `toHostPath` 反向映射（遵循路径泄露防护原则，参见 [19-path-leak-test.md](./19-path-leak-test.md)）。
 
 | 场景 | 预期 |
 |------|------|
@@ -110,7 +110,7 @@ error → starting (下次请求触发重新 ensure)
 # 前提：SaaS 容器使用包含 sandbox 默认启用 lsp tool 的代码启动。
 # 默认应满足：OPENCODE_SANDBOX_ENABLED=1 且未设置 OPENCODE_DISABLE_LSP_TOOL=1。
 
-bun docs/test-cases/lsp-tool-visibility-test.mjs
+bun docs/test-cases/scripts/lsp-tool-visibility-test.mjs
 ```
 
 **期望**：`/experimental/tool/ids` 包含 `lsp`，且 `/experimental/tool?provider=...&model=...` 返回的 provider tool schema 包含 `lsp`，并暴露 9 个 operation enum。
@@ -118,17 +118,17 @@ bun docs/test-cases/lsp-tool-visibility-test.mjs
 **关闭开关验证**：如果容器设置 `OPENCODE_DISABLE_LSP_TOOL=1` 后重启，`/experimental/tool/ids` 不应包含 `lsp`。
 
 ```bash
-EXPECT_LSP_DISABLED=1 BASE=http://localhost:14097 bun docs/test-cases/lsp-tool-visibility-test.mjs
+EXPECT_LSP_DISABLED=1 BASE=http://localhost:14097 bun docs/test-cases/scripts/lsp-tool-visibility-test.mjs
 ```
 
 > 说明：`lsp` tool 仍可通过 `OPENCODE_EXPERIMENTAL_LSP_TOOL=1` 在非 sandbox 模式显式开启；SaaS sandbox 模式默认开启是为了让 code-agent 能看到 `hover`、`goToDefinition`、`findReferences`、`goToImplementation`、`documentSymbol`、`workspaceSymbol` 等能力。
 
-📜 **可执行脚本**：[`lsp-smoke-test.mjs`](./lsp-smoke-test.mjs)
+📜 **可执行脚本**：[`lsp-smoke-test.mjs`](./scripts/lsp-smoke-test.mjs)
 
 ```bash
 # 前提：SaaS 容器 + OpenSandbox server 已启动（source test-env.sh 3）
 # 运行（30s 完成）：
-bun docs/test-cases/lsp-smoke-test.mjs
+bun docs/test-cases/scripts/lsp-smoke-test.mjs
 ```
 
 **验证 3 个核心端点**：
@@ -144,15 +144,15 @@ bun docs/test-cases/lsp-smoke-test.mjs
 本章节包含三条测试路径，均已沉淀为**可执行脚本**：
 
 - **路径 A — Daemon 单元测试**（T27.1–T27.7.6）：在宿主机直接用 `node` 跑 daemon bundle，curl 直连 `localhost:20877` 验证每个 LSP 端点。最快、无需 SaaS 栈，用于验证 daemon 本身。
-  - 📜 **可执行脚本**：[`lsp-daemon-unit-test.mjs`](./lsp-daemon-unit-test.mjs) —— 自动建临时 TS 项目、启 daemon、验证全部 13 个端点。实测 **14/14 通过**。
-  - 运行：`cd packages/opencode && bun run build:daemon && node ../../docs/test-cases/lsp-daemon-unit-test.mjs`
+  - 📜 **可执行脚本**：[`lsp-daemon-unit-test.mjs`](./scripts/lsp-daemon-unit-test.mjs) —— 自动建临时 TS 项目、启 daemon、验证全部 13 个端点。实测 **14/14 通过**。
+  - 运行：`cd packages/opencode && bun run build:daemon && node ../../docs/test-cases/scripts/lsp-daemon-unit-test.mjs`
 - **路径 B — 端到端 sandbox 测试**（T27.8–T27.16）：通过本地 OpenSandbox 创建**真实 sandbox 容器**，在容器内启动 daemon 并验证。模拟 SaaS 模式下 sandbox 内的真实场景。daemon 在容器内运行，宿主机**不能**直连 `localhost:20877`，脚本通过 OpenSandbox SDK 的 `commands.run` 从容器内部验证。
-  - 📜 **可执行脚本**：[`lsp-sandbox-e2e-test.mjs`](./lsp-sandbox-e2e-test.mjs) —— OpenSandbox SDK 直连，建 sandbox、启 daemon、验证 status/documentSymbol/callHierarchy/diagnostics。实测 **6/6 通过**。内置踩坑解法（platform amd64、execd 重试、QEMU 长等待）。
-- **路径 C — Code-Agent 端到端测试**：通过 SaaS API 完整模拟 code-agent 在沙箱中的真实开发流程。以"添加日期格式化工具函数"为场景，串联全部 LSP 操作（diagnostics / documentSymbol / workspaceSymbol / hover / goToDefinition / findReferences / goToImplementation / callHierarchy / apply_patch），并全程检查**路径泄露防护**（遵循 [20-path-leak-test.md](./20-path-leak-test.md) 的单向映射原则）。
-  - 📜 **可执行脚本**：[`lsp-code-agent-e2e-test.mjs`](./lsp-code-agent-e2e-test.mjs) —— 13 步 AI 对话，覆盖全部 9 个 LSP 操作 + write/edit 的诊断触发 + 非 TS 文件不触发 LSP。自动检查路径泄露和能力缺失。
-  - 运行：`node docs/test-cases/lsp-code-agent-e2e-test.mjs`（前提：SaaS 容器 + OpenSandbox + 权限已配置）
+  - 📜 **可执行脚本**：[`lsp-sandbox-e2e-test.mjs`](./scripts/lsp-sandbox-e2e-test.mjs) —— OpenSandbox SDK 直连，建 sandbox、启 daemon、验证 status/documentSymbol/callHierarchy/diagnostics。实测 **6/6 通过**。内置踩坑解法（platform amd64、execd 重试、QEMU 长等待）。
+- **路径 C — Code-Agent 端到端测试**：通过 SaaS API 完整模拟 code-agent 在沙箱中的真实开发流程。以"添加日期格式化工具函数"为场景，串联全部 LSP 操作（diagnostics / documentSymbol / workspaceSymbol / hover / goToDefinition / findReferences / goToImplementation / callHierarchy / apply_patch），并全程检查**路径泄露防护**（遵循 [19-path-leak-test.md](./19-path-leak-test.md) 的单向映射原则）。
+  - 📜 **可执行脚本**：[`lsp-code-agent-e2e-test.mjs`](./scripts/lsp-code-agent-e2e-test.mjs) —— 13 步 AI 对话，覆盖全部 9 个 LSP 操作 + write/edit 的诊断触发 + 非 TS 文件不触发 LSP。自动检查路径泄露和能力缺失。
+  - 运行：`node docs/test-cases/scripts/lsp-code-agent-e2e-test.mjs`（前提：SaaS 容器 + OpenSandbox + 权限已配置）
   - 注意：该脚本依赖真实模型响应。HTTP/provider 错误、模型未调用工具、`write`/`edit`/`lsp` 调用缺失都会硬失败，不能用作无模型环境的默认 smoke。
-  - 运行（需本地 OpenSandbox server + `opencode-opensandbox:local` 镜像）：`cd packages/opencode && OPENCODE_SANDBOX_DOMAIN=localhost:8080 bun ../../docs/test-cases/lsp-sandbox-e2e-test.mjs`
+  - 运行（需本地 OpenSandbox server + `opencode-opensandbox:local` 镜像）：`cd packages/opencode && OPENCODE_SANDBOX_DOMAIN=localhost:8080 bun ../../docs/test-cases/scripts/lsp-sandbox-e2e-test.mjs`
 
 > 路径 B 的本地环境搭建（TCP 转发、本地 OpenSandbox server、SaaS 容器启动、权限配置）完全遵循 [`docs/local-test-env.md`](../local-test-env.md)。下文仅补充 LSP 专属步骤。
 
@@ -161,11 +161,11 @@ bun docs/test-cases/lsp-smoke-test.mjs
 **路径 A（daemon 单元测试）：**
 - `node` ≥ 18
 - daemon bundle 已构建（`cd packages/opencode && bun run build:daemon`）
-- 宿主机安装 `typescript-language-server` 和 `typescript`（或测试项目 `node_modules` 内有）
+- 宿主机安装 `typescript`（TS 7.x，脚本会在临时项目内 npm install）
 
 **路径 B（端到端 SaaS）：**
 - 已按 `local-test-env.md` 完成：TCP 转发（PG `:15432`）、本地 OpenSandbox server（`:8080`）、SaaS 容器（`:14096`）
-- **sandbox 镜像 `opencode-opensandbox:local` 已构建且内置 LSP daemon**：`packages/opencode/docker/Dockerfile` 步骤 12 已 COPY daemon + 安装 `typescript-language-server`。重新构建镜像后才会包含最新 daemon bundle
+- **sandbox 镜像 `opencode-opensandbox:local` 已构建且内置 LSP daemon**：`packages/opencode/docker/Dockerfile` 步骤 12 已 COPY daemon + 安装 `typescript`（TS 7.x）+ `pyright`。重新构建镜像后才会包含最新 daemon bundle
 - 已通过 `PATCH /global/config` 配置权限（`edit:allow` / `write:allow`，见 `local-test-env.md` 常见问题表），否则工具卡 `running`
 
 ### 路径 A：Daemon 单元测试本地命令
@@ -174,7 +174,7 @@ bun docs/test-cases/lsp-smoke-test.mjs
 # 1. 构建 daemon
 cd /Users/ruomu/code/opencode/packages/opencode && bun run build:daemon
 
-# 2. 创建测试项目（含 typescript-language-server）
+# 2. 创建测试项目（含 TypeScript 7.x）
 mkdir -p /tmp/lsp-test && cd /tmp/lsp-test
 cat > tsconfig.json << 'EOF'
 { "compilerOptions": { "strict": true, "target": "ES2020" }, "include": ["*.ts"] }
@@ -185,9 +185,9 @@ function foo(a: number): string { return a }
 export { foo }
 EOF
 npm init -y >/dev/null 2>&1
-npm install --no-save typescript typescript-language-server >/dev/null 2>&1
+npm install --no-save typescript >/dev/null 2>&1
 
-# 3. 启动 daemon（DAEMON 在 /tmp/lsp-test 下能找到 node_modules/.bin/typescript-language-server）
+# 3. 启动 daemon（DAEMON 在 /tmp/lsp-test 下能找到 node_modules/.bin/tsc）
 DAEMON=/Users/ruomu/code/opencode/packages/opencode/docker/opt/opencode-lsp-daemon/index.js
 nohup env LSP_AGENT_PORT=20877 PATH="/tmp/lsp-test/node_modules/.bin:$PATH" \
   node "$DAEMON" > /tmp/daemon.log 2>&1 &
@@ -280,7 +280,7 @@ curl -s http://localhost:20877/lsp/status
 
 ### T27.2 TypeScript Server 自动启动
 
-**目标**：touch 一个 `.ts` 文件后，daemon 自动启动 typescript-language-server。
+**目标**：touch 一个 `.ts` 文件后，daemon 自动启动 TS 7.x 原生 LSP server（`tsc --lsp --stdio`）。
 
 ```bash
 curl -s -X POST http://localhost:20877/lsp/touch \
@@ -446,7 +446,7 @@ curl -s -X POST http://localhost:20877/lsp/workspaceSymbol \
 **预期**：
 - HTTP 200
 - 返回符号数组，包含 `Greeter` 接口和 `HelloGreeter` 类
-- 按 kind 过滤（Class=5, Method=6, Function=12, Module=11, Constructor=9, Enum=10 等常用类型）
+- 按 kind 过滤（`lsp-manager.ts:45` `WORKSPACE_SYMBOL_KINDS = new Set([5,6,12,11,13,14])`：Class=5, Method=6, Function=12, Module=11, Constant=13, Self-Event=14）
 - 结果限制 10 条
 
 ---
@@ -791,35 +791,146 @@ console.log('Bundle size:', (code.length / 1024).toFixed(1), 'KB');
 
 ---
 
-### T27.14 Dockerfile 集成验证
+### T27.14 Dockerfile 集成验证 — 镜像内 LSP 组件完整性
 
-**目标**：验证 Docker 镜像构建后 daemon 可用。
+> 2026-07-18 增强：覆盖 TS 版本/tsserver、tsc LSP、pyright、daemon bundle、symlink 全链路。以下脚本通过 SaaS exec 在沙箱容器内执行（也可用 `docker run` 直跑）。
 
 ```bash
-# 构建镜像（需要在 packages/opencode 目录下）
-docker build -t opencode-sandbox:lsp-test -f docker/Dockerfile .
+# 前置：source test-env.sh 3，创建 session
+SID=$(new_sid -k)
 
-# 运行并测试
-docker run --rm opencode-sandbox:lsp-test which typescript-language-server
-docker run --rm opencode-sandbox:lsp-test ls -la /opt/opencode-lsp-daemon/index.js
-docker run --rm opencode-sandbox:lsp-test node -e "require('/opt/opencode-lsp-daemon/index.js')" 2>&1 | head -5
+exec_result() { curl -s -X POST "$BASE/session/$SID/exec" -H 'Content-Type: application/json' -d "{\"command\":\"$1\"}" | python3 -c "import json,sys;print(json.load(sys.stdin).get('stdout','').strip())"; }
+
+# ── T27.14a TypeScript 版本 + tsserver.js 状态 ──
+TS_GLOBAL=$(exec_result "npm root -g")
+echo "=== T27.14a TypeScript + tsserver.js ==="
+exec_result "cat $TS_GLOBAL/typescript/package.json | grep '\\\"version\\\"' | head -1"
+exec_result "ls $TS_GLOBAL/typescript/lib/tsserver.js 2>/dev/null && echo TSSERVER_OK || echo TSSERVER_MISSING"
+# 期望：TS 7.x（tsserver.js MISSING → 原生 LSP 模式）
+
+# ── T27.14b tsc 原生 LSP 可用性 ──
+echo "=== T27.14b tsc --lsp --stdio ==="
+exec_result "tsc --version"
+exec_result "which tsc"
+# 期望：tsc 7.x 可执行，daemon 通过 tsc --lsp --stdio 启动原生 LSP server
+
+# ── T27.14c pyright（Python LSP）版本 + 可执行 ──
+echo "=== T27.14c pyright ==="
+exec_result "pyright --version"
+exec_result "which pyright"
+
+# ── T27.14d daemon bundle 存在 + 大小 + 自包含 ──
+echo "=== T27.14d daemon bundle ==="
+exec_result "ls -la /opt/opencode-lsp-daemon/index.js | awk '{print \$5,\$NF}'"
+exec_result "node -e \"const c=require('fs').readFileSync('/opt/opencode-lsp-daemon/index.js','utf8');process.stdout.write((c.includes('@/lsp/')||c.includes('@/tool/'))?'FAIL:opencode-imports':'OK:self-contained')\""
+
+# ── T27.14e symlink 链路 ──
+echo "=== T27.14e symlink ==="
+exec_result "readlink -f /usr/local/bin/opencode-lsp-agent"
+# 期望：指向 /opt/opencode-lsp-daemon/index.js
+
+# ── T27.14f PATH 可达性 ──
+echo "=== T27.14f PATH ==="
+exec_result "echo PATH=\$PATH | tr ':' '\n' | head -5"
+exec_result "which node && node -v"
+exec_result "which tsc"
+exec_result "which pyright"
+# 期望：node / tsc / pyright 均通过 mise shims 或全局 bin 可达
+
+req_delete $SID
 ```
 
-**预期**：
-- `typescript-language-server` 在 PATH 中可用
-- `/opt/opencode-lsp-daemon/index.js` 存在且大小 > 50KB
-- `node -e "require(...)..."` 不报语法错误
+**期望**：
+- TypeScript 7.x（`tsserver.js` MISSING → daemon 使用 `tsc --lsp --stdio` 原生 LSP 模式）
+- `tsc` 可执行（版本 7.x），通过 mise shims 或全局 bin 可达
+- pyright 可执行（版本 ≥ 1.1.x）
+- daemon bundle 50–100KB，自包含（无 `@/` 引用）
+- `/usr/local/bin/opencode-lsp-agent` symlink → daemon bundle
+- `node` / `tsc` / `pyright` 在 PATH 中
+
+---
+
+### T27.14a daemon bundle 与源码一致性
+
+> 镜像中的 daemon bundle 可能是旧版本（镜像构建后代码变更未重新 build:daemon）。通过 hash 对比验证一致性。
+
+```bash
+# 宿主机：构建最新 daemon 并计算 hash
+cd packages/opencode && bun run build:daemon
+HOST_HASH=$(sha256sum docker/opt/opencode-lsp-daemon/index.js | awk '{print $1}')
+echo "host daemon hash: $HOST_HASH"
+
+# 沙箱容器内：计算镜像中的 daemon hash
+source docs/test-cases/test-env.sh 3
+SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+CONTAINER_HASH=$(curl -s -X POST "$BASE/session/$SID/exec" -H 'Content-Type: application/json' \
+  -d '{"command":"sha256sum /opt/opencode-lsp-daemon/index.js | awk \"{print \\$1}\""}' \
+  | python3 -c "import json,sys;print(json.load(sys.stdin).get('stdout','').strip())")
+echo "container daemon hash: $CONTAINER_HASH"
+curl -s -X DELETE "$BASE/session/$SID" >/dev/null
+
+[ "$HOST_HASH" = "$CONTAINER_HASH" ] && echo "✅ daemon bundle 一致" || echo "❌ daemon bundle 不一致（需重建镜像）"
+```
+
+**期望**：host 与 container 的 daemon bundle sha256 一致。不一致说明镜像构建后 daemon 源码有变更但未重新 `build:daemon` + 重建镜像。
+
+---
+
+### T27.14b daemon 启动命令与环境变量
+
+> 验证 SaaS 代码（`agent.ts:ensureDaemon`）启动 daemon 的命令、环境变量继承、默认端口与 workspace root。
+
+```bash
+source test-env.sh 3 && source test-lib.sh
+SID=$(new_sid -k)
+
+# 1. 触发 daemon 启动（写一个 .ts 文件）
+send_and_verify $SID "用 write 工具创建 /workspace/probe.ts，内容：const x = 1" "触发 daemon"
+
+# 2. 验证 daemon 进程正在运行
+DAEMON_PID=$(curl -s -X POST "$BASE/session/$SID/exec" -H 'Content-Type: application/json' \
+  -d '{"command":"pgrep -f opencode-lsp-daemon | head -1"}' \
+  | python3 -c "import json,sys;print(json.load(sys.stdin).get('stdout','').strip())")
+echo "daemon PID: $DAEMON_PID"
+[ -n "$DAEMON_PID" ] && pass "T27.14b daemon running" || fail "T27.14b daemon running" "no daemon process"
+
+# 3. 验证 daemon 监听默认端口 20877（容器内）
+PORT_CHECK=$(curl -s -X POST "$BASE/session/$SID/exec" -H 'Content-Type: application/json' \
+  -d '{"command":"curl -s http://localhost:20877/lsp/status"}' \
+  | python3 -c "import json,sys;print(json.load(sys.stdin).get('stdout','').strip())")
+echo "daemon status: $PORT_CHECK"
+echo "$PORT_CHECK" | grep -q '"status":"running"' && pass "T27.14b port 20877" || fail "T27.14b port 20877" "$PORT_CHECK"
+
+# 4. 验证 daemon 日志文件存在
+LOG_CHECK=$(curl -s -X POST "$BASE/session/$SID/exec" -H 'Content-Type: application/json' \
+  -d '{"command":"test -f /tmp/opencode-lsp-daemon.log && echo LOG_EXISTS || echo LOG_MISSING"}' \
+  | python3 -c "import json,sys;print(json.load(sys.stdin).get('stdout','').strip())")
+echo "daemon log: $LOG_CHECK"
+
+# 5. 验证 nohup 启动不阻塞（runInSession 应立即返回，daemon 在后台运行）
+#    ensureDaemon 的 runInSession 执行 "nohup ... &" 后 Effect.forkDetach
+#    这已由 T27.17 死锁回归覆盖，此处仅验证进程在后台
+
+summary
+```
+
+**期望**：
+- daemon 进程存在（`pgrep -f opencode-lsp-daemon` 返回 PID）
+- 默认端口 20877 可达，`/lsp/status` 返回 `running`
+- `/tmp/opencode-lsp-daemon.log` 存在（nohup 输出重定向目标）
+- `LSP_WORKSPACE_ROOT` 默认 `/workspace`（daemon 代码 `process.env.LSP_WORKSPACE_ROOT ?? "/workspace"`）
+- `LSP_AGENT_PORT` 默认 `20877`（daemon 代码 `Number(process.env.LSP_AGENT_PORT ?? "20877")`）
 
 ---
 
 ## 四、错误处理测试
 
-### T27.15 Daemon 启动失败（无 TLS 二进制）
+### T27.15 Daemon 启动失败（无 tsc 二进制）
 
-**目标**：容器内没有 `typescript-language-server` 时，daemon 优雅降级。
+**目标**：容器内没有 `tsc`（TS 7.x 原生 binary）时，daemon 优雅降级。
 
 ```bash
-# 在没有 TLS 的容器中测试
+# 在没有 tsc 的容器中测试
 docker run --rm -p 20878:20877 node:24-bookworm sh -c \
   "LSP_AGENT_PORT=20877 node /opt/opencode-lsp-daemon/index.js & sleep 2 && \
    curl -s -X POST http://localhost:20877/lsp/touch -H 'Content-Type: application/json' -d '{\"path\": \"/tmp/test.ts\"}'"
@@ -827,7 +938,7 @@ docker run --rm -p 20878:20877 node:24-bookworm sh -c \
 
 **预期**：
 - touch 返回 `{"version":0}`（LspManager 不因无法启动 server 而崩溃）
-- 或返回空错误响应（取决于 `ensureServer` 的错误处理）
+- daemon 日志输出 `tsc binary not found`，server status 为 `error`
 - daemon HTTP 服务器本身不崩溃
 
 ---
@@ -845,7 +956,7 @@ docker run --rm -p 20878:20877 node:24-bookworm sh -c \
 
 ---
 
-## 四（续）、健壮性与回归测试
+## 五、健壮性与回归测试
 
 > 以下用例（T27.17–T27.22）针对 2026-06-18 代码审查发现的问题补充，覆盖 LspAgent 死锁回归、并发去重、daemon 输入校验、路径越界防护与状态自愈。其中 T27.17 是 **P0 回归**——历史实现用 `runDetached`（底层 `runInSession`）启动 daemon，对永不退出的 daemon 进程会永久阻塞，导致 `ensureDaemon` 死锁、所有 LSP 沙箱操作挂起。
 
@@ -855,7 +966,7 @@ docker run --rm -p 20878:20877 node:24-bookworm sh -c \
 
 **根因回顾**：`sandbox-provider.ts` 的 `runDetached` 内部调用 SDK 的 `sb.commands.runInSession()`，该方法返回的 `Promise` 通过 `consumeExecutionStream` 遍历 SSE 流直到**命令进程退出**才 resolve（见 `@alibaba-group/opensandbox` chunk-IXP4MG7A.js:373-389）。daemon 是 `http.createServer().listen()`，永不退出 → Promise 永不 resolve → `ensureDaemon` 在 `yield* sandbox.runDetached(...)` 处永久阻塞 → `getBaseUrl` / `touch` / `diagnostics` / `hover` 全部挂起。
 
-**修复**：`ensureDaemon` 用 `Effect.forkDetach` 把 `runDetached` fork 到后台，不 await 其结果；daemon 就绪靠 probe 轮询判定（原有 15s 轮询不变）。
+**修复**：`ensureDaemon`（`lsp/agent.ts:381-387`）改用 `runInSession`（**非** `runDetached`）+ `nohup &` 启动 daemon，再用 `Effect.forkDetach` fork 到后台。注释明确：`runDetached` 的 session 清理回调会在 finally 调 `deleteSession` 杀死 daemon，故改用 `runInSession`。daemon 就绪靠 probe 轮询判定（原有 15s 轮询不变）。
 
 **测试方法**（单元测试，不依赖真实沙箱）：
 
@@ -1030,11 +1141,13 @@ for m in msgs[-3:]:
 
 ---
 
-## 四（续 II）、PVC 模式 LSP 测试（session / app）
+## 六、PVC 模式 LSP 测试（session / app）
 
-> 前置条件：SaaS + PVC 环境（`OPENCODE_SANDBOX_VOLUME_TYPE=pvc`），搭建见 [`27-session-pvc-mode.md`](./27-session-pvc-mode.md) 与 [`local-test-env.md`](../local-test-env.md)。
+> 前置条件：SaaS + PVC 环境（`OPENCODE_SANDBOX_VOLUME_TYPE=pvc`），搭建见 [`38-session-pvc-mode.md`](./38-session-pvc-mode.md) 与 [`local-test-env.md`](../local-test-env.md)。
 >
 > **为何单独成章**：app 模式下沙箱内文件位于 `/workspace/worktrees/<rootSessionID>/...`（git worktree），而非 session 模式的 `/workspace/...`。LSP daemon 的 `WORKSPACE` 默认仍是 `/workspace`，而 `agent.ts` 通过 `toSandboxPath` 的 `isSandboxPath` 提前返回把 worktree 完整路径透传给 daemon。这一路径链路（host → `instance.directory=/workspace/worktrees/<sid>` → `toSandboxPath` → daemon `readFile` → LSP server `detectRoot`）此前**完全无测试覆盖**，是代码审查中多次误判「app 模式路径错位」的根因。以下用例补齐该盲区。
+>
+> ⚠️ **与代码核对**（2026-07-18）：`worktreeScript`（`sandbox-opts.ts:35`）已定义但**生产代码从未调用**（全仓库仅定义处与测试注释命中，无 sandbox 启动路径自动执行）。当前 app 模式下 worktree **不会自动创建**，`instance.directory` 仍为 `/workspace`。以下 T27.23–T27.27 需**手动 `git worktree add /workspace/worktrees/<sid> <branch>` 后**才能复现 worktree 路径场景；或待代码补齐自动调用点。
 
 ### T27.23 app 模式 write 工具触发 LSP 诊断（worktree 路径正确性）⚠️ P0
 
@@ -1051,7 +1164,7 @@ instance.directory = /workspace/worktrees/<sid>
     → LSP server 分析 → 诊断返回
 ```
 
-**前置**：app 模式 session 已创建，`/workspace/repo/.git` 已 init + commit，worktree 已自动创建（参见 `27-session-pvc-mode.md` T27.13）。
+**前置**：app 模式 session 已创建，`/workspace/repo/.git` 已 init + commit，worktree 已自动创建（参见 `38-session-pvc-mode.md` T38.13）。
 
 ```bash
 # 环境变量 $BASE $PG_URL $MODEL 由 test-env.sh 全局提供（source test-env.sh [1|2|3]）
@@ -1137,7 +1250,7 @@ for m in msgs[-3:]:
 - write 输出包含 `LSP errors detected`，诊断含 `Parameter 'x' implicitly has an 'any' type`（TS7006，由 `noImplicitAny` 触发）
 - 证明 LSP server 的 `detectRoot` 从 `/workspace/worktrees/<sid>/implicit.ts` 向上找到 `/workspace/worktrees/<sid>/tsconfig.json` 并以其为项目根
 
-**反例**：若 `detectRoot` 错误停在 `/workspace`（无 tsconfig 或读到错误配置），则不会触发 `noImplicitAny`（tsserver 默认配置不开启 strict）。
+**反例**：若 `detectRoot` 错误停在 `/workspace`（无 tsconfig 或读到错误配置），则不会触发 `noImplicitAny`（TS 默认配置不开启 strict）。
 
 ---
 
@@ -1272,7 +1385,7 @@ for m in msgs[-2:]:
 
 ---
 
-## 五、验收标准
+## 七、验收标准
 
 ### P0 核心验收
 
@@ -1327,7 +1440,7 @@ for m in msgs[-2:]:
 
 ---
 
-## 六、本地已验证结果
+## 八、本地已验证结果
 
 > 路径 A（daemon 单元测试）已于 2026-06-13 在本地 macOS (ARM) + Node v22.22.2 环境**实际运行验证通过**。测试项目 `/tmp/lsp-test`（含 tsconfig.json + 5 个 .ts 文件 + 本地安装的 typescript-language-server），daemon bundle 72 KB，通过 `LSP_WORKSPACE_ROOT=/tmp/lsp-test` 覆盖根目录。
 
@@ -1356,7 +1469,7 @@ for m in msgs[-2:]:
 
 | 验证项 | 状态 | 实际输出 |
 |------|------|---------|
-| 镜像内 daemon + TLS | ✅ | `/opt/opencode-lsp-daemon/index.js`（74312 字节）+ `typescript-language-server`（mise shim） |
+| 镜像内 daemon + tsc | ✅ | `/opt/opencode-lsp-daemon/index.js`（75KB）+ `tsc` 7.x（mise shim，原生 LSP `--lsp --stdio`） |
 | sandbox 内 daemon 启动 | ✅ | `node /opt/opencode-lsp-daemon/index.js` 正常启动 |
 | touch + status | ✅ | touch → `{"version":0}`，status → `{"servers":[{"id":"typescript","status":"running"}]}` |
 | documentSymbol | ✅ | `foo`(kind=12) + `Greeter`(kind=11) + ... 正确返回 |
@@ -1374,13 +1487,13 @@ for m in msgs[-2:]:
 
 ---
 
-## 七、注意事项
+## 九、注意事项
 
 1. **QEMU 模拟**：在 ARM Mac 上运行 amd64 容器时通过 QEMU 模拟，性能约下降 10 倍。daemon 启动和 LSP 初始化在容器内可能需要 30-60 秒
 2. **Bundle 格式**：必须使用 CJS（不能用 ESM），因为 `vscode-jsonrpc` 内部使用 `require("util")` 动态导入
-3. **首次请求延迟**：touch 首次请求需要启动 typescript-language-server 并执行 initialize 握手，可能需要 5-10 秒
-4. **Phase 2 范围**：当前 daemon 支持 TypeScript 的 10 个 LSP 操作（touch/diagnostics/status/shutdown/hover/definition/references/implementation/documentSymbol/workspaceSymbol）。lsp.ts sandbox 分支已接入 hover/definition/references，implementation/documentSymbol/workspaceSymbol 暂返回 "not yet supported in sandbox mode" 提示
-5. **apply_patch.ts sandbox 分支**：与 write.ts/edit.ts 一致，通过 `LspAgent` 获取 patch 后诊断，同样有 `MAX_PROJECT_DIAGNOSTICS_FILES = 5` 全项目诊断上限
+3. **首次请求延迟**：touch 首次请求需要启动 `tsc --lsp --stdio` 并执行 initialize 握手，可能需要 5-10 秒
+4. **Phase 2 范围**：当前 daemon 支持 **TypeScript + Python (pyright)**（`lsp-manager.ts:130` `PY_EXTENSIONS`、`:234-245` `findPyright`，Dockerfile 预装 pyright）的 10 个 LSP 操作（touch/diagnostics/status/shutdown/hover/definition/references/implementation/documentSymbol/workspaceSymbol）。lsp.ts sandbox 分支已接入全部 9 个查询操作（见第 10 条），无 "not yet supported" 降级路径
+5. **apply_patch.ts sandbox 分支**：与 edit.ts/write.ts 一致，通过 `LspAgent` 获取 patch 后诊断，同样有 `MAX_PROJECT_DIAGNOSTICS_FILES = 5` 全项目诊断上限
 6. **edit.ts sandbox 分支**：依赖 `SandboxProvider.Service` 可用，本地模式下 sandbox 分支不执行
 7. **format/BOM 在 SaaS 下的设计取舍（非缺陷）**：`Format.file` 通过 `appProcess.run(ChildProcess.make(...))` 在**主进程本地文件系统**上运行 prettier/ruff 等格式化命令。SaaS 模式下文件位于沙箱容器内，主进程既无文件也无格式化工具，因此 write/edit/apply_patch 的 sandbox 分支**显式跳过 format 和 BOM 处理**，这是符合架构的合理取舍。TypeScript 项目默认 UTF-8 无 BOM，影响可忽略。如需 SaaS 下格式化，应作为后续 Phase 在 daemon 侧实现（容器内运行格式化器）
 8. **apply_patch.ts format 修复**：行 276-281 的 `format.file(edited)` / `Bom.syncFile(afs, edited, ...)` 原会在 sandbox 模式下尝试操作宿主路径（文件不存在，静默失败）。已修复为 `svc._tag === "None"`（仅本地模式）时才执行，与 write/edit sandbox 分支保持一致

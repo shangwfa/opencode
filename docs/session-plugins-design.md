@@ -79,7 +79,7 @@ opencode 已有的会话级动态功能：
 | `packages/opencode/src/plugin/session-plugin.pg.ts` | Drizzle PG 表定义 |
 | `packages/opencode/migration-pg/20260715120000_session_plugins/migration.sql` | 建表 SQL |
 | `docs/session-plugins.md` | 用户使用文档 |
-| `docs/test-cases/33-session-plugins.md` | 测试用例 |
+| `docs/test-cases/35-session-plugins.md` | 测试用例 |
 | `packages/opencode/test/plugin/session-plugin.test.ts` | 单元测试 |
 
 ### 3.2 修改文件
@@ -619,7 +619,7 @@ yield* Effect.promise(() =>
 | T33.1.5 | `removeAll` 清空 |
 | T33.2.1 | 两个 session 隔离 |
 
-### 14.2 E2E 测试（`docs/test-cases/33-session-plugins.md`）
+### 14.2 E2E 测试（`docs/test-cases/35-session-plugins.md`）
 
 | 用例 | 覆盖点 |
 |------|--------|

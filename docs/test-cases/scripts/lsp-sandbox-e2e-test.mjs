@@ -15,7 +15,7 @@
 //
 // 用法（从 packages/opencode 目录跑，需 @alibaba-group/opensandbox 依赖）：
 //   cd packages/opencode
-//   OPENCODE_SANDBOX_DOMAIN=localhost:8080 node ../../docs/test-cases/lsp-sandbox-e2e-test.mjs
+//   OPENCODE_SANDBOX_DOMAIN=localhost:8080 node ../../docs/test-cases/scripts/lsp-sandbox-e2e-test.mjs
 //
 // 关键踩坑解法（已内置）：
 //   - platform 显式 amd64：基础镜像是 amd64，避免 SDK 按宿主 arch(arm64) 拉远端
@@ -26,7 +26,7 @@
 // 显式从 packages/opencode 解析，使脚本可从任意 cwd 运行。
 import { createRequire } from "node:module"
 import { resolve } from "node:path"
-const require = createRequire(resolve(import.meta.dirname, "../../packages/opencode/package.json"))
+const require = createRequire(resolve(import.meta.dirname, "../../../packages/opencode/package.json"))
 const { ConnectionConfig, Sandbox } = await import(require.resolve("@alibaba-group/opensandbox"))
 
 const DOMAIN = process.env.OPENCODE_SANDBOX_DOMAIN ?? "localhost:8080"
@@ -44,7 +44,7 @@ function check(name, ok, detail = "") {
 const sb = await Sandbox.create({
   connectionConfig: new ConnectionConfig({ domain: DOMAIN, protocol: "http", useServerProxy: USE_SERVER_PROXY }),
   image: IMAGE,
-  // 显式 amd64：本地镜像基于 amd64 的 opensandbox 基础镜像，避免 SDK 按宿主 arm64 拉远端
+  // 远端沙箱用 amd64（QEMU 模拟）；本地直跑单元测试见 lsp-daemon-unit-test.mjs
   platform: { os: "linux", arch: "amd64", entrypoint: ["/opt/opensandbox/code-interpreter.sh"] },
   timeoutSeconds: 360,
 })

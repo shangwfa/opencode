@@ -10,7 +10,7 @@
 | 机制 | 触发时机 | 阈值 | 覆盖 keep_alive? |
 |------|---------|------|-----------------|
 | `onIdle` 即时销毁 | Runner 转入 idle | 即时 | ❌ 跳过 |
-| 僵尸清理 | 后台周期扫描 | 120 min | ❌ 只扫 `keep_alive=false` |
+| 僵尸清理 | 后台周期扫描 | 默认 60 min 扫描 / 120 min 判定（flag 可配；测试环境 `OPENCODE_SANDBOX_IDLE_KILL_SEC=30`） | ❌ 只扫 `keep_alive=false` |
 | Session 删除 | 显式调用 | 即时 | ✅ |
 
 **缺口**：`keep_alive=true` 的沙箱（`background=true` 的 bash 命令触发），在会话 idle 后不会被即时销毁，也不会被僵尸清理扫描。需要新增一轮 **30 分钟无活跃即销毁** 的后台扫描，覆盖所有存活沙箱。
@@ -382,10 +382,10 @@ bun test test/tool/sandbox-idle-reap.test.ts
 
 | 用例 | 验证 | 耗时 |
 |------|------|------|
-| 超时记录被标记为 `destroyed` | T1 基本回收 | ~6s |
-| `keep_alive=true` 的超时记录也被回收 | T2 keepAlive 回收 | ~7s |
-| 未超时记录保持 `running` | T3 阈值边界 | ~3s |
-| 持续更新 `time_updated` 不被误杀 | T4 CAS 保护 | ~4s |
+| 超时记录被标记为 `destroyed` | 基本回收 | ~6s |
+| `keep_alive=true` 的超时记录也被回收 | keepAlive 回收 | ~7s |
+| 未超时记录保持 `running` | 阈值边界 | ~3s |
+| 持续更新 `time_updated` 不被误杀 | CAS 保护 | ~4s |
 
 ---
 

@@ -20,7 +20,7 @@
 //   5. 权限已配置（PATCH /global/config permission allow）
 //
 // 用法：
-//   node docs/test-cases/lsp-code-agent-e2e-test.mjs
+//   node docs/test-cases/scripts/lsp-code-agent-e2e-test.mjs
 //
 // 环境变量：
 //   BASE       — SaaS API 地址（默认 http://localhost:14096）
@@ -30,7 +30,7 @@ const BASE = process.env.BASE ?? "http://localhost:14096"
 const MODEL = JSON.parse(process.env.MODEL ?? '{"providerID":"zhipuai","modelID":"glm-5.1"}')
 
 // ─── 路径泄露检测 ─────────────────────────────────────────────
-// 遵循 20-path-leak-test.md 的规则：LLM 可见路径必须为 /workspace/...
+// 遵循 19-path-leak-test.md 的规则：LLM 可见路径必须为 /workspace/...
 const LEAK_PATTERNS = [
   { re: /\/Users\/[\w]+/g, name: "macOS 用户路径 /Users/..." },
   { re: /\/private\/var\/folders/g, name: "macOS tmp /private/var/folders" },
@@ -95,6 +95,7 @@ let step = 0
 let totalToolCalls = 0
 const toolSummary = {}
 const allLeaks = []
+const failures = []
 
 function countTools(result) {
   for (const p of result.parts || []) {
@@ -260,12 +261,23 @@ async function main() {
 
     // ── Phase 2: LSP 能力逐项验证 ────────────────────────────
 
-    // S5: 故意写入含类型错误的文件 → 验证 diagnostics
+    // S5: 故意写入含类型错误的文件 → 验证 diagnostics（write 工具必须触发 LSP 诊断）
     await sendMsg(
       sid,
       'Use write tool to create /workspace/src/utils/broken.ts with exactly: const x: string = 123; function add(a: number): string { return a }',
       "S5: write 含类型错误 → diagnostics 应检测到",
     )
+    // POST /message 只返回 AI 最终文字；write 工具输出在中间消息，需查 GET /message
+    const s5msgs = await api(`/session/${sid}/message`)
+    const s5writePart = [...s5msgs].reverse().find((m) => m.parts?.some((p) => p.type === "tool" && p.tool === "write"))?.parts?.find((p) => p.type === "tool" && p.tool === "write")
+    const s5hasDiag = (s5writePart?.state?.output || "").includes("LSP errors detected")
+    if (!s5hasDiag) {
+      console.log("  ❌ S5 FAIL: write 工具未触发 LSP 诊断（输出未含 'LSP errors detected'）")
+      console.log(`     write 输出: "${(s5writePart?.state?.output || "(未找到 write 工具)").slice(0, 200)}"`)
+      failures.push("S5: write LSP diagnostics")
+    } else {
+      console.log("  ✅ S5 PASS: write 工具成功触发 LSP 诊断")
+    }
 
     // S6: 用 edit 修复类型错误 → diagnostics 应清除
     await sendMsg(
@@ -429,7 +441,7 @@ async function main() {
     if (editTools === 0) missing.push("expected edit tool to be used")
     if (lspTools === 0) missing.push("expected lsp tool to be used")
 
-    const passed = uniqueLeaks.length === 0 && unsupportedCount === 0 && missing.length === 0
+    const passed = uniqueLeaks.length === 0 && unsupportedCount === 0 && missing.length === 0 && failures.length === 0
     if (passed) {
       console.log("  ✅ 测试通过")
       console.log(`     路径泄露: 0 处`)
@@ -440,6 +452,7 @@ async function main() {
       if (uniqueLeaks.length > 0) console.log(`     路径泄露: ${uniqueLeaks.length} 处`)
       if (unsupportedCount > 0) console.log(`     LSP 能力缺失: ${unsupportedCount} 处`)
       if (missing.length > 0) console.log(`     缺少断言: ${missing.join("; ")}`)
+      if (failures.length > 0) console.log(`     用例失败: ${failures.join("; ")}`)
       process.exit(1)
     }
     console.log("═".repeat(70))

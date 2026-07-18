@@ -90,6 +90,8 @@ send_and_verify "$SID" "只用 grep 工具在 /workspace/tool-regression 搜索 
 ### T18.4 subagent sandbox 复用验证
 
 > 该组用例用于发现子会话创建独立 sandbox 导致 `/workspace` 为空的问题。子会话必须通过 root session 的 `sandboxSessionID` 复用父会话 sandbox。
+>
+> **交叉引用**：双向写读验证见 T16.29（14 文档，`scripts/sandbox-shared-test.mjs`）；本条从 AI 对话路径验证。
 
 ```bash
 send_and_verify "$SID" "启动一个 explore 子 agent，让它只使用 grep/glob/read 工具验证 /workspace/tool-regression/src/search-target.ts 存在，并返回文件路径和 PROFILE_CARD_PATCHED 这一行" "T18.4a: subagent 搜索父会话文件"
@@ -266,7 +268,7 @@ echo "NEW_SB_ID: $NEW_SB_ID"
 
 #### T18.10c stuck tool watchdog 自动恢复
 
-> **背景**：session watchdog 每 60s 扫描最近 1 小时的 tool part，将 `status=running` 且 `time.start` 超过 5 分钟的工具标记为 `status=error`。用于兜底所有未被工具层 timeout 捕获的卡死场景。
+> **背景**：session watchdog（`watchdog.ts:84-108`）每 60s 扫描所有 `status=running` 且 `start < now-5min` 的 tool part（无“最近 1 小时”上限），标记为 `status=error`。用于兜底所有未被工具层 timeout 捕获的卡死场景。
 
 ```bash
 # 1. 构造一个 stuck tool：手动在 PG 插入一个 running 状态、start 时间为 6 分钟前的 tool part
@@ -311,7 +313,7 @@ echo "Final: $RESULT"
 **期望**：
 - 插入的 stuck tool part 初始 `status=running`。
 - watchdog 在 60-70s 内将其标记为 `status=error`。
-- `error` 字段包含 `timed out after 5min (watchdog)`。
+- `error` 字段包含 `Tool execution timed out after 300s (watchdog)`（`mark-timed-out.ts:67`，按 timeoutMs 动态生成）。
 - 容器日志中出现 `service=watchdog ... stuck=1 ... watchdog scan completed`。
 
 #### T18.10d 权限等待不阻塞会话
@@ -364,7 +366,7 @@ echo "  write status: $WRITE_STATUS"
 send_and_verify "$SID" "用 write 创建 /workspace/cache-test.txt 内容是 v1" "T18.10e-1: 写入 v1"
 
 # 2. 手动 destroy sandbox（触发 cache invalidate）
-curl -s -X POST "$BASE/session/$SID/sandbox/destroy" > /dev/null 2>&1 || true
+curl -s -X POST "$BASE/session/$SID/kill-sandbox" > /dev/null 2>&1 || true
 # 如果没有 destroy 端点，通过 DB 标记 + 等待 cache TTL 过期
 psql "$PG_URL" -c "UPDATE sandbox SET state='destroyed' WHERE session_id='$SID';" 2>/dev/null || true
 sleep 31  # 等 cache TTL 过期
@@ -615,7 +617,7 @@ ORDER BY p.time_created;
 | T18.9 | ✅ | bash 命令不存在快速失败：`ss: command not found` 在 2 秒内返回而非等待 28 分钟；`lsof` 失败后 AI 自动尝试 `netstat` → `ps aux | grep` → 完成端口检查任务，全程 < 10 秒 |
 | T18.10a | ⏳ | sandbox 不可用时 read/write 直接报错，不 fallback 到本地文件系统 |
 | T18.10b | ⏳ | read/write 文件 I/O 60s timeout 后 destroy sandbox 并自动重建 |
-| T18.10c | ⏳ | watchdog 检测 stuck tool（running > 5min）并标记为 error |
+| T18.10c | ⏳ | watchdog 检测 stuck tool（running > 5min）并标记为 error（error 字符串 `...after 300s (watchdog)`） |
 | T18.10d | ⏳ | 全局权限配置 allow，write 不被权限 ask 阻塞 |
 | T18.10e | ⏳ | sandbox cache invalidate 后 destroy → 重建一致性 |
 

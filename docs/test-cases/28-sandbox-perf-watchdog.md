@@ -4,7 +4,7 @@
 
 ## 背景
 
-针对 `ses_127609d2fffeU5lQ79qBAdcZYV` 卡顿会话的诊断（详见 [`20-session-diagnostic-guide.md`](./20-session-diagnostic-guide.md)），发现以下问题：
+针对 `ses_127609d2fffeU5lQ79qBAdcZYV` 卡顿会话的诊断（详见 [`guides/session-diagnostic-guide.md`](./guides/session-diagnostic-guide.md)），发现以下问题：
 
 1. **每次工具调用都重新走 reconnect + isHealthy**（无沙箱对象缓存），并发请求被 `lock(sessionID)` 串行化，单次卡顿会放大 N 倍
 2. **`getOrCreate` 无超时**，远端沙箱重建卡死时无限等待
@@ -17,7 +17,7 @@
 | 文件 | 改动 | 防御层 |
 |------|------|--------|
 | `packages/opencode/src/tool/sandbox-provider.ts` | 加 `sbCache`（30s TTL）+ getOrCreate 90s 超时 + 各阶段 `log.info` | 缓存（治本）+ 超时（防单点）+ 日志（诊断）|
-| `packages/opencode/src/session/tools.ts` | `getSandbox()` 的 `.catch` 加 `log.error` + 耗时日志；新增 `SessionTools.markTimedOut()` | 错误不再静默；tool lifecycle 统一超时标记 |
+| `packages/opencode/src/session/mark-timed-out.ts`（原 tools.ts 拆出）| `getSandbox()` 的 `.catch` 加 `log.error` + 耗时日志；`SessionTools.markTimedOut()` lifecycle 方法 | 错误不再静默；tool lifecycle 统一超时标记 |
 | `packages/opencode/src/session/watchdog.ts`（**新建**）| 每 60s 扫描候选 running tool，调用 `SessionTools.markTimedOut()` | Watchdog（发现）+ lifecycle（处理）|
 | `packages/opencode/src/effect/app-runtime.ts` | 注册 `SessionWatchdog.defaultLayer` 并提供 `SessionTools.defaultLayer` | 启动入口 |
 
@@ -607,7 +607,7 @@ docker logs opencode-saas-test 2>&1 | grep "watchdog stuck tools detected" | tai
 
 ```
 packages/opencode/src/tool/sandbox-provider.ts   # 缓存 + 超时 + 日志
-packages/opencode/src/session/tools.ts           # 错误日志 + SessionTools.markTimedOut lifecycle 方法
+packages/opencode/src/session/mark-timed-out.ts    # 错误日志 + SessionTools.markTimedOut lifecycle 方法（原 tools.ts 拆出）
 packages/opencode/src/session/watchdog.ts        # 新建：watchdog 扫描候选 + layerWithConfig + scanOnce
 packages/opencode/src/effect/app-runtime.ts      # 注册 watchdog layer 并提供 SessionTools layer
 ```

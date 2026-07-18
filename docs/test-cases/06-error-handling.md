@@ -12,9 +12,9 @@ bun -e "fetch('http://localhost:14096/session/$SID/message',{method:'POST',heade
 ```
 **期望**：返回 **500**，响应体为 `{"name":"UnknownError","data":{"message":"...","ref":"err_xxx"}}`。不卡死。
 
-> **设计说明**：`prompt` 方法（`session/prompt.ts:136`）用 `Effect.catch(Effect.die)` 把业务 failure（含 `ProviderModelNotFoundError`）转为 defect，handler 的 `mapError` 捕获不到，冒泡到 server defect handler 输出 `UnknownError` 500。
+> **设计说明**：`prompt` 内部（`session/prompt.ts:620` `Effect.die(err)` in requireModel；以及 `:152-158` 的 TaskTool ops 用 `Effect.catch(Effect.die)`）把业务 failure（含 `ProviderModelNotFoundError`）转为 defect，handler 的 `mapError` 捕获不到，冒泡到 server defect handler 输出 `UnknownError` 500。
 >
-> **已知缺陷**：当前响应体的 `data` 只有通用 message + ref，**原始 error（`ProviderModelNotFoundError` 的 suggestions 等）未保留**，前端无法据此做"Model not found: x/y, did you mean:..."友好提示。若需修复，可在 `prompt.ts:136` 的 `Effect.catch(Effect.die)` 前加 `catchTag`，映射到 `errors.ts` 现成的 `ModelNotFoundError`(404)，或让 defect handler 把原始 error 落到 `data` 里。
+> **已知缺陷**：当前响应体的 `data` 只有通用 message + ref，**原始 error（`ProviderModelNotFoundError` 的 suggestions 等）未保留**，前端无法据此做"Model not found: x/y, did you mean:..."友好提示。若需修复，可在 `prompt.ts:620` 的 `Effect.die(err)` 前加 `catchTag`，映射到 `errors.ts` 现成的 `ModelNotFoundError`(404)，或让 defect handler 把原始 error 落到 `data` 里。
 >
 > **HTTP 语义注记**：客户端错误（无效 provider/model）用 500 不够精确，理想应为 4xx。
 
@@ -36,7 +36,7 @@ bun -e "fetch('http://localhost:14096/session/$SID/message',{method:'POST',heade
 ```
 **期望**：返回 **500**（与 T7.1 同），`name=UnknownError`。
 
-> **说明**：body 无 `model` 字段时，`SessionPrompt.getModel` 解析失败同样抛 `ProviderModelNotFoundError`，走与 T7.1 相同的 defect → `UnknownError` 500 链路（原始 error 同样未保留，见 T7.1 已知缺陷）。
+> **说明**：请求未带 `model` 且 session 无持久化 model 时，`requireModel`（`prompt.ts:605` 内嵌 Effect.fn）解析失败同样走 defect 链路，走与 T7.1 相同的 defect → `UnknownError` 500 链路（原始 error 同样未保留，见 T7.1 已知缺陷）。
 
 ### T7.5 超长消息
 ```bash

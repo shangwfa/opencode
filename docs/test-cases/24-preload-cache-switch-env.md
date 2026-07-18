@@ -1,7 +1,9 @@
 # 环境切换与预装依赖缓存
 
-> 公共测试环境和配置请参考 [`00-INDEX.md`](./00-INDEX.md)。
+> 公共测试环境和配置请参考 [`00-preamble.md`](./00-preamble.md)。
 > 实现详见 [`../../packages/opencode/docker/README.md`](../../packages/opencode/docker/README.md)。
+>
+> **分工**（2026-07-17 去重）：本文档只保留**远端环境特有**用例——mise 版本切换（一）、NFS 环境影响（三）、远端隔离稳定性（四）。pnpm store 的**功能验证**（配置/首次/重装命中/并发/node_modules 隔离）统一由 [`23-package-cache.md`](./23-package-cache.md)（T23.x）覆盖；原 T24.11-T24.13、T24.21、T24.22 已归并删除，编号保留断档。
 
 ## 二十四、环境切换与预装依赖缓存（pnpm）
 
@@ -122,7 +124,7 @@ curl -s --max-time 30 -X POST "$BASE/session/$SID/exec" \
 
 **期望**：shims 检测 `.node-version`，node --version 输出 v22.x
 
-> **远端测试**（2026-06-11）：PASS — v22.22.3
+> **远端测试**（2026-06-11）：⚠️ NOTE — `.node-version` 不生效（`mise.toml` 优先级更高，与 99-acceptance-status 一致）
 
 ---
 
@@ -203,54 +205,6 @@ curl -s --max-time 30 -X POST "$BASE/session/$SID/exec" \
 > - `store-dir` = `/opt/pnpm-store`（镜像层 overlay，读快）
 > - `virtual-store-dir` = `/tmp/pnpm-vs`（overlay 本地盘，写快）
 > - 两者同文件系统 → hardlink 生效，NFS 上只有轻量 symlink
-
-### T24.11 pnpm store 配置验证
-
-```bash
-SID=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -H "X-API-Key: $API_KEY" -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
-
-curl -s --max-time 30 -X POST "$BASE/session/$SID/exec" \
-  -H 'Content-Type: application/json' -H "X-API-Key: $API_KEY" \
-  -d '{"command":"pnpm config get store-dir && pnpm config get virtual-store-dir && du -sh /opt/pnpm-store"}'
-```
-
-**期望**：store-dir=/opt/pnpm-store, virtual-store-dir=/tmp/pnpm-vs, store > 100MB
-
-> **远端测试**（2026-06-11）：PASS — 190MB
-
----
-
-### T24.12 pnpm install 首次（store 命中）
-
-```bash
-SID=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -H "X-API-Key: $API_KEY" -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
-
-curl -s --max-time 120 -X POST "$BASE/session/$SID/exec" \
-  -H 'Content-Type: application/json' -H "X-API-Key: $API_KEY" \
-  -d '{"command":"cd /workspace && npm create vite@5 pnpm-test -- --template react-ts 2>&1 | tail -1 && cd pnpm-test && time pnpm install 2>&1 | grep -E \"reused|downloaded|Packages|Done|real\""}'
-```
-
-**期望**：大部分 reused（store 预装命中），耗时 < 10s
-
-> **远端测试**（2026-06-11）：PASS — reused 173, downloaded 1, 174 packages, **6.8s**
-
----
-
-### T24.13 pnpm 重装（清空 node_modules，完全命中 store）
-
-```bash
-SID=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -H "X-API-Key: $API_KEY" -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
-
-curl -s --max-time 120 -X POST "$BASE/session/$SID/exec" \
-  -H 'Content-Type: application/json' -H "X-API-Key: $API_KEY" \
-  -d '{"command":"cd /workspace && npm create vite@5 reinstall-test -- --template react-ts 2>&1 | tail -1 && cd reinstall-test && pnpm install 2>&1 | tail -1 && rm -rf node_modules && time pnpm install 2>&1 | grep -E \"reused|downloaded|Packages|Done|real\""}'
-```
-
-**期望**：reused = 总包数（全部命中 store），耗时 < 3s
-
-> **远端测试**（2026-06-11）：PASS — reused 174/174, downloaded 0, **1.5s**（三次平均）
-
----
 
 ### T24.14 不匹配项目 pnpm install（express）
 
@@ -393,53 +347,6 @@ curl -s --max-time 120 -X POST "$BASE/session/$SID/exec" \
 
 ## 四、隔离性与稳定性
 
-### T24.21 多 session 并发 pnpm install
-
-```bash
-SID_A=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -H "X-API-Key: $API_KEY" -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
-SID_B=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -H "X-API-Key: $API_KEY" -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
-
-curl -s --max-time 120 -X POST "$BASE/session/$SID_A/exec" \
-  -H 'Content-Type: application/json' -H "X-API-Key: $API_KEY" \
-  -d '{"command":"cd /workspace && npm create vite@5 concurrent-a -- --template react-ts 2>&1 | tail -1 && cd concurrent-a && pnpm install 2>&1 | tail -3"}' &
-
-curl -s --max-time 120 -X POST "$BASE/session/$SID_B/exec" \
-  -H 'Content-Type: application/json' -H "X-API-Key: $API_KEY" \
-  -d '{"command":"cd /workspace && npm create vite@5 concurrent-b -- --template react-ts 2>&1 | tail -1 && cd concurrent-b && pnpm install 2>&1 | tail -3"}' &
-
-wait
-echo "Both done"
-```
-
-**期望**：两个 session 的 pnpm install 均成功完成
-
-> **实测结果**：待测试
-
----
-
-### T24.22 不同 session pnpm store 互不影响
-
-```bash
-SID_A=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -H "X-API-Key: $API_KEY" -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
-SID_B=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -H "X-API-Key: $API_KEY" -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
-
-# Session A: 安装项目并写入标记
-curl -s --max-time 120 -X POST "$BASE/session/$SID_A/exec" \
-  -H 'Content-Type: application/json' -H "X-API-Key: $API_KEY" \
-  -d '{"command":"cd /workspace && npm create vite@5 cross-a -- --template react-ts 2>&1 | tail -1 && cd cross-a && pnpm install 2>&1 | tail -1 && echo MARK_A > node_modules/.mark"}'
-
-# Session B: 检查无 A 的标记
-curl -s --max-time 15 -X POST "$BASE/session/$SID_B/exec" \
-  -H 'Content-Type: application/json' -H "X-API-Key: $API_KEY" \
-  -d '{"command":"cat /workspace/cross-a/node_modules/.mark 2>&1; echo EXIT=$?"}'
-```
-
-**期望**：Session B 无法读取 Session A 的文件（exitCode≠0）
-
-> **实测结果**：待测试
-
----
-
 ### T24.23 /opt/pnpm-store 不可变验证
 
 ```bash
@@ -459,7 +366,7 @@ curl -s --max-time 30 -X POST "$BASE/session/$SID_B/exec" \
 
 **期望**：Session B 的 `/opt/pnpm-store` 完整（镜像层隔离）
 
-> **实测结果**：待测试
+> **实测结果**：⚠️ NOTE — `/opt/pnpm-store` root 可写（overlay 层运行时行为，镜像构建时不可变；与 99-acceptance-status 一致）
 
 ---
 
@@ -490,7 +397,7 @@ curl -s --max-time 30 -X POST "$BASE/session/$SID/exec" \
 | T24.3 mise use 切换 Node | PASS | v24 → v20 |
 | T24.4 mise use 切换 pnpm | PASS | 10 → 9 |
 | T24.5 .nvmrc 自动检测 | PASS | v20.20.2 |
-| T24.6 .node-version 自动检测 | PASS | v22.22.3 |
+| T24.6 .node-version 自动检测 | ⚠️ NOTE | `.node-version` 不生效（`mise.toml` 优先级更高） |
 | T24.7 mise.toml 自动检测 | PASS | node@18 + pnpm@8 |
 | T24.8 切换版本后 pnpm install | PASS | node@20 + pnpm@9, 174 packages |
 | T24.9 不同 session 版本独立 | PASS | A→v18, B→v24 不受影响 |
@@ -500,9 +407,9 @@ curl -s --max-time 30 -X POST "$BASE/session/$SID/exec" \
 
 | 用例 | 结果 | 备注 |
 |------|------|------|
-| T24.11 store 配置验证 | PASS | store-dir + virtual-store-dir 正确, 190MB |
-| T24.12 pnpm install 首次 | PASS | reused 173/174, **6.8s** |
-| T24.13 pnpm 重装 | PASS | reused 174/174, **1.5s** |
+| T24.11 store 配置验证 | ➡️ 归并 T23.1 | 远端实测（2026-06-11）：store-dir + virtual-store-dir 正确, 190MB |
+| T24.12 pnpm install 首次 | ➡️ 归并 T23.2 | 远端实测：reused 173/174, **6.8s** |
+| T24.13 pnpm 重装 | ➡️ 归并 T23.3 | 远端实测：reused 174/174, **1.5s** |
 | T24.14 不匹配项目 fallback | PASS | express 68 packages, **2.7s** |
 | T24.15 hardlink 验证 | PASS | overlay 同 fs, hardlinks=2 |
 | T24.16 pnpm build 跑通 | PASS | vite build 成功, dist/ 160K, 3.9s |
@@ -520,7 +427,7 @@ curl -s --max-time 30 -X POST "$BASE/session/$SID/exec" \
 
 | 用例 | 结果 | 备注 |
 |------|------|------|
-| T24.21 多 session 并发 | 待测试 | |
-| T24.22 跨 session 独立性 | 待测试 | |
+| T24.21 多 session 并发 | ➡️ 归并 T23.8 | 远端实测：3 session 并发 install 成功 |
+| T24.22 跨 session 独立性 | ➡️ 归并 T23.5 | 远端实测：跨 session 互不可见 |
 | T24.23 /opt/pnpm-store 不可变 | 待测试 | |
 | T24.24 容器磁盘空间 | PASS | pnpm-store 190M, mise 839M, 可用 57G |

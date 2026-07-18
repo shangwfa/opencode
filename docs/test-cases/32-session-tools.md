@@ -98,244 +98,23 @@ async function sendAndWait(sid, body, timeout = 60000) {
 
 ---
 
-### T30.1 创建会话级 tool
+### T32.1-T32.9 通用 CRUD 生命周期（按附录 A 清单）
 
-```bash
-bun -e '
-const BASE = "http://localhost:14096"
-const SID = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "tool-create" }) })).json()
-console.log("SID:", SID.id)
+> 本节按 [`00-preamble.md` 附录 A](./00-preamble.md) 的 G1-G9 通用清单执行（含通用脚本模板），资源为 `tools`（`/session/:id/tools[/create]`），PG 表 `session_tools`。原始逐步脚本见 git 历史。
 
-const code = `import { tool } from "@opencode-ai/plugin"
-export default tool({
-  description: "Echo the input message",
-  args: { message: tool.schema.string().describe("Message to echo") },
-  async execute(args) { return { title: "Echo", output: args.message } },
-})`
+| 用例 | 清单 | 资源参数 | 特有期望 |
+|---|---|---|---|
+| T32.1 | G1 | `{name, description, code}`（code 为 ToolDefinition 源码） | 返回对象 id 以 `stl_` 开头；PG 记录完整 |
+| T32.2 | G2 | 建 2 个 tool | 列表按 name 排序 |
+| T32.3 | G3 | 同名更新 description + code | 列表 count=1，字段已更新 |
+| T32.4 | G4 | 删单个 | DELETE 200，列表/PG 移除 |
+| T32.5 | G5 | 建 2 个后清空 | DELETE 200，列表/PG 空 |
+| T32.6 | G6 | A/B 各建同名 tool | 列表互相隔离 |
+| T32.7 | G7 | 删除 session | GET tools → 404（`requireSession`）；PG 级联 COUNT=0 |
+| T32.8 | G9 | 缺 name / description / code | 均 400 |
+| T32.9 | G8 | ses_NOTEXIST create/list | create=500（FK）；list=404（`requireSession`） |
 
-const res = await (await fetch(BASE + "/session/" + SID.id + "/tools/create", {
-  method: "POST", headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ name: "echo-tool", description: "Echo the input message", code }),
-})).json()
-console.log("name:", res.name)
-console.log("description:", res.description)
-console.log("code includes tool():", res.code.includes("tool("))
-console.log("id prefix:", res.id?.startsWith("stl_"))
-'
-```
-**期望**：`name=echo-tool`，`description` 正确，`code` 包含 `tool(`，`id` 以 `stl_` 开头
-
-> **PG 验证**：`docker exec ai-nova-postgres psql -U postgres -d opencode -c "SELECT name, description, left(code, 50) FROM session_tools WHERE session_id='$SID' AND name='echo-tool';"`
-> 期望：name=echo-tool, description=Echo the input message, code 含 `import { tool }`
-
-### T30.2 列出会话 tools
-
-```bash
-bun -e '
-const BASE = "http://localhost:14096"
-const SID = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "tool-list" }) })).json()
-
-await fetch(BASE + "/session/" + SID.id + "/tools/create", {
-  method: "POST", headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ name: "tool-a", description: "Tool A", code: "export default { description: \"A\", args: {}, async execute() {} }" }),
-})
-await fetch(BASE + "/session/" + SID.id + "/tools/create", {
-  method: "POST", headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ name: "tool-b", description: "Tool B", code: "export default { description: \"B\", args: {}, async execute() {} }" }),
-})
-
-const list = await (await fetch(BASE + "/session/" + SID.id + "/tools")).json()
-console.log("count:", list.length, "(expect 2)")
-list.forEach(t => console.log(t.name + ": " + t.description))
-console.log("tool-a in list:", list.some(t => t.name === "tool-a"))
-console.log("tool-b in list:", list.some(t => t.name === "tool-b"))
-'
-```
-**期望**：列表按 name 排序，包含 `tool-a` 和 `tool-b`，count=2
-
-> **PG 验证**：`docker exec ai-nova-postgres psql -U postgres -d opencode -t -A -c "SELECT COUNT(*) FROM session_tools WHERE session_id='$SID';"`
-> 期望：COUNT=2
-
-### T30.3 Upsert 更新同名 tool
-
-```bash
-bun -e '
-const BASE = "http://localhost:14096"
-const SID = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) })).json()
-
-await fetch(BASE + "/session/" + SID.id + "/tools/create", {
-  method: "POST", headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ name: "upsert-tool", description: "v1", code: "// v1" }),
-})
-
-const updated = await (await fetch(BASE + "/session/" + SID.id + "/tools/create", {
-  method: "POST", headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ name: "upsert-tool", description: "v2", code: "// v2 updated" }),
-})).json()
-console.log("description:", updated.description, "(expect v2)")
-console.log("code:", updated.code, "(expect // v2 updated)")
-
-const list = await (await fetch(BASE + "/session/" + SID.id + "/tools")).json()
-console.log("count:", list.filter(t => t.name === "upsert-tool").length, "(expect 1)")
-'
-```
-**期望**：description 和 code 更新，列表仍只有 1 条 upsert-tool
-
-> **PG 验证**：`docker exec ai-nova-postgres psql -U postgres -d opencode -c "SELECT description, code FROM session_tools WHERE session_id='$SID' AND name='upsert-tool';"`
-> 期望：description=v2, code=// v2 updated
-
-### T30.4 删除单个 tool
-
-```bash
-bun -e '
-const BASE = "http://localhost:14096"
-const SID = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) })).json()
-
-await fetch(BASE + "/session/" + SID.id + "/tools/create", {
-  method: "POST", headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ name: "to-delete", description: "Delete me", code: "// code" }),
-})
-
-const delRes = await fetch(BASE + "/session/" + SID.id + "/tools/to-delete", { method: "DELETE" })
-console.log("DELETE status:", delRes.status)
-
-const list = await (await fetch(BASE + "/session/" + SID.id + "/tools")).json()
-console.log("to-delete gone:", !list.some(t => t.name === "to-delete"))
-'
-```
-**期望**：DELETE 返回 200，to-delete 已从列表中消失
-
-### T30.5 清空所有会话级 tools
-
-```bash
-bun -e '
-const BASE = "http://localhost:14096"
-const SID = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) })).json()
-
-await fetch(BASE + "/session/" + SID.id + "/tools/create", {
-  method: "POST", headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ name: "t1", description: "T1", code: "// 1" }),
-})
-await fetch(BASE + "/session/" + SID.id + "/tools/create", {
-  method: "POST", headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ name: "t2", description: "T2", code: "// 2" }),
-})
-
-const clearRes = await fetch(BASE + "/session/" + SID.id + "/tools", { method: "DELETE" })
-console.log("clear status:", clearRes.status)
-
-const list = await (await fetch(BASE + "/session/" + SID.id + "/tools")).json()
-console.log("leftover:", list.length, "(expect 0)")
-'
-```
-**期望**：清空后列表为空
-
-### T30.6 不同 session 的 tools 互相隔离
-
-```bash
-bun -e '
-const BASE = "http://localhost:14096"
-const SID_A = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "iso-A" }) })).json()
-const SID_B = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "iso-B" }) })).json()
-
-await fetch(BASE + "/session/" + SID_A.id + "/tools/create", {
-  method: "POST", headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ name: "shared", description: "Belongs to A", code: "// A" }),
-})
-await fetch(BASE + "/session/" + SID_B.id + "/tools/create", {
-  method: "POST", headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ name: "shared", description: "Belongs to B", code: "// B" }),
-})
-
-const listA = await (await fetch(BASE + "/session/" + SID_A.id + "/tools")).json()
-const listB = await (await fetch(BASE + "/session/" + SID_B.id + "/tools")).json()
-console.log("A:", listA.find(t => t.name === "shared")?.description)
-console.log("B:", listB.find(t => t.name === "shared")?.description)
-console.log("PASS:", listA.find(t => t.name === "shared")?.description === "Belongs to A" && listB.find(t => t.name === "shared")?.description === "Belongs to B")
-'
-```
-**期望**：A 显示"Belongs to A"，B 显示"Belongs to B"
-
-> **PG 验证**：`docker exec ai-nova-postgres psql -U postgres -d opencode -c "SELECT session_id, description FROM session_tools WHERE name='shared' ORDER BY session_id;"`
-> 期望：两条记录
-
-### T30.7 删除 session 后 tools 级联清理
-
-```bash
-bun -e '
-const BASE = "http://localhost:14096"
-const SID = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "cascade-test" }) })).json()
-
-await fetch(BASE + "/session/" + SID.id + "/tools/create", {
-  method: "POST", headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ name: "cascade-tool", description: "Will be cascaded", code: "// cascade" }),
-})
-
-const before = await (await fetch(BASE + "/session/" + SID.id + "/tools")).json()
-console.log("Before delete:", before.some(t => t.name === "cascade-tool"), "(expect true)")
-
-await fetch(BASE + "/session/" + SID.id, { method: "DELETE" })
-
-const after = await (await fetch(BASE + "/session/" + SID.id + "/tools")).json()
-console.log("After delete count:", Array.isArray(after) ? after.length : "n/a", "(expect 0)")
-'
-```
-**期望**：删除 session 后 GET tools 返回空列表
-
-> **PG 验证**：`docker exec ai-nova-postgres psql -U postgres -d opencode -t -A -c "SELECT COUNT(*) FROM session_tools WHERE session_id='$SID';"`
-> 期望：COUNT=0（ON DELETE cascade）
-
-### T30.8 缺少必填字段 → 400
-
-```bash
-bun -e '
-const BASE = "http://localhost:14096"
-const SID = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) })).json()
-
-// 缺 name
-const noName = await fetch(BASE + "/session/" + SID.id + "/tools/create", {
-  method: "POST", headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ description: "test", code: "// code" }),
-})
-console.log("no name:", noName.status, "(expect 400)")
-
-// 缺 description
-const noDesc = await fetch(BASE + "/session/" + SID.id + "/tools/create", {
-  method: "POST", headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ name: "test", code: "// code" }),
-})
-console.log("no description:", noDesc.status, "(expect 400)")
-
-// 缺 code
-const noCode = await fetch(BASE + "/session/" + SID.id + "/tools/create", {
-  method: "POST", headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ name: "test", description: "test" }),
-})
-console.log("no code:", noCode.status, "(expect 400)")
-'
-```
-**期望**：缺 name / description / code 均返回 400
-
-### T30.9 不存在的 session 创建 tool → 500（FK 约束）
-
-```bash
-bun -e '
-const BASE = "http://localhost:14096"
-const res = await fetch(BASE + "/session/ses_NOTEXIST/tools/create", {
-  method: "POST", headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ name: "ghost", description: "ghost", code: "// ghost" }),
-})
-console.log("create status:", res.status, "(expect 500 due FK)")
-
-const listRes = await fetch(BASE + "/session/ses_NOTEXIST/tools")
-const list = await listRes.json().catch(() => undefined)
-console.log("list status:", listRes.status, "(expect 200)")
-console.log("list length:", Array.isArray(list) ? list.length : "n/a", "(expect 0)")
-'
-```
-**期望**：create 返回 500（FK 约束），list 返回 200 空数组
-
-### T30.10 session tool 出现在 LLM 可用工具列表中（合并验证）
+### T32.10 session tool 出现在 LLM 可用工具列表中（合并验证）
 
 > 验证 opencode 内置工具和会话 tools 通过 Map 合并后，LLM 能看到 session tool。
 
@@ -419,7 +198,7 @@ async function sendAndWait(sid, body, timeout = 60000) {
 ```
 **期望**：LLM 成功调用 `add-numbers` 工具，输出包含 `8`
 
-### T30.11 session tool 覆盖同名全局工具（Map 覆盖策略）
+### T32.11 session tool 覆盖同名全局工具（Map 覆盖策略）
 
 > 验证当 session tool 的 name 与 opencode 内置工具 id 相同时，session tool 覆盖全局工具。
 
@@ -514,7 +293,7 @@ async function sendAndWait(sid, body, timeout = 60000) {
 ```
 **期望**：session tool `reverse-text` 被成功调用，输出包含 `olleh`（hello 的反转），证明合并后 LLM 能看到 session tools
 
-### T30.12 语法错误的 code 不影响其他工具
+### T32.12 语法错误的 code 不影响其他工具
 
 ```bash
 bun -e '
@@ -597,7 +376,7 @@ async function sendAndWait(sid, body, timeout = 60000) {
 ```
 **期望**：broken-tool 静默跳过，greet 工具正常调用，内置工具不受影响
 
-### T30.13 完整工作流（创建 → 执行 → 验证 → 清理）
+### T32.13 完整工作流（创建 → 执行 → 验证 → 清理）
 
 ```bash
 bun -e '
@@ -686,7 +465,7 @@ console.log("Step4 c-to-f deleted:", !list2.some(t => t.name === "c-to-f"))
 ```
 **期望**：完整流程顺利执行：创建→LLM 调用返回 212→列表存在→删除后消失
 
-### T30.14 code 使用 tool.schema 定义参数类型
+### T32.14 code 使用 tool.schema 定义参数类型
 
 ```bash
 bun -e '
@@ -720,7 +499,9 @@ console.log("code has tool.schema.boolean:", res.code.includes("tool.schema.bool
 
 > **PG 验证**：`docker exec ai-nova-postgres psql -U postgres -d opencode -c "SELECT name FROM session_tools WHERE session_id='$SID' AND name='profile';"`
 
-### T30.15 非法 name 格式 → 400
+### T32.15 非法 name 格式
+
+> ⚠️ **与代码核对**（2026-07-18）：`ToolCreatePayload.name: Schema.String`（`groups/session.ts:101`）**接受空字符串**，实际返回 200（与 plugin 的 `NonEmptyString` 不一致）。本用例期望 400 与代码不符。
 
 ```bash
 bun -e '
@@ -732,12 +513,12 @@ const empty = await fetch(BASE + "/session/" + SID.id + "/tools/create", {
   method: "POST", headers: { "Content-Type": "application/json" },
   body: JSON.stringify({ name: "", description: "test", code: "// code" }),
 })
-console.log("empty name:", empty.status, "(expect 400)")
+console.log("empty name:", empty.status, "(实际 200；若改为 NonEmptyString 则 400)")
 '
 ```
-**期望**：空 name 返回 400
+**期望**：当前代码返回 200（空 name 被接受，已知校验缺失）；若 `name` 改为 `Schema.NonEmptyString`（与 plugin 对齐）则返回 400
 
-### T30.16 内置工具不受 session tools 影响（零干扰验证）
+### T32.16 内置工具不受 session tools 影响（零干扰验证）
 
 > 验证添加 session tools 后，opencode 内置工具（read/write/shell/grep/glob 等）行为完全不变。
 
@@ -811,7 +592,7 @@ console.log("output contains marker:", textParts.includes("BUILTIN_STILL_WORKS")
 ```
 **期望**：内置 shell 工具正常调用，输出包含 `BUILTIN_STILL_WORKS`，session tools 的存在不影响内置工具
 
-### T30.17 time_created / time_updated 行为
+### T32.17 time_created / time_updated 行为
 
 > 验证创建时 time_created 和 time_updated 相等；upsert 更新后 time_updated 变大，time_created 不变。
 
@@ -843,7 +624,7 @@ console.log("time_updated 变大:", r2.time_updated > r1.time_updated)
 ```
 **期望**：创建时 `time_created === time_updated`；更新后 `time_created` 不变，`time_updated > time_created`
 
-### T30.18 删除不存在的 tool name（幂等）
+### T32.18 删除不存在的 tool name（幂等）
 
 > 验证删除一个不存在的 tool name 不报错，返回 200。
 
@@ -858,7 +639,7 @@ console.log("DELETE nonexistent:", res.status, "(expect 200)")
 ```
 **期望**：返回 200，不报错（幂等删除）
 
-### T30.19 清空空 session 的 tools（幂等）
+### T32.19 清空空 session 的 tools（幂等）
 
 > 验证对没有任何 tools 的 session 执行 clear 不报错。
 
@@ -876,7 +657,7 @@ console.log("still empty:", list.length === 0)
 ```
 **期望**：返回 200，列表仍为空
 
-### T30.20 tool execute 运行时抛异常（容错验证）
+### T32.20 tool execute 运行时抛异常（容错验证）
 
 > 验证 code 的 execute 运行时抛异常时，工具返回错误状态而非导致整个 session 崩溃。
 
@@ -975,7 +756,7 @@ console.log("session not crashed:", msg !== undefined)
 ```
 **期望**：crash-tool 被调用后返回错误状态，safe-tool 仍可正常调用，session 不崩溃
 
-### T30.21 tool 返回带 title 的结构
+### T32.21 tool 返回带 title 的结构
 
 > 验证 tool execute 返回 `{ title, output }` 时，title 正确传递到工具调用状态。
 
@@ -1057,7 +838,7 @@ console.log("output correct:", toolCall?.state?.output === "Hello, World!")
 ```
 **期望**：`title` 为 "Greeted World"，`output` 为 "Hello, World!"
 
-### T30.22 多个 session tools 同时被 LLM 调用
+### T32.22 多个 session tools 同时被 LLM 调用
 
 > 验证同一 session 注册多个 tools 时，LLM 能根据任务选择不同的工具调用。
 
@@ -1145,9 +926,9 @@ console.log("both correct:", addCalls[0]?.state?.output === "30" && mulCalls[0]?
 ```
 **期望**：add 返回 30，multiply 返回 30，两个工具都被成功调用
 
-### T30.23 PG 直接验证（CRUD 用例的数据库层断言）
+### T32.23 PG 直接验证（CRUD 用例的数据库层断言）
 
-> 对 T30.1–T30.7 的 CRUD 操作做 PG 直接验证，确认数据库记录与 API 返回一致。
+> 对 T32.1–T32.7 的 CRUD 操作做 PG 直接验证，确认数据库记录与 API 返回一致。
 
 ```bash
 bun -e '
@@ -1187,7 +968,7 @@ console.log("期望: 0")
 ```
 **期望**：API 返回与 PG 直接查询一致；每步后附 PG 验证 SQL
 
-### T30.24 真实覆盖内置工具名并删除后回退
+### T32.24 真实覆盖内置工具名并删除后回退
 
 > 验证 session tool 使用真实内置工具名（例如 `bash`）时，会覆盖内置工具；删除 session tool 后，下次工具解析回退到内置 `bash`。
 
@@ -1278,7 +1059,7 @@ async function sendAndWait(sid, body, timeout = 90000) {
 ```
 **期望**：覆盖期间 `bash` 调用返回 `SESSION_BASH_OVERRIDE`；删除 session tool 后，工具列表仍包含内置 `bash`，且不再出现 override marker
 
-### T30.27 非 ToolDefinition 导出被跳过且不影响其他工具
+### T32.27 非 ToolDefinition 导出被跳过且不影响其他工具
 
 > 验证 code 能正常存入数据库，但如果模块导出不符合 `ToolDefinition`，registry 加载时会跳过该工具；其他有效 session tool 和内置工具不受影响。
 
@@ -1320,7 +1101,7 @@ console.log("builtin still visible:", text.includes("bash") || text.includes("re
 ```
 **期望**：API list 能看到 `not-a-tool` 数据库记录；LLM 可用工具列表不包含 `not-a-tool`，但包含 `good-tool` 和内置工具
 
-### T30.28 更新 code 后下次调用使用新实现
+### T32.28 更新 code 后下次调用使用新实现
 
 > 验证同名 tool upsert 更新 code 后，下一次 LLM 工具调用使用新 code；同时覆盖 `importToolCode` 按 code 内容缓存的行为。
 
@@ -1416,34 +1197,36 @@ async function sendAndWait(sid, body, timeout = 90000) {
 
 ## 结果汇总
 
+> **编号说明**：T32.25/T32.26 为历史移除用例，保留断档不重排（避免引用失效）。
+
 | 用例 | 状态 | 备注 |
 |---|---|---|
-| T30.1 | ✅ | 创建会话级 tool（name/description/code，id 以 stl_ 开头） |
-| T30.2 | ✅ | 列出会话 tools，按 name 排序 |
-| T30.3 | ✅ | Upsert 更新同名 tool（description + code 更新） |
-| T30.4 | ✅ | 删除单个 tool → 200 |
-| T30.5 | ✅ | 清空所有 tools → 列表为空 |
-| T30.6 | ✅ | 不同 session tools 互相隔离 |
-| T30.7 | ⬜ | 删除 session 后级联清理（ON DELETE cascade）— PG 级联删除，list 返回 404 |
-| T30.8 | ✅ | 缺少必填字段（name/description/code）→ 400 |
-| T30.9 | ⬜ | 不存在 session 创建 tool → 500（FK），list → 404 |
-| T30.10 | ✅ | session tool 出现在 LLM 工具列表中（gen-uuid 被调用，输出 UUID） |
-| T30.11 | ✅ | session tool 与全局工具合并后 LLM 可调用（reverse-text 精确反转） |
-| T30.12 | ✅ | 语法错误的 code 不影响其他工具（静默跳过） |
-| T30.13 | ✅ | 完整工作流（创建→执行→验证→清理） |
-| T30.14 | ✅ | code 使用 tool.schema 定义多种参数类型 |
-| T30.15 | ✅ | 非法 name（空字符串）→ 400 |
-| T30.16 | ✅ | 内置工具不受 session tools 影响（对照组 11 内置工具，实验组 11 内置 + 3 session = 14 工具） |
-| T30.17 | ✅ | time_created 不变，time_updated 随 upsert 增大 |
-| T30.18 | ✅ | 删除不存在的 tool name → 200（幂等） |
-| T30.19 | ✅ | 清空空 session → 200（幂等） |
-| T30.20 | ✅ | crash-tool status=error，safe-tool 正常完成，session 不崩溃 |
-| T30.21 | ✅ | title="Greeted World"，output="Hello, World!" |
-| T30.22 | ✅ | add 输出 30，multiply 输出 30，两工具均被调用 |
-| T30.23 | ✅ | API 与 PG 直接查询一致（2→1→0） |
-| T30.24 | ✅ | 真实覆盖内置 bash，删除后回退内置 bash |
-| T30.27 | ✅ | 非 ToolDefinition 导出被 registry 跳过，不影响其他工具 |
-| T30.28 | ✅ | upsert 更新 code 后下次调用使用新实现，验证 code 内容缓存不陈旧 |
+| T32.1 | ✅ | 创建会话级 tool（name/description/code，id 以 stl_ 开头） |
+| T32.2 | ✅ | 列出会话 tools，按 name 排序 |
+| T32.3 | ✅ | Upsert 更新同名 tool（description + code 更新） |
+| T32.4 | ✅ | 删除单个 tool → 200 |
+| T32.5 | ✅ | 清空所有 tools → 列表为空 |
+| T32.6 | ✅ | 不同 session tools 互相隔离 |
+| T32.7 | ⬜ | 删除 session 后级联清理（ON DELETE cascade）— PG 级联删除，list 返回 404 |
+| T32.8 | ✅ | 缺少必填字段（name/description/code）→ 400 |
+| T32.9 | ⬜ | 不存在 session 创建 tool → 500（FK），list → 404 |
+| T32.10 | ✅ | session tool 出现在 LLM 工具列表中（gen-uuid 被调用，输出 UUID） |
+| T32.11 | ✅ | session tool 与全局工具合并后 LLM 可调用（reverse-text 精确反转） |
+| T32.12 | ✅ | 语法错误的 code 不影响其他工具（静默跳过） |
+| T32.13 | ✅ | 完整工作流（创建→执行→验证→清理） |
+| T32.14 | ✅ | code 使用 tool.schema 定义多种参数类型 |
+| T32.15 | ⚠️ NOTE | 非法 name（空字符串）实际返回 200（`Schema.String` 接受空，校验缺失；与 plugin `NonEmptyString` 不一致） |
+| T32.16 | ✅ | 内置工具不受 session tools 影响（对照组 11 内置工具，实验组 11 内置 + 3 session = 14 工具） |
+| T32.17 | ✅ | time_created 不变，time_updated 随 upsert 增大 |
+| T32.18 | ✅ | 删除不存在的 tool name → 200（幂等） |
+| T32.19 | ✅ | 清空空 session → 200（幂等） |
+| T32.20 | ✅ | crash-tool status=error，safe-tool 正常完成，session 不崩溃 |
+| T32.21 | ✅ | title="Greeted World"，output="Hello, World!" |
+| T32.22 | ✅ | add 输出 30，multiply 输出 30，两工具均被调用 |
+| T32.23 | ✅ | API 与 PG 直接查询一致（2→1→0） |
+| T32.24 | ✅ | 真实覆盖内置 bash，删除后回退内置 bash |
+| T32.27 | ✅ | 非 ToolDefinition 导出被 registry 跳过，不影响其他工具 |
+| T32.28 | ✅ | upsert 更新 code 后下次调用使用新实现，验证 code 内容缓存不陈旧 |
 
 ## 单元测试覆盖
 

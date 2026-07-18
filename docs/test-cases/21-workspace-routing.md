@@ -76,8 +76,15 @@ const plan = yield* planRequest(request, {
 
 ### 2.3 Fallback 优先级（修复后）
 
+> ⚠️ **与代码核对**（2026-07-18）：实际 `defaultDirectory`（`middleware/workspace-routing.ts:87`）顺序为 `Flag.OPENCODE_DEFAULT_DIRECTORY || url.directory || headers["x-opencode-directory"] || sessionDirectory || process.cwd()`——**flag 在最前**。下方"修改 1"代码块展示的是设计意图（flag 靠后），但提交的代码把 flag 放到了第一位。SaaS 下 flag 通常 undefined，行为与下方一致；仅当显式设置 `OPENCODE_DEFAULT_DIRECTORY` 时会覆盖 URL/Header。
+
 ```
-URL ?directory=xxx 
+OPENCODE_DEFAULT_DIRECTORY（若设置）
+  → URL ?directory=xxx 
+  → Header x-opencode-directory 
+  → Session.directory  ← 新增
+  → process.cwd()
+```
   → Header x-opencode-directory 
   → Session.directory  ← 新增
   → Env OPENCODE_DEFAULT_DIRECTORY 
@@ -168,7 +175,7 @@ assert(d.length === 0)  // 无 diff 数据
 
 ## 四、与路径泄露防护的关系
 
-本次修复与 [20-path-leak-test.md](./20-path-leak-test.md) 是**互补**关系：
+本次修复与 [19-path-leak-test.md](./19-path-leak-test.md) 是**互补**关系：
 
 | 维度 | 路径泄露防护 (PL-x) | 路径路由修复 (WR-x) |
 |------|-------------------|-------------------|

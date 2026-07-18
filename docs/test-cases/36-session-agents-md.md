@@ -1,5 +1,7 @@
 # Session AGENTS.md 测试用例
 
+> **通用清单映射**：T36.1-T36.7（API CRUD/持久化/隔离）遵循 [`00-preamble.md` 附录 A](./00-preamble.md) 通用 CRUD 清单（G1-G9）；其余为 AGENTS.md 特有场景（system instruction 优先级/工具调用/并发）。
+
 ## 范围
 
 验证每个 Session 独立的 `AGENTS.md` 指令覆盖层：API CRUD、PostgreSQL 持久化、Session 隔离、system instruction 优先级、删除清理、空状态和并发更新。

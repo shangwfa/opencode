@@ -35,7 +35,7 @@ MSG=$(python3 -c "import json;print(json.load(open('/tmp/fork-msg.json'))['info'
 curl -s -X POST "$BASE/session/$SID/fork" -H 'Content-Type: application/json' -d "{\"messageID\":\"$MSG\"}" | python3 -m json.tool
 curl -s "$BASE/session/$SID/children" | python3 -m json.tool
 ```
-**期望**：fork 返回 child session；children 列表包含该 child
+**期望**：fork 返回 child session。⚠️ 已知行为：fork 不建立 parent-child 关联，`children` 列表返回空（见结果汇总实测记录）
 
 ### T14.4 message 分页
 ```bash
@@ -63,7 +63,7 @@ curl -s "$BASE/session/$SID/diff?messageID=$MSG" | python3 -m json.tool
 curl -s -X POST "$BASE/session/$SID/revert" -H 'Content-Type: application/json' -d "{\"messageID\":\"$MSG\"}" | python3 -m json.tool
 curl -s -X POST "$BASE/session/$SID/unrevert" | python3 -m json.tool
 ```
-**期望**：diff 能显示文件变更；revert 后文件变更回滚；unrevert 后恢复
+**期望**：diff/revert/unrevert 均正常返回（HTTP 200）。⚠️ 已知行为：sandbox 内无 git 时 diff 返回空数组，不展示实际变更（见结果汇总实测记录）
 
 ### T14.7 file API
 ```bash
@@ -79,7 +79,7 @@ curl -s "$BASE/find/file?query=diff-test&limit=10" | python3 -m json.tool
 curl -s "$BASE/find?pattern=diff-test" | python3 -m json.tool
 curl -s "$BASE/find/symbol?query=main" | python3 -m json.tool
 ```
-**期望**：sandbox 模式下 find/file 和 find(pattern) 返回 400 BadRequest（需 session-scoped 路由，server-local ripgrep/filesystem 无法访问 sandbox 容器）；find/symbol 返回空数组（LSP 未实现）
+**期望**：find/file 和 find(pattern) 在 sandbox 不可达时返回 500（ripgrep 失败冒泡 defect；`handlers/file.ts` 未显式抛 400）；find/symbol 返回空数组（`file.ts:66-68` 永远 `return []`，instance 级未接线，session 内 LSP 见 T27）。⚠️ 结果汇总原记“400（方案 A 修复）”与当前代码不符。
 
 ### T14.9 VCS API
 ```bash
@@ -87,7 +87,7 @@ curl -s "$BASE/vcs" | python3 -m json.tool
 curl -s "$BASE/vcs/diff?mode=git" | python3 -m json.tool
 curl -s "$BASE/vcs/status" | python3 -m json.tool
 ```
-**期望**：sandbox 模式下 vcs info 返回 400 BadRequest（需 session-scoped vcsDiff）；vcs/diff mode 需为 git/branch；vcs/status 返回空数组
+**期望**：vcs info 成功返回 `{branch, default_branch}` 或失败时 500（`handlers/instance.ts:160` 无 sandbox 检测）；vcs/diff mode 需为 git/branch；vcs/status 返回空数组。⚠️ 结果汇总原记“400（方案 A 修复）”与当前代码不符。
 
 ### T14.10 agent/skill/command 列表
 ```bash

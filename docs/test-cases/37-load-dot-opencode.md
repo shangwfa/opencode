@@ -558,7 +558,7 @@ curl -s --noproxy '*' -X POST "$BASE/session/$SID/dot-opencode/load?directory=$W
 }
 ```
 
-> **实现说明**：`SessionLoadDotOpencode.load` 检测到 `SandboxProvider` 可用时，执行 `cd "$dir" && tar cf - --exclude='._*' .opencode | base64` 从沙箱快取配置到 SaaS 服务器临时目录，再用原有 `loadFromDirectory` 扫描解析。无沙箱时直接读本地 FS。
+> **实现说明**（2026-07-18 核对）：`SessionLoadDotOpencode.load`（`session-load-dot-opencode.ts:82-135`）检测到 `SandboxProvider` 可用时构造 `sandboxSource`（FileSource 抽象），通过 `sp.runInSession` 跑 `find ... -not -name '._*'`/`test -e`/`wc -c` + `sb.files.readFile` **逐文件远程读取**，再经 `loadFromDirectory(sessionID, directory, fs)` 扫描解析。**无 tar 快照、无 base64、无临时目录**（上方的 tar/base64 仅是本测试脚本把 .opencode 投递进沙箱的手段，非生产实现）。无沙箱时直接读本地 FS。
 
 ### T37.20 PG 持久化验证（实际字段值）
 
@@ -782,7 +782,7 @@ cd "${directory}" && tar cf - --exclude='._*' .opencode 2>/dev/null | base64 | t
 
 验证：上传含 `._*` 文件的 tar 后调用 load，期望不报错且 7 类正常 loaded。
 
-## 九、CodeGraph 集成模拟测试（实际执行）
+## 八、CodeGraph 集成模拟测试（实际执行）
 
 > 验证真实第三方工具（codegraph）通过 `.opencode` 配置自动发现并注入 MCP + AGENTS.md 的完整链路。
 >
@@ -1027,7 +1027,7 @@ AI 实际回复（节选）：
 | AI 利用图谱数据输出精确接口/行号 | ✅ `ProviderAdapter:244` 等 |
 | 端到端链路畅通 | ✅ 沙箱安装 → 图谱构建 → MCP serve → AI 调用 |
 
-## 十、MCP 进程隔离测试（实际执行）
+## 九、MCP 进程隔离测试（实际执行）
 
 > 验证沙箱被复用时 stale MCP 进程不会导致工具串台。
 >
@@ -1162,7 +1162,7 @@ codegraph_codegraph_explore
 
 > **修复前**：沙箱被复用时，上一个 session 的 antd supergateway 进程残留在 port 9100，新 session 的 codegraph supergateway 无法绑定端口，SaaS 连到了残留的 antd MCP server，返回 `codegraph_antd_doc` 等错误工具名。
 
-## 十、配置字段完整性测试
+## 十、配置字段完整性测试（原重复章节号已修正）
 
 > 验证 `.opencode` 各资源类型的全部 frontmatter / 配置字段正确映射到 PG。
 >

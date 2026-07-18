@@ -1,46 +1,58 @@
 # Provider 与模型、SSE 事件流
 
-> 本文档从 `saas-test-cases.md` 拆分而来。公共测试环境和配置请参考 [`00-preamble.md`](./00-preamble.md)。
+> 本文档从 `saas-test-cases.md` 拆分而来。公共测试环境和配置见 [`00-preamble.md`](./00-preamble.md)。运行用例前先 `source test-env.sh 3 && source test-lib.sh`（以下用例直接使用 `$BASE`/`$MODEL`/`jexec`）。
 
 ## 八、Provider 与模型
 
-> 运行前先全局加载环境：`source test-env.sh [1|2|3]`（见 [`00-preamble.md`](./00-preamble.md)）。以下用例直接用 `$BASE` `$PG_URL`，不重复定义。
-
 ### T8.1 列出所有 provider
+
 ```bash
-bun -e "fetch('http://localhost:14096/provider').then(r=>r.json()).then(d=>console.log('providers:',d.all?.length,'connected:',d.connected))"
+curl -s "$BASE/provider" | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+print('all:', len(d.get('all',[])))
+print('connected:', d.get('connected'))
+"
 ```
+**期望**：`all` 非空，`connected` 包含已配置 provider
 
 ### T8.2 切换模型
+
 ```bash
-# 用同一 session 在两轮里切换不同模型
-bun -e "fetch('http://localhost:14096/session/$SID/message',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({parts:[{type:'text',text:'你是哪个模型？'}],model:{providerID:'zhipuai',modelID:'glm-5.1'}})}).then(r=>r.json()).then(d=>console.log('m1:',d.info.modelID))"
+# 同 session 先发一条 glm-5.1 消息，再发一条其他模型消息
+SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
+
+curl -s --max-time 90 -X POST "$BASE/session/$SID/message" \
+  -H 'Content-Type: application/json' \
+  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"说一个字\"}],\"model\":$MODEL}" | jexec "d.get('info',{}).get('modelID','?')"
 ```
+**期望**：两次消息分别使用指定模型回复，无错误
 
 ---
 
 ## 九、SSE 事件流
 
-OpenCode 有两级 SSE 事件流：
-- **全局事件流** `GET /global/event` — 跨实例的全局事件（session 创建、升级、配置变更等）
-- **实例事件流** `GET /event`（需 `x-opencode-directory` 头） — 单实例范围内的事件（消息 delta、工具调用、权限请求、PTY、文件变更等），包含会话维度的实时推送
-
-两个端点均返回 `text/event-stream`，10 秒心跳。
-
 **事件格式差异**：
 - 全局 SSE：`data: {"directory":"...","project":"...","payload":{"id":"...","type":"...","properties":{}}}\n\n`
 - 实例 SSE：`data: {"id":"...","type":"...","properties":{}}\n\n`
 
-**通用解析函数**（后续用例中复用）：
-```javascript
-function parseSSE(buf) {
-  return buf.split('\n\n').filter(l => l.trim()).map(block => {
-    const line = block.split('\n').find(l => l.startsWith('data: '))
-    if (!line) return null
-    const raw = JSON.parse(line.slice(6))
-    return raw.payload || raw  // 统一：全局有 payload 层，实例没有
-  }).filter(Boolean)
-}
+**通用采集脚本**：所有 SSE 用例统一使用 [`scripts/sse-dump.mjs`](./scripts/sse-dump.mjs)（订阅 → 输出拍平后的事件 JSON 行，全局/实例格式已统一）：
+
+```bash
+# 标准三段式：后台订阅 → 执行业务动作 → 断言事件日志
+bun docs/test-cases/scripts/sse-dump.mjs "$BASE/event" <采集秒数> "$DIR" > /tmp/sse.log &
+SSE_PID=$!
+for i in $(seq 1 20); do grep -q server.connected /tmp/sse.log 2>/dev/null && break; sleep 0.5; done   # 等订阅建立
+# ... 业务动作（curl 发消息等）...
+wait $SSE_PID
+# grep/jq 断言 /tmp/sse.log
+```
+
+实例级 `/event` 需要先取 `DIR`：
+
+```bash
+SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
+DIR=$(curl -s "$BASE/session/$SID" | jexec "d['directory']")
 ```
 
 ---
@@ -50,113 +62,42 @@ function parseSSE(buf) {
 > 验证：响应头、初始 `server.connected` 事件
 
 ```bash
-timeout 5 bun -e "
-const ctrl = new AbortController()
-const timer = setTimeout(() => ctrl.abort(), 4000)
-const r = await fetch('http://localhost:14096/global/event', { signal: ctrl.signal })
-console.log('content-type:', r.headers.get('content-type'))
-console.log('cache-control:', r.headers.get('cache-control'))
+curl -s -N --max-time 3 -D - -o /dev/null "$BASE/global/event" | grep -i "content-type\|cache-control"
 
-const reader = r.body.getReader()
-const decoder = new TextDecoder()
-let buf = ''
-try {
-  const { value } = await reader.read()
-  if (value) buf = decoder.decode(value)
-} catch(e) {}
-reader.cancel()
-clearTimeout(timer)
-
-const events = buf.split('\n\n').filter(l => l.trim()).map(block => {
-  const line = block.split('\n').find(l => l.startsWith('data: '))
-  if (!line) return null
-  const raw = JSON.parse(line.slice(6))
-  return raw.payload || raw
-}).filter(Boolean)
-console.log('first event type:', events[0]?.type)
-"
+bun docs/test-cases/scripts/sse-dump.mjs "$BASE/global/event" 3 > /tmp/t91.log
+head -1 /tmp/t91.log | jexec "d.get('type')"
 ```
 **期望**：`content-type` 含 `text/event-stream`，`cache-control` 为 `no-cache, no-transform`，首个事件 `type` 为 `server.connected`
+
+---
 
 ### T9.2 全局事件流：创建 session 触发事件
 
 > 验证：全局 SSE 能收到 session 生命周期事件
 
 ```bash
-timeout 15 bun -e "
-const ctrl = new AbortController()
-const timer = setTimeout(() => { ctrl.abort(); process.exit(1) }, 12000)
+bun docs/test-cases/scripts/sse-dump.mjs "$BASE/global/event" 12 > /tmp/t92.log &
+SSE_PID=$!
+for i in $(seq 1 20); do grep -q server.connected /tmp/t92.log 2>/dev/null && break; sleep 0.5; done
 
-const r = await fetch('http://localhost:14096/global/event', { signal: ctrl.signal })
-const reader = r.body.getReader()
-const decoder = new TextDecoder()
+curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' > /dev/null
+wait $SSE_PID
 
-// 读 server.connected
-const first = await reader.read()
-const chunk0 = first.value ? decoder.decode(first.value) : ''
-console.log('initial:', (JSON.parse(chunk0.split('data: ')[1].split('\n')[0])).payload?.type)
-
-// 创建 session
-const sess = await (await fetch('http://localhost:14096/session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })).json()
-console.log('created:', sess.id)
-
-// 读后续事件
-for (let i = 0; i < 10; i++) {
-  try {
-    const { value, done } = await reader.read()
-    if (done) break
-    const chunk = decoder.decode(value)
-    const events = chunk.split('\n\n').filter(l => l.trim())
-    for (const block of events) {
-      const line = block.split('\n').find(l => l.startsWith('data: '))
-      if (!line) continue
-      const evt = JSON.parse(line.slice(6))
-      const p = evt.payload || evt
-      console.log('event:', p.type, p.properties?.sessionID?.slice(0,20) || '')
-      if (p.type !== 'server.connected' && p.type !== 'server.heartbeat') {
-        clearTimeout(timer)
-        console.log('✅ received session event via global SSE')
-        await reader.cancel()
-        process.exit(0)
-      }
-    }
-  } catch(e) { break }
-}
-"
+grep -m1 '"type":"session.created"' /tmp/t92.log
 ```
 **期望**：收到 `session.created` 事件，包含 `sessionID`
+
+---
 
 ### T9.3 全局事件流：心跳机制
 
 > 验证：约 10 秒后收到 `server.heartbeat`
 
 ```bash
-timeout 15 bun -e "
-const start = Date.now()
-const ctrl = new AbortController()
-const timer = setTimeout(() => { ctrl.abort(); console.log('❌ no heartbeat'); process.exit(1) }, 14000)
-
-const r = await fetch('http://localhost:14096/global/event', { signal: ctrl.signal })
-const reader = r.body.getReader()
-const decoder = new TextDecoder()
-
-while (true) {
-  try {
-    const { value, done } = await reader.read()
-    if (done) break
-    const chunk = decoder.decode(value)
-    if (chunk.includes('server.heartbeat')) {
-      const elapsed = ((Date.now() - start) / 1000).toFixed(1)
-      console.log('✅ heartbeat received after ' + elapsed + 's')
-      clearTimeout(timer)
-      await reader.cancel()
-      process.exit(0)
-    }
-  } catch(e) { break }
-}
-"
+time bun docs/test-cases/scripts/sse-dump.mjs "$BASE/global/event" 12 > /tmp/t93.log
+grep -c server.heartbeat /tmp/t93.log
 ```
-**期望**：约 10 秒后收到 `server.heartbeat`
+**期望**：`server.heartbeat` ≥ 1（首次心跳约 10s）
 
 ---
 
@@ -165,38 +106,12 @@ while (true) {
 > 验证：实例级 SSE 连接、`x-opencode-directory` 头、初始事件
 
 ```bash
-timeout 5 bun -e "
-// 创建 session 获取 directory
-const sess = await (await fetch('http://localhost:14096/session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })).json()
-const info = await (await fetch('http://localhost:14096/session/' + sess.id)).json()
-const DIR = info.directory
+SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
+DIR=$(curl -s "$BASE/session/$SID" | jexec "d['directory']")
 
-const ctrl = new AbortController()
-const timer = setTimeout(() => ctrl.abort(), 4000)
-const r = await fetch('http://localhost:14096/event', {
-  headers: { 'x-opencode-directory': DIR },
-  signal: ctrl.signal
-})
-console.log('content-type:', r.headers.get('content-type'))
-console.log('cache-control:', r.headers.get('cache-control'))
-
-const reader = r.body.getReader()
-const decoder = new TextDecoder()
-try {
-  const { value } = await reader.read()
-  if (value) {
-    const buf = decoder.decode(value)
-    const line = buf.split('\n').find(l => l.startsWith('data: '))
-    if (line) {
-      const evt = JSON.parse(line.slice(6))
-      const p = evt.payload || evt
-      console.log('first event type:', p.type)
-    }
-  }
-} catch(e) {}
-reader.cancel()
-clearTimeout(timer)
-"
+curl -s -N --max-time 3 -D - -o /dev/null -H "x-opencode-directory: $DIR" "$BASE/event" | grep -i content-type
+bun docs/test-cases/scripts/sse-dump.mjs "$BASE/event" 3 "$DIR" > /tmp/t94.log
+head -1 /tmp/t94.log | jexec "d.get('type')"
 ```
 **期望**：`content-type` 为 `text/event-stream`，首个事件 `type` 为 `server.connected`
 
@@ -205,114 +120,50 @@ clearTimeout(timer)
 > 验证：LLM 响应过程中 SSE 推送消息相关事件
 
 ```bash
-timeout 60 bun -e "
-const sess = await (await fetch('http://localhost:14096/session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })).json()
-const info = await (await fetch('http://localhost:14096/session/' + sess.id)).json()
-const DIR = info.directory
-const SID = sess.id
-console.log('session:', SID)
+SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
+DIR=$(curl -s "$BASE/session/$SID" | jexec "d['directory']")
 
-const ctrl = new AbortController()
-const timer = setTimeout(() => { ctrl.abort(); console.log('❌ timeout'); process.exit(1) }, 50000)
+bun docs/test-cases/scripts/sse-dump.mjs "$BASE/event" 50 "$DIR" > /tmp/t95.log &
+SSE_PID=$!
+for i in $(seq 1 20); do grep -q server.connected /tmp/t95.log 2>/dev/null && break; sleep 0.5; done
 
-const r = await fetch('http://localhost:14096/event', { headers: { 'x-opencode-directory': DIR }, signal: ctrl.signal })
-const reader = r.body.getReader()
-const decoder = new TextDecoder()
-const types = new Set()
-let count = 0
-let gotMessageEvent = false
+curl -s --max-time 45 -X POST "$BASE/session/$SID/message" \
+  -H 'Content-Type: application/json' \
+  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"说一个字\"}],\"model\":$MODEL}" > /dev/null
+wait $SSE_PID
 
-setTimeout(async () => {
-  await fetch('http://localhost:14096/session/' + SID + '/message', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ parts: [{ type: 'text', text: '说一个字' }], model: { providerID: 'zhipuai', modelID: 'glm-5.1' } })
-  })
-}, 500)
-
-while (true) {
-  try {
-    const { value, done } = await reader.read()
-    if (done) break
-    const chunk = decoder.decode(value)
-    const blocks = chunk.split('\n\n').filter(l => l.trim())
-    for (const block of blocks) {
-      const line = block.split('\n').find(l => l.startsWith('data: '))
-      if (!line) continue
-      const evt = JSON.parse(line.slice(6))
-      const p = evt.payload || evt
-      types.add(p.type)
-      count++
-      if (p.type === 'message.part.updated' || p.type === 'message.part.delta') gotMessageEvent = true
-      if (p.type === 'session.idle') {
-        clearTimeout(timer)
-        console.log('event types:', [...types].sort().join(', '))
-        console.log('total events:', count)
-        console.log(gotMessageEvent ? '✅ received message events' : '❌ no message events')
-        await reader.cancel()
-        process.exit(gotMessageEvent ? 0 : 1)
-      }
-    }
-  } catch(e) { break }
-}
-"
+grep -c '"type":"message.part.updated"\|"type":"message.part.delta"' /tmp/t95.log
+grep -c '"type":"session.idle"' /tmp/t95.log
 ```
-**期望**：收到 `message.part.updated` 和/或 `message.part.delta`，事件含 `properties.sessionID`
+**期望**：`message.part.updated`/`message.part.delta` ≥ 1（事件含 `properties.sessionID`），`session.idle` ≥ 1
 
 ### T9.6 实例事件流：工具调用事件
 
 > 验证：工具调用的 SSE 生命周期事件（pending → running → completed/error）
 
 ```bash
-timeout 90 bun -e "
-const sess = await (await fetch('http://localhost:14096/session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })).json()
-const info = await (await fetch('http://localhost:14096/session/' + sess.id)).json()
-const DIR = info.directory
-const SID = sess.id
+SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
+DIR=$(curl -s "$BASE/session/$SID" | jexec "d['directory']")
 
-const ctrl = new AbortController()
-const timer = setTimeout(() => { ctrl.abort(); console.log('❌ timeout'); process.exit(1) }, 80000)
+bun docs/test-cases/scripts/sse-dump.mjs "$BASE/event" 80 "$DIR" > /tmp/t96.log &
+SSE_PID=$!
+for i in $(seq 1 20); do grep -q server.connected /tmp/t96.log 2>/dev/null && break; sleep 0.5; done
 
-const r = await fetch('http://localhost:14096/event', { headers: { 'x-opencode-directory': DIR }, signal: ctrl.signal })
-const reader = r.body.getReader()
-const decoder = new TextDecoder()
-const toolEvents = []
+curl -s --max-time 75 -X POST "$BASE/session/$SID/message" \
+  -H 'Content-Type: application/json' \
+  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"用 bash 执行 echo hello_sse_test\"}],\"model\":$MODEL}" > /dev/null
+wait $SSE_PID
 
-setTimeout(async () => {
-  await fetch('http://localhost:14096/session/' + SID + '/message', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ parts: [{ type: 'text', text: '用 bash 执行 echo hello_sse_test' }], model: { providerID: 'zhipuai', modelID: 'glm-5.1' } })
-  })
-}, 500)
-
-while (true) {
-  try {
-    const { value, done } = await reader.read()
-    if (done) break
-    const chunk = decoder.decode(value)
-    const blocks = chunk.split('\n\n').filter(l => l.trim())
-    for (const block of blocks) {
-      const line = block.split('\n').find(l => l.startsWith('data: '))
-      if (!line) continue
-      const evt = JSON.parse(line.slice(6))
-      const p = evt.payload || evt
-      if (p.type === 'message.part.updated') {
-        const part = p.properties?.part
-        if (part?.type === 'tool') {
-          toolEvents.push({ tool: part.tool, status: part.state?.status })
-        }
-      }
-      if (p.type === 'session.idle' || toolEvents.length >= 3) {
-        clearTimeout(timer)
-        console.log('tool events:', JSON.stringify(toolEvents))
-        const statuses = toolEvents.map(e => e.status)
-        const hasLifecycle = statuses.includes('pending') && (statuses.includes('running') || statuses.includes('completed') || statuses.includes('error'))
-        console.log(hasLifecycle ? '✅ tool call lifecycle received' : '❌ no tool lifecycle')
-        await reader.cancel()
-        process.exit(hasLifecycle ? 0 : 1)
-      }
-    }
-  } catch(e) { break }
-}
+# 提取 tool part 的状态流转
+python3 -c "
+import json
+stats = []
+for line in open('/tmp/t96.log'):
+    part = json.loads(line).get('properties', {}).get('part', {})
+    if part.get('type') == 'tool':
+        stats.append(part.get('state', {}).get('status'))
+print('tool statuses:', stats)
+print('has lifecycle:', 'pending' in stats and any(s in stats for s in ('running','completed','error')))
 "
 ```
 **期望**：收到 `message.part.updated`（`part.type === 'tool'`），状态流转 `pending` → `running` → `completed`（或 `error`，取决于 sandbox 环境）
@@ -323,7 +174,7 @@ while (true) {
 
 > **前提**：不要在全局 config 中配 `permission.edit: allow`（否则不会触发 `permission.asked`）。如果已配，可临时移除：
 > ```bash
-> curl -s -X PATCH http://localhost:14096/global/config \
+> curl -s -X PATCH "$BASE/global/config" \
 >   -H 'Content-Type: application/json' \
 >   -d '{"permission":{"bash":"allow","edit":"ask","write":"ask","glob":"allow","grep":"allow","list":"allow","read":"allow","webfetch":"allow"}}'
 > ```
@@ -331,63 +182,31 @@ while (true) {
 > **根因说明**：`evaluate()` 默认返回 `{ action: "ask" }`。当 config 未配置 permission 时，所有工具调用都需权限确认。HTTP API 模式下无 UI 回复权限请求，工具会卡在 `running` 状态。本用例通过 SSE 监听 `permission.asked` 后自动回复来验证。
 
 ```bash
-timeout 90 bun -e "
-const BASE = 'http://localhost:14096'
-const sess = await (await fetch(BASE + '/session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })).json()
-const info = await (await fetch(BASE + '/session/' + sess.id)).json()
-const DIR = info.directory
-const SID = sess.id
-console.log('session:', SID)
+SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
+DIR=$(curl -s "$BASE/session/$SID" | jexec "d['directory']")
 
-const ctrl = new AbortController()
-const timer = setTimeout(() => { ctrl.abort(); console.log('⏭️ timeout'); process.exit(0) }, 80000)
+bun docs/test-cases/scripts/sse-dump.mjs "$BASE/event" 80 "$DIR" > /tmp/t97.log &
+SSE_PID=$!
+for i in $(seq 1 20); do grep -q server.connected /tmp/t97.log 2>/dev/null && break; sleep 0.5; done
 
-const r = await fetch(BASE + '/event', { headers: { 'x-opencode-directory': DIR }, signal: ctrl.signal })
-const reader = r.body.getReader()
-const decoder = new TextDecoder()
+curl -s --max-time 75 -X POST "$BASE/session/$SID/message" \
+  -H 'Content-Type: application/json' \
+  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"use the write tool to write hello to /workspace/sse-perm-test.txt\"}],\"model\":$MODEL}" > /dev/null &
 
-setTimeout(async () => {
-  await fetch(BASE + '/session/' + SID + '/message', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ parts: [{ type: 'text', text: 'use the write tool to write hello to /workspace/sse-perm-test.txt' }], model: { providerID: 'zhipuai', modelID: 'glm-5.1' } })
-  })
-}, 500)
-
-while (true) {
-  try {
-    const { value, done } = await reader.read()
-    if (done) break
-    const chunk = decoder.decode(value)
-    const blocks = chunk.split('\n\n').filter(l => l.trim())
-    for (const block of blocks) {
-      const line = block.split('\n').find(l => l.startsWith('data: '))
-      if (!line) continue
-      const evt = JSON.parse(line.slice(6))
-      const p = evt.payload || evt
-
-      if (p.type === 'permission.asked') {
-        clearTimeout(timer)
-        console.log('✅ permission.asked:', p.properties.permission, p.properties.patterns)
-        // 自动回复以释放工具
-        await fetch(BASE + '/session/' + SID + '/permission/' + p.properties.id, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ reply: 'always' })
-        })
-        console.log('replied: always')
-        await reader.cancel()
-        process.exit(0)
-      }
-      if (p.type === 'session.idle') {
-        clearTimeout(timer)
-        console.log('⏭️ session idle without permission.asked (may be auto-approved)')
-        await reader.cancel()
-        process.exit(0)
-      }
-    }
-  } catch(e) { if (!ctrl.signal.aborted) console.error(e); break }
-}
-"
+# 轮询日志捕获 permission.asked 并自动回复
+for i in $(seq 1 40); do
+  PLINE=$(grep -m1 '"type":"permission.asked"' /tmp/t97.log 2>/dev/null)
+  if [ -n "$PLINE" ]; then
+    PID=$(echo "$PLINE" | jexec "d['properties']['id']")
+    echo "permission.asked id=$PID"
+    curl -s -X POST "$BASE/session//permissions/" \
+      -H 'Content-Type: application/json' -d '{"response":"always"}'
+    echo "replied: always"
+    break
+  fi
+  sleep 2
+done
+wait $SSE_PID 2>/dev/null
 ```
 **期望**：收到 `permission.asked` 事件并成功回复（若 `edit` 权限已配 `allow` 则 session 正常完成无权限弹窗）
 
@@ -396,59 +215,28 @@ while (true) {
 > 验证：两个 session 的事件通过 `sessionID` 正确路由，无交叉污染
 
 ```bash
-timeout 90 bun -e "
-const sA = await (await fetch('http://localhost:14096/session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })).json()
-const sB = await (await fetch('http://localhost:14096/session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })).json()
-const infoA = await (await fetch('http://localhost:14096/session/' + sA.id)).json()
-const DIR = infoA.directory
-console.log('session A:', sA.id)
-console.log('session B:', sB.id)
+SID_A=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
+SID_B=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
+DIR=$(curl -s "$BASE/session/$SID_A" | jexec "d['directory']")
 
-const ctrl = new AbortController()
-const timer = setTimeout(() => { ctrl.abort(); process.exit(1) }, 80000)
+bun docs/test-cases/scripts/sse-dump.mjs "$BASE/event" 60 "$DIR" > /tmp/t98.log &
+SSE_PID=$!
+for i in $(seq 1 20); do grep -q server.connected /tmp/t98.log 2>/dev/null && break; sleep 0.5; done
 
-const r = await fetch('http://localhost:14096/event', { headers: { 'x-opencode-directory': DIR }, signal: ctrl.signal })
-const reader = r.body.getReader()
-const decoder = new TextDecoder()
-const counts = {}
-counts[sA.id] = 0
-counts[sB.id] = 0
+curl -s --max-time 55 -X POST "$BASE/session/$SID_A/message" \
+  -H 'Content-Type: application/json' -d "{\"parts\":[{\"type\":\"text\",\"text\":\"说A\"}],\"model\":$MODEL}" > /dev/null &
+curl -s --max-time 55 -X POST "$BASE/session/$SID_B/message" \
+  -H 'Content-Type: application/json' -d "{\"parts\":[{\"type\":\"text\",\"text\":\"说B\"}],\"model\":$MODEL}" > /dev/null &
+wait $SSE_PID
 
-setTimeout(() => {
-  fetch('http://localhost:14096/session/' + sA.id + '/message', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ parts: [{ type: 'text', text: '说A' }], model: { providerID: 'zhipuai', modelID: 'glm-5.1' } })
-  })
-  fetch('http://localhost:14096/session/' + sB.id + '/message', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ parts: [{ type: 'text', text: '说B' }], model: { providerID: 'zhipuai', modelID: 'glm-5.1' } })
-  })
-}, 500)
-
-while (true) {
-  try {
-    const { value, done } = await reader.read()
-    if (done) break
-    const chunk = decoder.decode(value)
-    const blocks = chunk.split('\n\n').filter(l => l.trim())
-    for (const block of blocks) {
-      const line = block.split('\n').find(l => l.startsWith('data: '))
-      if (!line) continue
-      const evt = JSON.parse(line.slice(6))
-      const p = evt.payload || evt
-      const sid = p.properties?.sessionID
-      if (sid && counts[sid] !== undefined) counts[sid]++
-      if (counts[sA.id] > 0 && counts[sB.id] > 0) {
-        clearTimeout(timer)
-        console.log('session A events:', counts[sA.id])
-        console.log('session B events:', counts[sB.id])
-        console.log('✅ both sessions received events')
-        await reader.cancel()
-        process.exit(0)
-      }
-    }
-  } catch(e) { break }
-}
+python3 -c "
+import json
+a=b=0
+for line in open('/tmp/t98.log'):
+    sid = json.loads(line).get('properties',{}).get('sessionID')
+    a += sid == '$SID_A'; b += sid == '$SID_B'
+print(f'A events: {a}, B events: {b}')
+print('✅ both > 0' if a>0 and b>0 else '❌')
 "
 ```
 **期望**：两个 session 各自收到事件（计数 > 0），事件 `sessionID` 无交叉
@@ -458,50 +246,18 @@ while (true) {
 > 验证：LLM 处理期间 `session.status` 事件，完成后 `session.idle` 事件
 
 ```bash
-timeout 60 bun -e "
-const sess = await (await fetch('http://localhost:14096/session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })).json()
-const info = await (await fetch('http://localhost:14096/session/' + sess.id)).json()
-const DIR = info.directory
-const SID = sess.id
+SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
+DIR=$(curl -s "$BASE/session/$SID" | jexec "d['directory']")
 
-const ctrl = new AbortController()
-const timer = setTimeout(() => { ctrl.abort(); process.exit(1) }, 50000)
+bun docs/test-cases/scripts/sse-dump.mjs "$BASE/event" 50 "$DIR" > /tmp/t99.log &
+SSE_PID=$!
+for i in $(seq 1 20); do grep -q server.connected /tmp/t99.log 2>/dev/null && break; sleep 0.5; done
 
-const r = await fetch('http://localhost:14096/event', { headers: { 'x-opencode-directory': DIR }, signal: ctrl.signal })
-const reader = r.body.getReader()
-const decoder = new TextDecoder()
-const statusEvents = []
+curl -s --max-time 45 -X POST "$BASE/session/$SID/message" \
+  -H 'Content-Type: application/json' -d "{\"parts\":[{\"type\":\"text\",\"text\":\"说一个字\"}],\"model\":$MODEL}" > /dev/null
+wait $SSE_PID
 
-setTimeout(async () => {
-  await fetch('http://localhost:14096/session/' + SID + '/message', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ parts: [{ type: 'text', text: '说一个字' }], model: { providerID: 'zhipuai', modelID: 'glm-5.1' } })
-  })
-}, 500)
-
-while (true) {
-  try {
-    const { value, done } = await reader.read()
-    if (done) break
-    const chunk = decoder.decode(value)
-    const blocks = chunk.split('\n\n').filter(l => l.trim())
-    for (const block of blocks) {
-      const line = block.split('\n').find(l => l.startsWith('data: '))
-      if (!line) continue
-      const evt = JSON.parse(line.slice(6))
-      const p = evt.payload || evt
-      if (p.type === 'session.status' || p.type === 'session.idle') statusEvents.push(p.type)
-      if (p.type === 'session.idle') {
-        clearTimeout(timer)
-        console.log('status lifecycle:', statusEvents.join(' → '))
-        console.log('✅ session status events received')
-        await reader.cancel()
-        process.exit(0)
-      }
-    }
-  } catch(e) { break }
-}
-"
+grep -o '"type":"session\.\(status\|idle\)"' /tmp/t99.log | sort | uniq -c
 ```
 **期望**：先收到 `session.status`（busy），完成后收到 `session.idle`
 
@@ -510,50 +266,18 @@ while (true) {
 > 验证：`POST /session/:id/prompt_async` 返回 204，事件通过 SSE 推送
 
 ```bash
-timeout 60 bun -e "
-const sess = await (await fetch('http://localhost:14096/session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })).json()
-const info = await (await fetch('http://localhost:14096/session/' + sess.id)).json()
-const DIR = info.directory
-const SID = sess.id
+SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
+DIR=$(curl -s "$BASE/session/$SID" | jexec "d['directory']")
 
-const ctrl = new AbortController()
-const timer = setTimeout(() => { ctrl.abort(); process.exit(1) }, 50000)
+bun docs/test-cases/scripts/sse-dump.mjs "$BASE/event" 50 "$DIR" > /tmp/t910.log &
+SSE_PID=$!
+for i in $(seq 1 20); do grep -q server.connected /tmp/t910.log 2>/dev/null && break; sleep 0.5; done
 
-const r = await fetch('http://localhost:14096/event', { headers: { 'x-opencode-directory': DIR }, signal: ctrl.signal })
-const reader = r.body.getReader()
-const decoder = new TextDecoder()
-let gotMessageEvent = false
+curl -s -o /dev/null -w "prompt_async: %{http_code}\n" -X POST "$BASE/session/$SID/prompt_async" \
+  -H 'Content-Type: application/json' -d "{\"parts\":[{\"type\":\"text\",\"text\":\"说一个字\"}],\"model\":$MODEL}"
+wait $SSE_PID
 
-setTimeout(async () => {
-  const resp = await fetch('http://localhost:14096/session/' + SID + '/prompt_async', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ parts: [{ type: 'text', text: '说一个字' }], model: { providerID: 'zhipuai', modelID: 'glm-5.1' } })
-  })
-  console.log('prompt_async status:', resp.status)
-}, 500)
-
-while (true) {
-  try {
-    const { value, done } = await reader.read()
-    if (done) break
-    const chunk = decoder.decode(value)
-    const blocks = chunk.split('\n\n').filter(l => l.trim())
-    for (const block of blocks) {
-      const line = block.split('\n').find(l => l.startsWith('data: '))
-      if (!line) continue
-      const evt = JSON.parse(line.slice(6))
-      const p = evt.payload || evt
-      if (p.type === 'message.part.updated' || p.type === 'message.part.delta') gotMessageEvent = true
-      if (p.type === 'session.idle') {
-        clearTimeout(timer)
-        console.log(gotMessageEvent ? '✅ async prompt triggered events' : '❌ no message events')
-        await reader.cancel()
-        process.exit(gotMessageEvent ? 0 : 1)
-      }
-    }
-  } catch(e) { break }
-}
-"
+grep -c '"type":"message.part.updated"\|"type":"message.part.delta"' /tmp/t910.log
 ```
 **期望**：`prompt_async` 返回 204，SSE 收到 `message.part.updated` / `message.part.delta`
 
@@ -569,72 +293,32 @@ while (true) {
 > **根因说明**：write 工具通过 `ctx.sandbox` 在沙箱中执行写操作，sandbox 不可达时 Promise 永远 pending（工具显示 `running`）。默认权限 `"ask"` 无 UI 回复也会卡住。
 
 ```bash
-timeout 90 bun -e "
-const BASE = 'http://localhost:14096'
-const sess = await (await fetch(BASE + '/session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })).json()
-const info = await (await fetch(BASE + '/session/' + sess.id)).json()
-const DIR = info.directory
-const SID = sess.id
-console.log('session:', SID)
+SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
+DIR=$(curl -s "$BASE/session/$SID" | jexec "d['directory']")
 
-const ctrl = new AbortController()
-const timer = setTimeout(() => { ctrl.abort(); console.log('⏭️ timeout'); process.exit(0) }, 80000)
+bun docs/test-cases/scripts/sse-dump.mjs "$BASE/event" 80 "$DIR" > /tmp/t911.log &
+SSE_PID=$!
+for i in $(seq 1 20); do grep -q server.connected /tmp/t911.log 2>/dev/null && break; sleep 0.5; done
 
-const r = await fetch(BASE + '/event', { headers: { 'x-opencode-directory': DIR }, signal: ctrl.signal })
-const reader = r.body.getReader()
-const decoder = new TextDecoder()
-let gotFileEvent = false
-const eventTypes = new Set()
+curl -s --max-time 75 -X POST "$BASE/session/$SID/message" \
+  -H 'Content-Type: application/json' \
+  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"use the write tool to write hello to /workspace/sse-file-test.txt\"}],\"model\":$MODEL}" > /dev/null &
 
-setTimeout(async () => {
-  await fetch(BASE + '/session/' + SID + '/message', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ parts: [{ type: 'text', text: 'use the write tool to write hello to /workspace/sse-file-test.txt' }], model: { providerID: 'zhipuai', modelID: 'glm-5.1' } })
-  })
-}, 500)
+# 若出现权限请求则自动回复（同 T9.7）
+for i in $(seq 1 40); do
+  PLINE=$(grep -m1 '"type":"permission.asked"' /tmp/t911.log 2>/dev/null)
+  if [ -n "$PLINE" ]; then
+    PID=$(echo "$PLINE" | jexec "d['properties']['id']")
+    curl -s -X POST "$BASE/session//permissions/" \
+      -H 'Content-Type: application/json' -d '{"response":"always"}' > /dev/null
+    break
+  fi
+  grep -q '"type":"file.edited"\|"type":"file.watcher.updated"' /tmp/t911.log 2>/dev/null && break
+  sleep 2
+done
+wait $SSE_PID 2>/dev/null
 
-while (true) {
-  try {
-    const { value, done } = await reader.read()
-    if (done) break
-    const chunk = decoder.decode(value)
-    const blocks = chunk.split('\n\n').filter(l => l.trim())
-    for (const block of blocks) {
-      const line = block.split('\n').find(l => l.startsWith('data: '))
-      if (!line) continue
-      const evt = JSON.parse(line.slice(6))
-      const p = evt.payload || evt
-      eventTypes.add(p.type)
-
-      // 自动回复权限请求（如果触发了 external_directory 等）
-      if (p.type === 'permission.asked') {
-        console.log('permission.asked:', p.properties.permission, p.properties.patterns)
-        await fetch(BASE + '/session/' + SID + '/permission/' + p.properties.id, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ reply: 'always' })
-        })
-        console.log('replied: always')
-      }
-
-      if (p.type === 'file.edited' || p.type === 'file.watcher.updated') {
-        gotFileEvent = true
-        clearTimeout(timer)
-        console.log('✅ file event:', p.type, JSON.stringify(p.properties))
-        await reader.cancel()
-        process.exit(0)
-      }
-      if (p.type === 'session.idle') {
-        clearTimeout(timer)
-        console.log(gotFileEvent ? '✅ file event received' : '⏭️ no file event (sandbox may be unavailable)')
-        console.log('all event types:', [...eventTypes].sort().join(', '))
-        await reader.cancel()
-        process.exit(0)
-      }
-    }
-  } catch(e) { if (!ctrl.signal.aborted) console.error(e); break }
-}
-"
+grep -m1 '"type":"file.edited"\|"type":"file.watcher.updated"' /tmp/t911.log
 ```
 **期望**：收到 `file.edited` 或 `file.watcher.updated` 事件（sandbox 可达 + 权限已配 `allow` 时）
 
@@ -643,35 +327,14 @@ while (true) {
 > 验证：`POST /global/dispose` 触发 `server.instance.disposed` 事件
 
 ```bash
-timeout 10 bun -e "
-const ctrl = new AbortController()
-const timer = setTimeout(() => { ctrl.abort(); console.log('❌ no dispose event'); process.exit(1) }, 8000)
+bun docs/test-cases/scripts/sse-dump.mjs "$BASE/global/event" 8 > /tmp/t912.log &
+SSE_PID=$!
+for i in $(seq 1 20); do grep -q server.connected /tmp/t912.log 2>/dev/null && break; sleep 0.5; done
 
-const r = await fetch('http://localhost:14096/global/event', { signal: ctrl.signal })
-const reader = r.body.getReader()
-const decoder = new TextDecoder()
+curl -s -o /dev/null -w "dispose: %{http_code}\n" -X POST "$BASE/global/dispose"
+wait $SSE_PID
 
-await reader.read() // consume server.connected
-
-setTimeout(() => {
-  fetch('http://localhost:14096/global/dispose', { method: 'POST' }).then(r => console.log('dispose status:', r.status))
-}, 300)
-
-while (true) {
-  try {
-    const { value, done } = await reader.read()
-    if (done) { console.log('✅ stream closed after dispose'); break }
-    const chunk = decoder.decode(value)
-    if (chunk.includes('disposed') || chunk.includes('disposed')) {
-      clearTimeout(timer)
-      console.log('✅ received dispose event')
-      await reader.cancel()
-      process.exit(0)
-    }
-  } catch(e) { break }
-}
-clearTimeout(timer)
-"
+grep -i disposed /tmp/t912.log
 ```
 **期望**：收到含 `disposed` 的事件，或连接被服务端关闭
 
@@ -680,37 +343,13 @@ clearTimeout(timer)
 > 验证：SSE 连接可重复建立，每次都收到 `server.connected`
 
 ```bash
-timeout 10 bun -e "
-const sess = await (await fetch('http://localhost:14096/session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })).json()
-const info = await (await fetch('http://localhost:14096/session/' + sess.id)).json()
-const DIR = info.directory
-const decoder = new TextDecoder()
+SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
+DIR=$(curl -s "$BASE/session/$SID" | jexec "d['directory']")
 
-async function connectAndRead(dir) {
-  const ctrl = new AbortController()
-  const timer = setTimeout(() => ctrl.abort(), 3000)
-  const r = await fetch('http://localhost:14096/event', { headers: { 'x-opencode-directory': dir }, signal: ctrl.signal })
-  const reader = r.body.getReader()
-  try {
-    const { value } = await reader.read()
-    await reader.cancel()
-    clearTimeout(timer)
-    if (!value) return null
-    const line = decoder.decode(value).split('\n').find(l => l.startsWith('data: '))
-    if (!line) return null
-    const evt = JSON.parse(line.slice(6))
-    return (evt.payload || evt).type
-  } catch(e) { return null }
-}
-
-const t1 = await connectAndRead(DIR)
-console.log('conn1:', t1)
-const t2 = await connectAndRead(DIR)
-console.log('conn2:', t2)
-
-const pass = t1 === 'server.connected' && t2 === 'server.connected'
-console.log(pass ? '✅ reconnection works' : '❌ reconnection failed')
-"
+bun docs/test-cases/scripts/sse-dump.mjs "$BASE/event" 3 "$DIR" > /tmp/t913a.log
+bun docs/test-cases/scripts/sse-dump.mjs "$BASE/event" 3 "$DIR" > /tmp/t913b.log
+head -1 /tmp/t913a.log | jexec "d.get('type')"
+head -1 /tmp/t913b.log | jexec "d.get('type')"
 ```
 **期望**：两次连接都收到 `server.connected`
 
@@ -721,91 +360,25 @@ console.log(pass ? '✅ reconnection works' : '❌ reconnection failed')
 > **场景**：模拟多用户（如编辑器 + 终端 + CI 监控）同时通过 SSE 观察同一个会话的执行过程。验证 Bus 的 PubSub 模式能正确广播到所有订阅者。
 
 ```bash
-timeout 60 bun -e "
-const BASE = 'http://localhost:14096'
-const sess = await (await fetch(BASE + '/session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })).json()
-const info = await (await fetch(BASE + '/session/' + sess.id)).json()
-const DIR = info.directory
-const SID = sess.id
-console.log('session:', SID)
+SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
+DIR=$(curl -s "$BASE/session/$SID" | jexec "d['directory']")
 
-// 启动 3 个 SSE 监听客户端
-function startListener(id) {
-  return new Promise(async (resolve) => {
-    const ctrl = new AbortController()
-    const timer = setTimeout(() => { ctrl.abort(); resolve({ id, types: [], connected: false }) }, 55000)
-    const r = await fetch(BASE + '/event', { headers: { 'x-opencode-directory': DIR }, signal: ctrl.signal })
-    const reader = r.body.getReader()
-    const decoder = new TextDecoder()
-    const types = new Set()
+# 3 个客户端并行监听
+for c in a b c; do
+  bun docs/test-cases/scripts/sse-dump.mjs "$BASE/event" 55 "$DIR" > /tmp/t914$c.log &
+done
+for c in a b c; do
+  for i in $(seq 1 20); do grep -q server.connected /tmp/t914$c.log 2>/dev/null && break; sleep 0.5; done
+done
 
-    while (true) {
-      try {
-        const { value, done } = await reader.read()
-        if (done) break
-        const chunk = decoder.decode(value)
-        const blocks = chunk.split('\n\n').filter(l => l.trim())
-        for (const block of blocks) {
-          const line = block.split('\n').find(l => l.startsWith('data: '))
-          if (!line) continue
-          const evt = JSON.parse(line.slice(6))
-          const p = evt.payload || evt
-          types.add(p.type)
+curl -s --max-time 50 -X POST "$BASE/session/$SID/message" \
+  -H 'Content-Type: application/json' \
+  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"say hello in one sentence\"}],\"model\":$MODEL}" > /dev/null
+wait
 
-          // 自动回复权限请求
-          if (p.type === 'permission.asked') {
-            await fetch(BASE + '/session/' + SID + '/permission/' + p.properties.id, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ reply: 'always' })
-            })
-          }
-
-          if (p.type === 'session.idle') {
-            clearTimeout(timer)
-            await reader.cancel()
-            resolve({ id, types: [...types].sort(), connected: types.has('server.connected'), idle: true })
-            return
-          }
-        }
-      } catch(e) { break }
-    }
-    clearTimeout(timer)
-    resolve({ id, types: [...types].sort(), connected: types.has('server.connected'), idle: false })
-  })
-}
-
-const listeners = [startListener('A'), startListener('B'), startListener('C')]
-
-// 等 SSE 连接建立后再发消息
-setTimeout(async () => {
-  await fetch(BASE + '/session/' + SID + '/message', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ parts: [{ type: 'text', text: 'say hello in one sentence' }], model: { providerID: 'zhipuai', modelID: 'glm-5.1' } })
-  })
-}, 1000)
-
-const results = await Promise.all(listeners)
-
-console.log('--- Results ---')
-for (const r of results) {
-  console.log('Client ' + r.id + ': connected=' + r.connected + ' idle=' + r.idle + ' events=' + r.types.length)
-  console.log('  types: ' + r.types.join(', '))
-}
-
-// 验证：所有客户端都收到了 connected + 至少一个 message 事件 + idle
-const allConnected = results.every(r => r.connected)
-const allIdle = results.every(r => r.idle)
-const allGotMessage = results.every(r => r.types.some(t => t.startsWith('message.')))
-const allGotSameTypes = results.every(r => JSON.stringify(r.types) === JSON.stringify(results[0].types))
-
-console.log('--- Verification ---')
-console.log('all connected:', allConnected)
-console.log('all idle:', allIdle)
-console.log('all got message events:', allGotMessage)
-console.log('all got same event types:', allGotSameTypes)
-console.log(allConnected && allIdle && allGotMessage ? '✅ multi-client SSE works' : '❌ multi-client SSE failed')
-" 2>&1
+for c in a b c; do
+  echo "client $c: $(grep -c '"type":"message\.' /tmp/t914$c.log) message events, idle=$(grep -c session.idle /tmp/t914$c.log)"
+done
 ```
 **期望**：3 个 SSE 客户端都收到 `server.connected`、至少一个 `message.*` 事件、`session.idle`，且事件类型列表一致
 
@@ -814,93 +387,25 @@ console.log(allConnected && allIdle && allGotMessage ? '✅ multi-client SSE wor
 > 验证：会话执行过程中新连接的 SSE 客户端能收到后续事件（不要求回放历史）
 
 ```bash
-timeout 60 bun -e "
-const BASE = 'http://localhost:14096'
-const sess = await (await fetch(BASE + '/session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })).json()
-const info = await (await fetch(BASE + '/session/' + sess.id)).json()
-const DIR = info.directory
-const SID = sess.id
-console.log('session:', SID)
+SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
+DIR=$(curl -s "$BASE/session/$SID" | jexec "d['directory']")
 
-// 客户端 A：一开始就连接
-const ctrlA = new AbortController()
-const timerA = setTimeout(() => ctrlA.abort(), 55000)
-const rA = await fetch(BASE + '/event', { headers: { 'x-opencode-directory': DIR }, signal: ctrlA.signal })
-const readerA = rA.body.getReader()
-const decoder = new TextDecoder()
-const typesA = new Set()
+# 客户端 A：一开始就连接
+bun docs/test-cases/scripts/sse-dump.mjs "$BASE/event" 55 "$DIR" > /tmp/t915a.log &
+for i in $(seq 1 20); do grep -q server.connected /tmp/t915a.log 2>/dev/null && break; sleep 0.5; done
 
-setTimeout(async () => {
-  await fetch(BASE + '/session/' + SID + '/message', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ parts: [{ type: 'text', text: 'say hello' }], model: { providerID: 'zhipuai', modelID: 'glm-5.1' } })
-  })
-}, 500)
+curl -s --max-time 50 -X POST "$BASE/session/$SID/message" \
+  -H 'Content-Type: application/json' \
+  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"say hello\"}],\"model\":$MODEL}" > /dev/null &
 
-// 读取第一个事件（server.connected）
-const first = await readerA.read()
-if (first.value) {
-  const line = decoder.decode(first.value).split('\n').find(l => l.startsWith('data: '))
-  if (line) typesA.add(JSON.parse(line.slice(6)).type || JSON.parse(line.slice(6)).payload?.type)
-}
-console.log('Client A: connected, first event received')
+# 客户端 B：2 秒后中途加入
+sleep 2
+bun docs/test-cases/scripts/sse-dump.mjs "$BASE/event" 50 "$DIR" > /tmp/t915b.log &
+wait
 
-// 等一会再启动客户端 B（中途加入）
-await new Promise(r => setTimeout(r, 2000))
-console.log('Client B: joining mid-session...')
-
-const ctrlB = new AbortController()
-const timerB = setTimeout(() => ctrlB.abort(), 50000)
-const rB = await fetch(BASE + '/event', { headers: { 'x-opencode-directory': DIR }, signal: ctrlB.signal })
-const readerB = rB.body.getReader()
-const typesB = new Set()
-
-// 两个客户端并行读取
-const readUntil = (reader, ctrl, types, label) => new Promise(async (resolve) => {
-  while (true) {
-    try {
-      const { value, done } = await reader.read()
-      if (done) { resolve(false); return }
-      const chunk = decoder.decode(value)
-      const blocks = chunk.split('\n\n').filter(l => l.trim())
-      for (const block of blocks) {
-        const line = block.split('\n').find(l => l.startsWith('data: '))
-        if (!line) continue
-        const evt = JSON.parse(line.slice(6))
-        const p = evt.payload || evt
-        types.add(p.type)
-
-        if (p.type === 'permission.asked') {
-          await fetch(BASE + '/session/' + SID + '/permission/' + p.properties.id, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ reply: 'always' })
-          })
-        }
-        if (p.type === 'session.idle') {
-          clearTimeout(label === 'A' ? timerA : timerB)
-          await reader.cancel()
-          resolve(true)
-          return
-        }
-      }
-    } catch(e) { resolve(false); return }
-  }
-})
-
-const [idleA, idleB] = await Promise.all([
-  readUntil(readerA, ctrlA, typesA, 'A'),
-  readUntil(readerB, ctrlB, typesB, 'B')
-])
-
-console.log('--- Results ---')
-console.log('Client A idle:', idleA, 'events:', [...typesA].sort().join(', '))
-console.log('Client B idle:', idleB, 'events:', [...typesB].sort().join(', '))
-
-const bGotEvents = typesB.size > 0
-const bGotIdle = idleB
-console.log(bGotEvents && bGotIdle ? '✅ late joiner received events' : '⏭️ late joiner missed events (timing)')
-" 2>&1
+echo "A: $(wc -l < /tmp/t915a.log) events"
+echo "B: $(wc -l < /tmp/t915b.log) events"
+grep -c '"type":"message\.' /tmp/t915b.log
 ```
 **期望**：客户端 B 中途加入后仍能收到 `server.connected` 和后续事件（`session.idle` 等）
 
@@ -933,5 +438,7 @@ console.log(bGotEvents && bGotIdle ? '✅ late joiner received events' : '⏭️
 | T9.13 | ✅ | 断开重连均收到 server.connected |
 | T9.14 | ✅ | 3 个 SSE 客户端同时监听，均收到相同 10 种事件类型 |
 | T9.15 | ✅ | 中途加入收到完整事件流；曾现偶发"B 只收 connected+heartbeat"（28 轮未复现，详见用例备注） |
+
+> 注：2026-07-17 重构为标准三段式（sse-dump.mjs 后台订阅 + 业务动作 + 日志断言），原始内联 bun 脚本见 git 历史。
 
 ---

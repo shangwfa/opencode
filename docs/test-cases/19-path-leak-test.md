@@ -27,7 +27,7 @@ opencode SaaS 模式下，LLM（code-agent）全程运行在沙箱中，但其 s
 
 | 文件 | 改动 |
 |------|------|
-| `src/session/system.ts` | `<env>` 中 Working directory / Workspace root 用 `toSandboxPath` 映射 |
+| `src/session/system.ts` | ⚠️ `<env>` 中 Working directory / Workspace root **实际未做 `toSandboxPath` 映射**（`system.ts:68-69` 直接用 `ctx.directory`/`ctx.worktree`）；SaaS 下 `ctx.directory=/workspace` 恰好不泄露，本地模式会泄露宿主路径（对比 `instruction.ts:98-99` 的 `sandboxDisplayPath` 已映射） |
 | `src/session/instruction.ts` | `system()` 和 `resolve()` 中 `Instructions from:` 路径映射，`worktree === "/"` 时跳过 |
 | `src/tool/glob.ts` | 去掉 `toHostPath`，沙箱路径直接透传 |
 | `src/tool/grep.ts` | 去掉 `toHostPath`，沙箱路径直接透传 |
@@ -104,7 +104,7 @@ bun test test/session/instruction-path-mapping.test.ts
 
 - 容器镜像：`opencode-saas-sandbox-test:v3fix`（含最新路径修复代码）
 - 沙箱提供者：远端 Sandbox API（通过 TCP 转发）
-- 测试脚本：`docs/test-cases/path-leak-e2e-test.mjs`
+- 测试脚本：`docs/test-cases/scripts/path-leak-e2e-test.mjs`
 
 ### 3.2 宿主机路径泄露模式
 

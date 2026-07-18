@@ -22,6 +22,9 @@ curl -s -X POST "$BASE/session/$SID/kill-sandbox" -w "\nkill-sandbox: %{http_cod
 **期望**：HTTP 200，返回 `{"sessionID":"...","destroyed":true}`，日志中出现该 `SID` 对应的 sandbox destroyed 记录
 
 ### T13.2 kill-sandbox 后 PVC 保留并自动重建
+
+> **交叉引用**：同类验证见 T5.3（04 文档）与 T12.8（10 文档，容器重启场景）；本条覆盖 kill-sandbox 显式销毁场景。
+
 ```bash
 curl -s --max-time 60 -X POST "$BASE/session/$SID/message" \
   -H 'Content-Type: application/json' \
@@ -31,18 +34,10 @@ curl -s --max-time 60 -X POST "$BASE/session/$SID/message" \
 **期望**：输出含 `kill-test`，证明 kill 只销毁 sandbox runtime，不删除 PVC 数据
 
 ### T13.3 同一 session 并发首条消息只创建一个 sandbox
-```bash
-SID_NEW=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
-for i in 1 2 3; do
-  curl -s --max-time 90 -X POST "$BASE/session/$SID_NEW/prompt_async" \
-    -H 'Content-Type: application/json' \
-    -d "{\"parts\":[{\"type\":\"text\",\"text\":\"用 bash 执行: echo concurrent-create-$i\"}],\"model\":$MODEL}" &
-done
-wait
-sleep 10
-docker exec opencode-saas-test grep "sandbox created.*$SID_NEW" /home/opencode/.local/share/opencode/log/dev.log 2>/dev/null | wc -l
-```
-**期望**：同一个 `SID_NEW` 只创建 1 个 sandbox；不能出现多个可用 sandbox runtime 绑定同一 session
+
+> **去重说明**（2026-07-17）：与 [`39-concurrency-p0-fixes.md`](./39-concurrency-p0-fixes.md) T39.3.1 完全重复（同一场景：3 条并发 prompt_async → 只建 1 个 sandbox）。执行脚本以 T39.3.1 为准；本条目保留作 11 文档的结果索引。
+
+**期望**：同一个 session 只创建 1 个 sandbox；不能出现多个可用 sandbox runtime 绑定同一 session
 
 ### T13.4 dispose 与正在执行的 prompt 并发
 ```bash

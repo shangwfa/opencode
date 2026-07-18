@@ -1,6 +1,8 @@
 # Session Agents（会话级动态 Agent）
 
-> 本文档从 `saas-test-cases.md` 拆分而来。公共测试环境和配置请参考 [`00-INDEX.md`](./00-INDEX.md)。
+> 本文档从 `saas-test-cases.md` 拆分而来。公共测试环境和配置请参考 [`00-preamble.md`](./00-preamble.md)。
+>
+> **通用清单映射**：T16.1-T16.5(G1-G5)、T16.9(G6)、T16.10(G7)、T16.12/T16.13(G8)、T16.14/T16.15(G9) 遵循 [`00-preamble.md` 附录 A](./00-preamble.md) 通用 CRUD 清单；其余为 agent 特有场景（primary/subagent/权限/调度）。
 
 ## 十六、Session Agents（会话级动态 Agent）
 
@@ -283,14 +285,14 @@ const res = await (await fetch(BASE + "/session/" + SID.id + "/agents/create", {
   body: JSON.stringify({
     name: "reviewer", description: "代码审查 agent，只读", mode: "primary",
     prompt: "你是代码审查专家。你只能读取文件，不能写入。",
-    permission: [
-      { permission: "read", pattern: "*", action: "allow" },
-      { permission: "bash", pattern: "*", action: "allow" },
-      { permission: "grep", pattern: "*", action: "allow" },
-      { permission: "glob", pattern: "*", action: "allow" },
-      { permission: "edit", pattern: "*", action: "deny" },
-      { permission: "write", pattern: "*", action: "deny" },
-    ],
+    permission: {
+      read: "allow",
+      bash: "allow",
+      grep: "allow",
+      glob: "allow",
+      edit: "deny",
+      write: "deny",
+    },
   }),
 })).json()
 console.log("permission数:", res.permission.length, "(expect 6)")
@@ -579,7 +581,7 @@ console.log("Step4 python-coder deleted:", !agents4.some(a => a.name === "python
 
 > **PG 验证**：Step 3 后 `docker exec ai-nova-postgres psql -U postgres -d opencode -c "SELECT name, steps FROM session_agents WHERE session_id='$SID';"` → name=python-coder, steps=3；Step 4 后 COUNT=0
 
-### T16.12 不存在的 session 创建 agent → 404
+### T16.12 不存在的 session 创建 agent → 500（FK 约束）
 
 ```bash
 bun -e '
@@ -587,10 +589,10 @@ const res = await fetch("http://localhost:14096/session/ses_NOTEXIST/agents/crea
   method: "POST", headers: { "Content-Type": "application/json" },
   body: JSON.stringify({ name: "test", description: "test", prompt: "test", mode: "primary" }),
 })
-console.log("status:", res.status, "(expect 404 or 200 with no custom agents)")
+console.log("status:", res.status, "(expect 500 — createAgent 无 requireSession，PG FK 拦截)")
 '
 ```
-**期望**：返回错误（当前返回 200 全局列表，session 未做存在性校验，标记为 NOTE）
+**期望**：返回 500（`createAgent` 未做 session 存在性校验，由 PG 外键约束拦截，与结果汇总实测一致）
 
 > **PG 验证**：`docker exec ai-nova-postgres psql -U postgres -d opencode -t -A -c "SELECT COUNT(*) FROM session_agents WHERE session_id='ses_NOTEXIST';"`
 > 期望：COUNT=0
@@ -600,10 +602,10 @@ console.log("status:", res.status, "(expect 404 or 200 with no custom agents)")
 ```bash
 bun -e '
 const res = await fetch("http://localhost:14096/session/ses_NOTEXIST/agents")
-console.log("status:", res.status, "(expect 404 or 200 with global agents only)")
+console.log("status:", res.status, "(expect 404 — listAgents 有 requireSession)")
 '
 ```
-**期望**：返回错误（同 T16.12 NOTE）
+**期望**：返回 404（`listAgents` 经 `requireSession` 校验 session 存在性）
 
 ### T16.14 非法 mode 值 → 400
 
@@ -1015,7 +1017,7 @@ test().catch(e => { console.error(e); process.exit(1) })
 **验证目标**：主 agent 和子 agent 运行在同一个沙箱实例中，文件系统完全共享。主 agent 写的文件子 agent 能读，反之亦然。
 
 ```bash
-bun run docs/test-cases/sandbox-shared-test.mjs
+bun run docs/test-cases/scripts/sandbox-shared-test.mjs
 ```
 
 <details>
@@ -1178,7 +1180,7 @@ console.log("═".repeat(50))
 **验证目标**：沙箱被销毁后，调用 `/vcs/diff` 能自动重建沙箱（PVC 恢复代码），返回正确的 diff 结果。
 
 ```bash
-bun run docs/test-cases/vcs-diff-sandbox-test.mjs
+bun run docs/test-cases/scripts/vcs-diff-sandbox-test.mjs
 ```
 
 <details>
@@ -1311,8 +1313,10 @@ console.log("═".repeat(50))
 ### v77 回归测试结果（2026-06-02）
 
 > 镜像 `opencode-saas-sandbox-test:v77`，容器 `opencode-saas-test`，端口 14096
-> 
+>
 > **关键发现**：subagent 执行 write/edit 等工具时，需在创建 agent 时指定 `permission: { edit: "allow", write: "allow", ... }`，否则 subagent session 的权限默认 `"ask"`，HTTP API 模式下无人应答权限请求导致工具永远卡在 `running`。详见 `docs/local-test-env.md` 常见问题表。
+>
+> **编号说明**：本节及以下历史回归中的 T16.21–T16.28（权限系列）已迁移至 [`26-session-agent-permissions.md`](./26-session-agent-permissions.md)（T26.21–T26.28），本文档正文无对应用例，仅保留历史回归记录。
 
 | 用例 | 状态 | 说明 |
 |------|------|------|

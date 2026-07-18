@@ -3,6 +3,8 @@
 > 验证会话级动态 Plugin：PG 持久化、Runtime 加载、Hook 执行、Session 隔离、缓存失效和错误隔离。
 >
 > 当前测试环境：本地 PG + 远程沙箱，服务地址 `http://localhost:14096`。
+>
+> **通用清单映射**：API CRUD 章节（T35.1-T35.6 等）遵循 [`00-preamble.md` 附录 A](./00-preamble.md) 通用 CRUD 清单（G1-G9）；其余为 plugin 特有场景（hook 执行/缓存/错误隔离/npm 包）。
 
 ---
 
@@ -44,13 +46,13 @@ echo "$SID"
 | `command.execute.before` | `session/prompt.ts` | `/command` 执行命令 |
 | `experimental.text.complete` | `session/processor.ts` | assistant 文本流结束时 |
 
-**Session Plugin 未接入**（普通实例 Plugin 有调用点）：`shell.env`、`experimental.session.compacting`、`experimental.compaction.autocontinue`。其中 `experimental.chat.messages.transform` 在普通 compaction 路径也会调用，但该路径目前没有 Session Plugin Runtime 调用。
+**Session Plugin 已接入**（allowlist `session-plugin-runtime.ts:16-34` 共 17 个 hook，均有 `sessionPluginRuntime.trigger` 调用点）：上表全部 9 个 hook + `shell.env`（`tool/shell.ts:530`）+ `experimental.session.compacting`（`session/compaction.ts:351`）+ `experimental.compaction.autocontinue`（`session/compaction.ts:475`）+ `tool`（`session-plugin-runtime.ts:195` → `tool/registry.ts:398` 注入 LLM 工具列表）+ `tool.definition`（`tool/registry.ts:438`）+ `dispose`（`session-plugin-runtime.ts:198`）+ `event`/`auth`。
 
-**不允许**（实例级，session runtime 过滤）：`config`、`provider`、`dispose`、`permission.ask`、`tool`、`tool.definition`、`experimental.provider.small_model`
+**不允许**（不在 allowlist，session runtime 过滤）：`config`、`provider`、`permission.ask`、`experimental.provider.small_model`。
 
-**Session Plugin 已补齐的实例级能力**：`event` 按 event 中的 sessionID 路由到对应 Runtime；`auth.loader` 在匹配 provider 的 Session LLM request 中合并返回 options。其余普通实例调用点不能被当前 Session Plugin 正向用例计入。
+**Session Plugin 已补齐的实例级能力**：`event` 按 event 中的 sessionID 路由到对应 Runtime；`auth.loader` 在匹配 provider 的 Session LLM request 中合并返回 options；`tool.definition` 与 `tool` 能向 LLM 工具列表注入 session plugin 定义的工具。
 
-**普通实例 Plugin 的实际调用点**：`chat.message`（prompt）、`shell.env`（shell/pty）、`experimental.text.complete`（processor）、`experimental.session.compacting` 与 `experimental.compaction.autocontinue`（compaction）、`tool.definition`（tool registry）、以及 `TaskTool` 的 `tool.execute.before/after`。这些调用点不能被当前 Session Plugin 正向用例计入。
+> ⚠️ **与代码核对**（2026-07-18）：早期版本曾把 `shell.env`/`compacting`/`autocontinue`/`tool`/`tool.definition`/`dispose` 列为"未接入/不允许"，当前代码均已接入（见上）。T35.32/T35.33/T35.47 等用例的"未接入"断言已过时，需改为正向断言。
 
 ---
 
@@ -518,7 +520,7 @@ print("PASS: all code redacted")
 
 ---
 
-## 八、覆盖审计与补充用例
+## 七、覆盖审计与补充用例
 
 下面这些场景是当前实现边界的一部分，不能用“HTTP 200”代替验证。它们用于补齐工厂生命周期、全部 hook 白名单、部署模式和安全边界。
 
@@ -619,7 +621,7 @@ print("PASS: all code redacted")
 
 ---
 
-## 九、与官方插件文档的兼容性审计
+## 八、与官方插件文档的兼容性审计
 
 官方文档（`https://opencode.ai/docs/zh-cn/plugins/`，2026-07-14）描述的是普通实例 Plugin，不是本功能的 Session Plugin。以下用例必须明确记录“支持、行为不同、还是不支持”，不能把普通 Plugin 的通过结果当作 Session Plugin 的通过结果。
 
@@ -811,7 +813,7 @@ export default async () => ({
 
 ---
 
-## 十、验收标准
+## 九、验收标准
 
 | 类别 | 用例 | 标准 |
 |------|------|------|
@@ -827,14 +829,14 @@ export default async () => ({
 
 > **总计 62 个用例**。其中 T35.32、T35.49、T35.50 和 T35.51 明确区分 legacy/V2、普通实例 Plugin 和 Session Plugin Runtime；T35.52-T35.62 覆盖 Session Plugin 的 npm 安装和真实功能验证。
 
-## 十一、本轮执行结果
+## 十、本轮执行结果
 
 执行时间：2026-07-16。测试服务：`http://localhost:14096`，本地 PG + 远程沙箱。
 
 ### 已通过
 
 - `test/plugin/session-plugin-runtime.test.ts`：3/3 通过。
-- 历史 E2E 脚本 `.tmp-session-plugins-e2e.mjs`：23/23 通过；该脚本的编号是旧版映射，不能替代当前 61 个用例的验收。
+- 历史 E2E 脚本 `.tmp-session-plugins-e2e.mjs`：23/23 通过；该脚本的编号是旧版映射，不能替代当前 62 个用例的验收。
 - 深层 hook 效果脚本：7/7 通过，验证了 `chat.params`、`chat.headers`、system transform、messages transform、tool before/after、command hook 的下游实际效果。
 - 新接入 Hook 功能验证：2/2 通过，`chat.message` 修改进入会话/模型，`experimental.text.complete` 替换最终 assistant 文本。
 - 补充 API/PG 脚本：26 项通过。

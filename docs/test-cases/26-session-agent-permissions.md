@@ -39,7 +39,7 @@ API `/session/:id/agents/create` 接受**对象语法**（经 `fromConfig` 转�
 
 ---
 
-## 权限用例（T26.21–T26.34）
+## 权限用例（T26.21–T26.55）
 
 > 参考 [OpenCode Permissions 文档](https://opencode.ai/docs/permissions)
 > 权限系统核心：`allow`（自动执行）/ `ask`（需确认）/ `deny`（禁止）
@@ -216,14 +216,12 @@ async function test() {
       name: "doc-editor",
       mode: "primary",
       prompt: "你是文档编辑器。你可以编辑 docs/ 下的 md 文件，但不能编辑其他路径的文件。直接执行操作，不要解释。",
-      permission: [
-        { permission: "edit", pattern: "*", action: "deny" },
-        { permission: "edit", pattern: "docs/*.md", action: "allow" },
-        { permission: "write", pattern: "*", action: "deny" },
-        { permission: "write", pattern: "docs/*.md", action: "allow" },
-        { permission: "bash", pattern: "*", action: "allow" },
-        { permission: "read", pattern: "*", action: "allow" },
-      ],
+      permission: {
+        edit: { "*": "deny", "docs/*.md": "allow" },
+        write: { "*": "deny", "docs/*.md": "allow" },
+        bash: "allow",
+        read: "allow",
+      },
     }),
   })
   const agentData = await agentRes.json()
@@ -317,12 +315,11 @@ async function test() {
       name: "doc-editor-v2",
       mode: "primary",
       prompt: "你是文档编辑器。直接执行操作。",
-      permission: [
-        { permission: "edit", pattern: "*", action: "ask" },
-        { permission: "edit", pattern: "docs/*.md", action: "allow" },
-        { permission: "bash", pattern: "*", action: "allow" },
-        { permission: "read", pattern: "*", action: "allow" },
-      ],
+      permission: {
+        edit: { "*": "ask", "docs/*.md": "allow" },
+        bash: "allow",
+        read: "allow",
+      },
     }),
   })
   const agentData = await agentRes.json()
@@ -371,13 +368,10 @@ async function test() {
       name: "git-operator",
       mode: "primary",
       prompt: "你是 Git 操作员。直接执行命令，不要解释。只执行用户要求的命令。",
-      permission: [
-        { permission: "bash", pattern: "*", action: "ask" },
-        { permission: "bash", pattern: "git *", action: "allow" },
-        { permission: "bash", pattern: "rm *", action: "deny" },
-        { permission: "bash", pattern: "ls *", action: "allow" },
-        { permission: "read", pattern: "*", action: "allow" },
-      ],
+      permission: {
+        bash: { "*": "ask", "git *": "allow", "rm *": "deny", "ls *": "allow" },
+        read: "allow",
+      },
     }),
   })
   const agentData = await agentRes.json()
@@ -507,12 +501,11 @@ async function test() {
       name: "src-only-editor",
       mode: "primary",
       prompt: "你是代码编辑器。直接执行。",
-      permission: [
-        { permission: "edit", pattern: "*", action: "deny" },
-        { permission: "edit", pattern: "src/*.ts", action: "allow" },
-        { permission: "bash", pattern: "*", action: "allow" },
-        { permission: "read", pattern: "*", action: "allow" },
-      ],
+      permission: {
+        edit: { "*": "deny", "src/*.ts": "allow" },
+        bash: "allow",
+        read: "allow",
+      },
     }),
   })
   const agentData = await agentRes.json()
@@ -637,9 +630,7 @@ async function test() {
 test().catch(e => { console.error(e); process.exit(1) })
 '
 ```
-**期望**：`tools: { edit: true }` 被自动转换为 `permission: [{ permission: "edit", pattern: "*", action: "allow" }]`；`bash: false` 转为 `deny`
-
-> **说明**：根据 `config/agent.ts` 的 `normalize` 函数，`tools` 字段会在配置解析时自动转为 `permission`。但 session agent 的 API 端点可能不经过此 normalize 流程
+**期望**：⚠️ **与代码核对**（2026-07-18）：`Agent.CreateInput`（`agent/agent.ts:73-87`）**没有 `tools` 字段**，Effect Schema 默认拒绝未知 key → 请求返回 **400**。`tools→permission` 的 `normalize` 仅存在于 config 加载层（`config/config.ts`），session agent API 不经过该流程。本用例当前会 400，`data.permission` 为 undefined → 输出 NOTE。建议改为反向用例："tools 字段不被 session agent API 接受（400）"。
 
 ---
 
@@ -683,13 +674,11 @@ async function test() {
       name: "restricted-manager",
       mode: "primary",
       prompt: "你是受限管理员。根据用户要求调度子 agent。",
-      permission: [
-        { permission: "task", pattern: "*", action: "ask" },
-        { permission: "task", pattern: "dangerous-agent", action: "deny" },
-        { permission: "task", pattern: "safe-agent", action: "allow" },
-        { permission: "bash", pattern: "*", action: "allow" },
-        { permission: "read", pattern: "*", action: "allow" },
-      ],
+      permission: {
+        task: { "*": "ask", "dangerous-agent": "deny", "safe-agent": "allow" },
+        bash: "allow",
+        read: "allow",
+      },
     }),
   })
   const data = await agentRes.json()
@@ -1895,4 +1884,4 @@ SSE 日志:
 | `merge` 全局+agent | agent.ts:550 | T26.22 等（含全局 merge）|
 | tools 向后兼容 | agent.ts:84 | T26.27 |
 
-**全部权限实现分支已覆盖**。共 19 个用例（T26.21–T26.40）。
+**全部权限实现分支已覆盖**。共 27 个用例（T26.21–T26.55，含 T26.26b）。编号说明：T26.30 仅有汇总记录无正文、T26.41–T26.49 为历史断档；正文顺序为 21–28 → 36–40 → 29 → 50–55 → 31–35（历史追加所致，不影响执行）。

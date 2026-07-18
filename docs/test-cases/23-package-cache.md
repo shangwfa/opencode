@@ -2,10 +2,14 @@
 
 > 公共测试环境和配置请参考 [`00-preamble.md`](./00-preamble.md)。
 > 技术方案详见 [`../shared-package-cache-design.md`](../shared-package-cache-design.md)。
+>
+> **分工**（2026-07-17 去重）：本文档负责 pnpm store 的**功能验证**（配置/共享/隔离/并发/加速）；远端 mise 版本切换与 NFS 环境特有验证见 [`24-preload-cache-switch-env.md`](./24-preload-cache-switch-env.md)（T24.x）。
 
 ## 二十三、共享 Package Cache（pnpm）
 
 > 前置条件：`OPENCODE_SANDBOX_VOLUME_TYPE=pvc`，沙箱镜像基于 Node v24 LTS，预装 `pnpm`（通过 mise 管理，默认 pnpm@10）。
+>
+> ⚠️ **环境前置**（2026-07-18 核对）：`Flag.OPENCODE_SANDBOX_PACKAGE_CACHE_MOUNT` 默认值为 `/xybot-front/cache`（`flag.ts:104-105`），而 Dockerfile 把 pnpm `store-dir` 配为 `/opt/pnpm-store`（`docker/Dockerfile:74`）。**两者不一致**——必须 `export OPENCODE_SANDBOX_PACKAGE_CACHE_MOUNT=/opt/pnpm-store` 才能让 store 真正挂载共享，否则下方用例的"跨 session 共享"不成立。
 >
 > ```bash
 > # 环境变量 $BASE $PG_URL $MODEL 由 test-env.sh 全局提供（source test-env.sh [1|2|3]）

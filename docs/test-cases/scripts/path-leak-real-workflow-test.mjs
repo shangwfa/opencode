@@ -6,7 +6,7 @@
  * 每个阶段都扫描路径泄露。
  *
  * 用法:
- *   node docs/test-cases/path-leak-real-workflow-test.mjs
+ *   node docs/test-cases/scripts/path-leak-real-workflow-test.mjs
  *
  * 前提: 本地测试环境已启动（容器 + TCP 转发）
  */

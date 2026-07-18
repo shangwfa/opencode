@@ -18,9 +18,9 @@
 
 ---
 
-## 第一层：代码路径审查（T19.1）
+## 第一层：代码路径审查（T20.1）
 
-### T19.1 静态检查 8 个工具文件
+### T20.1 静态检查 8 个工具文件
 
 ```bash
 cd packages/opencode/src/tool
@@ -42,7 +42,7 @@ done
 
 ---
 
-## 第二层：运行时验证（T19.2 – T19.9）
+## 第二层：运行时验证（T20.2 – T20.9）
 
 ### 通用函数
 
@@ -91,10 +91,10 @@ print('    ✅ 沙箱内存在' if '---EXISTS' in out else '    ❌ 沙箱内不
 }
 ```
 
-### T19.2 write 工具
+### T20.2 write 工具
 
 ```bash
-echo "=== T19.2 write ==="
+echo "=== T20.2 write ==="
 send_msg "$SID" "在 /workspace 创建 t19-write.txt 内容是 sandbox-write-proof" > /dev/null
 get_tools "$SID"
 verify_sandbox "$SID" "/workspace/t19-write.txt"
@@ -102,30 +102,30 @@ verify_sandbox "$SID" "/workspace/t19-write.txt"
 
 **期望**：工具 `write(completed)`，文件仅在沙箱内存在，内容含 `sandbox-write-proof`。
 
-### T19.3 read 工具
+### T20.3 read 工具
 
 ```bash
-echo "=== T19.3 read ==="
+echo "=== T20.3 read ==="
 send_msg "$SID" "读取 /workspace/t19-write.txt 的内容" > /dev/null
 get_tools "$SID"
 ```
 
 **期望**：工具 `read(completed)`，output 含 `sandbox-write-proof`。
 
-### T19.4 bash 工具
+### T20.4 bash 工具
 
 ```bash
-echo "=== T19.4 bash ==="
+echo "=== T20.4 bash ==="
 send_msg "$SID" "用 bash 执行: hostname && whoami && cat /workspace/t19-write.txt" > /dev/null
 get_tools "$SID"
 ```
 
 **期望**：工具 `bash(completed)`，hostname 为 UUID 格式（K8s Pod 名），whoami 为 `root`，文件内容正确。
 
-### T19.5 edit 工具
+### T20.5 edit 工具
 
 ```bash
-echo "=== T19.5 edit ==="
+echo "=== T20.5 edit ==="
 send_msg "$SID" "把 /workspace/t19-write.txt 中的 sandbox-write-proof 替换为 sandbox-edit-proof" > /dev/null
 get_tools "$SID"
 
@@ -143,10 +143,10 @@ print('    ✅ 编辑成功' if 'sandbox-edit-proof' in out else '    ❌ 编辑
 
 **期望**：工具 `edit(completed)`，文件内容变为 `sandbox-edit-proof`。
 
-### T19.6 glob 工具
+### T20.6 glob 工具
 
 ```bash
-echo "=== T19.6 glob ==="
+echo "=== T20.6 glob ==="
 curl -s -X POST "$BASE/session/$SID/exec" \
   -H 'Content-Type: application/json' \
   -d '{"command":"echo aaa > /workspace/t19-glob-a.txt && echo bbb > /workspace/t19-glob-b.log"}' > /dev/null
@@ -156,30 +156,30 @@ get_tools "$SID"
 
 **期望**：工具 `glob(completed)`，output 含 `t19-write.txt` 和 `t19-glob-a.txt`，不含 `.log` 文件。
 
-### T19.7 grep 工具
+### T20.7 grep 工具
 
 ```bash
-echo "=== T19.7 grep ==="
+echo "=== T20.7 grep ==="
 send_msg "$SID" "用 grep 在 /workspace 搜索包含 edit-proof 的文件" > /dev/null
 get_tools "$SID"
 ```
 
 **期望**：工具 `grep(completed)`，output 含 `t19-write.txt` 和 `edit-proof`。
 
-### T19.8 ls 工具
+### T20.8 ls 工具
 
 ```bash
-echo "=== T19.8 ls ==="
+echo "=== T20.8 ls ==="
 send_msg "$SID" "列出 /workspace 目录下的所有文件" > /dev/null
 get_tools "$SID"
 ```
 
 **期望**：使用 `bash`/`read`/`glob` 中的某一个列出目录（AI 自行选择工具），输出包含之前创建的文件。
 
-### T19.9 apply_patch 工具
+### T20.9 apply_patch 工具
 
 ```bash
-echo "=== T19.9 apply_patch ==="
+echo "=== T20.9 apply_patch ==="
 send_msg "$SID" "在 /workspace 创建 t19-patch.txt 内容是第一行和第二行，每行一个" > /dev/null
 send_msg "$SID" "用 apply_patch 工具给 /workspace/t19-patch.txt 在末尾添加第三行" > /dev/null
 get_tools "$SID"
@@ -200,12 +200,12 @@ print('    ✅ patch 成功' if len(lines) >= 3 else '    ❌ patch 失败')
 
 ---
 
-## 第三层：PG 记录验证（T19.10）
+## 第三层：PG 记录验证（T20.10）
 
-### T19.10 sandbox 表记录
+### T20.10 sandbox 表记录
 
 ```bash
-echo "=== T19.10 PG 记录 ==="
+echo "=== T20.10 PG 记录 ==="
 psql "$PG_URL" -c \
   "SELECT id, session_id, host, state, keep_alive FROM sandbox WHERE session_id='$SID'"
 ```
@@ -222,10 +222,10 @@ psql "$PG_URL" -c \
 
 ## 补充验证
 
-### T19.11 环境隔离确认
+### T20.11 环境隔离确认
 
 ```bash
-echo "=== T19.11 环境隔离 ==="
+echo "=== T20.11 环境隔离 ==="
 curl -s -X POST "$BASE/session/$SID/exec" \
   -H 'Content-Type: application/json' \
   -d '{"command":"hostname && echo --- && ls /app 2>&1 || echo NO_APP_DIR && echo --- && env | grep OPENCODE | wc -l && echo --- && ps aux | grep opencode | grep -v grep | wc -l"}' \
@@ -246,12 +246,14 @@ print(f'  opencode进程: {proc_count}个 {\"✅ 无\" if proc_count.strip() == 
 
 **期望**：沙箱 Pod 内无 opencode 代码、环境变量、进程，hostname 为 UUID。
 
-### T19.12 错误信息无 sandbox 泄露
+### T20.12 错误信息无 sandbox 泄露
+
+> ⚠️ **与代码核对**（2026-07-18）：`read.ts:49`（`"Sandbox is not available"`）与 `write.ts:46,49`（`"Sandbox initialization failed"` / `"Sandbox is not available"`）**仍含 "Sandbox" 关键字**。以下 grep 会命中这 3 行；shell.ts:106 已修。需修复 read.ts/write.ts 后本用例才全绿。
 
 ```bash
-echo "=== T19.12 错误信息泄露检查 ==="
+echo "=== T20.12 错误信息泄露检查 ==="
 grep -rn "new Error.*[Ss]andbox" packages/opencode/src/tool/{edit,glob,grep,read,write,shell,ls,apply_patch}.ts
-echo "期望: 无输出"
+echo "期望: 无输出（当前会命中 read.ts:49 / write.ts:46,49）"
 ```
 
 **期望**：无匹配，工具错误信息不含 `sandbox` 关键字。
@@ -262,18 +264,18 @@ echo "期望: 无输出"
 
 | 用例 | 验证层 | 工具 | 判定 |
 |------|--------|------|------|
-| T19.1 | 代码审查 | 全部8个 | 无本地 I/O 和条件分支 |
-| T19.2 | 运行时 | write | 文件仅在沙箱内 |
-| T19.3 | 运行时 | read | 从沙箱读取正确 |
-| T19.4 | 运行时 | bash | 沙箱 Pod 执行 |
-| T19.5 | 运行时 | edit | 沙箱内文件被修改 |
-| T19.6 | 运行时 | glob | 搜索沙箱内文件 |
-| T19.7 | 运行时 | grep | 搜索沙箱内内容 |
-| T19.8 | 运行时 | ls/read | 列出沙箱目录 |
-| T19.9 | 运行时 | apply_patch | 沙箱内 patch |
-| T19.10 | PG 记录 | — | sandbox 表 state=running |
-| T19.11 | 运行时 | — | 环境隔离 |
-| T19.12 | 代码审查 | 全部 | 无 sandbox 泄露 |
+| T20.1 | 代码审查 | 全部8个 | 无本地 I/O 和条件分支 |
+| T20.2 | 运行时 | write | 文件仅在沙箱内 |
+| T20.3 | 运行时 | read | 从沙箱读取正确 |
+| T20.4 | 运行时 | bash | 沙箱 Pod 执行 |
+| T20.5 | 运行时 | edit | 沙箱内文件被修改 |
+| T20.6 | 运行时 | glob | 搜索沙箱内文件 |
+| T20.7 | 运行时 | grep | 搜索沙箱内内容 |
+| T20.8 | 运行时 | ls/read | 列出沙箱目录 |
+| T20.9 | 运行时 | apply_patch | 沙箱内 patch |
+| T20.10 | PG 记录 | — | sandbox 表 state=running |
+| T20.11 | 运行时 | — | 环境隔离 |
+| T20.12 | 代码审查 | 全部 | 无 sandbox 泄露 |
 
 ---
 
@@ -283,23 +285,23 @@ echo "期望: 无输出"
 
 | 用例 | 结果 | 说明 |
 |------|------|------|
-| T19.1 | ✅ | 8 个工具文件静态检查全通过（无本地 I/O fallback） |
-| T19.2 | ✅ | write：沙箱内存在+内容正确，**容器内不存在，宿主机不存在**（三层验证） |
-| T19.4 | ✅ | bash：hostname=UUID, whoami=root, 文件内容正确 |
-| T19.5 | ✅ | edit：内容改为 sandbox-edit-proof |
-| T19.10 | ✅ | PG sandbox 记录 state=running |
-| T19.11 | ✅ | 环境隔离：UUID hostname, 无/app, 0 个 OPENCODE env, 0 个 opencode 进程 |
-| T19.12 | ✅ | 修复 shell.ts:106 泄露（见下） |
+| T20.1 | ✅ | 8 个工具文件静态检查全通过（无本地 I/O fallback） |
+| T20.2 | ✅ | write：沙箱内存在+内容正确，**容器内不存在，宿主机不存在**（三层验证） |
+| T20.4 | ✅ | bash：hostname=UUID, whoami=root, 文件内容正确 |
+| T20.5 | ✅ | edit：内容改为 sandbox-edit-proof |
+| T20.10 | ✅ | PG sandbox 记录 state=running |
+| T20.11 | ✅ | 环境隔离：UUID hostname, 无/app, 0 个 OPENCODE env, 0 个 opencode 进程 |
+| T20.12 | ✅ | 修复 shell.ts:106 泄露（见下） |
 
 ### 发现的问题
 
 #### 🔴 P1：glob/grep/ls 工具在沙箱内失效（缺 ripgrep）
 
-**现象**：T19.6 glob、T19.7 grep 均返回 "No files found"，即使文件确实存在于沙箱内。
+**现象**：T20.6 glob、T20.7 grep 均返回 "No files found"，即使文件确实存在于沙箱内。
 
 **根因**：glob.ts / grep.ts / ls.ts 的沙箱分支硬依赖 `rg`（ripgrep）命令：
-- `glob.ts:52` → `rg --files --glob ...`
-- `grep.ts:78` → `rg --json ...`
+- `glob.ts:48` → `rg --files --glob ...`
+- `grep.ts:74` → `rg --json ...`
 - `ls.ts:77` → `rg --files ...`
 
 但远端沙箱镜像**未安装 ripgrep**：

@@ -24,7 +24,7 @@
 
 ## 一、创建会话 — 输入校验
 
-### T27.1 创建 session 模式会话（默认行为不变）
+### T38.1 创建 session 模式会话（默认行为不变）
 
 **验证目标**：不传 `pvcMode` 时，行为与现有 session 模式完全一致。
 
@@ -38,7 +38,7 @@ console.log("pvcMode:", sid.pvcMode ?? "(undefined)")
 console.log("appId:", sid.appId ?? "(undefined)")
 console.log("directory:", sid.directory)
 const pass = sid.pvcMode === undefined && sid.appId === undefined && sid.directory === "/workspace"
-console.log("✅ T27.1: " + (pass ? "PASS — 默认行为不变, dir=/workspace" : "FAIL"))
+console.log("✅ T38.1: " + (pass ? "PASS — 默认行为不变, dir=/workspace" : "FAIL"))
 '
 ```
 **期望**：`pvcMode=undefined`，`appId=undefined`，`directory="/workspace"`
@@ -48,7 +48,7 @@ console.log("✅ T27.1: " + (pass ? "PASS — 默认行为不变, dir=/workspace
 
 ---
 
-### T27.2 创建 session 模式会话（显式传 pvcMode=session）
+### T38.2 创建 session 模式会话（显式传 pvcMode=session）
 
 ```bash
 bun -e '
@@ -57,14 +57,14 @@ const sid = await (await fetch(BASE + "/session", { method: "POST", headers: { "
 console.log("pvcMode:", sid.pvcMode)
 console.log("directory:", sid.directory)
 const pass = sid.pvcMode === "session" && sid.directory === "/workspace"
-console.log("✅ T27.2: " + (pass ? "PASS" : "FAIL"))
+console.log("✅ T38.2: " + (pass ? "PASS" : "FAIL"))
 '
 ```
 **期望**：`pvcMode="session"`，`directory="/workspace"`
 
 ---
 
-### T27.3 创建 app 模式会话（pvcMode=app + appId）
+### T38.3 创建 app 模式会话（pvcMode=app + appId）
 
 **三重验证**：API 返回 + PG 持久化 + directory 不暴露 worktree
 
@@ -77,7 +77,7 @@ console.log("pvcMode:", sid.pvcMode)
 console.log("appId:", sid.appId)
 console.log("directory:", sid.directory)
 const pass = sid.pvcMode === "app" && sid.appId === APP_ID && sid.directory === "/workspace"
-console.log("✅ T27.3: " + (pass ? "PASS — dir 不暴露 worktree" : "FAIL"))
+console.log("✅ T38.3: " + (pass ? "PASS — dir 不暴露 worktree" : "FAIL"))
 '
 ```
 **期望**：`pvcMode="app"`，`appId=<APP_ID>`，`directory="/workspace"`（不是 /workspace/worktrees/...）
@@ -87,7 +87,7 @@ console.log("✅ T27.3: " + (pass ? "PASS — dir 不暴露 worktree" : "FAIL"))
 
 ---
 
-### T27.4 app 模式缺少 appId → 400
+### T38.4 app 模式缺少 appId → 400
 
 ```bash
 bun -e '
@@ -95,14 +95,14 @@ const BASE = "http://localhost:14096"
 const res = await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pvcMode: "app" }) })
 console.log("status:", res.status)
 const pass = res.status === 400
-console.log("✅ T27.4: " + (pass ? "PASS — HTTP 400" : "FAIL — got " + res.status))
+console.log("✅ T38.4: " + (pass ? "PASS — HTTP 400" : "FAIL — got " + res.status))
 '
 ```
 **期望**：HTTP 400（精确状态码，非 >=400）
 
 ---
 
-### T27.5 app 模式 appId 空白 → 400
+### T38.5 app 模式 appId 空白 → 400
 
 ```bash
 bun -e '
@@ -110,14 +110,14 @@ const BASE = "http://localhost:14096"
 const res = await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pvcMode: "app", appId: "   " }) })
 console.log("status:", res.status)
 const pass = res.status === 400
-console.log("✅ T27.5: " + (pass ? "PASS — HTTP 400" : "FAIL"))
+console.log("✅ T38.5: " + (pass ? "PASS — HTTP 400" : "FAIL"))
 '
 ```
 **期望**：HTTP 400
 
 ---
 
-### T27.6 非法 pvcMode 值 → 400
+### T38.6 非法 pvcMode 值 → 400
 
 ```bash
 bun -e '
@@ -125,14 +125,14 @@ const BASE = "http://localhost:14096"
 const res = await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pvcMode: "global" }) })
 console.log("status:", res.status)
 const pass = res.status === 400
-console.log("✅ T27.6: " + (pass ? "PASS — HTTP 400 (schema 校验)" : "FAIL"))
+console.log("✅ T38.6: " + (pass ? "PASS — HTTP 400 (schema 校验)" : "FAIL"))
 '
 ```
 **期望**：HTTP 400（schema 校验拒绝）
 
 ---
 
-### T27.7 appId 路径穿越 → 拒绝
+### T38.7 appId 路径穿越 → 拒绝
 
 **验证目标**：appId 含 `../` 或特殊字符时被 schema pattern 拒绝，防止 PVC subPath 穿越。
 
@@ -148,14 +148,14 @@ const allBlocked = await Promise.all(malicious.map(appId =>
   fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pvcMode: "app", appId }) })
     .then(r => r.status === 400)
 ))
-console.log("✅ T27.7: " + (allBlocked.every(Boolean) ? "PASS — 路径穿越全部拒绝" : "FAIL — 有穿越通过"))
+console.log("✅ T38.7: " + (allBlocked.every(Boolean) ? "PASS — 路径穿越全部拒绝" : "FAIL — 有穿越通过"))
 '
 ```
 **期望**：全部 HTTP 400（appId 仅允许 `[\w\-\.]`，1-128 字符）
 
 ---
 
-### T27.8 appId 超长 → 拒绝
+### T38.8 appId 超长 → 拒绝
 
 ```bash
 bun -e '
@@ -164,14 +164,14 @@ const longId = "a".repeat(129)
 const res = await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pvcMode: "app", appId: longId }) })
 console.log("status:", res.status, "(appId length=129)")
 const pass = res.status === 400
-console.log("✅ T27.8: " + (pass ? "PASS — 超长 appId 拒绝" : "FAIL"))
+console.log("✅ T38.8: " + (pass ? "PASS — 超长 appId 拒绝" : "FAIL"))
 '
 ```
 **期望**：HTTP 400（appId 最长 128 字符）
 
 ---
 
-### T27.9 appId 合法边界字符 → 通过
+### T38.9 appId 合法边界字符 → 通过
 
 ```bash
 bun -e '
@@ -186,7 +186,7 @@ const allOk = await Promise.all(validIds.map(appId =>
   fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pvcMode: "app", appId }) })
     .then(r => r.status === 200)
 ))
-console.log("✅ T27.9: " + (allOk.every(Boolean) ? "PASS — 合法字符全部通过" : "FAIL"))
+console.log("✅ T38.9: " + (allOk.every(Boolean) ? "PASS — 合法字符全部通过" : "FAIL"))
 '
 ```
 **期望**：全部 HTTP 200
@@ -195,7 +195,7 @@ console.log("✅ T27.9: " + (allOk.every(Boolean) ? "PASS — 合法字符全部
 
 ## 二、PVC 共享与隔离
 
-### T27.10 同 appId 不同会话共享 PVC 空间
+### T38.10 同 appId 不同会话共享 PVC 空间
 
 **验证目标**：同一 `appId` 的两个会话，写入的文件互相可见。
 
@@ -213,14 +213,14 @@ await exec(sidA, "mkdir -p /workspace/repo && echo shared-content > /workspace/r
 await new Promise(r => setTimeout(r, 2000))
 const readRes = await exec(sidB, "cat /workspace/repo/shared-file.txt 2>&1")
 console.log("B 读取:", readRes.stdout?.trim())
-console.log("✅ T27.10: " + (readRes.stdout?.includes("shared-content") ? "PASS — 共享 PVC" : "FAIL"))
+console.log("✅ T38.10: " + (readRes.stdout?.includes("shared-content") ? "PASS — 共享 PVC" : "FAIL"))
 '
 ```
 **期望**：会话 B 能读到会话 A 写入的文件
 
 ---
 
-### T27.11 不同 appId 之间 PVC 隔离
+### T38.11 不同 appId 之间 PVC 隔离
 
 ```bash
 bun -e '
@@ -235,14 +235,14 @@ await exec(sidA, "echo from-a > /workspace/repo/iso-a.txt")
 await new Promise(r => setTimeout(r, 2000))
 const readRes = await exec(sidB, "cat /workspace/repo/iso-a.txt 2>&1")
 const isolated = readRes.stdout?.includes("No such file")
-console.log("✅ T27.11: " + (isolated ? "PASS — 隔离" : "FAIL — 泄漏"))
+console.log("✅ T38.11: " + (isolated ? "PASS — 隔离" : "FAIL — 泄漏"))
 '
 ```
 **期望**：会话 B 读不到会话 A 的文件
 
 ---
 
-### T27.12 session 模式与 app 模式隔离
+### T38.12 session 模式与 app 模式隔离
 
 ```bash
 bun -e '
@@ -257,16 +257,16 @@ await exec(sidS, "echo session-data > /workspace/repo/session-only.txt")
 await new Promise(r => setTimeout(r, 2000))
 const readRes = await exec(sidA, "cat /workspace/repo/session-only.txt 2>&1")
 const isolated = readRes.stdout?.includes("No such file")
-console.log("✅ T27.12: " + (isolated ? "PASS — session/app 隔离" : "FAIL"))
+console.log("✅ T38.12: " + (isolated ? "PASS — session/app 隔离" : "FAIL"))
 '
 ```
 **期望**：app 模式会话读不到 session 模式会话的文件
 
 ---
 
-## 四、持久化与继承
+## 三、持久化与继承
 
-### T27.18 pvcMode 持久化到 PG
+### T38.18 pvcMode 持久化到 PG
 
 **三重验证**：API 查询 + PG 直查 + directory 不暴露 worktree
 
@@ -279,7 +279,7 @@ const sid = await (await fetch(BASE + "/session", { method: "POST", headers: { "
 const info = await (await fetch(BASE + "/session/" + sid)).json()
 console.log("API: pvcMode=" + info.pvcMode + " appId=" + info.appId + " dir=" + info.directory)
 const pass = info.pvcMode === "app" && info.appId === APP_ID && info.directory === "/workspace"
-console.log("✅ T27.18: " + (pass ? "PASS — API + PG 持久化" : "FAIL"))
+console.log("✅ T38.18: " + (pass ? "PASS — API + PG 持久化" : "FAIL"))
 '
 ```
 
@@ -288,7 +288,7 @@ console.log("✅ T27.18: " + (pass ? "PASS — API + PG 持久化" : "FAIL"))
 
 ---
 
-### T27.19 fork 子会话继承 pvcMode 和 appId
+### T38.19 fork 子会话继承 pvcMode 和 appId
 
 **验证目标**：fork 子会话继承父会话的 pvcMode、appId，且共享 PVC 数据。
 
@@ -310,7 +310,7 @@ const metaOk = fork.pvcMode === "app" && fork.appId === APP_ID
 const dataOk = readRes.stdout?.includes("parent-data")
 console.log("fork 元数据:", metaOk ? "✅" : "❌", "pvcMode=" + fork.pvcMode, "appId=" + fork.appId)
 console.log("fork 读父文件:", dataOk ? "✅" : "❌", readRes.stdout?.trim()?.slice(0,30))
-console.log("✅ T27.19: " + (metaOk && dataOk ? "PASS" : "FAIL"))
+console.log("✅ T38.19: " + (metaOk && dataOk ? "PASS" : "FAIL"))
 '
 ```
 **期望**：子会话 `pvcMode=app`，`appId` 一致，且能读到父会话写入的文件
@@ -320,7 +320,7 @@ console.log("✅ T27.19: " + (metaOk && dataOk ? "PASS" : "FAIL"))
 
 ---
 
-### T27.20 子任务会话共享父会话 PVC（resolveSandboxOpts 追溯链路）
+### T38.20 子任务会话共享父会话 PVC（resolveSandboxOpts 追溯链路）
 
 **验证目标**：通过 `parentID` 创建的子任务会话（不传 pvcMode/appId），`resolveSandboxOpts` 通过 `parent_id` 链追溯 root，共享同一 sandbox/PVC。
 
@@ -347,7 +347,7 @@ const readRes = await exec(child.id, "cat /workspace/repo/parent.txt 2>&1")
 console.log("子读父文件:", readRes.stdout?.trim()?.slice(0,30))
 
 const dataOk = readRes.stdout?.includes("parent-data")
-console.log("✅ T27.20: " + (dataOk ? "PASS — 子任务会话通过 parent_id 追溯共享 PVC" : "FAIL"))
+console.log("✅ T38.20: " + (dataOk ? "PASS — 子任务会话通过 parent_id 追溯共享 PVC" : "FAIL"))
 '
 ```
 **期望**：子任务会话能读到父会话写入的文件（resolveSandboxOpts 追溯 parent_id 链到 root）
@@ -357,7 +357,7 @@ console.log("✅ T27.20: " + (dataOk ? "PASS — 子任务会话通过 parent_id
 
 ---
 
-### T27.21 session 模式不受 app 模式逻辑影响（回归保护）
+### T38.21 session 模式不受 app 模式逻辑影响（回归保护）
 
 **验证目标**：session 模式的子会话和 fork 不被 app 模式逻辑污染，pvc_mode 保持 NULL/undefined。
 
@@ -383,7 +383,7 @@ const childU = await (await fetch(BASE + "/session", { method: "POST", headers: 
 const pass3 = childU.pvcMode === undefined && childU.appId === undefined
 console.log("场景3 默认子会话: pvcMode=%s appId=%s %s", childU.pvcMode, childU.appId, pass3 ? "✅" : "❌")
 
-console.log("✅ T27.21: " + (pass1 && pass2 && pass3 ? "PASS — session 模式不受污染" : "FAIL"))
+console.log("✅ T38.21: " + (pass1 && pass2 && pass3 ? "PASS — session 模式不受污染" : "FAIL"))
 '
 ```
 **期望**：三个场景的 pvcMode/appId 全部为 undefined/null
@@ -395,24 +395,26 @@ console.log("✅ T27.21: " + (pass1 && pass2 && pass3 ? "PASS — session 模式
 
 ## 结果汇总
 
+> **编号说明**：T38.13–T38.17 为历史断档（原 worktree 自动创建等用例在文档演进中移除）；99-acceptance-status 中 T38.13 的实测记录来自历史回归，正文待补。
+
 | 用例 | 验证维度 | 状态 |
 |------|---------|------|
-| T27.1 | 默认行为不变（pvcMode=undefined, dir=/workspace） | |
-| T27.2 | 显式 pvcMode=session | |
-| T27.3 | app 模式创建 + dir 不暴露 worktree | |
-| T27.4 | app 缺 appId → 400 | |
-| T27.5 | app 空白 appId → 400 | |
-| T27.6 | 非法 pvcMode → 400 | |
-| T27.7 | appId 路径穿越 → 拒绝 | |
-| T27.8 | appId 超长(>128) → 拒绝 | |
-| T27.9 | appId 合法边界字符 → 通过 | |
-| T27.10 | 同 appId 共享 PVC | |
-| T27.11 | 不同 appId 隔离 | |
-| T27.12 | session/app 隔离 | |
-| T27.18 | PG 持久化 | |
-| T27.19 | fork 继承 pvcMode/appId + 数据共享 | |
-| T27.20 | 子任务会话 parent_id 追溯共享 PVC | |
-| T27.21 | session 模式不受 app 逻辑影响（回归保护） | |
+| T38.1 | 默认行为不变（pvcMode=undefined, dir=/workspace） | |
+| T38.2 | 显式 pvcMode=session | |
+| T38.3 | app 模式创建 + dir 不暴露 worktree | |
+| T38.4 | app 缺 appId → 400 | |
+| T38.5 | app 空白 appId → 400 | |
+| T38.6 | 非法 pvcMode → 400 | |
+| T38.7 | appId 路径穿越 → 拒绝 | |
+| T38.8 | appId 超长(>128) → 拒绝 | |
+| T38.9 | appId 合法边界字符 → 通过 | |
+| T38.10 | 同 appId 共享 PVC | |
+| T38.11 | 不同 appId 隔离 | |
+| T38.12 | session/app 隔离 | |
+| T38.18 | PG 持久化 | |
+| T38.19 | fork 继承 pvcMode/appId + 数据共享 | |
+| T38.20 | 子任务会话 parent_id 追溯共享 PVC | |
+| T38.21 | session 模式不受 app 逻辑影响（回归保护） | |
 
 ---
 
