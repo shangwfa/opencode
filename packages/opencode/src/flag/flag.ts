@@ -102,7 +102,7 @@ export namespace Flag {
   export const OPENCODE_SANDBOX_IDLE_REAP_SEC = number("OPENCODE_SANDBOX_IDLE_REAP_SEC") ?? 1800
   export const OPENCODE_SANDBOX_MAX_TTL_SEC = number("OPENCODE_SANDBOX_MAX_TTL_SEC") ?? 3600
   export const OPENCODE_SANDBOX_PACKAGE_CACHE_MOUNT =
-    process.env["OPENCODE_SANDBOX_PACKAGE_CACHE_MOUNT"] ?? "/xybot-front/cache"
+    process.env["OPENCODE_SANDBOX_PACKAGE_CACHE_MOUNT"] ?? "/opt/pnpm-store"
 
   function number(key: string) {
     const value = process.env[key]

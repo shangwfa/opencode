@@ -90,7 +90,7 @@ describe("PVC volume routing logic", () => {
 })
 
 describe("worktree script generation (app mode)", () => {
-  // 模拟 tools.ts 的 worktreeScript 逻辑
+  // 模拟 worktreeScript 逻辑（src 中已移除死代码，此处保留验证脚本生成格式）
   function worktreeScript(sessionID: string): string {
     const wt = `/workspace/worktrees/${sessionID}`
     return [

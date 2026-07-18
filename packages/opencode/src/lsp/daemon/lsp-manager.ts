@@ -205,20 +205,19 @@ function log(msg: string) {
   process.stderr.write(`[lsp-manager] ${msg}\n`)
 }
 
-function findTypescriptLanguageServer(): string | undefined {
+function findTscBinary(): string | undefined {
   const ext = process.platform === "win32" ? ".cmd" : ""
   const pathDirs = (process.env.PATH ?? "").split(path.delimiter)
   for (const dir of pathDirs) {
-    const candidate = path.join(dir, `typescript-language-server${ext}`)
+    const candidate = path.join(dir, `tsc${ext}`)
     try {
       fs.accessSync(candidate, fs.constants.X_OK)
       return candidate
     } catch {}
   }
-
   let current = WORKSPACE
   while (true) {
-    const candidate = path.join(current, "node_modules", ".bin", `typescript-language-server${ext}`)
+    const candidate = path.join(current, "node_modules", ".bin", `tsc${ext}`)
     try {
       fs.accessSync(candidate, fs.constants.X_OK)
       return candidate
@@ -227,7 +226,6 @@ function findTypescriptLanguageServer(): string | undefined {
     if (parent === current) break
     current = parent
   }
-
   return
 }
 
@@ -240,24 +238,6 @@ function findPyright(): string | undefined {
       fs.accessSync(candidate, fs.constants.X_OK)
       return candidate
     } catch {}
-  }
-  return
-}
-
-function findTsserverPath(): string | undefined {
-  try {
-    return require.resolve("typescript/lib/tsserver.js", { paths: [WORKSPACE] })
-  } catch {}
-  let current = WORKSPACE
-  while (true) {
-    const candidate = path.join(current, "node_modules", "typescript", "lib", "tsserver.js")
-    try {
-      fs.accessSync(candidate, fs.constants.R_OK)
-      return candidate
-    } catch {}
-    const parent = path.dirname(current)
-    if (parent === current) break
-    current = parent
   }
   return
 }
@@ -691,6 +671,7 @@ export class LspManager {
 
   private async initializeServer(server: HeldServer): Promise<void> {
     let bin: string | undefined
+    let spawnArgs: string[] = ["--stdio"]
     const initialization: Record<string, unknown> = {}
 
     if (server.languageId === "python") {
@@ -702,22 +683,20 @@ export class LspManager {
         return
       }
     } else {
-      bin = findTypescriptLanguageServer()
+      // TS 7.x native binary speaks LSP directly via --lsp --stdio (no typescript-language-server wrapper needed)
+      bin = findTscBinary()
       if (!bin) {
-        log("typescript-language-server not found")
+        log("tsc binary not found")
         server.status = "error"
         server.spawnFailed = true
         return
       }
-      const tsserverPath = findTsserverPath()
-      if (tsserverPath) {
-        initialization.tsserver = { path: tsserverPath }
-      }
+      spawnArgs = ["--lsp", "--stdio"]
     }
 
-    log(`spawning: ${bin} --stdio (root=${server.root}, lang=${server.languageId})`)
+    log(`spawning: ${bin} ${spawnArgs.join(" ")} (root=${server.root}, lang=${server.languageId})`)
 
-    const child = spawn(bin, ["--stdio"], {
+    const child = spawn(bin, spawnArgs, {
       cwd: server.root,
       env: { ...process.env },
       stdio: ["pipe", "pipe", "pipe"],

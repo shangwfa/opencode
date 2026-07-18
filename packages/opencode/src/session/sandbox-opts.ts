@@ -32,17 +32,6 @@ export async function resolveSandboxOpts(sessionID: SessionID): Promise<SandboxO
   return { id: current }
 }
 
-export function worktreeScript(sessionID: string): string {
-  const wt = `/workspace/worktrees/${sessionID}`
-  return [
-    `if [ -d /workspace/repo/.git ]; then`,
-    `  if [ ! -d ${wt} ]; then`,
-    `    mkdir -p /workspace/worktrees && git -C /workspace/repo worktree add --detach ${wt} HEAD;`,
-    `  fi;`,
-    `fi`,
-  ].join(" ")
-}
-
 function safeParse(s: string): { cpu: string; memory: string } | undefined {
   try {
     const v = JSON.parse(s)

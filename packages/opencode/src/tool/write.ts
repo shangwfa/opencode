@@ -9,13 +9,18 @@ import { Watcher } from "@opencode-ai/core/filesystem/watcher"
 import { InstanceState } from "@/effect/instance-state"
 import { trimDiff } from "./edit"
 import { assertExternalDirectoryEffect } from "./external-directory"
-import { toSandboxPath } from "./sandbox-path"
+import { toSandboxPath, toHostPath } from "./sandbox-path"
 import * as Log from "@opencode-ai/core/util/log"
 import { SandboxProvider } from "./sandbox-provider"
+import { LSP } from "@/lsp/lsp"
+import * as LSPClient from "@/lsp/client"
+import { Agent as LspAgent } from "@/lsp/agent"
+import { FSUtil } from "@opencode-ai/core/fs-util"
 import type { Sandbox } from "@alibaba-group/opensandbox"
 
 const writeLog = Log.create({ service: "write-tool" })
 const FILE_WRITE_TIMEOUT = Duration.seconds(60)
+const MAX_PROJECT_DIAGNOSTICS_FILES = 5
 
 export const Parameters = Schema.Struct({
   content: Schema.String.annotate({ description: "The content to write to the file" }),
@@ -86,12 +91,42 @@ export const WriteTool = Tool.define(
           yield* events.publish(FileSystem.Event.Edited, { file: filepath })
           yield* events.publish(Watcher.Event.Updated, { file: filepath, event: contentOld ? "change" : "add" })
 
+          let output = "Wrote file successfully."
+          const agentOpt = yield* Effect.serviceOption(LspAgent.Service)
+          if (agentOpt._tag === "Some") {
+            const sid = ctx.sandboxSessionID ?? ctx.sessionID
+            const result = yield* agentOpt.value.diagnostics(sid, filepath, instance.directory).pipe(
+              Effect.catchCause(() => Effect.succeed(null)),
+            )
+            if (result) {
+              const diagnostics: Record<string, LSPClient.Diagnostic[]> = {}
+              for (const [sp, diags] of Object.entries(result.diagnostics)) {
+                const hp = toHostPath(sp, instance.directory)
+                diagnostics[FSUtil.normalizePath(hp)] = diags as LSPClient.Diagnostic[]
+              }
+              const normalizedFilePath = FSUtil.normalizePath(filepath)
+              let projectDiagnosticsCount = 0
+              for (const [file, issues] of Object.entries(diagnostics)) {
+                const current = file === normalizedFilePath
+                if (!current && projectDiagnosticsCount >= MAX_PROJECT_DIAGNOSTICS_FILES) continue
+                const block = LSP.Diagnostic.report(current ? filepath : file, issues)
+                if (!block) continue
+                if (current) {
+                  output += `\n\nLSP errors detected in this file, please fix:\n${block}`
+                  continue
+                }
+                projectDiagnosticsCount++
+                output += `\n\nLSP errors detected in other files:\n${block}`
+              }
+            }
+          }
+
           return {
             title: path.relative(instance.worktree, filepath),
             metadata: { filepath, exists: !!contentOld },
-            output: "Wrote file successfully.",
+            output,
           }
-        }).pipe(Effect.orDie),
+        }).pipe(Effect.orDie) as any, // TODO: Tool Init type mismatch (LSP diagnostics R=HttpClient)
     }
   }),
 )
