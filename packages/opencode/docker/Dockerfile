@@ -57,6 +57,16 @@ RUN npx playwright install --with-deps chromium \
   && ln -sf /root/.cache/ms-playwright/chromium-*/chrome-linux/chrome /usr/local/bin/chromium
 ENV CHROME_PATH=/usr/local/bin/chromium
 
+# ── 8b. Install codegraph (self-contained Node bundle, no extra runtime) ──
+# Pre-installed to avoid per-session `curl install.sh | sh` (saves ~5s + network).
+# Bundle ships its own Node runtime; installed to /opt/codegraph, symlinked to /usr/local/bin.
+ENV CODEGRAPH_VERSION=v1.4.1
+ENV CODEGRAPH_INSTALL_DIR=/opt/codegraph
+RUN curl -fsSL https://raw.githubusercontent.com/colbymchenry/codegraph/main/install.sh \
+    | CODEGRAPH_BIN_DIR=/usr/local/bin sh \
+  && codegraph --version \
+  && which codegraph
+
 # ── 9. Symlink mise-managed binaries to OpenSandbox's expected PATH ──
 # OpenSandbox bootstrap may reset PATH; ensure node/pnpm/npm are always findable.
 RUN OLD_NODE_BIN=$(dirname $(readlink -f $(which node) 2>/dev/null) 2>/dev/null || echo "/usr/local/bin") \
