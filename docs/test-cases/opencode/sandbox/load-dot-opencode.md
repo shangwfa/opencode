@@ -784,7 +784,7 @@ cd "${directory}" && tar cf - --exclude='._*' .opencode 2>/dev/null | base64 | t
 
 ## 八、CodeGraph 集成模拟测试
 
-> 已抽离到独立文档：[`opencode/apis/codegraph.md`](./opencode/apis/codegraph.md)
+> 已抽离到独立文档：[`../apis/codegraph.md`](../apis/codegraph.md)
 
 ## 九、MCP 进程隔离测试（实际执行）
 
