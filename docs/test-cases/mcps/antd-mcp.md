@@ -7,7 +7,7 @@
 - 容器：`opencode-saas-test`（localhost:14096）
 - PG：本地 PostgreSQL（host.docker.internal:15432）
 - Sandbox：远端 K8s Sandbox API（host.docker.internal:30040）
-- 模型：zhipuai/glm-5.1
+- 模型：zhipuai/glm-5.2
 
 ## MCP Server 信息
 
