@@ -43,7 +43,7 @@ RUN mise install npm:pnpm@8 npm:pnpm@9 npm:pnpm@10 npm:pnpm@11
 RUN mise use -g npm:pnpm@10 && mise reshim
 
 # ── 8. Install global npm tools + ripgrep ──
-RUN npm install -g supergateway agent-browser
+RUN npm install -g supergateway agent-browser bun
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     apt-get update \
@@ -66,6 +66,11 @@ RUN curl -fsSL https://raw.githubusercontent.com/colbymchenry/codegraph/main/ins
     | CODEGRAPH_BIN_DIR=/usr/local/bin sh \
   && codegraph --version \
   && which codegraph
+
+# ── 8c. Install context-mode (context window optimization for AI agents) ──
+# Registered as session plugin with source: "code" wrapper (sets CONTEXT_MODE_PLATFORM=opencode).
+# --allow-scripts: required for better-sqlite3 prebuild-install (FTS5 native module).
+RUN npm install -g context-mode --allow-scripts
 
 # ── 9. Symlink mise-managed binaries to OpenSandbox's expected PATH ──
 # OpenSandbox bootstrap may reset PATH; ensure node/pnpm/npm are always findable.
@@ -102,3 +107,6 @@ RUN cd /tmp/preload \
 COPY docker/opt/opencode-lsp-daemon/ /opt/opencode-lsp-daemon/
 RUN npm install -g typescript pyright \
     && ln -sf /opt/opencode-lsp-daemon/index.js /usr/local/bin/opencode-lsp-agent
+
+# ── 13. Pre-install sandbox-plugin-agent (session plugin daemon for V2 sandbox execution) ──
+COPY docker/opt/sandbox-plugin-agent.ts /opt/sandbox-plugin-agent.ts

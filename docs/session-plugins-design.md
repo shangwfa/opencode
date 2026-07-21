@@ -647,3 +647,359 @@ yield* Effect.promise(() =>
 5. **单元测试**：状态机 + 多 session 隔离
 6. **E2E 测试**：CRUD + hook 生效 + 安全限制
 7. **文档**：使用文档 + 测试用例 + 索引更新
+
+---
+
+## 十六、沙箱执行模式（架构演进）
+
+> 当前实现（一至十五章）是 **V1 server 进程模式**——plugin 在 SaaS server 容器中 `import()` 加载执行。
+> 本章描述 **V2 沙箱执行模式**——plugin 在每个 session 对应的沙箱里执行，server 只做 HTTP 转发。
+
+### 16.1 V1 现状问题
+
+| 问题 | 严重度 | 根因 |
+|------|--------|------|
+| **plugin 在 server 进程跑** | 🔴 | `importPluginCode` 和 `importPlugins` 在 server 容器里 `import()`（行 47、63） |
+| **依赖必须在 server 容器安装** | 🔴 | server 容器没有 npm，context-mode 只装在沙箱镜像 |
+| **trigger 丢弃 hook 返回值** | 🔴 | `trigger` 遍历 hook 但最终返回原始 output（行 170），hooks 无法修改数据流 |
+| **加载失败完全静默** | 🟡 | `importPlugins` 失败返回 undefined，被跳过（行 144-156），用户无感知 |
+| **moduleCache 全局共享** | 🟡 | `moduleCache`（行 36）按 code 字符串缓存，跨 session 共享实例 |
+| **无超时控制** | 🟡 | hook 执行无超时（行 166），卡住会阻塞整个工具调用链路 |
+
+### 16.2 V2 架构设计
+
+```
+AI 工具调用
+    ↓
+SaaS server 接收
+    ↓
+server hooks 链（tool.execute.before）
+    ↓
+┌──────────────────────────────────────────────┐
+│ SandboxPluginRuntime（server 侧）             │
+│  HTTP POST → 沙箱直连 IP:9200/hook/{name}     │
+│  同步等待返回（5s 超时，超时则 fail open）     │
+└──────────────────────────────────────────────┘
+    ↓ (HTTP over sandbox IP)
+┌──────────────────────────────────────────────┐
+│ 沙箱                                         │
+│  plugin-agent（常驻 HTTP 服务 on :9200）       │
+│  ├── 加载 session plugins（import 在沙箱里）   │
+│  ├── 注册 hooks                               │
+│  ├── FTS5 存储（~/...context-mode/）          │
+│  └── HTTP endpoints:                         │
+│      POST /hook/{hookName}                    │
+│      → 执行 hook handler                      │
+│      → 返回修改后的 result（含 intercept）     │
+│      GET /health                              │
+└──────────────────────────────────────────────┘
+    ↓ (hook 返回值)
+server 根据 agent 返回值决定：拦截 / 修改 output / 放行
+    ↓
+转发到沙箱执行命令（原有 exec 路径不变）
+    ↓
+server hooks 链（tool.execute.after）
+    ↓ (同上 HTTP 通信)
+返回 AI
+```
+
+### 16.3 跟 Local MCP 的区别
+
+| 维度 | Local MCP（supergateway） | V2 Session Plugin（plugin-agent） |
+|------|---|---|
+| **触发方** | AI 主动调用 MCP 工具 | **Server 被动触发** hooks |
+| **协议** | MCP JSON-RPC（tools/call） | **自定义 hooks HTTP API** |
+| **AI 感知** | AI 知道有 ctx_* 工具 | **AI 不知道 hooks 存在**（透明拦截） |
+| **拦截能力** | ❌ 不拦截其他工具 | **✅ 拦截/修改任何工具的输入/输出** |
+| **supergateway** | 需要（stdio ↔ HTTP 桥接） | **不需要**（plugin-agent 直接开 HTTP） |
+| **生命周期** | 跟沙箱绑定（connectSandboxLocal 管理） | 跟沙箱绑定（SandboxPluginRuntime 管理） |
+
+> supergateway 解决的是 MCP 协议桥接问题（stdio ↔ HTTP），**不适用于 plugin hooks**——hooks 不是 AI 主动调用的工具，而是 server 内部事件的被动处理器。
+
+### 16.4 plugin-agent 脚本
+
+预装到沙箱镜像 `/opt/sandbox-plugin-agent.ts`，通过 exec background 启动：
+
+```typescript
+// /opt/sandbox-plugin-agent.ts（预装到沙箱镜像）
+// 接收 plugins JSON 通过环境变量传入，加载后在 :9200 开 HTTP 服务
+
+const PORT = parseInt(process.env.PLUGIN_AGENT_PORT || "9200")
+const SESSION_ID = process.env.SESSION_ID || ""
+const PLUGINS = JSON.parse(process.env.PLUGINS_JSON || "[]")
+
+// 1. 加载所有 plugin
+const hookHandlers = new Map<string, Function[]>()
+
+for (const plugin of PLUGINS) {
+  try {
+    let mod
+    if (plugin.source === "npm") {
+      mod = await import(plugin.spec)
+    } else {
+      const tmp = `/tmp/spa-${Date.now()}.ts`
+      await Bun.write(tmp, plugin.code)
+      mod = await import(tmp)
+    }
+
+    // 找到 server plugin function（跟 importPlugins 逻辑一致）
+    let fn
+    if (typeof mod.default === "function") fn = mod.default
+    else if (mod.default?.server) fn = mod.default.server
+    else {
+      for (const v of Object.values(mod)) {
+        if (typeof v === "function") { fn = v; break }
+        if (v && typeof v === "object" && typeof v.server === "function") { fn = v.server; break }
+      }
+    }
+    if (!fn) throw new Error(`No server plugin in ${plugin.name}`)
+
+    // 调用 plugin function 获取 hooks
+    const context = { sessionID: SESSION_ID, workdir: "/workspace" }
+    const hooks = await fn(context)
+    for (const [name, handler] of Object.entries(hooks)) {
+      if (typeof handler !== "function") continue
+      if (!hookHandlers.has(name)) hookHandlers.set(name, [])
+      hookHandlers.get(name)!.push(handler)
+    }
+    console.error(`[plugin-agent] loaded: ${plugin.name}`)
+  } catch (e) {
+    console.error(`[plugin-agent] load failed: ${plugin.name}: ${e}`)
+  }
+}
+
+// 2. HTTP server
+Bun.serve({
+  port: PORT,
+  async fetch(req) {
+    const url = new URL(req.url)
+
+    // 健康检查
+    if (url.pathname === "/health") {
+      return Response.json({ status: "ok", plugins: PLUGINS.length, hooks: [...hookHandlers.keys()] })
+    }
+
+    // hooks endpoint: POST /hook/{hookName}
+    if (url.pathname.startsWith("/hook/")) {
+      const hookName = url.pathname.replace("/hook/", "")
+      const handlers = hookHandlers.get(hookName) || []
+      const body = await req.json()
+
+      let result = body.output ?? body
+      for (const handler of handlers) {
+        try {
+          const ret = await Promise.race([
+            handler(body.input, body.output),
+            new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 5000)),
+          ])
+          if (ret !== undefined && ret !== null) result = ret  // hook 返回值覆盖 result
+        } catch (e) {
+          console.error(`[plugin-agent] hook ${hookName} error: ${e}`)
+        }
+      }
+      return Response.json({ result })
+    }
+
+    return new Response("Not found", { status: 404 })
+  },
+})
+console.error(`[plugin-agent] listening on :${PORT}`)
+```
+
+**关键设计**：
+- hook 返回值非 undefined/null 时**覆盖 result**（修复 V1 trigger 返回值丢弃问题）
+- 每个 hook 有 **5s 超时**（修复 V1 无超时问题）
+- 加载失败只 `console.error`（不崩溃，继续加载其他 plugin）
+
+### 16.5 通信协议
+
+```
+Server → Agent（HTTP POST）:
+POST http://<sandbox-ip>:9200/hook/tool.execute.before
+Content-Type: application/json
+{"input":{"tool":"bash","input":{"command":"rg --files | wc -l"}},"output":null}
+
+Agent → Server（HTTP Response）:
+{"result":null}                           ← 放行（不拦截）
+{"result":{"intercept":true,...}}         ← 拦截（替换输出）
+
+POST http://<sandbox-ip>:9200/hook/tool.execute.after
+{"input":{"tool":"bash"},"output":"<56KB raw data>"}
+
+{"result":"已索引到 FTS5，3 条匹配"}        ← 替换原始输出（56KB → 摘要）
+
+POST http://<sandbox-ip>:9200/hook/experimental.chat.system.transform
+{"input":null,"output":"<system prompt>"}
+
+{"result":"<system prompt + routing rules>"}  ← 修改后的 system prompt
+```
+
+### 16.6 SandboxPluginRuntime（server 侧改造）
+
+替代当前 `session-plugin-runtime.ts` 中的 `importPlugins` + `importPluginCode`：
+
+```typescript
+// session-plugin-runtime.ts（V2 新增）
+
+class SandboxPluginRuntime implements Runtime {
+  private agentUrl: string | null = null
+  private starting: Promise<void> | null = null
+
+  constructor(
+    private sessionID: SessionID,
+    private sandboxProvider: SandboxProvider,
+    private store: SessionPlugin.Service,
+  ) {}
+
+  // lazy 启动 plugin-agent（参考 connectSandboxLocal 的模式）
+  private async ensureAgent(): Promise<void> {
+    if (this.agentUrl) return
+    if (this.starting) { await this.starting; return }
+    this.starting = this.startAgent()
+    await this.starting
+  }
+
+  private async startAgent(): Promise<void> {
+    // 1. 从 PG 读 plugin 列表
+    const rows = await this.store.list(this.sessionID)
+    const enabled = rows.filter(r => r.enabled)
+    if (!enabled.length) return  // 无 plugin，不启动 agent
+
+    // 2. 构造 plugins JSON
+    const pluginsJson = JSON.stringify(enabled.map(r => ({
+      name: r.name,
+      source: r.source,
+      spec: r.spec,
+      code: r.code,
+    })))
+
+    // 3. 在沙箱里启动 plugin-agent（exec background，跟 supergateway 一致）
+    await this.sandboxProvider.runInSession(this.sessionID,
+      `pkill -f "bun.*sandbox-plugin-agent" 2>/dev/null; sleep 0.5; ` +
+      `SESSION_ID=${this.sessionID} PLUGINS_JSON='${pluginsJson}' ` +
+      `nohup bun /opt/sandbox-plugin-agent.ts > /tmp/plugin-agent.log 2>&1 &`
+    )
+
+    // 4. 拿沙箱直连 URL（跟 connectSandboxLocal 一致）
+    const endpoint = await this.sandboxProvider.getEndpoint(this.sessionID, 9200)
+    this.agentUrl = endpoint
+  }
+
+  // trigger 实现：HTTP POST 到 agent
+  async trigger<Output>(name: string, input: unknown, output: Output): Promise<Output> {
+    await this.ensureAgent()
+    if (!this.agentUrl) return output  // 无 agent（无 plugin），直接返回
+
+    try {
+      const resp = await fetch(`${this.agentUrl}/hook/${name}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ input, output }),
+        signal: AbortSignal.timeout(5000),  // 5s 超时
+      })
+      if (!resp.ok) return output
+      const data = await resp.json()
+      // hook 返回值覆盖 output（修复 V1 trigger 返回值丢弃问题）
+      return (data.result ?? output) as Output
+    } catch {
+      return output  // fail open（超时/连接失败 → 放行）
+    }
+  }
+
+  // 其他方法（event/auth/tools/dispose）同样走 HTTP
+  async event(input: unknown): Promise<void> {
+    await this.ensureAgent()
+    if (!this.agentUrl) return
+    try {
+      await fetch(`${this.agentUrl}/hook/event`, {
+        method: "POST", body: JSON.stringify({ input, output: null }),
+        signal: AbortSignal.timeout(3000),
+      })
+    } catch {}
+  }
+
+  async dispose(): Promise<void> {
+    // 沙箱销毁时 agent 自然清理；这里可选发 /shutdown
+    this.agentUrl = null
+  }
+}
+```
+
+**跟 V1 的关键改进**：
+- **trigger 返回值生效**：`return (data.result ?? output) as Output` ← hooks 能修改输出
+- **5s 超时**：`AbortSignal.timeout(5000)` ← 不会卡住工具调用链路
+- **fail open**：连接失败/超时 → 返回原始 output ← 不阻塞 AI
+- **lazy 启动**：第一次 trigger 时才启动 agent ← 无 plugin 时零开销
+
+### 16.7 endpoint 获取（参考 connectSandboxLocal）
+
+plugin-agent 监听 `:9200`，server 通过 `sandboxProvider.getEndpoint` 获取直连 URL：
+
+```typescript
+// 跟 mcp/index.ts:735 完全一致的模式
+const endpointUrl = yield* sandboxProvider.getEndpoint(sessionID, 9200)
+// 返回类似：http://10.12.11.x:9200（沙箱 Pod IP）
+```
+
+> endpoint API 已有实现（`/session/:id/endpoint/:port`），复用即可。
+
+### 16.8 生命周期
+
+| 事件 | 动作 | 跟 V1 的区别 |
+|------|------|-------------|
+| **plugins/create** | 写 PG（已有） | 不变 |
+| **第一次 trigger** | lazy 启动 plugin-agent | V1 直接 import；V2 exec background 启动 agent |
+| **后续 trigger** | HTTP POST 到 agent | V1 函数调用；V2 HTTP 调用 |
+| **plugins 更新** | 清缓存（已有），下次 trigger 重启 agent | V1 清 moduleCache；V2 重启 agent |
+| **沙箱 idle 回收** | agent 跟着销毁 | V1 server 进程的 hooks 仍在；V2 agent 自然消失 |
+| **沙箱重建** | 下次 trigger lazy 重启 agent | V1 不受影响；V2 自动恢复 |
+| **session 结束** | 清理 PG + dispose | 不变 |
+
+### 16.9 Dockerfile 改动
+
+```dockerfile
+# packages/opencode/docker/Dockerfile
+
+# ── 8d. Pre-install sandbox-plugin-agent ──
+COPY docker/opt/sandbox-plugin-agent.ts /opt/sandbox-plugin-agent.ts
+```
+
+> plugin-agent 只是一个 .ts 脚本（用 Bun 跑），不需要额外依赖。plugin 依赖（如 context-mode）在 8c 步骤已预装。
+
+### 16.10 全局 plugin 不变
+
+全局 plugin（通过 `PluginLoader` 在 server 启动时加载）**不受影响**，继续在 server 进程里跑。只有 **session plugin** 走沙箱执行模式。
+
+```typescript
+// session-plugin-runtime.ts
+
+// 判断是否走沙箱模式
+const isSandboxMode = Flag.OPENCODE_DATABASE_URL && sandboxProvider
+
+if (isSandboxMode) {
+  // V2：SandboxPluginRuntime（沙箱里跑）
+  runtime = new SandboxPluginRuntime(sessionID, sandboxProvider, store)
+} else {
+  // V1：当前逻辑（server 进程跑，fallback）
+  runtime = yield* load(sessionID, context)
+}
+```
+
+### 16.11 实现计划
+
+| 阶段 | 任务 | 文件 |
+|------|------|------|
+| **Phase 1** | 写 plugin-agent 脚本 | `docker/opt/sandbox-plugin-agent.ts` |
+| **Phase 2** | Dockerfile 预装 | `docker/Dockerfile`（COPY agent + 已有 context-mode 预装） |
+| **Phase 3** | 改 session-plugin-runtime.ts | 新增 `SandboxPluginRuntime` + endpoint 获取 + trigger 返回值修复 |
+| **Phase 4** | 构建镜像 + 测试 | `opencode-opensandbox:local` 重建 + context-mode plugin 测试 |
+| **Phase 5** | 修复 V1 遗留问题 | trigger 返回值（全局也修）+ moduleCache 按 sessionID 隔离 + 加载失败非静默 |
+
+### 16.12 兼容性
+
+| 场景 | V1（server 进程） | V2（沙箱执行） |
+|------|---|---|
+| **非 SaaS 模式**（无 DATABASE_URL） | 继续用 V1（importPluginCode） | 不走 V2（无沙箱） |
+| **SaaS + 无沙箱** | 继续用 V1 | 不走 V2 |
+| **SaaS + 有沙箱** | 可选 V1（fallback）或 V2 | **推荐 V2** |
+| **全局 plugin** | 不受影响 | 不受影响 |

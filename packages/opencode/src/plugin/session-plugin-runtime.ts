@@ -1,6 +1,6 @@
 import type { Hooks, Plugin as PluginInstance, PluginInput, PluginModule, ToolDefinition } from "@opencode-ai/plugin"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
-import { Context, Deferred, Effect, Layer } from "effect"
+import { Context, Deferred, Effect, Layer, Option } from "effect"
 import { SessionPlugin } from "./session-plugin"
 import { Plugin } from "."
 import type { SessionID } from "../session/schema"
@@ -9,6 +9,7 @@ import { pathToFileURL } from "url"
 import { PluginLoader } from "./loader"
 import { readV1Plugin } from "./shared"
 import { EventV2Bridge } from "../event-v2-bridge"
+import { SandboxProvider } from "../tool/sandbox-provider"
 
 type Hook = (input: unknown, output: unknown) => Promise<void> | void
 type Loaded = { readonly code: string; readonly hooks: Hooks }
@@ -84,6 +85,105 @@ function filterHooks(hooks: Hooks): Hooks {
   return Object.fromEntries(Object.entries(hooks).filter(([name]) => allowed.has(name))) as Hooks
 }
 
+const PLUGIN_AGENT_PORT = 9200
+const HOOK_TIMEOUT_MS = 5000
+
+function createSandboxRuntime(
+  sessionID: SessionID,
+  sandbox: SandboxProvider.Interface,
+  store: SessionPlugin.Interface,
+): Effect.Effect<Runtime> {
+  return Effect.gen(function* () {
+    let agentUrl: string | null = null
+
+    const ensureAgent = Effect.gen(function* () {
+      if (agentUrl) return
+      const rows = yield* store.list(sessionID).pipe(Effect.catch(() => Effect.succeed([] as SessionPlugin.Row[])))
+      const enabled = rows.filter((r: SessionPlugin.Row) => r.enabled)
+      if (!enabled.length) return
+
+      const pluginsJson = JSON.stringify(
+        enabled.map((r: SessionPlugin.Row) => ({ name: r.name, source: r.source, spec: r.spec, code: r.code })),
+      )
+      const escaped = pluginsJson.replace(/'/g, "'\\''")
+
+      yield* sandbox
+        .runInSession(
+          sessionID,
+          `pkill -f "bun.*sandbox-plugin-agent" 2>/dev/null; sleep 0.5; ` +
+            `SESSION_ID='${sessionID}' PLUGINS_JSON='${escaped}' ` +
+            `nohup bun /opt/sandbox-plugin-agent.ts > /tmp/plugin-agent.log 2>&1 &`,
+        )
+        .pipe(Effect.catch(() => Effect.void))
+
+      for (let attempt = 0; attempt < 15; attempt++) {
+        const url = yield* sandbox.getEndpoint(sessionID, PLUGIN_AGENT_PORT).pipe(
+          Effect.catch(() => Effect.succeed("")),
+        )
+        if (url) {
+          const healthy = yield* Effect.tryPromise({
+            try: () => fetch(`${url}/health`).then((r) => r.ok),
+            catch: () => false,
+          })
+          if (healthy) {
+              agentUrl = url
+              yield* Effect.logInfo("sandbox plugin-agent started", { sessionID, url })
+              return
+            }
+        }
+        yield* Effect.sleep("1 second")
+      }
+      yield* Effect.logWarning("sandbox plugin-agent failed to start", { sessionID })
+    })
+
+    const runtime: Runtime = {
+      trigger: <Output>(name: string, input: unknown, output: Output) =>
+        Effect.gen(function* () {
+          if (!agentUrl) {
+            yield* ensureAgent.pipe(Effect.catch(() => Effect.void))
+            if (!agentUrl) return output
+          }
+          return yield* Effect.tryPromise({
+            try: () =>
+              fetch(`${agentUrl}/hook/${name}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ input, output }),
+                signal: AbortSignal.timeout(HOOK_TIMEOUT_MS),
+              }).then((r) => (r.ok ? r.json() : null)),
+            catch: () => null,
+          }).pipe(
+            Effect.map((result: { result: unknown } | null) =>
+              result && result.result !== undefined && result.result !== null ? (result.result as Output) : output,
+            ),
+            Effect.catch(() => Effect.succeed(output)),
+          )
+        }),
+      event: (input: unknown) =>
+        Effect.gen(function* () {
+          if (!agentUrl) return
+          yield* Effect.tryPromise({
+            try: () =>
+              fetch(`${agentUrl}/hook/event`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ input, output: null }),
+                signal: AbortSignal.timeout(3000),
+              }),
+            catch: () => undefined,
+          }).pipe(Effect.catch(() => Effect.void))
+        }),
+      auth: () => Effect.succeed({} as Record<string, unknown>),
+      tools: () => Effect.succeed({} as Record<string, ToolDefinition>),
+      dispose: () =>
+        Effect.sync(() => {
+          agentUrl = null
+        }),
+    }
+    return runtime
+  })
+}
+
 export interface Runtime {
   readonly trigger: <Output>(name: string, input: unknown, output: Output) => Effect.Effect<Output>
   readonly event: (input: unknown) => Effect.Effect<void>
@@ -106,6 +206,7 @@ const layer = Layer.effect(
     const store = yield* SessionPlugin.Service
     const plugin = yield* Plugin.Service
     const events = yield* EventV2Bridge.Service
+    const maybeSandbox = Option.getOrUndefined(yield* Effect.serviceOption(SandboxProvider.Service))
     const runtimes = new Map<string, Runtime>()
     const pending = new Map<string, Deferred.Deferred<Runtime, Error>>()
 
@@ -232,7 +333,12 @@ const layer = Layer.effect(
       }
       const deferred = yield* Deferred.make<Runtime, Error>()
       pending.set(key, deferred)
-      const runtime = yield* load(sessionID, yield* plugin.context()).pipe(
+
+      // V2: sandbox execution mode — if SandboxProvider available, plugins run in sandbox
+      const runtime = yield* (maybeSandbox
+        ? createSandboxRuntime(sessionID, maybeSandbox, store)
+        : load(sessionID, yield* plugin.context())
+      ).pipe(
         Effect.tap((value) => Deferred.succeed(deferred, value).pipe(Effect.ignore)),
         Effect.tapError((error) => Deferred.fail(deferred, new Error(String(error))).pipe(Effect.ignore)),
         Effect.ensuring(Effect.sync(() => pending.delete(key))),
@@ -267,7 +373,7 @@ const layer = Layer.effect(
 export const node = LayerNode.make({
   service: Service,
   layer,
-  deps: [SessionPlugin.node, Plugin.node, EventV2Bridge.node],
+  deps: [SessionPlugin.node, Plugin.node, EventV2Bridge.node, SandboxProvider.node],
 })
 
 export * as SessionPluginRuntime from "./session-plugin-runtime"
