@@ -33,6 +33,7 @@ import { MessageDecodeError } from "./session/error"
 import { SessionEvent } from "./session/event"
 import { SessionInput } from "./session/input"
 import { Snapshot } from "./snapshot"
+import { Image } from "./image"
 import { SessionRevert } from "./session/revert"
 import { Revert } from "@opencode-ai/schema/revert"
 import { FSUtil } from "./fs-util"
@@ -150,7 +151,7 @@ export interface Interface {
     prompt: PromptInput.Prompt
     delivery?: SessionInput.Delivery
     resume?: boolean
-  }) => Effect.Effect<SessionInput.Admitted, NotFoundError | PromptConflictError>
+  }) => Effect.Effect<SessionInput.Admitted, NotFoundError | PromptConflictError | Image.DecodeError | Image.SizeError>
   readonly shell: (input: {
     id?: EventV2.ID
     sessionID: SessionSchema.ID
@@ -360,8 +361,36 @@ const layer = Layer.effect(
       prompt: Effect.fn("V2Session.prompt")((input) =>
         Effect.uninterruptible(
           Effect.gen(function* () {
-            yield* result.get(input.sessionID)
-            const prompt = resolvePrompt(input.prompt)
+            const session = yield* result.get(input.sessionID)
+            const resolved = resolvePrompt(input.prompt)
+            const prompt = !resolved.files?.some((f) => f.mime.startsWith("image/") && f.uri.startsWith("data:"))
+              ? resolved
+              : yield* Effect.gen(function* () {
+                  const image = yield* Image.Service
+                  const files = yield* Effect.forEach(resolved.files!, (file) =>
+                    file.mime.startsWith("image/") && file.uri.startsWith("data:")
+                      ? Effect.gen(function* () {
+                          const match = file.uri.match(/^data:([^;]+);base64,(.*)$/)
+                          if (!match) return file
+                          const normalized = yield* image.normalize(file.name ?? file.uri, {
+                            uri: file.uri,
+                            name: file.name,
+                            content: match[2],
+                            encoding: "base64",
+                            mime: file.mime,
+                          })
+                          return { ...file, uri: `data:${match[1]};base64,${normalized.content}` }
+                        }).pipe(
+                          Effect.catchIf(
+                            (error): error is Image.ResizerUnavailableError =>
+                              error instanceof Image.ResizerUnavailableError,
+                            () => Effect.succeed(file),
+                          ),
+                        )
+                      : Effect.succeed(file),
+                  )
+                  return { ...resolved, files }
+                }).pipe(Effect.provide(locations.get(session.location)))
             const messageID = input.id ?? SessionMessage.ID.create()
             const delivery = input.delivery ?? "steer"
             const expected = { sessionID: input.sessionID, messageID, prompt, delivery }

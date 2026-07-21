@@ -72,14 +72,13 @@ export type Error =
   | Integration.AuthorizationError
 
 export interface Interface {
-  readonly resolve: (session: SessionSchema.Info) => Effect.Effect<Model, Error>
+  readonly resolve: (session: SessionSchema.Info) => Effect.Effect<{ model: Model, capabilities?: ModelV2.Capabilities }, Error>
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/v2/SessionRunnerModel") {}
 
 /** Test or embedding seam for supplying a model resolver directly. */
 export const layerWith = (resolve: Interface["resolve"]) => Layer.succeed(Service, Service.of({ resolve }))
-
 const apiKey = (model: ModelV2.Info, credential?: Credential.Value) => {
   if (credential?.type === "key") return Auth.value(credential.key)
   if (credential?.type === "oauth") return Auth.value(credential.access)
@@ -209,7 +208,7 @@ export const locationLayer = Layer.effect(
           session,
           selected,
           connection ? yield* integrations.connection.resolve(connection) : undefined,
-        )
+        ).pipe(Effect.map((model) => ({ model, capabilities: selected.capabilities })))
       }),
     })
   }),

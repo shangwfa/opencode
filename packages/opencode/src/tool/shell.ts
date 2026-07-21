@@ -262,14 +262,9 @@ const parse = Effect.fn("ShellTool.parse")(function* (command: string, ps: boole
   return tree
 })
 
-const ask = Effect.fn("ShellTool.ask")(function* (
-  ctx: Tool.Context,
-  scan: Scan,
-  input: { command: string; description: string },
-) {
+const ask = Effect.fn("ShellTool.ask")(function* (ctx: Tool.Context, scan: Scan) {
   if (scan.dirs.size > 0) {
-    const directories = Array.from(scan.dirs)
-    const globs = directories.map((dir) => {
+    const globs = Array.from(scan.dirs).map((dir) => {
       if (process.platform === "win32") return FSUtil.normalizePathPattern(path.join(dir, "*"))
       return path.join(dir, "*")
     })
@@ -277,12 +272,7 @@ const ask = Effect.fn("ShellTool.ask")(function* (
       permission: "external_directory",
       patterns: globs,
       always: globs,
-      metadata: {
-        command: input.command,
-        description: input.description,
-        directories,
-        patterns: globs,
-      },
+      metadata: {},
     })
   }
 
@@ -291,10 +281,7 @@ const ask = Effect.fn("ShellTool.ask")(function* (
     permission: ShellID.ToolID,
     patterns: Array.from(scan.patterns),
     always: Array.from(scan.always),
-    metadata: {
-      command: input.command,
-      description: input.description,
-    },
+    metadata: {},
   })
 })
 
@@ -648,7 +635,7 @@ export const ShellTool = Tool.define(
                   )
                   const scan = yield* collect(tree.rootNode, cwd, ps, shell, instanceCtx)
                   if (!containsPath(cwd, instanceCtx)) scan.dirs.add(cwd)
-                  yield* ask(ctx, scan, params as any)
+                  yield* ask(ctx, scan)
                 }),
               )
 

@@ -10,13 +10,36 @@ import {
 import { SessionMessage } from "../message"
 import type { FileAttachment } from "../prompt"
 
-const media = (file: FileAttachment): ContentPart => ({
-  type: "media",
-  mediaType: file.mime,
-  data: file.uri,
-  filename: file.name,
-  metadata: file.description === undefined ? undefined : { description: file.description },
-})
+function mimeToModality(mime: string): string | undefined {
+  if (mime.startsWith("image/")) return "image"
+  if (mime.startsWith("audio/")) return "audio"
+  if (mime.startsWith("video/")) return "video"
+  if (mime === "application/pdf") return "pdf"
+  return undefined
+}
+
+const media = (file: FileAttachment, supportedInputs?: ReadonlySet<string>): ContentPart => {
+  if (file.uri.startsWith("data:")) {
+  const match = file.uri.match(/^data:([^;]+);base64,(.*)$/)
+    if (match && (!match[2] || match[2].length === 0))
+      return { type: "text", text: "ERROR: Image file is empty or corrupted. Please provide a valid image." }
+  }
+  const modality = mimeToModality(file.mime)
+  if (modality && supportedInputs && !supportedInputs.has(modality)) {
+    const name = file.name ? `"${file.name}"` : modality
+    return {
+      type: "text",
+      text: `ERROR: Cannot read ${name} (this model does not support ${modality} input). Inform the user.`,
+    }
+  }
+  return {
+    type: "media",
+    mediaType: file.mime,
+    data: file.uri,
+    filename: file.name,
+    metadata: file.description === undefined ? undefined : { description: file.description },
+  }
+}
 
 const toolInput = (tool: SessionMessage.AssistantTool) => {
   if (tool.state.status !== "pending") return tool.state.input
@@ -112,7 +135,7 @@ const assistant = (message: SessionMessage.Assistant, model: Model) => {
   ]
 }
 
-function toLLMMessage(message: SessionMessage.Message, model: Model): Message[] {
+function toLLMMessage(message: SessionMessage.Message, model: Model, supportedInputs?: ReadonlySet<string>): Message[] {
   switch (message.type) {
     case "agent-switched":
     case "model-switched":
@@ -122,7 +145,7 @@ function toLLMMessage(message: SessionMessage.Message, model: Model): Message[] 
         Message.make({
           id: message.id,
           role: "user",
-          content: [{ type: "text", text: message.text }, ...(message.files ?? []).map(media)],
+          content: [{ type: "text", text: message.text }, ...(message.files ?? []).map((file) => media(file, supportedInputs))],
           metadata: {
             ...message.metadata,
             ...(message.agents?.length ? { agents: message.agents } : {}),
@@ -167,5 +190,8 @@ ${message.recent}
 }
 
 /** Translate projected V2 Session history into canonical @opencode-ai/llm context. */
-export const toLLMMessages = (messages: readonly SessionMessage.Message[], model: Model) =>
-  messages.flatMap((message) => toLLMMessage(message, model))
+export const toLLMMessages = (
+  messages: readonly SessionMessage.Message[],
+  model: Model,
+  supportedInputs?: ReadonlySet<string>,
+) => messages.flatMap((message) => toLLMMessage(message, model, supportedInputs))

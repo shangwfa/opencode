@@ -499,3 +499,72 @@ Recent work
     ])
   })
 })
+
+describe("toLLMMessages — capability filtering", () => {
+  const imageFile = FileAttachment.make({ uri: "data:image/png;base64,aGVsbG8=", mime: "image/png", name: "hello.png" })
+  const emptyImage = FileAttachment.make({ uri: "data:image/png;base64,", mime: "image/png", name: "empty.png" })
+  const pdfFile = FileAttachment.make({ uri: "data:application/pdf;base64,JVBERi0=", mime: "application/pdf", name: "doc.pdf" })
+
+  const userWith = (files: typeof imageFile[]) =>
+    SessionMessage.User.make({
+      id: id("user-filter"),
+      type: "user",
+      text: "check this",
+      files,
+      time: { created },
+    })
+
+  test("replaces image with error text when model lacks image support", () => {
+    const messages = toLLMMessages([userWith([imageFile])], model, new Set(["text"]))
+    const content = messages[0].content as Array<{ type: string; text?: string }>
+    expect(content.some((p) => p.type === "text" && p.text?.includes("does not support image"))).toBe(true)
+    expect(content.some((p) => p.type === "media")).toBe(false)
+  })
+
+  test("keeps image as media when model supports image", () => {
+    const messages = toLLMMessages([userWith([imageFile])], model, new Set(["text", "image"]))
+    const content = messages[0].content as Array<{ type: string }>
+    expect(content.some((p) => p.type === "media")).toBe(true)
+  })
+
+  test("keeps image when supportedInputs is undefined", () => {
+    const messages = toLLMMessages([userWith([imageFile])], model)
+    const content = messages[0].content as Array<{ type: string }>
+    expect(content.some((p) => p.type === "media")).toBe(true)
+  })
+
+  test("replaces empty base64 image with error text", () => {
+    const messages = toLLMMessages([userWith([emptyImage])], model, new Set(["text", "image"]))
+    const content = messages[0].content as Array<{ type: string; text?: string }>
+    expect(content.some((p) => p.type === "text" && p.text?.includes("empty or corrupted"))).toBe(true)
+  })
+
+  test("replaces pdf with error text when model lacks pdf support", () => {
+    const messages = toLLMMessages([userWith([pdfFile])], model, new Set(["text", "image"]))
+    const content = messages[0].content as Array<{ type: string; text?: string }>
+    expect(content.some((p) => p.type === "text" && p.text?.includes("does not support pdf"))).toBe(true)
+  })
+
+  test("filters image but keeps non-image files in mixed batch", () => {
+    const textFile = FileAttachment.make({ uri: "data:text/plain;base64,aGVsbG8=", mime: "text/plain", name: "notes.txt" })
+    const messages = toLLMMessages([userWith([imageFile, textFile])], model, new Set(["text"]))
+    const content = messages[0].content as Array<{ type: string; text?: string }>
+    expect(content.some((p) => p.type === "text" && p.text?.includes("does not support image"))).toBe(true)
+    expect(content.some((p) => p.type === "media")).toBe(true)
+  })
+
+  test("filters audio when model lacks audio support", () => {
+    const audioFile = FileAttachment.make({ uri: "data:audio/wav;base64,UklGRiQ=", mime: "audio/wav", name: "beep.wav" })
+    const messages = toLLMMessages([userWith([audioFile])], model, new Set(["text", "image"]))
+    const content = messages[0].content as Array<{ type: string; text?: string }>
+    expect(content.some((p) => p.type === "text" && p.text?.includes("does not support audio"))).toBe(true)
+    expect(content.some((p) => p.type === "media")).toBe(false)
+  })
+
+  test("skips empty base64 check for non-data-url image", () => {
+    const urlFile = FileAttachment.make({ uri: "https://example.com/image.png", mime: "image/png", name: "remote.png" })
+    const messages = toLLMMessages([userWith([urlFile])], model, new Set(["text", "image"]))
+    const content = messages[0].content as Array<{ type: string }>
+    expect(content.some((p) => p.type === "media")).toBe(true)
+  })
+})

@@ -6,6 +6,7 @@ import { SessionsCursor } from "@opencode-ai/protocol/groups/session"
 import {
   ConflictError,
   InvalidCursorError,
+  InvalidRequestError,
   MessageNotFoundError,
   ServiceUnavailableError,
   SessionNotFoundError,
@@ -164,6 +165,12 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
                       resource: error.messageID,
                     }),
                   ),
+                ),
+                Effect.catchTag("Image.DecodeError", (error) =>
+                  Effect.fail(new InvalidRequestError({ message: error.message, kind: "Body" })),
+                ),
+                Effect.catchTag("Image.SizeError", (error) =>
+                  Effect.fail(new InvalidRequestError({ message: error.message, kind: "Body" })),
                 ),
               ),
           }
