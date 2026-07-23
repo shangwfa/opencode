@@ -1,6 +1,6 @@
 import type { Hooks, Plugin as PluginInstance, PluginInput, PluginModule, ToolDefinition } from "@opencode-ai/plugin"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
-import { Context, Deferred, Effect, Layer, Option } from "effect"
+import { Context, Deferred, Duration, Effect, Layer, Option } from "effect"
 import { SessionPlugin } from "./session-plugin"
 import { Plugin } from "."
 import type { SessionID } from "../session/schema"
@@ -27,10 +27,8 @@ const allowed = new Set([
   "experimental.session.compacting",
   "experimental.text.complete",
   "event",
-  "auth",
-  "tool",
   "tool.definition",
-  "dispose",
+  "permission.ask",
   "experimental.compaction.autocontinue",
 ])
 
@@ -92,27 +90,41 @@ function createSandboxRuntime(
   sessionID: SessionID,
   sandbox: SandboxProvider.Interface,
   store: SessionPlugin.Interface,
+  context: PluginInput | undefined,
 ): Effect.Effect<Runtime> {
   return Effect.gen(function* () {
     let agentUrl: string | null = null
+    let disposed = false
+    let empty = false
+    let revision: string | undefined
+    let startFailed = false
 
-    const ensureAgent = Effect.gen(function* () {
-      if (agentUrl) return
+    const startAgent = Effect.gen(function* () {
+      if (disposed || agentUrl) return
+      startFailed = false
       const rows = yield* store.list(sessionID).pipe(Effect.catch(() => Effect.succeed([] as SessionPlugin.Row[])))
       const enabled = rows.filter((r: SessionPlugin.Row) => r.enabled)
-      if (!enabled.length) return
+      revision = JSON.stringify(enabled.map((row) => [row.name, row.source, row.spec, row.code, row.time_updated]))
+      empty = enabled.length === 0
+      if (empty) return
 
       const pluginsJson = JSON.stringify(
         enabled.map((r: SessionPlugin.Row) => ({ name: r.name, source: r.source, spec: r.spec, code: r.code })),
       )
-      const escaped = pluginsJson.replace(/'/g, "'\\''")
+      const encoded = Buffer.from(pluginsJson).toString("base64")
+      const pluginContext = Buffer.from(JSON.stringify({
+        project: context?.project,
+        directory: "/workspace",
+        worktree: "/workspace",
+        serverUrl: context?.serverUrl.toString(),
+      })).toString("base64")
 
       yield* sandbox
         .runInSession(
           sessionID,
-          `pkill -f "bun.*sandbox-plugin-agent" 2>/dev/null; sleep 0.5; ` +
-            `SESSION_ID='${sessionID}' PLUGINS_JSON='${escaped}' ` +
-            `nohup bun /opt/sandbox-plugin-agent.ts > /tmp/plugin-agent.log 2>&1 &`,
+            `pkill -f "bun.*sandbox-plugin-agent" 2>/dev/null; sleep 0.5; ` +
+            `SESSION_ID='${sessionID}' PLUGINS_BASE64='${encoded}' PLUGIN_CONTEXT_BASE64='${pluginContext}' ` +
+            `setsid bun /opt/sandbox-plugin-agent.ts > /tmp/plugin-agent.log 2>&1 &`,
         )
         .pipe(Effect.catch(() => Effect.void))
 
@@ -122,10 +134,11 @@ function createSandboxRuntime(
         )
         if (url) {
           const healthy = yield* Effect.tryPromise({
-            try: () => fetch(`${url}/health`).then((r) => r.ok),
+            try: () => fetch(`${url}/health`, { signal: AbortSignal.timeout(5000) }).then((r) => r.ok),
             catch: () => false,
           })
           if (healthy) {
+              if (disposed) return
               agentUrl = url
               yield* Effect.logInfo("sandbox plugin-agent started", { sessionID, url })
               return
@@ -133,51 +146,198 @@ function createSandboxRuntime(
         }
         yield* Effect.sleep("1 second")
       }
+      startFailed = true
       yield* Effect.logWarning("sandbox plugin-agent failed to start", { sessionID })
     })
 
+    const [ensureAgent, invalidateAgent] = yield* Effect.cachedInvalidateWithTTL(startAgent, Duration.infinity)
+    const [refresh] = yield* Effect.cachedInvalidateWithTTL(
+      Effect.gen(function* () {
+        if (disposed || revision === undefined) return
+        const rows = yield* store.list(sessionID).pipe(Effect.catch(() => Effect.succeed([] as SessionPlugin.Row[])))
+        const enabled = rows.filter((row) => row.enabled)
+        const next = JSON.stringify(enabled.map((row) => [row.name, row.source, row.spec, row.code, row.time_updated]))
+        if (next === revision) return
+        const url = agentUrl
+        agentUrl = null
+        revision = undefined
+        empty = false
+        startFailed = false
+        yield* invalidateAgent
+        if (url) {
+          yield* Effect.tryPromise({
+            try: () => fetch(`${url}/shutdown`, {
+              method: "POST",
+              signal: AbortSignal.timeout(1000),
+            }),
+            catch: () => undefined,
+          }).pipe(Effect.ignore)
+        }
+      }),
+      Duration.seconds(1),
+    )
+
+    const send = <Output>(name: string, input: unknown, output: Output): Effect.Effect<
+      | { readonly ok: true; readonly value: Output }
+      | { readonly ok: false; readonly url: string | null; readonly error?: string }
+    > => Effect.gen(function* () {
+      yield* refresh
+      yield* ensureAgent.pipe(Effect.catch(() => Effect.void))
+      const url = agentUrl
+      if (!url || disposed) return { ok: false as const, url }
+      const result = yield* Effect.tryPromise({
+        try: async () => {
+          const response = await fetch(`${url}/hook/${name}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ input, output }),
+            signal: AbortSignal.timeout(HOOK_TIMEOUT_MS + 1000),
+          })
+          const body = await response.json().catch(() => undefined) as { result?: Output; error?: string } | undefined
+          if (!response.ok) {
+            if (response.headers.get("x-opencode-plugin-error") === "true") {
+              return { error: body?.error ?? `hook ${name} failed with status ${response.status}` }
+            }
+            return
+          }
+          return body
+        },
+        catch: () => undefined,
+      }).pipe(Effect.catch(() => Effect.succeed(undefined)))
+      if (!result) return { ok: false as const, url }
+      if (result.error) return { ok: false as const, url, error: result.error }
+      return { ok: true as const, value: result.result ?? output }
+    })
+
+    const request = <Output>(name: string, input: unknown, output: Output, retry: boolean): Effect.Effect<Output> =>
+      Effect.gen(function* () {
+        const first = yield* send(name, input, output)
+        if (first.ok) return first.value
+        if (first.error) return yield* Effect.die(new Error(first.error))
+        if (!retry || disposed || empty) return output
+        if (!first.url && startFailed) {
+          startFailed = false
+          yield* invalidateAgent
+          return output
+        }
+        if (agentUrl === first.url) {
+          agentUrl = null
+          yield* invalidateAgent
+        }
+        const second = yield* send(name, input, output)
+        if (!second.ok && second.error) return yield* Effect.die(new Error(second.error))
+        if (!second.ok && startFailed) {
+          startFailed = false
+          yield* invalidateAgent
+        }
+        return second.ok ? second.value : output
+      })
+
     const runtime: Runtime = {
-      trigger: <Output>(name: string, input: unknown, output: Output) =>
+      trigger: (name, input, output) => request(name, input, output, true),
+      event: (input: unknown, retry = true) => {
+        if (!retry && !agentUrl) return Effect.void
+        return request("event", input, null, retry).pipe(Effect.asVoid)
+      },
+      auth: () => Effect.succeed({} as Record<string, unknown>),
+      tools: () =>
         Effect.gen(function* () {
+          yield* refresh
           if (!agentUrl) {
             yield* ensureAgent.pipe(Effect.catch(() => Effect.void))
-            if (!agentUrl) return output
+            if (!agentUrl) return {} as Record<string, ToolDefinition>
           }
-          return yield* Effect.tryPromise({
-            try: () =>
-              fetch(`${agentUrl}/hook/${name}`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ input, output }),
-                signal: AbortSignal.timeout(HOOK_TIMEOUT_MS),
-              }).then((r) => (r.ok ? r.json() : null)),
-            catch: () => null,
-          }).pipe(
-            Effect.map((result: { result: unknown } | null) =>
-              result && result.result !== undefined && result.result !== null ? (result.result as Output) : output,
-            ),
-            Effect.catch(() => Effect.succeed(output)),
-          )
+          const fetchTools = Effect.gen(function* () {
+            const url = agentUrl
+            if (!url) return
+            const toolsMap = yield* Effect.tryPromise({
+              try: async () => {
+                const response = await fetch(`${url}/tools`, { signal: AbortSignal.timeout(10000) })
+                if (!response.ok) return
+                return (await response.json()) as Record<
+                  string,
+                  { description: string; jsonSchema: Record<string, unknown> }
+                >
+              },
+              catch: () => undefined,
+            }).pipe(Effect.catch(() => Effect.succeed(undefined)))
+            if (toolsMap) return { url, toolsMap }
+          })
+          const first = yield* fetchTools
+          const loaded = first ?? (yield* Effect.gen(function* () {
+            agentUrl = null
+            yield* invalidateAgent
+            yield* ensureAgent.pipe(Effect.catch(() => Effect.void))
+            return yield* fetchTools
+          }))
+          const result = {} as Record<string, ToolDefinition>
+          if (loaded) {
+            for (const [name, schema] of Object.entries(loaded.toolsMap)) {
+              result[name] = {
+                description: schema.description,
+                args: {},
+                jsonSchema: schema.jsonSchema,
+                execute: async (args: Record<string, unknown>, context: {
+                  sessionID: string
+                  messageID: string
+                  agent: string
+                  directory: string
+                  worktree: string
+                }) => {
+                  await Effect.runPromise(refresh)
+                  if (!agentUrl) await Effect.runPromise(ensureAgent.pipe(Effect.catch(() => Effect.void)))
+                  const current = agentUrl
+                  if (!current) throw new Error(`tool ${name} agent is unavailable`)
+                  const healthy = await fetch(`${current}/health`, { signal: AbortSignal.timeout(1000) })
+                    .then((response) => response.ok)
+                    .catch(() => false)
+                  if (!healthy) {
+                    if (agentUrl === current) agentUrl = null
+                    await Effect.runPromise(invalidateAgent)
+                    await Effect.runPromise(ensureAgent.pipe(Effect.catch(() => Effect.void)))
+                  }
+                  if (!agentUrl) throw new Error(`tool ${name} agent is unavailable`)
+                  const resp = await fetch(`${agentUrl}/tool/${encodeURIComponent(name)}`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      args,
+                      context: {
+                        sessionID: context.sessionID,
+                        messageID: context.messageID,
+                        agent: context.agent,
+                        directory: context.directory,
+                        worktree: context.worktree,
+                      },
+                    }),
+                    signal: AbortSignal.timeout(30000),
+                  })
+                  const data = await resp.json().catch(() => undefined) as
+                    | { result?: string | { output: string }; error?: string }
+                    | undefined
+                  if (!resp.ok) throw new Error(data?.error ?? `tool ${name} failed with status ${resp.status}`)
+                  return data?.result ?? `tool ${name} returned no result`
+                },
+              } as unknown as ToolDefinition
+            }
+          }
+          return result
         }),
-      event: (input: unknown) =>
-        Effect.gen(function* () {
-          if (!agentUrl) return
-          yield* Effect.tryPromise({
-            try: () =>
-              fetch(`${agentUrl}/hook/event`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ input, output: null }),
-                signal: AbortSignal.timeout(3000),
-              }),
-            catch: () => undefined,
-          }).pipe(Effect.catch(() => Effect.void))
-        }),
-      auth: () => Effect.succeed({} as Record<string, unknown>),
-      tools: () => Effect.succeed({} as Record<string, ToolDefinition>),
-      dispose: () =>
-        Effect.sync(() => {
+      dispose: () => Effect.gen(function* () {
+          if (disposed) return
+          disposed = true
+          const url = agentUrl
           agentUrl = null
+          yield* invalidateAgent
+          if (url) {
+            yield* Effect.tryPromise({
+            try: () => fetch(`${url}/shutdown`, {
+              method: "POST",
+              signal: AbortSignal.timeout(1000),
+            }),
+              catch: () => undefined,
+            }).pipe(Effect.ignore)
+          }
         }),
     }
     return runtime
@@ -186,7 +346,7 @@ function createSandboxRuntime(
 
 export interface Runtime {
   readonly trigger: <Output>(name: string, input: unknown, output: Output) => Effect.Effect<Output>
-  readonly event: (input: unknown) => Effect.Effect<void>
+  readonly event: (input: unknown, retry?: boolean) => Effect.Effect<void>
   readonly auth: (input: { providerID: string; provider: unknown; auth: unknown }) => Effect.Effect<Record<string, unknown>>
   readonly tools: () => Effect.Effect<Record<string, ToolDefinition>>
   readonly dispose: () => Effect.Effect<void>
@@ -223,9 +383,10 @@ const layer = Layer.effect(
       const sessionID = eventSessionID({ event: { properties: event.data } })
       const runtime = sessionID ? runtimes.get(sessionID) : undefined
       if (!runtime) return Effect.void
-      return runtime.event({
-        event: { id: event.id, type: event.type, properties: event.data },
-      })
+      return runtime.event(
+        { event: { id: event.id, type: event.type, properties: event.data } },
+        event.type !== "session.deleted",
+      )
     })
     yield* Effect.addFinalizer(() => unsubscribe)
 
@@ -263,10 +424,7 @@ const layer = Layer.effect(
           for (const item of loaded) {
             const handler = (item.hooks as Record<string, unknown>)[name]
             if (typeof handler !== "function") continue
-            yield* Effect.tryPromise({
-              try: () => Promise.resolve((handler as Hook)(input, output)),
-              catch: (error) => String(error),
-            }).pipe(Effect.ignore)
+            yield* Effect.promise(() => Promise.resolve((handler as Hook)(input, output)))
           }
           return output
         }),
@@ -320,7 +478,8 @@ const layer = Layer.effect(
       if (current) return current
       const inFlight = pending.get(key)
       if (inFlight) return yield* Deferred.await(inFlight).pipe(Effect.orDie)
-      if (!plugin.context) {
+      // V2 sandbox mode doesn't depend on global plugin context — plugins run in the sandbox.
+      if (!maybeSandbox && !plugin.context) {
         const runtime: Runtime = {
           trigger: (_name, _input, output) => Effect.succeed(output),
           event: () => Effect.void,
@@ -335,9 +494,10 @@ const layer = Layer.effect(
       pending.set(key, deferred)
 
       // V2: sandbox execution mode — if SandboxProvider available, plugins run in sandbox
+      const context = plugin.context ? yield* plugin.context() : undefined
       const runtime = yield* (maybeSandbox
-        ? createSandboxRuntime(sessionID, maybeSandbox, store)
-        : load(sessionID, yield* plugin.context())
+        ? createSandboxRuntime(sessionID, maybeSandbox, store, context)
+        : load(sessionID, context!)
       ).pipe(
         Effect.tap((value) => Deferred.succeed(deferred, value).pipe(Effect.ignore)),
         Effect.tapError((error) => Deferred.fail(deferred, new Error(String(error))).pipe(Effect.ignore)),
@@ -365,6 +525,12 @@ const layer = Layer.effect(
     const invalidate: Interface["invalidate"] = Effect.fn("SessionPluginRuntime.invalidate")(function* (sessionID: SessionID) {
       yield* dispose(sessionID)
     })
+
+    yield* Effect.addFinalizer(() =>
+      Effect.forEach(runtimes.values(), (runtime) => runtime.dispose(), { discard: true }).pipe(
+        Effect.ensuring(Effect.sync(() => runtimes.clear())),
+      ),
+    )
 
     return Service.of({ acquire, invalidate, dispose })
   }),
