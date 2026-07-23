@@ -238,9 +238,9 @@ export const layerWith = (options?: LayerOptions) =>
                 Effect.gen(function* () {
                   const committed = yield* db
                     .transaction(
-                      () =>
+                      (tx) =>
                         Effect.gen(function* () {
-                          const row = yield* db
+                          const row = yield* tx
                             .select({ seq: EventSequenceTable.seq, ownerID: EventSequenceTable.owner_id })
                             .from(EventSequenceTable)
                             .where(eq(EventSequenceTable.aggregate_id, aggregateID))
@@ -260,7 +260,7 @@ export const layerWith = (options?: LayerOptions) =>
                             )
                           }
                           if (input && input.seq <= latest) {
-                            const stored = yield* db
+                            const stored = yield* tx
                               .select()
                               .from(EventTable)
                               .where(and(eq(EventTable.aggregate_id, aggregateID), eq(EventTable.seq, input.seq)))
@@ -272,7 +272,7 @@ export const layerWith = (options?: LayerOptions) =>
                               isDeepStrictEqual(stored.data, encoded)
                             ) {
                               if (input.ownerID && row?.ownerID == null) {
-                                yield* db
+                                yield* tx
                                   .update(EventSequenceTable)
                                   .set({ owner_id: input.ownerID })
                                   .where(eq(EventSequenceTable.aggregate_id, aggregateID))
@@ -300,7 +300,7 @@ export const layerWith = (options?: LayerOptions) =>
                               }),
                             )
                           }
-                          const stored = yield* db
+                          const stored = yield* tx
                             .select({ aggregateID: EventTable.aggregate_id, seq: EventTable.seq })
                             .from(EventTable)
                             .where(eq(EventTable.id, event.id))
@@ -321,7 +321,7 @@ export const layerWith = (options?: LayerOptions) =>
                             yield* projector(committed)
                           }
                           if (commit) yield* commit(seq)
-                          yield* db
+                          yield* tx
                             .insert(EventSequenceTable)
                             .values([{ aggregate_id: aggregateID, seq, owner_id: input?.ownerID }])
                             .onConflictDoUpdate({
@@ -333,7 +333,7 @@ export const layerWith = (options?: LayerOptions) =>
                             })
                             .run()
                             .pipe(Effect.orDie)
-                          yield* db
+                          yield* tx
                             .insert(EventTable)
                             .values([
                               {

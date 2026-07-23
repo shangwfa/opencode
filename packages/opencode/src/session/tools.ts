@@ -125,15 +125,19 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
       execute(args, options) {
         return run.promise(
           Effect.gen(function* () {
-            const ctx = context(args, options)
-            yield* plugin.trigger(
+            const before = yield* plugin.trigger(
               "tool.execute.before",
-              { tool: item.id, sessionID: ctx.sessionID, callID: ctx.callID },
+              { tool: item.id, sessionID: input.session.id, callID: options.toolCallId },
               { args },
             )
-            yield* sessionPluginRuntime.trigger("tool.execute.before", { tool: item.id, sessionID: ctx.sessionID, callID: ctx.callID }, { args })
-            const result = yield* item.execute(args, ctx)
-            const output = {
+            const transformed = yield* sessionPluginRuntime.trigger(
+              "tool.execute.before",
+              { tool: item.id, sessionID: input.session.id, callID: options.toolCallId },
+              before,
+            )
+            const ctx = context(transformed.args, options)
+            const result = yield* item.execute(transformed.args, ctx)
+            let output = {
               ...result,
               attachments: result.attachments?.map((attachment) => ({
                 ...attachment,
@@ -142,12 +146,16 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
                 messageID: input.processor.message.id,
               })),
             }
-            yield* plugin.trigger(
+            output = yield* plugin.trigger(
               "tool.execute.after",
-              { tool: item.id, sessionID: ctx.sessionID, callID: ctx.callID, args },
+              { tool: item.id, sessionID: ctx.sessionID, callID: ctx.callID, args: transformed.args },
               output,
             )
-            yield* sessionPluginRuntime.trigger("tool.execute.after", { tool: item.id, sessionID: ctx.sessionID, callID: ctx.callID, args }, output)
+            output = yield* sessionPluginRuntime.trigger(
+              "tool.execute.after",
+              { tool: item.id, sessionID: ctx.sessionID, callID: ctx.callID, args: transformed.args },
+              output,
+            )
             if (options.abortSignal?.aborted) {
               yield* input.processor.completeToolCall(options.toolCallId, output)
             }

@@ -1,5 +1,6 @@
 # syntax=docker/dockerfile:1
-FROM registry.shadow-rpa.net/infra/opensandbox:2026-06-09
+ARG OPENSANDBOX_BASE=opensandbox/code-interpreter:latest
+FROM ${OPENSANDBOX_BASE}
 
 USER root
 
@@ -54,7 +55,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 # agent-browser requires Chrome; Playwright bundles a real Chromium binary
 # that works in containers (unlike Ubuntu snap chromium).
 RUN npx playwright install --with-deps chromium \
-  && ln -sf /root/.cache/ms-playwright/chromium-*/chrome-linux/chrome /usr/local/bin/chromium
+  && ln -sf /root/.cache/ms-playwright/chromium-*/chrome-linux*/chrome /usr/local/bin/chromium
 ENV CHROME_PATH=/usr/local/bin/chromium
 
 # ── 8b. Install codegraph (self-contained Node bundle, no extra runtime) ──
@@ -70,7 +71,7 @@ RUN curl -fsSL https://raw.githubusercontent.com/colbymchenry/codegraph/main/ins
 # ── 8c. Install context-mode (context window optimization for AI agents) ──
 # Registered as session plugin with source: "code" wrapper (sets CONTEXT_MODE_PLATFORM=opencode).
 # --allow-scripts: required for better-sqlite3 prebuild-install (FTS5 native module).
-RUN npm install -g context-mode --allow-scripts
+RUN npm install -g context-mode zod --allow-scripts
 
 # ── 9. Symlink mise-managed binaries to OpenSandbox's expected PATH ──
 # OpenSandbox bootstrap may reset PATH; ensure node/pnpm/npm are always findable.
@@ -110,3 +111,4 @@ RUN npm install -g typescript pyright \
 
 # ── 13. Pre-install sandbox-plugin-agent (session plugin daemon for V2 sandbox execution) ──
 COPY docker/opt/sandbox-plugin-agent.ts /opt/sandbox-plugin-agent.ts
+COPY docker/opt/sandbox-plugin-npm.ts /opt/sandbox-plugin-npm.ts

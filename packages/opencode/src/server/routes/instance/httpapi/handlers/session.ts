@@ -300,7 +300,11 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
     }) {
       yield* requireSession(ctx.params.sessionID)
       const directory = ctx.query.directory ?? (yield* InstanceState.directory)
-      return yield* sessionLoadDotOpencodeSvc.load(ctx.params.sessionID, directory)
+      const result = yield* sessionLoadDotOpencodeSvc.load(ctx.params.sessionID, directory)
+      if (result.loaded.some((item) => item.startsWith("plugins/"))) {
+        yield* pluginRuntime.invalidate(ctx.params.sessionID)
+      }
+      return result
     })
 
     // share/unshare errors aren't all client-induced — storage and network

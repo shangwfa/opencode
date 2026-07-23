@@ -6,6 +6,7 @@ import { Deferred, Effect, Layer, Context } from "effect"
 import os from "os"
 import { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import { EventV2Bridge } from "@/event-v2-bridge"
+import { SessionPluginRuntime } from "@/plugin/session-plugin-runtime"
 
 export const Event = PermissionV1.Event
 
@@ -43,6 +44,7 @@ const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
     const events = yield* EventV2Bridge.Service
+    const sessionPlugins = yield* SessionPluginRuntime.Service
     const state = yield* InstanceState.make<State>(
       Effect.fn("Permission.state")(function* (ctx) {
         void ctx
@@ -82,6 +84,16 @@ const layer = Layer.effect(
       }
 
       if (!needsAsk) return
+
+      const decision = yield* (yield* sessionPlugins.acquire(request.sessionID)).trigger("permission.ask", request, {
+        status: "ask",
+      } as { status: "ask" | "deny" | "allow" })
+      if (decision.status === "allow") return
+      if (decision.status === "deny") {
+        return yield* new PermissionV1.DeniedError({
+          ruleset: ruleset.filter((rule) => Wildcard.match(request.permission, rule.permission)),
+        })
+      }
 
       const id = request.id ?? PermissionV1.ID.ascending()
       const info: PermissionV1.Request = {
@@ -213,6 +225,10 @@ export function disabled(tools: string[], ruleset: PermissionV1.Ruleset): Set<st
   )
 }
 
-export const node = LayerNode.make({ service: Service, layer: layer, deps: [EventV2Bridge.node] })
+export const node = LayerNode.make({
+  service: Service,
+  layer: layer,
+  deps: [EventV2Bridge.node, SessionPluginRuntime.node],
+})
 
 export * as Permission from "."

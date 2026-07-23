@@ -247,6 +247,8 @@ async function runCommandEarlyExit(
 
 export namespace SandboxProvider {
   const log = Log.create({ service: "sandbox-provider" })
+  const CREATE_READY_TIMEOUT_SECONDS = 300
+  const CREATE_TIMEOUT_SECONDS = 360
 
   export interface Interface {
     readonly getOrCreate: (
@@ -350,6 +352,7 @@ export namespace SandboxProvider {
                 image: config.image,
                 timeoutSeconds,
                 resource,
+                readyTimeoutSeconds: CREATE_READY_TIMEOUT_SECONDS,
                 ...(volumes.length > 0 ? { volumes } : {}),
               }),
             catch: (e) => new Error(`Sandbox.create failed: ${e instanceof Error ? e.message : String(e)}`),
@@ -363,8 +366,8 @@ export namespace SandboxProvider {
           return sb
         }).pipe(
           Effect.timeoutOrElse({
-            duration: Duration.seconds(60),
-            orElse: () => Effect.fail(new Error(`Sandbox create timed out after 60s: ${sessionID}`)),
+            duration: Duration.seconds(CREATE_TIMEOUT_SECONDS),
+            orElse: () => Effect.fail(new Error(`Sandbox create timed out after ${CREATE_TIMEOUT_SECONDS}s: ${sessionID}`)),
           }),
           Effect.orDie,
           Effect.withSpan("SandboxProvider.createSandbox"),
@@ -878,6 +881,7 @@ export namespace SandboxProvider {
                 image: config.image,
                 timeoutSeconds,
                 resource,
+                readyTimeoutSeconds: CREATE_READY_TIMEOUT_SECONDS,
                 ...(volumes.length > 0 ? { volumes } : {}),
               }),
             catch: (e) => new Error(`Sandbox.create failed: ${e instanceof Error ? e.message : String(e)}`),
@@ -910,8 +914,8 @@ export namespace SandboxProvider {
           return sb
         }).pipe(
           Effect.timeoutOrElse({
-            duration: Duration.seconds(60),
-            orElse: () => Effect.fail(new Error(`Sandbox create timed out after 60s: ${sessionID}`)),
+            duration: Duration.seconds(CREATE_TIMEOUT_SECONDS),
+            orElse: () => Effect.fail(new Error(`Sandbox create timed out after ${CREATE_TIMEOUT_SECONDS}s: ${sessionID}`)),
           }),
           Effect.orDie,
           Effect.withSpan("SandboxProvider.createSandbox"),

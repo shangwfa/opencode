@@ -93,7 +93,8 @@ curl -s -X POST "$BASE/session/$SID/prompt_async" \
 # 立即中断
 sleep 1 && curl -s -X POST "$BASE/session/$SID/abort"
 ```
-**期望**：abort 返回 `true`，最后一条消息 `finish=abort` 或类似
+**期望**：abort 返回 `true`，session 不再是 `busy`。如果中断前 assistant message 已落库，最后一条消息应为 `finish=abort`、`finish=error` 或类似终止状态；如果在首个 assistant message 落库前中断，历史中可以没有 assistant message。
+
+**2026-07-22 实测**：等待 session 进入 `busy` 后调用 abort，返回 `true`，随后 session 从 busy status 列表移除；本次中断发生在首个 assistant message 落库前，因此没有 `finish` 字段，符合上述早期中断语义。
 
 ---
-

@@ -98,6 +98,7 @@ cd /Users/ruomu/code/opencode/packages/opencode
 # Apple Silicon（M 系列）用 arm64；Intel Mac 改为 linux/amd64
 docker buildx build --platform linux/arm64 \
   -t opencode-opensandbox:local \
+  -f docker/Dockerfile \
   --load .
 
 # 验证镜像继承了 code-interpreter 入口，且 rg/node 可用。

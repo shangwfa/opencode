@@ -369,9 +369,16 @@ export const ShellTool = Tool.define(
         metadata: { output: "", description: input.description },
       })
 
+      const environment = yield* shellEnv(ctx, input.cwd)
+      const prefix = Object.entries(environment)
+        .filter((entry): entry is [string, string] => /^[A-Za-z_][A-Za-z0-9_]*$/.test(entry[0]) && entry[1] !== undefined)
+        .map(([key, value]) => `${key}='${value.replaceAll("'", "'\\''")}'`)
+        .join(" ")
+      const nested = `sh -c '${input.command.replace(/'/g, "'\\''")}'`
+      const command = prefix ? `env ${prefix} ${nested}` : input.command
       const fullCommand = input.background
-        ? `cd ${input.cwd} && ( nohup sh -c '${input.command.replace(/'/g, "'\\''")}' </dev/null > /tmp/opencode-bg-${ctx.callID ?? Date.now()}.log 2>&1 & ) && echo "started background"`
-        : `cd ${input.cwd} && ${input.command}`
+        ? `cd ${input.cwd} && ( nohup ${prefix ? command : nested} </dev/null > /tmp/opencode-bg-${ctx.callID ?? Date.now()}.log 2>&1 & ) && echo "started background"`
+        : `cd ${input.cwd} && ${command}`
 
       const result = input.background
         ? yield* sandboxProvider.runDetached(
@@ -520,7 +527,6 @@ export const ShellTool = Tool.define(
           )
         : { env: {} }
       return {
-        ...process.env,
         ...extra.env,
         ...sessionExtra.env,
       }

@@ -57,7 +57,7 @@ const mergeOptions = (target: Record<string, any>, source: Record<string, any> |
 
 export const prepare = Effect.fn("LLMRequestPrep.prepare")(function* (input: PrepareInput) {
   const isOpenaiOauth = input.provider.id === "openai" && input.auth?.type === "oauth"
-  const system = [
+  let system = [
     [
       ...(input.agent.prompt ? [input.agent.prompt] : SystemPrompt.provider(input.model)),
       ...input.system,
@@ -74,11 +74,11 @@ export const prepare = Effect.fn("LLMRequestPrep.prepare")(function* (input: Pre
     { system },
   )
   if (input.sessionPluginRuntime) {
-    yield* input.sessionPluginRuntime.trigger(
+    system = (yield* input.sessionPluginRuntime.trigger(
       "experimental.chat.system.transform",
       { sessionID: input.sessionID, model: input.model },
       { system },
-    )
+    )).system
   }
   if (system.length > 2 && system[0] === header) {
     const rest = system.slice(1)
@@ -130,7 +130,7 @@ export const prepare = Effect.fn("LLMRequestPrep.prepare")(function* (input: Pre
           ...input.messages,
         ]
 
-  const params = yield* input.plugin.trigger(
+  let params = yield* input.plugin.trigger(
     "chat.params",
     {
       sessionID: input.sessionID,
@@ -150,7 +150,7 @@ export const prepare = Effect.fn("LLMRequestPrep.prepare")(function* (input: Pre
     },
   )
   if (input.sessionPluginRuntime) {
-    yield* input.sessionPluginRuntime.trigger("chat.params", {
+    params = yield* input.sessionPluginRuntime.trigger("chat.params", {
       sessionID: input.sessionID,
       agent: input.agent.name,
       model: input.model,
@@ -159,7 +159,7 @@ export const prepare = Effect.fn("LLMRequestPrep.prepare")(function* (input: Pre
     }, params)
   }
 
-  const { headers } = yield* input.plugin.trigger(
+  let { headers } = yield* input.plugin.trigger(
     "chat.headers",
     {
       sessionID: input.sessionID,
@@ -173,13 +173,13 @@ export const prepare = Effect.fn("LLMRequestPrep.prepare")(function* (input: Pre
     },
   )
   if (input.sessionPluginRuntime) {
-    yield* input.sessionPluginRuntime.trigger("chat.headers", {
+    headers = (yield* input.sessionPluginRuntime.trigger("chat.headers", {
       sessionID: input.sessionID,
       agent: input.agent.name,
       model: input.model,
       provider: input.provider,
       message: input.user,
-    }, { headers })
+    }, { headers })).headers
   }
 
   const tools = resolveTools(input)

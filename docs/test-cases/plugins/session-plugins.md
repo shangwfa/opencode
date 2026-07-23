@@ -46,11 +46,11 @@ echo "$SID"
 | `command.execute.before` | `session/prompt.ts` | `/command` 执行命令 |
 | `experimental.text.complete` | `session/processor.ts` | assistant 文本流结束时 |
 
-**Session Plugin 已接入**（allowlist `session-plugin-runtime.ts:16-34` 共 17 个 hook，均有 `sessionPluginRuntime.trigger` 调用点）：上表全部 9 个 hook + `shell.env`（`tool/shell.ts:530`）+ `experimental.session.compacting`（`session/compaction.ts:351`）+ `experimental.compaction.autocontinue`（`session/compaction.ts:475`）+ `tool`（`session-plugin-runtime.ts:195` → `tool/registry.ts:398` 注入 LLM 工具列表）+ `tool.definition`（`tool/registry.ts:438`）+ `dispose`（`session-plugin-runtime.ts:198`）+ `event`/`auth`。
+**Session Plugin 已接入**：Runtime allowlist 当前有 15 个字符串 hook：上表 9 个，加上 `shell.env`、`experimental.session.compacting`、`experimental.compaction.autocontinue`、`tool.definition`、`permission.ask`、`event`。V2 Agent 另外专门处理 `tool` 动态工具和 `dispose` 生命周期，它们不经过普通 trigger allowlist。
 
-**不允许**（不在 allowlist，session runtime 过滤）：`config`、`provider`、`permission.ask`、`experimental.provider.small_model`。
+**不允许**：`config`、`provider`、`auth`、`experimental.provider.small_model`。V1 进程内 Runtime 虽保留 `auth/tool/dispose` 处理代码，但这些字段会被 `filterHooks` 过滤；V2 支持 `tool/dispose`，不支持 `auth`。
 
-**Session Plugin 已补齐的实例级能力**：`event` 按 event 中的 sessionID 路由到对应 Runtime；`auth.loader` 在匹配 provider 的 Session LLM request 中合并返回 options；`tool.definition` 与 `tool` 能向 LLM 工具列表注入 session plugin 定义的工具。
+**Session Plugin 已补齐的实例级能力**：`event` 按 event 中的 sessionID 路由；`tool.definition` 可修改工具描述；V2 `tool` 可向 LLM 工具列表注入动态工具；`permission.ask` 可以返回 allow/deny。`auth.loader` 当前不是 V2 能力。
 
 > ⚠️ **与代码核对**（2026-07-18）：早期版本曾把 `shell.env`/`compacting`/`autocontinue`/`tool`/`tool.definition`/`dispose` 列为"未接入/不允许"，当前代码均已接入（见上）。T35.32/T35.33/T35.47 等用例的"未接入"断言已过时，需改为正向断言。
 
@@ -443,7 +443,7 @@ curl -s --noproxy '*' --max-time 30 -X POST "$BASE/session/$SID/message" \
   -w '\nHTTP %{http_code}\n'
 ```
 
-**期望**：异常 plugin 不阻断后续 plugin 和主流程，请求正常完成。
+**当前期望**：普通 hook 异常用于 veto，会停止后续 Plugin 和模型调用。`/message` 仍返回 HTTP 200，但 assistant `info.error` 包含 Plugin 错误。只有 Plugin 加载失败、`event` 和 `dispose` 等明确的 fail-soft 路径会隔离异常。
 
 ### T35.25 多 Plugin 稳定执行顺序
 
@@ -556,20 +556,21 @@ print("PASS: all code redacted")
 | `tool.execute.after` | 已接入 | 验证返回 title/output/metadata 被消息流消费 |
 | `command.execute.before` | 已接入 | 验证 parts 改变实际 command prompt |
 | `chat.message` | 已接入 | 验证修改后的 parts 被会话历史和 LLM 消费 |
-| `shell.env` | 未接入 | 当前版本必须明确“不应触发”，接入后再改为正向用例 |
-| `experimental.session.compacting` | 仅实例 plugin 路径 | 验证 session plugin 不会误触发，或补齐 session runtime 调用 |
+| `shell.env` | 已接入 AI ShellTool | 验证注入变量进入沙箱命令；不代表用户 PTY 路径 |
+| `experimental.session.compacting` | 已接入 | 验证 context/prompt 修改进入真实摘要流程 |
 | `experimental.text.complete` | 已接入 | 验证最终 assistant 文本被 hook 替换并持久化 |
-| `experimental.compaction.autocontinue` | 仅实例 plugin 路径且不在 session allowlist | 验证 session plugin 不会误触发，或补齐 session runtime 调用 |
+| `experimental.compaction.autocontinue` | 已接入 | 验证 continue 决策被 compaction 流程消费 |
 | `event` | Session Plugin 已接入 | 验证按 event 中的 sessionID 路由，其他 session 不收到 |
-| `auth` | Session Plugin 已接入 | 验证匹配 provider 时 loader options 被当前 LLM request 消费 |
+| `permission.ask` | 已接入 | 验证 allow/deny 决策被权限流程消费 |
+| `auth` | V2 未接入 | Agent 不加载 auth；不得宣称 provider options 生效 |
 
-`Hooks` 中的 `tool`、`auth`、`provider`、`dispose` 不是字符串 hook；它们也必须作为“不支持的 Session Plugin 能力”单独验证，而不能只用 `tool.definition` 或 `config` 代表。
+`Hooks` 中的 `tool`、`auth`、`provider`、`dispose` 不是普通字符串 hook。当前 V2 Agent 专门支持 `tool` 和 `dispose`，过滤 `auth/provider`；V1 的能力矩阵不同，必须分模式测试。
 
 ### T35.33 禁止 hook 的完整过滤
 
-同一个 plugin 同时返回 `config`、`provider`、`dispose`、`permission.ask`、`tool`、`tool.definition`、`experimental.provider.small_model`、`experimental.compaction.autocontinue`，并返回一个允许的 marker hook。
+同一个 plugin 同时返回 `config`、`provider`、`auth`、`experimental.provider.small_model`，并返回 `dispose`、`permission.ask`、`tool`、`tool.definition`、`experimental.compaction.autocontinue` 等允许能力。
 
-**期望**：所有禁止 hook 都不执行，允许的 marker 正常执行；不能只验证 `config` 一个名称。
+**期望**：禁止字段不执行；V2 允许的 `dispose`、`permission.ask`、`tool`、`tool.definition`、autocontinue 正常执行。不能继续按旧矩阵把这些能力判为禁止。
 
 ### T35.34 Runtime 缓存与工厂调用次数
 
@@ -611,7 +612,7 @@ print("PASS: all code redacted")
 
 在每个已接入 hook 中检查 input/output 的字段、可变性和异步行为；覆盖同步返回、resolved Promise、rejected Promise、修改后再抛错。
 
-**期望**：类型契约与运行时行为一致；rejected hook 被隔离；修改在抛错前发生时是否保留必须明确并固定测试结果。
+**期望**：类型契约与运行时行为一致；普通 rejected hook 形成 veto，assistant 记录 `info.error`；修改后再抛错时主流程不消费部分结果。加载/event/dispose 的 fail-soft 行为另行断言。
 
 ### T35.41 PluginInput 上下文与工厂签名
 
@@ -645,27 +646,27 @@ print("PASS: all code redacted")
 
 ### T35.45 `.env` 保护的阻止语义
 
-官方示例在 `tool.execute.before` 中抛异常来阻止读取 `.env`。Session Runtime 当前对每个 hook 使用 `Effect.ignore`，会吞掉异常。
+官方示例在 `tool.execute.before` 中抛异常来阻止读取 `.env`。当前 Session Runtime 会传播普通 hook 异常。
 
-**期望**：必须明确并测试当前行为：Session Plugin hook 抛错不会阻止工具执行，不能宣称 Session Plugin 可实现官方 `.env` 保护示例。若要支持安全拦截，应增加“拒绝/失败”控制流而不只是吞错。
+**期望**：Plugin 抛错会阻止工具或模型继续执行；`/message` 可能仍返回 HTTP 200，但 assistant `info.error` 必须包含拒绝原因，不能只按 HTTP 状态判断。
 
 ### T35.46 Shell 环境注入范围
 
-官方 `shell.env` 示例声称可注入 AI 工具和用户终端的所有 Shell 执行。Session Plugin 当前没有 `shell.env` runtime 调用点。
+官方 `shell.env` 示例声称可注入 AI 工具和用户终端的所有 Shell 执行。Session Plugin 当前已接入 AI ShellTool，但没有接入用户 PTY。
 
-**期望**：Session Plugin 注入的 env 不出现在 AI 工具或用户 PTY；普通实例 Plugin 的 env 用例单独验证，不能计入 Session Plugin 覆盖率。
+**期望**：Session Plugin 注入的 env 出现在 AI Bash/ShellTool 的沙箱命令中，不应扩展到用户 PTY。环境值必须正确 shell quote，不能复制 SaaS 进程的全部环境变量到沙箱。
 
 ### T35.47 自定义工具注册
 
-官方文档支持 `tool: { mytool: tool(...) }`，并规定自定义工具与内置工具合并、同名时优先覆盖。Session Runtime 当前过滤 `tool`，Session Plugin API 也没有工具定义字段。
+官方文档支持 `tool: { mytool: tool(...) }`。当前 V2 Agent 会提取 `hooks.tool`、转换 Zod schema，并通过 `/tools` 和 `/tool/:name` 注册执行。
 
-**期望**：Session Plugin 返回 `tool` 不会注册工具；自定义工具注册、参数 schema、执行上下文和同名覆盖必须由普通 Plugin 测试覆盖，不能归入本文件的 Session Plugin 验收。
+**期望**：V2 Session Plugin 自定义工具进入 LLM 工具列表，参数经 wire JSON Schema 校验，before/after hook 修改进入实际执行结果；V1 当前仍会过滤 `tool`。
 
 ### T35.48 压缩 hook 行为
 
-官方文档支持 `experimental.session.compacting`，包括追加 `output.context` 和完全替换 `output.prompt` 两种行为。Session Runtime 当前不触发该 hook。
+官方文档支持 `experimental.session.compacting`，包括追加 `output.context` 和替换 `output.prompt`。当前 Session Runtime 已接入该 hook。
 
-**期望**：Session Plugin 的 context/prompt 修改不影响 compaction；普通实例 Plugin 分别验证追加上下文和替换 prompt。若未来接入 Session Runtime，必须补充真实摘要内容验证，而不是只检查 hook marker。
+**期望**：Session Plugin 的 context/prompt 修改进入真实 compaction；V2 Agent 必须保留原地 object mutation，不能被不兼容的字符串返回值覆盖。
 
 ### T35.49 Tool Hook 执行路径矩阵
 
@@ -703,7 +704,7 @@ curl -s --noproxy '*' -X POST "$BASE/session/$SID/plugins/create" \
   -d '{"name":"session-compatible-latest","source":"npm","spec":"<session-compatible-package>"}' | python3 -m json.tool
 ```
 
-**期望**：记录创建成功，Runtime 首次 acquire 时自动安装并加载 npm 包；列表返回 `source=npm` 和原始 `spec`，不返回源码。
+**当前契约**：API 记录创建成功，列表返回 `source=npm` 和原始 `spec`，不返回源码。V2 Agent 将包安装到 Session PVC 的 `/workspace/.opencode/session-plugins`；无版本 spec 解析为 registry 最新版本。2026-07-22 使用 `@sillybit/renamer-opencode-plugin` 实测安装为 `0.2.1` 并生效。
 
 ### T35.53 Session Plugin npm 包指定版本
 
@@ -713,7 +714,7 @@ curl -s --noproxy '*' -X POST "$BASE/session/$SID/plugins/create" \
   -d '{"name":"session-compatible-pinned","source":"npm","spec":"<session-compatible-package>@1.2.3"}'
 ```
 
-**期望**：安装并加载精确的 `1.2.3`，不会被 `latest` 替换；重复 acquire 使用缓存，不重复安装。
+**当前结果**：API 保存原始精确版本 spec，Agent 使用 `bun add --exact` 安装后按包名导入。2026-07-22 使用 `@sillybit/renamer-opencode-plugin@0.2.0` 和 `@0.2.1` 均验证版本与实际安装结果一致。
 
 > `opencode-helicone-session` 依赖 `auth` 和 `event`。Session Runtime 已支持这两类能力的 session 路由；端到端验证还必须配置 `helicone` provider 和有效凭据，不能只用默认 `zhipuai` provider 代替。
 
@@ -725,17 +726,23 @@ curl -s --noproxy '*' -X POST "$BASE/session/$SID/plugins/create" \
 
 **期望**：旧 Runtime 被 invalidate，新版本重新解析；旧包导出的 hook 不再残留。
 
+**2026-07-22 实测**：同一 Session 从 `0.2.0` upsert 到 `0.2.1` 后实际安装版本更新，两个版本的消息 transform 均生效；更新后的首次请求约 7 秒。
+
 ### T35.55 Session Plugin scoped npm 包
 
 使用 `@scope/package` 和 `@scope/package@1.2.3` 两种 spec。
 
 **期望**：正确解析包名和版本，不把 scoped package 的 `@` 误当成版本分隔符。
 
+**2026-07-22 实测**：`@sillybit/renamer-opencode-plugin` 和 `@sillybit/renamer-opencode-plugin@0.2.1` 均解析、安装和加载成功。
+
 ### T35.56 npm 包入口和兼容性错误隔离
 
 覆盖不存在的包、没有 server 入口的包、导出非法值的包和 `engines.opencode` 不兼容的包，同时注册一个健康的 Session Plugin。
 
 **期望**：失败 npm plugin 被跳过并记录明确错误；健康 plugin 继续执行；安装/入口/兼容性错误不阻断 Session 主流程。
+
+**2026-07-22 实测**：不存在的包返回 registry 404，Agent health 为 `degraded` 并包含逐 Plugin 错误；同 Session 的两个健康 Plugin 继续加载，模型实际回复 `HEALTHY_SURVIVED`。无 server 入口、非法导出和 `engines.opencode` 不兼容仍待独立 fixture。
 
 ### T35.57 npm Plugin 多导出与 allowlist
 
@@ -761,7 +768,7 @@ Reply with exactly the word OpenCode
 
 **期望**：AI 实际回复为 `Renamer`。该用例必须验证 `experimental.chat.messages.transform` 修改后的消息被 LLM 消费，不能只检查 Plugin 记录或 HTTP 200。
 
-**实测**：通过，实际回复为 `Renamer`。
+**2026-07-22 实测**：通过。首次安装和请求约 70 秒，AI 实际回复 `Renamer`；重启 Agent 后命中同一 Session PVC 缓存，请求约 7.6 秒，health 为 `ok`、`plugins=1`、`configuredPlugins=1`、`errors=[]`。
 
 ### T35.59 真实 npm Plugin 功能：Helicone Header
 
@@ -831,33 +838,37 @@ export default async () => ({
 
 ## 十、本轮执行结果
 
-执行时间：2026-07-16。测试服务：`http://localhost:14096`，本地 PG + 远程沙箱。
+执行时间：2026-07-22。测试服务：`http://localhost:14096`，本地 PG + OpenSandbox，模型 `zhipuai/glm-5.2`。
 
 ### 已通过
 
-- `test/plugin/session-plugin-runtime.test.ts`：3/3 通过。
-- 历史 E2E 脚本 `.tmp-session-plugins-e2e.mjs`：23/23 通过；该脚本的编号是旧版映射，不能替代当前 62 个用例的验收。
-- 深层 hook 效果脚本：7/7 通过，验证了 `chat.params`、`chat.headers`、system transform、messages transform、tool before/after、command hook 的下游实际效果。
-- 新接入 Hook 功能验证：2/2 通过，`chat.message` 修改进入会话/模型，`experimental.text.complete` 替换最终 assistant 文本。
-- 补充 API/PG 脚本：26 项通过。
-- 合约审计脚本 `.tmp-session-plugins-contract.mjs`：14/14 通过，覆盖 allowlist、runtime 调用集合、执行顺序、删除清理、输入校验、默认导出、工具和 transform 路径边界、V2 未接入确认。
+- 自动测试：`31 pass, 0 fail`，覆盖 Runtime、Agent wire、动态工具、permission task、Plugin payload schema 和 npm spec 解析。
+- API/PG 确定性脚本：16 项通过，覆盖 T35.1-T35.10、T35.27、T35.29-T35.30、T35.37-T35.38。
+- 核心 Hook 下游脚本：15 项通过，覆盖空 Runtime、chat hooks、动态工具、tool before/after、text complete、顺序、更新/删除失效、语法错误、enabled 切换。
+- 高级 V2 脚本在 npm 阶段前 20 项通过：`shell.env`、PluginInput、event、allow/filter 矩阵、permission、tool.definition、compaction、dispose、veto、Session 隔离、default-only 导出和 npm API 记录。
+- `tool.execute.before` 修改进入实际工具执行，`tool.execute.after` 的 output/metadata 进入消息；消息中的 `state.input` 仍保留模型原始参数，这是当前可观察语义。
+- 普通 hook veto 已验证：`/message` 返回 HTTP 200，但 assistant `info.error.data.message` 包含 Plugin 错误，模型/工具不继续执行。
+- T35.52-T35.55、T35.58 npm E2E 通过：默认 latest、精确版本、同名版本更新、scoped spec 和 Renamer 下游消息修改均生效。
+- Renamer 首次安装和请求约 70 秒；Agent 重启后命中 Session PVC 缓存约 7.6 秒。`0.2.0 -> 0.2.1 -> latest` 的实际安装版本依次为 `0.2.0 -> 0.2.1 -> 0.2.1`。
+- T35.56 部分通过：缺失包使 Agent 进入 `degraded` 并报告 registry 404，健康 Plugin 仍执行且实际回复 `HEALTHY_SURVIVED`。
+- Session Plugin lifecycle 回归通过：带 `event` hook 的 Session 执行 `kill-sandbox` 后，以及随后删除 Session 后，`sandboxId` 均保持 `null`，终止事件不会重新创建沙箱。
 
 ### 失败
 
-- 本轮功能断言无失败。T35.37 的空 `name`、非法 JSON 和 `enabled` 类型错误分别返回 400。
-- T35.30 创建/更新响应已与列表接口统一脱敏，不再返回完整 `code`。
+- 首次执行发现空 `code` 被 HTTP 200 接受；已将 `PluginCreatePayload.code` 改为 `Schema.NonEmptyString`，增加 schema 测试并回归通过。
+- 首次执行发现 `shell.env` 虽注册但未进入沙箱命令；已消费 hook 返回值，并通过 `env ... sh -c` 保证变量在命令展开前生效。回归输出为 `SHELL_OK`。
+- 首次 Renamer 回归发现 V2 `PluginInput` 缺少 `directory/worktree`，包加载时抛出 `ERR_INVALID_ARG_TYPE`；已通过 `PLUGIN_CONTEXT_BASE64` 补齐 `directory`、`worktree`、`project` 和 `serverUrl`，远程镜像回归通过。
+- 首次清理回归发现 `session.deleted` 会重试启动已销毁的 Plugin Agent，且 Runtime dispose 的兜底 `runInSession` 也会隐式创建沙箱；已禁止终止事件重试，并移除会创建新沙箱的 dispose 命令，kill/delete 回归通过。
 
 ### 未完成或明确阻塞
 
-- T35.36 noop 模式受当前镜像本地 SQLite migration 重复列错误阻塞，需独立干净数据目录/镜像修复后再跑。
-- T35.39 动态代码权限边界需要隔离安全环境，不能在当前服务进程执行破坏性探针。
-- T35.40 全 hook 输入字段仍需专门 fixture；当前 7 个 hook 的 output 下游效果已验证。
-- T35.45 工具 veto 已验证：Session Plugin hook 抛错不会阻止工具执行，符合当前 `Effect.ignore` 实现但不符合官方 `.env` 防护示例。
-- T35.43、T35.44、T35.46、T35.47、T35.48、T35.49、T35.50、T35.51 已通过合约/源码边界审计；它们是当前明确不接入或需要普通 Plugin fixture 的能力，不再标记为实现失败。
-- T35.52-T35.57 npm 包 API 创建、默认 spec、精确版本 spec 和 Runtime 安装路径已验证；`auth`/`event` Session 路由也已用实际 marker 验证。`opencode-helicone-session@1.0.1` 的 Helicone provider 端到端请求仍需真实 Helicone 凭据。
-- T35.58 Renamer 功能已通过：输入 `OpenCode` 后实际 AI 回复为 `Renamer`。
-- T35.59 Helicone 包装器 header 注入已通过；真实 provider 请求待凭据。
-- T35.60 DCP 安装/加载已通过，真实消息裁剪尚未通过验收。
-- T35.61 mem/supermemory/translate 已完成 Hook 分类；其外部服务效果仍需各自凭据/配置。
+- T35.17 command hook 尚未建立确定性 command fixture。
+- T35.28 仅验证 `config` 被过滤；允许的 command hook 部分仍待 T35.17。
+- T35.36 noop 模式需单独启动无 PG 的 Server。
+- T35.39 动态代码权限边界需要隔离安全环境，未执行破坏性探针。
+- T35.43、T35.49-T35.51 当前只完成源码边界审计，没有全部 E2E 路径 fixture。
+- T35.56 尚未覆盖无 server 入口、非法导出和 `engines.opencode` 不兼容；T35.57 多导出与 allowlist 尚待专用 npm fixture。
+- T35.59 需要真实 Helicone provider 凭据；并且 V2 当前过滤 `auth`。
+- T35.60-T35.61 依赖外部 npm 包、服务和凭据，本轮未执行功能验收。
 
-> 本轮已修复并回归真实失败项；剩余 3 个需要专用环境或确定性 fixture 的用例保持未宣称通过，不把设计边界伪装成功能覆盖。
+> 本轮修复了空 code 校验、`shell.env` 下游注入、npm 安装与版本解析、Agent degraded health 和 V2 `PluginInput` 上下文。未执行或只做源码审计的项目保持未宣称通过。

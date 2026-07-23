@@ -134,14 +134,12 @@ describe("buildVolumes app mode (pvcMode=app)", () => {
     expect(b[0].subPath).toBe("apps/app-2/workspace")
   })
 
-  test("app mode missing appId falls back to session prefix", () => {
-    const vols = buildVolumes({ sessionID: "ses_x", pvcMode: "app" }, appCfg)
-    expect(vols[0].subPath).toBe("sessions/ses_x/workspace")
+  test("app mode missing appId rejects sandbox creation", () => {
+    expect(() => buildVolumes({ sessionID: "ses_x", pvcMode: "app" }, appCfg)).toThrow("app 模式缺少 appId")
   })
 
-  test("app mode empty appId falls back to session prefix", () => {
-    const vols = buildVolumes({ sessionID: "ses_x", pvcMode: "app", appId: "  " }, appCfg)
-    expect(vols[0].subPath).toBe("sessions/ses_x/workspace")
+  test("app mode empty appId rejects sandbox creation", () => {
+    expect(() => buildVolumes({ sessionID: "ses_x", pvcMode: "app", appId: "  " }, appCfg)).toThrow("app 模式缺少 appId")
   })
 
   test("pvcMode=session uses session prefix (explicit)", () => {
@@ -288,8 +286,8 @@ describe("Destroy handling by state", () => {
 })
 
 describe("SandboxConfig defaults", () => {
-  test("default volumeType is none", () => {
-    expect(SandboxConfig.defaultConfig.volumeType).toBe("none")
+  test("default volumeType is pvc", () => {
+    expect(SandboxConfig.defaultConfig.volumeType).toBe("pvc")
   })
 
   test("default idleKillMs is 60 minutes", () => {

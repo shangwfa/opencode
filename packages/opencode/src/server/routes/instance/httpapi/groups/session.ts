@@ -108,7 +108,7 @@ export const PluginCreatePayload = Schema.Union([
     name: Schema.NonEmptyString,
     source: Schema.optional(Schema.Literal("code")),
     description: Schema.optional(Schema.String),
-    code: Schema.String,
+    code: Schema.NonEmptyString,
     enabled: Schema.optional(Schema.Boolean),
   }),
   Schema.Struct({

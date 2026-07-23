@@ -662,7 +662,7 @@ const layer = Layer.effect(
           : undefined
       const variant = input.variant ?? (ag.variant && full?.variants?.[ag.variant] ? ag.variant : undefined)
 
-      const info: SessionV1.User = {
+      let info: SessionV1.User = {
         id: input.messageID ?? MessageID.ascending(),
         role: "user",
         sessionID: input.sessionID,
@@ -1004,12 +1004,12 @@ const layer = Layer.effect(
         return [{ ...part, messageID: info.id, sessionID: input.sessionID }]
       })
 
-      const resolvedParts = yield* Effect.forEach(input.parts, resolvePart, { concurrency: "unbounded" }).pipe(
+      let resolvedParts = yield* Effect.forEach(input.parts, resolvePart, { concurrency: "unbounded" }).pipe(
         Effect.map((x) => x.flat().map(assign)),
       )
       const sessionPluginRuntime = yield* sessionPlugins.acquire(input.sessionID)
 
-      yield* plugin.trigger(
+      const pluginMessage = yield* plugin.trigger(
         "chat.message",
         {
           sessionID: input.sessionID,
@@ -1020,7 +1020,7 @@ const layer = Layer.effect(
         },
         { message: info, parts: resolvedParts },
       )
-      yield* sessionPluginRuntime.trigger(
+      const sessionMessage = yield* sessionPluginRuntime.trigger(
         "chat.message",
         {
           sessionID: input.sessionID,
@@ -1029,8 +1029,10 @@ const layer = Layer.effect(
           messageID: input.messageID,
           variant: input.variant,
         },
-        { message: info, parts: resolvedParts },
+        pluginMessage,
       )
+      info = sessionMessage.message
+      resolvedParts = sessionMessage.parts
 
       const parts = yield* Effect.forEach(resolvedParts, (part) =>
         part.type === "file" && part.mime.startsWith("image/")
@@ -1378,7 +1380,7 @@ const layer = Layer.effect(
             }
 
             yield* plugin.trigger("experimental.chat.messages.transform", {}, { messages: msgs })
-            yield* sessionPluginRuntime.trigger("experimental.chat.messages.transform", {}, { messages: msgs })
+            msgs = (yield* sessionPluginRuntime.trigger("experimental.chat.messages.transform", {}, { messages: msgs })).messages
 
             const [skillsPrompt, env, instructions, mcpInstructions, modelMsgs] = yield* Effect.all([
               sys.skills(agent, skills, sessionID),
@@ -1607,7 +1609,7 @@ const layer = Layer.effect(
         { parts },
       )
       const sessionPluginRuntime = yield* sessionPlugins.acquire(input.sessionID)
-      yield* sessionPluginRuntime.trigger(
+      const transformed = yield* sessionPluginRuntime.trigger(
         "command.execute.before",
         { command: input.command, sessionID: input.sessionID, arguments: input.arguments },
         { parts },
@@ -1618,7 +1620,7 @@ const layer = Layer.effect(
         messageID: input.messageID,
         model: userModel,
         agent: userAgent,
-        parts,
+        parts: transformed.parts,
         variant: input.variant,
       })
       yield* events.publish(Command.Event.Executed, {

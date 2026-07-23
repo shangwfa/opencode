@@ -326,8 +326,11 @@ const layer = Layer.effect(
       const entries = Object.entries(args)
       const allZod = entries.every((entry) => isZodType(entry[1]))
       const zodParams = allZod ? z.object(args) : undefined
-      const jsonSchema = zodParams ? zodJsonSchema(zodParams) : legacyJsonSchema(entries)
-      const parameters = zodParams
+      const remoteJsonSchema = "jsonSchema" in def && isJsonSchemaObject(def.jsonSchema) ? def.jsonSchema : undefined
+      const jsonSchema = remoteJsonSchema ?? (zodParams ? zodJsonSchema(zodParams) : legacyJsonSchema(entries))
+      const parameters = remoteJsonSchema
+        ? Schema.Unknown
+        : zodParams
         ? Schema.declare<unknown>((u): u is unknown => zodParams.safeParse(u).success)
         : Schema.Unknown
       return {
@@ -429,14 +432,14 @@ const layer = Layer.effect(
       return yield* Effect.forEach(
         [...merged.values()],
         Effect.fnUntraced(function* (tool: Tool.Def) {
-          const output = {
+          let output = {
             description: tool.description,
             parameters: tool.parameters,
             jsonSchema: tool.jsonSchema,
           }
           yield* plugin.trigger("tool.definition", { toolID: tool.id }, output)
           if (sessionPluginRuntime) {
-            yield* sessionPluginRuntime.trigger("tool.definition", { toolID: tool.id }, output)
+            output = yield* sessionPluginRuntime.trigger("tool.definition", { toolID: tool.id }, output)
           }
           const jsonSchema =
             output.parameters === tool.parameters || output.jsonSchema !== tool.jsonSchema

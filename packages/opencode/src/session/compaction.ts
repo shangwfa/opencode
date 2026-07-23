@@ -343,20 +343,21 @@ const layer = Layer.effect(
       })
       const sessionPluginRuntime = yield* sessionPlugins.acquire(input.sessionID)
       // Allow plugins to inject context or replace compaction prompt.
-      const compacting = yield* plugin.trigger(
+      let compacting = yield* plugin.trigger(
         "experimental.session.compacting",
         { sessionID: input.sessionID },
         { context: [], prompt: undefined },
       )
-      yield* sessionPluginRuntime.trigger(
+      compacting = yield* sessionPluginRuntime.trigger(
         "experimental.session.compacting",
         { sessionID: input.sessionID },
         compacting,
       )
       const nextPrompt = compacting.prompt ?? buildPrompt({ previousSummary, context: compacting.context })
-      const msgs = structuredClone(selected.head)
+      let msgs = structuredClone(selected.head)
       yield* plugin.trigger("experimental.chat.messages.transform", {}, { messages: msgs })
-      yield* sessionPluginRuntime.trigger("experimental.chat.messages.transform", {}, { messages: msgs })
+      msgs = (yield* sessionPluginRuntime.trigger("experimental.chat.messages.transform", {}, { messages: msgs }))
+        .messages
       const modelMessages = yield* MessageV2.toModelMessagesEffect(msgs, model, {
         stripMedia: true,
         toolOutputMaxChars: TOOL_OUTPUT_MAX_CHARS,
@@ -467,12 +468,14 @@ const layer = Layer.effect(
             message: userMessage,
             overflow: input.overflow === true,
           }
-          const autocontinue = yield* plugin.trigger(
+          let autocontinue = yield* plugin.trigger("experimental.compaction.autocontinue", autocontinueInput, {
+            enabled: true,
+          })
+          autocontinue = yield* sessionPluginRuntime.trigger(
             "experimental.compaction.autocontinue",
             autocontinueInput,
-            { enabled: true },
+            autocontinue,
           )
-          yield* sessionPluginRuntime.trigger("experimental.compaction.autocontinue", autocontinueInput, autocontinue)
           if (autocontinue.enabled) {
             const continueMsg = yield* session.updateMessage({
               id: MessageID.ascending(),

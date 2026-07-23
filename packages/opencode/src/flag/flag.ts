@@ -91,7 +91,7 @@ export namespace Flag {
   export const OPENCODE_EVENT_BUS = process.env["OPENCODE_EVENT_BUS"] ?? "local"
   export const OPENCODE_SANDBOX_ENABLED = truthy("OPENCODE_SANDBOX_ENABLED")
   export const OPENCODE_SANDBOX_DOMAIN = process.env["OPENCODE_SANDBOX_DOMAIN"] ?? "localhost:8080"
-  export const OPENCODE_SANDBOX_IMAGE = process.env["OPENCODE_SANDBOX_IMAGE"] ?? "crpi-hlpnu8kiweghie0r.cn-hangzhou.personal.cr.aliyuncs.com/shangwfa/opencode-sandbox:session-lsp-v3"
+  export const OPENCODE_SANDBOX_IMAGE = process.env["OPENCODE_SANDBOX_IMAGE"] ?? "crpi-hlpnu8kiweghie0r.cn-hangzhou.personal.cr.aliyuncs.com/shangwfa/opencode-sandbox:session-opencode-v1"
   export const OPENCODE_SANDBOX_TIMEOUT = number("OPENCODE_SANDBOX_TIMEOUT") ?? 600
 
   export const OPENCODE_SANDBOX_API_KEY = process.env["OPENCODE_SANDBOX_API_KEY"] ?? ""
