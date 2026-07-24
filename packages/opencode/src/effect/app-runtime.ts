@@ -90,11 +90,10 @@ import { BackgroundJob } from "@/background/job"
 import { RuntimeFlags } from "@/effect/runtime-flags"
 import { EventV2Bridge } from "@/event-v2-bridge"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
-import { AppNodeBuilder } from "@opencode-ai/core/effect/app-node-builder"
-import { InstanceBootstrap } from "@/project/bootstrap"
+import { AppNodeBuilderV1 } from "./app-node-builder-v1"
 import { SessionProjector } from "@opencode-ai/core/session/projector"
 
-export const AppLayer = AppNodeBuilder.build(
+export const AppLayer = AppNodeBuilderV1.build(
   LayerNode.group([
     Npm.node,
     FSUtil.node,
@@ -145,13 +144,12 @@ export const AppLayer = AppNodeBuilder.build(
     ShareNext.node,
     SessionShare.node,
   ]),
-  [[InstanceStore.bootstrapNode, InstanceBootstrap.node]],
 ).pipe(
   // SaaS: provide foundational services early so SaaS-injected layers
   // (SandboxProvider, SessionAgent.pgLayer, repo tools, etc.) can resolve
   // their transitive dependencies during parallel construction.
   Layer.provideMerge(Bus.defaultLayer),
-  Layer.provideMerge(AppNodeBuilder.build(Ripgrep.node, [[InstanceStore.bootstrapNode, InstanceBootstrap.node]])),
+  Layer.provideMerge(AppNodeBuilderV1.build(Ripgrep.node)),
   Layer.provideMerge(Observability.layer),
   Layer.provideMerge(Layer.provide(SessionWatchdog.defaultLayer, SessionTools.defaultLayer)),
 )

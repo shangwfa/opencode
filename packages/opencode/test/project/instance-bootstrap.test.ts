@@ -15,7 +15,7 @@ import { waitGlobalBusEvent } from "../server/global-bus"
 const it = testEffect(
   LayerNode.compile(LayerNode.group([InstanceStore.node, CrossSpawnSpawner.node]), [
     [InstanceStore.bootstrapNode, InstanceBootstrap.node],
-  ] as any),
+  ]),
 )
 
 // InstanceBootstrap must run before any code touches the instance —

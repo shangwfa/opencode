@@ -16,6 +16,11 @@ const mockSkillLayer = Layer.succeed(
     all: () => Effect.succeed([]),
     dirs: () => Effect.succeed([]),
     available: () => Effect.succeed([]),
+    sessionList: () => Effect.succeed([]),
+    sessionCreate: () => Effect.die("not implemented"),
+    sessionLoad: () => Effect.succeed([]),
+    sessionUnload: () => Effect.void,
+    sessionClear: () => Effect.void,
   } as any),
 )
 

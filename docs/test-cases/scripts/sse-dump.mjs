@@ -32,7 +32,7 @@ const timer = setTimeout(() => ctrl.abort(), seconds * 1000)
 const headers = directory ? { "x-opencode-directory": directory } : {}
 
 try {
-  const r = await fetch(url, { signal: ctrl.signal, headers })
+  const r = await fetch(url, { signal: ctrl.signal, headers, proxy: "" })
   const reader = r.body.getReader()
   const decoder = new TextDecoder()
   let buf = ""

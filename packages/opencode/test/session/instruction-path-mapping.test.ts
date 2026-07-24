@@ -1,5 +1,6 @@
 import { describe, expect } from "bun:test"
 import path from "path"
+import { existsSync } from "node:fs"
 import { Effect, FileSystem, Layer } from "effect"
 import { FetchHttpClient } from "effect/unstable/http"
 import { NodeFileSystem } from "@effect/platform-node"
@@ -7,6 +8,8 @@ import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
 import { FSUtil } from "@opencode-ai/core/fs-util"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { Instruction } from "../../src/session/instruction"
+import { InstanceStore } from "../../src/project/instance-store"
+import { InstanceRef } from "../../src/effect/instance-ref"
 import { MessageID } from "../../src/session/schema"
 import { Global } from "@opencode-ai/core/global"
 import { RuntimeFlags } from "../../src/effect/runtime-flags"
@@ -26,12 +29,21 @@ const instructionLayer = (global: Partial<Global.Interface>, flags: Partial<Runt
     Layer.provide(FetchHttpClient.layer),
     Layer.provide(Global.layerWith(global)),
     Layer.provide(RuntimeFlags.layer(flags)),
+    Layer.provide(Layer.succeed(InstanceStore.Service, {} as any)),
   )
 
 const provideInstruction =
   (global: Partial<Global.Interface>, flags?: Partial<RuntimeFlags.Info>) =>
   <A, E, R>(self: Effect.Effect<A, E, R>) =>
-    self.pipe(Effect.provide(instructionLayer(global, flags)))
+    self.pipe(
+      Effect.provide(instructionLayer(global, flags)),
+      Effect.provideService(InstanceStore.Service, {
+        provide: ({ directory }: any, eff: any) => {
+          const isGit = existsSync(path.join(directory, ".git"))
+          return Effect.provideService(InstanceRef, { directory, worktree: isGit ? directory : "/", project: { id: "test", name: "test", path: directory, vcs: isGit ? "git" as const : "none" as const } } as any)(eff)
+        },
+      } as any),
+    )
 
 const write = (filepath: string, content: string) =>
   Effect.gen(function* () {

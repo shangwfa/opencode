@@ -101,19 +101,18 @@ curl -s --noproxy '*' --max-time 180 -X POST "$BASE/session/$SID/exec" \
   -H 'Content-Type: application/json' \
   -d "{\"command\":\"cd $WORKDIR && codegraph init 2>&1 | tail -5\"}"
 
-# 验证 .opencode/ 已生成
+# 验证文件已生成（codegraph install --location=local 放在项目根目录，不在 .opencode/ 子目录）
 curl -s --noproxy '*' -X POST "$BASE/session/$SID/exec" \
   -H 'Content-Type: application/json' \
-  -d "{\"command\":\"find $WORKDIR/.opencode -type f | sort\"}"
+  -d "{\"command\":\"ls $WORKDIR/AGENTS.md $WORKDIR/opencode.jsonc 2>&1\"}"
 ```
 
 **期望**：
-- `.opencode/` 下生成 `AGENTS.md` + `opencode.jsonc`
+- 项目根目录下生成 `AGENTS.md` + `opencode.jsonc`
 - `opencode.jsonc` 含 codegraph local MCP 配置：
   ```json
   {"mcp":{"codegraph":{"type":"local","command":["codegraph","serve","--mcp"],"enabled":true}}}
   ```
-- `codegraph init` 输出：Files/Nodes/Edges/DB Size 统计
 
 ---
 
@@ -159,10 +158,10 @@ curl -s --noproxy '*' -X POST "$BASE/session/$SID/mcps/create" \
 ### T-CG.6b 设置 AGENTS.md（POST /session/:id/agents-md/create）
 
 ```bash
-# 先从沙箱读出 AGENTS.md 内容（codegraph install 在 T-CG.5 生成的），base64 编码避免 JSON 转义陷阱
+# 先从沙箱读出 AGENTS.md 内容（codegraph install 在 T-CG.5 生成在项目根目录），base64 编码避免 JSON 转义陷阱
 AGENTS_B64=$(curl -s --noproxy '*' -X POST "$BASE/session/$SID/exec" \
   -H 'Content-Type: application/json' \
-  -d "{\"command\":\"cat $WORKDIR/.opencode/AGENTS.md | base64 -w0\"}" \
+  -d "{\"command\":\"cat $WORKDIR/AGENTS.md | base64 -w0\"}" \
   | python3 -c "import json,sys; print(json.load(sys.stdin, strict=False).get('stdout','').strip())")
 
 # 通过 agents-md/create API 写入 session
@@ -245,13 +244,13 @@ while (Date.now() - start < 180000) {
 
 | 验证项 | API | 结果 |
 |--------|------|------|
-| Session 创建 | `POST /session` | ⬜ |
-| 沙箱启动 | `POST /session/:id/keep-alive` | ⬜ |
-| 项目准备（exec git clone） | `POST /session/:id/exec` | ⬜ |
-| codegraph 预装验证 | `POST /session/:id/exec` | ⬜ |
-| codegraph install + init（生成 .opencode/） | `POST /session/:id/exec` | ⬜ |
-| **手动注册 MCP + 设置 AGENTS.md** | **`POST /session/:id/mcps/create`** + **`POST /session/:id/agents-md/create`** | ⬜ |
-| PG 持久化 | `psql` | ⬜ |
-| AI 调用 codegraph 工具 | `POST /session/:id/prompt_async` | ⬜ |
+| Session 创建 | `POST /session` | ✅ |
+| 沙箱启动 | `POST /session/:id/keep-alive` | ✅ |
+| 项目准备（exec git clone） | `POST /session/:id/exec` | ✅ |
+| codegraph 预装验证 | `POST /session/:id/exec` | ✅ 1.4.1 |
+| codegraph install（生成 AGENTS.md + opencode.jsonc 在项目根目录） | `POST /session/:id/exec` | ✅ `--location=local` 放项目根目录 |
+| **手动注册 MCP + 设置 AGENTS.md** | **`POST /session/:id/mcps/create`** + **`POST /session/:id/agents-md/create`** | ✅ PG 两表持久化 |
+| PG 持久化 | `psql` | ✅ MCP + AGENTS.md (18722 chars) |
+| AI 调用 codegraph 工具 | `POST /session/:id/prompt_async` | ✅ `codegraph_codegraph_explore(completed)×3` |
 
 > **关键验证**：T-CG.6 用 `mcps/create` + `agents-md/create` 两个独立 API 显式完成 MCP + AGENTS.md 注入——这种低层级 API 方式**每步可控**，适合需要精细管理 session 资源的场景。`dot-opencode/load` 是更高层的封装（一键扫描 `.opencode/`），见 [`opencode/sandbox/codegraph.md`](../sandbox/codegraph.md) T37.30。

@@ -1,8 +1,9 @@
 import { Client } from "@planetscale/database"
 import { Effect } from "effect"
 import { Resource } from "sst/resource"
+import { DatabaseError } from "../database"
 import type { GeoStatMetric } from "./geo"
-import type { ModelStatMetric } from "./model"
+import { ModelStatRepo, type ModelStatMetric } from "./model"
 import type { ProviderStatMetric } from "./provider"
 
 export type UsageProduct = "All Users" | "Zen" | "Go" | "Enterprise"
@@ -24,7 +25,6 @@ export type SessionCostEntry = { model: string; cost: number; tokens: number }
 export type CountryEntry = { country: string; continent: string; tokens: number; share: number; rank: number }
 export type ModelUsagePoint = { date: string; tokens: number; users: number; sessions: number; cost: number }
 export type ModelMixEntry = { label: string; tokens: number; share: number }
-export type ModelProductEntry = { product: string; tokens: number; sessions: number; share: number }
 export type ModelPeerEntry = {
   model: string
   provider: string
@@ -48,7 +48,7 @@ export type StatsModelData = {
   slug: string
   provider: string
   author: string
-  rank: number
+  rank: number | null
   previousRank: number | null
   totalModels: number
   tokenShare: number
@@ -65,7 +65,6 @@ export type StatsModelData = {
   }
   usage: ModelUsagePoint[]
   tokenMix: ModelMixEntry[]
-  productMix: ModelProductEntry[]
   country: Record<UsageRange, CountryEntry[]>
   peers: ModelPeerEntry[]
 }
@@ -82,6 +81,28 @@ export type StatsLabData = {
   }
   usage: ModelUsagePoint[]
   models: LabUsageModelEntry[]
+}
+export type StatsModelComparisonEntry = {
+  updatedAt: string | null
+  model: string
+  slug: string
+  provider: string
+  author: string
+  rank: number | null
+  previousRank: number | null
+  totalModels: number
+  tokenShare: number
+  tokenChange: number
+  totals: StatsModelData["totals"]
+  usage: ModelUsagePoint[]
+}
+export type StatsModelComparisonInput = {
+  provider: string
+  model: string
+}
+export type StatsModelComparisonData = {
+  updatedAt: string | null
+  models: (StatsModelComparisonEntry | null)[]
 }
 export type StatsHomeData = {
   updatedAt: string | null
@@ -107,6 +128,8 @@ const DAY_MS = 86_400_000
 const TOKEN_SCALE = 1_000_000
 const DOLLARS_PER_MICROCENT = 1 / 100_000_000
 const METRIC_MODEL_LIMIT = 10
+const TOP_MODEL_SEGMENT_LIMIT = 9
+const SITE_PRODUCT = "Go"
 const LEADERBOARD_CHANGE_MIN_MULTIPLE = 10
 const months = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"] as const
 
@@ -271,6 +294,35 @@ function dateValue(value: unknown) {
   return value instanceof Date ? value : new Date(stringValue(value))
 }
 
+export const getStatsModelsComparisonData: (
+  models: readonly StatsModelComparisonInput[],
+) => Effect.Effect<StatsModelComparisonData, DatabaseError, ModelStatRepo> = Effect.fn("StatsModelsComparison.getData")(
+  function* (models) {
+    const modelStats = yield* ModelStatRepo
+    const rows = yield* modelStats.listDaily()
+    const entries = models.map((model) => toComparisonEntry(buildStatsModelData(model.model, rows, [], model.provider)))
+    const latest = entries
+      .map((model) => model?.updatedAt)
+      .flatMap((value) => (value ? [dateTime(value)] : []))
+      .toSorted((a, b) => b - a)[0]
+    return {
+      updatedAt: latest === undefined ? null : new Date(latest).toISOString(),
+      models: entries,
+    }
+  },
+)
+
+export const getStatsModelComparisonData = (
+  firstProvider: string,
+  firstModel: string,
+  secondProvider: string,
+  secondModel: string,
+) =>
+  getStatsModelsComparisonData([
+    { provider: firstProvider, model: firstModel },
+    { provider: secondProvider, model: secondModel },
+  ])
+
 function buildStatsHomeData(
   modelRows: ModelStatMetric[],
   providerRows: ProviderStatMetric[],
@@ -289,7 +341,15 @@ function buildStatsHomeData(
   return {
     updatedAt: new Date(latestUpdate).toISOString(),
     usage: createUsageProductRecord((product) =>
-      createRangeRecord((range) => buildUsagePoints(normalized, product, range, getWindow(range, earliest, latest))),
+      createRangeRecord((range) =>
+        buildUsagePoints(
+          normalized,
+          product,
+          range,
+          getWindow(range, earliest, latest),
+          getWindow("1W", earliest, latest),
+        ),
+      ),
     ),
     users: createUsageProductRecord((product) =>
       createRangeRecord((range) =>
@@ -304,7 +364,7 @@ function buildStatsHomeData(
       ),
     ),
     leaderboard: createUsageProductRecord((product) =>
-      createRangeRecord((range) => buildLeaderboard(normalized, product, getWindow(range, earliest, latest))),
+      createRangeRecord((range) => buildLeaderboard(normalized, product, getWindow("1W", earliest, latest))),
     ),
     market: createRangeRecord((range) => buildMarketShare(providers, "Go", range, getWindow(range, earliest, latest))),
     tokenCost: createTokenProductRecord((product) =>
@@ -338,15 +398,16 @@ function buildStatsModelData(
   const latest = Math.max(...normalized.map((row) => row.periodStart))
   const latestUpdate = Math.max(...modelScopedRows.map((row) => row.updatedAt))
   const window = getWindow("2M", earliest, latest)
-  const currentRows = rowsForProduct(modelScopedRows, "All Users", window.start, window.end)
-  const previousRows = rowsForProduct(modelScopedRows, "All Users", window.previousStart, window.previousEnd)
+  const rankWindow = getWindow("1W", earliest, latest)
+  const currentRows = rowsForProduct(modelScopedRows, SITE_PRODUCT, window.start, window.end)
+  const previousRows = rowsForProduct(modelScopedRows, SITE_PRODUCT, window.previousStart, window.previousEnd)
   const current = combineRowsForModel(model, currentRows)
   const previous = combineRowsForModel(model, previousRows)
-  const peers = aggregateByModelName(rowsForProduct(normalized, "All Users", window.start, window.end))
+  const rankPeers = aggregateByModelName(rowsForProduct(normalized, SITE_PRODUCT, rankWindow.start, rankWindow.end))
     .filter((item) => item.totalTokens > 0)
     .toSorted((a, b) => b.totalTokens - a.totalTokens || a.model.localeCompare(b.model))
-  const previousPeers = aggregateByModelName(
-    rowsForProduct(normalized, "All Users", window.previousStart, window.previousEnd),
+  const previousRankPeers = aggregateByModelName(
+    rowsForProduct(normalized, SITE_PRODUCT, rankWindow.previousStart, rankWindow.previousEnd),
   )
     .filter((item) => item.totalTokens > 0)
     .toSorted((a, b) => b.totalTokens - a.totalTokens || a.model.localeCompare(b.model))
@@ -387,7 +448,6 @@ function buildStatsModelData(
     },
     usage: buildModelUsage(currentRows, window, "2M"),
     tokenMix: buildModelTokenMix(current),
-    productMix: buildModelProductMix(modelScopedRows, window, current),
     country: createRangeRecord((range) => buildCountryStats(geo, getWindow(range, earliest, latest))),
     peers: buildModelPeers(rankPeers, peerRank, peerTokens),
   }
@@ -407,11 +467,11 @@ function buildStatsLabData(providerParam: string, modelRows: ModelStatMetric[]):
   const latest = Math.max(...normalized.map((row) => row.periodStart))
   const latestUpdate = Math.max(...providerRows.map((row) => row.updatedAt))
   const window = getWindow("2M", earliest, latest)
-  const currentRows = rowsForProduct(providerRows, "All Users", window.start, window.end)
-  const previousRows = rowsForProduct(providerRows, "All Users", window.previousStart, window.previousEnd)
+  const currentRows = rowsForProduct(providerRows, SITE_PRODUCT, window.start, window.end)
+  const previousRows = rowsForProduct(providerRows, SITE_PRODUCT, window.previousStart, window.previousEnd)
   const current = combineRowsForModel("", currentRows)
   const previous = combineRowsForModel("", previousRows)
-  const allCurrent = aggregateByModel(rowsForProduct(normalized, "All Users", window.start, window.end))
+  const allCurrent = aggregateByModel(rowsForProduct(normalized, SITE_PRODUCT, window.start, window.end))
   const totalTokens = allCurrent.reduce((sum, item) => sum + item.totalTokens, 0)
   const models = aggregateByModel(currentRows)
     .filter((item) => item.totalTokens > 0)
@@ -437,6 +497,24 @@ function buildStatsLabData(providerParam: string, modelRows: ModelStatMetric[]):
       share: current.totalTokens > 0 ? round((item.totalTokens / current.totalTokens) * 100, 2) : 0,
       slug: modelSlug(item.model),
     })),
+  }
+}
+
+function toComparisonEntry(data: StatsModelData | null): StatsModelComparisonEntry | null {
+  if (!data) return null
+  return {
+    updatedAt: data.updatedAt,
+    model: data.model,
+    slug: data.slug,
+    provider: data.provider,
+    author: data.author,
+    rank: data.rank,
+    previousRank: data.previousRank,
+    totalModels: data.totalModels,
+    tokenShare: data.tokenShare,
+    tokenChange: data.tokenChange,
+    totals: data.totals,
+    usage: data.usage,
   }
 }
 
@@ -495,21 +573,20 @@ function usagePointValue(value: number, metric: "tokens" | "users") {
 
 function buildLeaderboard(rows: StatMetricRow[], product: UsageProduct, rankWindow: DateWindow) {
   const previous = new Map(
-    aggregateByModel(rowsForProduct(rows, product, window.previousStart, window.previousEnd)).map((item) => [
-      modelKey(item.provider, item.model),
-      item.totalTokens,
-    ]),
+    aggregateByModelName(rowsForProduct(rows, product, rankWindow.previousStart, rankWindow.previousEnd)).map(
+      (item) => [item.model, item.totalTokens],
+    ),
   )
 
-  return aggregateByModel(rowsForProduct(rows, product, window.start, window.end))
-    .toSorted((a, b) => b.totalTokens - a.totalTokens)
+  return aggregateByModelName(rowsForProduct(rows, product, rankWindow.start, rankWindow.end))
+    .toSorted((a, b) => b.totalTokens - a.totalTokens || a.model.localeCompare(b.model))
     .slice(0, 18)
     .map((item, index) => ({
       model: item.model,
       provider: item.provider,
       author: formatProvider(item.provider),
       tokens: Math.round(item.totalTokens / 1_000_000_000),
-      change: leaderboardChange(item.totalTokens, previous.get(modelKey(item.provider, item.model)) ?? 0),
+      change: leaderboardChange(item.totalTokens, previous.get(item.model) ?? 0),
       rank: index + 1,
     }))
 }
@@ -543,7 +620,7 @@ function buildMarketShare(rows: ProviderMetricRow[], product: UsageProduct, rang
 }
 
 function buildCountryStats(rows: GeoMetricRow[], window: DateWindow) {
-  const countries = aggregateByCountry(rowsForProduct(rows, "All Users", window.start, window.end))
+  const countries = aggregateByCountry(rowsForProduct(rows, SITE_PRODUCT, window.start, window.end))
     .filter((item) => item.tokens > 0 && item.country !== "AQ")
     .toSorted((a, b) => b.tokens - a.tokens)
   const totalTokens = countries.reduce((sum, item) => sum + item.tokens, 0)
@@ -562,7 +639,6 @@ function buildTokenCost(rows: StatMetricRow[], product: TokenProduct, window: Da
   return topModelsByUsage(rows, product, window)
     .flatMap((item) => {
       const total = costPerMillion(item.totalCostMicrocents, item.totalTokens)
-      if (total === 0) return []
       return [
         {
           model: item.model,
@@ -639,29 +715,9 @@ function buildModelTokenMix(aggregate: ModelAggregate): ModelMixEntry[] {
   return items.map((item) => ({ ...item, share: round((item.tokens / total) * 100, 1) }))
 }
 
-function buildModelProductMix(
-  rows: StatMetricRow[],
-  window: DateWindow,
-  fallback: ModelAggregate,
-): ModelProductEntry[] {
-  const products = ["Go", "Zen", "Enterprise"] as const
-  const items = products.flatMap((product) => {
-    const aggregate = combineRowsForModel(
-      fallback.model,
-      rows.filter((row) => row.tier === product && row.periodStart >= window.start && row.periodStart < window.end),
-    )
-    if (aggregate.totalTokens === 0) return []
-    return [{ product, tokens: aggregate.totalTokens, sessions: aggregate.sessions }]
-  })
-  const total = items.reduce((sum, item) => sum + item.tokens, 0)
-  if (total > 0) return items.map((item) => ({ ...item, share: round((item.tokens / total) * 100, 1) }))
-  if (fallback.totalTokens === 0) return []
-  return [{ product: "All Users", tokens: fallback.totalTokens, sessions: fallback.sessions, share: 100 }]
-}
-
 function buildModelPeers(peers: ModelAggregate[], rank: number, totalTokens: number): ModelPeerEntry[] {
-  const start = Math.max(0, Math.min(rank - 4, Math.max(peers.length - 7, 0)))
-  return peers.slice(start, start + 7).map((item, index) => ({
+  const start = Math.max(0, Math.min(rank - 5, Math.max(peers.length - 10, 0)))
+  return peers.slice(start, start + 10).map((item, index) => ({
     model: item.model,
     provider: item.provider,
     author: formatProvider(item.provider),
@@ -964,15 +1020,14 @@ function resolveModelProvider(model: string, rows: StatMetricRow[], providerPara
 }
 
 function providerMatches(provider: string, providerParam: string) {
-  return modelSlug(provider) === modelSlug(providerParam)
+  return providerSlug(provider) === providerSlug(providerParam)
 }
 
 function resolveProviderName(providerParam: string, rows: StatMetricRow[]) {
   const input = providerParam.trim()
   if (!input) return undefined
-  const inputSlug = modelSlug(input)
   return aggregateByModel(rows)
-    .filter((item) => modelSlug(item.provider) === inputSlug)
+    .filter((item) => providerMatches(item.provider, input))
     .toSorted((a, b) => b.totalTokens - a.totalTokens || a.provider.localeCompare(b.provider))[0]?.provider
 }
 
@@ -987,6 +1042,17 @@ export function modelSlug(value: string) {
 
 function modelKey(provider: string, model: string) {
   return `${provider}\u0000${model}`
+}
+
+function providerSlug(value: string) {
+  const slug = modelSlug(value)
+  const aliases: Record<string, string> = {
+    alibaba: "qwen",
+    moonshotai: "moonshot",
+    qwen: "qwen",
+    zhipuai: "zhipu",
+  }
+  return aliases[slug] ?? slug
 }
 
 function costPerMillion(costMicrocents: number, tokens: number) {

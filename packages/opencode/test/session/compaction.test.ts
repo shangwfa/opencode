@@ -237,7 +237,7 @@ const env = AppNodeBuilder.build(compactionTestNode, [
   [RuntimeFlags.node, RuntimeFlags.layer({ experimentalEventSystem: true })],
 ])
 
-const it = testEffect(env as any)
+const it = testEffect(env)
 
 const compactionEnv = AppNodeBuilder.build(
   LayerNode.group([SessionNs.node, SessionProjector.node, Database.node, EventV2Bridge.node, CrossSpawnSpawner.node]),
@@ -1430,8 +1430,8 @@ describe("session.compaction.process", () => {
         expect(captured).toContain("<previous-summary>")
         expect(captured).toContain("summary one")
         expect(captured.match(/summary one/g)?.length).toBe(1)
-        expect(captured).toContain("## Constraints & Preferences")
-        expect(captured).toContain("## Progress")
+        expect(captured).toContain("## Important Details")
+        expect(captured).toContain("## Work State")
       }).pipe(withCompaction({ llm: stub.llmLayer }))
     },
     { git: true },

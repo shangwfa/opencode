@@ -237,10 +237,11 @@ export const layer = Layer.effect(
       const pluginSvc = Option.getOrUndefined(yield* Effect.serviceOption(SessionPlugin.Service))
 
       const dotDir = path.join(directory, ".opencode")
+      const hasDotDir = yield* fs.exists(dotDir)
       const loaded: string[] = []
       const skipped: Diagnostic[] = []
 
-      if (!(yield* fs.exists(dotDir))) return { loaded, skipped }
+      if (!hasDotDir && !(yield* fs.exists(path.join(directory, "AGENTS.md"))) && !(yield* fs.exists(path.join(directory, "opencode.json"))) && !(yield* fs.exists(path.join(directory, "opencode.jsonc")))) return { loaded, skipped }
 
       for (const [service, resource] of [
         [agentsMdSvc, "AGENTS.md"],
@@ -254,10 +255,14 @@ export const layer = Layer.effect(
         if (!service) skipped.push({ path: resource, reason: "Session service unavailable" })
       }
 
-      // AGENTS.md
+      // AGENTS.md — check .opencode/AGENTS.md first, then project root AGENTS.md
       if (agentsMdSvc) {
-        const agentsMdPath = path.join(dotDir, "AGENTS.md")
-        const validPath = yield* fs.validateFile(directory, agentsMdPath)
+        let agentsMdPath = path.join(dotDir, "AGENTS.md")
+        let validPath = hasDotDir ? yield* fs.validateFile(directory, agentsMdPath) : undefined
+        if (!validPath) {
+          agentsMdPath = path.join(directory, "AGENTS.md")
+          validPath = yield* fs.validateFile(directory, agentsMdPath)
+        }
         if (validPath) {
           const content = yield* fs.readText(validPath)
           if (content.trim()) {
@@ -267,8 +272,8 @@ export const layer = Layer.effect(
         }
       }
 
-      // agents
-      if (agentSvc) {
+      // agents — only scan .opencode/ subdirectory
+      if (agentSvc && hasDotDir) {
         const agentFiles = yield* fs.scan("{agent,agents}/**/*.md", dotDir).pipe(
           Effect.catch((error) =>
             Effect.sync(() => {
@@ -319,7 +324,7 @@ export const layer = Layer.effect(
       }
 
       // skills
-      if (skillSvc) {
+      if (skillSvc && hasDotDir) {
         const skillFiles = yield* fs.scan("{skill,skills}/**/SKILL.md", dotDir).pipe(
           Effect.catch((error) =>
             Effect.sync(() => {
@@ -355,11 +360,15 @@ export const layer = Layer.effect(
         }
       }
 
-      // MCP (from opencode.json / opencode.jsonc)
+      // MCP (from opencode.json / opencode.jsonc) — check .opencode/ first, then project root
       if (mcpSvc) {
         for (const file of ["opencode.json", "opencode.jsonc"]) {
-          const mcpPath = path.join(dotDir, file)
-          const validPath = yield* fs.validateFile(directory, mcpPath)
+          let mcpPath = path.join(dotDir, file)
+          let validPath = hasDotDir ? yield* fs.validateFile(directory, mcpPath) : undefined
+          if (!validPath) {
+            mcpPath = path.join(directory, file)
+            validPath = yield* fs.validateFile(directory, mcpPath)
+          }
           if (!validPath) continue
           const raw = yield* fs.readText(validPath)
           if (!raw) continue
@@ -387,7 +396,7 @@ export const layer = Layer.effect(
       }
 
       // tools
-      if (toolSvc) {
+      if (toolSvc && hasDotDir) {
         const toolFiles = yield* fs.scan("tool/*.{ts,js}", dotDir).pipe(
           Effect.catch((error) =>
             Effect.sync(() => {
@@ -415,7 +424,7 @@ export const layer = Layer.effect(
       }
 
       // commands
-      if (commandSvc) {
+      if (commandSvc && hasDotDir) {
         const commandFiles = yield* fs.scan("{command,commands}/**/*.md", dotDir).pipe(
           Effect.catch((error) =>
             Effect.sync(() => {
@@ -458,7 +467,7 @@ export const layer = Layer.effect(
       }
 
       // plugins
-      if (pluginSvc) {
+      if (pluginSvc && hasDotDir) {
         const pluginFiles = yield* fs.scan("{plugin,plugins}/*.{ts,js}", dotDir).pipe(
           Effect.catch((error) =>
             Effect.sync(() => {

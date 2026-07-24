@@ -140,7 +140,7 @@ const layer = Layer.effect(
     const db = (yield* Database.Service).db
 
     const canonical = Effect.fnUntraced(function* (input: AbsolutePath) {
-      const resolved = AbsolutePath.make(FSUtil.resolve(input))
+      const resolved = AbsolutePath.make(yield* fs.resolve(input))
       if (!(yield* fs.isDir(resolved))) return yield* new DirectoryUnavailableError({ directory: input })
       return resolved
     })

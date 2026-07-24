@@ -14,7 +14,7 @@ import { testEffect } from "../lib/effect"
 const it = testEffect(
   LayerNode.compile(LayerNode.group([Worktree.node, FSUtil.node, Git.node]), [
     [InstanceStore.bootstrapNode, InstanceBootstrap.node],
-  ] as any),
+  ]),
 )
 const wintest = process.platform !== "win32" ? it.instance : it.instance.skip
 

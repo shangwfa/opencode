@@ -59,7 +59,7 @@ const drain = (input: LLM.StreamInput) => LLM.Service.use((svc) => svc.stream(in
 
 // drainWith builds an isolated runtime so custom replacements fully own LLM and
 // its transitive deps.
-const drainWith = (layer: Layer.Layer<LLM.Service, unknown, never>, input: LLM.StreamInput) =>
+const drainWith = (layer: Layer.Layer<LLM.Service>, input: LLM.StreamInput) =>
   Effect.gen(function* () {
     const ctx = yield* InstanceRef
     if (!ctx) return yield* Effect.die("InstanceRef not provided")
@@ -1092,7 +1092,7 @@ describe("session.llm.stream", () => {
         const agent = {
           name: "test",
           mode: "primary",
-          options: {},
+          options: { reasoningMode: "pro" },
           permission: [{ permission: "*", pattern: "*", action: "allow" }],
           temperature: 0.2,
         } satisfies Agent.Info
@@ -1123,6 +1123,7 @@ describe("session.llm.stream", () => {
         expect(body.model).toBe(resolved.api.id)
         expect(body.stream).toBe(true)
         expect((body.reasoning as { effort?: string } | undefined)?.effort).toBe("high")
+        expect((body.reasoning as { mode?: string } | undefined)?.mode).toBe("pro")
 
         const maxTokens = body.max_output_tokens as number | undefined
         expect(maxTokens).toBe(undefined) // match codex cli behavior

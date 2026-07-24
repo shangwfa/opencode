@@ -1,8 +1,4 @@
 import { makeGlobalNode } from "@opencode-ai/core/effect/app-node"
-import { LayerNode } from "@opencode-ai/core/effect/layer-node"
-import { buildLocationServiceMap } from "@opencode-ai/core/location-services"
-import { LocationServiceMap } from "@opencode-ai/core/location-service-map"
-import { Location } from "@opencode-ai/core/location"
 import { Plugin } from "../plugin"
 import { Format } from "../format"
 import { LSP } from "@/lsp/lsp"
@@ -52,25 +48,6 @@ const layer = Layer.effect(
     return Service.of({ run })
   }),
 )
-
-const defaultLocationRef = { directory: "/workspace" } as Location.Ref
-const locationReplacements: LayerNode.Replacements = [
-  [LocationServiceMap.node, makeGlobalNode({ service: LocationServiceMap.Service, layer: buildLocationServiceMap(), deps: [] })],
-  [Location.node, Location.boundNode(defaultLocationRef)],
-]
-
-export const defaultLayer: Layer.Layer<Service> = (layer.pipe(
-  Layer.provide([
-    LayerNode.compile(Config.node, locationReplacements),
-    LayerNode.compile(Format.node, locationReplacements),
-    LayerNode.compile(LSP.node, locationReplacements),
-    LayerNode.compile(Plugin.node, locationReplacements),
-    Project.defaultLayer,
-    LayerNode.compile(ShareNext.node, locationReplacements),
-    LayerNode.compile(Snapshot.node, locationReplacements),
-    LayerNode.compile(Vcs.node, locationReplacements),
-  ]),
-) as any)
 
 export const node = makeGlobalNode({
   service: Service,

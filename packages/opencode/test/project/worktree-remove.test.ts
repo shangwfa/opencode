@@ -10,7 +10,7 @@ import { Worktree } from "../../src/worktree"
 import { TestInstance } from "../fixture/fixture"
 import { testEffect } from "../lib/effect"
 
-const it = testEffect(LayerNode.compile(Worktree.node, [[InstanceStore.bootstrapNode, InstanceBootstrap.node]] as any))
+const it = testEffect(LayerNode.compile(Worktree.node, [[InstanceStore.bootstrapNode, InstanceBootstrap.node]]))
 const wintest = process.platform === "win32" ? it.instance : it.instance.skip
 
 describe("Worktree.remove", () => {

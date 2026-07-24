@@ -11,6 +11,8 @@ const [data, setData] = createStore({
   session_status: {} as Record<string, { type: "idle" | "busy" }>,
   agent: [{ name: "build", mode: "task", hidden: false }],
   command: [{ name: "fix", description: "Run fix command", source: "project" }],
+  reference: [],
+  mcp_resource: {},
 })
 
 export function useSync() {

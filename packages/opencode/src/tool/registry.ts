@@ -61,6 +61,9 @@ import { ModelV2 } from "@opencode-ai/core/model"
 import { SandboxProvider } from "./sandbox-provider"
 import { RepositoryCache } from "@opencode-ai/core/repository-cache"
 import { SessionTool, importToolCode } from "./session-tool"
+import { MCP } from "@/mcp"
+import { PermissionV1 } from "@opencode-ai/core/v1/permission"
+import { McpCatalog } from "@/mcp/catalog"
 
 export function webSearchEnabled(
   providerID: ProviderV2.ID,
@@ -89,6 +92,7 @@ export interface Interface {
     modelID: ModelV2.ID
     agent: Agent.Info
     sessionID?: SessionID
+    permission?: PermissionV1.Ruleset
   }) => Effect.Effect<Tool.Def[]>
 }
 
@@ -103,6 +107,7 @@ const layer = Layer.effect(
     const agents = yield* Agent.Service
     const truncate = yield* Truncate.Service
     const flags = yield* RuntimeFlags.Service
+    const mcp = yield* MCP.Service
 
     const invalid = yield* InvalidTool
     const task = yield* TaskTool
@@ -125,6 +130,8 @@ const layer = Layer.effect(
     const skilltool = yield* SkillTool
     const agent = yield* Agent.Service
     const sessionToolSvc = Option.getOrUndefined(yield* Effect.serviceOption(SessionTool.Service))
+    const codeMode = flags.experimentalCodeMode ? yield* Effect.promise(() => import("./code-mode")) : undefined
+    const codeModeTool = codeMode ? yield* codeMode.CodeModeTool : undefined
 
     const state = yield* InstanceState.make<State>(
       Effect.fn("ToolRegistry.state")(function* (ctx) {
@@ -236,6 +243,7 @@ const layer = Layer.effect(
           question: Tool.init(question),
           lsp: Tool.init(lsptool),
           plan: Tool.init(plan),
+          ...(codeModeTool ? { execute: Tool.init(codeModeTool) } : {}),
         })
 
         return {
@@ -257,6 +265,7 @@ const layer = Layer.effect(
             ...(flags.experimentalScout ? [tool.repo_clone, tool.repo_overview] : []),
             tool.skill,
             tool.patch,
+            ...(tool.execute ? [tool.execute] : []),
             ...(lspToolEnabled ? [tool.lsp] : []),
             ...(flags.experimentalPlanMode && flags.client === "cli" ? [tool.plan] : []),
           ],
@@ -376,6 +385,17 @@ const layer = Layer.effect(
       }
     }
 
+    const describeCodeMode = Effect.fn("ToolRegistry.describeCodeMode")(function* (input: {
+      agent: Agent.Info
+      permission?: PermissionV1.Ruleset
+    }) {
+      if (!codeMode) return
+      const ruleset = Permission.merge(input.agent.permission, input.permission ?? [])
+      const tools = Permission.visibleTools(yield* mcp.tools(), ruleset)
+      if (Object.keys(tools).length === 0) return
+      return codeMode.describeCatalog(tools, Object.keys(yield* mcp.clients()).map(McpCatalog.sanitize))
+    })
+
     const tools: Interface["tools"] = Effect.fn("ToolRegistry.tools")(function* (input) {
       const filtered = (yield* all()).filter((tool) => {
         if (tool.id === WebSearchTool.id) {
@@ -428,9 +448,15 @@ const layer = Layer.effect(
       const merged = new Map<string, Tool.Def>()
       for (const def of filtered) merged.set(def.id, def)
       for (const def of sessionDefs) merged.set(def.id, def)
+      const mergedList = [...merged.values()]
+
+      const codeModeDescription = mergedList.some((tool) => tool.id === "execute")
+        ? yield* describeCodeMode(input)
+        : undefined
+      const visible = mergedList.filter((tool) => tool.id !== "execute" || codeModeDescription)
 
       return yield* Effect.forEach(
-        [...merged.values()],
+        visible,
         Effect.fnUntraced(function* (tool: Tool.Def) {
           let output = {
             description: tool.description,
@@ -451,6 +477,7 @@ const layer = Layer.effect(
               output.description,
               tool.id === TaskTool.id ? yield* describeTask(input.agent, input.sessionID) : undefined,
               tool.id === SkillTool.id ? yield* describeSkill(input.agent) : undefined,
+              tool.id === "execute" ? codeModeDescription : undefined,
             ]
               .filter(Boolean)
               .join("\n"),
@@ -502,7 +529,6 @@ export const defaultLayer = Layer.suspend(() =>
       Layer.provide(LayerNode.compile(SessionRunState.node)),
     ),
 )
-
 function isZodType(value: unknown): value is z.ZodType {
   return typeof value === "object" && value !== null && "_zod" in value
 }
@@ -607,6 +633,7 @@ export const node = LayerNode.make({
     Format.node,
     Truncate.node,
     RuntimeFlags.node,
+    MCP.node,
     Database.node,
     RepositoryCache.node,
     SandboxProvider.node,

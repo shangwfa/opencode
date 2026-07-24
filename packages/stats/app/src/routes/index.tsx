@@ -1,11 +1,10 @@
-import "./index.css"
 import { Link, Meta, Title } from "@solidjs/meta"
 import { ProviderIcon } from "@opencode-ai/ui/provider-icon"
 import { geoEquirectangular, geoPath } from "d3-geo"
 import { scaleSqrt } from "d3-scale"
 import countryCodesSource from "i18n-iso-countries/codes.json?raw"
 import { feature, mesh } from "topojson-client"
-import countriesTopologySource from "world-atlas/countries-110m.json?raw"
+import countriesTopologySource from "world-atlas/countries-50m.json?raw"
 import ibmPlexMonoRegularLatin1 from "@ibm/plex/IBM-Plex-Mono/fonts/split/woff2/IBMPlexMono-Regular-Latin1.woff2?url"
 import ibmPlexMonoMediumLatin1 from "@ibm/plex/IBM-Plex-Mono/fonts/split/woff2/IBMPlexMono-Medium-Latin1.woff2?url"
 import ibmPlexMonoSemiBoldLatin1 from "@ibm/plex/IBM-Plex-Mono/fonts/split/woff2/IBMPlexMono-SemiBold-Latin1.woff2?url"
@@ -34,6 +33,7 @@ import { localizedUrl } from "../lib/language"
 import { findModelCatalogEntry, getModelCatalog, type ModelCatalog } from "./model-catalog"
 import { SectionHeading } from "./section-heading"
 import { setStatsPageCacheHeaders } from "./stats-cache"
+import { ComparisonCardsSection, uniqueComparisonPairs, type ComparisonModelRef } from "./compare-cards"
 import {
   applyThemePreference,
   Footer,
@@ -48,6 +48,12 @@ import {
 const products = ["All Users", "Zen", "Go"] as const
 const tokenProducts = ["Zen", "Go"] as const
 const ranges = ["1D", "1W", "2W", "1M", "2M"] as const
+const comparisonPairIndexes = [
+  [0, 1, "Top two by recent usage"],
+  [0, 2, "Leader vs challenger"],
+  [1, 2, "Adjacent leaderboard pair"],
+  [2, 3, "Top model alternative"],
+] as const
 const statsUnfurlPath = "banner.jpg"
 const usageColors = [
   "#ed6aff",
@@ -110,6 +116,7 @@ const worldPath = geoPath(worldProjection)
 const worldCountryPaths = worldCountries.features.map((country) => ({
   id: String(country.id ?? "").padStart(3, "0"),
   path: worldPath(country) ?? "",
+  marker: geoCountryMarker(country),
 }))
 const worldBorderPath = worldPath(mesh(worldTopology, worldCountryGeometries, (a, b) => a !== b)) ?? ""
 
@@ -126,6 +133,7 @@ export default function StatsHome() {
   const statsHomeUrl = localizedUrl(language.locale(), "/data/")
   const statsUnfurlUrl = new URL(statsUnfurlPath, localizedUrl("en", "/data/")).toString()
   const data = createAsync(() => getData())
+  const catalog = createAsync(() => getModelCatalog())
   const githubStars = createAsync(() => getGitHubStars())
   const [themePreference, setThemePreference] = createSignal<ThemePreference>("system")
   const updateThemePreference = (preference: ThemePreference) => {
@@ -177,15 +185,25 @@ export default function StatsHome() {
                 <TopModelsSection data={stats().usage} leaderboard={stats().leaderboard} />
                 <UniqueUsersSection data={stats().users} />
                 <SessionCostSection data={stats().sessionCost} />
-                <TokenCostSection data={stats().tokenCost} />
+                <TokenCostSection data={stats().tokenCost} catalog={catalog() ?? null} />
                 <CacheRatioSection data={stats().cacheRatio} />
                 <MarketShareSection data={stats().market} />
                 <GeoBreakdownSection data={stats().country} />
+                <ComparisonCardsSection
+                  pairs={homeComparisonPairs(stats().leaderboard["All Users"]["2M"])}
+                  title="Model Comparisons"
+                  description="Popular model pairs from the leaderboard."
+                  variant="featured"
+                />
               </>
             )}
           </Show>
         </div>
-        <Footer themePreference={themePreference()} onThemePreferenceChange={updateThemePreference} />
+        <Footer
+          themePreference={themePreference()}
+          onThemePreferenceChange={updateThemePreference}
+          bridge={{ href: "#model-comparison", label: "MODEL COMPARISONS" }}
+        />
       </div>
     </main>
   )
@@ -874,10 +892,8 @@ function stackedTopModelsSegments(point: UsagePoint, order: Map<string, number>)
 }
 
 function getTopModelsSegmentOrder(data: UsagePoint[]) {
-  return getRankOrder(
-    data.flatMap((point) =>
-      point.segments.map((segment, index) => ({ key: segment.model, value: segment.value, index })),
-    ),
+  return new Map(
+    data.find((point) => point.segments.length > 0)?.segments.map((segment, index) => [segment.model, index]) ?? [],
   )
 }
 
@@ -952,9 +968,7 @@ function Leaderboard(props: {
 }) {
   const i18n = useI18n()
   const featured = createMemo(() => props.data.slice(0, 3))
-  const columns = createMemo(() =>
-    [0, 1, 2].map((index) => props.data.slice(3 + index * 5, 8 + index * 5)).filter((column) => column.length > 0),
-  )
+  const compact = createMemo(() => props.data.slice(3))
 
   return (
     <div id="leaderboard" data-component="leaderboard" role="list" aria-label={i18n.t("chart.leaderboardAria")}>
@@ -972,20 +986,14 @@ function Leaderboard(props: {
       </div>
       <div data-slot="leaderboard-pattern" aria-hidden="true" />
       <div data-slot="leaderboard-compact">
-        <For each={columns()}>
-          {(column) => (
-            <div data-slot="leaderboard-column">
-              <For each={column}>
-                {(entry) => (
-                  <LeaderboardCard
-                    entry={entry}
-                    size="compact"
-                    active={props.activeModel === entry.model}
-                    onActiveModelChange={props.onActiveModelChange}
-                  />
-                )}
-              </For>
-            </div>
+        <For each={compact()}>
+          {(entry) => (
+            <LeaderboardCard
+              entry={entry}
+              size="compact"
+              active={props.activeModel === entry.model}
+              onActiveModelChange={props.onActiveModelChange}
+            />
           )}
         </For>
       </div>
@@ -1270,30 +1278,56 @@ function MarketShareList(props: {
   onActiveAuthorChange: (author: string) => void
 }) {
   const i18n = useI18n()
+  const language = useLanguage()
   return (
     <ol data-component="market-share-list">
       <For each={props.data}>
-        {(item, index) => (
-          <li
-            role="button"
-            tabIndex={0}
-            aria-label={`${item.author} ${formatTrillions(item.tokens)} ${item.share.toFixed(1)} ${i18n.t("chart.percent")}`}
-            data-active={props.activeAuthor === item.author ? "true" : undefined}
-            onPointerEnter={() => props.onActiveAuthorChange(item.author)}
-            onFocus={() => props.onActiveAuthorChange(item.author)}
-            onKeyDown={(event) => {
-              if (event.key !== "Enter" && event.key !== " ") return
-              event.preventDefault()
-              props.onActiveAuthorChange(item.author)
-            }}
-          >
-            <span>{String(index() + 1).padStart(2, "0")}</span>
-            <i style={{ background: getRankColor(item.author, index(), props.authorOrder, marketColors) }} />
-            <strong>{item.author}</strong>
-            <em>{formatTrillions(item.tokens)}</em>
-            <b>{item.share.toFixed(1)}%</b>
-          </li>
-        )}
+        {(item, index) => {
+          const label = () =>
+            `${item.author} ${formatTrillions(item.tokens)} ${item.share.toFixed(1)} ${i18n.t("chart.percent")}`
+          const content = () => (
+            <>
+              <span>{String(index() + 1).padStart(2, "0")}</span>
+              <i style={{ background: getRankColor(item.author, index(), props.authorOrder, marketColors) }} />
+              <strong>{item.author}</strong>
+              <em>{formatTrillions(item.tokens)}</em>
+              <b>{item.share.toFixed(1)}%</b>
+            </>
+          )
+          const href = () =>
+            item.author === "Other" ? undefined : language.route(`${import.meta.env.BASE_URL}${modelSlug(item.author)}`)
+          return (
+            <li
+              data-active={props.activeAuthor === item.author ? "true" : undefined}
+              onPointerEnter={() => props.onActiveAuthorChange(item.author)}
+            >
+              <Show
+                when={href()}
+                fallback={
+                  <button
+                    type="button"
+                    aria-label={label()}
+                    onClick={() => props.onActiveAuthorChange(item.author)}
+                    onFocus={() => props.onActiveAuthorChange(item.author)}
+                  >
+                    {content()}
+                  </button>
+                }
+              >
+                {(href) => (
+                  <a
+                    href={href()}
+                    aria-label={label()}
+                    onClick={() => props.onActiveAuthorChange(item.author)}
+                    onFocus={() => props.onActiveAuthorChange(item.author)}
+                  >
+                    {content()}
+                  </a>
+                )}
+              </Show>
+            </li>
+          )
+        }}
       </For>
     </ol>
   )
@@ -1397,6 +1431,7 @@ function GeoWorldMap(props: {
             return (
               <path
                 d={country.path}
+                data-country-id={country.id}
                 data-has-data={entry() ? "true" : undefined}
                 data-active={entry()?.country === props.activeCountry ? "true" : undefined}
                 style={{ "--geo-country-opacity": String(countryOpacity(entry())) } as JSX.CSSProperties}
@@ -1412,6 +1447,37 @@ function GeoWorldMap(props: {
                   props.onActiveCountryChange(item.country)
                 }}
               />
+            )
+          }}
+        </For>
+      </g>
+      <g data-slot="geo-country-markers">
+        <For each={worldCountryPaths}>
+          {(country) => {
+            const entry = () => props.countryById.get(country.id)
+            return (
+              <Show when={country.marker && entry() ? country.marker : undefined}>
+                {(marker) => (
+                  <circle
+                    cx={marker().x}
+                    cy={marker().y}
+                    r={entry()?.country === props.activeCountry ? 3.4 : 2.4}
+                    data-active={entry()?.country === props.activeCountry ? "true" : undefined}
+                    style={{ "--geo-country-opacity": String(countryOpacity(entry())) } as JSX.CSSProperties}
+                    aria-hidden="true"
+                    onPointerEnter={() => {
+                      const item = entry()
+                      if (!item) return
+                      props.onActiveCountryChange(item.country)
+                    }}
+                    onClick={() => {
+                      const item = entry()
+                      if (!item) return
+                      props.onActiveCountryChange(item.country)
+                    }}
+                  />
+                )}
+              </Show>
             )
           }}
         </For>
@@ -1573,7 +1639,7 @@ function TokenCostSection(props: { data: StatsHomeData["tokenCost"]; catalog: Mo
   const i18n = useI18n()
   const [product, setProduct] = createSignal<TokenProduct>("Go")
   const [activeIndex, setActiveIndex] = createSignal(2)
-  const data = createMemo(() => props.data[product()])
+  const data = createMemo(() => priceTokenCostFromCatalog(props.data[product()], props.catalog))
   const visible = createMemo(() => data().slice(0, 13))
   const selectedIndex = createMemo(() => Math.min(activeIndex(), Math.max(visible().length - 1, 0)))
 
@@ -1769,7 +1835,7 @@ function formatRatio(value: number) {
 }
 
 function formatDollars(value: number) {
-  return `$${value.toFixed(2)}`
+  return `$${value.toFixed(value > 0 && value < 0.01 ? 4 : 2)}`
 }
 
 function MetricBar(props: { value: number; max: number; active: boolean }) {
@@ -1892,8 +1958,51 @@ function formatTokenCount(value: number) {
   return `${Math.round(value / 1_000)}K`
 }
 
+function priceTokenCostFromCatalog(data: TokenCostEntry[], catalog: ModelCatalog | null) {
+  if (!catalog) return data
+  return data
+    .flatMap((item) => {
+      const cost = catalogModelCost(catalog, item.model)
+      if (!cost) return []
+      return [
+        {
+          ...item,
+          total: cost.output,
+          input: cost.input,
+          output: cost.output,
+          cached: cost.cacheRead ?? cost.input,
+        },
+      ]
+    })
+    .toSorted((a, b) => a.total - b.total || a.model.localeCompare(b.model))
+}
+
+function catalogModelCost(catalog: ModelCatalog, model: string) {
+  return findModelCatalogEntry(catalog, model)?.cost
+}
+
 function formatSessionCost(value: number) {
   return `$${value.toFixed(4)}`
+}
+
+function homeComparisonPairs(leaderboard: LeaderboardEntry[]) {
+  return uniqueComparisonPairs(
+    comparisonPairIndexes.flatMap(([firstIndex, secondIndex, detail]) => {
+      const first = leaderboard[firstIndex]
+      const second = leaderboard[secondIndex]
+      return first && second ? [{ first: leaderboardRef(first), second: leaderboardRef(second), detail }] : []
+    }),
+  )
+}
+
+function leaderboardRef(entry: LeaderboardEntry): ComparisonModelRef {
+  return {
+    name: entry.model,
+    lab: entry.provider,
+    slug: modelSlug(entry.model),
+    labName: entry.author,
+    metric: `#${entry.rank} / ${formatBillions(entry.tokens)}`,
+  }
 }
 
 function modelSlug(value: string) {
