@@ -399,7 +399,13 @@ export const layer = Layer.effect(
         yield* Effect.logDebug("LSP daemon ready", { sessionID })
       } else {
         daemonStates.set(sessionID, { state: "error", lastActive: Date.now() })
-        yield* Effect.logWarning("LSP daemon failed to start", { sessionID })
+        const logTail = yield* sandbox
+          .runInSession(sessionID, "tail -20 /tmp/opencode-lsp-daemon.log 2>/dev/null || echo '(no log file)'")
+          .pipe(
+            Effect.map((exec) => exec.logs.stdout.map((m) => m.text).join("").trim()),
+            Effect.catch(() => Effect.succeed("(failed to read log)")),
+          )
+        yield* Effect.logWarning("LSP daemon failed to start", { sessionID, daemonLog: logTail.slice(-500) })
       }
     })
 

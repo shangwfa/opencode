@@ -124,6 +124,7 @@ interface HeldServer {
   initPromise: Promise<void> | null
   crashed: boolean
   spawnFailed: boolean
+  lastSpawnAttempt: number
 }
 
 const TS_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts", ".cts", ".ets"])
@@ -285,8 +286,13 @@ export class LspManager {
       this.servers.set(id, server)
     }
 
-    if (server.crashed && !server.spawnFailed) {
+    const SPAWN_RETRY_INTERVAL_MS = 60_000
+    const canRetrySpawn = server.spawnFailed && Date.now() - server.lastSpawnAttempt > SPAWN_RETRY_INTERVAL_MS
+    if (server.crashed || canRetrySpawn) {
+      if (server.spawnFailed && !canRetrySpawn) return ""
       server.crashed = false
+      server.spawnFailed = false
+      server.lastSpawnAttempt = Date.now()
       // Clear stale document state so the restarted server gets fresh
       // didOpen notifications instead of didChange against documents it
       // has never seen (which tsserver silently ignores or errors on).
@@ -401,7 +407,9 @@ export class LspManager {
 
     try {
       await this.requestPullDiagnostics(server, normalized, result)
-    } catch {}
+    } catch (err) {
+      log(`pullDiagnostics failed: ${String(err)}`)
+    }
 
     return result
   }
@@ -471,7 +479,8 @@ export class LspManager {
 
       const hover = result as { contents?: unknown }
       return { contents: normalizeHoverContents(hover.contents) }
-    } catch {
+    } catch (err) {
+      log(`hover failed: ${String(err)}`)
       return { contents: null }
     }
   }
@@ -513,7 +522,8 @@ export class LspManager {
 
       if (!Array.isArray(result)) return { items: [] }
       return { items: result.filter(Boolean) as CallHierarchyItem[] }
-    } catch {
+    } catch (err) {
+      log(`prepareCallHierarchy failed: ${String(err)}`)
       return { items: [] }
     }
   }
@@ -545,7 +555,8 @@ export class LspManager {
 
       if (!Array.isArray(result)) return { calls: [] }
       return { calls: result.filter(Boolean) as CallHierarchyIncomingCall[] }
-    } catch {
+    } catch (err) {
+      log(`incomingCalls failed: ${String(err)}`)
       return { calls: [] }
     }
   }
@@ -577,7 +588,8 @@ export class LspManager {
 
       if (!Array.isArray(result)) return { calls: [] }
       return { calls: result.filter(Boolean) as CallHierarchyOutgoingCall[] }
-    } catch {
+    } catch (err) {
+      log(`outgoingCalls failed: ${String(err)}`)
       return { calls: [] }
     }
   }
@@ -600,7 +612,8 @@ export class LspManager {
       )
 
       return { symbols: Array.isArray(result) ? result : [] }
-    } catch {
+    } catch (err) {
+      log(`documentSymbol failed: ${String(err)}`)
       return { symbols: [] }
     }
   }
@@ -629,7 +642,8 @@ export class LspManager {
         .map((item) => ({ name: item.name, kind: item.kind, location: item.location }))
 
       return { symbols }
-    } catch {
+    } catch (err) {
+      log(`workspaceSymbol failed: ${String(err)}`)
       return { symbols: [] }
     }
   }
@@ -664,6 +678,7 @@ export class LspManager {
       initPromise: null,
       crashed: false,
       spawnFailed: false,
+      lastSpawnAttempt: 0,
     }
     server.initPromise = this.initializeServer(server)
     return server
@@ -932,7 +947,8 @@ export class LspManager {
       )
 
       return { locations: normalizeLocations(result) }
-    } catch {
+    } catch (err) {
+      log(`requestLocations ${method} failed: ${String(err)}`)
       return { locations: [] }
     }
   }
@@ -962,7 +978,8 @@ export class LspManager {
       )
 
       return { locations: normalizeLocations(result) }
-    } catch {
+    } catch (err) {
+      log(`requestLocationsWithParams ${method} failed: ${String(err)}`)
       return { locations: [] }
     }
   }

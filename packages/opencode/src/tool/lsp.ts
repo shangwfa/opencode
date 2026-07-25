@@ -1,10 +1,13 @@
-import { Effect, Schema } from "effect"
+import { Effect, Option, Schema, Cause } from "effect"
 import * as Tool from "./tool"
 import path from "path"
+import { LSP } from "@/lsp/lsp"
 import { Agent as LspAgent } from "@/lsp/agent"
 import DESCRIPTION from "./lsp.txt"
 import { InstanceState } from "@/effect/instance-state"
+import { pathToFileURL } from "url"
 import { assertExternalDirectoryEffect } from "./external-directory"
+import { FSUtil } from "@opencode-ai/core/fs-util"
 import { toSandboxPath } from "./sandbox-path"
 import { SandboxProvider } from "./sandbox-provider"
 
@@ -37,6 +40,8 @@ export const Parameters = Schema.Struct({
 export const LspTool = Tool.define(
   "lsp",
   Effect.gen(function* () {
+    const lsp = Option.getOrUndefined(yield* Effect.serviceOption(LSP.Service))
+    const fs = Option.getOrUndefined(yield* Effect.serviceOption(FSUtil.Service))
     return {
       description: DESCRIPTION,
       parameters: Parameters,
@@ -72,6 +77,13 @@ export const LspTool = Tool.define(
                   : `${sandboxRelPath}:${args.line}:${args.character}`
               const sandboxTitle = `${args.operation} ${sandboxDetail}`
 
+              const catchSandbox = (op: string) =>
+                Effect.catchCause((cause) =>
+                  Effect.logWarning("LSP sandbox operation failed", { operation: op, sessionID: sid, error: Cause.pretty(cause) }).pipe(
+                    Effect.as(null),
+                  ),
+                )
+
               // Note: no explicit agent.touch here — the daemon's hover/
               // definition/references/etc. endpoints all call touchFile
               // internally before performing the LSP request, so an outer
@@ -79,7 +91,7 @@ export const LspTool = Tool.define(
               switch (args.operation) {
                 case "hover": {
                   const result = yield* agent.hover(sid, file, instance.directory, args.line - 1, args.character - 1).pipe(
-                    Effect.catchCause(() => Effect.succeed(null)),
+                    catchSandbox("hover"),
                   )
                   if (!result || !result.contents) {
                     return { title: sandboxTitle, metadata: { result: [] }, output: "No hover information available." }
@@ -88,7 +100,7 @@ export const LspTool = Tool.define(
                 }
                 case "goToDefinition": {
                   const result = yield* agent.definition(sid, file, instance.directory, args.line - 1, args.character - 1).pipe(
-                    Effect.catchCause(() => Effect.succeed(null)),
+                    catchSandbox("definition"),
                   )
                   if (!result || result.locations.length === 0) {
                     return { title: sandboxTitle, metadata: { result: [] }, output: "No definitions found." }
@@ -98,7 +110,7 @@ export const LspTool = Tool.define(
                 }
                 case "findReferences": {
                   const result = yield* agent.references(sid, file, instance.directory, args.line - 1, args.character - 1).pipe(
-                    Effect.catchCause(() => Effect.succeed(null)),
+                    catchSandbox("references"),
                   )
                   if (!result || result.locations.length === 0) {
                     return { title: sandboxTitle, metadata: { result: [] }, output: "No references found." }
@@ -108,7 +120,7 @@ export const LspTool = Tool.define(
                 }
                 case "goToImplementation": {
                   const result = yield* agent.implementation(sid, file, instance.directory, args.line - 1, args.character - 1).pipe(
-                    Effect.catchCause(() => Effect.succeed(null)),
+                    catchSandbox("implementation"),
                   )
                   if (!result || result.locations.length === 0) {
                     return { title: sandboxTitle, metadata: { result: [] }, output: "No implementations found." }
@@ -118,7 +130,7 @@ export const LspTool = Tool.define(
                 }
                 case "documentSymbol": {
                   const result = yield* agent.documentSymbol(sid, file, instance.directory).pipe(
-                    Effect.catchCause(() => Effect.succeed(null)),
+                    catchSandbox("documentSymbol"),
                   )
                   if (!result || result.symbols.length === 0) {
                     return { title: sandboxTitle, metadata: { result: [] }, output: "No document symbols found." }
@@ -128,7 +140,7 @@ export const LspTool = Tool.define(
                 }
                 case "workspaceSymbol": {
                   const result = yield* agent.workspaceSymbol(sid, args.query ?? "").pipe(
-                    Effect.catchCause(() => Effect.succeed(null)),
+                    catchSandbox("workspaceSymbol"),
                   )
                   if (!result || result.symbols.length === 0) {
                     return { title: sandboxTitle, metadata: { result: [] }, output: "No workspace symbols found." }
@@ -138,7 +150,7 @@ export const LspTool = Tool.define(
                 }
                 case "prepareCallHierarchy": {
                   const result = yield* agent.prepareCallHierarchy(sid, file, instance.directory, args.line - 1, args.character - 1).pipe(
-                    Effect.catchCause(() => Effect.succeed(null)),
+                    catchSandbox("prepareCallHierarchy"),
                   )
                   if (!result || result.items.length === 0) {
                     return { title: sandboxTitle, metadata: { result: [] }, output: "No call hierarchy items found." }
@@ -148,7 +160,7 @@ export const LspTool = Tool.define(
                 }
                 case "incomingCalls": {
                   const result = yield* agent.incomingCalls(sid, file, instance.directory, args.line - 1, args.character - 1).pipe(
-                    Effect.catchCause(() => Effect.succeed(null)),
+                    catchSandbox("incomingCalls"),
                   )
                   if (!result || result.calls.length === 0) {
                     return { title: sandboxTitle, metadata: { result: [] }, output: "No incoming calls found." }
@@ -158,7 +170,7 @@ export const LspTool = Tool.define(
                 }
                 case "outgoingCalls": {
                   const result = yield* agent.outgoingCalls(sid, file, instance.directory, args.line - 1, args.character - 1).pipe(
-                    Effect.catchCause(() => Effect.succeed(null)),
+                    catchSandbox("outgoingCalls"),
                   )
                   if (!result || result.calls.length === 0) {
                     return { title: sandboxTitle, metadata: { result: [] }, output: "No outgoing calls found." }
@@ -169,6 +181,57 @@ export const LspTool = Tool.define(
                 default:
                   return { title: sandboxTitle, metadata: { result: [] }, output: `${args.operation} is not yet supported in sandbox mode.` }
               }
+            }
+          }
+
+          // Local LSP fallback when no sandbox/agent is available.
+          if (lsp && fs) {
+            const uri = pathToFileURL(file).href
+            const position = { file, line: args.line - 1, character: args.character - 1 }
+            const relPath = path.relative(instance.worktree, file)
+            const detail =
+              args.operation === "workspaceSymbol"
+                ? ""
+                : args.operation === "documentSymbol"
+                  ? relPath
+                  : `${relPath}:${args.line}:${args.character}`
+            const title = detail ? `${args.operation} ${detail}` : args.operation
+
+            const exists = yield* fs.existsSafe(file)
+            if (!exists) throw new Error(`File not found: ${file}`)
+
+            const available = yield* lsp.hasClients(file)
+            if (!available) throw new Error("No LSP server available for this file type.")
+
+            yield* lsp.touchFile(file, "document")
+
+            const result: unknown[] = yield* (() => {
+              switch (args.operation) {
+                case "goToDefinition":
+                  return lsp.definition(position)
+                case "findReferences":
+                  return lsp.references(position)
+                case "hover":
+                  return lsp.hover(position)
+                case "documentSymbol":
+                  return lsp.documentSymbol(uri)
+                case "workspaceSymbol":
+                  return lsp.workspaceSymbol(args.query ?? "")
+                case "goToImplementation":
+                  return lsp.implementation(position)
+                case "prepareCallHierarchy":
+                  return lsp.prepareCallHierarchy(position)
+                case "incomingCalls":
+                  return lsp.incomingCalls(position)
+                case "outgoingCalls":
+                  return lsp.outgoingCalls(position)
+              }
+            })()
+
+            return {
+              title,
+              metadata: { result },
+              output: result.length === 0 ? `No results found for ${args.operation}` : JSON.stringify(result, null, 2),
             }
           }
 
