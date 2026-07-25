@@ -40,7 +40,7 @@ export function usePromptMove(input: { projectID: () => string | undefined; sess
         },
         { throwOnError: true },
       )
-      const directory = result.data?.path
+      const directory = result.data?.directory
       if (!directory) throw new Error("No project copy directory returned")
 
       // Call a location-based route to make sure it's bootstrapped
