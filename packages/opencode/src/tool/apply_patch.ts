@@ -1,5 +1,5 @@
 import * as path from "path"
-import { Effect, Schema } from "effect"
+import { Effect, Option, Schema } from "effect"
 import * as Tool from "./tool"
 import { EventV2Bridge } from "@/event-v2-bridge"
 import { Watcher } from "@opencode-ai/core/filesystem/watcher"
@@ -29,9 +29,13 @@ export const ApplyPatchTool = Tool.define(
   "apply_patch",
   Effect.gen(function* () {
     const events = yield* EventV2Bridge.Service
+    const afs = yield* FSUtil.Service
+    const lsp = Option.getOrUndefined(yield* Effect.serviceOption(LSP.Service))
+    const format = Option.getOrUndefined(yield* Effect.serviceOption(Format.Service))
 
     const readFile = (filePath: string, ctx: Tool.Context, instance: { directory: string }) =>
       Effect.gen(function* () {
+        if (!ctx.sandbox) return (yield* Bom.readFile(afs, filePath)).text
         const sb: any = yield* Effect.tryPromise({ try: () => ctx.sandbox!, catch: (e) => new Error(String(e)) })
         return yield* Effect.tryPromise({
           try: () => sb.files.readFile(toSandboxPath(filePath, instance.directory)) as Promise<string>,
@@ -41,6 +45,7 @@ export const ApplyPatchTool = Tool.define(
 
     const writeFile = (filePath: string, content: string, ctx: Tool.Context, instance: { directory: string }) =>
       Effect.gen(function* () {
+        if (!ctx.sandbox) return yield* afs.writeWithDirs(filePath, content)
         const sb: any = yield* Effect.tryPromise({ try: () => ctx.sandbox!, catch: (e) => new Error(String(e)) })
         yield* Effect.tryPromise({
           try: () => sb.files.writeFiles([{ path: toSandboxPath(filePath, instance.directory), data: content }]),
@@ -50,6 +55,7 @@ export const ApplyPatchTool = Tool.define(
 
     const removeFile = (filePath: string, ctx: Tool.Context, instance: { directory: string }) =>
       Effect.gen(function* () {
+        if (!ctx.sandbox) return yield* afs.remove(filePath).pipe(Effect.catch(() => Effect.void))
         const svc = yield* Effect.serviceOption(SandboxProvider.Service)
         if (svc._tag === "Some") {
           yield* svc.value.runInSession(ctx.sandboxSessionID ?? ctx.sessionID, `rm -f "${toSandboxPath(filePath, instance.directory)}"`, { timeoutSeconds: 10 }).pipe(Effect.catchCause(() => Effect.void))
@@ -58,6 +64,10 @@ export const ApplyPatchTool = Tool.define(
 
     const statFile = (filePath: string, ctx: Tool.Context, instance: { directory: string }) =>
       (Effect.gen(function* () {
+        if (!ctx.sandbox) {
+          const stats = yield* afs.stat(filePath).pipe(Effect.catch(() => Effect.succeed(undefined)))
+          return stats?.type === "File" ? ({ type: "File" } as const) : undefined
+        }
         const sb: any = yield* Effect.tryPromise({ try: () => ctx.sandbox!, catch: (e) => new Error(String(e)) })
         const content = yield* Effect.tryPromise({
           try: () => sb.files.readFile(toSandboxPath(filePath, instance.directory)) as Promise<string>,
@@ -148,12 +158,21 @@ export const ApplyPatchTool = Tool.define(
               )
             }
 
-            const oldContent = yield* readFile(filePath, ctx, instance)
+            const source = ctx.sandbox
+              ? Bom.split(yield* readFile(filePath, ctx, instance))
+              : yield* Bom.readFile(afs, filePath)
+            const oldContent = source.text
             let newContent = oldContent
+            let bom = source.bom
 
             try {
-              const fileUpdate = Patch.deriveNewContentsFromChunks(filePath, hunk.chunks, oldContent)
+              const fileUpdate = Patch.deriveNewContentsFromChunks(
+                filePath,
+                hunk.chunks,
+                Bom.join(source.text, source.bom),
+              )
               newContent = fileUpdate.content
+              bom = fileUpdate.bom
             } catch (error) {
               return yield* Effect.fail(new Error(`apply_patch verification failed: ${error}`))
             }
@@ -179,7 +198,7 @@ export const ApplyPatchTool = Tool.define(
               diff,
               additions,
               deletions,
-              bom: false,
+              bom,
             })
 
             totalDiff += diff + "\n"
@@ -187,15 +206,28 @@ export const ApplyPatchTool = Tool.define(
           }
 
           case "delete": {
-            const contentToDelete = yield* (readFile(filePath, ctx, instance) as Effect.Effect<string, Error>).pipe(
-              Effect.catch((error: any) =>
-                Effect.fail(
-                  new Error(
-                    `apply_patch verification failed: ${error instanceof Error ? error.message : String(error)}`,
+            const source = ctx.sandbox
+              ? Bom.split(
+                  yield* (readFile(filePath, ctx, instance) as Effect.Effect<string, Error>).pipe(
+                    Effect.catch((error: any) =>
+                      Effect.fail(
+                        new Error(
+                          `apply_patch verification failed: ${error instanceof Error ? error.message : String(error)}`,
+                        ),
+                      ),
+                    ),
                   ),
-                ),
-              ),
-            )
+                )
+              : yield* Bom.readFile(afs, filePath).pipe(
+                  Effect.catch((error) =>
+                    Effect.fail(
+                      new Error(
+                        `apply_patch verification failed: ${error instanceof Error ? error.message : String(error)}`,
+                      ),
+                    ),
+                  ),
+                )
+            const contentToDelete = source.text
             const deleteDiff = trimDiff(createTwoFilesPatch(filePath, filePath, contentToDelete, ""))
 
             const deletions = contentToDelete.split("\n").length
@@ -208,7 +240,7 @@ export const ApplyPatchTool = Tool.define(
               diff: deleteDiff,
               additions: 0,
               deletions,
-              bom: false,
+              bom: source.bom,
             })
 
             totalDiff += deleteDiff + "\n"
@@ -243,7 +275,7 @@ export const ApplyPatchTool = Tool.define(
 
       for (const change of fileChanges) {
         const edited = change.type === "delete" ? undefined : (change.movePath ?? change.filePath)
-        const content = change.newContent
+        const content = Bom.join(change.newContent, change.bom)
         switch (change.type) {
           case "add":
             yield* writeFile(change.filePath, content, ctx, instance)
@@ -271,6 +303,9 @@ export const ApplyPatchTool = Tool.define(
         }
 
         if (edited) {
+          if (!ctx.sandbox && format && (yield* format.file(edited))) {
+            yield* Bom.syncFile(afs, edited, change.bom)
+          }
           yield* events.publish(FileSystem.Event.Edited, { file: edited })
         }
       }
@@ -293,8 +328,7 @@ export const ApplyPatchTool = Tool.define(
 
       const sandboxProviderOpt = yield* Effect.serviceOption(SandboxProvider.Service)
       const agentOpt = yield* Effect.serviceOption(LspAgent.Service)
-      if (sandboxProviderOpt._tag === "Some" && agentOpt._tag === "Some") {
-        const sid = ctx.sandboxSessionID ?? ctx.sessionID
+      if (sandboxProviderOpt._tag === "Some" && agentOpt._tag === "Some") {        const sid = ctx.sandboxSessionID ?? ctx.sessionID
         const diagnostics: Record<string, LSPClient.Diagnostic[]> = {}
         for (const change of fileChanges) {
           if (change.type === "delete") continue
@@ -334,6 +368,22 @@ export const ApplyPatchTool = Tool.define(
           if (!block) continue
           projectDiagnosticsCount++
           output += `\n\nLSP errors detected in other files:\n${block}`
+        }
+      }
+
+      if (!ctx.sandbox && lsp) {
+        for (const change of fileChanges) {
+          if (change.type === "delete") continue
+          yield* lsp.touchFile(change.movePath ?? change.filePath, "document")
+        }
+        const diagnostics = yield* lsp.diagnostics()
+        for (const change of fileChanges) {
+          if (change.type === "delete") continue
+          const target = change.movePath ?? change.filePath
+          const block = LSP.Diagnostic.report(target, diagnostics[FSUtil.normalizePath(target)] ?? [])
+          if (!block) continue
+          const rel = path.relative(instance.worktree, target).replaceAll("\\", "/")
+          output += `\n\nLSP errors detected in ${rel}, please fix:\n${block}`
         }
       }
 

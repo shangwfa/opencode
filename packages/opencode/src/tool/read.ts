@@ -308,13 +308,9 @@ export const ReadTool = Tool.define<
       }
 
       // readFile failed — confirm via getFileInfo whether path is a directory.
-      const infoResult = yield* Effect.tryPromise({
-        try: async () => {
-          const result = await sb.files.getFileInfo([sandboxPath])
-          return result[sandboxPath] ?? null
-        },
-        catch: () => null,
-      })
+      const infoResult = yield* Effect.tryPromise(() => sb.files.getFileInfo([sandboxPath]).then(r => r[sandboxPath] ?? null)).pipe(
+        Effect.catch(() => Effect.succeed(null)),
+      )
 
       if (infoResult) {
         // Path exists but readFile failed → it's a directory. List contents.

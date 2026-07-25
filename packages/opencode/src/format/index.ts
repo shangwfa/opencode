@@ -22,6 +22,7 @@ export interface Interface {
   readonly init: () => Effect.Effect<void>
   readonly status: () => Effect.Effect<Status[]>
   readonly file: (filepath: string) => Effect.Effect<boolean>
+  readonly command: (filepath: string) => Effect.Effect<string[][]>
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/Format") {}
@@ -70,6 +71,10 @@ const layer = Layer.effect(
             .map((x) => ({ item: x.item, cmd: x.cmd }))
         }
 
+        async function formatterCommands(filepath: string) {
+          const list = await getFormatter(path.extname(filepath))
+          return list.map(({ cmd }) => cmd)
+        }
         function formatFile(filepath: string) {
           return Effect.gen(function* () {
             yield* Effect.logInfo("formatting", { file: filepath })
@@ -124,6 +129,7 @@ const layer = Layer.effect(
             formatters,
             isEnabled,
             formatFile,
+            formatterCommands,
           }
         }
 
@@ -163,6 +169,7 @@ const layer = Layer.effect(
           formatters,
           isEnabled,
           formatFile,
+          formatterCommands,
         }
       }),
     )
@@ -190,7 +197,12 @@ const layer = Layer.effect(
       return yield* formatFile(filepath)
     })
 
-    return Service.of({ init, status, file })
+    const command = Effect.fn("Format.command")(function* (filepath: string) {
+      const { formatterCommands } = yield* InstanceState.get(state)
+      return yield* Effect.promise(() => formatterCommands(filepath))
+    })
+
+    return Service.of({ init, status, file, command })
   }),
 )
 
