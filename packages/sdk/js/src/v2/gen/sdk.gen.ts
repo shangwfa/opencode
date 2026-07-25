@@ -29,6 +29,8 @@ import type {
   EventTuiPromptAppend,
   EventTuiSessionSelect,
   EventTuiToastShow,
+  ExperimentalCapabilitiesGetErrors,
+  ExperimentalCapabilitiesGetResponses,
   ExperimentalConsoleGetErrors,
   ExperimentalConsoleGetResponses,
   ExperimentalConsoleListOrgsErrors,
@@ -123,6 +125,7 @@ import type {
   PartUpdateResponses,
   PathGetErrors,
   PathGetResponses,
+  PermissionConfig,
   PermissionListErrors,
   PermissionListResponses,
   PermissionReplyErrors,
@@ -179,10 +182,32 @@ import type {
   QuestionV2Reply,
   SessionAbortErrors,
   SessionAbortResponses,
+  SessionAgentsClearErrors,
+  SessionAgentsClearResponses,
+  SessionAgentsCreateErrors,
+  SessionAgentsCreateResponses,
+  SessionAgentsErrors,
+  SessionAgentsMdClearErrors,
+  SessionAgentsMdClearResponses,
+  SessionAgentsMdCreateErrors,
+  SessionAgentsMdCreateResponses,
+  SessionAgentsMdErrors,
+  SessionAgentsMdResponses,
+  SessionAgentsResponses,
+  SessionAgentsUnloadErrors,
+  SessionAgentsUnloadResponses,
   SessionChildrenErrors,
   SessionChildrenResponses,
   SessionCommandErrors,
   SessionCommandResponses,
+  SessionCommandsClearErrors,
+  SessionCommandsClearResponses,
+  SessionCommandsCreateErrors,
+  SessionCommandsCreateResponses,
+  SessionCommandsDeleteErrors,
+  SessionCommandsDeleteResponses,
+  SessionCommandsErrors,
+  SessionCommandsResponses,
   SessionCreateErrors,
   SessionCreateResponses,
   SessionDeleteErrors,
@@ -199,10 +224,28 @@ import type {
   SessionInitResponses,
   SessionListErrors,
   SessionListResponses,
+  SessionLoadDotOpencodeErrors,
+  SessionLoadDotOpencodeResponses,
+  SessionMcpsClearErrors,
+  SessionMcpsClearResponses,
+  SessionMcpsCreateErrors,
+  SessionMcpsCreateResponses,
+  SessionMcpsDeleteErrors,
+  SessionMcpsDeleteResponses,
+  SessionMcpsErrors,
+  SessionMcpsResponses,
   SessionMessageErrors,
   SessionMessageResponses,
   SessionMessagesErrors,
   SessionMessagesResponses,
+  SessionPluginsClearErrors,
+  SessionPluginsClearResponses,
+  SessionPluginsCreateErrors,
+  SessionPluginsCreateResponses,
+  SessionPluginsDeleteErrors,
+  SessionPluginsDeleteResponses,
+  SessionPluginsErrors,
+  SessionPluginsResponses,
   SessionPromptAsyncErrors,
   SessionPromptAsyncResponses,
   SessionPromptErrors,
@@ -213,12 +256,30 @@ import type {
   SessionShareResponses,
   SessionShellErrors,
   SessionShellResponses,
+  SessionSkillsClearErrors,
+  SessionSkillsClearResponses,
+  SessionSkillsCreateErrors,
+  SessionSkillsCreateResponses,
+  SessionSkillsErrors,
+  SessionSkillsLoadErrors,
+  SessionSkillsLoadResponses,
+  SessionSkillsResponses,
+  SessionSkillsUnloadErrors,
+  SessionSkillsUnloadResponses,
   SessionStatusErrors,
   SessionStatusResponses,
   SessionSummarizeErrors,
   SessionSummarizeResponses,
   SessionTodoErrors,
   SessionTodoResponses,
+  SessionToolsClearErrors,
+  SessionToolsClearResponses,
+  SessionToolsCreateErrors,
+  SessionToolsCreateResponses,
+  SessionToolsDeleteErrors,
+  SessionToolsDeleteResponses,
+  SessionToolsErrors,
+  SessionToolsResponses,
   SessionUnrevertErrors,
   SessionUnrevertResponses,
   SessionUnshareErrors,
@@ -283,6 +344,10 @@ import type {
   V2ConnectorGetResponses,
   V2ConnectorListErrors,
   V2ConnectorListResponses,
+  V2CredentialRemoveErrors,
+  V2CredentialRemoveResponses,
+  V2CredentialUpdateErrors,
+  V2CredentialUpdateResponses,
   V2EventSubscribeErrors,
   V2EventSubscribeResponses,
   V2FsFindErrors,
@@ -293,6 +358,20 @@ import type {
   V2FsReadResponses,
   V2HealthGetErrors,
   V2HealthGetResponses,
+  V2IntegrationAttemptCancelErrors,
+  V2IntegrationAttemptCancelResponses,
+  V2IntegrationAttemptCompleteErrors,
+  V2IntegrationAttemptCompleteResponses,
+  V2IntegrationAttemptStatusErrors,
+  V2IntegrationAttemptStatusResponses,
+  V2IntegrationConnectKeyErrors,
+  V2IntegrationConnectKeyResponses,
+  V2IntegrationConnectOauthErrors,
+  V2IntegrationConnectOauthResponses,
+  V2IntegrationGetErrors,
+  V2IntegrationGetResponses,
+  V2IntegrationListErrors,
+  V2IntegrationListResponses,
   V2LocationGetErrors,
   V2LocationGetResponses,
   V2ModelListErrors,
@@ -307,6 +386,20 @@ import type {
   V2ProviderGetResponses,
   V2ProviderListErrors,
   V2ProviderListResponses,
+  V2PtyConnectErrors,
+  V2PtyConnectResponses,
+  V2PtyConnectTokenErrors,
+  V2PtyConnectTokenResponses,
+  V2PtyCreateErrors,
+  V2PtyCreateResponses,
+  V2PtyGetErrors,
+  V2PtyGetResponses,
+  V2PtyListErrors,
+  V2PtyListResponses,
+  V2PtyRemoveErrors,
+  V2PtyRemoveResponses,
+  V2PtyUpdateErrors,
+  V2PtyUpdateResponses,
   V2QuestionRequestListErrors,
   V2QuestionRequestListResponses,
   V2ReferenceListErrors,
@@ -635,6 +728,42 @@ export class ControlPlane extends HeyApiClient {
   }
 }
 
+export class Capabilities extends HeyApiClient {
+  /**
+   * Get experimental capabilities
+   *
+   * Get experimental features enabled on the OpenCode server.
+   */
+  public get<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<
+      ExperimentalCapabilitiesGetResponses,
+      ExperimentalCapabilitiesGetErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/capabilities",
+      ...options,
+      ...params,
+    })
+  }
+}
+
 export class Console extends HeyApiClient {
   /**
    * Get active Console provider metadata
@@ -917,7 +1046,7 @@ export class ProjectCopy extends HeyApiClient {
     parameters: {
       projectID: string
       workspace?: string
-      strategy?: "git_worktree"
+      strategy?: string
       directory?: string
       name?: string
       context?: string
@@ -1269,6 +1398,11 @@ export class Experimental extends HeyApiClient {
   private _controlPlane?: ControlPlane
   get controlPlane(): ControlPlane {
     return (this._controlPlane ??= new ControlPlane({ client: this.client }))
+  }
+
+  private _capabilities?: Capabilities
+  get capabilities(): Capabilities {
+    return (this._capabilities ??= new Capabilities({ client: this.client }))
   }
 
   private _console?: Console
@@ -1857,6 +1991,7 @@ export class File extends HeyApiClient {
       directory?: string
       workspace?: string
       path: string
+      sessionID?: string
     },
     options?: Options<never, ThrowOnError>,
   ) {
@@ -1868,6 +2003,7 @@ export class File extends HeyApiClient {
             { in: "query", key: "directory" },
             { in: "query", key: "workspace" },
             { in: "query", key: "path" },
+            { in: "query", key: "sessionID" },
           ],
         },
       ],
@@ -1889,6 +2025,7 @@ export class File extends HeyApiClient {
       directory?: string
       workspace?: string
       path: string
+      sessionID?: string
     },
     options?: Options<never, ThrowOnError>,
   ) {
@@ -1900,6 +2037,7 @@ export class File extends HeyApiClient {
             { in: "query", key: "directory" },
             { in: "query", key: "workspace" },
             { in: "query", key: "path" },
+            { in: "query", key: "sessionID" },
           ],
         },
       ],
@@ -2108,6 +2246,7 @@ export class Vcs extends HeyApiClient {
     parameters: {
       directory?: string
       workspace?: string
+      sessionID?: string
       mode: "git" | "branch"
       context?: number
     },
@@ -2120,6 +2259,7 @@ export class Vcs extends HeyApiClient {
           args: [
             { in: "query", key: "directory" },
             { in: "query", key: "workspace" },
+            { in: "query", key: "sessionID" },
             { in: "query", key: "mode" },
             { in: "query", key: "context" },
           ],
@@ -3379,6 +3519,895 @@ export class Provider extends HeyApiClient {
   }
 }
 
+export class Skills extends HeyApiClient {
+  /**
+   * Clear session skills
+   *
+   * Remove all skills attached to a specific OpenCode session.
+   */
+  public clear<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).delete<SessionSkillsClearResponses, SessionSkillsClearErrors, ThrowOnError>(
+      {
+        url: "/session/{sessionID}/skills",
+        ...options,
+        ...params,
+      },
+    )
+  }
+
+  /**
+   * Create session skill
+   *
+   * Create or update an inline skill attached to a specific OpenCode session.
+   */
+  public create<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+      name?: string
+      description?: string
+      content?: string
+      resources?: Array<{
+        path: string
+        type: "doc" | "script" | "template" | "asset"
+        content: string
+      }>
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "name" },
+            { in: "body", key: "description" },
+            { in: "body", key: "content" },
+            { in: "body", key: "resources" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<SessionSkillsCreateResponses, SessionSkillsCreateErrors, ThrowOnError>(
+      {
+        url: "/session/{sessionID}/skills/create",
+        ...options,
+        ...params,
+        headers: {
+          "Content-Type": "application/json",
+          ...options?.headers,
+          ...params.headers,
+        },
+      },
+    )
+  }
+
+  /**
+   * Load session skills
+   *
+   * Import skills from a local directory as snapshots attached to a specific OpenCode session.
+   */
+  public load<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+      path?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "path" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<SessionSkillsLoadResponses, SessionSkillsLoadErrors, ThrowOnError>({
+      url: "/session/{sessionID}/skills/load",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Unload session skill
+   *
+   * Remove a skill from a specific OpenCode session.
+   */
+  public unload<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      name: string
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "path", key: "name" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).delete<
+      SessionSkillsUnloadResponses,
+      SessionSkillsUnloadErrors,
+      ThrowOnError
+    >({
+      url: "/session/{sessionID}/skills/{name}",
+      ...options,
+      ...params,
+    })
+  }
+}
+
+export class AgentsMd extends HeyApiClient {
+  /**
+   * Clear session AGENTS.md
+   *
+   * Remove the AGENTS.md instructions attached to a specific session.
+   */
+  public clear<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).delete<
+      SessionAgentsMdClearResponses,
+      SessionAgentsMdClearErrors,
+      ThrowOnError
+    >({
+      url: "/session/{sessionID}/agents-md",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Create session AGENTS.md
+   *
+   * Create or replace the AGENTS.md instructions attached to a specific session.
+   */
+  public create<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+      content?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "content" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      SessionAgentsMdCreateResponses,
+      SessionAgentsMdCreateErrors,
+      ThrowOnError
+    >({
+      url: "/session/{sessionID}/agents-md/create",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+}
+
+export class Agents extends HeyApiClient {
+  /**
+   * Clear session agents
+   *
+   * Remove all agents attached to a specific OpenCode session.
+   */
+  public clear<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).delete<SessionAgentsClearResponses, SessionAgentsClearErrors, ThrowOnError>(
+      {
+        url: "/session/{sessionID}/agents",
+        ...options,
+        ...params,
+      },
+    )
+  }
+
+  /**
+   * Create session agent
+   *
+   * Create or update an inline agent attached to a specific OpenCode session. Only available in SaaS mode.
+   */
+  public create<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+      name?: string
+      description?: string
+      mode?: "subagent" | "primary" | "all"
+      prompt?: string
+      permission?: PermissionConfig
+      model?: {
+        modelID: string
+        providerID: string
+      }
+      temperature?: number
+      topP?: number
+      steps?: number
+      color?: string
+      variant?: string
+      options?: {
+        [key: string]: unknown
+      }
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "name" },
+            { in: "body", key: "description" },
+            { in: "body", key: "mode" },
+            { in: "body", key: "prompt" },
+            { in: "body", key: "permission" },
+            { in: "body", key: "model" },
+            { in: "body", key: "temperature" },
+            { in: "body", key: "topP" },
+            { in: "body", key: "steps" },
+            { in: "body", key: "color" },
+            { in: "body", key: "variant" },
+            { in: "body", key: "options" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<SessionAgentsCreateResponses, SessionAgentsCreateErrors, ThrowOnError>(
+      {
+        url: "/session/{sessionID}/agents/create",
+        ...options,
+        ...params,
+        headers: {
+          "Content-Type": "application/json",
+          ...options?.headers,
+          ...params.headers,
+        },
+      },
+    )
+  }
+
+  /**
+   * Unload session agent
+   *
+   * Remove an agent from a specific OpenCode session.
+   */
+  public unload<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      name: string
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "path", key: "name" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).delete<
+      SessionAgentsUnloadResponses,
+      SessionAgentsUnloadErrors,
+      ThrowOnError
+    >({
+      url: "/session/{sessionID}/agents/{name}",
+      ...options,
+      ...params,
+    })
+  }
+}
+
+export class Mcps extends HeyApiClient {
+  /**
+   * Clear session MCPs
+   *
+   * Remove all MCP servers attached to a specific OpenCode session.
+   */
+  public clear<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).delete<SessionMcpsClearResponses, SessionMcpsClearErrors, ThrowOnError>({
+      url: "/session/{sessionID}/mcps",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Create session MCP
+   *
+   * Create or update a session-level MCP server. Only available in SaaS mode.
+   */
+  public create<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+      body?:
+        | {
+            name: string
+            type: "local"
+            command: Array<string>
+            environment?: {
+              [key: string]: string
+            }
+            enabled?: boolean
+          }
+        | {
+            name: string
+            type: "remote"
+            url: string
+            headers?: {
+              [key: string]: string
+            }
+            enabled?: boolean
+          }
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { key: "body", map: "body" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<SessionMcpsCreateResponses, SessionMcpsCreateErrors, ThrowOnError>({
+      url: "/session/{sessionID}/mcps/create",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Delete session MCP
+   *
+   * Remove a session-level MCP server.
+   */
+  public delete<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      name: string
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "path", key: "name" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).delete<SessionMcpsDeleteResponses, SessionMcpsDeleteErrors, ThrowOnError>({
+      url: "/session/{sessionID}/mcps/{name}",
+      ...options,
+      ...params,
+    })
+  }
+}
+
+export class Tools extends HeyApiClient {
+  /**
+   * Clear session tools
+   *
+   * Remove all custom tools attached to a specific OpenCode session.
+   */
+  public clear<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).delete<SessionToolsClearResponses, SessionToolsClearErrors, ThrowOnError>({
+      url: "/session/{sessionID}/tools",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Create session tool
+   *
+   * Create or update a custom tool attached to a specific OpenCode session. Only available in SaaS mode.
+   */
+  public create<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+      name?: string
+      description?: string
+      code?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "name" },
+            { in: "body", key: "description" },
+            { in: "body", key: "code" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<SessionToolsCreateResponses, SessionToolsCreateErrors, ThrowOnError>({
+      url: "/session/{sessionID}/tools/create",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Delete session tool
+   *
+   * Remove a custom tool from a specific OpenCode session.
+   */
+  public delete<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      name: string
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "path", key: "name" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).delete<SessionToolsDeleteResponses, SessionToolsDeleteErrors, ThrowOnError>(
+      {
+        url: "/session/{sessionID}/tools/{name}",
+        ...options,
+        ...params,
+      },
+    )
+  }
+}
+
+export class Commands extends HeyApiClient {
+  /**
+   * Clear session commands
+   *
+   * Remove all custom commands attached to a specific OpenCode session.
+   */
+  public clear<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).delete<
+      SessionCommandsClearResponses,
+      SessionCommandsClearErrors,
+      ThrowOnError
+    >({
+      url: "/session/{sessionID}/commands",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Create session command
+   *
+   * Create or update a custom command attached to a specific OpenCode session. Only available in SaaS mode.
+   */
+  public create<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+      name?: string
+      template?: string
+      description?: string
+      agent?: string
+      model?: string
+      subtask?: boolean
+      hints?: Array<string>
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "name" },
+            { in: "body", key: "template" },
+            { in: "body", key: "description" },
+            { in: "body", key: "agent" },
+            { in: "body", key: "model" },
+            { in: "body", key: "subtask" },
+            { in: "body", key: "hints" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      SessionCommandsCreateResponses,
+      SessionCommandsCreateErrors,
+      ThrowOnError
+    >({
+      url: "/session/{sessionID}/commands/create",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Delete session command
+   *
+   * Remove a custom command from a specific OpenCode session.
+   */
+  public delete<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      name: string
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "path", key: "name" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).delete<
+      SessionCommandsDeleteResponses,
+      SessionCommandsDeleteErrors,
+      ThrowOnError
+    >({
+      url: "/session/{sessionID}/commands/{name}",
+      ...options,
+      ...params,
+    })
+  }
+}
+
+export class Plugins extends HeyApiClient {
+  /**
+   * Clear session plugins
+   *
+   * Remove all plugins from a specific OpenCode session.
+   */
+  public clear<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).delete<
+      SessionPluginsClearResponses,
+      SessionPluginsClearErrors,
+      ThrowOnError
+    >({
+      url: "/session/{sessionID}/plugins",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Create session plugin
+   *
+   * Create or update a plugin attached to a specific OpenCode session.
+   */
+  public create<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+      body?:
+        | {
+            name: string
+            source?: "code"
+            description?: string
+            code: string
+            enabled?: boolean
+          }
+        | {
+            name: string
+            source: "npm"
+            spec: string
+            description?: string
+            enabled?: boolean
+          }
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { key: "body", map: "body" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      SessionPluginsCreateResponses,
+      SessionPluginsCreateErrors,
+      ThrowOnError
+    >({
+      url: "/session/{sessionID}/plugins/create",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Delete session plugin
+   *
+   * Remove a plugin from a specific OpenCode session.
+   */
+  public delete<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      name: string
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "path", key: "name" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).delete<
+      SessionPluginsDeleteResponses,
+      SessionPluginsDeleteErrors,
+      ThrowOnError
+    >({
+      url: "/session/{sessionID}/plugins/{name}",
+      ...options,
+      ...params,
+    })
+  }
+}
+
 export class Session2 extends HeyApiClient {
   /**
    * List sessions
@@ -3444,6 +4473,12 @@ export class Session2 extends HeyApiClient {
       }
       permission?: PermissionRuleset
       workspaceID?: string
+      pvcMode?: "session" | "app"
+      appId?: string
+      sandbox?: {
+        cpu: string
+        memory: string
+      }
     },
     options?: Options<never, ThrowOnError>,
   ) {
@@ -3461,6 +4496,9 @@ export class Session2 extends HeyApiClient {
             { in: "body", key: "metadata" },
             { in: "body", key: "permission" },
             { in: "body", key: "workspaceID" },
+            { in: "body", key: "pvcMode" },
+            { in: "body", key: "appId" },
+            { in: "body", key: "sandbox" },
           ],
         },
       ],
@@ -3579,9 +4617,10 @@ export class Session2 extends HeyApiClient {
   public update<ThrowOnError extends boolean = false>(
     parameters: {
       sessionID: string
-      directory?: string
+      query_directory?: string
       workspace?: string
       title?: string
+      body_directory?: string
       metadata?: {
         [key: string]: unknown
       }
@@ -3598,9 +4637,18 @@ export class Session2 extends HeyApiClient {
         {
           args: [
             { in: "path", key: "sessionID" },
-            { in: "query", key: "directory" },
+            {
+              in: "query",
+              key: "query_directory",
+              map: "directory",
+            },
             { in: "query", key: "workspace" },
             { in: "body", key: "title" },
+            {
+              in: "body",
+              key: "body_directory",
+              map: "directory",
+            },
             { in: "body", key: "metadata" },
             { in: "body", key: "permission" },
             { in: "body", key: "time" },
@@ -3777,6 +4825,9 @@ export class Session2 extends HeyApiClient {
       format?: OutputFormat
       system?: string
       variant?: string
+      userName?: string
+      userId?: string
+      skills?: Array<string>
       parts?: Array<TextPartInput | FilePartInput | AgentPartInput | SubtaskPartInput>
     },
     options?: Options<never, ThrowOnError>,
@@ -3797,6 +4848,9 @@ export class Session2 extends HeyApiClient {
             { in: "body", key: "format" },
             { in: "body", key: "system" },
             { in: "body", key: "variant" },
+            { in: "body", key: "userName" },
+            { in: "body", key: "userId" },
+            { in: "body", key: "skills" },
             { in: "body", key: "parts" },
           ],
         },
@@ -4001,6 +5055,42 @@ export class Session2 extends HeyApiClient {
   }
 
   /**
+   * Load project .opencode configuration
+   *
+   * Load the current project's .opencode configuration into the session.
+   */
+  public loadDotOpencode<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      SessionLoadDotOpencodeResponses,
+      SessionLoadDotOpencodeErrors,
+      ThrowOnError
+    >({
+      url: "/session/{sessionID}/dot-opencode/load",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
    * Unshare session
    *
    * Remove the shareable link for a session, making it private again.
@@ -4130,6 +5220,9 @@ export class Session2 extends HeyApiClient {
       format?: OutputFormat
       system?: string
       variant?: string
+      userName?: string
+      userId?: string
+      skills?: Array<string>
       parts?: Array<TextPartInput | FilePartInput | AgentPartInput | SubtaskPartInput>
     },
     options?: Options<never, ThrowOnError>,
@@ -4150,6 +5243,9 @@ export class Session2 extends HeyApiClient {
             { in: "body", key: "format" },
             { in: "body", key: "system" },
             { in: "body", key: "variant" },
+            { in: "body", key: "userName" },
+            { in: "body", key: "userId" },
+            { in: "body", key: "skills" },
             { in: "body", key: "parts" },
           ],
         },
@@ -4344,6 +5440,265 @@ export class Session2 extends HeyApiClient {
       ...options,
       ...params,
     })
+  }
+
+  /**
+   * List session skills
+   *
+   * Get skills attached to a specific OpenCode session.
+   */
+  public skills<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<SessionSkillsResponses, SessionSkillsErrors, ThrowOnError>({
+      url: "/session/{sessionID}/skills",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Get session AGENTS.md
+   *
+   * Get the AGENTS.md instructions attached to a specific OpenCode session.
+   */
+  public agentsMd<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<SessionAgentsMdResponses, SessionAgentsMdErrors, ThrowOnError>({
+      url: "/session/{sessionID}/agents-md",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * List session agents
+   *
+   * Get agents attached to a specific OpenCode session.
+   */
+  public agents<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<SessionAgentsResponses, SessionAgentsErrors, ThrowOnError>({
+      url: "/session/{sessionID}/agents",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * List session MCPs
+   *
+   * Get MCP servers attached to a specific OpenCode session.
+   */
+  public mcps<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<SessionMcpsResponses, SessionMcpsErrors, ThrowOnError>({
+      url: "/session/{sessionID}/mcps",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * List session tools
+   *
+   * Get custom tools attached to a specific OpenCode session.
+   */
+  public tools<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<SessionToolsResponses, SessionToolsErrors, ThrowOnError>({
+      url: "/session/{sessionID}/tools",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * List session commands
+   *
+   * Get custom commands attached to a specific OpenCode session, merged with instance-level commands.
+   */
+  public commands<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<SessionCommandsResponses, SessionCommandsErrors, ThrowOnError>({
+      url: "/session/{sessionID}/commands",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * List session plugins
+   *
+   * List custom plugins attached to a specific OpenCode session.
+   */
+  public plugins<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<SessionPluginsResponses, SessionPluginsErrors, ThrowOnError>({
+      url: "/session/{sessionID}/plugins",
+      ...options,
+      ...params,
+    })
+  }
+
+  private _skills?: Skills
+  get skills2(): Skills {
+    return (this._skills ??= new Skills({ client: this.client }))
+  }
+
+  private _agentsMd?: AgentsMd
+  get agentsMd2(): AgentsMd {
+    return (this._agentsMd ??= new AgentsMd({ client: this.client }))
+  }
+
+  private _agents?: Agents
+  get agents2(): Agents {
+    return (this._agents ??= new Agents({ client: this.client }))
+  }
+
+  private _mcps?: Mcps
+  get mcps2(): Mcps {
+    return (this._mcps ??= new Mcps({ client: this.client }))
+  }
+
+  private _tools?: Tools
+  get tools2(): Tools {
+    return (this._tools ??= new Tools({ client: this.client }))
+  }
+
+  private _commands?: Commands
+  get commands2(): Commands {
+    return (this._commands ??= new Commands({ client: this.client }))
+  }
+
+  private _plugins?: Plugins
+  get plugins2(): Plugins {
+    return (this._plugins ??= new Plugins({ client: this.client }))
   }
 }
 
@@ -5974,6 +7329,291 @@ export class Provider2 extends HeyApiClient {
   }
 }
 
+export class Connect extends HeyApiClient {
+  /**
+   * Connect with key
+   *
+   * Run a key authentication method and store the resulting credential.
+   */
+  public key<ThrowOnError extends boolean = false>(
+    parameters: {
+      integrationID: string
+      location?: {
+        directory?: string
+        workspace?: string
+      }
+      key?: string
+      label?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "integrationID" },
+            { in: "query", key: "location" },
+            { in: "body", key: "key" },
+            { in: "body", key: "label" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      V2IntegrationConnectKeyResponses,
+      V2IntegrationConnectKeyErrors,
+      ThrowOnError
+    >({
+      url: "/api/integration/{integrationID}/connect/key",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Begin OAuth connection
+   *
+   * Start an OAuth attempt and return the authorization details.
+   */
+  public oauth<ThrowOnError extends boolean = false>(
+    parameters: {
+      integrationID: string
+      location?: {
+        directory?: string
+        workspace?: string
+      }
+      methodID?: string
+      inputs?: {
+        [key: string]: string
+      }
+      label?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "integrationID" },
+            { in: "query", key: "location" },
+            { in: "body", key: "methodID" },
+            { in: "body", key: "inputs" },
+            { in: "body", key: "label" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      V2IntegrationConnectOauthResponses,
+      V2IntegrationConnectOauthErrors,
+      ThrowOnError
+    >({
+      url: "/api/integration/{integrationID}/connect/oauth",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+}
+
+export class Attempt extends HeyApiClient {
+  /**
+   * Cancel OAuth connection
+   *
+   * Cancel an OAuth attempt and release its resources.
+   */
+  public cancel<ThrowOnError extends boolean = false>(
+    parameters: {
+      attemptID: string
+      location?: {
+        directory?: string
+        workspace?: string
+      }
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "attemptID" },
+            { in: "query", key: "location" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).delete<
+      V2IntegrationAttemptCancelResponses,
+      V2IntegrationAttemptCancelErrors,
+      ThrowOnError
+    >({
+      url: "/api/integration/attempt/{attemptID}",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Get OAuth attempt status
+   *
+   * Poll the current status of an OAuth attempt.
+   */
+  public status<ThrowOnError extends boolean = false>(
+    parameters: {
+      attemptID: string
+      location?: {
+        directory?: string
+        workspace?: string
+      }
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "attemptID" },
+            { in: "query", key: "location" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<
+      V2IntegrationAttemptStatusResponses,
+      V2IntegrationAttemptStatusErrors,
+      ThrowOnError
+    >({
+      url: "/api/integration/attempt/{attemptID}",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Complete OAuth connection
+   *
+   * Complete a code-based OAuth attempt and store the resulting credential.
+   */
+  public complete<ThrowOnError extends boolean = false>(
+    parameters: {
+      attemptID: string
+      location?: {
+        directory?: string
+        workspace?: string
+      }
+      code?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "attemptID" },
+            { in: "query", key: "location" },
+            { in: "body", key: "code" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      V2IntegrationAttemptCompleteResponses,
+      V2IntegrationAttemptCompleteErrors,
+      ThrowOnError
+    >({
+      url: "/api/integration/attempt/{attemptID}/complete",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+}
+
+export class Integration extends HeyApiClient {
+  /**
+   * List integrations
+   *
+   * Retrieve available integrations and their authentication methods.
+   */
+  public list<ThrowOnError extends boolean = false>(
+    parameters?: {
+      location?: {
+        directory?: string
+        workspace?: string
+      }
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams([parameters], [{ args: [{ in: "query", key: "location" }] }])
+    return (options?.client ?? this.client).get<V2IntegrationListResponses, V2IntegrationListErrors, ThrowOnError>({
+      url: "/api/integration",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Get integration
+   *
+   * Retrieve one integration and its authentication methods.
+   */
+  public get<ThrowOnError extends boolean = false>(
+    parameters: {
+      integrationID: string
+      location?: {
+        directory?: string
+        workspace?: string
+      }
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "integrationID" },
+            { in: "query", key: "location" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<V2IntegrationGetResponses, V2IntegrationGetErrors, ThrowOnError>({
+      url: "/api/integration/{integrationID}",
+      ...options,
+      ...params,
+    })
+  }
+
+  private _connect?: Connect
+  get connect(): Connect {
+    return (this._connect ??= new Connect({ client: this.client }))
+  }
+
+  private _attempt?: Attempt
+  get attempt(): Attempt {
+    return (this._attempt ??= new Attempt({ client: this.client }))
+  }
+}
+
 export class Oauth2 extends HeyApiClient {
   /**
    * Begin OAuth connection
@@ -6144,7 +7784,7 @@ export class Oauth2 extends HeyApiClient {
   }
 }
 
-export class Connect extends HeyApiClient {
+export class Connect2 extends HeyApiClient {
   /**
    * Connect with key
    *
@@ -6259,9 +7899,86 @@ export class Connector extends HeyApiClient {
     })
   }
 
-  private _connect?: Connect
-  get connect(): Connect {
-    return (this._connect ??= new Connect({ client: this.client }))
+  private _connect?: Connect2
+  get connect(): Connect2 {
+    return (this._connect ??= new Connect2({ client: this.client }))
+  }
+}
+
+export class Credential extends HeyApiClient {
+  /**
+   * Remove credential
+   *
+   * Remove a stored integration credential.
+   */
+  public remove<ThrowOnError extends boolean = false>(
+    parameters: {
+      credentialID: string
+      location?: {
+        directory?: string
+        workspace?: string
+      }
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "credentialID" },
+            { in: "query", key: "location" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).delete<V2CredentialRemoveResponses, V2CredentialRemoveErrors, ThrowOnError>(
+      {
+        url: "/api/credential/{credentialID}",
+        ...options,
+        ...params,
+      },
+    )
+  }
+
+  /**
+   * Update credential
+   *
+   * Update a stored credential label.
+   */
+  public update<ThrowOnError extends boolean = false>(
+    parameters: {
+      credentialID: string
+      location?: {
+        directory?: string
+        workspace?: string
+      }
+      label?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "credentialID" },
+            { in: "query", key: "location" },
+            { in: "body", key: "label" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).patch<V2CredentialUpdateResponses, V2CredentialUpdateErrors, ThrowOnError>({
+      url: "/api/credential/{credentialID}",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
   }
 }
 
@@ -6509,6 +8226,258 @@ export class Event2 extends HeyApiClient {
   }
 }
 
+export class Pty2 extends HeyApiClient {
+  /**
+   * List PTY sessions
+   *
+   * List PTY sessions for a location, including exited sessions retained until removal.
+   */
+  public list<ThrowOnError extends boolean = false>(
+    parameters?: {
+      location?: {
+        directory?: string
+        workspace?: string
+      }
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams([parameters], [{ args: [{ in: "query", key: "location" }] }])
+    return (options?.client ?? this.client).get<V2PtyListResponses, V2PtyListErrors, ThrowOnError>({
+      url: "/api/pty",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Create PTY session
+   *
+   * Create a pseudo-terminal session for a location.
+   */
+  public create<ThrowOnError extends boolean = false>(
+    parameters?: {
+      location?: {
+        directory?: string
+        workspace?: string
+      }
+      command?: string
+      args?: Array<string>
+      cwd?: string
+      title?: string
+      env?: {
+        [key: string]: string
+      }
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "location" },
+            { in: "body", key: "command" },
+            { in: "body", key: "args" },
+            { in: "body", key: "cwd" },
+            { in: "body", key: "title" },
+            { in: "body", key: "env" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<V2PtyCreateResponses, V2PtyCreateErrors, ThrowOnError>({
+      url: "/api/pty",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Remove PTY session
+   *
+   * Terminate and remove one PTY session.
+   */
+  public remove<ThrowOnError extends boolean = false>(
+    parameters: {
+      ptyID: string
+      location?: {
+        directory?: string
+        workspace?: string
+      }
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "ptyID" },
+            { in: "query", key: "location" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).delete<V2PtyRemoveResponses, V2PtyRemoveErrors, ThrowOnError>({
+      url: "/api/pty/{ptyID}",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Get PTY session
+   *
+   * Get one PTY session, including its exit code once exited.
+   */
+  public get<ThrowOnError extends boolean = false>(
+    parameters: {
+      ptyID: string
+      location?: {
+        directory?: string
+        workspace?: string
+      }
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "ptyID" },
+            { in: "query", key: "location" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<V2PtyGetResponses, V2PtyGetErrors, ThrowOnError>({
+      url: "/api/pty/{ptyID}",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Update PTY session
+   *
+   * Update the title or viewport size of one PTY session.
+   */
+  public update<ThrowOnError extends boolean = false>(
+    parameters: {
+      ptyID: string
+      location?: {
+        directory?: string
+        workspace?: string
+      }
+      title?: string
+      size?: {
+        rows: number
+        cols: number
+      }
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "ptyID" },
+            { in: "query", key: "location" },
+            { in: "body", key: "title" },
+            { in: "body", key: "size" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).put<V2PtyUpdateResponses, V2PtyUpdateErrors, ThrowOnError>({
+      url: "/api/pty/{ptyID}",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Create PTY WebSocket token
+   *
+   * Create a short-lived single-use ticket for opening a PTY WebSocket connection.
+   */
+  public connectToken<ThrowOnError extends boolean = false>(
+    parameters: {
+      ptyID: string
+      location?: {
+        directory?: string
+        workspace?: string
+      }
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "ptyID" },
+            { in: "query", key: "location" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<V2PtyConnectTokenResponses, V2PtyConnectTokenErrors, ThrowOnError>({
+      url: "/api/pty/{ptyID}/connect-token",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Connect to PTY session
+   *
+   * Establish a WebSocket connection streaming PTY output and accepting terminal input.
+   */
+  public connect<ThrowOnError extends boolean = false>(
+    parameters: {
+      ptyID: string
+      "location[directory]"?: string
+      "location[workspace]"?: string
+      cursor?: string
+      ticket?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "ptyID" },
+            { in: "query", key: "location[directory]" },
+            { in: "query", key: "location[workspace]" },
+            { in: "query", key: "cursor" },
+            { in: "query", key: "ticket" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<V2PtyConnectResponses, V2PtyConnectErrors, ThrowOnError>({
+      url: "/api/pty/{ptyID}/connect",
+      ...options,
+      ...params,
+    })
+  }
+}
+
 export class Request2 extends HeyApiClient {
   /**
    * List pending question requests
@@ -6599,9 +8568,19 @@ export class V2 extends HeyApiClient {
     return (this._provider ??= new Provider2({ client: this.client }))
   }
 
+  private _integration?: Integration
+  get integration(): Integration {
+    return (this._integration ??= new Integration({ client: this.client }))
+  }
+
   private _connector?: Connector
   get connector(): Connector {
     return (this._connector ??= new Connector({ client: this.client }))
+  }
+
+  private _credential?: Credential
+  get credential(): Credential {
+    return (this._credential ??= new Credential({ client: this.client }))
   }
 
   private _permission?: Permission3
@@ -6627,6 +8606,11 @@ export class V2 extends HeyApiClient {
   private _event?: Event2
   get event(): Event2 {
     return (this._event ??= new Event2({ client: this.client }))
+  }
+
+  private _pty?: Pty2
+  get pty(): Pty2 {
+    return (this._pty ??= new Pty2({ client: this.client }))
   }
 
   private _question?: Question3
