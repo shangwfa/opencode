@@ -47,6 +47,7 @@ import { Truncate } from "@/tool/truncate"
 import { Image } from "@/image/image"
 import { decodeDataUrl } from "@/util/data-url"
 import { Process } from "@/util/process"
+import { SandboxProvider } from "@/tool/sandbox-provider"
 import { Cause, Effect, Exit, Latch, Layer, Option, Scope, Context, Schema, Types } from "effect"
 import { InstanceState } from "@/effect/instance-state"
 import { TaskTool, type TaskPromptOps } from "@/tool/task"
@@ -1535,6 +1536,7 @@ const layer = Layer.effect(
 
       const withArgs = templateCommand.replaceAll(placeholderRegex, (_, index) => {
         const position = Number(index)
+        if (position < 1) return ""
         const argIndex = position - 1
         if (argIndex >= args.length) return ""
         if (position === last) return args.slice(argIndex).join(" ")
@@ -1549,13 +1551,29 @@ const layer = Layer.effect(
 
       const shellMatches = ConfigMarkdown.shell(template)
       if (shellMatches.length > 0) {
-        const cfg = yield* config.get()
-        const sh = Shell.preferred(cfg.shell)
-        const results = yield* Effect.promise(() =>
-          Promise.all(
-            shellMatches.map(async ([, cmd]) => (await Process.text([cmd], { shell: sh, nothrow: true })).text),
-          ),
-        )
+        const maybeSandboxProvider = Option.getOrUndefined(yield* Effect.serviceOption(SandboxProvider.Service))
+        let results: string[]
+        if (maybeSandboxProvider) {
+          results = yield* Effect.forEach(
+            shellMatches,
+            ([, cmd]) =>
+              maybeSandboxProvider
+                .runInSession(input.sessionID, cmd, { timeoutSeconds: 30 })
+                .pipe(
+                  Effect.map((exec) => exec.logs.stdout.map((m) => m.text).join("")),
+                  Effect.catch(() => Effect.succeed("")),
+                ),
+            { concurrency: "unbounded" },
+          )
+        } else {
+          const cfg = yield* config.get()
+          const sh = Shell.preferred(cfg.shell)
+          results = yield* Effect.promise(() =>
+            Promise.all(
+              shellMatches.map(async ([, cmd]) => (await Process.text([cmd], { shell: sh, nothrow: true })).text),
+            ),
+          )
+        }
         let index = 0
         template = template.replace(bashRegex, () => results[index++])
       }
@@ -1583,6 +1601,12 @@ const layer = Layer.effect(
       }
 
       const templateParts = yield* resolvePromptParts(template)
+      const inputFiles = new Set(
+        input.parts?.filter((part) => new URL(part.url).protocol === "file:").map((part) => fileURLToPath(part.url)),
+      )
+      const uniqueTemplateParts = templateParts.filter(
+        (part) => part.type !== "file" || !inputFiles.has(fileURLToPath(part.url)),
+      )
       const isSubtask = (agent.mode === "subagent" && cmd.subtask !== false) || cmd.subtask === true
       const parts = isSubtask
         ? [
@@ -1595,7 +1619,7 @@ const layer = Layer.effect(
               prompt: templateParts.find((y) => y.type === "text")?.text ?? "",
             },
           ]
-        : [...templateParts, ...(input.parts ?? [])]
+        : [...uniqueTemplateParts, ...(input.parts ?? [])]
 
       const userAgent = isSubtask ? (input.agent ?? (yield* agents.defaultInfo()).name) : agent.name
       const userModel = isSubtask
