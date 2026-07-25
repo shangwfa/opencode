@@ -40,7 +40,7 @@ type DatabaseFlags = {
 
 const readRuntimeFlags = (): DatabaseFlags => ({
   disableChannelDb: false,
-  skipMigrations: false,
+  skipMigrations: Flag.OPENCODE_SKIP_MIGRATIONS,
 })
 
 export function getChannelPath(flags: Pick<DatabaseFlags, "disableChannelDb"> = readRuntimeFlags()) {
