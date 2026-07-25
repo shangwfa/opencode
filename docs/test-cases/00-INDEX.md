@@ -53,6 +53,16 @@
 | [`41-mastra-mcp-e2e.md`](./41-mastra-mcp-e2e.md) | T41.x | Mastra MCP 端到端：CRUD、AI 查询 Mastra 文档、生成 Agent 代码 |
 | [`42-compose-agent.md`](./42-compose-agent.md) | T42.x | Compose Agent 编排：plan→execute→review 编排执行、子 agent 并行分发、隔离、重启持久化 |
 
+### 子目录测试
+
+| 文件 | 用例 ID | 内容概述 |
+|------|---------|---------|
+| [`sandbox/`](./sandbox/) | T12.x T20.x T28.x T30.x 等 | 沙箱生命周期、proxy、idle reap、watchdog、endpoint、tool 执行（8 文件） |
+| [`skills/`](./skills/) | T15.x | Session skills CRUD、bundle、agent-browser/mastra/mattpocock 数据驱动（4 文件） |
+| [`pvc/`](./pvc/) | T38.x | Session PVC 模式：session/app 创建、共享/隔离、worktree、PG（1 文件） |
+| [`mcps/`](./mcps/) | T40.x T45.x | Ant Design / Playwright MCP 端到端（2 文件） |
+| [`code-mode/`](./code-mode/) | T50.x | Code-Mode（execute 工具）：受限 JS 解释器编排 MCP 工具、并发、错误、沙箱限制、权限过滤、搜索、中止（1 文件） |
+
 ## 指南（非用例）
 
 | 文件 | 内容 |

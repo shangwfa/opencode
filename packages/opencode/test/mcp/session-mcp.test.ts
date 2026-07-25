@@ -2,6 +2,7 @@ import { describe, expect, beforeEach, mock } from "bun:test"
 import { Effect, Layer } from "effect"
 import { testEffect } from "../lib/effect"
 import { SandboxProvider } from "../../src/tool/sandbox-provider"
+import { McpBrowser } from "../../src/mcp/browser"
 
 // ─── Mock Flag: force SaaS mode ───
 
@@ -86,6 +87,7 @@ mock.module("@modelcontextprotocol/sdk/client/index.js", () => ({
   Client: class {
     _opts: any
     constructor(opts: any) { this._opts = opts }
+    setRequestHandler() {}
     async connect(t: any) { await t.start() }
     async close() { clientStates.forEach((s) => { s.closed = true }) }
     async listTools() { getOrCreateState().listToolsCalls++; return { tools: getOrCreateState().tools } }
@@ -136,10 +138,12 @@ function recordingSandboxLayer() {
   )
 }
 
+const browserLayer = Layer.succeed(McpBrowser.Service, McpBrowser.Service.of({ open: () => Effect.void }))
+
 // ─── Import after mocks ───
 
 const { MCP } = await import("../../src/mcp/index")
-const it = testEffect(MCP.defaultLayer.pipe(Layer.provideMerge(recordingSandboxLayer())))
+const it = testEffect(MCP.defaultLayer.pipe(Layer.provideMerge(recordingSandboxLayer()), Layer.provideMerge(browserLayer)))
 
 // ─── Fixture data ───
 
@@ -197,6 +201,25 @@ describe("MCP toolsForSession - SaaS sandbox routing", () => {
       yield* mcp.toolsForSession(SID)
 
       expect(sandboxRunCalls.length).toBe(1)
+    }),
+    { config: localOnly } as any,
+  )
+
+  it.instance(
+    "clearSessionCache closes the client and reconnects on the next lookup",
+    () => Effect.gen(function* () {
+      const SID = "sess_clear" as any
+      const mcp = yield* MCP.Service
+
+      yield* mcp.toolsForSession(SID)
+      expect(sandboxRunCalls.length).toBe(1)
+      expect(getOrCreateState().closed).toBe(false)
+
+      yield* mcp.clearSessionCache(SID)
+      expect(getOrCreateState().closed).toBe(true)
+
+      yield* mcp.toolsForSession(SID)
+      expect(sandboxRunCalls.filter((call) => call.command.includes("supergateway")).length).toBe(2)
     }),
     { config: localOnly } as any,
   )
@@ -261,6 +284,27 @@ describe("MCP toolsForSession - SaaS per-session isolation", () => {
       }
     }),
     { config: twoLocals } as any,
+  )
+
+  it.instance(
+    "clearing one session leaves another session cached",
+    () => Effect.gen(function* () {
+      const mcp = yield* MCP.Service
+      const sessionA = "clear_a" as any
+      const sessionB = "clear_b" as any
+
+      yield* mcp.toolsForSession(sessionA)
+      yield* mcp.toolsForSession(sessionB)
+      expect(sandboxRunCalls.length).toBe(2)
+
+      yield* mcp.clearSessionCache(sessionA)
+      yield* mcp.toolsForSession(sessionB)
+      expect(sandboxRunCalls.filter((call) => call.command.includes("supergateway")).length).toBe(2)
+
+      yield* mcp.toolsForSession(sessionA)
+      expect(sandboxRunCalls.filter((call) => call.command.includes("supergateway")).length).toBe(3)
+    }),
+    { config: localOnly } as any,
   )
 })
 

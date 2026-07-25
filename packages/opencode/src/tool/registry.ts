@@ -64,11 +64,9 @@ import { SessionTool, importToolCode } from "./session-tool"
 import { MCP } from "@/mcp"
 import { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import { McpCatalog } from "@/mcp/catalog"
+import { CodeModePolicy } from "./code-mode-policy"
 
-export function webSearchEnabled(
-  providerID: ProviderV2.ID,
-  flags = { exa: false, parallel: false, zhipu: false },
-) {
+export function webSearchEnabled(providerID: ProviderV2.ID, flags = { exa: false, parallel: false, zhipu: false }) {
   if (String(providerID).includes("zhipu")) return true
   return providerID === ProviderV2.ID.opencode || flags.exa || flags.parallel
 }
@@ -130,7 +128,8 @@ const layer = Layer.effect(
     const skilltool = yield* SkillTool
     const agent = yield* Agent.Service
     const sessionToolSvc = Option.getOrUndefined(yield* Effect.serviceOption(SessionTool.Service))
-    const codeMode = flags.experimentalCodeMode ? yield* Effect.promise(() => import("./code-mode")) : undefined
+    const codeMode =
+      flags.experimentalCodeMode !== "off" ? yield* Effect.promise(() => import("./code-mode")) : undefined
     const codeModeTool = codeMode ? yield* codeMode.CodeModeTool : undefined
 
     const state = yield* InstanceState.make<State>(
@@ -246,29 +245,30 @@ const layer = Layer.effect(
           ...(codeModeTool ? { execute: Tool.init(codeModeTool) } : {}),
         })
 
+        const builtin = [
+          tool.invalid,
+          ...(questionEnabled ? [tool.question] : []),
+          tool.shell,
+          tool.read,
+          tool.glob,
+          tool.grep,
+          tool.edit,
+          tool.write,
+          tool.task,
+          ...(flags.experimentalBackgroundSubagents ? [tool.task_status] : []),
+          tool.fetch,
+          tool.todo,
+          tool.search,
+          ...(flags.experimentalScout ? [tool.repo_clone, tool.repo_overview] : []),
+          tool.skill,
+          tool.patch,
+          ...(tool.execute ? [tool.execute] : []),
+          ...(lspToolEnabled ? [tool.lsp] : []),
+          ...(flags.experimentalPlanMode && flags.client === "cli" ? [tool.plan] : []),
+        ]
         return {
           custom,
-          builtin: [
-            tool.invalid,
-            ...(questionEnabled ? [tool.question] : []),
-            tool.shell,
-            tool.read,
-            tool.glob,
-            tool.grep,
-            tool.edit,
-            tool.write,
-            tool.task,
-            ...(flags.experimentalBackgroundSubagents ? [tool.task_status] : []),
-            tool.fetch,
-            tool.todo,
-            tool.search,
-            ...(flags.experimentalScout ? [tool.repo_clone, tool.repo_overview] : []),
-            tool.skill,
-            tool.patch,
-            ...(tool.execute ? [tool.execute] : []),
-            ...(lspToolEnabled ? [tool.lsp] : []),
-            ...(flags.experimentalPlanMode && flags.client === "cli" ? [tool.plan] : []),
-          ],
+          builtin,
           task: tool.task,
           read: tool.read,
         }
@@ -340,8 +340,8 @@ const layer = Layer.effect(
       const parameters = remoteJsonSchema
         ? Schema.Unknown
         : zodParams
-        ? Schema.declare<unknown>((u): u is unknown => zodParams.safeParse(u).success)
-        : Schema.Unknown
+          ? Schema.declare<unknown>((u): u is unknown => zodParams.safeParse(u).success)
+          : Schema.Unknown
       return {
         id,
         parameters,
@@ -385,15 +385,30 @@ const layer = Layer.effect(
       }
     }
 
-    const describeCodeMode = Effect.fn("ToolRegistry.describeCodeMode")(function* (input: {
-      agent: Agent.Info
-      permission?: PermissionV1.Ruleset
-    }) {
+    const describeCodeMode = Effect.fn("ToolRegistry.describeCodeMode")(function* (
+      input: {
+        agent: Agent.Info
+        permission?: PermissionV1.Ruleset
+        sessionID?: SessionID
+      },
+      extensions: readonly Tool.Def[],
+    ) {
       if (!codeMode) return
       const ruleset = Permission.merge(input.agent.permission, input.permission ?? [])
-      const tools = Permission.visibleTools(yield* mcp.tools(), ruleset)
-      if (Object.keys(tools).length === 0) return
-      return codeMode.describeCatalog(tools, Object.keys(yield* mcp.clients()).map(McpCatalog.sanitize))
+      const available = input.sessionID
+        ? yield* mcp.toolsForSession(input.sessionID).pipe(
+            Effect.timeout("30 seconds"),
+            Effect.catch((error) =>
+              Effect.logWarning("CodeMode session MCP discovery failed", {
+                sessionID: input.sessionID,
+                error: String(error),
+              }).pipe(Effect.as({} as Record<string, MCP.McpTool>)),
+            ),
+          )
+        : yield* mcp.tools()
+      const tools = Permission.visibleTools(available, ruleset)
+      if (Object.keys(tools).length === 0 && extensions.length === 0) return
+      return codeMode.describeCatalog(tools, Object.keys(yield* mcp.clients()).map(McpCatalog.sanitize), extensions)
     })
 
     const tools: Interface["tools"] = Effect.fn("ToolRegistry.tools")(function* (input) {
@@ -415,22 +430,21 @@ const layer = Layer.effect(
       })
 
       const sessionDefs: Tool.Def[] = []
-      const sessionPluginRuntime = input.sessionID && Option.isSome(sessionPlugins)
-        ? yield* sessionPlugins.value.acquire(input.sessionID)
-        : undefined
+      const sessionPluginRuntime =
+        input.sessionID && Option.isSome(sessionPlugins)
+          ? yield* sessionPlugins.value.acquire(input.sessionID)
+          : undefined
       const sessionPluginTools = sessionPluginRuntime ? yield* sessionPluginRuntime.tools() : {}
       const sessionContext = yield* InstanceState.context.pipe(Effect.catch(() => Effect.succeed(undefined)))
       for (const [name, def] of Object.entries(sessionPluginTools)) {
         sessionDefs.push(fromSessionToolDef(name, def, sessionContext?.directory ?? "", sessionContext?.worktree))
       }
       if (input.sessionID && sessionToolSvc && Flag.OPENCODE_DATABASE_URL) {
-        const ictx = yield* InstanceState.context.pipe(
-          Effect.catch(() => Effect.succeed(undefined)),
-        )
+        const ictx = yield* InstanceState.context.pipe(Effect.catch(() => Effect.succeed(undefined)))
 
-        const rows = yield* sessionToolSvc.list(input.sessionID).pipe(
-          Effect.catch(() => Effect.succeed([] as SessionTool.Row[])),
-        )
+        const rows = yield* sessionToolSvc
+          .list(input.sessionID)
+          .pipe(Effect.catch(() => Effect.succeed([] as SessionTool.Row[])))
         for (const row of rows) {
           const mod = yield* Effect.tryPromise({
             try: () => importToolCode(row.code),
@@ -439,9 +453,7 @@ const layer = Layer.effect(
           if (!mod) continue
           const def = (mod.default ?? mod) as ToolDefinition
           if (!isPluginTool(def)) continue
-          sessionDefs.push(
-            fromSessionToolDef(row.name, def, ictx?.directory ?? "", ictx?.worktree),
-          )
+          sessionDefs.push(fromSessionToolDef(row.name, def, ictx?.directory ?? "", ictx?.worktree))
         }
       }
 
@@ -449,9 +461,12 @@ const layer = Layer.effect(
       for (const def of filtered) merged.set(def.id, def)
       for (const def of sessionDefs) merged.set(def.id, def)
       const mergedList = [...merged.values()]
+      const codeModeExtensions = codeMode ? CodeModePolicy.select(flags.experimentalCodeMode, mergedList) : []
 
       const codeModeDescription = mergedList.some((tool) => tool.id === "execute")
-        ? yield* describeCodeMode(input)
+        ? yield* describeCodeMode({ ...input, sessionID: input.sessionID }, codeModeExtensions).pipe(
+            Effect.catch(() => Effect.succeed(undefined)),
+          )
         : undefined
       const visible = mergedList.filter((tool) => tool.id !== "execute" || codeModeDescription)
 
@@ -474,7 +489,9 @@ const layer = Layer.effect(
           return {
             id: tool.id,
             description: [
-              output.description,
+              tool.id === "execute" && codeModeExtensions.length > 0
+                ? codeMode!.DESCRIPTION_EXTENSIONS
+                : output.description,
               tool.id === TaskTool.id ? yield* describeTask(input.agent, input.sessionID) : undefined,
               tool.id === SkillTool.id ? yield* describeSkill(input.agent) : undefined,
               tool.id === "execute" ? codeModeDescription : undefined,

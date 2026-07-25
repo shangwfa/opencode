@@ -12,6 +12,7 @@ COMBO="${1:-3}"
 # 三种组合共享
 export BASE="http://localhost:14096"
 export MODEL='{"providerID":"zhipuai","modelID":"glm-5.1"}'
+export KIMI_MODEL='{"providerID":"moonshotai-cn","modelID":"kimi-k3"}'
 export NO_PROXY=localhost,127.0.0.1
 
 # PG 连接串按组合不同（PG 用户差异：远端 app / 本地 local）

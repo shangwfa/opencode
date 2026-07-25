@@ -1,6 +1,7 @@
 import { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import { Agent } from "@/agent/agent"
 import { SessionMcp } from "@/mcp/session-mcp"
+import { MCP } from "@/mcp"
 import { SessionLoadDotOpencode } from "@/config/session-load-dot-opencode"
 import { SessionTool } from "@/tool/session-tool"
 import { SessionPlugin } from "@/plugin/session-plugin"
@@ -77,6 +78,7 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
     const statusSvc = yield* SessionStatus.Service
     const todoSvc = yield* Todo.Service
     const mcpSessionSvc = Option.getOrUndefined(yield* Effect.serviceOption(SessionMcp.Service))
+    const mcpSvc = yield* MCP.Service
     const toolSessionSvc = Option.getOrUndefined(yield* Effect.serviceOption(SessionTool.Service))
     const pluginSessionSvc = yield* SessionPlugin.Service
     const pluginRuntime = yield* SessionPluginRuntime.Service
@@ -539,7 +541,9 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       payload: any
     }) {
       if (!mcpSessionSvc) throw new Error("Session MCPs are only available in SaaS mode")
-      return yield* mcpSessionSvc.upsert(ctx.params.sessionID, ctx.payload)
+      const result = yield* mcpSessionSvc.upsert(ctx.params.sessionID, ctx.payload)
+      yield* mcpSvc.clearSessionCache(ctx.params.sessionID)
+      return result
     })
 
     const deleteMcp = Effect.fn("SessionHttpApi.mcpsDelete")(function* (ctx: {
@@ -547,6 +551,7 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
     }) {
       if (!mcpSessionSvc) throw new Error("Session MCPs are only available in SaaS mode")
       yield* mcpSessionSvc.remove(ctx.params.sessionID, ctx.params.name)
+      yield* mcpSvc.clearSessionCache(ctx.params.sessionID)
     })
 
     const clearMcps = Effect.fn("SessionHttpApi.mcpsClear")(function* (ctx: {
@@ -554,6 +559,7 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
     }) {
       if (!mcpSessionSvc) throw new Error("Session MCPs are only available in SaaS mode")
       yield* mcpSessionSvc.removeAll(ctx.params.sessionID)
+      yield* mcpSvc.clearSessionCache(ctx.params.sessionID)
     })
 
     const listTools = Effect.fn("SessionHttpApi.tools")(function* (ctx: {
@@ -597,7 +603,9 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
     }) {
       yield* requireSession(ctx.params.sessionID)
       const cmds = yield* commandSvc.sessionList(ctx.params.sessionID).pipe(
-        Effect.catch(() => Effect.succeed([])),
+        Effect.catch((error) =>
+          Effect.logWarning("sessionList failed", { sessionID: ctx.params.sessionID, error: String(error) }).pipe(Effect.as([])),
+        ),
       )
       return cmds.map((c) => stripUndefined(c as unknown as Record<string, unknown>))
     })
@@ -614,6 +622,10 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
         hints?: readonly string[]
       }
     }) {
+      yield* requireSession(ctx.params.sessionID)
+      if (!ctx.payload.name?.trim() || /[\s/]/.test(ctx.payload.name)) {
+        return yield* Effect.fail(new HttpApiError.BadRequest({}))
+      }
       const info = yield* commandSvc.sessionCreate(ctx.params.sessionID, ctx.payload)
       return stripUndefined(info as unknown as Record<string, unknown>)
     })
@@ -621,12 +633,14 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
     const deleteCommand = Effect.fn("SessionHttpApi.commandsDelete")(function* (ctx: {
       params: { sessionID: SessionID; name: string }
     }) {
+      yield* requireSession(ctx.params.sessionID)
       yield* commandSvc.sessionRemove(ctx.params.sessionID, ctx.params.name)
     })
 
     const clearCommands = Effect.fn("SessionHttpApi.commandsClear")(function* (ctx: {
       params: { sessionID: SessionID }
     }) {
+      yield* requireSession(ctx.params.sessionID)
       yield* commandSvc.sessionClear(ctx.params.sessionID)
     })
 

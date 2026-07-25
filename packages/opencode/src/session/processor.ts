@@ -26,6 +26,7 @@ import { EventV2Bridge } from "@/event-v2-bridge"
 import { Database } from "@opencode-ai/core/database/database"
 import { Usage, type LLMEvent } from "@opencode-ai/llm"
 import { SessionPluginRuntime } from "@/plugin/session-plugin-runtime"
+import { Tool } from "@/tool/tool"
 
 const DOOM_LOOP_THRESHOLD = 3
 export type Result = "compact" | "stop" | "continue"
@@ -189,6 +190,7 @@ const layer = Layer.effect(
       const failToolCall = Effect.fn("SessionProcessor.failToolCall")(function* (toolCallID: string, error: unknown) {
         const match = yield* readToolCall(toolCallID)
         if (!match || match.part.state.status !== "running") return false
+        const metadata = "metadata" in match.part.state && isRecord(match.part.state.metadata) ? match.part.state.metadata : {}
         yield* session.updatePart({
           ...match.part,
           state: {
@@ -196,7 +198,7 @@ const layer = Layer.effect(
             input: match.part.state.input,
             error: errorMessage(error),
             // Keep metadata streamed while running so failures retain progress detail (e.g. execute's child calls).
-            metadata: match.part.state.metadata,
+            metadata: { ...metadata, ...(error instanceof Tool.ExecutionError ? error.metadata : {}) },
             time: { start: match.part.state.time.start, end: Date.now() },
           },
         })

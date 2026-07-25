@@ -13,6 +13,22 @@ const enabledByExperimental = (name: string) =>
     Config.map((flags) => Option.getOrElse(flags.enabled, () => flags.experimental)),
   )
 
+export type CodeMode = "off" | "mcp" | "read" | "all"
+
+const codeMode = Config.all({
+  experimental,
+  value: Config.string("OPENCODE_EXPERIMENTAL_CODE_MODE").pipe(Config.option),
+}).pipe(
+  Config.map(({ experimental, value }) => {
+    const raw = Option.getOrUndefined(value)?.toLowerCase()
+    if (raw === undefined) return experimental ? "mcp" : "off"
+    if (raw === "true") return "mcp"
+    if (raw === "false") return "off"
+    if (raw === "off" || raw === "mcp" || raw === "read" || raw === "all") return raw
+    return "off"
+  }),
+)
+
 export class Service extends ConfigService.Service<Service>()("@opencode/RuntimeFlags", {
   autoShare: bool("OPENCODE_AUTO_SHARE"),
   pure: bool("OPENCODE_PURE"),
@@ -47,7 +63,7 @@ export class Service extends ConfigService.Service<Service>()("@opencode/Runtime
   experimentalLspTool: enabledByExperimental("OPENCODE_EXPERIMENTAL_LSP_TOOL"),
   experimentalOxfmt: enabledByExperimental("OPENCODE_EXPERIMENTAL_OXFMT"),
   experimentalPlanMode: enabledByExperimental("OPENCODE_EXPERIMENTAL_PLAN_MODE"),
-  experimentalCodeMode: enabledByExperimental("OPENCODE_EXPERIMENTAL_CODE_MODE"),
+  experimentalCodeMode: codeMode,
   experimentalEventSystem: enabledByExperimental("OPENCODE_EXPERIMENTAL_EVENT_SYSTEM"),
   experimentalWorkspaces: enabledByExperimental("OPENCODE_EXPERIMENTAL_WORKSPACES"),
   experimentalIconDiscovery: enabledByExperimental("OPENCODE_EXPERIMENTAL_ICON_DISCOVERY"),

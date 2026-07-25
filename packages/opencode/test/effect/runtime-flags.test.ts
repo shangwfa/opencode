@@ -79,6 +79,22 @@ describe("RuntimeFlags", () => {
     }),
   )
 
+  it.effect("parses code mode variants while preserving boolean compatibility", () =>
+    Effect.gen(function* () {
+      const disabled = yield* readFlags.pipe(Effect.provide(fromConfig({})))
+      const umbrella = yield* readFlags.pipe(Effect.provide(fromConfig({ OPENCODE_EXPERIMENTAL: "true" })))
+      const legacy = yield* readFlags.pipe(Effect.provide(fromConfig({ OPENCODE_EXPERIMENTAL_CODE_MODE: "true" })))
+      const read = yield* readFlags.pipe(Effect.provide(fromConfig({ OPENCODE_EXPERIMENTAL_CODE_MODE: "read" })))
+      const all = yield* readFlags.pipe(Effect.provide(fromConfig({ OPENCODE_EXPERIMENTAL_CODE_MODE: "all" })))
+
+      expect(disabled.experimentalCodeMode).toBe("off")
+      expect(umbrella.experimentalCodeMode).toBe("mcp")
+      expect(legacy.experimentalCodeMode).toBe("mcp")
+      expect(read.experimentalCodeMode).toBe("read")
+      expect(all.experimentalCodeMode).toBe("all")
+    }),
+  )
+
   it.effect("enables native LLM via dedicated flag only", () =>
     Effect.gen(function* () {
       const explicit = yield* readFlags.pipe(Effect.provide(fromConfig({ OPENCODE_EXPERIMENTAL_NATIVE_LLM: "true" })))

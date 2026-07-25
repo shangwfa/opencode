@@ -27,6 +27,8 @@ import { SandboxProvider } from "@/tool/sandbox-provider"
 import { InstanceState } from "@/effect/instance-state"
 import { resolveSandboxOpts } from "@/session/sandbox-opts"
 import { RuntimeFlags } from "@/effect/runtime-flags"
+import type { Extension as CodeModeExtension } from "@/tool/code-mode"
+import { CodeModePolicy } from "@/tool/code-mode-policy"
 
 const MCP_RESOURCE_TOOLS = {
   list: "list_mcp_resources",
@@ -41,6 +43,8 @@ const SUPPORTED_MCP_RESOURCE_ATTACHMENT_MIMES = new Set([
   "image/png",
   "image/webp",
 ])
+
+type ExecutionOptions = Pick<ToolExecutionOptions, "abortSignal" | "toolCallId">
 
 export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
   agent: Agent.Info
@@ -61,6 +65,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
   const mcp = yield* MCP.Service
   const truncate = yield* Truncate.Service
   const flags = yield* RuntimeFlags.Service
+  let codeModeExtensions: CodeModeExtension[] = []
 
   const maybeSandboxProvider = Option.getOrUndefined(yield* Effect.serviceOption(SandboxProvider.Service))
   const root = maybeSandboxProvider
@@ -80,7 +85,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
       .catch(() => null)
   }
 
-  const context = (args: Record<string, unknown>, options: ToolExecutionOptions): Tool.Context => ({
+  const context = (args: Record<string, unknown>, options: ExecutionOptions): Tool.Context => ({
     sessionID: input.session.id,
     sandboxSessionID,
     abort: options.abortSignal!,
@@ -115,13 +120,83 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
         .pipe(Effect.orDie),
   })
 
-  for (const item of yield* registry.tools({
+  const invoke = Effect.fnUntraced(function* (
+    item: Tool.Def,
+    args: Record<string, unknown>,
+    options: ExecutionOptions,
+    parent?: Tool.Context,
+  ) {
+    const before = yield* plugin.trigger(
+      "tool.execute.before",
+      { tool: item.id, sessionID: input.session.id, callID: options.toolCallId },
+      { args },
+    )
+    const transformed = yield* sessionPluginRuntime.trigger(
+      "tool.execute.before",
+      { tool: item.id, sessionID: input.session.id, callID: options.toolCallId },
+      before,
+    )
+    const base = parent
+      ? { ...parent, callID: options.toolCallId, metadata: () => Effect.void }
+      : context(transformed.args, options)
+    const ctx = !parent && item.id === "execute" ? { ...base, orchestration: { extensions: codeModeExtensions } } : base
+    const result = yield* item.execute(transformed.args, ctx)
+    if (parent) {
+      const global = yield* plugin.trigger(
+        "tool.execute.after",
+        { tool: item.id, sessionID: ctx.sessionID, callID: ctx.callID, args: transformed.args },
+        result,
+      )
+      return yield* sessionPluginRuntime.trigger(
+        "tool.execute.after",
+        { tool: item.id, sessionID: ctx.sessionID, callID: ctx.callID, args: transformed.args },
+        global,
+      )
+    }
+    let output = {
+      ...result,
+      attachments: result.attachments?.map((attachment) => ({
+        ...attachment,
+        id: PartID.ascending(),
+        sessionID: ctx.sessionID,
+        messageID: input.processor.message.id,
+      })),
+    }
+    output = yield* plugin.trigger(
+      "tool.execute.after",
+      { tool: item.id, sessionID: ctx.sessionID, callID: ctx.callID, args: transformed.args },
+      output,
+    )
+    output = yield* sessionPluginRuntime.trigger(
+      "tool.execute.after",
+      { tool: item.id, sessionID: ctx.sessionID, callID: ctx.callID, args: transformed.args },
+      output,
+    )
+    if (!parent && options.abortSignal?.aborted) {
+      yield* input.processor.completeToolCall(options.toolCallId, output)
+    }
+    return output
+  })
+
+  const registered = yield* registry.tools({
     modelID: ModelV2.ID.make(input.model.api.id),
     providerID: input.model.providerID,
     agent: input.agent,
     sessionID: input.session.id,
     permission: input.session.permission,
-  })) {
+  })
+  if (flags.experimentalCodeMode !== "off" && flags.experimentalCodeMode !== "mcp") {
+    const codeMode = yield* Effect.promise(() => import("@/tool/code-mode"))
+    const selected = CodeModePolicy.select(flags.experimentalCodeMode, registered)
+    codeModeExtensions = selected.map((item) => ({
+      id: item.id,
+      description: item.description,
+      input: ToolJsonSchema.fromTool(item) as CodeModeExtension["input"],
+      run: (args, callID, ctx) => invoke(item, args, { toolCallId: callID, abortSignal: ctx.abort }, ctx),
+    }))
+  }
+
+  for (const item of registered) {
     const schema = ProviderTransform.schema(input.model, ToolJsonSchema.fromTool(item))
     tools[item.id] = tool({
       description: item.description,
@@ -129,41 +204,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
       execute(args, options) {
         return run.promise(
           Effect.gen(function* () {
-            const before = yield* plugin.trigger(
-              "tool.execute.before",
-              { tool: item.id, sessionID: input.session.id, callID: options.toolCallId },
-              { args },
-            )
-            const transformed = yield* sessionPluginRuntime.trigger(
-              "tool.execute.before",
-              { tool: item.id, sessionID: input.session.id, callID: options.toolCallId },
-              before,
-            )
-            const ctx = context(transformed.args, options)
-            const result = yield* item.execute(transformed.args, ctx)
-            let output = {
-              ...result,
-              attachments: result.attachments?.map((attachment) => ({
-                ...attachment,
-                id: PartID.ascending(),
-                sessionID: ctx.sessionID,
-                messageID: input.processor.message.id,
-              })),
-            }
-            output = yield* plugin.trigger(
-              "tool.execute.after",
-              { tool: item.id, sessionID: ctx.sessionID, callID: ctx.callID, args: transformed.args },
-              output,
-            )
-            output = yield* sessionPluginRuntime.trigger(
-              "tool.execute.after",
-              { tool: item.id, sessionID: ctx.sessionID, callID: ctx.callID, args: transformed.args },
-              output,
-            )
-            if (options.abortSignal?.aborted) {
-              yield* input.processor.completeToolCall(options.toolCallId, output)
-            }
-            return output
+            return yield* invoke(item, args, options)
           }),
         )
       },
@@ -422,7 +463,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
     })
   }
 
-  if (flags.experimentalCodeMode) return tools
+  if (flags.experimentalCodeMode !== "off") return tools
 
   for (const [key, entry] of Object.entries(yield* mcp.toolsForSession(input.session.id))) {
     const item = McpCatalog.convertTool(entry.def, entry.client, entry.timeout)

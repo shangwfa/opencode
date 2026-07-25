@@ -60,7 +60,7 @@ const it = testEffect(LayerNode.compile(root, replacements))
 const withCodeMode = testEffect(
   LayerNode.compile(root, [
     [Config.node, configLayer],
-    [RuntimeFlags.node, RuntimeFlags.layer({ experimentalCodeMode: true })],
+    [RuntimeFlags.node, RuntimeFlags.layer({ experimentalCodeMode: "mcp" })],
     [
       MCP.node,
       Layer.mock(MCP.Service, {
@@ -83,7 +83,7 @@ const withCodeMode = testEffect(
 const withEmptyCodeMode = testEffect(
   LayerNode.compile(root, [
     [Config.node, configLayer],
-    [RuntimeFlags.node, RuntimeFlags.layer({ experimentalCodeMode: true })],
+    [RuntimeFlags.node, RuntimeFlags.layer({ experimentalCodeMode: "mcp" })],
     [
       MCP.node,
       Layer.mock(MCP.Service, {

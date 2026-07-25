@@ -151,6 +151,7 @@ async function buildTool() {
     Layer.mock(Session.Service, { get: () => Effect.succeed({ permission: [] } as any) }),
     Layer.mock(MCP.Service, {
       tools: () => Effect.succeed(mcpTools),
+      toolsForSession: () => Effect.succeed(mcpTools),
       clients: () => Effect.succeed({ [SERVER]: {} as any }),
     }),
   )

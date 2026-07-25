@@ -8,10 +8,15 @@ import { Agent } from "@/agent/agent"
 import { Session } from "@/session/session"
 import { Permission } from "@/permission"
 import { Plugin } from "@/plugin"
+import { ToolJsonSchema } from "./json-schema"
 
 export const CODE_MODE_TOOL = "execute"
 
 const DESCRIPTION = "Run a confined orchestration script with access to connected MCP tools."
+
+export const DESCRIPTION_EXTENSIONS = `Execute JavaScript to orchestrate the available tools in a single call. Inside the script, your regular tools are exposed under the \`tools.opencode.*\` namespace and connected MCP servers under \`tools.<server>.*\`.
+
+Use this when a task chains multiple dependent tool calls (write then read then verify), fans out several independent calls (\`Promise.all\`), or transforms large intermediate results in code — it saves model round-trips and keeps bulky outputs out of the conversation. Prefer direct tool calls when a step needs your judgment before the next one, or when a single small call suffices; do not use this merely to force concurrency.`
 
 export const Parameters = Schema.Struct({
   code: Schema.String.annotate({
@@ -28,22 +33,62 @@ type Metadata = {
 
 type Attachment = NonNullable<Tool.ExecuteResult["attachments"]>[number]
 
-type CatalogEntry = {
+type CatalogEntryBase = {
   path: string
   key: string
   server: string
   local: string
+}
+
+type McpEntry = CatalogEntryBase & {
+  type: "mcp"
   tool: MCP.McpTool
 }
 
-function groupByServer(mcpTools: Record<string, MCP.McpTool>, servers: readonly string[]): Map<string, CatalogEntry[]> {
+export type Extension = {
+  id: string
+  description: string
+  input: SandboxTool.JsonSchema
+  output?: SandboxTool.JsonSchema
+  run: (args: Record<string, unknown>, callID: string, ctx: Tool.Context) => Effect.Effect<Tool.ExecuteResult, unknown>
+}
+
+type ExtensionEntry = CatalogEntryBase & {
+  type: "extension"
+  extension: Extension
+}
+
+type CatalogEntry = McpEntry | ExtensionEntry
+
+function extensionEntries(extensions: readonly Extension[]): ExtensionEntry[] {
+  return extensions.map((extension) => ({
+    type: "extension",
+    path: `opencode.${extension.id}`,
+    key: extension.id,
+    server: "opencode",
+    local: extension.id,
+    extension,
+  }))
+}
+
+function previewExtensions(tools: readonly Tool.Def[]): Extension[] {
+  return tools.map((tool) => ({
+    id: tool.id,
+    description: tool.description,
+    input: ToolJsonSchema.fromTool(tool) as SandboxTool.JsonSchema,
+    run: () => Effect.fail(toolError("Tool preview is not executable.")),
+  }))
+}
+
+function groupByServer(mcpTools: Record<string, MCP.McpTool>, servers: readonly string[]): Map<string, McpEntry[]> {
   const byLongest = [...servers].sort((a, b) => b.length - a.length)
-  const groups = new Map<string, CatalogEntry[]>()
+  const groups = new Map<string, McpEntry[]>()
   for (const key of Object.keys(mcpTools).sort((a, b) => a.localeCompare(b))) {
     const server =
       byLongest.find((name) => key.startsWith(name + "_")) ?? (key.includes("_") ? key.slice(0, key.indexOf("_")) : key)
     const local = server && key.startsWith(server + "_") ? key.slice(server.length + 1) : key
-    const entry: CatalogEntry = {
+    const entry: McpEntry = {
+      type: "mcp",
       path: `${server}.${local}`,
       key,
       server,
@@ -55,13 +100,19 @@ function groupByServer(mcpTools: Record<string, MCP.McpTool>, servers: readonly 
   return groups
 }
 
-export function describeCatalog(mcpTools: Record<string, MCP.McpTool>, servers: readonly string[]): string {
-  return CodeMode.make({
+export function describeCatalog(
+  mcpTools: Record<string, MCP.McpTool>,
+  servers: readonly string[],
+  extensions: readonly Tool.Def[] = [],
+): string {
+  const instructions = CodeMode.make({
     tools: toolTree(
-      [...groupByServer(mcpTools, servers).values()].flat(),
+      [...[...groupByServer(mcpTools, servers).values()].flat(), ...extensionEntries(previewExtensions(extensions))],
       () => () => Effect.fail(toolError("Tool preview is not executable.")),
     ),
   }).instructions()
+  if (extensions.length === 0) return instructions
+  return `Note: the \`tools.opencode\` namespace below re-exposes your regular built-in/agent tools (write, edit, read, bash, glob, grep, and others) for use inside the script — they are the same tools, not a separate API.\n\n${instructions}`
 }
 
 const lastSegment = (uri: string) => {
@@ -122,9 +173,12 @@ function toolTree(catalog: readonly CatalogEntry[], run: (entry: CatalogEntry) =
   for (const entry of catalog) {
     const namespace = (tree[entry.server] ??= {})
     namespace[entry.local] = SandboxTool.make({
-      description: entry.tool.def.description ?? "",
-      input: entry.tool.def.inputSchema as SandboxTool.JsonSchema,
-      output: entry.tool.def.outputSchema as SandboxTool.JsonSchema | undefined,
+      description: entry.type === "mcp" ? (entry.tool.def.description ?? "") : entry.extension.description,
+      input: entry.type === "mcp" ? (entry.tool.def.inputSchema as SandboxTool.JsonSchema) : entry.extension.input,
+      output:
+        entry.type === "mcp"
+          ? (entry.tool.def.outputSchema as SandboxTool.JsonSchema | undefined)
+          : entry.extension.output,
       run: run(entry),
     })
   }
@@ -133,7 +187,7 @@ function toolTree(catalog: readonly CatalogEntry[], run: (entry: CatalogEntry) =
 
 const invokeChildTool = Effect.fn("CodeMode.invokeChildTool")(function* (input: {
   plugin: Plugin.Interface
-  entry: CatalogEntry
+  entry: McpEntry
   args: Record<string, unknown>
   callID: string
   ctx: Tool.Context
@@ -185,8 +239,20 @@ const invokeChildTool = Effect.fn("CodeMode.invokeChildTool")(function* (input: 
   return result
 })
 
-export const CodeModeTool = Tool.define(
-  CODE_MODE_TOOL,
+function contextExtensions(ctx: Tool.Context, fallback: readonly Extension[]) {
+  if (!ctx.orchestration) return fallback
+  return ctx.orchestration.extensions.filter(
+    (item): item is Extension =>
+      typeof item === "object" &&
+      item !== null &&
+      "id" in item &&
+      typeof item.id === "string" &&
+      "run" in item &&
+      typeof item.run === "function",
+  )
+}
+
+const makeInit = (extensions: readonly Extension[]) =>
   Effect.gen(function* () {
     const mcp = yield* MCP.Service
     const agents = yield* Agent.Service
@@ -198,18 +264,18 @@ export const CodeModeTool = Tool.define(
       parameters: Parameters,
       execute: Effect.fn("CodeMode.execute")(function* (params, ctx) {
         if (ctx.abort.aborted) {
-          return {
-            title: CODE_MODE_TOOL,
-            metadata: { toolCalls: [], error: true },
-            output: "Execution cancelled.",
-          } satisfies Tool.ExecuteResult<Metadata>
+          yield* ctx.metadata({ title: CODE_MODE_TOOL, metadata: { toolCalls: [], error: true } })
+          return yield* Effect.fail(new Tool.ExecutionError("Execution cancelled.", { toolCalls: [], error: true }))
         }
         const agent = yield* agents.get(ctx.agent)
         const session = yield* sessions.get(ctx.sessionID).pipe(Effect.orDie)
         const ruleset = Permission.merge(agent.permission, session.permission ?? [])
-        const mcpTools = Permission.visibleTools(yield* mcp.tools(), ruleset)
+        const mcpTools = Permission.visibleTools(yield* mcp.toolsForSession(ctx.sessionID), ruleset)
         const servers = Object.keys(yield* mcp.clients()).map(McpCatalog.sanitize)
-        const catalog = [...groupByServer(mcpTools, servers).values()].flat()
+        const catalog: CatalogEntry[] = [
+          ...[...groupByServer(mcpTools, servers).values()].flat(),
+          ...extensionEntries(contextExtensions(ctx, extensions)),
+        ]
 
         const calls: CallEntry[] = []
         const attachments: Attachment[] = []
@@ -220,14 +286,20 @@ export const CodeModeTool = Tool.define(
         const callTool = (entry: CatalogEntry) => (input: unknown) =>
           Effect.gen(function* () {
             childCalls += 1
-            const result = yield* invokeChildTool({
-              plugin,
-              entry,
-              args: (input ?? {}) as Record<string, unknown>,
-              callID: `${ctx.callID ?? entry.key}/${childCalls}`,
-              ctx,
-            })
-            return projectMcpResult(result, (attachment: Attachment) => void attachments.push(attachment))
+            const callID = `${ctx.callID ?? entry.key}/${childCalls}`
+            if (entry.type === "mcp") {
+              const result = yield* invokeChildTool({
+                plugin,
+                entry,
+                args: (input ?? {}) as Record<string, unknown>,
+                callID,
+                ctx,
+              })
+              return projectMcpResult(result, (attachment: Attachment) => void attachments.push(attachment))
+            }
+            const result = yield* entry.extension.run((input ?? {}) as Record<string, unknown>, callID, ctx)
+            for (const attachment of result.attachments ?? []) attachments.push(attachment)
+            return result.output
           }).pipe(
             Effect.catchCause((cause) => {
               if (Cause.hasInterruptsOnly(cause)) return Effect.interrupt
@@ -271,6 +343,7 @@ export const CodeModeTool = Tool.define(
           toolCalls: calls.map((call) => ({ name: call.tool })),
         })
 
+        yield* publish()
         const result = yield* Effect.raceFirst(runtime.execute(params.code), abort.pipe(Effect.map(cancelled)))
         const logs = result.logs ?? []
         const withLogs = (text: string) => {
@@ -280,14 +353,15 @@ export const CodeModeTool = Tool.define(
 
         if (!result.ok) {
           if (ctx.abort.aborted) {
-            return {
-              title: CODE_MODE_TOOL,
-              metadata: { toolCalls: calls, error: true },
-              output: "Execution cancelled.",
-            } satisfies Tool.ExecuteResult<Metadata>
+            yield* ctx.metadata({ title: CODE_MODE_TOOL, metadata: { toolCalls: calls, error: true } })
+            return yield* Effect.fail(
+              new Tool.ExecutionError("Execution cancelled.", { toolCalls: calls, error: true }),
+            )
           }
           const hints = (result.error.suggestions ?? []).filter((hint) => !result.error.message.includes(hint))
-          return yield* Effect.fail(new Error(withLogs([result.error.message, ...hints].join("\n"))))
+          const message = withLogs([result.error.message, ...hints].join("\n"))
+          yield* ctx.metadata({ title: CODE_MODE_TOOL, metadata: { toolCalls: calls, error: true } })
+          return yield* Effect.fail(new Tool.ExecutionError(message, { toolCalls: calls, error: true }))
         }
 
         // The interpreter validates returned values as plain JSON, so stringify cannot throw;
@@ -306,5 +380,9 @@ export const CodeModeTool = Tool.define(
       }, Effect.orDie),
     }
     return init
-  }),
-)
+  })
+
+export const makeCodeModeTool = (extensions: readonly Extension[] = []) =>
+  Tool.define(CODE_MODE_TOOL, makeInit(extensions))
+
+export const CodeModeTool = makeCodeModeTool()

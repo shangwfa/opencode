@@ -1,5 +1,12 @@
 import { describe, expect, test } from "bun:test"
-import { CODE_MODE_TOOL, CodeModeTool, Parameters, describeCatalog } from "@/tool/code-mode"
+import {
+  CODE_MODE_TOOL,
+  CodeModeTool,
+  Parameters,
+  describeCatalog,
+  makeCodeModeTool,
+  type Extension,
+} from "@/tool/code-mode"
 import type { Tool as MCPToolDef } from "@modelcontextprotocol/sdk/types.js"
 import type { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import { Agent } from "@/agent/agent"
@@ -59,6 +66,7 @@ function harness(input: {
     }),
     Layer.mock(MCP.Service, {
       tools: () => Effect.succeed(input.mcpTools),
+      toolsForSession: () => Effect.succeed(input.mcpTools),
       clients: () => Effect.succeed(Object.fromEntries(input.servers.map((name) => [name, {} as any]))),
     }),
   )
@@ -79,6 +87,15 @@ function build(
     CodeModeTool.pipe(
       Effect.flatMap(Tool.init),
       Effect.provide(harness({ mcpTools, servers: names, permission, trigger })),
+    ),
+  )
+}
+
+function buildExtended(extensions: readonly Extension[]) {
+  return Effect.runPromise(
+    makeCodeModeTool(extensions).pipe(
+      Effect.flatMap(Tool.init),
+      Effect.provide(harness({ mcpTools: {}, servers: [] })),
     ),
   )
 }
@@ -143,6 +160,16 @@ describe("code mode execute", () => {
     expect(tool.description).toBe("Run a confined orchestration script with access to connected MCP tools.")
     expect(tool.description).not.toContain("Available tools")
     expect(tool.description).not.toContain("list_issues")
+  })
+
+  test("describeCatalog notes the opencode namespace only when extensions are present", () => {
+    const note = "the `tools.opencode` namespace below re-exposes your regular built-in/agent tools"
+    const withoutExtensions = describeCatalog({ github_search: mcpTool("search", () => "") }, ["github"])
+    expect(withoutExtensions).not.toContain(note)
+    const withExtensions = describeCatalog({}, [], [
+      { id: "read", description: "Read a file", parameters: Schema.Struct({ path: Schema.String }) } as unknown as Tool.Def,
+    ])
+    expect(withExtensions).toContain(note)
   })
 
   test("small catalogs inline every full signature in the appended catalog", () => {
@@ -257,6 +284,36 @@ describe("code mode execute", () => {
     expect(output.metadata.toolCalls).toEqual([])
   })
 
+  test("composes an explicitly provided native tool under the opencode namespace", async () => {
+    const tool = await buildExtended([
+      {
+        id: "read",
+        description: "Read a file",
+        input: {
+          type: "object",
+          properties: { path: { type: "string" } },
+          required: ["path"],
+          additionalProperties: false,
+        },
+        run: (args) =>
+          Effect.succeed({
+            title: "read",
+            metadata: {},
+            output: `contents:${args.path}`,
+          }),
+      },
+    ])
+
+    const output = await Effect.runPromise(
+      tool.execute({ code: 'return await tools.opencode.read({ path: "README.md" })' }, ctx),
+    )
+
+    expect(output.output).toBe("contents:README.md")
+    expect(output.metadata.toolCalls).toEqual([
+      { tool: "opencode.read", status: "completed", input: { path: "README.md" } },
+    ])
+  })
+
   test("Object.keys(tools) enumerates the MCP server and CodeMode namespaces", async () => {
     const tool = await build({
       github_list_issues: mcpTool("list_issues", () => ""),
@@ -341,6 +398,8 @@ describe("code mode execute", () => {
     const tool = await build({})
     const error = await failure(tool.execute({ code: "throw new Error('boom')" }, ctx))
     expect(error.message).toBe("Uncaught: boom")
+    expect(error).toBeInstanceOf(Tool.ExecutionError)
+    expect((error as Tool.ExecutionError).metadata).toEqual({ toolCalls: [], error: true })
   })
 
   test("reports an unknown tool as a failed execution", async () => {
@@ -604,21 +663,25 @@ describe("code mode execute", () => {
 
   test("cancelling via ctx.abort interrupts the running program", async () => {
     const controller = new AbortController()
+    const snapshots: unknown[] = []
     const tool = await build({
       host_trigger: mcpTool("trigger", () => {
         controller.abort()
         return new Promise(() => {})
       }),
     })
-    const output = await Effect.runPromise(
+    const error = await failure(
       tool.execute(
         { code: "try { await tools.host.trigger({}) } catch {} while (true) {}" },
-        { ...ctx, abort: controller.signal },
+        {
+          ...ctx,
+          abort: controller.signal,
+          metadata: (value) => Effect.sync(() => void snapshots.push(value.metadata)),
+        },
       ),
     )
-    expect(output.output).toBe("Execution cancelled.")
-    expect(output.metadata.error).toBe(true)
-    expect(output.metadata.toolCalls).toEqual([{ tool: "host.trigger", status: "running" }])
+    expect(error.message).toBe("Execution cancelled.")
+    expect(snapshots).toContainEqual({ error: true, toolCalls: [{ tool: "host.trigger", status: "running" }] })
   })
 
   test("a pre-aborted signal cancels before the program runs", async () => {
@@ -626,10 +689,10 @@ describe("code mode execute", () => {
     controller.abort()
     const ran: string[] = []
     const tool = await build({ host_touch: mcpTool("touch", () => (ran.push("called"), "ok")) })
-    const output = await Effect.runPromise(
+    const error = await failure(
       tool.execute({ code: "return await tools.host.touch({})" }, { ...ctx, abort: controller.signal }),
     )
-    expect(output.output).toBe("Execution cancelled.")
+    expect(error.message).toBe("Execution cancelled.")
     expect(ran).toEqual([])
   })
 
