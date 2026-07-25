@@ -797,6 +797,7 @@ export const SessionApi = HttpApi.make("session")
           query: WorkspaceRoutingQuery,
           payload: CommandCreatePayload,
           success: described(Schema.Unknown, "Created session command"),
+          error: [HttpApiError.BadRequest, ApiNotFoundError],
         }).annotateMerge(
           OpenApi.annotations({
             identifier: "session.commands.create",
@@ -808,6 +809,7 @@ export const SessionApi = HttpApi.make("session")
           params: { sessionID: SessionID, name: Schema.String },
           query: WorkspaceRoutingQuery,
           success: described(Schema.Void, "Session command removed"),
+          error: [HttpApiError.BadRequest, ApiNotFoundError],
         }).annotateMerge(
           OpenApi.annotations({
             identifier: "session.commands.delete",
@@ -819,6 +821,7 @@ export const SessionApi = HttpApi.make("session")
           params: { sessionID: SessionID },
           query: WorkspaceRoutingQuery,
           success: described(Schema.Void, "Session commands cleared"),
+          error: [HttpApiError.BadRequest, ApiNotFoundError],
         }).annotateMerge(
           OpenApi.annotations({
             identifier: "session.commands.clear",

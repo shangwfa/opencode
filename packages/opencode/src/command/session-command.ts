@@ -1,8 +1,7 @@
 import z from "zod"
 import { randomBytes } from "crypto"
 import { Effect, Context, Layer } from "effect"
-import { Database, and, asc, eq } from "../storage/db"
-import { SessionCommandTable } from "./session-command.pg"
+import { Database } from "../storage/db"
 import type { SessionID } from "../session/schema"
 
 export namespace SessionCommand {
@@ -35,12 +34,6 @@ export namespace SessionCommand {
     return `scmd_${randomBytes(12).toString("base64url")}`
   }
 
-  const db = <T>(
-    fn: (
-      d: Parameters<typeof Database.use>[0] extends (trx: infer D) => unknown ? D : never,
-    ) => T,
-  ) => Effect.promise(() => Database.use(fn) as Promise<T>)
-
   export interface Interface {
     readonly list: (sessionID: SessionID) => Effect.Effect<Row[]>
     readonly get: (sessionID: SessionID, name: string) => Effect.Effect<Row | undefined>
@@ -72,94 +65,6 @@ export namespace SessionCommand {
         } as Row),
       remove: () => Effect.void,
       removeAll: () => Effect.void,
-    }),
-  )
-
-  export const layer = Layer.effect(
-    Service,
-    Effect.gen(function* () {
-      return Service.of({
-        list: Effect.fn("SessionCommand.list")(function* (sessionID) {
-          const rows = yield* db((d) =>
-            d
-              .select()
-              .from(SessionCommandTable)
-              .where(eq(SessionCommandTable.session_id, sessionID))
-              .orderBy(asc(SessionCommandTable.name))
-              .all(),
-          )
-          return rows.map((row: unknown) => Row.parse(row))
-        }),
-
-        get: Effect.fn("SessionCommand.get")(function* (sessionID, name) {
-          const row = yield* db((d) =>
-            d
-              .select()
-              .from(SessionCommandTable)
-              .where(
-                and(eq(SessionCommandTable.session_id, sessionID), eq(SessionCommandTable.name, name)),
-              )
-              .get(),
-          )
-          if (!row) return undefined
-          return Row.parse(row)
-        }),
-
-        upsert: Effect.fn("SessionCommand.upsert")(function* (sessionID, input) {
-          const now = Date.now()
-          const row = {
-            id: id(),
-            session_id: sessionID,
-            name: input.name,
-            description: input.description ?? null,
-            template: input.template,
-            agent: input.agent ?? null,
-            model: input.model ?? null,
-            subtask: input.subtask ?? null,
-            hints: [...(input.hints ?? [])] as any,
-            time_created: now,
-            time_updated: now,
-          } as any
-          const rows = yield* db((d: any) =>
-            d
-              .insert(SessionCommandTable)
-              .values(row)
-              .onConflictDoUpdate({
-                target: [SessionCommandTable.session_id, SessionCommandTable.name],
-                set: {
-                  description: input.description ?? null,
-                  template: input.template,
-                  agent: input.agent ?? null,
-                  model: input.model ?? null,
-                  subtask: input.subtask ?? null,
-                  hints: [...(input.hints ?? [])] as any,
-                  time_updated: now,
-                } as any,
-              })
-              .returning(),
-          )
-          const result = (rows as any[])[0]
-          if (!result) throw new Error("SessionCommand upsert returned no rows")
-          return Row.parse(result)
-        }),
-
-        remove: Effect.fn("SessionCommand.remove")(function* (sessionID, name) {
-          yield* db((d) =>
-            d
-              .delete(SessionCommandTable)
-              .where(
-                and(eq(SessionCommandTable.session_id, sessionID), eq(SessionCommandTable.name, name)),
-              )
-              .run(),
-          )
-        }),
-
-        removeAll: Effect.fn("SessionCommand.removeAll")(function* (sessionID) {
-          yield* db((d) =>
-            d.delete(SessionCommandTable).where(eq(SessionCommandTable.session_id, sessionID)).run(),
-          )
-        }),
-      })
     }),
   )
 

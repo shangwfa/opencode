@@ -217,7 +217,11 @@ const layer = Layer.effect(
       const s = yield* InstanceState.get(state)
       const base = Object.values(s.commands)
       if (!sessionCommandSvc || !Flag.OPENCODE_DATABASE_URL) return base
-      const rows = yield* sessionCommandSvc.list(session).pipe(Effect.catch(() => Effect.succeed([])))
+      const rows = yield* sessionCommandSvc.list(session).pipe(
+        Effect.catch((error) =>
+          Effect.logWarning("SessionCommand.list failed", { session, error: String(error) }).pipe(Effect.as([])),
+        ),
+      )
       if (rows.length === 0) return base
       const overlay = new Map(rows.map((r) => [r.name, rowToInfo(r)]))
       return base
@@ -230,7 +234,11 @@ const layer = Layer.effect(
       if (!session || !sessionCommandSvc || !Flag.OPENCODE_DATABASE_URL) return s.commands[name]
       const row = yield* sessionCommandSvc
         .get(session, name)
-        .pipe(Effect.catch(() => Effect.succeed(undefined)))
+        .pipe(
+          Effect.catch((error) =>
+            Effect.logWarning("SessionCommand.get failed", { session, name, error: String(error) }).pipe(Effect.as(undefined)),
+          ),
+        )
       if (row) return rowToInfo(row)
       return s.commands[name]
     }, Effect.orDie)
