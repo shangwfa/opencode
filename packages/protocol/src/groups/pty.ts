@@ -1,10 +1,13 @@
 import { Pty } from "@opencode-ai/schema/pty"
 import { PtyTicket } from "@opencode-ai/schema/pty-ticket"
 import { Location } from "@opencode-ai/schema/location"
+import { Session } from "@opencode-ai/schema/session"
 import { Schema } from "effect"
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema, OpenApi } from "effect/unstable/httpapi"
 import { ForbiddenError, PtyNotFoundError } from "../errors"
 import { LocationQuery, locationQueryOpenApi } from "./location"
+
+export const PtyQuery = Schema.Struct({ ...LocationQuery.fields, sessionID: Schema.optional(Session.ID) })
 
 export const PTY_CONNECT_TICKET_QUERY = "ticket"
 export const PTY_CONNECT_TOKEN_HEADER = "x-opencode-ticket"
@@ -21,7 +24,7 @@ export function hasPtyConnectTicketURL(url: URL) {
 export const PtyGroup = HttpApiGroup.make("server.pty")
   .add(
     HttpApiEndpoint.get("pty.list", "/api/pty", {
-      query: LocationQuery,
+      query: PtyQuery,
       success: Location.response(Schema.Array(Pty.Info)),
     })
       .annotateMerge(locationQueryOpenApi)
@@ -35,7 +38,7 @@ export const PtyGroup = HttpApiGroup.make("server.pty")
   )
   .add(
     HttpApiEndpoint.post("pty.create", "/api/pty", {
-      query: LocationQuery,
+      query: PtyQuery,
       payload: Pty.CreateInput,
       success: Location.response(Pty.Info),
     })
@@ -51,7 +54,7 @@ export const PtyGroup = HttpApiGroup.make("server.pty")
   .add(
     HttpApiEndpoint.get("pty.get", "/api/pty/:ptyID", {
       params: { ptyID: Pty.ID },
-      query: LocationQuery,
+      query: PtyQuery,
       success: Location.response(Pty.Info),
       error: PtyNotFoundError,
     })
@@ -67,7 +70,7 @@ export const PtyGroup = HttpApiGroup.make("server.pty")
   .add(
     HttpApiEndpoint.put("pty.update", "/api/pty/:ptyID", {
       params: { ptyID: Pty.ID },
-      query: LocationQuery,
+      query: PtyQuery,
       payload: Pty.UpdateInput,
       success: Location.response(Pty.Info),
       error: PtyNotFoundError,
@@ -84,7 +87,7 @@ export const PtyGroup = HttpApiGroup.make("server.pty")
   .add(
     HttpApiEndpoint.delete("pty.remove", "/api/pty/:ptyID", {
       params: { ptyID: Pty.ID },
-      query: LocationQuery,
+      query: PtyQuery,
       success: HttpApiSchema.NoContent,
       error: PtyNotFoundError,
     })
@@ -100,7 +103,7 @@ export const PtyGroup = HttpApiGroup.make("server.pty")
   .add(
     HttpApiEndpoint.post("pty.connectToken", "/api/pty/:ptyID/connect-token", {
       params: { ptyID: Pty.ID },
-      query: LocationQuery,
+      query: PtyQuery,
       success: Location.response(PtyTicket.ConnectToken),
       error: [ForbiddenError, PtyNotFoundError],
     })
@@ -109,7 +112,7 @@ export const PtyGroup = HttpApiGroup.make("server.pty")
         OpenApi.annotations({
           identifier: "v2.pty.connectToken",
           summary: "Create PTY WebSocket token",
-          description: "Create a short-lived single-use ticket for opening a PTY WebSocket connection.",
+          description: "Create a short-lived scope-bound ticket for opening a PTY WebSocket connection.",
         }),
       ),
   )
@@ -130,7 +133,7 @@ export const PtyGroup = HttpApiGroup.make("server.pty")
           "x-websocket": true,
           parameters: [
             ...(operation.parameters ?? []),
-            ...["location[directory]", "location[workspace]", "cursor", PTY_CONNECT_TICKET_QUERY].map((name) => ({
+            ...["location[directory]", "location[workspace]", "sessionID", "cursor", PTY_CONNECT_TICKET_QUERY].map((name) => ({
               in: "query",
               name,
               schema: { type: "string" },

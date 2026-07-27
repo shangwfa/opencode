@@ -3,16 +3,18 @@ export * as PtyTicket from "./ticket"
 import { WorkspaceV2 } from "../workspace"
 import { PtyTicket } from "@opencode-ai/schema/pty-ticket"
 import { PtyID } from "./schema"
-import { Cache, Context, Duration, Effect, Layer } from "effect"
+import { Context, Duration, Effect, Layer } from "effect"
 import { makeGlobalNode } from "../effect/app-node"
+import { createHmac, timingSafeEqual } from "node:crypto"
 
-const DEFAULT_TTL = Duration.seconds(60)
-const CAPACITY = 10_000
+const DEFAULT_TTL = Duration.seconds(30)
+const DEFAULT_SECRET = process.env.OPENCODE_PTY_TICKET_SECRET || crypto.randomUUID()
 
 export const ConnectToken = PtyTicket.ConnectToken
 
 export type Scope = {
   readonly ptyID: PtyID
+  readonly sessionID?: string
   readonly directory?: string
   readonly workspaceID?: WorkspaceV2.ID
 }
@@ -26,27 +28,52 @@ export class Service extends Context.Service<Service, Interface>()("@opencode/Pt
 
 function matches(record: Scope, input: Scope) {
   return (
-    record.ptyID === input.ptyID && record.directory === input.directory && record.workspaceID === input.workspaceID
+    record.ptyID === input.ptyID &&
+    record.sessionID === input.sessionID &&
+    record.directory === input.directory &&
+    record.workspaceID === input.workspaceID
   )
 }
 
-// Tickets are inserted via Cache.set and removed atomically via invalidateWhen. The lookup is
-// never invoked; it dies if it ever is, which would signal a misuse of the Service interface.
-const noLookup = () => Effect.die("PtyTicket cache must be used via set/invalidateWhen, never get")
+function sign(secret: string, payload: string) {
+  return createHmac("sha256", secret).update(payload).digest("base64url")
+}
 
-// Visible for tests so the TTL can be shortened. Production uses `layer` with the default TTL.
-export const make = (ttl: Duration.Input = DEFAULT_TTL) =>
-  Effect.gen(function* () {
-    const cache = yield* Cache.make<string, Scope>({ capacity: CAPACITY, lookup: noLookup, timeToLive: ttl })
-    const expiresIn = Math.max(1, Math.round(Duration.toSeconds(Duration.fromInputUnsafe(ttl))))
+export const make = (ttl: Duration.Input = DEFAULT_TTL, secret = DEFAULT_SECRET) =>
+  Effect.sync(() => {
+    const duration = Duration.fromInputUnsafe(ttl)
+    const expiresIn = Math.max(1, Math.round(Duration.toSeconds(duration)))
+    const expiresInMillis = Duration.toMillis(duration)
     return Service.of({
       issue: Effect.fn("PtyTicket.issue")(function* (input) {
-        const ticket = crypto.randomUUID()
-        yield* Cache.set(cache, ticket, input)
-        return { ticket, expires_in: expiresIn }
+        const payload = Buffer.from(JSON.stringify({ scope: input, expiresAt: Date.now() + expiresInMillis })).toString(
+          "base64url",
+        )
+        return { ticket: `${payload}.${sign(secret, payload)}`, expires_in: expiresIn }
       }),
       consume: Effect.fn("PtyTicket.consume")(function* (input) {
-        return yield* Cache.invalidateWhen(cache, input.ticket, (stored) => matches(stored, input))
+        const [payload, signature, extra] = input.ticket.split(".")
+        if (!payload || !signature || extra) return false
+        const expected = sign(secret, payload)
+        if (
+          signature.length !== expected.length ||
+          !timingSafeEqual(Buffer.from(signature), Buffer.from(expected))
+        )
+          return false
+        try {
+          const parsed = JSON.parse(Buffer.from(payload, "base64url").toString()) as {
+            scope?: Scope
+            expiresAt?: unknown
+          }
+          return (
+            typeof parsed.expiresAt === "number" &&
+            parsed.expiresAt >= Date.now() &&
+            !!parsed.scope &&
+            matches(parsed.scope, input)
+          )
+        } catch {
+          return false
+        }
       }),
     })
   })

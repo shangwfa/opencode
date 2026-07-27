@@ -116,7 +116,10 @@ import { handlers } from "@opencode-ai/server/handlers"
 import { buildLocationServiceMap, LocationServiceMap } from "@opencode-ai/core/location-services"
 import { layer as locationLayer } from "@opencode-ai/server/location"
 import { sessionLocationLayer } from "@opencode-ai/server/middleware/session-location"
-import { PtyEnvironment } from "@opencode-ai/server/pty-environment"
+import { PluginPtyEnvironment } from "@/plugin/pty-environment"
+import { PtyRuntime } from "@opencode-ai/server/pty-runtime"
+import { SandboxPtyRuntime } from "@/pty/sandbox-runtime"
+import { LocalPtyRuntime } from "@/pty/local-runtime"
 import { schemaErrorLayer as v2SchemaErrorLayer } from "@opencode-ai/server/middleware/schema-error"
 import { workspaceHandlers } from "./handlers/workspace"
 import { instanceContextLayer } from "./middleware/instance-context"
@@ -202,6 +205,14 @@ const serverRoutes = HttpApiBuilder.layer(Api).pipe(
   Layer.provide(handlers),
   Layer.provide([serverHttpApiAuthLayer, v2SchemaErrorLayer]),
 )
+const ptyRuntimeLayer: Layer.Layer<
+  PtyRuntime.Service,
+  never,
+  EventV2.Service | Session.Service | LocationServiceMap.Service
+> =
+  Flag.OPENCODE_SANDBOX_ENABLED
+  ? SandboxPtyRuntime.defaultLayer.pipe(Layer.provide(SandboxProvider.defaultLayer))
+  : LocalPtyRuntime.layer
 
 // `OpenApi.fromApi` is non-trivial; defer until /doc is actually hit so
 // processes that never serve it (CLI, scripts) don't pay at module load.
@@ -332,9 +343,10 @@ export function createRoutes(
       HttpServer.layerServices,
     ]),
     Layer.provide(Layer.succeed(CorsConfig)(corsOptions)),
+    Layer.provide(ptyRuntimeLayer),
     Layer.provide(sessionLocationLayer),
     Layer.provide(locationLayer),
-    Layer.provide(PtyEnvironment.layer),
+    Layer.provide(PluginPtyEnvironment.layer),
     Layer.provide(
       AppNodeBuilderV1.build(SessionV2.node, [
         [LocationServiceMap.node, locationServiceMapV2],

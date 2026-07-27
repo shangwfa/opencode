@@ -38,7 +38,10 @@ RUN npm config set registry https://registry.npmmirror.com \
 # ── 6. Install multiple pnpm versions (via npm backend, uses npmmirror) ──
 # Default backend (aqua) downloads from GitHub which is slow/blocked in China.
 # npm backend downloads from npm registry (npmmirror) instead.
-RUN mise install npm:pnpm@8 npm:pnpm@9 npm:pnpm@10 npm:pnpm@11
+RUN mise install npm:pnpm@8.15.9 \
+  && mise install npm:pnpm@9.15.9 \
+  && mise install npm:pnpm@10.20.0 \
+  && mise install npm:pnpm@11.17.0
 
 # ── 7. Set default versions (node@24 + pnpm@10) and refresh shims ──
 RUN mise use -g npm:pnpm@10 && mise reshim
@@ -48,7 +51,7 @@ RUN npm install -g supergateway agent-browser bun
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     apt-get update \
-  && apt-get install -y --no-install-recommends ripgrep \
+  && apt-get install -y --no-install-recommends ripgrep util-linux \
   && rm -rf /var/lib/apt/lists/*
 
 # ── 8a. Install Chromium via Playwright (supports arm64 + x86_64) ──
@@ -112,3 +115,9 @@ RUN npm install -g typescript pyright \
 # ── 13. Pre-install sandbox-plugin-agent (session plugin daemon for V2 sandbox execution) ──
 COPY docker/opt/sandbox-plugin-agent.ts /opt/sandbox-plugin-agent.ts
 COPY docker/opt/sandbox-plugin-npm.ts /opt/sandbox-plugin-npm.ts
+
+# ── 14. Pre-install interactive PTY agent ──
+RUN mkdir -p /opt/opencode-pty-agent \
+    && cd /opt/opencode-pty-agent \
+    && bun add bun-pty@0.4.8
+COPY docker/opt/opencode-pty-agent.ts /opt/opencode-pty-agent/index.ts
