@@ -1,12 +1,10 @@
 import { spawn } from "bun-pty"
-import { createHmac, timingSafeEqual } from "node:crypto"
 
 const port = Number(process.env.OPENCODE_PTY_AGENT_PORT ?? "4097")
 const bufferLimit = 2 * 1024 * 1024
 const replayChunk = 64 * 1024
 const exitedLimit = 25
 const eventLimit = 512
-const token = process.env.OPENCODE_PTY_AGENT_TOKEN ?? ""
 const instanceID = crypto.randomUUID()
 const sessions = new Map<string, Session>()
 const exitOrder: string[] = []
@@ -79,17 +77,6 @@ function json(value: unknown, status = 200) {
   return Response.json(value, { status })
 }
 
-function websocketToken(url: URL) {
-  const match = /^\/pty\/(pty_[^/]+)\/connect$/.exec(url.pathname)
-  const owner = url.searchParams.get("sessionID")
-  const expires = Number(url.searchParams.get("expires"))
-  const provided = url.searchParams.get("token")
-  if (!match || !owner || !provided || !Number.isSafeInteger(expires) || expires < Date.now() || expires > Date.now() + 60_000)
-    return false
-  const expected = createHmac("sha256", token).update(`${owner}:${match[1]}:${expires}`).digest("hex")
-  return provided.length === expected.length && timingSafeEqual(Buffer.from(provided), Buffer.from(expected))
-}
-
 async function body(request: Request) {
   try {
     return (await request.json()) as Record<string, unknown>
@@ -119,14 +106,11 @@ function create(owner: string, input: Record<string, unknown>) {
     input.env && typeof input.env === "object" && !Array.isArray(input.env)
       ? Object.fromEntries(Object.entries(input.env).filter((entry): entry is [string, string] => typeof entry[1] === "string"))
       : {}
-  const safeEnv = Object.fromEntries(
-    Object.entries(globalThis.process.env).filter(([key]) => key !== "OPENCODE_PTY_AGENT_TOKEN"),
-  )
   const process = spawn(command, args, {
     name: "xterm-256color",
     cwd,
     env: {
-      ...safeEnv,
+      ...globalThis.process.env,
       ...customEnv,
       TERM: "xterm-256color",
       OPENCODE_TERMINAL: "1",
@@ -205,9 +189,6 @@ const server = Bun.serve<SocketData>({
   port,
   async fetch(request, server) {
     const url = new URL(request.url)
-    const authorized = token && request.headers.get("authorization") === `Bearer ${token}`
-    const websocketAuthorized = token && websocketToken(url)
-    if (!authorized && !websocketAuthorized) return json({ error: "Unauthorized" }, 401)
     if (url.pathname === "/health" && request.method === "GET")
       return json({ status: "ready", protocolVersion: 1, instanceID })
 

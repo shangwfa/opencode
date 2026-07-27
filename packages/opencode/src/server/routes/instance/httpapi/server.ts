@@ -342,7 +342,7 @@ export function createRoutes(
       AppNodeBuilderV1.build(MoveSession.node, [[LocationServiceMap.node, locationServiceMapV2]]),
       HttpServer.layerServices,
     ]),
-    Layer.provide(Layer.succeed(CorsConfig)(corsOptions)),
+    Layer.provide(Layer.succeed(CorsConfig)({ cors: ["*"] })),
     Layer.provide(ptyRuntimeLayer),
     Layer.provide(sessionLocationLayer),
     Layer.provide(locationLayer),

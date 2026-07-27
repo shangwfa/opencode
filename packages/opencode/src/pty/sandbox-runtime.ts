@@ -8,8 +8,6 @@ import { Effect, Layer } from "effect"
 import type { SessionID } from "@/session/schema"
 import { SandboxProvider } from "@/tool/sandbox-provider"
 import { SandboxPtyScope } from "./sandbox-scope"
-import { createHmac } from "node:crypto"
-import { SandboxPtyCredential } from "./sandbox-credential"
 
 const port = 4097
 
@@ -21,7 +19,6 @@ export const layer = Layer.effect(
   Effect.gen(function* () {
     const sandbox = yield* SandboxProvider.Service
     const scope = yield* SandboxPtyScope.Service
-    const credentials = yield* SandboxPtyCredential.Service
     const events = yield* EventV2.Service
     const context = yield* Effect.context()
     const runPromise = Effect.runPromiseWith(context)
@@ -30,16 +27,11 @@ export const layer = Layer.effect(
     const relays = new Map<SessionID, AbortController>()
     const eventCursors = new Map<SessionID, number>()
     const agentInstances = new Map<SessionID, string>()
-    const credential = credentials.token
     const agentURL = (endpoint: string, path: string, sessionID?: string) => {
       const url = new URL(`${endpoint}${path}`)
       if (sessionID) url.searchParams.set("sessionID", sessionID)
       return url
     }
-    const agentHeaders = (root: SessionID, headers?: HeadersInit) => ({
-      ...Object.fromEntries(new Headers(headers).entries()),
-      authorization: `Bearer ${credential(root)}`,
-    })
 
     const publish = (event: { type?: unknown; data?: unknown }) => {
       if (!event.data || typeof event.data !== "object") return Effect.void
@@ -59,7 +51,7 @@ export const layer = Layer.effect(
       const controller = new AbortController()
       relays.set(root, controller)
       const list = () =>
-        fetch(agentURL(endpoint, "/pty", "*"), { headers: agentHeaders(root) }).then(
+        fetch(agentURL(endpoint, "/pty", "*")).then(
           (response) => response.json() as Promise<Pty.Info[]>,
         )
       const reconcile = async () => {
@@ -91,7 +83,7 @@ export const layer = Layer.effect(
               try {
                 const response = await fetch(`${endpoint}/pty/events`, {
                   signal: controller.signal,
-                  headers: agentHeaders(root, eventCursors.has(root)
+                  headers: eventCursors.has(root
                     ? { "last-event-id": String(eventCursors.get(root)) }
                     : undefined),
                 })
@@ -184,7 +176,6 @@ export const layer = Layer.effect(
             const endpoint = await cached
             const healthy = await fetch(`${endpoint}/health`, {
               signal: AbortSignal.timeout(1_000),
-              headers: agentHeaders(root.id),
             })
               .then((response) => response.ok)
               .catch(() => false)
@@ -201,7 +192,6 @@ export const layer = Layer.effect(
             const endpoint = await runPromise(sandbox.getEndpoint(root.id, port))
             const healthy = await fetch(`${endpoint}/health`, {
               signal: AbortSignal.timeout(1_000),
-              headers: agentHeaders(root.id),
             })
               .then((response) => response.ok)
               .catch(() => false)
@@ -209,14 +199,13 @@ export const layer = Layer.effect(
               await runPromise(
                 sandbox.runInSession(
                   root.id,
-                  `flock -w 10 /tmp/opencode-pty-agent.lock sh -c 'if [ -f /tmp/opencode-pty-agent.pid ] && kill -0 "$(cat /tmp/opencode-pty-agent.pid)" 2>/dev/null; then exit 0; fi; OPENCODE_PTY_AGENT_TOKEN=${credential(root.id)} setsid bun /opt/opencode-pty-agent/index.ts >/tmp/opencode-pty-agent.log 2>&1 & echo $! >/tmp/opencode-pty-agent.pid'`,
+                  `flock -w 10 /tmp/opencode-pty-agent.lock sh -c 'if [ -f /tmp/opencode-pty-agent.pid ] && kill -0 "$(cat /tmp/opencode-pty-agent.pid)" 2>/dev/null; then exit 0; fi; setsid bun /opt/opencode-pty-agent/index.ts >/tmp/opencode-pty-agent.log 2>&1 & echo $! >/tmp/opencode-pty-agent.pid'`,
                   { workingDirectory: "/workspace", timeoutSeconds: 10 },
                 ),
               )
               for (let attempt = 0; attempt < 40; attempt++) {
                 const ready = await fetch(`${endpoint}/health`, {
                   signal: AbortSignal.timeout(1_000),
-                  headers: agentHeaders(root.id),
                 })
                   .then((response) => response.ok)
                   .catch(() => false)
@@ -250,7 +239,7 @@ export const layer = Layer.effect(
           try: () =>
             fetch(agentURL(target.endpoint, path, sessionID), {
               ...options,
-              headers: agentHeaders(target.root, options?.headers),
+              headers: options?.headers,
               signal: AbortSignal.timeout(10_000),
             }),
           catch: (cause) => cause,
@@ -283,12 +272,6 @@ export const layer = Layer.effect(
               const url = new URL(`${target.endpoint}/pty/${id}/connect`)
               url.protocol = url.protocol === "https:" ? "wss:" : "ws:"
               url.searchParams.set("sessionID", sessionID)
-              const expires = Date.now() + 30_000
-              url.searchParams.set("expires", String(expires))
-              url.searchParams.set(
-                "token",
-                createHmac("sha256", credential(target.root)).update(`${sessionID}:${id}:${expires}`).digest("hex"),
-              )
               if (input.cursor !== undefined) url.searchParams.set("cursor", String(input.cursor))
               const socket = new WebSocket(url)
               socket.binaryType = "arraybuffer"
@@ -394,16 +377,12 @@ export const layer = Layer.effect(
             Effect.promise(async () => {
               const root = await runPromise(scope.resolve(sessionID as SessionID))
               const target = await runPromise(resolve(sessionID, false))
-              const all = (await fetch(agentURL(target.endpoint, "/pty", "*"), {
-                headers: agentHeaders(root.id),
-              }).then((response) => response.json())) as Pty.Info[]
+              const all = (await fetch(agentURL(target.endpoint, "/pty", "*")).then((response) => response.json())) as Pty.Info[]
               if (!all.some((item) => item.status === "running")) {
                 relays.get(root.id)?.abort()
                 relays.delete(root.id)
                 await runPromise(sandbox.release(root.id))
-                const confirmed = (await fetch(agentURL(target.endpoint, "/pty", "*"), {
-                  headers: agentHeaders(root.id),
-                }).then((response) => response.json())) as Pty.Info[]
+                const confirmed = (await fetch(agentURL(target.endpoint, "/pty", "*")).then((response) => response.json())) as Pty.Info[]
                 if (confirmed.some((item) => item.status === "running")) {
                   await runPromise(sandbox.keepAlive(root.id))
                   await startRelay(root.id, target.endpoint)
@@ -417,4 +396,4 @@ export const layer = Layer.effect(
   }),
 )
 
-export const defaultLayer = layer.pipe(Layer.provide([SandboxPtyScope.layer, SandboxPtyCredential.layer]))
+export const defaultLayer = layer.pipe(Layer.provide(SandboxPtyScope.layer))
