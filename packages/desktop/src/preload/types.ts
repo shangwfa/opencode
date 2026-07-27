@@ -90,6 +90,8 @@ export type ElectronAPI = {
   readClipboardImage: () => Promise<{ buffer: ArrayBuffer; width: number; height: number } | null>
   showNotification: (title: string, body?: string) => void
   getWindowFocused: () => Promise<boolean>
+  getWindowFullscreen: () => Promise<boolean>
+  onWindowFullscreenChanged: (cb: (fullscreen: boolean) => void) => () => void
   setWindowFocus: () => Promise<void>
   showWindow: () => Promise<void>
   relaunch: () => void
