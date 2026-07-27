@@ -12,14 +12,14 @@ const itExpiring = testEffect(
 )
 
 describe("PTY websocket tickets", () => {
-  it.live("consumes tickets once", () =>
+  it.live("accepts signed tickets throughout their validity window", () =>
     Effect.gen(function* () {
       const tickets = yield* PtyTicket.Service
       const scope = { ptyID: PtyID.ascending(), directory: "/tmp/a" }
       const issued = yield* tickets.issue(scope)
 
       expect(yield* tickets.consume({ ...scope, ticket: issued.ticket })).toBe(true)
-      expect(yield* tickets.consume({ ...scope, ticket: issued.ticket })).toBe(false)
+      expect(yield* tickets.consume({ ...scope, ticket: issued.ticket })).toBe(true)
     }),
   )
 
@@ -57,6 +57,17 @@ describe("PTY websocket tickets", () => {
         false,
       )
       expect(yield* tickets.consume({ ptyID, workspaceID, ticket: issued.ticket })).toBe(true)
+    }),
+  )
+
+  it.live("rejects tickets scoped to a different session", () =>
+    Effect.gen(function* () {
+      const tickets = yield* PtyTicket.Service
+      const ptyID = PtyID.ascending()
+      const issued = yield* tickets.issue({ ptyID, sessionID: "ses_a" })
+
+      expect(yield* tickets.consume({ ptyID, sessionID: "ses_b", ticket: issued.ticket })).toBe(false)
+      expect(yield* tickets.consume({ ptyID, sessionID: "ses_a", ticket: issued.ticket })).toBe(true)
     }),
   )
 })

@@ -1,10 +1,11 @@
 import { NodeHttpServer, NodeServices } from "@effect/platform-node"
 import { Flag } from "@opencode-ai/core/flag/flag"
-import { describe, expect } from "bun:test"
+import { describe, expect, test } from "bun:test"
 import { Config, ConfigProvider, Effect, Layer } from "effect"
 import { HttpClient, HttpClientRequest, HttpRouter, HttpServer } from "effect/unstable/http"
 import * as Socket from "effect/unstable/socket/Socket"
 import { Server } from "../../src/server/server"
+import { isAllowedRequestOrigin } from "../../src/server/cors"
 import { InstancePaths } from "../../src/server/routes/instance/httpapi/groups/instance"
 import { HttpApiApp } from "../../src/server/routes/instance/httpapi/server"
 import { resetDatabase } from "../fixture/db"
@@ -43,6 +44,13 @@ const it = testEffect(
 )
 
 describe("HttpApi CORS", () => {
+  test("restricts cross-origin requests to the configured allowlist", () => {
+    expect(isAllowedRequestOrigin("https://app.example", "api.example", { cors: ["https://app.example"] })).toBe(true)
+    expect(isAllowedRequestOrigin("https://evil.example", "api.example", { cors: ["https://app.example"] })).toBe(false)
+    expect(isAllowedRequestOrigin("https://api.example", "api.example")).toBe(true)
+    expect(isAllowedRequestOrigin("https://app.example", "api.example", { cors: ["*"] })).toBe(true)
+  })
+
   it.live("allows browser preflight requests without credentials", () =>
     Effect.gen(function* () {
       const response = yield* HttpClientRequest.options(InstancePaths.path).pipe(

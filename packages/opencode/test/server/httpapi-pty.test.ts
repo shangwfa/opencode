@@ -51,6 +51,8 @@ function serverUrl() {
 }
 
 const directoryHeader = (dir: string) => HttpClientRequest.setHeader("x-opencode-directory", dir)
+const sessionID = "ses_pty_test"
+const routed = (path: string) => `${path}${path.includes("?") ? "&" : "?"}sessionID=${sessionID}`
 
 afterEach(async () => {
   await disposeAllInstances()
@@ -77,11 +79,11 @@ describe("pty HttpApi bridge", () => {
   testPty("serves PTY JSON routes through experimental Effect routes", async () => {
     await using tmp = await tmpdir({ git: true, config: { formatter: false, lsp: false } })
     const headers = { "x-opencode-directory": tmp.path }
-    const list = await app().request(PtyPaths.list, { headers })
+    const list = await app().request(routed(PtyPaths.list), { headers })
     expect(list.status).toBe(200)
     expect(await list.json()).toEqual([])
 
-    const created = await app().request(PtyPaths.create, {
+    const created = await app().request(routed(PtyPaths.create), {
       method: "POST",
       headers: { ...headers, "content-type": "application/json" },
       body: JSON.stringify({ command: "/usr/bin/env", args: ["sh", "-c", "sleep 5"], title: "demo" }),
@@ -92,11 +94,11 @@ describe("pty HttpApi bridge", () => {
     try {
       expect(info).toMatchObject({ title: "demo", command: "/usr/bin/env", status: "running" })
 
-      const found = await app().request(PtyPaths.get.replace(":ptyID", info.id), { headers })
+      const found = await app().request(routed(PtyPaths.get.replace(":ptyID", info.id)), { headers })
       expect(found.status).toBe(200)
       expect(await found.json()).toMatchObject({ id: info.id, title: "demo" })
 
-      const updated = await app().request(PtyPaths.update.replace(":ptyID", info.id), {
+      const updated = await app().request(routed(PtyPaths.update.replace(":ptyID", info.id)), {
         method: "PUT",
         headers: { ...headers, "content-type": "application/json" },
         body: JSON.stringify({ title: "renamed", size: { cols: 80, rows: 24 } }),
@@ -104,10 +106,10 @@ describe("pty HttpApi bridge", () => {
       expect(updated.status).toBe(200)
       expect(await updated.json()).toMatchObject({ id: info.id, title: "renamed" })
     } finally {
-      await app().request(PtyPaths.remove.replace(":ptyID", info.id), { method: "DELETE", headers })
+      await app().request(routed(PtyPaths.remove.replace(":ptyID", info.id)), { method: "DELETE", headers })
     }
 
-    const missing = await app().request(PtyPaths.get.replace(":ptyID", info.id), { headers })
+    const missing = await app().request(routed(PtyPaths.get.replace(":ptyID", info.id)), { headers })
     expect(missing.status).toBe(404)
     expect(await missing.json()).toEqual({
       _tag: "PtyNotFoundError",
@@ -115,7 +117,7 @@ describe("pty HttpApi bridge", () => {
       message: `PTY session not found: ${info.id}`,
     })
 
-    const missingUpdate = await app().request(PtyPaths.update.replace(":ptyID", info.id), {
+    const missingUpdate = await app().request(routed(PtyPaths.update.replace(":ptyID", info.id)), {
       method: "PUT",
       headers: { ...headers, "content-type": "application/json" },
       body: JSON.stringify({ title: "missing" }),
@@ -127,7 +129,10 @@ describe("pty HttpApi bridge", () => {
       message: `PTY session not found: ${info.id}`,
     })
 
-    const missingRemove = await app().request(PtyPaths.remove.replace(":ptyID", info.id), { method: "DELETE", headers })
+    const missingRemove = await app().request(routed(PtyPaths.remove.replace(":ptyID", info.id)), {
+      method: "DELETE",
+      headers,
+    })
     expect(missingRemove.status).toBe(404)
     expect(await missingRemove.json()).toEqual({
       _tag: "PtyNotFoundError",
@@ -139,7 +144,7 @@ describe("pty HttpApi bridge", () => {
   testPty("disposes PTY sessions with their legacy instance", async () => {
     await using tmp = await tmpdir({ git: true, config: { formatter: false, lsp: false } })
     const headers = { "x-opencode-directory": tmp.path }
-    const created = await app().request(PtyPaths.create, {
+    const created = await app().request(routed(PtyPaths.create), {
       method: "POST",
       headers: { ...headers, "content-type": "application/json" },
       body: JSON.stringify({ command: "/usr/bin/env", args: ["sh", "-c", "sleep 5"] }),
@@ -148,14 +153,14 @@ describe("pty HttpApi bridge", () => {
 
     await disposeAllInstances()
 
-    const list = await app().request(PtyPaths.list, { headers })
+    const list = await app().request(routed(PtyPaths.list), { headers })
     expect(list.status).toBe(200)
     expect(await list.json()).toEqual([])
   })
 
   test("returns 404 for missing PTY websocket before upgrade", async () => {
     await using tmp = await tmpdir({ git: true, config: { formatter: false, lsp: false } })
-    const response = await app().request(PtyPaths.connect.replace(":ptyID", PtyID.ascending()), {
+    const response = await app().request(routed(PtyPaths.connect.replace(":ptyID", PtyID.ascending())), {
       headers: { "x-opencode-directory": tmp.path },
     })
     expect(response.status).toBe(404)
@@ -163,7 +168,7 @@ describe("pty HttpApi bridge", () => {
 
   test("returns 404 for missing PTY websocket before decoding cursor query", async () => {
     await using tmp = await tmpdir({ git: true, config: { formatter: false, lsp: false } })
-    const response = await app().request(`${PtyPaths.connect.replace(":ptyID", PtyID.ascending())}?cursor=a&cursor=b`, {
+    const response = await app().request(routed(`${PtyPaths.connect.replace(":ptyID", PtyID.ascending())}?cursor=a&cursor=b`), {
       headers: { "x-opencode-directory": tmp.path },
     })
     expect(response.status).toBe(404)
@@ -179,11 +184,11 @@ describe("pty HttpApi bridge", () => {
       message: `PTY session not found: ${missingID}`,
     }
 
-    const found = await app().request(PtyPaths.get.replace(":ptyID", missingID), { headers })
+    const found = await app().request(routed(PtyPaths.get.replace(":ptyID", missingID)), { headers })
     expect(found.status).toBe(404)
     expect(await found.json()).toEqual(expected)
 
-    const updated = await app().request(PtyPaths.update.replace(":ptyID", missingID), {
+    const updated = await app().request(routed(PtyPaths.update.replace(":ptyID", missingID)), {
       method: "PUT",
       headers: { ...headers, "content-type": "application/json" },
       body: JSON.stringify({ title: "missing" }),
@@ -191,7 +196,10 @@ describe("pty HttpApi bridge", () => {
     expect(updated.status).toBe(404)
     expect(await updated.json()).toEqual(expected)
 
-    const removed = await app().request(PtyPaths.remove.replace(":ptyID", missingID), { method: "DELETE", headers })
+    const removed = await app().request(routed(PtyPaths.remove.replace(":ptyID", missingID)), {
+      method: "DELETE",
+      headers,
+    })
     expect(removed.status).toBe(404)
     expect(await removed.json()).toEqual(expected)
   })
@@ -201,7 +209,7 @@ describe("pty HttpApi bridge", () => {
     const headers = { "x-opencode-directory": tmp.path }
     const missingID = String(PtyID.ascending())
 
-    const forbidden = await app().request(PtyPaths.connectToken.replace(":ptyID", missingID), {
+    const forbidden = await app().request(routed(PtyPaths.connectToken.replace(":ptyID", missingID)), {
       method: "POST",
       headers,
     })
@@ -211,7 +219,7 @@ describe("pty HttpApi bridge", () => {
       message: "Invalid PTY connect token request",
     })
 
-    const missing = await app().request(PtyPaths.connectToken.replace(":ptyID", missingID), {
+    const missing = await app().request(routed(PtyPaths.connectToken.replace(":ptyID", missingID)), {
       method: "POST",
       headers: {
         ...headers,
@@ -230,7 +238,7 @@ describe("pty HttpApi bridge", () => {
     () =>
       Effect.gen(function* () {
         const dir = yield* tmpdirScoped({ git: true, config: { formatter: false, lsp: false } })
-        const created = yield* HttpClientRequest.post(PtyPaths.create).pipe(
+        const created = yield* HttpClientRequest.post(routed(PtyPaths.create)).pipe(
           directoryHeader(dir),
           HttpClientRequest.bodyJson({ command: "/bin/cat", title: "websocket" }),
           Effect.flatMap(HttpClient.execute),
@@ -239,7 +247,7 @@ describe("pty HttpApi bridge", () => {
         const info = yield* Schema.decodeUnknownEffect(Pty.Info)(yield* created.json)
 
         const socket = yield* Socket.makeWebSocket(
-          `${(yield* serverUrl()).replace(/^http/, "ws")}${PtyPaths.connect.replace(":ptyID", info.id)}?cursor=-1&directory=${encodeURIComponent(dir)}`,
+          `${(yield* serverUrl()).replace(/^http/, "ws")}${routed(PtyPaths.connect.replace(":ptyID", info.id))}&cursor=-1&directory=${encodeURIComponent(dir)}`,
           { closeCodeIsError: () => false },
         )
         const messages = yield* Queue.unbounded<string>()
@@ -262,7 +270,7 @@ describe("pty HttpApi bridge", () => {
         expect(yield* takeUntil("ping-route")).toContain("ping-route")
         yield* write(new Socket.CloseEvent(1000, "done")).pipe(Effect.catch(() => Effect.void))
 
-        const removed = yield* HttpClientRequest.delete(PtyPaths.remove.replace(":ptyID", info.id)).pipe(
+        const removed = yield* HttpClientRequest.delete(routed(PtyPaths.remove.replace(":ptyID", info.id))).pipe(
           directoryHeader(dir),
           HttpClient.execute,
         )

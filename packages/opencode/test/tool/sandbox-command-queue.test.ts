@@ -162,6 +162,7 @@ function buildFakeLayer() {
           sandboxes.set(sessionID, sb)
         }),
         keepAlive: () => Effect.void,
+        touch: () => Effect.void,
         release: () => Effect.void,
         isKeepAlive: () => Effect.succeed(false),
         getEndpoint: () => Effect.die(new Error("not implemented")),

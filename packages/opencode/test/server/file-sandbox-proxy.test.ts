@@ -24,6 +24,7 @@ function mockProvider(runInSessionFn: (sessionID: SessionID, command: string) =>
       interrupt: () => Effect.void,
       register: () => Effect.void,
       keepAlive: () => Effect.void,
+      touch: () => Effect.void,
       release: () => Effect.void,
       isKeepAlive: () => Effect.succeed(false),
       getEndpoint: () => Effect.die(new Error("not implemented")),

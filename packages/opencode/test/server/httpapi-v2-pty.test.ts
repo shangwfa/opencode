@@ -16,12 +16,14 @@ import { testEffect } from "../lib/effect"
 
 const context = Context.empty() as Context.Context<unknown>
 const testPty = process.platform === "win32" ? test.skip : test
+const sessionID = "ses_pty_v2_test"
+const routed = (path: string) => `${path}${path.includes("?") ? "&" : "?"}sessionID=${sessionID}`
 
 function request(route: string, directory: string, init: RequestInit = {}) {
   const headers = new Headers(init.headers)
   headers.set("x-opencode-directory", directory)
   return HttpApiApp.webHandler().handler(
-    new Request(`http://localhost${route}`, {
+    new Request(`http://localhost${routed(route)}`, {
       ...init,
       headers,
     }),
@@ -134,7 +136,7 @@ describe("v2 pty HttpApi", () => {
     () =>
       Effect.gen(function* () {
         const dir = yield* tmpdirScoped({ git: true, config: { formatter: false, lsp: false } })
-        const created = yield* HttpClientRequest.post("/api/pty").pipe(
+        const created = yield* HttpClientRequest.post(routed("/api/pty")).pipe(
           directoryHeader(dir),
           HttpClientRequest.bodyJson({ command: "/bin/cat", title: "v2-websocket" }),
           Effect.flatMap(HttpClient.execute),
@@ -144,7 +146,7 @@ describe("v2 pty HttpApi", () => {
         const info = body.data
 
         const socket = yield* Socket.makeWebSocket(
-          `${(yield* serverUrl()).replace(/^http/, "ws")}/api/pty/${info.id}/connect?cursor=-1&location[directory]=${encodeURIComponent(dir)}`,
+          `${(yield* serverUrl()).replace(/^http/, "ws")}${routed(`/api/pty/${info.id}/connect`)}&cursor=-1&location[directory]=${encodeURIComponent(dir)}`,
           { closeCodeIsError: () => false },
         )
         const messages = yield* Queue.unbounded<string>()
@@ -167,7 +169,7 @@ describe("v2 pty HttpApi", () => {
         expect(yield* takeUntil("ping-v2")).toContain("ping-v2")
         yield* write(new Socket.CloseEvent(1000, "done")).pipe(Effect.catch(() => Effect.void))
 
-        const removed = yield* HttpClientRequest.delete(`/api/pty/${info.id}`).pipe(
+        const removed = yield* HttpClientRequest.delete(routed(`/api/pty/${info.id}`)).pipe(
           directoryHeader(dir),
           HttpClient.execute,
         )
@@ -205,7 +207,7 @@ describe("v2 pty HttpApi", () => {
           ),
         )
 
-        const created = yield* HttpClientRequest.post("/api/pty").pipe(
+        const created = yield* HttpClientRequest.post(routed("/api/pty")).pipe(
           directoryHeader(dir),
           HttpClientRequest.bodyJson({
             command: "/bin/sh",
@@ -219,7 +221,7 @@ describe("v2 pty HttpApi", () => {
         const info = (yield* Schema.decodeUnknownEffect(Location.response(Pty.Info))(yield* created.json)).data
 
         const socket = yield* Socket.makeWebSocket(
-          `${(yield* serverUrl()).replace(/^http/, "ws")}/api/pty/${info.id}/connect?cursor=0&location[directory]=${encodeURIComponent(dir)}`,
+          `${(yield* serverUrl()).replace(/^http/, "ws")}${routed(`/api/pty/${info.id}/connect`)}&cursor=0&location[directory]=${encodeURIComponent(dir)}`,
           { closeCodeIsError: () => false },
         )
         const messages = yield* Queue.unbounded<string>()
@@ -244,7 +246,7 @@ describe("v2 pty HttpApi", () => {
           `caller|plugin|plugin|xterm-256color|${cwd}`,
         )
         yield* write(new Socket.CloseEvent(1000, "done")).pipe(Effect.catch(() => Effect.void))
-        yield* HttpClientRequest.delete(`/api/pty/${info.id}`).pipe(directoryHeader(dir), HttpClient.execute)
+        yield* HttpClientRequest.delete(routed(`/api/pty/${info.id}`)).pipe(directoryHeader(dir), HttpClient.execute)
       }),
   )
 })

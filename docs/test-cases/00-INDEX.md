@@ -57,7 +57,8 @@
 
 | 文件 | 用例 ID | 内容概述 |
 |------|---------|---------|
-| [`sandbox/`](./sandbox/) | T12.x T20.x T28.x T30.x 等 | 沙箱生命周期、proxy、idle reap、watchdog、endpoint、tool 执行（8 文件） |
+| [`sandbox/`](./sandbox/) | T12.x T20.x T28.x T30.x 等 | 沙箱生命周期、proxy、idle reap、watchdog、endpoint、tool 执行（9 文件） |
+| [`sandbox/sandbox-terminal.md`](./sandbox/sandbox-terminal.md) | PTY-1 ~ PTY-35 | 沙箱 Terminal：PTY 生命周期、WebSocket/cursor、Session 隔离、多 Pod、安全、事件恢复、lease/reaper、背压、workspace reset 与本地兼容 |
 | [`skills/`](./skills/) | T15.x | Session skills CRUD、bundle、agent-browser/mastra/mattpocock 数据驱动（4 文件） |
 | [`pvc/`](./pvc/) | T38.x | Session PVC 模式：session/app 创建、共享/隔离、worktree、PG（1 文件） |
 | [`mcps/`](./mcps/) | T40.x T45.x | Ant Design / Playwright MCP 端到端（2 文件） |
