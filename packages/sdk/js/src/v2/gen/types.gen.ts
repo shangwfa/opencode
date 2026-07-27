@@ -9102,6 +9102,7 @@ export type PtyListData = {
   query?: {
     directory?: string
     workspace?: string
+    sessionID?: string
   }
   url: "/pty"
 }
@@ -9138,6 +9139,7 @@ export type PtyCreateData = {
   query?: {
     directory?: string
     workspace?: string
+    sessionID?: string
   }
   url: "/pty"
 }
@@ -9168,6 +9170,7 @@ export type PtyRemoveData = {
   query?: {
     directory?: string
     workspace?: string
+    sessionID?: string
   }
   url: "/pty/{ptyID}"
 }
@@ -9202,6 +9205,7 @@ export type PtyGetData = {
   query?: {
     directory?: string
     workspace?: string
+    sessionID?: string
   }
   url: "/pty/{ptyID}"
 }
@@ -9242,6 +9246,7 @@ export type PtyUpdateData = {
   query?: {
     directory?: string
     workspace?: string
+    sessionID?: string
   }
   url: "/pty/{ptyID}"
 }
@@ -9276,6 +9281,7 @@ export type PtyConnectTokenData = {
   query?: {
     directory?: string
     workspace?: string
+    sessionID?: string
   }
   url: "/pty/{ptyID}/connect-token"
 }
@@ -11402,9 +11408,13 @@ export type SessionCommandsClearData = {
 
 export type SessionCommandsClearErrors = {
   /**
-   * Bad request
+   * BadRequest | InvalidRequestError
    */
-  400: BadRequestError
+  400: EffectHttpApiErrorBadRequest | InvalidRequestError
+  /**
+   * NotFoundError
+   */
+  404: NotFoundError
 }
 
 export type SessionCommandsClearError = SessionCommandsClearErrors[keyof SessionCommandsClearErrors]
@@ -11472,9 +11482,13 @@ export type SessionCommandsCreateData = {
 
 export type SessionCommandsCreateErrors = {
   /**
-   * Bad request
+   * BadRequest | InvalidRequestError
    */
-  400: BadRequestError
+  400: EffectHttpApiErrorBadRequest | InvalidRequestError
+  /**
+   * NotFoundError
+   */
+  404: NotFoundError
 }
 
 export type SessionCommandsCreateError = SessionCommandsCreateErrors[keyof SessionCommandsCreateErrors]
@@ -11501,9 +11515,13 @@ export type SessionCommandsDeleteData = {
 
 export type SessionCommandsDeleteErrors = {
   /**
-   * Bad request
+   * BadRequest | InvalidRequestError
    */
-  400: BadRequestError
+  400: EffectHttpApiErrorBadRequest | InvalidRequestError
+  /**
+   * NotFoundError
+   */
+  404: NotFoundError
 }
 
 export type SessionCommandsDeleteError = SessionCommandsDeleteErrors[keyof SessionCommandsDeleteErrors]
@@ -14471,6 +14489,7 @@ export type V2PtyListData = {
       directory?: string
       workspace?: string
     }
+    sessionID?: string
   }
   url: "/api/pty"
 }
@@ -14516,6 +14535,7 @@ export type V2PtyCreateData = {
       directory?: string
       workspace?: string
     }
+    sessionID?: string
   }
   url: "/api/pty"
 }
@@ -14555,6 +14575,7 @@ export type V2PtyRemoveData = {
       directory?: string
       workspace?: string
     }
+    sessionID?: string
   }
   url: "/api/pty/{ptyID}"
 }
@@ -14595,6 +14616,7 @@ export type V2PtyGetData = {
       directory?: string
       workspace?: string
     }
+    sessionID?: string
   }
   url: "/api/pty/{ptyID}"
 }
@@ -14644,6 +14666,7 @@ export type V2PtyUpdateData = {
       directory?: string
       workspace?: string
     }
+    sessionID?: string
   }
   url: "/api/pty/{ptyID}"
 }
@@ -14687,6 +14710,7 @@ export type V2PtyConnectTokenData = {
       directory?: string
       workspace?: string
     }
+    sessionID?: string
   }
   url: "/api/pty/{ptyID}/connect-token"
 }
@@ -14732,6 +14756,7 @@ export type V2PtyConnectData = {
   query?: {
     "location[directory]"?: string
     "location[workspace]"?: string
+    sessionID?: string
     cursor?: string
     ticket?: string
   }
@@ -14959,6 +14984,7 @@ export type PtyConnectData = {
   query?: {
     directory?: string
     workspace?: string
+    sessionID?: string
     cursor?: string
     ticket?: string
   }

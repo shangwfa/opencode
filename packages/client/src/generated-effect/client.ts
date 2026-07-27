@@ -610,13 +610,19 @@ const Endpoint14_0 = (raw: RawClient["server.event"]) => () =>
 const adaptGroup14 = (raw: RawClient["server.event"]) => ({ subscribe: Endpoint14_0(raw) })
 
 type Endpoint15_0Request = Parameters<RawClient["server.pty"]["pty.list"]>[0]
-type Endpoint15_0Input = { readonly location?: Endpoint15_0Request["query"]["location"] }
+type Endpoint15_0Input = {
+  readonly location?: Endpoint15_0Request["query"]["location"]
+  readonly sessionID?: Endpoint15_0Request["query"]["sessionID"]
+}
 const Endpoint15_0 = (raw: RawClient["server.pty"]) => (input?: Endpoint15_0Input) =>
-  raw["pty.list"]({ query: { location: input?.["location"] } }).pipe(Effect.mapError(mapClientError))
+  raw["pty.list"]({ query: { location: input?.["location"], sessionID: input?.["sessionID"] } }).pipe(
+    Effect.mapError(mapClientError),
+  )
 
 type Endpoint15_1Request = Parameters<RawClient["server.pty"]["pty.create"]>[0]
 type Endpoint15_1Input = {
   readonly location?: Endpoint15_1Request["query"]["location"]
+  readonly sessionID?: Endpoint15_1Request["query"]["sessionID"]
   readonly command?: Endpoint15_1Request["payload"]["command"]
   readonly args?: Endpoint15_1Request["payload"]["args"]
   readonly cwd?: Endpoint15_1Request["payload"]["cwd"]
@@ -625,7 +631,7 @@ type Endpoint15_1Input = {
 }
 const Endpoint15_1 = (raw: RawClient["server.pty"]) => (input?: Endpoint15_1Input) =>
   raw["pty.create"]({
-    query: { location: input?.["location"] },
+    query: { location: input?.["location"], sessionID: input?.["sessionID"] },
     payload: {
       command: input?.["command"],
       args: input?.["args"],
@@ -639,23 +645,26 @@ type Endpoint15_2Request = Parameters<RawClient["server.pty"]["pty.get"]>[0]
 type Endpoint15_2Input = {
   readonly ptyID: Endpoint15_2Request["params"]["ptyID"]
   readonly location?: Endpoint15_2Request["query"]["location"]
+  readonly sessionID?: Endpoint15_2Request["query"]["sessionID"]
 }
 const Endpoint15_2 = (raw: RawClient["server.pty"]) => (input: Endpoint15_2Input) =>
-  raw["pty.get"]({ params: { ptyID: input["ptyID"] }, query: { location: input["location"] } }).pipe(
-    Effect.mapError(mapClientError),
-  )
+  raw["pty.get"]({
+    params: { ptyID: input["ptyID"] },
+    query: { location: input["location"], sessionID: input["sessionID"] },
+  }).pipe(Effect.mapError(mapClientError))
 
 type Endpoint15_3Request = Parameters<RawClient["server.pty"]["pty.update"]>[0]
 type Endpoint15_3Input = {
   readonly ptyID: Endpoint15_3Request["params"]["ptyID"]
   readonly location?: Endpoint15_3Request["query"]["location"]
+  readonly sessionID?: Endpoint15_3Request["query"]["sessionID"]
   readonly title?: Endpoint15_3Request["payload"]["title"]
   readonly size?: Endpoint15_3Request["payload"]["size"]
 }
 const Endpoint15_3 = (raw: RawClient["server.pty"]) => (input: Endpoint15_3Input) =>
   raw["pty.update"]({
     params: { ptyID: input["ptyID"] },
-    query: { location: input["location"] },
+    query: { location: input["location"], sessionID: input["sessionID"] },
     payload: { title: input["title"], size: input["size"] },
   }).pipe(Effect.mapError(mapClientError))
 
@@ -663,11 +672,13 @@ type Endpoint15_4Request = Parameters<RawClient["server.pty"]["pty.remove"]>[0]
 type Endpoint15_4Input = {
   readonly ptyID: Endpoint15_4Request["params"]["ptyID"]
   readonly location?: Endpoint15_4Request["query"]["location"]
+  readonly sessionID?: Endpoint15_4Request["query"]["sessionID"]
 }
 const Endpoint15_4 = (raw: RawClient["server.pty"]) => (input: Endpoint15_4Input) =>
-  raw["pty.remove"]({ params: { ptyID: input["ptyID"] }, query: { location: input["location"] } }).pipe(
-    Effect.mapError(mapClientError),
-  )
+  raw["pty.remove"]({
+    params: { ptyID: input["ptyID"] },
+    query: { location: input["location"], sessionID: input["sessionID"] },
+  }).pipe(Effect.mapError(mapClientError))
 
 const adaptGroup15 = (raw: RawClient["server.pty"]) => ({
   list: Endpoint15_0(raw),

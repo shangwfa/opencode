@@ -2814,7 +2814,12 @@ export type EventsSubscribeOutput = OpenCodeEventEncoded
 export type PtysListInput = {
   readonly location?: {
     readonly location?: { readonly directory?: string | undefined; readonly workspace?: string | undefined } | undefined
+    readonly sessionID?: string | undefined
   }["location"]
+  readonly sessionID?: {
+    readonly location?: { readonly directory?: string | undefined; readonly workspace?: string | undefined } | undefined
+    readonly sessionID?: string | undefined
+  }["sessionID"]
 }
 
 export type PtysListOutput = {
@@ -2838,7 +2843,12 @@ export type PtysListOutput = {
 export type PtysCreateInput = {
   readonly location?: {
     readonly location?: { readonly directory?: string | undefined; readonly workspace?: string | undefined } | undefined
+    readonly sessionID?: string | undefined
   }["location"]
+  readonly sessionID?: {
+    readonly location?: { readonly directory?: string | undefined; readonly workspace?: string | undefined } | undefined
+    readonly sessionID?: string | undefined
+  }["sessionID"]
   readonly command?: {
     readonly command?: string
     readonly args?: ReadonlyArray<string>
@@ -2898,7 +2908,12 @@ export type PtysGetInput = {
   readonly ptyID: { readonly ptyID: string }["ptyID"]
   readonly location?: {
     readonly location?: { readonly directory?: string | undefined; readonly workspace?: string | undefined } | undefined
+    readonly sessionID?: string | undefined
   }["location"]
+  readonly sessionID?: {
+    readonly location?: { readonly directory?: string | undefined; readonly workspace?: string | undefined } | undefined
+    readonly sessionID?: string | undefined
+  }["sessionID"]
 }
 
 export type PtysGetOutput = {
@@ -2923,7 +2938,12 @@ export type PtysUpdateInput = {
   readonly ptyID: { readonly ptyID: string }["ptyID"]
   readonly location?: {
     readonly location?: { readonly directory?: string | undefined; readonly workspace?: string | undefined } | undefined
+    readonly sessionID?: string | undefined
   }["location"]
+  readonly sessionID?: {
+    readonly location?: { readonly directory?: string | undefined; readonly workspace?: string | undefined } | undefined
+    readonly sessionID?: string | undefined
+  }["sessionID"]
   readonly title?: {
     readonly title?: string
     readonly size?: { readonly rows: number; readonly cols: number }
@@ -2953,7 +2973,12 @@ export type PtysRemoveInput = {
   readonly ptyID: { readonly ptyID: string }["ptyID"]
   readonly location?: {
     readonly location?: { readonly directory?: string | undefined; readonly workspace?: string | undefined } | undefined
+    readonly sessionID?: string | undefined
   }["location"]
+  readonly sessionID?: {
+    readonly location?: { readonly directory?: string | undefined; readonly workspace?: string | undefined } | undefined
+    readonly sessionID?: string | undefined
+  }["sessionID"]
 }
 
 export type PtysRemoveOutput = void

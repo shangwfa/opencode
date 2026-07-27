@@ -918,7 +918,7 @@ export function make(options: ClientOptions) {
           {
             method: "GET",
             path: `/api/pty`,
-            query: { location: input?.["location"] },
+            query: { location: input?.["location"], sessionID: input?.["sessionID"] },
             successStatus: 200,
             declaredStatuses: [401, 400],
             empty: false,
@@ -930,7 +930,7 @@ export function make(options: ClientOptions) {
           {
             method: "POST",
             path: `/api/pty`,
-            query: { location: input?.["location"] },
+            query: { location: input?.["location"], sessionID: input?.["sessionID"] },
             body: {
               command: input?.["command"],
               args: input?.["args"],
@@ -949,7 +949,7 @@ export function make(options: ClientOptions) {
           {
             method: "GET",
             path: `/api/pty/${encodeURIComponent(input.ptyID)}`,
-            query: { location: input["location"] },
+            query: { location: input["location"], sessionID: input["sessionID"] },
             successStatus: 200,
             declaredStatuses: [404, 401, 400],
             empty: false,
@@ -961,7 +961,7 @@ export function make(options: ClientOptions) {
           {
             method: "PUT",
             path: `/api/pty/${encodeURIComponent(input.ptyID)}`,
-            query: { location: input["location"] },
+            query: { location: input["location"], sessionID: input["sessionID"] },
             body: { title: input["title"], size: input["size"] },
             successStatus: 200,
             declaredStatuses: [404, 401, 400],
@@ -974,7 +974,7 @@ export function make(options: ClientOptions) {
           {
             method: "DELETE",
             path: `/api/pty/${encodeURIComponent(input.ptyID)}`,
-            query: { location: input["location"] },
+            query: { location: input["location"], sessionID: input["sessionID"] },
             successStatus: 204,
             declaredStatuses: [404, 401, 400],
             empty: true,
