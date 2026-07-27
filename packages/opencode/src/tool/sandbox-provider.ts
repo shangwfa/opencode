@@ -43,7 +43,7 @@ export namespace SandboxConfig {
     pvcClaimName: Flag.OPENCODE_SANDBOX_PVC_CLAIM,
     idleKillMs: Flag.OPENCODE_SANDBOX_IDLE_KILL_SEC * 1000,
     idleReapMs: Flag.OPENCODE_SANDBOX_IDLE_REAP_SEC * 1000,
-    idleReapIntervalMs: 60_000,
+    idleReapIntervalMs: 300_000,
     maxTtlSeconds: Flag.OPENCODE_SANDBOX_MAX_TTL_SEC,
     packageCacheMount: Flag.OPENCODE_SANDBOX_PACKAGE_CACHE_MOUNT,
     cleanupOnScopeExit: true,
@@ -634,7 +634,7 @@ export namespace SandboxProvider {
       const detachedCommandSessions = new Map<string, Set<string>>()
       const createRef = yield* Ref.make(new Map<string, Deferred.Deferred<Sandbox, Error>>())
       const sbCache = new Map<string, { sb: Sandbox; cachedAt: number; sandboxID: string }>()
-      const SB_CACHE_TTL_MS = 30_000
+      const SB_CACHE_TTL_MS = 300_000
 
       function getCachedSandbox(sessionID: string): Sandbox | null {
         const hit = sbCache.get(sessionID)
