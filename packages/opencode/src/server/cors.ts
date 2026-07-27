@@ -6,8 +6,9 @@ export const CorsConfig = Context.Reference<CorsOptions | undefined>("@opencode/
   defaultValue: () => undefined,
 })
 
-export function isAllowedCorsOrigin(_input: string | undefined, _opts?: CorsOptions) {
-  return true
+export function isAllowedCorsOrigin(input: string | undefined, opts?: CorsOptions) {
+  if (!input) return true
+  return opts?.cors?.some((origin) => origin === "*" || origin === input) ?? false
 }
 
 export function isAllowedRequestOrigin(input: string | undefined, host: string | undefined, opts?: CorsOptions) {

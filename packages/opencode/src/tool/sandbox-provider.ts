@@ -260,6 +260,7 @@ export namespace SandboxProvider {
     readonly destroyAll: () => Effect.Effect<void>
     readonly cleanupSessionVolume: (sessionID: SessionID) => Effect.Effect<void>
     readonly keepAlive: (sessionID: SessionID) => Effect.Effect<void>
+    readonly touch: (sessionID: SessionID) => Effect.Effect<void>
     readonly release: (sessionID: SessionID) => Effect.Effect<void>
     readonly isKeepAlive: (sessionID: SessionID) => Effect.Effect<boolean>
     readonly runInSession: (
@@ -495,6 +496,8 @@ export namespace SandboxProvider {
       const keepAlive: Interface["keepAlive"] = (sessionID) =>
         Effect.sync(() => { log.info("sandbox keep alive enabled", { sessionID }) })
 
+      const touch: Interface["touch"] = touchLastActive
+
       const release: Interface["release"] = (sessionID) =>
         Effect.sync(() => { log.info("sandbox keep alive released", { sessionID }) })
 
@@ -614,7 +617,7 @@ export namespace SandboxProvider {
       }
 
       return Service.of({
-        getOrCreate, get, destroy, destroyById, destroyAll, keepAlive, release, isKeepAlive,
+        getOrCreate, get, destroy, destroyById, destroyAll, keepAlive, touch, release, isKeepAlive,
         runInSession, runDetached, interrupt, register, getEndpoint,
         cleanupSessionVolume: (sessionID) => cleanupSessionVolume(sessionID, config, connectionConfig),
       })
@@ -626,6 +629,7 @@ export namespace SandboxProvider {
     Service,
     Effect.gen(function* () {
       const config = yield* SandboxConfig.Service
+      const runPromise = Effect.runPromiseWith(yield* Effect.context())
       const commandSemaphores = new Map<string, Semaphore.Semaphore>()
       const detachedCommandSessions = new Map<string, Set<string>>()
       const createRef = yield* Ref.make(new Map<string, Deferred.Deferred<Sandbox, Error>>())
@@ -717,6 +721,34 @@ export namespace SandboxProvider {
         }).pipe(Effect.orDie)
       }
 
+      function dbEnsureKeepAlive(sessionID: string) {
+        return Effect.tryPromise({
+          try: async () => {
+            const now = Date.now()
+            await pgDb
+              .insert(SandboxTable)
+              .values({
+                id: `pending-${sessionID}`,
+                session_id: sessionID,
+                host: "",
+                state: "killed",
+                keep_alive: true,
+                command_session_id: null,
+                time_created: now,
+                time_updated: now,
+              })
+              .onConflictDoNothing()
+              .run()
+            await pgDb
+              .update(SandboxTable)
+              .set({ keep_alive: true, time_updated: Date.now() })
+              .where(eq(SandboxTable.session_id, sessionID))
+              .run()
+          },
+          catch: (e) => new Error(`db.ensureKeepAlive failed: ${String(e)}`),
+        }).pipe(Effect.orDie)
+      }
+
       function dbSetState(sessionID: string, state: "running" | "killed") {
         return Effect.tryPromise({
           try: () => pgDb
@@ -773,6 +805,24 @@ export namespace SandboxProvider {
             ))
             .run(),
           catch: (e) => new Error(`db.touchSandbox failed: ${String(e)}`),
+        }).pipe(Effect.orDie)
+      }
+
+      function dbClaimIdleSandbox(sessionID: string, id: string, threshold: number, keepAlive?: boolean) {
+        return Effect.tryPromise({
+          try: () => pgDb
+            .update(SandboxTable)
+            .set({ state: "killed", time_updated: Date.now() })
+            .where(and(
+              eq(SandboxTable.session_id, sessionID),
+              eq(SandboxTable.id, id),
+              eq(SandboxTable.state, "running"),
+              lt(SandboxTable.time_updated, threshold),
+              keepAlive === undefined ? undefined : eq(SandboxTable.keep_alive, keepAlive),
+            ))
+            .returning({ id: SandboxTable.id })
+            .then((rows: Array<{ id: string }>) => rows.length > 0),
+          catch: (e) => new Error(`db.claimIdleSandbox failed: ${String(e)}`),
         }).pipe(Effect.orDie)
       }
 
@@ -1029,7 +1079,18 @@ export namespace SandboxProvider {
               const result = yield* Effect.promise(() =>
                 pgDb.transaction(async (tx: any) => {
                   await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${sessionID}))`)
-                  return Effect.runPromise(createSandbox(sessionID, opts))
+                  const current = await runPromise(dbGet(sessionID).pipe(Effect.orElseSucceed(() => null)))
+                  if (current?.state === "running") {
+                    const existing = await runPromise(reconnect(current).pipe(Effect.orElseSucceed(() => null)))
+                    if (existing) {
+                      const healthy = await existing.isHealthy().catch(() => false)
+                      if (healthy) {
+                        await runPromise(dbTouchSandbox(sessionID, current.id).pipe(Effect.catchCause(() => Effect.void)))
+                        return existing
+                      }
+                    }
+                  }
+                  return runPromise(createSandbox(sessionID, opts))
                 }) as Promise<Sandbox>,
               )
               log.info("createSandbox done", {
@@ -1173,22 +1234,15 @@ export namespace SandboxProvider {
 
       const keepAlive: Interface["keepAlive"] = (sessionID) =>
         Effect.gen(function* () {
-          const row = yield* dbGet(sessionID).pipe(Effect.orElseSucceed(() => null))
-          if (row) {
-            yield* dbSetKeepAlive(sessionID, true)
-          } else {
-            yield* dbUpsert({
-              id: `pending-${sessionID}`,
-              session_id: sessionID,
-              host: "",
-              state: "killed",
-              keep_alive: true,
-              command_session_id: null,
-              time_created: Date.now(),
-              time_updated: Date.now(),
-            })
-          }
+          yield* dbEnsureKeepAlive(sessionID)
           log.info("sandbox keep alive enabled", { sessionID })
+        })
+
+      const touch: Interface["touch"] = (sessionID) =>
+        Effect.gen(function* () {
+          const row = yield* dbGet(sessionID).pipe(Effect.orElseSucceed(() => null))
+          if (row && row.state === "running")
+            yield* dbTouchSandbox(sessionID, row.id).pipe(Effect.catchCause(() => Effect.void))
         })
 
       const release: Interface["release"] = (sessionID) =>
@@ -1368,9 +1422,8 @@ export namespace SandboxProvider {
             log.info("zombie sandbox cleanup", { count: rows.length })
             for (const row of rows) {
               yield* lock(row.session_id, Effect.gen(function* () {
-                const current = yield* dbGet(row.session_id).pipe(Effect.orElseSucceed(() => null))
-                if (!current || current.id !== row.id || current.state !== "running") return
-                if (current.time_updated > threshold) return
+                const claimed = yield* dbClaimIdleSandbox(row.session_id, row.id, threshold, false)
+                if (!claimed) return
                 const sb = yield* reconnect(row).pipe(Effect.orElseSucceed(() => null))
                 if (sb) {
                   // reconcile：用 getInfo 验证 sandbox 实际状态，已终止的跳过 kill 直接回收 DB
@@ -1422,9 +1475,8 @@ export namespace SandboxProvider {
             log.info("idle sandbox reap scan", { count: rows.length })
             for (const row of rows) {
               yield* lock(row.session_id, Effect.gen(function* () {
-                const current = yield* dbGet(row.session_id).pipe(Effect.orElseSucceed(() => null))
-                if (!current || current.id !== row.id || current.state !== "running") return
-                if (current.time_updated > threshold) return
+                const claimed = yield* dbClaimIdleSandbox(row.session_id, row.id, threshold)
+                if (!claimed) return
                 const sb = yield* reconnect(row).pipe(Effect.orElseSucceed(() => null))
                 if (sb) {
                   yield* destroySandbox(sb, row.session_id).pipe(Effect.catchCause(() => Effect.void))
@@ -1454,7 +1506,7 @@ export namespace SandboxProvider {
       }
 
       return Service.of({
-        getOrCreate, get, destroy, destroyById, destroyAll, keepAlive, release, isKeepAlive,
+        getOrCreate, get, destroy, destroyById, destroyAll, keepAlive, touch, release, isKeepAlive,
         runInSession, runDetached, interrupt, register, getEndpoint,
         cleanupSessionVolume: (sessionID) => cleanupSessionVolume(sessionID, config, connectionConfig),
       })
@@ -1482,6 +1534,7 @@ export namespace NoopSandboxProvider {
       destroyById: () => Effect.void,
       destroyAll: () => Effect.void,
       keepAlive: () => Effect.void,
+      touch: () => Effect.void,
       release: () => Effect.void,
       isKeepAlive: () => Effect.succeed(false),
       runInSession: () => Effect.fail(new Error("Sandbox is disabled")),
