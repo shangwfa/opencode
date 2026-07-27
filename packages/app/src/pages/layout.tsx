@@ -876,7 +876,7 @@ export default function LegacyLayout(props: ParentProps) {
     const nextSession = sessions[index + 1] ?? sessions[index - 1]
 
     await serverSDK().client.session.update({
-      directory: session.directory,
+      query_directory: session.directory,
       sessionID: session.id,
       time: { archived: Date.now() },
     })
@@ -1445,10 +1445,74 @@ export default function LegacyLayout(props: ParentProps) {
     })
     const dismiss = () => toaster.dismiss(progress)
 
-    const sessions: Session[] = await serverSDK()
+    const sessions = await serverSDK()
       .client.session.list({ directory })
       .then((x) => x.data ?? [])
-      .catch(() => [])
+      .catch((err) => {
+        showToast({
+          title: language.t("workspace.reset.failed.title"),
+          description: errorMessage(err, language.t("common.requestFailed")),
+        })
+        return undefined
+      })
+
+    if (!sessions) {
+      setBusy(directory, false)
+      dismiss()
+      return
+    }
+
+    const client = serverSDK().createClient({ directory, throwOnError: true })
+    const terminalsClosed = await Promise.all(
+      sessions.map(async (session) => ({
+        sessionID: session.id,
+        terminals: (await client.pty.list({ sessionID: session.id })).data ?? [],
+      })),
+    )
+      .then((lists) =>
+        Promise.allSettled(
+          lists.flatMap((entry) =>
+            entry.terminals.map((terminal) =>
+              client.pty.remove({ sessionID: entry.sessionID, ptyID: terminal.id }),
+            ),
+          ),
+        ),
+      )
+      .then((results) => {
+        const failed = results.find((result) => result.status === "rejected")
+        if (failed?.status === "rejected") throw failed.reason
+        return true
+      })
+      .catch((err) => {
+        showToast({
+          title: language.t("workspace.reset.failed.title"),
+          description: errorMessage(err, language.t("common.requestFailed")),
+        })
+        return false
+      })
+
+    if (!terminalsClosed) {
+      setBusy(directory, false)
+      dismiss()
+      return
+    }
+
+    const disposed = await serverSDK()
+      .client.instance.dispose({ directory })
+      .then(() => true)
+      .catch((err) => {
+        showToast({
+          title: language.t("workspace.reset.failed.title"),
+          description: errorMessage(err, language.t("common.requestFailed")),
+        })
+        return false
+      })
+
+    if (!disposed) {
+      setBusy(directory, false)
+      dismiss()
+      return
+    }
 
     clearWorkspaceTerminals(
       directory,
@@ -1456,9 +1520,6 @@ export default function LegacyLayout(props: ParentProps) {
       platform,
       serverSDK().scope,
     )
-    await serverSDK()
-      .client.instance.dispose({ directory })
-      .catch(() => undefined)
 
     const result = await serverSDK()
       .client.worktree.reset({ directory: root, worktreeResetInput: { directory } })
@@ -1485,7 +1546,7 @@ export default function LegacyLayout(props: ParentProps) {
           serverSDK()
             .client.session.update({
               sessionID: session.id,
-              directory: session.directory,
+              query_directory: session.directory,
               time: { archived: archivedAt },
             })
             .catch(() => undefined),

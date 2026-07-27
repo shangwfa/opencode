@@ -433,10 +433,16 @@ function createV1Api(input: CompatibleInput): CompatibleApi {
         return located((await legacy(value?.location).pty.shells()).data ?? [], value?.location)
       },
       async list(value?: Parameters<ServerApi["pty"]["list"]>[0]) {
-        return located((await legacy(value?.location).pty.list()).data ?? [], value?.location)
+        const sessionID = value && "sessionID" in value && typeof value.sessionID === "string" ? value.sessionID : ""
+        return located(
+          (await legacy(value?.location).pty.list({ sessionID })).data ?? [],
+          value?.location,
+        )
       },
       async create(value?: Parameters<ServerApi["pty"]["create"]>[0]) {
+        const sessionID = value && "sessionID" in value && typeof value.sessionID === "string" ? value.sessionID : ""
         const result = await legacy(value?.location).pty.create({
+          sessionID,
           command: value?.command,
           args: value?.args ? [...value.args] : undefined,
           cwd: value?.cwd,
@@ -447,13 +453,16 @@ function createV1Api(input: CompatibleInput): CompatibleApi {
         return located(result.data, value?.location)
       },
       async get(value: Parameters<ServerApi["pty"]["get"]>[0]) {
-        const result = await legacy(value.location).pty.get({ ptyID: value.ptyID })
+        const sessionID = "sessionID" in value && typeof value.sessionID === "string" ? value.sessionID : ""
+        const result = await legacy(value.location).pty.get({ ptyID: value.ptyID, sessionID })
         if (!result.data) throw new Error(`Terminal not found: ${value.ptyID}`)
         return located(result.data, value.location)
       },
       async update(value: Parameters<ServerApi["pty"]["update"]>[0]) {
+        const sessionID = "sessionID" in value && typeof value.sessionID === "string" ? value.sessionID : ""
         const result = await legacy(value.location).pty.update({
           ptyID: value.ptyID,
+          sessionID,
           title: value.title,
           size: value.size,
         })
@@ -461,10 +470,15 @@ function createV1Api(input: CompatibleInput): CompatibleApi {
         return located(result.data, value.location)
       },
       async remove(value: Parameters<ServerApi["pty"]["remove"]>[0]) {
-        await legacy(value.location).pty.remove({ ptyID: value.ptyID })
+        const sessionID = "sessionID" in value && typeof value.sessionID === "string" ? value.sessionID : ""
+        await legacy(value.location).pty.remove({ ptyID: value.ptyID, sessionID })
       },
       async connectToken(value: Parameters<ServerApi["pty"]["connectToken"]>[0]) {
-        const result = await legacy(value.location).pty.connectToken({ ptyID: value.ptyID })
+        const sessionID = "sessionID" in value && typeof value.sessionID === "string" ? value.sessionID : ""
+        const result = await legacy(value.location).pty.connectToken({
+          ptyID: value.ptyID,
+          sessionID,
+        })
         if (!result.data) throw new Error(`Failed to connect terminal: ${value.ptyID}`)
         return located(result.data, value.location)
       },

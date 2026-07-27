@@ -3,6 +3,7 @@ import { authTokenFromCredentials } from "@/utils/server"
 export function terminalWebSocketURL(input: {
   url: string
   id: string
+  sessionID: string
   directory: string
   cursor: number
   ticket?: string
@@ -13,6 +14,7 @@ export function terminalWebSocketURL(input: {
 }) {
   const next = new URL(`${input.url}/pty/${input.id}/connect`)
   next.searchParams.set("directory", input.directory)
+  next.searchParams.set("sessionID", input.sessionID)
   next.searchParams.set("cursor", String(input.cursor))
   next.protocol = next.protocol === "https:" ? "wss:" : "ws:"
   if (input.ticket) {

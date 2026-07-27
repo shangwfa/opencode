@@ -6,6 +6,7 @@ describe("terminalWebSocketURL", () => {
     const url = terminalWebSocketURL({
       url: "http://127.0.0.1:49365",
       id: "pty_test",
+      sessionID: "ses_test",
       directory: "/tmp/project",
       cursor: 0,
       sameOrigin: false,
@@ -17,12 +18,14 @@ describe("terminalWebSocketURL", () => {
     expect(url.username).toBe("")
     expect(url.password).toBe("")
     expect(url.searchParams.get("auth_token")).toBe(btoa("opencode:secret"))
+    expect(url.searchParams.get("sessionID")).toBe("ses_test")
   })
 
   test("omits query auth for same-origin saved credentials", () => {
     const url = terminalWebSocketURL({
       url: "https://app.example.test",
       id: "pty_test",
+      sessionID: "ses_test",
       directory: "/tmp/project",
       cursor: 10,
       sameOrigin: true,
@@ -38,6 +41,7 @@ describe("terminalWebSocketURL", () => {
     const url = terminalWebSocketURL({
       url: "https://app.example.test",
       id: "pty_test",
+      sessionID: "ses_test",
       directory: "/tmp/project",
       cursor: 10,
       sameOrigin: true,

@@ -22,6 +22,7 @@ const TOGGLE_TERMINAL_ID = "terminal.toggle"
 const DEFAULT_TOGGLE_TERMINAL_KEYBIND = "ctrl+`"
 export interface TerminalProps extends ComponentProps<"div"> {
   pty: LocalPTY
+  sessionID: string
   autoFocus?: boolean
   onAutoFocus?: () => void
   onSubmit?: () => void
@@ -188,6 +189,7 @@ export const Terminal = (props: TerminalProps) => {
   let container!: HTMLDivElement
   const [local, others] = splitProps(props, [
     "pty",
+    "sessionID",
     "class",
     "classList",
     "autoFocus",
@@ -196,6 +198,7 @@ export const Terminal = (props: TerminalProps) => {
     "onConnectError",
   ])
   const id = local.pty.id
+  const routed = <T extends object>(input: T) => ({ ...input, sessionID: local.sessionID })
   const restore = typeof local.pty.buffer === "string" ? local.pty.buffer : ""
   const restoreSize =
     restore &&
@@ -243,10 +246,10 @@ export const Terminal = (props: TerminalProps) => {
 
   const pushSize = (cols: number, rows: number) => {
     return client.pty
-      .update({
+      .update(routed({
         ptyID: id,
         size: { cols, rows },
-      })
+      }))
       .catch((err) => {
         debugTerminal("failed to sync terminal size", err)
       })
@@ -524,7 +527,7 @@ export const Terminal = (props: TerminalProps) => {
 
       const gone = () =>
         client.pty
-          .get({ ptyID: id }, { throwOnError: false })
+          .get(routed({ ptyID: id }), { throwOnError: false })
           .then((result) => result.response.status === 404)
           .catch((err) => {
             debugTerminal("failed to inspect terminal session", err)
@@ -534,7 +537,7 @@ export const Terminal = (props: TerminalProps) => {
       const connectToken = async () => {
         const result = await client.pty
           .connectToken(
-            { ptyID: id, directory },
+            routed({ ptyID: id, directory }),
             {
               throwOnError: false,
               headers: { "x-opencode-ticket": "1" },
@@ -586,6 +589,7 @@ export const Terminal = (props: TerminalProps) => {
           terminalWebSocketURL({
             url,
             id,
+            sessionID: local.sessionID,
             directory,
             cursor: seek,
             ticket,
@@ -655,7 +659,6 @@ export const Terminal = (props: TerminalProps) => {
           socket.removeEventListener("error", handleError)
           socket.removeEventListener("close", handleClose)
           if (disposed) return
-          if (event.code === 1000) return
           retry(new Error(language.t("terminal.connectionLost.abnormalClose", { code: event.code })))
         }
 
