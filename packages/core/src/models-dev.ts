@@ -220,13 +220,17 @@ const layer = Layer.effect(
           }),
         ),
         Effect.catch((error) => {
-          if (!fallback) return Effect.fail(error)
+          if (!fallback) {
+            return Effect.logError("Failed to fetch models.dev and no fallback available", { error }).pipe(
+              Effect.as({} as Record<string, Provider>),
+            )
+          }
           return Effect.logWarning("Failed to fetch models.dev, using bundled fallback", { error }).pipe(
             Effect.as(fallback),
           )
         }),
       )
-    }).pipe(Effect.withSpan("ModelsDev.populate"), Effect.orDie)
+    }).pipe(Effect.withSpan("ModelsDev.populate"))
 
     const [cachedGet, invalidate] = yield* Effect.cachedInvalidateWithTTL(populate, Duration.infinity)
 

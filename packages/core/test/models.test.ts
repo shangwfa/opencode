@@ -1,5 +1,5 @@
 import { describe, expect, beforeAll, beforeEach, afterAll } from "bun:test"
-import { Effect, Exit, Layer, Ref } from "effect"
+import { Effect, Layer, Ref } from "effect"
 import { HttpClient, HttpClientResponse } from "effect/unstable/http"
 import { AppNodeBuilder } from "@opencode-ai/core/effect/app-node-builder"
 import { LayerNodePlatform } from "@opencode-ai/core/effect/app-node-platform"
@@ -246,20 +246,22 @@ describe("ModelsDev Service", () => {
     }),
   )
 
-  it.live("get() dies when fetch fails and no fallback is available", () =>
+  it.live("get() returns empty catalog when fetch fails and no fallback is available", () =>
     Effect.gen(function* () {
       const state = yield* Ref.make({ ...initialState, status: 500, body: "boom" })
-      const exit = yield* Effect.acquireUseRelease(
+      const result = yield* Effect.acquireUseRelease(
         Effect.sync(() => {
           Flag.OPENCODE_DISABLE_MODELS_FETCH = false
         }),
-        () => provided(state, ModelsDev.Service.use((s) => s.get()).pipe(Effect.exit)),
+        () => provided(state, ModelsDev.Service.use((s) => s.get())),
         () =>
           Effect.sync(() => {
             Flag.OPENCODE_DISABLE_MODELS_FETCH = true
           }),
       )
-      expect(Exit.isFailure(exit)).toBe(true)
+      expect(result).toEqual({})
+      const final = yield* Ref.get(state)
+      expect(final.calls.length).toBeGreaterThanOrEqual(1)
     }),
   )
 
