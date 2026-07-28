@@ -313,14 +313,6 @@ export const layerWith = (options?: LayerOptions) =>
                                 message: `Event ${event.id} already exists at aggregate ${stored.aggregateID} sequence ${stored.seq}`,
                               }),
                             )
-                          const committed = {
-                            ...event,
-                            durable: { aggregateID, seq, version: durable.version },
-                          } as Payload
-                          for (const projector of list) {
-                            yield* projector(committed)
-                          }
-                          if (commit) yield* commit(seq)
                           yield* tx
                             .insert(EventSequenceTable)
                             .values([{ aggregate_id: aggregateID, seq, owner_id: input?.ownerID }])
@@ -352,11 +344,20 @@ export const layerWith = (options?: LayerOptions) =>
                     )
                     .pipe(Effect.orDie)
                   if (committed) {
+                    const payload = {
+                      ...event,
+                      durable: { aggregateID: committed.aggregateID, seq: committed.seq, version: durable.version },
+                    } as Payload
+                    for (const projector of list) {
+                      yield* projector(payload)
+                    }
+                    if (commit) yield* commit(committed.seq)
                     yield* Effect.forEach(
                       pubsub.durable.get(committed.aggregateID) ?? [],
                       (wake) => PubSub.publish(wake, undefined),
                       { discard: true },
                     )
+                    return payload
                   }
                   return committed
                 }),
