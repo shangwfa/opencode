@@ -11,9 +11,6 @@ COPY packages packages
 RUN rm -rf patches && sed -i '/"patchedDependencies"/,/^[[:space:]]*}/d' package.json
 RUN bun install --ignore-scripts
 
-ARG OPENCODE_MODELS_URL=https://models.dev
-RUN bun -e 'const response = await fetch(`${process.env.OPENCODE_MODELS_URL}/api.json`); if (!response.ok) throw new Error(`Failed to fetch models catalog: ${response.status}`); await Bun.write("/app/models.json", response)'
-
 RUN find /app -path "*/node-pty/prebuilds/*/spawn-helper" -exec chmod +x {} \;
 
 FROM base AS runtime
@@ -21,7 +18,7 @@ WORKDIR /app
 
 COPY --from=builder /app/node_modules node_modules
 COPY --from=builder /app/packages packages
-COPY --from=builder /app/models.json models.json
+COPY models-dev.json /app/models.json
 COPY --from=builder /app/package.json /app/bun.lock /app/bunfig.toml ./
 
 WORKDIR /app/packages/opencode
