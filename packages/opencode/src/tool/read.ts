@@ -8,6 +8,7 @@ import { assertExternalDirectoryEffect } from "./external-directory"
 import { Instruction } from "../session/instruction"
 import { toSandboxPath } from "./sandbox-path"
 import { SandboxProvider } from "./sandbox-provider"
+import { isImageAttachment, sniffAttachmentMime } from "@/util/media"
 import type { Sandbox } from "@alibaba-group/opensandbox"
 
 const DEFAULT_READ_LIMIT = 2000
@@ -81,9 +82,27 @@ export const ReadTool = Tool.define(
       )
 
       if (fileContent) {
-        const content = fileContent
+        const content = fileContent as string
+        const bytes = Buffer.from(content, "binary")
+        const mime = sniffAttachmentMime(bytes, "")
 
-        const allLines = (content as string).split("\n")
+        if (isImageAttachment(mime)) {
+          const base64Content = bytes.toString("base64")
+          return {
+            title,
+            output: "Image read successfully",
+            metadata: {},
+            attachments: [
+              {
+                type: "file" as const,
+                mime,
+                url: `data:${mime};base64,${base64Content}`,
+              },
+            ],
+          }
+        }
+
+        const allLines = content.split("\n")
         const start = (params.offset ?? 1) - 1
         const limit = params.limit ?? DEFAULT_READ_LIMIT
         const selected = allLines.slice(start, start + limit)
