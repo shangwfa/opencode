@@ -58,6 +58,7 @@ export const Flag = {
     copy === undefined ? process.platform === "win32" : truthy("OPENCODE_EXPERIMENTAL_DISABLE_COPY_ON_SELECT"),
   OPENCODE_MODELS_URL: process.env["OPENCODE_MODELS_URL"],
   OPENCODE_MODELS_PATH: process.env["OPENCODE_MODELS_PATH"],
+  OPENCODE_MODELS_FALLBACK_PATH: process.env["OPENCODE_MODELS_FALLBACK_PATH"] ?? "/app/models.json",
   OPENCODE_DB: process.env["OPENCODE_DB"],
   OPENCODE_DATABASE_URL: process.env["OPENCODE_DATABASE_URL"],
   OPENCODE_AUTH_PROVIDER: (process.env["OPENCODE_AUTH_PROVIDER"] ?? "auto") as "auto" | "pg" | "file",

@@ -1,5 +1,5 @@
 import { describe, expect, beforeAll, beforeEach, afterAll } from "bun:test"
-import { Effect, Layer, Ref } from "effect"
+import { Effect, Exit, Layer, Ref } from "effect"
 import { HttpClient, HttpClientResponse } from "effect/unstable/http"
 import { AppNodeBuilder } from "@opencode-ai/core/effect/app-node-builder"
 import { LayerNodePlatform } from "@opencode-ai/core/effect/app-node-platform"
@@ -17,17 +17,21 @@ import path from "path"
 // the suite — never leak the mutation to subsequent test files in the same
 // bun process.
 const ORIGINAL_MODELS_PATH = Flag.OPENCODE_MODELS_PATH
+const ORIGINAL_MODELS_FALLBACK_PATH = Flag.OPENCODE_MODELS_FALLBACK_PATH
 const ORIGINAL_DISABLE_FETCH = Flag.OPENCODE_DISABLE_MODELS_FETCH
 beforeAll(() => {
   Flag.OPENCODE_MODELS_PATH = undefined
+  Flag.OPENCODE_MODELS_FALLBACK_PATH = undefined
   Flag.OPENCODE_DISABLE_MODELS_FETCH = true
 })
 afterAll(() => {
   Flag.OPENCODE_MODELS_PATH = ORIGINAL_MODELS_PATH
+  Flag.OPENCODE_MODELS_FALLBACK_PATH = ORIGINAL_MODELS_FALLBACK_PATH
   Flag.OPENCODE_DISABLE_MODELS_FETCH = ORIGINAL_DISABLE_FETCH
 })
 
 const cacheFile = path.join(Global.Path.cache, "models.json")
+const fallbackFile = path.join(Global.Path.cache, "models-fallback.json")
 
 const fixture: Record<string, ModelsDev.Provider> = {
   acme: {
@@ -114,10 +118,12 @@ const provided = <A, E>(state: Ref.Ref<MockState>, eff: Effect.Effect<A, E, Mode
 
 beforeEach(async () => {
   await rm(cacheFile, { force: true })
+  await rm(fallbackFile, { force: true })
 })
 
 afterAll(async () => {
   await rm(cacheFile, { force: true })
+  await rm(fallbackFile, { force: true })
 })
 
 const initialState: MockState = {
@@ -173,6 +179,87 @@ describe("ModelsDev Service", () => {
       expect(yield* Effect.promise(() => readFile(cacheFile, "utf8"))).toBe(JSON.stringify(fixture2))
       const final = yield* Ref.get(state)
       expect(final.calls.length).toBe(1)
+    }),
+  )
+
+  it.live("get() uses the bundled fallback when fetching fails", () =>
+    Effect.gen(function* () {
+      yield* Effect.promise(() => writeFile(fallbackFile, JSON.stringify(fixture)))
+      const state = yield* Ref.make({ ...initialState, status: 500, body: "boom" })
+      const result = yield* Effect.acquireUseRelease(
+        Effect.sync(() => {
+          Flag.OPENCODE_MODELS_FALLBACK_PATH = fallbackFile
+          Flag.OPENCODE_DISABLE_MODELS_FETCH = false
+        }),
+        () => provided(state, ModelsDev.Service.use((s) => s.get())),
+        () =>
+          Effect.sync(() => {
+            Flag.OPENCODE_MODELS_FALLBACK_PATH = undefined
+            Flag.OPENCODE_DISABLE_MODELS_FETCH = true
+          }),
+      )
+      expect(result).toEqual(fixture)
+      const final = yield* Ref.get(state)
+      expect(final.calls.length).toBeGreaterThanOrEqual(1)
+    }),
+  )
+
+  it.live("get() uses fallback when fetch is disabled and fallback file exists", () =>
+    Effect.gen(function* () {
+      yield* Effect.promise(() => writeFile(fallbackFile, JSON.stringify(fixture)))
+      const state = yield* Ref.make(initialState)
+      const result = yield* Effect.acquireUseRelease(
+        Effect.sync(() => {
+          Flag.OPENCODE_MODELS_FALLBACK_PATH = fallbackFile
+        }),
+        () => provided(state, ModelsDev.Service.use((s) => s.get())),
+        () =>
+          Effect.sync(() => {
+            Flag.OPENCODE_MODELS_FALLBACK_PATH = undefined
+          }),
+      )
+      expect(result).toEqual(fixture)
+      const final = yield* Ref.get(state)
+      expect(final.calls).toEqual([])
+    }),
+  )
+
+  it.live("get() uses fallback when response body is not valid JSON", () =>
+    Effect.gen(function* () {
+      yield* Effect.promise(() => writeFile(fallbackFile, JSON.stringify(fixture)))
+      const state = yield* Ref.make({ ...initialState, status: 200, body: "not-json" })
+      const result = yield* Effect.acquireUseRelease(
+        Effect.sync(() => {
+          Flag.OPENCODE_MODELS_FALLBACK_PATH = fallbackFile
+          Flag.OPENCODE_DISABLE_MODELS_FETCH = false
+        }),
+        () => provided(state, ModelsDev.Service.use((s) => s.get())),
+        () =>
+          Effect.sync(() => {
+            Flag.OPENCODE_MODELS_FALLBACK_PATH = undefined
+            Flag.OPENCODE_DISABLE_MODELS_FETCH = true
+          }),
+      )
+      expect(result).toEqual(fixture)
+      const final = yield* Ref.get(state)
+      expect(final.calls.length).toBeGreaterThanOrEqual(1)
+    }),
+  )
+
+  it.live("get() dies when fetch fails and no fallback is available", () =>
+    Effect.gen(function* () {
+      const state = yield* Ref.make({ ...initialState, status: 500, body: "boom" })
+      const exit = yield* Effect.acquireUseRelease(
+        Effect.sync(() => {
+          Flag.OPENCODE_DISABLE_MODELS_FETCH = false
+        }),
+        () => provided(state, ModelsDev.Service.use((s) => s.get()).pipe(Effect.exit)),
+        () =>
+          Effect.sync(() => {
+            Flag.OPENCODE_DISABLE_MODELS_FETCH = true
+          }),
+      )
+      expect(Exit.isFailure(exit)).toBe(true)
     }),
   )
 

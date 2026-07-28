@@ -177,6 +177,13 @@ const layer = Layer.effect(
       typeof OPENCODE_MODELS_DEV === "undefined" ? undefined : OPENCODE_MODELS_DEV,
     )
 
+    const loadFallback = Flag.OPENCODE_MODELS_FALLBACK_PATH
+      ? fs.readJson(Flag.OPENCODE_MODELS_FALLBACK_PATH).pipe(
+          Effect.catch(() => Effect.succeed(undefined)),
+          Effect.map((value) => value as Record<string, Provider> | undefined),
+        )
+      : Effect.succeed(undefined)
+
     const fetchAndWrite = Effect.fn("ModelsDev.fetchAndWrite")(function* () {
       const text = yield* fetchApi()
       const tempfile = `${filepath}.${process.pid}.${Date.now()}.tmp`
@@ -197,15 +204,28 @@ const layer = Layer.effect(
       if (fromDisk) return fromDisk
       const snapshot = yield* loadSnapshot
       if (snapshot) return snapshot
-      if (Flag.OPENCODE_DISABLE_MODELS_FETCH) return {}
+      const fallback = yield* loadFallback
+      if (Flag.OPENCODE_DISABLE_MODELS_FETCH) return fallback ?? {}
       // Flock is cross-process: concurrent opencode CLIs can race on this cache file.
-      const text = yield* Effect.scoped(
+      return yield* Effect.scoped(
         Effect.gen(function* () {
           yield* Flock.effect(lockKey)
           return yield* fetchAndWrite()
         }),
+      ).pipe(
+        Effect.flatMap((text) =>
+          Effect.try({
+            try: () => JSON.parse(text) as Record<string, Provider>,
+            catch: (cause) => cause,
+          }),
+        ),
+        Effect.catch((error) => {
+          if (!fallback) return Effect.fail(error)
+          return Effect.logWarning("Failed to fetch models.dev, using bundled fallback", { error }).pipe(
+            Effect.as(fallback),
+          )
+        }),
       )
-      return JSON.parse(text) as Record<string, Provider>
     }).pipe(Effect.withSpan("ModelsDev.populate"), Effect.orDie)
 
     const [cachedGet, invalidate] = yield* Effect.cachedInvalidateWithTTL(populate, Duration.infinity)
