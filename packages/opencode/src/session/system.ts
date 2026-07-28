@@ -1,5 +1,5 @@
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
-import { Context, Effect, Layer } from "effect"
+import { Cause, Context, Effect, Layer, PlatformError } from "effect"
 
 import { InstanceState } from "@/effect/instance-state"
 
@@ -59,7 +59,18 @@ const layer = Layer.effect(
         const ctx = yield* InstanceState.context
         const references = yield* Effect.gen(function* () {
           return (yield* (yield* Reference.Service).list()).filter((reference) => reference.description !== undefined)
-        }).pipe(Effect.provide(locations.get(Location.Ref.make({ directory: AbsolutePath.make(ctx.directory) }))))
+        }).pipe(
+          Effect.provide(locations.get(Location.Ref.make({ directory: AbsolutePath.make(ctx.directory) }))),
+          Effect.catchCause((cause) => {
+            const error = Cause.squash(cause)
+            if (!(error instanceof PlatformError.PlatformError) || error.reason._tag !== "NotFound") {
+              return Effect.failCause(cause)
+            }
+            return Effect.logWarning("project directory is unavailable while loading references", {
+              directory: ctx.directory,
+            }).pipe(Effect.as([]))
+          }),
+        )
         return [
           [
             `You are powered by the model named ${model.api.id}. The exact model ID is ${model.providerID}/${model.api.id}`,
