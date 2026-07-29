@@ -35,7 +35,9 @@ import { errorMessage } from "@/util/error"
 import { isMedia } from "@/util/media"
 import type { SystemError } from "bun"
 import type { Provider } from "@/provider/provider"
-import { Effect, Schema } from "effect"
+import { Effect, Option, Schema } from "effect"
+import { ToolAttachment } from "@/tool/attachment"
+import { SandboxProvider } from "@/tool/sandbox-provider"
 
 /** Error shape thrown by Bun's fetch() when gzip/br decompression fails mid-stream */
 interface FetchDecompressionError extends Error {
@@ -136,6 +138,33 @@ export const toModelMessagesEffect = Effect.fnUntraced(function* (
 ) {
   const result: UIMessage[] = []
   const toolNames = new Set<string>()
+  const sandboxProvider = Option.getOrUndefined(yield* Effect.serviceOption(SandboxProvider.Service))
+  const resolveAttachment = Effect.fnUntraced(function* (attachment: { mime: string; url: string; filename?: string }) {
+    const match = attachment.url.match(/^\/session\/([^/]+)\/attachment\/([^/]+)$/)
+    if (!match) return attachment
+    if (!sandboxProvider) return undefined
+    const sessionID = Schema.decodeUnknownOption(SessionID)(match[1])
+    const attachmentID = Schema.decodeUnknownOption(ToolAttachment.ID)(match[2])
+    if (Option.isNone(sessionID) || Option.isNone(attachmentID)) return undefined
+    const file = yield* ToolAttachment.open({
+      provider: sandboxProvider,
+      sessionID: sessionID.value,
+      id: attachmentID.value,
+    }).pipe(Effect.option)
+    if (Option.isNone(file) || file.value.metadata.audience === "display-only") return undefined
+    const data = yield* Effect.tryPromise(async () => {
+      const chunks: Uint8Array[] = []
+      for await (const chunk of file.value.bytes()) chunks.push(chunk)
+      return Buffer.concat(chunks).toString("base64")
+    }).pipe(Effect.option)
+    if (Option.isNone(data)) return undefined
+    return {
+      ...attachment,
+      mime: file.value.metadata.mime,
+      filename: file.value.metadata.filename,
+      url: `data:${file.value.metadata.mime};base64,${data.value}`,
+    }
+  })
   // Track media from tool results that need to be injected as user messages
   // for providers that don't support that media type in tool results.
   //
@@ -294,7 +323,12 @@ export const toModelMessagesEffect = Effect.fnUntraced(function* (
             const outputText = part.state.time.compacted
               ? "[Old tool result content cleared]"
               : truncateToolOutput(part.state.output, options?.toolOutputMaxChars)
-            const attachments = part.state.time.compacted || options?.stripMedia ? [] : (part.state.attachments ?? [])
+            const attachments =
+              part.state.time.compacted || options?.stripMedia
+                ? []
+                : (yield* Effect.forEach(part.state.attachments ?? [], resolveAttachment, { concurrency: 4 })).filter(
+                    (attachment) => attachment !== undefined,
+                  )
 
             // For providers that don't support media in tool results, extract media files
             // (images, PDFs) to be sent as a separate user message

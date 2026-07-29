@@ -38,7 +38,8 @@ RUN npm config set registry https://registry.npmmirror.com \
 # ── 6. Install multiple pnpm versions (via npm backend, uses npmmirror) ──
 # Default backend (aqua) downloads from GitHub which is slow/blocked in China.
 # npm backend downloads from npm registry (npmmirror) instead.
-RUN mise install npm:pnpm@8 npm:pnpm@9 npm:pnpm@10 npm:pnpm@11
+RUN mise settings npm.shell_out=true \
+  && mise install npm:pnpm@8 npm:pnpm@9 npm:pnpm@10 npm:pnpm@11
 
 # ── 7. Set default versions (node@24 + pnpm@10) and refresh shims ──
 RUN mise use -g npm:pnpm@10 && mise reshim
