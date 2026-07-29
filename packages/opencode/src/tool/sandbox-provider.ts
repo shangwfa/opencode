@@ -7,6 +7,7 @@ import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { Flag } from "@/flag/flag"
 import type { SessionID } from "../session/schema"
 import { resolveSandboxOpts } from "../session/sandbox-opts"
+import { SessionTable } from "../session/session.pg"
 import { Database } from "../storage/db"
 import { SandboxTable } from "./sandbox.pg"
 
@@ -688,6 +689,18 @@ export namespace SandboxProvider {
         }).pipe(Effect.orDie)
       }
 
+      function dbGetSessionDirectory(sessionID: string) {
+        return Effect.tryPromise({
+          try: () => pgDb
+            .select({ directory: SessionTable.directory })
+            .from(SessionTable)
+            .where(eq(SessionTable.id, sessionID as SessionID))
+            .limit(1)
+            .then((rows: { directory: string }[]) => rows[0]?.directory ?? null) as Promise<string | null>,
+          catch: () => null as null,
+        }).pipe(Effect.orElseSucceed(() => null))
+      }
+
       function dbGetById(id: string) {
         return Effect.tryPromise({
           try: () => pgDb
@@ -1261,6 +1274,7 @@ export namespace SandboxProvider {
         Effect.gen(function* () {
           const sb = yield* lock(sessionID, getOrCreateUnlocked(sessionID))
           yield* dbTouchSandbox(sessionID, sb.id).pipe(Effect.catchCause(() => Effect.void))
+          const workingDirectory = options?.workingDirectory ?? (yield* dbGetSessionDirectory(sessionID)) ?? "/workspace"
 
           const row = yield* dbGet(sessionID).pipe(Effect.orElseSucceed(() => null))
           let cmdSessionID = (row?.id === sb.id ? row?.command_session_id : null) ?? null
@@ -1275,7 +1289,7 @@ export namespace SandboxProvider {
               if (existing) return existing
 
               const newSession = yield* Effect.tryPromise({
-                try: () => sb.commands.createSession({ workingDirectory: "/workspace" }),
+                try: () => sb.commands.createSession({ workingDirectory }),
                 catch: (e) => new Error(`Failed to create command session: ${String(e)}`),
               })
               yield* dbSetCommandSession(sessionID, sb.id, newSession).pipe(Effect.catchCause(() => Effect.void))
@@ -1286,7 +1300,7 @@ export namespace SandboxProvider {
           return yield* sem.withPermit(
             withExecTimeout(
               Effect.tryPromise({
-                try: () => runCommandEarlyExit(sb, cmdSessionID!, command, options, handlers, signal),
+                try: () => runCommandEarlyExit(sb, cmdSessionID!, command, { ...options, workingDirectory }, handlers, signal),
                 catch: (e) => new Error(`runInSession failed: ${String(e)}`),
               }).pipe(
                 Effect.tapError((err) =>
@@ -1304,8 +1318,9 @@ export namespace SandboxProvider {
         Effect.gen(function* () {
           const sb = yield* lock(sessionID, getOrCreateUnlocked(sessionID))
           yield* dbTouchSandbox(sessionID, sb.id).pipe(Effect.catchCause(() => Effect.void))
+          const workingDirectory = options?.workingDirectory ?? (yield* dbGetSessionDirectory(sessionID)) ?? "/workspace"
           const detachedSessionId = yield* Effect.tryPromise({
-            try: () => sb.commands.createSession({ workingDirectory: options?.workingDirectory ?? "/workspace" }),
+            try: () => sb.commands.createSession({ workingDirectory }),
             catch: (e) => new Error(`Failed to create detached session: ${String(e)}`),
           })
           const detached = detachedCommandSessions.get(sessionID) ?? new Set<string>()
@@ -1315,7 +1330,7 @@ export namespace SandboxProvider {
           try {
             const result = yield* withExecTimeout(
               Effect.tryPromise({
-                try: () => runCommandEarlyExit(sb, detachedSessionId, command, options, handlers, signal),
+                try: () => runCommandEarlyExit(sb, detachedSessionId, command, { ...options, workingDirectory }, handlers, signal),
                 catch: (e) => new Error(`runDetached failed: ${String(e)}`),
               }).pipe(
                 Effect.tapError((err) =>

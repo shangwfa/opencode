@@ -78,7 +78,13 @@ function parseNameStatus(text) {
 
 function untracked() {
   const parts = output(["status", "--porcelain=v1", "-z", "--untracked-files=all"])?.split("\\0").filter(Boolean) ?? []
-  return parts.flatMap((entry) => entry.startsWith("?? ") ? [{ file: entry.slice(3), status: "added" }] : [])
+  return parts.flatMap((entry) => {
+    if (!entry.startsWith("?? ")) return []
+    const file = entry.slice(3)
+    // git worktree / nested-repo directories appear as "dir/" — skip, they are not file diffs
+    if (file.endsWith("/")) return []
+    return [{ file, status: "added" }]
+  })
 }
 
 function patchFor(item, ref) {

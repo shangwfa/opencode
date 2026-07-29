@@ -114,8 +114,8 @@ function createSandboxRuntime(
       const encoded = Buffer.from(pluginsJson).toString("base64")
       const pluginContext = Buffer.from(JSON.stringify({
         project: context?.project,
-        directory: "/workspace",
-        worktree: "/workspace",
+        directory: context?.directory ?? "/workspace",
+        worktree: context?.worktree ?? "/workspace",
         serverUrl: context?.serverUrl.toString(),
       })).toString("base64")
 
