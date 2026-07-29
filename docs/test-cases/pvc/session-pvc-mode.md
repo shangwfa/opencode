@@ -393,6 +393,141 @@ console.log("✅ T38.21: " + (pass1 && pass2 && pass3 ? "PASS — session 模式
 
 ---
 
+## 四、真实流程 E2E — worktree 代码写入位置验证
+
+> 前置条件：SaaS 服务已启动，远端 Sandbox API + PVC 可用。
+>
+> 这组用例模拟真实使用流程：创建会话 → 拉取代码仓库 → 创建 worktree → 修改代码 → 验证写入位置和 diff 结果。
+
+### T38.22 app 模式：worktree 代码写入位置验证
+
+**验证目标**：app 模式会话创建 worktree 后，exec 写文件、`/path`、`/vcs/diff` 全部指向 worktree 目录，主仓库不被污染。
+
+```bash
+bun -e '
+const BASE = "http://localhost:14096"
+const exec = (sid, cmd) => fetch(BASE + "/session/" + sid + "/exec", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ command: cmd, timeoutSeconds: 120 }) }).then(r=>r.json())
+const get = (path) => fetch(BASE + path).then(r=>r.json())
+const sleep = ms => new Promise(r => setTimeout(r, ms))
+
+// 1. 创建 app 模式会话
+const APP_ID = "e2e-app-" + Date.now().toString(36)
+const session = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pvcMode: "app", appId: APP_ID }) })).json()
+const SID = session.id
+await sleep(3000)
+
+// 2. clone 仓库到 /workspace/repo
+await exec(SID, "git clone --depth=1 https://github.com/vercel-labs/agent-browser.git /workspace/repo 2>&1")
+
+// 3. 创建 worktree
+const branch = "feature/test-" + Date.now().toString(36)
+const wtPath = "/workspace/worktrees/" + SID
+await exec(SID, `cd /workspace/repo && git worktree add -b ${branch} ${wtPath} HEAD 2>&1`)
+
+// 4. 更新 PG session.directory 指向 worktree（模拟外部编排系统）
+//    PGPASSWORD=8zuhlMLd4gaeUG5k psql -h 127.0.0.1 -p 15432 -U app -d opencode \
+//      -c "UPDATE session SET directory='\''${wtPath}'\'' WHERE id='\''${SID}'\''"
+
+// 5. 验证 /path 返回 worktree 目录
+const pathInfo = await get("/path?sessionID=" + SID)
+console.log("path.directory:", pathInfo.directory)
+
+// 6. 验证 exec pwd 在 worktree
+const pwdRes = await exec(SID, "pwd")
+console.log("pwd:", pwdRes.stdout?.trim())
+
+// 7. exec 写文件到 worktree
+await exec(SID, `echo "test content from e2e" > README.md`)
+
+// 8. 验证文件在 worktree 中
+const verifyRes = await exec(SID, "head -1 README.md && git status --short")
+console.log("worktree git status:", verifyRes.stdout?.trim())
+
+// 9. 验证主仓库 clean
+const repoRes = await exec(SID, "cd /workspace/repo && git status --short")
+console.log("main repo status:", reprRes.stdout?.trim() || "(clean)")
+
+// 10. 验证 /vcs/diff 只显示 worktree 变更
+const diffRes = await get("/vcs/diff?mode=git&sessionID=" + SID)
+console.log("diff files:", diffRes.length, diffRes.map(d => d.file).join(", "))
+
+// 11. 验证不传 directory 的 /vcs/diff 也指向 worktree
+const noDirDiff = await get("/vcs/diff?mode=git&sessionID=" + SID)
+console.log("no-dir diff files:", noDirDiff.length)
+
+const allPass =
+  pathInfo.directory === wtPath &&
+  pwdRes.stdout?.trim() === wtPath &&
+  verifyRes.stdout?.includes("test content from e2e") &&
+  (repoRes.stdout?.trim() === "" || repoRes.stdout == null) &&
+  diffRes.length === 1 && diffRes[0]?.file === "README.md" &&
+  noDirDiff.length === 1
+console.log("✅ T38.22: " + (allPass ? "PASS — app 模式 worktree 写入位置正确" : "FAIL"))
+'
+```
+
+**期望**：
+- `/path` directory = `/workspace/worktrees/{sessionID}`
+- `exec pwd` = `/workspace/worktrees/{sessionID}`
+- 写入的文件出现在 worktree 的 `git status` 中
+- 主仓库 `/workspace/repo` git status 为空（clean）
+- `/vcs/diff` 只返回 1 个文件（README.md），不包含 `worktrees/` 目录
+- 不传 directory 的 `/vcs/diff` 与传 directory 结果一致
+
+---
+
+### T38.23 session 模式：worktree 代码写入位置验证
+
+**验证目标**：session 模式（非 app 模式）创建 worktree 后，行为与 app 模式一致——exec 写文件、`/path`、`/vcs/diff` 全部指向 worktree 目录，主仓库不被污染。
+
+```bash
+bun -e '
+const BASE = "http://localhost:14096"
+const exec = (sid, cmd) => fetch(BASE + "/session/" + sid + "/exec", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ command: cmd, timeoutSeconds: 120 }) }).then(r=>r.json())
+const get = (path) => fetch(BASE + path).then(r=>r.json())
+const sleep = ms => new Promise(r => setTimeout(r, ms))
+
+// 1. 创建 session 模式会话（不传 pvcMode）
+const session = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" })).json()
+const SID = session.id
+await sleep(3000)
+
+// 2. clone 仓库到 /workspace/repo
+await exec(SID, "git clone --depth=1 https://github.com/vercel-labs/agent-browser.git /workspace/repo 2>&1")
+
+// 3. 创建 worktree
+const branch = "feature/session-" + Date.now().toString(36)
+const wtPath = "/workspace/worktrees/" + SID
+await exec(SID, `cd /workspace/repo && git worktree add -b ${branch} ${wtPath} HEAD 2>&1`)
+
+// 4. 更新 PG session.directory 指向 worktree
+//    PGPASSWORD=8zuhlMLd4gaeUG5k psql -h 127.0.0.1 -p 15432 -U app -d opencode \
+//      -c "UPDATE session SET directory='\''${wtPath}'\'' WHERE id='\''${SID}'\''"
+
+// 5-11. 同 T38.22 验证步骤
+const pathInfo = await get("/path?sessionID=" + SID)
+const pwdRes = await exec(SID, "pwd")
+await exec(SID, `echo "session-mode test" > README.md`)
+const verifyRes = await exec(SID, "head -1 README.md && git status --short")
+const repoRes = await exec(SID, "cd /workspace/repo && git status --short")
+const diffRes = await get("/vcs/diff?mode=git&sessionID=" + SID)
+const noDirDiff = await get("/vcs/diff?mode=git&sessionID=" + SID)
+
+const allPass =
+  pathInfo.directory === wtPath &&
+  pwdRes.stdout?.trim() === wtPath &&
+  verifyRes.stdout?.includes("session-mode test") &&
+  (repoRes.stdout?.trim() === "" || repoRes.stdout == null) &&
+  diffRes.length === 1 && diffRes[0]?.file === "README.md" &&
+  noDirDiff.length === 1
+console.log("✅ T38.23: " + (allPass ? "PASS — session 模式 worktree 写入位置正确" : "FAIL"))
+'
+```
+
+**期望**：与 T38.22 完全一致（session 模式行为不受 pvcMode 影响）
+
+---
+
 ## 结果汇总
 
 > **编号说明**：T38.13–T38.17 为历史断档（原 worktree 自动创建等用例在文档演进中移除）；99-acceptance-status 中 T38.13 的实测记录来自历史回归，正文待补。
@@ -415,6 +550,8 @@ console.log("✅ T38.21: " + (pass1 && pass2 && pass3 ? "PASS — session 模式
 | T38.19 | fork 继承 pvcMode/appId + 数据共享 | |
 | T38.20 | 子任务会话 parent_id 追溯共享 PVC | |
 | T38.21 | session 模式不受 app 逻辑影响（回归保护） | |
+| T38.22 | app 模式 worktree 代码写入位置验证 | |
+| T38.23 | session 模式 worktree 代码写入位置验证 | |
 
 ---
 

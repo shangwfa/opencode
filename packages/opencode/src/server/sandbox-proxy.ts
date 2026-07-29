@@ -193,9 +193,13 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
 
     const requireSession = (sessionID: SessionID) =>
       Effect.promise(() =>
-        Database.use((db) => db.select({ id: SessionTable.id }).from(SessionTable).where(eq(SessionTable.id, sessionID)).get()),
+        Database.use((db) => db
+          .select({ id: SessionTable.id, directory: SessionTable.directory })
+          .from(SessionTable)
+          .where(eq(SessionTable.id, sessionID))
+          .get()),
       ).pipe(
-        Effect.flatMap((row) => row ? Effect.void : Effect.fail({ _tag: "NotFound" as const, sessionID })),
+        Effect.flatMap((row) => row ? Effect.succeed(row) : Effect.fail({ _tag: "NotFound" as const, sessionID })),
       )
 
     const resolveRootSessionID = (sessionID: SessionID) =>
@@ -304,7 +308,7 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
     yield* router.add("POST", "/session/:sessionID/exec",
       Effect.gen(function* () {
         const params = yield* HttpRouter.schemaPathParams(SessionParams)
-        yield* requireSession(params.sessionID).pipe(Effect.catch(() => Effect.fail(HttpServerResponse.jsonUnsafe({ error: "session not found" }, { status: 404 }))))
+        const session = yield* requireSession(params.sessionID).pipe(Effect.catch(() => Effect.fail(HttpServerResponse.jsonUnsafe({ error: "session not found" }, { status: 404 }))))
         const body = yield* HttpServerRequest.schemaBodyJson(ExecBody).pipe(
           Effect.catch(() => Effect.succeed({ command: "", workingDirectory: undefined, timeoutSeconds: undefined })),
         )
@@ -321,12 +325,13 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
         }
 
         const command = body.command
+        const workingDirectory = body.workingDirectory ?? session.directory
         const t0 = Date.now()
         const execId = `exec-${++execCounter}-${t0}`
         const result = yield* sandbox.runInSession(
           root.id,
           command,
-          { workingDirectory: body.workingDirectory, timeoutSeconds: body.timeoutSeconds },
+          { workingDirectory, timeoutSeconds: body.timeoutSeconds },
           {},
         ).pipe(Effect.catch((err) => Effect.succeed(null as any)))
 
@@ -337,7 +342,7 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
           id: execId,
           session_id: root.id,
           command,
-          working_directory: body.workingDirectory ?? null,
+          working_directory: workingDirectory,
           status: result?.error?.name === "TimeoutError" ? "timed_out" : result ? "completed" : "failed",
           exit_code: result?.exitCode ?? null,
           stdout: truncateOutput(stdout),
@@ -364,7 +369,7 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
     yield* router.add("POST", "/session/:sessionID/exec/async",
       Effect.gen(function* () {
         const params = yield* HttpRouter.schemaPathParams(SessionParams)
-        yield* requireSession(params.sessionID).pipe(Effect.catch(() => Effect.fail(HttpServerResponse.jsonUnsafe({ error: "session not found" }, { status: 404 }))))
+        const session = yield* requireSession(params.sessionID).pipe(Effect.catch(() => Effect.fail(HttpServerResponse.jsonUnsafe({ error: "session not found" }, { status: 404 }))))
         const body = yield* HttpServerRequest.schemaBodyJson(ExecBody).pipe(
           Effect.catch(() => Effect.succeed({ command: "", workingDirectory: undefined, timeoutSeconds: undefined })),
         )
@@ -402,7 +407,7 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
           id: execId,
           session_id: sid,
           command: body.command,
-          working_directory: body.workingDirectory ?? null,
+          working_directory: body.workingDirectory ?? session.directory,
           status: "running",
           source: "exec-async",
           time_started: state.startedAt,
@@ -426,7 +431,7 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
         }
 
         const cmd = body.command
-        const opts = { workingDirectory: body.workingDirectory, timeoutSeconds: body.timeoutSeconds }
+        const opts = { workingDirectory: body.workingDirectory ?? session.directory, timeoutSeconds: body.timeoutSeconds }
 
         const handlers = {
           onStdout: (msg: { text: string }) => {
