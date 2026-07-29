@@ -951,6 +951,9 @@ export namespace SandboxProvider {
               Effect.catchCause(() => Effect.void),
             )
           }
+          yield* Effect.tryPromise(() => sb.commands.run("git config --global core.fsmonitor true && git config --global core.untrackedcache true")).pipe(
+            Effect.catchCause(() => Effect.void),
+          )
           const host = `http://${config.domain}`
           yield* dbUpsert({
             id: sb.id,
