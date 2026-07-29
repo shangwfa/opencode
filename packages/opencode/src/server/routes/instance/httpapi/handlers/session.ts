@@ -3,6 +3,8 @@ import { Agent } from "@/agent/agent"
 import { SessionMcp } from "@/mcp/session-mcp"
 import { SessionLoadDotOpencode } from "@/config/session-load-dot-opencode"
 import { SessionTool } from "@/tool/session-tool"
+import { ToolAttachment } from "@/tool/attachment"
+import { SandboxProvider } from "@/tool/sandbox-provider"
 import { SessionPlugin } from "@/plugin/session-plugin"
 import { SessionPluginRuntime } from "@/plugin/session-plugin-runtime"
 import { SessionAgentsMd } from "@/session/agents-md"
@@ -53,7 +55,7 @@ import {
   SummarizePayload,
   UpdatePayload,
 } from "../groups/session"
-import { PermissionNotFoundError } from "../errors"
+import { ApiNotFoundError, PermissionNotFoundError, notFound } from "../errors"
 import * as SessionError from "./session-errors"
 import { withSessionLock, waitForSessionLock } from "./session-lock"
 
@@ -86,6 +88,7 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
     const sessionLoadDotOpencodeSvc = yield* SessionLoadDotOpencode.Service
     const events = yield* EventV2Bridge.Service
     const scope = yield* Scope.Scope
+    const sandboxProvider = Option.getOrUndefined(yield* Effect.serviceOption(SandboxProvider.Service))
 
     const list = Effect.fn("SessionHttpApi.list")(function* (ctx: { query: typeof ListQuery.Type }) {
       const directory = ctx.query.directory ? yield* InstanceState.directory : undefined
@@ -175,6 +178,53 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
     }) {
       return yield* SessionError.mapStorageNotFound(
         MessageV2.get({ sessionID: ctx.params.sessionID, messageID: ctx.params.messageID }),
+      )
+    })
+
+    const attachment = Effect.fn("SessionHttpApi.attachment")(function* (ctx: {
+      params: { sessionID: SessionID; attachmentID: ToolAttachment.ID }
+      request: HttpServerRequest.HttpServerRequest
+    }) {
+      yield* requireSession(ctx.params.sessionID)
+      if (!sandboxProvider) return yield* new HttpApiError.InternalServerError({})
+      const file = yield* ToolAttachment.open({
+        provider: sandboxProvider,
+        sessionID: ctx.params.sessionID,
+        id: ctx.params.attachmentID,
+      }).pipe(
+        Effect.catchTag("ToolAttachment.NotFoundError", () =>
+          Effect.fail(notFound(`Attachment not found: ${ctx.params.attachmentID}`)),
+        ),
+        Effect.mapError((error) =>
+          error instanceof HttpApiError.InternalServerError || error instanceof ApiNotFoundError
+            ? error
+            : new HttpApiError.InternalServerError({}),
+        ),
+      )
+      const range = ToolAttachment.parseByteRange(ctx.request.headers.range, file.metadata.size)
+      if (range === null)
+        return HttpServerResponse.empty({
+          status: 416,
+          headers: { "Content-Range": `bytes */${file.metadata.size}` },
+        })
+      const etag = `"sha256-${file.metadata.sha256}"`
+      if (!range && ctx.request.headers["if-none-match"] === etag)
+        return HttpServerResponse.empty({ status: 304, headers: { ETag: etag } })
+      return HttpServerResponse.stream(
+        Stream.fromAsyncIterable(file.bytes(range?.header), (cause) => cause),
+        {
+          status: range ? 206 : 200,
+          contentType: file.metadata.mime,
+          contentLength: range ? range.end - range.start + 1 : file.metadata.size,
+          headers: {
+            "Accept-Ranges": "bytes",
+            "Cache-Control": "private, max-age=31536000, immutable",
+            "Content-Disposition": `${file.metadata.audience === "display-only" ? "attachment" : "inline"}; filename="attachment"; filename*=UTF-8''${encodeFilename(file.metadata.filename)}`,
+            ...(range ? { "Content-Range": `bytes ${range.start}-${range.end}/${file.metadata.size}` } : {}),
+            ETag: etag,
+            "X-Content-Type-Options": "nosniff",
+          },
+        },
       )
     })
 
@@ -688,6 +738,7 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       .handle("diff", diff)
       .handle("messages", messages)
       .handle("message", message)
+      .handleRaw("attachment", attachment)
       .handleRaw("create", createRaw)
       .handle("remove", remove)
       .handle("update", update)
@@ -738,3 +789,7 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       .handle("pluginsClear", clearPlugins)
   }),
 )
+
+function encodeFilename(value: string) {
+  return encodeURIComponent(value).replace(/[!'()*]/g, (character) => `%${character.charCodeAt(0).toString(16).toUpperCase()}`)
+}

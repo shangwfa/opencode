@@ -411,6 +411,75 @@ describe("session.message-v2.toModelMessage", () => {
     ])
   })
 
+  test("does not expose managed attachment URLs when sandbox access is unavailable", async () => {
+    const userID = "m-user-managed"
+    const assistantID = "m-assistant-managed"
+    const input: SessionV1.WithParts[] = [
+      {
+        info: userInfo(userID),
+        parts: [{ ...basePart(userID, "u-managed"), type: "text", text: "read image" }] as SessionV1.Part[],
+      },
+      {
+        info: assistantInfo(assistantID, userID),
+        parts: [
+          {
+            ...basePart(assistantID, "tool-managed"),
+            type: "tool",
+            callID: "call-managed",
+            tool: "read",
+            state: {
+              status: "completed",
+              input: { filePath: "/workspace/image.png" },
+              output: "Image read successfully",
+              title: "Read",
+              metadata: {},
+              time: { start: 0, end: 1 },
+              attachments: [
+                {
+                  ...basePart(assistantID, "file-managed"),
+                  type: "file",
+                  mime: "image/png",
+                  filename: "image.png",
+                  url: "/session/session/attachment/att_test",
+                },
+              ],
+            },
+          },
+        ] as SessionV1.Part[],
+      },
+    ]
+
+    const result = await MessageV2.toModelMessages(input, model)
+
+    expect(JSON.stringify(result)).not.toContain("/session/session/attachment/att_test")
+    expect(result).toStrictEqual([
+      { role: "user", content: [{ type: "text", text: "read image" }] },
+      {
+        role: "assistant",
+        content: [
+          {
+            type: "tool-call",
+            toolCallId: "call-managed",
+            toolName: "read",
+            input: { filePath: "/workspace/image.png" },
+            providerExecuted: undefined,
+          },
+        ],
+      },
+      {
+        role: "tool",
+        content: [
+          {
+            type: "tool-result",
+            toolCallId: "call-managed",
+            toolName: "read",
+            output: { type: "text", value: "Image read successfully" },
+          },
+        ],
+      },
+    ])
+  })
+
   test("preserves jpeg tool-result media for anthropic models", async () => {
     const anthropicModel: Provider.Model = {
       ...model,

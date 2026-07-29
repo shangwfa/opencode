@@ -29,6 +29,7 @@ import { described } from "./metadata"
 import { QueryBoolean } from "./query"
 import { ProviderV2 } from "@opencode-ai/core/provider"
 import { ModelV2 } from "@opencode-ai/core/model"
+import { ToolAttachment } from "@/tool/attachment"
 
 const root = "/session"
 export const ListQuery = Schema.Struct({
@@ -156,6 +157,7 @@ export const SessionPaths = {
   diff: `${root}/:sessionID/diff`,
   messages: `${root}/:sessionID/message`,
   message: `${root}/:sessionID/message/:messageID`,
+  attachment: `${root}/:sessionID/attachment/:attachmentID`,
   create: root,
   remove: `${root}/:sessionID`,
   update: `${root}/:sessionID`,
@@ -292,6 +294,18 @@ export const SessionApi = HttpApi.make("session")
             identifier: "session.message",
             summary: "Get message",
             description: "Retrieve a specific message from a session by its message ID.",
+          }),
+        ),
+        HttpApiEndpoint.get("attachment", SessionPaths.attachment, {
+          params: { sessionID: SessionID, attachmentID: ToolAttachment.ID },
+          query: WorkspaceRoutingQuery,
+          success: Schema.String.pipe(HttpApiSchema.asText({ contentType: "application/octet-stream" })),
+          error: [ApiNotFoundError, HttpApiError.InternalServerError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.attachment",
+            summary: "Download session attachment",
+            description: "Stream a managed tool attachment associated with a session.",
           }),
         ),
         HttpApiEndpoint.post("create", SessionPaths.create, {

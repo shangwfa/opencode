@@ -48,10 +48,10 @@ export const WriteTool = Tool.define(
 
           const maybeSandbox = ctx.sandbox ? (yield* Effect.promise(() => ctx.sandbox!)) as Sandbox | null : null
           if (maybeSandbox === null && ctx.sandbox) {
-            return yield* Effect.fail(new Error("Sandbox initialization failed"))
+            return yield* Effect.fail(new Error("Initialization failed"))
           }
           if (!maybeSandbox) {
-            return yield* Effect.fail(new Error("Sandbox is not available"))
+            return yield* Effect.fail(new Error("Execution environment is not available"))
           }
 
           const contentOld = (yield* Effect.tryPromise(() => maybeSandbox.files.readFile(sandboxPath)).pipe(
