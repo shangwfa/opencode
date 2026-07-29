@@ -24,6 +24,7 @@ import { LocationServiceMap, locationServiceMapLayer } from "@opencode-ai/core/l
 import { Reference } from "@opencode-ai/core/reference"
 import { MCP } from "@/mcp"
 import { PermissionV1 } from "@opencode-ai/core/v1/permission"
+import { Flag } from "@/flag/flag"
 
 export function provider(model: Provider.Model) {
   if (model.api.id.includes("muse-spark")) return [PROMPT_META]
@@ -60,12 +61,16 @@ const layer = Layer.effect(
     return Service.of({
       environment: Effect.fn("SystemPrompt.environment")(function* (model: Provider.Model) {
         const ctx = yield* InstanceState.context
-        const references = yield* Effect.gen(function* () {
-          return (yield* (yield* Reference.Service).list()).filter((reference) => reference.description !== undefined)
-        }).pipe(
-          Effect.provide(locations.get(Location.Ref.make({ directory: AbsolutePath.make(ctx.directory) }))),
-          Effect.catchCauseIf(() => true, () => Effect.succeed([])),
-        )
+        const references = Flag.OPENCODE_SANDBOX_ENABLED
+          ? []
+          : yield* Effect.gen(function* () {
+              return (yield* (yield* Reference.Service).list()).filter(
+                (reference) => reference.description !== undefined,
+              )
+            }).pipe(
+              Effect.provide(locations.get(Location.Ref.make({ directory: AbsolutePath.make(ctx.directory) }))),
+              Effect.catchCauseIf(() => true, () => Effect.succeed([])),
+            )
         return [
           [
             `You are powered by the model named ${model.api.id}. The exact model ID is ${model.providerID}/${model.api.id}`,

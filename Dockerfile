@@ -18,6 +18,7 @@ WORKDIR /app
 
 COPY --from=builder /app/node_modules node_modules
 COPY --from=builder /app/packages packages
+COPY models-dev.json /app/models.json
 COPY --from=builder /app/package.json /app/bun.lock /app/bunfig.toml ./
 
 WORKDIR /app/packages/opencode

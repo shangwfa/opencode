@@ -75,7 +75,7 @@ export const WriteTool = Tool.define(
 
           const maybeSandbox = ctx.sandbox ? ((yield* Effect.promise(() => ctx.sandbox!)) as Sandbox | null) : null
           if (maybeSandbox === null && ctx.sandbox) {
-            return yield* Effect.fail(new Error("Sandbox initialization failed"))
+            return yield* Effect.fail(new Error("Initialization failed"))
           }
 
           if (!maybeSandbox) {
