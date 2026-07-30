@@ -6,6 +6,8 @@ import { Global } from "@opencode-ai/core/global"
 import { LSP } from "@/lsp/lsp"
 import { Vcs } from "@/project/vcs"
 import { SessionID } from "@/session/schema"
+import { Session } from "@/session/session"
+import { resolveSandboxOpts } from "@/session/sandbox-opts"
 import { Skill } from "@/skill"
 import { SandboxProvider } from "@/tool/sandbox-provider"
 import { toSandboxPath } from "@/tool/sandbox-path"
@@ -13,7 +15,8 @@ import { Flag } from "@opencode-ai/core/flag/flag"
 import { Effect } from "effect"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
 import { InstanceHttpApi } from "../api"
-import { ApiVcsApplyError } from "../groups/instance"
+import { ApiVcsApplyError, ApiVcsDiffError } from "../groups/instance"
+import { notFound } from "../errors"
 import { markInstanceForDisposal } from "../lifecycle"
 
 const sandboxVcsDiffCommand = (mode: Vcs.Mode, context: number | undefined, directory: string) => `node <<'NODE'
@@ -145,6 +148,7 @@ export const instanceHandlers = HttpApiBuilder.group(InstanceHttpApi, "instance"
     const lsp = yield* LSP.Service
     const skill = yield* Skill.Service
     const vcs = yield* Vcs.Service
+    const session = yield* Session.Service
 
     const dispose = Effect.fn("InstanceHttpApi.dispose")(function* () {
       yield* markInstanceForDisposal(yield* InstanceState.context)
@@ -178,23 +182,54 @@ export const instanceHandlers = HttpApiBuilder.group(InstanceHttpApi, "instance"
       query: { mode: Vcs.Mode; context?: number; sessionID?: SessionID }
     }) {
       if (Flag.OPENCODE_SANDBOX_ENABLED && ctx.query.sessionID) {
-        const instanceCtx = yield* InstanceState.context
+        const sessionID = ctx.query.sessionID
+        const info = yield* session
+          .get(sessionID)
+          .pipe(Effect.mapError(() => notFound(`Session not found: ${sessionID}`)))
+        const root = yield* Effect.tryPromise({
+          try: () => resolveSandboxOpts(sessionID),
+          catch: (error) =>
+            new ApiVcsDiffError({
+              name: "VcsDiffError",
+              data: { message: `Failed to resolve session sandbox: ${String(error)}` },
+            }),
+        })
         const sandbox = yield* Effect.serviceOption(SandboxProvider.Service)
-        if (sandbox._tag === "Some") {
-          const result = yield* sandbox.value
-            .runInSession(ctx.query.sessionID, sandboxVcsDiffCommand(ctx.query.mode, ctx.query.context, instanceCtx.directory), {
-              timeoutSeconds: 30,
-            })
-            .pipe(Effect.catch(() => Effect.succeed(undefined)))
-          const stdout = result?.logs.stdout.map((line: { text: string }) => line.text).join("").trim()
-          if (stdout) {
-            const parsed = yield* Effect.try({
-              try: () => JSON.parse(stdout) as Vcs.FileDiff[],
-              catch: () => undefined,
-            }).pipe(Effect.catch(() => Effect.succeed(undefined)))
-            if (parsed) return parsed
-          }
-        }
+        if (sandbox._tag === "None")
+          return yield* new ApiVcsDiffError({
+            name: "VcsDiffError",
+            data: { message: "Sandbox provider is not available" },
+          })
+
+        const result = yield* sandbox.value
+          .runInSession(root.id, sandboxVcsDiffCommand(ctx.query.mode, ctx.query.context, info.directory), {
+            workingDirectory: info.directory,
+            timeoutSeconds: 30,
+          })
+          .pipe(
+            Effect.mapError(
+              (error) =>
+                new ApiVcsDiffError({
+                  name: "VcsDiffError",
+                  data: { message: `Failed to read sandbox diff: ${error.message}` },
+                }),
+            ),
+          )
+        const stdout = result.logs.stdout.map((line: { text: string }) => line.text).join("").trim()
+        if (!stdout)
+          return yield* new ApiVcsDiffError({
+            name: "VcsDiffError",
+            data: { message: "Sandbox diff returned no output" },
+          })
+
+        return yield* Effect.try({
+          try: () => JSON.parse(stdout) as Vcs.FileDiff[],
+          catch: () =>
+            new ApiVcsDiffError({
+              name: "VcsDiffError",
+              data: { message: "Sandbox diff returned invalid JSON" },
+            }),
+        })
       }
       return yield* vcs.diff(ctx.query.mode, { context: ctx.query.context })
     })

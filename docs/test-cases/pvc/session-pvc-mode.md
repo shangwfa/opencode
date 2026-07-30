@@ -445,10 +445,10 @@ console.log("worktree git status:", verifyRes.stdout?.trim())
 
 // 9. 验证主仓库 clean
 const repoRes = await exec(SID, "cd /workspace/repo && git status --short")
-console.log("main repo status:", reprRes.stdout?.trim() || "(clean)")
+console.log("main repo status:", repoRes.stdout?.trim() || "(clean)")
 
 // 10. 验证 /vcs/diff 只显示 worktree 变更
-const diffRes = await get("/vcs/diff?mode=git&sessionID=" + SID)
+const diffRes = await get("/vcs/diff?mode=git&directory=" + encodeURIComponent(wtPath) + "&sessionID=" + SID)
 console.log("diff files:", diffRes.length, diffRes.map(d => d.file).join(", "))
 
 // 11. 验证不传 directory 的 /vcs/diff 也指向 worktree
@@ -510,7 +510,7 @@ const pwdRes = await exec(SID, "pwd")
 await exec(SID, `echo "session-mode test" > README.md`)
 const verifyRes = await exec(SID, "head -1 README.md && git status --short")
 const repoRes = await exec(SID, "cd /workspace/repo && git status --short")
-const diffRes = await get("/vcs/diff?mode=git&sessionID=" + SID)
+const diffRes = await get("/vcs/diff?mode=git&directory=" + encodeURIComponent(wtPath) + "&sessionID=" + SID)
 const noDirDiff = await get("/vcs/diff?mode=git&sessionID=" + SID)
 
 const allPass =
@@ -525,6 +525,116 @@ console.log("✅ T38.23: " + (allPass ? "PASS — session 模式 worktree 写入
 ```
 
 **期望**：与 T38.22 完全一致（session 模式行为不受 pvcMode 影响）
+
+---
+
+### T38.24 session 模式：`/vcs/diff` 使用会话 `/workspace`
+
+**验证目标**：`GET /vcs/diff?mode=git&sessionID={sessionID}` 在 session PVC 中读取该会话的 `/workspace`，并返回已跟踪和未跟踪文件的 diff。
+
+```bash
+bun -e '
+const BASE = process.env.BASE ?? "http://localhost:14096"
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
+const exec = async (sid, command) => {
+  const res = await fetch(BASE + "/session/" + sid + "/exec", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ command, timeoutSeconds: 120 }),
+  })
+  if (!res.ok) throw new Error("exec failed: HTTP " + res.status + " " + await res.text())
+  return res.json()
+}
+
+const sessionRes = await fetch(BASE + "/session", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ pvcMode: "session" }),
+})
+const session = await sessionRes.json()
+await sleep(3000)
+await exec(session.id, "cd /workspace && git init -q && git config user.email test@test.com && git config user.name Test && printf baseline > tracked.txt && git add -A && git commit -qm baseline && printf session-changed > tracked.txt && printf session-new > untracked.txt")
+
+const diffRes = await fetch(BASE + "/vcs/diff?mode=git&sessionID=" + encodeURIComponent(session.id))
+const diffs = await diffRes.json()
+const files = Array.isArray(diffs) ? diffs.map(diff => diff.file).sort() : []
+const tracked = Array.isArray(diffs) ? diffs.find(diff => diff.file === "tracked.txt") : undefined
+const untracked = Array.isArray(diffs) ? diffs.find(diff => diff.file === "untracked.txt") : undefined
+const pass =
+  diffRes.status === 200 &&
+  JSON.stringify(files) === JSON.stringify(["tracked.txt", "untracked.txt"]) &&
+  tracked?.status === "modified" && tracked.patch.includes("+session-changed") &&
+  untracked?.status === "added" && untracked.patch.includes("+session-new")
+
+console.log("status:", diffRes.status)
+console.log("directory:", session.directory)
+console.log("diff files:", files.join(", "))
+console.log("✅ T38.24: " + (pass ? "PASS — session diff 来自 /workspace" : "FAIL"))
+if (!pass) process.exitCode = 1
+'
+```
+
+**期望**：HTTP 200；只返回 `tracked.txt` 和 `untracked.txt`；patch 分别包含 `session-changed` 和 `session-new`。
+
+---
+
+### T38.25 app 模式：`/vcs/diff` 使用会话 worktree
+
+**验证目标**：app PVC 共享 `/workspace` 时，接口仍以 PG 中该 session 的 `directory` 为准，只读取 `/workspace/worktrees/{sessionID}`，不读取共享主仓库 `/workspace/repo`。
+
+```bash
+bun -e '
+const BASE = process.env.BASE ?? "http://localhost:14096"
+const PG_URL = process.env.PG_URL
+if (!PG_URL) throw new Error("请先 source test-env.sh [1|2|3]，缺少 PG_URL")
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
+const exec = async (sid, command) => {
+  const res = await fetch(BASE + "/session/" + sid + "/exec", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ command, timeoutSeconds: 120 }),
+  })
+  if (!res.ok) throw new Error("exec failed: HTTP " + res.status + " " + await res.text())
+  return res.json()
+}
+
+const appId = "vcs-diff-" + Date.now().toString(36)
+const sessionRes = await fetch(BASE + "/session", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ pvcMode: "app", appId }),
+})
+const session = await sessionRes.json()
+const worktree = "/workspace/worktrees/" + session.id
+await sleep(3000)
+await exec(session.id, "git init -q /workspace/repo && cd /workspace/repo && git config user.email test@test.com && git config user.name Test && printf baseline > tracked.txt && git add tracked.txt && git commit -qm baseline && git worktree add -q -b test-" + session.id + " " + worktree + " HEAD")
+
+const update = Bun.spawnSync(["psql", PG_URL, "-v", "ON_ERROR_STOP=1", "-c", `UPDATE session SET directory=$$${worktree}$$ WHERE id=$$${session.id}$$;`])
+if (update.exitCode !== 0) throw new Error("更新 session.directory 失败: " + new TextDecoder().decode(update.stderr))
+
+await exec(session.id, "printf app-changed > tracked.txt && printf app-new > worktree-only.txt && printf main-pollution > /workspace/repo/main-only.txt")
+const diffRes = await fetch(BASE + "/vcs/diff?mode=git&sessionID=" + encodeURIComponent(session.id))
+const diffs = await diffRes.json()
+const files = Array.isArray(diffs) ? diffs.map(diff => diff.file).sort() : []
+const tracked = Array.isArray(diffs) ? diffs.find(diff => diff.file === "tracked.txt") : undefined
+const added = Array.isArray(diffs) ? diffs.find(diff => diff.file === "worktree-only.txt") : undefined
+const pass =
+  diffRes.status === 200 &&
+  JSON.stringify(files) === JSON.stringify(["tracked.txt", "worktree-only.txt"]) &&
+  !files.includes("main-only.txt") &&
+  tracked?.status === "modified" && tracked.patch.includes("+app-changed") &&
+  added?.status === "added" && added.patch.includes("+app-new")
+
+console.log("status:", diffRes.status)
+console.log("session directory:", worktree)
+console.log("diff files:", files.join(", "))
+console.log("main-only excluded:", !files.includes("main-only.txt"))
+console.log("✅ T38.25: " + (pass ? "PASS — app diff 来自 session worktree" : "FAIL"))
+if (!pass) process.exitCode = 1
+'
+```
+
+**期望**：HTTP 200；只返回 worktree 中的 `tracked.txt` 和 `worktree-only.txt`；不得返回主仓库的 `main-only.txt`。
 
 ---
 
@@ -552,6 +662,8 @@ console.log("✅ T38.23: " + (allPass ? "PASS — session 模式 worktree 写入
 | T38.21 | session 模式不受 app 逻辑影响（回归保护） | |
 | T38.22 | app 模式 worktree 代码写入位置验证 | |
 | T38.23 | session 模式 worktree 代码写入位置验证 | |
+| T38.24 | session 模式 `/vcs/diff` 读取 `/workspace` | ✅ PASS (2026-07-30) |
+| T38.25 | app 模式 `/vcs/diff` 读取 session worktree | ✅ PASS (2026-07-30) |
 
 ---
 
