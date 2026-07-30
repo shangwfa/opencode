@@ -119,7 +119,6 @@ import { sessionLocationLayer } from "@opencode-ai/server/middleware/session-loc
 import { PluginPtyEnvironment } from "@/plugin/pty-environment"
 import { PtyRuntime } from "@opencode-ai/server/pty-runtime"
 import { SandboxPtyRuntime } from "@/pty/sandbox-runtime"
-import { LocalPtyRuntime } from "@/pty/local-runtime"
 import { schemaErrorLayer as v2SchemaErrorLayer } from "@opencode-ai/server/middleware/schema-error"
 import { workspaceHandlers } from "./handlers/workspace"
 import { instanceContextLayer } from "./middleware/instance-context"
@@ -209,10 +208,14 @@ const ptyRuntimeLayer: Layer.Layer<
   PtyRuntime.Service,
   never,
   EventV2.Service | Session.Service | LocationServiceMap.Service
-> =
-  Flag.OPENCODE_SANDBOX_ENABLED
+> = Flag.OPENCODE_SANDBOX_ENABLED
   ? SandboxPtyRuntime.defaultLayer.pipe(Layer.provide(SandboxProvider.defaultLayer))
-  : LocalPtyRuntime.layer
+  : Layer.unwrap(
+      Effect.promise(async () => {
+        const { LocalPtyRuntime } = await import("@/pty/local-runtime")
+        return LocalPtyRuntime.layer
+      }),
+    )
 
 // `OpenApi.fromApi` is non-trivial; defer until /doc is actually hit so
 // processes that never serve it (CLI, scripts) don't pay at module load.
