@@ -11,6 +11,7 @@ import { TestInstance, tmpdirScoped } from "../fixture/fixture"
 import type { Permission } from "../../src/permission"
 import { SessionID, MessageID } from "../../src/session/schema"
 import { testEffect } from "../lib/effect"
+import { SkillResource } from "../../src/skill/resource"
 
 const it = testEffect(LayerNode.compile(CrossSpawnSpawner.node))
 
@@ -103,6 +104,28 @@ describe("tool.assertExternalDirectory", () => {
       yield* assertExternalDirectoryEffect(ctx, "/tmp/outside/file.txt", { bypass: true })
 
       expect(requests.length).toBe(0)
+    }),
+  )
+
+  it.instance("allows read access to managed session skill resources", () =>
+    Effect.gen(function* () {
+      const { requests, ctx } = makeCtx()
+      const target = `${SkillResource.SANDBOX_ROOT}/ses_test/resource.md`
+
+      yield* assertExternalDirectoryEffect(ctx, target, { managed: true })
+
+      expect(requests.length).toBe(0)
+    }),
+  )
+
+  it.instance("keeps managed session skill resources external for writes", () =>
+    Effect.gen(function* () {
+      const { requests, ctx } = makeCtx()
+      const target = `${SkillResource.SANDBOX_ROOT}/ses_test/resource.md`
+
+      yield* assertExternalDirectoryEffect(ctx, target)
+
+      expect(requests.some((request) => request.permission === "external_directory")).toBe(true)
     }),
   )
 

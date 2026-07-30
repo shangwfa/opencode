@@ -551,7 +551,7 @@ export const SessionApi = HttpApi.make("session")
         HttpApiEndpoint.get("skills", SessionPaths.skills, {
           params: { sessionID: SessionID },
           query: WorkspaceRoutingQuery,
-          success: described(Schema.Array(Skill.Info), "Session skills"),
+          success: described(Schema.Array(Skill.PublicInfo), "Session skills"),
         }).annotateMerge(
           OpenApi.annotations({
             identifier: "session.skills",
@@ -563,7 +563,8 @@ export const SessionApi = HttpApi.make("session")
           params: { sessionID: SessionID },
           query: WorkspaceRoutingQuery,
           payload: SkillCreatePayload,
-          success: described(Skill.Info, "Created session skill"),
+          success: described(Skill.PublicInfo, "Created session skill"),
+          error: [HttpApiError.BadRequest, ApiNotFoundError],
         }).annotateMerge(
           OpenApi.annotations({
             identifier: "session.skills.create",
@@ -575,7 +576,8 @@ export const SessionApi = HttpApi.make("session")
           params: { sessionID: SessionID },
           query: WorkspaceRoutingQuery,
           payload: SkillLoadPayload,
-          success: described(Schema.Array(Skill.Info), "Loaded session skills"),
+          success: described(Schema.Array(Skill.PublicInfo), "Loaded session skills"),
+          error: [HttpApiError.BadRequest, ApiNotFoundError],
         }).annotateMerge(
           OpenApi.annotations({
             identifier: "session.skills.load",
@@ -586,7 +588,7 @@ export const SessionApi = HttpApi.make("session")
         HttpApiEndpoint.delete("skillsDelete", SessionPaths.skillsDelete, {
           params: { sessionID: SessionID, name: Schema.String },
           query: WorkspaceRoutingQuery,
-          success: described(Schema.Void, "Session skill unloaded"),
+          success: described(HttpApiSchema.NoContent, "Session skill unloaded"),
         }).annotateMerge(
           OpenApi.annotations({
             identifier: "session.skills.unload",
@@ -597,7 +599,7 @@ export const SessionApi = HttpApi.make("session")
         HttpApiEndpoint.delete("skillsClear", SessionPaths.skills, {
           params: { sessionID: SessionID },
           query: WorkspaceRoutingQuery,
-          success: described(Schema.Void, "Session skills cleared"),
+          success: described(HttpApiSchema.NoContent, "Session skills cleared"),
         }).annotateMerge(
           OpenApi.annotations({
             identifier: "session.skills.clear",
@@ -663,7 +665,8 @@ export const SessionApi = HttpApi.make("session")
           OpenApi.annotations({
             identifier: "session.agents.create",
             summary: "Create session agent",
-            description: "Create or update an inline agent attached to a specific OpenCode session. Only available in SaaS mode.",
+            description:
+              "Create or update an inline agent attached to a specific OpenCode session. Only available in SaaS mode.",
           }),
         ),
         HttpApiEndpoint.delete("agentsDelete", SessionPaths.agentsDelete, {
@@ -755,7 +758,8 @@ export const SessionApi = HttpApi.make("session")
           OpenApi.annotations({
             identifier: "session.tools.create",
             summary: "Create session tool",
-            description: "Create or update a custom tool attached to a specific OpenCode session. Only available in SaaS mode.",
+            description:
+              "Create or update a custom tool attached to a specific OpenCode session. Only available in SaaS mode.",
           }),
         ),
         HttpApiEndpoint.delete("toolsDelete", SessionPaths.toolsDelete, {
@@ -789,7 +793,8 @@ export const SessionApi = HttpApi.make("session")
           OpenApi.annotations({
             identifier: "session.commands",
             summary: "List session commands",
-            description: "Get custom commands attached to a specific OpenCode session, merged with instance-level commands.",
+            description:
+              "Get custom commands attached to a specific OpenCode session, merged with instance-level commands.",
           }),
         ),
         HttpApiEndpoint.post("commandsCreate", SessionPaths.commandsCreate, {
@@ -801,7 +806,8 @@ export const SessionApi = HttpApi.make("session")
           OpenApi.annotations({
             identifier: "session.commands.create",
             summary: "Create session command",
-            description: "Create or update a custom command attached to a specific OpenCode session. Only available in SaaS mode.",
+            description:
+              "Create or update a custom command attached to a specific OpenCode session. Only available in SaaS mode.",
           }),
         ),
         HttpApiEndpoint.delete("commandsDelete", SessionPaths.commandsDelete, {

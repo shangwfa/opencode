@@ -66,6 +66,7 @@ export const GrepTool = Tool.define(
           yield* assertExternalDirectoryEffect(ctx, requested, {
             bypass: false,
             kind: "directory",
+            managed: true,
           })
 
           const limit = 100

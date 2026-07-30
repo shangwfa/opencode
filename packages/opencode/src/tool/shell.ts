@@ -8,6 +8,7 @@ import { lazy } from "@/util/lazy"
 import { Language, type Node } from "web-tree-sitter"
 
 import { FSUtil } from "@opencode-ai/core/fs-util"
+import { SkillResource } from "@/skill/resource"
 import { fileURLToPath } from "url"
 import { ChildProcess } from "effect/unstable/process"
 import { ChildProcessSpawner } from "effect/unstable/process/ChildProcessSpawner"
@@ -336,7 +337,10 @@ const COMMAND_NOT_FOUND_RE = /command not found|No such file or directory/i
 function checkCommandNotFound(text: string): string | undefined {
   const m = text.match(COMMAND_NOT_FOUND_RE)
   if (m) {
-    const line = text.trim().split("\n").find((l) => COMMAND_NOT_FOUND_RE.test(l))
+    const line = text
+      .trim()
+      .split("\n")
+      .find((l) => COMMAND_NOT_FOUND_RE.test(l))
     return line ?? m[0]
   }
 }
@@ -371,7 +375,9 @@ export const ShellTool = Tool.define(
 
       const environment = yield* shellEnv(ctx, input.cwd)
       const prefix = Object.entries(environment)
-        .filter((entry): entry is [string, string] => /^[A-Za-z_][A-Za-z0-9_]*$/.test(entry[0]) && entry[1] !== undefined)
+        .filter(
+          (entry): entry is [string, string] => /^[A-Za-z_][A-Za-z0-9_]*$/.test(entry[0]) && entry[1] !== undefined,
+        )
         .map(([key, value]) => `${key}='${value.replaceAll("'", "'\\''")}'`)
         .join(" ")
       const nested = `sh -c '${input.command.replace(/'/g, "'\\''")}'`
@@ -388,13 +394,17 @@ export const ShellTool = Tool.define(
             {
               onStdout: (msg: { text: string }) => {
                 output += msg.text
-                ctx.metadata({ metadata: { output: output.slice(-MAX_METADATA_LENGTH), description: input.description } })
+                ctx.metadata({
+                  metadata: { output: output.slice(-MAX_METADATA_LENGTH), description: input.description },
+                })
               },
               onStderr: (msg: { text: string }) => {
                 const cmdErr = checkCommandNotFound(msg.text)
                 if (cmdErr) throw new Error(`Command failed: ${cmdErr}`)
                 output += msg.text
-                ctx.metadata({ metadata: { output: output.slice(-MAX_METADATA_LENGTH), description: input.description } })
+                ctx.metadata({
+                  metadata: { output: output.slice(-MAX_METADATA_LENGTH), description: input.description },
+                })
               },
             },
             ctx.abort,
@@ -402,8 +412,7 @@ export const ShellTool = Tool.define(
         : yield* Effect.gen(function* () {
             const sb = yield* Effect.tryPromise({
               try: () => ctx.sandbox!,
-              catch: (e) =>
-                new Error(`Initialization failed: ${e instanceof Error ? e.message : String(e)}`),
+              catch: (e) => new Error(`Initialization failed: ${e instanceof Error ? e.message : String(e)}`),
             })
             return yield* sandboxProvider.runInSession(
               ctx.sandboxSessionID ?? ctx.sessionID,
@@ -435,7 +444,8 @@ export const ShellTool = Tool.define(
       if (exitCode === null) expired = true
 
       const meta: string[] = []
-      if (expired) meta.push(`bash tool terminated command after exceeding timeout ${Math.min(input.timeout, MAX_TIMEOUT_MS)} ms.`)
+      if (expired)
+        meta.push(`bash tool terminated command after exceeding timeout ${Math.min(input.timeout, MAX_TIMEOUT_MS)} ms.`)
       if (meta.length > 0) output += "\n\n<bash_metadata>\n" + meta.join("\n") + "\n</bash_metadata>"
 
       return {
@@ -497,7 +507,7 @@ export const ShellTool = Tool.define(
           for (const arg of pathArgs(command, ps, shellKind === "cmd")) {
             const resolved = yield* argPath(arg, cwd, ps, shell)
             yield* Effect.logInfo("resolved path", { arg, resolved })
-            if (!resolved || containsPath(resolved, instance)) continue
+            if (!resolved || containsPath(resolved, instance) || SkillResource.isManagedPath(resolved)) continue
             const dir = (yield* fs.isDir(resolved)) ? resolved : path.dirname(resolved)
             scan.dirs.add(dir)
           }
@@ -522,9 +532,13 @@ export const ShellTool = Tool.define(
         { env: {} },
       )
       const sessionExtra = Option.isSome(sessionPlugins)
-        ? yield* sessionPlugins.value.acquire(ctx.sessionID).pipe(
-            Effect.flatMap((runtime) => runtime.trigger("shell.env", { cwd, sessionID: ctx.sessionID, callID: ctx.callID }, { env: {} })),
-          )
+        ? yield* sessionPlugins.value
+            .acquire(ctx.sessionID)
+            .pipe(
+              Effect.flatMap((runtime) =>
+                runtime.trigger("shell.env", { cwd, sessionID: ctx.sessionID, callID: ctx.callID }, { env: {} }),
+              ),
+            )
         : { env: {} }
       return {
         ...extra.env,
@@ -562,19 +576,26 @@ export const ShellTool = Tool.define(
             {
               onStdout: (msg: { text: string }) => {
                 output += msg.text
-                ctx.metadata({ metadata: { output: output.slice(-MAX_METADATA_LENGTH), description: input.description } })
+                ctx.metadata({
+                  metadata: { output: output.slice(-MAX_METADATA_LENGTH), description: input.description },
+                })
               },
               onStderr: (msg: { text: string }) => {
                 const cmdErr = checkCommandNotFound(msg.text)
                 if (cmdErr) throw new Error(`Command failed: ${cmdErr}`)
                 output += msg.text
-                ctx.metadata({ metadata: { output: output.slice(-MAX_METADATA_LENGTH), description: input.description } })
+                ctx.metadata({
+                  metadata: { output: output.slice(-MAX_METADATA_LENGTH), description: input.description },
+                })
               },
             },
             ctx.abort,
           )
         : yield* Effect.gen(function* () {
-            const sb = yield* Effect.tryPromise({ try: () => ctx.sandbox!, catch: (e) => new Error(`Initialization failed: ${e instanceof Error ? e.message : String(e)}`) })
+            const sb = yield* Effect.tryPromise({
+              try: () => ctx.sandbox!,
+              catch: (e) => new Error(`Initialization failed: ${e instanceof Error ? e.message : String(e)}`),
+            })
             return yield* sandboxProvider.runInSession(
               ctx.sandboxSessionID ?? ctx.sessionID,
               fullCommand,
@@ -582,13 +603,17 @@ export const ShellTool = Tool.define(
               {
                 onStdout: (msg: { text: string }) => {
                   output += msg.text
-                  ctx.metadata({ metadata: { output: output.slice(-MAX_METADATA_LENGTH), description: input.description } })
+                  ctx.metadata({
+                    metadata: { output: output.slice(-MAX_METADATA_LENGTH), description: input.description },
+                  })
                 },
                 onStderr: (msg: { text: string }) => {
                   const cmdErr = checkCommandNotFound(msg.text)
                   if (cmdErr) throw new Error(`Command failed: ${cmdErr}`)
                   output += msg.text
-                  ctx.metadata({ metadata: { output: output.slice(-MAX_METADATA_LENGTH), description: input.description } })
+                  ctx.metadata({
+                    metadata: { output: output.slice(-MAX_METADATA_LENGTH), description: input.description },
+                  })
                 },
               },
               ctx.abort,
@@ -601,7 +626,8 @@ export const ShellTool = Tool.define(
       if (exitCode === null) expired = true
 
       const meta: string[] = []
-      if (expired) meta.push(`bash tool terminated command after exceeding timeout ${Math.min(input.timeout, MAX_TIMEOUT_MS)} ms.`)
+      if (expired)
+        meta.push(`bash tool terminated command after exceeding timeout ${Math.min(input.timeout, MAX_TIMEOUT_MS)} ms.`)
       if (meta.length > 0) output += "\n\n<bash_metadata>\n" + meta.join("\n") + "\n</bash_metadata>"
 
       return {
@@ -640,8 +666,11 @@ export const ShellTool = Tool.define(
                     Effect.sync(() => tree.delete()),
                   )
                   const scan = yield* collect(tree.rootNode, cwd, ps, shell, instanceCtx)
-                  if (!containsPath(cwd, instanceCtx)) scan.dirs.add(cwd)
-                  yield* ask(ctx, scan, { command: params.command, description: (params as any).description ?? params.command })
+                  if (!containsPath(cwd, instanceCtx) && !SkillResource.isManagedPath(cwd)) scan.dirs.add(cwd)
+                  yield* ask(ctx, scan, {
+                    command: params.command,
+                    description: (params as any).description ?? params.command,
+                  })
                 }),
               )
 

@@ -1,15 +1,15 @@
 import path from "path"
 import { Effect, Schema } from "effect"
+import type { Sandbox } from "@alibaba-group/opensandbox"
 import { Ripgrep } from "@opencode-ai/core/ripgrep"
 import { Skill } from "../skill"
+import { SkillResource } from "../skill/resource"
+import { escapeHtml } from "@/util/html"
 import * as Tool from "./tool"
 import DESCRIPTION from "./skill.txt"
 
 export const Parameters = Schema.Struct({
   name: Schema.String.annotate({ description: "The name of the skill from available_skills" }),
-  resources: Schema.optional(Schema.Array(Schema.String)).annotate({
-    description: "Optional resource paths to load from this skill bundle",
-  }),
 })
 
 export const SkillTool = Tool.define(
@@ -38,42 +38,18 @@ export const SkillTool = Tool.define(
           })
 
           const resources = info.resources ?? []
-          const requested = new Set(params.resources ?? [])
-          const selected = params.resources ? resources.filter((item) => requested.has(item.path)) : []
-          const missing =
-            params.resources?.filter((item) => !resources.some((resource) => resource.path === item)) ?? []
 
-          // session:// and memory:// skills: manifest + on-demand resources only
+          // Session skills are durable PG snapshots. Their resources belong in
+          // the code-agent filesystem rather than model context.
           if (info.location.startsWith("session://") || info.location.startsWith("memory://")) {
+            const dir = yield* materialize(info, ctx)
             return {
               title: `Loaded skill: ${info.name}`,
-              output: [
-                `<skill_content name="${info.name}">`,
-                `# Skill: ${info.name}`,
-                "",
-                info.content.trim(),
-                "",
-                resources.length > 0 ? "<resources>" : undefined,
-                ...(params.resources
-                  ? selected.flatMap((resource) => [
-                      `  <resource path="${resource.path}" type="${resource.type}">`,
-                      resource.content.trim(),
-                      "  </resource>",
-                    ])
-                  : resources.map(
-                      (resource) =>
-                        `  <resource path="${resource.path}" type="${resource.type}" size="${Buffer.byteLength(resource.content)}" />`,
-                    )),
-                ...missing.map((item) => `  <missing_resource path="${item}" />`),
-                resources.length > 0 ? "</resources>" : undefined,
-                "</skill_content>",
-              ]
-                .filter((line) => line !== undefined)
-                .join("\n"),
+              output: sessionOutput(info, dir),
               metadata: {
                 name: info.name,
-                dir: info.location,
-                resources: selected.map((item) => item.path),
+                dir: dir ?? info.location,
+                resources: resources.map((item) => item.path),
               },
             }
           }
@@ -95,17 +71,10 @@ export const SkillTool = Tool.define(
               ? [
                   "",
                   "<resources>",
-                  ...(params.resources
-                    ? selected.flatMap((resource) => [
-                        `  <resource path="${resource.path}" type="${resource.type}">`,
-                        resource.content.trim(),
-                        "  </resource>",
-                      ])
-                    : resources.map(
-                        (resource) =>
-                          `  <resource path="${resource.path}" type="${resource.type}" size="${Buffer.byteLength(resource.content)}" />`,
-                      )),
-                  ...missing.map((item) => `  <missing_resource path="${item}" />`),
+                  ...resources.map(
+                    (resource) =>
+                      `  <resource path="${escapeHtml(resource.path)}" type="${resource.type}" size="${resource.size}" digest="${resource.digest}" />`,
+                  ),
                   "</resources>",
                 ]
               : []
@@ -113,7 +82,7 @@ export const SkillTool = Tool.define(
           return {
             title: `Loaded skill: ${info.name}`,
             output: [
-              `<skill_content name="${info.name}">`,
+              `<skill_content name="${escapeHtml(info.name)}">`,
               `# Skill: ${info.name}`,
               "",
               info.content.trim(),
@@ -123,7 +92,7 @@ export const SkillTool = Tool.define(
               "Note: file list is sampled.",
               "",
               "<skill_files>",
-              files.map((file) => `<file>${path.resolve(dir, file.path)}</file>`).join("\n"),
+              files.map((file) => `<file>${escapeHtml(path.resolve(dir, file.path))}</file>`).join("\n"),
               "</skill_files>",
               ...resourcesBlock,
               "</skill_content>",
@@ -131,10 +100,68 @@ export const SkillTool = Tool.define(
             metadata: {
               name: info.name,
               dir,
-              resources: selected.map((item) => item.path),
+              resources: resources.map((item) => item.path),
             },
           }
         }).pipe(Effect.orDie),
     }
   }),
 )
+
+export function materialize(info: Skill.Info, ctx: Tool.Context) {
+  return Effect.gen(function* () {
+    const resources = info.resources ?? []
+    if (resources.length === 0 || !ctx.sandbox) return undefined
+    const sandbox = (yield* Effect.promise(() => ctx.sandbox!)) as Sandbox | null
+    if (!sandbox) return undefined
+
+    const dir = SkillResource.directory(ctx.sessionID, info.name, info.content, resources)
+    const manifest = {
+      name: info.name,
+      description: info.description ?? "",
+      snapshot: SkillResource.snapshot(info.content, resources),
+      resources: resources.map(SkillResource.metadata),
+    }
+    const frontmatter = [
+      "---",
+      `name: ${JSON.stringify(info.name)}`,
+      `description: ${JSON.stringify(info.description ?? "")}`,
+      "---",
+      "",
+      info.content.trim(),
+      "",
+    ].join("\n")
+    const files = [
+      { path: path.posix.join(dir, "SKILL.md"), data: frontmatter },
+      { path: path.posix.join(dir, "resources.json"), data: JSON.stringify(manifest, null, 2) },
+      ...resources.map((resource) => ({ path: path.posix.join(dir, resource.path), data: resource.content })),
+    ]
+    const directories = [...new Set(files.map((file) => path.posix.dirname(file.path)))]
+
+    yield* Effect.tryPromise(() => sandbox.files.createDirectories(directories.map((item) => ({ path: item }))))
+    yield* Effect.tryPromise(() => sandbox.files.writeFiles(files))
+    return dir
+  })
+}
+
+export function sessionOutput(info: Skill.Info, dir?: string) {
+  const resources = info.resources ?? []
+  return [
+    `<skill_content name="${escapeHtml(info.name)}">`,
+    `# Skill: ${info.name}`,
+    "",
+    info.content.trim(),
+    "",
+    dir ? `<resource_directory>${escapeHtml(dir)}</resource_directory>` : undefined,
+    !dir && resources.length > 0 ? "<resources_unavailable />" : undefined,
+    resources.length > 0 ? "<resources>" : undefined,
+    ...resources.map(
+      (resource) =>
+        `  <resource path="${escapeHtml(resource.path)}" type="${resource.type}" size="${resource.size}" digest="${resource.digest}" />`,
+    ),
+    resources.length > 0 ? "</resources>" : undefined,
+    "</skill_content>",
+  ]
+    .filter((line) => line !== undefined)
+    .join("\n")
+}

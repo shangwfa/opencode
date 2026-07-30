@@ -45,7 +45,7 @@ export const ReadTool = Tool.define(
 
       const sandboxPath = toSandboxPath(filepath, instance.directory)
 
-      const maybeSandbox = ctx.sandbox ? (yield* Effect.promise(() => ctx.sandbox!)) as Sandbox | null : null
+      const maybeSandbox = ctx.sandbox ? ((yield* Effect.promise(() => ctx.sandbox!)) as Sandbox | null) : null
       if (!maybeSandbox || !sandboxProvider) {
         return yield* Effect.fail(new Error("Sandbox is not available"))
       }
@@ -55,6 +55,7 @@ export const ReadTool = Tool.define(
       yield* assertExternalDirectoryEffect(ctx, filepath, {
         bypass: Boolean(ctx.extra?.["bypassCwdCheck"]),
         kind: "file",
+        managed: true,
       })
 
       yield* ctx.ask({
@@ -137,22 +138,26 @@ export const ReadTool = Tool.define(
       }
 
       // readFile failed — confirm via getFileInfo whether path is a directory.
-      const infoResult = yield* Effect.tryPromise({
-        try: async () => {
+      const infoResult = yield* Effect.promise(async () => {
+        try {
           const result = await sb.files.getFileInfo([sandboxPath])
           return result[sandboxPath] ?? null
-        },
-        catch: () => null,
+        } catch {
+          return null
+        }
       })
 
       if (infoResult) {
         // Path exists but readFile failed → it's a directory. List contents.
-        const lsResult = yield* sandboxProvider.runInSession(
-          ctx.sandboxSessionID ?? ctx.sessionID,
-          `ls -1 "${sandboxPath}"`,
-          { timeoutSeconds: 10 },
-        ).pipe(Effect.catch(() => Effect.succeed({ logs: { stdout: [], stderr: [] }, exitCode: 1 } as any)))
-        const items = ((lsResult as any).logs?.stdout?.map((l: { text: string }) => l.text).join("\n").trim() || "")
+        const lsResult = yield* sandboxProvider
+          .runInSession(ctx.sandboxSessionID ?? ctx.sessionID, `ls -1 "${sandboxPath}"`, { timeoutSeconds: 10 })
+          .pipe(Effect.catch(() => Effect.succeed({ logs: { stdout: [], stderr: [] }, exitCode: 1 } as any)))
+        const items = (
+          (lsResult as any).logs?.stdout
+            ?.map((l: { text: string }) => l.text)
+            .join("\n")
+            .trim() || ""
+        )
           .split("\n")
           .filter((s: string) => s.length > 0)
           .sort((a: string, b: string) => a.localeCompare(b))

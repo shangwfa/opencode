@@ -48,21 +48,22 @@ describe("session skills routes", () => {
           }),
         })
         expect(created.status).toBe(200)
-        const json = (await created.json()) as Skill.Info
+        const json = (await created.json()) as Skill.PublicInfo
         expect(json.location).toContain("route-skill")
         expect(json.resources![0].path).toBe("references/route.md")
+        expect(json.resources![0].size).toBe(Buffer.byteLength("route docs"))
 
         const listed = await app.request(`/session/${session.id}/skills`)
         expect(listed.status).toBe(200)
-        const items = (await listed.json()) as Skill.Info[]
+        const items = (await listed.json()) as Skill.PublicInfo[]
         expect(items.map((item) => item.name)).toContain("route-skill")
-        expect(items[0]!.resources![0].content).toBe("route docs")
+        expect(items[0]!.resources![0]).not.toHaveProperty("content")
 
         const unloaded = await app.request(`/session/${session.id}/skills/route-skill`, { method: "DELETE" })
         expect(unloaded.status).toBe(204)
 
         const empty = await app.request(`/session/${session.id}/skills`)
-        expect((await empty.json()) as Skill.Info[]).toEqual([])
+        expect((await empty.json()) as Skill.PublicInfo[]).toEqual([])
 
         await app.request(`/session/${session.id}/skills/create`, {
           method: "POST",
@@ -73,7 +74,7 @@ describe("session skills routes", () => {
         expect(cleared.status).toBe(204)
 
         const after = await app.request(`/session/${session.id}/skills`)
-        expect((await after.json()) as Skill.Info[]).toEqual([])
+        expect((await after.json()) as Skill.PublicInfo[]).toEqual([])
 
         await svc.remove(session.id)
       },
