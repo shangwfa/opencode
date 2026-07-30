@@ -104,7 +104,7 @@ export function toSandboxCwd(
   hostWorkdir: string,
 ): string {
   if (hostCwd === undefined || hostCwd === "") {
-    return SANDBOX_WORKDIR
+    return isSandboxPath(hostWorkdir) ? hostWorkdir : SANDBOX_WORKDIR
   }
   return toSandboxPath(hostCwd, hostWorkdir)
 }

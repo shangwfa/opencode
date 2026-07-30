@@ -22,6 +22,9 @@ import { LocationServiceMap, locationServiceMapLayer } from "@opencode-ai/core/l
 import { Reference } from "@opencode-ai/core/reference"
 import { MCP } from "@/mcp"
 import { PermissionV1 } from "@opencode-ai/core/v1/permission"
+import { Flag } from "@/flag/flag"
+import { existsSync } from "fs"
+import { toSandboxPath } from "@/tool/sandbox-path"
 
 export function provider(model: Provider.Model) {
   if (model.api.id.includes("gpt-4") || model.api.id.includes("o1") || model.api.id.includes("o3"))
@@ -57,16 +60,21 @@ const layer = Layer.effect(
     return Service.of({
       environment: Effect.fn("SystemPrompt.environment")(function* (model: Provider.Model) {
         const ctx = yield* InstanceState.context
-        const references = yield* Effect.gen(function* () {
-          return (yield* (yield* Reference.Service).list()).filter((reference) => reference.description !== undefined)
-        }).pipe(Effect.provide(locations.get(Location.Ref.make({ directory: AbsolutePath.make(ctx.directory) }))))
+        const root = ctx.worktree === "/" ? ctx.directory : ctx.worktree
+        const directory = toSandboxPath(ctx.directory, root)
+        const workspace = toSandboxPath(root, root)
+        const references = Flag.OPENCODE_SANDBOX_ENABLED || !existsSync(ctx.directory)
+          ? []
+          : yield* Effect.gen(function* () {
+              return (yield* (yield* Reference.Service).list()).filter((reference) => reference.description !== undefined)
+            }).pipe(Effect.provide(locations.get(Location.Ref.make({ directory: AbsolutePath.make(ctx.directory) }))))
         return [
           [
             `You are powered by the model named ${model.api.id}. The exact model ID is ${model.providerID}/${model.api.id}`,
             `Here is some useful information about the environment you are running in:`,
             `<env>`,
-            `  Working directory: ${ctx.directory}`,
-            `  Workspace root folder: ${ctx.worktree}`,
+            `  Working directory: ${directory}`,
+            ...(workspace === directory ? [] : [`  Workspace root folder: ${workspace}`]),
             `  Is directory a git repo: ${ctx.project.vcs === "git" ? "yes" : "no"}`,
             `  Platform: ${process.platform}`,
             `  Today's date: ${new Date().toDateString()}`,
