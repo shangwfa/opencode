@@ -8,7 +8,6 @@ WORKDIR /app
 COPY package.json bun.lock bunfig.toml ./
 COPY patches/ patches/
 COPY packages packages
-RUN rm -rf patches && sed -i '/"patchedDependencies"/,/^[[:space:]]*}/d' package.json
 RUN bun install --ignore-scripts
 
 RUN find /app -path "*/node-pty/prebuilds/*/spawn-helper" -exec chmod +x {} \;

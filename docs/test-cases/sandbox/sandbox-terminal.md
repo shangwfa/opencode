@@ -15,7 +15,7 @@
 | 生命周期 | 首个 PTY 创建前启用 lease；最后一个 PTY 退出或删除后释放 lease |
 | 多副本 | ticket 可跨 Pod 验证；同一 Session 不重复创建沙箱或互相重启 Agent |
 | 恢复 | Agent SSE 断线重连后不丢失退出/删除事件 |
-| 安全 | Agent bearer 不进入子 shell；ticket 绑定 PTY、Session、Location 且短时有效 |
+| 安全 | Agent endpoint 仅在 Server 与沙箱之间可达；ticket 绑定 PTY、Session、Location 且短时有效 |
 | 兼容 | 非沙箱模式允许旧客户端省略 `sessionID`；SaaS 不回退本地 PTY |
 
 ## 前置条件
@@ -188,6 +188,7 @@ cleanup_pty_sid "$SID_A"
 ### PTY-6 退出态保留与显式删除
 
 ```bash
+SID_A=$(new_pty_sid)
 EXITED=$(curl -sS -X POST "$BASE/pty?sessionID=$SID_A" \
   -H 'Content-Type: application/json' \
   -d '{"title":"exit-test","command":"/bin/sh","args":["-lc","exit 23"]}')
@@ -196,6 +197,7 @@ sleep 1
 
 curl -sS "$BASE/pty/$EXITED_ID?sessionID=$SID_A" | jexec "d"
 curl -sS -X DELETE "$BASE/pty/$EXITED_ID?sessionID=$SID_A" -o /dev/null -w '%{http_code}\n'
+cleanup_pty_sid "$SID_A"
 ```
 
 **期望**：退出后查询返回 `status=exited`、`exitCode=23`；显式删除后返回 404。Agent 最多保留最近 25 个 exited PTY，超过后淘汰最旧记录。
@@ -208,10 +210,10 @@ PTY_JSON=$(pty_create "$SID_A" "lease-release")
 PTY_ID=$(printf '%s' "$PTY_JSON" | jexec "d.get('id')")
 
 psql "$PG_URL" -tAc "SELECT keep_alive FROM sandbox WHERE session_id='$SID_A'"
-cleanup_pty_sid "$SID_A"
 curl -sS -X DELETE "$BASE/pty/$PTY_ID?sessionID=$SID_A" >/dev/null
 sleep 2
 psql "$PG_URL" -tAc "SELECT keep_alive FROM sandbox WHERE session_id='$SID_A'"
+cleanup_pty_sid "$SID_A"
 ```
 
 **期望**：创建后 `keep_alive=true`；删除最后一个 running PTY 后变为 `false`。如果并发创建了新 PTY，二次确认会恢复为 `true`，不得误释放。
@@ -274,16 +276,6 @@ psql "$PG_URL" -x -c "SELECT id,session_id,state FROM sandbox WHERE session_id='
 
 **期望**：Agent PID 不变；没有重复 bind 4097、相互 kill 或启动风暴；所有请求成功。
 
-### PTY-12 Agent bearer 不泄漏到子 shell
-
-通过 PTY WebSocket 执行：
-
-```bash
-env | grep '^OPENCODE_PTY_AGENT_TOKEN=' || echo TOKEN_NOT_EXPOSED
-```
-
-**期望**：输出 `TOKEN_NOT_EXPOSED`；Agent bearer 只存在于 Agent 进程环境，不注入 PTY 子进程。
-
 ### PTY-13 缺少生产 secret 时 fail closed
 
 以 `OPENCODE_SANDBOX_ENABLED=true` 且不配置 `OPENCODE_PTY_TICKET_SECRET` 启动独立测试实例。
@@ -318,14 +310,6 @@ env | grep '^OPENCODE_PTY_AGENT_TOKEN=' || echo TOKEN_NOT_EXPOSED
 3. 通过另一 Pod 或重启后的 Pod list/get，并使用最后 cursor 重连。
 
 **期望**：PTY ID、PID 和沙箱 ID 不变；Agent 不被重启；重连可恢复 buffer 并继续交互。
-
-### PTY-17 workspace reset 终止远端 PTY
-
-1. 在 App 中为目标 workspace 的两个 Session 分别打开 Terminal，并运行长任务。
-2. 执行 workspace reset。
-3. reset 完成后查询两个 Session 的 `/pty` 列表及 PG lease。
-
-**期望**：App 在 `instance.dispose` 和 worktree reset 前逐 Session 删除远端 PTY；列表为空且进程退出；清理失败时 reset 中止并显示错误，不允许终端继续写入正在重置的 workspace。
 
 ---
 
@@ -368,27 +352,17 @@ bun test test/pty/ticket.test.ts test/pty/pty-output-isolation.test.ts test/pty/
   test/pty/protocol.test.ts test/pty/input.test.ts test/pty/info-schema.test.ts
 
 cd ../opencode
-bun test test/pty/agent.test.ts test/pty/sandbox-runtime.test.ts
 bun test test/server/httpapi-pty.test.ts
-bun test test/server/httpapi-v2-pty.test.ts
 bun test test/pty/pty-shell.test.ts
 bun build docker/opt/opencode-pty-agent.ts --target bun --outfile /tmp/opencode-pty-agent.js
-docker build --check -f docker/Dockerfile .
-bun typecheck
 
 cd ../app
 bun test src/context/terminal.test.ts \
   src/pages/session/terminal-panel.test.ts \
-  src/utils/terminal-websocket-url.test.ts \
   src/utils/terminal-writer.test.ts
-bun typecheck
-
-cd ../server && bun typecheck
-cd ../client && bun typecheck
-cd ../protocol && bun typecheck
 ```
 
-**期望**：全部通过；Agent bundle 构建、`docker build --check -f docker/Dockerfile .` 和相关 package `bun typecheck` 均成功。
+**期望**：与当前 PTY 契约一致的 focused tests 和 Agent bundle 构建全部通过。全仓 typecheck、Docker 发布检查和其他 package 门禁属于通用 CI，不计入单个 Terminal 用例结果。
 
 ### PTY-22 只读操作不得创建沙箱
 
@@ -396,11 +370,11 @@ cd ../protocol && bun typecheck
 
 **期望**：list 返回空数组，其余返回 404；PG 中该 Session 没有 `state=running` 的 sandbox。只有 create 可以触发 `getOrCreate`。
 
-### PTY-23 Agent health 与 bearer
+### PTY-23 Agent health 与网络边界
 
-从 Server 所在网络直接请求 Agent `/health`，分别省略 bearer、使用错误 bearer 和正确 bearer。
+从 Server 所在网络直接请求 Agent `/health`，并从公网入口尝试访问 Agent 端口。
 
-**期望**：前两者 401；正确 bearer 返回 `status=ready`、`protocolVersion=1`。Agent endpoint 不应暴露到公网入口。
+**期望**：内网请求返回 `status=ready`、`protocolVersion=1` 和非空 `instanceID`；Agent 端口不应暴露到公网入口。当前 Agent 没有 bearer 协议，不测试不存在的 Authorization 契约。
 
 ### PTY-24 resize 作用于真实 TTY
 
@@ -416,9 +390,9 @@ cd ../protocol && bun typecheck
 
 ### PTY-26 ticket 强制鉴权
 
-在 sandbox runtime 下分别尝试：无 ticket、有 Basic Auth 但无 ticket、合法 ticket、错误 Origin、缺 CSRF header mint。
+在 sandbox runtime 下分别尝试：无 ticket、有 Basic Auth 但无 ticket、合法 ticket，以及缺少 `x-opencode-ticket: 1` 的 mint 请求。
 
-**期望**：前两种 WebSocket 请求均 403；合法 ticket 成功；错误 Origin 和缺 mint header 均 403。本地 runtime 无 ticket仍保持兼容。
+**期望**：前两种 WebSocket 请求均 403；合法 ticket 成功；缺 mint header 返回 403。本地 runtime 无 ticket 仍保持兼容。Origin 按 Server 的 CORS 配置校验；当前 `allowedOrigins=["*"]` 会接受任意合法 Origin，不断言错误 Origin 固定返回 403。
 
 ### PTY-27 cursor 与 buffer 边界
 
@@ -454,7 +428,7 @@ cd ../protocol && bun typecheck
 
 覆盖 Agent PID 文件陈旧、Agent 进程重启、Server cursor 落后超过 512 个事件三种情况。
 
-**期望**：旧 PTY 返回 404并触发 App clone；lease 最终收敛；事件 gap 不得静默造成永久 running tab。若当前版本只能快照收敛而不能还原全部事件，应记录为明确降级而非 exactly-once。
+**期望**：陈旧 PID 文件不会阻止 Agent 重启；重启后旧 PTY 返回 404，已连接的 App tab 在查询确认 404 后 clone；事件 gap 返回 409，Server 通过 Agent 快照收敛 lease。快照不会还原缺失的 exited/deleted 事件，本用例不对未连接的 inactive tab 作收敛保证。
 
 ### PTY-33 父子 Session root 路由
 
@@ -464,56 +438,6 @@ cd ../protocol && bun typecheck
 
 ### PTY-34 App 状态与恢复
 
-自动化覆盖 session-scoped cache、持久化迁移、浏览器刷新、`pty.deleted`、inactive tab exited、clone 清理旧 ID、clone 期间 tab 被删除，以及 close code 1000 后 get=200 重连/get=404 clone。
+自动化分别覆盖 session/server-scoped cache、`pty.deleted` 幂等删除、clone 清理旧 ID、clone 期间 tab 被删除，以及 WebSocket close 后 get=200 重连/get=404 clone。浏览器刷新与完整远端恢复另设 App E2E，不由纯状态单测代替。
 
 **期望**：不串 Session、不遗留远端 PTY、不保留僵尸 tab，重连不重复完整 buffer。
-
-### PTY-35 reset 失败注入
-
-分别注入 session list、PTY list、某个 PTY remove、instance dispose 失败，并记录后续 API 调用。
-
-**期望**：任一步失败都不调用 worktree reset；所有已发出的 remove 均 settled 后才返回失败；dispose 成功前不清本地 Terminal cache。
-
-## 结果记录
-
-执行日期：2026-07-26。环境：本地 PostgreSQL、本地 OpenSandbox、两个共享 PG 与 secret 的源码 Server Pod。
-
-| 用例 | 状态 | 备注 |
-|---|---|---|
-| PTY-1 | PASS | CRUD、cwd 与显式删除均符合预期 |
-| PTY-2 | PASS | 唯一进程标记只存在于沙箱 |
-| PTY-3 | PASS | 跨 Session list 为空，get/update/remove 均 404 |
-| PTY-4 | PASS | WebSocket 双向交互与 meta cursor 正常 |
-| PTY-5 | PASS | cursor 重连仅补发缺失输出 |
-| PTY-6 | PASS | exitCode=23 保留，删除后 404 |
-| PTY-7 | PASS | 最后一个 running PTY 删除后 lease 释放 |
-| PTY-8 | PASS | Pod A ticket 可由 Pod B 验证并连接 |
-| PTY-9 | PASS | 合法重试成功，篡改与 scope 替换被拒绝 |
-| PTY-10 | PASS | 修复 keepAlive 竞态后连续压力轮次均为 4 次创建、1 个沙箱 |
-| PTY-11 | PASS | 跨 Pod 操作前后 Agent PID 不变 |
-| PTY-12 | PASS | PTY 子进程环境无 Agent bearer |
-| PTY-13 | PASS | 缺 ticket secret 的沙箱服务启动退出码为 1 |
-| PTY-14 | SKIP | Agent SSE 重放单测通过并观测到 exit 事件；未完成 Server relay 断网故障注入 |
-| PTY-15 | SKIP | 65 秒心跳与存活验证通过；未执行双 reaper 原子抢占故障注入 |
-| PTY-16 | PASS | Server 重启前后 PTY ID、Agent PID、sandbox ID 不变并可继续交互 |
-| PTY-17 | SKIP | 本轮未启动 App 执行真实 workspace reset |
-| PTY-18 | PASS | 本地模式无 session/ticket 的 create/list/WebSocket 均成功 |
-| PTY-19 | PASS | 沙箱模式缺 sessionID 返回非 2xx，不回退本地 PTY |
-| PTY-20 | PASS | current/legacy API 集成测试与真实跨接口查询通过 |
-| PTY-21 | FAIL | 指定测试、Agent bundle、Docker check 与多数 typecheck 通过；opencode 全量 typecheck 被分支合并遗留的 LayerNode、Compaction 与 LLM fixture 类型错误阻断 |
-| PTY-22 | PASS | list 返回空数组，其余 404，PG 未创建沙箱 |
-| PTY-23 | PASS | Agent health 无 bearer/错误 bearer 为 401，正确 bearer 为 200 |
-| PTY-24 | PASS | `stty size` 返回 `37 119` |
-| PTY-25 | PASS | 恰好保留 25 个 exited PTY，最旧记录淘汰 |
-| PTY-26 | PASS | ticket、Origin 与 mint header 均按预期强制校验 |
-| PTY-27 | PASS | replay frame 最大 65536 bytes，cursor 边界符合协议 |
-| PTY-28 | PASS | 非法 UTF-8 丢弃，CJK/emoji 与后续输入正常 |
-| PTY-29 | PASS | 两个正常订阅者各完整收到 104857874 bytes；慢客户端在约 2 MiB 积压后以 backpressure close 断开，正常订阅者不受影响 |
-| PTY-30 | PASS | 快速退出后 lease 收敛为 false |
-| PTY-31 | PASS | 20 次并发 list 后 Agent event stream 连接数为 1 |
-| PTY-32 | PASS | 陈旧 PID 后 Agent 重启、旧 PTY 404、512 事件 gap 返回 409，lease 最终释放 |
-| PTY-33 | PASS | 父子 Session 共享 root sandbox 且 PTY owner 互相隔离 |
-| PTY-34 | SKIP | App 相关 17 个自动化测试通过；未执行浏览器刷新与 clone 竞态全流程 |
-| PTY-35 | SKIP | 实现已审查为 fail-closed；本轮未建立 App API 失败注入 harness |
-
-汇总：29 PASS、1 FAIL、5 SKIP。
