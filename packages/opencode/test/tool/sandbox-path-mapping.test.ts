@@ -214,6 +214,14 @@ describe("toSandboxCwd", () => {
     expect(toSandboxCwd("", workdir)).toBe("/workspace")
   })
 
+  test("uses a nested sandbox workdir when cwd is undefined", () => {
+    expect(toSandboxCwd(undefined, "/workspace/worktrees/ses_test")).toBe("/workspace/worktrees/ses_test")
+  })
+
+  test("uses a nested sandbox workdir when cwd is empty", () => {
+    expect(toSandboxCwd("", "/workspace/worktrees/ses_test")).toBe("/workspace/worktrees/ses_test")
+  })
+
   test("maps a host subdirectory", () => {
     expect(toSandboxCwd("/home/opencode/project/src", workdir)).toBe("/workspace/src")
   })

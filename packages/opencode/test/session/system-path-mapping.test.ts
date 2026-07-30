@@ -53,7 +53,7 @@ describe("SystemPrompt.environment - sandbox path mapping", () => {
       const result = yield* svc.environment(mockModel).pipe(Effect.provideService(InstanceRef, ctx))
 
       expect(result[0]).toContain("Working directory: /workspace")
-      expect(result[0]).toContain("Workspace root folder: /workspace")
+      expect(result[0]).not.toContain("Workspace root folder:")
       expect(result[0]).not.toContain("/home/opencode")
     }),
   )
@@ -77,7 +77,7 @@ describe("SystemPrompt.environment - sandbox path mapping", () => {
       const result = yield* svc.environment(mockModel).pipe(Effect.provideService(InstanceRef, ctx))
 
       expect(result[0]).toContain("Working directory: /workspace")
-      expect(result[0]).toContain("Workspace root folder: /workspace")
+      expect(result[0]).not.toContain("Workspace root folder:")
     }),
   )
 
