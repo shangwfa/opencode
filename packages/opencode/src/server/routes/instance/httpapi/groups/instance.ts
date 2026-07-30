@@ -15,6 +15,7 @@ import {
   WorkspaceRoutingQueryFields,
 } from "../middleware/workspace-routing"
 import { described } from "./metadata"
+import { ApiNotFoundError } from "../errors"
 
 const PathInfo = Schema.Struct({
   home: Schema.String,
@@ -40,6 +41,14 @@ export class ApiVcsApplyError extends Schema.ErrorClass<ApiVcsApplyError>("VcsAp
     }),
   },
   { httpApiStatus: 400 },
+) {}
+
+export class ApiVcsDiffError extends Schema.ErrorClass<ApiVcsDiffError>("VcsDiffError")(
+  {
+    name: Schema.Literal("VcsDiffError"),
+    data: Schema.Struct({ message: Schema.String }),
+  },
+  { httpApiStatus: 502 },
 ) {}
 
 export const InstancePaths = {
@@ -107,6 +116,7 @@ export const InstanceApi = HttpApi.make("instance")
         HttpApiEndpoint.get("vcsDiff", InstancePaths.vcsDiff, {
           query: VcsDiffQuery,
           success: described(Schema.Array(Vcs.FileDiff), "VCS diff"),
+          error: [ApiVcsDiffError, ApiNotFoundError],
         }).annotateMerge(
           OpenApi.annotations({
             identifier: "vcs.diff",
