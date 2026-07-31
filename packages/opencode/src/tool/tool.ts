@@ -1,5 +1,5 @@
 import { PermissionV1 } from "@opencode-ai/core/v1/permission"
-import { Effect, Schema } from "effect"
+import { Cause, Effect, Schema } from "effect"
 import { SessionV1 } from "@opencode-ai/core/v1/session"
 import type { JSONSchema7 } from "@ai-sdk/provider"
 import type { Permission } from "../permission"
@@ -143,7 +143,16 @@ function wrap<Parameters extends Schema.Decoder<unknown>, Result extends Metadat
               ...(truncated.truncated && { outputPath: truncated.outputPath }),
             },
           }
-        }).pipe(Effect.orDie, Effect.withSpan("Tool.execute", { attributes: attrs }))
+        }).pipe(
+          // Catch all errors and preserve the Error.message so the AI SDK and
+          // processor can surface it to the user. Previously Effect.orDie
+          // converted typed errors to defects whose message was lost.
+          Effect.catchCause((cause) => {
+            const error = Cause.squash(cause)
+            return Effect.fail(error instanceof Error ? error : new Error(String(error)))
+          }),
+          Effect.withSpan("Tool.execute", { attributes: attrs }),
+        ) as any
       }
       return toolInfo
     })

@@ -12,6 +12,53 @@ import { SessionV1 } from "@opencode-ai/core/v1/session"
 import nextProjectors from "./projectors-next"
 import type { EventV2 } from "@opencode-ai/core/event"
 
+// PG jsonb rejects \u0000 (null byte) inside string values — any tool output
+// containing raw null bytes (e.g. grep over binary log files) will cause the
+// upsert to fail with "invalid input syntax for type json". Strip them before
+// persistence so the projector never hits that error.
+export function stripNullBytes(value: unknown): unknown {
+  if (typeof value === "string") return value.replaceAll("\0", "")
+  if (Array.isArray(value)) return value.map(stripNullBytes)
+  if (value && typeof value === "object") {
+    const out: Record<string, unknown> = {}
+    for (const [k, v] of Object.entries(value)) out[k] = stripNullBytes(v)
+    return out
+  }
+  return value
+}
+
+// Retry a DB write on transient connection errors (CONNECTION_CLOSED, etc.)
+// so a brief TCP forward interruption doesn't surface as UnknownError.
+export async function withRetry<T>(fn: () => Promise<T>, retries = 3): Promise<T> {
+  let lastError: unknown
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await fn()
+    } catch (err) {
+      lastError = err
+      if (attempt < retries && isTransientConnectionError(err)) {
+        await new Promise((resolve) => setTimeout(resolve, 200 * (attempt + 1)))
+        continue
+      }
+      throw err
+    }
+  }
+  throw lastError
+}
+
+export function isTransientConnectionError(err: unknown): boolean {
+  if (err instanceof Error) {
+    const msg = err.message.toLowerCase()
+    return (
+      msg.includes("connection_closed") ||
+      msg.includes("connect_timeout") ||
+      msg.includes("econnreset") ||
+      msg.includes("socket hang up")
+    )
+  }
+  return false
+}
+
 /** Bridge an EventV2 Definition (core) into a SyncEvent Definition (opencode sync). */
 function toSyncDefinition<D extends EventV2.Definition>(def: D): SyncEvent.Definition<D["type"]> {
   return {
@@ -143,15 +190,18 @@ export default [
     const { id, sessionID, ...rest } = data.info
 
     try {
-      await db.insert(MessageTable)
-        .values({
-          id,
-          session_id: sessionID,
-          time_created,
-          data: rest,
-        })
-        .onConflictDoUpdate({ target: MessageTable.id, set: { data: rest } })
-        .run()
+      const cleaned = stripNullBytes(rest)
+      await withRetry(() =>
+        db.insert(MessageTable)
+          .values({
+            id,
+            session_id: sessionID,
+            time_created,
+            data: cleaned,
+          })
+          .onConflictDoUpdate({ target: MessageTable.id, set: { data: cleaned } })
+          .run(),
+      )
     } catch (err) {
       if (!foreign(err)) throw err
       log.warn("ignored late message update", { messageID: id, sessionID })
@@ -189,19 +239,22 @@ export default [
 
   SyncEvent.project(toSyncDefinition(MessageV2.Event.PartUpdated), async (db, data: any) => {
     const { id, messageID, sessionID, ...rest } = data.part
+    const cleaned = stripNullBytes(rest)
     const row = await db.select().from(PartTable).where(eq(PartTable.id, id)).get()
 
     try {
-      await db.insert(PartTable)
-        .values({
-          id,
-          message_id: messageID,
-          session_id: sessionID,
-          time_created: data.time,
-          data: rest,
-        })
-        .onConflictDoUpdate({ target: PartTable.id, set: { data: rest } })
-        .run()
+      await withRetry(() =>
+        db.insert(PartTable)
+          .values({
+            id,
+            message_id: messageID,
+            session_id: sessionID,
+            time_created: data.time,
+            data: cleaned,
+          })
+          .onConflictDoUpdate({ target: PartTable.id, set: { data: cleaned } })
+          .run(),
+      )
       const previous = row && usage(row.data)
       const next = usage(data.part)
       if (previous) await applyUsage(db, row.session_id, previous, -1)

@@ -9,7 +9,10 @@ import { Effect, Schema } from "effect"
 import path from "path"
 
 export const MAX_BYTES = 20 * 1024 * 1024
-const ROOT = "/home/sandbox/.local/share/opencode/tool-attachments"
+// Sandbox-side storage root for managed attachments. Overridable via env so the
+// layout does not hard-depend on a specific base image's home directory.
+const ROOT = process.env.OPENCODE_SANDBOX_ATTACHMENT_ROOT ?? "/home/sandbox/.local/share/opencode/tool-attachments"
+const MAX_SNIFF_BYTES = 64 * 1024
 
 export const ID = Schema.String.check(Schema.isPattern(/^att_[0-9A-Za-z]+$/)).pipe(Schema.brand("ToolAttachmentID"))
 export type ID = typeof ID.Type
@@ -54,7 +57,7 @@ export class NotFoundError extends Schema.TaggedErrorClass<NotFoundError>()("Too
 export type FileKind =
   | { readonly type: "text"; readonly mime: string }
   | { readonly type: "svg"; readonly mime: "image/svg+xml" }
-  | { readonly type: "image"; readonly mime: "image/png" | "image/jpeg" | "image/gif" | "image/webp" }
+  | { readonly type: "image"; readonly mime: "image/png" | "image/jpeg" | "image/gif" | "image/webp" | "image/bmp" }
   | { readonly type: "pdf"; readonly mime: "application/pdf" }
   | { readonly type: "office"; readonly mime: string }
   | { readonly type: "binary"; readonly mime: string }
@@ -94,6 +97,7 @@ export function classify(filename: string, bytes: Uint8Array): FileKind {
   if (startsWith(bytes, [0x47, 0x49, 0x46, 0x38])) return { type: "image", mime: "image/gif" }
   if (startsWith(bytes, [0x52, 0x49, 0x46, 0x46]) && startsWith(bytes.subarray(8), [0x57, 0x45, 0x42, 0x50]))
     return { type: "image", mime: "image/webp" }
+  if (startsWith(bytes, [0x42, 0x4d])) return { type: "image", mime: "image/bmp" }
   if (startsWith(bytes, [0x25, 0x50, 0x44, 0x46, 0x2d])) return { type: "pdf", mime: "application/pdf" }
 
   const extension = path.posix.extname(filename).toLowerCase()
@@ -107,7 +111,22 @@ export function classify(filename: string, bytes: Uint8Array): FileKind {
   if (startsWith(bytes, [0x00, 0x61, 0x73, 0x6d])) return { type: "binary", mime: "application/wasm" }
   if (startsWith(bytes, [0x4d, 0x5a])) return { type: "binary", mime: "application/vnd.microsoft.portable-executable" }
 
-  const text = new TextDecoder("utf-8").decode(bytes.subarray(0, Math.min(bytes.length, 4096))).trimStart()
+  // Heuristic binary detection: if the first sample has no null byte but
+  // more than 30% non-printable control characters, treat it as binary.
+  // This catches formats without known magic bytes (compiled .dat, .o, etc.)
+  // that would otherwise enter the text path and fail during UTF-8 decoding.
+  const sample = bytes.subarray(0, Math.min(bytes.length, MAX_SNIFF_BYTES))
+  if (sample.length > 0) {
+    let nonPrintable = 0
+    for (let i = 0; i < sample.length; i++) {
+      const b = sample[i]
+      if (b === 0) return { type: "binary", mime: "application/octet-stream" }
+      if (b < 9 || (b > 13 && b < 32)) nonPrintable++
+    }
+    if (nonPrintable / sample.length > 0.3) return { type: "binary", mime: "application/octet-stream" }
+  }
+
+  const text = new TextDecoder("utf-8").decode(sample).trimStart()
   if (extension === ".svg" || text.startsWith("<svg") || (text.startsWith("<?xml") && text.includes("<svg")))
     return { type: "svg", mime: "image/svg+xml" }
   return { type: "text", mime: textMime(extension) }
@@ -142,7 +161,15 @@ function textMime(extension: string) {
   if (extension === ".csv") return "text/csv"
   if (extension === ".md" || extension === ".mdx") return "text/markdown"
   if (extension === ".js" || extension === ".mjs" || extension === ".cjs") return "text/javascript"
+  if (extension === ".jsx") return "text/jsx"
   if (extension === ".ts" || extension === ".tsx") return "text/typescript"
+  if (extension === ".xml") return "application/xml"
+  if (extension === ".yaml" || extension === ".yml") return "application/yaml"
+  if (extension === ".toml") return "application/toml"
+  if (extension === ".sh" || extension === ".bash" || extension === ".zsh") return "application/x-sh"
+  if (extension === ".py") return "text/x-python"
+  if (extension === ".go") return "text/x-go"
+  if (extension === ".rs") return "text/x-rust"
   return "text/plain"
 }
 
@@ -260,5 +287,11 @@ function attachmentMetadata(sessionID: SessionID, id: ID) {
 }
 
 function sanitizeFilename(filename: string) {
-  return path.posix.basename(filename).replace(/[\u0000-\u001f\u007f]/g, "_") || "attachment"
+  return (
+    path
+      .posix.basename(filename)
+      // Control characters break headers/terminals; quotes/backslash break the
+      // Content-Disposition filename*= UTF-8'' form, so map them all to '_'.
+      .replace(/[\u0000-\u001f\u007f"\\]/g, "_") || "attachment"
+  )
 }
