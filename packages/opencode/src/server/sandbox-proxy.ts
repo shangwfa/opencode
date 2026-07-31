@@ -310,7 +310,7 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
         const params = yield* HttpRouter.schemaPathParams(SessionParams)
         const session = yield* requireSession(params.sessionID).pipe(Effect.catch(() => Effect.fail(HttpServerResponse.jsonUnsafe({ error: "session not found" }, { status: 404 }))))
         const body = yield* HttpServerRequest.schemaBodyJson(ExecBody).pipe(
-          Effect.catch(() => Effect.succeed({ command: "", workingDirectory: undefined, timeoutSeconds: undefined })),
+          Effect.catch(() => Effect.fail(HttpServerResponse.jsonUnsafe({ error: "invalid request body" }, { status: 400 }))),
         )
         if (!body.command) return HttpServerResponse.jsonUnsafe({ error: "command is required" }, { status: 400 })
 
@@ -371,7 +371,7 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
         const params = yield* HttpRouter.schemaPathParams(SessionParams)
         const session = yield* requireSession(params.sessionID).pipe(Effect.catch(() => Effect.fail(HttpServerResponse.jsonUnsafe({ error: "session not found" }, { status: 404 }))))
         const body = yield* HttpServerRequest.schemaBodyJson(ExecBody).pipe(
-          Effect.catch(() => Effect.succeed({ command: "", workingDirectory: undefined, timeoutSeconds: undefined })),
+          Effect.catch(() => Effect.fail(HttpServerResponse.jsonUnsafe({ error: "invalid request body" }, { status: 400 }))),
         )
         if (!body.command) return HttpServerResponse.jsonUnsafe({ error: "command is required" }, { status: 400 })
 
