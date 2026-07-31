@@ -139,31 +139,51 @@ export const toModelMessagesEffect = Effect.fnUntraced(function* (
   const result: UIMessage[] = []
   const toolNames = new Set<string>()
   const sandboxProvider = Option.getOrUndefined(yield* Effect.serviceOption(SandboxProvider.Service))
-  const resolveAttachment = Effect.fnUntraced(function* (attachment: { mime: string; url: string; filename?: string }) {
+  type ResolvedAttachment = { mime: string; url: string; filename?: string }
+  // Cache resolved base64 Data URLs for the duration of this model turn, so a
+  // managed attachment referenced by multiple tool results is only read once.
+  const resolvedCache = new Map<string, ResolvedAttachment | undefined>()
+  const resolveAttachment = Effect.fnUntraced(function* (attachment: ResolvedAttachment) {
     const match = attachment.url.match(/^\/session\/([^/]+)\/attachment\/([^/]+)$/)
     if (!match) return attachment
     if (!sandboxProvider) return undefined
     const sessionID = Schema.decodeUnknownOption(SessionID)(match[1])
     const attachmentID = Schema.decodeUnknownOption(ToolAttachment.ID)(match[2])
     if (Option.isNone(sessionID) || Option.isNone(attachmentID)) return undefined
+    const key = `${sessionID.value}/${attachmentID.value}`
+    if (resolvedCache.has(key)) return resolvedCache.get(key)
     const file = yield* ToolAttachment.open({
       provider: sandboxProvider,
       sessionID: sessionID.value,
       id: attachmentID.value,
     }).pipe(Effect.option)
-    if (Option.isNone(file) || file.value.metadata.audience === "display-only") return undefined
+    if (Option.isNone(file)) {
+      yield* Effect.logWarning("managed attachment unavailable for model input", { key })
+      resolvedCache.set(key, undefined)
+      return undefined
+    }
+    if (file.value.metadata.audience === "display-only") {
+      resolvedCache.set(key, undefined)
+      return undefined
+    }
     const data = yield* Effect.tryPromise(async () => {
       const chunks: Uint8Array[] = []
       for await (const chunk of file.value.bytes()) chunks.push(chunk)
       return Buffer.concat(chunks).toString("base64")
     }).pipe(Effect.option)
-    if (Option.isNone(data)) return undefined
-    return {
+    if (Option.isNone(data)) {
+      yield* Effect.logWarning("managed attachment read failed for model input", { key })
+      resolvedCache.set(key, undefined)
+      return undefined
+    }
+    const resolved = {
       ...attachment,
       mime: file.value.metadata.mime,
       filename: file.value.metadata.filename,
       url: `data:${file.value.metadata.mime};base64,${data.value}`,
     }
+    resolvedCache.set(key, resolved)
+    return resolved
   })
   // Track media from tool results that need to be injected as user messages
   // for providers that don't support that media type in tool results.
@@ -438,14 +458,21 @@ export const toModelMessagesEffect = Effect.fnUntraced(function* (
 
   const tools = Object.fromEntries(Array.from(toolNames).map((toolName) => [toolName, { toModelOutput }]))
 
+  // Merge consecutive user messages so the AI SDK never inserts an empty
+  // assistant placeholder between them — which would cause providers like
+  // kimi to reject the request with "must not be empty".
+  const merged: UIMessage[] = []
+  for (const msg of result.filter((m) => m.parts.some((p) => p.type !== "step-start"))) {
+    const prev = merged[merged.length - 1]
+    if (prev && prev.role === "user" && msg.role === "user") prev.parts.push(...msg.parts)
+    else merged.push(msg)
+  }
+
   return yield* Effect.promise(() =>
-    convertToModelMessages(
-      result.filter((msg) => msg.parts.some((part) => part.type !== "step-start")),
-      {
-        //@ts-expect-error (convertToModelMessages expects a ToolSet but only actually needs tools[name]?.toModelOutput)
-        tools,
-      },
-    ),
+    convertToModelMessages(merged, {
+      //@ts-expect-error (convertToModelMessages expects a ToolSet but only actually needs tools[name]?.toModelOutput)
+      tools,
+    }),
   )
 })
 

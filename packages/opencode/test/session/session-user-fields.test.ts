@@ -68,7 +68,7 @@ describe("session.user-fields message-v2 schema", () => {
 describe("session.user-fields SessionMessage schema", () => {
   test("SessionMessage.User schema accepts userName and userId", () => {
     const decoded = Schema.decodeUnknownSync(SessionMessage.User)({
-      id: "msg-1",
+      id: MessageID.ascending("msg_1"),
       type: "user",
       time: { created: Date.now() },
       text: "hello",
@@ -84,7 +84,7 @@ describe("session.user-fields SessionMessage schema", () => {
 
   test("SessionMessage.User schema works without userName and userId", () => {
     const decoded = Schema.decodeUnknownSync(SessionMessage.User)({
-      id: "msg-1",
+      id: MessageID.ascending("msg_1"),
       type: "user",
       time: { created: Date.now() },
       text: "hello",

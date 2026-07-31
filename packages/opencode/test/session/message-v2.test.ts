@@ -480,6 +480,39 @@ describe("session.message-v2.toModelMessage", () => {
     ])
   })
 
+  test("merges consecutive user messages to prevent empty assistant placeholder", async () => {
+    const userID = "m-user-merge"
+    const input: SessionV1.WithParts[] = [
+      {
+        info: userInfo(userID),
+        parts: [{ ...basePart(userID, "u1"), type: "text", text: "first" }] as SessionV1.Part[],
+      },
+      {
+        // Empty assistant (0 parts, has error) — should be skipped
+        info: { ...assistantInfo("m-empty", userID), error: { name: "APIError", data: { message: "empty" } } as any },
+        parts: [] as SessionV1.Part[],
+      },
+      {
+        // Second user message — would be adjacent to first if empty assistant is skipped
+        info: userInfo("m-user-merge-2"),
+        parts: [{ ...basePart("m-user-merge-2", "u2"), type: "text", text: "second" }] as SessionV1.Part[],
+      },
+      {
+        info: assistantInfo("m-assistant-merge", "m-user-merge-2"),
+        parts: [{ ...basePart("m-assistant-merge", "a1"), type: "text", text: "reply" }] as SessionV1.Part[],
+      },
+    ]
+
+    const result = await MessageV2.toModelMessages(input, model)
+
+    // The two user messages should be merged into one, not produce an empty assistant between them
+    const userMessages = result.filter((m) => m.role === "user")
+    expect(userMessages.length).toBe(1)
+    const userContent = JSON.stringify(userMessages[0])
+    expect(userContent).toContain("first")
+    expect(userContent).toContain("second")
+  })
+
   test("preserves jpeg tool-result media for anthropic models", async () => {
     const anthropicModel: Provider.Model = {
       ...model,

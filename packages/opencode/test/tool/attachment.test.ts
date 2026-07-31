@@ -49,10 +49,66 @@ describe("ToolAttachment.classify", () => {
     })
   })
 
+  test("detects binary by non-printable ratio without known magic bytes", () => {
+    // 70% non-printable control chars (0x01), no known magic, no null byte
+    const sample = new Uint8Array(100)
+    sample.fill(0x01, 0, 70)
+    sample.fill(0x41, 70) // 'A' for the rest
+    expect(ToolAttachment.classify("mystery.dat", sample)).toEqual({
+      type: "binary",
+      mime: "application/octet-stream",
+    })
+  })
+
+  test("does not misclassify text with some control chars as binary", () => {
+    // Only 10% control chars — should be treated as text
+    const sample = new Uint8Array(100)
+    sample.fill(0x41, 0, 90) // 'A'
+    sample.fill(0x01, 90, 100) // 10% control chars
+    expect(ToolAttachment.classify("logfile", sample).type).toBe("text")
+  })
+
   test("assigns text MIME types by extension", () => {
     expect(ToolAttachment.classify("config.json", text('{"enabled":true}'))).toEqual({
       type: "text",
       mime: "application/json",
+    })
+  })
+
+  test("assigns extended text MIME types by extension", () => {
+    expect(ToolAttachment.classify("component.jsx", text("export default <div/>"))).toEqual({
+      type: "text",
+      mime: "text/jsx",
+    })
+    expect(ToolAttachment.classify("config.yaml", text("a: 1"))).toEqual({
+      type: "text",
+      mime: "application/yaml",
+    })
+    expect(ToolAttachment.classify("config.xml", text("<root/>"))).toEqual({
+      type: "text",
+      mime: "application/xml",
+    })
+    expect(ToolAttachment.classify("script.py", text("print(1)"))).toEqual({
+      type: "text",
+      mime: "text/x-python",
+    })
+    expect(ToolAttachment.classify("run.sh", text("#!/bin/sh"))).toEqual({
+      type: "text",
+      mime: "application/x-sh",
+    })
+    expect(ToolAttachment.classify("main.go", text("package main"))).toEqual({
+      type: "text",
+      mime: "text/x-go",
+    })
+  })
+
+  test("sniffs SVG inside a large XML preamble beyond 4096 bytes", () => {
+    const doctype = "<!DOCTYPE svg PUBLIC \"-//W3C//DTD SVG 1.1//EN\" \"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd\">"
+    const padding = " ".repeat(8192)
+    const content = `<?xml version="1.0"?>${doctype}${padding}<svg viewBox="0 0 1 1"></svg>`
+    expect(ToolAttachment.classify("diagram", text(content))).toEqual({
+      type: "svg",
+      mime: "image/svg+xml",
     })
   })
 })
@@ -116,6 +172,46 @@ describe("ToolAttachment.store", () => {
     expect(JSON.parse(metadata)).toEqual(result.metadata)
     expect(result.metadata.filename).toBe("image_.png")
     expect(result.url).toBe(`/session/ses_test/attachment/${result.metadata.id}`)
+  })
+
+  test("sanitizes quotes and backslashes out of filenames", async () => {
+    const files = new Map<string, Uint8Array>()
+    const sandbox: ToolAttachment.AttachmentSandbox = {
+      files: {
+        createDirectories: async () => {},
+        deleteFiles: async (paths) => {
+          paths.forEach((path) => files.delete(path))
+        },
+        readBytesStream: async function* () {
+          yield bytes(0x89, 0x50, 0x4e, 0x47, 0x00, 0xff)
+        },
+        writeFiles: async (entries) => {
+          for (const entry of entries) {
+            if (typeof entry.data === "string") {
+              files.set(entry.path, text(entry.data))
+              continue
+            }
+            if (!isAsyncIterable(entry.data)) throw new Error("Unsupported test file payload")
+            const chunks: Uint8Array[] = []
+            for await (const chunk of entry.data) chunks.push(chunk)
+            files.set(entry.path, Buffer.concat(chunks))
+          }
+        },
+      },
+    }
+
+    const result = await Effect.runPromise(
+      ToolAttachment.store({
+        sandbox,
+        sessionID: SessionID.make("ses_test"),
+        sourcePath: "/workspace/screenshot.png",
+        filename: 'report"final"\\v2.png',
+        mime: "image/png",
+        audience: "model-and-display",
+      }),
+    )
+
+    expect(result.metadata.filename).toBe("report_final__v2.png")
   })
 
   test("removes copied bytes when metadata persistence fails", async () => {
@@ -251,6 +347,112 @@ describe("ToolAttachment.isManagedUrl", () => {
     expect(ToolAttachment.isManagedUrl("/session/ses_test/attachment/att_abc")).toBeTrue()
     expect(ToolAttachment.isManagedUrl("data:image/png;base64,abc")).toBeFalse()
     expect(ToolAttachment.isManagedUrl("https://example.com/img.png")).toBeFalse()
+  })
+})
+
+describe("ToolAttachment.classify — BMP and heuristic binary", () => {
+  test("classifies BMP by magic bytes", () => {
+    expect(ToolAttachment.classify("image.bmp", bytes(0x42, 0x4d, 0x00, 0x00))).toEqual({
+      type: "image",
+      mime: "image/bmp",
+    })
+  })
+
+  test("detects binary by null byte in sample without known magic", () => {
+    const sample = new Uint8Array([0x41, 0x42, 0x00, 0x43, 0x44])
+    expect(ToolAttachment.classify("mystery.dat", sample)).toEqual({
+      type: "binary",
+      mime: "application/octet-stream",
+    })
+  })
+
+  test("detects binary by non-printable ratio > 30%", () => {
+    const sample = new Uint8Array(100)
+    sample.fill(0x01, 0, 70) // 70% control chars
+    sample.fill(0x41, 70) // 30% printable
+    expect(ToolAttachment.classify("compiled.dat", sample)).toEqual({
+      type: "binary",
+      mime: "application/octet-stream",
+    })
+  })
+
+  test("does not misclassify text with < 30% control chars", () => {
+    const sample = new Uint8Array(100)
+    sample.fill(0x41, 0, 90) // 90% printable
+    sample.fill(0x01, 90, 100) // 10% control chars
+    expect(ToolAttachment.classify("logfile", sample).type).toBe("text")
+  })
+
+  test("empty file is not binary (falls to text)", () => {
+    expect(ToolAttachment.classify("empty.txt", new Uint8Array()).type).toBe("text")
+  })
+})
+
+describe("ToolAttachment.store — filename sanitization", () => {
+  test("strips quotes and backslashes from filename", async () => {
+    const source = bytes(0x89, 0x50, 0x4e, 0x47, 0x00, 0xff)
+    const files = new Map<string, Uint8Array>()
+    const sandbox: ToolAttachment.AttachmentSandbox = {
+      files: {
+        createDirectories: async () => {},
+        deleteFiles: async (paths) => paths.forEach((p) => files.delete(p)),
+        readBytesStream: async function* () { yield source },
+        writeFiles: async (entries) => {
+          for (const entry of entries) {
+            if (typeof entry.data === "string") { files.set(entry.path, text(entry.data)); continue }
+            if (!isAsyncIterable(entry.data)) throw new Error("unsupported")
+            const chunks: Uint8Array[] = []
+            for await (const chunk of entry.data) chunks.push(chunk)
+            files.set(entry.path, Buffer.concat(chunks))
+          }
+        },
+      },
+    }
+
+    const result = await Effect.runPromise(
+      ToolAttachment.store({
+        sandbox,
+        sessionID: SessionID.make("ses_test"),
+        sourcePath: "/workspace/report.png",
+        filename: 'test"final"\\v2.png',
+        mime: "image/png",
+        audience: "model-and-display",
+      }),
+    )
+    expect(result.metadata.filename).toBe("test_final__v2.png")
+  })
+
+  test("null bytes in filename are sanitized", async () => {
+    const source = bytes(1, 2, 3)
+    const files = new Map<string, Uint8Array>()
+    const sandbox: ToolAttachment.AttachmentSandbox = {
+      files: {
+        createDirectories: async () => {},
+        deleteFiles: async () => {},
+        readBytesStream: async function* () { yield source },
+        writeFiles: async (entries) => {
+          for (const entry of entries) {
+            if (typeof entry.data === "string") { files.set(entry.path, text(entry.data)); continue }
+            if (!isAsyncIterable(entry.data)) throw new Error("unsupported")
+            const chunks: Uint8Array[] = []
+            for await (const chunk of entry.data) chunks.push(chunk)
+            files.set(entry.path, Buffer.concat(chunks))
+          }
+        },
+      },
+    }
+
+    const result = await Effect.runPromise(
+      ToolAttachment.store({
+        sandbox,
+        sessionID: SessionID.make("ses_test"),
+        sourcePath: "/workspace/x.png",
+        filename: "file\x00name.png",
+        mime: "image/png",
+        audience: "model-and-display",
+      }),
+    )
+    expect(result.metadata.filename).toBe("file_name.png")
   })
 })
 

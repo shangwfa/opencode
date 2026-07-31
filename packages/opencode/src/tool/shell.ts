@@ -397,13 +397,13 @@ export const ShellTool = Tool.define(
             { timeoutSeconds: Math.ceil((input.timeout + 5000) / 1000) },
             {
               onStdout: (msg: { text: string }) => {
-                output += msg.text
+                output += msg.text.replaceAll("\0", "")
                 ctx.metadata({ metadata: { output: output.slice(-MAX_METADATA_LENGTH), description: input.description } })
               },
               onStderr: (msg: { text: string }) => {
                 const cmdErr = checkCommandNotFound(msg.text)
                 if (cmdErr) throw new Error(`Command failed: ${cmdErr}`)
-                output += msg.text
+                output += msg.text.replaceAll("\0", "")
                 ctx.metadata({ metadata: { output: output.slice(-MAX_METADATA_LENGTH), description: input.description } })
               },
             },
@@ -421,7 +421,7 @@ export const ShellTool = Tool.define(
               { timeoutSeconds: Math.ceil((input.timeout + 5000) / 1000) },
               {
                 onStdout: (msg: { text: string }) => {
-                  output += msg.text
+                  output += msg.text.replaceAll("\0", "")
                   ctx.metadata({
                     metadata: { output: output.slice(-MAX_METADATA_LENGTH), description: input.description },
                   })
@@ -429,7 +429,7 @@ export const ShellTool = Tool.define(
                 onStderr: (msg: { text: string }) => {
                   const cmdErr = checkCommandNotFound(msg.text)
                   if (cmdErr) throw new Error(`Command failed: ${cmdErr}`)
-                  output += msg.text
+                  output += msg.text.replaceAll("\0", "")
                   ctx.metadata({
                     metadata: { output: output.slice(-MAX_METADATA_LENGTH), description: input.description },
                   })
