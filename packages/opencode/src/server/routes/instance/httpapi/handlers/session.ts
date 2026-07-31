@@ -524,36 +524,42 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       return yield* session.updatePart(payload)
     })
 
-    const listSkills = Effect.fn("SessionHttpApi.skills")(function* (ctx: {
-      params: { sessionID: SessionID }
-    }) {
-      return yield* skillSvc.sessionList(ctx.params.sessionID)
+    const listSkills = Effect.fn("SessionHttpApi.skills")(function* (ctx: { params: { sessionID: SessionID } }) {
+      return (yield* skillSvc.sessionList(ctx.params.sessionID)).map(Skill.publicInfo)
     })
 
     const createSkill = Effect.fn("SessionHttpApi.skillsCreate")(function* (ctx: {
       params: { sessionID: SessionID }
       payload: typeof SkillCreatePayload.Type
     }) {
-      return yield* skillSvc.sessionCreate(ctx.params.sessionID, ctx.payload)
+      yield* requireSession(ctx.params.sessionID)
+      return Skill.publicInfo(
+        yield* skillSvc
+          .sessionCreate(ctx.params.sessionID, ctx.payload)
+          .pipe(Effect.mapError(() => new HttpApiError.BadRequest({}))),
+      )
     })
 
     const loadSkills = Effect.fn("SessionHttpApi.skillsLoad")(function* (ctx: {
       params: { sessionID: SessionID }
       payload: typeof SkillLoadPayload.Type
     }) {
-      return yield* skillSvc.sessionLoad(ctx.params.sessionID, ctx.payload.path)
+      yield* requireSession(ctx.params.sessionID)
+      return (yield* skillSvc
+        .sessionLoad(ctx.params.sessionID, ctx.payload.path)
+        .pipe(Effect.mapError(() => new HttpApiError.BadRequest({})))).map(Skill.publicInfo)
     })
 
     const deleteSkill = Effect.fn("SessionHttpApi.skillsDelete")(function* (ctx: {
       params: { sessionID: SessionID; name: string }
     }) {
       yield* skillSvc.sessionUnload(ctx.params.sessionID, ctx.params.name)
+      return HttpApiSchema.NoContent.make()
     })
 
-    const clearSkills = Effect.fn("SessionHttpApi.skillsClear")(function* (ctx: {
-      params: { sessionID: SessionID }
-    }) {
+    const clearSkills = Effect.fn("SessionHttpApi.skillsClear")(function* (ctx: { params: { sessionID: SessionID } }) {
       yield* skillSvc.sessionClear(ctx.params.sessionID)
+      return HttpApiSchema.NoContent.make()
     })
 
     const listAgents = Effect.fn("SessionHttpApi.agents")(function* (ctx: {
