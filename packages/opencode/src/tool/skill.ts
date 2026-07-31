@@ -1,10 +1,12 @@
 import path from "path"
-import { Effect, Schema } from "effect"
+import { Effect, Option, Schema } from "effect"
 import type { Sandbox } from "@alibaba-group/opensandbox"
 import { Ripgrep } from "@opencode-ai/core/ripgrep"
 import { Skill } from "../skill"
 import { SkillResource } from "../skill/resource"
+import type { SessionID } from "../session/schema"
 import { escapeHtml } from "@/util/html"
+import { SandboxProvider } from "./sandbox-provider"
 import * as Tool from "./tool"
 import DESCRIPTION from "./skill.txt"
 
@@ -114,25 +116,33 @@ export function materialize(info: Skill.Info, ctx: Tool.Context) {
     if (resources.length === 0 || !ctx.sandbox) return undefined
     const sandbox = (yield* Effect.promise(() => ctx.sandbox!)) as Sandbox | null
     if (!sandbox) return undefined
+    return yield* writeToSandbox(info, ctx.sessionID, sandbox)
+  })
+}
 
-    const dir = SkillResource.directory(ctx.sessionID, info.name, info.content, resources)
+function writeToSandbox(info: Skill.Info, sessionID: string, sandbox: Sandbox) {
+  return Effect.gen(function* () {
+    const resources = info.resources ?? []
+    const dir = SkillResource.directory(sessionID, info.name, info.content, resources)
     const manifest = {
       name: info.name,
       description: info.description ?? "",
       snapshot: SkillResource.snapshot(info.content, resources),
       resources: resources.map(SkillResource.metadata),
     }
-    const frontmatter = [
-      "---",
-      `name: ${JSON.stringify(info.name)}`,
-      `description: ${JSON.stringify(info.description ?? "")}`,
-      "---",
-      "",
-      info.content.trim(),
-      "",
-    ].join("\n")
+    const skillMd = info.content.trimStart().startsWith("---")
+      ? info.content.trim()
+      : [
+          "---",
+          `name: ${JSON.stringify(info.name)}`,
+          `description: ${JSON.stringify(info.description ?? "")}`,
+          "---",
+          "",
+          info.content.trim(),
+          "",
+        ].join("\n")
     const files = [
-      { path: path.posix.join(dir, "SKILL.md"), data: frontmatter },
+      { path: path.posix.join(dir, "SKILL.md"), data: skillMd },
       { path: path.posix.join(dir, "resources.json"), data: JSON.stringify(manifest, null, 2) },
       ...resources.map((resource) => ({ path: path.posix.join(dir, resource.path), data: resource.content })),
     ]
@@ -140,9 +150,53 @@ export function materialize(info: Skill.Info, ctx: Tool.Context) {
 
     yield* Effect.tryPromise(() => sandbox.files.createDirectories(directories.map((item) => ({ path: item }))))
     yield* Effect.tryPromise(() => sandbox.files.writeFiles(files))
+    yield* Effect.tryPromise(() => sandbox.commands.run(`find ${dir} -type f -exec chmod 644 {} +`))
     return dir
   })
 }
+
+/**
+ * Before each model turn, check whether preloaded session skills still have
+ * their materialized files in the sandbox. A sandbox rebuild wipes the
+ * materialization directory, but AI cache-hits skip the skill tool — so
+ * resources would be silently missing. This restores them proactively.
+ *
+ * Uses `SandboxProvider.get` (never creates a sandbox). If no sandbox exists
+ * yet, or the materialization is still intact, this is a no-op.
+ */
+export const rematerializeIfNeeded = Effect.fn("SkillTool.rematerializeIfNeeded")(function* (
+  sessionID: SessionID,
+  preload?: string[],
+) {
+  if (!preload?.length) return
+  const maybeProvider = Option.getOrUndefined(yield* Effect.serviceOption(SandboxProvider.Service))
+  if (!maybeProvider) return
+
+  const sandbox = yield* maybeProvider.get(sessionID).pipe(Effect.catch(() => Effect.succeed(null)))
+  if (!sandbox) return
+
+  const skillService = yield* Skill.Service
+  for (const name of preload) {
+    const info = yield* skillService.get(name, sessionID)
+    if (!info) continue
+    if (!info.location.startsWith("session://") && !info.location.startsWith("memory://")) continue
+    const resources = info.resources ?? []
+    if (resources.length === 0) continue
+
+    const dir = SkillResource.directory(sessionID, info.name, info.content, resources)
+    const sentinel = path.posix.join(dir, "resources.json")
+    const exists = yield* Effect.tryPromise({
+      try: async () => {
+        const res = await sandbox.commands.run(`test -f ${sentinel} && echo YES`)
+        return String(res?.stdout ?? res ?? "").includes("YES")
+      },
+      catch: () => false,
+    })
+    if (exists) continue
+
+    yield* writeToSandbox(info, sessionID, sandbox).pipe(Effect.catch(() => Effect.void))
+  }
+})
 
 export function sessionOutput(info: Skill.Info, dir?: string) {
   const resources = info.resources ?? []
