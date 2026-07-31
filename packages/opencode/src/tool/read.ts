@@ -326,6 +326,7 @@ export const ReadTool = Tool.define<
           title,
           output,
           metadata: {
+            count: allItems.length,
             preview: sliced.slice(0, 20).join("\n"),
             truncated: dirTruncated,
             loaded: [],
