@@ -245,10 +245,17 @@ export const ReadTool = Tool.define<
       const instance = yield* InstanceState.context
       const sandboxPath = toSandboxPath(filepath, instance.directory)
 
+      const info = yield* Effect.tryPromise({
+        try: async () => (await sb.files.getFileInfo([sandboxPath]))[sandboxPath],
+        catch: () => undefined,
+      })
+
+      const isDirectory = typeof info?.mode === "number" && (info.mode & 0o170000) === 0o040000
 
       yield* assertExternalDirectoryEffect(ctx, filepath, {
         bypass: Boolean(ctx.extra?.["bypassCwdCheck"]),
-        kind: "file",
+        kind: isDirectory ? "directory" : "file",
+        managed: true,
       })
 
       yield* ctx.ask({
@@ -258,10 +265,74 @@ export const ReadTool = Tool.define<
         metadata: {},
       })
 
-      const info = yield* Effect.tryPromise({
-        try: async () => (await sb.files.getFileInfo([sandboxPath]))[sandboxPath],
-        catch: () => undefined,
-      })
+      if (!info) {
+        const dir = path.posix.dirname(sandboxPath)
+        const base = path.posix.basename(sandboxPath).toLowerCase()
+        const lsResult = yield* provider
+          .runInSession(ctx.sandboxSessionID ?? ctx.sessionID, `ls -1 ${shellQuote(dir)} 2>/dev/null`, {
+            timeoutSeconds: 5,
+          })
+          .pipe(
+            Effect.catchCause(() =>
+              Effect.succeed({ logs: { stdout: [] as { text: string }[] }, exitCode: 1 }),
+            ),
+          )
+        const matches = lsResult.logs.stdout
+          .map((line) => line.text)
+          .filter((name) => name.toLowerCase().includes(base) || base.includes(name.toLowerCase()))
+          .slice(0, 3)
+        if (matches.length > 0) {
+          return yield* Effect.fail(
+            new Error(`File not found: ${sandboxPath}\n\nDid you mean one of these?\n${matches.join("\n")}`),
+          )
+        }
+        return yield* Effect.fail(new Error(`File not found: ${sandboxPath}`))
+      }
+
+      if (isDirectory) {
+        const quoted = shellQuote(sandboxPath)
+        const lsResult = yield* provider.runInSession(
+          ctx.sandboxSessionID ?? ctx.sessionID,
+          `if [ -d ${quoted} ]; then for entry in ${quoted}/* ${quoted}/.[!.]* ${quoted}/..?*; do [ -e "$entry" ] || continue; name="\${entry##*/}"; if [ -d "$entry" ]; then printf '%s/\\n' "$name"; else printf '%s\\n' "$name"; fi; done; else exit 2; fi`,
+          { timeoutSeconds: 10 },
+        )
+        if (lsResult.exitCode === 2) return yield* Effect.fail(new Error(`Cannot read file: ${sandboxPath}`))
+        if (lsResult.exitCode !== 0)
+          return yield* Effect.fail(new Error(`Failed to list directory ${sandboxPath} (exit ${lsResult.exitCode})`))
+        const allItems = (
+          lsResult.logs.stdout
+            .map((line) => line.text)
+            .join("\n")
+            .trim() || ""
+        )
+          .split("\n")
+          .filter((s: string) => s.length > 0)
+          .sort((a: string, b: string) => a.localeCompare(b))
+
+        const dirOffset = params.offset ?? 1
+        const dirLimit = params.limit ?? DEFAULT_READ_LIMIT
+        const dirStart = dirOffset - 1
+        const sliced = allItems.slice(dirStart, dirStart + dirLimit)
+        const dirTruncated = dirStart + sliced.length < allItems.length
+
+        let output = [`<path>${sandboxPath}</path>`, `<type>directory</type>`, "<contents>"].join("\n")
+        output += "\n" + sliced.map((item: string) => `- ${item}`).join("\n")
+        if (dirTruncated)
+          output += `\n\n(Showing ${sliced.length} of ${allItems.length} entries. Use offset=${dirOffset + sliced.length} to continue.)`
+        else output += `\n\n(${allItems.length} entries)`
+        output += "\n</contents>"
+
+        return {
+          title,
+          output,
+          metadata: {
+            preview: sliced.slice(0, 20).join("\n"),
+            truncated: dirTruncated,
+            loaded: [],
+          },
+        }
+      }
+
       const header = yield* Effect.tryPromise({
         try: () => sb.files.readBytes(sandboxPath, { range: "bytes=0-65535" }),
         catch: () => undefined,
@@ -337,8 +408,11 @@ export const ReadTool = Tool.define<
 
         let output = [`<path>${sandboxPath}</path>`, `<type>file</type>`, "<content>\n"].join("\n")
         output += page.lines.map((line, i) => `${i + start + 1}: ${line}`).join("\n")
-        if (page.next)
-          output += `\n\n(Showing lines ${start + 1}-${start + page.lines.length} of ${page.total}. Use offset=${page.next} to continue.)`
+        const next = page.next
+        if (page.byteCapped)
+          output += `\n\n(Output capped at ${MAX_BYTES_LABEL}. Showing lines ${start + 1}-${start + page.lines.length}. Use offset=${next} to continue.)`
+        else if (next)
+          output += `\n\n(Showing lines ${start + 1}-${start + page.lines.length} of ${page.total}. Use offset=${next} to continue.)`
         else output += `\n\n(End of file - total ${page.total} lines)`
         output += "\n</content>"
 
@@ -354,47 +428,13 @@ export const ReadTool = Tool.define<
             mime: kind.mime,
             size: info?.size ?? page.sourceBytes,
             preview: page.lines.slice(0, 20).join("\n"),
-            truncated: page.next !== undefined,
+            truncated: page.byteCapped || page.next !== undefined,
             loaded: loaded.map((item) => item.filepath),
           },
         }
       }
 
-      // readFile failed — path exists but is likely a directory. List contents.
-      if (info) {
-        const quoted = shellQuote(sandboxPath)
-        const lsResult = yield* provider.runInSession(
-          ctx.sandboxSessionID ?? ctx.sessionID,
-          `if [ -d ${quoted} ]; then for entry in ${quoted}/* ${quoted}/.[!.]* ${quoted}/..?*; do [ -e "$entry" ] || continue; name="\${entry##*/}"; if [ -d "$entry" ]; then printf '%s/\\n' "$name"; else printf '%s\\n' "$name"; fi; done; else exit 2; fi`,
-          { timeoutSeconds: 10 },
-        )
-        if (lsResult.exitCode !== 0) return yield* Effect.fail(new Error(`Cannot read file: ${sandboxPath}`))
-        const items = (
-          lsResult.logs.stdout
-            .map((line) => line.text)
-            .join("\n")
-            .trim() || ""
-        )
-          .split("\n")
-          .filter((s: string) => s.length > 0)
-          .sort((a: string, b: string) => a.localeCompare(b))
-
-        let output = [`<path>${sandboxPath}</path>`, `<type>directory</type>`, "<contents>"].join("\n")
-        output += "\n" + items.map((item: string) => `- ${item}`).join("\n")
-        output += "\n</contents>"
-
-        return {
-          title,
-          output,
-          metadata: {
-            preview: items.slice(0, 20).join("\n"),
-            truncated: false,
-            loaded: [],
-          },
-        }
-      }
-
-      return yield* Effect.fail(new Error(`File not found: ${sandboxPath}`))
+      return yield* Effect.fail(new Error(`Cannot read file: ${sandboxPath}`))
     })
 
     const run = Effect.fn("ReadTool.execute")(function* (
@@ -603,8 +643,9 @@ async function readTextPage(stream: AsyncIterable<Uint8Array>, offset: number, l
   if (!byteLimitReached) consume(decoder.decode())
   if (pending && !byteLimitReached) append(pending.endsWith("\r") ? pending.slice(0, -1) : pending)
   if (offset > Math.max(total, 1)) throw new Error(`Offset ${offset} is out of range for this file (${total} lines)`)
-  const next = total > offset - 1 + lines.length ? offset + lines.length : undefined
-  return { lines, total, sourceBytes, next }
+  const hasMore = byteLimitReached || total > offset - 1 + lines.length
+  const next = hasMore ? offset + lines.length : undefined
+  return { lines, total, sourceBytes, next, byteCapped: byteLimitReached }
 }
 
 class BinaryContentError extends Error {}
