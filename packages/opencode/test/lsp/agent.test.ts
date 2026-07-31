@@ -6,19 +6,19 @@ import { Agent as LspAgent } from "@/lsp/agent"
 import { SessionID } from "@/session/schema"
 import { awaitWithTimeout, it } from "../lib/effect"
 
-// Counts how many times runDetached was invoked across the mock provider.
+// Counts how many times runInSession was invoked across the mock provider.
 // Reset before each scenario via makeMockSandbox().
-let runDetachedCount = 0
+let runInSessionCount = 0
 
-// Mock SandboxProvider whose runDetached either never resolves (simulating a
+// Mock SandboxProvider whose runInSession either never resolves (simulating a
 // long-lived daemon process that the SDK would otherwise block on) or returns
-// immediately. Only runDetached + getEndpoint are exercised by LspAgent;
+// immediately. Only runInSession + getEndpoint are exercised by LspAgent;
 // Layer.mock leaves the rest as UnimplementedError so accidental calls surface.
 function mockSandboxLayer(neverResolve: boolean) {
-  runDetachedCount = 0
+  runInSessionCount = 0
   return Layer.mock(SandboxProvider.Service, {
-    runDetached: () => {
-      runDetachedCount++
+    runInSession: () => {
+      runInSessionCount++
       // Effect.never models a daemon that never exits: the historical bug was
       // that awaiting this inline deadlocked ensureDaemon. forkDetach lets it
       // run in the background while probe polling determines readiness.
@@ -55,14 +55,14 @@ function buildLayer(neverResolve: boolean) {
   return Layer.mergeAll(LspAgent.layer, mockSandboxLayer(neverResolve), mockHttpLayer())
 }
 
-// T27.17 — P0 regression: ensureDaemon must NOT block when runDetached never
-// resolves. Before the fix, `yield* sandbox.runDetached(...)` deadlocked
+// T27.17 — P0 regression: ensureDaemon must NOT block when runInSession never
+// resolves. Before the fix, `yield* sandbox.runInSession(...)` deadlocked
 // because the underlying runInSession Promise only settles once the command
-// process exits, and a daemon never exits. The fix forks runDetached into the
+// process exits, and a daemon never exits. The fix forks runInSession into the
 // background (Effect.forkDetach) so ensureDaemon proceeds to probe polling.
 describe("LspAgent ensureDaemon — T27.17 deadlock regression", () => {
   it.live(
-    "ensureDaemon returns even when runDetached never resolves",
+    "ensureDaemon returns even when runInSession never resolves",
     () =>
       awaitWithTimeout(
         Effect.gen(function* () {
@@ -71,8 +71,8 @@ describe("LspAgent ensureDaemon — T27.17 deadlock regression", () => {
           // below flips this test from pass to fail.
           const result = yield* agent.touch(SessionID.make("ses-deadlock"), "/workspace/foo.ts", "/workspace")
           expect(result.version).toBe(0)
-          // runDetached was actually invoked (daemon launch was attempted).
-          yield* Effect.sync(() => expect(runDetachedCount).toBe(1))
+          // runInSession was actually invoked (daemon launch was attempted).
+          yield* Effect.sync(() => expect(runInSessionCount).toBe(1))
         }).pipe(Effect.provide(buildLayer(true))) as any,
         "ensureDaemon deadlocked: touch never returned",
         "10 seconds",
@@ -82,7 +82,7 @@ describe("LspAgent ensureDaemon — T27.17 deadlock regression", () => {
 })
 
 // T27.18 — concurrent dedup: multiple concurrent LSP requests for the same
-// session must trigger runDetached exactly once. The fix moves the
+// session must trigger runInSession exactly once. The fix moves the
 // `daemonStates.set("starting")` ahead of the first yield so the check-then-set
 // is an atomic synchronous step (Effect only yields at yield*).
 describe("LspAgent ensureDaemon — T27.18 concurrent dedup", () => {
@@ -103,10 +103,10 @@ describe("LspAgent ensureDaemon — T27.18 concurrent dedup", () => {
             ),
             { concurrency: "unbounded" },
           )
-          // The key assertion: runDetached was called exactly once. Before the
+          // The key assertion: runInSession was called exactly once. Before the
           // fix, concurrent fibers could each pass the `state === undefined`
-          // check and each invoke runDetached.
-          yield* Effect.sync(() => expect(runDetachedCount).toBe(1))
+          // check and each invoke runInSession.
+          yield* Effect.sync(() => expect(runInSessionCount).toBe(1))
         }).pipe(Effect.provide(buildLayer(true))) as any,
         "concurrent dedup test timed out",
         "15 seconds",
@@ -127,12 +127,12 @@ describe("LspAgent shutdown — cache entry reclamation", () => {
           const agent = yield* LspAgent.Service
           // First touch: starts daemon, creates cache entry.
           yield* agent.touch(SessionID.make("ses-gc"), "/workspace/foo.ts", "/workspace")
-          expect(runDetachedCount).toBe(1)
+          expect(runInSessionCount).toBe(1)
           // Shutdown: clears cache entry (daemonStates delete-first).
           yield* agent.shutdown(SessionID.make("ses-gc"))
           // Second touch: cache entry was deleted, ensureDaemon runs again.
           yield* agent.touch(SessionID.make("ses-gc"), "/workspace/foo.ts", "/workspace")
-          expect(runDetachedCount).toBe(2)
+          expect(runInSessionCount).toBe(2)
         }).pipe(Effect.provide(buildLayer(true))) as any,
         "shutdown reclamation test timed out",
         "15 seconds",
