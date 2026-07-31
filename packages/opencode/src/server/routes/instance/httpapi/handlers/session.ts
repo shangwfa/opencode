@@ -210,7 +210,12 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
           headers: { "Content-Range": `bytes */${file.metadata.size}` },
         })
       const etag = `"sha256-${file.metadata.sha256}"`
-      if (!range && ctx.request.headers["if-none-match"] === etag)
+      // If-None-Match may be a comma-separated list of entity-tags (RFC 7232 §3.2).
+      const ifNoneMatch = ctx.request.headers["if-none-match"]
+        ?.split(",")
+        .map((tag) => tag.trim())
+        .filter(Boolean)
+      if (!range && ifNoneMatch?.includes(etag))
         return HttpServerResponse.empty({ status: 304, headers: { ETag: etag } })
       return HttpServerResponse.stream(
         Stream.fromAsyncIterable(file.bytes(range?.header), (cause) => cause),
@@ -406,12 +411,10 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
     }) {
       yield* requireSession(ctx.params.sessionID)
       yield* waitForSessionLock(ctx.params.sessionID)
-      const message = yield* promptSvc
-        .prompt({
-          ...ctx.payload,
-          sessionID: ctx.params.sessionID,
-        })
-        .pipe(Effect.mapError(() => new HttpApiError.BadRequest({})))
+      const message = yield* withSessionLock(ctx.params.sessionID, promptSvc.prompt({
+        ...ctx.payload,
+        sessionID: ctx.params.sessionID,
+      })).pipe(Effect.mapError(() => new HttpApiError.BadRequest({})))
       return HttpServerResponse.stream(Stream.make(JSON.stringify(message)).pipe(Stream.encodeText), {
         contentType: "application/json",
       })
@@ -423,7 +426,7 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
     }) {
       yield* requireSession(ctx.params.sessionID)
       yield* waitForSessionLock(ctx.params.sessionID)
-      yield* promptSvc.prompt({ ...ctx.payload, sessionID: ctx.params.sessionID }).pipe(
+      yield* withSessionLock(ctx.params.sessionID, promptSvc.prompt({ ...ctx.payload, sessionID: ctx.params.sessionID })).pipe(
         Effect.catchCause((cause) =>
           Effect.gen(function* () {
             yield* Effect.logError("prompt_async failed", { sessionID: ctx.params.sessionID, cause })
@@ -444,8 +447,8 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
     }) {
       yield* requireSession(ctx.params.sessionID)
       yield* waitForSessionLock(ctx.params.sessionID)
-      return yield* promptSvc
-        .command({ ...ctx.payload, sessionID: ctx.params.sessionID })
+      return yield* withSessionLock(ctx.params.sessionID, promptSvc
+        .command({ ...ctx.payload, sessionID: ctx.params.sessionID }))
         .pipe(Effect.mapError(() => new HttpApiError.BadRequest({})))
     })
 
