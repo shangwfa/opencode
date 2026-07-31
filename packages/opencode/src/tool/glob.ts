@@ -40,6 +40,7 @@ export const GlobTool = Tool.define(
           yield* assertExternalDirectoryEffect(ctx, search, {
             bypass: false,
             kind: "directory",
+            managed: true,
           })
 
           const limit = 100

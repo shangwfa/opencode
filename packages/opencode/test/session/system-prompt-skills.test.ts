@@ -2,8 +2,9 @@ import { describe, expect } from "bun:test"
 import { Effect, Layer, Context } from "effect"
 import { SystemPrompt } from "../../src/session/system"
 import { Skill } from "../../src/skill"
+import { SkillResource } from "../../src/skill/resource"
 import { testEffect } from "../lib/effect"
-import { LayerNode } from "@opencode-ai/core/effect/layer-node"
+import { AppNodeBuilder } from "@opencode-ai/core/effect/app-node-builder"
 import type { Agent } from "../../src/agent/agent"
 
 const store = new Map<string, Map<string, Skill.Info>>()
@@ -37,7 +38,7 @@ const mockSkillLayer = Layer.succeed(
           description: input.description,
           location: `memory://${input.name}`,
           content: input.content,
-          resources: input.resources,
+          resources: input.resources?.map(SkillResource.make),
         }
         getStore(session).set(input.name, info)
         return info
@@ -54,10 +55,7 @@ const mockSkillLayer = Layer.succeed(
   }),
 )
 
-const it = testEffect(Layer.mergeAll(
-  LayerNode.compile(SystemPrompt.node).pipe(Layer.provide(mockSkillLayer)),
-  mockSkillLayer,
-))
+const it = testEffect(Layer.mergeAll(AppNodeBuilder.build(SystemPrompt.node, [[Skill.node, mockSkillLayer]]), mockSkillLayer))
 
 const AGENT: Agent.Info = {
   name: "build",

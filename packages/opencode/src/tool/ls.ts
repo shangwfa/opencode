@@ -57,7 +57,7 @@ export const ListTool = Tool.define(
         Effect.gen(function* () {
           const ins = yield* InstanceState.context
           const search = path.resolve(ins.directory, params.path || ".")
-          yield* assertExternalDirectoryEffect(ctx, search, { kind: "directory" })
+          yield* assertExternalDirectoryEffect(ctx, search, { kind: "directory", managed: true })
 
           yield* ctx.ask({
             permission: "list",

@@ -4,6 +4,7 @@ import { Effect, Context, Layer } from "effect"
 import { Database, and, asc, eq } from "../storage/db"
 import { SessionSkillTable } from "./skill.pg"
 import type { SessionID } from "../session/schema"
+import { SkillResource } from "./resource"
 
 export namespace SessionSkill {
   export const Info = z.object({
@@ -12,11 +13,17 @@ export namespace SessionSkill {
     name: z.string(),
     description: z.string(),
     content: z.string(),
-    resources: z.array(z.object({
-      path: z.string(),
-      type: z.enum(["doc", "script", "template", "asset"]),
-      content: z.string(),
-    })).default([]),
+    resources: z
+      .array(
+        z.object({
+          path: z.string(),
+          type: z.enum(["doc", "script", "template", "asset"]),
+          content: z.string(),
+          size: z.number(),
+          digest: z.string(),
+        }),
+      )
+      .default([]),
     time_created: z.number(),
     time_updated: z.number(),
   })
@@ -26,7 +33,7 @@ export namespace SessionSkill {
     name: string
     description: string
     content: string
-    resources?: Info["resources"]
+    resources?: SkillResource.Input[]
   }
 
   function id() {
@@ -39,7 +46,7 @@ export namespace SessionSkill {
   export interface Interface {
     readonly list: (sessionID: SessionID) => Effect.Effect<Info[]>
     readonly get: (sessionID: SessionID, name: string) => Effect.Effect<Info | undefined>
-    readonly upsert: (sessionID: SessionID, input: Input) => Effect.Effect<Info>
+    readonly upsert: (sessionID: SessionID, input: Input) => Effect.Effect<Info, Error>
     readonly remove: (sessionID: SessionID, name: string) => Effect.Effect<void>
     readonly removeAll: (sessionID: SessionID) => Effect.Effect<void>
   }
@@ -51,16 +58,23 @@ export namespace SessionSkill {
     Service.of({
       list: () => Effect.succeed([]),
       get: () => Effect.succeed(undefined),
-      upsert: (_sessionID, input) => Effect.succeed({
-        id: id(),
-        session_id: _sessionID as string,
-        name: input.name,
-        description: input.description,
-        content: input.content,
-        resources: input.resources ?? [],
-        time_created: Date.now(),
-        time_updated: Date.now(),
-      }),
+      upsert: (_sessionID, input) =>
+        Effect.try({
+          try: () => {
+            const resources = SkillResource.validateBundle((input.resources ?? []).map(SkillResource.make))
+            return {
+              id: id(),
+              session_id: _sessionID as string,
+              name: input.name,
+              description: input.description,
+              content: input.content,
+              resources,
+              time_created: Date.now(),
+              time_updated: Date.now(),
+            }
+          },
+          catch: (error) => error as Error,
+        }),
       remove: () => Effect.void,
       removeAll: () => Effect.void,
     }),
@@ -70,7 +84,9 @@ export namespace SessionSkill {
   function parseRow(r: any): Info {
     return Info.parse({
       ...r,
-      resources: typeof r.resources === "string" ? JSON.parse(r.resources) : r.resources,
+      resources: (typeof r.resources === "string" ? JSON.parse(r.resources) : r.resources).map(
+        SkillResource.fromStored,
+      ),
       time_created: Number(r.time_created),
       time_updated: Number(r.time_updated),
     })
@@ -106,13 +122,17 @@ export namespace SessionSkill {
 
         upsert: Effect.fn("SessionSkill.upsert")(function* (sessionID, input) {
           const now = Date.now()
+          const resources = yield* Effect.try({
+            try: () => SkillResource.validateBundle((input.resources ?? []).map(SkillResource.make)),
+            catch: (error) => error as Error,
+          })
           const row = {
             id: id(),
             session_id: sessionID,
             name: input.name,
             description: input.description,
             content: input.content,
-            resources: [...(input.resources ?? [])] as any,
+            resources,
             time_created: now,
             time_updated: now,
           }
@@ -125,7 +145,7 @@ export namespace SessionSkill {
                 set: {
                   description: input.description,
                   content: input.content,
-                  resources: [...(input.resources ?? [])] as any,
+                  resources,
                   time_updated: now,
                 } as any,
               })
@@ -144,9 +164,7 @@ export namespace SessionSkill {
         }),
 
         removeAll: Effect.fn("SessionSkill.removeAll")(function* (sessionID) {
-          yield* db((d) =>
-            d.delete(SessionSkillTable).where(eq(SessionSkillTable.session_id, sessionID)).run(),
-          )
+          yield* db((d) => d.delete(SessionSkillTable).where(eq(SessionSkillTable.session_id, sessionID)).run())
         }),
       })
     }),

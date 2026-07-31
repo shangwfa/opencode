@@ -6,7 +6,7 @@
 
 ## 十五、Session Skills
 
-本节验证 SaaS API 中 session 维度的 skills：创建、读取、删除、复杂 bundle、resources 注入，以及从 SkillsMP 拉取真实 skill bundle 后执行。所有请求都打容器服务 `BASE=http://localhost:14096`。
+本节验证 SaaS API 中 session 维度的 skills：创建、读取、删除、复杂 bundle、PG 资源快照、resources 元数据查询、隐藏目录物化，以及从 SkillsMP 拉取真实 skill bundle 后执行。资源正文只保存在 PG，并在调用 `skill` 工具后物化到 code-agent 文件系统，不进入 system prompt、skill tool output 或 Session Skills 查询响应。所有请求都打容器服务 `BASE=http://localhost:14096`。
 
 > 运行前先全局加载环境：`source test-env.sh [1|2|3]`（见 [`00-preamble.md`](./00-preamble.md)）。以下用例直接用 `$BASE` `$PG_URL` `$MODEL`，不重复定义。
 
@@ -66,7 +66,16 @@ curl -s -X POST "$BASE/session/$SID_BUNDLE/skills/create" \
   }' | python3 -m json.tool
 
 curl -s "$BASE/session/$SID_BUNDLE/skills" \
-  | python3 -c "import json,sys;d=json.load(sys.stdin);print([(s['name'], [r['path'] for r in s.get('resources',[])]) for s in d])"
+  | python3 -c "import json,sys;d=json.load(sys.stdin);print([(s['name'], [(r['path'],r['type'],r['size'],bool(r['digest']), 'content' in r) for r in s.get('resources',[])]) for s in d])"
+
+psql "$PG_URL" -c "
+SELECT r->>'path' AS path,
+       (r->>'size')::int AS size,
+       length(r->>'digest') AS digest_len,
+       length(r->>'content') AS stored_content_len
+FROM session_skill, jsonb_array_elements(resources) r
+WHERE session_id='$SID_BUNDLE'
+ORDER BY path;"
 
 curl -s --max-time 180 -X POST "$BASE/session/$SID_BUNDLE/message" \
   -H 'Content-Type: application/json' \
@@ -77,7 +86,7 @@ curl -s --max-time 180 -X POST "$BASE/session/$SID_BUNDLE/message" \
   }" | python3 -c "import json,sys;d=json.load(sys.stdin);t=''.join(p.get('text','') for p in d.get('parts',[]) if p.get('type')=='text');print(t[:1800])"
 ```
 
-**期望**：`GET /skills` 能读回 `references/security-checklist.md` 和 `templates/safe-query.py`；AI 回复中明确引用这两个资源路径，并识别 SQL 注入、连接泄漏、返回 raw cursor 等问题。
+**期望**：`GET /skills` 能读回两个资源的 `path/type/size/digest`，且 `'content' in r` 为 `False`；PG JSONB 仍保存完整正文；AI 调用 skill 后从隐藏资源目录读取文件，回复中明确引用两个资源路径，并识别 SQL 注入、连接泄漏、返回 raw cursor 等问题。
 
 ### T15.3 删除与清空 session skills
 
@@ -276,7 +285,7 @@ curl -s -X POST "$BASE/session/$SID/skills/create" \
   -d '{"name":"checker","description":"v1","content":"# Checker V1\n必须说 V1","resources":[{"path":"a.md","type":"doc","content":"resource A"}]}'
 
 # PG 验证：name=checker, description=v1, res_count=1
-docker exec ai-nova-postgres psql -U postgres -d opencode -c \
+psql "$PG_URL" -c \
   "SELECT name, description, jsonb_array_length(resources) as res_count FROM session_skill WHERE session_id='$SID';"
 
 # 第二次：同一名字，不同内容和 resources
@@ -285,7 +294,7 @@ curl -s -X POST "$BASE/session/$SID/skills/create" \
   -d '{"name":"checker","description":"v2","content":"# Checker V2\n必须说 V2","resources":[{"path":"b.md","type":"doc","content":"resource B"},{"path":"c.md","type":"doc","content":"resource C"}]}'
 
 # PG 验证：name=checker, description=v2, res_count=2（覆盖而非新增）
-docker exec ai-nova-postgres psql -U postgres -d opencode -c \
+psql "$PG_URL" -c \
   "SELECT name, description, jsonb_array_length(resources) as res_count FROM session_skill WHERE session_id='$SID';"
 
 # API 验证：skills 列表只有 1 个
@@ -303,9 +312,9 @@ curl -s --max-time 180 -X POST "$BASE/session/$SID/message" \
 
 ---
 
-### T15.7 AI 通过 skill tool 按需加载 resource 内容
+### T15.7 skill tool 将 resources 物化到隐藏目录
 
-验证 AI 在需要时会主动调用 `skill` tool 加载指定 resource 的完整内容，而非仅看 skill 摘要。
+验证 AI 调用 `skill` tool 后，全部 resources 自动物化到 `/home/sandbox/.local/share/opencode/session-skills`，tool output 只返回 `resource_directory` 和资源元数据，不包含资源正文。
 
 ```bash
 # 环境变量 $BASE $PG_URL $MODEL 由 test-env.sh 全局提供（source test-env.sh [1|2|3]）
@@ -317,7 +326,7 @@ curl -s -X POST "$BASE/session/$SID/skills/create" \
   -d '{
     "name":"db-reviewer",
     "description":"数据库代码审查 skill",
-    "content":"# DB Reviewer\n使用 resources 中的 checklist 和模板审查数据库代码。必须先加载 resources 内容再审查。",
+    "content":"# DB Reviewer\n先调用 skill，再从返回的 resource_directory 读取 checklist.md 和 safe-template.py，按文件内容审查数据库代码。",
     "resources":[
       {"path":"checklist.md","type":"doc","content":"## 安全检查清单\n1. SQL注入: f-string拼接SQL是HIGH\n2. 连接泄漏: 不用with/close是HIGH\n3. 必须返回具体行，不能返回cursor"},
       {"path":"safe-template.py","type":"template","content":"query = \"SELECT * FROM users WHERE id = ?\"\nwith db.connect() as conn:\n    return conn.execute(query, (user_id,)).fetchone()"}
@@ -326,7 +335,7 @@ curl -s -X POST "$BASE/session/$SID/skills/create" \
 
 curl -s --max-time 180 -X POST "$BASE/session/$SID/message" \
   -H 'Content-Type: application/json' \
-  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"请使用 db-reviewer skill 审查这段代码。注意：你需要先用 skill 工具加载 db-reviewer 的 resources 内容（checklist.md 和 safe-template.py），然后按 checklist 审查。\\n\\n代码:\\n```python\\ndef get_user(user_id):\\n    query = f\\\"SELECT * FROM users WHERE id = {user_id}\\\"\\n    conn = db.connect()\\n    return conn.execute(query)\\n```\"}],\"skills\":[\"db-reviewer\"],\"model\":$MODEL}" \
+  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"请使用 db-reviewer skill 审查这段代码。先调用 skill 工具，再用 read 工具读取 resource_directory 下的 checklist.md 和 safe-template.py。\\n\\n代码:\\n```python\\ndef get_user(user_id):\\n    query = f\\\"SELECT * FROM users WHERE id = {user_id}\\\"\\n    conn = db.connect()\\n    return conn.execute(query)\\n```\"}],\"skills\":[\"db-reviewer\"],\"model\":$MODEL}" \
   | python3 -c "
 import json,sys
 d=json.load(sys.stdin)
@@ -335,15 +344,37 @@ for p in d.get('parts',[]):
     elif p.get('type')=='tool': print('Tool:', p.get('name',''), 'input:', json.dumps(p.get('input',{}))[:200])
 "
 
-# PG 验证：tool 调用记录
-docker exec ai-nova-postgres psql -U postgres -d opencode -c \"
-  SELECT p.data->>'name' as tool_name, substring(p.data->'state'->>'output', 1, 400) as output
+# PG 验证：tool output 只有隐藏目录和 metadata
+TOOL_OUTPUT=$(psql "$PG_URL" -t -A -c "
+  SELECT p.data->'state'->>'output'
   FROM message m JOIN part p ON p.message_id = m.id
-  WHERE m.session_id='$SID' AND p.data->>'type'='tool';
-\"
+  WHERE m.session_id='$SID' AND p.data->>'type'='tool'
+    AND p.data->'state'->>'output' LIKE '%<skill_content name=\"db-reviewer\"%'
+  ORDER BY m.time_created DESC LIMIT 1;")
+
+printf '%s\n' "$TOOL_OUTPUT" | python3 -c "
+import re,sys
+s=sys.stdin.read()
+directory=re.search(r'<resource_directory>([^<]+)</resource_directory>',s)
+print('resource_directory=',directory.group(1) if directory else None)
+print('has_metadata=',all(x in s for x in ['path=\"checklist.md\"','size=\"','digest=\"']))
+print('leaked_checklist=', 'SQL注入: f-string拼接SQL是HIGH' in s)
+print('leaked_template=', 'SELECT * FROM users WHERE id = ?' in s)
+"
+
+# 验证资源不在用户 workspace
+curl -s -X POST "$BASE/session/$SID/exec" \
+  -H 'Content-Type: application/json' \
+  -d '{"command":"test ! -e /workspace/.opencode/session-skills && test -d /home/sandbox/.local/share/opencode/session-skills && echo HIDDEN_RESOURCE_OK"}' \
+  | python3 -m json.tool
 ```
 
-**期望**：PG `part` 表存在 `tool_name` 为空的 `skill` tool 调用，`output` 包含 `<skill_content name="db-reviewer">` 且包含 checklist 和 safe-template 内容；AI 回复引用了 checklist 条目（SQL 注入 HIGH、连接泄漏 HIGH）。
+**期望**：
+- tool output 包含 `<resource_directory>/home/sandbox/.local/share/opencode/session-skills/...`；
+- 两个资源都有 `path/type/size/digest` 元数据；
+- `leaked_checklist=False`、`leaked_template=False`；
+- exec 输出 `HIDDEN_RESOURCE_OK`，用户 `/workspace` 中不存在 session skill 文件；
+- AI 通过 read 读取物化文件后，回复引用 SQL 注入 HIGH、连接泄漏 HIGH。
 
 ---
 
@@ -399,7 +430,7 @@ curl -s -X POST "$BASE/session/$SID/skills/create" \
   }'
 
 # PG 验证
-docker exec ai-nova-postgres psql -U postgres -d opencode -c \
+psql "$PG_URL" -c \
   "SELECT name, description FROM session_skill WHERE session_id='$SID';"
 
 # AI 测试：应加载 session 版本
@@ -431,7 +462,7 @@ SID=$(curl -s -X POST "$BASE/session" \
   -H 'Content-Type: application/json' \
   -d '{
     "title":"permission-deny-test",
-    "permission": [{"permission":"tool","pattern":"skill","action":"deny"}]
+    "permission": [{"permission":"skill","pattern":"*","action":"deny"}]
   }' | python3 -c "import json,sys;d=json.load(sys.stdin);print(d.get('id',''))")
 
 # 创建一个 skill
@@ -462,7 +493,7 @@ for p in d.get('parts',[]):
 
 ### T15.11 resources 边界：超大 resource 与超多 resources
 
-验证单个超大 resource（>256KB）和超多 resources（>64个）能否正常写入 PG。
+验证单个超大 resource（>256KiB）和超多 resources（>64 个）会被拒绝，且 PG 不留下部分数据。
 
 ```bash
 # 环境变量 $BASE $PG_URL $MODEL 由 test-env.sh 全局提供（source test-env.sh [1|2|3]）
@@ -470,12 +501,21 @@ for p in d.get('parts',[]):
 # === T15.11a: 超大 resource (300KB) ===
 SID_A=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{"title":"boundary-large-test"}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
 
-LARGE_CONTENT=$(python3 -c "print('x' * 300000)")
-curl -s -X POST "$BASE/session/$SID_A/skills/create" \
+python3 - <<'PY' >/tmp/t15-11a-request.json
+import json
+print(json.dumps({
+    "name": "huge-skill",
+    "description": "超大 resource 测试",
+    "content": "# Huge Skill",
+    "resources": [{"path": "big.md", "type": "doc", "content": "x" * 300000}],
+}, ensure_ascii=False))
+PY
+STATUS_A=$(curl -s -o /tmp/t15-11a.json -w '%{http_code}' -X POST "$BASE/session/$SID_A/skills/create" \
   -H 'Content-Type: application/json' \
-  -d "{\"name\":\"huge-skill\",\"description\":\"超大 resource 测试\",\"content\":\"# Huge Skill\",\"resources\":[{\"path\":\"big.md\",\"type\":\"doc\",\"content\":\"$LARGE_CONTENT\"}]}"
+  --data-binary @/tmp/t15-11a-request.json)
+echo "large_status=$STATUS_A body=$(cat /tmp/t15-11a.json)"
 
-docker exec ai-nova-postgres psql -U postgres -d opencode -c \
+psql "$PG_URL" -c \
   "SELECT name, jsonb_array_length(resources) as res_count, length(resources->0->>'content') as first_res_size, pg_column_size(resources) as total_jsonb_size FROM session_skill WHERE session_id='$SID_A';"
 
 # === T15.11b: 超多 resources (70个) ===
@@ -487,17 +527,19 @@ resources = [{'path':f'file_{i}.md','type':'doc','content':f'content of file {i}
 print(json.dumps(resources))
 ")
 
-curl -s -X POST "$BASE/session/$SID_B/skills/create" \
+STATUS_B=$(curl -s -o /tmp/t15-11b.json -w '%{http_code}' -X POST "$BASE/session/$SID_B/skills/create" \
   -H 'Content-Type: application/json' \
-  -d "{\"name\":\"many-resources\",\"description\":\"超多 resources 测试\",\"content\":\"# Many Resources\",\"resources\":$RESOURCES}"
+  -d "{\"name\":\"many-resources\",\"description\":\"超多 resources 测试\",\"content\":\"# Many Resources\",\"resources\":$RESOURCES}")
+echo "many_status=$STATUS_B body=$(cat /tmp/t15-11b.json)"
 
-docker exec ai-nova-postgres psql -U postgres -d opencode -c \
-  "SELECT name, jsonb_array_length(resources) as res_count, pg_column_size(resources) as total_jsonb_size FROM session_skill WHERE session_id='$SID_B';"
+psql "$PG_URL" -c \
+  "SELECT session_id, count(*) FROM session_skill WHERE session_id IN ('$SID_A','$SID_B') GROUP BY session_id;"
 ```
 
 **期望**：
-- T15.11a：PG `first_res_size=300000`，无截断无报错
-- T15.11b：PG `res_count=70`，无截断无报错
+- T15.11a、T15.11b 的 HTTP 状态均为非 2xx；
+- 错误信息分别指出单文件 256KiB 和最多 64 个资源限制；
+- PG 查询返回 0 行，没有写入部分 skill 快照。
 
 ---
 
@@ -679,7 +721,7 @@ curl -s -X POST "$BASE/session/$SID/skills/create" \
 # 让 AI 检查自己的 system prompt 内容
 curl -s --max-time 180 -X POST "$BASE/session/$SID/message" \
   -H 'Content-Type: application/json' \
-  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"请检查你的 system prompt，回答以下问题：\\n1. preloaded_skills 部分是否存在？\\n2. api-designer skill 的 content 是否出现在 system prompt 中？还是只有 name 和 description？\\n3. resources 部分是显示了完整 content 还是只有 path/size 元数据？\\n4. available_skills 列表中 api-designer 的信息是什么？\\n\\n请如实回答，逐条列出。\"}],\"skills\":[\"api-designer\"],\"model\":$MODEL}" \
+  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"请检查你的 system prompt，回答以下问题：\\n1. preloaded_skills 部分是否存在？\\n2. api-designer skill 的 content 是否出现在 system prompt 中？还是只有 name 和 description？\\n3. resources 部分是显示了完整 content 还是只有 path/type/size/digest 元数据？\\n4. available_skills 列表中 api-designer 的信息是什么？\\n\\n请如实回答，逐条列出。\"}],\"skills\":[\"api-designer\"],\"model\":$MODEL}" \
   | python3 -c "
 import json,sys
 d=json.load(sys.stdin)
@@ -691,15 +733,15 @@ for p in d.get('parts',[]):
 **期望**：
 1. `preloaded_skills` 存在
 2. api-designer 的 **完整 content 不在** system prompt 中，只有 name/description/location
-3. resources 只显示 path/type/size **元数据**，不含实际内容
+3. resources 只显示 path/type/size/digest **元数据**，不含实际内容
 4. `available_skills` 列表只有 name/description/location
-5. System prompt 包含提示语："These preloaded skills are manifests only. Before applying a preloaded skill, call the skill tool with its name to load the full instructions."
+5. System prompt 包含提示语："These preloaded skills are manifests only. Before applying a preloaded skill, call the skill tool with its name to load the full instructions and materialize its resources in the code-agent filesystem."
 
 ---
 
-### T15.16 渐进式披露：skill tool 不指定 resources 时只返回 manifest
+### T15.16 skill tool 协议：只接收 name 并自动物化全部 resources
 
-验证 AI 调用 `skill` tool 不指定 `resources` 参数时，返回的 resources 部分只有 path/type/size 元数据，不含实际 content。
+验证 `skill` tool 输入只包含 `name`，调用后自动物化全部 resources；输出包含隐藏目录及 path/type/size/digest，不含实际 content。
 
 ```bash
 # 环境变量 $BASE $PG_URL $MODEL 由 test-env.sh 全局提供（source test-env.sh [1|2|3]）
@@ -720,7 +762,7 @@ curl -s -X POST "$BASE/session/$SID/skills/create" \
 
 curl -s --max-time 180 -X POST "$BASE/session/$SID/message" \
   -H 'Content-Type: application/json' \
-  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"请调用 skill tool 加载 code-reviewer，但不要指定 resources 参数。然后告诉我：\\n1. resources 部分显示的是什么？是完整内容还是只有 path/size 元数据？\\n2. 逐字列出 resources 部分的内容。\"}],\"model\":$MODEL}" \
+  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"请调用 skill tool 加载 code-reviewer。然后告诉我：\\n1. tool input 有哪些字段？\\n2. resource_directory 是什么？\\n3. resources 部分是否只有 path/type/size/digest？\"}],\"model\":$MODEL}" \
   | python3 -c "
 import json,sys
 d=json.load(sys.stdin)
@@ -738,15 +780,17 @@ ORDER BY m.time_created;
 "
 ```
 
-**期望**：PG tool output 中 resources 显示 `<resource path="checklist.md" type="doc" size="78" />`（只有元数据），**不含** "SQL注入检查" 等实际内容。
+**期望**：
+- tool input 是 `{"name":"code-reviewer"}`，不存在 `resources` 参数；
+- tool output 包含 `/home/sandbox/.local/share/opencode/session-skills/...`；
+- 两个资源均显示 path/type/size/digest；
+- tool output **不含** “SQL注入检查”和 template.json 正文。
 
 ---
 
-### T15.17 渐进式披露：指定 resources 获取内容 + 不存在 resource → missing_resource
+### T15.17 code-agent 从隐藏目录读取资源
 
-验证 AI 调用 `skill` tool 指定 `resources` 参数时：
-1. 存在的 resource 返回完整 content
-2. 不存在的 resource 标记为 `<missing_resource>`，不报错
+验证资源正文只能通过 code-agent 文件工具读取；`skill` tool output 不返回正文，也不再负责生成 `<missing_resource>`。
 
 ```bash
 # 环境变量 $BASE $PG_URL $MODEL 由 test-env.sh 全局提供（source test-env.sh [1|2|3]）
@@ -767,7 +811,7 @@ curl -s -X POST "$BASE/session/$SID/skills/create" \
 
 curl -s --max-time 180 -X POST "$BASE/session/$SID/message" \
   -H 'Content-Type: application/json' \
-  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"调用 skill tool 加载 code-reviewer，指定 resources 为 [\\\"checklist.md\\\", \\\"nonexistent-file.md\\\"]。然后告诉我：\\n1. checklist.md 的完整内容是什么？\\n2. nonexistent-file.md 出现了什么？\\n3. 逐字列出 resources 部分的全部内容。\"}],\"model\":$MODEL}" \
+  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"调用 skill tool 加载 code-reviewer，然后执行以下操作：\\n1. 用 read 读取 resource_directory/checklist.md；\\n2. 用 read 读取 resource_directory/template.json；\\n3. 确认 resource_directory/nonexistent-file.md 不存在；\\n4. 汇报读取结果。\"}],\"model\":$MODEL}" \
   | python3 -c "
 import json,sys
 d=json.load(sys.stdin)
@@ -786,9 +830,10 @@ ORDER BY m.time_created;
 ```
 
 **期望**：
-1. `checklist.md` 返回完整内容：`<resource path="checklist.md" type="doc">## 审查清单\n1. SQL注入检查...</resource>`
-2. `nonexistent-file.md` 返回：`<missing_resource path="nonexistent-file.md" />`
-3. PG tool output 包含两者
+1. `skill` tool output 仅包含 metadata 和 `resource_directory`，不包含 checklist/template 正文；
+2. 后续 `read` tool output 能读到“SQL注入检查”和 `{"severity":"HIGH"...}`；
+3. 不存在文件由 `read` 返回文件不存在错误，不出现 `<missing_resource>`；
+4. 所有读取路径都位于 `/home/sandbox/.local/share/opencode/session-skills`，不位于 `/workspace`。
 
 ---
 
@@ -913,8 +958,8 @@ curl -s -X POST "$BASE/session/$SID/skills/create" \
   -d "{\"name\":\"$LONG_NAME\",\"description\":\"long name\",\"content\":\"# Long\"}" \
   -w "\nHTTP: %{http_code}" | tail -1
 
-# 特殊字符
-for name in "../escape" "skill/slash" "skill with space" "skill<script>" "中文技能"; do
+# 特殊字符及非小写字母
+for name in "../escape" "skill/slash" "skill with space" "skill<script>" "中文技能" "UpperCase" "-leading" "trailing-" "double--dash"; do
   echo "--- name='$name' ---"
   RESP=$(curl -s -X POST "$BASE/session/$SID/skills/create" \
     -H 'Content-Type: application/json' \
@@ -927,7 +972,7 @@ done
 # 列出创建成功的 skills
 curl -s "$BASE/session/$SID/skills" | python3 -c "import json,sys;d=json.load(sys.stdin);print('created:', [s['name'] for s in d])"
 ```
-**期望**：空名称应返回 400 或被拒绝；超长名称视实现返回 400 或截断；特殊字符（`../`、`/`、`<>`）应被拒绝或转义；中文名可接受
+**期望**：所有非法名称（空、超长、路径、`/`、空格、`<>`、中文、大小写）均返回 HTTP 400，响应 body 包含 `Invalid skill name` 或 schema 校验错误；`skills` 列表为空（无任何非法名称被持久化）。
 
 ---
 
@@ -988,15 +1033,13 @@ curl -s -X POST "$BASE/session/$SID/skills/create" \
     ]
   }'
 
-# API 读回验证
+# API 只返回 metadata，不返回正文
 curl -s "$BASE/session/$SID/skills" | python3 -c "
 import json,sys
 d=json.load(sys.stdin)
 for s in d:
   for r in s.get('resources',[]):
-    c=r['content']
-    print(f'{r[\"path\"]}: len={len(c)}, has_emoji={\"🎉\" in c}, has_chinese={\"中文\" in c}')
-    print(f'  first 80: {c[:80]}')
+    print(f'{r[\"path\"]}: size={r[\"size\"]}, digest={r[\"digest\"][:12]}, has_content={\"content\" in r}')
 "
 
 # PG 验证
@@ -1008,8 +1051,14 @@ docker exec ai-nova-postgres psql -U postgres -d opencode -t -A -c \
     (r->>'content') LIKE '%中文%' as has_chinese
   FROM session_skill, jsonb_array_elements(resources) r
   WHERE session_id='$SID';"
+
+# 物化后通过 code-agent 文件系统验证正文编码
+curl -s --max-time 180 -X POST "$BASE/session/$SID/message" \
+  -H 'Content-Type: application/json' \
+  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"调用 encoding-skill，然后用 read 读取 resource_directory 下的 unicode.md、special.md、code.py，确认中文、emoji、反斜杠和尖括号均完整。\"}],\"skills\":[\"encoding-skill\"],\"model\":$MODEL}" \
+  | python3 -c "import json,sys;d=json.load(sys.stdin);print(''.join(p.get('text','') for p in d.get('parts',[]) if p.get('type')=='text')[:1200])"
 ```
-**期望**：API 和 PG 中 Unicode（中文、emoji）完整保留；特殊字符（引号、反斜杠、尖括号）不被截断或转义破坏
+**期望**：API 的 `has_content=False` 且 size/digest 完整；PG 和物化文件中的 Unicode、emoji、中文、引号、反斜杠和尖括号均完整保留。
 
 
 ---
@@ -1046,32 +1095,32 @@ curl -s -X PATCH "$BASE/session/$SID" \
   -H 'Content-Type: application/json' \
   -d '{"permission":{"bash":"allow","read":"allow","write":"allow","edit":"allow","glob":"allow","grep":"allow","list":"allow","webfetch":"allow"}}' > /dev/null
 
-# Step 2: 安装 agent-browser CLI
-# 注意：npm 全局安装后二进制在 /home/coder/.npm-global/bin/，不在默认 PATH 中
-echo "=== 安装 agent-browser CLI ==="
-curl -s --max-time 60 -X POST "$BASE/session/$SID/exec" \
-  -H 'Content-Type: application/json' \
-  -d '{"command":"npm install -g agent-browser 2>&1 | tail -1 && /home/coder/.npm-global/bin/agent-browser --version"}' \
-  | python3 -c "import json,sys;d=json.load(sys.stdin);print(d.get('stdout','')[:300])"
-
-# Step 3: 下载 Chrome（需 curl -k 绕过 DNS 劫持 + 过期证书）
-echo ""
-echo "=== 下载 Chrome (178MB) ==="
-curl -s --max-time 180 -X POST "$BASE/session/$SID/exec" \
-  -H 'Content-Type: application/json' \
-  -d '{"command":"curl -sk --max-time 120 -o /tmp/chrome.zip \"https://storage.googleapis.com/chrome-for-testing-public/149.0.7827.54/linux64/chrome-linux64.zip\" && ls -lh /tmp/chrome.zip && cd /tmp && unzip -o chrome.zip -d chrome 2>&1 | tail -1 && /tmp/chrome/chrome-linux64/chrome --version"}' \
-  | python3 -c "import json,sys;d=json.load(sys.stdin);print(d.get('stdout','')[:500])"
-
-# Step 4: 验证 Chrome 可用
-echo ""
-echo "=== 验证 Chrome ==="
+# Step 2: 验证镜像预装 agent-browser CLI
+# 镜像已预装 agent-browser（mise shim），通过 PATH 直接可用
+echo "=== 验证 agent-browser CLI ==="
 curl -s --max-time 15 -X POST "$BASE/session/$SID/exec" \
   -H 'Content-Type: application/json' \
-  -d '{"command":"/tmp/chrome/chrome-linux64/chrome --headless --no-sandbox --disable-gpu --dump-dom https://example.com 2>/dev/null | head -3"}' \
+  -d '{"command":"command -v agent-browser && agent-browser --version"}' \
+  | python3 -c "import json,sys;d=json.load(sys.stdin);print(d.get('stdout','')[:300])"
+
+# Step 3: 验证镜像预装 Chromium
+echo ""
+echo "=== 验证 Chromium ==="
+curl -s --max-time 15 -X POST "$BASE/session/$SID/exec" \
+  -H 'Content-Type: application/json' \
+  -d '{"command":"command -v chromium && chromium --version"}' \
+  | python3 -c "import json,sys;d=json.load(sys.stdin);print(d.get('stdout','')[:300])"
+
+# Step 4: 验证 Chromium headless 可用
+echo ""
+echo "=== Chromium headless smoke ==="
+curl -s --max-time 30 -X POST "$BASE/session/$SID/exec" \
+  -H 'Content-Type: application/json' \
+  -d '{"command":"chromium --headless --no-sandbox --disable-gpu --dump-dom https://example.com 2>/dev/null | head -3"}' \
   | python3 -c "import json,sys;d=json.load(sys.stdin);print(d.get('stdout','')[:500])"
 
 # Step 5: 创建会话级 agent-browser skill
-# content 中需包含 CLI/Chrome 的实际路径（PATH 下不可用）
+# 不硬编码具体路径，通过 PATH/环境变量解析
 echo ""
 echo "=== 创建 agent-browser session skill ==="
 curl -s -X POST "$BASE/session/$SID/skills/create" \
@@ -1079,7 +1128,7 @@ curl -s -X POST "$BASE/session/$SID/skills/create" \
   -d '{
     "name":"agent-browser",
     "description":"Browser automation CLI for AI agents. Use for navigating pages, filling forms, clicking buttons, screenshots, data extraction.",
-    "content":"# agent-browser\n\nCLI path: /home/coder/.npm-global/bin/agent-browser\nChrome path: /tmp/chrome/chrome-linux64/chrome\n\n## Core Workflow\n1. Navigate: /home/coder/.npm-global/bin/agent-browser --executable-path /tmp/chrome/chrome-linux64/chrome --ignore-https-errors open <url> --args no-sandbox\n2. Snapshot: /home/coder/.npm-global/bin/agent-browser snapshot / snapshot -i\n3. Interact: click @eN / fill @eN \"text\" / get title / get url / get text @eN\n4. Close: /home/coder/.npm-global/bin/agent-browser close\n\n## Important\n- Always use --executable-path /tmp/chrome/chrome-linux64/chrome\n- Always use --args no-sandbox (required for Docker)\n- Always use --ignore-https-errors\n- Close browser when done: `close` or `close --all`"
+    "content":"# agent-browser\n\nCLI 与 Chromium 均由镜像预装，直接通过 PATH 调用：agent-browser / chromium\n\n## Core Workflow\n1. Navigate: agent-browser open <url> --args no-sandbox --ignore-https-errors\n2. Snapshot: agent-browser snapshot / snapshot -i\n3. Interact: click @eN / fill @eN \"text\" / get title / get url / get text @eN\n4. Close: agent-browser close\n\n## Important\n- Always use --args no-sandbox (required for Docker)\n- Always use --ignore-https-errors\n- Close browser when done: `close` or `close --all`"
   }' | python3 -c "import json,sys;d=json.load(sys.stdin);print(f'Created: {d.get("name")}')"
 
 # Step 6: 验证 skill 列表
@@ -1096,13 +1145,13 @@ else:
 ```
 
 **期望**：
-- agent-browser CLI 安装成功，版本号为 `0.27.0`
-- Chrome 下载成功（178MB），`--version` 输出 `Google Chrome for Testing 149.x`
-- Chrome `--headless --dump-dom` 可渲染 example.com 页面
+- `command -v agent-browser` 成功（mise shim），版本号 ≥ `0.31`
+- `command -v chromium` 成功（`/usr/local/bin/chromium`），`--version` 输出版本
+- Chromium `--headless --dump-dom` 可渲染 example.com 页面
 - session skill 创建返回 `name: agent-browser`
 - session skill 列表中包含 `agent-browser`
 
-> **注意**：Chrome 首次启动偶发超时（出 `Operation timed out`），关闭旧 daemon（`agent-browser close --all`）后重试通常可恢复。
+> **注意**：T15.24 已验证镜像预装 agent-browser + Chromium，无需手动安装/下载。
 
 ### T15.25 使用 agent-browser 浏览网页
 
@@ -1225,6 +1274,70 @@ print(f'\\nTools: {set(tools_used)} ({len(tools_used)} calls)')
 
 ---
 
+### T15.27 大型脚本物化与 sandbox 重建
+
+验证大于工具输出截断阈值（50KiB）、小于单资源上限（256KiB）的脚本不会进入模型上下文，并能在 sandbox 销毁重建后继续执行。
+
+```bash
+SID=$(curl -s -X POST "$BASE/session" \
+  -H 'Content-Type: application/json' \
+  -d '{"title":"large-skill-resource-rebuild"}' \
+  | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+
+python3 - <<'PY' >/tmp/t15-27-skill.json
+import json
+script = "console.log('LARGE_SCRIPT_OK')\n/*" + ("x" * 120000) + "*/\n"
+print(json.dumps({
+    "name": "large-script-skill",
+    "description": "大型脚本资源测试",
+    "content": "# Large Script Skill\n调用 skill 后执行 resource_directory/scripts/large.mjs。",
+    "resources": [{"path": "scripts/large.mjs", "type": "script", "content": script}],
+}, ensure_ascii=False))
+PY
+
+curl -s -X POST "$BASE/session/$SID/skills/create" \
+  -H 'Content-Type: application/json' \
+  --data-binary @/tmp/t15-27-skill.json \
+  | python3 -c "import json,sys;d=json.load(sys.stdin);r=d['resources'][0];print(r);print('has_content=', 'content' in r)"
+
+# 第一次物化并执行
+curl -s --max-time 180 -X POST "$BASE/session/$SID/message" \
+  -H 'Content-Type: application/json' \
+  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"调用 large-script-skill，然后用 bash 执行 resource_directory/scripts/large.mjs，只报告执行结果。\"}],\"skills\":[\"large-script-skill\"],\"model\":$MODEL}" \
+  | python3 -c "import json,sys;d=json.load(sys.stdin);print(''.join(p.get('text','') for p in d.get('parts',[]) if p.get('type')=='text')[:800])"
+
+# tool output 应保持很小，不包含 120KB 脚本正文
+psql "$PG_URL" -t -A -c "
+SELECT length(p.data->'state'->>'output'),
+       position(repeat('x',1000) in p.data->'state'->>'output') > 0 AS leaked_body
+FROM message m JOIN part p ON p.message_id=m.id
+WHERE m.session_id='$SID' AND p.data->'state'->>'output' LIKE '%large-script-skill%'
+ORDER BY m.time_created DESC LIMIT 1;"
+
+# 销毁 sandbox，PVC 中的 .local 数据保留
+curl -s -X POST "$BASE/session/$SID/kill-sandbox" | python3 -m json.tool
+
+# 重建后再次调用 skill，并直接执行物化脚本
+curl -s --max-time 180 -X POST "$BASE/session/$SID/message" \
+  -H 'Content-Type: application/json' \
+  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"重新调用 large-script-skill，并用 bash 再次执行 resource_directory/scripts/large.mjs。\"}],\"skills\":[\"large-script-skill\"],\"model\":$MODEL}" \
+  | python3 -c "import json,sys;d=json.load(sys.stdin);print(''.join(p.get('text','') for p in d.get('parts',[]) if p.get('type')=='text')[:800])"
+
+curl -s -X POST "$BASE/session/$SID/exec" \
+  -H 'Content-Type: application/json' \
+  -d '{"command":"FILE=$(find /home/sandbox/.local/share/opencode/session-skills -path \"*/scripts/large.mjs\" | head -1); test -n \"$FILE\" && node \"$FILE\" && test ! -e /workspace/.opencode/session-skills"}' \
+  | python3 -m json.tool
+```
+
+**期望**：
+- create/list response 中 `size>50000`、digest 非空、`has_content=False`；
+- 两次执行均输出 `LARGE_SCRIPT_OK`；
+- tool output 长度远小于脚本正文，`leaked_body=false`；
+- `kill-sandbox` 后可重新物化或复用 PVC 文件；
+- `/workspace/.opencode/session-skills` 不存在。
+
+---
+
 ## 改进建议
 
 1. **Chrome 预装**：在沙箱 Docker 镜像（`registry.shadow-rpa.net/infra/xybot-sandbox-coder`）中预装 Chrome for Testing，避免每次下载 178MB 且绕过 DNS 劫持问题。Dockerfile 中添加：
@@ -1246,28 +1359,29 @@ print(f'\\nTools: {set(tools_used)} ({len(tools_used)} calls)')
 | 用例 | 状态 | 说明 |
 |------|------|------|
 | T15.1 | ✅ | 简单 skill 创建+触发，AI 明确提到 reviewer skill |
-| T15.2 | ✅ | 复杂 bundle（含 resources）创建+读取+触发，AI 引用资源路径 |
+| T15.2 | 🧪 | 复杂 bundle 创建；API 只返回 metadata；AI 从隐藏目录读取资源 |
 | T15.3 | ✅ | 删除单个+清空全部 |
 | T15.4 | ✅ | 从目录加载 skill bundle，AI 引用 security-checklist + safe-query |
 | T15.5 | 🧪 | SkillsMP 拉取 10 个真实 skill 并执行（待测，依赖外部 API） |
 | T15.6 | ✅ | 重复创建同名 skill（upsert 覆盖），PG description=v2, res_count=2 |
-| T15.7 | ✅ | AI 通过 skill tool 加载 resource，PG 含 skill_content + resources |
+| T15.7 | 🧪 | skill tool 自动物化到 `.local/share/opencode`，tool output 不泄漏正文 |
 | T15.8 | ✅ | skill 不存在时 AI 未调用 skill tool，直接告知不可用 |
 | T15.9 | ✅ | session skill 覆盖全局同名，AI 加载 SESSION 版本 |
 | T15.10 | ✅ | permission deny 生效，skill tool 未被调用 |
-| T15.11 | ✅ | 300KB resource + 70 个 resources 均正常写入 PG |
+| T15.11 | 🧪 | 300KB resource 和 70 个 resources 均被拒绝，PG 无部分快照 |
 | T15.12 | ✅ | 全局 skill 列表返回 customize-opencode |
 | T15.13 | ✅ | 多 skills 主动触发，AI 三维度（安全/性能/风格）完整报告 |
 | T15.14 | ✅ | 多 skills 被动触发，AI 自动加载 git-helper（回复 GIT_HELPER已激活） |
-| T15.15 | ✅ | preloaded_skills manifest：只有 name/desc/location + resource 元数据 |
-| T15.16 | ✅ | skill tool 不指定 resources → 只显示 path/type/size |
-| T15.17 | ✅ | 指定 resources 返回完整 content，不存在返回 missing_resource |
+| T15.15 | 🧪 | preloaded_skills manifest：只有 name/desc/location + path/type/size/digest |
+| T15.16 | 🧪 | skill tool 仅接收 name，自动物化全部资源，输出 metadata + hidden directory |
+| T15.17 | 🧪 | code-agent 通过 read 读取隐藏目录；不存在文件由文件工具报错 |
 | T15.18 | ✅ | A=['private-skill'], B=[], PG 只有 A |
 | T15.19 | ✅ | 删除前 COUNT=2, 删除后 COUNT=0 |
 | T15.20 | ✅ | HTTP 200, real-skill 加载成功, ghost-skill 被忽略 |
 | T15.21 | ⚠️ | 空名称/超长/特殊字符均被接受（缺少输入校验） |
 | T15.22 | ✅ | 5 并发 PG COUNT=1, upsert 安全 |
-| T15.23 | ✅ | Unicode/emoji/中文 API+PG 完整保留 |
+| T15.23 | 🧪 | API metadata-only；Unicode/emoji/中文在 PG 和物化文件中完整保留 |
 | T15.24 | ✅ | 创建 agent-browser 会话 skill（安装 CLI + 下载 Chrome + 创建 skill） |
 | T15.25 | ✅ | 使用 agent-browser 浏览网页（open/snapshot/get url/close 全部成功） |
 | T15.26 | ⚠️ | agent-browser + page-summarizer（skill 加载 + AI 任务规划通过，Chrome 偶发不稳定） |
+| T15.27 | 🧪 | 120KB 脚本不进入上下文，隐藏目录执行及 sandbox 重建恢复 |

@@ -9,10 +9,10 @@
 | 维度 | Skill 模式（本文档） | MCP 模式（见 [`../41-mastra-mcp-e2e.md`](../41-mastra-mcp-e2e.md)） |
 |------|---------------------|-------------------------------------------|
 | 接入接口 | `POST /session/:id/skills/create` | `POST /session/:id/mcps/create` |
-| AI 工具调用类型 | `bash`（执行 `ls`/`cat`/`mastra api` 等命令） + `skill`（按需加载 reference） | `mastra_*`（MCP 工具） |
+| AI 工具调用类型 | `skill`（加载 SKILL.md 指令） + `read`/`bash`（从隐藏目录读取 resource / 执行命令） | `mastra_*`（MCP 工具） |
 | 内容来源 | GitHub `mastra-ai/skills` 仓库 `skills/mastra/` 目录 | `@mastra/mcp-docs-server` npm 包 |
 | 性能 | 官方推荐（"skills will perform better"） | 较慢 |
-| AI 上下文 | SaaS progressive disclosure：system prompt 仅 manifest；AI 按需通过 `skill` tool 加载 SKILL.md / reference | 每次工具调用都列出可用工具 |
+| AI 上下文 | SaaS progressive disclosure：system prompt 仅 manifest；AI 调 `skill` tool 加载 SKILL.md 指令；resource 正文物化到隐藏目录，AI 用 `read`/`bash` 按需读取 | 每次工具调用都列出可用工具 |
 | 工具粒度 | 任意 shell + 文档查询脚本（provider-registry.mjs） | 固定 MCP 工具集（`mastra_mastraDocs` / `mastra_getMastraExportDetails` 等） |
 
 > **何时选 Skill 模式**：希望 AI 用 CLI 完整能力（创建项目、跑 `mastra api`、查 `node_modules/@mastra/*/dist/docs/`），按官方推荐获得更好性能。
@@ -36,10 +36,10 @@
 
 > **Skill 设计核心**：教 AI "**不要相信内部知识**"（"Everything you know about Mastra is likely outdated or wrong"）。AI 按 skill 指引通过 bash 跑 `ls node_modules/@mastra/` / `cat dist/docs/SKILL.md` / `curl mastra.ai/llms.txt` 拉取最新文档，**避免凭训练数据乱写代码**。
 
-> **SaaS progressive disclosure 机制**（同 13-session-skills.md T15.15-T15.17，agent-browser-skill.md T45.10-T45.13）：
-> 1. **system prompt 仅注入 `<preloaded_skills>` manifest**：name/description + 9 个 resource 的 path/type/size 元数据
-> 2. **第一层按需加载**：AI 调 `skill` tool with `{"name":"mastra"}` → 返回 SKILL.md 完整 content（6KB）到 assistant turn
-> 3. **第二层按需加载（resource-level）**：调 `skill` tool with `{"name":"mastra","resources":["references/common-errors.md"]}` → 返回指定 reference 完整 content
+> **SaaS progressive disclosure 机制**（同 [`session-skill-resources.md`](../../../docs/session-skill-resources.md)）：
+> 1. **system prompt 仅注入 `<preloaded_skills>` manifest**：name/description + 9 个 resource 的 path/type/size/digest 元数据
+> 2. **第一层按需加载**：AI 调 `skill` tool with `{"name":"mastra"}` → 返回 SKILL.md 完整 content（6KB） + `resource_directory`（隐藏目录路径） + 9 个 resource 元数据（path/type/size/digest）
+> 3. **第二层按需加载（resource-level）**：AI 用 `read`/`bash` 从 `resource_directory` 读取所需 resource 文件（如 `read resource_directory/references/common-errors.md`）
 
 ---
 
@@ -50,13 +50,13 @@
 | 1. 创建 session | `new_sid -kb` 启动沙箱 | T46.1 |
 | 2. 验证沙箱 | 确认 npm + 网络可达 mastra.ai | T46.2 |
 | 3. 注册 skill bundle | `skills/create` 把 `SKILL.md` + 9 个 resources 写入 PG | T46.3 |
-| 4. AI 调用 | `prompt_async` 显式 `skills:["mastra"]` 触发，AI 第一轮调 `skill` tool 加载 SKILL.md，按需加载 reference，用 `bash` 查文档/跑 CLI | T46.4 |
+| 4. AI 调用 | `prompt_async` 显式 `skills:["mastra"]` 触发，AI 第一轮调 `skill` tool 加载 SKILL.md 指令，用 `read`/`bash` 从隐藏目录按需读取 resource | T46.4 |
 
 **关键**：步骤 3 只写 PG `session_skill` 表，**不进 system prompt**。AI 在 message 处理时：
-1. **system prompt 仅注入 manifest**（`<preloaded_skills>`：name/description + 9 个 resource 的 path/type/size 元数据）
-2. **AI 第一次需要 skill 时主动调 `skill` tool**（SaaS 内置工具）→ 返回 SKILL.md 完整 content（6KB）注入 assistant turn
-3. **AI 需要某个 reference 时调 `skill` tool 带 `resources` 参数**（resource-level progressive disclosure）
-4. **AI 通过 bash 执行 skill 教的命令**：`ls node_modules/@mastra/` / `cat dist/docs/SKILL.md` / `bash scripts/provider-registry.mjs` / `mastra api ...`
+1. **system prompt 仅注入 manifest**（`<preloaded_skills>`：name/description + 9 个 resource 的 path/type/size/digest 元数据）
+2. **AI 第一次需要 skill 时主动调 `skill` tool**（SaaS 内置工具，输入只有 `{"name":"mastra"}`）→ 返回 SKILL.md 完整 content（6KB） + `resource_directory` 隐藏目录路径 + 9 个 resource 元数据
+3. **AI 需要某个 reference 时用 `read`/`bash` 从隐藏目录读取**（如 `read resource_directory/references/common-errors.md`），resource 正文不进入 `skill` tool output
+4. **AI 通过 bash 执行 skill 教的命令**：`ls node_modules/@mastra/` / `cat dist/docs/SKILL.md` / `node resource_directory/scripts/provider-registry.mjs` / `mastra api ...`
 
 ---
 
@@ -220,7 +220,7 @@ BEFORE=$(curl -s "$BASE/session/$SID/message" | python3 -c "import json,sys;prin
 
 curl -s -X POST "$BASE/session/$SID/prompt_async" \
   -H 'Content-Type: application/json' \
-  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"用 mastra skill 告诉我：1) Mastra 是什么 2) Agent 和 Workflow 的区别（如果需要详细 API 参考，用 skill tool 加载 resources=['references/core-concepts.md']）\"}],\"skills\":[\"mastra\"],\"model\":$MODEL}" \
+  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"用 mastra skill 告诉我：1) Mastra 是什么 2) Agent 和 Workflow 的区别（如果需要详细 API 参考，用 read 从 skill 返回的 resource_directory 读取 references/core-concepts.md）\"}],\"skills\":[\"mastra\"],\"model\":$MODEL}" \
   -w "HTTP %{http_code}\n"
 
 # 轮询：等到 AI 输出 assistant 文本
@@ -243,6 +243,8 @@ while (Date.now() - start < 150000) {
           console.log(`[${i} ${role}] skill ${s.status||"?"} input=${JSON.stringify(s.input||{}).slice(0,200)}`)
         } else if (p.tool === "bash") {
           console.log(`[${i} ${role}] bash ${s.status||"?"} ${(s.input?.command||"").slice(0,150)}`)
+        } else if (p.tool === "read") {
+          console.log(`[${i} ${role}] read ${s.status||"?"} ${(s.input?.filePath||"").slice(0,150)}`)
         }
       } else if (p.type === "text" && p.text?.trim()) {
         console.log(`[${i} ${role}] TEXT: ${p.text.slice(0,500)}`)
@@ -257,10 +259,10 @@ while (Date.now() - start < 150000) {
 '
 ```
 
-**期望**（关键差异：AI 第一步调内置 `skill` tool，按需加载 reference）：
+**期望**（关键差异：AI 第一步调内置 `skill` tool，resource 正文通过 `read`/`bash` 从隐藏目录读取）：
 - `prompt_async` 返回 `HTTP 204`
-- **第一个工具调用是 `skill`**（SaaS 内置 tool），input 可能带 `resources:["references/core-concepts.md"]`，output 含 SKILL.md（≈6KB）或 SKILL.md + 指定 reference
-- 后续多个 `bash` 工具调用 `completed`：命令可能是 `ls node_modules/@mastra/` / `cat ...` / `curl https://mastra.ai/llms.txt` 等
+- **第一个工具调用是 `skill`**（SaaS 内置 tool），input 为 `{"name":"mastra"}`（无 `resources` 参数），output 含 SKILL.md 完整 content（≈6KB） + `<resource_directory>` 隐藏目录路径 + 9 个 resource 的 path/type/size/digest 元数据，**不含 resource 正文**
+- 后续 `read` 工具调用从隐藏目录读取所需 reference（如 `read resource_directory/references/core-concepts.md`），或 `bash` 调用执行命令：`ls node_modules/@mastra/` / `cat ...` / `curl https://mastra.ai/llms.txt` 等
 - AI 文本回复用中文回答 "Mastra 是什么" + "Agent vs Workflow 区别"，**关键 API 引用 mastra 当前文档**（不是凭训练数据乱答）
 
 > **Mastra skill 特点**：skill content 教 AI "**不要相信内部知识，先查文档**"，所以 AI 看到问题后第一步通常是 bash 跑 `ls node_modules/@mastra/` 检查包是否安装，再决定走 embedded-docs（包已装）还是 remote-docs（fetch mastra.ai）。
@@ -269,7 +271,7 @@ while (Date.now() - start < 150000) {
 
 ## 五、实战场景
 
-> 复用 T46.1-T46.3 已注册 skill 的 session（变量 `$SID` 复用）。每个场景只给 prompt 和期望，工具调用类型均为 `skill` + `bash`。
+> 复用 T46.1-T46.3 已注册 skill 的 session（变量 `$SID` 复用）。每个场景只给 prompt 和期望，工具调用类型为 `skill`（加载指令） + `read`/`bash`（从隐藏目录读取 resource / 执行命令）。
 
 ### T46.5 创建 Mastra 项目
 
@@ -279,19 +281,20 @@ while (Date.now() - start < 150000) {
 ```
 
 **期望**：
+- AI 调 `skill` tool（input 只有 `{"name":"mastra"}`），从 output 获取 `resource_directory`
+- AI 用 `read` 从隐藏目录读取 `references/create-mastra.md` 获取步骤
 - bash 调用含 `npx create-mastra` 或 `npm install @mastra/core`
 - 项目创建后 `ls /workspace/my-app/src/mastra/` 显示 `index.ts` / `agents/` 等
-- AI 引用 `references/create-mastra.md` 的步骤
 
 ### T46.6 写一个简单 Agent
 
 **Prompt**：
 ```text
-用 mastra skill 在 /workspace/my-app/src/mastra/agents/weather-agent.ts 创建一个简单 Agent：用 OpenAI gpt-4o-mini，回答天气问题。如果 API 不确定，用 skill tool 加载 resources=['references/embedded-docs.md'] 查最新 Agent API
+用 mastra skill 在 /workspace/my-app/src/mastra/agents/weather-agent.ts 创建一个简单 Agent：用 OpenAI gpt-4o-mini，回答天气问题。如果 API 不确定，用 read 从 skill 返回的 resource_directory 读取 references/embedded-docs.md 查最新 Agent API
 ```
 
 **期望**：
-- AI 调 `skill` tool 带 resources 参数加载 `embedded-docs.md`
+- AI 用 `read` 从隐藏目录读取 `references/embedded-docs.md`
 - bash 调用含 `cat node_modules/@mastra/core/dist/docs/...` 或 `curl https://mastra.ai/docs/...`
 - 生成的代码用**当前 API**（`new Agent({...})`），不是过时的写法
 
@@ -299,22 +302,22 @@ while (Date.now() - start < 150000) {
 
 **Prompt**：
 ```text
-我在用 mastra 创建 Agent 时遇到错误 "Cannot find module '@mastra/core'"。用 mastra skill 帮我排查（如果需要错误代码参考，用 skill tool 加载 resources=['references/common-errors.md']）
+我在用 mastra 创建 Agent 时遇到错误 "Cannot find module '@mastra/core'"。用 mastra skill 帮我排查（如果需要错误代码参考，用 read 从 skill 返回的 resource_directory 读取 references/common-errors.md）
 ```
 
 **期望**：
-- AI 调 `skill` tool 带 `resources:["references/common-errors.md"]`
+- AI 用 `read` 从隐藏目录读取 `references/common-errors.md`
 - AI 给出具体排查步骤（检查 package.json、npm install、tsconfig paths 等）
 
 ### T46.8 用 provider-registry 选模型
 
 **Prompt**：
 ```text
-用 mastra skill 的 scripts/provider-registry.mjs 查一下 Anthropic 有哪些 model 可用，告诉我 model 列表
+用 mastra skill 的 scripts/provider-registry.mjs 查一下 Anthropic 有哪些 model 可用，告诉我 model 列表。脚本在 skill 返回的 resource_directory 中
 ```
 
 **期望**：
-- bash 调用含 `node scripts/provider-registry.mjs` 或类似
+- bash 调用含 `node resource_directory/scripts/provider-registry.mjs`（隐藏目录完整路径）
 - AI 列出 Anthropic 当前可用 model（claude-3-5-sonnet 等）
 
 ### T46.9 异常处理：node_modules 没装 mastra
@@ -325,6 +328,7 @@ while (Date.now() - start < 150000) {
 ```
 
 **期望**：
+- AI 用 `read` 从隐藏目录读取 `references/remote-docs.md` 获取 remote-docs 指引
 - AI 不应该尝试 `cat node_modules/@mastra/...`（因为没装）
 - AI 应该走 remote-docs：`curl https://mastra.ai/llms.txt` 或 `curl https://mastra.ai/docs/<path>.md`
 - 回答符合 `references/remote-docs.md` 的指引
@@ -333,7 +337,7 @@ while (Date.now() - start < 150000) {
 
 ## 六、Progressive Disclosure 验证
 
-> 验证 SaaS session_skill 的渐进式披露机制（同 13-session-skills.md T15.15-T15.17，agent-browser-skill.md T45.10-T45.13）。测试方法：同一个 session 内连续观察 4 个阶段的 input tokens 与工具调用类型。
+> 验证 SaaS session_skill 的渐进式披露机制（同 [`session-skill-resources.md`](../../../docs/session-skill-resources.md)）。测试方法：同一个 session 内连续观察 4 个阶段的 input tokens 与工具调用类型。
 
 ### T46.10 baseline：无 skill 时 system prompt token 数
 
@@ -379,14 +383,14 @@ for (const p of last.parts||[]) if (p.type==="step-finish") {
 '
 ```
 
-**期望**：`(input + cache_read)` 增量 **≤ 200 tokens**（仅 manifest 几行：name/description + 9 个 resource 元数据）。**50KB bundle 不进 system prompt**。
+**期望**：`(input + cache_read)` 增量 **≤ 200 tokens**（仅 manifest 几行：name/description + 9 个 resource 的 path/type/size/digest 元数据）。**50KB bundle 不进 system prompt**。
 
-> **实测记录**（2026-07-20）：
-> - baseline: input=205 + cache_read=8512 = **8717**
-> - 注册 50KB bundle 后: input=7645 + cache_read=1216 = **8861**
-> - **delta = 144 tokens**（9 个 resource 的 manifest 元数据）
+> **实测记录**（2026-07-30）：
+> - baseline: input=481 + cache_read=8192 = **8673**
+> - 注册 50KB bundle 后: input=626 + cache_read=8192 = **8818**
+> - **delta = 145 tokens**（9 个 resource 的 manifest 元数据含 size/digest）
 >
-> 注意 `cache_read` 从 8512 暴跌到 1216 —— 说明 system prompt 因加入 manifest 发生变化，缓存失效重传，这正是 progressive disclosure 的证据（manifest 进 prompt，完整 content/resource 不进）。
+> 注意 `input` 从 481 升至 626 —— system prompt 因加入 manifest 而增长，但 cache_read 不变（仍 8192），说明增量很小且缓存仍有效。50KB resource 正文不进 system prompt。
 
 ### T46.12 显式触发：AI 第一个 tool 是内置 `skill`
 
@@ -417,8 +421,9 @@ for (let i = before; i < msgs.length; i++) {
 
 **期望**：
 - AI 第一段 reasoning 含 "load the skill" / "first load" 之类
-- **第一个 TOOL 是 `skill`**（不是 bash！），input=`{"name":"mastra"}` 或带 `resources` 参数
-- `skill` tool output 长度 ≈ 6000 字符（SKILL.md 完整 content）或更多（含 resource）
+- **第一个 TOOL 是 `skill`**（不是 bash/read！），input=`{"name":"mastra"}`（无 `resources` 参数）
+- `skill` tool output 含 SKILL.md 完整 content（≈6KB） + `<resource_directory>` 隐藏目录路径 + 9 个 resource 的 path/type/size/digest 元数据，**不含 resource 正文**
+- output 长度 ≈ 8000 字符（远小于 52KB bundle）
 
 ### T46.13 同 session 再发：缓存命中，不重复调 `skill` tool
 
@@ -434,29 +439,30 @@ sleep 80
 curl -s "$BASE/session/$PD_SID/message" | bun -e '
 const msgs = await new Response(Bun.stdin.stream()).json()
 const before = '$BEFORE'
-let skillCount = 0, bashCount = 0
+let skillCount = 0, bashCount = 0, readCount = 0
 for (let i = before; i < msgs.length; i++) {
   for (const p of msgs[i].parts||[]) {
     if (p.type==="tool") {
       if (p.tool==="skill") skillCount++
       if (p.tool==="bash") bashCount++
+      if (p.tool==="read") readCount++
     }
   }
 }
-console.log(`\n=== skill 调用 ${skillCount} 次, bash ${bashCount} 次 ===`)
-console.log(skillCount === 0 ? "✅ 缓存生效" : "⚠️ 重复加载")
+console.log(`\n=== skill 调用 ${skillCount} 次, bash ${bashCount} 次, read ${readCount} 次 ===`)
+console.log(skillCount === 0 ? "✅ 缓存生效" : "⚠️ 重复加载 skill")
 '
 ```
 
 **期望**：
 - **`cache_read` 持续高位（10K+）**：system prompt 走 prompt cache（progressive disclosure 缓存生效的核心证据）
-- **skill tool 调用次数可能不为 0**：mastra SKILL.md 教 AI "按问题精确查 reference"，AI 遇到新主题问题时会主动加载对应 reference（这是按需加载，不是缓存失败）
-- 跟 agent-browser 的 T45.13 区别：agent-browser SKILL.md 是 CLI 命令清单（一次加载够用），所以重复 message 时 skill tool = 0 次；mastra 是文档查询型（每个新主题都查），skill tool 调用是预期行为
+- **skill tool 调用次数可能不为 0**：mastra SKILL.md 教 AI "按问题精确查 reference"，AI 遇到新主题问题时会主动用 `read` 从隐藏目录加载对应 reference（这是按需读取，不是缓存失败）
+- 跟 agent-browser 的区别：agent-browser SKILL.md 是 CLI 命令清单（一次加载够用），所以重复 message 时 skill tool = 0 次；mastra 是文档查询型（每个新主题都查），AI 用 `read` 从隐藏目录按需读取 reference 是预期行为
 
-> **实测记录**（2026-07-20）：
-> - T46.12（首次触发）: msg[1] reasoning "load the skill first" → skill tool 加载 SKILL.md + core-concepts.md（output 7451c），in=311 cache_read=10752
-> - T46.13（同 session 换主题）: AI 再次调 skill tool 加载 core-concepts.md，但 **`in=311 cache_read=10752` 跟 T46.12 完全一致** —— system prompt 全缓存命中，只新增 resource content（按需）
-> - **结论**：progressive disclosure 的"缓存"本质是 **system prompt 走 prompt cache**（input 低、cache_read 高），不是"AI 不再调 skill tool"。AI 按 SKILL.md 指引主动按需加载 resource 是预期行为。
+> **实测记录**（2026-07-30）：
+> - T46.12（首次触发）: skill tool input=`{"name":"mastra"}`，output 8002c（SKILL.md 6KB + resource_directory + 9 条 metadata），AI 用 `read` 从隐藏目录读 `core-concepts.md`
+> - T46.13（同 session 换主题）: skill tool 调用 0 次，**cache_read=11776, input=653** —— system prompt 全缓存命中，AI 直接用已有上下文回答
+> - **结论**：progressive disclosure 的"缓存"本质是 **system prompt 走 prompt cache**（input 低、cache_read 高）。resource 正文物化到隐藏目录后，AI 按需用 `read` 读取，不经过 `skill` tool。
 
 ---
 
@@ -464,12 +470,13 @@ console.log(skillCount === 0 ? "✅ 缓存生效" : "⚠️ 重复加载")
 
 ### N46.1 SaaS progressive disclosure 自动处理大 skill
 
-**机制**（同 13-session-skills.md T15.15-T15.17）：
-- system prompt 只注入 `<preloaded_skills>` manifest（name/description + 9 个 resource 元数据）
-- AI 第一次需要时调内置 `skill` tool 加载完整 content 到 assistant turn（一次性）
-- 后续 message 缓存命中，不重复加载
+**机制**（同 [`session-skill-resources.md`](../../../docs/session-skill-resources.md)）：
+- system prompt 只注入 `<preloaded_skills>` manifest（name/description + 9 个 resource 的 path/type/size/digest 元数据）
+- AI 第一次需要时调内置 `skill` tool（input 只有 `{"name":"mastra"}`）→ 返回 SKILL.md 完整 content + `resource_directory` 隐藏目录路径 + resource 元数据
+- resource 正文物化到 `/home/sandbox/.local/share/opencode/session-skills/` 隐藏目录，AI 用 `read`/`bash` 按需读取
+- 后续 message 缓存命中，不重复调 `skill` tool
 
-**结论**：注册 50KB 完整 skill bundle（6KB SKILL.md + 9 resources）不会挤压 system prompt。
+**结论**：注册 50KB 完整 skill bundle（6KB SKILL.md + 9 resources）不会挤压 system prompt，resource 正文也不进入 `skill` tool output。
 
 ### N46.2 网络依赖（remote-docs 模式）
 
@@ -491,30 +498,30 @@ console.log(skillCount === 0 ? "✅ 缓存生效" : "⚠️ 重复加载")
 
 | 用例 | 结果 | 验证详情 |
 |------|------|---------|
-| T46.1 创建 session | ⬜ | `new_sid -kb` 返回 ses_xxx |
-| T46.2 验证沙箱 | ⬜ | Node + npm + mastra.ai 可达 |
-| T46.3 注册 skill bundle | ⬜ | PG `mastra\|<6000+>\|9` |
-| T46.4 AI 调用（基础 + resource 加载） | ⬜ | 第一个 tool 是 `skill`，可能带 `resources` 参数；bash 查文档；AI 中文回答 |
-| T46.5 创建 Mastra 项目 | ⬜ | bash 调 `npx create-mastra`，生成 src/mastra/ |
-| T46.6 写简单 Agent | ⬜ | 加载 `embedded-docs.md`，代码用当前 API |
-| T46.7 排查错误 | ⬜ | 加载 `common-errors.md`，给具体步骤 |
-| T46.8 用 provider-registry | ⬜ | bash 跑 `node scripts/provider-registry.mjs`，列出 model |
-| T46.9 异常处理（无 node_modules） | ⬜ | AI 走 remote-docs，不试 cat node_modules |
-| T46.10 baseline token | ⬜ | 无 skill 时 input ≈ 8653 tokens |
-| T46.11 注册后 system prompt | ✅ | 注册 50KB bundle 后 `(input+cache_read)` 仅 +144 tokens（manifest 化） |
-| T46.12 触发时 skill tool | ⬜ | 第一个 tool 是 `skill`，output 含 SKILL.md（≈6KB） |
-| T46.13 缓存命中 | ⬜ | 同 session 再发，skill tool 调用 0 次 |
+| T46.1 创建 session | ✅ | `new_sid -kb` 返回 ses_xxx |
+| T46.2 验证沙箱 | ✅ | Node v24.18.0 + npm 11.16.0 + mastra.ai 200 |
+| T46.3 注册 skill bundle | ✅ | PG `mastra\|6334\|9`；API resources 仅元数据无 content；PG 完整 content+size+digest |
+| T46.4 AI 调用（基础 + resource 加载） | ✅ | 第一个 tool 是 `skill`，input 只有 name；output 含 resource_directory+metadata 无 content；AI 用 read 从隐藏目录读 reference |
+| T46.5 创建 Mastra 项目 | ✅ | AI 用 read 读 create-mastra.md；npm install 508 packages；tsc 通过 |
+| T46.6 写简单 Agent | ✅ | 确认已有 weather-agent.ts 符合要求 |
+| T46.7 排查错误 | ✅ | AI 用 read 读 common-errors.md；逐项检查 tsconfig/package.json |
+| T46.8 用 provider-registry | ✅ | bash 跑 `node resource_directory/scripts/provider-registry.mjs`；列出 15 个 model |
+| T46.9 异常处理（无 node_modules） | ✅ | AI 用 read 读 remote-docs.md；走 remote-docs 路径 |
+| T46.10 baseline token | ✅ | 无 skill 时 sum=8673 tokens |
+| T46.11 注册后 system prompt | ✅ | 注册 50KB bundle 后 `(input+cache_read)` 仅 +145 tokens（manifest 含 size/digest） |
+| T46.12 触发时 skill tool | ✅ | 第一个 tool 是 `skill`，input 只有 name，output 8002c（远小于 52KB bundle） |
+| T46.13 缓存命中 | ✅ | 同 session 再发，skill tool 0 次，cache_read=11776 |
 
 **验证层级**：
 
 | 层级 | 标准 | 结果 |
 |------|------|------|
-| 沙箱预装 | Node + npm + 网络可达 mastra.ai | ⬜ |
-| Skill 注册 | session_skill 表 content + 9 resources 完整持久化 | ⬜ |
-| AI 感知 | message 显式触发 skill 后 AI 用 bash 查文档 | ⬜ |
-| 真实执行 | bash 实际拉到当前 API 文档（embedded 或 remote） | ⬜ |
-| 模式差异 | 工具类型为 `skill` + `bash`（不是 `mastra_*`） | ⬜ |
-| Progressive Disclosure | system prompt 仅 manifest；AI 用 `skill` tool 按需加载；缓存命中 | ⬜ |
+| 沙箱预装 | Node + npm + 网络可达 mastra.ai | ✅ |
+| Skill 注册 | session_skill 表 content + 9 resources 完整持久化（含 size/digest） | ✅ |
+| AI 感知 | message 显式触发 skill 后 AI 用 read/bash 从隐藏目录查文档 | ✅ |
+| 真实执行 | bash/read 实际拉到当前 API 文档（embedded 或 remote） | ✅ |
+| 模式差异 | 工具类型为 `skill` + `read`/`bash`（不是 `mastra_*`） | ✅ |
+| Progressive Disclosure | system prompt 仅 manifest；resource 正文物化到隐藏目录；AI 用 read 按需读取；缓存命中 | ✅ |
 
 ---
 
@@ -567,5 +574,5 @@ curl -s -X POST "$BASE/session/$SID/prompt_async" -H 'Content-Type: application/
   -w "HTTP %{http_code}\n"
 
 # 5. PG 验证
-psql "$PG_URL" -t -c "SELECT data->>'tool', data->'state'->>'status' FROM part WHERE session_id='$SID' AND data->>'tool' IN ('skill','bash')"
+psql "$PG_URL" -t -c "SELECT data->>'tool', data->'state'->>'status' FROM part WHERE session_id='$SID' AND data->>'tool' IN ('skill','bash','read')"
 ```

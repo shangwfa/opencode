@@ -19,6 +19,7 @@ import { configEntryNameFromPath } from "./entry-name"
 import { SessionAgentsMd } from "@/session/agents-md"
 import { SessionAgent } from "@/agent/session-agent"
 import { SessionSkill } from "@/skill/session-skill"
+import { SkillResource } from "@/skill/resource"
 import { SessionMcp } from "@/mcp/session-mcp"
 import { SessionTool } from "@/tool/session-tool"
 import { SessionCommand } from "@/command/session-command"
@@ -36,9 +37,6 @@ export class Service extends Context.Service<Service, Interface>()("@opencode/Se
 
 const INTERNAL_AGENTS = new Set(["compaction", "title", "summary"])
 
-const RESOURCE_MAX = 256 * 1024
-const BUNDLE_MAX = 1024 * 1024
-const RESOURCE_COUNT_MAX = 64
 const SKIP_DIRS = new Set([".git", "node_modules", ".DS_Store", "__pycache__", ".cache"])
 
 // ── FileSource: abstracts local FS vs sandbox file access ──
@@ -84,9 +82,9 @@ function sandboxSource(sp: NonNullable<SandboxProvider.Interface>, sessionID: Se
     r.logs.stdout.map((l) => (typeof l === "string" ? l : l.text)).join("\n")
 
   const run = (cmd: string, timeoutSeconds = 10) =>
-    sp.runInSession(sessionID, cmd, { timeoutSeconds }).pipe(
-      Effect.catch(() => Effect.succeed({ logs: { stdout: [] as any[], stderr: [] }, exitCode: 1 } as any)),
-    )
+    sp
+      .runInSession(sessionID, cmd, { timeoutSeconds })
+      .pipe(Effect.catch(() => Effect.succeed({ logs: { stdout: [] as any[], stderr: [] }, exitCode: 1 } as any)))
 
   return {
     exists: (p) =>
@@ -97,9 +95,7 @@ function sandboxSource(sp: NonNullable<SandboxProvider.Interface>, sessionID: Se
 
     readText: (p) =>
       Effect.gen(function* () {
-        const sb = yield* sp.getOrCreate(sessionID).pipe(
-          Effect.catch(() => Effect.succeed(null as any)),
-        )
+        const sb = yield* sp.getOrCreate(sessionID).pipe(Effect.catch(() => Effect.succeed(null as any)))
         if (!sb) return ""
         return yield* Effect.promise(() => sb.files.readFile(p).catch(() => "") as Promise<string>)
       }),
@@ -118,7 +114,10 @@ function sandboxSource(sp: NonNullable<SandboxProvider.Interface>, sessionID: Se
 
     validateFile: (worktree, file) =>
       Effect.gen(function* () {
-        const r = yield* run(`rp=$(realpath "${file}" 2>/dev/null) && wt=$(realpath "${worktree}" 2>/dev/null) && test -f "$rp" && echo "OK $rp $wt"`, 5)
+        const r = yield* run(
+          `rp=$(realpath "${file}" 2>/dev/null) && wt=$(realpath "${worktree}" 2>/dev/null) && test -f "$rp" && echo "OK $rp $wt"`,
+          5,
+        )
         const out = stdout(r).trim()
         if (!out.startsWith("OK ")) return undefined
         const [, real, realWt] = out.split(" ")
@@ -136,20 +135,13 @@ function sandboxSource(sp: NonNullable<SandboxProvider.Interface>, sessionID: Se
 
 // ── Helpers ──
 
-type SkillResource = { path: string; type: "doc" | "script" | "template" | "asset"; content: string }
-
-function resourceKind(file: string): SkillResource["type"] {
-  if (file.startsWith("templates/")) return "template"
-  if (file.startsWith("references/")) return "doc"
-  const ext = path.extname(file)
-  if ([".md", ".mdx", ".txt"].includes(ext)) return "doc"
-  if ([".sh", ".bash", ".zsh", ".py", ".js", ".ts"].includes(ext)) return "script"
-  return "asset"
-}
-
 const isSkipPath = (rel: string) => rel.split("/").some((seg) => SKIP_DIRS.has(seg))
 
-function collectSkillResources(fs: FileSource, worktree: string, skillRoot: string): Effect.Effect<SkillResource[]> {
+function collectSkillResources(
+  fs: FileSource,
+  worktree: string,
+  skillRoot: string,
+): Effect.Effect<SkillResource.Stored[]> {
   return Effect.gen(function* () {
     const files = yield* fs.scan("**/*", skillRoot).pipe(Effect.catch(() => Effect.succeed([] as string[])))
 
@@ -159,19 +151,20 @@ function collectSkillResources(fs: FileSource, worktree: string, skillRoot: stri
       .filter((rel) => !isSkipPath(rel))
       .toSorted()
 
-    const resources: SkillResource[] = []
+    const resources: SkillResource.Stored[] = []
     let total = 0
     for (const rel of candidates) {
       const absolute = path.join(skillRoot, rel)
       const validPath = yield* fs.validateFile(worktree, absolute)
       if (!validPath) continue
       const size = yield* fs.size(validPath)
-      if (size > RESOURCE_MAX) continue
+      if (size > SkillResource.MAX_SIZE) continue
       const content = yield* fs.readText(validPath)
       if (!content) continue
-      resources.push({ path: rel, type: resourceKind(rel), content })
-      total += Buffer.byteLength(content)
-      if (total > BUNDLE_MAX || resources.length >= RESOURCE_COUNT_MAX) break
+      const resource = SkillResource.make({ path: rel, type: SkillResource.kind(rel), content })
+      if (total + resource.size > SkillResource.MAX_BUNDLE_SIZE || resources.length >= SkillResource.MAX_COUNT) break
+      resources.push(resource)
+      total += resource.size
     }
     return resources
   })
@@ -237,11 +230,10 @@ export const layer = Layer.effect(
       const pluginSvc = Option.getOrUndefined(yield* Effect.serviceOption(SessionPlugin.Service))
 
       const dotDir = path.join(directory, ".opencode")
-      const hasDotDir = yield* fs.exists(dotDir)
       const loaded: string[] = []
       const skipped: Diagnostic[] = []
 
-      if (!hasDotDir && !(yield* fs.exists(path.join(directory, "AGENTS.md"))) && !(yield* fs.exists(path.join(directory, "opencode.json"))) && !(yield* fs.exists(path.join(directory, "opencode.jsonc")))) return { loaded, skipped }
+      if (!(yield* fs.exists(dotDir))) return { loaded, skipped }
 
       for (const [service, resource] of [
         [agentsMdSvc, "AGENTS.md"],
@@ -255,14 +247,10 @@ export const layer = Layer.effect(
         if (!service) skipped.push({ path: resource, reason: "Session service unavailable" })
       }
 
-      // AGENTS.md — check .opencode/AGENTS.md first, then project root AGENTS.md
+      // AGENTS.md
       if (agentsMdSvc) {
-        let agentsMdPath = path.join(dotDir, "AGENTS.md")
-        let validPath = hasDotDir ? yield* fs.validateFile(directory, agentsMdPath) : undefined
-        if (!validPath) {
-          agentsMdPath = path.join(directory, "AGENTS.md")
-          validPath = yield* fs.validateFile(directory, agentsMdPath)
-        }
+        const agentsMdPath = path.join(dotDir, "AGENTS.md")
+        const validPath = yield* fs.validateFile(directory, agentsMdPath)
         if (validPath) {
           const content = yield* fs.readText(validPath)
           if (content.trim()) {
@@ -272,8 +260,8 @@ export const layer = Layer.effect(
         }
       }
 
-      // agents — only scan .opencode/ subdirectory
-      if (agentSvc && hasDotDir) {
+      // agents
+      if (agentSvc) {
         const agentFiles = yield* fs.scan("{agent,agents}/**/*.md", dotDir).pipe(
           Effect.catch((error) =>
             Effect.sync(() => {
@@ -290,16 +278,18 @@ export const layer = Layer.effect(
             continue
           }
           const raw = yield* fs.readText(validPath)
-          const md = yield* Effect.try({ try: () => ConfigMarkdownCore.parse(raw), catch: () => undefined as any }).pipe(
-            Effect.catch(() => Effect.succeed(undefined)),
-          )
+          const md = yield* Effect.try({
+            try: () => ConfigMarkdownCore.parse(raw),
+            catch: () => undefined as any,
+          }).pipe(Effect.catch(() => Effect.succeed(undefined)))
           if (!md) {
             skipped.push({ path: rel, reason: "invalid markdown" })
             continue
           }
           const name = configEntryNameFromPath(rel, ["agent/", "agents/"])
           const parsed = yield* Effect.try({
-            try: () => ConfigParse.schema(ConfigAgentV1.Info, { name, ...md.data, prompt: md.content.trim() }, validPath),
+            try: () =>
+              ConfigParse.schema(ConfigAgentV1.Info, { name, ...md.data, prompt: md.content.trim() }, validPath),
             catch: (error) => error,
           }).pipe(
             Effect.catch((error) =>
@@ -324,7 +314,7 @@ export const layer = Layer.effect(
       }
 
       // skills
-      if (skillSvc && hasDotDir) {
+      if (skillSvc) {
         const skillFiles = yield* fs.scan("{skill,skills}/**/SKILL.md", dotDir).pipe(
           Effect.catch((error) =>
             Effect.sync(() => {
@@ -341,10 +331,16 @@ export const layer = Layer.effect(
             continue
           }
           const raw = yield* fs.readText(validPath)
-          const md = yield* Effect.try({ try: () => ConfigMarkdownCore.parse(raw), catch: () => undefined as any }).pipe(
-            Effect.catch(() => Effect.succeed(undefined)),
-          )
-          if (!md || typeof md.data !== "object" || md.data === null || typeof (md.data as { name?: unknown }).name !== "string") {
+          const md = yield* Effect.try({
+            try: () => ConfigMarkdownCore.parse(raw),
+            catch: () => undefined as any,
+          }).pipe(Effect.catch(() => Effect.succeed(undefined)))
+          if (
+            !md ||
+            typeof md.data !== "object" ||
+            md.data === null ||
+            typeof (md.data as { name?: unknown }).name !== "string"
+          ) {
             skipped.push({ path: rel, reason: "invalid skill frontmatter" })
             continue
           }
@@ -360,19 +356,18 @@ export const layer = Layer.effect(
         }
       }
 
-      // MCP (from opencode.json / opencode.jsonc) — check .opencode/ first, then project root
+      // MCP (from opencode.json / opencode.jsonc)
       if (mcpSvc) {
         for (const file of ["opencode.json", "opencode.jsonc"]) {
-          let mcpPath = path.join(dotDir, file)
-          let validPath = hasDotDir ? yield* fs.validateFile(directory, mcpPath) : undefined
-          if (!validPath) {
-            mcpPath = path.join(directory, file)
-            validPath = yield* fs.validateFile(directory, mcpPath)
-          }
+          const mcpPath = path.join(dotDir, file)
+          const validPath = yield* fs.validateFile(directory, mcpPath)
           if (!validPath) continue
           const raw = yield* fs.readText(validPath)
           if (!raw) continue
-          const data = yield* Effect.try({ try: () => ConfigParse.jsonc(raw, validPath), catch: (error) => error }).pipe(
+          const data = yield* Effect.try({
+            try: () => ConfigParse.jsonc(raw, validPath),
+            catch: (error) => error,
+          }).pipe(
             Effect.catch((error) =>
               Effect.sync(() => {
                 skipped.push({ path: file, reason: `invalid JSON: ${String(error)}` })
@@ -396,7 +391,7 @@ export const layer = Layer.effect(
       }
 
       // tools
-      if (toolSvc && hasDotDir) {
+      if (toolSvc) {
         const toolFiles = yield* fs.scan("tool/*.{ts,js}", dotDir).pipe(
           Effect.catch((error) =>
             Effect.sync(() => {
@@ -424,7 +419,7 @@ export const layer = Layer.effect(
       }
 
       // commands
-      if (commandSvc && hasDotDir) {
+      if (commandSvc) {
         const commandFiles = yield* fs.scan("{command,commands}/**/*.md", dotDir).pipe(
           Effect.catch((error) =>
             Effect.sync(() => {
@@ -441,9 +436,10 @@ export const layer = Layer.effect(
             continue
           }
           const raw = yield* fs.readText(validPath)
-          const md = yield* Effect.try({ try: () => ConfigMarkdownCore.parse(raw), catch: () => undefined as any }).pipe(
-            Effect.catch(() => Effect.succeed(undefined)),
-          )
+          const md = yield* Effect.try({
+            try: () => ConfigMarkdownCore.parse(raw),
+            catch: () => undefined as any,
+          }).pipe(Effect.catch(() => Effect.succeed(undefined)))
           if (!md) {
             skipped.push({ path: rel, reason: "invalid markdown" })
             continue
@@ -467,7 +463,7 @@ export const layer = Layer.effect(
       }
 
       // plugins
-      if (pluginSvc && hasDotDir) {
+      if (pluginSvc) {
         const pluginFiles = yield* fs.scan("{plugin,plugins}/*.{ts,js}", dotDir).pipe(
           Effect.catch((error) =>
             Effect.sync(() => {

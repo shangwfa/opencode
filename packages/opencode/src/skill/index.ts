@@ -20,6 +20,7 @@ import { SessionSkill } from "./session-skill"
 import type { SessionID } from "@/session/schema"
 import { isRecord } from "@/util/record"
 import { escapeHtml } from "@/util/html"
+import { SkillResource } from "./resource"
 
 const CLAUDE_EXTERNAL_DIR = ".claude"
 const AGENTS_EXTERNAL_DIR = ".agents"
@@ -37,12 +38,14 @@ const CUSTOMIZE_OPENCODE_SKILL_DESCRIPTION =
   "Use ONLY when the user is editing or creating opencode's own configuration: opencode.json, opencode.jsonc, files under .opencode/, or files under ~/.config/opencode/. Also use when creating or fixing opencode agents, subagents, skills, plugins, MCP servers, or permission rules. Do not use for the user's own application code, or for any project that is not configuring opencode itself."
 const CUSTOMIZE_OPENCODE_SKILL_BODY = SkillPlugin.CustomizeOpencodeContent
 
-export const Resource = Schema.Struct({
-  path: Schema.String,
-  type: Schema.Literals(["doc", "script", "template", "asset"]),
-  content: Schema.String,
-})
-export type Resource = Schema.Schema.Type<typeof Resource>
+export const Resource = SkillResource.Stored
+export type Resource = SkillResource.Stored
+
+export const ResourceInput = SkillResource.Input
+export type ResourceInput = SkillResource.Input
+
+export const ResourceInfo = SkillResource.Info
+export type ResourceInfo = SkillResource.Info
 
 export const Info = Schema.Struct({
   name: Schema.String,
@@ -52,6 +55,25 @@ export const Info = Schema.Struct({
   resources: Schema.optional(Schema.Array(Resource)),
 })
 export type Info = Schema.Schema.Type<typeof Info>
+
+export const PublicInfo = Schema.Struct({
+  name: Schema.String,
+  description: Schema.optional(Schema.String),
+  location: Schema.String,
+  content: Schema.String,
+  resources: Schema.optional(Schema.Array(ResourceInfo)),
+})
+export type PublicInfo = Schema.Schema.Type<typeof PublicInfo>
+
+export function publicInfo(info: Info): PublicInfo {
+  return {
+    name: info.name,
+    description: info.description,
+    location: info.location,
+    content: info.content,
+    resources: info.resources?.map(SkillResource.metadata),
+  }
+}
 
 const Issue = Schema.StructWithRest(
   Schema.Struct({
@@ -81,6 +103,19 @@ export class NameMismatchError extends Schema.TaggedErrorClass<NameMismatchError
   actual: Schema.String,
 }) {}
 
+export class InvalidNameError extends Schema.TaggedErrorClass<InvalidNameError>()("SkillInvalidNameError", {
+  name: Schema.String,
+}) {
+  override get message() {
+    return `Invalid skill name: ${JSON.stringify(this.name)}. Expected 1-64 lowercase alphanumeric segments separated by hyphens.`
+  }
+}
+
+export function requireName(name: string) {
+  if (/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(name) && name.length <= 64) return name
+  throw new InvalidNameError({ name })
+}
+
 export class NotFoundError extends Schema.TaggedErrorClass<NotFoundError>()("Skill.NotFoundError", {
   name: Schema.String,
   available: Schema.Array(Schema.String),
@@ -107,10 +142,10 @@ type ScanState = {
 }
 
 export const CreateInput = Schema.Struct({
-  name: Schema.String,
+  name: Schema.String.check(Schema.isPattern(/^[a-z0-9]+(?:-[a-z0-9]+)*$/), Schema.isMaxLength(64)),
   description: Schema.optional(Schema.String),
   content: Schema.String,
-  resources: Schema.optional(Schema.Array(Resource)),
+  resources: Schema.optional(Schema.Array(ResourceInput)),
 })
 export type CreateInput = Schema.Schema.Type<typeof CreateInput>
 
@@ -121,7 +156,7 @@ export interface Interface {
   readonly dirs: () => Effect.Effect<string[]>
   readonly available: (agent?: Agent.Info, session?: string) => Effect.Effect<Info[]>
   readonly sessionList: (session: string) => Effect.Effect<Info[]>
-  readonly sessionCreate: (session: string, input: CreateInput) => Effect.Effect<Info>
+  readonly sessionCreate: (session: string, input: CreateInput) => Effect.Effect<Info, Error>
   readonly sessionLoad: (session: string, dir: string) => Effect.Effect<Info[]>
   readonly sessionUnload: (session: string, name: string) => Effect.Effect<void>
   readonly sessionClear: (session: string) => Effect.Effect<void>
@@ -147,17 +182,27 @@ const add = Effect.fnUntraced(function* (state: State, match: string, events: Ev
 
   if (!isSkillFrontmatter(md.data)) return
 
-  if (state.skills[md.data.name]) {
+  const name = yield* Effect.try({
+    try: () => requireName(md.data.name),
+    catch: (error) => error,
+  }).pipe(
+    Effect.catch((error) =>
+      Effect.logWarning("invalid skill name", { skill: match, error }).pipe(Effect.as(undefined)),
+    ),
+  )
+  if (!name) return
+
+  if (state.skills[name]) {
     yield* Effect.logWarning("duplicate skill name", {
-      name: md.data.name,
-      existing: state.skills[md.data.name].location,
+      name,
+      existing: state.skills[name].location,
       duplicate: match,
     })
   }
 
   state.dirs.add(path.dirname(match))
-  state.skills[md.data.name] = {
-    name: md.data.name,
+  state.skills[name] = {
+    name,
     description: md.data.description,
     location: match,
     content: md.content,
@@ -316,13 +361,14 @@ const layerImpl = Layer.effect(
     const get = Effect.fn("Skill.get")(function* (name: string, session?: string) {
       if (session) {
         const row = yield* sessionSkill.get(session as SessionID, name).pipe(Effect.orDie)
-        if (row) return {
-          name: row.name,
-          description: row.description,
-          location: `session://${session}/${row.name}`,
-          content: row.content,
-          resources: row.resources ?? [],
-        }
+        if (row)
+          return {
+            name: row.name,
+            description: row.description,
+            location: `session://${session}/${row.name}`,
+            content: row.content,
+            resources: row.resources ?? [],
+          }
       }
       const s = yield* InstanceState.get(state)
       return s.skills[name]
@@ -331,13 +377,14 @@ const layerImpl = Layer.effect(
     const require = Effect.fn("Skill.require")(function* (name: string, session?: string) {
       if (session) {
         const row = yield* sessionSkill.get(session as SessionID, name).pipe(Effect.orDie)
-        if (row) return {
-          name: row.name,
-          description: row.description,
-          location: `session://${session}/${row.name}`,
-          content: row.content,
-          resources: row.resources ?? [],
-        }
+        if (row)
+          return {
+            name: row.name,
+            description: row.description,
+            location: `session://${session}/${row.name}`,
+            content: row.content,
+            resources: row.resources ?? [],
+          }
       }
       const s = yield* InstanceState.get(state)
       const info = s.skills[name]
@@ -379,15 +426,15 @@ const layerImpl = Layer.effect(
           resources: row.resources ?? [],
         }))
       }
-      let list = session
-        ? [...sessionSkills, ...Object.values(s.skills)]
-        : Object.values(s.skills)
+      let list = session ? [...sessionSkills, ...Object.values(s.skills)] : Object.values(s.skills)
       const seen = new Set<string>()
-      list = list.filter((skill) => {
-        if (seen.has(skill.name)) return false
-        seen.add(skill.name)
-        return true
-      }).toSorted((a, b) => a.name.localeCompare(b.name))
+      list = list
+        .filter((skill) => {
+          if (seen.has(skill.name)) return false
+          seen.add(skill.name)
+          return true
+        })
+        .toSorted((a, b) => a.name.localeCompare(b.name))
       if (!agent) return list
       return list.filter((skill) => Permission.evaluate("skill", skill.name, agent.permission).action !== "deny")
     })
@@ -404,12 +451,19 @@ const layerImpl = Layer.effect(
     })
 
     const sessionCreate = Effect.fn("Skill.sessionCreate")(function* (session: string, value: CreateInput) {
+      const resources = yield* Effect.try({
+        try: () => {
+          requireName(value.name)
+          return SkillResource.validateBundle((value.resources ?? []).map(SkillResource.make))
+        },
+        catch: (error) => error as Error,
+      })
       const row = yield* sessionSkill.upsert(session as SessionID, {
         name: value.name,
         description: value.description ?? "",
         content: value.content,
-        resources: value.resources as any,
-      }).pipe(Effect.orDie)
+        resources,
+      })
       return {
         name: row.name,
         description: row.description,
@@ -419,19 +473,8 @@ const layerImpl = Layer.effect(
       }
     })
 
-    const RESOURCE_MAX = 256 * 1024
-    const BUNDLE_MAX = 1024 * 1024
-    const RESOURCE_COUNT_MAX = 64
     const SKIP_DIRS = new Set([".git", "node_modules", ".DS_Store", "__pycache__", ".cache"])
     const isSkipPath = (rel: string) => rel.split("/").some((seg) => SKIP_DIRS.has(seg))
-    const resourceKind = (file: string): Resource["type"] => {
-      if (file.startsWith("templates/")) return "template"
-      if (file.startsWith("references/")) return "doc"
-      const ext = path.extname(file)
-      if ([".md", ".mdx", ".txt"].includes(ext)) return "doc"
-      if ([".sh", ".bash", ".zsh", ".py", ".js", ".ts"].includes(ext)) return "script"
-      return "asset"
-    }
 
     const attachResources = (skills: Info[]) =>
       Effect.forEach(skills, (skill) =>
@@ -451,13 +494,14 @@ const layerImpl = Layer.effect(
           for (const rel of candidates) {
             const stat = yield* fsys.stat(path.join(root, rel)).pipe(Effect.option)
             const size = stat._tag === "Some" ? Number((stat.value as any).size ?? 0) : 0
-            if (size > RESOURCE_MAX) continue
+            if (size > SkillResource.MAX_SIZE) continue
             const content = yield* fsys.readFileString(path.join(root, rel)).pipe(Effect.catch(Effect.die))
             if (!content) continue
-            resources.push({ path: rel, type: resourceKind(rel), content })
-            const total = Buffer.byteLength(skill.content)
-              + resources.reduce((sum, r) => sum + Buffer.byteLength(r.content), 0)
-            if (total > BUNDLE_MAX || resources.length >= RESOURCE_COUNT_MAX) break
+            const resource = SkillResource.make({ path: rel, type: SkillResource.kind(rel), content })
+            const total = resources.reduce((sum, item) => sum + item.size, 0)
+            if (total + resource.size > SkillResource.MAX_BUNDLE_SIZE || resources.length >= SkillResource.MAX_COUNT)
+              break
+            resources.push(resource)
           }
           return { ...skill, resources } satisfies Info
         }),
@@ -476,12 +520,14 @@ const layerImpl = Layer.effect(
       const loaded = yield* attachResources(Object.values(tmp.skills))
       const results: Info[] = []
       for (const skill of loaded) {
-        const row = yield* sessionSkill.upsert(session as SessionID, {
-          name: skill.name,
-          description: skill.description ?? "",
-          content: skill.content,
-          resources: skill.resources as any,
-        }).pipe(Effect.orDie)
+        const row = yield* sessionSkill
+          .upsert(session as SessionID, {
+            name: skill.name,
+            description: skill.description ?? "",
+            content: skill.content,
+            resources: skill.resources as any,
+          })
+          .pipe(Effect.orDie)
         results.push({
           name: row.name,
           description: row.description,
@@ -501,7 +547,18 @@ const layerImpl = Layer.effect(
       yield* sessionSkill.removeAll(session as SessionID).pipe(Effect.orDie)
     })
 
-    return Service.of({ get, require, all, dirs, available, sessionList, sessionCreate, sessionLoad, sessionUnload, sessionClear })
+    return Service.of({
+      get,
+      require,
+      all,
+      dirs,
+      available,
+      sessionList,
+      sessionCreate,
+      sessionLoad,
+      sessionUnload,
+      sessionClear,
+    })
   }),
 )
 

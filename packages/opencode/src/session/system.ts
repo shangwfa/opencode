@@ -9,7 +9,6 @@ import PROMPT_BEAST from "./prompt/beast.txt"
 import PROMPT_GEMINI from "./prompt/gemini.txt"
 import PROMPT_GPT from "./prompt/gpt.txt"
 import PROMPT_KIMI from "./prompt/kimi.txt"
-import PROMPT_META from "./prompt/meta.txt"
 
 import PROMPT_CODEX from "./prompt/codex.txt"
 import PROMPT_TRINITY from "./prompt/trinity.txt"
@@ -18,16 +17,17 @@ import type { Agent } from "@/agent/agent"
 import { Permission } from "@/permission"
 import { Skill } from "@/skill"
 import { AbsolutePath } from "@opencode-ai/core/schema"
-import { toSandboxPath } from "@/tool/sandbox-path"
 import { Location } from "@opencode-ai/core/location"
 import { LocationServiceMap, locationServiceMapLayer } from "@opencode-ai/core/location-services"
 import { Reference } from "@opencode-ai/core/reference"
 import { MCP } from "@/mcp"
 import { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import { Flag } from "@/flag/flag"
+import { escapeHtml } from "@/util/html"
+import { existsSync } from "fs"
+import { toSandboxPath } from "@/tool/sandbox-path"
 
 export function provider(model: Provider.Model) {
-  if (model.api.id.includes("muse-spark")) return [PROMPT_META]
   if (model.api.id.includes("gpt-4") || model.api.id.includes("o1") || model.api.id.includes("o3"))
     return [PROMPT_BEAST]
   if (model.api.id.includes("gpt")) {
@@ -45,7 +45,12 @@ export function provider(model: Provider.Model) {
 
 export interface Interface {
   readonly environment: (model: Provider.Model) => Effect.Effect<string[]>
-  readonly skills: (agent: Agent.Info, preload?: string[], session?: string) => Effect.Effect<string | undefined>
+  readonly skills: (
+    agent: Agent.Info,
+    preload?: string[],
+    session?: string,
+    sessionPermission?: PermissionV1.Ruleset,
+  ) => Effect.Effect<string | undefined>
   readonly mcp: (agent: Agent.Info, permission?: PermissionV1.Ruleset) => Effect.Effect<string | undefined>
 }
 
@@ -61,23 +66,24 @@ const layer = Layer.effect(
     return Service.of({
       environment: Effect.fn("SystemPrompt.environment")(function* (model: Provider.Model) {
         const ctx = yield* InstanceState.context
-        const references = Flag.OPENCODE_SANDBOX_ENABLED
-          ? []
-          : yield* Effect.gen(function* () {
-              return (yield* (yield* Reference.Service).list()).filter(
-                (reference) => reference.description !== undefined,
-              )
-            }).pipe(
-              Effect.provide(locations.get(Location.Ref.make({ directory: AbsolutePath.make(ctx.directory) }))),
-              Effect.catchCauseIf(() => true, () => Effect.succeed([])),
-            )
+        const root = ctx.worktree === "/" ? ctx.directory : ctx.worktree
+        const directory = toSandboxPath(ctx.directory, root)
+        const workspace = toSandboxPath(root, root)
+        const references =
+          Flag.OPENCODE_SANDBOX_ENABLED || !existsSync(ctx.directory)
+            ? []
+            : yield* Effect.gen(function* () {
+                return (yield* (yield* Reference.Service).list()).filter(
+                  (reference) => reference.description !== undefined,
+                )
+              }).pipe(Effect.provide(locations.get(Location.Ref.make({ directory: AbsolutePath.make(ctx.directory) }))))
         return [
           [
             `You are powered by the model named ${model.api.id}. The exact model ID is ${model.providerID}/${model.api.id}`,
             `Here is some useful information about the environment you are running in:`,
             `<env>`,
-            `  Working directory: ${ctx.worktree === "/" ? ctx.directory : toSandboxPath(ctx.directory, ctx.worktree)}`,
-            `  Workspace root folder: ${ctx.worktree === "/" ? "/" : toSandboxPath(ctx.worktree, ctx.worktree)}`,
+            `  Working directory: ${directory}`,
+            ...(workspace === directory ? [] : [`  Workspace root folder: ${workspace}`]),
             `  Is directory a git repo: ${ctx.project.vcs === "git" ? "yes" : "no"}`,
             `  Platform: ${process.platform}`,
             `  Today's date: ${new Date().toDateString()}`,
@@ -104,8 +110,14 @@ const layer = Layer.effect(
         ].filter((part): part is string => part !== undefined)
       }),
 
-      skills: Effect.fn("SystemPrompt.skills")(function* (agent: Agent.Info, preload?: string[], session?: string) {
-        if (Permission.disabled(["skill"], agent.permission).has("skill")) return
+      skills: Effect.fn("SystemPrompt.skills")(function* (
+        agent: Agent.Info,
+        preload?: string[],
+        session?: string,
+        sessionPermission?: PermissionV1.Ruleset,
+      ) {
+        if (Permission.disabled(["skill"], Permission.merge(agent.permission, sessionPermission ?? [])).has("skill"))
+          return
 
         const list = yield* skill.available(agent, session)
 
@@ -118,15 +130,16 @@ const layer = Layer.effect(
             if (!info) continue
             parts.push(
               "  <skill>",
-              `    <name>${info.name}</name>`,
-              `    <description>${info.description ?? ""}</description>`,
-              `    <location>${info.location}</location>`,
+              `    <name>${escapeHtml(info.name)}</name>`,
+              `    <description>${escapeHtml(info.description ?? "")}</description>`,
+              `    <location>${escapeHtml(info.location)}</location>`,
             )
             if (info.resources && info.resources.length > 0) {
               parts.push(
                 "    <resources>",
-                ...info.resources.map((resource) =>
-                  `      <resource path="${resource.path}" type="${resource.type}" size="${Buffer.byteLength(resource.content)}" />`,
+                ...info.resources.map(
+                  (resource) =>
+                    `      <resource path="${escapeHtml(resource.path)}" type="${resource.type}" size="${resource.size}" digest="${resource.digest}" />`,
                 ),
                 "    </resources>",
               )
@@ -135,7 +148,7 @@ const layer = Layer.effect(
           }
           parts.push(
             "</preloaded_skills>",
-            "These preloaded skills are manifests only. Before applying a preloaded skill, call the skill tool with its name to load the full instructions. If specific resource content is needed, call the skill tool with the resource paths.",
+            "These preloaded skills are manifests only. Before applying a preloaded skill, call the skill tool with its name to load the full instructions and materialize its resources in the code-agent filesystem.",
           )
         }
 

@@ -36,6 +36,7 @@ import { SessionSummary } from "./summary"
 import { NamedError } from "@opencode-ai/core/util/error"
 import { SessionProcessor } from "./processor"
 import { Tool } from "@/tool/tool"
+import { rematerializeIfNeeded } from "@/tool/skill"
 import { Permission } from "@/permission"
 import { SessionStatus } from "./status"
 import { Goal } from "./goal"
@@ -1383,6 +1384,8 @@ const layer = Layer.effect(
 
             yield* plugin.trigger("experimental.chat.messages.transform", {}, { messages: msgs })
             msgs = (yield* sessionPluginRuntime.trigger("experimental.chat.messages.transform", {}, { messages: msgs })).messages
+
+            yield* rematerializeIfNeeded(sessionID, skills).pipe(Effect.catch(() => Effect.void))
 
             const [skillsPrompt, env, instructions, mcpInstructions, modelMsgs] = yield* Effect.all([
               sys.skills(agent, skills, sessionID),
