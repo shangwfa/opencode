@@ -562,7 +562,7 @@ export const ReadTool = Tool.define<
 )
 
 async function readTextPage(stream: AsyncIterable<Uint8Array>, offset: number, limit: number) {
-  const decoder = new TextDecoder("utf-8", { fatal: true })
+  const decoder = new TextDecoder("utf-8", { fatal: false })
   const lines: string[] = []
   let pending = ""
   let total = 0
@@ -590,6 +590,7 @@ async function readTextPage(stream: AsyncIterable<Uint8Array>, offset: number, l
       const line = pending.slice(0, newline)
       pending = pending.slice(newline + 1)
       append(line.endsWith("\r") ? line.slice(0, -1) : line)
+      if (byteLimitReached) return
     }
   }
 
@@ -597,9 +598,10 @@ async function readTextPage(stream: AsyncIterable<Uint8Array>, offset: number, l
     sourceBytes += chunk.length
     if (chunk.includes(0)) throw new BinaryContentError()
     consume(decoder.decode(chunk, { stream: true }))
+    if (byteLimitReached) break
   }
-  consume(decoder.decode())
-  if (pending) append(pending.endsWith("\r") ? pending.slice(0, -1) : pending)
+  if (!byteLimitReached) consume(decoder.decode())
+  if (pending && !byteLimitReached) append(pending.endsWith("\r") ? pending.slice(0, -1) : pending)
   if (offset > Math.max(total, 1)) throw new Error(`Offset ${offset} is out of range for this file (${total} lines)`)
   const next = total > offset - 1 + lines.length ? offset + lines.length : undefined
   return { lines, total, sourceBytes, next }
