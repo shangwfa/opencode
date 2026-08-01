@@ -55,12 +55,20 @@ function wrap(target: any): any {
 
 function wrapTransaction(pgDb: any) {
   return (fn: (tx: any) => any) => {
-    return Effect.promise(() =>
-      SaasDb.transaction(async (tx: any) => {
-        const result = fn(wrap(tx))
-        if (Effect.isEffect(result)) return await Effect.runPromise(result as any)
-        return result
-      }),
+    // Run the postgres.js transaction to completion regardless of outer
+    // interruption. If we let the effect be interrupted mid-transaction, the
+    // `client.begin` connection is abandoned while still open — every
+    // concurrent durable commit leaks one `idle in transaction` connection,
+    // eventually exhausting the pool and hanging all requests. Interruption
+    // is deferred until the transaction has committed or rolled back.
+    return Effect.uninterruptible(
+      Effect.promise(() =>
+        SaasDb.transaction(async (tx: any) => {
+          const result = fn(wrap(tx))
+          if (Effect.isEffect(result)) return await Effect.runPromise(result as any)
+          return result
+        }),
+      ),
     )
   }
 }
