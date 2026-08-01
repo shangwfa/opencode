@@ -429,28 +429,28 @@ console.log(skillCount === 0 ? "✅ 缓存生效" : "⚠️ 重复加载 skill")
 
 | 用例 | 结果 | 验证详情 |
 |------|------|---------|
-| T48.1 创建 session | ⬜ | `new_sid -kb` 返回 ses_xxx |
-| T48.2 验证沙箱 | ⬜ | Python 3 + Node ≥ 18 |
-| T48.3 注册 skill bundle | ⬜ | PG `humanize-ppt\|<16000+>\|36`；API resources 仅元数据无 content |
-| T48.4 AI 生成大纲 | ⬜ | 第一个 tool 是 `skill`，input 只有 name；output 含 resource_directory+metadata 无 content；AI 生成 AST 大纲 |
-| T48.5 演讲体检 | ⬜ | AI 用 read 读 qa-failure-modes.md；生成 qa_report.md + fix_prompt.md |
-| T48.6 执行脚本 | ⬜ | AI 用 bash 从隐藏目录执行 smoke_check.py |
-| T48.7 baseline token | ⬜ | 无 skill 时 sum ≈ 8700 tokens |
-| T48.8 注册后 system prompt | ⬜ | 注册 200KB bundle 后增量 ≤ 2000 tokens |
-| T48.9 精确触发 | ⬜ | 第一个 tool 是 `skill`，output ≈ 16KB（远小于 200KB bundle） |
-| T48.10 缓存命中 | ⬜ | 同 session 再发，skill tool 0 次，cache_read 高位 |
-| T48.11 异常处理 | ⬜ | 列出可用 skill 让用户重选 |
+| T48.1 创建 session | ✅ | `ses_0450ea5c6ffeBnRODNYFhUQKPG`，keep-alive boot 后沙箱就绪 |
+| T48.2 验证沙箱 | ✅ | Python 3.12.3 + Node v24.18.0 |
+| T48.3 注册 skill bundle | ✅ | PG `humanize-ppt\|15776\|37`（15 references + 10 scripts + 8 contracts + 4 adapters）；API resources 仅元数据无 content；37 资源含完整 content+size+digest |
+| T48.4 AI 生成大纲 | ✅ | 第一个 tool 是 `skill`，input 只有 name；output 21827B 含 resource_directory+metadata 无 resource 正文；AI 用 6+ 次 read 从隐藏目录读 reference，生成 9 个交付物（deck_brief/ast_outline/slide_plan/speaker_intent/asset_manifest/video_slots/style_brief/outline-preview/run_manifest）到 /workspace |
+| T48.5 演讲体检 | ✅ | AI read `/workspace/test-deck/index.html` + 隐藏目录 `references/qa-failure-modes.md` + `slide_plan.json`；生成 qa_report.md(5606B)+fix_prompt.md(6453B)+qa_iteration.json(2196B)；结论 fail（5 fail / 1 warn），含 P0/P1/P2 分级修复 |
+| T48.6 执行脚本 | ✅ | AI 用 bash 执行隐藏目录 `scripts/smoke_check.py`，EXIT=0，三项检查全 passed（stable entrypoint / outline gate / exit-code matrix） |
+| T48.7 baseline token | ✅ | input=3 cache_read=8704 sum=8707 |
+| T48.8 注册后 system prompt | ✅ | 注册 335KB bundle 后 sum=8898，增量 **191 tokens** ≤ 2000（37 resources manifest 元数据，bundle 正文不进 prompt） |
+| T48.9 精确触发 | ✅ | reasoning 首句 "Let me load the skill first"；第一个 TOOL 是 `skill`，input 只有 name；output 21827B（≈16KB，远小于 335KB bundle）含 resource_directory+resources 元数据 |
+| T48.10 缓存命中 | ✅ | skill tool **0 次**、read/bash **0 次**（AI: "I already loaded the skill in the previous turn"）；cache_read=18048 高位 |
+| T48.11 异常处理 | ✅ | AI 从 manifest 判断不存在，列出可用 skill（`humanize-ppt`）并让用户重选 |
 
 **验证层级**：
 
 | 层级 | 标准 | 结果 |
 |------|------|------|
-| 沙箱预装 | Python 3 + Node | ⬜ |
-| Skill 注册 | 36 个 resources 完整持久化（含 size/digest） | ⬜ |
-| AI 感知 | message 显式触发 skill 后 AI 按 OPC 工作流生成大纲 | ⬜ |
-| 资源物化 | resource 正文在隐藏目录，AI 用 read/bash 按需读取 | ⬜ |
-| 脚本执行 | AI 从隐藏目录执行 Python 脚本 | ⬜ |
-| Progressive Disclosure | system prompt 仅 manifest；200KB 正文不进 prompt；缓存命中 | ⬜ |
+| 沙箱预装 | Python 3 + Node | ✅ Python 3.12.3 + Node v24.18.0 |
+| Skill 注册 | 37 个 resources 完整持久化（含 size/digest） | ✅ PG `humanize-ppt\|15776\|37`，37 资源含 content+size+digest |
+| AI 感知 | message 显式触发 skill 后 AI 按 OPC 工作流生成大纲 | ✅ AST 大纲 10 页 + 9 个交付物 |
+| 资源物化 | resource 正文在隐藏目录，AI 用 read/bash 按需读取 | ✅ 物化 39 文件（SKILL.md+resources.json+37），AI 用 6+ 次 read 读 reference |
+| 脚本执行 | AI 从隐藏目录执行 Python 脚本 | ✅ smoke_check.py EXIT=0 三项通过 |
+| Progressive Disclosure | system prompt 仅 manifest；200KB 正文不进 prompt；缓存命中 | ✅ 增量 191 tokens；skill tool 21827B；缓存命中 0 次 skill 调用 |
 
 ---
 
