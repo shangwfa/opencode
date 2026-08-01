@@ -454,31 +454,31 @@ exec_in_sandbox "$SID" "find $RESOURCE_DIR -type f | wc -l"
 
 | 用例 | 结果 | 验证详情 |
 |------|------|---------|
-| T49.1 创建 session | ⬜ | `new_sid -kb` 返回 ses_xxx |
-| T49.2 验证沙箱 | ⬜ | Node ≥ 18 |
-| T49.3 注册 skill bundle | ⬜ | PG `loop-engineering\|<21000+>\|13`；API resources 仅元数据无 content |
-| T49.4 AI 装配 Loop | ⬜ | 第一个 tool 是 `skill`，input 只有 name；output 含 resource_directory+metadata 无 content；AI 按六步法产出 |
-| T49.5 AI 读取模板 | ⬜ | AI 用 read 从隐藏目录读 manifest.json + component-matrix.md |
-| T49.6 停手验证 | ⬜ | AI 渲染命令后停手，不主动执行 |
-| T49.7 baseline token | ⬜ | 无 skill 时 sum ≈ 8700 tokens |
-| T49.8 注册后 system prompt | ⬜ | 注册 50KB bundle 后增量 ≤ 1000 tokens |
-| T49.9 精确触发 | ⬜ | 第一个 tool 是 `skill`，output ≈ 21KB（远小于 50KB bundle） |
-| T49.10 缓存命中 | ⬜ | 同 session 再发，skill tool 0 次，用 read 从隐藏目录读取 |
-| T49.11 沙箱恢复 | ⬜ | 销毁物化目录后 rematerializeIfNeeded 自动恢复，AI 正常 read |
-| T49.12 异常处理 | ⬜ | 列出可用 skill 让用户重选 |
+| T49.1 创建 session | ✅ | `ses_04486000dffeQDquaUnqyXFNio`，keep-alive boot 后沙箱就绪 |
+| T49.2 验证沙箱 | ✅ | Node v24.18.0 |
+| T49.3 注册 skill bundle | ✅ | PG `loop-engineering\|11432\|13`（6 references + 1 examples + 6 templates）；API resources 仅元数据无 content；13 资源含完整 content+size+digest |
+| T49.4 AI 装配 Loop | ✅ | 第一个 tool 是 `skill`，input 只有 name；output 13732B 含 resource_directory+metadata 无 content；AI 用 12 次 read 从隐藏目录读取全部 13 资源，按愚公六步法产出完整装配 |
+| T49.5 AI 读取模板 | ✅ | AI read 隐藏目录 templates/manifest.json + component-matrix.md，生成 REPOS.md 实例 |
+| T49.6 停手验证 | ✅ | AI 渲染完命令后明确"复制去执行的那一下由你来"，不主动执行 |
+| T49.7 baseline token | ✅ | input=7555 cache_read=1152 sum=8707 |
+| T49.8 注册后 system prompt | ✅ | 注册 30KB bundle 后 sum=8980，增量 **273 tokens** ≤ 1000（13 resources manifest 元数据，bundle 正文不进 prompt） |
+| T49.9 精确触发 | ✅ | reasoning 首句 "load the loop-engineering skill"；第一个 TOOL 是 `skill`，input 只有 name；output 13732B（≈11.4KB，远小于 30KB bundle） |
+| T49.10 缓存命中 | ✅ | skill tool **0 次**、bash 0 次；用 read 从隐藏目录读 guardrails.md；cache_read=16768 高位 |
+| T49.11 沙箱恢复 | ✅ | 销毁物化目录后 rematerializeIfNeeded 自动恢复 15 文件（SKILL.md+resources.json+13）；权限 644；AI 缓存命中直接 read manifest.json 成功 |
+| T49.12 异常处理 | ✅ | AI 从 manifest 判断不存在，列出可用 skill（customize-opencode / loop-engineering）并让用户重选 |
 
 **验证层级**：
 
 | 层级 | 标准 | 结果 |
 |------|------|------|
-| 沙箱预装 | Node | ⬜ |
-| Skill 注册 | 13 个 resources 完整持久化（含 size/digest） | ⬜ |
-| AI 感知 | message 显式触发 skill 后 AI 按六步法装配 Loop | ⬜ |
-| 资源物化 | resource 正文在隐藏目录，AI 用 read 按需读取 | ⬜ |
-| 模板填充 | AI 从隐藏目录读取 manifest.json 模板并生成实例 | ⬜ |
-| 停手规则 | AI 渲染完命令不主动执行 | ⬜ |
-| Progressive Disclosure | system prompt 仅 manifest；50KB 正文不进 prompt；缓存命中 | ⬜ |
-| 沙箱恢复 | rematerializeIfNeeded 在 prompt 处理前恢复物化目录 | ⬜ |
+| 沙箱预装 | Node | ✅ Node v24.18.0 |
+| Skill 注册 | 13 个 resources 完整持久化（含 size/digest） | ✅ PG `loop-engineering\|11432\|13`，13 资源含 content+size+digest |
+| AI 感知 | message 显式触发 skill 后 AI 按六步法装配 Loop | ✅ 愚公六步（采石/琢玉/开凿/立柱/砌墙/验收）完整产出 |
+| 资源物化 | resource 正文在隐藏目录，AI 用 read 按需读取 | ✅ 物化 15 文件，AI 用 12 次 read 读全部 13 资源 |
+| 模板填充 | AI 从隐藏目录读取 manifest.json 模板并生成实例 | ✅ 生成 REPOS.md 5 仓库实例 |
+| 停手规则 | AI 渲染完命令不主动执行 | ✅ "复制去执行的那一下由你来" |
+| Progressive Disclosure | system prompt 仅 manifest；30KB 正文不进 prompt；缓存命中 | ✅ 增量 273 tokens；skill tool 13732B；缓存命中 0 次 skill 调用 |
+| 沙箱恢复 | rematerializeIfNeeded 在 prompt 处理前恢复物化目录 | ✅ 销毁后自动恢复 15 文件，AI 正常 read |
 
 ---
 
