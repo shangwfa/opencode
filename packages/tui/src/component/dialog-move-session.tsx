@@ -61,7 +61,7 @@ export function DialogMoveSession(props: {
     async (projectID) => {
       setWorking(true)
       try {
-        await sdk.client.experimental.projectCopy.refresh({ projectID }, { throwOnError: true })
+        await sdk.client.v2.projectCopy.refresh({ projectID }, { throwOnError: true })
         const directories = await sdk.client.project.directories({ projectID }, { throwOnError: true })
         return directories.data?.map((item) => item.directory) ?? []
       } finally {
@@ -146,7 +146,7 @@ export function DialogMoveSession(props: {
     setToDelete(undefined)
     setRemoving(option.value.directory)
     setWorking(true)
-    const result = await sdk.client.experimental.projectCopy
+    const result = await sdk.client.v2.projectCopy
       .remove({ projectID: props.projectID, directory: option.value.directory, force: false })
       .catch((error) => ({ error }))
     if (result.error) {
@@ -163,7 +163,7 @@ export function DialogMoveSession(props: {
           return
         }
         reopen(option.value.directory)
-        const forced = await sdk.client.experimental.projectCopy
+        const forced = await sdk.client.v2.projectCopy
           .remove({ projectID: props.projectID, directory: option.value.directory, force: true })
           .catch((error) => ({ error }))
         if (forced.error) {

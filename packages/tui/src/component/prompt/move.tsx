@@ -31,7 +31,7 @@ export function usePromptMove(input: { projectID: () => string | undefined; sess
     setCreating(true)
     setProgress("Creating copy")
     try {
-      const result = await sdk.client.experimental.projectCopy.create(
+      const result = await sdk.client.v2.projectCopy.create(
         {
           projectID,
           strategy: "git_worktree",

@@ -212,7 +212,7 @@ export const layerWith = (options?: LayerOptions) =>
           readonly strictOwner?: boolean
         },
         commit?: (seq: number) => Effect.Effect<void>,
-      ) {
+      ): Effect.Effect<{ aggregateID: string; seq: number } | undefined, never, never> {
         return Effect.gen(function* () {
           const durable = definition?.durable
           if (durable) {
@@ -357,7 +357,7 @@ export const layerWith = (options?: LayerOptions) =>
                       (wake) => PubSub.publish(wake, undefined),
                       { discard: true },
                     )
-                    return payload
+                    return { aggregateID: committed.aggregateID, seq: committed.seq }
                   }
                   return committed
                 }),

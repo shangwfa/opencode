@@ -77,7 +77,7 @@ export const browser = {
         instructions: "Complete authorization in your browser. This window will close automatically.",
         callback: Deferred.await(code).pipe(
           Effect.flatMap((value) => exchange(value, redirect, pkce)),
-          Effect.map(credential),
+          Effect.map((tokens) => credential(tokens, Connector.MethodID.make("chatgpt-browser") as unknown as Credential.OAuth["methodID"])),
         ),
       }
     }),
@@ -128,6 +128,7 @@ export const headless = {
                   verifier: data.code_verifier,
                   challenge: "",
                 }),
+                Connector.MethodID.make("chatgpt-headless") as unknown as Credential.OAuth["methodID"],
               )
             }
             if (response.status !== 403 && response.status !== 404) {
@@ -170,8 +171,8 @@ function refresh(value: Credential.OAuth) {
     }).toString(),
   }).pipe(
     Effect.map((tokens) => {
-      const next = credential(tokens)
-      return new Credential.OAuth({
+      const next = credential(tokens, value.methodID)
+      return Credential.OAuth.make({
         ...next,
         metadata: next.metadata ?? value.metadata,
       })
@@ -190,10 +191,11 @@ function request<A>(url: string, init: RequestInit) {
   })
 }
 
-function credential(tokens: TokenResponse) {
+function credential(tokens: TokenResponse, methodID: Credential.OAuth["methodID"]) {
   const accountID = extractAccountID(tokens)
-  return new Credential.OAuth({
+  return Credential.OAuth.make({
     type: "oauth",
+    methodID,
     refresh: tokens.refresh_token,
     access: tokens.access_token,
     expires: Date.now() + (tokens.expires_in ?? 3600) * 1000,

@@ -3,6 +3,7 @@ import { Effect, Schema } from "effect"
 import { Catalog } from "@opencode-ai/core/catalog"
 import { Config } from "@opencode-ai/core/config"
 import { ConfigProviderPlugin } from "@opencode-ai/core/config/plugin/provider"
+import { Integration } from "@opencode-ai/core/integration"
 import { ModelV2 } from "@opencode-ai/core/model"
 import { PluginV2 } from "@opencode-ai/core/plugin"
 import { PluginHost } from "@opencode-ai/core/plugin/host"
@@ -188,52 +189,51 @@ describe("ConfigProviderPlugin.Plugin", () => {
                       },
                     },
                   },
-                },
+                }),
               }),
-            }),
-            new Config.Document({
-              type: "document",
-              info: decode({
-                model: "custom/default",
-                providers: {
-                  custom: {
-                    api: { type: "aisdk", package: "custom-sdk", url: "https://example.test" },
-                    request: request({ last: "last", shared: "last" }),
-                    models: {
-                      default: {
-                        name: "Default",
-                      },
-                      chat: {
-                        api: { id: "api-chat" },
-                        name: "Last",
-                        limit: { output: 75 },
-                        request: request({ last: "last", shared: "last" }),
-                        variants: [
-                          {
-                            id: "fast",
-                            headers: { last: "last", shared: "last" },
-                          },
-                          {
-                            id: "slow",
-                            headers: { slow: "slow" },
-                          },
-                        ],
+              new Config.Document({
+                type: "document",
+                info: decode({
+                  model: "custom/default",
+                  providers: {
+                    custom: {
+                      api: { type: "aisdk", package: "custom-sdk", url: "https://example.test" },
+                      request: request({ last: "last", shared: "last" }),
+                      models: {
+                        default: {
+                          name: "Default",
+                        },
+                        chat: {
+                          api: { id: "api-chat" },
+                          name: "Last",
+                          limit: { output: 75 },
+                          request: request({ last: "last", shared: "last" }),
+                          variants: [
+                            {
+                              id: "fast",
+                              headers: { last: "last", shared: "last" },
+                            },
+                            {
+                              id: "slow",
+                              headers: { slow: "slow" },
+                            },
+                          ],
+                        },
                       },
                     },
                   },
-                },
+                }),
               }),
-            }),
-            new Config.Document({
-              type: "document",
-              info: decode({
-                providers: {
-                  custom: { name: "Renamed" },
-                },
+              new Config.Document({
+                type: "document",
+                info: decode({
+                  providers: {
+                    custom: { name: "Renamed" },
+                  },
+                }),
               }),
-            }),
-          ]),
-      })
+            ]),
+        })
 
         yield* addPlugin(config)
 

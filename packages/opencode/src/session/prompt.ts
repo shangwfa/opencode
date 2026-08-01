@@ -1480,12 +1480,12 @@ const layer = Layer.effect(
       input: LoopInput,
     ) {
       return yield* state.ensureRunning(
-         input.sessionID,
-         lastAssistant(input.sessionID),
-         runLoop(input.sessionID, input.skills ? [...input.skills] : undefined).pipe(
-           Effect.provideService(SessionPluginRuntime.Service, sessionPlugins),
-         ),
-       )
+        input.sessionID,
+        lastAssistant(input.sessionID),
+        runLoop(input.sessionID, input.skills ? [...input.skills] : undefined).pipe(
+          Effect.provideService(SessionPluginRuntime.Service, sessionPlugins),
+        ),
+      )
     })
 
     const shell: (input: ShellInput) => Effect.Effect<SessionV1.WithParts, Session.BusyError> = Effect.fn(

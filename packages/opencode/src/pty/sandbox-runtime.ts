@@ -83,9 +83,9 @@ export const layer = Layer.effect(
               try {
                 const response = await fetch(`${endpoint}/pty/events`, {
                   signal: controller.signal,
-                  headers: eventCursors.has(root
+                  headers: eventCursors.has(root)
                     ? { "last-event-id": String(eventCursors.get(root)) }
-                    : undefined),
+                    : undefined,
                 })
                 if (response.status === 409) {
                   const gap = await response.json() as { oldest?: unknown }
