@@ -34,7 +34,7 @@ export function TerminalPanelV2(props: { stacked?: boolean } = {}) {
   const language = useLanguage()
   const command = useCommand()
   const settings = useSettings()
-  const { params, sessionKey, view } = useSessionLayout()
+  const { workspaceKey, view } = useSessionLayout()
 
   const isDesktop = createMediaQuery("(min-width: 768px)")
   const newLayout = createMemo(() => settings.general.newLayoutDesigns())
@@ -120,7 +120,7 @@ export function TerminalPanelV2(props: { stacked?: boolean } = {}) {
     language.locale()
 
     setTerminalHandoff(
-      sessionKey(),
+      workspaceKey(),
       terminal.all().map((pty) =>
         terminalTabLabel({
           title: pty.title,
@@ -134,7 +134,7 @@ export function TerminalPanelV2(props: { stacked?: boolean } = {}) {
   const handoff = createMemo(() => {
     const dir = sdk().directory
     if (!dir) return []
-    return getTerminalHandoff(sessionKey()) ?? []
+    return getTerminalHandoff(workspaceKey()) ?? []
   })
 
   const all = terminal.all
@@ -329,7 +329,6 @@ export function TerminalPanelV2(props: { stacked?: boolean } = {}) {
                           <div id={`terminal-wrapper-${id}`} class="absolute inset-0">
                             <Terminal
                               pty={pty()}
-                              sessionID={params.id ?? ""}
                               autoFocus={terminal.focusRequested(id)}
                               onAutoFocus={() => terminal.consumeFocus(id)}
                               class="!px-[14px]"

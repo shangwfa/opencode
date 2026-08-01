@@ -172,12 +172,6 @@ export type Session = {
   slug: string
   projectID: string
   workspaceID?: string
-  pvcMode?: "session" | "app"
-  appId?: string
-  sandbox?: {
-    cpu: string
-    memory: string
-  }
   directory: string
   path?: string
   parentID?: string
@@ -265,8 +259,6 @@ export type UserMessage = {
   tools?: {
     [key: string]: boolean
   }
-  userName?: string
-  userId?: string
 }
 
 export type ProviderAuthError = {
@@ -1776,9 +1768,13 @@ export type ProviderConfig = {
       temperature?: boolean
       tool_call?: boolean
       interleaved?:
-        | true
+        | boolean
+        | "reasoning"
+        | "reasoning_content"
+        | "reasoning_text"
+        | string
         | {
-            field: "reasoning" | "reasoning_content" | "reasoning_details"
+            field: "reasoning" | "reasoning_content" | "reasoning_text" | string
           }
       cost?: {
         input: number
@@ -2065,7 +2061,7 @@ export type Model = {
     interleaved:
       | boolean
       | {
-          field: "reasoning" | "reasoning_content" | "reasoning_details"
+          field: "reasoning" | "reasoning_content" | "reasoning_text" | string
         }
   }
   cost: {
@@ -2246,12 +2242,6 @@ export type GlobalSession = {
     partID?: string
     snapshot?: string
     diff?: string
-  }
-  pvcMode?: "session" | "app"
-  appId?: string
-  sandbox?: {
-    cpu: string
-    memory: string
   }
   project: ProjectSummary | null
 }
@@ -2446,14 +2436,6 @@ export type ProjectNotFoundError = {
   _tag: "ProjectNotFoundError"
   projectID: string
   message: string
-}
-
-export type ProjectCopyError = {
-  name: "ProjectCopyError"
-  data: {
-    message: string
-    forceRequired?: boolean
-  }
 }
 
 export type PtyNotFoundError = {
@@ -2965,6 +2947,14 @@ export type V2EventStream = string
 export type ForbiddenError = {
   _tag: "ForbiddenError"
   message: string
+}
+
+export type ProjectCopyError = {
+  name: "ProjectCopyError"
+  data: {
+    message: string
+    forceRequired?: boolean
+  }
 }
 
 export type EffectHttpApiErrorForbidden = {
@@ -3856,12 +3846,8 @@ export type ConfigV2ExperimentalPolicy = {
 
 export type ProjectDirectories = Array<{
   directory: string
-  type: "main" | "root" | "git_worktree"
+  strategy?: string
 }>
-
-export type ProjectCopyCopy = {
-  directory: string
-}
 
 export type PtyTicketConnectToken = {
   ticket: string
@@ -4964,96 +4950,6 @@ export type IntegrationAttempt = {
 }
 
 export type IntegrationAttemptStatus =
-  | {
-      status: "pending"
-      time: {
-        created: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
-        expires: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
-      }
-    }
-  | {
-      status: "complete"
-      time: {
-        created: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
-        expires: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
-      }
-    }
-  | {
-      status: "failed"
-      message: string
-      time: {
-        created: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
-        expires: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
-      }
-    }
-  | {
-      status: "expired"
-      time: {
-        created: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
-        expires: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
-      }
-    }
-
-export type ConnectorWhen = {
-  key: string
-  op: "eq" | "neq"
-  value: string
-}
-
-export type ConnectorTextPrompt = {
-  type: "text"
-  key: string
-  message: string
-  placeholder?: string
-  when?: ConnectorWhen
-}
-
-export type ConnectorSelectPrompt = {
-  type: "select"
-  key: string
-  message: string
-  options: Array<{
-    label: string
-    value: string
-    hint?: string
-  }>
-  when?: ConnectorWhen
-}
-
-export type ConnectorOAuthMethod = {
-  id: string
-  type: "oauth"
-  label: string
-  prompts?: Array<ConnectorTextPrompt | ConnectorSelectPrompt>
-}
-
-export type ConnectorKeyMethod = {
-  id: string
-  type: "key"
-  label: string
-  prompts?: Array<ConnectorTextPrompt | ConnectorSelectPrompt>
-}
-
-export type ConnectorMethod = ConnectorOAuthMethod | ConnectorKeyMethod
-
-export type ConnectorInfo = {
-  id: string
-  name: string
-  methods: Array<ConnectorMethod>
-}
-
-export type ConnectorAttempt = {
-  attemptID: string
-  url: string
-  instructions: string
-  mode: "auto" | "code"
-  time: {
-    created: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
-    expires: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
-  }
-}
-
-export type ConnectorAttemptStatus =
   | {
       status: "pending"
       time: {
@@ -6249,6 +6145,10 @@ export type ReferenceInfo = {
   description?: string
   hidden?: boolean
   source: ReferenceSource
+}
+
+export type ProjectCopyCopy = {
+  directory: string
 }
 
 export type EventModelsDevRefreshed = {
@@ -8002,9 +7902,9 @@ export type FindTextData = {
 
 export type FindTextErrors = {
   /**
-   * BadRequest | InvalidRequestError
+   * Bad request
    */
-  400: EffectHttpApiErrorBadRequest | InvalidRequestError
+  400: BadRequestError
 }
 
 export type FindTextError = FindTextErrors[keyof FindTextErrors]
@@ -8050,9 +7950,9 @@ export type FindFilesData = {
 
 export type FindFilesErrors = {
   /**
-   * BadRequest | InvalidRequestError
+   * Bad request
    */
-  400: EffectHttpApiErrorBadRequest | InvalidRequestError
+  400: BadRequestError
 }
 
 export type FindFilesError = FindFilesErrors[keyof FindFilesErrors]
@@ -8102,7 +8002,6 @@ export type FileListData = {
     directory?: string
     workspace?: string
     path: string
-    sessionID?: string
   }
   url: "/file"
 }
@@ -8132,7 +8031,6 @@ export type FileReadData = {
     directory?: string
     workspace?: string
     path: string
-    sessionID?: string
   }
   url: "/file/content"
 }
@@ -8251,9 +8149,9 @@ export type VcsGetData = {
 
 export type VcsGetErrors = {
   /**
-   * BadRequest | InvalidRequestError
+   * Bad request
    */
-  400: EffectHttpApiErrorBadRequest | InvalidRequestError
+  400: BadRequestError
 }
 
 export type VcsGetError = VcsGetErrors[keyof VcsGetErrors]
@@ -8301,7 +8199,6 @@ export type VcsDiffData = {
   query: {
     directory?: string
     workspace?: string
-    sessionID?: string
     mode: "git" | "branch"
     context?: number
   }
@@ -8470,11 +8367,6 @@ export type AppSkillsResponses = {
     description?: string
     location: string
     content: string
-    resources?: Array<{
-      path: string
-      type: "doc" | "script" | "template" | "asset"
-      content: string
-    }>
   }>
 }
 
@@ -8962,78 +8854,10 @@ export type ProjectDirectoriesResponses = {
 
 export type ProjectDirectoriesResponse = ProjectDirectoriesResponses[keyof ProjectDirectoriesResponses]
 
-export type ExperimentalProjectCopyRemoveData = {
+export type ExperimentalProjectCopyGenerateNameData = {
   body?: {
-    directory: string
-    force: boolean
-  }
-  path: {
-    projectID: string
-  }
-  query?: {
-    workspace?: string
-  }
-  url: "/experimental/project/{projectID}/copy"
-}
-
-export type ExperimentalProjectCopyRemoveErrors = {
-  /**
-   * ProjectCopyError | InvalidRequestError
-   */
-  400: ProjectCopyError | InvalidRequestError
-}
-
-export type ExperimentalProjectCopyRemoveError =
-  ExperimentalProjectCopyRemoveErrors[keyof ExperimentalProjectCopyRemoveErrors]
-
-export type ExperimentalProjectCopyRemoveResponses = {
-  /**
-   * Project copy removed
-   */
-  204: void
-}
-
-export type ExperimentalProjectCopyRemoveResponse =
-  ExperimentalProjectCopyRemoveResponses[keyof ExperimentalProjectCopyRemoveResponses]
-
-export type ExperimentalProjectCopyCreateData = {
-  body?: {
-    strategy: string
-    directory: string
-    name?: string
     context?: string
   }
-  path: {
-    projectID: string
-  }
-  query?: {
-    workspace?: string
-  }
-  url: "/experimental/project/{projectID}/copy"
-}
-
-export type ExperimentalProjectCopyCreateErrors = {
-  /**
-   * ProjectCopyError | InvalidRequestError
-   */
-  400: ProjectCopyError | InvalidRequestError
-}
-
-export type ExperimentalProjectCopyCreateError =
-  ExperimentalProjectCopyCreateErrors[keyof ExperimentalProjectCopyCreateErrors]
-
-export type ExperimentalProjectCopyCreateResponses = {
-  /**
-   * Project copy created
-   */
-  200: ProjectCopyCopy
-}
-
-export type ExperimentalProjectCopyCreateResponse =
-  ExperimentalProjectCopyCreateResponses[keyof ExperimentalProjectCopyCreateResponses]
-
-export type ExperimentalProjectCopyRefreshData = {
-  body?: never
   path: {
     projectID: string
   }
@@ -9041,28 +8865,30 @@ export type ExperimentalProjectCopyRefreshData = {
     directory?: string
     workspace?: string
   }
-  url: "/experimental/project/{projectID}/copy/refresh"
+  url: "/experimental/project/{projectID}/copy/generate-name"
 }
 
-export type ExperimentalProjectCopyRefreshErrors = {
+export type ExperimentalProjectCopyGenerateNameErrors = {
   /**
-   * ProjectCopyError | InvalidRequestError
+   * Bad request
    */
-  400: ProjectCopyError | InvalidRequestError
+  400: BadRequestError
 }
 
-export type ExperimentalProjectCopyRefreshError =
-  ExperimentalProjectCopyRefreshErrors[keyof ExperimentalProjectCopyRefreshErrors]
+export type ExperimentalProjectCopyGenerateNameError =
+  ExperimentalProjectCopyGenerateNameErrors[keyof ExperimentalProjectCopyGenerateNameErrors]
 
-export type ExperimentalProjectCopyRefreshResponses = {
+export type ExperimentalProjectCopyGenerateNameResponses = {
   /**
-   * Project copies refreshed
+   * Success
    */
-  204: void
+  200: {
+    name: string
+  }
 }
 
-export type ExperimentalProjectCopyRefreshResponse =
-  ExperimentalProjectCopyRefreshResponses[keyof ExperimentalProjectCopyRefreshResponses]
+export type ExperimentalProjectCopyGenerateNameResponse =
+  ExperimentalProjectCopyGenerateNameResponses[keyof ExperimentalProjectCopyGenerateNameResponses]
 
 export type PtyShellsData = {
   body?: never
@@ -9102,7 +8928,6 @@ export type PtyListData = {
   query?: {
     directory?: string
     workspace?: string
-    sessionID?: string
   }
   url: "/pty"
 }
@@ -9139,7 +8964,6 @@ export type PtyCreateData = {
   query?: {
     directory?: string
     workspace?: string
-    sessionID?: string
   }
   url: "/pty"
 }
@@ -9170,7 +8994,6 @@ export type PtyRemoveData = {
   query?: {
     directory?: string
     workspace?: string
-    sessionID?: string
   }
   url: "/pty/{ptyID}"
 }
@@ -9205,7 +9028,6 @@ export type PtyGetData = {
   query?: {
     directory?: string
     workspace?: string
-    sessionID?: string
   }
   url: "/pty/{ptyID}"
 }
@@ -9246,7 +9068,6 @@ export type PtyUpdateData = {
   query?: {
     directory?: string
     workspace?: string
-    sessionID?: string
   }
   url: "/pty/{ptyID}"
 }
@@ -9281,7 +9102,6 @@ export type PtyConnectTokenData = {
   query?: {
     directory?: string
     workspace?: string
-    sessionID?: string
   }
   url: "/pty/{ptyID}/connect-token"
 }
@@ -9665,12 +9485,6 @@ export type SessionCreateData = {
     }
     permission?: PermissionRuleset
     workspaceID?: string
-    pvcMode?: "session" | "app"
-    appId?: string
-    sandbox?: {
-      cpu: string
-      memory: string
-    }
   }
   path?: never
   query?: {
@@ -9799,7 +9613,6 @@ export type SessionGetResponse = SessionGetResponses[keyof SessionGetResponses]
 export type SessionUpdateData = {
   body?: {
     title?: string
-    directory?: string
     metadata?: {
       [key: string]: unknown
     }
@@ -9993,9 +9806,6 @@ export type SessionPromptData = {
     format?: OutputFormat
     system?: string
     variant?: string
-    userName?: string
-    userId?: string
-    skills?: Array<string>
     parts: Array<TextPartInput | FilePartInput | AgentPartInput | SubtaskPartInput>
   }
   path: {
@@ -10214,46 +10024,6 @@ export type SessionInitResponses = {
 
 export type SessionInitResponse = SessionInitResponses[keyof SessionInitResponses]
 
-export type SessionLoadDotOpencodeData = {
-  body?: never
-  path: {
-    sessionID: string
-  }
-  query?: {
-    directory?: string
-    workspace?: string
-  }
-  url: "/session/{sessionID}/dot-opencode/load"
-}
-
-export type SessionLoadDotOpencodeErrors = {
-  /**
-   * BadRequest | InvalidRequestError
-   */
-  400: EffectHttpApiErrorBadRequest | InvalidRequestError
-  /**
-   * NotFoundError
-   */
-  404: NotFoundError
-}
-
-export type SessionLoadDotOpencodeError = SessionLoadDotOpencodeErrors[keyof SessionLoadDotOpencodeErrors]
-
-export type SessionLoadDotOpencodeResponses = {
-  /**
-   * Loaded project .opencode configuration
-   */
-  200: {
-    loaded: Array<string>
-    skipped: Array<{
-      path: string
-      reason: string
-    }>
-  }
-}
-
-export type SessionLoadDotOpencodeResponse = SessionLoadDotOpencodeResponses[keyof SessionLoadDotOpencodeResponses]
-
 export type SessionUnshareData = {
   body?: never
   path: {
@@ -10383,9 +10153,6 @@ export type SessionPromptAsyncData = {
     format?: OutputFormat
     system?: string
     variant?: string
-    userName?: string
-    userId?: string
-    skills?: Array<string>
     parts: Array<TextPartInput | FilePartInput | AgentPartInput | SubtaskPartInput>
   }
   path: {
@@ -10708,975 +10475,6 @@ export type PartUpdateResponses = {
 }
 
 export type PartUpdateResponse = PartUpdateResponses[keyof PartUpdateResponses]
-
-export type SessionSkillsClearData = {
-  body?: never
-  path: {
-    sessionID: string
-  }
-  query?: {
-    directory?: string
-    workspace?: string
-  }
-  url: "/session/{sessionID}/skills"
-}
-
-export type SessionSkillsClearErrors = {
-  /**
-   * Bad request
-   */
-  400: BadRequestError
-}
-
-export type SessionSkillsClearError = SessionSkillsClearErrors[keyof SessionSkillsClearErrors]
-
-export type SessionSkillsClearResponses = {
-  /**
-   * Session skills cleared
-   */
-  200: unknown
-}
-
-export type SessionSkillsData = {
-  body?: never
-  path: {
-    sessionID: string
-  }
-  query?: {
-    directory?: string
-    workspace?: string
-  }
-  url: "/session/{sessionID}/skills"
-}
-
-export type SessionSkillsErrors = {
-  /**
-   * Bad request
-   */
-  400: BadRequestError
-}
-
-export type SessionSkillsError = SessionSkillsErrors[keyof SessionSkillsErrors]
-
-export type SessionSkillsResponses = {
-  /**
-   * Session skills
-   */
-  200: Array<{
-    name: string
-    description?: string
-    location: string
-    content: string
-    resources?: Array<{
-      path: string
-      type: "doc" | "script" | "template" | "asset"
-      content: string
-    }>
-  }>
-}
-
-export type SessionSkillsResponse = SessionSkillsResponses[keyof SessionSkillsResponses]
-
-export type SessionSkillsCreateData = {
-  body?: {
-    name: string
-    description?: string
-    content: string
-    resources?: Array<{
-      path: string
-      type: "doc" | "script" | "template" | "asset"
-      content: string
-    }>
-  }
-  path: {
-    sessionID: string
-  }
-  query?: {
-    directory?: string
-    workspace?: string
-  }
-  url: "/session/{sessionID}/skills/create"
-}
-
-export type SessionSkillsCreateErrors = {
-  /**
-   * Bad request
-   */
-  400: BadRequestError
-}
-
-export type SessionSkillsCreateError = SessionSkillsCreateErrors[keyof SessionSkillsCreateErrors]
-
-export type SessionSkillsCreateResponses = {
-  /**
-   * Created session skill
-   */
-  200: {
-    name: string
-    description?: string
-    location: string
-    content: string
-    resources?: Array<{
-      path: string
-      type: "doc" | "script" | "template" | "asset"
-      content: string
-    }>
-  }
-}
-
-export type SessionSkillsCreateResponse = SessionSkillsCreateResponses[keyof SessionSkillsCreateResponses]
-
-export type SessionSkillsLoadData = {
-  body?: {
-    path: string
-  }
-  path: {
-    sessionID: string
-  }
-  query?: {
-    directory?: string
-    workspace?: string
-  }
-  url: "/session/{sessionID}/skills/load"
-}
-
-export type SessionSkillsLoadErrors = {
-  /**
-   * Bad request
-   */
-  400: BadRequestError
-}
-
-export type SessionSkillsLoadError = SessionSkillsLoadErrors[keyof SessionSkillsLoadErrors]
-
-export type SessionSkillsLoadResponses = {
-  /**
-   * Loaded session skills
-   */
-  200: Array<{
-    name: string
-    description?: string
-    location: string
-    content: string
-    resources?: Array<{
-      path: string
-      type: "doc" | "script" | "template" | "asset"
-      content: string
-    }>
-  }>
-}
-
-export type SessionSkillsLoadResponse = SessionSkillsLoadResponses[keyof SessionSkillsLoadResponses]
-
-export type SessionSkillsUnloadData = {
-  body?: never
-  path: {
-    sessionID: string
-    name: string
-  }
-  query?: {
-    directory?: string
-    workspace?: string
-  }
-  url: "/session/{sessionID}/skills/{name}"
-}
-
-export type SessionSkillsUnloadErrors = {
-  /**
-   * Bad request
-   */
-  400: BadRequestError
-}
-
-export type SessionSkillsUnloadError = SessionSkillsUnloadErrors[keyof SessionSkillsUnloadErrors]
-
-export type SessionSkillsUnloadResponses = {
-  /**
-   * Session skill unloaded
-   */
-  200: unknown
-}
-
-export type SessionAgentsMdClearData = {
-  body?: never
-  path: {
-    sessionID: string
-  }
-  query?: {
-    directory?: string
-    workspace?: string
-  }
-  url: "/session/{sessionID}/agents-md"
-}
-
-export type SessionAgentsMdClearErrors = {
-  /**
-   * BadRequest | InvalidRequestError
-   */
-  400: EffectHttpApiErrorBadRequest | InvalidRequestError
-  /**
-   * NotFoundError
-   */
-  404: NotFoundError
-}
-
-export type SessionAgentsMdClearError = SessionAgentsMdClearErrors[keyof SessionAgentsMdClearErrors]
-
-export type SessionAgentsMdClearResponses = {
-  /**
-   * Session AGENTS.md cleared
-   */
-  200: unknown
-}
-
-export type SessionAgentsMdData = {
-  body?: never
-  path: {
-    sessionID: string
-  }
-  query?: {
-    directory?: string
-    workspace?: string
-  }
-  url: "/session/{sessionID}/agents-md"
-}
-
-export type SessionAgentsMdErrors = {
-  /**
-   * BadRequest | InvalidRequestError
-   */
-  400: EffectHttpApiErrorBadRequest | InvalidRequestError
-  /**
-   * NotFoundError
-   */
-  404: NotFoundError
-}
-
-export type SessionAgentsMdError = SessionAgentsMdErrors[keyof SessionAgentsMdErrors]
-
-export type SessionAgentsMdResponses = {
-  /**
-   * Session AGENTS.md
-   */
-  200: unknown
-}
-
-export type SessionAgentsMdCreateData = {
-  body?: {
-    content: string
-  }
-  path: {
-    sessionID: string
-  }
-  query?: {
-    directory?: string
-    workspace?: string
-  }
-  url: "/session/{sessionID}/agents-md/create"
-}
-
-export type SessionAgentsMdCreateErrors = {
-  /**
-   * BadRequest | InvalidRequestError
-   */
-  400: EffectHttpApiErrorBadRequest | InvalidRequestError
-  /**
-   * NotFoundError
-   */
-  404: NotFoundError
-}
-
-export type SessionAgentsMdCreateError = SessionAgentsMdCreateErrors[keyof SessionAgentsMdCreateErrors]
-
-export type SessionAgentsMdCreateResponses = {
-  /**
-   * Created session AGENTS.md
-   */
-  200: unknown
-}
-
-export type SessionAgentsClearData = {
-  body?: never
-  path: {
-    sessionID: string
-  }
-  query?: {
-    directory?: string
-    workspace?: string
-  }
-  url: "/session/{sessionID}/agents"
-}
-
-export type SessionAgentsClearErrors = {
-  /**
-   * Bad request
-   */
-  400: BadRequestError
-}
-
-export type SessionAgentsClearError = SessionAgentsClearErrors[keyof SessionAgentsClearErrors]
-
-export type SessionAgentsClearResponses = {
-  /**
-   * Session agents cleared
-   */
-  200: unknown
-}
-
-export type SessionAgentsData = {
-  body?: never
-  path: {
-    sessionID: string
-  }
-  query?: {
-    directory?: string
-    workspace?: string
-  }
-  url: "/session/{sessionID}/agents"
-}
-
-export type SessionAgentsErrors = {
-  /**
-   * BadRequest | InvalidRequestError
-   */
-  400: EffectHttpApiErrorBadRequest | InvalidRequestError
-  /**
-   * NotFoundError
-   */
-  404: NotFoundError
-}
-
-export type SessionAgentsError = SessionAgentsErrors[keyof SessionAgentsErrors]
-
-export type SessionAgentsResponses = {
-  /**
-   * Session agents
-   */
-  200: Array<Agent>
-}
-
-export type SessionAgentsResponse = SessionAgentsResponses[keyof SessionAgentsResponses]
-
-export type SessionAgentsCreateData = {
-  body?: {
-    name: string
-    description?: string
-    mode: "subagent" | "primary" | "all"
-    prompt?: string
-    permission?: PermissionConfig
-    model?: {
-      modelID: string
-      providerID: string
-    }
-    temperature?: number
-    topP?: number
-    steps?: number
-    color?: string
-    variant?: string
-    options?: {
-      [key: string]: unknown
-    }
-  }
-  path: {
-    sessionID: string
-  }
-  query?: {
-    directory?: string
-    workspace?: string
-  }
-  url: "/session/{sessionID}/agents/create"
-}
-
-export type SessionAgentsCreateErrors = {
-  /**
-   * Bad request
-   */
-  400: BadRequestError
-}
-
-export type SessionAgentsCreateError = SessionAgentsCreateErrors[keyof SessionAgentsCreateErrors]
-
-export type SessionAgentsCreateResponses = {
-  /**
-   * Created session agent
-   */
-  200: Agent
-}
-
-export type SessionAgentsCreateResponse = SessionAgentsCreateResponses[keyof SessionAgentsCreateResponses]
-
-export type SessionAgentsUnloadData = {
-  body?: never
-  path: {
-    sessionID: string
-    name: string
-  }
-  query?: {
-    directory?: string
-    workspace?: string
-  }
-  url: "/session/{sessionID}/agents/{name}"
-}
-
-export type SessionAgentsUnloadErrors = {
-  /**
-   * Bad request
-   */
-  400: BadRequestError
-}
-
-export type SessionAgentsUnloadError = SessionAgentsUnloadErrors[keyof SessionAgentsUnloadErrors]
-
-export type SessionAgentsUnloadResponses = {
-  /**
-   * Session agent unloaded
-   */
-  200: unknown
-}
-
-export type SessionMcpsClearData = {
-  body?: never
-  path: {
-    sessionID: string
-  }
-  query?: {
-    directory?: string
-    workspace?: string
-  }
-  url: "/session/{sessionID}/mcps"
-}
-
-export type SessionMcpsClearErrors = {
-  /**
-   * Bad request
-   */
-  400: BadRequestError
-}
-
-export type SessionMcpsClearError = SessionMcpsClearErrors[keyof SessionMcpsClearErrors]
-
-export type SessionMcpsClearResponses = {
-  /**
-   * Session MCPs cleared
-   */
-  200: unknown
-}
-
-export type SessionMcpsData = {
-  body?: never
-  path: {
-    sessionID: string
-  }
-  query?: {
-    directory?: string
-    workspace?: string
-  }
-  url: "/session/{sessionID}/mcps"
-}
-
-export type SessionMcpsErrors = {
-  /**
-   * BadRequest | InvalidRequestError
-   */
-  400: EffectHttpApiErrorBadRequest | InvalidRequestError
-  /**
-   * NotFoundError
-   */
-  404: NotFoundError
-}
-
-export type SessionMcpsError = SessionMcpsErrors[keyof SessionMcpsErrors]
-
-export type SessionMcpsResponses = {
-  /**
-   * Session MCPs
-   */
-  200: Array<unknown>
-}
-
-export type SessionMcpsResponse = SessionMcpsResponses[keyof SessionMcpsResponses]
-
-export type SessionMcpsCreateData = {
-  body?:
-    | {
-        name: string
-        type: "local"
-        command: Array<string>
-        environment?: {
-          [key: string]: string
-        }
-        enabled?: boolean
-      }
-    | {
-        name: string
-        type: "remote"
-        url: string
-        headers?: {
-          [key: string]: string
-        }
-        enabled?: boolean
-      }
-  path: {
-    sessionID: string
-  }
-  query?: {
-    directory?: string
-    workspace?: string
-  }
-  url: "/session/{sessionID}/mcps/create"
-}
-
-export type SessionMcpsCreateErrors = {
-  /**
-   * Bad request
-   */
-  400: BadRequestError
-}
-
-export type SessionMcpsCreateError = SessionMcpsCreateErrors[keyof SessionMcpsCreateErrors]
-
-export type SessionMcpsCreateResponses = {
-  /**
-   * Created session MCP
-   */
-  200: unknown
-}
-
-export type SessionMcpsDeleteData = {
-  body?: never
-  path: {
-    sessionID: string
-    name: string
-  }
-  query?: {
-    directory?: string
-    workspace?: string
-  }
-  url: "/session/{sessionID}/mcps/{name}"
-}
-
-export type SessionMcpsDeleteErrors = {
-  /**
-   * Bad request
-   */
-  400: BadRequestError
-}
-
-export type SessionMcpsDeleteError = SessionMcpsDeleteErrors[keyof SessionMcpsDeleteErrors]
-
-export type SessionMcpsDeleteResponses = {
-  /**
-   * Session MCP removed
-   */
-  200: unknown
-}
-
-export type SessionToolsClearData = {
-  body?: never
-  path: {
-    sessionID: string
-  }
-  query?: {
-    directory?: string
-    workspace?: string
-  }
-  url: "/session/{sessionID}/tools"
-}
-
-export type SessionToolsClearErrors = {
-  /**
-   * Bad request
-   */
-  400: BadRequestError
-}
-
-export type SessionToolsClearError = SessionToolsClearErrors[keyof SessionToolsClearErrors]
-
-export type SessionToolsClearResponses = {
-  /**
-   * Session tools cleared
-   */
-  200: unknown
-}
-
-export type SessionToolsData = {
-  body?: never
-  path: {
-    sessionID: string
-  }
-  query?: {
-    directory?: string
-    workspace?: string
-  }
-  url: "/session/{sessionID}/tools"
-}
-
-export type SessionToolsErrors = {
-  /**
-   * BadRequest | InvalidRequestError
-   */
-  400: EffectHttpApiErrorBadRequest | InvalidRequestError
-  /**
-   * NotFoundError
-   */
-  404: NotFoundError
-}
-
-export type SessionToolsError = SessionToolsErrors[keyof SessionToolsErrors]
-
-export type SessionToolsResponses = {
-  /**
-   * Session tools
-   */
-  200: Array<unknown>
-}
-
-export type SessionToolsResponse = SessionToolsResponses[keyof SessionToolsResponses]
-
-export type SessionToolsCreateData = {
-  body?: {
-    name: string
-    description: string
-    code: string
-  }
-  path: {
-    sessionID: string
-  }
-  query?: {
-    directory?: string
-    workspace?: string
-  }
-  url: "/session/{sessionID}/tools/create"
-}
-
-export type SessionToolsCreateErrors = {
-  /**
-   * Bad request
-   */
-  400: BadRequestError
-}
-
-export type SessionToolsCreateError = SessionToolsCreateErrors[keyof SessionToolsCreateErrors]
-
-export type SessionToolsCreateResponses = {
-  /**
-   * Created session tool
-   */
-  200: unknown
-}
-
-export type SessionToolsDeleteData = {
-  body?: never
-  path: {
-    sessionID: string
-    name: string
-  }
-  query?: {
-    directory?: string
-    workspace?: string
-  }
-  url: "/session/{sessionID}/tools/{name}"
-}
-
-export type SessionToolsDeleteErrors = {
-  /**
-   * Bad request
-   */
-  400: BadRequestError
-}
-
-export type SessionToolsDeleteError = SessionToolsDeleteErrors[keyof SessionToolsDeleteErrors]
-
-export type SessionToolsDeleteResponses = {
-  /**
-   * Session tool removed
-   */
-  200: unknown
-}
-
-export type SessionCommandsClearData = {
-  body?: never
-  path: {
-    sessionID: string
-  }
-  query?: {
-    directory?: string
-    workspace?: string
-  }
-  url: "/session/{sessionID}/commands"
-}
-
-export type SessionCommandsClearErrors = {
-  /**
-   * BadRequest | InvalidRequestError
-   */
-  400: EffectHttpApiErrorBadRequest | InvalidRequestError
-  /**
-   * NotFoundError
-   */
-  404: NotFoundError
-}
-
-export type SessionCommandsClearError = SessionCommandsClearErrors[keyof SessionCommandsClearErrors]
-
-export type SessionCommandsClearResponses = {
-  /**
-   * Session commands cleared
-   */
-  200: unknown
-}
-
-export type SessionCommandsData = {
-  body?: never
-  path: {
-    sessionID: string
-  }
-  query?: {
-    directory?: string
-    workspace?: string
-  }
-  url: "/session/{sessionID}/commands"
-}
-
-export type SessionCommandsErrors = {
-  /**
-   * BadRequest | InvalidRequestError
-   */
-  400: EffectHttpApiErrorBadRequest | InvalidRequestError
-  /**
-   * NotFoundError
-   */
-  404: NotFoundError
-}
-
-export type SessionCommandsError = SessionCommandsErrors[keyof SessionCommandsErrors]
-
-export type SessionCommandsResponses = {
-  /**
-   * Session commands
-   */
-  200: Array<unknown>
-}
-
-export type SessionCommandsResponse = SessionCommandsResponses[keyof SessionCommandsResponses]
-
-export type SessionCommandsCreateData = {
-  body?: {
-    name: string
-    template: string
-    description?: string
-    agent?: string
-    model?: string
-    subtask?: boolean
-    hints?: Array<string>
-  }
-  path: {
-    sessionID: string
-  }
-  query?: {
-    directory?: string
-    workspace?: string
-  }
-  url: "/session/{sessionID}/commands/create"
-}
-
-export type SessionCommandsCreateErrors = {
-  /**
-   * BadRequest | InvalidRequestError
-   */
-  400: EffectHttpApiErrorBadRequest | InvalidRequestError
-  /**
-   * NotFoundError
-   */
-  404: NotFoundError
-}
-
-export type SessionCommandsCreateError = SessionCommandsCreateErrors[keyof SessionCommandsCreateErrors]
-
-export type SessionCommandsCreateResponses = {
-  /**
-   * Created session command
-   */
-  200: unknown
-}
-
-export type SessionCommandsDeleteData = {
-  body?: never
-  path: {
-    sessionID: string
-    name: string
-  }
-  query?: {
-    directory?: string
-    workspace?: string
-  }
-  url: "/session/{sessionID}/commands/{name}"
-}
-
-export type SessionCommandsDeleteErrors = {
-  /**
-   * BadRequest | InvalidRequestError
-   */
-  400: EffectHttpApiErrorBadRequest | InvalidRequestError
-  /**
-   * NotFoundError
-   */
-  404: NotFoundError
-}
-
-export type SessionCommandsDeleteError = SessionCommandsDeleteErrors[keyof SessionCommandsDeleteErrors]
-
-export type SessionCommandsDeleteResponses = {
-  /**
-   * Session command removed
-   */
-  200: unknown
-}
-
-export type SessionPluginsClearData = {
-  body?: never
-  path: {
-    sessionID: string
-  }
-  query?: {
-    directory?: string
-    workspace?: string
-  }
-  url: "/session/{sessionID}/plugins"
-}
-
-export type SessionPluginsClearErrors = {
-  /**
-   * BadRequest | InvalidRequestError
-   */
-  400: EffectHttpApiErrorBadRequest | InvalidRequestError
-  /**
-   * NotFoundError
-   */
-  404: NotFoundError
-}
-
-export type SessionPluginsClearError = SessionPluginsClearErrors[keyof SessionPluginsClearErrors]
-
-export type SessionPluginsClearResponses = {
-  /**
-   * Session plugins cleared
-   */
-  200: unknown
-}
-
-export type SessionPluginsData = {
-  body?: never
-  path: {
-    sessionID: string
-  }
-  query?: {
-    directory?: string
-    workspace?: string
-  }
-  url: "/session/{sessionID}/plugins"
-}
-
-export type SessionPluginsErrors = {
-  /**
-   * BadRequest | InvalidRequestError
-   */
-  400: EffectHttpApiErrorBadRequest | InvalidRequestError
-  /**
-   * NotFoundError
-   */
-  404: NotFoundError
-}
-
-export type SessionPluginsError = SessionPluginsErrors[keyof SessionPluginsErrors]
-
-export type SessionPluginsResponses = {
-  /**
-   * Session plugins
-   */
-  200: Array<unknown>
-}
-
-export type SessionPluginsResponse = SessionPluginsResponses[keyof SessionPluginsResponses]
-
-export type SessionPluginsCreateData = {
-  body?:
-    | {
-        name: string
-        source?: "code"
-        description?: string
-        code: string
-        enabled?: boolean
-      }
-    | {
-        name: string
-        source: "npm"
-        spec: string
-        description?: string
-        enabled?: boolean
-      }
-  path: {
-    sessionID: string
-  }
-  query?: {
-    directory?: string
-    workspace?: string
-  }
-  url: "/session/{sessionID}/plugins/create"
-}
-
-export type SessionPluginsCreateErrors = {
-  /**
-   * BadRequest | InvalidRequestError
-   */
-  400: EffectHttpApiErrorBadRequest | InvalidRequestError
-  /**
-   * NotFoundError
-   */
-  404: NotFoundError
-}
-
-export type SessionPluginsCreateError = SessionPluginsCreateErrors[keyof SessionPluginsCreateErrors]
-
-export type SessionPluginsCreateResponses = {
-  /**
-   * Created session plugin
-   */
-  200: unknown
-}
-
-export type SessionPluginsDeleteData = {
-  body?: never
-  path: {
-    sessionID: string
-    name: string
-  }
-  query?: {
-    directory?: string
-    workspace?: string
-  }
-  url: "/session/{sessionID}/plugins/{name}"
-}
-
-export type SessionPluginsDeleteErrors = {
-  /**
-   * BadRequest | InvalidRequestError
-   */
-  400: EffectHttpApiErrorBadRequest | InvalidRequestError
-  /**
-   * NotFoundError
-   */
-  404: NotFoundError
-}
-
-export type SessionPluginsDeleteError = SessionPluginsDeleteErrors[keyof SessionPluginsDeleteErrors]
-
-export type SessionPluginsDeleteResponses = {
-  /**
-   * Session plugin removed
-   */
-  200: unknown
-}
 
 export type SyncStartData = {
   body?: never
@@ -13640,291 +12438,6 @@ export type V2IntegrationAttemptCompleteResponses = {
 export type V2IntegrationAttemptCompleteResponse =
   V2IntegrationAttemptCompleteResponses[keyof V2IntegrationAttemptCompleteResponses]
 
-export type V2ConnectorListData = {
-  body?: never
-  path?: never
-  query?: {
-    location?: {
-      directory?: string
-      workspace?: string
-    }
-  }
-  url: "/api/connector"
-}
-
-export type V2ConnectorListErrors = {
-  /**
-   * InvalidRequestError
-   */
-  400: InvalidRequestError
-  /**
-   * UnauthorizedError
-   */
-  401: UnauthorizedError
-}
-
-export type V2ConnectorListError = V2ConnectorListErrors[keyof V2ConnectorListErrors]
-
-export type V2ConnectorListResponses = {
-  /**
-   * Success
-   */
-  200: {
-    location: LocationInfo
-    data: Array<ConnectorInfo>
-  }
-}
-
-export type V2ConnectorListResponse = V2ConnectorListResponses[keyof V2ConnectorListResponses]
-
-export type V2ConnectorGetData = {
-  body?: never
-  path: {
-    connectorID: string
-  }
-  query?: {
-    location?: {
-      directory?: string
-      workspace?: string
-    }
-  }
-  url: "/api/connector/{connectorID}"
-}
-
-export type V2ConnectorGetErrors = {
-  /**
-   * InvalidRequestError
-   */
-  400: InvalidRequestError
-  /**
-   * UnauthorizedError
-   */
-  401: UnauthorizedError
-}
-
-export type V2ConnectorGetError = V2ConnectorGetErrors[keyof V2ConnectorGetErrors]
-
-export type V2ConnectorGetResponses = {
-  /**
-   * Success
-   */
-  200: {
-    location: LocationInfo
-    data: ConnectorInfo
-  }
-}
-
-export type V2ConnectorGetResponse = V2ConnectorGetResponses[keyof V2ConnectorGetResponses]
-
-export type V2ConnectorConnectKeyData = {
-  body: {
-    methodID: string
-    key: string
-    inputs: {
-      [key: string]: string
-    }
-    label?: string
-  }
-  path: {
-    connectorID: string
-  }
-  query?: {
-    location?: {
-      directory?: string
-      workspace?: string
-    }
-  }
-  url: "/api/connector/{connectorID}/connect/key"
-}
-
-export type V2ConnectorConnectKeyErrors = {
-  /**
-   * InvalidRequestError
-   */
-  400: InvalidRequestError
-  /**
-   * UnauthorizedError
-   */
-  401: UnauthorizedError
-}
-
-export type V2ConnectorConnectKeyError = V2ConnectorConnectKeyErrors[keyof V2ConnectorConnectKeyErrors]
-
-export type V2ConnectorConnectKeyResponses = {
-  /**
-   * <No Content>
-   */
-  204: void
-}
-
-export type V2ConnectorConnectKeyResponse = V2ConnectorConnectKeyResponses[keyof V2ConnectorConnectKeyResponses]
-
-export type V2ConnectorConnectOauthBeginData = {
-  body: {
-    methodID: string
-    inputs: {
-      [key: string]: string
-    }
-    label?: string
-  }
-  path: {
-    connectorID: string
-  }
-  query?: {
-    location?: {
-      directory?: string
-      workspace?: string
-    }
-  }
-  url: "/api/connector/{connectorID}/connect/oauth"
-}
-
-export type V2ConnectorConnectOauthBeginErrors = {
-  /**
-   * InvalidRequestError
-   */
-  400: InvalidRequestError
-  /**
-   * UnauthorizedError
-   */
-  401: UnauthorizedError
-}
-
-export type V2ConnectorConnectOauthBeginError =
-  V2ConnectorConnectOauthBeginErrors[keyof V2ConnectorConnectOauthBeginErrors]
-
-export type V2ConnectorConnectOauthBeginResponses = {
-  /**
-   * Success
-   */
-  200: {
-    location: LocationInfo
-    data: ConnectorAttempt
-  }
-}
-
-export type V2ConnectorConnectOauthBeginResponse =
-  V2ConnectorConnectOauthBeginResponses[keyof V2ConnectorConnectOauthBeginResponses]
-
-export type V2ConnectorConnectOauthCancelData = {
-  body?: never
-  path: {
-    attemptID: string
-  }
-  query?: {
-    location?: {
-      directory?: string
-      workspace?: string
-    }
-  }
-  url: "/api/connector/oauth/{attemptID}"
-}
-
-export type V2ConnectorConnectOauthCancelErrors = {
-  /**
-   * InvalidRequestError
-   */
-  400: InvalidRequestError
-  /**
-   * UnauthorizedError
-   */
-  401: UnauthorizedError
-}
-
-export type V2ConnectorConnectOauthCancelError =
-  V2ConnectorConnectOauthCancelErrors[keyof V2ConnectorConnectOauthCancelErrors]
-
-export type V2ConnectorConnectOauthCancelResponses = {
-  /**
-   * <No Content>
-   */
-  204: void
-}
-
-export type V2ConnectorConnectOauthCancelResponse =
-  V2ConnectorConnectOauthCancelResponses[keyof V2ConnectorConnectOauthCancelResponses]
-
-export type V2ConnectorConnectOauthStatusData = {
-  body?: never
-  path: {
-    attemptID: string
-  }
-  query?: {
-    location?: {
-      directory?: string
-      workspace?: string
-    }
-  }
-  url: "/api/connector/oauth/{attemptID}"
-}
-
-export type V2ConnectorConnectOauthStatusErrors = {
-  /**
-   * InvalidRequestError
-   */
-  400: InvalidRequestError
-  /**
-   * UnauthorizedError
-   */
-  401: UnauthorizedError
-}
-
-export type V2ConnectorConnectOauthStatusError =
-  V2ConnectorConnectOauthStatusErrors[keyof V2ConnectorConnectOauthStatusErrors]
-
-export type V2ConnectorConnectOauthStatusResponses = {
-  /**
-   * Success
-   */
-  200: {
-    location: LocationInfo
-    data: ConnectorAttemptStatus
-  }
-}
-
-export type V2ConnectorConnectOauthStatusResponse =
-  V2ConnectorConnectOauthStatusResponses[keyof V2ConnectorConnectOauthStatusResponses]
-
-export type V2ConnectorConnectOauthCompleteData = {
-  body: {
-    code?: string
-  }
-  path: {
-    attemptID: string
-  }
-  query?: {
-    location?: {
-      directory?: string
-      workspace?: string
-    }
-  }
-  url: "/api/connector/oauth/{attemptID}/complete"
-}
-
-export type V2ConnectorConnectOauthCompleteErrors = {
-  /**
-   * InvalidRequestError
-   */
-  400: InvalidRequestError
-  /**
-   * UnauthorizedError
-   */
-  401: UnauthorizedError
-}
-
-export type V2ConnectorConnectOauthCompleteError =
-  V2ConnectorConnectOauthCompleteErrors[keyof V2ConnectorConnectOauthCompleteErrors]
-
-export type V2ConnectorConnectOauthCompleteResponses = {
-  /**
-   * <No Content>
-   */
-  204: void
-}
-
-export type V2ConnectorConnectOauthCompleteResponse =
-  V2ConnectorConnectOauthCompleteResponses[keyof V2ConnectorConnectOauthCompleteResponses]
-
 export type V2CredentialRemoveData = {
   body?: never
   path: {
@@ -14489,7 +13002,6 @@ export type V2PtyListData = {
       directory?: string
       workspace?: string
     }
-    sessionID?: string
   }
   url: "/api/pty"
 }
@@ -14535,7 +13047,6 @@ export type V2PtyCreateData = {
       directory?: string
       workspace?: string
     }
-    sessionID?: string
   }
   url: "/api/pty"
 }
@@ -14575,7 +13086,6 @@ export type V2PtyRemoveData = {
       directory?: string
       workspace?: string
     }
-    sessionID?: string
   }
   url: "/api/pty/{ptyID}"
 }
@@ -14616,7 +13126,6 @@ export type V2PtyGetData = {
       directory?: string
       workspace?: string
     }
-    sessionID?: string
   }
   url: "/api/pty/{ptyID}"
 }
@@ -14666,7 +13175,6 @@ export type V2PtyUpdateData = {
       directory?: string
       workspace?: string
     }
-    sessionID?: string
   }
   url: "/api/pty/{ptyID}"
 }
@@ -14710,7 +13218,6 @@ export type V2PtyConnectTokenData = {
       directory?: string
       workspace?: string
     }
-    sessionID?: string
   }
   url: "/api/pty/{ptyID}/connect-token"
 }
@@ -14756,7 +13263,6 @@ export type V2PtyConnectData = {
   query?: {
     "location[directory]"?: string
     "location[workspace]"?: string
-    sessionID?: string
     cursor?: string
     ticket?: string
   }
@@ -14976,6 +13482,109 @@ export type V2ReferenceListResponses = {
 
 export type V2ReferenceListResponse = V2ReferenceListResponses[keyof V2ReferenceListResponses]
 
+export type V2ProjectCopyRemoveData = {
+  body?: {
+    directory: string
+    force: boolean
+  }
+  path: {
+    projectID: string
+  }
+  query?: {
+    location?: {
+      directory?: string
+      workspace?: string
+    }
+  }
+  url: "/experimental/project/{projectID}/copy"
+}
+
+export type V2ProjectCopyRemoveErrors = {
+  /**
+   * ProjectCopyError | InvalidRequestError
+   */
+  400: ProjectCopyError | InvalidRequestError
+}
+
+export type V2ProjectCopyRemoveError = V2ProjectCopyRemoveErrors[keyof V2ProjectCopyRemoveErrors]
+
+export type V2ProjectCopyRemoveResponses = {
+  /**
+   * <No Content>
+   */
+  204: void
+}
+
+export type V2ProjectCopyRemoveResponse = V2ProjectCopyRemoveResponses[keyof V2ProjectCopyRemoveResponses]
+
+export type V2ProjectCopyCreateData = {
+  body?: {
+    strategy: string
+    directory: string
+    name?: string
+  }
+  path: {
+    projectID: string
+  }
+  query?: {
+    location?: {
+      directory?: string
+      workspace?: string
+    }
+  }
+  url: "/experimental/project/{projectID}/copy"
+}
+
+export type V2ProjectCopyCreateErrors = {
+  /**
+   * ProjectCopyError | InvalidRequestError
+   */
+  400: ProjectCopyError | InvalidRequestError
+}
+
+export type V2ProjectCopyCreateError = V2ProjectCopyCreateErrors[keyof V2ProjectCopyCreateErrors]
+
+export type V2ProjectCopyCreateResponses = {
+  /**
+   * ProjectCopy.Copy
+   */
+  200: ProjectCopyCopy
+}
+
+export type V2ProjectCopyCreateResponse = V2ProjectCopyCreateResponses[keyof V2ProjectCopyCreateResponses]
+
+export type V2ProjectCopyRefreshData = {
+  body?: never
+  path: {
+    projectID: string
+  }
+  query?: {
+    location?: {
+      directory?: string
+      workspace?: string
+    }
+  }
+  url: "/experimental/project/{projectID}/copy/refresh"
+}
+
+export type V2ProjectCopyRefreshErrors = {
+  /**
+   * ProjectCopyError | InvalidRequestError
+   */
+  400: ProjectCopyError | InvalidRequestError
+}
+
+export type V2ProjectCopyRefreshError = V2ProjectCopyRefreshErrors[keyof V2ProjectCopyRefreshErrors]
+
+export type V2ProjectCopyRefreshResponses = {
+  /**
+   * <No Content>
+   */
+  204: void
+}
+
+export type V2ProjectCopyRefreshResponse = V2ProjectCopyRefreshResponses[keyof V2ProjectCopyRefreshResponses]
+
 export type PtyConnectData = {
   body?: never
   path: {
@@ -14984,7 +13593,6 @@ export type PtyConnectData = {
   query?: {
     directory?: string
     workspace?: string
-    sessionID?: string
     cursor?: string
     ticket?: string
   }

@@ -30,7 +30,7 @@ export function TerminalPanel() {
   const language = useLanguage()
   const command = useCommand()
   const settings = useSettings()
-  const { params, sessionKey, view } = useSessionLayout()
+  const { workspaceKey, view } = useSessionLayout()
 
   const opened = createMemo(() => view().terminal.opened())
   const size = createSizing()
@@ -132,7 +132,7 @@ export function TerminalPanel() {
     language.locale()
 
     setTerminalHandoff(
-      sessionKey(),
+      workspaceKey(),
       terminal.all().map((pty) =>
         terminalTabLabel({
           title: pty.title,
@@ -146,7 +146,7 @@ export function TerminalPanel() {
   const handoff = createMemo(() => {
     const dir = sdk().directory
     if (!dir) return []
-    return getTerminalHandoff(sessionKey()) ?? []
+    return getTerminalHandoff(workspaceKey()) ?? []
   })
 
   const all = terminal.all
@@ -304,7 +304,6 @@ export function TerminalPanel() {
                           <div id={`terminal-wrapper-${id}`} class="absolute inset-0">
                             <Terminal
                               pty={pty()}
-                              sessionID={params.id ?? ""}
                               autoFocus={opened()}
                               onAutoFocus={() => terminal.consumeFocus(id)}
                               onConnect={() => markTerminalConnected(terminalRecoveryKey(pty()), id, ops.trim)}

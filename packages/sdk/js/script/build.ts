@@ -13,10 +13,7 @@ const opencode = path.resolve(dir, "../../opencode")
 
 await $`bun dev generate > ${dir}/openapi.json`.cwd(opencode)
 
-// Startup log lines can land in stdout after the JSON payload; strip them.
-const rawSpec = await Bun.file("./openapi.json").text()
-const logStart = rawSpec.search(/\n\[[a-z]/)
-const document = JSON.parse(logStart > 0 ? rawSpec.slice(0, logStart) : rawSpec) as {
+const document = (await Bun.file("./openapi.json").json()) as {
   components?: { schemas?: Record<string, unknown> }
   [key: string]: unknown
 }

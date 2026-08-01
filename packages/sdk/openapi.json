@@ -810,6 +810,60 @@
         ]
       }
     },
+    "/experimental/capabilities": {
+      "get": {
+        "tags": ["experimental"],
+        "operationId": "experimental.capabilities.get",
+        "parameters": [
+          {
+            "name": "directory",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "name": "workspace",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Experimental capabilities",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExperimentalCapabilities"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Get experimental features enabled on the OpenCode server.",
+        "summary": "Get experimental capabilities",
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.experimental.capabilities.get({\n  ...\n})"
+          }
+        ]
+      }
+    },
     "/experimental/console": {
       "get": {
         "tags": ["experimental"],
@@ -3873,168 +3927,10 @@
         ]
       }
     },
-    "/experimental/project/{projectID}/copy": {
+    "/experimental/project/{projectID}/copy/generate-name": {
       "post": {
         "tags": ["projectCopy"],
-        "operationId": "experimental.projectCopy.create",
-        "parameters": [
-          {
-            "name": "projectID",
-            "in": "path",
-            "schema": {
-              "type": "string"
-            },
-            "required": true
-          },
-          {
-            "name": "workspace",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            },
-            "required": false
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Project copy created",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProjectCopyCopy"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "ProjectCopyError | InvalidRequestError",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/components/schemas/ProjectCopyError"
-                    },
-                    {
-                      "$ref": "#/components/schemas/InvalidRequestError"
-                    }
-                  ]
-                }
-              }
-            }
-          }
-        },
-        "description": "Create a local physical copy of a project using the selected strategy.",
-        "summary": "Create project copy",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "strategy": {
-                    "type": "string",
-                    "enum": ["git_worktree"]
-                  },
-                  "directory": {
-                    "type": "string"
-                  },
-                  "name": {
-                    "type": "string"
-                  },
-                  "context": {
-                    "type": "string"
-                  }
-                },
-                "required": ["strategy", "directory"],
-                "additionalProperties": false
-              }
-            }
-          }
-        },
-        "x-codeSamples": [
-          {
-            "lang": "js",
-            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.experimental.projectCopy.create({\n  ...\n})"
-          }
-        ]
-      },
-      "delete": {
-        "tags": ["projectCopy"],
-        "operationId": "experimental.projectCopy.remove",
-        "parameters": [
-          {
-            "name": "projectID",
-            "in": "path",
-            "schema": {
-              "type": "string"
-            },
-            "required": true
-          },
-          {
-            "name": "workspace",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            },
-            "required": false
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "Project copy removed"
-          },
-          "400": {
-            "description": "ProjectCopyError | InvalidRequestError",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/components/schemas/ProjectCopyError"
-                    },
-                    {
-                      "$ref": "#/components/schemas/InvalidRequestError"
-                    }
-                  ]
-                }
-              }
-            }
-          }
-        },
-        "description": "Remove a local physical copy of a project using the selected strategy.",
-        "summary": "Remove project copy",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "directory": {
-                    "type": "string"
-                  },
-                  "force": {
-                    "type": "boolean"
-                  }
-                },
-                "required": ["directory", "force"],
-                "additionalProperties": false
-              }
-            }
-          }
-        },
-        "x-codeSamples": [
-          {
-            "lang": "js",
-            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.experimental.projectCopy.remove({\n  ...\n})"
-          }
-        ]
-      }
-    },
-    "/experimental/project/{projectID}/copy/refresh": {
-      "post": {
-        "tags": ["projectCopy"],
-        "operationId": "experimental.projectCopy.refresh",
+        "operationId": "experimental.projectCopy.generateName",
         "parameters": [
           {
             "name": "projectID",
@@ -4062,33 +3958,55 @@
           }
         ],
         "responses": {
-          "204": {
-            "description": "Project copies refreshed"
-          },
-          "400": {
-            "description": "ProjectCopyError | InvalidRequestError",
+          "200": {
+            "description": "Success",
             "content": {
               "application/json": {
                 "schema": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/components/schemas/ProjectCopyError"
-                    },
-                    {
-                      "$ref": "#/components/schemas/InvalidRequestError"
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
                     }
-                  ]
+                  },
+                  "required": ["name"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestError"
                 }
               }
             }
           }
         },
-        "description": "Discover local project copies using one or all configured strategies.",
-        "summary": "Refresh project copies",
+        "description": "Generate a short name for a project copy from task context.",
+        "summary": "Generate project copy name",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "context": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
         "x-codeSamples": [
           {
             "lang": "js",
-            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.experimental.projectCopy.refresh({\n  ...\n})"
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.experimental.projectCopy.generateName({\n  ...\n})"
           }
         ]
       }
@@ -12028,10 +11946,10 @@
         ]
       }
     },
-    "/api/connector": {
+    "/api/integration": {
       "get": {
-        "tags": ["connectors"],
-        "operationId": "v2.connector.list",
+        "tags": ["integrations"],
+        "operationId": "v2.integration.list",
         "parameters": [
           {
             "name": "location",
@@ -12068,7 +11986,7 @@
                     "data": {
                       "type": "array",
                       "items": {
-                        "$ref": "#/components/schemas/ConnectorInfo"
+                        "$ref": "#/components/schemas/IntegrationInfo"
                       }
                     }
                   },
@@ -12099,23 +12017,23 @@
             }
           }
         },
-        "description": "Retrieve available connectors and their authentication methods.",
-        "summary": "List connectors",
+        "description": "Retrieve available integrations and their authentication methods.",
+        "summary": "List integrations",
         "x-codeSamples": [
           {
             "lang": "js",
-            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.v2.connector.list({\n  ...\n})"
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.v2.integration.list({\n  ...\n})"
           }
         ]
       }
     },
-    "/api/connector/{connectorID}": {
+    "/api/integration/{integrationID}": {
       "get": {
-        "tags": ["connectors"],
-        "operationId": "v2.connector.get",
+        "tags": ["integrations"],
+        "operationId": "v2.integration.get",
         "parameters": [
           {
-            "name": "connectorID",
+            "name": "integrationID",
             "in": "path",
             "schema": {
               "type": "string"
@@ -12155,7 +12073,7 @@
                       "$ref": "#/components/schemas/LocationInfo"
                     },
                     "data": {
-                      "$ref": "#/components/schemas/ConnectorInfo"
+                      "$ref": "#/components/schemas/IntegrationInfo"
                     }
                   },
                   "required": ["location", "data"],
@@ -12185,23 +12103,23 @@
             }
           }
         },
-        "description": "Retrieve one connector and its authentication methods.",
-        "summary": "Get connector",
+        "description": "Retrieve one integration and its authentication methods.",
+        "summary": "Get integration",
         "x-codeSamples": [
           {
             "lang": "js",
-            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.v2.connector.get({\n  ...\n})"
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.v2.integration.get({\n  ...\n})"
           }
         ]
       }
     },
-    "/api/connector/{connectorID}/connect/key": {
+    "/api/integration/{integrationID}/connect/key": {
       "post": {
-        "tags": ["connectors"],
-        "operationId": "v2.connector.connect.key",
+        "tags": ["integrations"],
+        "operationId": "v2.integration.connect.key",
         "parameters": [
           {
-            "name": "connectorID",
+            "name": "integrationID",
             "in": "path",
             "schema": {
               "type": "string"
@@ -12269,23 +12187,14 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "methodID": {
-                    "type": "string"
-                  },
                   "key": {
                     "type": "string"
-                  },
-                  "inputs": {
-                    "type": "object",
-                    "additionalProperties": {
-                      "type": "string"
-                    }
                   },
                   "label": {
                     "type": "string"
                   }
                 },
-                "required": ["methodID", "key", "inputs"],
+                "required": ["key"],
                 "additionalProperties": false
               }
             }
@@ -12295,18 +12204,18 @@
         "x-codeSamples": [
           {
             "lang": "js",
-            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.v2.connector.connect.key({\n  ...\n})"
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.v2.integration.connect.key({\n  ...\n})"
           }
         ]
       }
     },
-    "/api/connector/{connectorID}/connect/oauth": {
+    "/api/integration/{integrationID}/connect/oauth": {
       "post": {
-        "tags": ["connectors"],
-        "operationId": "v2.connector.connect.oauth.begin",
+        "tags": ["integrations"],
+        "operationId": "v2.integration.connect.oauth",
         "parameters": [
           {
-            "name": "connectorID",
+            "name": "integrationID",
             "in": "path",
             "schema": {
               "type": "string"
@@ -12346,7 +12255,7 @@
                       "$ref": "#/components/schemas/LocationInfo"
                     },
                     "data": {
-                      "$ref": "#/components/schemas/ConnectorAttempt"
+                      "$ref": "#/components/schemas/IntegrationAttempt"
                     }
                   },
                   "required": ["location", "data"],
@@ -12414,15 +12323,15 @@
         "x-codeSamples": [
           {
             "lang": "js",
-            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.v2.connector.connect.oauth.begin({\n  ...\n})"
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.v2.integration.connect.oauth({\n  ...\n})"
           }
         ]
       }
     },
-    "/api/connector/oauth/{attemptID}": {
+    "/api/integration/attempt/{attemptID}": {
       "get": {
-        "tags": ["connectors"],
-        "operationId": "v2.connector.connect.oauth.status",
+        "tags": ["integrations"],
+        "operationId": "v2.integration.attempt.status",
         "parameters": [
           {
             "name": "attemptID",
@@ -12500,13 +12409,13 @@
         "x-codeSamples": [
           {
             "lang": "js",
-            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.v2.connector.connect.oauth.status({\n  ...\n})"
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.v2.integration.attempt.status({\n  ...\n})"
           }
         ]
       },
       "delete": {
-        "tags": ["connectors"],
-        "operationId": "v2.connector.connect.oauth.cancel",
+        "tags": ["integrations"],
+        "operationId": "v2.integration.attempt.cancel",
         "parameters": [
           {
             "name": "attemptID",
@@ -12567,15 +12476,15 @@
         "x-codeSamples": [
           {
             "lang": "js",
-            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.v2.connector.connect.oauth.cancel({\n  ...\n})"
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.v2.integration.attempt.cancel({\n  ...\n})"
           }
         ]
       }
     },
-    "/api/connector/oauth/{attemptID}/complete": {
+    "/api/integration/attempt/{attemptID}/complete": {
       "post": {
-        "tags": ["connectors"],
-        "operationId": "v2.connector.connect.oauth.complete",
+        "tags": ["integrations"],
+        "operationId": "v2.integration.attempt.complete",
         "parameters": [
           {
             "name": "attemptID",
@@ -12659,7 +12568,160 @@
         "x-codeSamples": [
           {
             "lang": "js",
-            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.v2.connector.connect.oauth.complete({\n  ...\n})"
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.v2.integration.attempt.complete({\n  ...\n})"
+          }
+        ]
+      }
+    },
+    "/api/credential/{credentialID}": {
+      "patch": {
+        "tags": ["opencode HttpApi"],
+        "operationId": "v2.credential.update",
+        "parameters": [
+          {
+            "name": "credentialID",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          },
+          {
+            "name": "location",
+            "in": "query",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "directory": {
+                  "type": "string"
+                },
+                "workspace": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            },
+            "required": false,
+            "style": "deepObject",
+            "explode": true
+          }
+        ],
+        "security": [],
+        "responses": {
+          "204": {
+            "description": "<No Content>"
+          },
+          "400": {
+            "description": "InvalidRequestError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidRequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UnauthorizedError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Update a stored credential label.",
+        "summary": "Update credential",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  }
+                },
+                "required": ["label"],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        },
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.v2.credential.update({\n  ...\n})"
+          }
+        ]
+      },
+      "delete": {
+        "tags": ["opencode HttpApi"],
+        "operationId": "v2.credential.remove",
+        "parameters": [
+          {
+            "name": "credentialID",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          },
+          {
+            "name": "location",
+            "in": "query",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "directory": {
+                  "type": "string"
+                },
+                "workspace": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            },
+            "required": false,
+            "style": "deepObject",
+            "explode": true
+          }
+        ],
+        "security": [],
+        "responses": {
+          "204": {
+            "description": "<No Content>"
+          },
+          "400": {
+            "description": "InvalidRequestError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidRequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UnauthorizedError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Remove a stored integration credential.",
+        "summary": "Remove credential",
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.v2.credential.remove({\n  ...\n})"
           }
         ]
       }
@@ -14871,6 +14933,241 @@
         ]
       }
     },
+    "/experimental/project/{projectID}/copy": {
+      "post": {
+        "tags": ["projectCopy"],
+        "operationId": "v2.projectCopy.create",
+        "parameters": [
+          {
+            "name": "projectID",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          },
+          {
+            "name": "location",
+            "in": "query",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "directory": {
+                  "type": "string"
+                },
+                "workspace": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            },
+            "required": false,
+            "style": "deepObject",
+            "explode": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ProjectCopy.Copy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectCopyCopy"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "ProjectCopyError | InvalidRequestError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ProjectCopyError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/InvalidRequestError"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "strategy": {
+                    "type": "string"
+                  },
+                  "directory": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": ["strategy", "directory"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.v2.projectCopy.create({\n  ...\n})"
+          }
+        ]
+      },
+      "delete": {
+        "tags": ["projectCopy"],
+        "operationId": "v2.projectCopy.remove",
+        "parameters": [
+          {
+            "name": "projectID",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          },
+          {
+            "name": "location",
+            "in": "query",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "directory": {
+                  "type": "string"
+                },
+                "workspace": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            },
+            "required": false,
+            "style": "deepObject",
+            "explode": true
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "<No Content>"
+          },
+          "400": {
+            "description": "ProjectCopyError | InvalidRequestError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ProjectCopyError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/InvalidRequestError"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "directory": {
+                    "type": "string"
+                  },
+                  "force": {
+                    "type": "boolean"
+                  }
+                },
+                "required": ["directory", "force"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.v2.projectCopy.remove({\n  ...\n})"
+          }
+        ]
+      }
+    },
+    "/experimental/project/{projectID}/copy/refresh": {
+      "post": {
+        "tags": ["projectCopy"],
+        "operationId": "v2.projectCopy.refresh",
+        "parameters": [
+          {
+            "name": "projectID",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          },
+          {
+            "name": "location",
+            "in": "query",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "directory": {
+                  "type": "string"
+                },
+                "workspace": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            },
+            "required": false,
+            "style": "deepObject",
+            "explode": true
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "<No Content>"
+          },
+          "400": {
+            "description": "ProjectCopyError | InvalidRequestError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ProjectCopyError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/InvalidRequestError"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.v2.projectCopy.refresh({\n  ...\n})"
+          }
+        ]
+      }
+    },
     "/pty/{ptyID}/connect": {
       "get": {
         "tags": ["pty"],
@@ -15122,6 +15419,9 @@
             "$ref": "#/components/schemas/EventPluginAdded"
           },
           {
+            "$ref": "#/components/schemas/EventProjectDirectoriesUpdated"
+          },
+          {
             "$ref": "#/components/schemas/EventFileWatcherUpdated"
           },
           {
@@ -15179,13 +15479,13 @@
             "$ref": "#/components/schemas/EventCommandExecuted"
           },
           {
-            "$ref": "#/components/schemas/EventProjectDirectoriesUpdated"
-          },
-          {
             "$ref": "#/components/schemas/EventProjectUpdated"
           },
           {
-            "$ref": "#/components/schemas/EventVcsBranchUpdated"
+            "$ref": "#/components/schemas/EventSessionStatus"
+          },
+          {
+            "$ref": "#/components/schemas/EventSessionIdle"
           },
           {
             "$ref": "#/components/schemas/EventQuestionAsked"
@@ -15197,19 +15497,10 @@
             "$ref": "#/components/schemas/EventQuestionRejected"
           },
           {
-            "$ref": "#/components/schemas/EventSessionStatus"
-          },
-          {
-            "$ref": "#/components/schemas/EventSessionIdle"
-          },
-          {
             "$ref": "#/components/schemas/EventSessionCompacted"
           },
           {
-            "$ref": "#/components/schemas/EventWorktreeReady"
-          },
-          {
-            "$ref": "#/components/schemas/EventWorktreeFailed"
+            "$ref": "#/components/schemas/EventVcsBranchUpdated"
           },
           {
             "$ref": "#/components/schemas/EventWorkspaceReady"
@@ -15219,6 +15510,12 @@
           },
           {
             "$ref": "#/components/schemas/EventWorkspaceStatus"
+          },
+          {
+            "$ref": "#/components/schemas/EventWorktreeReady"
+          },
+          {
+            "$ref": "#/components/schemas/EventWorktreeFailed"
           },
           {
             "$ref": "#/components/schemas/EventServerConnected"
@@ -16938,6 +17235,10 @@
           "pid": {
             "type": "integer",
             "minimum": 0
+          },
+          "exitCode": {
+            "type": "integer",
+            "minimum": 0
           }
         },
         "required": ["id", "title", "command", "args", "cwd", "status", "pid"],
@@ -16961,69 +17262,6 @@
         },
         "required": ["content", "status", "priority"],
         "additionalProperties": false
-      },
-      "QuestionOption": {
-        "type": "object",
-        "properties": {
-          "label": {
-            "type": "string",
-            "description": "Display text (1-5 words, concise)"
-          },
-          "description": {
-            "type": "string",
-            "description": "Explanation of choice"
-          }
-        },
-        "required": ["label", "description"],
-        "additionalProperties": false
-      },
-      "QuestionInfo": {
-        "type": "object",
-        "properties": {
-          "question": {
-            "type": "string",
-            "description": "Complete question"
-          },
-          "header": {
-            "type": "string",
-            "description": "Very short label (max 30 chars)"
-          },
-          "options": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/QuestionOption"
-            },
-            "description": "Available choices"
-          },
-          "multiple": {
-            "type": "boolean"
-          },
-          "custom": {
-            "type": "boolean"
-          }
-        },
-        "required": ["question", "header", "options"],
-        "additionalProperties": false
-      },
-      "QuestionTool": {
-        "type": "object",
-        "properties": {
-          "messageID": {
-            "type": "string",
-            "pattern": "^msg"
-          },
-          "callID": {
-            "type": "string"
-          }
-        },
-        "required": ["messageID", "callID"],
-        "additionalProperties": false
-      },
-      "QuestionAnswer": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        }
       },
       "SessionStatus": {
         "anyOf": [
@@ -17097,6 +17335,69 @@
             "additionalProperties": false
           }
         ]
+      },
+      "QuestionOption": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "description": "Display text (1-5 words, concise)"
+          },
+          "description": {
+            "type": "string",
+            "description": "Explanation of choice"
+          }
+        },
+        "required": ["label", "description"],
+        "additionalProperties": false
+      },
+      "QuestionInfo": {
+        "type": "object",
+        "properties": {
+          "question": {
+            "type": "string",
+            "description": "Complete question"
+          },
+          "header": {
+            "type": "string",
+            "description": "Very short label (max 30 chars)"
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QuestionOption"
+            },
+            "description": "Available choices"
+          },
+          "multiple": {
+            "type": "boolean"
+          },
+          "custom": {
+            "type": "boolean"
+          }
+        },
+        "required": ["question", "header", "options"],
+        "additionalProperties": false
+      },
+      "QuestionTool": {
+        "type": "object",
+        "properties": {
+          "messageID": {
+            "type": "string",
+            "pattern": "^msg"
+          },
+          "callID": {
+            "type": "string"
+          }
+        },
+        "required": ["messageID", "callID"],
+        "additionalProperties": false
+      },
+      "QuestionAnswer": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
       },
       "GlobalEvent": {
         "type": "object",
@@ -19053,6 +19354,31 @@
                   },
                   "type": {
                     "type": "string",
+                    "enum": ["project.directories.updated"]
+                  },
+                  "properties": {
+                    "type": "object",
+                    "properties": {
+                      "projectID": {
+                        "type": "string"
+                      }
+                    },
+                    "required": ["projectID"],
+                    "additionalProperties": false
+                  }
+                },
+                "required": ["id", "type", "properties"],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "pattern": "^evt_"
+                  },
+                  "type": {
+                    "type": "string",
                     "enum": ["file.watcher.updated"]
                   },
                   "properties": {
@@ -19667,31 +19993,6 @@
                   },
                   "type": {
                     "type": "string",
-                    "enum": ["project.directories.updated"]
-                  },
-                  "properties": {
-                    "type": "object",
-                    "properties": {
-                      "projectID": {
-                        "type": "string"
-                      }
-                    },
-                    "required": ["projectID"],
-                    "additionalProperties": false
-                  }
-                },
-                "required": ["id", "type", "properties"],
-                "additionalProperties": false
-              },
-              {
-                "type": "object",
-                "properties": {
-                  "id": {
-                    "type": "string",
-                    "pattern": "^evt_"
-                  },
-                  "type": {
-                    "type": "string",
                     "enum": ["project.updated"]
                   },
                   "properties": {
@@ -19741,15 +20042,46 @@
                   },
                   "type": {
                     "type": "string",
-                    "enum": ["vcs.branch.updated"]
+                    "enum": ["session.status"]
                   },
                   "properties": {
                     "type": "object",
                     "properties": {
-                      "branch": {
-                        "type": "string"
+                      "sessionID": {
+                        "type": "string",
+                        "pattern": "^ses"
+                      },
+                      "status": {
+                        "$ref": "#/components/schemas/SessionStatus"
                       }
                     },
+                    "required": ["sessionID", "status"],
+                    "additionalProperties": false
+                  }
+                },
+                "required": ["id", "type", "properties"],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "pattern": "^evt_"
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": ["session.idle"]
+                  },
+                  "properties": {
+                    "type": "object",
+                    "properties": {
+                      "sessionID": {
+                        "type": "string",
+                        "pattern": "^ses"
+                      }
+                    },
+                    "required": ["sessionID"],
                     "additionalProperties": false
                   }
                 },
@@ -19871,61 +20203,6 @@
                   },
                   "type": {
                     "type": "string",
-                    "enum": ["session.status"]
-                  },
-                  "properties": {
-                    "type": "object",
-                    "properties": {
-                      "sessionID": {
-                        "type": "string",
-                        "pattern": "^ses"
-                      },
-                      "status": {
-                        "$ref": "#/components/schemas/SessionStatus"
-                      }
-                    },
-                    "required": ["sessionID", "status"],
-                    "additionalProperties": false
-                  }
-                },
-                "required": ["id", "type", "properties"],
-                "additionalProperties": false
-              },
-              {
-                "type": "object",
-                "properties": {
-                  "id": {
-                    "type": "string",
-                    "pattern": "^evt_"
-                  },
-                  "type": {
-                    "type": "string",
-                    "enum": ["session.idle"]
-                  },
-                  "properties": {
-                    "type": "object",
-                    "properties": {
-                      "sessionID": {
-                        "type": "string",
-                        "pattern": "^ses"
-                      }
-                    },
-                    "required": ["sessionID"],
-                    "additionalProperties": false
-                  }
-                },
-                "required": ["id", "type", "properties"],
-                "additionalProperties": false
-              },
-              {
-                "type": "object",
-                "properties": {
-                  "id": {
-                    "type": "string",
-                    "pattern": "^evt_"
-                  },
-                  "type": {
-                    "type": "string",
                     "enum": ["session.compacted"]
                   },
                   "properties": {
@@ -19952,44 +20229,15 @@
                   },
                   "type": {
                     "type": "string",
-                    "enum": ["worktree.ready"]
+                    "enum": ["vcs.branch.updated"]
                   },
                   "properties": {
                     "type": "object",
                     "properties": {
-                      "name": {
-                        "type": "string"
-                      },
                       "branch": {
                         "type": "string"
                       }
                     },
-                    "required": ["name"],
-                    "additionalProperties": false
-                  }
-                },
-                "required": ["id", "type", "properties"],
-                "additionalProperties": false
-              },
-              {
-                "type": "object",
-                "properties": {
-                  "id": {
-                    "type": "string",
-                    "pattern": "^evt_"
-                  },
-                  "type": {
-                    "type": "string",
-                    "enum": ["worktree.failed"]
-                  },
-                  "properties": {
-                    "type": "object",
-                    "properties": {
-                      "message": {
-                        "type": "string"
-                      }
-                    },
-                    "required": ["message"],
                     "additionalProperties": false
                   }
                 },
@@ -20070,6 +20318,59 @@
                       }
                     },
                     "required": ["workspaceID", "status"],
+                    "additionalProperties": false
+                  }
+                },
+                "required": ["id", "type", "properties"],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "pattern": "^evt_"
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": ["worktree.ready"]
+                  },
+                  "properties": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string"
+                      },
+                      "branch": {
+                        "type": "string"
+                      }
+                    },
+                    "required": ["name"],
+                    "additionalProperties": false
+                  }
+                },
+                "required": ["id", "type", "properties"],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "pattern": "^evt_"
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": ["worktree.failed"]
+                  },
+                  "properties": {
+                    "type": "object",
+                    "properties": {
+                      "message": {
+                        "type": "string"
+                      }
+                    },
+                    "required": ["message"],
                     "additionalProperties": false
                   }
                 },
@@ -20519,15 +20820,28 @@
                 "interleaved": {
                   "anyOf": [
                     {
-                      "type": "boolean",
-                      "enum": [true]
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "string",
+                      "enum": ["reasoning", "reasoning_content", "reasoning_text"]
+                    },
+                    {
+                      "type": "string"
                     },
                     {
                       "type": "object",
                       "properties": {
                         "field": {
-                          "type": "string",
-                          "enum": ["reasoning", "reasoning_content", "reasoning_details"]
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": ["reasoning", "reasoning_content", "reasoning_text"]
+                            },
+                            {
+                              "type": "string"
+                            }
+                          ]
                         }
                       },
                       "required": ["field"],
@@ -20671,6 +20985,9 @@
               "type": "string"
             },
             "description": "Command and arguments to run the MCP server"
+          },
+          "cwd": {
+            "type": "string"
           },
           "environment": {
             "type": "object",
@@ -21337,8 +21654,15 @@
                     "type": "object",
                     "properties": {
                       "field": {
-                        "type": "string",
-                        "enum": ["reasoning", "reasoning_content", "reasoning_details"]
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": ["reasoning", "reasoning_content", "reasoning_text"]
+                          },
+                          {
+                            "type": "string"
+                          }
+                        ]
                       }
                     },
                     "required": ["field"],
@@ -21532,6 +21856,16 @@
           }
         },
         "required": ["id", "name", "source", "env", "options", "models"],
+        "additionalProperties": false
+      },
+      "ExperimentalCapabilities": {
+        "type": "object",
+        "properties": {
+          "backgroundSubagents": {
+            "type": "boolean"
+          }
+        },
+        "required": ["backgroundSubagents"],
         "additionalProperties": false
       },
       "ConsoleState": {
@@ -22428,30 +22762,6 @@
           }
         },
         "required": ["_tag", "projectID", "message"],
-        "additionalProperties": false
-      },
-      "ProjectCopyError": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string",
-            "enum": ["ProjectCopyError"]
-          },
-          "data": {
-            "type": "object",
-            "properties": {
-              "message": {
-                "type": "string"
-              },
-              "forceRequired": {
-                "type": "boolean"
-              }
-            },
-            "required": ["message"],
-            "additionalProperties": false
-          }
-        },
-        "required": ["name", "data"],
         "additionalProperties": false
       },
       "PtyNotFoundError": {
@@ -26767,12 +27077,11 @@
             "directory": {
               "type": "string"
             },
-            "type": {
-              "type": "string",
-              "enum": ["main", "root", "git_worktree"]
+            "strategy": {
+              "type": "string"
             }
           },
-          "required": ["directory", "type"],
+          "required": ["directory"],
           "additionalProperties": false
         }
       },
@@ -29716,61 +30025,8 @@
           "name": {
             "type": "string"
           },
-          "enabled": {
-            "anyOf": [
-              {
-                "type": "boolean",
-                "enum": [false]
-              },
-              {
-                "type": "object",
-                "properties": {
-                  "via": {
-                    "type": "string",
-                    "enum": ["env"]
-                  },
-                  "name": {
-                    "type": "string"
-                  }
-                },
-                "required": ["via", "name"],
-                "additionalProperties": false
-              },
-              {
-                "type": "object",
-                "properties": {
-                  "via": {
-                    "type": "string",
-                    "enum": ["credential"]
-                  },
-                  "credentialID": {
-                    "type": "string"
-                  }
-                },
-                "required": ["via", "credentialID"],
-                "additionalProperties": false
-              },
-              {
-                "type": "object",
-                "properties": {
-                  "via": {
-                    "type": "string",
-                    "enum": ["custom"]
-                  },
-                  "data": {
-                    "type": "object"
-                  }
-                },
-                "required": ["via", "data"],
-                "additionalProperties": false
-              }
-            ]
-          },
-          "env": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
+          "disabled": {
+            "type": "boolean"
           },
           "api": {
             "$ref": "#/components/schemas/ProviderApi"
@@ -29779,10 +30035,10 @@
             "$ref": "#/components/schemas/ProviderRequest"
           }
         },
-        "required": ["id", "name", "enabled", "env", "api", "request"],
+        "required": ["id", "name", "api", "request"],
         "additionalProperties": false
       },
-      "ConnectorWhen": {
+      "IntegrationWhen": {
         "type": "object",
         "properties": {
           "key": {
@@ -29799,7 +30055,7 @@
         "required": ["key", "op", "value"],
         "additionalProperties": false
       },
-      "ConnectorTextPrompt": {
+      "IntegrationTextPrompt": {
         "type": "object",
         "properties": {
           "type": {
@@ -29816,13 +30072,13 @@
             "type": "string"
           },
           "when": {
-            "$ref": "#/components/schemas/ConnectorWhen"
+            "$ref": "#/components/schemas/IntegrationWhen"
           }
         },
         "required": ["type", "key", "message"],
         "additionalProperties": false
       },
-      "ConnectorSelectPrompt": {
+      "IntegrationSelectPrompt": {
         "type": "object",
         "properties": {
           "type": {
@@ -29855,13 +30111,13 @@
             }
           },
           "when": {
-            "$ref": "#/components/schemas/ConnectorWhen"
+            "$ref": "#/components/schemas/IntegrationWhen"
           }
         },
         "required": ["type", "key", "message", "options"],
         "additionalProperties": false
       },
-      "ConnectorOAuthMethod": {
+      "IntegrationOAuthMethod": {
         "type": "object",
         "properties": {
           "id": {
@@ -29879,10 +30135,10 @@
             "items": {
               "anyOf": [
                 {
-                  "$ref": "#/components/schemas/ConnectorTextPrompt"
+                  "$ref": "#/components/schemas/IntegrationTextPrompt"
                 },
                 {
-                  "$ref": "#/components/schemas/ConnectorSelectPrompt"
+                  "$ref": "#/components/schemas/IntegrationSelectPrompt"
                 }
               ]
             }
@@ -29891,37 +30147,79 @@
         "required": ["id", "type", "label"],
         "additionalProperties": false
       },
-      "ConnectorKeyMethod": {
+      "IntegrationKeyMethod": {
         "type": "object",
         "properties": {
-          "id": {
-            "type": "string"
-          },
           "type": {
             "type": "string",
             "enum": ["key"]
           },
           "label": {
             "type": "string"
+          }
+        },
+        "required": ["type"],
+        "additionalProperties": false
+      },
+      "IntegrationEnvMethod": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["env"]
           },
-          "prompts": {
+          "names": {
             "type": "array",
             "items": {
-              "anyOf": [
-                {
-                  "$ref": "#/components/schemas/ConnectorTextPrompt"
-                },
-                {
-                  "$ref": "#/components/schemas/ConnectorSelectPrompt"
-                }
-              ]
+              "type": "string"
             }
           }
         },
-        "required": ["id", "type", "label"],
+        "required": ["type", "names"],
         "additionalProperties": false
       },
-      "ConnectorInfo": {
+      "ConnectionCredentialInfo": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["credential"]
+          },
+          "id": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          }
+        },
+        "required": ["type", "id", "label"],
+        "additionalProperties": false
+      },
+      "ConnectionEnvInfo": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["env"]
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": ["type", "name"],
+        "additionalProperties": false
+      },
+      "ConnectionInfo": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/ConnectionCredentialInfo"
+          },
+          {
+            "$ref": "#/components/schemas/ConnectionEnvInfo"
+          }
+        ]
+      },
+      "IntegrationInfo": {
         "type": "object",
         "properties": {
           "id": {
@@ -29935,12 +30233,18 @@
             "items": {
               "$ref": "#/components/schemas/IntegrationMethod"
             }
+          },
+          "connections": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConnectionInfo"
+            }
           }
         },
-        "required": ["id", "name", "methods"],
+        "required": ["id", "name", "methods", "connections"],
         "additionalProperties": false
       },
-      "ConnectorAttempt": {
+      "IntegrationAttempt": {
         "type": "object",
         "properties": {
           "attemptID": {
@@ -33510,6 +33814,16 @@
         "required": ["name", "path", "source"],
         "additionalProperties": false
       },
+      "ProjectCopyCopy": {
+        "type": "object",
+        "properties": {
+          "directory": {
+            "type": "string"
+          }
+        },
+        "required": ["directory"],
+        "additionalProperties": false
+      },
       "EventModels-devRefreshed": {
         "type": "object",
         "properties": {
@@ -33533,530 +33847,19 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "string"
-          },
-          "providerID": {
-            "type": "string"
-          },
-          "family": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          },
-          "api": {
-            "anyOf": [
-              {
-                "type": "object",
-                "properties": {
-                  "id": {
-                    "type": "string"
-                  },
-                  "type": {
-                    "type": "string",
-                    "enum": ["aisdk"]
-                  },
-                  "package": {
-                    "type": "string"
-                  },
-                  "url": {
-                    "type": "string"
-                  },
-                  "settings": {
-                    "type": "object"
-                  }
-                },
-                "required": ["id", "type", "package"],
-                "additionalProperties": false
-              },
-              {
-                "type": "object",
-                "properties": {
-                  "id": {
-                    "type": "string"
-                  },
-                  "type": {
-                    "type": "string",
-                    "enum": ["native"]
-                  },
-                  "url": {
-                    "type": "string"
-                  },
-                  "settings": {
-                    "type": "object"
-                  }
-                },
-                "required": ["id", "type", "settings"],
-                "additionalProperties": false
-              }
-            ]
-          },
-          "capabilities": {
-            "type": "object",
-            "properties": {
-              "tools": {
-                "type": "boolean"
-              },
-              "input": {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                }
-              },
-              "output": {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                }
-              }
-            },
-            "required": ["tools", "input", "output"],
-            "additionalProperties": false
-          },
-          "request": {
-            "type": "object",
-            "properties": {
-              "headers": {
-                "type": "object",
-                "additionalProperties": {
-                  "type": "string"
-                }
-              },
-              "body": {
-                "type": "object"
-              },
-              "generation": {
-                "type": "object",
-                "properties": {
-                  "maxTokens": {
-                    "anyOf": [
-                      {
-                        "type": "number"
-                      },
-                      {
-                        "type": "string",
-                        "enum": ["NaN"]
-                      },
-                      {
-                        "type": "string",
-                        "enum": ["Infinity"]
-                      },
-                      {
-                        "type": "string",
-                        "enum": ["-Infinity"]
-                      }
-                    ]
-                  },
-                  "temperature": {
-                    "anyOf": [
-                      {
-                        "type": "number"
-                      },
-                      {
-                        "type": "string",
-                        "enum": ["NaN"]
-                      },
-                      {
-                        "type": "string",
-                        "enum": ["Infinity"]
-                      },
-                      {
-                        "type": "string",
-                        "enum": ["-Infinity"]
-                      }
-                    ]
-                  },
-                  "topP": {
-                    "anyOf": [
-                      {
-                        "type": "number"
-                      },
-                      {
-                        "type": "string",
-                        "enum": ["NaN"]
-                      },
-                      {
-                        "type": "string",
-                        "enum": ["Infinity"]
-                      },
-                      {
-                        "type": "string",
-                        "enum": ["-Infinity"]
-                      }
-                    ]
-                  },
-                  "topK": {
-                    "anyOf": [
-                      {
-                        "type": "number"
-                      },
-                      {
-                        "type": "string",
-                        "enum": ["NaN"]
-                      },
-                      {
-                        "type": "string",
-                        "enum": ["Infinity"]
-                      },
-                      {
-                        "type": "string",
-                        "enum": ["-Infinity"]
-                      }
-                    ]
-                  },
-                  "frequencyPenalty": {
-                    "anyOf": [
-                      {
-                        "type": "number"
-                      },
-                      {
-                        "type": "string",
-                        "enum": ["NaN"]
-                      },
-                      {
-                        "type": "string",
-                        "enum": ["Infinity"]
-                      },
-                      {
-                        "type": "string",
-                        "enum": ["-Infinity"]
-                      }
-                    ]
-                  },
-                  "presencePenalty": {
-                    "anyOf": [
-                      {
-                        "type": "number"
-                      },
-                      {
-                        "type": "string",
-                        "enum": ["NaN"]
-                      },
-                      {
-                        "type": "string",
-                        "enum": ["Infinity"]
-                      },
-                      {
-                        "type": "string",
-                        "enum": ["-Infinity"]
-                      }
-                    ]
-                  },
-                  "seed": {
-                    "anyOf": [
-                      {
-                        "type": "number"
-                      },
-                      {
-                        "type": "string",
-                        "enum": ["NaN"]
-                      },
-                      {
-                        "type": "string",
-                        "enum": ["Infinity"]
-                      },
-                      {
-                        "type": "string",
-                        "enum": ["-Infinity"]
-                      }
-                    ]
-                  },
-                  "stop": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    }
-                  }
-                },
-                "additionalProperties": false
-              },
-              "options": {
-                "type": "object"
-              },
-              "variant": {
-                "type": "string"
-              }
-            },
-            "required": ["headers", "body"],
-            "additionalProperties": false
-          },
-          "variants": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "id": {
-                  "type": "string"
-                },
-                "headers": {
-                  "type": "object",
-                  "additionalProperties": {
-                    "type": "string"
-                  }
-                },
-                "body": {
-                  "type": "object"
-                },
-                "generation": {
-                  "type": "object",
-                  "properties": {
-                    "maxTokens": {
-                      "anyOf": [
-                        {
-                          "type": "number"
-                        },
-                        {
-                          "type": "string",
-                          "enum": ["NaN"]
-                        },
-                        {
-                          "type": "string",
-                          "enum": ["Infinity"]
-                        },
-                        {
-                          "type": "string",
-                          "enum": ["-Infinity"]
-                        }
-                      ]
-                    },
-                    "temperature": {
-                      "anyOf": [
-                        {
-                          "type": "number"
-                        },
-                        {
-                          "type": "string",
-                          "enum": ["NaN"]
-                        },
-                        {
-                          "type": "string",
-                          "enum": ["Infinity"]
-                        },
-                        {
-                          "type": "string",
-                          "enum": ["-Infinity"]
-                        }
-                      ]
-                    },
-                    "topP": {
-                      "anyOf": [
-                        {
-                          "type": "number"
-                        },
-                        {
-                          "type": "string",
-                          "enum": ["NaN"]
-                        },
-                        {
-                          "type": "string",
-                          "enum": ["Infinity"]
-                        },
-                        {
-                          "type": "string",
-                          "enum": ["-Infinity"]
-                        }
-                      ]
-                    },
-                    "topK": {
-                      "anyOf": [
-                        {
-                          "type": "number"
-                        },
-                        {
-                          "type": "string",
-                          "enum": ["NaN"]
-                        },
-                        {
-                          "type": "string",
-                          "enum": ["Infinity"]
-                        },
-                        {
-                          "type": "string",
-                          "enum": ["-Infinity"]
-                        }
-                      ]
-                    },
-                    "frequencyPenalty": {
-                      "anyOf": [
-                        {
-                          "type": "number"
-                        },
-                        {
-                          "type": "string",
-                          "enum": ["NaN"]
-                        },
-                        {
-                          "type": "string",
-                          "enum": ["Infinity"]
-                        },
-                        {
-                          "type": "string",
-                          "enum": ["-Infinity"]
-                        }
-                      ]
-                    },
-                    "presencePenalty": {
-                      "anyOf": [
-                        {
-                          "type": "number"
-                        },
-                        {
-                          "type": "string",
-                          "enum": ["NaN"]
-                        },
-                        {
-                          "type": "string",
-                          "enum": ["Infinity"]
-                        },
-                        {
-                          "type": "string",
-                          "enum": ["-Infinity"]
-                        }
-                      ]
-                    },
-                    "seed": {
-                      "anyOf": [
-                        {
-                          "type": "number"
-                        },
-                        {
-                          "type": "string",
-                          "enum": ["NaN"]
-                        },
-                        {
-                          "type": "string",
-                          "enum": ["Infinity"]
-                        },
-                        {
-                          "type": "string",
-                          "enum": ["-Infinity"]
-                        }
-                      ]
-                    },
-                    "stop": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      }
-                    }
-                  },
-                  "additionalProperties": false
-                },
-                "options": {
-                  "type": "object"
-                }
-              },
-              "required": ["id", "headers", "body"],
-              "additionalProperties": false
-            }
-          },
-          "time": {
-            "type": "object",
-            "properties": {
-              "released": {
-                "anyOf": [
-                  {
-                    "type": "number"
-                  },
-                  {
-                    "type": "string",
-                    "enum": ["NaN"]
-                  },
-                  {
-                    "type": "string",
-                    "enum": ["Infinity"]
-                  },
-                  {
-                    "type": "string",
-                    "enum": ["-Infinity"]
-                  }
-                ]
-              }
-            },
-            "required": ["released"],
-            "additionalProperties": false
-          },
-          "cost": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "tier": {
-                  "type": "object",
-                  "properties": {
-                    "type": {
-                      "type": "string",
-                      "enum": ["context"]
-                    },
-                    "size": {
-                      "type": "integer"
-                    }
-                  },
-                  "required": ["type", "size"],
-                  "additionalProperties": false
-                },
-                "input": {
-                  "type": "number"
-                },
-                "output": {
-                  "type": "number"
-                },
-                "cache": {
-                  "type": "object",
-                  "properties": {
-                    "read": {
-                      "type": "number"
-                    },
-                    "write": {
-                      "type": "number"
-                    }
-                  },
-                  "required": ["read", "write"],
-                  "additionalProperties": false
-                }
-              },
-              "required": ["input", "output", "cache"],
-              "additionalProperties": false
-            }
-          },
-          "status": {
             "type": "string",
-            "enum": ["alpha", "beta", "deprecated", "active"]
+            "pattern": "^evt_"
           },
-          "enabled": {
-            "type": "boolean"
+          "type": {
+            "type": "string",
+            "enum": ["integration.updated"]
           },
-          "limit": {
+          "properties": {
             "type": "object",
-            "properties": {
-              "context": {
-                "type": "integer"
-              },
-              "input": {
-                "type": "integer"
-              },
-              "output": {
-                "type": "integer"
-              }
-            },
-            "required": ["context", "output"],
-            "additionalProperties": false
+            "properties": {}
           }
         },
-        "required": [
-          "id",
-          "providerID",
-          "name",
-          "api",
-          "capabilities",
-          "request",
-          "variants",
-          "time",
-          "cost",
-          "status",
-          "enabled",
-          "limit"
-        ],
+        "required": ["id", "type", "properties"],
         "additionalProperties": false
       },
       "EventIntegrationConnectionUpdated": {
@@ -34093,17 +33896,11 @@
           },
           "type": {
             "type": "string",
-            "enum": ["catalog.model.updated"]
+            "enum": ["catalog.updated"]
           },
           "properties": {
             "type": "object",
-            "properties": {
-              "model": {
-                "$ref": "#/components/schemas/ModelV2Info1"
-              }
-            },
-            "required": ["model"],
-            "additionalProperties": false
+            "properties": {}
           }
         },
         "required": ["id", "type", "properties"],
@@ -35951,6 +35748,31 @@
         "required": ["id", "type", "properties"],
         "additionalProperties": false
       },
+      "EventProjectDirectoriesUpdated": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^evt_"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["project.directories.updated"]
+          },
+          "properties": {
+            "type": "object",
+            "properties": {
+              "projectID": {
+                "type": "string"
+              }
+            },
+            "required": ["projectID"],
+            "additionalProperties": false
+          }
+        },
+        "required": ["id", "type", "properties"],
+        "additionalProperties": false
+      },
       "EventFileWatcherUpdated": {
         "type": "object",
         "properties": {
@@ -36427,31 +36249,6 @@
         "required": ["id", "type", "properties"],
         "additionalProperties": false
       },
-      "EventProjectDirectoriesUpdated": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "pattern": "^evt_"
-          },
-          "type": {
-            "type": "string",
-            "enum": ["project.directories.updated"]
-          },
-          "properties": {
-            "type": "object",
-            "properties": {
-              "projectID": {
-                "type": "string"
-              }
-            },
-            "required": ["projectID"],
-            "additionalProperties": false
-          }
-        },
-        "required": ["id", "type", "properties"],
-        "additionalProperties": false
-      },
       "EventProjectUpdated": {
         "type": "object",
         "properties": {
@@ -36501,7 +36298,7 @@
         "required": ["id", "type", "properties"],
         "additionalProperties": false
       },
-      "EventVcsBranchUpdated": {
+      "EventSessionStatus": {
         "type": "object",
         "properties": {
           "id": {
@@ -36510,15 +36307,46 @@
           },
           "type": {
             "type": "string",
-            "enum": ["vcs.branch.updated"]
+            "enum": ["session.status"]
           },
           "properties": {
             "type": "object",
             "properties": {
-              "branch": {
-                "type": "string"
+              "sessionID": {
+                "type": "string",
+                "pattern": "^ses"
+              },
+              "status": {
+                "$ref": "#/components/schemas/SessionStatus"
               }
             },
+            "required": ["sessionID", "status"],
+            "additionalProperties": false
+          }
+        },
+        "required": ["id", "type", "properties"],
+        "additionalProperties": false
+      },
+      "EventSessionIdle": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^evt_"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["session.idle"]
+          },
+          "properties": {
+            "type": "object",
+            "properties": {
+              "sessionID": {
+                "type": "string",
+                "pattern": "^ses"
+              }
+            },
+            "required": ["sessionID"],
             "additionalProperties": false
           }
         },
@@ -36631,61 +36459,6 @@
         "required": ["id", "type", "properties"],
         "additionalProperties": false
       },
-      "EventSessionStatus": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "pattern": "^evt_"
-          },
-          "type": {
-            "type": "string",
-            "enum": ["session.status"]
-          },
-          "properties": {
-            "type": "object",
-            "properties": {
-              "sessionID": {
-                "type": "string",
-                "pattern": "^ses"
-              },
-              "status": {
-                "$ref": "#/components/schemas/SessionStatus"
-              }
-            },
-            "required": ["sessionID", "status"],
-            "additionalProperties": false
-          }
-        },
-        "required": ["id", "type", "properties"],
-        "additionalProperties": false
-      },
-      "EventSessionIdle": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "pattern": "^evt_"
-          },
-          "type": {
-            "type": "string",
-            "enum": ["session.idle"]
-          },
-          "properties": {
-            "type": "object",
-            "properties": {
-              "sessionID": {
-                "type": "string",
-                "pattern": "^ses"
-              }
-            },
-            "required": ["sessionID"],
-            "additionalProperties": false
-          }
-        },
-        "required": ["id", "type", "properties"],
-        "additionalProperties": false
-      },
       "EventSessionCompacted": {
         "type": "object",
         "properties": {
@@ -36712,7 +36485,7 @@
         "required": ["id", "type", "properties"],
         "additionalProperties": false
       },
-      "EventWorktreeReady": {
+      "EventVcsBranchUpdated": {
         "type": "object",
         "properties": {
           "id": {
@@ -36721,44 +36494,15 @@
           },
           "type": {
             "type": "string",
-            "enum": ["worktree.ready"]
+            "enum": ["vcs.branch.updated"]
           },
           "properties": {
             "type": "object",
             "properties": {
-              "name": {
-                "type": "string"
-              },
               "branch": {
                 "type": "string"
               }
             },
-            "required": ["name"],
-            "additionalProperties": false
-          }
-        },
-        "required": ["id", "type", "properties"],
-        "additionalProperties": false
-      },
-      "EventWorktreeFailed": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "pattern": "^evt_"
-          },
-          "type": {
-            "type": "string",
-            "enum": ["worktree.failed"]
-          },
-          "properties": {
-            "type": "object",
-            "properties": {
-              "message": {
-                "type": "string"
-              }
-            },
-            "required": ["message"],
             "additionalProperties": false
           }
         },
@@ -36839,6 +36583,59 @@
               }
             },
             "required": ["workspaceID", "status"],
+            "additionalProperties": false
+          }
+        },
+        "required": ["id", "type", "properties"],
+        "additionalProperties": false
+      },
+      "EventWorktreeReady": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^evt_"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["worktree.ready"]
+          },
+          "properties": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "branch": {
+                "type": "string"
+              }
+            },
+            "required": ["name"],
+            "additionalProperties": false
+          }
+        },
+        "required": ["id", "type", "properties"],
+        "additionalProperties": false
+      },
+      "EventWorktreeFailed": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^evt_"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["worktree.failed"]
+          },
+          "properties": {
+            "type": "object",
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": ["message"],
             "additionalProperties": false
           }
         },
@@ -37038,7 +36835,7 @@
     },
     {
       "name": "projectCopy",
-      "description": "Project copy management routes."
+      "description": "Project copy naming routes."
     },
     {
       "name": "pty",
@@ -37101,8 +36898,12 @@
       "description": "Experimental provider routes."
     },
     {
-      "name": "connectors",
-      "description": "Connector discovery and authentication routes."
+      "name": "integrations",
+      "description": "Integration discovery and authentication routes."
+    },
+    {
+      "name": "opencode HttpApi",
+      "description": "Experimental HttpApi surface for selected instance routes."
     },
     {
       "name": "permissions",
@@ -37125,12 +36926,20 @@
       "description": "Experimental event stream route."
     },
     {
+      "name": "pty",
+      "description": "Experimental location-scoped PTY routes."
+    },
+    {
       "name": "session questions",
       "description": "Experimental session question routes."
     },
     {
       "name": "reference",
       "description": "Location-scoped project references."
+    },
+    {
+      "name": "projectCopy",
+      "description": "Project copy management routes."
     },
     {
       "name": "pty",
