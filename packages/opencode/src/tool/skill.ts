@@ -123,7 +123,9 @@ export function materialize(info: Skill.Info, ctx: Tool.Context) {
 function writeToSandbox(info: Skill.Info, sessionID: string, sandbox: Sandbox) {
   return Effect.gen(function* () {
     const resources = info.resources ?? []
-    const dir = SkillResource.directory(sessionID, info.name, info.content, resources)
+    const dir = info.id
+      ? SkillResource.directory(sessionID, info.id, info.content, resources)
+      : SkillResource.directoryForName(sessionID, info.name, info.content, resources)
     const manifest = {
       name: info.name,
       description: info.description ?? "",
@@ -183,7 +185,9 @@ export const rematerializeIfNeeded = Effect.fn("SkillTool.rematerializeIfNeeded"
     const resources = info.resources ?? []
     if (resources.length === 0) continue
 
-    const dir = SkillResource.directory(sessionID, info.name, info.content, resources)
+    const dir = info.id
+      ? SkillResource.directory(sessionID, info.id, info.content, resources)
+      : SkillResource.directoryForName(sessionID, info.name, info.content, resources)
     const sentinel = path.posix.join(dir, "resources.json")
     const exists = yield* Effect.tryPromise({
       try: async () => {

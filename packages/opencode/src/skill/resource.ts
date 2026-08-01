@@ -111,8 +111,12 @@ export function snapshot(content: string, resources: readonly Stored[]) {
   )
 }
 
-export function directory(sessionID: string, name: string, content: string, resources: readonly Stored[]) {
-  return path.posix.join(SANDBOX_ROOT, sessionID, digest(name), snapshot(content, resources))
+export function directory(sessionID: string, id: string, content: string, resources: readonly Stored[]) {
+  return path.posix.join(SANDBOX_ROOT, sessionID, id, snapshot(content, resources))
+}
+
+export function directoryForName(sessionID: string, name: string, content: string, resources: readonly Stored[]) {
+  return directory(sessionID, digest(name), content, resources)
 }
 
 export function isManagedPath(input: string) {

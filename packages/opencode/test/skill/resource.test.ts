@@ -30,6 +30,18 @@ describe("SkillResource", () => {
     expect(SkillResource.snapshot("body", [a, b])).toBe(SkillResource.snapshot("body", [b, a]))
   })
 
+  test("directory prefers the database id over a digest of the name", () => {
+    const a = SkillResource.make({ path: "a.md", type: "doc", content: "a" })
+    const byId = SkillResource.directory("ses_x", "ssk_abc", "body", [a])
+    const byName = SkillResource.directoryForName("ses_x", "skill-name", "body", [a])
+
+    expect(byId).toContain("/ses_x/ssk_abc/")
+    expect(byName).toContain("/ses_x/")
+    expect(byName).not.toContain("/skill-name/")
+    expect(byName).not.toContain("/ssk_abc/")
+    expect(byId).not.toBe(byName)
+  })
+
   test("rejects duplicate resource paths", () => {
     const resource = SkillResource.make({ path: "same.md", type: "doc", content: "x" })
     expect(() => SkillResource.validateBundle([resource, resource])).toThrow("duplicate resource paths")

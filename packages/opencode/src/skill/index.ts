@@ -1,6 +1,6 @@
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import path from "path"
-import { Effect, Layer, Context, Schema } from "effect"
+import { Effect, Layer, Context, Option, Schema } from "effect"
 import { NamedError } from "@opencode-ai/core/util/error"
 import type { Agent } from "@/agent/agent"
 import { EventV2Bridge } from "@/event-v2-bridge"
@@ -52,6 +52,7 @@ export const Info = Schema.Struct({
   description: Schema.optional(Schema.String),
   location: Schema.String,
   content: Schema.String,
+  id: Schema.optional(Schema.String),
   resources: Schema.optional(Schema.Array(Resource)),
 })
 export type Info = Schema.Schema.Type<typeof Info>
@@ -61,6 +62,7 @@ export const PublicInfo = Schema.Struct({
   description: Schema.optional(Schema.String),
   location: Schema.String,
   content: Schema.String,
+  id: Schema.optional(Schema.String),
   resources: Schema.optional(Schema.Array(ResourceInfo)),
 })
 export type PublicInfo = Schema.Schema.Type<typeof PublicInfo>
@@ -71,6 +73,7 @@ export function publicInfo(info: Info): PublicInfo {
     description: info.description,
     location: info.location,
     content: info.content,
+    id: info.id,
     resources: info.resources?.map(SkillResource.metadata),
   }
 }
@@ -367,6 +370,7 @@ const layerImpl = Layer.effect(
             description: row.description,
             location: `session://${session}/${row.name}`,
             content: row.content,
+            id: row.id,
             resources: row.resources ?? [],
           }
       }
@@ -383,6 +387,7 @@ const layerImpl = Layer.effect(
             description: row.description,
             location: `session://${session}/${row.name}`,
             content: row.content,
+            id: row.id,
             resources: row.resources ?? [],
           }
       }
@@ -403,6 +408,7 @@ const layerImpl = Layer.effect(
           description: row.description,
           location: `session://${session}/${row.name}`,
           content: row.content,
+          id: row.id,
           resources: row.resources ?? [],
         }
       }
@@ -423,6 +429,7 @@ const layerImpl = Layer.effect(
           description: row.description,
           location: `session://${session}/${row.name}`,
           content: row.content,
+          id: row.id,
           resources: row.resources ?? [],
         }))
       }
@@ -446,6 +453,7 @@ const layerImpl = Layer.effect(
         description: row.description,
         location: `session://${session}/${row.name}`,
         content: row.content,
+        id: row.id,
         resources: row.resources ?? [],
       }))
     })
@@ -469,6 +477,7 @@ const layerImpl = Layer.effect(
         description: row.description,
         location: `session://${session}/${row.name}`,
         content: row.content,
+        id: row.id,
         resources: row.resources ?? [],
       }
     })
@@ -491,11 +500,19 @@ const layerImpl = Layer.effect(
             .filter((rel) => !isSkipPath(rel))
             .toSorted()
           const resources: Resource[] = []
+          const rootReal = yield* fsys.resolve(root).pipe(Effect.catch(() => Effect.succeed(root)))
           for (const rel of candidates) {
-            const stat = yield* fsys.stat(path.join(root, rel)).pipe(Effect.option)
+            const absolute = path.join(root, rel)
+            const resolved = yield* fsys.resolve(absolute).pipe(Effect.option)
+            if (Option.isNone(resolved)) continue
+            const isWithinRoot = resolved.value === rootReal || resolved.value.startsWith(`${rootReal}${path.sep}`)
+            if (!isWithinRoot) continue
+            const isFile = yield* fsys.isFile(resolved.value).pipe(Effect.option)
+            if (Option.isNone(isFile) || !isFile.value) continue
+            const stat = yield* fsys.stat(resolved.value).pipe(Effect.option)
             const size = stat._tag === "Some" ? Number((stat.value as any).size ?? 0) : 0
             if (size > SkillResource.MAX_SIZE) continue
-            const content = yield* fsys.readFileString(path.join(root, rel)).pipe(Effect.catch(Effect.die))
+            const content = yield* fsys.readFileString(resolved.value).pipe(Effect.catch(Effect.die))
             if (!content) continue
             const resource = SkillResource.make({ path: rel, type: SkillResource.kind(rel), content })
             const total = resources.reduce((sum, item) => sum + item.size, 0)
@@ -533,6 +550,7 @@ const layerImpl = Layer.effect(
           description: row.description,
           location: `session://${session}/${row.name}`,
           content: row.content,
+          id: row.id,
           resources: row.resources ?? [],
         })
       }
