@@ -314,14 +314,14 @@ psql "$PG_URL" -t -c "SELECT data->>'tool', data->'state'->>'status' FROM part W
 | 用例 | 结果 | 验证详情 |
 |------|------|---------|
 | T44.1 创建 session | ✅ | `new_sid -kb` 返回 ses_xxx |
-| T44.2 验证预装 | ✅ | agent-browser 0.31.1 + chromium + 系统库就绪 |
+| T44.2 验证预装 | ✅ | agent-browser 0.31.1 + chromium 151 + 系统库就绪；smoke test 打开 example.com 返回 Example Domain |
 | T44.3 注册 local MCP | ✅ | PG `agent-browser\|local\|["agent-browser","mcp","--tools","core"]` |
-| T44.4 AI 调用浏览器（基础） | ✅ | 多个 `agent-browser_*` 工具 completed（open+snapshot+文本获取），AI 中文总结页面 |
-| T44.5 多元素批量提取 | ⬜ | books.toscrape.com 抓 20 本书的标题+价格 |
-| T44.6 表单填写与提交 | ⬜ | httpbin 表单 6 字段填写，回显 JSON |
-| T44.7 SPA 动态交互 | ⬜ | TodoMVC React 添加/完成/删除 todo |
-| T44.8 JS eval 数据提取 | ⬜ | books.toscrape.com 用 eval 提结构化 JSON |
-| T44.9 异常处理 | ⬜ | 不存在域名，验证容错 |
+| T44.4 AI 调用浏览器（基础） | ✅ | 多个 `agent-browser_*` 工具 completed（open+snapshot），AI 中文总结页面 |
+| T44.5 多元素批量提取 | ✅ | books.toscrape.com open + eval 提取，Markdown 表格 20 行（标题 + £价格） |
+| T44.6 表单填写与提交 | ✅ | httpbin 表单 6 字段填写（含多选 topping），提交后回显完整 JSON（custname/custtel/size/topping/comments） |
+| T44.7 SPA 动态交互 | ✅ | TodoMVC React 添加 3 todo + 标记完成 + 删除，返回剩余列表（买牛奶✅/睡觉⬜） |
+| T44.8 JS eval 数据提取 | ✅ | books.toscrape.com 用 eval 提结构化 JSON，20 条 {title, price, availability} |
+| T44.9 异常处理 | ✅ | 不存在域名 → agent_browser_open status=error，AI 明确报告 `net::ERR_NAME_NOT_RESOLVED` |
 
 **验证层级**：
 
@@ -332,6 +332,8 @@ psql "$PG_URL" -t -c "SELECT data->>'tool', data->'state'->>'status' FROM part W
 | AI 感知 | AI 主动选择 `agent_browser_*` 工具 | ✅ |
 | 真实执行 | 工具实际驱动 chromium 打开 example.com | ✅ title=Example Domain |
 | 反馈 | AI 综合工具输出做中文总结 | ✅ |
+
+> **2026-08-02 补充**：环境为 `OPENCODE_EXPERIMENTAL_CODE_MODE=all`，agent-browser 工具经 code-mode `execute` 内嵌调用（metadata.toolCalls 记录 `agent-browser.agent_browser_*`，PG `part` 表持久化为 execute 记录，内嵌 toolCalls 全量覆盖 8 种工具）。T44.5-T44.9 均为实测通过（同一 session 串行 6 轮，MCP 连接缓存复用）。
 
 ---
 

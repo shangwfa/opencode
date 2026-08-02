@@ -24,9 +24,17 @@
 - 已配置权限（bash/write/edit/read allow）
 - 环境变量已加载：`source test-env.sh 3 && source test-lib.sh`
 
-> **API 端点区别**：
-> - `POST /session/:id/command` — 执行命令（`/goal`），`model` 字段为字符串格式 `"provider/model"`
-> - `POST /session/:id/message` — 发送普通消息，`model` 字段为对象 `{"providerID":"...","modelID":"..."}`
+> **API 端点区别（命令触发唯一入口）**：
+> - **`POST /session/:id/command`** — 执行命令（`/goal`、`/review`、`/codex-review` 等），`model` 字段为字符串格式 `"provider/model"`。**命令只能通过该接口执行**。
+> - `POST /session/:id/message` / `prompt_async` — 发送普通消息，`model` 字段为对象 `{"providerID":"...","modelID":"..."}`。**不解析 `/` 前缀命令**——服务端 `/message` 只处理普通消息；slash 命令解析在前端 `prompt-input/submit.ts`（`text.startsWith("/")` → 转调 `api.session.command()`）。HTTP API 调用方触发 `/goal` 等命令必须直接用 `/command` endpoint。
+>
+> 因此，本文档中所有"通过 `/message` 发送 `/goal ...`"的用例应改为：
+> ```bash
+> curl -s --max-time 180 -X POST "$BASE/session/$SID/command" \
+>   -H 'Content-Type: application/json' \
+>   -d '{"command":"goal","arguments":"<condition 或 clear/reset>","model":"zhipuai/glm-5.1"}'
+> ```
+> 其中 `arguments` 为 `clear` / `reset` / 空字符串时清除 goal（见 `prompt.ts:1514-1527`），否则设置 condition。
 
 ---
 

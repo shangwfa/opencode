@@ -97,9 +97,9 @@ curl -s -X POST "$BASE/session/$SID/exec" \
 | 用例 | 结果 | 验证详情 |
 |------|------|---------|
 | T41.1 创建 MCP | ✅ | PG `mastra\|local` |
-| T41.2 AI 感知工具 | ✅ | AI 列出 mastra 工具表 |
-| T41.3 AI 查询文档 | ✅ | `mastra_mastraDocs(completed)`，返回 agent 示例 |
-| T41.4 AI 生成代码 | ✅ | 多个 mastra 工具 + write → my-agent.ts |
+| T41.2 AI 感知工具 | ✅ | AI 列出 13 个 mastra 工具（listMastraPackages/getMastraExports/getMastraExportDetails/mastraDocs/searchMastraDocs 等） |
+| T41.3 AI 查询文档 | ✅ | `mastraDocs`×2 + `searchMastraDocs`×1 全部 completed，返回 agent 创建示例（`new Agent({...})`） |
+| T41.4 AI 生成代码 | ✅ | `mastraDocs`（docs/agents/using-tools）+ write → my-agent.ts（35 行，weatherAgent + weatherTool） |
 
 **验证层级**：
 

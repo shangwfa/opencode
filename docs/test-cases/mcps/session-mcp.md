@@ -463,16 +463,25 @@ console.log("after cleanup:", check.stdout || "")
 | T22.10 | ✅ | 输入校验：缺 name/缺 type/非法 type → 400 |
 | T22.11 | ✅ | remote 完整字段持久化（url/headers/enabled） |
 | T22.12 | ✅ | disabled MCP 的 enabled=false 持久化 |
-| T22.13 | ✅ | Remote MCP 工具执行验证：ev_echo 工具成功调用，输出 Echo: hello |
+| T22.13 | ✅ | Remote MCP 工具执行验证：test-tools.echo 成功调用，输出 Echo: hello-mcp。⚠️ 环境为 `OPENCODE_EXPERIMENTAL_CODE_MODE=all`，工具经 code-mode `execute` 内嵌调用（metadata.toolCalls 记录 test-tools.echo completed），非顶层 MCP 工具 part |
 | T22.14 | ✅ | Local MCP 在 Sandbox 中执行验证：sandbox-everything_echo 工具成功调用，输出 Echo: hello-sandbox-mcp |
 | T22.15 | ✅ | Session MCP 工具多轮对话持续可用：3 轮 3 次调用全部成功 |
-| T22.16 | ⬜ | 严格输入校验：local command 必填且非空，remote url 必填 |
-| T22.17 | ⬜ | local MCP environment 实际注入 sandbox 进程 |
-| T22.18 | ⬜ | shell 安全：恶意 name/env/command 不产生注入 |
-| T22.19 | ⬜ | local MCP pid/log 生命周期与清理 |
+| T22.16 | ✅ | 严格输入校验：local command 必填且非空，remote url 必填 → 全部 400 |
+| T22.17 | ✅ | local MCP environment 实际注入 sandbox 进程：`/tmp/mcp-env-test`=`hello-env-value` |
+| T22.18 | ✅ | shell 安全：恶意 name/env/command 不产生注入（SAFE_MARKER 存在，NAME_PWNED/ENV_PWNED 无）。⚠️ **修复前为 FAIL**：env key 未转义导致沙箱内任意命令执行 |
+| T22.19 | ✅ | local MCP pid/log 生命周期与清理：启动后存在 pid-everything-9100.{pid,log} + supergateway 进程；abort 回收后删除、进程消失 |
 
 ## 单元测试覆盖
 
 Service 层单测（内存 mock）：`packages/opencode/test/mcp/session-mcp-crud.test.ts`（16 用例）
 
-Sandbox MCP 路由单测：`packages/opencode/test/mcp/session-mcp.test.ts`（9 用例）
+Sandbox MCP 路由单测：`packages/opencode/test/mcp/session-mcp.test.ts`（13 用例，含 shell 注入加固 2 用例）
+
+### 修复记录（2026-08-02）
+
+T22.18 实测发现两个 local MCP sandbox 启动相关的安全问题，已修复（`packages/opencode/src/mcp/index.ts`）：
+
+1. **env key 命令注入**（`connectSandboxLocal`）：`envArg` 拼装时 env **key 未 `shellQuote`**，仅 value 转义。恶意 key 如 `"BAD-ENV;touch /tmp/x"` 会经 shell 分号注入执行任意命令（沙箱内）。修复：key 同样 `shellQuote`（`${shellQuote(k)}=${shellQuote(String(v))}`）。
+2. **name 路径破坏**（`sandboxMcpPaths`）：用户可控 MCP name 直接拼入 `/tmp/opencode-mcp/${key}-${port}.{pid,log}` 文件路径，name 含 `/` 时重定向目标成为不存在的嵌套目录 → MCP 无法启动。修复：key 做路径 sanitize（非 `[A-Za-z0-9._-]` 替换为 `_`）。清理逻辑（kill supergateway）复用同一函数，启动/清理路径一致。
+
+> 注：session MCP local 端口从 `SANDBOX_MCP_BASE_PORT=9100` 起（实测端口 9100，非文档旧假设）。

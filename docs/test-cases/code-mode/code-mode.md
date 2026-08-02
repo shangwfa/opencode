@@ -596,6 +596,8 @@ curl -s -X DELETE "$BASE/session/$SID" >/dev/null
 
 **期望**：MCP 行数为 0，删除后请求没有产生新的 execute part。模型自然语言工具列表不作为判据。
 
+> ⚠️ **模式差异说明（2026-08-01 实测）**：本用例的"删除 MCP 后 execute 消失"仅在 **`mcp` 模式**（`OPENCODE_EXPERIMENTAL_CODE_MODE=mcp`）下成立——此时 execute 仅在 session 有已连接 MCP 工具时注册，删除后 execute 从工具列表消失。在 **`all` 模式**下，execute **始终保留**（可编排本地工具 read/glob/grep 等，见运行模式表），删除 MCP 后 execute 仍在注册表（`/experimental/tool/ids` 仍含 `execute`），会继续产生 execute part。因此 T50.27 应使用 `mcp` 模式执行，或在 `all` 模式下改为验证"MCP 工具命名空间（tools.echo）消失、execute 保留但无法调用被删除的 MCP 工具"。
+
 ---
 
 ## 测试矩阵

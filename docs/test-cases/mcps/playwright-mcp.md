@@ -118,20 +118,28 @@ curl -s --max-time 120 -X POST "$BASE/session/$SID/prompt_async" -H 'Content-Typ
 
 | 用例 | 验证点 | 结果 |
 |------|--------|------|
-| T45.1 | 创建 session + 沙箱 | |
-| T45.2 | 注册 MCP + PG 持久化 | |
-| T45.3 | AI 感知 browser_* 工具 | |
-| T45.4 | AI 调用 navigate + snapshot | |
-| T45.5 | 表单填写 + 提交 | |
-| T45.6 | JS eval 数据提取 | |
-| T45.7 | 异常处理 | |
+| T45.1 | 创建 session + 沙箱 | ✅ |
+| T45.2 | 注册 MCP + PG 持久化 | ✅ `playwright\|local` |
+| T45.3 | AI 感知 browser_* 工具 | ✅ 24 个工具 |
+| T45.4 | AI 调用 navigate + snapshot | ✅ 返回 Example Domain 标题/正文 |
+| T45.5 | 表单填写 + 提交 | ✅ httpbin 回显 custname/custtel |
+| T45.6 | JS eval 数据提取 | ✅ browser_evaluate 返回 JSON 数组 |
+| T45.7 | 异常处理 | ✅ net::ERR_NAME_NOT_RESOLVED 正确上报 |
 
 **验证层级**：
 
-| 层级 | 标准 |
-|------|------|
-| CRUD | 创建/PG 持久化 |
-| AI 感知 | AI 列出 MCP 工具 |
-| AI 调用 | AI 实际调用 browser_* 工具 |
-| 真实执行 | 工具驱动 chromium 打开页面 |
-| 反馈 | AI 综合工具输出总结 |
+| 层级 | 标准 | 结果 |
+|------|------|------|
+| CRUD | 创建/PG 持久化 | ✅ |
+| AI 感知 | AI 列出 MCP 工具 | ✅ 24 个 browser_* 工具 |
+| AI 调用 | AI 实际调用 browser_* 工具 | ✅ navigate/snapshot/type/click/evaluate 全 completed |
+| 真实执行 | 工具驱动 chromium 打开页面 | ✅ |
+| 反馈 | AI 综合工具输出总结 | ✅ |
+
+### 修复记录（2026-08-02）
+
+T45.4 实测发现 **supergateway stateless bridge 与 playwright-mcp 不兼容**：playwright-mcp 在 `tools/call` 时会重新发起 initialize 协商并请求 roots/list，supergateway `stdioToStatelessStreamableHttp`（stateless，默认）的 requestId 关联被重置，最终工具结果报 `No connection established for request ID: N` → opencode 侧 MCP 调用超时（navigate 等全部失败）。
+
+**修复**（`packages/opencode/src/mcp/index.ts` `connectSandboxLocal`）：bridge 命令加 `--stateful`，使 stdio→StreamableHttp 保持 session 关联。实测 SDK 客户端 navigate 由超时变为 ~1s 成功。
+
+> 前置条件补充：playwright MCP 依赖 playwright 版本对应的 chromium（`chromium_headless_shell-1232`），沙箱需 `npx playwright install chromium` 预装匹配版本（沙箱 `opencode-opensandbox:local` 镜像建议预装；缺时 AI 会自动检测并安装）。

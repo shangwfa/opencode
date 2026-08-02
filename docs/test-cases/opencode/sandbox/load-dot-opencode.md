@@ -757,6 +757,8 @@ AI 实际回复（节选）：
 
 > **容器环境说明**：`importToolCode` 在容器内写入临时文件时，`import.meta.dir` 对 `opencode` 用户只读。代码已修复为 fallback 到 `os.tmpdir()`。
 
+> **实测记录（2026-08-02，容器重建后重跑）**：T37.16-23 全通过。创建 session（directory=/workspace/dot-opencode-e2e）+ 沙箱 → 项目结构（package.json + src/App.tsx）→ 上传 7 个 `.opencode` 配置文件 → `dot-opencode/load` 返回 `loaded:["AGENTS.md","agents/reviewer","skills/reviewer","mcp/disabled-mcp","tool/marker","commands/review","plugins/marker"]` → PG 7 表全部正确持久化（agents/skill/mcps/tools/commands/plugins/agents_md）→ 运行时生效：`reviewer` agent 回复含 AGENT_ACTIVE + AGENTS_ACTIVE + SKILL_ACTIVE，`review` 命令含 COMMAND_ACTIVE，`marker` 工具返回 TOOL_ACTIVE。
+
 ### T37.24 配置标记总览
 
 | 标记 | 资源类型 | 配置文件 | 运行时验证方式 |

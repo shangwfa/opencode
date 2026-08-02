@@ -644,26 +644,28 @@ if (!pass) process.exitCode = 1
 
 | 用例 | 验证维度 | 状态 |
 |------|---------|------|
-| T38.1 | 默认行为不变（pvcMode=undefined, dir=/workspace） | |
-| T38.2 | 显式 pvcMode=session | |
-| T38.3 | app 模式创建 + dir 不暴露 worktree | |
-| T38.4 | app 缺 appId → 400 | |
-| T38.5 | app 空白 appId → 400 | |
-| T38.6 | 非法 pvcMode → 400 | |
-| T38.7 | appId 路径穿越 → 拒绝 | |
-| T38.8 | appId 超长(>128) → 拒绝 | |
-| T38.9 | appId 合法边界字符 → 通过 | |
-| T38.10 | 同 appId 共享 PVC | |
-| T38.11 | 不同 appId 隔离 | |
-| T38.12 | session/app 隔离 | |
-| T38.18 | PG 持久化 | |
-| T38.19 | fork 继承 pvcMode/appId + 数据共享 | |
-| T38.20 | 子任务会话 parent_id 追溯共享 PVC | |
-| T38.21 | session 模式不受 app 逻辑影响（回归保护） | |
-| T38.22 | app 模式 worktree 代码写入位置验证 | |
-| T38.23 | session 模式 worktree 代码写入位置验证 | |
+| T38.1 | 默认行为不变（pvcMode=undefined, dir=/workspace） | ✅ (2026-08-02) |
+| T38.2 | 显式 pvcMode=session | ✅ (2026-08-02) |
+| T38.3 | app 模式创建 + dir 不暴露 worktree | ✅ (2026-08-02) |
+| T38.4 | app 缺 appId → 400 | ✅ (2026-08-02) |
+| T38.5 | app 空白 appId → 400 | ✅ (2026-08-02) |
+| T38.6 | 非法 pvcMode → 400 | ✅ (2026-08-02) |
+| T38.7 | appId 路径穿越 → 拒绝 | ✅ (2026-08-02) |
+| T38.8 | appId 超长(>128) → 拒绝 | ✅ (2026-08-02) |
+| T38.9 | appId 合法边界字符 → 通过 | ✅ (2026-08-02) |
+| T38.10 | 同 appId 共享 PVC | ✅ (2026-08-02) |
+| T38.11 | 不同 appId 隔离 | ✅ (2026-08-02) |
+| T38.12 | session/app 隔离 | ✅ (2026-08-02) |
+| T38.18 | PG 持久化 | ✅ (2026-08-02) |
+| T38.19 | fork 继承 pvcMode/appId + 数据共享 | ✅ (2026-08-02) |
+| T38.20 | 子任务会话 parent_id 追溯共享 PVC | ✅ (2026-08-02) ⚠️ 实测为创建时继承 |
+| T38.21 | session 模式不受 app 逻辑影响（回归保护） | ✅ (2026-08-02) |
+| T38.22 | app 模式 worktree 代码写入位置验证 | ✅ (2026-08-02) |
+| T38.23 | session 模式 worktree 代码写入位置验证 | ✅ (2026-08-02) |
 | T38.24 | session 模式 `/vcs/diff` 读取 `/workspace` | ✅ PASS (2026-07-30) |
 | T38.25 | app 模式 `/vcs/diff` 读取 session worktree | ✅ PASS (2026-07-30) |
+
+> **2026-08-02 重跑**：T38.1-23 全通过（容器重建后）。**实现差异**：T38.20 文档原写"子任务会话不存 pvcMode，靠 resolveSandboxOpts 运行时追溯"，实测子任务会话（`parentID` 创建）**创建时直接继承**父会话的 `pvcMode=app` + `appId`（API 与 PG 均落库），数据共享同样成立——属实现演进（创建期继承字段，优于运行时追溯）。
 
 ---
 

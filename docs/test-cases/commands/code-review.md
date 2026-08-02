@@ -48,11 +48,13 @@ curl -s -X POST "$BASE/session/$SID/exec" -H 'Content-Type: application/json' \
 
 ### T31.2 `/review` 自由文本审查
 
+> ⚠️ **命令触发入口（2026-08-01 实测确认）**：命令只能通过 `POST /session/:id/command` 接口执行（`model` 字段为字符串 `"provider/model"`）。服务端 `/message` / `/message_async` 接口**不解析 `/` 前缀命令**，只处理普通消息；slash 命令解析在前端 `prompt-input/submit.ts`（`text.startsWith("/")` → `api.session.command()`）。前端输入 `/review` 会自动走 `/command`，HTTP API 调用方必须直接用 `/command` endpoint。
+
 ```bash
-# 通过 message 接口触发 /review 命令
-curl -s --max-time 120 -X POST "$BASE/session/$SID/message" \
+# 通过 command 接口触发 /review 命令（model 为字符串格式）
+curl -s --max-time 180 -X POST "$BASE/session/$SID/command" \
   -H 'Content-Type: application/json' \
-  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"/review\"}],\"model\":$MODEL}" \
+  -d '{"command":"review","arguments":"","model":"zhipuai/glm-5.1"}' \
   | python3 -c "
 import json, sys
 d = json.load(sys.stdin)
@@ -81,7 +83,7 @@ print('✅ T31.2 PASS' if has_task else '⚠️ T31.2 无 subtask')
 ```
 
 **期望**：
-- `/review` 触发 `task` 子 agent
+- `/review` 触发 `task` 子 agent（`review` 命令定义 `subtask: true`）
 - AI 文本回复包含 bug 分析（至少提及 `bug.ts` 的类型问题）
 - 自由文本格式，无 JSON 结构
 
@@ -89,10 +91,12 @@ print('✅ T31.2 PASS' if has_task else '⚠️ T31.2 无 subtask')
 
 ### T31.3 `/codex-review` 结构化审查
 
+> ⚠️ **命令执行方式（2026-08-01 实测）**：`/codex-review` 和 `/review` 是**命令**，必须通过 `POST /session/:id/command`（body `{"command":"codex-review","model":"zhipuai/glm-5.1"}`）执行，命令模板才会注入。通过 `/message` 发送 `/codex-review` 文本时，服务端**不解析命令前缀**，AI 把它当普通用户输入处理（会自行审查但输出非结构化）。以下 `/message` 用例应改为 command API 调用。结构化输出实测：`Verdict: Incorrect (confidence: 0.97)` + `[P1]` 优先级 + 逐条 finding（模型用自然语言呈现 findings/verdict，非严格 `"findings":[]` JSON）。
+
 ```bash
-curl -s --max-time 120 -X POST "$BASE/session/$SID/message" \
+curl -s --max-time 180 -X POST "$BASE/session/$SID/command" \
   -H 'Content-Type: application/json' \
-  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"/codex-review\"}],\"model\":$MODEL}" \
+  -d '{"command":"codex-review","arguments":"","model":"zhipuai/glm-5.1"}' \
   | python3 -c "
 import json, sys
 d = json.load(sys.stdin)
@@ -170,9 +174,9 @@ curl -s -X POST "$BASE/session/$SID/exec" -H 'Content-Type: application/json' \
   -d '{"command":"cd /workspace && echo \"const x: number = 123\" > bug.ts && git add . && git commit -m fix"}'
 
 # 审查一个干净的改动
-curl -s --max-time 120 -X POST "$BASE/session/$SID/message" \
+curl -s --max-time 180 -X POST "$BASE/session/$SID/command" \
   -H 'Content-Type: application/json' \
-  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"/codex-review\"}],\"model\":$MODEL}" \
+  -d '{"command":"codex-review","arguments":"","model":"zhipuai/glm-5.1"}' \
   | python3 -c "
 import json, sys
 d = json.load(sys.stdin)
@@ -197,9 +201,9 @@ COMMIT_SHA=$(curl -s -X POST "$BASE/session/$SID/exec" -H 'Content-Type: applica
   | python3 -c "import json,sys;print(json.load(sys.stdin).get('stdout','').strip()[:8])")
 echo "Commit: $COMMIT_SHA"
 
-curl -s --max-time 120 -X POST "$BASE/session/$SID/message" \
+curl -s --max-time 180 -X POST "$BASE/session/$SID/command" \
   -H 'Content-Type: application/json' \
-  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"/codex-review $COMMIT_SHA\"}],\"model\":$MODEL}" \
+  -d "{\"command\":\"codex-review\",\"arguments\":\"$COMMIT_SHA\",\"model\":\"zhipuai/glm-5.1\"}" \
   | python3 -c "
 import json, sys
 d = json.load(sys.stdin)

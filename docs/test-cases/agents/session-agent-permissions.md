@@ -630,7 +630,7 @@ async function test() {
 test().catch(e => { console.error(e); process.exit(1) })
 '
 ```
-**期望**：⚠️ **与代码核对**（2026-07-18）：`Agent.CreateInput`（`agent/agent.ts:73-87`）**没有 `tools` 字段**，Effect Schema 默认拒绝未知 key → 请求返回 **400**。`tools→permission` 的 `normalize` 仅存在于 config 加载层（`config/config.ts`），session agent API 不经过该流程。本用例当前会 400，`data.permission` 为 undefined → 输出 NOTE。建议改为反向用例："tools 字段不被 session agent API 接受（400）"。
+**期望**：⚠️ **实测行为（2026-08-01）**：`tools` 字段当前被 API **接受但静默忽略**——请求返回 **200**，`data.tools` 为 `undefined`（未存储），`permission` 为默认 8 条规则（`read/edit/glob/grep/list/bash/webfetch/write` 全 allow），`tools` 不会自动转换为 permission 规则。`tools→permission` 的 `normalize` 仅存在于 config 加载层（`config/config.ts`），session agent API 不经过该流程。**建议**：改用例描述为"tools 字段不被 session agent API 生效（200 + 忽略）"，或让 API 层显式拒绝未知 `tools` 字段（400）以明确语义。
 
 ---
 
@@ -1751,7 +1751,7 @@ ORDER BY sa.time_created DESC;
 | T26.25 | ✅ | 字符串简写 `"allow"`/`"deny"` 各转为 ruleset (PG:9,9条) |
 | T26.26 | ✅ | last matching rule wins：deny* 在前、allow src/*.ts 在后 (PG:10条) |
 | T26.26b | ✅ | 对象 key 顺序：`*` 在前→白名单生效；`*` 在后→白名单被覆盖 (PG:10,10条) |
-| T26.27 | ⚠️ | `tools` 字段 API 层不转 permission（已知限制）(PG:8条) |
+| T26.27 | ⚠️ | `tools` 字段被接受但静默忽略（status=200，tools 未存储，permission 为默认 8 条），不转 permission；建议 API 层显式拒绝或明确忽略语义 |
 | T26.28 | ✅ | task 权限持久化：safe:allow + danger:deny + *:ask (PG:11条) |
 
 #### T26.31–T26.34（pattern 匹配与修复验证）

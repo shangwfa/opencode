@@ -114,6 +114,12 @@ curl -s --noproxy '*' -X POST "$BASE/session/$SID/exec" \
   ```
 - `codegraph init` 输出：Files/Nodes/Edges/DB Size 统计
 
+> ⚠️ **实测修正（2026-08-02）**：`codegraph install --location=local` 实际把 `AGENTS.md` + `opencode.jsonc` 生成在**项目根目录**（非 `.opencode/` 子目录）。要让 `dot-opencode/load` 扫描到，需移动到 `.opencode/`：
+> ```bash
+> mkdir -p $WORKDIR/.opencode && mv $WORKDIR/opencode.jsonc $WORKDIR/.opencode/ && mv $WORKDIR/AGENTS.md $WORKDIR/.opencode/
+> ```
+> 另：`codegraph serve --mcp` 必须在项目目录运行（opencode local MCP 默认 cwd `/workspace` 无图谱会空转），`opencode.jsonc` 里 codegraph command 需改为 `["sh","-lc","cd /workspace/proma-codegraph && codegraph serve --mcp"]`。
+
 ---
 
 ## T-CG.6 通过 dot-opencode/load API 自动注入（核心）
@@ -203,13 +209,15 @@ while (Date.now() - start < 180000) {
 
 | 验证项 | API | 结果 |
 |--------|------|------|
-| Session 创建 | `POST /session` | ⬜ |
-| 沙箱启动 | `POST /session/:id/keep-alive` | ⬜ |
-| 项目准备（exec git clone） | `POST /session/:id/exec` | ⬜ |
-| codegraph 预装验证 | `POST /session/:id/exec` | ⬜ |
-| codegraph install + init（生成 .opencode/） | `POST /session/:id/exec` | ⬜ |
-| **自动注入 MCP + AGENTS.md** | **`POST /session/:id/dot-opencode/load`** | ⬜ |
-| PG 持久化 | `psql` | ⬜ |
-| AI 调用 codegraph 工具 | `POST /session/:id/prompt_async` | ⬜ |
+| Session 创建 | `POST /session` | ✅ |
+| 沙箱启动 | `POST /session/:id/keep-alive` | ✅ |
+| 项目准备（exec git clone） | `POST /session/:id/exec` | ✅ 655 TS 文件 |
+| codegraph 预装验证 | `POST /session/:id/exec` | ✅ 1.4.1 |
+| codegraph install + init（生成 .opencode/） | `POST /session/:id/exec` | ✅ 实测生成在项目根，需 mv 到 `.opencode/` |
+| **自动注入 MCP + AGENTS.md** | **`POST /session/:id/dot-opencode/load`** | ✅ `loaded:["AGENTS.md","mcp/codegraph"]` |
+| PG 持久化 | `psql` | ✅ MCP + AGENTS.md 两表 |
+| AI 调用 codegraph 工具 | `POST /session/:id/prompt_async` | ✅ `codegraph_explore(completed)`，返回 core 包 4 导出子模块 + ProviderAdapter 接口 |
 
 > **关键验证**：T-CG.6 的 `dot-opencode/load` 一个调用同时完成 MCP 注入 + AGENTS.md 注入，**无需手动 `/mcps/create` 或 `/agents-md`**——这是 opencode API 对第三方工具集成（如 codegraph）的核心支持点。
+
+> **实测记录（2026-08-02，容器重建后重跑）**：T-CG.1-8 全通过。`dot-opencode/load` 返回 `{"loaded":["AGENTS.md","mcp/codegraph"],"skipped":[]}`，PG `session_mcps` 注入 codegraph local MCP（cd 版命令）、`session_agents_md` 注入 AGENTS.md。AI 调用 `codegraph_explore`（含 error 重试后 completed），回复含 `@proma/core` 4 个导出子模块（providers/highlight/types/utils）+ ProviderAdapter 接口详情。与 [`../apis/codegraph.md`](../apis/codegraph.md)（手动 `mcps/create` + `agents-md/create` 方式）对比，本方式单 API 自动注入。

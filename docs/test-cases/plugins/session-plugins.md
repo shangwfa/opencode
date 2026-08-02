@@ -838,6 +838,8 @@ export default async () => ({
 
 ## 十、本轮执行结果
 
+> **2026-08-02 容器重建后重跑**：T35.1-10（CRUD+PG）15/15、T35.11-19（Runtime Hook 含 MSGHOOK77 下游 + enabled 切换）8/8、T35.20-25（缓存失效/语法错误/veto info.error/多 plugin 顺序）8/8、T35.62（chat.message 历史消费 + text.complete 下游 TEXT_COMPLETE_MARKER）全部通过。核心链路与 2026-07-22 结论一致。npm 类用例（T35.52-61）此前已实测，本次未重跑。
+
 执行时间：2026-07-22。测试服务：`http://localhost:14096`，本地 PG + OpenSandbox，模型 `zhipuai/glm-5.2`。
 
 ### 已通过

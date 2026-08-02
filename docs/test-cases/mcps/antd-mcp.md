@@ -172,11 +172,13 @@ curl -s --max-time 120 -X POST "$BASE/session/$SID/message" \
 | 用例 | 结果 | 验证详情 |
 |------|------|---------|
 | T40.1 创建 MCP | ✅ | PG `antd\|local\|enabled=t` |
-| T40.2 CRUD | ✅ | 列出/删除/隔离/级联全通过 |
-| T40.3 AI 感知工具 | ✅ | 列出 8 个 antd_ 工具 |
-| T40.4 antd_list 调用 | ✅ | PG `antd_antd_list(completed)`，返回 50+ 组件 |
-| T40.5 antd_info 调用 | ✅ | PG `antd_antd_info(completed)`，返回 Button API |
-| T40.6 完整开发流程 | ✅ | 18 次工具调用全 completed，生成 495 行 Dashboard.tsx |
+| T40.2 CRUD | ✅ | 列出/删除/隔离/级联全通过（与 T22 同资源覆盖） |
+| T40.3 AI 感知工具 | ✅ | 列出 8 个 antd_ 工具（list/info/doc/demo/token/design_md/semantic/changelog） |
+| T40.4 antd_list 调用 | ✅ | `antd_list(completed)`，返回 50+ 组件 |
+| T40.5 antd_info 调用 | ✅ | `antd_info(completed)`，返回 Button 完整 API |
+| T40.6 完整开发流程 | ✅ | antd_info×5 + antd_demo×9 + antd_list×1 全 completed，write 生成 Dashboard.tsx |
+
+> **2026-08-02 重跑记录**（容器重建后）：T40.1-6 全通过。环境为 `OPENCODE_EXPERIMENTAL_CODE_MODE=all`，antd MCP 工具经 code-mode `execute` 内嵌调用（metadata.toolCalls 记录 `antd.antd_*`，PG `part` 表以 execute 持久化并可从 toolCalls 提取）。本次 T40.6 生成 Dashboard.tsx **412 行**（Card×11 / Statistic / Table / `variant="borderless"` 等 antd v6 API，2 个 SVG 图表），先查 MCP API/示例再写代码的完整流程与历史一致。
 
 **验证层级**：
 

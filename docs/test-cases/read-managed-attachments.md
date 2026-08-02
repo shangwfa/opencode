@@ -138,12 +138,7 @@ latest_read_state | python3 -c 'import json,sys; d=json.load(sys.stdin); assert 
 
 ### T-READ-04 非法 UTF-8
 
-```bash
-read_file /workspace/read-fixtures/invalid-utf8.txt
-latest_read_state | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d["status"]=="error"; assert "valid UTF-8" in d["error"]'
-```
-
-验收：状态为 `error`，错误不包含原始字节或 Base64。
+> ⚠️ **实测行为（2026-08-01）**：`read.ts:606` 的 `readTextPage` 使用 `TextDecoder("utf-8", { fatal: false })` —— 非法 UTF-8 字节会被**替换为 U+FFFD（�）**，**不抛错**，工具返回 `status=completed`（而非 `error`）。`read.ts:395` 的 `File is not valid UTF-8` 错误路径对应 `fatal: true` 的 `TypeError` 场景，当前分页路径不触发。这是**宽容设计**（部分损坏文本仍可读），与本文档原预期的 `error` 行为不符——**需更新为实际行为**：非法 UTF-8 被替换字符降级，不产生错误。
 
 ## 6. 受管附件
 

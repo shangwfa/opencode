@@ -126,18 +126,25 @@ curl -s --noproxy '*' -X POST "$BASE/session/$SID/exec" \
 
 ### T-CG.6a 注册 codegraph local MCP（POST /session/:id/mcps/create）
 
+> ⚠️ **实测修正（2026-08-02）**：`codegraph serve --mcp` 必须在**项目目录**运行（`cwd` 有 `.codegraph` 图谱）。opencode local MCP 的默认 workingDirectory 是 `/workspace`（无图谱），直接 `["codegraph","serve","--mcp"]` 会导致 codegraph 进程高 CPU 空转、`codegraph_explore` 调用失败。需用 `sh -lc` 先 `cd` 到项目目录：
+>
+> ```json
+> { "name": "codegraph", "type": "local",
+>   "command": ["sh", "-lc", "cd /workspace/proma-codegraph && codegraph serve --mcp"], "enabled": true }
+> ```
+
 ```bash
 # 先清理旧数据（避免干扰）
 psql "$PG_URL" -c "DELETE FROM session_mcps WHERE session_id='$SID';"
 psql "$PG_URL" -c "DELETE FROM session_agents_md WHERE session_id='$SID';"
 
-# 注册 codegraph local MCP（命令对应 .opencode/opencode.jsonc 里的 mcp.codegraph）
+# 注册 codegraph local MCP（命令对应 .opencode/opencode.jsonc 里的 mcp.codegraph，加 cd 到项目目录）
 curl -s --noproxy '*' -X POST "$BASE/session/$SID/mcps/create" \
   -H 'Content-Type: application/json' \
   -d '{
     "name": "codegraph",
     "type": "local",
-    "command": ["codegraph", "serve", "--mcp"],
+    "command": ["sh", "-lc", "cd /workspace/proma-codegraph && codegraph serve --mcp"],
     "enabled": true
   }' | python3 -m json.tool
 ```
@@ -150,7 +157,7 @@ curl -s --noproxy '*' -X POST "$BASE/session/$SID/mcps/create" \
   "session_id": "ses_xxx",
   "name": "codegraph",
   "type": "local",
-  "command": ["codegraph", "serve", "--mcp"],
+  "command": ["sh", "-lc", "cd /workspace/proma-codegraph && codegraph serve --mcp"],
   "enabled": true
 }
 ```
@@ -238,6 +245,8 @@ while (Date.now() - start < 180000) {
 - AI 调用 `codegraph_codegraph_explore` 工具 ≥ 1 次（status=completed）
 - AI 回复含**精确接口/行号**（如 `ProviderAdapter:244`），证明用的是 codegraph 图谱数据
 
+> **实测记录（2026-08-02，容器重建后重跑）**：注册（cd 版命令）+ AGENTS.md（18763 chars）→ AI 调用 `codegraph.codegraph_explore` completed，返回 `packages/core/src/providers/types.ts:250` 的 `ProviderAdapter` 接口 + 4 个方法签名（providerType/buildStreamRequest/parseSSELine/buildTitleRequest/parseTitleResponse）——精确到行号，基于 codegraph 图谱数据。⚠️ 注意：AI 可能倾向用 grep/bash 替代 MCP 工具，若需强制验证 MCP 链路，prompt 应明确"必须使用 codegraph_explore 工具"。
+
 ---
 
 ## 验收对照
@@ -251,6 +260,6 @@ while (Date.now() - start < 180000) {
 | codegraph install（生成 AGENTS.md + opencode.jsonc 在项目根目录） | `POST /session/:id/exec` | ✅ `--location=local` 放项目根目录 |
 | **手动注册 MCP + 设置 AGENTS.md** | **`POST /session/:id/mcps/create`** + **`POST /session/:id/agents-md/create`** | ✅ PG 两表持久化 |
 | PG 持久化 | `psql` | ✅ MCP + AGENTS.md (18722 chars) |
-| AI 调用 codegraph 工具 | `POST /session/:id/prompt_async` | ✅ `codegraph_codegraph_explore(completed)×3` |
+| AI 调用 codegraph 工具 | `POST /session/:id/prompt_async` | ✅ `codegraph_explore(completed)`，返回 `types.ts:250` 精确接口（2026-08-02 重跑） |
 
 > **关键验证**：T-CG.6 用 `mcps/create` + `agents-md/create` 两个独立 API 显式完成 MCP + AGENTS.md 注入——这种低层级 API 方式**每步可控**，适合需要精细管理 session 资源的场景。`dot-opencode/load` 是更高层的封装（一键扫描 `.opencode/`），见 [`opencode/sandbox/codegraph.md`](../sandbox/codegraph.md) T37.30。

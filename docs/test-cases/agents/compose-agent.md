@@ -30,34 +30,34 @@ curl -s -X POST "$BASE/session/$SID/agents/create" \
     "name":"compose",
     "description":"编排Agent，协调plan→execute→review工作流",
     "mode":"primary",
-    "prompt":"你是 Compose Agent — 一个编排器，通过调用 compose 技能来协调工作流。\n\n规则：\n1. 收到任务后，先用 skill 工具加载 compose:plan 技能，制定计划\n2. 计划完成后，用 skill 工具加载 compose:execute 技能，分发子agent执行\n3. 执行完成后，用 skill 工具加载 compose:review 技能，进行代码审查\n4. 所有决策通过 compose:ask 技能路由给用户\n\n你必须按 plan → execute → review 顺序编排，不能跳过步骤。",
+    "prompt":"你是 Compose Agent — 一个编排器，通过调用 compose 技能来协调工作流。\n\n规则：\n1. 收到任务后，先用 skill 工具加载 compose-plan 技能，制定计划\n2. 计划完成后，用 skill 工具加载 compose-execute 技能，分发子agent执行\n3. 执行完成后，用 skill 工具加载 compose-review 技能，进行代码审查\n4. 所有决策通过 compose:ask 技能路由给用户\n\n你必须按 plan → execute → review 顺序编排，不能跳过步骤。",
     "temperature":0.3,
-    "permission":{"skill":"allow","task":"allow","bash":"allow","read":"allow","write":"allow","edit":"allow","glob":"allow","grep":"allow"}
+    "permission":{"skill":"allow","task":"allow","bash":"allow","read":"allow","write":"allow","edit":"allow","glob":"allow","grep":"allow","todowrite":"allow"}
   }'
 
 # 2. 创建 3 个编排技能
 curl -s -X POST "$BASE/session/$SID/skills/create" \
   -H 'Content-Type: application/json' \
   -d '{
-    "name":"compose:plan",
+    "name":"compose-plan",
     "description":"制定实现计划。当需要规划多步骤任务时使用。",
-    "content":"# compose:plan\n\n## 规则\n1. 分析需求，拆解为独立任务\n2. 每个任务包含：目标、涉及文件、验证方法\n3. 将计划写入 /workspace/plan.md\n4. 计划完成后说【PLAN_COMPLETE】\n\n## 输出格式\n```markdown\n# 实现计划\n## Task 1: [标题]\n- 目标: ...\n- 文件: ...\n- 验证: ...\n```"
+    "content":"# compose-plan\n\n## 规则\n1. 分析需求，拆解为独立任务\n2. 每个任务包含：目标、涉及文件、验证方法\n3. 将计划写入 /workspace/plan.md\n4. 计划完成后说【PLAN_COMPLETE】\n\n## 输出格式\n```markdown\n# 实现计划\n## Task 1: [标题]\n- 目标: ...\n- 文件: ...\n- 验证: ...\n```"
   }'
 
 curl -s -X POST "$BASE/session/$SID/skills/create" \
   -H 'Content-Type: application/json' \
   -d '{
-    "name":"compose:execute",
+    "name":"compose-execute",
     "description":"执行实现计划。读取plan.md，逐步执行每个任务。",
-    "content":"# compose:execute\n\n## 规则\n1. 读取 /workspace/plan.md\n2. 按顺序执行每个 Task\n3. 每个 Task 完成后标记【TASK_N_DONE】\n4. 全部完成后说【EXECUTE_COMPLETE】\n5. 使用 write/edit/bash 工具实际执行代码变更"
+    "content":"# compose-execute\n\n## 规则\n1. 读取 /workspace/plan.md\n2. 按顺序执行每个 Task\n3. 每个 Task 完成后标记【TASK_N_DONE】\n4. 全部完成后说【EXECUTE_COMPLETE】\n5. 使用 write/edit/bash 工具实际执行代码变更"
   }'
 
 curl -s -X POST "$BASE/session/$SID/skills/create" \
   -H 'Content-Type: application/json' \
   -d '{
-    "name":"compose:review",
+    "name":"compose-review",
     "description":"代码审查。验证实现是否符合计划，检查质量问题。",
-    "content":"# compose:review\n\n## 规则\n1. 读取 /workspace/plan.md 了解预期\n2. 用 bash/read 工具检查实际实现\n3. 按以下维度审查：功能正确性、代码质量、测试覆盖\n4. 输出审查报告，说【REVIEW_COMPLETE】\n\n## 输出格式\n| 维度 | 状态 | 说明 |\n|------|------|------|"
+    "content":"# compose-review\n\n## 规则\n1. 读取 /workspace/plan.md 了解预期\n2. 用 bash/read 工具检查实际实现\n3. 按以下维度审查：功能正确性、代码质量、测试覆盖\n4. 输出审查报告，说【REVIEW_COMPLETE】\n\n## 输出格式\n| 维度 | 状态 | 说明 |\n|------|------|------|"
   }'
 
 # 验证
@@ -85,9 +85,13 @@ print(f'  skills: {[s[\"name\"] for s in d]}')"
 
 **期望**：
 - PG `session_agents` 含 `compose/primary`
-- PG `session_skill` 含 3 个 `compose:plan`、`compose:execute`、`compose:review`
+- PG `session_skill` 含 3 个 `compose-plan`、`compose-execute`、`compose-review`
 - API 列表合并了全局 agent + compose agent
 - API skills 列表含 3 个编排技能
+
+> ⚠️ **skill 命名约束**（2026-08-01 实测）：skill `name` 必须匹配 `^[a-z0-9]+(?:-[a-z0-9]+)*$`（`skill/index.ts:148`，1-64 个由连字符分隔的小写字母数字段），**不允许冒号 `:`**。原文档 `compose:plan` 等冒号命名会返回 400（`Expected a string matching the RegExp ...`）。本文档已改为连字符命名 `compose-plan` / `compose-execute` / `compose-review`。
+>
+> ⚠️ **todowrite 权限**（2026-08-01 实测）：compose agent 的 permission **必须包含 `todowrite: allow`**，否则编排流程中 `todowrite` 工具默认 `ask`，HTTP API 模式无人应答会**永远卡在 running**（与 subagent 权限卡住问题同因，见 `local-test-env.md` 常见问题表）。
 
 ---
 
@@ -100,8 +104,8 @@ print(f'  skills: {[s[\"name\"] for s in d]}')"
 curl -s --max-time 300 -X POST "$BASE/session/$SID/message" \
   -H 'Content-Type: application/json' \
   -d "{
-    \"parts\":[{\"type\":\"text\",\"text\":\"请创建一个 Python 计算器模块：\n1. /workspace/calc.py — 包含 add, subtract, multiply, divide 四个函数\n2. /workspace/test_calc.py — 包含每个函数的测试\n3. 运行测试确认通过\n\n按照 compose 工作流执行：先用 compose:plan 制定计划，再用 compose:execute 执行，最后用 compose:review 审查。\"}],
-    \"skills\":[\"compose:plan\",\"compose:execute\",\"compose:review\"],
+    \"parts\":[{\"type\":\"text\",\"text\":\"请创建一个 Python 计算器模块：\n1. /workspace/calc.py — 包含 add, subtract, multiply, divide 四个函数\n2. /workspace/test_calc.py — 包含每个函数的测试\n3. 运行测试确认通过\n\n按照 compose 工作流执行：先用 compose-plan 制定计划，再用 compose-execute 执行，最后用 compose-review 审查。\"}],
+    \"skills\":[\"compose-plan\",\"compose-execute\",\"compose-review\"],
     \"agent\":\"compose\",
     \"model\":$MODEL
   }" > /tmp/t262_ai.json
@@ -116,7 +120,7 @@ for p in d.get('parts',[]):
     elif t=='tool': print(f'[tool]: {p.get(\"tool\",\"?\")}({p.get(\"state\",{}).get(\"status\",\"?\")})')
 "
 
-# PG 验证 skill tool 调用（应有 compose:plan/execute/review 的加载记录）
+# PG 验证 skill tool 调用（应有 compose-plan/execute/review 的加载记录）
 psql "$PG_URL" -c "
 SELECT p.data->>'tool' as tool, p.data->'state'->>'status' as status,
        substring(p.data->'state'->>'output' from 1 for 80) as output
@@ -139,7 +143,7 @@ python3 -c "import json;d=json.loads(open('/tmp/t262_test.json').read(),strict=F
 ```
 
 **期望**：
-- PG `part` 表有 `skill(completed)` 调用，output 含 `compose:plan` 等
+- PG `part` 表有 `skill(completed)` 调用，output 含 `compose-plan` 等
 - PG `part` 表有 `write(completed)` / `bash(completed)` 等工具调用
 - exec 确认 `/workspace/calc.py` 和 `/workspace/test_calc.py` 存在
 - 测试通过（add/subtract/multiply/divide 四个函数均正确）
@@ -161,7 +165,7 @@ curl -s -X POST "$BASE/session/$SID/agents/create" \
     "name":"compose","description":"编排器","mode":"primary",
     "prompt":"你是编排器。收到多个独立任务时，用 @implementer 子agent并行执行。每个任务一个 @implementer。",
     "temperature":0.3,
-    "permission":{"task":"allow","bash":"allow","read":"allow","write":"allow","edit":"allow","skill":"allow","glob":"allow","grep":"allow"}
+    "permission":{"task":"allow","bash":"allow","read":"allow","write":"allow","edit":"allow","skill":"allow","glob":"allow","grep":"allow","todowrite":"allow"}
   }' > /dev/null
 
 curl -s -X POST "$BASE/session/$SID/agents/create" \
@@ -170,7 +174,7 @@ curl -s -X POST "$BASE/session/$SID/agents/create" \
     "name":"implementer","description":"实现者子agent","mode":"subagent",
     "prompt":"你是实现者。按指令创建文件，简洁执行。",
     "temperature":0.3,
-    "permission":{"bash":"allow","read":"allow","write":"allow","edit":"allow","glob":"allow","grep":"allow"}
+    "permission":{"bash":"allow","read":"allow","write":"allow","edit":"allow","glob":"allow","grep":"allow","todowrite":"allow"}
   }' > /dev/null
 
 # 发送并行任务
@@ -206,9 +210,9 @@ python3 -c "import json;d=json.loads(open('/tmp/t263_exec.json').read(),strict=F
 
 ## T42.4 编排隔离：compose 技能仅在 compose session 可见
 
-> **去重说明**（2026-07-17）：session skill 跨 session 隔离的通用验证见 T15.18（附录 A G6）。本节仅需确认 compose 技能无特殊泄露路径——按 G6 模式：A 创建 `compose:plan`，B 的 skills 列表为 `[]`，PG `session_skill` 按 `session_id` 隔离。
+> **去重说明**（2026-07-17）：session skill 跨 session 隔离的通用验证见 T15.18（附录 A G6）。本节仅需确认 compose 技能无特殊泄露路径——按 G6 模式：A 创建 `compose-plan`，B 的 skills 列表为 `[]`，PG `session_skill` 按 `session_id` 隔离。
 
-**期望**：A 有 `compose:plan`，B 为 `[]`，PG 确认隔离
+**期望**：A 有 `compose-plan`，B 为 `[]`，PG 确认隔离
 
 ---
 
@@ -222,7 +226,7 @@ SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{"
 curl -s -X POST "$BASE/session/$SID/agents/create" -H 'Content-Type: application/json' \
   -d '{"name":"compose","description":"编排器","mode":"primary","prompt":"编排"}' > /dev/null
 curl -s -X POST "$BASE/session/$SID/skills/create" -H 'Content-Type: application/json' \
-  -d '{"name":"compose:plan","description":"计划","content":"# Plan"}' > /dev/null
+  -d '{"name":"compose-plan","description":"计划","content":"# Plan"}' > /dev/null
 
 # PG 验证（重启前）
 PG_AGENT_BEFORE=$(psql "$PG_URL" -t -A -c "SELECT COUNT(*) FROM session_agents WHERE session_id='$SID'")

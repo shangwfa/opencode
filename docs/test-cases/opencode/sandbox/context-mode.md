@@ -677,6 +677,8 @@ python3 /tmp/cm-prompt.py ctx_search \
 
 ## 验收记录
 
+> **2026-08-02 容器重建后重跑**（T-CM.1-7 核心链路）：session/沙箱、context-mode 预装 + FTS5、plugin 注册（`context-mode|code|t`）、11 工具精确匹配 + 6 hooks、execute（42）/execute_file（49）/batch_execute、index/search（helios / NOT_FOUND 隔离）、fetch_and_index（atlas / 缓存命中 / 404 报错）全部通过。L3-L6 历史结论不变。
+
 | 验证项 | 结果 | 证据 |
 |--------|------|------|
 | Session 与沙箱启动 | 通过 | SID `ses_077a3afbfffejdCimEHum6C4IH`，sandbox `3c226...` |

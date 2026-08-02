@@ -90,7 +90,7 @@ async function sendAndWait(sid, body, timeout = 60000) {
 | T33.6 | G6 | A/B 各建同名 command | 列表互相隔离 |
 | T33.7 | G7 | 删除 session | GET commands → 404（`requireSession`）；PG 级联 COUNT=0 |
 | T33.8 | G9 | 缺 name / template | 均 400 |
-| T33.9 | G8 | ses_NOTEXIST create/list | create=500（FK）；list=404（`requireSession`） |
+| T33.9 | G8 | ses_NOTEXIST create/list | create=500（FK）；list=404（`requireSession`）。**实测（2026-08-01）**：create 也返回 404（`requireSession` 统一校验），非 FK 500——实现已改进为统一 session 存在性校验 |
 
 ### T33.10 session command 覆盖同名 instance 命令（overlay 合并）
 
@@ -629,3 +629,50 @@ console.log("template:", cmd?.template)
 '
 ```
 **期望**：命令创建成功，template 包含 `@README.md` 文件引用语法。（执行需沙箱展开文件内容）
+
+---
+
+### T33.29 多命令编排（一个任务顺序触发多个命令）
+
+> **背景（2026-08-01 实测确认）**：命令只能通过 `POST /session/:id/command` 触发，且**一次调用只执行一个命令**。前端 `prompt-input/submit.ts:76` 的 `text.split(" ")` 只取第一个词作为命令，剩余作为 arguments——`/cmd1 ... \n/cmd2 ...` 单次提交只有 `/cmd1` 被识别，`/cmd2` 会成为 cmd1 的 arguments。因此**多命令编排必须多次调用 `/command`**（每个命令一次，串行执行）。
+>
+> 服务端 `/message` / `prompt_async` **不解析命令前缀**：单次 message 提交 `/cmd1\n/cmd2` 被当作普通文本（AI 会误读为文件路径/普通指令），不触发任何命令。
+
+**验证目标**：
+1. 多次 `/command` 调用可顺序执行多个命令（步骤编排）
+2. 单次 message 提交含多命令文本不触发命令（记录当前限制）
+
+```bash
+bun -e '
+const BASE = "http://localhost:14096"
+const MODEL = "zhipuai/glm-5.1"
+const SID = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "multi-cmd" }) })).json()
+const runCommand = (command, args = "") =>
+  fetch(BASE + "/session/" + SID.id + "/command", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ command, arguments: args, model: MODEL }) }).then(r => r.json())
+
+// 创建 2 个顺序编排命令
+await fetch(BASE + "/session/" + SID.id + "/commands/create", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: "step-one", template: "Respond with exactly: STEP1_OK and nothing else." }) })
+await fetch(BASE + "/session/" + SID.id + "/commands/create", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: "step-two", template: "Respond with exactly: STEP2_OK and nothing else." }) })
+
+// 方式一：多次 /command 串行编排（推荐）
+const r1 = await runCommand("step-one")
+const r2 = await runCommand("step-two")
+const t1 = (r1.parts || []).filter(p => p.type === "text").map(p => p.text).join(" ")
+const t2 = (r2.parts || []).filter(p => p.type === "text").map(p => p.text).join(" ")
+console.log("cmd1:", t1.slice(0, 40), "| contains STEP1_OK:", t1.includes("STEP1_OK"))
+console.log("cmd2:", t2.slice(0, 40), "| contains STEP2_OK:", t2.includes("STEP2_OK"))
+console.log("✅ 方式一 多命令串行编排:", t1.includes("STEP1_OK") && t2.includes("STEP2_OK"))
+
+// 方式二：单次 message 提交多命令（应不触发命令）
+const msgRes = await fetch(BASE + "/session/" + SID.id + "/message", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ parts: [{ type: "text", text: "/step-one\\n/step-two" }], model: { providerID: "zhipuai", modelID: "glm-5.1" } }) }).then(r => r.json())
+const msgText = (msgRes.parts || []).filter(p => p.type === "text").map(p => p.text).join(" ")
+const triggeredAsCommand = msgText.includes("STEP1_OK")
+console.log("单次 message 提交多命令被当命令执行:", triggeredAsCommand, "（期望 false — 服务端不解析命令前缀）")
+console.log("⚠️ 方式二 记录限制: 单次提交不触发命令, 需多次 /command")
+'
+```
+
+**期望**：
+- 多次 `/command` 调用依次返回 `STEP1_OK`、`STEP2_OK`（多命令串行编排可用）
+- 单次 message 提交 `/cmd1\n/cmd2` **不触发命令**（服务端 `/message` 不解析命令前缀；AI 当普通文本处理）
+- 多命令编排的正确方式是**多次调用 `/command`**，每次一个命令
