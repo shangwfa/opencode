@@ -72,7 +72,8 @@ function stdioCommand(mcp: { command: string[] }): string {
 }
 
 function sandboxMcpPaths(key: string, port: number) {
-  const base = `/tmp/opencode-mcp/${key}-${port}`
+  const safeKey = key.replace(/[^A-Za-z0-9._-]/g, "_")
+  const base = `/tmp/opencode-mcp/${safeKey}-${port}`
   return { log: `${base}.log`, pid: `${base}.pid` }
 }
 
@@ -729,9 +730,9 @@ const layer = Layer.effect(
       // Use supergateway to bridge stdio MCP → StreamableHTTP inside the sandbox
       const paths = sandboxMcpPaths(key, port)
       const envArg = mcp.environment
-        ? "env " + Object.entries(mcp.environment).map(([k, v]) => `${k}=${shellQuote(String(v))}`).join(" ") + " "
+        ? "env " + Object.entries(mcp.environment).map(([k, v]) => `${shellQuote(k)}=${shellQuote(String(v))}`).join(" ") + " "
         : ""
-      const bridgeCommand = `${envArg}supergateway --stdio ${shellQuote(stdioCommand(mcp))} --outputTransport streamableHttp --port ${port} --logLevel none`
+      const bridgeCommand = `${envArg}supergateway --stdio ${shellQuote(stdioCommand(mcp))} --outputTransport streamableHttp --stateful --port ${port} --logLevel none`
       yield* Effect.logInfo("starting MCP in sandbox via supergateway", { key, sessionID, port, command: bridgeCommand })
 
       // Clean up stale MCP processes from previous sandbox usage (once per session)

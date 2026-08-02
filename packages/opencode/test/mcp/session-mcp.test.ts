@@ -335,3 +335,44 @@ describe("MCP toolsForSession - SaaS empty config", () => {
     { config: { mcp: {} } } as any,
   )
 })
+
+// ─── Shell injection hardening ───
+
+const maliciousEnv = {
+  mcp: {
+    "bad;touch /tmp/x;#": {
+      type: "local",
+      command: ["echo", "hi"],
+      enabled: true,
+      environment: { "BAD-ENV;touch /tmp/pwned": "x", SAFE: "v" },
+    },
+  },
+}
+
+describe("MCP shell injection hardening", () => {
+  it.instance(
+    "quotes env keys so malicious keys cannot inject commands",
+    () => Effect.gen(function* () {
+      const mcp = yield* MCP.Service
+      yield* mcp.toolsForSession("inj1" as any)
+      expect(sandboxRunCalls.length).toBe(1)
+      const cmd = sandboxRunCalls[0].command
+      expect(cmd).toContain("'BAD-ENV;touch /tmp/pwned'='x'")
+      expect(cmd).not.toContain("BAD-ENV;touch /tmp/pwned=x")
+    }),
+    { config: maliciousEnv } as any,
+  )
+
+  it.instance(
+    "sanitizes MCP name in sandbox pid/log paths",
+    () => Effect.gen(function* () {
+      const mcp = yield* MCP.Service
+      yield* mcp.toolsForSession("inj2" as any)
+      expect(sandboxRunCalls.length).toBe(1)
+      const cmd = sandboxRunCalls[0].command
+      expect(cmd).toContain("/tmp/opencode-mcp/bad_touch__tmp_x_")
+      expect(cmd).not.toContain("/tmp/opencode-mcp/bad;touch")
+    }),
+    { config: maliciousEnv } as any,
+  )
+})
