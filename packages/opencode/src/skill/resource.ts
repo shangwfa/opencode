@@ -2,7 +2,7 @@ import { createHash } from "crypto"
 import path from "path"
 import { Schema } from "effect"
 
-export const MAX_SIZE = 256 * 1024
+export const MAX_SIZE = 512 * 1024
 export const MAX_BUNDLE_SIZE = 1024 * 1024
 export const MAX_COUNT = 64
 export const SANDBOX_ROOT = "/home/sandbox/.local/share/opencode/session-skills"
