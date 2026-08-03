@@ -2166,6 +2166,50 @@ describe("ProviderTransform.message - anthropic empty content filtering", () => 
     expect(result[1].content).toHaveLength(1)
   })
 
+  test("filters empty content for openai-compatible providers", () => {
+    const openaiCompatibleModel = {
+      ...anthropicModel,
+      id: "moonshotai-cn/kimi-k2",
+      providerID: "moonshotai-cn",
+      api: {
+        id: "kimi-k2",
+        url: "https://api.moonshot.cn",
+        npm: "@ai-sdk/openai-compatible",
+      },
+    }
+
+    const msgs = [
+      { role: "user", content: "Hello" },
+      { role: "assistant", content: "" },
+      {
+        role: "assistant",
+        content: [
+          { type: "text", text: "" },
+          { type: "text", text: "Answer" },
+        ],
+      },
+      // reasoning serializes into reasoning_content, contributing no content:
+      // a thinking-only turn must be dropped like an empty message.
+      {
+        role: "assistant",
+        content: [{ type: "reasoning", text: "thinking only, no body" }],
+      },
+      // tool calls must survive - subsequent tool messages reference them.
+      {
+        role: "assistant",
+        content: [{ type: "tool-call", toolCallId: "call_1", toolName: "read", input: {} }],
+      },
+    ] as any[]
+
+    const result = ProviderTransform.message(msgs, openaiCompatibleModel, {})
+
+    expect(result).toHaveLength(3)
+    expect(result[0].content).toBe("Hello")
+    expect(result[1].content).toHaveLength(1)
+    expect(result[1].content[0]).toEqual({ type: "text", text: "Answer" })
+    expect(result[2].content[0]).toEqual({ type: "tool-call", toolCallId: "call_1", toolName: "read", input: {} })
+  })
+
   test("leaves valid anthropic assistant tool ordering unchanged", () => {
     const msgs = [
       {

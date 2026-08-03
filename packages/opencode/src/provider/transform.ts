@@ -220,6 +220,30 @@ function normalizeMessages(
       .filter((msg): msg is ModelMessage => msg !== undefined && msg.content !== "")
   }
 
+  // OpenAI-compatible providers (e.g. Moonshot/Kimi) reject assistant messages
+  // whose content is empty ("assistant must not be empty"). Reasoning parts
+  // serialize into reasoning_content and contribute no content here, so a
+  // thinking-only turn would leave content empty; drop empty text parts and
+  // remove the message when no text or tool call survives (matches the
+  // Anthropic/Bedrock handling above).
+  if (model.api.npm === "@ai-sdk/openai-compatible") {
+    msgs = msgs
+      .map((msg) => {
+        if (typeof msg.content === "string") {
+          if (msg.content === "") return undefined
+          return msg
+        }
+        if (!Array.isArray(msg.content)) return msg
+        const filtered = msg.content.filter((part) => {
+          if (part.type === "text") return part.text !== ""
+          return true
+        })
+        if (!filtered.some((part) => part.type !== "reasoning")) return undefined
+        return { ...msg, content: filtered }
+      })
+      .filter((msg): msg is ModelMessage => msg !== undefined && msg.content !== "")
+  }
+
   if (model.api.id.includes("claude")) {
     const scrub = (id: string) => id.replace(/[^a-zA-Z0-9_-]/g, "_")
     msgs = msgs.map((msg) => {
