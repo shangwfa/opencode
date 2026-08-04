@@ -587,13 +587,15 @@ curl -s -X PUT "$BASE/saas/project/$PRIVATE_PROJECT_ID/mcps/secret-mcp" \
     \"headers\": { \"Authorization\": \"Bearer $GIT_TOKEN\" }
   }" > /dev/null
 
-# API 响应不返回 secret value
-RES=$(curl -s "$BASE/saas/project/$PRIVATE_PROJECT_ID/mcps/secret-mcp")
+# API 响应不返回 secret value（从列表接口取，无单查端点）
+RES=$(curl -s "$BASE/saas/project/$PRIVATE_PROJECT_ID/mcps")
 echo "$RES" | python3 -c "
 import json,sys
-d = json.load(sys.stdin)
-ok = d.get('headerKeys')==['Authorization'] and d.get('hasSecrets')==True and 'Bearer' not in json.dumps(d)
-print('✅ T51.13 PASS — API 脱敏' if ok else '❌ T51.13 FAIL — ' + json.dumps(d))
+mcps = json.load(sys.stdin)
+m = next((x for x in mcps if x['name']=='secret-mcp'), None)
+if not m: raise SystemExit('not found')
+ok = m.get('headerKeys')==['Authorization'] and m.get('hasSecrets')==True and 'Bearer' not in json.dumps(m)
+print('✅ T51.13 PASS — API 脱敏' if ok else '❌ T51.13 FAIL — ' + json.dumps(m))
 "
 
 # DB 不含明文
@@ -879,10 +881,12 @@ REMAIN=$(psql -d "$PG" -Atqc "
     (SELECT count(*) FROM mcp WHERE project_id='$TMP_ID')
 ")
 
-[ "$REMAIN" = "1" ] && pass "T51.17 (archived, row retained)" || fail "T51.17" "remaining=$REMAIN"
+STATUS=$(psql -d "$PG" -Atqc "SELECT status FROM saas_project WHERE id='$TMP_ID'")
+
+[ "$REMAIN" = "4" ] && [ "$STATUS" = "archived" ] && pass "T51.17 (archived, all rows retained)" || fail "T51.17" "remaining=$REMAIN status=$STATUS"
 ```
 
-**期望**：DELETE 执行软归档（`status=archived`），Project 行和子资源行都保留。
+**期望**：DELETE 执行软归档（`status=archived`），Project 行和子资源行都保留（共 4 行）。
 
 ### T51.18 孤儿资源清理
 
@@ -1048,6 +1052,25 @@ HTTP=$(curl -s --noproxy '*' -o /dev/null -w '%{http_code}' -X PUT "$BASE/saas/p
 # ── T51.19 不依赖目录路由 ──
 HTTP=$(curl -s --noproxy '*' -o /dev/null -w '%{http_code}' "$BASE/saas/project/$PUB_ID")
 [ "$HTTP" = "200" ] && pass "T51.19 读取不依赖路由" || fail "T51.19 读取不依赖路由" "HTTP=$HTTP"
+
+# ── T51.20 Session 按 projectId 关联与查询 ──
+SID=$(curl -s --noproxy '*' --max-time 15 -X POST "$BASE/session" -H 'Content-Type: application/json' \
+  -d "{\"projectId\":\"$PUB_ID\",\"title\":\"by-project\"}" | python3 -c "import json,sys;print(json.load(sys.stdin).get('id',''))")
+PGID=$(psql -d "$PG" -Atqc "SELECT saas_project_id FROM session WHERE id='$SID'" 2>/dev/null || echo "")
+[ "$PGID" = "$PUB_ID" ] && pass "T51.20 session持久化projectId" || fail "T51.20 session持久化projectId" "pg=$PGID"
+
+CNT=$(curl -s --noproxy '*' --max-time 10 "$BASE/saas/project/$PUB_ID/sessions" | python3 -c "import json,sys;d=json.load(sys.stdin);print(sum(1 for s in d if s.get('saasProjectID')=='$PUB_ID'))")
+[ "$CNT" -ge 1 ] && pass "T51.21 按projectId查询session" || fail "T51.21 按projectId查询session" "count=$CNT"
+
+# 无 projectId 的 session 不关联
+SID2=$(curl -s --noproxy '*' --max-time 15 -X POST "$BASE/session" -H 'Content-Type: application/json' \
+  -d '{"title":"no-project"}' | python3 -c "import json,sys;print(json.load(sys.stdin).get('id',''))")
+PGID2=$(psql -d "$PG" -Atqc "SELECT saas_project_id FROM session WHERE id='$SID2'" 2>/dev/null || echo "")
+[ -z "$PGID2" ] && pass "T51.22 无projectId不关联" || fail "T51.22 无projectId不关联" "pg=$PGID2"
+
+# 不存在 project 返回空
+EMPTY=$(curl -s --noproxy '*' --max-time 10 "$BASE/saas/project/prj_00000000000000000000000000/sessions" | python3 -c "import json,sys;print(len(json.load(sys.stdin)))")
+[ "$EMPTY" = "0" ] && pass "T51.23 不存在project空列表" || fail "T51.23 不存在project空列表" "count=$EMPTY"
 
 # ── 汇总 ──
 echo ""

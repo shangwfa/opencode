@@ -1,4 +1,5 @@
 import { SaasProject } from "@/saas-project"
+import { Session } from "@/session/session"
 import { Schema } from "effect"
 import { HttpApi, HttpApiEndpoint, HttpApiError, HttpApiGroup, OpenApi } from "effect/unstable/httpapi"
 import { described } from "./metadata"
@@ -144,6 +145,11 @@ export const SaasProjectApi = HttpApi.make("saas-project").add(
       HttpApiEndpoint.delete("removeTool", `${root}/:projectID/tools/:name`, {
         params: { projectID: SaasProject.ID, name: SaasProject.ResourceName },
         success: Schema.Void,
+        error: errors,
+      }),
+      HttpApiEndpoint.get("listSessions", `${root}/:projectID/sessions`, {
+        params: { projectID: SaasProject.ID },
+        success: described(Schema.Array(Session.Info), "Project sessions"),
         error: errors,
       }),
     )

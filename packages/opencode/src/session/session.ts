@@ -94,6 +94,7 @@ export function fromRow(row: SessionRow): Info {
     pvcMode: row.pvc_mode ?? undefined,
     appId: row.app_id ?? undefined,
     sandbox: row.sandbox ?? undefined,
+    saasProjectID: row.saas_project_id ?? undefined,
     directory: row.directory,
     path: row.path ?? undefined,
     parentID: row.parent_id ?? undefined,
@@ -141,6 +142,7 @@ export function toRow(info: Info) {
     pvc_mode: info.pvcMode,
     app_id: info.appId,
     sandbox: info.sandbox,
+    saas_project_id: info.saasProjectID,
     directory: info.directory,
     path: info.path,
     title: info.title,
@@ -273,6 +275,7 @@ export const Info = Schema.Struct({
   pvcMode: optional(PvcMode),
   appId: optional(Schema.String),
   sandbox: optional(SandboxResource),
+  saasProjectID: optional(Schema.String),
 }).annotate({ identifier: "Session" })
 export type Info = Types.DeepMutable<Schema.Schema.Type<typeof Info>>
 
@@ -458,6 +461,7 @@ export type NotFound = NotFoundError
 export interface Interface {
   readonly list: (input?: ListInput) => Effect.Effect<Info[]>
   readonly listGlobal: (input?: GlobalListInput) => Effect.Effect<GlobalInfo[]>
+  readonly listByProjectId: (projectID: string) => Effect.Effect<Info[]>
   readonly create: (input?: {
     parentID?: SessionID
     title?: string
@@ -562,6 +566,7 @@ export const layer: Layer.Layer<
       pvcMode?: PvcMode
       appId?: string
       sandbox?: SandboxResource
+      saasProjectID?: string
     }) {
       const ctx = yield* InstanceState.context
       const result: Info = {
@@ -575,6 +580,7 @@ export const layer: Layer.Layer<
         pvcMode: input.pvcMode,
         appId: input.appId,
         sandbox: input.sandbox,
+        saasProjectID: input.saasProjectID,
         parentID: input.parentID,
         title: input.title ?? (input.parentID ? childTitlePrefix : parentTitlePrefix) + new Date().toISOString(),
         agent: input.agent,
@@ -649,6 +655,17 @@ export const layer: Layer.Layer<
         }
       }
       return rows.map((row) => ({ ...fromRow(row), project: projects.get(row.project_id) ?? null }))
+    })
+
+    const listByProjectId = Effect.fn("Session.listByProjectId")(function* (projectID: string) {
+      const rows = yield* db
+        .select()
+        .from(SessionTable)
+        .where(eq(SessionTable.saas_project_id, projectID))
+        .orderBy(desc(SessionTable.time_updated))
+        .all()
+        .pipe(Effect.orDie)
+      return rows.map(fromRow)
     })
 
     const children = Effect.fn("Session.children")(function* (parentID: SessionID) {
@@ -793,6 +810,7 @@ export const layer: Layer.Layer<
         pvcMode,
         appId,
         sandbox,
+        saasProjectID: input?.projectId,
       }).pipe(
         Effect.tap((result) => injectProjectAgents(result.id, input?.projectId)),
         Effect.tap((result) => injectProjectSkills(result.id, input?.projectId)),
@@ -918,9 +936,7 @@ export const layer: Layer.Layer<
       if (Exit.isFailure(exit)) return
       const agentsMd = exit.value
       if (!agentsMd) return
-      const SessionAgentsMd = yield* Effect.promise(() =>
-        import("@/session/agents-md").then((m) => m.SessionAgentsMd),
-      )
+      const SessionAgentsMd = yield* Effect.promise(() => import("@/session/agents-md").then((m) => m.SessionAgentsMd))
       const agentsMdService = Option.getOrUndefined(yield* Effect.serviceOption(SessionAgentsMd.Service))
       if (!agentsMdService) return
       yield* Effect.exit(agentsMdService.upsert(sessionID, { content: agentsMd.content }))
@@ -1221,6 +1237,7 @@ export const layer: Layer.Layer<
     return Service.of({
       list,
       listGlobal,
+      listByProjectId,
       create,
       fork,
       touch,

@@ -62,6 +62,9 @@ esac
 })
 
 beforeEach(async () => {
+  await sql`DELETE FROM project_tool`
+  await sql`DELETE FROM project_command`
+  await sql`DELETE FROM project_agents_md`
   await sql`DELETE FROM mcp`
   await sql`DELETE FROM skill`
   await sql`DELETE FROM agent`
@@ -114,6 +117,32 @@ describe("SaaS Project", () => {
       expect((yield* service.listAgents(second.id)).map((item) => item.description)).toEqual(["second"])
       expect(yield* service.listSkills(first.id)).toHaveLength(1)
       expect(yield* service.listMcps(first.id)).toHaveLength(1)
+    }),
+  )
+
+  it.live("creates, updates, and removes agents md, commands, and tools", () =>
+    Effect.gen(function* () {
+      const service = yield* SaasProject.Service
+      const project = yield* service.create(input)
+
+      yield* service.upsertAgentsMd(project.id, "initial instructions")
+      yield* service.upsertAgentsMd(project.id, "updated instructions")
+      expect(yield* service.getAgentsMd(project.id)).toEqual({ content: "updated instructions" })
+
+      yield* service.upsertCommand(project.id, "review", { template: "initial" })
+      yield* service.upsertCommand(project.id, "review", { template: "updated" })
+      expect((yield* service.listCommands(project.id))[0]?.template).toBe("updated")
+
+      yield* service.upsertTool(project.id, "inspect", { description: "Initial", code: "initial" })
+      yield* service.upsertTool(project.id, "inspect", { description: "Updated", code: "updated" })
+      expect((yield* service.listTools(project.id))[0]?.code).toBe("updated")
+
+      yield* service.removeAgentsMd(project.id)
+      yield* service.removeCommand(project.id, "review")
+      yield* service.removeTool(project.id, "inspect")
+      expect(yield* service.getAgentsMd(project.id)).toBeUndefined()
+      expect(yield* service.listCommands(project.id)).toEqual([])
+      expect(yield* service.listTools(project.id)).toEqual([])
     }),
   )
 
@@ -185,6 +214,9 @@ describe("SaaS Project", () => {
       yield* service.upsertAgent(project.id, "builder", {})
       yield* service.upsertSkill(project.id, "review", { description: "Review", content: "Review code" })
       yield* service.upsertMcp(project.id, "docs", { type: "remote", url: "https://example.com/mcp" })
+      yield* service.upsertAgentsMd(project.id, "Project instructions")
+      yield* service.upsertCommand(project.id, "review", { template: "Review code" })
+      yield* service.upsertTool(project.id, "inspect", { description: "Inspect", code: "export default {}" })
 
       yield* service.purge(project.id)
       const rows = yield* Effect.promise(
@@ -193,13 +225,19 @@ describe("SaaS Project", () => {
             (SELECT count(*) FROM saas_project WHERE id = ${project.id}) AS projects,
             (SELECT count(*) FROM agent WHERE project_id = ${project.id}) AS agents,
             (SELECT count(*) FROM skill WHERE project_id = ${project.id}) AS skills,
-            (SELECT count(*) FROM mcp WHERE project_id = ${project.id}) AS mcps
+            (SELECT count(*) FROM mcp WHERE project_id = ${project.id}) AS mcps,
+            (SELECT count(*) FROM project_agents_md WHERE project_id = ${project.id}) AS agents_md,
+            (SELECT count(*) FROM project_command WHERE project_id = ${project.id}) AS commands,
+            (SELECT count(*) FROM project_tool WHERE project_id = ${project.id}) AS tools
         `,
       )
       expect(Number(rows[0].projects)).toBe(0)
       expect(Number(rows[0].agents)).toBe(0)
       expect(Number(rows[0].skills)).toBe(0)
       expect(Number(rows[0].mcps)).toBe(0)
+      expect(Number(rows[0].agents_md)).toBe(0)
+      expect(Number(rows[0].commands)).toBe(0)
+      expect(Number(rows[0].tools)).toBe(0)
     }),
   )
 
@@ -207,15 +245,37 @@ describe("SaaS Project", () => {
     Effect.gen(function* () {
       const service = yield* SaasProject.Service
       const now = Date.now()
-      yield* Effect.promise(
-        () => sql`
+      yield* Effect.promise(() =>
+        sql.begin(async (tx) => {
+          await tx`
           INSERT INTO agent (id, project_id, name, time_created, time_updated)
           VALUES ('agt_orphan', 'prj_missing', 'orphan', ${now}, ${now})
-        `,
+        `
+          await tx`
+          INSERT INTO project_agents_md (id, project_id, content, time_created, time_updated)
+          VALUES ('pam_orphan', 'prj_missing', 'orphan', ${now}, ${now})
+        `
+          await tx`
+          INSERT INTO project_command (id, project_id, name, template, time_created, time_updated)
+          VALUES ('cmd_orphan', 'prj_missing', 'orphan', 'orphan', ${now}, ${now})
+        `
+          await tx`
+          INSERT INTO project_tool (id, project_id, name, description, code, time_created, time_updated)
+          VALUES ('tl_orphan', 'prj_missing', 'orphan', 'orphan', 'orphan', ${now}, ${now})
+        `
+        }),
       )
 
-      expect(yield* service.cleanupOrphans()).toBe(1)
-      const rows = yield* Effect.promise(() => sql`SELECT count(*) AS count FROM agent WHERE id = 'agt_orphan'`)
+      expect(yield* service.cleanupOrphans()).toBe(4)
+      const rows = yield* Effect.promise(
+        () => sql`
+          SELECT
+            (SELECT count(*) FROM agent WHERE id = 'agt_orphan') +
+            (SELECT count(*) FROM project_agents_md WHERE id = 'pam_orphan') +
+            (SELECT count(*) FROM project_command WHERE id = 'cmd_orphan') +
+            (SELECT count(*) FROM project_tool WHERE id = 'tl_orphan') AS count
+        `,
+      )
       expect(Number(rows[0].count)).toBe(0)
     }),
   )

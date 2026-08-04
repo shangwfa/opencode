@@ -569,6 +569,9 @@ export const layer = Layer.effect(
       yield* get(id)
       yield* storage(() =>
         client().begin(async (tx) => {
+          await tx`DELETE FROM project_tool WHERE project_id = ${id}`
+          await tx`DELETE FROM project_command WHERE project_id = ${id}`
+          await tx`DELETE FROM project_agents_md WHERE project_id = ${id}`
           await tx`DELETE FROM mcp WHERE project_id = ${id}`
           await tx`DELETE FROM skill WHERE project_id = ${id}`
           await tx`DELETE FROM agent WHERE project_id = ${id}`
@@ -583,6 +586,15 @@ export const layer = Layer.effect(
         WITH deleted_mcp AS (
           DELETE FROM mcp WHERE NOT EXISTS (SELECT 1 FROM saas_project WHERE saas_project.id = mcp.project_id)
           RETURNING 1
+        ), deleted_tool AS (
+          DELETE FROM project_tool WHERE NOT EXISTS (SELECT 1 FROM saas_project WHERE saas_project.id = project_tool.project_id)
+          RETURNING 1
+        ), deleted_command AS (
+          DELETE FROM project_command WHERE NOT EXISTS (SELECT 1 FROM saas_project WHERE saas_project.id = project_command.project_id)
+          RETURNING 1
+        ), deleted_agents_md AS (
+          DELETE FROM project_agents_md WHERE NOT EXISTS (SELECT 1 FROM saas_project WHERE saas_project.id = project_agents_md.project_id)
+          RETURNING 1
         ), deleted_skill AS (
           DELETE FROM skill WHERE NOT EXISTS (SELECT 1 FROM saas_project WHERE saas_project.id = skill.project_id)
           RETURNING 1
@@ -592,6 +604,9 @@ export const layer = Layer.effect(
         )
         SELECT
           (SELECT count(*) FROM deleted_mcp) +
+          (SELECT count(*) FROM deleted_tool) +
+          (SELECT count(*) FROM deleted_command) +
+          (SELECT count(*) FROM deleted_agents_md) +
           (SELECT count(*) FROM deleted_skill) +
           (SELECT count(*) FROM deleted_agent) AS count
       `,

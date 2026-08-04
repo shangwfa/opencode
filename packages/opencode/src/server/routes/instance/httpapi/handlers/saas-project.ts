@@ -1,4 +1,5 @@
 import { SaasProject } from "@/saas-project"
+import { Session } from "@/session/session"
 import { Effect } from "effect"
 import { HttpApiBuilder, HttpApiError } from "effect/unstable/httpapi"
 import { SaasProjectRootApi } from "../api"
@@ -24,6 +25,7 @@ const transport = <A, E extends { readonly _tag: string }, R>(effect: Effect.Eff
 export const saasProjectHandlers = HttpApiBuilder.group(SaasProjectRootApi, "saasProject", (handlers) =>
   Effect.gen(function* () {
     const project = yield* SaasProject.Service
+    const session = yield* Session.Service
 
     return handlers
       .handle("create", (ctx) => transport(project.create(ctx.payload)))
@@ -59,5 +61,6 @@ export const saasProjectHandlers = HttpApiBuilder.group(SaasProjectRootApi, "saa
       .handle("listTools", (ctx) => transport(project.listTools(ctx.params.projectID)))
       .handle("upsertTool", (ctx) => transport(project.upsertTool(ctx.params.projectID, ctx.params.name, ctx.payload)))
       .handle("removeTool", (ctx) => transport(project.removeTool(ctx.params.projectID, ctx.params.name)))
+      .handle("listSessions", (ctx) => transport(session.listByProjectId(ctx.params.projectID)))
   }),
 )

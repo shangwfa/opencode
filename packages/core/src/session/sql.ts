@@ -60,11 +60,13 @@ export const SessionTable = sqliteTable(
     pvc_mode: text().$type<"session" | "app">(),
     app_id: text(),
     sandbox: text({ mode: "json" }).$type<{ cpu: string; memory: string }>(),
+    saas_project_id: text(),
   },
   (table) => [
     index("session_project_idx").on(table.project_id),
     index("session_workspace_idx").on(table.workspace_id),
     index("session_parent_idx").on(table.parent_id),
+    index("session_saas_project_idx").on(table.saas_project_id),
   ],
 )
 
