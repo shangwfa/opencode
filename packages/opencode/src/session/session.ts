@@ -42,8 +42,9 @@ import { SessionRunState } from "./run-state"
 import { SandboxProvider } from "@/tool/sandbox-provider"
 
 import type { Provider } from "@/provider/provider"
+import { SaasProject } from "@/saas-project"
 import { Global } from "@opencode-ai/core/global"
-import { Effect, Layer, Option, Context, Schema, Types } from "effect"
+import { Effect, Layer, Option, Context, Schema, Types, Exit } from "effect"
 import { NonNegativeInt, optional } from "@opencode-ai/core/schema"
 import { RuntimeFlags } from "@/effect/runtime-flags"
 import { LocationServiceMap } from "@opencode-ai/core/location-service-map"
@@ -300,6 +301,7 @@ export const CreateInput = Schema.optional(
     pvcMode: Schema.optional(PvcMode),
     appId: Schema.optional(Schema.String),
     sandbox: Schema.optional(SandboxResource),
+    projectId: Schema.optional(Schema.String),
   }),
 )
 export type CreateInput = Types.DeepMutable<Schema.Schema.Type<typeof CreateInput>>
@@ -466,6 +468,8 @@ export interface Interface {
     workspaceID?: WorkspaceV2.ID
     pvcMode?: PvcMode
     appId?: string
+    sandbox?: SandboxResource
+    projectId?: string
   }) => Effect.Effect<Info, InvalidPvcConfigError>
   readonly fork: (input: { sessionID: SessionID; messageID?: MessageID }) => Effect.Effect<Info, NotFound>
   readonly touch: (sessionID: SessionID) => Effect.Effect<void>
@@ -738,6 +742,7 @@ export const layer: Layer.Layer<
       pvcMode?: PvcMode
       appId?: string
       sandbox?: SandboxResource
+      projectId?: string
     }) {
       if (input?.pvcMode === "app" && !input.appId?.trim()) {
         return yield* new InvalidPvcConfigError({ message: "appId is required when pvcMode is app" })
@@ -747,10 +752,14 @@ export const layer: Layer.Layer<
       }
       if (input?.sandbox) {
         if (!CpuPattern.test(input.sandbox.cpu)) {
-          return yield* new InvalidPvcConfigError({ message: `Invalid sandbox.cpu: "${input.sandbox.cpu}". Must be a number like "1", "0.5", or "500m"` })
+          return yield* new InvalidPvcConfigError({
+            message: `Invalid sandbox.cpu: "${input.sandbox.cpu}". Must be a number like "1", "0.5", or "500m"`,
+          })
         }
         if (!MemoryPattern.test(input.sandbox.memory)) {
-          return yield* new InvalidPvcConfigError({ message: `Invalid sandbox.memory: "${input.sandbox.memory}". Must be like "2Gi", "512Mi", or "1G"` })
+          return yield* new InvalidPvcConfigError({
+            message: `Invalid sandbox.memory: "${input.sandbox.memory}". Must be like "2Gi", "512Mi", or "1G"`,
+          })
         }
       }
       // 子会话自动继承父会话的 app 模式配置（session 模式不影响，保持原行为）
@@ -784,7 +793,191 @@ export const layer: Layer.Layer<
         pvcMode,
         appId,
         sandbox,
-      })
+      }).pipe(
+        Effect.tap((result) => injectProjectAgents(result.id, input?.projectId)),
+        Effect.tap((result) => injectProjectSkills(result.id, input?.projectId)),
+        Effect.tap((result) => injectProjectMcps(result.id, input?.projectId)),
+        Effect.tap((result) => injectProjectAgentsMd(result.id, input?.projectId)),
+        Effect.tap((result) => injectProjectCommands(result.id, input?.projectId)),
+        Effect.tap((result) => injectProjectTools(result.id, input?.projectId)),
+      )
+    })
+
+    const injectProjectAgents = Effect.fn("Session.injectProjectAgents")(function* (
+      sessionID: SessionID,
+      projectId?: string,
+    ) {
+      if (!projectId) return
+      const projectService = Option.getOrUndefined(yield* Effect.serviceOption(SaasProject.Service))
+      if (!projectService) return
+      const exit = yield* Effect.exit(projectService.listAgents(SaasProject.ID.make(projectId)))
+      if (Exit.isFailure(exit)) return
+      const agentList = exit.value
+      if (!agentList || agentList.length === 0) return
+      const Agent = yield* Effect.promise(() => import("@/agent/agent").then((m) => m.Agent))
+      const agentService = Option.getOrUndefined(yield* Effect.serviceOption(Agent.Service))
+      if (!agentService) return
+      for (const agent of agentList) {
+        const permObj: Record<string, string> = {}
+        const perms = (agent as any).permission ?? []
+        for (const p of perms) permObj[p.permission] = p.action
+        yield* Effect.exit(
+          agentService.sessionCreate(sessionID, {
+            name: agent.name,
+            description: agent.description ?? undefined,
+            mode: agent.mode,
+            prompt: agent.prompt ?? undefined,
+            ...(Object.keys(permObj).length > 0 ? { permission: permObj as any } : {}),
+            ...((agent as any).model ? { model: (agent as any).model } : {}),
+            ...(agent.temperature !== undefined ? { temperature: agent.temperature } : {}),
+            ...(agent.topP !== undefined ? { topP: agent.topP } : {}),
+            ...(agent.steps !== undefined ? { steps: agent.steps } : {}),
+            ...(agent.color ? { color: agent.color } : {}),
+            ...(agent.variant ? { variant: agent.variant } : {}),
+            ...(Object.keys((agent as any).options ?? {}).length > 0 ? { options: (agent as any).options } : {}),
+          }),
+        )
+      }
+    })
+
+    const injectProjectSkills = Effect.fn("Session.injectProjectSkills")(function* (
+      sessionID: SessionID,
+      projectId?: string,
+    ) {
+      if (!projectId) return
+      const projectService = Option.getOrUndefined(yield* Effect.serviceOption(SaasProject.Service))
+      if (!projectService) return
+      const exit = yield* Effect.exit(projectService.listSkills(SaasProject.ID.make(projectId)))
+      if (Exit.isFailure(exit)) return
+      const skillList = exit.value
+      if (!skillList || skillList.length === 0) return
+      const Skill = yield* Effect.promise(() => import("@/skill").then((m) => m.Skill))
+      const skillService = Option.getOrUndefined(yield* Effect.serviceOption(Skill.Service))
+      if (!skillService) return
+      for (const skill of skillList) {
+        const resources = (skill as any).resources ?? []
+        yield* Effect.exit(
+          skillService.sessionCreate(sessionID, {
+            name: skill.name,
+            description: skill.description ?? undefined,
+            content: skill.content,
+            ...(resources.length > 0
+              ? {
+                  resources: resources.map((r: any) => ({
+                    path: r.path,
+                    type: r.type,
+                    content: r.content,
+                  })),
+                }
+              : {}),
+          }),
+        )
+      }
+    })
+
+    const injectProjectMcps = Effect.fn("Session.injectProjectMcps")(function* (
+      sessionID: SessionID,
+      projectId?: string,
+    ) {
+      if (!projectId) return
+      const projectService = Option.getOrUndefined(yield* Effect.serviceOption(SaasProject.Service))
+      if (!projectService) return
+      const exit = yield* Effect.exit(projectService.listMcpsWithSecrets(SaasProject.ID.make(projectId)))
+      if (Exit.isFailure(exit)) return
+      const mcpList = exit.value
+      if (!mcpList || mcpList.length === 0) return
+      const SessionMcp = yield* Effect.promise(() => import("@/mcp/session-mcp").then((m) => m.SessionMcp))
+      const mcpService = Option.getOrUndefined(yield* Effect.serviceOption(SessionMcp.Service))
+      if (!mcpService) return
+      for (const mcp of mcpList) {
+        const info = mcp.info
+        yield* Effect.exit(
+          mcpService.upsert(sessionID, {
+            name: info.name,
+            type: info.type as "local" | "remote",
+            ...(info.type === "local" && info.command ? { command: [...info.command] } : {}),
+            ...(info.type === "remote" && info.url ? { url: info.url } : {}),
+            ...(info.type === "local" && Object.keys(mcp.environment).length > 0
+              ? { environment: mcp.environment }
+              : {}),
+            ...(info.type === "remote" && Object.keys(mcp.headers).length > 0 ? { headers: mcp.headers } : {}),
+            enabled: info.enabled,
+          } as any),
+        )
+      }
+    })
+
+    const injectProjectAgentsMd = Effect.fn("Session.injectProjectAgentsMd")(function* (
+      sessionID: SessionID,
+      projectId?: string,
+    ) {
+      if (!projectId) return
+      const projectService = Option.getOrUndefined(yield* Effect.serviceOption(SaasProject.Service))
+      if (!projectService) return
+      const exit = yield* Effect.exit(projectService.getAgentsMd(SaasProject.ID.make(projectId)))
+      if (Exit.isFailure(exit)) return
+      const agentsMd = exit.value
+      if (!agentsMd) return
+      const SessionAgentsMd = yield* Effect.promise(() =>
+        import("@/session/agents-md").then((m) => m.SessionAgentsMd),
+      )
+      const agentsMdService = Option.getOrUndefined(yield* Effect.serviceOption(SessionAgentsMd.Service))
+      if (!agentsMdService) return
+      yield* Effect.exit(agentsMdService.upsert(sessionID, { content: agentsMd.content }))
+    })
+
+    const injectProjectCommands = Effect.fn("Session.injectProjectCommands")(function* (
+      sessionID: SessionID,
+      projectId?: string,
+    ) {
+      if (!projectId) return
+      const projectService = Option.getOrUndefined(yield* Effect.serviceOption(SaasProject.Service))
+      if (!projectService) return
+      const exit = yield* Effect.exit(projectService.listCommands(SaasProject.ID.make(projectId)))
+      if (Exit.isFailure(exit)) return
+      const cmdList = exit.value
+      if (!cmdList || cmdList.length === 0) return
+      const Command = yield* Effect.promise(() => import("@/command").then((m) => m.Command))
+      const commandService = Option.getOrUndefined(yield* Effect.serviceOption(Command.Service))
+      if (!commandService) return
+      for (const cmd of cmdList) {
+        yield* Effect.exit(
+          commandService.sessionCreate(sessionID, {
+            name: cmd.name,
+            description: cmd.description ?? undefined,
+            template: cmd.template,
+            ...(cmd.agent ? { agent: cmd.agent } : {}),
+            ...(cmd.model ? { model: cmd.model } : {}),
+            ...(cmd.subtask !== undefined ? { subtask: cmd.subtask } : {}),
+            ...(cmd.hints && cmd.hints.length > 0 ? { hints: [...cmd.hints] } : {}),
+          }),
+        )
+      }
+    })
+
+    const injectProjectTools = Effect.fn("Session.injectProjectTools")(function* (
+      sessionID: SessionID,
+      projectId?: string,
+    ) {
+      if (!projectId) return
+      const projectService = Option.getOrUndefined(yield* Effect.serviceOption(SaasProject.Service))
+      if (!projectService) return
+      const exit = yield* Effect.exit(projectService.listTools(SaasProject.ID.make(projectId)))
+      if (Exit.isFailure(exit)) return
+      const toolList = exit.value
+      if (!toolList || toolList.length === 0) return
+      const SessionTool = yield* Effect.promise(() => import("@/tool/session-tool").then((m) => m.SessionTool))
+      const toolService = Option.getOrUndefined(yield* Effect.serviceOption(SessionTool.Service))
+      if (!toolService) return
+      for (const tool of toolList) {
+        yield* Effect.exit(
+          toolService.upsert(sessionID, {
+            name: tool.name,
+            description: tool.description,
+            code: tool.code,
+          }),
+        )
+      }
     })
 
     const fork = Effect.fn("Session.fork")(function* (input: { sessionID: SessionID; messageID?: MessageID }) {
@@ -857,7 +1050,10 @@ export const layer: Layer.Layer<
       yield* patch(input.sessionID, { title: input.title }).pipe(Effect.orDie)
     })
 
-    const setDirectory = Effect.fn("Session.setDirectory")(function* (input: { sessionID: SessionID; directory: string }) {
+    const setDirectory = Effect.fn("Session.setDirectory")(function* (input: {
+      sessionID: SessionID
+      directory: string
+    }) {
       const ctx = yield* InstanceState.context
       const newPath = sessionPath(ctx.worktree, input.directory)
       yield* patch(input.sessionID, { directory: input.directory, path: newPath }).pipe(Effect.orDie)
@@ -919,10 +1115,12 @@ export const layer: Layer.Layer<
     const setShare = Effect.fn("Session.setShare")(function* (input: { sessionID: SessionID; share: Info["share"] }) {
       if (input.share == null) {
         // unshare: 直接 PG update 清除 share_url，不走 patch/事件投影（事件总线会将 null 还原为旧值）
-        yield* db.update(SessionTable).set({ share_url: null, time_updated: Date.now() }).where(eq(SessionTable.id, input.sessionID)).run().pipe(
-          Effect.provideService(Database.Service, database),
-          Effect.orDie,
-        )
+        yield* db
+          .update(SessionTable)
+          .set({ share_url: null, time_updated: Date.now() })
+          .where(eq(SessionTable.id, input.sessionID))
+          .run()
+          .pipe(Effect.provideService(Database.Service, database), Effect.orDie)
       } else {
         yield* patch(input.sessionID, { share: input.share, time: { updated: Date.now() } }).pipe(Effect.orDie)
       }

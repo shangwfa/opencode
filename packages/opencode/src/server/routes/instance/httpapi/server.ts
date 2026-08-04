@@ -82,7 +82,7 @@ import { serveUIEffect } from "@/server/shared/ui"
 import { ServerAuth } from "@/server/auth"
 import { SandboxProvider } from "@/tool/sandbox-provider"
 import { sandboxProxyRoute } from "@/server/sandbox-proxy"
-import { InstanceHttpApi, RootHttpApi } from "./api"
+import { InstanceHttpApi, RootHttpApi, SaasProjectRootApi } from "./api"
 import { Api } from "@opencode-ai/server/api"
 import { PublicApi } from "./public"
 import {
@@ -138,6 +138,8 @@ import { Instruction } from "@/session/instruction"
 import { SessionProcessor } from "@/session/processor"
 import { Git } from "@/git"
 import { Env } from "@/env"
+import { SaasProject } from "@/saas-project"
+import { saasProjectHandlers } from "./handlers/saas-project"
 
 export const context = Context.makeUnsafe<unknown>(new Map())
 
@@ -166,6 +168,12 @@ const serverHttpApiAuthLayer = serverAuthorizationLayer.pipe(Layer.provide(Serve
 const workspaceRoutingLive = workspaceRoutingLayer.pipe(Layer.provide(Socket.layerWebSocketConstructorGlobal))
 const rootApiRoutes = HttpApiBuilder.layer(RootHttpApi).pipe(
   Layer.provide([controlHandlers, controlPlaneHandlers, globalHandlers]),
+  Layer.provide(schemaErrorLayer),
+  Layer.provide(httpApiAuthLayer),
+)
+const saasProjectApiRoutes = HttpApiBuilder.layer(SaasProjectRootApi).pipe(
+  Layer.provide(saasProjectHandlers),
+  Layer.provide(SaasProject.live),
   Layer.provide(schemaErrorLayer),
   Layer.provide(httpApiAuthLayer),
 )
@@ -317,6 +325,7 @@ export function createRoutes(
 
   return Layer.mergeAll(
     rootApiRoutes,
+    saasProjectApiRoutes,
     eventApiRoutes,
     ptyConnectApiRoutes,
     instanceRoutes,
@@ -339,6 +348,7 @@ export function createRoutes(
       Flag.OPENCODE_DATABASE_URL ? SessionTool.pgLayer : SessionTool.noopLayer,
       Flag.OPENCODE_DATABASE_URL ? SessionCommand.pgLayer : SessionCommand.noopLayer,
       Flag.OPENCODE_DATABASE_URL ? SessionPlugin.pgLayer : SessionPlugin.noopLayer,
+      SaasProject.live,
       SandboxProvider.defaultLayer,
       LspAgent.layer,
       FetchHttpClient.layer,

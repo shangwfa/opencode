@@ -7,6 +7,8 @@ import { Agent } from "@/agent/agent"
 import { Instruction } from "../../src/session/instruction"
 import { SessionID, MessageID } from "../../src/session/schema"
 import type { Sandbox, FileInfo, Execution, OutputMessage } from "@alibaba-group/opensandbox"
+import { FSUtil } from "@opencode-ai/core/fs-util"
+import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { provideInstance, testInstanceStoreLayer } from "../fixture/fixture"
 
 const S_IFDIR = 0o040000
@@ -174,6 +176,7 @@ function makeLayers(sandbox: Sandbox) {
     Layer.succeed(Agent.Service, {
       get: () => Effect.succeed({ model: undefined, permission: [], tools: [] } as any),
     } as any),
+    LayerNode.compile(LayerNode.group([FSUtil.node])),
   )
 }
 

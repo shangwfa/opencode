@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SaaS Project 测试台</title>
+<style>
+  :root {
+    --bg: #0d1117; --surface: #161b22; --border: #30363d;
+    --text: #e6edf3; --muted: #8b949e; --accent: #2f81f7;
+    --green: #3fb950; --red: #f85149; --yellow: #d29922; --purple: #bc8cff;
+    --radius: 8px; --mono: 'SF Mono', 'Monaco', 'Menlo', monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--bg); color: var(--text); font-family: -apple-system, system-ui, sans-serif; font-size: 14px; padding: 20px; }
+  h1 { font-size: 20px; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+  h1 .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); }
+  h2 { font-size: 15px; margin: 20px 0 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+  .layout { display: grid; grid-template-columns: 420px 1fr; gap: 16px; max-width: 1400px; }
+  .panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
+  .row { display: flex; gap: 8px; margin-bottom: 8px; align-items: center; }
+  .row label { width: 100px; color: var(--muted); font-size: 12px; flex-shrink: 0; }
+  input, select, textarea {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+    color: var(--text); padding: 6px 10px; font-size: 13px; flex: 1; outline: none;
+    font-family: var(--mono);
+  }
+  input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+  textarea { min-height: 60px; resize: vertical; font-family: var(--mono); }
+  button {
+    background: var(--accent); color: #fff; border: none; border-radius: 6px;
+    padding: 7px 14px; font-size: 13px; cursor: pointer; white-space: nowrap;
+    transition: opacity .15s;
+  }
+  button:hover { opacity: 0.85; }
+  button.secondary { background: var(--surface); border: 1px solid var(--border); color: var(--text); }
+  button.danger { background: var(--red); }
+  button.small { padding: 4px 8px; font-size: 12px; }
+  .btn-group { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+  .auth-config { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 10px; margin: 8px 0; }
+  .auth-config .row label { width: 80px; }
+  .project-list { max-height: 200px; overflow-y: auto; }
+  .project-item {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+    padding: 10px 12px; margin-bottom: 6px; cursor: pointer; transition: border-color .15s;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .project-item:hover { border-color: var(--accent); }
+  .project-item.active { border-color: var(--accent); background: #1a2332; }
+  .project-item .name { font-weight: 600; }
+  .project-item .meta { font-size: 11px; color: var(--muted); font-family: var(--mono); }
+  .badge {
+    display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px;
+    font-family: var(--mono); font-weight: 600;
+  }
+  .badge.green { background: rgba(63,185,80,0.15); color: var(--green); }
+  .badge.red { background: rgba(248,81,73,0.15); color: var(--red); }
+  .badge.yellow { background: rgba(210,153,34,0.15); color: var(--yellow); }
+  .badge.purple { background: rgba(188,140,255,0.15); color: var(--purple); }
+  .badge.blue { background: rgba(47,129,247,0.15); color: var(--accent); }
+  .detail-section { margin-bottom: 16px; }
+  .detail-section h3 { font-size: 13px; color: var(--muted); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .kv { display: flex; gap: 8px; padding: 3px 0; font-size: 13px; }
+  .kv .k { color: var(--muted); width: 140px; flex-shrink: 0; }
+  .kv .v { font-family: var(--mono); word-break: break-all; }
+  .resource-list { margin-top: 8px; }
+  .resource-item {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+    padding: 8px 10px; margin-bottom: 4px; font-size: 12px; display: flex; justify-content: space-between; align-items: center;
+  }
+  .resource-item .name { font-family: var(--mono); font-weight: 600; }
+  .resource-item .desc { color: var(--muted); margin-left: 8px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tab-bar { display: flex; gap: 4px; margin-bottom: 12px; }
+  .tab {
+    padding: 6px 14px; border-radius: 6px 6px 0 0; cursor: pointer; font-size: 13px;
+    border: 1px solid var(--border); border-bottom: none; background: var(--bg); color: var(--muted);
+  }
+  .tab.active { background: var(--surface); color: var(--text); border-color: var(--accent); }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+  .log {
+    background: #010409; border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 12px; font-family: var(--mono); font-size: 12px; max-height: 300px;
+    overflow-y: auto; line-height: 1.6;
+  }
+  .log .line { padding: 1px 0; }
+  .log .pass { color: var(--green); }
+  .log .fail { color: var(--red); }
+  .log .info { color: var(--muted); }
+  .log .warn { color: var(--yellow); }
+  .log .req { color: var(--accent); }
+  .hidden { display: none !important; }
+  .json-viewer {
+    background: #010409; border: 1px solid var(--border); border-radius: 6px;
+    padding: 10px; font-family: var(--mono); font-size: 12px; max-height: 200px;
+    overflow: auto; white-space: pre-wrap; word-break: break-all; color: var(--text);
+  }
+  .empty { color: var(--muted); font-style: italic; padding: 20px; text-align: center; }
+  .divider { border-top: 1px solid var(--border); margin: 12px 0; }
+</style>
+</head>
+<body>
+
+<h1><span class="dot"></span> SaaS Project 测试台</h1>
+
+<div class="layout">
+  <!-- 左栏：操作面板 -->
+  <div>
+    <!-- 环境配置 -->
+    <div class="panel" style="margin-bottom:12px">
+      <h2>环境</h2>
+      <div class="row">
+        <label>BASE URL</label>
+        <input id="baseUrl" value="http://localhost:14096" />
+      </div>
+      <div class="row">
+        <label>Git Token</label>
+        <input id="gitToken" type="password" placeholder="gho_ / ghp_ / github_pat_" />
+        <button class="small secondary" onclick="loadToken()">从 gh</button>
+      </div>
+      <div class="row">
+        <label>Token User</label>
+        <input id="gitUser" value="x-access-token" />
+      </div>
+      <div class="btn-group" style="margin-top:8px">
+        <button class="small secondary" onclick="testHealth()">健康检查</button>
+        <button class="small secondary" onclick="loadProjects()">刷新列表</button>
+        <button class="small danger" onclick="clearData()">清理数据</button>
+      </div>
+    </div>
+
+    <!-- GitHub OAuth 授权 -->
+    <div class="panel" style="margin-bottom:12px">
+      <h2>GitHub OAuth 授权</h2>
+      <div class="row">
+        <label>Client ID</label>
+        <input id="oauthClientId" placeholder="OAuth App Client ID" />
+      </div>
+      <div class="row">
+        <label>Client Secret</label>
+        <input id="oauthClientSecret" type="password" placeholder="OAuth App Client Secret" />
+      </div>
+      <div class="row">
+        <label>Scope</label>
+        <select id="oauthScope">
+          <option value="repo">repo（私有仓库读写）</option>
+          <option value="read:repo">read:repo（只读）</option>
+          <option value="public_repo">public_repo（仅公开）</option>
+        </select>
+      </div>
+      <div class="btn-group" style="margin-top:8px">
+        <button onclick="startOAuth()">GitHub 授权</button>
+        <a href="https://github.com/settings/applications/new" target="_blank" class="small secondary" style="display:inline-block;padding:4px 8px;font-size:12px;text-decoration:none;border:1px solid var(--border);border-radius:6px;color:var(--text);background:var(--surface)">创建 OAuth App</a>
+      </div>
+      <div id="oauthStatus" style="font-size:12px;color:var(--muted);margin-top:4px"></div>
+    </div>
+
+    <!-- 创建项目 -->
+    <div class="panel" style="margin-bottom:12px">
+      <h2>创建项目</h2>
+      <div class="row">
+        <label>名称</label>
+        <input id="pName" placeholder="my-project" />
+      </div>
+      <div class="row">
+        <label>描述</label>
+        <input id="pDesc" placeholder="可选" />
+      </div>
+      <div class="divider"></div>
+      <div class="row">
+        <label>Provider</label>
+        <select id="pProvider" onchange="toggleRepoUrl()">
+          <option value="github">github</option>
+          <option value="gitlab">gitlab</option>
+          <option value="generic">generic</option>
+        </select>
+      </div>
+      <div class="row">
+        <label>仓库 URL</label>
+        <input id="pUrl" placeholder="https://github.com/owner/repo.git" />
+      </div>
+      <div class="row">
+        <label>默认分支</label>
+        <input id="pBranch" placeholder="main" value="main" />
+      </div>
+      <div class="divider"></div>
+      <div class="row">
+        <label>认证方式</label>
+        <select id="pAuthType" onchange="toggleAuthFields()">
+          <option value="none">none（公开仓库）</option>
+          <option value="token">token（PAT）</option>
+          <option value="oauth">oauth（OAuth Token）</option>
+          <option value="basic">basic（用户名+密码）</option>
+        </select>
+      </div>
+      <div id="authTokenFields" class="auth-config hidden">
+        <div class="row">
+          <label>Token</label>
+          <input id="aToken" type="password" placeholder="ghp_xxx / github_pat_xxx" />
+          <button class="small secondary" onclick="fillToken()">填入 Git Token</button>
+        </div>
+      </div>
+      <div id="authOauthFields" class="auth-config hidden">
+        <div class="row">
+          <label>Access Token</label>
+          <input id="aOauthToken" type="password" placeholder="gho_xxx" />
+          <button class="small secondary" onclick="fillOauthToken()">填入 Git Token</button>
+        </div>
+      </div>
+      <div id="authBasicFields" class="auth-config hidden">
+        <div class="row">
+          <label>用户名</label>
+          <input id="aBasicUser" placeholder="x-access-token" />
+        </div>
+        <div class="row">
+          <label>密码</label>
+          <input id="aBasicPass" type="password" />
+        </div>
+        <div class="row">
+          <button class="small secondary" onclick="fillBasic()">填入 Git Token</button>
+        </div>
+      </div>
+      <div class="btn-group" style="margin-top:8px">
+        <button onclick="createProject()">创建项目</button>
+        <button class="secondary" onclick="fillPublicRepo()">公开仓库</button>
+        <button class="secondary" onclick="fillPrivateRepo()">私有仓库</button>
+      </div>
+    </div>
+
+    <!-- 项目列表 -->
+    <div class="panel">
+      <h2>项目列表</h2>
+      <div id="projectList" class="project-list">
+        <div class="empty">暂无项目</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 右栏：详情和资源 -->
+  <div>
+    <div id="detailPanel" class="panel">
+      <div class="empty">选择左侧项目查看详情</div>
+    </div>
+
+    <!-- 日志 -->
+    <div class="panel" style="margin-top:12px">
+      <h2>请求日志</h2>
+      <div id="log" class="log">
+        <div class="line info">— 就绪 —</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let currentProject = null;
+let projects = [];
+
+const $ = id => document.getElementById(id);
+const base = () => $('baseUrl').value.replace(/\/$/, '');
+
+function log(msg, type = 'info') {
+  const el = $('log');
+  const time = new Date().toLocaleTimeString();
+  const div = document.createElement('div');
+  div.className = `line ${type}`;
+  div.textContent = `[${time}] ${msg}`;
+  el.appendChild(div);
+  el.scrollTop = el.scrollHeight;
+}
+
+async function api(method, path, body) {
+  const url = base() + path;
+  log(`${method} ${path}`, 'req');
+  const opts = { method, headers: {} };
+  if (body) {
+    opts.headers['Content-Type'] = 'application/json';
+    opts.body = JSON.stringify(body);
+  }
+  try {
+    const res = await fetch(url, opts);
+    const text = await res.text();
+    let data;
+    try { data = JSON.parse(text); } catch { data = text; }
+    if (!res.ok && data && data._tag === 'BadRequest') {
+      log(`→ ${res.status} BadRequest — 可能原因：Git 验证失败/超时、Schema 校验错误、网络抖动`, 'fail');
+    } else {
+      log(`→ ${res.status}`, res.ok ? 'pass' : 'fail');
+    }
+    return { ok: res.ok, status: res.status, data };
+  } catch (e) {
+    log(`→ ERROR: ${e.message}`, 'fail');
+    return { ok: false, status: 0, data: e.message };
+  }
+}
+
+// ── 环境 ──
+
+async function loadToken() {
+  log('从 gh CLI 获取 token（需在本机执行）...', 'warn');
+  log('请手动填入 token 到输入框', 'info');
+}
+
+async function testHealth() {
+  const r = await api('GET', '/global/health');
+  if (r.ok && r.data.healthy) {
+    log(`✅ 服务就绪 version=${r.data.version}`, 'pass');
+  } else {
+    log(`❌ 服务未就绪: ${r.status}`, 'fail');
+  }
+}
+
+async function clearData() {
+  if (!confirm('确认清理所有 SaaS Project 数据？')) return;
+  const r = await api('DELETE', '/saas/project/all');
+  log('数据已清理（需后端支持）', 'warn');
+  loadProjects();
+}
+
+// ── Auth 字段切换 ──
+
+function toggleAuthFields() {
+  const type = $('pAuthType').value;
+  $('authTokenFields').classList.toggle('hidden', type !== 'token');
+  $('authOauthFields').classList.toggle('hidden', type !== 'oauth');
+  $('authBasicFields').classList.toggle('hidden', type !== 'basic');
+}
+
+function toggleRepoUrl() {
+  const p = $('pProvider').value;
+  const url = $('pUrl').value;
+  if (!url) {
+    if (p === 'github') $('pUrl').placeholder = 'https://github.com/owner/repo.git';
+    else if (p === 'gitlab') $('pUrl').placeholder = 'https://gitlab.com/group/repo.git';
+    else $('pUrl').placeholder = 'https://git.example.com/repo.git';
+  }
+}
+
+function fillToken() {
+  $('aToken').value = $('gitToken').value;
+}
+
+function fillOauthToken() {
+  $('aOauthToken').value = $('gitToken').value;
+}
+
+function fillBasic() {
+  $('aBasicUser').value = $('gitUser').value;
+  $('aBasicPass').value = $('gitToken').value;
+}
+
+function fillPublicRepo() {
+  $('pName').value = 'qm-public';
+  $('pProvider').value = 'github';
+  $('pUrl').value = 'https://github.com/yc-software/qm.git';
+  $('pBranch').value = 'main';
+  $('pAuthType').value = 'none';
+  toggleAuthFields();
+}
+
+function fillPrivateRepo() {
+  $('pName').value = 'nbs-private';
+  $('pProvider').value = 'github';
+  $('pUrl').value = 'https://github.com/nb-saas/nbs-saas.git';
+  $('pBranch').value = 'main';
+  $('pAuthType').value = 'token';
+  toggleAuthFields();
+  fillToken();
+}
+
+// ── CRUD ──
+
+function buildAuth() {
+  const type = $('pAuthType').value;
+  if (type === 'none') return { type: 'none' };
+  if (type === 'token') return { type: 'token', token: $('aToken').value };
+  if (type === 'oauth') return { type: 'oauth', accessToken: $('aOauthToken').value };
+  if (type === 'basic') return { type: 'basic', username: $('aBasicUser').value, password: $('aBasicPass').value };
+}
+
+async function createProject() {
+  const body = {
+    name: $('pName').value,
+    description: $('pDesc').value || undefined,
+    repository: {
+      provider: $('pProvider').value,
+      url: $('pUrl').value,
+      defaultBranch: $('pBranch').value || undefined,
+      auth: buildAuth(),
+    },
+  };
+  log(`创建项目: ${body.name} (${body.repository.auth.type})`, 'info');
+  const r = await api('POST', '/saas/project', body);
+  if (r.ok) {
+    log(`✅ 创建成功 id=${r.data.id}`, 'pass');
+    log(`   authType=${r.data.repository.authType} hasCredential=${r.data.repository.hasCredential} status=${r.data.repository.connectionStatus}`, 'info');
+    loadProjects();
+    selectProject(r.data.id);
+  } else {
+    const reason = r.data?._tag === 'BadRequest'
+      ? 'Git 仓库验证失败或请求格式错误。请检查：1) 仓库 URL 是否正确 2) 认证信息是否有效 3) 网络是否可达（容器内 git ls-remote 超时约 15s）'
+      : JSON.stringify(r.data);
+    log(`❌ 创建失败: ${reason}`, 'fail');
+  }
+}
+
+async function loadProjects() {
+  const r = await api('GET', '/saas/project');
+  if (r.ok) {
+    projects = r.data;
+    renderProjectList();
+    log(`加载 ${projects.length} 个项目`, 'info');
+  }
+}
+
+function renderProjectList() {
+  const el = $('projectList');
+  if (!projects.length) {
+    el.innerHTML = '<div class="empty">暂无项目</div>';
+    return;
+  }
+  el.innerHTML = projects.map(p => `
+    <div class="project-item ${currentProject === p.id ? 'active' : ''}" onclick="selectProject('${p.id}')">
+      <div>
+        <div class="name">${esc(p.name)}</div>
+        <div class="meta">${p.id.slice(0, 20)}... · ${p.repository.provider}/${p.repository.path}</div>
+      </div>
+      <div>
+        <span class="badge ${p.status === 'active' ? 'green' : 'yellow'}">${p.status}</span>
+        <span class="badge ${p.repository.connectionStatus === 'verified' ? 'green' : p.repository.connectionStatus === 'unauthorized' ? 'red' : 'yellow'}">${p.repository.connectionStatus}</span>
+        <span class="badge ${p.repository.authType === 'none' ? 'muted' : 'purple'}">${p.repository.authType}</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+function selectProject(id) {
+  currentProject = id;
+  const p = projects.find(x => x.id === id);
+  if (p) renderDetail(p);
+  renderProjectList();
+  loadResources(id);
+}
+
+function esc(s) { return String(s).replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
+function authBadge(type) {
+  const colors = { none: 'muted', token: 'blue', oauth: 'purple', basic: 'green', ssh: 'yellow' };
+  return `<span class="badge ${colors[type] || 'muted'}">${type}</span>`;
+}
+
+function renderDetail(p) {
+  const r = p.repository;
+  $('detailPanel').innerHTML = `
+    <div class="detail-section">
+      <h2>项目详情</h2>
+      <div class="kv"><span class="k">ID</span><span class="v">${p.id}</span></div>
+      <div class="kv"><span class="k">名称</span><span class="v">${esc(p.name)}</span></div>
+      <div class="kv"><span class="k">描述</span><span class="v">${esc(p.description)}</span></div>
+      <div class="kv"><span class="k">状态</span><span class="v"><span class="badge ${p.status === 'active' ? 'green' : 'yellow'}">${p.status}</span></span></div>
+      <div class="kv"><span class="k">创建时间</span><span class="v">${new Date(p.time.created).toLocaleString()}</span></div>
+      <div class="kv"><span class="k">更新时间</span><span class="v">${new Date(p.time.updated).toLocaleString()}</span></div>
+    </div>
+    <div class="detail-section">
+      <h3>Git 仓库</h3>
+      <div class="kv"><span class="k">Provider</span><span class="v"><span class="badge blue">${r.provider}</span></span></div>
+      <div class="kv"><span class="k">URL</span><span class="v">${r.url}</span></div>
+      <div class="kv"><span class="k">Host / Path</span><span class="v">${r.host} / ${r.path}</span></div>
+      <div class="kv"><span class="k">默认分支</span><span class="v">${r.defaultBranch || '(未指定)'}</span></div>
+      <div class="kv"><span class="k">认证类型</span><span class="v">${authBadge(r.authType)}</span></div>
+      <div class="kv"><span class="k">有凭据</span><span class="v">${r.hasCredential ? '✅' : '❌'}</span></div>
+      <div class="kv"><span class="k">连接状态</span><span class="v"><span class="badge ${r.connectionStatus === 'verified' ? 'green' : r.connectionStatus === 'unauthorized' ? 'red' : 'yellow'}">${r.connectionStatus}</span></span></div>
+      <div class="kv"><span class="k">验证时间</span><span class="v">${r.verifiedAt ? new Date(r.verifiedAt).toLocaleString() : '-'}</span></div>
+      <div class="btn-group" style="margin-top:8px">
+        <button class="small" onclick="verifyRepo()">重新验证</button>
+        <button class="small secondary" onclick="updateProject()">更新名称/描述</button>
+        <button class="small danger" onclick="archiveProject()">归档</button>
+      </div>
+    </div>
+    <div class="detail-section">
+      <div class="tab-bar">
+        <div class="tab active" onclick="switchTab('agents', this)">Agents</div>
+        <div class="tab" onclick="switchTab('skills', this)">Skills</div>
+        <div class="tab" onclick="switchTab('mcps', this)">MCPs</div>
+        <div class="tab" onclick="switchTab('raw', this)">Raw JSON</div>
+      </div>
+      <div id="tab-agents" class="tab-content active">
+        <div class="row">
+          <input id="agName" placeholder="agent-name" style="flex:1" />
+          <select id="agMode" style="width:100px">
+            <option value="all">all</option>
+            <option value="primary">primary</option>
+            <option value="subagent">subagent</option>
+          </select>
+          <button class="small" onclick="upsertAgent()">添加/更新</button>
+        </div>
+        <div class="row">
+          <input id="agDesc" placeholder="描述" style="flex:1" />
+          <input id="agPrompt" placeholder="prompt" style="flex:1" />
+        </div>
+        <div id="agentList" class="resource-list"></div>
+      </div>
+      <div id="tab-skills" class="tab-content">
+        <div class="row">
+          <input id="skName" placeholder="skill-name" style="flex:1" />
+          <button class="small" onclick="upsertSkill()">添加/更新</button>
+        </div>
+        <div class="row">
+          <input id="skDesc" placeholder="描述" style="flex:1" />
+        </div>
+        <div class="row">
+          <textarea id="skContent" placeholder="skill content (markdown)" style="flex:1"></textarea>
+        </div>
+        <div id="skillList" class="resource-list"></div>
+      </div>
+      <div id="tab-mcps" class="tab-content">
+        <div class="row">
+          <input id="mcpName" placeholder="mcp-name" style="flex:1" />
+          <select id="mcpType" style="width:80px" onchange="toggleMcpFields()">
+            <option value="remote">remote</option>
+            <option value="local">local</option>
+          </select>
+          <button class="small" onclick="upsertMcp()">添加/更新</button>
+        </div>
+        <div id="mcpRemoteFields">
+          <div class="row"><input id="mcpUrl" placeholder="https://example.com/mcp" style="flex:1" /></div>
+          <div class="row"><input id="mcpHeaders" placeholder='{"Authorization":"Bearer xxx"}' style="flex:1" /></div>
+        </div>
+        <div id="mcpLocalFields" class="hidden">
+          <div class="row"><input id="mcpCommand" placeholder='["npx","-y","server"]' style="flex:1" /></div>
+          <div class="row"><input id="mcpEnv" placeholder='{"KEY":"value"}' style="flex:1" /></div>
+        </div>
+        <div id="mcpList" class="resource-list"></div>
+      </div>
+      <div id="tab-raw" class="tab-content">
+        <div class="json-viewer">${esc(JSON.stringify(p, null, 2))}</div>
+      </div>
+    </div>
+  `;
+}
+
+function switchTab(name, el) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  $(`tab-${name}`).classList.add('active');
+}
+
+function toggleMcpFields() {
+  const type = $('mcpType').value;
+  $('mcpRemoteFields').classList.toggle('hidden', type !== 'remote');
+  $('mcpLocalFields').classList.toggle('hidden', type !== 'local');
+}
+
+// ── 项目操作 ──
+
+async function verifyRepo() {
+  const r = await api('POST', `/saas/project/${currentProject}/repository/verify`);
+  if (r.ok) {
+    log(`✅ 验证成功 status=${r.data.repository.connectionStatus}`, 'pass');
+    selectProject(currentProject);
+  } else {
+    log(`❌ 验证失败: ${JSON.stringify(r.data)}`, 'fail');
+  }
+}
+
+async function updateProject() {
+  const name = prompt('新名称（留空不变）:');
+  const desc = prompt('新描述（留空不变）:');
+  const body = {};
+  if (name) body.name = name;
+  if (desc) body.description = desc;
+  if (!Object.keys(body).length) return;
+  const r = await api('PATCH', `/saas/project/${currentProject}`, body);
+  if (r.ok) {
+    log(`✅ 更新成功`, 'pass');
+    loadProjects();
+    selectProject(currentProject);
+  }
+}
+
+async function archiveProject() {
+  if (!confirm('确认归档此项目？')) return;
+  const r = await api('DELETE', `/saas/project/${currentProject}`);
+  if (r.ok) {
+    log(`✅ 已归档`, 'pass');
+    loadProjects();
+  }
+}
+
+// ── 资源 CRUD ──
+
+async function loadResources(id) {
+  loadAgents(id);
+  loadSkills(id);
+  loadMcps(id);
+}
+
+async function loadAgents(id) {
+  const r = await api('GET', `/saas/project/${id}/agents`);
+  const el = $('agentList');
+  if (!r.ok || !r.data.length) { el.innerHTML = '<div class="empty">无 Agent</div>'; return; }
+  el.innerHTML = r.data.map(a => `
+    <div class="resource-item">
+      <span class="name">${esc(a.name)}</span>
+      <span class="desc">${esc(a.description || a.mode)}</span>
+      <span class="badge ${a.mode === 'primary' ? 'green' : a.mode === 'subagent' ? 'purple' : 'blue'}">${a.mode}</span>
+      <button class="small danger" onclick="deleteAgent('${esc(a.name)}')">删除</button>
+    </div>
+  `).join('');
+}
+
+async function upsertAgent() {
+  const body = {
+    description: $('agDesc').value || undefined,
+    mode: $('agMode').value,
+    prompt: $('agPrompt').value || undefined,
+  };
+  const r = await api('PUT', `/saas/project/${currentProject}/agents/${$('agName').value}`, body);
+  if (r.ok) { log(`✅ Agent 保存成功`, 'pass'); loadAgents(currentProject); }
+}
+
+async function deleteAgent(name) {
+  const r = await api('DELETE', `/saas/project/${currentProject}/agents/${name}`);
+  if (r.ok) { log(`✅ Agent 已删除`, 'pass'); loadAgents(currentProject); }
+}
+
+async function loadSkills(id) {
+  const r = await api('GET', `/saas/project/${id}/skills`);
+  const el = $('skillList');
+  if (!r.ok || !r.data.length) { el.innerHTML = '<div class="empty">无 Skill</div>'; return; }
+  el.innerHTML = r.data.map(s => `
+    <div class="resource-item">
+      <span class="name">${esc(s.name)}</span>
+      <span class="desc">${esc(s.description)}</span>
+      <button class="small danger" onclick="deleteSkill('${esc(s.name)}')">删除</button>
+    </div>
+  `).join('');
+}
+
+async function upsertSkill() {
+  const body = {
+    description: $('skDesc').value,
+    content: $('skContent').value,
+  };
+  const r = await api('PUT', `/saas/project/${currentProject}/skills/${$('skName').value}`, body);
+  if (r.ok) { log(`✅ Skill 保存成功`, 'pass'); loadSkills(currentProject); }
+}
+
+async function deleteSkill(name) {
+  const r = await api('DELETE', `/saas/project/${currentProject}/skills/${name}`);
+  if (r.ok) { log(`✅ Skill 已删除`, 'pass'); loadSkills(currentProject); }
+}
+
+async function loadMcps(id) {
+  const r = await api('GET', `/saas/project/${id}/mcps`);
+  const el = $('mcpList');
+  if (!r.ok || !r.data.length) { el.innerHTML = '<div class="empty">无 MCP</div>'; return; }
+  el.innerHTML = r.data.map(m => `
+    <div class="resource-item">
+      <span class="name">${esc(m.name)}</span>
+      <span class="desc">${esc(m.url || JSON.stringify(m.command))}</span>
+      <span class="badge ${m.type === 'remote' ? 'blue' : 'green'}">${m.type}</span>
+      ${m.hasSecrets ? '<span class="badge yellow">secret</span>' : ''}
+      <span class="badge ${m.enabled ? 'green' : 'red'}">${m.enabled ? 'on' : 'off'}</span>
+      <button class="small danger" onclick="deleteMcp('${esc(m.name)}')">删除</button>
+    </div>
+  `).join('');
+}
+
+async function upsertMcp() {
+  const type = $('mcpType').value;
+  const body = { type };
+  if (type === 'remote') {
+    body.url = $('mcpUrl').value;
+    try { const h = $('mcpHeaders').value; if (h) body.headers = JSON.parse(h); } catch {}
+  } else {
+    try { body.command = JSON.parse($('mcpCommand').value); } catch {}
+    try { const e = $('mcpEnv').value; if (e) body.environment = JSON.parse(e); } catch {}
+  }
+  const r = await api('PUT', `/saas/project/${currentProject}/mcps/${$('mcpName').value}`, body);
+  if (r.ok) { log(`✅ MCP 保存成功`, 'pass'); loadMcps(currentProject); }
+}
+
+async function deleteMcp(name) {
+  const r = await api('DELETE', `/saas/project/${currentProject}/mcps/${name}`);
+  if (r.ok) { log(`✅ MCP 已删除`, 'pass'); loadMcps(currentProject); }
+}
+
+// ── 初始化 ──
+toggleAuthFields();
+loadProjects();
+
+// ── GitHub OAuth ──
+
+const OAUTH_REDIRECT = `${window.location.origin}/oauth/callback`;
+let oauthState = '';
+
+function startOAuth() {
+  const clientId = $('oauthClientId').value.trim();
+  const clientSecret = $('oauthClientSecret').value.trim();
+  if (!clientId) { log('请填写 Client ID', 'fail'); return; }
+  if (!clientSecret) { log('请填写 Client Secret', 'fail'); return; }
+
+  oauthState = Math.random().toString(36).slice(2);
+
+  // 持久化到 sessionStorage（302 重定向会重新加载页面，输入框会清空）
+  sessionStorage.setItem('oauth-client-id', clientId);
+  sessionStorage.setItem('oauth-client-secret', clientSecret);
+  sessionStorage.setItem('oauth-state', oauthState);
+
+  const scope = $('oauthScope').value;
+  const authUrl = `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(OAUTH_REDIRECT)}&scope=${scope}&state=${oauthState}`;
+
+  $('oauthStatus').textContent = '等待授权...';
+  log('重定向到 GitHub 授权页面...', 'req');
+  window.open(authUrl, '_blank');
+}
+
+// 监听 OAuth 回调（serve.ts 的 /oauth/callback 页面通过 postMessage 或 URL hash 传回 code）
+window.addEventListener('message', async (event) => {
+  if (event.data?.type !== 'oauth-code') return;
+  await handleOAuthCode(event.data.code, event.data.state);
+});
+
+// 检测 URL hash 中的 code（从 /oauth/callback 重定向回来时携带）
+function checkOAuthHash() {
+  const hash = window.location.hash;
+  if (!hash || !hash.includes('oauth-code=')) return;
+  const params = new URLSearchParams(hash.slice(1));
+  const code = params.get('oauth-code');
+  const state = params.get('oauth-state');
+  if (code) {
+    // 清除 hash，避免刷新重复触发
+    history.replaceState(null, '', window.location.pathname);
+    handleOAuthCode(code, state);
+  }
+}
+
+async function handleOAuthCode(code, state) {
+  // 从 sessionStorage 恢复 OAuth 配置（302 重定向后页面重新加载）
+  const clientId = $('oauthClientId').value.trim() || sessionStorage.getItem('oauth-client-id') || '';
+  const clientSecret = $('oauthClientSecret').value.trim() || sessionStorage.getItem('oauth-client-secret') || '';
+  const savedState = sessionStorage.getItem('oauth-state') || '';
+
+  if (!clientId || !clientSecret) {
+    log('❌ 缺少 OAuth Client ID/Secret，请重新填写后再次授权', 'fail');
+    $('oauthStatus').textContent = '❌ 配置丢失，请重新填写';
+    $('oauthStatus').style.color = 'var(--red)';
+    return;
+  }
+
+  // 回填到输入框（以防页面刷新后清空）
+  $('oauthClientId').value = clientId;
+  $('oauthClientSecret').value = clientSecret;
+
+  if (savedState && state && savedState !== state) {
+    log('⚠️ OAuth state 不匹配', 'fail');
+    return;
+  }
+  if (!code) return;
+
+  log(`收到授权码: ${code.slice(0, 8)}...`, 'info');
+  $('oauthStatus').textContent = '正在交换 token...';
+
+  try {
+    const res = await fetch('/oauth/exchange', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ clientId, clientSecret, code, redirectUri: OAUTH_REDIRECT }),
+    });
+    const data = await res.json();
+
+    if (data.access_token) {
+      log(`✅ 获取 token 成功: ${data.access_token.slice(0, 12)}... scope=${data.scope}`, 'pass');
+      $('gitToken').value = data.access_token;
+      $('oauthStatus').textContent = `✅ Token 已获取 (${data.access_token.slice(0, 10)}...)`;
+      $('oauthStatus').style.color = 'var(--green)';
+
+      $('pAuthType').value = 'oauth';
+      toggleAuthFields();
+      $('aOauthToken').value = data.access_token;
+      $('aToken').value = data.access_token;
+      $('aBasicPass').value = data.access_token;
+    } else {
+      log(`❌ token 交换失败: ${JSON.stringify(data)}`, 'fail');
+      $('oauthStatus').textContent = `❌ ${data.error || '交换失败'}`;
+      $('oauthStatus').style.color = 'var(--red)';
+    }
+  } catch (e) {
+    log(`❌ 请求失败: ${e.message}`, 'fail');
+    $('oauthStatus').textContent = `❌ ${e.message}`;
+    $('oauthStatus').style.color = 'var(--red)';
+  }
+}
+
+// 页面加载时检测 hash
+checkOAuthHash();
+</script>
+</body>
+</html>
