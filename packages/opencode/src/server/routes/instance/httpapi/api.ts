@@ -30,6 +30,7 @@ import { LocationMiddleware } from "@opencode-ai/server/location"
 import { SessionLocationMiddleware } from "@opencode-ai/server/middleware/session-location"
 import { GlobalApi } from "./groups/global"
 import { SaasProjectApi } from "./groups/saas-project"
+import { SaasTaskApi } from "./groups/saas-task"
 import { Authorization } from "./middleware/authorization"
 import { SchemaErrorMiddleware } from "./middleware/schema-error"
 
@@ -64,6 +65,11 @@ export const SaasProjectRootApi = HttpApi.make("opencode-saas-project")
   .middleware(SchemaErrorMiddleware)
   .middleware(Authorization)
 
+export const SaasTaskRootApi = HttpApi.make("opencode-saas-task")
+  .addHttpApi(SaasTaskApi)
+  .middleware(SchemaErrorMiddleware)
+  .middleware(Authorization)
+
 export const InstanceHttpApi = HttpApi.make("opencode-instance")
   .addHttpApi(ConfigApi)
   .addHttpApi(ExperimentalApi)
@@ -85,6 +91,7 @@ export const InstanceHttpApi = HttpApi.make("opencode-instance")
 export const OpenCodeHttpApi = HttpApi.make("opencode")
   .addHttpApi(RootHttpApi)
   .addHttpApi(SaasProjectRootApi)
+  .addHttpApi(SaasTaskRootApi)
   .addHttpApi(EventApi)
   .addHttpApi(InstanceHttpApi)
   .addHttpApi(ServerApi)

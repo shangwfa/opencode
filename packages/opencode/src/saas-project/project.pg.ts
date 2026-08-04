@@ -55,7 +55,7 @@ export const AgentTable = pgTable(
   "agent",
   {
     id: text().primaryKey(),
-    project_id: text().notNull(),
+    project_id: text(),
     name: text().notNull(),
     description: text(),
     mode: text().notNull().default("all"),
@@ -71,12 +71,14 @@ export const AgentTable = pgTable(
     color: text(),
     variant: text(),
     options: jsonb().notNull().$type<Record<string, unknown>>().default({}),
+    task_id: text(),
     time_created: Timestamps.time_created,
     time_updated: Timestamps.time_updated,
   },
   (table) => [
     index("agent_project_idx").on(table.project_id),
     uniqueIndex("agent_project_name_idx").on(table.project_id, table.name),
+    index("agent_task_idx").on(table.task_id),
     check("agent_mode_check", sql`${table.mode} IN ('primary', 'subagent', 'all')`),
   ],
 )
@@ -85,7 +87,7 @@ export const SkillTable = pgTable(
   "skill",
   {
     id: text().primaryKey(),
-    project_id: text().notNull(),
+    project_id: text(),
     name: text().notNull(),
     description: text().notNull(),
     content: text().notNull(),
@@ -93,12 +95,14 @@ export const SkillTable = pgTable(
       .notNull()
       .$type<Array<{ path: string; type: string; content: string; size: number }>>()
       .default([]),
+    task_id: text(),
     time_created: Timestamps.time_created,
     time_updated: Timestamps.time_updated,
   },
   (table) => [
     index("skill_project_idx").on(table.project_id),
     uniqueIndex("skill_project_name_idx").on(table.project_id, table.name),
+    index("skill_task_idx").on(table.task_id),
   ],
 )
 
@@ -106,7 +110,7 @@ export const McpTable = pgTable(
   "mcp",
   {
     id: text().primaryKey(),
-    project_id: text().notNull(),
+    project_id: text(),
     name: text().notNull(),
     type: text().notNull(),
     command: jsonb().$type<string[]>(),
@@ -116,12 +120,14 @@ export const McpTable = pgTable(
     environment_keys: jsonb().notNull().$type<string[]>().default([]),
     header_keys: jsonb().notNull().$type<string[]>().default([]),
     secrets: jsonb().$type<SecretEnvelope>(),
+    task_id: text(),
     time_created: Timestamps.time_created,
     time_updated: Timestamps.time_updated,
   },
   (table) => [
     index("mcp_project_idx").on(table.project_id),
     uniqueIndex("mcp_project_name_idx").on(table.project_id, table.name),
+    index("mcp_task_idx").on(table.task_id),
     check("mcp_type_check", sql`${table.type} IN ('local', 'remote')`),
     check(
       "mcp_transport_check",
@@ -134,8 +140,9 @@ export const ProjectAgentsMdTable = pgTable(
   "project_agents_md",
   {
     id: text().primaryKey(),
-    project_id: text().notNull(),
+    project_id: text(),
     content: text().notNull(),
+    task_id: text(),
     time_created: Timestamps.time_created,
     time_updated: Timestamps.time_updated,
   },
@@ -146,7 +153,7 @@ export const ProjectCommandTable = pgTable(
   "project_command",
   {
     id: text().primaryKey(),
-    project_id: text().notNull(),
+    project_id: text(),
     name: text().notNull(),
     description: text(),
     template: text().notNull(),
@@ -154,12 +161,14 @@ export const ProjectCommandTable = pgTable(
     model: text(),
     subtask: boolean(),
     hints: jsonb().notNull().$type<string[]>().default([]),
+    task_id: text(),
     time_created: Timestamps.time_created,
     time_updated: Timestamps.time_updated,
   },
   (table) => [
     index("project_command_project_idx").on(table.project_id),
     uniqueIndex("project_command_project_name_idx").on(table.project_id, table.name),
+    index("project_command_task_idx").on(table.task_id),
   ],
 )
 
@@ -167,15 +176,17 @@ export const ProjectToolTable = pgTable(
   "project_tool",
   {
     id: text().primaryKey(),
-    project_id: text().notNull(),
+    project_id: text(),
     name: text().notNull(),
     description: text().notNull(),
     code: text().notNull(),
+    task_id: text(),
     time_created: Timestamps.time_created,
     time_updated: Timestamps.time_updated,
   },
   (table) => [
     index("project_tool_project_idx").on(table.project_id),
     uniqueIndex("project_tool_project_name_idx").on(table.project_id, table.name),
+    index("project_tool_task_idx").on(table.task_id),
   ],
 )

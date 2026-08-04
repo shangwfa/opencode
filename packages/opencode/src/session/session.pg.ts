@@ -53,12 +53,14 @@ export const SessionTable = pgTable(
     app_id: text(),
     sandbox: jsonb().$type<{ cpu: string; memory: string }>(),
     saas_project_id: text(),
+    task_id: text(),
   },
   (table) => [
     index("session_project_idx").on(table.project_id),
     index("session_workspace_idx").on(table.workspace_id),
     index("session_parent_idx").on(table.parent_id),
     index("session_saas_project_idx").on(table.saas_project_id),
+    index("session_task_idx").on(table.task_id),
   ],
 )
 

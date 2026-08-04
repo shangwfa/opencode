@@ -72,6 +72,7 @@ function sessionRow(info: SessionV1.SessionInfo): typeof SessionTable.$inferInse
     revert: info.revert ? { ...info.revert, messageID: SessionMessage.ID.make(info.revert.messageID) } : null,
     permission: info.permission ? [...info.permission] : undefined,
     saas_project_id: info.saasProjectID,
+    task_id: info.taskID,
     time_created: info.time.created,
     time_updated: info.time.updated,
     time_compacting: info.time.compacting,

@@ -18,4 +18,13 @@ export { SessionToolTable } from "../tool/session-tool.pg"
 export { SessionCommandTable } from "../command/session-command.pg"
 export { SessionPluginTable } from "../plugin/session-plugin.pg"
 export { SessionAgentsMdTable } from "../session/agents-md.pg"
-export { SaasProjectTable, AgentTable, SkillTable, McpTable, ProjectAgentsMdTable, ProjectCommandTable, ProjectToolTable } from "../saas-project/project.pg"
+export {
+  SaasProjectTable,
+  AgentTable,
+  SkillTable,
+  McpTable,
+  ProjectAgentsMdTable,
+  ProjectCommandTable,
+  ProjectToolTable,
+} from "../saas-project/project.pg"
+export { SaasTaskTable } from "../saas-task/task.pg"

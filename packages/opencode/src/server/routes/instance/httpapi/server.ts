@@ -82,7 +82,7 @@ import { serveUIEffect } from "@/server/shared/ui"
 import { ServerAuth } from "@/server/auth"
 import { SandboxProvider } from "@/tool/sandbox-provider"
 import { sandboxProxyRoute } from "@/server/sandbox-proxy"
-import { InstanceHttpApi, RootHttpApi, SaasProjectRootApi } from "./api"
+import { InstanceHttpApi, RootHttpApi, SaasProjectRootApi, SaasTaskRootApi } from "./api"
 import { Api } from "@opencode-ai/server/api"
 import { PublicApi } from "./public"
 import {
@@ -140,6 +140,8 @@ import { Git } from "@/git"
 import { Env } from "@/env"
 import { SaasProject } from "@/saas-project"
 import { saasProjectHandlers } from "./handlers/saas-project"
+import { SaasTask } from "@/saas-task"
+import { saasTaskHandlers } from "./handlers/saas-task"
 
 export const context = Context.makeUnsafe<unknown>(new Map())
 
@@ -173,6 +175,13 @@ const rootApiRoutes = HttpApiBuilder.layer(RootHttpApi).pipe(
 )
 const saasProjectApiRoutes = HttpApiBuilder.layer(SaasProjectRootApi).pipe(
   Layer.provide(saasProjectHandlers),
+  Layer.provide(SaasProject.live),
+  Layer.provide(schemaErrorLayer),
+  Layer.provide(httpApiAuthLayer),
+)
+const saasTaskApiRoutes = HttpApiBuilder.layer(SaasTaskRootApi).pipe(
+  Layer.provide(saasTaskHandlers),
+  Layer.provide(SaasTask.live),
   Layer.provide(SaasProject.live),
   Layer.provide(schemaErrorLayer),
   Layer.provide(httpApiAuthLayer),
@@ -326,6 +335,7 @@ export function createRoutes(
   return Layer.mergeAll(
     rootApiRoutes,
     saasProjectApiRoutes,
+    saasTaskApiRoutes,
     eventApiRoutes,
     ptyConnectApiRoutes,
     instanceRoutes,
@@ -349,6 +359,7 @@ export function createRoutes(
       Flag.OPENCODE_DATABASE_URL ? SessionCommand.pgLayer : SessionCommand.noopLayer,
       Flag.OPENCODE_DATABASE_URL ? SessionPlugin.pgLayer : SessionPlugin.noopLayer,
       SaasProject.live,
+      SaasTask.live,
       SandboxProvider.defaultLayer,
       LspAgent.layer,
       FetchHttpClient.layer,

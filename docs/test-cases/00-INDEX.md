@@ -64,6 +64,7 @@
 | [`mcps/`](./mcps/) | T40.x T45.x | Ant Design / Playwright MCP 端到端（2 文件） |
 | [`code-mode/`](./code-mode/) | T50.x | Code-Mode（execute 工具）：受限 JS 解释器编排 MCP 工具、并发、错误、沙箱限制、权限过滤、搜索、中止（1 文件） |
 | [`saas-project/`](./saas-project/) | T51.x T52.x T53.x T54.x T55.x T56.x T57.x | SaaS Project：PG 无外键表、Git 认证、Secret 加密、Agent/Skill/MCP/AGENTS.md/Command/Tool、Project 资源注入 Session（7 文件） |
+| [`saas-task/`](./saas-task/) | T61.x T62.x T63.x T64.x T65.x T66.x T67.x | SaaS Task：Task CRUD、关联 Project、六类资源复用表、Session 注入、AGENTS.md 生效、purge（8 文件） |
 
 ## 指南（非用例）
 
