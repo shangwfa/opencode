@@ -30,7 +30,7 @@ if (process.env.OPENCODE_SANDBOX_ENDPOINT_REWRITE) {
   if (from && to) {
     const originalFetch = globalThis.fetch
     globalThis.fetch = ((input: any, init?: any) => {
-      const url = typeof input === "string" ? input : input?.url ?? ""
+      const url = typeof input === "string" ? input : (input?.url ?? "")
       if (url.includes(from)) {
         const rewritten = url.replace(new RegExp(from.replace(/\./g, "\\."), "g"), to)
         const newInput = typeof input === "string" ? rewritten : new Request(rewritten, input)
@@ -84,6 +84,9 @@ import { Worktree } from "@/worktree"
 import { Installation } from "@/installation"
 import { ShareNext } from "@/share/share-next"
 import { SessionShare } from "@/share/session"
+import { Scheduler } from "@/scheduler"
+import { SaasTask } from "@/saas-task"
+import { SaasProject } from "@/saas-project"
 import { Npm } from "@opencode-ai/core/npm"
 import { memoMap } from "@opencode-ai/core/effect/memo-map"
 import { BackgroundJob } from "@/background/job"
@@ -152,7 +155,10 @@ export const AppLayer = AppNodeBuilderV1.build(
   Layer.provideMerge(AppNodeBuilderV1.build(Ripgrep.node)),
   Layer.provideMerge(Observability.layer),
   Layer.provideMerge(Layer.provide(SessionWatchdog.defaultLayer, SessionTools.defaultLayer)),
-)
+  Layer.provideMerge(SaasProject.live as unknown as Layer.Layer<never>),
+  Layer.provideMerge(SaasTask.live as unknown as Layer.Layer<never>),
+  Layer.provideMerge(Scheduler.live as unknown as Layer.Layer<never>),
+) as unknown as Layer.Layer<never>
 
 const rt = ManagedRuntime.make(AppLayer, { memoMap })
 type Runtime = Pick<typeof rt, "runSync" | "runPromise" | "runPromiseExit" | "runFork" | "runCallback" | "dispose">

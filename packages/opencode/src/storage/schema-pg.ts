@@ -28,3 +28,4 @@ export {
   ProjectToolTable,
 } from "../saas-project/project.pg"
 export { SaasTaskTable } from "../saas-task/task.pg"
+export { ScheduleTable } from "../scheduler/schedule.pg"

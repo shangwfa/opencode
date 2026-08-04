@@ -385,6 +385,7 @@ export const layer = Layer.effect(
           await tx`DELETE FROM mcp WHERE task_id = ${id}`
           await tx`DELETE FROM skill WHERE task_id = ${id}`
           await tx`DELETE FROM agent WHERE task_id = ${id}`
+          await tx`DELETE FROM schedule WHERE owner_type = 'task' AND owner_id = ${id}`
           await tx`DELETE FROM saas_task WHERE id = ${id}`
         }),
       )

@@ -1,4 +1,4 @@
-import { Config as EffectConfig, Context, Effect, Layer } from "effect"
+import { Config as EffectConfig, Context, Effect, Layer, Schedule, Duration, Option } from "effect"
 import { HttpApiBuilder, OpenApi } from "effect/unstable/httpapi"
 import {
   FetchHttpClient,
@@ -82,7 +82,7 @@ import { serveUIEffect } from "@/server/shared/ui"
 import { ServerAuth } from "@/server/auth"
 import { SandboxProvider } from "@/tool/sandbox-provider"
 import { sandboxProxyRoute } from "@/server/sandbox-proxy"
-import { InstanceHttpApi, RootHttpApi, SaasProjectRootApi, SaasTaskRootApi } from "./api"
+import { InstanceHttpApi, RootHttpApi, SaasProjectRootApi, SaasTaskRootApi, SchedulerRootApi } from "./api"
 import { Api } from "@opencode-ai/server/api"
 import { PublicApi } from "./public"
 import {
@@ -142,6 +142,8 @@ import { SaasProject } from "@/saas-project"
 import { saasProjectHandlers } from "./handlers/saas-project"
 import { SaasTask } from "@/saas-task"
 import { saasTaskHandlers } from "./handlers/saas-task"
+import { Scheduler } from "@/scheduler"
+import { schedulerHandlers } from "./handlers/scheduler"
 
 export const context = Context.makeUnsafe<unknown>(new Map())
 
@@ -183,6 +185,12 @@ const saasTaskApiRoutes = HttpApiBuilder.layer(SaasTaskRootApi).pipe(
   Layer.provide(saasTaskHandlers),
   Layer.provide(SaasTask.live),
   Layer.provide(SaasProject.live),
+  Layer.provide(schemaErrorLayer),
+  Layer.provide(httpApiAuthLayer),
+)
+const schedulerApiRoutes = HttpApiBuilder.layer(SchedulerRootApi).pipe(
+  Layer.provide(schedulerHandlers),
+  Layer.provide(Scheduler.live),
   Layer.provide(schemaErrorLayer),
   Layer.provide(httpApiAuthLayer),
 )
@@ -336,6 +344,7 @@ export function createRoutes(
     rootApiRoutes,
     saasProjectApiRoutes,
     saasTaskApiRoutes,
+    schedulerApiRoutes,
     eventApiRoutes,
     ptyConnectApiRoutes,
     instanceRoutes,
@@ -360,6 +369,7 @@ export function createRoutes(
       Flag.OPENCODE_DATABASE_URL ? SessionPlugin.pgLayer : SessionPlugin.noopLayer,
       SaasProject.live,
       SaasTask.live,
+      Scheduler.live,
       SandboxProvider.defaultLayer,
       LspAgent.layer,
       FetchHttpClient.layer,

@@ -31,6 +31,7 @@ import { SessionLocationMiddleware } from "@opencode-ai/server/middleware/sessio
 import { GlobalApi } from "./groups/global"
 import { SaasProjectApi } from "./groups/saas-project"
 import { SaasTaskApi } from "./groups/saas-task"
+import { SchedulerApi } from "./groups/scheduler"
 import { Authorization } from "./middleware/authorization"
 import { SchemaErrorMiddleware } from "./middleware/schema-error"
 
@@ -70,6 +71,11 @@ export const SaasTaskRootApi = HttpApi.make("opencode-saas-task")
   .middleware(SchemaErrorMiddleware)
   .middleware(Authorization)
 
+export const SchedulerRootApi = HttpApi.make("opencode-saas-scheduler")
+  .addHttpApi(SchedulerApi)
+  .middleware(SchemaErrorMiddleware)
+  .middleware(Authorization)
+
 export const InstanceHttpApi = HttpApi.make("opencode-instance")
   .addHttpApi(ConfigApi)
   .addHttpApi(ExperimentalApi)
@@ -92,6 +98,7 @@ export const OpenCodeHttpApi = HttpApi.make("opencode")
   .addHttpApi(RootHttpApi)
   .addHttpApi(SaasProjectRootApi)
   .addHttpApi(SaasTaskRootApi)
+  .addHttpApi(SchedulerRootApi)
   .addHttpApi(EventApi)
   .addHttpApi(InstanceHttpApi)
   .addHttpApi(ServerApi)
