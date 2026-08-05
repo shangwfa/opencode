@@ -4,7 +4,13 @@ import {
   ChevronDown,
   HelpCircle,
   ListTree,
+  Loader2,
+  Maximize2,
   MessageSquare,
+  Minimize2,
+  Eye,
+  FileText,
+  ShieldCheck,
   Sparkles,
   Trash2,
   UserRound,
@@ -38,6 +44,12 @@ type TaskInfo = {
   childId?: string
 }
 
+type FilePreview = {
+  filePath: string
+  content: string
+  status?: string
+}
+
 type Message = {
   id: number
   sourceId?: string
@@ -50,6 +62,7 @@ type Message = {
   time: string
   finish?: boolean
   task?: TaskInfo
+  file?: FilePreview
 }
 
 type ApiPart = {
@@ -61,7 +74,16 @@ type ApiPart = {
   state?: {
     status?: string
     error?: string
-    input?: { description?: string; prompt?: string; subagent_type?: string }
+    input?: {
+      description?: string
+      prompt?: string
+      subagent_type?: string
+      command?: string
+      filePath?: string
+      content?: string
+      oldString?: string
+      newString?: string
+    }
     output?: string
   }
 }
@@ -116,16 +138,16 @@ function loadStored<T>(key: string, fallback: T): T {
   }
 }
 
-const AGENTS_VERSION = 2
+const AGENTS_VERSION = 3
 
 function loadAgents(): Agent[] {
   const stored = loadStored<Agent[]>("session-team-agents", [])
   const version = Number(window.localStorage.getItem("session-team-agents-version") ?? "0")
   if (version >= AGENTS_VERSION) return stored
-  const merged = [...stored]
-  for (const agent of initialAgents) if (!merged.some((item) => item.name === agent.name)) merged.push(agent)
+  const builtInNames = new Set(initialAgents.map((a) => a.name))
+  const customs = stored.filter((a) => !builtInNames.has(a.name))
   window.localStorage.setItem("session-team-agents-version", String(AGENTS_VERSION))
-  return merged
+  return [...initialAgents, ...customs]
 }
 
 type QuestionOption = { label: string; description?: string }
@@ -144,6 +166,16 @@ type QuestionRequest = {
   questions: QuestionInfo[]
 }
 
+type PermissionRequest = {
+  id: string
+  sessionID: string
+  permission: string
+  patterns: string[]
+  metadata?: { command?: string; description?: string }
+  always?: string[]
+  tool?: { messageID?: string; callID?: string }
+}
+
 const initialAgents: Agent[] = [
   {
     name: "manager",
@@ -152,7 +184,7 @@ const initialAgents: Agent[] = [
     provider: "zhipuai",
     model: "glm-5.1",
     tone: "负责拆解目标、分配任务和汇总交付物。对于方案讨论和规划问题直接回复，不要调用 read、glob、bash 或 task；只有用户明确要求执行代码或调度成员时才使用工具。",
-    permissions: ["read", "edit", "bash", "task"],
+    permissions: ["read", "edit", "write", "bash", "task", "question", "glob", "grep", "ls"],
     status: "ready",
   },
   {
@@ -162,7 +194,7 @@ const initialAgents: Agent[] = [
     provider: "zhipuai",
     model: "glm-5.1",
     tone: "整理可靠资料，需要时调度 source-finder。",
-    permissions: ["read", "task"],
+    permissions: ["read", "edit", "write", "bash", "task", "question", "glob", "grep", "ls"],
     status: "ready",
   },
   {
@@ -172,7 +204,7 @@ const initialAgents: Agent[] = [
     provider: "zhipuai",
     model: "glm-5.1",
     tone: "将资料组织为清晰、有说服力的内容。",
-    permissions: ["read", "edit"],
+    permissions: ["read", "edit", "write", "bash", "task", "question", "glob", "grep", "ls"],
     status: "ready",
   },
   {
@@ -182,7 +214,7 @@ const initialAgents: Agent[] = [
     provider: "zhipuai",
     model: "glm-5.1",
     tone: "只由 primary 调度，返回结构化检索结果。",
-    permissions: ["read"],
+    permissions: ["read", "edit", "write", "bash", "task", "question", "glob", "grep", "ls"],
     status: "ready",
   },
   {
@@ -192,7 +224,7 @@ const initialAgents: Agent[] = [
     provider: "zhipuai",
     model: "glm-5.1",
     tone: "把模糊目标拆解为可执行的里程碑和任务清单，输出优先级、依赖关系和验收标准。只做规划，不调用工具。",
-    permissions: ["read"],
+    permissions: ["read", "edit", "write", "bash", "task", "question", "glob", "grep", "ls"],
     status: "ready",
   },
   {
@@ -202,7 +234,7 @@ const initialAgents: Agent[] = [
     provider: "zhipuai",
     model: "glm-5.1",
     tone: "撰写结构化 PRD：背景、目标、用户故事、功能范围、验收标准、边界情况。关键不确定点用 question 工具向用户确认。",
-    permissions: ["read", "question"],
+    permissions: ["read", "edit", "write", "bash", "task", "question", "glob", "grep", "ls"],
     status: "ready",
   },
   {
@@ -212,7 +244,7 @@ const initialAgents: Agent[] = [
     provider: "zhipuai",
     model: "glm-5.1",
     tone: "负责技术选型与系统设计：模块划分、数据模型、接口契约、扩展性与风险权衡。输出决策依据，不直接写代码。",
-    permissions: ["read"],
+    permissions: ["read", "edit", "write", "bash", "task", "question", "glob", "grep", "ls"],
     status: "ready",
   },
   {
@@ -222,7 +254,7 @@ const initialAgents: Agent[] = [
     provider: "zhipuai",
     model: "glm-5.1",
     tone: "根据需求和设计实现代码，遵循现有代码风格，完成后自测并说明改动点。禁止访问外网（无网络环境）。",
-    permissions: ["read", "edit", "bash"],
+    permissions: ["read", "edit", "write", "bash", "task", "question", "glob", "grep", "ls"],
     status: "ready",
   },
   {
@@ -232,7 +264,7 @@ const initialAgents: Agent[] = [
     provider: "zhipuai",
     model: "glm-5.1",
     tone: "审查代码与方案：找出事实错误、逻辑漏洞、安全与性能风险，按严重程度输出问题清单和修改建议。",
-    permissions: ["read"],
+    permissions: ["read", "edit", "write", "bash", "task", "question", "glob", "grep", "ls"],
     status: "ready",
   },
   {
@@ -242,7 +274,7 @@ const initialAgents: Agent[] = [
     provider: "zhipuai",
     model: "glm-5.1",
     tone: "设计测试用例：正常路径、边界条件、异常场景，输出可执行的验证步骤和预期结果。",
-    permissions: ["read", "bash"],
+    permissions: ["read", "edit", "write", "bash", "task", "question", "glob", "grep", "ls"],
     status: "ready",
   },
   {
@@ -252,7 +284,7 @@ const initialAgents: Agent[] = [
     provider: "zhipuai",
     model: "glm-5.1",
     tone: "分析数据与指标：清洗、统计、解读趋势和异常，输出结论和可视化建议（表格优先）。",
-    permissions: ["read", "bash"],
+    permissions: ["read", "edit", "write", "bash", "task", "question", "glob", "grep", "ls"],
     status: "ready",
   },
   {
@@ -262,7 +294,7 @@ const initialAgents: Agent[] = [
     provider: "zhipuai",
     model: "glm-5.1",
     tone: "提供交互与视觉设计建议：信息架构、布局、组件状态、可用性细节，输出具体可落地的方案。",
-    permissions: ["read"],
+    permissions: ["read", "edit", "write", "bash", "task", "question", "glob", "grep", "ls"],
     status: "ready",
   },
   {
@@ -272,7 +304,7 @@ const initialAgents: Agent[] = [
     provider: "zhipuai",
     model: "glm-5.1",
     tone: "撰写营销文案与内容：标题、正文、 slogan，风格匹配目标受众，给出多个版本供选择。",
-    permissions: ["read"],
+    permissions: ["read", "edit", "write", "bash", "task", "question", "glob", "grep", "ls"],
     status: "ready",
   },
   {
@@ -282,7 +314,7 @@ const initialAgents: Agent[] = [
     provider: "zhipuai",
     model: "glm-5.1",
     tone: "负责部署、监控与故障排查：容器、进程、日志、资源占用。诊断问题先收集证据再给结论。禁止访问外网。",
-    permissions: ["read", "bash"],
+    permissions: ["read", "edit", "write", "bash", "task", "question", "glob", "grep", "ls"],
     status: "ready",
   },
 ]
@@ -343,6 +375,25 @@ function parseTaskInfo(part: ApiPart): TaskInfo | undefined {
   }
 }
 
+const fileContents = new Map<string, string>()
+
+function parseFileInfo(part: ApiPart): FilePreview | undefined {
+  if (part.tool !== "write" && part.tool !== "edit") return undefined
+  const filePath = part.state?.input?.filePath
+  if (!filePath) return undefined
+  if (part.tool === "write") {
+    const content = part.state?.input?.content
+    if (content) fileContents.set(filePath, content)
+    return { filePath, content: content ?? fileContents.get(filePath) ?? "", status: part.state?.status }
+  }
+  const previous = fileContents.get(filePath) ?? ""
+  const oldString = part.state?.input?.oldString
+  const next =
+    previous && oldString ? previous.replace(oldString, part.state?.input?.newString ?? "") : previous
+  if (next !== previous) fileContents.set(filePath, next)
+  return { filePath, content: next, status: part.state?.status }
+}
+
 function toolLabel(part: ApiPart) {
   return `${part.tool ?? "tool"} · ${part.state?.status ?? "running"}${part.state?.error ? ` · ${part.state.error}` : ""}`
 }
@@ -369,14 +420,16 @@ function normalizeMessages(messages: ApiMessage[]): Message[] {
       })
     toolParts.forEach((tool, toolIndex) => {
       const task = parseTaskInfo(tool)
+      const file = parseFileInfo(tool)
       result.push({
         id: (index + 1) * 1000 + toolIndex + 1,
         sourceId: info.id,
         sourcePartId: tool.id,
         role: "tool",
         agent: info.agent ?? tool.tool ?? "task",
-        text: task ? (task.description ?? toolLabel(tool)) : toolLabel(tool),
+        text: task ? (task.description ?? toolLabel(tool)) : file ? file.filePath : toolLabel(tool),
         task,
+        file,
         time: "now",
       })
     })
@@ -396,6 +449,7 @@ function App() {
   const [sessions, setSessions] = useState(() => loadStored<SessionEntry[]>("session-team-sessions", []))
   const [messages, setMessages] = useState(initialMessages)
   const [questions, setQuestions] = useState<QuestionRequest[]>([])
+  const [permissions, setPermissions] = useState<PermissionRequest[]>([])
   const [selectedAgent, setSelectedAgent] = useState("researcher")
   const [draft, setDraft] = useState("")
   const [mentionQuery, setMentionQuery] = useState<string | null>(null)
@@ -424,6 +478,15 @@ function App() {
       setQuestions(all.filter((question) => question.sessionID === id))
     } catch {
       setQuestions([])
+    }
+  }
+
+  async function refreshPermissions(id: string) {
+    try {
+      const all = await apiRequest<PermissionRequest[]>("/permission")
+      setPermissions(all.filter((perm) => perm.sessionID === id))
+    } catch {
+      setPermissions([])
     }
   }
   const [sessionId, setSessionId] = useState(() => window.localStorage.getItem("session-team-demo-id") ?? "")
@@ -457,8 +520,16 @@ function App() {
             model: { providerID: agent.provider, modelID: agent.model },
             permission: {
               ...Object.fromEntries(agent.permissions.map((permission) => [permission, "allow"])),
-              // 容器无外网，websearch 会挂死会话，统一禁用
-              websearch: "deny",
+              // 全量 allow 所有工具，避免 ask 模式卡死（前端当前无权限审批 UI）
+              read: "allow",
+              edit: "allow",
+              write: "allow",
+              bash: "allow",
+              task: "allow",
+              question: "allow",
+              glob: "allow",
+              grep: "allow",
+              ls: "allow",
             },
           }),
         }),
@@ -495,6 +566,7 @@ function App() {
         const history = await apiRequest<ApiMessage[]>(`/session/${id}/message`)
         if (!cancelled) setMessages(normalizeMessages(history))
         await refreshQuestions(id)
+        await refreshPermissions(id)
         setConnection("connected")
       } catch {
         if (!cancelled) setConnection("offline")
@@ -604,14 +676,14 @@ function App() {
         if (kind === "tool") {
           const label = toolLabel(part)
           const task = parseTaskInfo(part)
+          const file = parseFileInfo(part)
           const partID = part.id
           setMessages((current) => {
             const index = current.findIndex((message) => message.role === "tool" && message.sourcePartId === partID)
+            const displayText = task ? (task.description ?? label) : file ? file.filePath : label
             if (index >= 0)
               return current.map((message, messageIndex) =>
-                messageIndex === index
-                  ? { ...message, text: task ? (task.description ?? label) : label, task }
-                  : message,
+                messageIndex === index ? { ...message, text: displayText, task, file } : message,
               )
             return [
               ...current,
@@ -621,8 +693,9 @@ function App() {
                 sourcePartId: partID,
                 role: "tool",
                 agent: part.tool ?? "tool",
-                text: task ? (task.description ?? label) : label,
+                text: displayText,
                 task,
+                file,
                 time: "now",
               },
             ]
@@ -652,6 +725,11 @@ function App() {
 
       if (event.type === "question.asked" || event.type === "question.replied" || event.type === "question.rejected") {
         void refreshQuestions(sessionId)
+        return
+      }
+
+      if (event.type === "permission.asked" || event.type === "permission.resolved") {
+        void refreshPermissions(sessionId)
         return
       }
 
@@ -829,7 +907,7 @@ function App() {
         provider: "zhipuai",
         model: "glm-5.1",
         tone: String(form.get("prompt") || "").trim(),
-        permissions: mode === "primary" ? ["read", "task"] : ["read"],
+        permissions: ["read", "edit", "write", "bash", "task", "question", "glob", "grep", "ls"],
         status: "ready",
       },
     ])
@@ -993,6 +1071,8 @@ function App() {
               running={running}
               questions={questions}
               onAnswered={() => sessionId && void refreshQuestions(sessionId)}
+              permissions={permissions}
+              onPermissionResolved={() => sessionId && void refreshPermissions(sessionId)}
             />
           )}
         </div>
@@ -1022,7 +1102,7 @@ function App() {
               职责 Prompt（Agent 的系统指令，决定它做什么、怎么做）
               <textarea
                 name="prompt"
-                className="modal-textarea"
+                className="w-full resize-y rounded-lg border border-[#dde4ec] p-2.5 text-xs leading-relaxed outline-none focus:border-[#3159ef]"
                 placeholder="例如：负责把调研资料整理成结构化摘要，输出时标注信息来源，不确定的内容要明确说明。"
                 rows={4}
                 required
@@ -1035,7 +1115,7 @@ function App() {
                 <option value="subagent">subagent · 仅由 primary 通过 task 调度</option>
               </select>
             </label>
-            {agentFormError && <p className="modal-error">{agentFormError}</p>}
+            {agentFormError && <p className="mt-1 text-[11px] text-[#c4544a]">{agentFormError}</p>}
             <button className="submit-button" type="submit">
               创建 Agent
             </button>
@@ -1321,6 +1401,199 @@ function TaskCard({ task, parentSessionId }: { task: TaskInfo; parentSessionId: 
   )
 }
 
+function PermissionCard({ request, onResolved }: { request: PermissionRequest; onResolved: () => void }) {
+  const [submitting, setSubmitting] = useState(false)
+  const desc = request.metadata?.description || request.metadata?.command || request.patterns.join(", ")
+
+  async function respond(reply: "always" | "once" | "reject") {
+    if (submitting) return
+    setSubmitting(true)
+    try {
+      await apiRequest(`/permission/${request.id}/reply`, {
+        method: "POST",
+        body: JSON.stringify({ reply }),
+      })
+      onResolved()
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <div className="rounded-2xl border border-blue-200 bg-blue-50/50 p-4">
+      <div className="flex items-center gap-2 pb-2">
+        <ShieldCheck size={16} className="text-blue-500" />
+        <span className="text-sm font-semibold text-gray-800">权限请求</span>
+        <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
+          {request.permission}
+        </span>
+      </div>
+      <p className="text-sm text-gray-600">{desc}</p>
+      <div className="mt-3 flex items-center justify-end gap-2">
+        <button
+          type="button"
+          onClick={() => respond("reject")}
+          disabled={submitting}
+          className="rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-xs text-gray-500 hover:bg-gray-50 disabled:opacity-50"
+        >
+          拒绝
+        </button>
+        <button
+          type="button"
+          onClick={() => respond("always")}
+          disabled={submitting}
+          className="rounded-xl bg-blue-600 px-4 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-40"
+        >
+          {submitting ? "处理中..." : "允许"}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function FileCard({ file, onPreview }: { file: FilePreview; onPreview: () => void }) {
+  const name = file.filePath.split("/").pop() ?? file.filePath
+  const writing = file.status !== "completed" && file.status !== "error"
+  return (
+    <div
+      className={`relative flex cursor-pointer items-center gap-2 overflow-hidden rounded-lg border px-3 py-2 transition-colors ${
+        writing
+          ? "border-[#b9cdfb] bg-[#f0f4ff] hover:border-[#3159ef]"
+          : "border-[#dde4ec] bg-[#f7f9fc] hover:border-[#3159ef] hover:bg-[#f0f4ff]"
+      }`}
+      onClick={onPreview}
+      role="button"
+    >
+      {writing && <span className="file-writing-bar" />}
+      <FileText size={14} className={`shrink-0 ${writing ? "text-[#3159ef]" : "text-[#5b8def]"}`} />
+      <span className="text-xs font-semibold text-[#3d4a5c]">{name}</span>
+      <span className="font-mono text-[10px] text-[#8b96a5]">{file.filePath}</span>
+      {writing ? (
+        <span className="ml-auto flex shrink-0 items-center gap-1 text-[10px] font-semibold text-[#3159ef]">
+          <Loader2 size={12} className="animate-spin" />
+          写入中
+        </span>
+      ) : file.status === "error" ? (
+        <span className="ml-auto flex shrink-0 items-center gap-1 text-[10px] font-semibold text-[#d44040]">
+          <X size={12} />
+          失败
+        </span>
+      ) : (
+        <span className="ml-auto flex shrink-0 items-center gap-1 text-[10px] font-semibold text-[#3d9960]">
+          <Check size={12} />
+          已完成
+        </span>
+      )}
+      <Eye size={13} className="shrink-0 text-[#8b96a5]" />
+    </div>
+  )
+}
+
+function FilePreviewModal({
+  file,
+  sessionId,
+  onClose,
+}: {
+  file: FilePreview
+  sessionId: string
+  onClose: () => void
+}) {
+  const isHtml = file.filePath.endsWith(".html") || file.filePath.endsWith(".htm")
+  const writing = file.status !== "completed" && file.status !== "error"
+  const [mode, setMode] = useState<"preview" | "source">("preview")
+  const [fullscreen, setFullscreen] = useState(isHtml)
+  const [remoteContent, setRemoteContent] = useState<string | null>(null)
+  useEffect(() => {
+    if (file.content || writing) return
+    let cancelled = false
+    fetch(`/opencode/file/content?path=${encodeURIComponent(file.filePath)}&sessionID=${encodeURIComponent(sessionId)}`, {
+      signal: AbortSignal.timeout(30000),
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { content?: string } | null) => {
+        if (!cancelled && data?.content) setRemoteContent(data.content)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [file.filePath, file.content, writing, sessionId])
+  const content = file.content || remoteContent || ""
+  return (
+    <div className={fullscreen ? "fixed inset-0 z-50" : "modal-backdrop"} onClick={onClose}>
+      <div
+        className={
+          fullscreen
+            ? "flex h-full w-full flex-col bg-white"
+            : "flex h-[85vh] w-[90%] max-w-[860px] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
+        }
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="flex shrink-0 items-center gap-3 border-b border-[#e8edf3] px-5 py-3.5">
+          <FileText size={16} className="shrink-0 text-[#5b8def]" />
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-sm font-semibold text-[#253141]">{file.filePath.split("/").pop()}</div>
+            <div className="truncate font-mono text-[10px] text-[#8b96a5]">{file.filePath}</div>
+          </div>
+          {writing && (
+            <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-[#f0f4ff] px-2.5 py-1 text-[10px] font-semibold text-[#3159ef]">
+              <Loader2 size={11} className="animate-spin" />
+              正在写入
+            </span>
+          )}
+          {isHtml && (
+            <div className="flex shrink-0 rounded-md border border-[#dde4ec] p-0.5">
+              {(["preview", "source"] as const).map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  className={`rounded px-2.5 py-1 text-[10px] font-semibold transition-colors ${
+                    mode === value ? "bg-[#3159ef] text-white" : "text-[#69768a] hover:text-[#253141]"
+                  }`}
+                  onClick={() => setMode(value)}
+                >
+                  {value === "preview" ? "预览" : "源码"}
+                </button>
+              ))}
+            </div>
+          )}
+          <button
+            type="button"
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[#7c8794] transition-colors hover:bg-[#f2f5f9] hover:text-[#253141]"
+            onClick={() => setFullscreen((value) => !value)}
+            title={fullscreen ? "退出全屏" : "全屏"}
+          >
+            {fullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+          </button>
+          <button
+            type="button"
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[#7c8794] transition-colors hover:bg-[#f2f5f9] hover:text-[#253141]"
+            onClick={onClose}
+          >
+            <X size={15} />
+          </button>
+        </div>
+        {isHtml && mode === "preview" ? (
+          <iframe
+            title={file.filePath}
+            sandbox="allow-scripts"
+            srcDoc={content}
+            className="min-h-0 flex-1 border-0 bg-white"
+          />
+        ) : isHtml ? (
+          <pre className="min-h-0 flex-1 overflow-auto bg-[#f7f9fc] px-5 py-4 font-mono text-[11px] leading-relaxed text-[#3d4a5c]">
+            {content}
+          </pre>
+        ) : (
+          <div className="markdown-content min-h-0 flex-1 overflow-y-auto px-7 py-5 text-[13px] leading-relaxed text-[#3d4a5c]">
+            <Streamdown plugins={streamdownPlugins}>{content}</Streamdown>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function Conversation(props: {
   messages: Message[]
   sessionId: string
@@ -1337,6 +1610,8 @@ function Conversation(props: {
   running: boolean
   questions: QuestionRequest[]
   onAnswered: () => void
+  permissions: PermissionRequest[]
+  onPermissionResolved: () => void
 }) {
   const mentionAgents = props.primaryAgents.filter((agent) => agent.name.includes(props.mentionQuery ?? ""))
   const mentionMembers = props.members.filter(
@@ -1347,6 +1622,14 @@ function Conversation(props: {
   const streamingContent =
     lastMessage?.role === "assistant" && !lastMessage.finish && Boolean(lastMessage.reasoning || lastMessage.text)
   const showThinking = props.running && !streamingContent && props.questions.length === 0
+  const [previewPath, setPreviewPath] = useState<string | null>(null)
+  const previewFile = previewPath
+    ? [...props.messages].reverse().find((message) => message.file?.filePath === previewPath)?.file ?? null
+    : null
+  const bottomRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" })
+  }, [props.messages, props.questions, props.permissions, showThinking])
   return (
     <div className="conversation-layout min-h-0 flex-1">
       <section className="panel conversation-panel flex min-h-0 flex-1 flex-col">
@@ -1382,6 +1665,8 @@ function Conversation(props: {
                   </>
                 ) : message.role === "tool" && message.task ? (
                   <TaskCard task={message.task} parentSessionId={props.sessionId} />
+                ) : message.role === "tool" && message.file ? (
+                  <FileCard file={message.file} onPreview={() => setPreviewPath(message.file!.filePath)} />
                 ) : (
                   message.text
                 )}
@@ -1390,6 +1675,9 @@ function Conversation(props: {
           ))}
           {props.questions.map((question) => (
             <QuestionCard key={question.id} request={question} onAnswered={props.onAnswered} />
+          ))}
+          {props.permissions.map((perm) => (
+            <PermissionCard key={perm.id} request={perm} onResolved={props.onPermissionResolved} />
           ))}
           {showThinking && (
             <div className="thinking-indicator" role="status" aria-live="polite">
@@ -1403,6 +1691,7 @@ function Conversation(props: {
               </span>
             </div>
           )}
+          <div ref={bottomRef} />
         </div>
         <div className="composer shrink-0">
           <div className="composer-editor">
@@ -1471,6 +1760,9 @@ function Conversation(props: {
           </div>
         </div>
       </section>
+      {previewFile && (
+        <FilePreviewModal file={previewFile} sessionId={props.sessionId} onClose={() => setPreviewPath(null)} />
+      )}
     </div>
   )
 }
