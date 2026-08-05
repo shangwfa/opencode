@@ -1,10 +1,24 @@
-import { useEffect, useMemo, useRef, useState } from "react"
-import { Check, ChevronDown, HelpCircle, Sparkles, X } from "lucide-react"
+import { Fragment, useEffect, useMemo, useRef, useState } from "react"
+import {
+  Check,
+  ChevronDown,
+  HelpCircle,
+  ListTree,
+  MessageSquare,
+  Sparkles,
+  Trash2,
+  UserRound,
+  Users,
+  X,
+} from "lucide-react"
 import { Streamdown } from "streamdown"
+import { mermaid } from "@streamdown/mermaid"
+
+const streamdownPlugins = { mermaid }
 import { subscribeEvents } from "./sse"
 
 type AgentMode = "primary" | "subagent"
-type Tab = "conversation" | "team" | "verification"
+type View = "session" | "team" | "members"
 
 type Agent = {
   name: string
@@ -15,6 +29,13 @@ type Agent = {
   tone: string
   permissions: string[]
   status: "ready" | "running"
+}
+
+type TaskInfo = {
+  description?: string
+  subagent?: string
+  status?: string
+  childId?: string
 }
 
 type Message = {
@@ -28,6 +49,7 @@ type Message = {
   reasoning?: string
   time: string
   finish?: boolean
+  task?: TaskInfo
 }
 
 type ApiPart = {
@@ -36,7 +58,12 @@ type ApiPart = {
   type?: string
   text?: string
   tool?: string
-  state?: { status?: string; error?: string }
+  state?: {
+    status?: string
+    error?: string
+    input?: { description?: string; prompt?: string; subagent_type?: string }
+    output?: string
+  }
 }
 
 type ApiInfo = {
@@ -65,7 +92,41 @@ type StreamEvent = {
   }
 }
 
-type ApiSession = { id: string; directory?: string }
+type ApiSession = { id: string; directory?: string; title?: string }
+
+type Member = {
+  name: string
+  label: string
+  title: string
+}
+
+type SessionEntry = {
+  id: string
+  title: string
+  directory?: string
+  createdAt: number
+}
+
+function loadStored<T>(key: string, fallback: T): T {
+  try {
+    const raw = window.localStorage.getItem(key)
+    return raw ? (JSON.parse(raw) as T) : fallback
+  } catch {
+    return fallback
+  }
+}
+
+const AGENTS_VERSION = 2
+
+function loadAgents(): Agent[] {
+  const stored = loadStored<Agent[]>("session-team-agents", [])
+  const version = Number(window.localStorage.getItem("session-team-agents-version") ?? "0")
+  if (version >= AGENTS_VERSION) return stored
+  const merged = [...stored]
+  for (const agent of initialAgents) if (!merged.some((item) => item.name === agent.name)) merged.push(agent)
+  window.localStorage.setItem("session-team-agents-version", String(AGENTS_VERSION))
+  return merged
+}
 
 type QuestionOption = { label: string; description?: string }
 
@@ -124,6 +185,106 @@ const initialAgents: Agent[] = [
     permissions: ["read"],
     status: "ready",
   },
+  {
+    name: "planner",
+    label: "项目规划师",
+    mode: "primary",
+    provider: "zhipuai",
+    model: "glm-5.1",
+    tone: "把模糊目标拆解为可执行的里程碑和任务清单，输出优先级、依赖关系和验收标准。只做规划，不调用工具。",
+    permissions: ["read"],
+    status: "ready",
+  },
+  {
+    name: "prd",
+    label: "需求分析师",
+    mode: "primary",
+    provider: "zhipuai",
+    model: "glm-5.1",
+    tone: "撰写结构化 PRD：背景、目标、用户故事、功能范围、验收标准、边界情况。关键不确定点用 question 工具向用户确认。",
+    permissions: ["read", "question"],
+    status: "ready",
+  },
+  {
+    name: "architect",
+    label: "架构师",
+    mode: "primary",
+    provider: "zhipuai",
+    model: "glm-5.1",
+    tone: "负责技术选型与系统设计：模块划分、数据模型、接口契约、扩展性与风险权衡。输出决策依据，不直接写代码。",
+    permissions: ["read"],
+    status: "ready",
+  },
+  {
+    name: "developer",
+    label: "开发工程师",
+    mode: "primary",
+    provider: "zhipuai",
+    model: "glm-5.1",
+    tone: "根据需求和设计实现代码，遵循现有代码风格，完成后自测并说明改动点。禁止访问外网（无网络环境）。",
+    permissions: ["read", "edit", "bash"],
+    status: "ready",
+  },
+  {
+    name: "reviewer",
+    label: "代码审查员",
+    mode: "primary",
+    provider: "zhipuai",
+    model: "glm-5.1",
+    tone: "审查代码与方案：找出事实错误、逻辑漏洞、安全与性能风险，按严重程度输出问题清单和修改建议。",
+    permissions: ["read"],
+    status: "ready",
+  },
+  {
+    name: "tester",
+    label: "测试工程师",
+    mode: "primary",
+    provider: "zhipuai",
+    model: "glm-5.1",
+    tone: "设计测试用例：正常路径、边界条件、异常场景，输出可执行的验证步骤和预期结果。",
+    permissions: ["read", "bash"],
+    status: "ready",
+  },
+  {
+    name: "analyst",
+    label: "数据分析师",
+    mode: "primary",
+    provider: "zhipuai",
+    model: "glm-5.1",
+    tone: "分析数据与指标：清洗、统计、解读趋势和异常，输出结论和可视化建议（表格优先）。",
+    permissions: ["read", "bash"],
+    status: "ready",
+  },
+  {
+    name: "designer",
+    label: "设计顾问",
+    mode: "primary",
+    provider: "zhipuai",
+    model: "glm-5.1",
+    tone: "提供交互与视觉设计建议：信息架构、布局、组件状态、可用性细节，输出具体可落地的方案。",
+    permissions: ["read"],
+    status: "ready",
+  },
+  {
+    name: "copywriter",
+    label: "文案策划",
+    mode: "primary",
+    provider: "zhipuai",
+    model: "glm-5.1",
+    tone: "撰写营销文案与内容：标题、正文、 slogan，风格匹配目标受众，给出多个版本供选择。",
+    permissions: ["read"],
+    status: "ready",
+  },
+  {
+    name: "devops",
+    label: "运维工程师",
+    mode: "primary",
+    provider: "zhipuai",
+    model: "glm-5.1",
+    tone: "负责部署、监控与故障排查：容器、进程、日志、资源占用。诊断问题先收集证据再给结论。禁止访问外网。",
+    permissions: ["read", "bash"],
+    status: "ready",
+  },
 ]
 
 const initialMessages: Message[] = [
@@ -146,13 +307,10 @@ const initialMessages: Message[] = [
     finish: true,
   },
 ]
-
-const checks = [
-  { id: "ST.3.2", title: "不指定 Agent + noReply", detail: "仅记录用户消息，不触发默认 Agent", state: "pass" },
-  { id: "ST.3.4", title: "@researcher 回复", detail: "assistant.info.agent = researcher", state: "pass" },
-  { id: "ST.3.11", title: "primary 调度 subagent", detail: "发现 task 工具调用", state: "pass" },
-  { id: "ST.3.12", title: "创建子会话", detail: "source-finder / parent relation", state: "pass" },
-  { id: "ST.3.14", title: "PG 持久化父子关系", detail: "session_agents + parent_id", state: "pending" },
+const initialMembers: Member[] = [
+  { name: "pm-li", label: "李然", title: "产品经理" },
+  { name: "dev-wang", label: "王工", title: "后端工程师" },
+  { name: "design-chen", label: "陈曦", title: "设计师" },
 ]
 
 async function apiRequest<T>(path: string, init?: RequestInit) {
@@ -175,12 +333,26 @@ function isInfoFinished(info: ApiInfo | undefined) {
   return isMessageFinished(info.finish) || Boolean(info.error) || Boolean(info.time?.completed)
 }
 
+function parseTaskInfo(part: ApiPart): TaskInfo | undefined {
+  if (part.tool !== "task") return undefined
+  return {
+    description: part.state?.input?.description,
+    subagent: part.state?.input?.subagent_type,
+    status: part.state?.status,
+    childId: part.state?.output?.match(/<task id="([^"]+)"/)?.[1],
+  }
+}
+
+function toolLabel(part: ApiPart) {
+  return `${part.tool ?? "tool"} · ${part.state?.status ?? "running"}${part.state?.error ? ` · ${part.state.error}` : ""}`
+}
+
 function normalizeMessages(messages: ApiMessage[]): Message[] {
   return messages.flatMap<Message>((message, index) => {
     const info = message.info ?? {}
     const textParts = (message.parts ?? []).filter((part) => part.type === "text" && part.text)
     const reasoningParts = (message.parts ?? []).filter((part) => part.type === "reasoning" && part.text)
-    const tool = (message.parts ?? []).find((part) => part.type === "tool")
+    const toolParts = (message.parts ?? []).filter((part) => part.type === "tool")
     const result: Message[] = []
     if ((textParts.length > 0 || reasoningParts.length > 0) && ["user", "assistant"].includes(info.role ?? ""))
       result.push({
@@ -195,15 +367,19 @@ function normalizeMessages(messages: ApiMessage[]): Message[] {
         time: "now",
         finish: isInfoFinished(info),
       })
-    if (tool)
+    toolParts.forEach((tool, toolIndex) => {
+      const task = parseTaskInfo(tool)
       result.push({
-        id: index + 1 + 100000,
+        id: (index + 1) * 1000 + toolIndex + 1,
         sourceId: info.id,
+        sourcePartId: tool.id,
         role: "tool",
         agent: info.agent ?? tool.tool ?? "task",
-        text: `${tool.tool ?? "tool"} · ${tool.state?.status ?? "running"}${tool.state?.error ? ` · ${tool.state.error}` : ""}`,
+        text: task ? (task.description ?? toolLabel(tool)) : toolLabel(tool),
+        task,
         time: "now",
       })
+    })
     return result
   })
 }
@@ -214,15 +390,18 @@ function mergeMessages(current: Message[], remote: Message[], optimisticId: numb
 }
 
 function App() {
-  const [tab, setTab] = useState<Tab>("conversation")
-  const [agents, setAgents] = useState(initialAgents)
+  const [view, setView] = useState<View>("session")
+  const [agents, setAgents] = useState(loadAgents)
+  const [members, setMembers] = useState(() => loadStored<Member[]>("session-team-members", initialMembers))
+  const [sessions, setSessions] = useState(() => loadStored<SessionEntry[]>("session-team-sessions", []))
   const [messages, setMessages] = useState(initialMessages)
   const [questions, setQuestions] = useState<QuestionRequest[]>([])
   const [selectedAgent, setSelectedAgent] = useState("researcher")
-  const [noReply, setNoReply] = useState(false)
   const [draft, setDraft] = useState("")
   const [mentionQuery, setMentionQuery] = useState<string | null>(null)
   const [showAgentForm, setShowAgentForm] = useState(false)
+  const [agentFormError, setAgentFormError] = useState<string | null>(null)
+  const [showMemberForm, setShowMemberForm] = useState(false)
   const [running, setRunning] = useState(false)
   const [runningAgent, setRunningAgent] = useState<string | null>(null)
   const runningAgentRef = useRef<string | null>(null)
@@ -254,6 +433,40 @@ function App() {
   const [connection, setConnection] = useState<"connecting" | "connected" | "offline">("connecting")
 
   useEffect(() => {
+    window.localStorage.setItem("session-team-agents", JSON.stringify(agents))
+  }, [agents])
+
+  useEffect(() => {
+    window.localStorage.setItem("session-team-members", JSON.stringify(members))
+  }, [members])
+
+  useEffect(() => {
+    window.localStorage.setItem("session-team-sessions", JSON.stringify(sessions))
+  }, [sessions])
+
+  async function syncSessionAgents(id: string, list: Agent[]) {
+    await apiRequest<Array<{ name: string }>>(`/session/${id}/agents`)
+    await Promise.all(
+      list.map((agent) =>
+        apiRequest(`/session/${id}/agents/create`, {
+          method: "POST",
+          body: JSON.stringify({
+            name: agent.name,
+            mode: agent.mode,
+            prompt: agent.tone,
+            model: { providerID: agent.provider, modelID: agent.model },
+            permission: {
+              ...Object.fromEntries(agent.permissions.map((permission) => [permission, "allow"])),
+              // 容器无外网，websearch 会挂死会话，统一禁用
+              websearch: "deny",
+            },
+          }),
+        }),
+      ),
+    )
+  }
+
+  useEffect(() => {
     let cancelled = false
     async function bootstrap() {
       try {
@@ -261,33 +474,26 @@ function App() {
           ? await apiRequest<ApiSession>(`/session/${sessionId}`)
           : await apiRequest<ApiSession>("/session", {
               method: "POST",
-              body: JSON.stringify({ title: "新品发布方案" }),
+              body: JSON.stringify({
+                title: `新会话 ${new Date().toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}`,
+              }),
             })
         if (cancelled) return
         const id = session.id
         setSessionId(id)
         setSessionDirectory(session.directory ?? "")
         window.localStorage.setItem("session-team-demo-id", id)
-        const remoteAgents = await apiRequest<Array<{ name: string }>>(`/session/${id}/agents`)
-        await Promise.all(
-          initialAgents
-            .filter((agent) => !remoteAgents.some((remote) => remote.name === agent.name))
-            .map((agent) =>
-              apiRequest(`/session/${id}/agents/create`, {
-                method: "POST",
-                body: JSON.stringify({
-                  name: agent.name,
-                  mode: agent.mode,
-                  prompt: agent.tone,
-                  model: { providerID: agent.provider, modelID: agent.model },
-                  permission: Object.fromEntries(agent.permissions.map((permission) => [permission, "allow"])),
-                }),
-              }),
-            ),
+        setSessions((current) =>
+          current.some((entry) => entry.id === id)
+            ? current
+            : [
+                { id, title: session.title ?? "未命名会话", directory: session.directory, createdAt: Date.now() },
+                ...current,
+              ],
         )
+        await syncSessionAgents(id, agents)
         const history = await apiRequest<ApiMessage[]>(`/session/${id}/message`)
-        const loadedMessages = normalizeMessages(history)
-        if (loadedMessages.length > 0) setMessages(loadedMessages)
+        if (!cancelled) setMessages(normalizeMessages(history))
         await refreshQuestions(id)
         setConnection("connected")
       } catch {
@@ -347,125 +553,125 @@ function App() {
     return close
 
     function handleEvent(event: { type: string; properties: Record<string, unknown> }) {
-        const props = event.properties
-        const part = props.part as ApiPart | undefined
-        const eventSessionID = props.sessionID as string | undefined
-        if (event.type === "server.connected") {
-          setEventConnected(true)
-          eventConnectedRef.current = true
+      const props = event.properties
+      const part = props.part as ApiPart | undefined
+      const eventSessionID = props.sessionID as string | undefined
+      if (event.type === "server.connected") {
+        setEventConnected(true)
+        eventConnectedRef.current = true
+        return
+      }
+      if (eventSessionID && eventSessionID !== sessionId) return
+
+      if (
+        event.type === "message.part.delta" &&
+        props.messageID &&
+        props.partID &&
+        props.field === "text" &&
+        props.delta
+      ) {
+        if (userMessageIds.has(props.messageID as string)) return
+        const partID = props.partID as string
+        const kind = partKinds.get(partID)
+        if (!kind) {
+          pendingDeltas.set(partID, `${pendingDeltas.get(partID) ?? ""}${props.delta as string}`)
           return
         }
-        if (eventSessionID && eventSessionID !== sessionId) return
+        if (kind !== "reasoning" && kind !== "text") return
+        updateAssistant(props.messageID as string, (message) =>
+          kind === "reasoning"
+            ? { ...message, reasoningPartId: partID, reasoning: `${message.reasoning ?? ""}${props.delta as string}` }
+            : { ...message, sourcePartId: partID, text: message.text + (props.delta as string) },
+        )
+        return
+      }
 
-        if (event.type === "message.part.delta" && props.messageID && props.partID && props.field === "text" && props.delta) {
-          if (userMessageIds.has(props.messageID as string)) return
-          const partID = props.partID as string
-          const kind = partKinds.get(partID)
-          if (!kind) {
-            pendingDeltas.set(partID, `${pendingDeltas.get(partID) ?? ""}${props.delta as string}`)
-            return
-          }
-          if (kind !== "reasoning" && kind !== "text") return
-          updateAssistant(props.messageID as string, (message) =>
+      if (event.type === "message.part.updated" && part?.id && part.messageID) {
+        // 用户消息的 text part 也会触发 part.updated，不能为其创建 assistant 消息
+        if (userMessageIds.has(part.messageID)) return
+        const kind = part.type ?? "unknown"
+        partKinds.set(part.id, kind)
+        // 快照已包含此前所有 delta，丢弃缓冲区避免重复
+        pendingDeltas.delete(part.id)
+        if (kind === "reasoning" || kind === "text") {
+          updateAssistant(part.messageID, (message) =>
             kind === "reasoning"
-              ? { ...message, reasoningPartId: partID, reasoning: `${message.reasoning ?? ""}${props.delta as string}` }
-              : { ...message, sourcePartId: partID, text: message.text + (props.delta as string) },
+              ? { ...message, reasoningPartId: part.id, reasoning: part.text || message.reasoning }
+              : { ...message, sourcePartId: part.id, text: part.text ?? message.text },
           )
           return
         }
+        if (kind === "tool") {
+          const label = toolLabel(part)
+          const task = parseTaskInfo(part)
+          const partID = part.id
+          setMessages((current) => {
+            const index = current.findIndex((message) => message.role === "tool" && message.sourcePartId === partID)
+            if (index >= 0)
+              return current.map((message, messageIndex) =>
+                messageIndex === index
+                  ? { ...message, text: task ? (task.description ?? label) : label, task }
+                  : message,
+              )
+            return [
+              ...current,
+              {
+                id: nextMessageId(),
+                sourceId: part.messageID,
+                sourcePartId: partID,
+                role: "tool",
+                agent: part.tool ?? "tool",
+                text: task ? (task.description ?? label) : label,
+                task,
+                time: "now",
+              },
+            ]
+          })
+        }
+        return
+      }
 
-        if (event.type === "message.part.updated" && part?.id && part.messageID) {
-          // 用户消息的 text part 也会触发 part.updated，不能为其创建 assistant 消息
-          if (userMessageIds.has(part.messageID)) return
-          const kind = part.type ?? "unknown"
-          partKinds.set(part.id, kind)
-          // 快照已包含此前所有 delta，丢弃缓冲区避免重复
-          pendingDeltas.delete(part.id)
-          if (kind === "reasoning" || kind === "text") {
-            updateAssistant(part.messageID, (message) =>
-              kind === "reasoning"
-                ? { ...message, reasoningPartId: part.id, reasoning: part.text || message.reasoning }
-                : { ...message, sourcePartId: part.id, text: part.text ?? message.text },
-            )
-            return
-          }
-          if (kind === "tool") {
-            const label = `${part.tool ?? "tool"} · ${part.state?.status ?? "running"}${part.state?.error ? ` · ${part.state.error}` : ""}`
-            const partID = part.id
-            setMessages((current) => {
-              const index = current.findIndex((message) => message.role === "tool" && message.sourcePartId === partID)
-              if (index >= 0)
-                return current.map((message, messageIndex) =>
-                  messageIndex === index ? { ...message, text: label } : message,
-                )
-              return [
-                ...current,
-                {
-                  id: nextMessageId(),
-                  sourceId: part.messageID,
-                  sourcePartId: partID,
-                  role: "tool",
-                  agent: part.tool ?? "tool",
-                  text: label,
-                  time: "now",
-                },
-              ]
-            })
-          }
+      if (event.type === "message.updated") {
+        const info = props.info as ApiInfo | undefined
+        if (!info?.id) return
+        if (info.role === "user") {
+          userMessageIds.add(info.id)
           return
         }
-
-        if (event.type === "message.updated") {
-          const info = props.info as ApiInfo | undefined
-          if (!info?.id) return
-          if (info.role === "user") {
-            userMessageIds.add(info.id)
-            return
-          }
-          if (info.role === "assistant") {
-            const finished = isInfoFinished(info)
-            updateAssistant(info.id, (message) => ({
-              ...message,
-              agent: info.agent ?? message.agent,
-              finish: message.finish || finished,
-            }))
-            if (finished) stopRunning()
-          }
-          return
+        if (info.role === "assistant") {
+          const finished = isInfoFinished(info)
+          updateAssistant(info.id, (message) => ({
+            ...message,
+            agent: info.agent ?? message.agent,
+            finish: message.finish || finished,
+          }))
+          if (finished) stopRunning()
         }
+        return
+      }
 
-        if (
-          event.type === "question.asked" ||
-          event.type === "question.replied" ||
-          event.type === "question.rejected"
-        ) {
-          void refreshQuestions(sessionId)
-          return
-        }
+      if (event.type === "question.asked" || event.type === "question.replied" || event.type === "question.rejected") {
+        void refreshQuestions(sessionId)
+        return
+      }
 
-        if (event.type === "session.error") {
-          stopRunning()
-          void refetchMessages()
-          return
-        }
+      if (event.type === "session.error") {
+        stopRunning()
+        void refetchMessages()
+        return
+      }
 
-        if (
-          event.type === "session.idle" ||
-          (event.type === "session.status" && (props.status as { type?: string } | undefined)?.type === "idle")
-        ) {
-          stopRunning()
-          void refetchMessages()
-        }
+      if (
+        event.type === "session.idle" ||
+        (event.type === "session.status" && (props.status as { type?: string } | undefined)?.type === "idle")
+      ) {
+        stopRunning()
+        void refetchMessages()
+      }
     }
   }, [sessionId, sessionDirectory])
 
   const primaryAgents = useMemo(() => agents.filter((agent) => agent.mode === "primary"), [agents])
-  const sessionStats = [
-    { label: "Agents", value: agents.length, accent: "text-cyan-300" },
-    { label: "Messages", value: messages.filter((message) => message.role !== "tool").length, accent: "text-lime-300" },
-    { label: "Children", value: 1, accent: "text-amber-300" },
-    { label: "Checks", value: "4/5", accent: "text-violet-300" },
-  ]
 
   function sendMessage() {
     if (!draft.trim() || running) return
@@ -473,10 +679,15 @@ function App() {
     const text = draft.trim()
     const mentionedName = text.match(/(?:^|\s)@([a-zA-Z0-9_-]+)/)?.[1]
     const mentionedAgent = primaryAgents.find((agent) => agent.name === mentionedName)
-    const targetAgent = mentionedAgent?.name ?? selectedAgent
+    // 扣子语义：@ 才派发任务，不 @ 仅记录为项目背景
+    const targetAgent = mentionedAgent?.name ?? null
     const messageId = Date.now()
     setMessages((current) => [...current, { id: messageId, role: "user", text, time: now }])
     setDraft("")
+    if (!targetAgent) {
+      void sendToApi(text, messageId, null)
+      return
+    }
     setRunning(true)
     setRunningAgent(targetAgent)
     runningAgentRef.current = targetAgent
@@ -484,25 +695,20 @@ function App() {
     void sendToApi(text, messageId, targetAgent)
   }
 
-  async function sendToApi(text: string, optimisticId: number, targetAgent: string) {
+  async function sendToApi(text: string, optimisticId: number, targetAgent: string | null) {
     try {
       if (!sessionId) throw new Error("Session 尚未创建")
-      const path = noReply ? `/session/${sessionId}/message` : `/session/${sessionId}/prompt_async`
+      const path = targetAgent ? `/session/${sessionId}/prompt_async` : `/session/${sessionId}/message`
       await apiRequest(path, {
         method: "POST",
         body: JSON.stringify({
           parts: [{ type: "text", text }],
-          ...(noReply
-            ? { noReply: true }
-            : { agent: targetAgent, model: { providerID: "zhipuai", modelID: "glm-5.1" } }),
+          ...(targetAgent
+            ? { agent: targetAgent, model: { providerID: "zhipuai", modelID: "glm-5.1" } }
+            : { noReply: true }),
         }),
       })
-      if (noReply) {
-        setRunning(false)
-        setRunningAgent(null)
-        runningAgentRef.current = null
-        return
-      }
+      if (!targetAgent) return
       if (!eventConnectedRef.current) await pollMessages(sessionId, optimisticId, text)
     } catch (error) {
       setMessages((current) => [
@@ -537,9 +743,25 @@ function App() {
     window.localStorage.removeItem("session-team-demo-id")
     setSessionId("")
     setSessionDirectory("")
-    setMessages(initialMessages)
+    setMessages([])
     setConnection("connecting")
+    setView("session")
   }
+
+  function selectSession(id: string) {
+    if (id === sessionId) return
+    window.localStorage.setItem("session-team-demo-id", id)
+    setMessages([])
+    setQuestions([])
+    setConnection("connecting")
+    setSessionId(id)
+    setView("session")
+  }
+
+  useEffect(() => {
+    if (!sessionId || connection !== "connected") return
+    void syncSessionAgents(sessionId, agents).catch(() => undefined)
+  }, [agents, sessionId, connection])
 
   async function pollMessages(id: string, optimisticId: number, text: string) {
     for (let attempt = 0; attempt < 120; attempt += 1) {
@@ -576,23 +798,27 @@ function App() {
     setMentionQuery(match ? match[1].toLowerCase() : null)
   }
 
-  function selectMention(agent: Agent) {
+  function selectMention(name: string) {
     const nextDraft = draft.replace(
       /(?:^|\s)@[a-zA-Z0-9_-]*$/,
-      (match) => `${match.slice(0, -match.trim().length)}@${agent.name} `,
+      (match) => `${match.slice(0, -match.trim().length)}@${name} `,
     )
     setDraft(nextDraft)
-    setSelectedAgent(agent.name)
+    if (agents.some((agent) => agent.name === name)) setSelectedAgent(name)
     setMentionQuery(null)
   }
 
   function addAgent(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const form = new FormData(event.currentTarget)
-    const name = String(form.get("name") || "new-agent")
+    const name = String(form.get("name") || "")
       .trim()
       .toLowerCase()
       .replaceAll(" ", "-")
+    if (agents.some((agent) => agent.name === name)) {
+      setAgentFormError(`已存在同名 Agent：${name}`)
+      return
+    }
     const mode = form.get("mode") === "primary" ? "primary" : "subagent"
     setAgents((current) => [
       ...current,
@@ -602,17 +828,36 @@ function App() {
         mode,
         provider: "zhipuai",
         model: "glm-5.1",
-        tone: "新建的 Session Agent，等待配置工作职责。",
+        tone: String(form.get("prompt") || "").trim(),
         permissions: mode === "primary" ? ["read", "task"] : ["read"],
         status: "ready",
       },
     ])
+    setAgentFormError(null)
     setShowAgentForm(false)
   }
 
+  function addMember(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const form = new FormData(event.currentTarget)
+    const name = String(form.get("name") || "new-member")
+      .trim()
+      .toLowerCase()
+      .replaceAll(" ", "-")
+    setMembers((current) => [
+      ...current,
+      {
+        name,
+        label: String(form.get("label") || "新成员"),
+        title: String(form.get("title") || "成员"),
+      },
+    ])
+    setShowMemberForm(false)
+  }
+
   return (
-    <div className="app-shell">
-      <aside className="sidebar">
+    <div className="app-shell h-screen w-full overflow-hidden">
+      <aside className="sidebar h-full overflow-y-auto">
         <div className="brand-lockup">
           <div className="brand-mark">S</div>
           <div>
@@ -620,34 +865,60 @@ function App() {
             <div className="brand-caption">test console / 0.1</div>
           </div>
         </div>
+        <div className="sidebar-label">MENU</div>
+        <div className="session-list">
+          <button
+            className={`session-row ${view === "session" ? "active" : ""}`}
+            type="button"
+            onClick={() => setView("session")}
+          >
+            <MessageSquare size={15} className="menu-icon" />
+            <span className="session-copy">
+              <strong>会话</strong>
+              <small>Session 工作台</small>
+            </span>
+          </button>
+          <button
+            className={`session-row ${view === "team" ? "active" : ""}`}
+            type="button"
+            onClick={() => setView("team")}
+          >
+            <Users size={15} className="menu-icon" />
+            <span className="session-copy">
+              <strong>Agent 团队</strong>
+              <small>全局 Agent 管理</small>
+            </span>
+          </button>
+          <button
+            className={`session-row ${view === "members" ? "active" : ""}`}
+            type="button"
+            onClick={() => setView("members")}
+          >
+            <UserRound size={15} className="menu-icon" />
+            <span className="session-copy">
+              <strong>成员管理</strong>
+              <small>全局成员管理</small>
+            </span>
+          </button>
+        </div>
         <div className="sidebar-label">
-          WORKSPACES <span>03</span>
+          WORKSPACES <span>{String(sessions.length).padStart(2, "0")}</span>
         </div>
         <div className="session-list">
-          <button className="session-row active" type="button">
-            <span className="session-dot live" />
-            <span className="session-copy">
-              <strong>新品发布方案</strong>
-              <small>多主 Agent 分工测试</small>
-            </span>
-            <span className="session-count">12</span>
-          </button>
-          <button className="session-row" type="button">
-            <span className="session-dot" />
-            <span className="session-copy">
-              <strong>行业专家矩阵</strong>
-              <small>法务 / 运营 / 数据</small>
-            </span>
-            <span className="session-count">08</span>
-          </button>
-          <button className="session-row" type="button">
-            <span className="session-dot" />
-            <span className="session-copy">
-              <strong>云端与本地</strong>
-              <small>多模型统一托管</small>
-            </span>
-            <span className="session-count">06</span>
-          </button>
+          {sessions.map((entry) => (
+            <button
+              className={`session-row ${entry.id === sessionId && view === "session" ? "active" : ""}`}
+              type="button"
+              key={entry.id}
+              onClick={() => selectSession(entry.id)}
+            >
+              <span className={`session-dot ${entry.id === sessionId ? "live" : ""}`} />
+              <span className="session-copy">
+                <strong>{entry.title}</strong>
+                <small>{entry.id.slice(0, 12)}</small>
+              </span>
+            </button>
+          ))}
         </div>
         <button className="new-session" type="button" onClick={newSession}>
           <span>+</span> 新建 Session
@@ -662,8 +933,8 @@ function App() {
         </div>
       </aside>
 
-      <main className="workspace">
-        <header className="topbar">
+      <main className="workspace flex h-full min-h-0 flex-col overflow-hidden">
+        <header className="topbar shrink-0">
           <div className="breadcrumbs">
             <span>WORKSPACES</span>
             <b>/</b>
@@ -686,51 +957,33 @@ function App() {
           </div>
         </header>
 
-        <div className="content-wrap">
-          <section className="hero-row">
-            <div>
-              <div className="eyebrow">SESSION / TEAM LAB</div>
-              <h1>新品发布方案</h1>
-              <p>验证多主 Agent 分工、子会话调度与上下文持久化。</p>
+        <div className="content-wrap flex min-h-0 w-full flex-1 flex-col overflow-hidden">
+          {view === "team" && (
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              <Team
+                agents={agents}
+                setShowAgentForm={setShowAgentForm}
+                onRemove={(name) => setAgents((current) => current.filter((agent) => agent.name !== name))}
+              />
             </div>
-            <button className="run-button" type="button" onClick={() => setTab("verification")}>
-              <span>▶</span> Run checks <kbd>⌘ ↵</kbd>
-            </button>
-          </section>
-
-          <section className="stat-grid">
-            {sessionStats.map((stat) => (
-              <div className="stat-card" key={stat.label}>
-                <span>{stat.label}</span>
-                <strong className={stat.accent}>{stat.value}</strong>
-                <small>{stat.label === "Checks" ? "last run 2m ago" : "in this session"}</small>
-              </div>
-            ))}
-          </section>
-
-          <nav className="tabs" aria-label="Session sections">
-            {(["conversation", "team", "verification"] as Tab[]).map((item) => (
-              <button
-                key={item}
-                type="button"
-                className={tab === item ? "tab active" : "tab"}
-                onClick={() => setTab(item)}
-              >
-                {item === "conversation" ? "对话现场" : item === "team" ? "Agent 团队" : "测试验证"}
-                {item === "verification" && <span className="tab-alert">1</span>}
-              </button>
-            ))}
-          </nav>
-
-          {tab === "conversation" && (
+          )}
+          {view === "members" && (
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              <Members
+                members={members}
+                setShowMemberForm={setShowMemberForm}
+                onRemove={(name) => setMembers((current) => current.filter((member) => member.name !== name))}
+              />
+            </div>
+          )}
+          {view === "session" && (
             <Conversation
               messages={messages}
+              sessionId={sessionId}
               selectedAgent={selectedAgent}
               runningAgent={runningAgent}
-              setSelectedAgent={setSelectedAgent}
               primaryAgents={primaryAgents}
-              noReply={noReply}
-              setNoReply={setNoReply}
+              members={members}
               draft={draft}
               updateDraft={updateDraft}
               mentionQuery={mentionQuery}
@@ -742,8 +995,6 @@ function App() {
               onAnswered={() => sessionId && void refreshQuestions(sessionId)}
             />
           )}
-          {tab === "team" && <Team agents={agents} setShowAgentForm={setShowAgentForm} />}
-          {tab === "verification" && <Verification />}
         </div>
       </main>
 
@@ -752,30 +1003,72 @@ function App() {
           <form className="modal" onSubmit={addAgent} onClick={(event) => event.stopPropagation()}>
             <div className="modal-header">
               <div>
-                <div className="eyebrow">SESSION AGENT</div>
-                <h2>添加团队成员</h2>
+                <div className="eyebrow">GLOBAL AGENT</div>
+                <h2>添加 Agent</h2>
               </div>
               <button type="button" className="close-button" onClick={() => setShowAgentForm(false)}>
                 ×
               </button>
             </div>
             <label>
-              Agent name
-              <input name="name" placeholder="例如 analyst" required />
+              Agent 标识（用于 @ 提及，英文小写）
+              <input name="name" placeholder="例如 analyst" pattern="[a-z0-9_-]+" required />
             </label>
             <label>
               显示名称
               <input name="label" placeholder="例如 数据分析师" required />
             </label>
             <label>
+              职责 Prompt（Agent 的系统指令，决定它做什么、怎么做）
+              <textarea
+                name="prompt"
+                className="modal-textarea"
+                placeholder="例如：负责把调研资料整理成结构化摘要，输出时标注信息来源，不确定的内容要明确说明。"
+                rows={4}
+                required
+              />
+            </label>
+            <label>
               模式
-              <select name="mode" defaultValue="subagent">
-                <option value="primary">primary · 用户可直接调度</option>
-                <option value="subagent">subagent · 仅由 primary 调度</option>
+              <select name="mode" defaultValue="primary">
+                <option value="primary">primary · 用户可直接 @ 调度</option>
+                <option value="subagent">subagent · 仅由 primary 通过 task 调度</option>
               </select>
             </label>
+            {agentFormError && <p className="modal-error">{agentFormError}</p>}
             <button className="submit-button" type="submit">
               创建 Agent
+            </button>
+          </form>
+        </div>
+      )}
+
+      {showMemberForm && (
+        <div className="modal-backdrop" onClick={() => setShowMemberForm(false)}>
+          <form className="modal" onSubmit={addMember} onClick={(event) => event.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <div className="eyebrow">GLOBAL MEMBER</div>
+                <h2>添加成员</h2>
+              </div>
+              <button type="button" className="close-button" onClick={() => setShowMemberForm(false)}>
+                ×
+              </button>
+            </div>
+            <label>
+              成员标识（用于 @ 提及）
+              <input name="name" placeholder="例如 pm-li" required />
+            </label>
+            <label>
+              姓名
+              <input name="label" placeholder="例如 李然" required />
+            </label>
+            <label>
+              角色
+              <input name="title" placeholder="例如 产品经理" required />
+            </label>
+            <button className="submit-button" type="submit">
+              添加成员
             </button>
           </form>
         </div>
@@ -933,18 +1226,112 @@ function QuestionCard({ request, onAnswered }: { request: QuestionRequest; onAns
   )
 }
 
+function TaskCard({ task, parentSessionId }: { task: TaskInfo; parentSessionId: string }) {
+  const running = task.status === "running" || task.status === "pending"
+  const [open, setOpen] = useState(running)
+  const [childId, setChildId] = useState(task.childId)
+  const [childMessages, setChildMessages] = useState<Message[]>([])
+
+  useEffect(() => {
+    if (running) setOpen(true)
+  }, [running])
+  useEffect(() => {
+    if (task.childId) setChildId(task.childId)
+  }, [task.childId])
+
+  useEffect(() => {
+    if (!open) return
+    let stopped = false
+    let timer = 0
+    async function load() {
+      let cid = childId
+      if (!cid) {
+        try {
+          const children = await apiRequest<Array<{ id: string; title?: string }>>(
+            `/session/${parentSessionId}/children`,
+          )
+          const match =
+            children.find((child) => task.description && child.title?.startsWith(task.description)) ??
+            children[children.length - 1]
+          if (match) {
+            cid = match.id
+            setChildId(cid)
+          }
+        } catch {
+          // 子会话尚未创建，下一轮继续
+        }
+      }
+      if (cid) {
+        try {
+          const remote = await apiRequest<ApiMessage[]>(`/session/${cid}/message`)
+          if (!stopped) setChildMessages(normalizeMessages(remote))
+        } catch {
+          // 转录拉取失败，下一轮继续
+        }
+      }
+      if (!stopped && running) timer = window.setTimeout(load, 2000)
+    }
+    void load()
+    return () => {
+      stopped = true
+      window.clearTimeout(timer)
+    }
+  }, [open, childId, running, parentSessionId, task.description])
+
+  const visibleMessages = childMessages.filter((message) => message.role !== "user")
+  return (
+    <div className={`task-card ${running ? "running" : ""}`}>
+      <button type="button" className="task-card-head" onClick={() => setOpen((current) => !current)}>
+        <ListTree size={14} />
+        <span className="task-desc">{task.description ?? "子任务"}</span>
+        {task.subagent && <em>@{task.subagent}</em>}
+        <span className={`task-status ${task.status ?? "running"}`}>
+          {running ? "执行中" : task.status === "completed" ? "已完成" : (task.status ?? "")}
+        </span>
+        <ChevronDown size={12} className={`task-chevron ${open ? "open" : ""}`} />
+      </button>
+      {open && (
+        <div className="task-card-body">
+          {visibleMessages.map((message) =>
+            message.role === "tool" ? (
+              <div className="subtask-tool" key={message.id}>
+                {message.text}
+              </div>
+            ) : (
+              <div className="subtask-msg" key={message.id}>
+                <span className="subtask-agent">{message.agent}</span>
+                {message.reasoning && (
+                  <details className="subtask-reasoning">
+                    <summary>思考过程</summary>
+                    <div>{message.reasoning}</div>
+                  </details>
+                )}
+                {message.text && (
+                  <div className="markdown-content">
+                    <Streamdown plugins={streamdownPlugins}>{message.text}</Streamdown>
+                  </div>
+                )}
+              </div>
+            ),
+          )}
+          {running && visibleMessages.length === 0 && <div className="subtask-loading">子任务执行中…</div>}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function Conversation(props: {
   messages: Message[]
+  sessionId: string
   selectedAgent: string
   runningAgent: string | null
-  setSelectedAgent: (value: string) => void
   primaryAgents: Agent[]
-  noReply: boolean
-  setNoReply: (value: boolean) => void
+  members: Member[]
   draft: string
   updateDraft: (value: string) => void
   mentionQuery: string | null
-  selectMention: (agent: Agent) => void
+  selectMention: (name: string) => void
   sendMessage: () => void
   stopMessage: () => void
   running: boolean
@@ -952,14 +1339,18 @@ function Conversation(props: {
   onAnswered: () => void
 }) {
   const mentionAgents = props.primaryAgents.filter((agent) => agent.name.includes(props.mentionQuery ?? ""))
+  const mentionMembers = props.members.filter(
+    (member) => member.name.includes(props.mentionQuery ?? "") || member.label.includes(props.mentionQuery ?? ""),
+  )
+  const showMentionMenu = props.mentionQuery !== null && (mentionAgents.length > 0 || mentionMembers.length > 0)
   const lastMessage = props.messages[props.messages.length - 1]
   const streamingContent =
     lastMessage?.role === "assistant" && !lastMessage.finish && Boolean(lastMessage.reasoning || lastMessage.text)
   const showThinking = props.running && !streamingContent && props.questions.length === 0
   return (
-    <div className="conversation-layout">
-      <section className="panel conversation-panel">
-        <div className="panel-heading">
+    <div className="conversation-layout min-h-0 flex-1">
+      <section className="panel conversation-panel flex min-h-0 flex-1 flex-col">
+        <div className="panel-heading shrink-0">
           <div>
             <span className="panel-kicker">LIVE TRANSCRIPT</span>
             <h2>对话现场</h2>
@@ -968,7 +1359,7 @@ function Conversation(props: {
             <span className="pulse" /> streaming
           </span>
         </div>
-        <div className="message-list">
+        <div className="message-list min-h-0 flex-1 overflow-y-auto">
           {props.messages.map((message) => (
             <article className={`message ${message.role}`} key={message.id}>
               <div className="message-meta">
@@ -983,10 +1374,14 @@ function Conversation(props: {
                     {message.reasoning && <ReasoningBlock reasoning={message.reasoning} finished={message.finish} />}
                     {message.text && (
                       <div className="markdown-content">
-                        <Streamdown animated={!message.finish}>{message.text}</Streamdown>
+                        <Streamdown animated={!message.finish} plugins={streamdownPlugins}>
+                          {message.text}
+                        </Streamdown>
                       </div>
                     )}
                   </>
+                ) : message.role === "tool" && message.task ? (
+                  <TaskCard task={message.task} parentSessionId={props.sessionId} />
                 ) : (
                   message.text
                 )}
@@ -1009,45 +1404,41 @@ function Conversation(props: {
             </div>
           )}
         </div>
-        <div className="composer">
-          <div className="composer-toolbar">
-            <label className="select-label">
-              @{" "}
-              <select value={props.selectedAgent} onChange={(event) => props.setSelectedAgent(event.target.value)}>
-                {props.primaryAgents.map((agent) => (
-                  <option key={agent.name} value={agent.name}>
-                    {agent.name} · primary
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className={`switch-label ${props.noReply ? "selected" : ""}`}>
-              <input
-                type="checkbox"
-                checked={props.noReply}
-                onChange={(event) => props.setNoReply(event.target.checked)}
-              />
-              <span className="switch" /> noReply <small>仅记录，不回复</small>
-            </label>
-          </div>
+        <div className="composer shrink-0">
           <div className="composer-editor">
-            {props.mentionQuery !== null && mentionAgents.length > 0 && (
+            {showMentionMenu && (
               <div className="mention-menu">
-                <div className="mention-hint">选择要 @ 的 primary Agent</div>
+                <div className="mention-hint">@ Agent 派发任务 · @ 成员提醒参与</div>
                 {mentionAgents.map((agent) => (
                   <button
                     type="button"
                     className="mention-option"
                     key={agent.name}
                     onMouseDown={(event) => event.preventDefault()}
-                    onClick={() => props.selectMention(agent)}
+                    onClick={() => props.selectMention(agent.name)}
                   >
                     <span className="mention-avatar">{agent.name.slice(0, 1).toUpperCase()}</span>
                     <span>
                       <strong>{agent.name}</strong>
                       <small>{agent.label}</small>
                     </span>
-                    <em>primary</em>
+                    <em>Agent</em>
+                  </button>
+                ))}
+                {mentionMembers.map((member) => (
+                  <button
+                    type="button"
+                    className="mention-option"
+                    key={member.name}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => props.selectMention(member.name)}
+                  >
+                    <span className="mention-avatar member">{member.label.slice(0, 1)}</span>
+                    <span>
+                      <strong>{member.label}</strong>
+                      <small>@{member.name}</small>
+                    </span>
+                    <em>成员</em>
                   </button>
                 ))}
               </div>
@@ -1061,16 +1452,12 @@ function Conversation(props: {
                   props.sendMessage()
                 }
               }}
-              placeholder={
-                props.noReply
-                  ? "写入一条不会触发 Agent 的消息..."
-                  : `输入 @ 选择 Agent，或发送给 @${props.selectedAgent}...`
-              }
+              placeholder="不 @ 仅记录为项目背景，@ Agent 才会派发任务..."
             />
           </div>
           <div className="composer-footer">
             <span>
-              Enter 发送 <b>·</b> Shift Enter 换行 <b>·</b> API /session/:id/prompt_async
+              Enter 发送 <b>·</b> Shift Enter 换行 <b>·</b> @ 派发 = prompt_async <b>·</b> 不 @ = noReply 仅记录
             </span>
             {props.running ? (
               <button type="button" className="stop-button" onClick={props.stopMessage}>
@@ -1084,58 +1471,26 @@ function Conversation(props: {
           </div>
         </div>
       </section>
-      <aside className="panel event-panel">
-        <div className="panel-heading">
-          <div>
-            <span className="panel-kicker">EVENT STREAM</span>
-            <h2>运行事件</h2>
-          </div>
-          <button type="button" className="text-button">
-            清空
-          </button>
-        </div>
-        <div className="event-list">
-          <div className="event-item">
-            <span className="event-icon cyan">↳</span>
-            <div>
-              <strong>task completed</strong>
-              <p>source-finder returned result</p>
-              <time>10:25:42</time>
-            </div>
-          </div>
-          <div className="event-item">
-            <span className="event-icon violet">◇</span>
-            <div>
-              <strong>assistant finished</strong>
-              <p>researcher / info.finish = true</p>
-              <time>10:26:08</time>
-            </div>
-          </div>
-          <div className="event-item">
-            <span className="event-icon amber">◌</span>
-            <div>
-              <strong>message persisted</strong>
-              <p>message + parts written to PG</p>
-              <time>10:26:09</time>
-            </div>
-          </div>
-        </div>
-        <div className="event-footer">
-          <span className="pulse green" /> SSE /event
-        </div>
-      </aside>
     </div>
   )
 }
 
-function Team({ agents, setShowAgentForm }: { agents: Agent[]; setShowAgentForm: (value: boolean) => void }) {
+function Team({
+  agents,
+  setShowAgentForm,
+  onRemove,
+}: {
+  agents: Agent[]
+  setShowAgentForm: (value: boolean) => void
+  onRemove: (name: string) => void
+}) {
   return (
     <div className="team-view">
       <div className="team-heading">
         <div>
-          <span className="panel-kicker">SESSION AGENTS / 04</span>
-          <h2>工作空间团队</h2>
-          <p>每个 Agent 都属于当前 Session，配置和消息互相隔离。</p>
+          <span className="panel-kicker">GLOBAL AGENTS / {String(agents.length).padStart(2, "0")}</span>
+          <h2>Agent 团队</h2>
+          <p>Agent 团队是全局能力，可在任意 Session 中 @ 调度。</p>
         </div>
         <button type="button" className="add-button" onClick={() => setShowAgentForm(true)}>
           + 添加 Agent
@@ -1151,6 +1506,9 @@ function Team({ agents, setShowAgentForm }: { agents: Agent[]; setShowAgentForm:
                 <span>{agent.label}</span>
               </div>
               <span className={`mode-badge ${agent.mode}`}>{agent.mode}</span>
+              <button type="button" className="card-delete" title="删除 Agent" onClick={() => onRemove(agent.name)}>
+                <Trash2 size={13} />
+              </button>
             </div>
             <p className="agent-tone">{agent.tone}</p>
             <div className="agent-config">
@@ -1184,80 +1542,64 @@ function Team({ agents, setShowAgentForm }: { agents: Agent[]; setShowAgentForm:
           <h3>调度关系</h3>
         </div>
         <div className="graph">
-          <div className="graph-node primary">
-            <b>manager</b>
-            <small>primary</small>
-          </div>
-          <span className="graph-line" />
-          <div className="graph-node sub">
-            <b>writer</b>
-            <small>subagent</small>
-          </div>
-          <div className="graph-node primary">
-            <b>researcher</b>
-            <small>primary</small>
-          </div>
-          <span className="graph-line" />
-          <div className="graph-node sub">
-            <b>source-finder</b>
-            <small>subagent</small>
-          </div>
+          {agents.map((agent, index) => (
+            <Fragment key={agent.name}>
+              {index > 0 && <span className="graph-line" />}
+              <div className={`graph-node ${agent.mode === "primary" ? "primary" : "sub"}`}>
+                <b>{agent.name}</b>
+                <small>{agent.mode}</small>
+              </div>
+            </Fragment>
+          ))}
         </div>
       </div>
     </div>
   )
 }
 
-function Verification() {
+function Members({
+  members,
+  setShowMemberForm,
+  onRemove,
+}: {
+  members: Member[]
+  setShowMemberForm: (value: boolean) => void
+  onRemove: (name: string) => void
+}) {
   return (
-    <div className="verification-view">
-      <div className="verification-heading">
+    <div className="team-view">
+      <div className="team-heading">
         <div>
-          <span className="panel-kicker">SCENARIO / 03-AGENT-DISPATCH</span>
-          <h2>测试验证</h2>
-          <p>把文档用例变成可观察的运行断言，验证 API 响应、消息流和 PG 状态。</p>
+          <span className="panel-kicker">GLOBAL MEMBERS / {String(members.length).padStart(2, "0")}</span>
+          <h2>成员管理</h2>
+          <p>成员可被 @ 提醒参与讨论，相关消息作为项目背景沉淀。</p>
         </div>
-        <button type="button" className="run-button">
-          <span>▶</span> Run all checks
+        <button type="button" className="add-button" onClick={() => setShowMemberForm(true)}>
+          + 添加成员
         </button>
       </div>
-      <div className="verification-summary">
-        <div>
-          <strong>4</strong>
-          <span>passed</span>
-        </div>
-        <div className="summary-divider" />
-        <div>
-          <strong className="pending-text">1</strong>
-          <span>pending</span>
-        </div>
-        <div className="summary-progress">
-          <span style={{ width: "80%" }} />
-        </div>
-        <small>last run · 2 min ago</small>
-      </div>
-      <div className="check-list">
-        {checks.map((check) => (
-          <article className="check-row" key={check.id}>
-            <span className={`check-status ${check.state}`}>{check.state === "pass" ? "✓" : "○"}</span>
-            <div className="check-copy">
-              <strong>
-                {check.id} <span>{check.title}</span>
-              </strong>
-              <p>{check.detail}</p>
+      <div className="agent-grid">
+        {members.map((member) => (
+          <article className="agent-card member" key={member.name}>
+            <div className="agent-card-top">
+              <div className="agent-avatar member">{member.label.slice(0, 1)}</div>
+              <div className="agent-title">
+                <h3>{member.label}</h3>
+                <span>@{member.name}</span>
+              </div>
+              <span className="mode-badge member">{member.title}</span>
+              <button type="button" className="card-delete" title="删除成员" onClick={() => onRemove(member.name)}>
+                <Trash2 size={13} />
+              </button>
             </div>
-            <span className="check-endpoint">
-              {check.id === "ST.3.2" ? "POST /message" : check.id === "ST.3.12" ? "GET /children" : "ASSERT"}
-            </span>
-            <button type="button" className="inspect-button">
-              inspect ↗
-            </button>
+            <div className="agent-card-foot">
+              <span>
+                <span className="pulse green" /> online
+              </span>
+              <span className="dispatch-note">@ 提醒参与，不触发任务</span>
+            </div>
           </article>
         ))}
-      </div>
-      <div className="verification-note">
-        <span>i</span>
-        <p>验证面板将来可以直接调用 `test-lib.sh` 对应的 HTTP API，当前版本使用本地演示数据展示状态流。</p>
       </div>
     </div>
   )
