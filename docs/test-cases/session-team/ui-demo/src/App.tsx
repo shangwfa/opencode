@@ -1,7 +1,9 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react"
 import {
+  ArrowUp,
   Check,
   ChevronDown,
+  Cpu,
   HelpCircle,
   ListTree,
   Loader2,
@@ -12,6 +14,7 @@ import {
   FileText,
   ShieldCheck,
   Sparkles,
+  Square,
   Trash2,
   UserRound,
   Users,
@@ -63,6 +66,14 @@ type Message = {
   finish?: boolean
   task?: TaskInfo
   file?: FilePreview
+  pending?: boolean
+}
+
+type QueuedMessage = {
+  id: number
+  bubbleId: number
+  text: string
+  agent: string
 }
 
 type ApiPart = {
@@ -122,11 +133,22 @@ type Member = {
   title: string
 }
 
+type ModelRef = {
+  providerID: string
+  modelID: string
+}
+
+type ModelOption = ModelRef & {
+  providerName: string
+  modelName: string
+}
+
 type SessionEntry = {
   id: string
   title: string
   directory?: string
   createdAt: number
+  titled?: boolean
 }
 
 function loadStored<T>(key: string, fallback: T): T {
@@ -457,6 +479,7 @@ function App() {
   const [agentFormError, setAgentFormError] = useState<string | null>(null)
   const [showMemberForm, setShowMemberForm] = useState(false)
   const [running, setRunning] = useState(false)
+  const [queue, setQueue] = useState<QueuedMessage[]>([])
   const [runningAgent, setRunningAgent] = useState<string | null>(null)
   const runningAgentRef = useRef<string | null>(null)
   const messageIdRef = useRef(10000)
@@ -490,6 +513,10 @@ function App() {
     }
   }
   const [sessionId, setSessionId] = useState(() => window.localStorage.getItem("session-team-demo-id") ?? "")
+  const [model, setModel] = useState<ModelRef>(() =>
+    loadStored<ModelRef>("session-team-model", { providerID: "zhipuai", modelID: "glm-5.1" }),
+  )
+  const [modelOptions, setModelOptions] = useState<ModelOption[]>([])
   const [sessionDirectory, setSessionDirectory] = useState("")
   const [eventConnected, setEventConnected] = useState(false)
   const eventConnectedRef = useRef(false)
@@ -506,6 +533,36 @@ function App() {
   useEffect(() => {
     window.localStorage.setItem("session-team-sessions", JSON.stringify(sessions))
   }, [sessions])
+
+  useEffect(() => {
+    if (!sessionId) return
+    window.localStorage.setItem(`session-team-queue:${sessionId}`, JSON.stringify(queue))
+  }, [queue, sessionId])
+
+  useEffect(() => {
+    window.localStorage.setItem("session-team-model", JSON.stringify(model))
+  }, [model])
+
+  useEffect(() => {
+    apiRequest<{
+      all: Array<{ id: string; name?: string; models: Record<string, { name?: string }> }>
+      connected: string[]
+    }>("/provider")
+      .then((data) => {
+        const options = data.all
+          .filter((provider) => data.connected.includes(provider.id))
+          .flatMap((provider) =>
+            Object.entries(provider.models).map(([modelID, item]) => ({
+              providerID: provider.id,
+              modelID,
+              providerName: provider.name ?? provider.id,
+              modelName: item.name ?? modelID,
+            })),
+          )
+        setModelOptions(options)
+      })
+      .catch(() => undefined)
+  }, [])
 
   async function syncSessionAgents(id: string, list: Agent[]) {
     await apiRequest<Array<{ name: string }>>(`/session/${id}/agents`)
@@ -567,8 +624,32 @@ function App() {
         if (!cancelled) setMessages(normalizeMessages(history))
         await refreshQuestions(id)
         await refreshPermissions(id)
+        // 刷新恢复：持久化队列 + 服务端执行状态
+        const storedQueue = loadStored<QueuedMessage[]>(`session-team-queue:${id}`, [])
+        if (!cancelled) setQueue(storedQueue)
+        try {
+          const status = await apiRequest<Record<string, { type?: string }>>("/session/status")
+          if (!cancelled && status[id]?.type === "busy") {
+            setRunning(true)
+          } else if (!cancelled && storedQueue.length > 0) {
+            const [head, ...rest] = storedQueue
+            setQueue(rest)
+            void dispatchQueued(head, Date.now(), () => {
+              setMessages((current) => current.filter((message) => !message.pending))
+            })
+          }
+        } catch {
+          // 状态查询失败不阻塞，保持默认 idle
+        }
         setConnection("connected")
-      } catch {
+      } catch (error) {
+        // 本地记住的会话已被删除：移除记录并触发新建
+        if (!cancelled && sessionId && error instanceof Error && error.message.startsWith("4")) {
+          setSessions((current) => current.filter((entry) => entry.id !== sessionId))
+          window.localStorage.removeItem("session-team-demo-id")
+          setSessionId("")
+          return
+        }
         if (!cancelled) setConnection("offline")
       }
     }
@@ -743,7 +824,7 @@ function App() {
         event.type === "session.idle" ||
         (event.type === "session.status" && (props.status as { type?: string } | undefined)?.type === "idle")
       ) {
-        stopRunning()
+        // running 由 busy watcher 统一驱动，这里只补一次消息全量刷新
         void refetchMessages()
       }
     }
@@ -751,8 +832,29 @@ function App() {
 
   const primaryAgents = useMemo(() => agents.filter((agent) => agent.mode === "primary"), [agents])
 
+  async function deleteSession(id: string) {
+    setSessions((current) => current.filter((entry) => entry.id !== id))
+    void apiRequest(`/session/${id}`, { method: "DELETE" }).catch(() => undefined)
+    if (id !== sessionId) return
+    const next = sessions.find((entry) => entry.id !== id)
+    if (next) {
+      selectSession(next.id)
+      return
+    }
+    newSession()
+  }
+
+  async function autoTitleSession(id: string, text: string) {
+    const entry = sessions.find((item) => item.id === id)
+    if (!entry || entry.titled) return
+    const title = text.replace(/@[a-zA-Z0-9_-]+/g, "").replace(/\s+/g, " ").trim().slice(0, 20)
+    if (!title) return
+    setSessions((current) => current.map((item) => (item.id === id ? { ...item, title, titled: true } : item)))
+    void apiRequest(`/session/${id}`, { method: "PATCH", body: JSON.stringify({ title }) }).catch(() => undefined)
+  }
+
   function sendMessage() {
-    if (!draft.trim() || running) return
+    if (!draft.trim()) return
     const now = new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })
     const text = draft.trim()
     const mentionedName = text.match(/(?:^|\s)@([a-zA-Z0-9_-]+)/)?.[1]
@@ -760,8 +862,15 @@ function App() {
     // 扣子语义：@ 才派发任务，不 @ 仅记录为项目背景
     const targetAgent = mentionedAgent?.name ?? null
     const messageId = Date.now()
-    setMessages((current) => [...current, { id: messageId, role: "user", text, time: now }])
+    // Agent 运行中：不 @ 仅记录背景；@ 进入排队，当前任务完成后自动派发
+    const queued = running && targetAgent !== null
+    setMessages((current) => [...current, { id: messageId, role: "user", text, time: now, pending: queued }])
     setDraft("")
+    void autoTitleSession(sessionId, text)
+    if (queued) {
+      setQueue((current) => [...current, { id: messageId, bubbleId: messageId, text, agent: targetAgent }])
+      return
+    }
     if (!targetAgent) {
       void sendToApi(text, messageId, null)
       return
@@ -770,10 +879,27 @@ function App() {
     setRunningAgent(targetAgent)
     runningAgentRef.current = targetAgent
     setSelectedAgent(targetAgent)
-    void sendToApi(text, messageId, targetAgent)
+    void sendToApi(text, messageId, targetAgent, () => {
+      setMessages((current) => current.filter((message) => message.id !== messageId))
+    })
   }
 
-  async function sendToApi(text: string, optimisticId: number, targetAgent: string | null) {
+  async function dispatchQueued(item: QueuedMessage, optimisticId: number, onFailure: () => void, optimistic = false) {
+    const now = new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })
+    setMessages((current) =>
+      current.map((message) => (message.id === item.bubbleId ? { ...message, pending: false } : message)),
+    )
+    if (optimistic) {
+      setMessages((current) => [...current, { id: optimisticId, role: "user", text: item.text, time: now }])
+    }
+    setRunning(true)
+    setRunningAgent(item.agent)
+    runningAgentRef.current = item.agent
+    setSelectedAgent(item.agent)
+    await sendToApi(item.text, optimisticId, item.agent, onFailure)
+  }
+
+  async function sendToApi(text: string, optimisticId: number, targetAgent: string | null, onFailure?: () => void) {
     try {
       if (!sessionId) throw new Error("Session 尚未创建")
       const path = targetAgent ? `/session/${sessionId}/prompt_async` : `/session/${sessionId}/message`
@@ -781,9 +907,7 @@ function App() {
         method: "POST",
         body: JSON.stringify({
           parts: [{ type: "text", text }],
-          ...(targetAgent
-            ? { agent: targetAgent, model: { providerID: "zhipuai", modelID: "glm-5.1" } }
-            : { noReply: true }),
+          ...(targetAgent ? { agent: targetAgent, model: { providerID: model.providerID, modelID: model.modelID } } : { noReply: true }),
         }),
       })
       if (!targetAgent) return
@@ -803,6 +927,7 @@ function App() {
       setRunning(false)
       setRunningAgent(null)
       runningAgentRef.current = null
+      onFailure?.()
     }
   }
 
@@ -822,6 +947,7 @@ function App() {
     setSessionId("")
     setSessionDirectory("")
     setMessages([])
+    setQueue([])
     setConnection("connecting")
     setView("session")
   }
@@ -831,6 +957,7 @@ function App() {
     window.localStorage.setItem("session-team-demo-id", id)
     setMessages([])
     setQuestions([])
+    setQueue([])
     setConnection("connecting")
     setSessionId(id)
     setView("session")
@@ -840,6 +967,61 @@ function App() {
     if (!sessionId || connection !== "connected") return
     void syncSessionAgents(sessionId, agents).catch(() => undefined)
   }, [agents, sessionId, connection])
+
+  // SSE 安全网：服务端 busy 状态驱动 running，覆盖 SSE 断连 / LLM 挂死 / 手动 abort 卡死等所有路径
+  // 必须先观测到一次 busy 才允许清除（沙箱重建期间 status 尚未 busy，不能误判 idle）
+  const sawBusyRef = useRef(false)
+  const runningSinceRef = useRef(0)
+  useEffect(() => {
+    if (!sessionId || connection !== "connected") return
+    if (!running) {
+      sawBusyRef.current = false
+      return
+    }
+    if (!runningSinceRef.current) runningSinceRef.current = Date.now()
+    let cancelled = false
+    let timer = 0
+    async function check() {
+      let busy = false
+      try {
+        const status = await apiRequest<Record<string, { type?: string }>>("/session/status")
+        busy = status[sessionId]?.type === "busy"
+      } catch {
+        // 查询失败时保守处理：继续等，不清除 running
+        busy = true
+      }
+      if (cancelled) return
+      if (busy) {
+        sawBusyRef.current = true
+        timer = window.setTimeout(check, 3000)
+        return
+      }
+      // 还没观测到 busy（沙箱重建/drain 未启动），30s 内继续等
+      if (!sawBusyRef.current && Date.now() - runningSinceRef.current < 30_000) {
+        timer = window.setTimeout(check, 2000)
+        return
+      }
+      runningSinceRef.current = 0
+      setRunning(false)
+      setRunningAgent(null)
+      runningAgentRef.current = null
+    }
+    timer = window.setTimeout(check, 2000)
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
+  }, [running, sessionId, connection])
+
+  // running 转 idle 后自动派发队首
+  useEffect(() => {
+    if (running || queue.length === 0) return
+    const [head, ...rest] = queue
+    setQueue(rest)
+    void dispatchQueued(head, Date.now(), () => {
+      setMessages((current) => current.filter((message) => message.id !== head.bubbleId))
+    }, messages.length === 0)
+  }, [running, queue])
 
   async function pollMessages(id: string, optimisticId: number, text: string) {
     for (let attempt = 0; attempt < 120; attempt += 1) {
@@ -984,18 +1166,33 @@ function App() {
         </div>
         <div className="session-list">
           {sessions.map((entry) => (
-            <button
-              className={`session-row ${entry.id === sessionId && view === "session" ? "active" : ""}`}
-              type="button"
+            <div
+              className={`session-row group ${entry.id === sessionId && view === "session" ? "active" : ""}`}
+              role="button"
+              tabIndex={0}
               key={entry.id}
               onClick={() => selectSession(entry.id)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") selectSession(entry.id)
+              }}
             >
               <span className={`session-dot ${entry.id === sessionId ? "live" : ""}`} />
               <span className="session-copy">
                 <strong>{entry.title}</strong>
                 <small>{entry.id.slice(0, 12)}</small>
               </span>
-            </button>
+              <span
+                className="session-delete"
+                role="button"
+                title="删除会话"
+                onClick={(event) => {
+                  event.stopPropagation()
+                  void deleteSession(entry.id)
+                }}
+              >
+                <Trash2 size={13} />
+              </span>
+            </div>
           ))}
         </div>
         <button className="new-session" type="button" onClick={newSession}>
@@ -1073,6 +1270,14 @@ function App() {
               onAnswered={() => sessionId && void refreshQuestions(sessionId)}
               permissions={permissions}
               onPermissionResolved={() => sessionId && void refreshPermissions(sessionId)}
+              model={model}
+              modelOptions={modelOptions}
+              onModelChange={setModel}
+              queue={queue}
+              onCancelQueued={(id) => {
+                setQueue((current) => current.filter((item) => item.id !== id))
+                setMessages((current) => current.filter((message) => message.id !== id))
+              }}
             />
           )}
         </div>
@@ -1612,6 +1817,11 @@ function Conversation(props: {
   onAnswered: () => void
   permissions: PermissionRequest[]
   onPermissionResolved: () => void
+  model: ModelRef
+  modelOptions: ModelOption[]
+  onModelChange: (model: ModelRef) => void
+  queue: QueuedMessage[]
+  onCancelQueued: (id: number) => void
 }) {
   const mentionAgents = props.primaryAgents.filter((agent) => agent.name.includes(props.mentionQuery ?? ""))
   const mentionMembers = props.members.filter(
@@ -1650,6 +1860,7 @@ function Conversation(props: {
                 {message.role === "user" ? "YOU" : message.role === "tool" ? `TOOL / ${message.agent}` : message.agent}
                 <time>{message.time}</time>
                 {message.role === "assistant" && message.finish && <em>finished</em>}
+                {message.pending && <em className="pending-badge">排队中</em>}
               </div>
               <div className="message-body">
                 {message.role === "assistant" ? (
@@ -1744,17 +1955,37 @@ function Conversation(props: {
               placeholder="不 @ 仅记录为项目背景，@ Agent 才会派发任务..."
             />
           </div>
+          {props.queue.length > 0 && (
+            <div className="queue-bar">
+              {props.queue.map((item) => (
+                <span className="queue-chip" key={item.id}>
+                  <b>@{item.agent}</b>
+                  {item.text.length > 24 ? `${item.text.slice(0, 24)}…` : item.text}
+                  <i role="button" title="取消排队" onClick={() => props.onCancelQueued(item.id)}>
+                    <X size={11} />
+                  </i>
+                </span>
+              ))}
+            </div>
+          )}
           <div className="composer-footer">
             <span>
-              Enter 发送 <b>·</b> Shift Enter 换行 <b>·</b> @ 派发 = prompt_async <b>·</b> 不 @ = noReply 仅记录
+              Enter 发送 <b>·</b> Shift Enter 换行 <b>·</b> @ 派发 <b>·</b> 运行中 @ 发送 = 排队 <b>·</b> 不 @ = 仅记录
             </span>
+            <ModelSelect model={props.model} options={props.modelOptions} onChange={props.onModelChange} />
             {props.running ? (
-              <button type="button" className="stop-button" onClick={props.stopMessage}>
-                停止 <span>■</span>
+              <button type="button" className="stop-button" onClick={props.stopMessage} title="停止执行">
+                <Square size={11} fill="currentColor" />
               </button>
             ) : (
-              <button type="button" className="send-button" onClick={props.sendMessage} disabled={!props.draft.trim()}>
-                发送 <span>↗</span>
+              <button
+                type="button"
+                className="send-button"
+                onClick={props.sendMessage}
+                disabled={!props.draft.trim()}
+                title="发送"
+              >
+                <ArrowUp size={16} strokeWidth={2.5} />
               </button>
             )}
           </div>
@@ -1762,6 +1993,71 @@ function Conversation(props: {
       </section>
       {previewFile && (
         <FilePreviewModal file={previewFile} sessionId={props.sessionId} onClose={() => setPreviewPath(null)} />
+      )}
+    </div>
+  )
+}
+
+function ModelSelect({
+  model,
+  options,
+  onChange,
+}: {
+  model: ModelRef
+  options: ModelOption[]
+  onChange: (model: ModelRef) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!open) return
+    const close = (event: MouseEvent) => {
+      if (!ref.current?.contains(event.target as Node)) setOpen(false)
+    }
+    document.addEventListener("mousedown", close)
+    return () => document.removeEventListener("mousedown", close)
+  }, [open])
+  const current = options.find((option) => option.providerID === model.providerID && option.modelID === model.modelID)
+  const groups = [...new Map(options.map((option) => [option.providerID, option.providerName])).entries()]
+  return (
+    <div className="model-select" ref={ref}>
+      <button
+        type="button"
+        className={`model-trigger ${open ? "open" : ""}`}
+        onClick={() => setOpen((value) => !value)}
+        title="选择模型"
+      >
+        <Cpu size={13} />
+        <span>{current?.modelName ?? model.modelID}</span>
+        <ChevronDown size={12} className={`model-chevron ${open ? "open" : ""}`} />
+      </button>
+      {open && (
+        <div className="model-panel">
+          {groups.map(([providerID, providerName]) => (
+            <div key={providerID}>
+              <div className="model-group">{providerName}</div>
+              {options
+                .filter((option) => option.providerID === providerID)
+                .map((option) => {
+                  const selected = option.providerID === model.providerID && option.modelID === model.modelID
+                  return (
+                    <button
+                      key={option.modelID}
+                      type="button"
+                      className={`model-option ${selected ? "selected" : ""}`}
+                      onClick={() => {
+                        onChange({ providerID: option.providerID, modelID: option.modelID })
+                        setOpen(false)
+                      }}
+                    >
+                      <span>{option.modelName}</span>
+                      {selected && <Check size={13} />}
+                    </button>
+                  )
+                })}
+            </div>
+          ))}
+        </div>
       )}
     </div>
   )
