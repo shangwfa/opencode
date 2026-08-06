@@ -22,7 +22,7 @@ function eventID() {
   return EventV2.ID.create()
 }
 
-function eventResponse(events: EventV2.Interface) {
+function eventResponse(events: EventV2.Interface, sessionID?: string) {
   return Effect.gen(function* () {
     const instance = yield* InstanceState.context
     const workspaceID = yield* InstanceState.workspaceID
@@ -32,11 +32,14 @@ function eventResponse(events: EventV2.Interface) {
     const unsubscribe = yield* events.listen((event) => Effect.sync(() => Queue.offerUnsafe(queue, event)))
     yield* Effect.addFinalizer(() => unsubscribe)
     const stream = Stream.fromQueue(queue).pipe(
-      Stream.filter(
-        (event) =>
-          event.location?.directory === instance.directory &&
-          (event.location.workspaceID === undefined || event.location.workspaceID === workspaceID),
-      ),
+      Stream.filter((event) => {
+        if (event.location?.directory !== instance.directory) return false
+        if (event.location.workspaceID !== undefined && event.location.workspaceID !== workspaceID) return false
+        // 会话级订阅：只放行该会话的事件；不带 sessionID 的全局事件（心跳等）始终放行
+        if (!sessionID) return true
+        const eventSessionID = (event.data as { sessionID?: string } | undefined)?.sessionID
+        return eventSessionID === undefined || eventSessionID === sessionID
+      }),
       Stream.map((event) => ({ id: event.id, type: event.type, properties: event.data })),
     )
     const disposed = Stream.callback<{ id: string; type: string; properties: unknown }>((queue) => {
@@ -91,8 +94,9 @@ export const eventHandlers = HttpApiBuilder.group(EventApi, "event", (handlers) 
     const events = yield* EventV2Bridge.Service
     return handlers.handleRaw(
       "subscribe",
-      Effect.fn("EventHttpApi.subscribe")(function* () {
-        return yield* eventResponse(events)
+      Effect.fn("EventHttpApi.subscribe")(function* (ctx) {
+        const sessionID = new URL(ctx.request.url, "http://localhost").searchParams.get("sessionID") ?? undefined
+        return yield* eventResponse(events, sessionID)
       }),
     )
   }),

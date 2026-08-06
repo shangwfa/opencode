@@ -101,7 +101,11 @@ const layer = Layer.effect(
         sessionID: request.sessionID,
         permission: request.permission,
         patterns: request.patterns,
-        metadata: request.metadata,
+        // 工具的 metadata 可能带 undefined 值（如 websearch 的可选参数），
+        // 不过滤会导致 GET /permission 的 Schema 编码直接失败
+        metadata: request.metadata
+          ? Object.fromEntries(Object.entries(request.metadata).filter(([, value]) => value !== undefined))
+          : request.metadata,
         always: request.always,
         tool: request.tool,
       }

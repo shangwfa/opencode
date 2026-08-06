@@ -1,34 +1,8 @@
-# Provider 与模型、SSE 事件流
+# SSE 事件流
 
 > 本文档从 `saas-test-cases.md` 拆分而来。公共测试环境和配置见 [`00-preamble.md`](./00-preamble.md)。运行用例前先 `source test-env.sh 3 && source test-lib.sh`（以下用例直接使用 `$BASE`/`$MODEL`/`jexec`）。
 
-## 八、Provider 与模型
 
-### T8.1 列出所有 provider
-
-```bash
-curl -s "$BASE/provider" | python3 -c "
-import json,sys
-d=json.load(sys.stdin)
-print('all:', len(d.get('all',[])))
-print('connected:', d.get('connected'))
-"
-```
-**期望**：`all` 非空，`connected` 包含已配置 provider
-
-### T8.2 切换模型
-
-```bash
-# 同 session 先发一条 glm-5.1 消息，再发一条其他模型消息
-SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
-
-curl -s --max-time 90 -X POST "$BASE/session/$SID/message" \
-  -H 'Content-Type: application/json' \
-  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"说一个字\"}],\"model\":$MODEL}" | jexec "d.get('info',{}).get('modelID','?')"
-```
-**期望**：两次消息分别使用指定模型回复，无错误
-
----
 
 ## 九、SSE 事件流
 
@@ -199,8 +173,8 @@ for i in $(seq 1 40); do
   if [ -n "$PLINE" ]; then
     PID=$(echo "$PLINE" | jexec "d['properties']['id']")
     echo "permission.asked id=$PID"
-    curl -s -X POST "$BASE/session//permissions/" \
-      -H 'Content-Type: application/json' -d '{"response":"always"}'
+    curl -s -X POST "$BASE/permission/$PID/reply" \
+      -H 'Content-Type: application/json' -d '{"reply":"always"}'
     echo "replied: always"
     break
   fi
@@ -309,8 +283,8 @@ for i in $(seq 1 40); do
   PLINE=$(grep -m1 '"type":"permission.asked"' /tmp/t911.log 2>/dev/null)
   if [ -n "$PLINE" ]; then
     PID=$(echo "$PLINE" | jexec "d['properties']['id']")
-    curl -s -X POST "$BASE/session//permissions/" \
-      -H 'Content-Type: application/json' -d '{"response":"always"}' > /dev/null
+    curl -s -X POST "$BASE/permission/$PID/reply" \
+      -H 'Content-Type: application/json' -d '{"reply":"always"}' > /dev/null
     break
   fi
   grep -q '"type":"file.edited"\|"type":"file.watcher.updated"' /tmp/t911.log 2>/dev/null && break
@@ -419,6 +393,273 @@ grep -c '"type":"message\.' /tmp/t915b.log
 
 ---
 
+### T9.16 会话级订阅：完整事件生命周期
+
+> 验证：`GET /event?sessionID=xxx` 只推送目标会话的事件，且生命周期完整（connected → busy → part.* → idle）
+
+```bash
+SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
+DIR=$(curl -s "$BASE/session/$SID" | jexec "d['directory']")
+
+bun docs/test-cases/scripts/sse-dump.mjs "$BASE/event?sessionID=$SID" 50 "$DIR" > /tmp/t916.log &
+SSE_PID=$!
+for i in $(seq 1 20); do grep -q server.connected /tmp/t916.log 2>/dev/null && break; sleep 0.5; done
+
+curl -s --max-time 45 -X POST "$BASE/session/$SID/message" \
+  -H 'Content-Type: application/json' \
+  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"说一个字\"}],\"model\":$MODEL}" > /dev/null
+wait $SSE_PID
+
+grep -c '"type":"session.status"' /tmp/t916.log
+grep -c '"type":"message.part.updated"\|"type":"message.part.delta"' /tmp/t916.log
+grep -c '"type":"session.idle"' /tmp/t916.log
+# 所有带 sessionID 的事件都属于目标会话
+python3 -c "
+import json
+sids = {json.loads(l).get('properties',{}).get('sessionID') for l in open('/tmp/t916.log')}
+sids.discard(None)
+print('sessionIDs:', sids)
+print('✅ only target session' if sids == {'$SID'} else '❌')
+"
+```
+**期望**：`session.status` ≥ 1、`message.part.*` ≥ 1、`session.idle` ≥ 1，且事件中出现的 sessionID 只有目标会话
+
+---
+
+### T9.17 会话级订阅：跨会话隔离
+
+> 验证：订阅会话 A 时，会话 B 的执行事件不会出现在 A 的事件流中
+
+```bash
+SID_A=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
+SID_B=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
+DIR=$(curl -s "$BASE/session/$SID_A" | jexec "d['directory']")
+
+bun docs/test-cases/scripts/sse-dump.mjs "$BASE/event?sessionID=$SID_A" 50 "$DIR" > /tmp/t917.log &
+SSE_PID=$!
+for i in $(seq 1 20); do grep -q server.connected /tmp/t917.log 2>/dev/null && break; sleep 0.5; done
+
+curl -s --max-time 45 -X POST "$BASE/session/$SID_A/message" \
+  -H 'Content-Type: application/json' -d "{\"parts\":[{\"type\":\"text\",\"text\":\"说A\"}],\"model\":$MODEL}" > /dev/null &
+curl -s --max-time 45 -X POST "$BASE/session/$SID_B/message" \
+  -H 'Content-Type: application/json' -d "{\"parts\":[{\"type\":\"text\",\"text\":\"说B\"}],\"model\":$MODEL}" > /dev/null &
+wait $SSE_PID
+
+grep -c "$SID_B" /tmp/t917.log
+```
+**期望**：A 的订阅流中 B 的 sessionID 出现 0 次；A 自身事件正常收到
+
+---
+
+### T9.18 会话级订阅：不带 sessionID 向后兼容
+
+> 验证：不带 `sessionID` 的实例 `/event` 保持原有行为，收到所有会话的事件
+
+```bash
+SID_A=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
+SID_B=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
+DIR=$(curl -s "$BASE/session/$SID_A" | jexec "d['directory']")
+
+bun docs/test-cases/scripts/sse-dump.mjs "$BASE/event" 50 "$DIR" > /tmp/t918.log &
+SSE_PID=$!
+for i in $(seq 1 20); do grep -q server.connected /tmp/t918.log 2>/dev/null && break; sleep 0.5; done
+
+curl -s --max-time 45 -X POST "$BASE/session/$SID_A/message" \
+  -H 'Content-Type: application/json' -d "{\"parts\":[{\"type\":\"text\",\"text\":\"说A\"}],\"model\":$MODEL}" > /dev/null &
+curl -s --max-time 45 -X POST "$BASE/session/$SID_B/message" \
+  -H 'Content-Type: application/json' -d "{\"parts\":[{\"type\":\"text\",\"text\":\"说B\"}],\"model\":$MODEL}" > /dev/null &
+wait $SSE_PID
+
+echo "A events: $(grep -c "$SID_A" /tmp/t918.log), B events: $(grep -c "$SID_B" /tmp/t918.log)"
+```
+**期望**：两个会话的事件都收到（计数均 > 0），行为与未加过滤参数前一致
+
+---
+
+### T9.19 abort 中断：session.error + session.idle
+
+> 验证：执行中调用 `POST /session/:id/abort`，SSE 推送 `session.error`（AbortError）和 `session.idle`，会话回到空闲态
+
+```bash
+SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
+DIR=$(curl -s "$BASE/session/$SID" | jexec "d['directory']")
+
+bun docs/test-cases/scripts/sse-dump.mjs "$BASE/event?sessionID=$SID" 30 "$DIR" > /tmp/t919.log &
+SSE_PID=$!
+for i in $(seq 1 20); do grep -q server.connected /tmp/t919.log 2>/dev/null && break; sleep 0.5; done
+
+curl -s -X POST "$BASE/session/$SID/prompt_async" \
+  -H 'Content-Type: application/json' \
+  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"写一篇800字文章\"}],\"model\":$MODEL}" > /dev/null
+sleep 6   # 等流式输出开始
+curl -s -o /dev/null -w "abort: %{http_code}\n" -X POST "$BASE/session/$SID/abort"
+wait $SSE_PID
+
+grep -c '"type":"session.error"' /tmp/t919.log
+grep -c '"type":"session.idle"' /tmp/t919.log
+```
+**期望**：abort 返回 200，收到 `session.error` ≥ 1 且 `session.idle` ≥ 1
+
+---
+
+### T9.20 question 工具：question.asked / question.replied
+
+> 验证：Agent 调用 question 工具时 SSE 推送 `question.asked`，程序化回复后推送 `question.replied`
+
+```bash
+SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
+DIR=$(curl -s "$BASE/session/$SID" | jexec "d['directory']")
+
+bun docs/test-cases/scripts/sse-dump.mjs "$BASE/event?sessionID=$SID" 60 "$DIR" > /tmp/t920.log &
+SSE_PID=$!
+for i in $(seq 1 20); do grep -q server.connected /tmp/t920.log 2>/dev/null && break; sleep 0.5; done
+
+curl -s --max-time 55 -X POST "$BASE/session/$SID/message" \
+  -H 'Content-Type: application/json' \
+  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"请使用 question 工具问我一个问题：我最喜欢的颜色是什么？给出两个选项\"}],\"model\":$MODEL}" > /dev/null &
+
+# 轮询捕获 question.asked 并自动回复
+for i in $(seq 1 25); do
+  QLINE=$(grep -m1 '"type":"question.asked"' /tmp/t920.log 2>/dev/null)
+  if [ -n "$QLINE" ]; then
+    QID=$(echo "$QLINE" | jexec "d['properties']['id']")
+    echo "question.asked id=$QID"
+    curl -s -X POST "$BASE/question/$QID/reply" \
+      -H 'Content-Type: application/json' -d '{"answers":[["红色"]]}'
+    break
+  fi
+  sleep 2
+done
+wait $SSE_PID 2>/dev/null
+
+grep -o '"type":"question\.[a-z]*"' /tmp/t920.log | sort | uniq -c
+```
+**期望**：reply 返回 `true`，事件流含 `question.asked` 和 `question.replied`（拒绝路径可用 `POST /question/:id/reject`，对应 `question.rejected` 事件）
+
+---
+
+### T9.21 删除会话：session.deleted
+
+> 验证：`DELETE /session/:id` 推送 `session.deleted`；会话级订阅（`?sessionID=`）在会话删除前也能收到该事件
+
+```bash
+SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
+DIR=$(curl -s "$BASE/session/$SID" | jexec "d['directory']")
+
+bun docs/test-cases/scripts/sse-dump.mjs "$BASE/event?sessionID=$SID" 15 "$DIR" > /tmp/t921.log &
+SSE_PID=$!
+for i in $(seq 1 20); do grep -q server.connected /tmp/t921.log 2>/dev/null && break; sleep 0.5; done
+
+curl -s -o /dev/null -w "delete: %{http_code}\n" -X DELETE "$BASE/session/$SID"
+wait $SSE_PID
+
+grep -o '"type":"session\.[a-z]*"' /tmp/t921.log | sort | uniq -c
+```
+**期望**：delete 返回 200，收到 `session.deleted` 事件（伴随 `session.idle`）
+
+---
+
+### T9.22 会话元数据变更：session.updated
+
+> 验证：`PATCH /session/:id` 修改标题后推送 `session.updated`，事件携带新标题
+
+```bash
+SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{"title":"旧标题"}' | jexec "d['id']")
+DIR=$(curl -s "$BASE/session/$SID" | jexec "d['directory']")
+
+bun docs/test-cases/scripts/sse-dump.mjs "$BASE/event?sessionID=$SID" 12 "$DIR" > /tmp/t922.log &
+SSE_PID=$!
+for i in $(seq 1 20); do grep -q server.connected /tmp/t922.log 2>/dev/null && break; sleep 0.5; done
+
+curl -s -X PATCH "$BASE/session/$SID" -H 'Content-Type: application/json' -d '{"title":"新标题"}' > /dev/null
+wait $SSE_PID
+
+grep -m1 '"type":"session.updated"' /tmp/t922.log | grep -o '"title":"[^"]*"'
+```
+**期望**：收到 `session.updated`，且 `info.title` 为新标题
+
+---
+
+### T9.23 todo 工具：todo.updated
+
+> 验证：Agent 调用 todowrite 工具时推送 `todo.updated` 事件
+
+```bash
+SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
+DIR=$(curl -s "$BASE/session/$SID" | jexec "d['directory']")
+
+bun docs/test-cases/scripts/sse-dump.mjs "$BASE/event?sessionID=$SID" 70 "$DIR" > /tmp/t923.log &
+SSE_PID=$!
+for i in $(seq 1 20); do grep -q server.connected /tmp/t923.log 2>/dev/null && break; sleep 0.5; done
+
+curl -s --max-time 65 -X POST "$BASE/session/$SID/message" \
+  -H 'Content-Type: application/json' \
+  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"请使用 todowrite 工具创建一个包含两项任务的待办清单：1.写文档 2.写代码\"}],\"model\":$MODEL}" > /dev/null
+wait $SSE_PID
+
+grep -c '"type":"todo.updated"' /tmp/t923.log
+```
+**期望**：`todo.updated` ≥ 1
+
+---
+
+### T9.24 权限请求完整生命周期：permission.asked + permission.replied
+
+> 验证：权限请求从发起到回复的完整事件对（T9.7 只断言 asked，本用例补 replied）
+
+```bash
+SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
+DIR=$(curl -s "$BASE/session/$SID" | jexec "d['directory']")
+
+bun docs/test-cases/scripts/sse-dump.mjs "$BASE/event?sessionID=$SID" 80 "$DIR" > /tmp/t924.log &
+SSE_PID=$!
+for i in $(seq 1 20); do grep -q server.connected /tmp/t924.log 2>/dev/null && break; sleep 0.5; done
+
+curl -s --max-time 75 -X POST "$BASE/session/$SID/message" \
+  -H 'Content-Type: application/json' \
+  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"用 bash 工具执行 rm -rf /tmp/nonexistent-test-dir\"}],\"model\":$MODEL}" > /dev/null &
+
+for i in $(seq 1 30); do
+  PLINE=$(grep -m1 '"type":"permission.asked"' /tmp/t924.log 2>/dev/null)
+  if [ -n "$PLINE" ]; then
+    PID=$(echo "$PLINE" | jexec "d['properties']['id']")
+    curl -s -X POST "$BASE/permission/$PID/reply" \
+      -H 'Content-Type: application/json' -d '{"reply":"reject"}'
+    break
+  fi
+  sleep 2
+done
+wait $SSE_PID 2>/dev/null
+
+grep -o '"type":"permission\.[a-z]*"' /tmp/t924.log | sort | uniq -c
+```
+**期望**：reply 返回 `true`，事件流依次含 `permission.asked` 和 `permission.replied`（`reject` 拒绝也通过 reply 端点，无单独 rejected 事件）
+
+---
+
+### T9.25 会话 diff 汇总：session.diff
+
+> 验证：助手轮次完成后推送 `session.diff`（文件变更汇总，无文件变更时为空数组）
+
+```bash
+SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
+DIR=$(curl -s "$BASE/session/$SID" | jexec "d['directory']")
+
+bun docs/test-cases/scripts/sse-dump.mjs "$BASE/event?sessionID=$SID" 50 "$DIR" > /tmp/t925.log &
+SSE_PID=$!
+for i in $(seq 1 20); do grep -q server.connected /tmp/t925.log 2>/dev/null && break; sleep 0.5; done
+
+curl -s --max-time 45 -X POST "$BASE/session/$SID/message" \
+  -H 'Content-Type: application/json' \
+  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"说一个字\"}],\"model\":$MODEL}" > /dev/null
+wait $SSE_PID
+
+grep -m1 '"type":"session.diff"' /tmp/t925.log
+```
+**期望**：收到 `session.diff` 事件（`properties.diff` 为数组）
+
+---
+
 ## 测试结果
 
 | 用例 | 结果 | 备注 |
@@ -438,6 +679,16 @@ grep -c '"type":"message\.' /tmp/t915b.log
 | T9.13 | ✅ | 断开重连均收到 server.connected |
 | T9.14 | ✅ | 3 个 SSE 客户端同时监听，均收到相同 10 种事件类型 |
 | T9.15 | ✅ | 中途加入收到完整事件流；曾现偶发"B 只收 connected+heartbeat"（28 轮未复现，详见用例备注） |
+| T9.16 | ✅ | 会话级订阅生命周期完整：connected → status busy → part.* → idle，事件 sessionID 均为目标会话 |
+| T9.17 | ✅ | 订阅 A 时 B 的事件出现 0 次，跨会话零污染 |
+| T9.18 | ✅ | 不带 sessionID 时 A/B 事件均收到，向后兼容 |
+| T9.19 | ✅ | abort 返回 200，收到 session.error + session.idle |
+| T9.20 | ✅ | question.asked + question.replied，reply 返回 true |
+| T9.21 | ✅ | 删除返回 200，会话级订阅收到 session.deleted + session.idle |
+| T9.22 | ✅ | PATCH 标题后收到 session.updated，携带新标题 |
+| T9.23 | ✅ | todowrite 触发 todo.updated |
+| T9.24 | ✅ | permission.asked + permission.replied 完整生命周期（reject 也走 reply 端点） |
+| T9.25 | ✅ | 轮次完成收到 session.diff |
 
 > 注：2026-07-17 重构为标准三段式（sse-dump.mjs 后台订阅 + 业务动作 + 日志断言），原始内联 bun 脚本见 git 历史。
 
