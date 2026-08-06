@@ -6,6 +6,7 @@ export type SSEEvent = {
 
 export function subscribeEvents(
   directory: string,
+  sessionID: string,
   onEvent: (event: SSEEvent) => void,
   onError?: (error: unknown) => void,
 ) {
@@ -17,7 +18,7 @@ export function subscribeEvents(
     while (!closed) {
       try {
         controller = new AbortController()
-        const response = await fetch("/opencode/event", {
+        const response = await fetch(`/opencode/event?sessionID=${encodeURIComponent(sessionID)}`, {
           headers: { "x-opencode-directory": directory },
           signal: controller.signal,
         })
