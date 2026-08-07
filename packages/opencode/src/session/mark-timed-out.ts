@@ -1,11 +1,13 @@
 import { Context, Effect, Layer, Option } from "effect"
-import { type ToolPart, type ToolStateRunning } from "@opencode-ai/core/v1/session"
+import { SessionV1, type ToolPart, type ToolStateRunning } from "@opencode-ai/core/v1/session"
 import { PartID, type SessionID } from "./schema"
 import * as Log from "@opencode-ai/core/util/log"
 import { SandboxProvider } from "@/tool/sandbox-provider"
 import { Database } from "../storage/db"
 import { PartTable } from "./session.pg"
 import { and, eq, sql } from "drizzle-orm"
+import { EventV2Bridge } from "@/event-v2-bridge"
+import { ToolExecution } from "./tool-execution"
 
 const log = Log.create({ service: "session.tools" })
 
@@ -17,6 +19,7 @@ type LifecycleDb = {
     from(table: typeof PartTable): {
       where(condition: ReturnType<typeof eq>): {
         get(): Promise<ToolPartRow | undefined>
+        all(): Promise<ToolPartRow[]>
       }
     }
   }
@@ -46,6 +49,7 @@ export const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
     const maybeSandbox = yield* Effect.serviceOption(SandboxProvider.Service)
+    const events = yield* EventV2Bridge.Service
 
     const markTimedOut: Interface["markTimedOut"] = Effect.fn("SessionTools.markTimedOut")(function* (input) {
       const now = input.now ?? Date.now()
@@ -58,14 +62,40 @@ export const layer = Layer.effect(
               if (!row || !part) return undefined
               if (part.state.time.start !== input.expectedStart) return undefined
               if (now - part.state.time.start <= input.timeoutMs) return undefined
+              const attempts = (await tx
+                .select()
+                .from(PartTable)
+                .where(eq(PartTable.message_id, row.message_id))
+                .all())
+                .filter((item) => isWatchdogTimeout(item.data)).length + 1
+              const eligible = attempts <= MAX_AGENT_RETRY_ATTEMPTS
+              const requiresVerification = RETRY_WITH_VERIFICATION.has(part.tool)
 
               const updateData: StoredToolPart = {
                 ...part,
                 state: {
                   status: "error",
                   input: part.state.input,
-                  error: `Tool execution timed out after ${Math.round(input.timeoutMs / 1000)}s (watchdog)`,
-                  metadata: { ...(part.state.metadata ?? {}), timeout: true },
+                  error: [
+                    `Tool execution timed out after ${Math.round(input.timeoutMs / 1000)}s (watchdog).`,
+                    "The operation may have partially completed.",
+                    eligible
+                      ? requiresVerification
+                        ? `Inspect the current state before retrying, then use a narrower or idempotent operation; retry ${attempts} of ${MAX_AGENT_RETRY_ATTEMPTS}.`
+                        : `The code agent may retry with a narrower operation; retry ${attempts} of ${MAX_AGENT_RETRY_ATTEMPTS}.`
+                      : `The code agent retry budget of ${MAX_AGENT_RETRY_ATTEMPTS} attempts is exhausted; report the failure instead of retrying.`,
+                  ].join(" "),
+                  metadata: {
+                    ...(part.state.metadata ?? {}),
+                    timeout: true,
+                    retry: {
+                      strategy: "agent",
+                      eligible,
+                      attempt: attempts,
+                      maxAttempts: MAX_AGENT_RETRY_ATTEMPTS,
+                      requiresVerification,
+                    },
+                  },
                   time: { start: part.state.time.start, end: now },
                 },
               }
@@ -90,12 +120,30 @@ export const layer = Layer.effect(
       if (!result) return false
 
       const sessionID = result.row.session_id as SessionID
+      const interrupted = ToolExecution.interrupt(sessionID, result.updateData.callID)
+
+      yield* events.publish(SessionV1.Event.PartUpdated, {
+        sessionID,
+        part: {
+          ...result.updateData,
+          id: result.row.id,
+          sessionID,
+          messageID: result.row.message_id,
+        },
+        time: now,
+      }).pipe(
+        Effect.catchCause((cause) => {
+          log.error("timed out part event publish failed", { partID: input.partID, cause: String(cause) })
+          return Effect.void
+        }),
+      )
 
       if (COMMAND_TOOLS.has(result.updateData.tool)) {
         yield* Option.match(maybeSandbox, {
           onNone: () => Effect.void,
           onSome: (provider) =>
             provider.interrupt(sessionID).pipe(
+              Effect.timeout("10 seconds"),
               Effect.catchCause((cause) => {
                 log.warn("sandbox interrupt on timeout failed", { partID: input.partID, cause: String(cause) })
                 return Effect.void
@@ -109,6 +157,7 @@ export const layer = Layer.effect(
         sessionID,
         tool: result.updateData.tool,
         runningMs: now - input.expectedStart,
+        interrupted,
       })
       return true
     })
@@ -118,8 +167,33 @@ export const layer = Layer.effect(
 )
 
 const COMMAND_TOOLS = new Set(["bash", "task"])
+const RETRY_WITH_VERIFICATION = new Set(["write", "edit", "apply_patch"])
+const MAX_AGENT_RETRY_ATTEMPTS = 2
 
 export const defaultLayer = layer
+
+export function transitionRunningTool(part: ToolPart, expectedStart: number) {
+  const { id, sessionID: _, messageID: __, ...data } = part
+  return Effect.tryPromise({
+    try: () =>
+      Database.transaction(
+        async (tx: LifecycleDb) => {
+          const updated = await tx
+            .update(PartTable)
+            .set({ data, time_updated: Date.now() })
+            .where(runningToolCasCondition(id, expectedStart))
+            .returning({ id: PartTable.id })
+            .all()
+          return updated.length > 0
+        },
+        { behavior: "immediate" },
+      ),
+    catch: (error) => new Error(`tool transition failed for ${part.id}: ${String(error)}`),
+  }).pipe(
+    Effect.tapError((error) => Effect.sync(() => log.error("tool transition failed", { partID: part.id, error: String(error) }))),
+    Effect.orDie,
+  )
+}
 
 function parseToolPart(data: unknown): StoredRunningToolPart | undefined {
   const value = typeof data === "string" ? parseJson(data) : data
@@ -132,6 +206,12 @@ function parseToolPart(data: unknown): StoredRunningToolPart | undefined {
   if (!isRecord(value.state.time)) return
   if (typeof value.state.time.start !== "number") return
   return value as StoredRunningToolPart
+}
+
+function isWatchdogTimeout(data: unknown) {
+  const value = typeof data === "string" ? parseJson(data) : data
+  if (!isRecord(value) || !isRecord(value.state) || !isRecord(value.state.metadata)) return false
+  return value.state.metadata.timeout === true
 }
 
 function parseJson(data: string): unknown {

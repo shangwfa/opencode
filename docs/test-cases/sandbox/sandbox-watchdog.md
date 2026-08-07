@@ -224,55 +224,28 @@ docker rm -f opencode-saas-test-timeout
 
 **验证点**：watchdog 每 60s 扫描一次 parts 表（`watchdog.ts:18` `scanInterval: Duration.seconds(60)`，**硬编码，无 env**，仅可 `layerWithConfig` 注入），发现 `status=running` 且 `time.start` 超过 5 分钟（`timeoutMs`，`watchdog.ts:20`）的 tool part 后，不直接裸写 DB，而是调用 `SessionTools.markTimedOut(partID, expectedStart, timeoutMs)` 标记为 error，并设置 `metadata.timeout=true`。
 
+生产 Watchdog 只处理本进程 `ToolExecution` 注册表中仍活跃的调用，避免一个 Pod 将另一个 Pod 正在执行的工具误标为超时。因此不能再通过“只向 PG 插入 running part”模拟真实超时；该记录没有本地执行所有权，正确行为是保持 `running`。
+
+推荐使用应用级集成测试：
+
+1. 通过测试 ToolRegistry 注册一个等待 `ctx.abort` 的阻塞工具。
+2. 使用 `layerWithConfig` 注入较短的 `timeoutMs`、`scanInterval` 和 `initialDelay`。
+3. 正常发起工具调用，使 `ToolExecution.register()` 建立本进程所有权。
+4. 等待 Watchdog 调用 `markTimedOut()`，并确认工具收到 abort。
+5. 查询 PG Part 状态及订阅 `PartUpdated`。
+
 ```bash
-# 1. 直接向 PG 插入一个"卡死"的 part（start 时间设为 6 分钟前）
-psql "$PG_URL" <<'SQL'
-INSERT INTO session (id, project_id, directory, slug, title, version, time_created, time_updated, cost, tokens_input, tokens_output, tokens_reasoning)
-VALUES ('ses_test_watchdog', 'global', '/workspace', 'test', 'watchdog test', '2.0',
-        (extract(epoch from now())*1000)::bigint, (extract(epoch from now())*1000)::bigint, 0, 0, 0, 0);
-
-INSERT INTO message (id, session_id, data, time_created, time_updated)
-VALUES ('msg_test_watchdog', 'ses_test_watchdog', '{"role":"assistant"}'::jsonb,
-        (extract(epoch from now())*1000)::bigint, (extract(epoch from now())*1000)::bigint);
-
-INSERT INTO part (id, message_id, session_id, data, time_created, time_updated)
-VALUES ('prt_test_watchdog', 'msg_test_watchdog', 'ses_test_watchdog',
-  '{"type":"tool","callID":"test","tool":"read","state":{"status":"running","input":{"filePath":"/workspace"},"time":{"start":0}}}'::jsonb,
-  (extract(epoch from now()-interval '7 minute')*1000)::bigint,
-  (extract(epoch from now()-interval '7 minute')*1000)::bigint);
-
--- 把 start 改成 6 分钟前
-UPDATE part SET data = jsonb_set(data, '{state,time,start}', to_jsonb((extract(epoch from now()-interval '6 minute')*1000)::bigint))
-WHERE id = 'prt_test_watchdog';
-SQL
-
-echo "插入 stuck part，start=6min ago"
-echo ""
-echo "等 watchdog 扫描（最多 90s）..."
-
-# 2. 轮询 part 状态，等待被标记
-for i in $(seq 1 18); do
-  sleep 5
-  STATUS=$(psql "$PG_URL" -t -c "SELECT data->'state'->>'status' FROM part WHERE id='prt_test_watchdog'" | tr -d '[:space:]')
-  TIMEOUT=$(psql "$PG_URL" -t -c "SELECT data->'state'->'metadata'->>'timeout' FROM part WHERE id='prt_test_watchdog'" | tr -d '[:space:]')
-  echo "  [$((i*5))s] status=$STATUS timeout=$TIMEOUT"
-  if [ "$STATUS" = "error" ]; then
-    echo ""
-    echo "✅ T28.5 PASS: Watchdog 已通过 lifecycle 标记 error"
-    psql "$PG_URL" -c "SELECT substring(data->'state'->>'error', 1, 80) as error FROM part WHERE id='prt_test_watchdog'"
-    break
-  fi
-done
-
-# 3. 清理
-psql "$PG_URL" -c "DELETE FROM session WHERE id='ses_test_watchdog'" >/dev/null
+cd packages/opencode
+bun test test/session/watchdog.test.ts test/session/tool-execution.test.ts
 ```
 
 **期望**：
-- 90s 内 part 状态变为 `error`
+- 活跃的本进程超时调用状态变为 `error`
 - `data->state->error` 含 `"Tool execution timed out after 300s (watchdog)"`
 - `data->state->metadata.timeout = true`
+- 工具的 `AbortSignal.aborted = true`
 - 容器日志含 `service=session.tools ... marked tool as timed out`
+- 仅向 PG 插入、没有本地 `ToolExecution` 所有权的记录不会被处理
 
 ---
 
@@ -281,15 +254,14 @@ psql "$PG_URL" -c "DELETE FROM session WHERE id='ses_test_watchdog'" >/dev/null
 **验证点**：超时标记必须经过 `MessageV2.Event.PartUpdated` 同步事件路径，不能只改 `part` 表。这样 UI/SSE/share/sync 订阅者可以看到状态变化。
 
 ```bash
-# 复用 T28.5 创建并被 watchdog 标记的 prt_test_watchdog。
-# 如果 T28.5 已清理，请先重新执行 T28.5 的插入步骤，并等到 status=error。
+# 复用 T28.5 应用级集成测试产生的 $SID 和 $PART_ID。
 
 psql "$PG_URL" -c "
 SELECT type, aggregate_id, data->'part'->>'id' AS part_id, data->'part'->'state'->>'status' AS status
 FROM event
 WHERE type LIKE 'message.part.updated%'
-  AND aggregate_id = 'ses_test_watchdog'
-  AND data->'part'->>'id' = 'prt_test_watchdog'
+  AND aggregate_id = '$SID'
+  AND data->'part'->>'id' = '$PART_ID'
 ORDER BY seq DESC
 LIMIT 3;
 "
@@ -297,7 +269,7 @@ LIMIT 3;
 
 **期望**：
 - 至少有一条 `message.part.updated` 事件。
-- `part_id = prt_test_watchdog`。
+- `part_id = $PART_ID`。
 - 最新事件里的 `status = error`。
 - 如果 `OPENCODE_EXPERIMENTAL_WORKSPACES` 未开启导致 `event` 表不落库，则改用 SSE/SDK 订阅验证同一事件。
 
@@ -611,6 +583,60 @@ docker logs opencode-saas-test 2>&1 | grep "watchdog stuck tools detected" | tai
 
 ---
 
+### T28.14 Watchdog 超时后的 Code Agent 恢复重试
+
+**验证点**：Watchdog 不在服务端直接重放原工具调用。它中断当前执行、写入结构化 Agent 重试策略并 settle 当前 tool call，让模型在下一 provider turn 重新读取历史、检查现场并决定是否重试。
+
+超时 ToolPart 的 `metadata.retry` 应为：
+
+```json
+{
+  "strategy": "agent",
+  "eligible": true,
+  "attempt": 1,
+  "maxAttempts": 2,
+  "requiresVerification": false
+}
+```
+
+其中 `write`、`edit`、`apply_patch` 的 `requiresVerification=true`；Code Agent 必须先用 `read` 等只读工具确认操作是否已部分完成，再使用更窄或幂等的操作重试。服务端不得自动重放 `bash`、`task` 或任何写入型工具。
+
+```bash
+# 复用真实执行超时后的 $SID 和 $PART_ID。直接向 PG 插入 part 不会触发
+# 本进程 watchdog，因为生产实现只处理 ToolExecution 注册表中由本进程拥有的调用。
+psql "$PG_URL" -x -c "
+SELECT
+  data->'state'->>'status' AS status,
+  data->'state'->'metadata'->'retry'->>'strategy' AS strategy,
+  data->'state'->'metadata'->'retry'->>'eligible' AS eligible,
+  data->'state'->'metadata'->'retry'->>'attempt' AS attempt,
+  data->'state'->'metadata'->'retry'->>'maxAttempts' AS max_attempts,
+  data->'state'->'metadata'->'retry'->>'requiresVerification' AS requires_verification,
+  data->'state'->>'error' AS error
+FROM part
+WHERE id = '$PART_ID';
+"
+
+# 检查后续工具调用。重试必须使用新的 callID，由 Code Agent 发起，而不是服务端重放。
+psql "$PG_URL" -c "
+SELECT id, data->>'callID' AS call_id, data->>'tool' AS tool,
+       data->'state'->>'status' AS status
+FROM part
+WHERE session_id = '$SID' AND data->>'type' = 'tool'
+ORDER BY time_created;
+"
+```
+
+**期望**：
+- 第一、二次超时 part 为 `error`，`strategy=agent`、`eligible=true`、`attempt=1/2`、`max_attempts=2`。
+- 同一 assistant message 的第三次超时为 `eligible=false`，错误文本要求停止重试并报告失败。
+- 错误文本提示操作可能已部分完成，并要求最多重试两次。
+- 当前调用被 settle，Session 不因普通 watchdog timeout 进入 blocked。
+- 如果 Agent 决定重试，会出现新 `callID`；写入型工具之前先出现状态检查调用。
+- 连续失败达到两次后 Agent 停止重试并向用户报告，不形成无限工具循环。
+
+---
+
 ## 排查场景对照表
 
 | 现象 | 可能原因 | 验证用例 | 日志关键字 |
@@ -627,6 +653,8 @@ docker logs opencode-saas-test 2>&1 | grep "watchdog stuck tools detected" | tai
 | 错误看不到原因 | tools.ts 静默吞错 | T28.7 | `ERROR ... sandbox init failed` |
 | 卡 90s+ 才报错 | getOrCreate 超时生效 | T28.4 | `Sandbox getOrCreate timeout after 90s` |
 | scan 标记数/耗时不可见 | 结果丢弃或未记日志 | T28.13 | `watchdog scan completed ... marked= durationMs=` |
+| 超时后 Session 不继续 | 已标记 error 的 tool call 未 settle | T28.14 | `metadata.retry.strategy=agent`，后续出现新 callID |
+| 写入操作被重复执行 | 服务端直接重放或 Agent 未检查现场 | T28.14 | `requiresVerification=true`，重试前应先 read |
 
 ## 改动文件清单
 
@@ -662,5 +690,9 @@ SessionTools.markTimedOut(partID, expectedStart, timeoutMs)
   ↓
 发布 MessageV2.Event.PartUpdated 同步事件
   ↓
-用户看到明确错误，可以重试
+Processor settle 已被 Watchdog 终结的 tool call
+  ↓
+重新加载最新历史，进入下一 provider turn
+  ↓
+Code Agent 检查现场并决定是否重试（最多 2 次；写入操作先验证）
 ```

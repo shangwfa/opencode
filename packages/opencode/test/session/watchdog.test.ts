@@ -1,9 +1,6 @@
 import { describe, expect, test, beforeEach, afterEach } from "bun:test"
 import { Database as BunSqlite } from "bun:sqlite"
 import { drizzle, type SQLiteBunDatabase } from "drizzle-orm/bun-sqlite"
-import { migrate } from "drizzle-orm/bun-sqlite/migrator"
-import path from "path"
-import { readdirSync, readFileSync } from "fs"
 import { PartTable } from "../../src/session/session.pg"
 import { runningToolCondition } from "../../src/session/watchdog-sql"
 
@@ -14,18 +11,17 @@ let db: SQLiteBunDatabase
 
 function createTestDb(): [BunSqlite, SQLiteBunDatabase] {
   const client = new BunSqlite(":memory:")
-  const dir = path.join(import.meta.dirname, "../../migration")
-  const entries = readdirSync(dir, { withFileTypes: true })
-  const migrations = entries
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => ({
-      sql: readFileSync(path.join(dir, entry.name, "migration.sql"), "utf-8"),
-      timestamp: Number(entry.name.split("_")[0]),
-      name: entry.name,
-    }))
-    .sort((a, b) => a.timestamp - b.timestamp)
+  client.exec(`
+    CREATE TABLE part (
+      id text PRIMARY KEY,
+      message_id text NOT NULL,
+      session_id text NOT NULL,
+      time_created integer NOT NULL,
+      time_updated integer NOT NULL,
+      data text NOT NULL
+    )
+  `)
   const handle = drizzle({ client })
-  migrate(handle, migrations)
   return [client, handle]
 }
 
@@ -43,25 +39,17 @@ function insertToolPart(id: string, tool: string, status: string, start: number)
     callID: `call-${id}`,
     state: { status, input: {}, time: { start } },
   }
-  db.insert(PartTable).values({
-    id,
-    message_id: "msg-fake",
-    session_id: "ses-fake",
-    time_created: start,
-    time_updated: start,
-    data,
-  } as any).run()
+  sqlite.run(
+    "INSERT INTO part (id, message_id, session_id, time_created, time_updated, data) VALUES (?, ?, ?, ?, ?, ?)",
+    [id, "msg-fake", "ses-fake", start, start, JSON.stringify(data)],
+  )
 }
 
 function insertTextPart(id: string) {
-  db.insert(PartTable).values({
-    id,
-    message_id: "msg-fake",
-    session_id: "ses-fake",
-    time_created: 0,
-    time_updated: 0,
-    data: { type: "text", text: "hello" },
-  } as any).run()
+  sqlite.run(
+    "INSERT INTO part (id, message_id, session_id, time_created, time_updated, data) VALUES (?, ?, ?, ?, ?, ?)",
+    [id, "msg-fake", "ses-fake", 0, 0, JSON.stringify({ type: "text", text: "hello" })],
+  )
 }
 
 function queryStuckIds(startBefore: number): string[] {
@@ -79,7 +67,7 @@ describe("SessionWatchdog runningToolCondition", () => {
     ;[sqlite, db] = createTestDb()
   })
 
-  afterEach(() => sqlite.close())
+  afterEach(() => sqlite?.close())
 
   describe("whitelist filtering", () => {
     const NOW = 10_000_000
@@ -148,6 +136,22 @@ describe("SessionWatchdog runningToolCondition", () => {
     test("excludes non-tool parts", () => {
       const startBefore = NOW - TIMEOUT_MS
       insertTextPart("p-text")
+      expect(queryStuckIds(startBefore)).toEqual([])
+    })
+
+    test("excludes tool parts without callID", () => {
+      const startBefore = NOW - TIMEOUT_MS
+      sqlite.run(
+        "INSERT INTO part (id, message_id, session_id, time_created, time_updated, data) VALUES (?, ?, ?, ?, ?, ?)",
+        [
+          "p-no-call",
+          "msg-fake",
+          "ses-fake",
+          0,
+          0,
+          JSON.stringify({ type: "tool", tool: "read", state: { status: "running", time: { start: startBefore - 1 } } }),
+        ],
+      )
       expect(queryStuckIds(startBefore)).toEqual([])
     })
 

@@ -151,7 +151,12 @@ export const AppLayer = AppNodeBuilderV1.build(
   Layer.provideMerge(Bus.defaultLayer),
   Layer.provideMerge(AppNodeBuilderV1.build(Ripgrep.node)),
   Layer.provideMerge(Observability.layer),
-  Layer.provideMerge(Layer.provide(SessionWatchdog.defaultLayer, SessionTools.defaultLayer)),
+  Layer.provideMerge(
+    Layer.provide(
+      SessionWatchdog.defaultLayer,
+      Layer.provide(SessionTools.defaultLayer, AppNodeBuilderV1.build(EventV2Bridge.node)),
+    ),
+  ),
 )
 
 const rt = ManagedRuntime.make(AppLayer, { memoMap })

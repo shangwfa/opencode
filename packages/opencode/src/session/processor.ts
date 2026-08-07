@@ -28,8 +28,20 @@ import { Usage, type LLMEvent } from "@opencode-ai/llm"
 import { SessionPluginRuntime } from "@/plugin/session-plugin-runtime"
 import { Tool } from "@/tool/tool"
 import { ToolAttachment } from "@/tool/attachment"
+import { transitionRunningTool } from "./mark-timed-out"
 
 const DOOM_LOOP_THRESHOLD = 3
+
+export function isWatchdogTimeout(part: SessionV1.ToolPart) {
+  if (part.state.status !== "error") return false
+  return isRecord(part.state.metadata) && part.state.metadata.timeout === true
+}
+
+export function settleWatchdogTimeout(part: SessionV1.ToolPart, settle: Effect.Effect<void>) {
+  if (!isWatchdogTimeout(part)) return Effect.succeed(false)
+  return settle.pipe(Effect.as(true))
+}
+
 export type Result = "compact" | "stop" | "continue"
 
 export interface Handle {
@@ -172,8 +184,12 @@ const layer = Layer.effect(
         },
       ) {
         const match = yield* readToolCall(toolCallID)
-        if (!match || match.part.state.status !== "running") return
-        yield* session.updatePart({
+        if (!match) return
+        if (match.part.state.status !== "running") {
+          yield* settleWatchdogTimeout(match.part, settleToolCall(toolCallID))
+          return
+        }
+        const part = {
           ...match.part,
           state: {
             status: "completed",
@@ -184,15 +200,20 @@ const layer = Layer.effect(
             time: { start: match.part.state.time.start, end: Date.now() },
             attachments: output.attachments,
           },
-        })
+        } satisfies SessionV1.ToolPart
+        const transitioned = yield* transitionRunningTool(part, match.part.state.time.start)
+        if (transitioned) yield* session.updatePart(part)
         yield* settleToolCall(toolCallID)
       })
 
       const failToolCall = Effect.fn("SessionProcessor.failToolCall")(function* (toolCallID: string, error: unknown) {
         const match = yield* readToolCall(toolCallID)
-        if (!match || match.part.state.status !== "running") return false
+        if (!match) return false
+        if (match.part.state.status !== "running") {
+          return yield* settleWatchdogTimeout(match.part, settleToolCall(toolCallID))
+        }
         const metadata = "metadata" in match.part.state && isRecord(match.part.state.metadata) ? match.part.state.metadata : {}
-        yield* session.updatePart({
+        const part = {
           ...match.part,
           state: {
             status: "error",
@@ -202,7 +223,10 @@ const layer = Layer.effect(
             metadata: { ...metadata, ...(error instanceof Tool.ExecutionError ? error.metadata : {}) },
             time: { start: match.part.state.time.start, end: Date.now() },
           },
-        })
+        } satisfies SessionV1.ToolPart
+        const transitioned = yield* transitionRunningTool(part, match.part.state.time.start)
+        if (!transitioned) return false
+        yield* session.updatePart(part)
         if (error instanceof PermissionV1.RejectedError || error instanceof Question.RejectedError) {
           ctx.blocked = ctx.shouldBreak
         }
@@ -595,7 +619,8 @@ const layer = Layer.effect(
           const part = match.part
           const end = Date.now()
           const metadata = "metadata" in part.state && isRecord(part.state.metadata) ? part.state.metadata : {}
-          yield* session.updatePart({
+          if (part.state.status !== "running") continue
+          const next = {
             ...part,
             state: {
               ...part.state,
@@ -604,7 +629,9 @@ const layer = Layer.effect(
               metadata: { ...metadata, interrupted: true },
               time: { start: "time" in part.state ? part.state.time.start : end, end },
             },
-          })
+          } satisfies SessionV1.ToolPart
+          const transitioned = yield* transitionRunningTool(next, part.state.time.start)
+          if (transitioned) yield* session.updatePart(next)
         }
         ctx.toolcalls = {}
         ctx.assistantMessage.time.completed = Date.now()

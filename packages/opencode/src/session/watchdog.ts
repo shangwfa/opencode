@@ -1,10 +1,12 @@
 import { Context, Duration, Effect, Layer, Schedule } from "effect"
-import { and, sql } from "drizzle-orm"
+import { and, asc } from "drizzle-orm"
 import * as Log from "@opencode-ai/core/util/log"
 import { Database } from "../storage/db"
 import { PartTable } from "./session.pg"
 import type { PartID } from "./schema"
 import { SessionTools } from "./mark-timed-out"
+import { runningToolCondition } from "./watchdog-sql"
+import { ToolExecution } from "./tool-execution"
 
 const log = Log.create({ service: "watchdog" })
 
@@ -25,7 +27,11 @@ type WatchdogDb = {
   select(input: { id: typeof PartTable.id; session_id: typeof PartTable.session_id; data: typeof PartTable.data }): {
     from(table: typeof PartTable): {
       where(condition: ReturnType<typeof and>): {
-        all(): Promise<WatchdogRow[]>
+        orderBy(column: ReturnType<typeof asc>): {
+          limit(count: number): {
+            all(): Promise<WatchdogRow[]>
+          }
+        }
       }
     }
   }
@@ -51,42 +57,26 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null
 }
 
-function runningStart(data: unknown): number | undefined {
+function runningExecution(data: unknown): { start: number; callID: string } | undefined {
   const value = parsePartData(data)
   if (!isRecord(value)) return
   if (value.type !== "tool") return
   if (!isRecord(value.state)) return
   if (value.state.status !== "running") return
+  if (typeof value.callID !== "string") return
   if (!isRecord(value.state.time)) return
   if (typeof value.state.time.start !== "number") return
-  return value.state.time.start
+  return { start: value.state.time.start, callID: value.callID }
 }
 
-const MONITORED_TOOLS = ["read", "write", "edit", "apply_patch", "glob", "grep", "ls"] as const
-
-function runningToolCondition(startBefore: number) {
-  const toolList = sql.raw(MONITORED_TOOLS.map((t) => `'${t}'`).join(", "))
-  if (Database.dialect === "pg") {
-    return and(
-      sql`${PartTable.data}->>'type' = 'tool'`,
-      sql`${PartTable.data}->>'tool' IN (${toolList})`,
-      sql`${PartTable.data}->'state'->>'status' = 'running'`,
-      sql`(${PartTable.data}->'state'->'time'->>'start')::bigint < ${startBefore}`,
-    )
-  }
-  return and(
-    sql`json_extract(${PartTable.data}, '$.type') = 'tool'`,
-    sql`json_extract(${PartTable.data}, '$.tool') IN (${toolList})`,
-    sql`json_extract(${PartTable.data}, '$.state.status') = 'running'`,
-    sql`json_extract(${PartTable.data}, '$.state.time.start') < ${startBefore}`,
-  )
-}
 const scan = Effect.fn("SessionWatchdog.scan")(function* (config: Config) {
   const db = Database.Client() as WatchdogDb
   const tools = yield* SessionTools.Service
   const t0 = Date.now()
   const startBefore = t0 - config.timeoutMs
   const span = yield* Effect.currentSpan
+  const callIDs = ToolExecution.callIDs()
+  if (callIDs.length === 0) return
 
   const rows = yield* Effect.tryPromise({
     try: () =>
@@ -97,7 +87,9 @@ const scan = Effect.fn("SessionWatchdog.scan")(function* (config: Config) {
           data: PartTable.data,
         })
         .from(PartTable)
-        .where(runningToolCondition(startBefore))
+        .where(runningToolCondition(startBefore, Database.dialect, callIDs))
+        .orderBy(asc(PartTable.time_created))
+        .limit(100)
         .all(),
     catch: (error) => new Error(`watchdog scan query failed: ${String(error)}`),
   }).pipe(
@@ -109,9 +101,9 @@ const scan = Effect.fn("SessionWatchdog.scan")(function* (config: Config) {
 
   const stuck = rows
     .map((row) => {
-      const start = runningStart(row.data)
-      if (start === undefined) return
-      return { row, start }
+      const execution = runningExecution(row.data)
+      if (!execution || !ToolExecution.has(row.session_id, execution.callID)) return
+      return { row, start: execution.start }
     })
     .filter((item) => item !== undefined)
 
@@ -120,7 +112,10 @@ const scan = Effect.fn("SessionWatchdog.scan")(function* (config: Config) {
     (item) =>
       tools
         .markTimedOut({ partID: item.row.id, expectedStart: item.start, timeoutMs: config.timeoutMs })
-        .pipe(Effect.catchCause(() => Effect.succeed(false))),
+        .pipe(Effect.catchCause((cause) => {
+          log.error("watchdog candidate failed", { partID: item.row.id, cause: String(cause) })
+          return Effect.succeed(false)
+        })),
     { concurrency: 4 },
   )
   const marked = results.filter(Boolean).length

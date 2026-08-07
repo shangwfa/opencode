@@ -29,6 +29,7 @@ import { resolveSandboxOpts } from "@/session/sandbox-opts"
 import { RuntimeFlags } from "@/effect/runtime-flags"
 import type { Extension as CodeModeExtension } from "@/tool/code-mode"
 import { CodeModePolicy } from "@/tool/code-mode-policy"
+import { ToolExecution } from "./tool-execution"
 
 const MCP_RESOURCE_TOOLS = {
   list: "list_mcp_resources",
@@ -126,56 +127,68 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
     options: ExecutionOptions,
     parent?: Tool.Context,
   ) {
-    const before = yield* plugin.trigger(
-      "tool.execute.before",
-      { tool: item.id, sessionID: input.session.id, callID: options.toolCallId },
-      { args },
-    )
-    const transformed = yield* sessionPluginRuntime.trigger(
-      "tool.execute.before",
-      { tool: item.id, sessionID: input.session.id, callID: options.toolCallId },
-      before,
-    )
-    const base = parent
-      ? { ...parent, callID: options.toolCallId, metadata: () => Effect.void }
-      : context(transformed.args, options)
-    const ctx = !parent && item.id === "execute" ? { ...base, orchestration: { extensions: codeModeExtensions } } : base
-    const result = yield* item.execute(transformed.args, ctx)
-    if (parent) {
-      const global = yield* plugin.trigger(
+    const controller = new AbortController()
+    const unregister = ToolExecution.register(input.session.id, options.toolCallId, controller)
+    try {
+      const before = yield* plugin.trigger(
+        "tool.execute.before",
+        { tool: item.id, sessionID: input.session.id, callID: options.toolCallId },
+        { args },
+      )
+      const transformed = yield* sessionPluginRuntime.trigger(
+        "tool.execute.before",
+        { tool: item.id, sessionID: input.session.id, callID: options.toolCallId },
+        before,
+      )
+      const executionOptions = {
+        ...options,
+        abortSignal: options.abortSignal
+          ? AbortSignal.any([options.abortSignal, controller.signal])
+          : controller.signal,
+      }
+      const base = parent
+        ? { ...parent, callID: options.toolCallId, abort: executionOptions.abortSignal, metadata: () => Effect.void }
+        : context(transformed.args, executionOptions)
+      const ctx = !parent && item.id === "execute" ? { ...base, orchestration: { extensions: codeModeExtensions } } : base
+      const result = yield* item.execute(transformed.args, ctx)
+      if (parent) {
+        const global = yield* plugin.trigger(
+          "tool.execute.after",
+          { tool: item.id, sessionID: ctx.sessionID, callID: ctx.callID, args: transformed.args },
+          result,
+        )
+        return yield* sessionPluginRuntime.trigger(
+          "tool.execute.after",
+          { tool: item.id, sessionID: ctx.sessionID, callID: ctx.callID, args: transformed.args },
+          global,
+        )
+      }
+      let output = {
+        ...result,
+        attachments: result.attachments?.map((attachment) => ({
+          ...attachment,
+          id: PartID.ascending(),
+          sessionID: ctx.sessionID,
+          messageID: input.processor.message.id,
+        })),
+      }
+      output = yield* plugin.trigger(
         "tool.execute.after",
         { tool: item.id, sessionID: ctx.sessionID, callID: ctx.callID, args: transformed.args },
-        result,
+        output,
       )
-      return yield* sessionPluginRuntime.trigger(
+      output = yield* sessionPluginRuntime.trigger(
         "tool.execute.after",
         { tool: item.id, sessionID: ctx.sessionID, callID: ctx.callID, args: transformed.args },
-        global,
+        output,
       )
+      if (!parent && options.abortSignal?.aborted) {
+        yield* input.processor.completeToolCall(options.toolCallId, output)
+      }
+      return output
+    } finally {
+      unregister()
     }
-    let output = {
-      ...result,
-      attachments: result.attachments?.map((attachment) => ({
-        ...attachment,
-        id: PartID.ascending(),
-        sessionID: ctx.sessionID,
-        messageID: input.processor.message.id,
-      })),
-    }
-    output = yield* plugin.trigger(
-      "tool.execute.after",
-      { tool: item.id, sessionID: ctx.sessionID, callID: ctx.callID, args: transformed.args },
-      output,
-    )
-    output = yield* sessionPluginRuntime.trigger(
-      "tool.execute.after",
-      { tool: item.id, sessionID: ctx.sessionID, callID: ctx.callID, args: transformed.args },
-      output,
-    )
-    if (!parent && options.abortSignal?.aborted) {
-      yield* input.processor.completeToolCall(options.toolCallId, output)
-    }
-    return output
   })
 
   const registered = yield* registry.tools({

@@ -1,7 +1,7 @@
 import { Effect, Context, Layer, Cause, Deferred, Ref, Semaphore, Schedule, Duration } from "effect"
-import { Sandbox, ConnectionConfig } from "@alibaba-group/opensandbox"
+import { Sandbox, ConnectionConfig, SandboxApiException, SandboxManager } from "@alibaba-group/opensandbox"
 import type { CommandExecution, Volume } from "@alibaba-group/opensandbox"
-import { and, eq, lt, sql } from "drizzle-orm"
+import { and, asc, eq, lt, or, sql } from "drizzle-orm"
 import * as Log from "@opencode-ai/core/util/log"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { Flag } from "@/flag/flag"
@@ -637,6 +637,12 @@ export namespace SandboxProvider {
       const createRef = yield* Ref.make(new Map<string, Deferred.Deferred<Sandbox, Error>>())
       const sbCache = new Map<string, { sb: Sandbox; cachedAt: number; sandboxID: string }>()
       const SB_CACHE_TTL_MS = 300_000
+      const CLEANUP_BATCH_SIZE = 100
+      const CLEANUP_RETRY_MS = Math.max(30_000, config.idleReapIntervalMs)
+      const COMMAND_HEARTBEAT_MS = Math.max(
+        1_000,
+        Math.min(60_000, Math.floor(Math.min(config.idleReapMs, config.idleKillMs * 2) / 3)),
+      )
 
       function getCachedSandbox(sessionID: string): Sandbox | null {
         const hit = sbCache.get(sessionID)
@@ -817,12 +823,14 @@ export namespace SandboxProvider {
               eq(SandboxTable.id, id),
               eq(SandboxTable.state, "running"),
             ))
-            .run(),
+            .returning({ id: SandboxTable.id })
+            .then((rows: Array<{ id: string }>) => rows.length > 0),
           catch: (e) => new Error(`db.touchSandbox failed: ${String(e)}`),
         }).pipe(Effect.orDie)
       }
 
       function dbClaimIdleSandbox(sessionID: string, id: string, threshold: number, keepAlive?: boolean) {
+        const retryBefore = Date.now() - CLEANUP_RETRY_MS
         return Effect.tryPromise({
           try: () => pgDb
             .update(SandboxTable)
@@ -830,9 +838,17 @@ export namespace SandboxProvider {
             .where(and(
               eq(SandboxTable.session_id, sessionID),
               eq(SandboxTable.id, id),
-              eq(SandboxTable.state, "running"),
-              lt(SandboxTable.time_updated, threshold),
-              keepAlive === undefined ? undefined : eq(SandboxTable.keep_alive, keepAlive),
+              or(
+                and(
+                  eq(SandboxTable.state, "running"),
+                  lt(SandboxTable.time_updated, threshold),
+                  keepAlive === undefined ? undefined : eq(SandboxTable.keep_alive, keepAlive),
+                ),
+                and(
+                  eq(SandboxTable.state, "killed"),
+                  lt(SandboxTable.time_updated, retryBefore),
+                ),
+              ),
             ))
             .returning({ id: SandboxTable.id })
             .then((rows: Array<{ id: string }>) => rows.length > 0),
@@ -906,9 +922,9 @@ export namespace SandboxProvider {
         })
       }
 
-      function bestEffortKill(sandboxId: string, sessionID: string) {
+      function killByID(sandboxId: string, sessionID: string) {
         return Effect.tryPromise({
-          try: () => {
+          try: async () => {
             const killCfg = new ConnectionConfig({
               domain: config.domain,
               protocol: config.protocol,
@@ -916,13 +932,17 @@ export namespace SandboxProvider {
               useServerProxy: config.useServerProxy,
               requestTimeoutSeconds: 10,
             })
-            return Sandbox.connect({ connectionConfig: killCfg, sandboxId })
-              .then((sb) => sb.kill().then(() => sb.close()))
+            const manager = SandboxManager.create({ connectionConfig: killCfg })
+            try {
+              await manager.killSandbox(sandboxId)
+            } catch (error) {
+              if (!(error instanceof SandboxApiException) || error.statusCode !== 404) throw error
+            } finally {
+              await manager.close().catch(() => undefined)
+            }
           },
-          catch: (e) => {
-            log.warn("best-effort sandbox kill failed", { sessionID, sandboxId, error: String(e) })
-          },
-        }).pipe(Effect.catchCause(() => Effect.void))
+          catch: (e) => new Error(`Sandbox kill failed: ${sessionID}/${sandboxId}: ${String(e)}`),
+        })
       }
 
       function createSandbox(sessionID: SessionID, opts?: { pvcMode?: "session" | "app"; appId?: string; sandbox?: { cpu: string; memory: string } }) {
@@ -996,24 +1016,61 @@ export namespace SandboxProvider {
               Effect.catchCause(() => Effect.void),
             )
           }
-          yield* Effect.tryPromise(() => sb.kill()).pipe(
-            Effect.catchCause((cause) =>
+          yield* Effect.tryPromise({
+            try: () => sb.kill(),
+            catch: (error) => new Error(`Sandbox kill failed: ${sessionID}/${sb.id}: ${String(error)}`),
+          }).pipe(
+            Effect.tapError(() =>
               Effect.gen(function* () {
-                log.error("sandbox kill failed", { sessionID, cause: String(cause) })
-                // 诊断：获取 sandbox 实际状态/reason（SDK 已暴露，替代完整 diagnostic logs）
                 const info = yield* Effect.tryPromise(() => sb.getInfo()).pipe(Effect.orElseSucceed(() => null))
-                if (info?.status) {
-                  log.warn("sandbox status on kill failure", { sessionID, sandboxID: sb.id, state: info.status.state, reason: info.status.reason, message: info.status.message })
-                }
+                if (!info?.status) return
+                log.warn("sandbox status on kill failure", { sessionID, sandboxID: sb.id, state: info.status.state, reason: info.status.reason, message: info.status.message })
               }),
             ),
-          )
-          yield* Effect.tryPromise(() => sb.close()).pipe(
-            Effect.catchCause(() => { log.error("sandbox close failed", { sessionID }); return Effect.void }),
+            Effect.ensuring(
+              Effect.tryPromise(() => sb.close()).pipe(
+                Effect.catchCause(() => { log.error("sandbox close failed", { sessionID }); return Effect.void }),
+              ),
+            ),
           )
           yield* dbMarkDestroyed(sessionID, sb.id)
           log.info("sandbox destroyed", { sessionID })
         }).pipe(Effect.withSpan("SandboxProvider.destroySandbox"))
+      }
+
+      function cleanupSandbox(row: Row) {
+        return Effect.gen(function* () {
+          invalidateCachedSandbox(row.session_id)
+          const sb = yield* reconnect(row).pipe(Effect.orElseSucceed(() => null))
+          if (sb) return yield* destroySandbox(sb, row.session_id)
+          yield* killByID(row.id, row.session_id)
+          yield* dbMarkDestroyed(row.session_id, row.id)
+          log.info("sandbox destroyed by id", { sessionID: row.session_id, sandboxID: row.id })
+        }).pipe(
+          Effect.catchCause((cause) => {
+            log.error("sandbox cleanup failed; leaving killed for retry", {
+              sessionID: row.session_id,
+              sandboxID: row.id,
+              cause: Cause.pretty(cause),
+            })
+            return Effect.void
+          }),
+        )
+      }
+
+      function withCommandHeartbeat<A, E>(sessionID: string, sandboxID: string, effect: Effect.Effect<A, E>) {
+        return Effect.scoped(
+          Effect.gen(function* () {
+            const active = yield* dbTouchSandbox(sessionID, sandboxID)
+            if (!active) return yield* Effect.fail(new Error(`Sandbox is no longer running: ${sessionID}/${sandboxID}`))
+            yield* dbTouchSandbox(sessionID, sandboxID).pipe(
+              Effect.catchCause(() => Effect.void),
+              Effect.repeat(Schedule.spaced(Duration.millis(COMMAND_HEARTBEAT_MS))),
+              Effect.forkScoped,
+            )
+            return yield* effect
+          }),
+        )
       }
 
       function claim<D, E>(ref: Ref.Ref<Map<string, Deferred.Deferred<D, E>>>, key: string, token: Deferred.Deferred<D, E>) {
@@ -1030,8 +1087,9 @@ export namespace SandboxProvider {
         return Effect.gen(function* () {
           const cached = getCachedSandbox(sessionID)
           if (cached) {
-            yield* dbTouchSandbox(sessionID, cached.id).pipe(Effect.catchCause(() => Effect.void))
-            return cached
+            const touched = yield* dbTouchSandbox(sessionID, cached.id).pipe(Effect.orElseSucceed(() => false))
+            if (touched) return cached
+            invalidateCachedSandbox(sessionID)
           }
 
           const t0 = Date.now()
@@ -1072,7 +1130,11 @@ export namespace SandboxProvider {
                   })
 
                   if (healthy) {
-                    yield* dbTouchSandbox(sessionID, row.id).pipe(Effect.catchCause(() => Effect.void))
+                    const touched = yield* dbTouchSandbox(sessionID, row.id).pipe(Effect.orElseSucceed(() => false))
+                    if (!touched) {
+                      yield* Effect.tryPromise(() => existing.close()).pipe(Effect.ignore)
+                      return yield* Effect.fail(new Error(`Sandbox lifecycle changed: ${sessionID}/${row.id}`))
+                    }
                     log.info("reconnected to existing sandbox", {
                       sessionID,
                       sandboxID: row.id,
@@ -1081,14 +1143,21 @@ export namespace SandboxProvider {
                     return existing
                   }
                   log.warn("sandbox unhealthy after reconnect, rebuilding", { sessionID })
-                  yield* destroySandbox(existing, sessionID).pipe(Effect.catchCause(() => Effect.void))
+                  yield* dbSetStateFor(sessionID, row.id, "killed")
+                  yield* destroySandbox(existing, sessionID)
                 } else {
                   invalidateCachedSandbox(sessionID)
-                  log.warn("sandbox reconnect returned null, rebuilding", { sessionID, sandboxID: row.id })
+                  log.warn("sandbox reconnect failed; leaving state unchanged", { sessionID, sandboxID: row.id })
+                  return yield* Effect.fail(new Error(`Sandbox reconnect failed: ${sessionID}/${row.id}`))
                 }
               }
               if (row?.state === "killed") {
-                log.info("recreating killed sandbox", { sessionID, sandboxID: row.id })
+                log.info("retrying killed sandbox cleanup before recreation", { sessionID, sandboxID: row.id })
+                yield* cleanupSandbox(row)
+                const pending = yield* dbGet(sessionID).pipe(Effect.orElseSucceed(() => null))
+                if (pending?.id === row.id && pending.state === "killed") {
+                  return yield* Effect.fail(new Error(`Sandbox cleanup pending: ${sessionID}/${row.id}`))
+                }
               }
               // P0-3: cross-pod mutex — transaction-level locks are released with
               // the same pooled connection that acquired them.
@@ -1102,7 +1171,11 @@ export namespace SandboxProvider {
                     if (existing) {
                       const healthy = await existing.isHealthy().catch(() => false)
                       if (healthy) {
-                        await runPromise(dbTouchSandbox(sessionID, current.id).pipe(Effect.catchCause(() => Effect.void)))
+                        const touched = await runPromise(dbTouchSandbox(sessionID, current.id).pipe(Effect.orElseSucceed(() => false)))
+                        if (!touched) {
+                          await existing.close().catch(() => undefined)
+                          throw new Error(`Sandbox lifecycle changed: ${sessionID}/${current.id}`)
+                        }
                         return existing
                       }
                     }
@@ -1166,7 +1239,8 @@ export namespace SandboxProvider {
           if (!row || row.state !== "running") return null
           const sb = yield* reconnect(row).pipe(Effect.orElseSucceed(() => null))
           if (!sb) {
-            yield* dbSetStateFor(sessionID, row.id, "killed").pipe(Effect.catchCause(() => Effect.void))
+            invalidateCachedSandbox(sessionID)
+            log.warn("sandbox reconnect failed; leaving state unchanged", { sessionID, sandboxID: row.id })
             return null
           }
           yield* dbTouchSandbox(sessionID, row.id).pipe(Effect.catchCause(() => Effect.void))
@@ -1184,41 +1258,30 @@ export namespace SandboxProvider {
           })
           if (inFlight) yield* Deferred.fail(inFlight, new Error(`Sandbox destroyed while creating: ${sessionID}`))
           const row = yield* dbGet(sessionID).pipe(Effect.orElseSucceed(() => null))
-          if (row?.state === "running") {
+          if (row?.state === "running" || row?.state === "killed") {
+            if (row.state === "running") yield* dbSetStateFor(sessionID, row.id, "killed")
             const sb = yield* reconnect(row).pipe(Effect.orElseSucceed(() => null))
             if (sb) yield* destroySandbox(sb, sessionID).pipe(Effect.catchCause(() => Effect.void))
-            else {
-              invalidateCachedSandbox(sessionID)
-              yield* bestEffortKill(row.id, sessionID)
-              yield* dbMarkDestroyed(sessionID, row.id)
-            }
-          } else if (row) {
-            yield* dbMarkDestroyed(sessionID, row.id)
+            else yield* cleanupSandbox({ ...row, state: "killed" })
           }
         })).pipe(Effect.withSpan("SandboxProvider.destroy"))
 
       const destroyById: Interface["destroyById"] = (sandboxID) =>
         Effect.gen(function* () {
           const row = yield* dbGetById(sandboxID).pipe(Effect.orElseSucceed(() => null))
-          if (!row || row.state !== "running") return
+          if (!row || (row.state !== "running" && row.state !== "killed")) return
           invalidateCachedSandbox(row.session_id)
           yield* lock(row.session_id, Effect.gen(function* () {
             invalidateCachedSandbox(row.session_id)
             const current = yield* dbGetById(sandboxID).pipe(Effect.orElseSucceed(() => null))
-            if (!current || current.id !== sandboxID || current.state !== "running") return
+            if (!current || current.id !== sandboxID || (current.state !== "running" && current.state !== "killed")) return
+            if (current.state === "running") yield* dbSetStateFor(current.session_id, current.id, "killed")
             yield* Ref.modify(createRef, (m) => {
               const d = m.get(current.session_id)
               if (d) m.delete(current.session_id)
               return [undefined, m] as const
             })
-            const sb = yield* reconnect(current).pipe(Effect.orElseSucceed(() => null))
-            if (sb) {
-              yield* destroySandbox(sb, current.session_id).pipe(Effect.catchCause(() => Effect.void))
-              return
-            }
-            invalidateCachedSandbox(current.session_id)
-            yield* bestEffortKill(sandboxID, current.session_id)
-            yield* dbDeleteFor(current.session_id, sandboxID).pipe(Effect.catchCause(() => Effect.void))
+            yield* cleanupSandbox({ ...current, state: "killed" })
           }))
         }).pipe(Effect.withSpan("SandboxProvider.destroyById"))
 
@@ -1233,16 +1296,8 @@ export namespace SandboxProvider {
             yield* lock(row.session_id, Effect.gen(function* () {
               const current = yield* dbGet(row.session_id).pipe(Effect.orElseSucceed(() => null))
               if (!current || current.id !== row.id || current.state !== "running") return
-              const sb = yield* reconnect(row).pipe(Effect.orElseSucceed(() => null))
-              if (sb) {
-                yield* destroySandbox(sb, row.session_id).pipe(
-                  Effect.catchCause((cause) => { log.error("failed to destroy sandbox during shutdown", { cause: Cause.pretty(cause) }); return Effect.void }),
-                )
-                return
-              }
-              invalidateCachedSandbox(row.session_id)
-              yield* bestEffortKill(row.id, row.session_id)
-              yield* dbDeleteFor(row.session_id, row.id).pipe(Effect.catchCause(() => Effect.void))
+              yield* dbSetStateFor(row.session_id, row.id, "killed")
+              yield* cleanupSandbox({ ...row, state: "killed" })
             }))
           }
           commandSemaphores.clear()
@@ -1302,7 +1357,7 @@ export namespace SandboxProvider {
           }
 
           return yield* sem.withPermit(
-            withExecTimeout(
+            withCommandHeartbeat(sessionID, sb.id, withExecTimeout(
               Effect.tryPromise({
                 try: () => runCommandEarlyExit(sb, cmdSessionID!, command, { ...options, workingDirectory }, handlers, signal),
                 catch: (e) => new Error(`runInSession failed: ${String(e)}`),
@@ -1314,7 +1369,7 @@ export namespace SandboxProvider {
                 ),
               ),
               options?.timeoutSeconds,
-            ),
+            )),
           )
         }).pipe(Effect.withSpan("SandboxProvider.runInSession"))
 
@@ -1332,7 +1387,7 @@ export namespace SandboxProvider {
           detachedCommandSessions.set(sessionID, detached)
           let completed = false
           try {
-            const result = yield* withExecTimeout(
+            const result = yield* withCommandHeartbeat(sessionID, sb.id, withExecTimeout(
               Effect.tryPromise({
                 try: () => runCommandEarlyExit(sb, detachedSessionId, command, { ...options, workingDirectory }, handlers, signal),
                 catch: (e) => new Error(`runDetached failed: ${String(e)}`),
@@ -1344,7 +1399,7 @@ export namespace SandboxProvider {
                 ),
               ),
               options?.timeoutSeconds,
-            )
+            ))
             if (result.error?.name === "TimeoutError") {
               yield* Effect.tryPromise(() => sb.commands.interrupt(detachedSessionId)).pipe(Effect.ignore)
             }
@@ -1433,14 +1488,19 @@ export namespace SandboxProvider {
                   eq(SandboxTable.keep_alive, false),
                   lt(SandboxTable.time_updated, threshold),
                 ))
+                .orderBy(asc(SandboxTable.time_updated))
+                .limit(CLEANUP_BATCH_SIZE)
                 .all() as Promise<Row[]>,
-              catch: () => [] as Row[],
-            }).pipe(Effect.orElseSucceed(() => [] as Row[]))
+              catch: (error) => new Error(`zombie sandbox query failed: ${String(error)}`),
+            }).pipe(Effect.catchCause((cause) => {
+              log.error("zombie sandbox query failed", { cause: Cause.pretty(cause) })
+              return Effect.succeed([] as Row[])
+            }))
 
             if (rows.length === 0) return
             log.info("zombie sandbox cleanup", { count: rows.length })
-            for (const row of rows) {
-              yield* lock(row.session_id, Effect.gen(function* () {
+            yield* Effect.forEach(rows, (row) =>
+              lock(row.session_id, Effect.gen(function* () {
                 const claimed = yield* dbClaimIdleSandbox(row.session_id, row.id, threshold, false)
                 if (!claimed) return
                 const sb = yield* reconnect(row).pipe(Effect.orElseSucceed(() => null))
@@ -1459,10 +1519,13 @@ export namespace SandboxProvider {
                   )
                   return
                 }
-                yield* bestEffortKill(row.id, row.session_id)
-                yield* dbMarkDestroyed(row.session_id, row.id).pipe(Effect.catchCause(() => Effect.void))
-              }))
-            }
+                yield* cleanupSandbox({ ...row, state: "killed" })
+              })).pipe(Effect.catchCause((cause) => {
+                log.error("zombie sandbox candidate failed", { sessionID: row.session_id, cause: Cause.pretty(cause) })
+                return Effect.void
+              })),
+              { concurrency: 4, discard: true },
+            )
           }),
           { schedule: Schedule.spaced(config.idleKillMs) },
         ).pipe(
@@ -1478,33 +1541,43 @@ export namespace SandboxProvider {
         yield* Effect.repeat(
           Effect.gen(function* () {
             const threshold = Date.now() - idleReapMs
+            const retryBefore = Date.now() - CLEANUP_RETRY_MS
             const rows = yield* Effect.tryPromise({
               try: () => pgDb
                 .select()
                 .from(SandboxTable)
-                .where(and(
-                  eq(SandboxTable.state, "running"),
-                  lt(SandboxTable.time_updated, threshold),
+                .where(or(
+                  and(
+                    eq(SandboxTable.state, "running"),
+                    lt(SandboxTable.time_updated, threshold),
+                  ),
+                  and(
+                    eq(SandboxTable.state, "killed"),
+                    lt(SandboxTable.time_updated, retryBefore),
+                  ),
                 ))
+                .orderBy(asc(SandboxTable.time_updated))
+                .limit(CLEANUP_BATCH_SIZE)
                 .all() as Promise<Row[]>,
-              catch: () => [] as Row[],
-            }).pipe(Effect.orElseSucceed(() => [] as Row[]))
+              catch: (error) => new Error(`idle sandbox reap query failed: ${String(error)}`),
+            }).pipe(Effect.catchCause((cause) => {
+              log.error("idle sandbox reap query failed", { cause: Cause.pretty(cause) })
+              return Effect.succeed([] as Row[])
+            }))
 
             if (rows.length === 0) return
             log.info("idle sandbox reap scan", { count: rows.length })
-            for (const row of rows) {
-              yield* lock(row.session_id, Effect.gen(function* () {
+            yield* Effect.forEach(rows, (row) =>
+              lock(row.session_id, Effect.gen(function* () {
                 const claimed = yield* dbClaimIdleSandbox(row.session_id, row.id, threshold)
                 if (!claimed) return
-                const sb = yield* reconnect(row).pipe(Effect.orElseSucceed(() => null))
-                if (sb) {
-                  yield* destroySandbox(sb, row.session_id).pipe(Effect.catchCause(() => Effect.void))
-                  return
-                }
-                yield* bestEffortKill(row.id, row.session_id)
-                yield* dbMarkDestroyed(row.session_id, row.id).pipe(Effect.catchCause(() => Effect.void))
-              }))
-            }
+                yield* cleanupSandbox({ ...row, state: "killed" })
+              })).pipe(Effect.catchCause((cause) => {
+                log.error("idle sandbox candidate failed", { sessionID: row.session_id, cause: Cause.pretty(cause) })
+                return Effect.void
+              })),
+              { concurrency: 4, discard: true },
+            )
           }),
           { schedule: Schedule.spaced(Duration.millis(config.idleReapIntervalMs)) },
         ).pipe(
@@ -1513,16 +1586,8 @@ export namespace SandboxProvider {
         )
       })
 
-      if (config.cleanupOnScopeExit !== false) {
-        yield* Effect.addFinalizer(() =>
-          destroyAll().pipe(
-            Effect.catchCause((cause) => {
-              log.error("sandbox cleanup on scope exit failed", { cause: Cause.pretty(cause) })
-              return Effect.void
-            }),
-          ),
-        )
-      }
+      // PG sandboxes are shared across server instances. Process shutdown must
+      // not destroy resources owned by other instances; idle cleanup handles them.
 
       return Service.of({
         getOrCreate, get, destroy, destroyById, destroyAll, keepAlive, touch, release, isKeepAlive,
