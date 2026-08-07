@@ -9,7 +9,6 @@ import { Token } from "@/util/token"
 import { SessionProcessor } from "./processor"
 import { Agent } from "@/agent/agent"
 import { Plugin } from "@/plugin"
-import { SessionPluginRuntime } from "@/plugin/session-plugin-runtime"
 import { Config } from "@/config/config"
 import { NotFoundError } from "@/storage/storage"
 
@@ -48,6 +47,42 @@ type CompletedCompaction = {
   userIndex: number
   assistantIndex: number
   summary: string | undefined
+}
+
+const truncate = (value: string) =>
+  value.length <= TOOL_OUTPUT_MAX_CHARS ? value : `${value.slice(0, TOOL_OUTPUT_MAX_CHARS)}\n[truncated]`
+
+const serialize = (message: SessionV1.WithParts) => {
+  if (message.info.role === "user") {
+    const text = message.parts
+      .filter((part): part is SessionV1.TextPart => part.type === "text" && !part.ignored)
+      .map((part) => part.text)
+      .filter(Boolean)
+      .join("\n")
+    const files = message.parts.flatMap((part) =>
+      part.type === "file" ? [`[Attached ${part.mime}: ${part.filename ?? "file"}]`] : [],
+    )
+    return [...(text ? [`[User]: ${text}`] : []), ...files].join("\n")
+  }
+  return message.parts
+    .flatMap((part) => {
+      if (part.type === "text") return part.text ? [`[Assistant]: ${part.text}`] : []
+      if (part.type === "reasoning") return part.text ? [`[Assistant reasoning]: ${part.text}`] : []
+      if (part.type !== "tool") return []
+      const call = `[Assistant tool call]: ${part.tool}(${JSON.stringify(part.state.input)})`
+      if (part.state.status === "completed") {
+        const attachments = (part.state.attachments ?? []).map(
+          (item) => `[Attached ${item.mime}: ${item.filename ?? "file"}]`,
+        )
+        const output = part.state.time.compacted
+          ? "[Old tool result content cleared]"
+          : truncate([part.state.output, ...attachments].join("\n"))
+        return [call, `[Tool result]: ${output}`]
+      }
+      if (part.state.status === "error") return [call, `[Tool error]: ${part.state.error}`]
+      return [call]
+    })
+    .join("\n")
 }
 
 function summaryText(message: SessionV1.WithParts) {
@@ -161,7 +196,6 @@ const layer = Layer.effect(
     const session = yield* Session.Service
     const agents = yield* Agent.Service
     const plugin = yield* Plugin.Service
-    const sessionPlugins = yield* SessionPluginRuntime.Service
     const processors = yield* SessionProcessor.Service
     const provider = yield* Provider.Service
     const events = yield* EventV2Bridge.Service
@@ -341,27 +375,16 @@ const layer = Layer.effect(
         cfg,
         model,
       })
-      const sessionPluginRuntime = yield* sessionPlugins.acquire(input.sessionID)
       // Allow plugins to inject context or replace compaction prompt.
-      let compacting = yield* plugin.trigger(
+      const compacting = yield* plugin.trigger(
         "experimental.session.compacting",
         { sessionID: input.sessionID },
         { context: [], prompt: undefined },
       )
-      compacting = yield* sessionPluginRuntime.trigger(
-        "experimental.session.compacting",
-        { sessionID: input.sessionID },
-        compacting,
-      )
       const nextPrompt = compacting.prompt ?? buildPrompt({ previousSummary, context: compacting.context })
-      let msgs = structuredClone(selected.head)
+      const msgs = structuredClone(selected.head)
       yield* plugin.trigger("experimental.chat.messages.transform", {}, { messages: msgs })
-      msgs = (yield* sessionPluginRuntime.trigger("experimental.chat.messages.transform", {}, { messages: msgs }))
-        .messages
-      const modelMessages = yield* MessageV2.toModelMessagesEffect(msgs, model, {
-        stripMedia: true,
-        toolOutputMaxChars: TOOL_OUTPUT_MAX_CHARS,
-      })
+      const conversation = msgs.map(serialize).filter(Boolean).join("\n\n")
       const ctx = yield* InstanceState.context
       const msg: SessionV1.Assistant = {
         id: MessageID.ascending(),
@@ -402,10 +425,16 @@ const layer = Layer.effect(
         tools: {},
         system: [],
         messages: [
-          ...modelMessages,
           {
             role: "user",
-            content: [{ type: "text", text: nextPrompt }],
+            content: [
+              {
+                type: "text",
+                text: [nextPrompt, "The following is the conversation history:", conversation]
+                  .filter(Boolean)
+                  .join("\n\n"),
+              },
+            ],
           },
         ],
         model,
@@ -460,23 +489,26 @@ const layer = Layer.effect(
 
         if (!replay) {
           const info = yield* provider.getProvider(userMessage.model.providerID)
-          const autocontinueInput = {
-            sessionID: input.sessionID,
-            agent: userMessage.agent,
-            model: yield* provider.getModel(userMessage.model.providerID, userMessage.model.modelID).pipe(Effect.orDie),
-            provider: { source: info.source, info, options: info.options },
-            message: userMessage,
-            overflow: input.overflow === true,
-          }
-          let autocontinue = yield* plugin.trigger("experimental.compaction.autocontinue", autocontinueInput, {
-            enabled: true,
-          })
-          autocontinue = yield* sessionPluginRuntime.trigger(
-            "experimental.compaction.autocontinue",
-            autocontinueInput,
-            autocontinue,
-          )
-          if (autocontinue.enabled) {
+          if (
+            (yield* plugin.trigger(
+              "experimental.compaction.autocontinue",
+              {
+                sessionID: input.sessionID,
+                agent: userMessage.agent,
+                model: yield* provider
+                  .getModel(userMessage.model.providerID, userMessage.model.modelID)
+                  .pipe(Effect.orDie),
+                provider: {
+                  source: info.source,
+                  info,
+                  options: info.options,
+                },
+                message: userMessage,
+                overflow: input.overflow === true,
+              },
+              { enabled: true },
+            )).enabled
+          ) {
             const continueMsg = yield* session.updateMessage({
               id: MessageID.ascending(),
               role: "user",
@@ -559,7 +591,6 @@ export const node = LayerNode.make({
     Session.node,
     Agent.node,
     Plugin.node,
-    SessionPluginRuntime.node,
     SessionProcessor.node,
     Provider.node,
     EventV2Bridge.node,
