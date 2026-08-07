@@ -2,6 +2,15 @@
 
 > 公共测试环境和配置请参考 [`00-preamble.md`](./00-preamble.md)。
 
+> **本文档含两个主题**：
+> - **一、沙箱缓存性能**（T28.1-T28.4, T28.6-T28.8）：`getOrCreate` 缓存、并发、超时、日志——属于沙箱对象访问性能优化
+> - **二、Part Watchdog 工具超时兜底**（T28.5, T28.5b, T28.9-T28.13）：扫描超时 tool part 并标记 error——与沙箱生命周期无关
+>
+> **与其他文档的关系**：
+> - 沙箱生命周期（创建/复用/keepAlive/onIdle 销毁）见 [`sandbox-lifecycle.md`](./sandbox-lifecycle.md)（T12）
+> - 空闲沙箱回收（idle-reap）见 [`sandbox-idle-reap.md`](./sandbox-idle-reap.md)（T30）
+> - 本文档的缓存/超时/日志属于沙箱对象访问层；Part Watchdog 标记的是 tool part 状态，**不销毁沙箱**（沙箱回收由 T12/T30 负责）
+
 ## 背景
 
 针对 `ses_127609d2fffeU5lQ79qBAdcZYV` 卡顿会话的诊断（详见 [`guides/session-diagnostic-guide.md`](./guides/session-diagnostic-guide.md)），发现以下问题：
@@ -16,7 +25,7 @@
 
 | 文件 | 改动 | 防御层 |
 |------|------|--------|
-| `packages/opencode/src/tool/sandbox-provider.ts` | 加 `sbCache`（30s TTL）+ getOrCreate 90s 超时 + 各阶段 `log.info` | 缓存（治本）+ 超时（防单点）+ 日志（诊断）|
+| `packages/opencode/src/tool/sandbox-provider.ts` | 加 `sbCache`（5 分钟 TTL，`SB_CACHE_TTL_MS=300_000`）+ getOrCreate 90s 超时 + 各阶段 `log.info` | 缓存（治本）+ 超时（防单点）+ 日志（诊断）|
 | `packages/opencode/src/session/mark-timed-out.ts`（原 tools.ts 拆出）| `getSandbox()` 的 `.catch` 加 `log.error` + 耗时日志；`SessionTools.markTimedOut()` lifecycle 方法 | 错误不再静默；tool lifecycle 统一超时标记 |
 | `packages/opencode/src/session/watchdog.ts`（**新建**）| 每 60s 扫描候选 running tool，调用 `SessionTools.markTimedOut()` | Watchdog（发现）+ lifecycle（处理）|
 | `packages/opencode/src/effect/app-runtime.ts` | 注册 `SessionWatchdog.defaultLayer` 并提供 `SessionTools.defaultLayer` | 启动入口 |
@@ -43,9 +52,11 @@
 
 ## 二十八、沙箱性能优化与 Watchdog
 
+## 一、沙箱缓存性能优化
+
 ### T28.1 沙箱对象缓存命中（首次慢、后续快）
 
-**验证点**：首次 `getOrCreate` 走完整流程（reconnect + isHealthy），成功后写入 30s TTL 缓存；缓存窗口内的后续调用直接返回沙箱对象，跳过 lock 和 SDK 调用。
+**验证点**：首次 `getOrCreate` 走完整流程（reconnect + isHealthy），成功后写入 **5 分钟 TTL** 缓存（`SB_CACHE_TTL_MS=300_000`，见 `sandbox-provider.ts:639`；曾为 30s，`a7ca47c15d` 调整为 5 分钟以减少 SDK handle 重建）。缓存窗口内的后续调用直接返回沙箱对象，跳过 lock 和 SDK 调用。
 
 ```bash
 SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' \
@@ -116,9 +127,9 @@ fi
 
 ---
 
-### T28.3 缓存 TTL 过期（30s 后重新走流程）
+### T28.3 缓存 TTL 过期（5 分钟后重新走流程）
 
-**验证点**：缓存 TTL 30 秒，过期后首次调用重新走完整 getOrCreate 流程，再次写入缓存。
+**验证点**：缓存 TTL **5 分钟**（`SB_CACHE_TTL_MS=300_000`），过期后首次调用重新走完整 getOrCreate 流程，再次写入缓存。
 
 ```bash
 SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' \
@@ -133,9 +144,9 @@ echo "首次: ${T1}s"
 T2=$(curl -s -o /dev/null -w '%{time_total}' --max-time 30 "$FILE_URL")
 echo "缓存内: ${T2}s"
 
-# 等 35s 让缓存过期
-echo "等 35s 让缓存过期..."
-sleep 35
+# 等 305s 让缓存过期（TTL 5 分钟 + buffer）
+echo "等 305s 让缓存过期（TTL 5 分钟）..."
+sleep 305
 
 # 过期后第 1 次（重新走流程）
 T3=$(curl -s -o /dev/null -w '%{time_total}' --max-time 30 "$FILE_URL")
@@ -151,6 +162,8 @@ echo "重新缓存: ${T4}s"
 - 缓存内 T2：< 0.2s
 - 过期后 T3：0.2-1s（reconnect + isHealthy，比 T1 快因为不用 createSandbox）
 - 重新缓存 T4：< 0.2s
+
+> ⚠️ **等待 305s**：缓存 TTL 是 5 分钟（`a7ca47c15d` 由 30s 调整），需等 5 分钟才能观察到缓存过期。若不想等，可临时把 `SB_CACHE_TTL_MS` 调小后重建镜像。
 
 ---
 
@@ -203,9 +216,13 @@ docker rm -f opencode-saas-test-timeout
 
 ---
 
+## 二、Part Watchdog：工具执行超时兜底
+
+> 本节与沙箱生命周期无关。Part Watchdog 每 60s 扫描超时的 tool part 并标记 error，**不销毁沙箱**（沙箱回收见 T12/T30）。
+
 ### T28.5 Part Watchdog 自动标记超时工具
 
-**验证点**：watchdog 每 60s 扫描一次 parts 表，发现 `status=running` 且 `time.start` 超过 5 分钟的 tool part 后，不直接裸写 DB，而是调用 `SessionTools.markTimedOut(partID, expectedStart, timeoutMs)` 标记为 error，并设置 `metadata.timeout=true`。
+**验证点**：watchdog 每 60s 扫描一次 parts 表（`watchdog.ts:18` `scanInterval: Duration.seconds(60)`，**硬编码，无 env**，仅可 `layerWithConfig` 注入），发现 `status=running` 且 `time.start` 超过 5 分钟（`timeoutMs`，`watchdog.ts:20`）的 tool part 后，不直接裸写 DB，而是调用 `SessionTools.markTimedOut(partID, expectedStart, timeoutMs)` 标记为 error，并设置 `metadata.timeout=true`。
 
 ```bash
 # 1. 直接向 PG 插入一个"卡死"的 part（start 时间设为 6 分钟前）
@@ -290,6 +307,10 @@ LIMIT 3;
 > 如果未来需要完整事件溯源，开启 `OPENCODE_EXPERIMENTAL_WORKSPACES=true` 即可自动落库。
 
 ---
+
+## 三、缓存性能：缓存失效与日志（续一）
+
+> T28.6-T28.8 属于「一、沙箱缓存性能优化」主题（缓存失效、init 失败日志、阶段耗时日志），物理位置在此，逻辑归属「一」。
 
 ### T28.6 沙箱销毁后缓存失效
 
@@ -396,6 +417,10 @@ INFO ... getOrCreate done    totalMs=XXX          sessionID=ses_... sandboxID=..
 - createSandbox `ms` 大 → `Sandbox.create` + `waitUntilReady` 慢（K8s 调度慢）
 
 ---
+
+## 四、Part Watchdog：CAS 幂等与配置（续二）
+
+> T28.9-T28.13 属于「二、Part Watchdog」主题（markTimedOut CAS 防覆盖、多实例幂等、配置注入、未超时不处理、可观测性）。
 
 ### T28.9 `SessionTools.markTimedOut` CAS 防覆盖
 

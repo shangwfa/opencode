@@ -196,6 +196,8 @@ sleep 10 && docker logs opencode-saas-test 2>&1 | tail -3
 #        opencode server listening on http://0.0.0.0:4096
 ```
 
+> **API key 说明（远端 PG）**：组合 1/2 使用远端 PG，provider API key 已持久化在 `credential` 表（历史数据完整），**容器启动无需 `-e ZHIPU_API_KEY`**，server 启动时会从 PG 加载并激活 credential。仅组合 3（本地 PG 全空）才必须传 `-e ZHIPU_API_KEY`。验证方式：`docker exec opencode-saas-test env | grep ZHIPU` 可能为空，但只要 `/message` 能收到 AI 回复即说明 credential 加载正常（2026-08-07 实测）。
+
 **Step 4：基础验证**
 
 ```bash

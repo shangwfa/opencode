@@ -74,6 +74,7 @@ export function buildVolumes(scope: VolumeScope, config: SandboxConfig.Interface
   const prefix = useApp ? `apps/${scope.appId!.trim()}` : `sessions/${scope.sessionID}`
   const mounts = [
     { name: "workspace", mountPath: "/workspace", sub: `${prefix}/workspace` },
+    { name: "resources", mountPath: "/resources", sub: `${prefix}/resources` },
     { name: "home", mountPath: "/home/sandbox", sub: `${prefix}/home` },
     { name: "cache", mountPath: "/home/sandbox/.cache", sub: `${prefix}/cache` },
     { name: "config", mountPath: "/home/sandbox/.config", sub: `${prefix}/config` },

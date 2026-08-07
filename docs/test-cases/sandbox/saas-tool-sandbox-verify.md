@@ -20,12 +20,12 @@
 
 ## 第一层：代码路径审查（T20.1）
 
-### T20.1 静态检查 8 个工具文件
+### T20.1 静态检查 10 个沙箱工具文件
 
 ```bash
 cd packages/opencode/src/tool
 
-for f in edit.ts glob.ts grep.ts read.ts write.ts shell.ts ls.ts apply_patch.ts; do
+for f in edit.ts glob.ts grep.ts read.ts write.ts shell.ts ls.ts apply_patch.ts lsp.ts skill.ts; do
   local_io=$(grep -n "yield\* fs\.\|yield\* afs\.\|Bun\.file\|readFileSync\|writeFileSync\|fs\.readFile\|fs\.writeFile\|fs\.stat\|fs\.open\|fs\.stream\|fs\.readDirectory\|fs\.existsSafe" "$f" 2>/dev/null | grep -v "^.*import\|^.*//\|^.*\*" || true)
   branch=$(grep -n "ctx\.sandbox !== null\|ctx\.sandbox !=" "$f" 2>/dev/null | grep -v "^.*//\|^.*\*" || true)
   if [ -z "$local_io" ] && [ -z "$branch" ]; then
@@ -38,7 +38,7 @@ for f in edit.ts glob.ts grep.ts read.ts write.ts shell.ts ls.ts apply_patch.ts;
 done
 ```
 
-**期望**：8 个文件全部 `✅`。
+**期望**：10 个文件全部 `✅`。
 
 ---
 
@@ -200,6 +200,72 @@ print('    ✅ patch 成功' if len(lines) >= 3 else '    ❌ patch 失败')
 
 ---
 
+## 工具分类总览
+
+> 系统注册 15 个工具（`GET /experimental/tool/ids`），按是否在沙箱内执行分三类：
+
+| 分类 | 工具 | sandbox 引用 | 验证方式 |
+|------|------|-------------|---------|
+| **沙箱内执行** | write / read / bash / edit / glob / grep / apply_patch / ls | `ctx.sandbox` / `sandboxProvider.runDetached` | T20.2-T20.9（本文档） |
+| **沙箱内执行** | `lsp` | `lsp.ts:67-71` SandboxProvider 分支 | [`27-session-lsp.md`](../27-session-lsp.md) T27.8-T27.9.3 |
+| **沙箱内执行** | `skill` | `skill.ts:116-194` `ctx.sandbox` + `sandbox.commands.run` | T20.13（本文档） |
+| **编排（间接触发沙箱）** | `task` | 本身无 sandbox 引用，子 agent 工具走沙箱 | T20.14（本文档） |
+| **非沙箱** | webfetch / websearch / question / todowrite / plan | 无 sandbox 引用 | 不需沙箱验证 |
+| **占位** | `invalid` | — | 不需验证 |
+
+---
+
+### T20.13 skill 工具沙箱分支
+
+> 验证 `skill.ts` 在沙箱模式下通过 `sandbox.commands.run` 执行 `find`/`test -f` 检测 session 级 skill 资源。
+
+```bash
+echo "=== T20.13 skill sandbox ==="
+# skill 工具的沙箱分支在加载 skill 时通过 sandbox 执行 find 检测文件
+# 先通过 exec 在沙箱内创建一个 skill 文件
+curl -s -X POST "$BASE/session/$SID/exec" \
+  -H 'Content-Type: application/json' \
+  -d '{"command":"mkdir -p /workspace/.opencode/skills && printf '\''{"description":"test skill","prompt":"test"}'\'' > /workspace/.opencode/skills/test-skill.md && echo skill-created"}' \
+  | python3 -c "import json,sys;d=json.load(sys.stdin);print(d.get('stdout','').strip())"
+
+# 让 AI 加载 skill（触发 skill.ts sandbox 分支的 find/test 检测）
+send_msg "$SID" "Use the skill tool to load the test-skill skill" > /dev/null
+get_tools "$SID"
+```
+
+**期望**：工具 `skill(completed)`，output 确认 skill 已加载。`skill.ts:155` 的 `sandbox.commands.run("find ... -exec chmod 644")` 和 `skill.ts:194` 的 `sandbox.commands.run("test -f ... && echo YES")` 在沙箱内执行，非本地文件系统。
+
+---
+
+### T20.14 task 工具子 agent 沙箱隔离
+
+> 验证 `task` 工具创建的子 agent 在**独立沙箱**中执行工具，与父 session 隔离。
+
+```bash
+echo "=== T20.14 task sandbox isolation ==="
+# 父 session 写一个标记文件
+send_msg "$SID" "用 bash 执行: echo parent-marker > /workspace/parent-marker.txt" > /dev/null
+
+# 用 task 创建子 agent，子 agent 在自己的沙箱中执行
+send_msg "$SID" "Use the task tool with a general subagent to run: echo subagent-isolated > /workspace/subagent-marker.txt" > /dev/null
+get_tools "$SID"
+
+# 验证子 agent 写的文件不在父 session 的沙箱中（隔离）
+curl -s -X POST "$BASE/session/$SID/exec" \
+  -H 'Content-Type: application/json' \
+  -d '{"command":"cat /workspace/subagent-marker.txt 2>&1"}' | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+out=d.get('stdout','').strip()
+print(f'    父 session 沙箱: {out}')
+print('    ✅ 隔离（父沙箱无子 agent 文件）' if 'subagent-isolated' not in out else '    ⚠️ 子 agent 复用父沙箱')
+"
+```
+
+**期望**：`task(completed)`，子 agent 在自己的 session/sandbox 中执行（`task.ts` 本身无 sandbox 引用，但创建的子 agent session 有独立 sandbox）。父 session 沙箱内无子 agent 写入的文件（隔离）。
+
+---
+
 ## 第三层：PG 记录验证（T20.10）
 
 ### T20.10 sandbox 表记录
@@ -264,7 +330,7 @@ echo "期望: 无输出（当前会命中 read.ts:49 / write.ts:46,49）"
 
 | 用例 | 验证层 | 工具 | 判定 |
 |------|--------|------|------|
-| T20.1 | 代码审查 | 全部8个 | 无本地 I/O 和条件分支 |
+| T20.1 | 代码审查 | 10 个沙箱工具 | 无本地 I/O 和条件分支 |
 | T20.2 | 运行时 | write | 文件仅在沙箱内 |
 | T20.3 | 运行时 | read | 从沙箱读取正确 |
 | T20.4 | 运行时 | bash | 沙箱 Pod 执行 |
@@ -276,6 +342,9 @@ echo "期望: 无输出（当前会命中 read.ts:49 / write.ts:46,49）"
 | T20.10 | PG 记录 | — | sandbox 表 state=running |
 | T20.11 | 运行时 | — | 环境隔离 |
 | T20.12 | 代码审查 | 全部 | 无 sandbox 泄露 |
+| T20.13 | 运行时 | skill | skill.ts sandbox 分支（find/test 检测） |
+| T20.14 | 运行时 | task | 子 agent 独立沙箱隔离 |
+| — | 交叉引用 | lsp | 见 [`27-session-lsp.md`](../27-session-lsp.md) |
 
 ---
 

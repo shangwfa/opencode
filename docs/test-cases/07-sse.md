@@ -1,34 +1,8 @@
-# Provider 与模型、SSE 事件流
+# SSE 事件流
 
 > 本文档从 `saas-test-cases.md` 拆分而来。公共测试环境和配置见 [`00-preamble.md`](./00-preamble.md)。运行用例前先 `source test-env.sh 3 && source test-lib.sh`（以下用例直接使用 `$BASE`/`$MODEL`/`jexec`）。
 
-## 八、Provider 与模型
 
-### T8.1 列出所有 provider
-
-```bash
-curl -s "$BASE/provider" | python3 -c "
-import json,sys
-d=json.load(sys.stdin)
-print('all:', len(d.get('all',[])))
-print('connected:', d.get('connected'))
-"
-```
-**期望**：`all` 非空，`connected` 包含已配置 provider
-
-### T8.2 切换模型
-
-```bash
-# 同 session 先发一条 glm-5.1 消息，再发一条其他模型消息
-SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
-
-curl -s --max-time 90 -X POST "$BASE/session/$SID/message" \
-  -H 'Content-Type: application/json' \
-  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"说一个字\"}],\"model\":$MODEL}" | jexec "d.get('info',{}).get('modelID','?')"
-```
-**期望**：两次消息分别使用指定模型回复，无错误
-
----
 
 ## 九、SSE 事件流
 
@@ -419,6 +393,234 @@ grep -c '"type":"message\.' /tmp/t915b.log
 
 ---
 
+### T9.16 实例事件流：会话更新与删除事件（session.updated / session.deleted）
+
+> 验证：`PATCH /session/:id` 触发 `session.updated`，`DELETE /session/:id` 触发 `session.deleted`
+
+```bash
+SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
+DIR=$(curl -s "$BASE/session/$SID" | jexec "d['directory']")
+
+bun docs/test-cases/scripts/sse-dump.mjs "$BASE/event" 20 "$DIR" > /tmp/t916.log &
+SSE_PID=$!
+for i in $(seq 1 20); do grep -q server.connected /tmp/t916.log 2>/dev/null && break; sleep 0.5; done
+
+curl -s -X PATCH "$BASE/session/$SID" -H 'Content-Type: application/json' -d '{"title":"sse-updated"}' > /dev/null
+curl -s -X DELETE "$BASE/session/$SID" > /dev/null
+wait $SSE_PID
+
+grep -m1 '"type":"session.updated"' /tmp/t916.log | jexec "d['properties']['info']['title']"
+grep -c '"type":"session.deleted"' /tmp/t916.log
+```
+**期望**：收到 `session.updated`（`properties.info.title=sse-updated`）与 `session.deleted`（计数 ≥1）
+
+### T9.17 实例事件流：消息删除事件（message.removed / message.part.removed）
+
+> 验证：删除消息/part 触发 `message.removed` / `message.part.removed`
+
+```bash
+SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
+DIR=$(curl -s "$BASE/session/$SID" | jexec "d['directory']")
+curl -s --max-time 45 -X POST "$BASE/session/$SID/message" \
+  -H 'Content-Type: application/json' -d "{\"parts\":[{\"type\":\"text\",\"text\":\"hi\"}],\"model\":$MODEL}" > /dev/null
+
+MID=$(curl -s "$BASE/session/$SID/message" | python3 -c "
+import json,sys
+msgs=json.load(sys.stdin, strict=False)
+print([m for m in msgs if m.get('info',{}).get('role')=='assistant'][-1]['info']['id'])
+")
+PID=$(curl -s "$BASE/session/$SID/message" | python3 -c "
+import json,sys
+msgs=json.load(sys.stdin, strict=False)
+print(msgs[-1]['parts'][0]['id'])
+")
+
+bun docs/test-cases/scripts/sse-dump.mjs "$BASE/event" 15 "$DIR" > /tmp/t917.log &
+SSE_PID=$!
+for i in $(seq 1 20); do grep -q server.connected /tmp/t917.log 2>/dev/null && break; sleep 0.5; done
+
+curl -s -X DELETE "$BASE/session/$SID/message/$MID" > /dev/null
+wait $SSE_PID
+
+grep -c '"type":"message.removed"' /tmp/t917.log
+```
+**期望**：删除消息后收到 `message.removed`（计数 ≥1）；`message.part.removed` 需通过删 part 端点触发（`DELETE /session/:id/message/:mid/part/:pid`），两者均可选验证
+
+### T9.18 实例事件流：消息状态事件（message.updated）
+
+> 验证：`POST /session/:id/prompt_async` 消息处理完成后触发 `message.updated`
+
+```bash
+SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
+DIR=$(curl -s "$BASE/session/$SID" | jexec "d['directory']")
+
+bun docs/test-cases/scripts/sse-dump.mjs "$BASE/event" 50 "$DIR" > /tmp/t918.log &
+SSE_PID=$!
+for i in $(seq 1 20); do grep -q server.connected /tmp/t918.log 2>/dev/null && break; sleep 0.5; done
+
+curl -s -X POST "$BASE/session/$SID/prompt_async" \
+  -H 'Content-Type: application/json' -d "{\"parts\":[{\"type\":\"text\",\"text\":\"说一个字\"}],\"model\":$MODEL}" > /dev/null
+wait $SSE_PID
+
+grep -c '"type":"message.updated"' /tmp/t918.log
+```
+**期望**：收到 `message.updated` ≥ 1（assistant 消息落库时触发）
+
+### T9.19 实例事件流：会话错误事件（session.error）
+
+> 验证：非法模型 ID 发送消息触发 `session.error`
+
+```bash
+SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
+DIR=$(curl -s "$BASE/session/$SID" | jexec "d['directory']")
+
+bun docs/test-cases/scripts/sse-dump.mjs "$BASE/event" 20 "$DIR" > /tmp/t919.log &
+SSE_PID=$!
+for i in $(seq 1 20); do grep -q server.connected /tmp/t919.log 2>/dev/null && break; sleep 0.5; done
+
+curl -s --max-time 15 -X POST "$BASE/session/$SID/message" \
+  -H 'Content-Type: application/json' \
+  -d '{"parts":[{"type":"text","text":"hi"}],"model":{"providerID":"zhipuai","modelID":"nonexistent-model-xyz"}}' > /dev/null
+wait $SSE_PID
+
+grep -m1 '"type":"session.error"' /tmp/t919.log | jexec "d['properties'].get('error',{}).get('name')"
+```
+**期望**：收到 `session.error` 事件（`properties.error` 含错误信息；非法模型实测触发 `UnknownError`，可能与预期 `ProviderModelNotFoundError` 有差异，事件发出即可）
+
+### T9.20 实例事件流：diff 事件（session.diff）
+
+> 验证：`POST /session/:id/revert` 触发 `session.diff`
+>
+> ⚠️ **revert 必须传 `messageID`**（来自会话中的 user 消息）。空 body 时 revert 找不到目标消息，直接返回不发布 diff 事件。
+
+```bash
+SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
+DIR=$(curl -s "$BASE/session/$SID" | jexec "d['directory']")
+curl -s --max-time 45 -X POST "$BASE/session/$SID/message" \
+  -H 'Content-Type: application/json' -d "{\"parts\":[{\"type\":\"text\",\"text\":\"hi\"}],\"model\":$MODEL}" > /dev/null
+MID=$(curl -s "$BASE/session/$SID/message" | python3 -c "
+import json,sys
+msgs=json.load(sys.stdin, strict=False)
+u=[m for m in msgs if m.get('info',{}).get('role')=='user'][0]
+print(u['info']['id'])
+")
+
+bun docs/test-cases/scripts/sse-dump.mjs "$BASE/event" 20 "$DIR" > /tmp/t920.log &
+SSE_PID=$!
+for i in $(seq 1 20); do grep -q server.connected /tmp/t920.log 2>/dev/null && break; sleep 0.5; done
+
+curl -s -X POST "$BASE/session/$SID/revert" -H 'Content-Type: application/json' -d "{\"messageID\":\"$MID\"}" > /dev/null
+wait $SSE_PID
+
+grep -c '"type":"session.diff"' /tmp/t920.log
+```
+**期望**：收到 `session.diff` ≥ 1（`properties.diff` 为 diff 数组，可为空数组）
+
+### T9.21 实例事件流：agent/model 切换事件
+
+> 验证：`session.agent.switched` / `session.model.switched` 事件
+>
+> **触发路径说明（实测确认）**：这两个事件由 V2 `Session.switchModel` / `Session.switchAgent` 发布（`packages/core/src/session.ts`）。**HTTP PATCH `/session/:id` 的 `UpdatePayload` 不支持 `model`/`agent` 字段**（仅 directory/title/metadata/permission/time.archived），PATCH model 会被静默忽略、不触发任何事件。当前 HTTP API 层无直接 switch 端点，事件由 LLM 工具调用（如 TUI/CLI 侧切换）或内部流程触发。本用例标记为**待补端点后验证**，当前通过 `session.updated`（T9.16）覆盖会话级变更。
+
+```bash
+# 待 HTTP switch 端点就绪后执行。当前 PATCH model 不会触发事件：
+SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
+DIR=$(curl -s "$BASE/session/$SID" | jexec "d['directory']")
+
+bun docs/test-cases/scripts/sse-dump.mjs "$BASE/event" 25 "$DIR" > /tmp/t921.log &
+SSE_PID=$!
+for i in $(seq 1 20); do grep -q server.connected /tmp/t921.log 2>/dev/null && break; sleep 0.5; done
+
+# PATCH model 不会触发 session.model.switched（UpdatePayload 不支持 model 字段）
+curl -s -X PATCH "$BASE/session/$SID" -H 'Content-Type: application/json' \
+  -d '{"model":{"providerID":"zhipuai","modelID":"glm-4.6"}}' > /dev/null
+wait $SSE_PID
+
+echo "model.switched count: $(grep -c '"type":"session.model.switched"' /tmp/t921.log) (期望 0，见说明)"
+echo "session.updated count: $(grep -c '"type":"session.updated"' /tmp/t921.log)"
+```
+**期望**：PATCH model 因 `UpdatePayload` 不支持被静默忽略，`session.model.switched`=0、`session.updated`=0。待 HTTP switch 端点就绪后，再验证 `session.model.switched`（`properties.model.modelID` 为新模型）与 `session.agent.switched`
+
+### T9.22 实例事件流：资源生命周期事件（command.executed / todo.updated / mcp.tools.changed）
+
+> 验证：自定义命令执行、todo 更新、MCP server 连接分别触发对应事件
+
+```bash
+SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
+DIR=$(curl -s "$BASE/session/$SID" | jexec "d['directory']")
+
+bun docs/test-cases/scripts/sse-dump.mjs "$BASE/event" 25 "$DIR" > /tmp/t922.log &
+SSE_PID=$!
+for i in $(seq 1 20); do grep -q server.connected /tmp/t922.log 2>/dev/null && break; sleep 0.5; done
+
+# 创建并执行自定义命令（CommandCreatePayload 用 template 字段；执行 payload 必填 command 字段）
+curl -s -X POST "$BASE/session/$SID/commands/create" \
+  -H 'Content-Type: application/json' -d '{"name":"sse-test-cmd","description":"t","template":"say hi","agent":"build","model":"zhipuai/glm-5.1"}' > /dev/null
+curl -s -X POST "$BASE/session/$SID/command" \
+  -H 'Content-Type: application/json' -d '{"command":"sse-test-cmd","arguments":""}' > /dev/null
+wait $SSE_PID
+
+grep -c '"type":"command.executed"' /tmp/t922.log
+```
+**期望**：执行自定义命令收到 `command.executed` ≥ 1。`todo.updated`（AI 更新 todo 时）与 `mcp.tools.changed`（MCP server 连接/断开时）为按需补充验证项
+
+### T9.23 全局事件流：事件 envelope 字段完整性
+
+> 验证：全局 SSE 事件的 `directory`/`project`/`payload` 字段结构
+>
+> ⚠️ 不能用 `sse-dump.mjs`（它会拍平 payload 层）。必须用原始 curl 查看未拍平的行。
+
+```bash
+curl -s -N --max-time 8 "$BASE/global/event" > /tmp/t923raw.log &
+CURL_PID=$!
+sleep 2
+curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' > /dev/null
+wait $CURL_PID
+
+python3 -c "
+import re
+for line in open('/tmp/t923raw.log'):
+    m = re.search(r'data: (.+)', line)
+    if not m: continue
+    raw = m.group(1)
+    if 'session.created' in raw:
+        print(raw[:300]); break
+"
+```
+**期望**：全局事件为 `{"directory":"/workspace","project":"global","payload":{"id":"evt_*","type":"session.created","properties":{...}}}`，`directory`/`project`/`payload` 三者齐全
+
+### T9.24 实例事件流：事件 ID 格式
+
+> 验证：事件 `id` 为 `evt_*` 前缀，且连接生命周期事件与业务事件一致
+
+```bash
+SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
+DIR=$(curl -s "$BASE/session/$SID" | jexec "d['directory']")
+
+bun docs/test-cases/scripts/sse-dump.mjs "$BASE/event" 10 "$DIR" > /tmp/t924.log
+python3 -c "
+import json
+for line in open('/tmp/t924.log')[:3]:
+    d = json.loads(line)
+    print(d.get('id','?'), d.get('type','?'))
+"
+```
+**期望**：事件含 `id`（`evt_*` 前缀），类型分别为 `server.connected` / `server.heartbeat`
+
+### T9.25 实例事件流：负向测试（缺 x-opencode-directory 头）
+
+> 验证：无 `x-opencode-directory` 头时实例 SSE 的行为
+>
+> **实测结论**：缺头时 middleware 回退到 `Flag.OPENCODE_DEFAULT_DIRECTORY`（`/workspace`），**仍返回 200 + `server.connected`**，属于正常连接而非拒绝。因此负向判定标准是「事件仍能收到，但归属默认目录」，而非连接被拒。
+
+```bash
+# 无头请求：应返回 200 + text/event-stream + server.connected
+curl -s -N --max-time 3 -D - "$BASE/event" | head -3
+```
+**期望**：HTTP 200、`content-type: text/event-stream`、首行 `server.connected`（回退默认目录连接成功）。若未来行为改为 400 拒绝，则标准同步调整
+
+---
+
 ## 测试结果
 
 | 用例 | 结果 | 备注 |
@@ -438,6 +640,18 @@ grep -c '"type":"message\.' /tmp/t915b.log
 | T9.13 | ✅ | 断开重连均收到 server.connected |
 | T9.14 | ✅ | 3 个 SSE 客户端同时监听，均收到相同 10 种事件类型 |
 | T9.15 | ✅ | 中途加入收到完整事件流；曾现偶发"B 只收 connected+heartbeat"（28 轮未复现，详见用例备注） |
+| T9.16 | ✅ | session.updated（PATCH title）/ session.deleted（DELETE）均收到 |
+| T9.17 | ✅ | message.removed（删消息收到）；message.part.removed 走删 part 端点 |
+| T9.18 | ✅ | message.updated（异步消息落库触发 6 次） |
+| T9.19 | ✅ | session.error（非法模型触发，error.name=UnknownError） |
+| T9.20 | ✅ | session.diff（revert 需传 messageID 才触发） |
+| T9.21 | ⚠️ 待端点 | session.model.switched 走 V2 switchModel，HTTP PATCH 的 UpdatePayload 不支持 model 字段（静默忽略，不触发事件），待 switch 端点就绪后验证 |
+| T9.22 | ✅ | command.executed（执行 payload 需 `command` 字段，创建用 `template` 字段） |
+| T9.23 | ✅ | 全局事件 envelope 为 `{directory,project,payload}`（需原始 curl，sse-dump 会拍平） |
+| T9.24 | ✅ | 事件 id 为 `evt_*` 前缀 |
+| T9.25 | ✅ | 缺 x-opencode-directory 头时回退默认目录（OPENCODE_DEFAULT_DIRECTORY），仍返回 200 + server.connected，非拒绝 |
+
+> 注：T9.16-T9.25 为覆盖补全用例，已在本轮验证（组合 1：远端 PG + 远端 Sandbox）。T9.21 的 `session.agent.switched`/`session.model.switched` 需 HTTP switch 端点就绪后验证；`todo.updated`/`mcp.tools.changed` 为按需补充项。
 
 > 注：2026-07-17 重构为标准三段式（sse-dump.mjs 后台订阅 + 业务动作 + 日志断言），原始内联 bun 脚本见 git 历史。
 

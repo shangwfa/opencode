@@ -93,6 +93,8 @@ curl -s -m 10 "$BASE/session/$SID3/exec" \
 
 ### T12.4 无 keepAlive 时 session idle 后沙箱被销毁
 
+> **交叉引用**：本用例验证 `keep_alive=false` 的 onIdle 即时销毁（`run-state.ts:66-93`）。`keep_alive=true` 的沙箱不走此路径，由 **Idle Reap**（[`sandbox-idle-reap.md`](./sandbox-idle-reap.md) T30，30 分钟未活跃回收）和 **zombie 清理**（T12.11，`keep_alive=false` 兜底）覆盖，共同构成完整回收链路：onIdle（即时）→ idle-reap（30min 兜底 keep_alive=true）→ zombie（崩溃恢复）。
+
 ```bash
 # 创建新 session（避免污染已有 keepAlive session）
 SID2=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
@@ -116,6 +118,8 @@ docker exec opencode-saas-test grep "sandbox destroyed\|destroy.*$SID2" /home/op
 ### T12.5 keepAlive 阻止 idle 销毁
 
 > **交叉引用**：等价验证见 T19.8（17 文档，纯 exec API 可控路径）；本条走 AI 消息路径。
+>
+> **注意**：keepAlive 只阻止 **onIdle 即时销毁**，不阻止 **Idle Reap**（[`sandbox-idle-reap.md`](./sandbox-idle-reap.md) T30.2 专门验证 keep_alive=true 的沙箱也会在 30 分钟未活跃后被回收）。长时间挂起不用的 keepAlive 沙箱最终由 idle-reap 兜底释放。
 
 ```bash
 SID3=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
@@ -265,7 +269,7 @@ docker exec opencode-saas-test env | grep IDLE_KILL
 grep -n 'idleKillMs\|IDLE_KILL' /Users/ruomu/code/opencode/packages/opencode/src/tool/sandbox-provider.ts
 ```
 **期望**：
-- `env` 显示 `OPENCODE_SANDBOX_IDLE_KILL_SEC=30`
+- `env` 显示 `OPENCODE_SANDBOX_IDLE_KILL_SEC=30`（**测试环境手动设置**；代码默认 3600，见 `flag.ts:104`）
 - `idleKillMs` 在 `sandbox-provider.ts` 中**有实际使用**（2026-07-18 核对）：第 24 行为 config 字段定义、第 44 行取值（`Flag.OPENCODE_SANDBOX_IDLE_KILL_SEC * 1000`）；第 1348-1352 行用于僵尸 sandbox 判定（`zombieThresholdMs = idleKillMs*2`，`state=running` 且 `time_updated` 超过阈值未更新）；第 1394 行用于僵尸清理定时器（`Schedule.spaced(config.idleKillMs)`）
 - 正常 sandbox 销毁由 `run-state.ts` `onIdle` 回调触发（session runner 空闲）；`idleKillMs` 定时器是**兜底机制**，清理因异常残留的僵尸 sandbox
 

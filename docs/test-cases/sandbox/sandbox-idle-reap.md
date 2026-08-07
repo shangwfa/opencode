@@ -10,10 +10,16 @@
 | 机制 | 触发时机 | 阈值 | 覆盖 keep_alive? |
 |------|---------|------|-----------------|
 | `onIdle` 即时销毁 | Runner 转入 idle | 即时 | ❌ 跳过 |
-| 僵尸清理 | 后台周期扫描 | 默认 60 min 扫描 / 120 min 判定（flag 可配；测试环境 `OPENCODE_SANDBOX_IDLE_KILL_SEC=30`） | ❌ 只扫 `keep_alive=false` |
+| 僵尸清理 | 后台周期扫描 | `idleKillMs`（判定 `idleKillMs*2`）| ❌ 只扫 `keep_alive=false` |
+| Idle Reap | 后台周期扫描 | `idleReapMs`（默认 30 分钟）超时未活跃即销毁 | ✅ |
 | Session 删除 | 显式调用 | 即时 | ✅ |
 
-**缺口**：`keep_alive=true` 的沙箱（`background=true` 的 bash 命令触发），在会话 idle 后不会被即时销毁，也不会被僵尸清理扫描。需要新增一轮 **30 分钟无活跃即销毁** 的后台扫描，覆盖所有存活沙箱。
+**缺口**：`keep_alive=true` 的沙箱（`background=true` 的 bash 命令触发），在会话 idle 后不会被即时销毁，也不会被僵尸清理扫描。需要新增一轮 **30 分钟无活跃即销毁** 的后台扫描（**Idle Reap**），覆盖所有存活沙箱。
+
+> **可配置性说明**（以代码为准）：
+> - **阈值可配**：`OPENCODE_SANDBOX_IDLE_KILL_SEC`（僵尸，默认 3600）、`OPENCODE_SANDBOX_IDLE_REAP_SEC`（idle-reap，默认 1800）、`OPENCODE_SANDBOX_MAX_TTL_SEC`（最大 TTL，默认 3600）
+> - **间隔硬编码**：`idleReapIntervalMs=300_000`（5 分钟，无 env，`a7ca47c15d` 由 60s 调整）；watchdog 扫描 60s、缓存 TTL 300s 同样硬编码
+> - 测试时若需加速观察，只能临时改代码或依赖 T30.8 的单测注入方式
 
 ## 改动清单
 
@@ -47,7 +53,9 @@
 
 ### T30.1 超时沙箱被自动回收
 
-**验证点**：idle reap 每 `idleReapIntervalMs`（默认 60s）扫描一次 `SandboxTable`，发现 `state=running` 且 `time_updated` 超过 `idleReapMs`（默认 30 分钟）的记录后，直接销毁沙箱并标记 `state=destroyed`。不修改 `keep_alive` 标志（用户重启会话继续时仍需要该状态）。
+**验证点**：idle reap 每 `idleReapIntervalMs`（**默认 5 分钟**，`idleReapIntervalMs=300_000`，见 `sandbox-provider.ts:47`；曾为 60s，`a7ca47c15d` 调整为 5 分钟以减少扫描开销）扫描一次 `SandboxTable`，发现 `state=running` 且 `time_updated` 超过 `idleReapMs`（默认 30 分钟）的记录后，直接销毁沙箱并标记 `state=destroyed`。不修改 `keep_alive` 标志（用户重启会话继续时仍需要该状态）。
+
+> ⚠️ **扫描间隔是 5 分钟**：单次扫描窗口 5 分钟，插入超时记录后需等待**最多一个完整扫描周期**（5 分钟 + buffer）才能确保观察到回收。若不想等 5 分钟，可临时把 `idleReapIntervalMs` 调小（如 5s）后重建镜像，或用 `layerWithConfig` 注入短间隔（见 T30.8 单测方式）。
 
 ```bash
 # 1. 向 PG 插入一个"超时"的沙箱记录（time_updated 设为 31 分钟前）
@@ -71,10 +79,10 @@ SQL
 
 echo "插入超时沙箱记录（keep_alive=false, time_updated=31min ago）"
 echo ""
-echo "等 idle reap 扫描（最多 70s）..."
+echo "等 idle reap 扫描（默认间隔 5 分钟，最多等 330s）..."
 
 # 2. 轮询 sandbox 状态
-for i in $(seq 1 14); do
+for i in $(seq 1 66); do
   sleep 5
   STATE=$(psql "$PG_URL" -t -c "SELECT state FROM sandbox WHERE session_id='ses_test_reap_basic'" | tr -d '[:space:]')
   echo "  [$((i*5))s] state=$STATE"
@@ -90,7 +98,7 @@ psql "$PG_URL" -c "DELETE FROM sandbox WHERE session_id='ses_test_reap_basic'" >
 ```
 
 **期望**：
-- 70s 内 `sandbox.state` 从 `running` 变为 `destroyed`
+- **330s 内** `sandbox.state` 从 `running` 变为 `destroyed`
 - 容器日志含 `service=sandbox-provider ... idle sandbox reap scan ... count=1`
 
 ---
@@ -121,9 +129,9 @@ SQL
 
 echo "插入超时沙箱记录（keep_alive=true, time_updated=31min ago）"
 echo ""
-echo "等 idle reap 扫描（最多 70s）..."
+echo "等 idle reap 扫描（默认间隔 5 分钟，最多等 330s）..."
 
-for i in $(seq 1 14); do
+for i in $(seq 1 66); do
   sleep 5
   STATE=$(psql "$PG_URL" -t -c "SELECT state FROM sandbox WHERE session_id='ses_test_reap_ka'" | tr -d '[:space:]')
   KEEP=$(psql "$PG_URL" -t -c "SELECT keep_alive FROM sandbox WHERE session_id='ses_test_reap_ka'" | tr -d '[:space:]')
@@ -143,7 +151,7 @@ psql "$PG_URL" -c "DELETE FROM sandbox WHERE session_id='ses_test_reap_ka'" >/de
 ```
 
 **期望**：
-- 70s 内 `sandbox.state` 变为 `destroyed`
+- **330s 内** `sandbox.state` 变为 `destroyed`
 - `sandbox.keep_alive` 仍为 `true`（不因 idle reap 而修改）
 - 与 T30.1 行为一致（不因 `keep_alive=true` 而跳过）
 
@@ -175,8 +183,8 @@ ON CONFLICT (session_id) DO UPDATE SET
   time_updated = (extract(epoch from now())*1000)::bigint;
 SQL
 
-echo "等待 70s（超过一个完整扫描周期 + buffer）..."
-sleep 70
+echo "等待 330s（超过一个完整扫描周期 5 分钟 + buffer）..."
+sleep 330
 
 STATE=$(psql "$PG_URL" -t -c "SELECT state FROM sandbox WHERE session_id='ses_test_reap_fresh'" | tr -d '[:space:]')
 
@@ -221,10 +229,10 @@ SQL
 
 echo "插入超时记录，开始持续刷新 time_updated..."
 
-# 2. 持续刷新 time_updated（每 20s 一次，覆盖至少一个扫描周期）
-for i in $(seq 1 6); do
+# 2. 持续刷新 time_updated（每 60s 一次，覆盖超过一个完整扫描周期 5 分钟）
+for i in $(seq 1 8); do
   psql "$PG_URL" -c "UPDATE sandbox SET time_updated = (extract(epoch from now())*1000)::bigint WHERE session_id='ses_test_reap_cas'" >/dev/null
-  sleep 20
+  sleep 60
 done
 
 STATE=$(psql "$PG_URL" -t -c "SELECT state FROM sandbox WHERE session_id='ses_test_reap_cas'" | tr -d '[:space:]')
@@ -281,8 +289,8 @@ else
   echo "❌ T30.5 FAIL: time_updated 未刷新或沙箱被误杀"
 fi
 
-echo "等待 70s，确认下一轮 idle reap 不会回收刚刚被 touch 的沙箱..."
-sleep 70
+echo "等待 330s，确认下一轮 idle reap 不会回收刚刚被 touch 的沙箱..."
+sleep 330
 
 STATE2=$(psql "$PG_URL" -t -c "SELECT state FROM sandbox WHERE session_id='$SID'" | tr -d '[:space:]')
 if [ "$STATE2" = "running" ]; then
@@ -347,10 +355,10 @@ ON CONFLICT (session_id) DO UPDATE SET
   time_updated = (extract(epoch from now()-interval '90 second')*1000)::bigint;
 SQL
 
-echo "插入 time_updated=90s ago 的记录（超过 60s 自定义阈值）"
-echo "等 idle reap 扫描（最多 70s）..."
+echo "插入 time_updated=90s ago 的记录（超过自定义阈值，远小于默认 30min）"
+echo "等 idle reap 扫描（默认间隔 5 分钟，最多等 330s）..."
 
-for i in $(seq 1 14); do
+for i in $(seq 1 66); do
   sleep 5
   STATE=$(psql "$PG_URL" -t -c "SELECT state FROM sandbox WHERE session_id='ses_test_reap_cfg'" | tr -d '[:space:]')
   if [ "$STATE" = "destroyed" ]; then
@@ -363,7 +371,7 @@ psql "$PG_URL" -c "DELETE FROM sandbox WHERE session_id='ses_test_reap_cfg'" >/d
 ```
 
 **期望**：
-- 70s 内 `sandbox.state` 变为 `destroyed`
+- **330s 内** `sandbox.state` 变为 `destroyed`
 - 证明 `OPENCODE_SANDBOX_IDLE_REAP_SEC=60` 覆盖了默认 1800 秒
 
 ---

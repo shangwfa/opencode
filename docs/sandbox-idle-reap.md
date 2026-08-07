@@ -22,7 +22,7 @@
   └─ keep_alive=true  → 沙箱保留
         │
         ▼
-  Idle Reap 扫描器（新增，每 60s）
+  Idle Reap 扫描器（新增，每 5 分钟）
         │
         ├─ 查询 SandboxTable: state='running' AND time_updated < now - idleReapMs
         │    （不限 keep_alive，覆盖所有存活沙箱）
@@ -166,7 +166,7 @@ yield* Effect.gen(function* () {
 | **语义** | 崩溃恢复（pod crash 后遗留的孤儿记录） | 资源回收（空闲沙箱主动释放） |
 | **阈值** | `idleKillMs * 2`（默认 120 min） | `idleReapMs`（默认 30 min，可配置） |
 | **查询条件** | `state=running AND keep_alive=false` | `state=running`（不限 keep_alive） |
-| **扫描间隔** | `Schedule.spaced(idleKillMs)`（默认 60 min） | `Schedule.spaced(60s)` |
+| **扫描间隔** | `Schedule.spaced(idleKillMs)`（默认 60 min） | `Schedule.spaced(idleReapIntervalMs)`（默认 5 min，`idleReapIntervalMs=300_000`） |
 | **getInfo reconcile** | ✅ 有（验证沙箱实际状态，已终止的跳过 kill） | ❌ 不需要（主动清理存活沙箱） |
 | **dbSetKeepAlive(false)** | ❌ 不需要（本就 keep_alive=false） | ❌ 不需要（直接销毁，不修改会话状态） |
 
@@ -229,7 +229,7 @@ yield* Effect.gen(function* () {
 | 长时间 AI 推理（无工具调用）期间沙箱被误杀 | 沙箱重建有 5-10s 延迟 | 可接受：`time_updated` 不更新说明无沙箱操作；重建走 `getOrCreate` 自动恢复 |
 | 后台 bash 任务还在跑但沙箱被杀 | 后台任务中断 | 可接受：30 分钟无活动说明用户已不在；不修改 keep_alive 标志，用户重启会话时可重建沙箱继续 |
 | 多实例并发扫描同一沙箱 | 重复 destroy | 已由 per-session `Semaphore(1)` + CAS 校验覆盖；跨进程由 PG row 状态校验兜底 |
-| 60s 扫描间隔的 DB 查询开销 | 轻微 DB 负载 | 查询走 `state + time_updated`，数据量小；可按需调间隔 |
+| 5 分钟扫描间隔的 DB 查询开销 | 轻微 DB 负载 | 查询走 `state + time_updated`，数据量小；可按需调间隔 |
 
 ## 十、改动文件清单
 
@@ -248,7 +248,7 @@ packages/opencode/src/tool/sandbox-provider.ts  # SandboxConfig 新增 idleReapM
   └─ keep_alive=true  → 沙箱保留
         │
         ▼
-  Idle Reap 扫描（每 60s，L1）
+  Idle Reap 扫描（每 5 分钟，L1）
         │
         ├─ 查 SandboxTable: state=running AND time_updated < now - 30min
         │
