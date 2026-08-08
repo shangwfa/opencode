@@ -660,6 +660,13 @@ export const layer: Layer.Layer<
     const remove: Interface["remove"] = Effect.fnUntraced(function* (sessionID: SessionID) {
       const session = yield* get(sessionID)
       try {
+        // 沙箱是全局共享资源（PG），删除会话前无条件关闭，避免孤儿记录残留。
+        // SandboxProvider 不可用时 serviceOption 自动跳过；destroy 幂等（404/已 destroyed 均容忍）。
+        const sandboxProvider = yield* Effect.serviceOption(SandboxProvider.Service)
+        if (sandboxProvider._tag === "Some") {
+          yield* sandboxProvider.value.destroy(sessionID).pipe(Effect.catchCause(() => Effect.void))
+        }
+
         const hasInstance = yield* InstanceState.directory.pipe(
           Effect.as(true),
           Effect.catchCause(() => Effect.succeed(false)),
@@ -670,11 +677,6 @@ export const layer: Layer.Layer<
 
           const runState = yield* Effect.serviceOption(SessionRunState.Service)
           if (runState._tag === "Some") yield* runState.value.cancel(sessionID)
-
-          const sandboxProvider = yield* Effect.serviceOption(SandboxProvider.Service)
-          if (sandboxProvider._tag === "Some") {
-            yield* sandboxProvider.value.destroy(sessionID).pipe(Effect.catchCause(() => Effect.void))
-          }
         }
 
         const kids = yield* children(sessionID)

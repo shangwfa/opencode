@@ -14,6 +14,7 @@
 import { describe, expect, test, beforeAll, afterAll } from "bun:test"
 import { Context, Effect, Exit, Layer, Scope } from "effect"
 import { eq, like } from "drizzle-orm"
+import { ConnectionConfig, Sandbox } from "@alibaba-group/opensandbox"
 import { Database } from "../../src/storage/db"
 import { SandboxTable } from "../../src/tool/sandbox.pg"
 import { SandboxProvider, SandboxConfig } from "../../src/tool/sandbox-provider"
@@ -29,13 +30,41 @@ const enabled = (() => {
 const db = Database.Client()
 const lifecycleRequests: Array<{ method: string; path: string }> = []
 const failedDeletes = new Set<string>()
+const failedConnects = new Set<string>()
+let nextSandboxID: string | undefined
+let activeCommand: ReadableStreamDefaultController<Uint8Array> | undefined
+let createDelayMs = 0
 const lifecycle = Bun.serve({
   port: 0,
-  fetch(request) {
+  async fetch(request) {
     const path = new URL(request.url).pathname
     lifecycleRequests.push({ method: request.method, path })
+    if (request.method === "GET" && Array.from(failedConnects).some((id) => path.includes(id))) {
+      return Response.json({ code: "CONNECT_FAILED", message: "simulated connect failure" }, { status: 500 })
+    }
     if (request.method === "DELETE" && Array.from(failedDeletes).some((id) => path.includes(id))) {
       return Response.json({ code: "DELETE_FAILED", message: "simulated delete failure" }, { status: 500 })
+    }
+    if (request.method === "POST" && path === "/v1/sandboxes" && nextSandboxID) {
+      if (createDelayMs > 0) await Bun.sleep(createDelayMs)
+      return Response.json({ id: nextSandboxID, createdAt: new Date().toISOString() })
+    }
+    if (request.method === "GET" && nextSandboxID && path.includes(`/v1/sandboxes/${nextSandboxID}/endpoints/`)) {
+      return Response.json({ endpoint: new URL(request.url).host, headers: {} })
+    }
+    if (request.method === "GET" && path === "/ping") return new Response("ok")
+    if (request.method === "POST" && path === "/session") {
+      return Response.json({ session_id: "cmd_test" })
+    }
+    if (request.method === "POST" && path === "/session/cmd_test/run") {
+      return new Response(new ReadableStream<Uint8Array>({
+        start(controller) {
+          activeCommand = controller
+        },
+      }), { headers: { "content-type": "text/event-stream" } })
+    }
+    if (request.method === "POST" && path === "/command") {
+      return new Response("", { headers: { "content-type": "text/event-stream" } })
     }
     return Response.json({ code: "NOT_FOUND", message: "sandbox not found" }, { status: 404 })
   },
@@ -180,6 +209,110 @@ describe.skipIf(!enabled)("pgLayer - idle reap: 空闲沙箱定期回收", () =>
     await dbCleanup(SID)
   }, 30_000)
 
+  test("reconnect 返回 404 时自动重建并替换 lifecycle 记录", async () => {
+    const SID = sid("ses_reap_reconnect_404")
+    const oldID = `sb_${SID}`
+    nextSandboxID = `sb_rebuilt_${SID}`
+    await insertSandbox(SID, { ageMs: 0 })
+
+    const sb = await Effect.runPromise(
+      Effect.gen(function* () {
+        const svc = yield* SandboxProvider.Service
+        return yield* svc.getOrCreate(SID, { pvcMode: "session" })
+      }).pipe(Effect.provide(context as Context.Context<SandboxProvider.Service>)),
+    )
+
+    expect(sb.id).toBe(nextSandboxID)
+    expect(await getSandboxState(SID)).toMatchObject({ id: nextSandboxID, state: "running" })
+    expect(lifecycleRequests.some((request) => request.method === "GET" && request.path.includes(oldID))).toBe(true)
+    expect(lifecycleRequests.filter((request) => request.method === "POST" && request.path === "/v1/sandboxes")).toHaveLength(1)
+    nextSandboxID = undefined
+    await dbCleanup(SID)
+  }, 20_000)
+
+  test("reconnect 返回 500 时保留 running 且不创建重复 sandbox", async () => {
+    const SID = sid("ses_reap_reconnect_500")
+    const sandboxID = `sb_${SID}`
+    const createsBefore = lifecycleRequests.filter((request) => request.method === "POST" && request.path === "/v1/sandboxes").length
+    failedConnects.add(sandboxID)
+    await insertSandbox(SID, { ageMs: 0 })
+
+    const exit = await Effect.runPromise(
+      Effect.gen(function* () {
+        const svc = yield* SandboxProvider.Service
+        return yield* Effect.exit(svc.getOrCreate(SID, { pvcMode: "session" }))
+      }).pipe(Effect.provide(context as Context.Context<SandboxProvider.Service>)),
+    )
+
+    expect(Exit.isFailure(exit)).toBe(true)
+    expect(await getSandboxState(SID)).toMatchObject({ id: sandboxID, state: "running" })
+    expect(lifecycleRequests.filter((request) => request.method === "POST" && request.path === "/v1/sandboxes")).toHaveLength(createsBefore)
+    failedConnects.delete(sandboxID)
+    await dbCleanup(SID)
+  }, 20_000)
+
+  test("创建期间并发 keepAlive 不会被 upsert 覆盖", async () => {
+    const SID = sid("ses_reap_keepalive_race")
+    nextSandboxID = `sb_keepalive_race_${SID}`
+    createDelayMs = 3_000
+    try {
+      const creating = Effect.runPromise(
+        Effect.gen(function* () {
+          const svc = yield* SandboxProvider.Service
+          return yield* svc.getOrCreate(SID, { pvcMode: "session" })
+        }).pipe(Effect.provide(context as Context.Context<SandboxProvider.Service>)),
+      )
+
+      // 等 POST /v1/sandboxes 被请求（创建已进入 delay），期间调用 keepAlive
+      for (let i = 0; i < 100 && !lifecycleRequests.some((request) => request.method === "POST" && request.path === "/v1/sandboxes"); i++) {
+        await Bun.sleep(50)
+      }
+      await Effect.runPromise(
+        Effect.gen(function* () {
+          const svc = yield* SandboxProvider.Service
+          yield* svc.keepAlive(SID)
+        }).pipe(Effect.provide(context as Context.Context<SandboxProvider.Service>)),
+      )
+
+      const sb = await creating
+      expect(sb.id).toBe(nextSandboxID)
+      expect(await getSandboxState(SID)).toMatchObject({ id: nextSandboxID, state: "running", keep_alive: true })
+    } finally {
+      createDelayMs = 0
+      nextSandboxID = undefined
+      await dbCleanup(SID)
+    }
+  }, 20_000)
+
+  test("destroy 保留 keepAlive，重建后仍保持 keepAlive", async () => {
+    const SID = sid("ses_reap_destroy_keepalive")
+    nextSandboxID = `sb_destroy_keep_${SID}`
+    await insertSandbox(SID, { keepAlive: true, ageMs: 0 })
+
+    const provide = <A>(effect: Effect.Effect<A, never, SandboxProvider.Service>) =>
+      Effect.runPromise(effect.pipe(Effect.provide(context as Context.Context<SandboxProvider.Service>)))
+
+    await provide(Effect.gen(function* () {
+      const svc = yield* SandboxProvider.Service
+      yield* svc.destroy(SID)
+    }))
+    expect((await getSandboxState(SID))?.state).toBe("destroyed")
+    expect(await provide(Effect.gen(function* () {
+      const svc = yield* SandboxProvider.Service
+      return yield* svc.isKeepAlive(SID)
+    }))).toBe(true)
+
+    const sb = await provide(Effect.gen(function* () {
+      const svc = yield* SandboxProvider.Service
+      return yield* svc.getOrCreate(SID, { pvcMode: "session" })
+    }))
+    expect(sb.id).toBe(nextSandboxID)
+    expect(await getSandboxState(SID)).toMatchObject({ id: nextSandboxID, state: "running", keep_alive: true })
+
+    nextSandboxID = undefined
+    await dbCleanup(SID)
+  }, 20_000)
+
   test("单个候选删除失败不会阻断同批其他候选", async () => {
     const FAILED = sid("ses_reap_batch_failure")
     const SUCCESS = sid("ses_reap_batch_success")
@@ -195,6 +328,74 @@ describe.skipIf(!enabled)("pgLayer - idle reap: 空闲沙箱定期回收", () =>
     failedDeletes.delete(failedID)
     await dbCleanup(FAILED)
     await dbCleanup(SUCCESS)
+  }, 20_000)
+
+  test("多个 pgLayer 同时扫描只会 claim 和删除一次", async () => {
+    const SID = sid("ses_reap_multi_layer")
+    const sandboxID = `sb_${SID}`
+    const deletesBefore = lifecycleRequests.filter((request) => request.method === "DELETE" && request.path.includes(sandboxID)).length
+    const firstScope = await Effect.runPromise(Scope.make())
+    const secondScope = await Effect.runPromise(Scope.make())
+    await Promise.all([
+      Effect.runPromise(Layer.buildWithScope(SandboxProvider.pgLayer.pipe(Layer.provide(configLayer)), firstScope)),
+      Effect.runPromise(Layer.buildWithScope(SandboxProvider.pgLayer.pipe(Layer.provide(configLayer)), secondScope)),
+    ])
+    await insertSandbox(SID, { ageMs: 6_000 })
+
+    expect(await waitForState(SID, "destroyed")).toBe(true)
+    expect(lifecycleRequests.filter((request) => request.method === "DELETE" && request.path.includes(sandboxID))).toHaveLength(deletesBefore + 1)
+
+    await Promise.all([
+      Effect.runPromise(Scope.close(firstScope, Exit.void)),
+      Effect.runPromise(Scope.close(secondScope, Exit.void)),
+    ])
+    await dbCleanup(SID)
+  }, 30_000)
+
+  test("长命令跨越 idle 阈值时 heartbeat 防止误回收", async () => {
+    const SID = sid("ses_reap_command_heartbeat")
+    nextSandboxID = `sb_heartbeat_${SID}`
+    const sandbox = await Sandbox.create({
+      connectionConfig: new ConnectionConfig({
+        domain: lifecycle.url.host,
+        protocol: "http",
+      }),
+      image: "fake",
+      timeoutSeconds: 300,
+    })
+    await Effect.runPromise(
+      Effect.gen(function* () {
+        const svc = yield* SandboxProvider.Service
+        yield* svc.register(SID, sandbox)
+      }).pipe(Effect.provide(context as Context.Context<SandboxProvider.Service>)),
+    )
+    const running = Effect.runPromise(
+      Effect.gen(function* () {
+        const svc = yield* SandboxProvider.Service
+        return yield* svc.runInSession(SID, "sleep 10")
+      }).pipe(Effect.provide(context as Context.Context<SandboxProvider.Service>)),
+    )
+
+    for (let i = 0; i < 100 && !activeCommand; i++) await Bun.sleep(50)
+    expect(activeCommand).toBeDefined()
+    const before = (await db.select({ time_updated: SandboxTable.time_updated })
+      .from(SandboxTable)
+      .where(eq(SandboxTable.session_id, SID))
+      .limit(1))[0]?.time_updated
+    await Bun.sleep(6_000)
+    const after = (await db.select({ time_updated: SandboxTable.time_updated })
+      .from(SandboxTable)
+      .where(eq(SandboxTable.session_id, SID))
+      .limit(1))[0]?.time_updated
+
+    expect((await getSandboxState(SID))?.state).toBe("running")
+    expect(after).toBeGreaterThan(before ?? 0)
+    activeCommand?.close()
+    activeCommand = undefined
+    await running
+    await sandbox.close()
+    nextSandboxID = undefined
+    await dbCleanup(SID)
   }, 20_000)
 
   // 额外预检：全新记录不应被误回收

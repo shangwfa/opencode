@@ -1,7 +1,7 @@
-import { and, inArray, sql } from "drizzle-orm"
+import { and, inArray, or, sql } from "drizzle-orm"
 import { PartTable } from "./session.pg"
 
-export const MONITORED_TOOLS = ["read", "write", "edit", "apply_patch", "glob", "grep", "ls"] as const
+export const MONITORED_TOOLS = ["read", "write", "edit", "apply_patch", "glob", "grep", "list"] as const
 
 export function runningToolCondition(startBefore: number, dialect: "sqlite" | "pg" = "sqlite", callIDs?: string[]) {
   const toolList = sql.raw(MONITORED_TOOLS.map((t) => `'${t}'`).join(", "))
@@ -26,5 +26,32 @@ export function runningToolCondition(startBefore: number, dialect: "sqlite" | "p
     sql`json_extract(${PartTable.data}, '$.tool') IN (${toolList})`,
     sql`json_extract(${PartTable.data}, '$.state.status') = 'running'`,
     sql`json_extract(${PartTable.data}, '$.state.time.start') < ${startBefore}`,
+  )
+}
+
+export function watchdogToolCondition(input: {
+  startBefore: number
+  orphanBefore: number
+  now: number
+  dialect: "sqlite" | "pg"
+  callIDs: string[]
+}) {
+  if (input.dialect !== "pg") {
+    if (input.callIDs.length === 0) return and(runningToolCondition(input.startBefore, input.dialect), sql`1 = 0`)
+    return runningToolCondition(input.startBefore, input.dialect, input.callIDs)
+  }
+  const local = input.callIDs.length
+    ? inArray(sql<string>`${PartTable.data}->>'callID'`, input.callIDs)
+    : sql`false`
+  return and(
+    runningToolCondition(input.startBefore, input.dialect),
+    or(
+      local,
+      sql`CASE
+        WHEN jsonb_typeof(${PartTable.data}->'state'->'metadata'->'watchdog'->'leaseUntil') = 'number'
+        THEN (${PartTable.data}->'state'->'metadata'->'watchdog'->>'leaseUntil')::bigint <= ${input.now}
+        ELSE (${PartTable.data}->'state'->'time'->>'start')::bigint < ${input.orphanBefore}
+      END`,
+    ),
   )
 }

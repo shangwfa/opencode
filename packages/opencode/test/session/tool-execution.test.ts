@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test"
+import { Effect } from "effect"
 import { ToolExecution } from "../../src/session/tool-execution"
 
 describe("ToolExecution", () => {
@@ -42,5 +43,20 @@ describe("ToolExecution", () => {
 
     unregisterFirst()
     unregisterSecond()
+  })
+
+  test("abort releases a caller even when the tool does not observe the signal", async () => {
+    const controller = new AbortController()
+    let finalized = false
+    const execution = Effect.never.pipe(
+      Effect.ensuring(Effect.sync(() => finalized = true)),
+      (effect) => ToolExecution.raceAbort(controller.signal, effect),
+    )
+
+    const result = Effect.runPromiseExit(execution)
+    controller.abort()
+
+    expect((await result)._tag).toBe("Failure")
+    expect(finalized).toBe(true)
   })
 })

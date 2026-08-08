@@ -751,7 +751,7 @@ export namespace SandboxProvider {
                 id: `pending-${sessionID}`,
                 session_id: sessionID,
                 host: "",
-                state: "killed",
+                state: "destroyed",
                 keep_alive: true,
                 command_session_id: null,
                 time_created: now,
@@ -918,8 +918,18 @@ export namespace SandboxProvider {
       function reconnect(row: { id: string; host: string }) {
         return Effect.tryPromise({
           try: () => Sandbox.connect({ connectionConfig, sandboxId: row.id }),
-          catch: (e) => new Error(`Sandbox.connect failed: ${String(e)}`),
+          catch: (error) => error instanceof Error ? error : new Error(`Sandbox.connect failed: ${String(error)}`),
         })
+      }
+
+      function reconnectIfPresent(row: { id: string; host: string }) {
+        return reconnect(row).pipe(
+          Effect.catch((error) =>
+            error instanceof SandboxApiException && error.statusCode === 404
+              ? Effect.succeed(null)
+              : Effect.fail(error),
+          ),
+        )
       }
 
       function killByID(sandboxId: string, sessionID: string) {
@@ -976,12 +986,15 @@ export namespace SandboxProvider {
             Effect.catchCause(() => Effect.void),
           )
           const host = `http://${config.domain}`
+          // 远程创建期间 keepAlive 可能已并发设置（async 场景），upsert 前重新读取
+          // latest 的 keep_alive，避免用创建前的快照覆盖掉刚设置的 keepAlive。
+          const latest = yield* dbGet(sessionID).pipe(Effect.orElseSucceed(() => null))
           yield* dbUpsert({
             id: sb.id,
             session_id: sessionID,
             host,
             state: "running",
-            keep_alive: existingRow?.keep_alive ?? false,
+            keep_alive: latest?.keep_alive ?? existingRow?.keep_alive ?? false,
             command_session_id: null,
             time_created: Date.now(),
             time_updated: Date.now(),
@@ -1059,13 +1072,14 @@ export namespace SandboxProvider {
       }
 
       function withCommandHeartbeat<A, E>(sessionID: string, sandboxID: string, effect: Effect.Effect<A, E>) {
+        const intervalMs = Math.min(COMMAND_HEARTBEAT_MS, Math.max(1_000, Math.floor(config.idleReapMs / 3)))
         return Effect.scoped(
           Effect.gen(function* () {
             const active = yield* dbTouchSandbox(sessionID, sandboxID)
             if (!active) return yield* Effect.fail(new Error(`Sandbox is no longer running: ${sessionID}/${sandboxID}`))
             yield* dbTouchSandbox(sessionID, sandboxID).pipe(
               Effect.catchCause(() => Effect.void),
-              Effect.repeat(Schedule.spaced(Duration.millis(COMMAND_HEARTBEAT_MS))),
+              Effect.repeat(Schedule.spaced(Duration.millis(intervalMs))),
               Effect.forkScoped,
             )
             return yield* effect
@@ -1109,7 +1123,7 @@ export namespace SandboxProvider {
             const sb = yield* Effect.gen(function* () {
               if (row?.state === "running") {
                 const tReconnect = Date.now()
-                const existing = yield* reconnect(row).pipe(Effect.orElseSucceed(() => null))
+                const existing = yield* reconnectIfPresent(row)
                 log.info("reconnect done", {
                   sessionID,
                   sandboxID: row.id,
@@ -1147,8 +1161,7 @@ export namespace SandboxProvider {
                   yield* destroySandbox(existing, sessionID)
                 } else {
                   invalidateCachedSandbox(sessionID)
-                  log.warn("sandbox reconnect failed; leaving state unchanged", { sessionID, sandboxID: row.id })
-                  return yield* Effect.fail(new Error(`Sandbox reconnect failed: ${sessionID}/${row.id}`))
+                  log.info("sandbox no longer exists; rebuilding", { sessionID, sandboxID: row.id })
                 }
               }
               if (row?.state === "killed") {
@@ -1167,7 +1180,7 @@ export namespace SandboxProvider {
                   await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${sessionID}))`)
                   const current = await runPromise(dbGet(sessionID).pipe(Effect.orElseSucceed(() => null)))
                   if (current?.state === "running") {
-                    const existing = await runPromise(reconnect(current).pipe(Effect.orElseSucceed(() => null)))
+                    const existing = await runPromise(reconnectIfPresent(current))
                     if (existing) {
                       const healthy = await existing.isHealthy().catch(() => false)
                       if (healthy) {
@@ -1250,7 +1263,8 @@ export namespace SandboxProvider {
       const destroy: Interface["destroy"] = (sessionID) =>
         lock(sessionID, Effect.gen(function* () {
           invalidateCachedSandbox(sessionID)
-          yield* dbSetKeepAlive(sessionID, false).pipe(Effect.orElseSucceed(() => null))
+          // keepAlive 是 session 维度的持久偏好：destroy 只销毁 sandbox，不改变 keepAlive。
+          // 清除 keepAlive 必须显式调用 release()；destroy 后重建仍继承 keepAlive。
           const inFlight = yield* Ref.modify(createRef, (m) => {
             const d = m.get(sessionID)
             if (d) m.delete(sessionID)
@@ -1449,16 +1463,18 @@ export namespace SandboxProvider {
 
       const register: Interface["register"] = (sessionID, sb) =>
         lock(sessionID, Effect.gen(function* () {
+          const existing = yield* dbGet(sessionID).pipe(Effect.orElseSucceed(() => null))
           yield* dbUpsert({
             id: sb.id,
             session_id: sessionID,
             host: `http://${config.domain}`,
             state: "running",
-            keep_alive: false,
+            keep_alive: existing?.keep_alive ?? false,
             command_session_id: null,
             time_created: Date.now(),
             time_updated: Date.now(),
           })
+          cacheSandbox(sessionID, sb)
         }))
 
       const getEndpoint: Interface["getEndpoint"] = (sessionID, port) =>

@@ -30,6 +30,8 @@ import { RuntimeFlags } from "@/effect/runtime-flags"
 import type { Extension as CodeModeExtension } from "@/tool/code-mode"
 import { CodeModePolicy } from "@/tool/code-mode-policy"
 import { ToolExecution } from "./tool-execution"
+import { ToolExecutionLease } from "./tool-execution-lease"
+import { MONITORED_TOOLS } from "./watchdog-sql"
 
 const MCP_RESOURCE_TOOLS = {
   list: "list_mcp_resources",
@@ -127,8 +129,10 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
     options: ExecutionOptions,
     parent?: Tool.Context,
   ) {
-    const controller = new AbortController()
-    const unregister = ToolExecution.register(input.session.id, options.toolCallId, controller)
+    const controller = parent ? undefined : new AbortController()
+    const unregister = controller
+      ? ToolExecution.register(input.session.id, options.toolCallId, controller)
+      : () => {}
     try {
       const before = yield* plugin.trigger(
         "tool.execute.before",
@@ -142,15 +146,30 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
       )
       const executionOptions = {
         ...options,
-        abortSignal: options.abortSignal
-          ? AbortSignal.any([options.abortSignal, controller.signal])
-          : controller.signal,
+        abortSignal: controller
+          ? options.abortSignal
+            ? AbortSignal.any([options.abortSignal, controller.signal])
+            : controller.signal
+          : options.abortSignal ?? parent!.abort,
       }
       const base = parent
         ? { ...parent, callID: options.toolCallId, abort: executionOptions.abortSignal, metadata: () => Effect.void }
         : context(transformed.args, executionOptions)
       const ctx = !parent && item.id === "execute" ? { ...base, orchestration: { extensions: codeModeExtensions } } : base
-      const result = yield* item.execute(transformed.args, ctx)
+      const execution = MONITORED_TOOLS.some((tool) => tool === item.id)
+        ? Effect.raceFirst(
+            item.execute(transformed.args, ctx),
+            ToolExecutionLease.maintain({
+              sessionID: input.session.id,
+              messageID: input.processor.message.id,
+              callID: options.toolCallId,
+            }),
+          )
+        : item.execute(transformed.args, ctx)
+      const result = yield* ToolExecution.raceAbort(
+        executionOptions.abortSignal,
+        execution,
+      )
       if (parent) {
         const global = yield* plugin.trigger(
           "tool.execute.after",

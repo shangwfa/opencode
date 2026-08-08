@@ -76,7 +76,7 @@ describe("SessionWatchdog runningToolCondition", () => {
       const startBefore = NOW - TIMEOUT_MS
       const oldStart = NOW - TIMEOUT_MS - 1000
 
-      for (const tool of ["read", "write", "edit", "apply_patch", "glob", "grep", "ls"]) {
+      for (const tool of ["read", "write", "edit", "apply_patch", "glob", "grep", "list"]) {
         insertToolPart(`p-${tool}`, tool, "running", oldStart)
       }
 
@@ -85,7 +85,7 @@ describe("SessionWatchdog runningToolCondition", () => {
         "p-edit",
         "p-glob",
         "p-grep",
-        "p-ls",
+        "p-list",
         "p-read",
         "p-write",
       ])
@@ -101,6 +101,7 @@ describe("SessionWatchdog runningToolCondition", () => {
       insertToolPart("p-websearch", "websearch", "running", oldStart)
       insertToolPart("p-mcp", "mcp__server__tool", "running", oldStart)
       insertToolPart("p-lsp", "lsp", "running", oldStart)
+      insertToolPart("p-ls", "ls", "running", oldStart)
 
       expect(queryStuckIds(startBefore)).toEqual([])
     })

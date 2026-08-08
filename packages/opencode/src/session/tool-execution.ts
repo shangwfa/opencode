@@ -1,3 +1,5 @@
+import { Effect } from "effect"
+
 const executions = new Map<string, AbortController>()
 
 function key(sessionID: string, callID: string) {
@@ -25,6 +27,16 @@ export function has(sessionID: string, callID: string) {
 
 export function callIDs() {
   return Array.from(executions.keys(), (id) => id.slice(id.indexOf(":") + 1))
+}
+
+export function raceAbort<A, E, R>(signal: AbortSignal, effect: Effect.Effect<A, E, R>) {
+  const aborted = Effect.callback<never>((resume) => {
+    const abort = () => resume(Effect.interrupt)
+    if (signal.aborted) abort()
+    else signal.addEventListener("abort", abort, { once: true })
+    return Effect.sync(() => signal.removeEventListener("abort", abort))
+  })
+  return Effect.raceFirst(effect, aborted)
 }
 
 export * as ToolExecution from "./tool-execution"

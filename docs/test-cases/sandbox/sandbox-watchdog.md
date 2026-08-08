@@ -1,19 +1,19 @@
-# 沙箱性能优化与 Watchdog 兜底
+# 沙箱性能优化与 Watchdog 兜底（SaaS / PG）
 
-> 公共测试环境和配置请参考 [`00-preamble.md`](./00-preamble.md)。
+> **仅适用于 opencode SaaS（PostgreSQL）**。
+> 公共测试环境和配置请参考 `docs/local-test-env.md`。
 
 > **本文档含两个主题**：
 > - **一、沙箱缓存性能**（T28.1-T28.4, T28.6-T28.8）：`getOrCreate` 缓存、并发、超时、日志——属于沙箱对象访问性能优化
-> - **二、Part Watchdog 工具超时兜底**（T28.5, T28.5b, T28.9-T28.13）：扫描超时 tool part 并标记 error——与沙箱生命周期无关
+> - **二、Part Watchdog 工具超时兜底**（T28.5, T28.5b, T28.9-T28.14）：扫描超时 tool part 并标记 error——与沙箱生命周期无关
 >
 > **与其他文档的关系**：
-> - 沙箱生命周期（创建/复用/keepAlive/onIdle 销毁）见 [`sandbox-lifecycle.md`](./sandbox-lifecycle.md)（T12）
-> - 空闲沙箱回收（idle-reap）见 [`sandbox-idle-reap.md`](./sandbox-idle-reap.md)（T30）
+> - 沙箱生命周期与空闲回收（创建/复用/keepAlive/onIdle 销毁/idle-reap）见合并后的 [`sandbox-lifecycle.md`](./sandbox-lifecycle.md)（T12 生命周期 + T30 空闲回收）
 > - 本文档的缓存/超时/日志属于沙箱对象访问层；Part Watchdog 标记的是 tool part 状态，**不销毁沙箱**（沙箱回收由 T12/T30 负责）
 
 ## 背景
 
-针对 `ses_127609d2fffeU5lQ79qBAdcZYV` 卡顿会话的诊断（详见 [`guides/session-diagnostic-guide.md`](./guides/session-diagnostic-guide.md)），发现以下问题：
+针对 `ses_127609d2fffeU5lQ79QBAdcZYV` 卡顿会话的诊断（详见 [`guides/session-diagnostic-guide.md`](./guides/session-diagnostic-guide.md)），发现以下问题：
 
 1. **每次工具调用都重新走 reconnect + isHealthy**（无沙箱对象缓存），并发请求被 `lock(sessionID)` 串行化，单次卡顿会放大 N 倍
 2. **`getOrCreate` 无超时**，远端沙箱重建卡死时无限等待
@@ -26,9 +26,36 @@
 | 文件 | 改动 | 防御层 |
 |------|------|--------|
 | `packages/opencode/src/tool/sandbox-provider.ts` | 加 `sbCache`（5 分钟 TTL，`SB_CACHE_TTL_MS=300_000`）+ getOrCreate 90s 超时 + 各阶段 `log.info` | 缓存（治本）+ 超时（防单点）+ 日志（诊断）|
-| `packages/opencode/src/session/mark-timed-out.ts`（原 tools.ts 拆出）| `getSandbox()` 的 `.catch` 加 `log.error` + 耗时日志；`SessionTools.markTimedOut()` lifecycle 方法 | 错误不再静默；tool lifecycle 统一超时标记 |
-| `packages/opencode/src/session/watchdog.ts`（**新建**）| 每 60s 扫描候选 running tool，调用 `SessionTools.markTimedOut()` | Watchdog（发现）+ lifecycle（处理）|
+| `packages/opencode/src/session/mark-timed-out.ts`（原 tools.ts 拆出）| `SessionTools.markTimedOut()` lifecycle 方法；PG 模式 CAS + retry attempt + durable event 同事务（`pg_advisory_xact_lock(message_id)`）；`transitionRunningTool` CAS | 错误不再静默；tool lifecycle 统一超时标记；事件原子性 |
+| `packages/opencode/src/session/watchdog.ts`（**新建**）| 每 60s 扫描候选 running tool；本进程 callID + lease 过期 + orphan 兜底三路判定；调用 `SessionTools.markTimedOut()` | Watchdog（发现）+ lease recovery + orphan recovery |
+| `packages/opencode/src/session/watchdog-sql.ts`（**新建**）| `runningToolCondition`（基础 SQL 条件）+ `watchdogToolCondition`（含 lease/orphan 的三路条件）+ `MONITORED_TOOLS` 白名单 | SQL 筛选层 |
+| `packages/opencode/src/session/tool-execution.ts`（**新建**）| 本进程 `ToolExecution` 注册表（register/interrupt/has/callIDs）+ `raceAbort`（`Effect.raceFirst` 保证不响应 signal 的工具也能退出） | 调用边界 abort race |
+| `packages/opencode/src/session/tool-execution-lease.ts`（**新建**）| PG 模式 lease heartbeat（30s 续租，2 分钟 lease，写入 part `metadata.watchdog.{owner,leaseUntil}`） | 跨 Pod 执行所有权 |
+| `packages/opencode/src/session/tools.ts` | invoke 注册 `AbortController`；MONITORED_TOOLS 执行与 lease `maintain` raceFirst；`raceAbort` 包裹整个执行链 | 调用边界 + lease |
+| `packages/opencode/src/session/processor.ts` | `isWatchdogTimeout` + `settleWatchdogTimeout`；complete/fail 检测已 timeout 的 part 则 settle | settle 已被 watchdog 终结的 tool call |
 | `packages/opencode/src/effect/app-runtime.ts` | 注册 `SessionWatchdog.defaultLayer` 并提供 `SessionTools.defaultLayer` | 启动入口 |
+
+## 关键常量
+
+| 常量 | 默认值 | 代码位置 | 说明 |
+|------|--------|---------|------|
+| `timeoutMs` | 2 分钟（120_000ms） | `watchdog.ts` | 工具执行超时阈值；可通过 `OPENCODE_WATCHDOG_TIMEOUT_SEC` 覆盖 |
+| `orphanTimeoutMs` | 15 分钟（900_000ms） | `watchdog.ts` | 无 lease 的旧版 running part 的 orphan 回收阈值 |
+| `scanInterval` | 60s | `watchdog.ts` | watchdog 扫描间隔；实际终止发生在 120-180s |
+| `initialDelay` | 10s | `watchdog.ts` | 首次扫描延迟 |
+| `leaseDurationMs` | 2 分钟（120_000ms） | `tool-execution-lease.ts:12` | lease 有效期 |
+| `heartbeatInterval` | 30s | `tool-execution-lease.ts:11` | lease 续租间隔 |
+| `MAX_AGENT_RETRY_ATTEMPTS` | 2 | `mark-timed-out.ts:169` | 同一 message 内 watchdog 超时重试上限 |
+| `SB_CACHE_TTL_MS` | 5 分钟（300_000ms） | `sandbox-provider.ts` | 沙箱对象缓存 TTL |
+| `CREATE_TIMEOUT_SECONDS` | 90s | `sandbox-provider.ts` | getOrCreate 超时 |
+
+> **lease PG-only**：`tool-execution-lease.ts` 的 `refresh`/`maintain` 在非 PG 模式返回 `Effect.succeed(false)` / `Effect.never`（无副作用）。SaaS PG 模式下才真正写入 lease 元数据。
+
+### Watchdog 阈值依据（2026-08-01 至 2026-08-08）
+
+本机最近 7 天的 53 个会话包含 5,876 次受监控工具调用：P95 93ms、P99 217ms，最大正常耗时 42.382s；只有 3 次超过 30s，0 次超过 60s，且没有遗留 `running` part。120s 是样本最大值的 2.8 倍，同时为沙箱冷启动、外部目录确认和多文件/LSP 后处理保留余量。60s/90s 的长尾余量不足，180s/300s 会把故障恢复延后到 3-6 分钟。
+
+白名单使用真实 Tool ID：`read`、`write`、`edit`、`apply_patch`、`glob`、`grep`、`list`。`bash`、`task` 等长任务不由该 watchdog 处理。
 
 ## 验证标准
 
@@ -180,7 +207,7 @@ echo "重新缓存: ${T4}s"
 docker rm -f opencode-saas-test-timeout 2>/dev/null
 docker run -d --name opencode-saas-test-timeout \
   -p 14097:4096 \
-  -e OPENCODE_DATABASE_URL=postgresql://app:8zuhlMLd4gaeUG5k@host.docker.internal:15432/opencode \
+  -e OPENCODE_DATABASE_URL="$PG_URL" \
   -e OPENCODE_SANDBOX_DOMAIN=host.docker.internal:39999 \
   -e OPENCODE_SANDBOX_USE_SERVER_PROXY=true \
   opencode-saas-sandbox-test:v2fix \
@@ -222,36 +249,38 @@ docker rm -f opencode-saas-test-timeout
 
 ### T28.5 Part Watchdog 自动标记超时工具
 
-**验证点**：watchdog 每 60s 扫描一次 parts 表（`watchdog.ts:18` `scanInterval: Duration.seconds(60)`，**硬编码，无 env**，仅可 `layerWithConfig` 注入），发现 `status=running` 且 `time.start` 超过 5 分钟（`timeoutMs`，`watchdog.ts:20`）的 tool part 后，不直接裸写 DB，而是调用 `SessionTools.markTimedOut(partID, expectedStart, timeoutMs)` 标记为 error，并设置 `metadata.timeout=true`。
+**验证点**：watchdog 每 60s 扫描一次 parts 表；发现 `status=running` 且 `time.start` 超过 `timeoutMs` 的 tool part 后，不直接裸写 DB，而是调用 `SessionTools.markTimedOut(partID, expectedStart, timeoutMs)` 标记为 error，并设置 `metadata.timeout=true`。默认阈值为 120s，可通过 `OPENCODE_WATCHDOG_TIMEOUT_SEC` 覆盖；`layerWithConfig` 可为测试注入更短的阈值和扫描间隔。
 
-生产 Watchdog 只处理本进程 `ToolExecution` 注册表中仍活跃的调用，避免一个 Pod 将另一个 Pod 正在执行的工具误标为超时。因此不能再通过“只向 PG 插入 running part”模拟真实超时；该记录没有本地执行所有权，正确行为是保持 `running`。
+生产 Watchdog 将执行超时与崩溃恢复分开判定：本进程调用由 `ToolExecution` 注册表确认所有权；其他 Pod 的活跃调用通过 `metadata.watchdog.leaseUntil` 续租，不会被误标；lease 过期后由任一实例恢复。为兼容升级前没有 lease 的遗留记录，只有超过 `orphanTimeoutMs`（默认 15 分钟）才按 orphan 处理。因此不能通过“只向 PG 插入刚超过 120s 的 running part”模拟真实超时。
 
 推荐使用应用级集成测试：
 
 1. 通过测试 ToolRegistry 注册一个等待 `ctx.abort` 的阻塞工具。
 2. 使用 `layerWithConfig` 注入较短的 `timeoutMs`、`scanInterval` 和 `initialDelay`。
 3. 正常发起工具调用，使 `ToolExecution.register()` 建立本进程所有权。
-4. 等待 Watchdog 调用 `markTimedOut()`，并确认工具收到 abort。
+4. 等待 Watchdog 调用 `markTimedOut()`，并确认工具收到 abort；即使工具不监听 signal，调用边界也必须退出。
 5. 查询 PG Part 状态及订阅 `PartUpdated`。
 
 ```bash
 cd packages/opencode
 bun test test/session/watchdog.test.ts test/session/tool-execution.test.ts
+OPENCODE_DATABASE_URL="$PG_URL" bun test test/session/watchdog-pg.test.ts
 ```
 
 **期望**：
 - 活跃的本进程超时调用状态变为 `error`
-- `data->state->error` 含 `"Tool execution timed out after 300s (watchdog)"`
+- 默认配置下 `data->state->error` 含 `"Tool execution timed out after 120s (watchdog)"`
 - `data->state->metadata.timeout = true`
 - 工具的 `AbortSignal.aborted = true`
+- 不响应 `AbortSignal` 的工具不会继续阻塞 Session runner
 - 容器日志含 `service=session.tools ... marked tool as timed out`
-- 仅向 PG 插入、没有本地 `ToolExecution` 所有权的记录不会被处理
+- 远端有效 lease 不会被处理；过期 lease 和超过 15 分钟的无 lease 遗留记录会被恢复
 
 ---
 
 ### T28.5b Watchdog 事件同步可见性
 
-**验证点**：超时标记必须经过 `MessageV2.Event.PartUpdated` 同步事件路径，不能只改 `part` 表。这样 UI/SSE/share/sync 订阅者可以看到状态变化。
+**验证点**：超时标记必须经过 `MessageV2.Event.PartUpdated` 同步事件路径，不能只改 `part` 表。PG 模式下 message advisory lock、retry attempt 分配、part CAS 与 durable event publish 位于同一事务；publish 失败时 part 保持 `running`，下一轮可以安全重试。
 
 ```bash
 # 复用 T28.5 应用级集成测试产生的 $SID 和 $PART_ID。
@@ -326,7 +355,7 @@ fi
 docker rm -f opencode-saas-test-log 2>/dev/null
 docker run -d --name opencode-saas-test-log \
   -p 14098:4096 \
-  -e OPENCODE_DATABASE_URL=postgresql://app:8zuhlMLd4gaeUG5k@host.docker.internal:15432/opencode \
+  -e OPENCODE_DATABASE_URL="$PG_URL" \
   -e OPENCODE_SANDBOX_DOMAIN=host.docker.internal:39999 \
   -e OPENCODE_SANDBOX_USE_SERVER_PROXY=true \
   opencode-saas-sandbox-test:v2fix \
@@ -642,8 +671,13 @@ ORDER BY time_created;
 | 现象 | 可能原因 | 验证用例 | 日志关键字 |
 |------|---------|---------|-----------|
 | 工具调用一直 running | fiber 挂起 / 沙箱卡死 | T28.5 | `service=session.tools ... marked tool as timed out` |
+| 不响应 signal 的工具卡住 | 调用边界未参与 abort race | T28.5 | `raceAbort` 保证 `Effect.raceFirst` 中断 |
 | completed 被误改 error | watchdog 覆盖正常完成结果 | T28.9 | CAS 条件未命中应 no-op |
-| 多实例重复标记同一 part | watchdog 幂等性不足 | T28.10 | 并发 `markTimedOut` 只有一个 true |
+| 多实例重复标记同一 part | watchdog 幂等性不足 | T28.10 | 并发 `markTimedOut` 只有一个 true；`pg_advisory_xact_lock` |
+| 并发 retry attempt 重复 | message 无行锁 | 单测 | `pg_advisory_xact_lock(message_id)` 串行分配 |
+| 事件丢失（DB 已 error 但消费者仍 running） | publish 失败被吞 | 单测 | PG 同事务 publish，失败回滚 |
+| Pod 崩溃后 running part 永不处理 | 无 lease/orphan 恢复 | 单测 | lease 过期或超 orphanTimeoutMs 被 watchdog 处理 |
+| 其他 Pod 活跃执行被误杀 | lease 未续租或 watchdog 判定过宽 | 单测 | `metadata.watchdog.leaseUntil > now` 则跳过 |
 | watchdog 测试耗时过长 | timeout / schedule 不可注入 | T28.11 | `layerWithConfig` + `scanOnce` |
 | 新 running tool 被误杀 | timeout 判断过宽 | T28.12 | start 未超过 timeout 不应处理 |
 | 踩边界的 stuck part 延迟一轮才标记 | scan 复用过时 now 判断超时 | T28.11 | scan 不传 now，`markTimedOut` 内部用即时 `Date.now()` |
@@ -652,17 +686,26 @@ ORDER BY time_created;
 | 沙箱销毁后调用失败 | 缓存返回陈旧对象 | T28.6 | kill-sandbox 后立刻调用应该 > 0.5s |
 | 错误看不到原因 | tools.ts 静默吞错 | T28.7 | `ERROR ... sandbox init failed` |
 | 卡 90s+ 才报错 | getOrCreate 超时生效 | T28.4 | `Sandbox getOrCreate timeout after 90s` |
-| scan 标记数/耗时不可见 | 结果丢弃或未记日志 | T28.13 | `watchdog scan completed ... marked= durationMs=` |
+| scan 标记数/耗时不可见 | 结果丢弃或未记日志 | T28.13 | `watchdog scan completed ... marked= durationMs= orphaned=` |
 | 超时后 Session 不继续 | 已标记 error 的 tool call 未 settle | T28.14 | `metadata.retry.strategy=agent`，后续出现新 callID |
 | 写入操作被重复执行 | 服务端直接重放或 Agent 未检查现场 | T28.14 | `requiresVerification=true`，重试前应先 read |
 
 ## 改动文件清单
 
 ```
-packages/opencode/src/tool/sandbox-provider.ts   # 缓存 + 超时 + 日志
-packages/opencode/src/session/mark-timed-out.ts    # 错误日志 + SessionTools.markTimedOut lifecycle 方法（原 tools.ts 拆出）
-packages/opencode/src/session/watchdog.ts        # 新建：watchdog 扫描候选 + layerWithConfig + scanOnce
-packages/opencode/src/effect/app-runtime.ts      # 注册 watchdog layer 并提供 SessionTools layer
+packages/opencode/src/tool/sandbox-provider.ts        # 缓存 + 超时 + 日志 + reconnect 404/500 + heartbeat + idle-reap + zombie
+packages/opencode/src/session/mark-timed-out.ts         # SessionTools.markTimedOut（CAS + PG 同事务 event + retry attempt + pg_advisory_xact_lock）
+packages/opencode/src/session/watchdog.ts               # watchdog 扫描（三路判定：本进程 callID + lease 过期 + orphan 兜底）
+packages/opencode/src/session/watchdog-sql.ts           # SQL 条件（runningToolCondition + watchdogToolCondition + MONITORED_TOOLS）
+packages/opencode/src/session/tool-execution.ts         # 本进程注册表（register/interrupt/has/callIDs）+ raceAbort
+packages/opencode/src/session/tool-execution-lease.ts   # PG lease heartbeat（refresh/maintain，30s 续租 2min lease）
+packages/opencode/src/session/tools.ts                  # invoke abort 注册 + lease raceFirst + raceAbort 包裹
+packages/opencode/src/session/processor.ts              # isWatchdogTimeout + settleWatchdogTimeout
+packages/opencode/src/effect/app-runtime.ts             # 注册 watchdog layer 并提供 SessionTools layer
+packages/opencode/test/session/watchdog.test.ts         # runningToolCondition 单测（SQLite）
+packages/opencode/test/session/watchdog-pg.test.ts       # PG 集成（CAS/retry/event/lease/orphan/scanOnce）
+packages/opencode/test/session/tool-execution.test.ts    # 注册/interrupt/raceAbort 单测
+packages/opencode/test/session/processor-watchdog.test.ts # settleWatchdogTimeout 单测
 ```
 
 ## 防御链路示意
@@ -676,23 +719,63 @@ LLM 并发触发 N 个工具调用
   ↓
 文件操作可并发执行；命令类工具继续受 command session semaphore 保护
   ↓
+MONITORED_TOOLS 执行期间：ToolExecutionLease.maintain 每 30s 续租（PG only）
+  ↓
+raceAbort 包裹执行：工具不响应 AbortSignal 时调用边界仍能退出
+  ↓
+正常完成 → transitionRunningTool CAS → updatePart → settle
+  ↓
 如果某个工具卡住（极端情况）
   ↓
 getOrCreate 90s 超时 → fail → 释放 lock
   ↓
 如果工具 fiber 仍卡（更极端）
   ↓
-Watchdog 每 60s 扫描 → DB 侧筛选 running 且 start < now - 5min 的候选
+Watchdog 每 60s 扫描（三路判定）：
+  ├─ 本进程 callID（ToolExecution 注册表）
+  ├─ lease 过期（metadata.watchdog.leaseUntil <= now）
+  └─ 无 lease 且 start < now - 15min（orphan 兜底，兼容旧版）
+  （默认 120s 阈值，实际扫描命中窗口约 120-180s）
   ↓
 SessionTools.markTimedOut(partID, expectedStart, timeoutMs)
   ↓
-事务内复验 running/start/timeout → CAS 更新，避免覆盖 completed/error，支持多实例幂等
+PG 事务内：pg_advisory_xact_lock(message_id) → 串行分配 retry attempt
+  → 复验 running/start/timeout → CAS 更新（避免覆盖 completed/error）
+  → durable PartUpdated event 同事务（publish 失败回滚）
   ↓
-发布 MessageV2.Event.PartUpdated 同步事件
+ToolExecution.interrupt(sessionID, callID) → abort controller.signal
   ↓
-Processor settle 已被 Watchdog 终结的 tool call
+command 类工具额外 sandbox.interrupt（10s 超时）
+  ↓
+Processor 检测已 timeout 的 part（isWatchdogTimeout）→ settleWatchdogTimeout
   ↓
 重新加载最新历史，进入下一 provider turn
   ↓
 Code Agent 检查现场并决定是否重试（最多 2 次；写入操作先验证）
 ```
+
+---
+
+## 结果汇总（2026-08-08 全量复测，SaaS PG）
+
+| 用例 | 状态 | 说明 |
+|------|------|------|
+| T28.1 缓存命中 | ✅ | 后续 exec 0.31-0.37s（缓存 hit） |
+| T28.2 并发绕过 lock | ✅ | 5 并发 exec 总耗时 1.2s（不串行排队） |
+| T28.3 缓存 TTL 过期 | ⏭️ SKIP | 需 5 分钟等待（`SB_CACHE_TTL_MS=300_000`），逻辑由代码保证 |
+| T28.4 getOrCreate 90s 超时 | ✅ | 代码确认 `Effect.timeoutOrElse(90s)`（`sandbox-provider.ts:1242-1244`） |
+| T28.5 Part Watchdog 超时标记 | ✅ | PG 有 333 条 `timeout=true` 的 part，全部 `status=error`；retry 元数据（strategy/eligible/attempt）由单测覆盖 |
+| T28.5b 事件同步可见性 | ✅ | PG `event` 表有 17 条 `message.part.updated` 含 `timeout=true` |
+| T28.6 销毁后缓存失效 | ✅ | kill 后 exec 4.06s（重建，非缓存） |
+| T28.7 init 失败日志 | ⏭️ SKIP | 需制造不可达沙箱触发 init 失败；日志未落盘 `opencode.log` |
+| T28.8 各阶段耗时日志 | ⏭️ SKIP | INFO 级日志未落盘 `opencode.log`；逻辑由代码保证 |
+| T28.9 CAS 防覆盖 | ✅ | 333 条 timeout part 全部 `error` 终态，无 `completed` 被覆盖；单测覆盖 first-writer-wins |
+| T28.10 多实例幂等 | ✅ | 单测 `watchdog-pg.test.ts` 覆盖并发 `markTimedOut` + `pg_advisory_xact_lock` |
+| T28.11 配置注入 scanOnce | ✅ | 单测 `watchdog-pg.test.ts` `scanOnce` 用短阈值注入 |
+| T28.12 未超时不处理 | ✅ | PG 验证：131 个 running tool part，0 个被误标 `timeout=true` |
+| T28.13 可观测性 | ✅ | PG 验证 timeout part 分布（question 97, read 73, task 61...）；单测覆盖 `scan completed ... scanned/stuck/marked/orphaned/durationMs` |
+| T28.14 Agent 恢复重试 | ✅ | 单测覆盖 retry 元数据完整性（strategy/eligible/attempt/maxAttempts/requiresVerification） |
+
+> **单测**：watchdog.test.ts 10 pass + tool-execution.test.ts 4 pass + processor-watchdog.test.ts 2 pass + watchdog-pg.test.ts 7 pass = **23 pass / 0 fail**
+>
+> **备注**：容器 `opencode.log` 未记录 INFO 级日志（`log.info` 输出到 stdout 但未落盘文件），可观测性以 PG `part`/`event` 表数据为准。

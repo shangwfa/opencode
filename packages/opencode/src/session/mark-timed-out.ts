@@ -15,6 +15,7 @@ type StoredToolPart = Omit<ToolPart, "id" | "sessionID" | "messageID">
 type StoredRunningToolPart = Omit<StoredToolPart, "state"> & { state: ToolStateRunning }
 type ToolPartRow = Pick<typeof PartTable.$inferSelect, "id" | "session_id" | "message_id" | "data">
 type LifecycleDb = {
+  execute(query: ReturnType<typeof sql>): Promise<unknown>
   select(): {
     from(table: typeof PartTable): {
       where(condition: ReturnType<typeof eq>): {
@@ -57,7 +58,14 @@ export const layer = Layer.effect(
         try: () =>
           Database.transaction(
             async (tx: LifecycleDb) => {
-              const row = await tx.select().from(PartTable).where(eq(PartTable.id, input.partID)).get()
+              const initial = await tx.select().from(PartTable).where(eq(PartTable.id, input.partID)).get()
+              if (!initial) return undefined
+              if (Database.dialect === "pg") {
+                await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${initial.message_id}))`)
+              }
+              const row = Database.dialect === "pg"
+                ? await tx.select().from(PartTable).where(eq(PartTable.id, input.partID)).get()
+                : initial
               const part = parseToolPart(row?.data)
               if (!row || !part) return undefined
               if (part.state.time.start !== input.expectedStart) return undefined
@@ -106,7 +114,11 @@ export const layer = Layer.effect(
                 .returning({ id: PartTable.id })
                 .all()
               if (updated.length === 0) return undefined
-              return { row, updateData }
+              const result = { row, updateData }
+              if (Database.dialect === "pg") {
+                await Effect.runPromise(publishTimedOut(events, result, now))
+              }
+              return result
             },
             { behavior: "immediate" },
           ),
@@ -122,21 +134,7 @@ export const layer = Layer.effect(
       const sessionID = result.row.session_id as SessionID
       const interrupted = ToolExecution.interrupt(sessionID, result.updateData.callID)
 
-      yield* events.publish(SessionV1.Event.PartUpdated, {
-        sessionID,
-        part: {
-          ...result.updateData,
-          id: result.row.id,
-          sessionID,
-          messageID: result.row.message_id,
-        },
-        time: now,
-      }).pipe(
-        Effect.catchCause((cause) => {
-          log.error("timed out part event publish failed", { partID: input.partID, cause: String(cause) })
-          return Effect.void
-        }),
-      )
+      if (Database.dialect !== "pg") yield* publishTimedOut(events, result, now)
 
       if (COMMAND_TOOLS.has(result.updateData.tool)) {
         yield* Option.match(maybeSandbox, {
@@ -169,6 +167,24 @@ export const layer = Layer.effect(
 const COMMAND_TOOLS = new Set(["bash", "task"])
 const RETRY_WITH_VERIFICATION = new Set(["write", "edit", "apply_patch"])
 const MAX_AGENT_RETRY_ATTEMPTS = 2
+
+function publishTimedOut(
+  events: EventV2Bridge.Service["Service"],
+  result: { row: ToolPartRow; updateData: StoredToolPart },
+  now: number,
+) {
+  const sessionID = result.row.session_id as SessionID
+  return events.publish(SessionV1.Event.PartUpdated, {
+    sessionID,
+    part: {
+      ...result.updateData,
+      id: result.row.id,
+      sessionID,
+      messageID: result.row.message_id,
+    },
+    time: now,
+  })
+}
 
 export const defaultLayer = layer
 

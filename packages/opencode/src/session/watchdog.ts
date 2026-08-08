@@ -1,11 +1,12 @@
 import { Context, Duration, Effect, Layer, Schedule } from "effect"
 import { and, asc } from "drizzle-orm"
 import * as Log from "@opencode-ai/core/util/log"
+import { Flag } from "@/flag/flag"
 import { Database } from "../storage/db"
 import { PartTable } from "./session.pg"
 import type { PartID } from "./schema"
 import { SessionTools } from "./mark-timed-out"
-import { runningToolCondition } from "./watchdog-sql"
+import { watchdogToolCondition } from "./watchdog-sql"
 import { ToolExecution } from "./tool-execution"
 
 const log = Log.create({ service: "watchdog" })
@@ -14,12 +15,14 @@ export interface Config {
   readonly scanInterval: ReturnType<typeof Duration.seconds>
   readonly initialDelay: ReturnType<typeof Duration.seconds>
   readonly timeoutMs: number
+  readonly orphanTimeoutMs: number
 }
 
 export const defaultConfig: Config = {
   scanInterval: Duration.seconds(60),
   initialDelay: Duration.seconds(10),
-  timeoutMs: 5 * 60 * 1000,
+  timeoutMs: Flag.OPENCODE_WATCHDOG_TIMEOUT_SEC * 1000,
+  orphanTimeoutMs: 15 * 60 * 1000,
 }
 
 type WatchdogRow = Pick<typeof PartTable.$inferSelect, "id" | "session_id" | "data">
@@ -57,7 +60,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null
 }
 
-function runningExecution(data: unknown): { start: number; callID: string } | undefined {
+function runningExecution(data: unknown): { start: number; callID: string; leaseUntil?: number } | undefined {
   const value = parsePartData(data)
   if (!isRecord(value)) return
   if (value.type !== "tool") return
@@ -66,7 +69,13 @@ function runningExecution(data: unknown): { start: number; callID: string } | un
   if (typeof value.callID !== "string") return
   if (!isRecord(value.state.time)) return
   if (typeof value.state.time.start !== "number") return
-  return { start: value.state.time.start, callID: value.callID }
+  const metadata = isRecord(value.state.metadata) ? value.state.metadata : undefined
+  const watchdog = metadata && isRecord(metadata.watchdog) ? metadata.watchdog : undefined
+  return {
+    start: value.state.time.start,
+    callID: value.callID,
+    ...(typeof watchdog?.leaseUntil === "number" ? { leaseUntil: watchdog.leaseUntil } : {}),
+  }
 }
 
 const scan = Effect.fn("SessionWatchdog.scan")(function* (config: Config) {
@@ -74,9 +83,9 @@ const scan = Effect.fn("SessionWatchdog.scan")(function* (config: Config) {
   const tools = yield* SessionTools.Service
   const t0 = Date.now()
   const startBefore = t0 - config.timeoutMs
+  const orphanBefore = t0 - config.orphanTimeoutMs
   const span = yield* Effect.currentSpan
   const callIDs = ToolExecution.callIDs()
-  if (callIDs.length === 0) return
 
   const rows = yield* Effect.tryPromise({
     try: () =>
@@ -87,7 +96,7 @@ const scan = Effect.fn("SessionWatchdog.scan")(function* (config: Config) {
           data: PartTable.data,
         })
         .from(PartTable)
-        .where(runningToolCondition(startBefore, Database.dialect, callIDs))
+        .where(watchdogToolCondition({ startBefore, orphanBefore, now: t0, dialect: Database.dialect, callIDs }))
         .orderBy(asc(PartTable.time_created))
         .limit(100)
         .all(),
@@ -102,8 +111,17 @@ const scan = Effect.fn("SessionWatchdog.scan")(function* (config: Config) {
   const stuck = rows
     .map((row) => {
       const execution = runningExecution(row.data)
-      if (!execution || !ToolExecution.has(row.session_id, execution.callID)) return
-      return { row, start: execution.start }
+      if (!execution) return
+      const local = ToolExecution.has(row.session_id, execution.callID)
+      const orphaned = execution.leaseUntil === undefined
+        ? execution.start < orphanBefore
+        : execution.leaseUntil <= t0
+      if (!local && !orphaned) return
+      return {
+        row,
+        start: execution.start,
+        local,
+      }
     })
     .filter((item) => item !== undefined)
 
@@ -124,12 +142,14 @@ const scan = Effect.fn("SessionWatchdog.scan")(function* (config: Config) {
   span.attribute("watchdog.scanned", rows.length)
   span.attribute("watchdog.stuck", stuck.length)
   span.attribute("watchdog.marked", marked)
+  span.attribute("watchdog.orphaned", stuck.filter((item) => !item.local).length)
   span.attribute("watchdog.duration_ms", durationMs)
 
   if (stuck.length > 0) log.warn("watchdog stuck tools detected", { count: stuck.length, marked })
   log.info("watchdog scan completed", {
     scanned: rows.length,
     stuck: stuck.length,
+    orphaned: stuck.filter((item) => !item.local).length,
     marked,
     durationMs,
   })
