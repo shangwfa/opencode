@@ -23,6 +23,16 @@ const SAMPLE_BYTES = 4096
 const SUPPORTED_IMAGE_MIMES = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"])
 const MAX_READ_BYTES = 50 * 1024
 const FILE_OP_TIMEOUT = Duration.seconds(60)
+const INVALID_UTF8_RATIO = 0.3
+
+function hasExcessiveInvalidUtf8(bytes: Uint8Array): boolean {
+  if (bytes.length === 0) return false
+  const decoder = new TextDecoder("utf-8", { fatal: false })
+  const text = decoder.decode(bytes)
+  let invalid = 0
+  for (let i = 0; i < text.length; i++) if (text.charCodeAt(i) === 0xfffd) invalid++
+  return invalid / Math.max(text.length, 1) > INVALID_UTF8_RATIO
+}
 
 class ReadStop extends Schema.TaggedErrorClass<ReadStop>()("ReadStop", {}) {}
 
@@ -152,7 +162,7 @@ export const ReadTool = Tool.define<
       // avoid Stream.runForEachWhile (it currently swallows the final unterminated
       // line of the upstream splitLines pipeline) and use a tagged error to stop the
       // upstream file stream as soon as the byte cap is reached.
-      const decoder = new TextDecoder("utf-8")
+  const decoder = new TextDecoder("utf-8", { fatal: false })
       yield* fs.stream(filepath).pipe(
         Stream.map((bytes) => decoder.decode(bytes, { stream: true })),
         Stream.splitLines,
@@ -248,7 +258,7 @@ export const ReadTool = Tool.define<
       const info = yield* Effect.tryPromise({
         try: async () => (await sb.files.getFileInfo([sandboxPath]))[sandboxPath],
         catch: () => undefined,
-      })
+      }).pipe(Effect.catchCause(() => Effect.succeed(undefined)))
 
       const isDirectory = typeof info?.mode === "number" && (info.mode & 0o170000) === 0o040000
 
@@ -338,6 +348,7 @@ export const ReadTool = Tool.define<
         try: () => sb.files.readBytes(sandboxPath, { range: "bytes=0-65535" }),
         catch: () => undefined,
       }).pipe(
+        Effect.catchCause(() => Effect.succeed(undefined)),
         Effect.timeoutOrElse({
           duration: FILE_OP_TIMEOUT,
           orElse: () =>
@@ -388,6 +399,9 @@ export const ReadTool = Tool.define<
 
         const start = (params.offset ?? 1) - 1
         const limit = params.limit ?? DEFAULT_READ_LIMIT
+        if (hasExcessiveInvalidUtf8(header)) {
+          return yield* Effect.fail(new Error(`File is not valid UTF-8: ${sandboxPath}`))
+        }
         const page = yield* Effect.tryPromise({
           try: () => readTextPage(sb.files.readBytesStream(sandboxPath), start + 1, limit),
           catch: (cause) => {
@@ -543,6 +557,10 @@ export const ReadTool = Tool.define<
 
       if (isBinaryFile(filepath, sample)) {
         return yield* Effect.fail(new Error(`Cannot read binary file: ${filepath}`))
+      }
+
+      if (hasExcessiveInvalidUtf8(sample)) {
+        return yield* Effect.fail(new Error(`File is not valid UTF-8: ${filepath}`))
       }
 
       const file = yield* lines(filepath, { limit: params.limit ?? DEFAULT_READ_LIMIT, offset: params.offset || 1 })

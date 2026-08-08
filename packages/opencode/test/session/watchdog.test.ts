@@ -2,7 +2,14 @@ import { describe, expect, test, beforeEach, afterEach } from "bun:test"
 import { Database as BunSqlite } from "bun:sqlite"
 import { drizzle, type SQLiteBunDatabase } from "drizzle-orm/bun-sqlite"
 import { PartTable } from "../../src/session/session.pg"
-import { runningToolCondition } from "../../src/session/watchdog-sql"
+import { runningToolCondition, MONITORED_TOOLS } from "../../src/session/watchdog-sql"
+import { ReadTool } from "../../src/tool/read"
+import { WriteTool } from "../../src/tool/write"
+import { EditTool } from "../../src/tool/edit"
+import { ApplyPatchTool } from "../../src/tool/apply_patch"
+import { GlobTool } from "../../src/tool/glob"
+import { GrepTool } from "../../src/tool/grep"
+import { ListTool } from "../../src/tool/ls"
 
 const TIMEOUT_MS = 5 * 60 * 1000
 
@@ -186,5 +193,22 @@ describe("SessionWatchdog runningToolCondition", () => {
 
       expect(queryStuckIds(startBefore)).toEqual(["stuck-edit", "stuck-grep", "stuck-read"])
     })
+  })
+})
+
+describe("MONITORED_TOOLS whitelist linkage", () => {
+  test("every whitelisted tool id maps to a real registered Tool", () => {
+    const whitelist: string[] = [...MONITORED_TOOLS]
+    const registered: string[] = [ReadTool, WriteTool, EditTool, ApplyPatchTool, GlobTool, GrepTool, ListTool].map(
+      (t) => t.id,
+    )
+    expect(whitelist.sort()).toEqual(registered.sort())
+  })
+
+  test("no MONITORED_TOOLS entry references a non-existent tool id", () => {
+    const registered = new Set([ReadTool, WriteTool, EditTool, ApplyPatchTool, GlobTool, GrepTool, ListTool].map((t) => t.id))
+    for (const tool of MONITORED_TOOLS) {
+      expect(registered.has(tool)).toBe(true)
+    }
   })
 })

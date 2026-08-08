@@ -606,4 +606,15 @@ describe("tool.read binary detection", () => {
       expect(err.message).toContain("Cannot read binary file")
     }),
   )
+
+  it.live("rejects files with invalid UTF-8 bytes", () =>
+    Effect.gen(function* () {
+      const dir = yield* tmpdirScoped()
+      const bytes = Buffer.from([0xff, 0xfe])
+      yield* put(path.join(dir, "invalid-utf8.txt"), bytes)
+
+      const err = yield* fail(dir, { filePath: path.join(dir, "invalid-utf8.txt") })
+      expect(err.message).toContain("File is not valid UTF-8")
+    }),
+  )
 })

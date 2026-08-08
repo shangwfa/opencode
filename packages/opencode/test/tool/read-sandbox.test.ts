@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { Effect, Layer } from "effect"
+import { LayerNode } from "@opencode-ai/core/effect/layer-node"
+import { FSUtil } from "@opencode-ai/core/fs-util"
 import { ReadTool } from "../../src/tool/read"
 import { SandboxProvider } from "@/tool/sandbox-provider"
 import { Truncate } from "@/tool/truncate"
@@ -165,6 +167,7 @@ function makeCtx(sandbox: Sandbox) {
 function makeLayers(sandbox: Sandbox) {
   const provider = makeProvider(sandbox)
   return Layer.mergeAll(
+    LayerNode.compile(FSUtil.node),
     Layer.succeed(SandboxProvider.Service, provider),
     Layer.succeed(Instruction.Service, { resolve: () => Effect.succeed([]) } as any),
     Layer.succeed(Truncate.Service, {
@@ -183,16 +186,20 @@ async function execRead(
   opts?: { offset?: number; limit?: number },
 ) {
   const layers = makeLayers(sandbox)
-  const init = await Effect.runPromise(ReadTool.pipe(Effect.provide(layers), Effect.provide(testInstanceStoreLayer)))
+  const init = await Effect.runPromise(Effect.scoped(ReadTool.pipe(Effect.provide(layers), Effect.provide(testInstanceStoreLayer))))
   const tool = await Effect.runPromise(
-    init
-      .init()
-      .pipe(Effect.provide(layers), provideInstance("/workspace"), Effect.provide(testInstanceStoreLayer)),
+    Effect.scoped(
+      init
+        .init()
+        .pipe(Effect.provide(layers), provideInstance("/workspace"), Effect.provide(testInstanceStoreLayer)),
+    ),
   )
   const result = await Effect.runPromise(
-    tool
-      .execute({ filePath, ...opts }, makeCtx(sandbox))
-      .pipe(Effect.provide(layers), provideInstance("/workspace"), Effect.provide(testInstanceStoreLayer)),
+    Effect.scoped(
+      tool
+        .execute({ filePath, ...opts }, makeCtx(sandbox))
+        .pipe(Effect.provide(layers), provideInstance("/workspace"), Effect.provide(testInstanceStoreLayer)),
+    ),
   )
   return result
 }
@@ -331,14 +338,18 @@ describe("read tool (sandbox mode)", () => {
     }
     const provider = makeProvider(sb)
     const layers = makeLayers(sb)
-    const init = await Effect.runPromise(ReadTool.pipe(Effect.provide(layers), Effect.provide(testInstanceStoreLayer)))
+    const init = await Effect.runPromise(Effect.scoped(ReadTool.pipe(Effect.provide(layers), Effect.provide(testInstanceStoreLayer))))
     const tool = await Effect.runPromise(
-      init.init().pipe(Effect.provide(layers), provideInstance("/workspace"), Effect.provide(testInstanceStoreLayer)),
+      Effect.scoped(
+        init.init().pipe(Effect.provide(layers), provideInstance("/workspace"), Effect.provide(testInstanceStoreLayer)),
+      ),
     )
     await Effect.runPromise(
-      tool
-        .execute({ filePath: "/workspace/test.txt" }, ctx)
-        .pipe(Effect.provide(layers), provideInstance("/workspace"), Effect.provide(testInstanceStoreLayer)),
+      Effect.scoped(
+        tool
+          .execute({ filePath: "/workspace/test.txt" }, ctx)
+          .pipe(Effect.provide(layers), provideInstance("/workspace"), Effect.provide(testInstanceStoreLayer)),
+      ),
     )
     expect(askPatterns.length).toBeGreaterThan(0)
     expect(askPatterns[0]).not.toContain("/workspace")
