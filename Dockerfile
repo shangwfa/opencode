@@ -8,11 +8,8 @@ WORKDIR /app
 COPY package.json bun.lock bunfig.toml ./
 COPY patches/ patches/
 COPY packages packages
-RUN bun install --ignore-scripts || \
-    (rm -rf node_modules patches && \
-     bun -e 'import{readFileSync,writeFileSync}from"fs";const f="package.json",o=JSON.parse(readFileSync(f,"utf8"));delete o.patchedDependencies;writeFileSync(f,JSON.stringify(o,null,2)+"\n")' && \
-     bun -e 'import{readFileSync,writeFileSync}from"fs";const f="bun.lock",c=readFileSync(f,"utf8").replace(/,\s*([}\]])/g,"$1"),o=JSON.parse(c);delete o.patchedDependencies;writeFileSync(f,JSON.stringify(o,null,2)+"\n")' && \
-     bun install --ignore-scripts)
+RUN rm -rf patches && sed -i '/"patchedDependencies"/,/^[[:space:]]*}/d' package.json
+RUN bun install --ignore-scripts
 
 RUN find /app -path "*/node-pty/prebuilds/*/spawn-helper" -exec chmod +x {} \;
 
