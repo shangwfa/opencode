@@ -507,4 +507,23 @@ curl -s -X POST "$BASE/session/$SID/prompt_async" -H 'Content-Type: application/
 
 # 6. PG 验证 tool 调用
 psql "$PG_URL" -t -c "SELECT data->>'tool', data->'state'->>'status' FROM part WHERE session_id='$SID' AND data->>'tool' IN ('skill','bash','read','write')"
-```
+
+---
+
+## 重跑记录 2026-08-08
+
+> **环境**：本地 PG `postgresql://postgres:postgres@127.0.0.1:5433/opencode_test` + 容器 `opencode-saas-test` @ localhost:14096。model=zhipuai/glm-5.1。
+>
+> **结果**：核心链路重跑通过（T48.1-4/6），与验收汇总一致。
+
+| 用例 | 结果 | 重跑验证详情 |
+|------|------|-------------|
+| T48.1 创建 session | ✅ | `POST /session` + keep-alive boot |
+| T48.2 验证沙箱 | ✅ | Python 3.12.3 + Node v24.18.0 |
+| T48.3 注册 bundle | ✅ | 39 文件目录注册，id=ssk_xxx、resources=37、PG `humanize-ppt\|15776\|37`（references/scripts/contracts/adapters 混合类型） |
+| T48.4 触发 skill | ✅ | 第一个 tool 是 `skill`（input=`{"name":"humanize-ppt"}`，out=21799c 含 SKILL.md+manifest） |
+| T48.6 执行 smoke_check | ✅ | bash 在物化目录 workdir 执行 `python3 scripts/smoke_check.py`（EXIT=0，out=679c），3 项检查全 passed：基础 brief（inline fixture）+ outline gate（preview→confirm→brief + unrelated-out-dir guard）+ exit-code 矩阵；AI 中文汇总 |
+
+> **注意**：resource type 判定用扩展名——`.py/.mjs/.js/.ts/.sh` → script，其余 → doc（文档 T48.3 脚本一致）。contracts/*.json 归为 doc 是安全的（API 无 json 类型）。
+>
+> **清理**：测试 session 已删除。

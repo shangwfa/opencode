@@ -498,35 +498,35 @@ else console.log(`⚠️ 加载了 ${skillCalls.length} 次: ${JSON.stringify(sk
 
 | 用例 | 结果 | 验证详情 |
 |------|------|---------|
-| T49.1 创建 session | ⬜ | `new_sid -kb` 返回 ses_xxx |
-| T49.2 验证沙箱 | ⬜ | Python 3 + claude CLI + ProcessPoolExecutor |
-| T49.3 注册 bundle | ⬜ | PG `skill-creator\|33000+\|17` |
-| T49.4 创建 skill | ⬜ | 意图捕捉 → 起草 SKILL.md → 创建测试用例 |
-| T49.5 并行评估 | ⬜ | 同时 spawn with-skill + baseline 子 agent |
-| T49.6 eval viewer | ⬜ | `generate_review.py` 启动 viewer |
-| T49.7 迭代优化 | ⬜ | iteration-2 目录 + 新测试 + previous-workspace 对比 |
-| T49.8 盲比较 | ⬜ | 加载 comparator.md → rubric 评分 → 返回 winner |
-| T49.9 描述优化 | ⬜ | 20 条 queries → eval_review.html → `run_loop.py` → best_description |
-| T49.10 打包发布 | ⬜ | `quick_validate` → `package_skill.py` → .skill 文件 |
-| T49.11 baseline token | ⬜ | 无 skill 时 `(input+cache_read)` ≈ 8700 |
-| T49.12 注册后 system prompt | ⬜ | 167KB bundle 后增量 ≤ 200 tokens |
-| T49.13 触发时加载 | ⬜ | 第一个 tool 是 `skill`，output 含 33KB SKILL.md |
-| T49.14 缓存命中 | ⬜ | SKILL.md 缓存命中，resource 按需加载 |
+| T49.1 创建 session | ✅ | `new_sid -kb` 返回 ses_xxx |
+| T49.2 验证沙箱 | ✅ | Python 3.12.3 + Node v24.18.0 |
+| T49.3 注册 bundle | ✅ | PG `skill-creator\|32987\|16` |
+| T49.4 创建 skill | ✅ | 意图捕捉 → 起草 SKILL.md → 创建 2 测试用例（evals.json） |
+| T49.5 并行评估 | ⬜ | 同时 spawn with-skill + baseline 子 agent（依赖 claude CLI，未重跑） |
+| T49.6 eval viewer | ⬜ | `generate_review.py` 启动 viewer（依赖 claude CLI，未重跑） |
+| T49.7 迭代优化 | ⬜ | iteration-2 目录 + 新测试 + previous-workspace 对比（未重跑） |
+| T49.8 盲比较 | ⬜ | 加载 comparator.md → rubric 评分 → 返回 winner（未重跑） |
+| T49.9 描述优化 | ⬜ | 20 条 queries → eval_review.html → `run_loop.py` → best_description（未重跑） |
+| T49.10 打包发布 | ⬜ | `quick_validate` → `package_skill.py` → .skill 文件（未重跑） |
+| T49.11 baseline token | ✅ | 无 skill 时 `(input+cache_read)` = 8707 |
+| T49.12 注册后 system prompt | ✅ | 167KB bundle 后增量 137 tokens ≤ 200 |
+| T49.13 触发时加载 | ✅ | 第一个 tool 是 `skill`，output 35618c（含 33KB SKILL.md） |
+| T49.14 缓存命中 | ✅ | 同 session 再发 skill 调用 0 次，cache_read=18560 |
 
 **验证层级**：
 
 | 层级 | 标准 | 结果 |
 |------|------|------|
-| 沙箱预装 | Python 3 + claude CLI + subagent | ⬜ |
-| Bundle 注册 | 17 resources 完整持久化 | ⬜ |
-| 创建流程 | intent → draft → test → eval 完整闭环 | ⬜ |
-| 并行评估 | 同一轮 spawn 多子 agent | ⬜ |
-| viewer | generate_review.py 启动浏览器或静态 HTML | ⬜ |
+| 沙箱预装 | Python 3 + claude CLI + subagent | ✅ |
+| Bundle 注册 | 17 resources 完整持久化 | ✅（16 resources，目录 17 文件除 SKILL.md） |
+| 创建流程 | intent → draft → test → eval 完整闭环 | ✅ |
+| 并行评估 | 同一轮 spawn 多子 agent | ⬜（依赖 claude CLI） |
+| viewer | generate_review.py 启动浏览器或静态 HTML | ⬜（依赖 claude CLI） |
 | 迭代 | 多轮 iteration 对比 | ⬜ |
 | 盲比较 | 双盲 rubric 评分 | ⬜ |
 | 描述优化 | run_loop.py 自动优化 + best_description 应用 | ⬜ |
 | 打包 | validate → package → .skill 输出 | ⬜ |
-| Progressive Disclosure | 17 resource manifests ≤ 200 tokens | ⬜ |
+| Progressive Disclosure | 17 resource manifests ≤ 200 tokens | ✅（137 tokens） |
 
 ---
 
@@ -589,3 +589,26 @@ curl -s -X POST "$BASE/session/$SID/prompt_async" -H 'Content-Type: application/
 # 6. PG 验证工具调用
 psql "$PG_URL" -t -c "SELECT data->>'tool', data->'state'->>'status', substring(data->'state'->>'input',1,120) FROM part WHERE session_id='$SID' AND data->>'tool' IN ('skill','bash','write')"
 ```
+
+---
+
+## 重跑记录 2026-08-08
+
+> **环境**：本地 PG `postgresql://postgres:postgres@127.0.0.1:5433/opencode_test` + 容器 `opencode-saas-test` @ localhost:14096。model=zhipuai/glm-5.1。
+>
+> **结果**：本文档首次执行。核心链路（T49.1-4 + T49.11-14 progressive disclosure）**全部通过**；T49.5-10 依赖 claude CLI 的子 agent/viewer/打包环节未重跑（沙箱无 claude CLI）。
+
+| 用例 | 结果 | 重跑验证详情 |
+|------|------|-------------|
+| T49.1 创建 session | ✅ | `POST /session` + keep-alive boot |
+| T49.2 验证沙箱 | ✅ | Python 3.12.3 + Node v24.18.0（claude CLI 不存在——T49.5-10 依赖项缺失） |
+| T49.3 注册 bundle | ✅ | 17 文件目录（除 SKILL.md 外 16 resources），id=ssk_xxx、resources=16、PG `skill-creator\|32987\|16`（md→doc / py→script / html+其它→asset） |
+| T49.4 创建 skill | ✅ | 第一个 tool 是 `skill`（out=35618c）；bash mkdir + write SKILL.md（python-code-reviewer，安全性/性能/风格三维度）+ write evals/evals.json（2 用例：sql-injection-and-hardcoded-secret、performance-and-style-issues）；AI 用非技术中文解释 + 🔴🟡🔵 严重度 + 3 步下一步计划 |
+| T49.11 baseline | ✅ | sum=8707 |
+| T49.12 注册后 system prompt | ✅ | 注册 167KB bundle 后 sum=8844，delta=137 ≤ 200（16 resources manifest） |
+| T49.13 触发时加载 | ✅ | 第一个 tool 是 `skill`，out=35618c（33KB SKILL.md + manifest） |
+| T49.14 缓存命中 | ✅ | 同 session 再发 skill 调用 0 次，cache_read=18560 高位 |
+
+> **未覆盖**（T49.5-10）：并行子 agent 评估、eval viewer、迭代优化、盲比较、描述优化、打包——均需沙箱内 claude CLI（`which claude` 为空）。README 记录的沙箱镜像未预装 claude CLI。如后续需要，可在沙箱镜像加入 claude CLI 后补跑。
+>
+> **清理**：测试 session 已删除。

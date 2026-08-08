@@ -335,6 +335,8 @@ psql "$PG_URL" -t -c "SELECT data->>'tool', data->'state'->>'status' FROM part W
 
 > **2026-08-02 补充**：环境为 `OPENCODE_EXPERIMENTAL_CODE_MODE=all`，agent-browser 工具经 code-mode `execute` 内嵌调用（metadata.toolCalls 记录 `agent-browser.agent_browser_*`，PG `part` 表持久化为 execute 记录，内嵌 toolCalls 全量覆盖 8 种工具）。T44.5-T44.9 均为实测通过（同一 session 串行 6 轮，MCP 连接缓存复用）。
 
+> **2026-08-08 全量重跑记录**（容器 `opencode-saas-test`，`OPENCODE_EXPERIMENTAL_CODE_MODE=mcp`）：T44.1-9 全通过。PG 持久化 `agent-browser|local|["agent-browser","mcp","--tools","core"]`；T44.2 沙箱预装 agent-browser 0.31.1 + chromium 151；T44.4 open+snapshot+get_text 返回 Example Domain；T44.5 books.toscrape.com eval 提取 20 本 {title, price}；T44.6 httpbin 当日 503 → 沙箱本地 POST 表单（/workspace/formsrv/f.py @ 9095），fill×2+select+click 提交回显 张三/13800138000/L；T44.7 TodoMVC 添加 3 个 todo（type+press）+ 标记完成（check）+ 删除，剩余 2 个；T44.8 eval 返回前 5 本 {title, price, availability}；T44.9 不存在域名 → open error + `net::ERR_NAME_NOT_RESOLVED`。MCP 进程 `agent-browser-9100.{pid,log}` 正常；PG `part` 表 9 种 agent-browser 工具全记录（open 含 error 状态）。
+
 ---
 
 ## 测试命令汇总

@@ -471,6 +471,8 @@ console.log("after cleanup:", check.stdout || "")
 | T22.18 | ✅ | shell 安全：恶意 name/env/command 不产生注入（SAFE_MARKER 存在，NAME_PWNED/ENV_PWNED 无）。⚠️ **修复前为 FAIL**：env key 未转义导致沙箱内任意命令执行 |
 | T22.19 | ✅ | local MCP pid/log 生命周期与清理：启动后存在 pid-everything-9100.{pid,log} + supergateway 进程；abort 回收后删除、进程消失 |
 
+> **2026-08-08 全量重跑记录**（容器 `opencode-saas-test`，`OPENCODE_EXPERIMENTAL_CODE_MODE=mcp`）：T22.1-12/16 纯 API CRUD 全通过（含 PG 持久化与级联）；T22.17 env 注入 `/tmp/mcp-env-test`=`hello-env-value`；T22.18 shell 安全（SAFE_MARKER 存在、无注入）；T22.19 pid/log abort 后删除、进程归零；T22.13 remote MCP `test-tools.echo` 经 code-mode `execute` 内嵌调用（metadata.toolCalls 记录 completed，PG 一致）；T22.15 多轮 3/3 全成功。T22.13/14 环境为 `CODE_MODE=mcp`，MCP 工具经 `execute` 嵌套调用（非顶层 part），行为与文档记录一致。
+
 ## 单元测试覆盖
 
 Service 层单测（内存 mock）：`packages/opencode/test/mcp/session-mcp-crud.test.ts`（16 用例）

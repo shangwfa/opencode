@@ -399,6 +399,14 @@ console.log("✅ T38.21: " + (pass1 && pass2 && pass3 ? "PASS — session 模式
 >
 > 这组用例模拟真实使用流程：创建会话 → 拉取代码仓库 → 创建 worktree → 修改代码 → 验证写入位置和 diff 结果。
 
+> **code-agent 工作目录语义（重要）**：在 opencode SaaS 中，code-agent 的工作目录**只由会话的 `session.directory` 决定**，不受 opencode 原生 worktree 概念影响。验证链路：
+> - `workspace-routing.ts`：请求级 `directory = session?.directory ? session.directory : defaultDirectory(...)`（session 存在时项目目录只作默认值）
+> - `instance-context.ts`：`store.load({ directory: route.directory })` → InstanceState.directory = session.directory
+> - `sandbox-proxy.ts`：exec 的 `workingDirectory = session.directory`
+> - `/vcs/diff`、`/path` 均以 `session.directory` 为 workingDirectory / directory
+>
+> 因此下方 T38.22/23 中"外部编排系统把 PG 的 `session.directory` 改为 worktree 路径"，本质是在改变 code-agent 的权威工作目录；opencode 原生 worktree（Project.worktree）只影响 `/path` 的 worktree 展示字段和权限边界，不会覆盖工作目录。T38.25 验证的也是同一语义：`/vcs/diff` 以 PG 中该 session 的 `directory` 为准。
+
 ### T38.22 app 模式：worktree 代码写入位置验证
 
 **验证目标**：app 模式会话创建 worktree 后，exec 写文件、`/path`、`/vcs/diff` 全部指向 worktree 目录，主仓库不被污染。

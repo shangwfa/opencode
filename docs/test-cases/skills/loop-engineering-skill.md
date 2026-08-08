@@ -534,3 +534,25 @@ curl -s -X POST "$BASE/session/$SID/prompt_async" -H 'Content-Type: application/
 # 6. PG 验证 tool 调用
 psql "$PG_URL" -t -c "SELECT data->>'tool', data->'state'->>'status' FROM part WHERE session_id='$SID' AND data->>'tool' IN ('skill','read','write')"
 ```
+
+---
+
+## 重跑记录 2026-08-08
+
+> **环境**：本地 PG `postgresql://postgres:postgres@127.0.0.1:5433/opencode_test` + 容器 `opencode-saas-test` @ localhost:14096。model=zhipuai/glm-5.1。
+>
+> **结果**：核心链路重跑通过（T49.1/3/4/5/11），与验收汇总一致。
+
+| 用例 | 结果 | 重跑验证详情 |
+|------|------|-------------|
+| T49.1 创建 session | ✅ | `POST /session` + keep-alive boot |
+| T49.3 注册 bundle | ✅ | id=ssk_xxx、resources=13、PG `loop-engineering\|11432\|13` |
+| T49.4 装配 Loop | ✅ | 第一个 tool 是 `skill`（out=13688c 含 SKILL.md+manifest）；随后 read 隐藏目录 manifest.json + component-matrix.md；AI 中途发起 `question`（询问目标项目/改进含义），reply 后继续；给出愚公六动作装配步骤（manifest 状态机 {pending,doing,done,blocked} + 11 行 component-matrix） |
+| T49.5 读取模板 | ✅ | read `.../templates/manifest.json`（741c）+ component-matrix（727c），AI 引用状态机字段 |
+| T49.11 物化恢复 | ✅ | 删除物化目录后触发 AI 重新读取，read 依然 completed（741c 返回 manifest 状态机）——rematerializeIfNeeded 自动恢复生效 |
+
+> **注意**：resource type 枚举为 `doc|script|template|asset`（`session-skill.ts:20`），无 `example`——`examples/*` 必须映射为 `doc`（文档 T49.3 脚本 `rtype = "template" if sub == "templates" else "doc"` 已正确处理；本次初次用 "example" 注册返回 400，改为 doc 后成功）。
+>
+> **注意**：AI 装配 loop 时会主动发 `question`（目标项目/改进含义），需 reply `POST /session/$SID/question/$QID/reply` 才能继续（同 session-skills T15.14 的 question 阻塞机制）。
+>
+> **清理**：测试 session 已删除。

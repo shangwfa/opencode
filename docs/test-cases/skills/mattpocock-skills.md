@@ -606,3 +606,22 @@ curl -s -X POST "$BASE/session/$SID/prompt_async" -H 'Content-Type: application/
   -d "{\"parts\":[{\"type\":\"text\",\"text\":\"用 tdd skill 在 /workspace 写一个 add 函数\"}],\"skills\":[\"tdd\"],\"model\":$MODEL}" \
   -w "HTTP %{http_code}\n"
 ```
+
+---
+
+## 重跑记录 2026-08-08
+
+> **环境**：本地 PG `postgresql://postgres:postgres@127.0.0.1:5433/opencode_test` + 容器 `opencode-saas-test` @ localhost:14096。model=zhipuai/glm-5.1。
+>
+> **结果**：核心链路重跑通过（T47.3/4/5/13），与验收汇总一致。
+
+| 用例 | 结果 | 重跑验证详情 |
+|------|------|-------------|
+| T47.3 批量注册 | ✅ | 遍历 `mattpocock/` 10 个子目录注册，全部 HTTP 200，PG count=10（tdd 3185c+2 resources、diagnosing-bugs 8471c+1、setup 6860c+5 等） |
+| T47.4 tdd 红绿 | ✅ | skill 加载 tdd → read 物化 references → write package.json + calc.test.js（字面量 5 避免同义反复）→ `npm test` fail 1（add 未导出）→ write calc.js 最小实现 → `npm test` pass 1；AI 说明 refactor 属 review 阶段 |
+| T47.5 grill-me | ✅ | grill-me prompt 触发后 AI 先加载 `grill-me` 再**链式加载 `grilling`**（grill-me 教 AI 用 grilling 执行审问式流程）——多 skill 链式依赖真实发生；AI 一次问一个问题，grep 找 React 代码（无则转向提问），发 `question`（Measured bottleneck），不直接给方案 |
+| T47.13 多 skill 切换 | ✅ | 同一 session 从 tdd 切到 grill-me（+grilling），skill tool 按需加载不同 skill，无冲突 |
+
+> **注意**：grill-me（147c）与 grilling（841c）是轻量 content skill——grill-me 内容极短，主要靠链式调 grilling 生效，验证了元 skill 依赖链。
+>
+> **清理**：测试 session 已删除。

@@ -80,6 +80,12 @@ docker build -t opencode-saas-sandbox-test:v2fix -f Dockerfile .
 ```
 
 > 首次必须构建；后续仅当根目录 `Dockerfile` 或 SaaS 代码改动时才需重新构建。
+>
+> **固定 tag 复用风险**：`v2fix` 等固定 tag 会复用旧镜像缓存——若工作区新增源码文件（如新增模块）而未重建，旧镜像启动时会因缺文件崩溃（实测：`Cannot find module './tool-execution'` → server HTTP 000）。建议改用内容/commit hash 作 tag 以绑定源码版本：
+> ```bash
+> docker build -t "opencode-saas-sandbox-test:$(git rev-parse --short HEAD)" -f Dockerfile .
+> ```
+> 注：根 Dockerfile（SaaS server 镜像）目前**无 CI 构建**——`.github/workflows` 中 `containers.yml` 仅构建 `packages/containers/**`（dev container），`publish.yml` 的 docker/buildx 用于 CLI/desktop。SaaS 服务镜像完全依赖本地手动构建。
 
 ### 2.1.1 构建 OpenSandbox 沙箱镜像（组合 2、3 需要）
 

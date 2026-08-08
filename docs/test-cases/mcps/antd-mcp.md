@@ -180,6 +180,8 @@ curl -s --max-time 120 -X POST "$BASE/session/$SID/message" \
 
 > **2026-08-02 重跑记录**（容器重建后）：T40.1-6 全通过。环境为 `OPENCODE_EXPERIMENTAL_CODE_MODE=all`，antd MCP 工具经 code-mode `execute` 内嵌调用（metadata.toolCalls 记录 `antd.antd_*`，PG `part` 表以 execute 持久化并可从 toolCalls 提取）。本次 T40.6 生成 Dashboard.tsx **412 行**（Card×11 / Statistic / Table / `variant="borderless"` 等 antd v6 API，2 个 SVG 图表），先查 MCP API/示例再写代码的完整流程与历史一致。
 
+> **2026-08-08 全量重跑记录**（容器 `opencode-saas-test`，`OPENCODE_EXPERIMENTAL_CODE_MODE=mcp`）：T40.1-6 全通过。PG 持久化 `antd|local|true`；T40.3 AI 列出 8 个 antd_ 工具；T40.4 `antd_list` 返回 71 组件；T40.5 `antd_info` 返回 Button 完整 API；T40.6 `antd_list×2 + antd_info×4 + antd_demo×6` 全 completed，`write` 生成 `/workspace/Dashboard.tsx`（165 行）。MCP 进程 `antd-9100.{pid,log}` 正常。工具经 code-mode `execute` 内嵌调用（state.metadata.toolCalls 记录 `antd.antd_*|completed`，PG `part` 表持久化一致，排序列为 `time_created`）。
+
 **验证层级**：
 
 | 层级 | 标准 | 结果 |

@@ -126,6 +126,8 @@ curl -s --max-time 120 -X POST "$BASE/session/$SID/prompt_async" -H 'Content-Typ
 | T45.6 | JS eval 数据提取 | ✅ browser_evaluate 返回 JSON 数组 |
 | T45.7 | 异常处理 | ✅ net::ERR_NAME_NOT_RESOLVED 正确上报 |
 
+> **2026-08-08 全量重跑记录**（容器 `opencode-saas-test`，`OPENCODE_EXPERIMENTAL_CODE_MODE=mcp`）：T45.1-7 全通过。PG 持久化 `playwright|local`；T45.3 AI 列出 24 个 browser_* 工具；T45.4 navigate+snapshot 返回 Example Domain（首次 navigate error 后 AI 自动重装浏览器自愈）；T45.5 httpbin.org 当日 503 不可用 → AI 触发 question 工具询问，回复"本地创建表单页面"后 AI 自动建 POST 服务器（`/workspace/form_server.py` @ 9095），fill_form+click 提交成功，`/post` 回显 `custname=张三 / custtel=13800138000`；T45.6 browser_evaluate×3 返回 `{h1_text, links}` JSON；T45.7 navigate 不存在域名返回 `net::ERR_NAME_NOT_RESOLVED`。PG `part` 表持久化 playwright.browser_navigate/fill_form/click/evaluate/wait_for 全 completed（navigate 含 error 状态正确记录）。
+
 **验证层级**：
 
 | 层级 | 标准 | 结果 |

@@ -101,6 +101,8 @@ curl -s -X POST "$BASE/session/$SID/exec" \
 | T41.3 AI 查询文档 | ✅ | `mastraDocs`×2 + `searchMastraDocs`×1 全部 completed，返回 agent 创建示例（`new Agent({...})`） |
 | T41.4 AI 生成代码 | ✅ | `mastraDocs`（docs/agents/using-tools）+ write → my-agent.ts（35 行，weatherAgent + weatherTool） |
 
+> **2026-08-08 全量重跑记录**（容器 `opencode-saas-test`，`OPENCODE_EXPERIMENTAL_CODE_MODE=mcp`）：T41.1-4 全通过。PG 持久化 `mastra|local|true`；T41.2 AI 列出 mastra 工具表；T41.3 `mastra.getMastraHelp + searchMastraDocs + listMastraPackages + mastraDocs×4` 全 completed；T41.4 write 生成 `/workspace/src/mastra/`（weather-tool.ts + weather-agent.ts + index.ts），工具经 code-mode `execute` 内嵌调用（PG `part` 表记录 `mastra.*|completed`）。
+
 **验证层级**：
 
 | 层级 | 标准 | 结果 |

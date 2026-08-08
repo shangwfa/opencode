@@ -625,3 +625,31 @@ curl -s -X POST "$BASE/session/$SID/prompt_async" -H 'Content-Type: application/
 # 5. PG 验证 bash 工具调用含 agent-browser
 psql "$PG_URL" -t -c "SELECT data->>'tool', data->'state'->>'status' FROM part WHERE session_id='$SID' AND data->>'tool'='bash' AND data->'state'->>'input' LIKE '%agent-browser%'"
 ```
+
+---
+
+## 重跑记录 2026-08-08
+
+> **环境**：本地 PG `postgresql://postgres:postgres@127.0.0.1:5433/opencode_test` + 容器 `opencode-saas-test`（镜像 `opencode-saas-sandbox-test:v2fix`）@ localhost:14096。model=zhipuai/glm-5.1。
+>
+> **结果**：T45.1-13 全量重跑，**全部通过**。与验收汇总一致。
+
+| 用例 | 结果 | 重跑验证详情 |
+|------|------|-------------|
+| T45.1 创建 session | ✅ | `POST /session` 返回 ses_xxx |
+| T45.2 验证预装 | ✅ | agent-browser 0.31.1、`skills list` 含 core/agentcore/dogfood/electron/slack、`skills get core` 输出 25KB frontmatter、chromium "Google Chrome for Testing 151.0.7922.34"、smoke（open example.com → get title → close）全通过 |
+| T45.3 注册 bundle | ✅ | 13 文件目录注册，id=ssk_xxx、resources=12、PG `agent-browser\|25381\|12` |
+| T45.4 AI 调用 CLI | ✅ | 第一个 tool 是 `skill`（completed），output 27479c；随后 bash 4 次（open/get title+read/close）；AI 中文总结 "example.com 是文档示例占位域名" |
+| T45.5 批量提取 | ✅ | books.toscrape，bash 含 eval 提取 20 本，AI 返回完整 20 行 Markdown 表格（£51.77 等价格） |
+| T45.6 表单填写 | ✅ | 沙箱内 localhost:8000 本地 POST 服务器（base64 注入起服），bash 8 次（fill 张三/13800138000、click 尺寸、check 奶酪+蘑菇、提交、read），服务端回显 JSON 完全匹配 |
+| T45.7 SPA 交互 | ✅ | TodoMVC React，bash 10 次（fill+press Enter ×3、hover+snapshot 定位 destroy、click），剩余 2 todo（买牛奶✅+睡觉⬜）正确 |
+| T45.8 JS eval | ✅ | 与 T45.5 同一 eval 机制验证（books.toscrape 三元组提取） |
+| T45.9 异常处理 | ✅ | open 不存在的域名后 AI 从 chrome-error://chromewebdata/ 取 `net::ERR_NAME_NOT_RESOLVED`，中文说明 DNS 失败 |
+| T45.10 baseline | ✅ | 无 skill 时 `input=202 + cache_read=8512 = 8714` |
+| T45.11 注册后 system prompt | ✅ | 注册 100KB bundle 后 `input=298 + cache_read=8576 = 8874`，delta=160 ≤ 200（manifest 化） |
+| T45.12 触发时 skill tool | ✅ | 第一个 TOOL 是 `skill` input=`{"name":"agent-browser"}`，output 27479c |
+| T45.13 缓存命中 | ✅ | 第二次 prompt 内 skill 调用 **0 次**、bash 3 次、cache_read 稳定高位（16640→16768→18560） |
+
+> **注意**：PG `part.time_created` 是 bigint epoch-ms（非 timestamp），跨 prompt 查"最近 N 分钟 skill 调用数"时要用具体 user 消息的 time_created 作下界，否则会把上一轮 prompt 的 skill 调用计入。本次初次查询因此误报"第二次仍调 skill 1 次"，按时间线（`/session/$SID/message` 重建）确认实际为 0 次。
+>
+> **清理**：DELETE 端点应为 `DELETE /session/$SID`（返回 200）；`POST /session/$SID/delete` 不生效。测试 session 已全部清理（session 表 0 行）。

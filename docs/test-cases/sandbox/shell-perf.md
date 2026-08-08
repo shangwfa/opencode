@@ -562,3 +562,6 @@ fi
 | stdout 截断或丢失 | 早退过早 break | ST.E3 | 输出行数少于预期 |
 | 并发 bash 总耗时 = N × 单命令 | SSE 流串行化（未修复时）| ST.E4 | 3 个并发 ~3x 单命令耗时 |
 | runInSessionStream 不存在 | SDK 版本过低 | ST.E5 | `runInSessionStream is not a function` |
+| stderr 被合并进 stdout | 远端 harness execd 输出合并（execd 侧行为，非 opencode）| ST.E3 | `stderr` 字段为空、stderr 内容出现在 stdout |
+
+> **stderr 合并说明（2026-08-08 实测）**：远端 harness-sandbox 镜像的 execd 把 stderr 事件合并为 stdout 事件发出（`echo to-stdout && echo to-stderr >&2` 的两个输出都以 `type:"stdout"` 到达）。`runCommandEarlyExit` 按事件类型正确分离 stdout/stderr，但底层流未发 stderr 事件。这是 opensandbox execd 侧行为，需在 SDK/execd 层跟进，不影响 stdout 完整性。

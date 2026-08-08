@@ -576,3 +576,29 @@ curl -s -X POST "$BASE/session/$SID/prompt_async" -H 'Content-Type: application/
 # 5. PG 验证
 psql "$PG_URL" -t -c "SELECT data->>'tool', data->'state'->>'status' FROM part WHERE session_id='$SID' AND data->>'tool' IN ('skill','bash','read')"
 ```
+
+---
+
+## 重跑记录 2026-08-08
+
+> **环境**：本地 PG `postgresql://postgres:postgres@127.0.0.1:5433/opencode_test` + 容器 `opencode-saas-test` @ localhost:14096。model=zhipuai/glm-5.1。
+>
+> **结果**：T46.1-13 全量重跑，**全部通过**。
+
+| 用例 | 结果 | 重跑验证详情 |
+|------|------|-------------|
+| T46.1 创建 session | ✅ | `POST /session` 返回 ses_xxx + keep-alive boot |
+| T46.2 验证沙箱 | ✅ | node v24.18.0 + npm 11.16.0 + mastra.ai/llms.txt 200（含 "Mastra is a framework..." 主入口）+ npm ping PONG |
+| T46.3 注册 bundle | ✅ | 10 文件目录注册，id=ssk_xxx、resources=9、PG `mastra\|6334\|9` |
+| T46.4 基础 + resource 加载 | ✅ | 第一个 tool 是 `skill`（input=`{"name":"mastra"}`，out=7958c 含 SKILL.md+manifest 无 resource 正文）；随后 read 隐藏目录 `.../references/core-concepts.md`；AI 用当前文档回答 Mastra 定义 + Agent/Workflow 对比表 |
+| T46.5 创建项目 | ✅ | read create-mastra.md + bash（mkdir、npm init、`npm install -D typescript @types/node mastra@latest`、`npm approve-scripts esbuild`）+ write weather tool/agent/mastra 入口；`npx tsc --noEmit` 与 `npm run build` 通过；AI 返回 8 步创建步骤 + 文件树（规避交互式 `npm create mastra`） |
+| T46.6 写 Agent | ✅ | 验证 API（`node resource_directory/scripts/provider-registry.mjs --provider openai` 确认 gpt-4o-mini + read node_modules `reference-agents-agent.md:450` 确认 model 字符串格式）；write weather-agent.ts（model=`"openai/gpt-4o-mini"`）+ 更新 .env；tsc + build 通过 |
+| T46.7 排查错误 | ✅ | read common-errors.md（隐藏目录）；逐项对照 3 原因表格，定位根因 package.json `"type":"commonjs"` 应为 module |
+| T46.8 provider-registry | ✅ | bash 跑 `node .../scripts/provider-registry.mjs`；列出 Anthropic 15 个 model（claude-sonnet-5/opus-5 等最新 ID） |
+| T46.9 remote-docs 异常 | ✅ | read remote-docs.md；给出无 @mastra 包时的 3 步远程查文档流程（llms.txt 索引 + URL 模式） |
+| T46.10 baseline | ✅ | sum=8707 |
+| T46.11 注册后 system prompt | ✅ | 注册 50KB bundle 后 sum=8850，delta=143 ≤ 200（manifest 化） |
+| T46.12 触发时 skill tool | ✅ | 第一个 tool 是 `skill`，out=7958c（远小于 52KB bundle），随后 read 隐藏目录 |
+| T46.13 缓存命中 | ✅ | 同 session 换主题：skill/bash/read 调用 0 次，cache_read=12160 高位，AI 复用已加载 core-concepts.md |
+
+> **清理**：测试 session 已全部删除（DELETE /session/$SID）。

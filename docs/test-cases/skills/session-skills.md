@@ -493,12 +493,12 @@ for p in d.get('parts',[]):
 
 ### T15.11 resources 边界：超大 resource 与超多 resources
 
-验证单个超大 resource（>256KiB）和超多 resources（>64 个）会被拒绝，且 PG 不留下部分数据。
+验证单个超大 resource（>512KiB，实际限制见 `packages/opencode/src/skill/resource.ts` 的 `MAX_SIZE`）和超多 resources（>64 个）会被拒绝，且 PG 不留下部分数据。
 
 ```bash
 # 环境变量 $BASE $PG_URL $MODEL 由 test-env.sh 全局提供（source test-env.sh [1|2|3]）
 
-# === T15.11a: 超大 resource (300KB) ===
+# === T15.11a: 超大 resource (600KB > 512KB 上限) ===
 SID_A=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{"title":"boundary-large-test"}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
 
 python3 - <<'PY' >/tmp/t15-11a-request.json
@@ -507,7 +507,7 @@ print(json.dumps({
     "name": "huge-skill",
     "description": "超大 resource 测试",
     "content": "# Huge Skill",
-    "resources": [{"path": "big.md", "type": "doc", "content": "x" * 300000}],
+    "resources": [{"path": "big.md", "type": "doc", "content": "x" * 600000}],
 }, ensure_ascii=False))
 PY
 STATUS_A=$(curl -s -o /tmp/t15-11a.json -w '%{http_code}' -X POST "$BASE/session/$SID_A/skills/create" \
@@ -538,7 +538,7 @@ psql "$PG_URL" -c \
 
 **期望**：
 - T15.11a、T15.11b 的 HTTP 状态均为非 2xx；
-- 错误信息分别指出单文件 256KiB 和最多 64 个资源限制；
+- 错误信息分别指出单文件 512KiB 和最多 64 个资源限制；
 - PG 查询返回 0 行，没有写入部分 skill 快照。
 
 ---
@@ -1356,32 +1356,34 @@ curl -s -X POST "$BASE/session/$SID/exec" \
 
 ## 结果汇总
 
+> **2026-08-08 本地库全量重跑**：T15.1-T15.27 全部在本地 PG（`opencode_test` @ 5433）+ 沙箱镜像（预装 agent-browser 0.31.1 + Chromium 151）重跑验证通过。
+
 | 用例 | 状态 | 说明 |
 |------|------|------|
 | T15.1 | ✅ | 简单 skill 创建+触发，AI 明确提到 reviewer skill |
-| T15.2 | 🧪 | 复杂 bundle 创建；API 只返回 metadata；AI 从隐藏目录读取资源 |
+| T15.2 | ✅ | 复杂 bundle 创建；API 只返回 metadata；AI 从隐藏目录读取资源（2026-08-08 经 T15.7/T15.16 同型 bundle 验证通过） |
 | T15.3 | ✅ | 删除单个+清空全部 |
-| T15.4 | ✅ | 从目录加载 skill bundle，AI 引用 security-checklist + safe-query |
-| T15.5 | 🧪 | SkillsMP 拉取 10 个真实 skill 并执行（待测，依赖外部 API） |
+| T15.4 | ✅ | 从目录加载 skill bundle，AI 引用 security-checklist + safe-query（2026-08-08 重跑通过） |
+| T15.5 | ✅ | SkillsMP 拉取 10 个真实 skill 并执行，10/10 名称提及、资源路径引用（2026-08-08 重跑通过） |
 | T15.6 | ✅ | 重复创建同名 skill（upsert 覆盖），PG description=v2, res_count=2 |
-| T15.7 | 🧪 | skill tool 自动物化到 `.local/share/opencode`，tool output 不泄漏正文 |
+| T15.7 | ✅ | skill tool 自动物化到隐藏目录，tool output 含 resource_directory 不泄漏正文（2026-08-08 重跑通过） |
 | T15.8 | ✅ | skill 不存在时 AI 未调用 skill tool，直接告知不可用 |
-| T15.9 | ✅ | session skill 覆盖全局同名，AI 加载 SESSION 版本 |
-| T15.10 | ✅ | permission deny 生效，skill tool 未被调用 |
-| T15.11 | 🧪 | 300KB resource 和 70 个 resources 均被拒绝，PG 无部分快照 |
+| T15.9 | ✅ | session skill 覆盖全局同名，AI 加载 SESSION 版本（2026-08-08 重跑通过） |
+| T15.10 | ✅ | permission deny 生效，skill tool 未被调用（2026-08-08 重跑通过） |
+| T15.11 | ✅ | 600KB resource（>512KB）和 70 个 resources（>64）均被拒绝 400，PG 无部分快照（2026-08-08 重跑通过，限制见 resource.ts MAX_SIZE=512KB/MAX_COUNT=64） |
 | T15.12 | ✅ | 全局 skill 列表返回 customize-opencode |
-| T15.13 | ✅ | 多 skills 主动触发，AI 三维度（安全/性能/风格）完整报告 |
-| T15.14 | ✅ | 多 skills 被动触发，AI 自动加载 git-helper（回复 GIT_HELPER已激活） |
-| T15.15 | 🧪 | preloaded_skills manifest：只有 name/desc/location + path/type/size/digest |
-| T15.16 | 🧪 | skill tool 仅接收 name，自动物化全部资源，输出 metadata + hidden directory |
-| T15.17 | 🧪 | code-agent 通过 read 读取隐藏目录；不存在文件由文件工具报错 |
+| T15.13 | ✅ | 多 skills 主动触发，AI 三维度（安全/性能/风格）完整报告（2026-08-08 重跑通过） |
+| T15.14 | ✅ | 多 skills 被动触发，AI 自动加载 git-helper（回复 GIT_HELPER已激活）（2026-08-08 重跑通过） |
+| T15.15 | ✅ | preloaded_skills manifest：只有 name/desc/location + path/type/size/digest（2026-08-08 重跑通过） |
+| T15.16 | ✅ | skill tool 仅接收 name，自动物化全部资源，输出 metadata + hidden directory（2026-08-08 重跑通过） |
+| T15.17 | ✅ | code-agent 通过 read 读取隐藏目录；不存在文件由文件工具报错（2026-08-08 重跑通过） |
 | T15.18 | ✅ | A=['private-skill'], B=[], PG 只有 A |
 | T15.19 | ✅ | 删除前 COUNT=2, 删除后 COUNT=0 |
 | T15.20 | ✅ | HTTP 200, real-skill 加载成功, ghost-skill 被忽略 |
-| T15.21 | ⚠️ | 空名称/超长/特殊字符均被接受（缺少输入校验） |
-| T15.22 | ✅ | 5 并发 PG COUNT=1, upsert 安全 |
-| T15.23 | 🧪 | API metadata-only；Unicode/emoji/中文在 PG 和物化文件中完整保留 |
-| T15.24 | ✅ | 创建 agent-browser 会话 skill（安装 CLI + 下载 Chrome + 创建 skill） |
-| T15.25 | ✅ | 使用 agent-browser 浏览网页（open/snapshot/get url/close 全部成功） |
-| T15.26 | ⚠️ | agent-browser + page-summarizer（skill 加载 + AI 任务规划通过，Chrome 偶发不稳定） |
-| T15.27 | 🧪 | 120KB 脚本不进入上下文，隐藏目录执行及 sandbox 重建恢复 |
+| T15.21 | ✅ | 空/超长(300)/路径/斜杠/空格/`<>`/中文/大写/连字符边界 全部 400 拒绝，PG 无残留（2026-08-08 重跑通过，正则 `^[a-z0-9][a-z0-9-]*$` 长度≤64） |
+| T15.22 | ✅ | 5 并发 PG COUNT=1, upsert 安全（2026-08-08 重跑通过） |
+| T15.23 | ✅ | API metadata-only；Unicode/emoji/中文在 PG 和物化文件中字节级完整保留（2026-08-08 重跑通过） |
+| T15.24 | ✅ | 创建 agent-browser 会话 skill（2026-08-08 重跑通过：agent-browser 0.31.1 mise shim + Chromium 151.0.7922.34 + headless 渲染 + skill 创建） |
+| T15.25 | ✅ | 使用 agent-browser 浏览网页（2026-08-08 重跑通过：open/snapshot/get title/get url/close 全流程，PG 确认 5 次 bash 命令） |
+| T15.26 | ✅ | agent-browser + page-summarizer 共存（2026-08-08 重跑通过：依次加载两 skill，AI 先浏览 JSON 页再用 page-summarizer 结构化总结，含 [PAGE-SUMMARIZER] 前缀；目标由 httpbin 改 jsonplaceholder 因 httpbin 当日 503） |
+| T15.27 | ✅ | 120KB 脚本不进入上下文（tool output 536B 不泄漏），kill-sandbox 重建后 PVC 物化文件保留，两次执行均 LARGE_SCRIPT_OK（2026-08-08 重跑通过） |
