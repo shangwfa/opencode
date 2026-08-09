@@ -6,6 +6,7 @@ import DESCRIPTION from "./glob.txt"
 import * as Tool from "./tool"
 import { toSandboxPath } from "./sandbox-path"
 import { SandboxProvider } from "./sandbox-provider"
+import { IGNORE_PATTERNS } from "./ls"
 
 export const Parameters = Schema.Struct({
   pattern: Schema.String.annotate({ description: "The glob pattern to match files against" }),
@@ -46,7 +47,9 @@ export const GlobTool = Tool.define(
           const limit = 100
           const sandboxSearchPath = toSandboxPath(search, ins.directory)
           const escapedPattern = params.pattern.replace(/'/g, "'\\''")
-          const cmd = `rg --files --glob '${escapedPattern}' --sortr modified '${sandboxSearchPath}' 2>/dev/null | head -${limit + 1}`
+          const excludeArgs = IGNORE_PATTERNS.map((item) => `--glob '!${item}'`).join(" ")
+          const gitignoreArgs = `$(test -f '${sandboxSearchPath}/.gitignore' && echo --ignore-file ${sandboxSearchPath}/.gitignore)`
+          const cmd = `rg --files --glob '${escapedPattern}' ${excludeArgs} ${gitignoreArgs} --sortr modified '${sandboxSearchPath}' 2>/dev/null | head -${limit + 1}`
           const result = yield* sandboxProvider.runDetached(ctx.sandboxSessionID ?? ctx.sessionID, cmd, { timeoutSeconds: 30 })
           const stdout = result.logs.stdout.map((l: { text: string }) => l.text).join("\n").trim()
           const lines = stdout ? stdout.split("\n").filter((line: string) => line.length > 0) : []
