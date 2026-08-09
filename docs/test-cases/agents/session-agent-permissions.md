@@ -1856,6 +1856,172 @@ SSE 日志:
 
 ---
 
+
+## Agent 切换（T26.56–T26.59）
+
+> 背景：多 agent 编排系统（dyn-spec/dyn-build/dyn-review）通过 **message 接口**（prompt 携带 `agent` 字段）切换角色。
+> 切换链路：`createUserMessage`（`prompt.ts:646`）检测 `input.agent` 变化 → `setAgentModel`（`prompt.ts:692`）持久化 → loop 每 step 读 `session.agent`（`prompt.ts:1282`）→ 当轮第一个 step 即用新 agent 的 system/tools/permission。
+> 设计原则：agent 切换只通过 message 接口，不需要文本信号解析。
+
+### T26.56 prompt 携带 `agent` 字段触发即时 agent 切换
+
+**验证目标**：用户通过 `prompt_async` 携带 `agent: "dyn-build"` 时，`createUserMessage` 检测到 agent 变化，即时更新 `session.agent`
+
+**前置条件**：
+- session 创建两个 agent：`dyn-spec`（edit deny all，只允许写 spec.md）和 `dyn-build`（edit/write allow all）
+- 当前 session agent = dyn-spec
+
+**验证步骤**：
+```bash
+# 1. 创建 session，prompt 1 带 agent=dyn-spec
+# 2. prompt 2 带 agent=dyn-build
+# 3. 检查 session.agent 在 createUserMessage 后立即变为 dyn-build
+```
+
+**预期结果**：
+- `session.agent` 在 `createUserMessage` 处理后立即更新为 `dyn-build`
+- 当轮 prompt 的第一个 step 即用 dyn-build 的 system prompt / tools / permission
+- SSE 收到 `session.updated` 事件（agent=dyn-build）
+
+**关键代码**：`prompt.ts` `createUserMessage` → `current.agent !== info.agent`（`prompt.ts:687`）→ `setAgentModel`（`prompt.ts:692`）
+
+### T26.57 切换后当轮第一个 step 即用新 agent 权限
+
+**验证目标**：message 接口切换 agent 后，**当轮 prompt 的第一个 step** 就使用新 agent 的权限
+
+**前置条件**：
+- 同 T26.56，session agent 从 dyn-spec 切换到 dyn-build
+- dyn-spec 权限：write deny all（只允许 spec.md）
+- dyn-build 权限：write allow all
+
+**验证步骤**：
+```bash
+# 1. prompt 1：agent=dyn-spec（write 被禁用）
+# 2. prompt 2：agent=dyn-build，要求 write 代码文件
+# 3. 检查 write 状态 = completed（用 dyn-build 权限）
+```
+
+**预期结果**：
+- prompt 2 的 step 1 读 `session.agent` = dyn-build（`prompt.ts:1282`）
+- write 工具可用（dyn-build allow all）→ completed
+- system prompt / tools 列表按 dyn-build 构建（`prompt.ts:1393-1405`）
+
+**关键代码**：`prompt.ts:1282` 每 step 读 `sessions.get().agent` → `agents.sessionGet` → 构建 system/tools/permission
+
+### T26.58 指定不存在的 agent 报错
+
+**验证目标**：prompt 携带不存在的 agent 名称时，`createUserMessage` 报错，不影响 session
+
+**验证步骤**：
+```bash
+# 1. prompt 带 agent="nonexistent-agent"
+# 2. 检查返回错误，session.agent 不变
+```
+
+**预期结果**：
+- `agents.sessionGet("nonexistent-agent")` 返回 undefined（`prompt.ts:649`）
+- 发布 `Session.Event.Error`，抛出 `NamedError.Unknown`
+- session.agent 保持原值不变
+
+### T26.59 `setAgentModel` / `setAgent` API 验证
+
+**验证目标**：`Session.Service.setAgentModel()` 和 `setAgent()` 方法正确更新 session.agent 字段
+
+**验证步骤**：
+```bash
+# 1. 获取当前 session.agent
+# 2. 调用 setAgentModel({ sessionID, agent: "dyn-build", model, time })
+# 3. 重新 get session，验证 agent 字段已更新
+```
+
+**预期结果**：
+- `session.agent` 从旧值更新为新值
+- `session.model` 同步更新（setAgentModel）
+- `session.time.updated` 时间戳更新
+- 触发 `SessionV1.Event.Updated` 事件
+
+**关键代码**：`session.ts` Interface `setAgentModel` / `setAgent`（`patch(sessionID, { agent })`）
+
+---
+
+## Agent 切换 — 进阶用例（T26.60–T26.61, T26.65）
+
+### T26.60 严格→宽松切换（dyn-spec→dyn-build，被移除工具恢复）
+
+**验证目标**：从 write deny 的 dyn-spec 切换到 write allow 的 dyn-build 后，write 工具从工具列表恢复可用
+
+**前置条件**：
+- dyn-spec：write deny all（`disabled()` 移除 write 工具）
+- dyn-build：write allow all
+
+**验证步骤**：
+```bash
+# 1. 创建 session，创建 dyn-spec + dyn-build agent
+# 2. prompt 1：agent=dyn-spec（write 工具不存在）
+# 3. prompt 2：agent=dyn-build，让 AI write 文件
+# 4. 检查 write 状态 = completed（工具恢复可用）
+```
+
+**预期结果**：
+- prompt 1 阶段：write 工具不存在（dyn-spec deny → disabled）
+- prompt 2 阶段：write 工具恢复，write 调用 status = completed
+
+**关键代码**：`prompt.ts` loop 每 step 读 `session.agent` → `disabled()` 基于 `sessionGet` 返回的 permission 判断
+
+### T26.61 连续三阶段链式切换（spec→build→review）
+
+**验证目标**：完整编排链路 dyn-spec→dyn-build→dyn-review 三条 prompt 各带不同 agent，均正确切换
+
+**验证步骤**：
+```bash
+# 1. 创建 3 个 agent：dyn-spec（edit deny）、dyn-build（edit allow）、dyn-review（read-only）
+# 2. prompt 1：agent=dyn-spec → session.agent=dyn-spec
+# 3. prompt 2：agent=dyn-build → session.agent=dyn-build
+# 4. prompt 3：agent=dyn-review → session.agent=dyn-review
+# 5. 每步检查 session.agent
+```
+
+**预期结果**：
+- 3 条 prompt 后 session.agent 依次为 dyn-spec → dyn-build → dyn-review
+- 每次切换后当轮 step 立即用对应 agent 的 system/tools/permission
+- 无中间状态残留
+
+### T26.65 SessionV1.Event.Updated 事件验证
+
+**验证目标**：`setAgentModel()` 调用后正确触发 `SessionV1.Event.Updated` 事件
+
+**验证步骤**：
+```bash
+# 1. 订阅 SSE event stream
+# 2. 发送 prompt 带 agent=dyn-build
+# 3. 检查 SSE 中是否收到 session.updated 事件
+# 4. 验证事件 data 中 agent 字段 = dyn-build
+```
+
+**预期结果**：
+- `createUserMessage` → `setAgentModel` → `patch()` → `events.publish(SessionV1.Event.Updated, ...)`
+- SSE 收到 `session.updated` 事件，info.agent = 目标 agent
+- 外部编排系统可通过监听此事件感知 agent 切换
+
+**关键代码**：`session.ts` `patch()` → `events.publish(SessionV1.Event.Updated, { sessionID, info: next })`
+
+---
+
+### 进阶用例代码覆盖矩阵
+
+| 代码逻辑 | 位置 | 用例 |
+|---------|------|------|
+| createUserMessage agent 变化检测 | `prompt.ts:687` `current.agent !== info.agent` | T26.56 |
+| setAgentModel 持久化 | `prompt.ts:692` → `session.ts:877` | T26.56, T26.59 |
+| loop 每 step 读 session.agent | `prompt.ts:1282` `sessions.get().agent` | T26.57, T26.60 |
+| system/tools/permission 按新 agent 构建 | `prompt.ts:1393-1405` `sys.skills(agent)` / `sys.mcp(agent)` | T26.57 |
+| 严格→宽松权限切换（工具恢复） | loop 每 step `disabled()` 基于 `sessionGet` | T26.60 |
+| 链式切换（多次 setAgentModel） | `prompt.ts` createUserMessage → setAgentModel | T26.61 |
+| SessionV1.Event.Updated 发布 | `session.ts` `patch()` → `events.publish` | T26.65 |
+| 跨 turn 沿用 session.agent | `prompt.ts` createUserMessage `input.agent ?? current.agent` | T26.61 |
+
+---
+
 ## 代码覆盖矩阵
 
 权限实现链路与用例对应关系（用于评估覆盖完整性）：
@@ -1878,10 +2044,40 @@ SSE 日志:
 | subagent 权限继承派生 | subagent-permissions.ts | T26.36 |
 | external_directory 检查 | write.ts:39 | T26.37 |
 | ask → always → approved | reply permission/index.ts:246 | T26.38 |
-| reject 级联同 session | reply permission/index.ts:233 | （T26.38 相关） |
 | DeniedError 规则过滤 | ask permission/index.ts:183 | T26.39 |
 | `expand()` ~/$HOME | permission/index.ts:282 | T26.40 |
+| message 接口 agent 变化检测 | `prompt.ts:687` `current.agent !== info.agent` | T26.56 |
+| setAgentModel 持久化 | `prompt.ts:692` → `session.ts:877` | T26.56, T26.59 |
+| loop 每 step 读 session.agent | `prompt.ts:1282` `sessions.get().agent` | T26.57, T26.60 |
+| 指定不存在 agent 报错 | `prompt.ts:649` `agents.sessionGet` → undefined | T26.58 |
+| SessionV1.Event.Updated 发布 | `session.ts` `patch()` → `events.publish` | T26.65 |
 | `merge` 全局+agent | agent.ts:550 | T26.22 等（含全局 merge）|
 | tools 向后兼容 | agent.ts:84 | T26.27 |
 
-**全部权限实现分支已覆盖**。共 27 个用例（T26.21–T26.55，含 T26.26b）。编号说明：T26.30 仅有汇总记录无正文、T26.41–T26.49 为历史断档；正文顺序为 21–28 → 36–40 → 29 → 50–55 → 31–35（历史追加所致，不影响执行）。
+**全部权限实现分支已覆盖**。共 31 个用例（T26.21–T26.65，含 T26.26b；T26.62–T26.64 已删除——dispatch 文本信号机制不再使用）。
+
+---
+
+## 多 agent 编排约束（P0 补充）
+
+以下约束用于确保 agent 切换通过 message 接口可靠生效：
+
+1. **agent 切换只通过 message 接口**（prompt 携带 `agent` 字段）。`createUserMessage`（`prompt.ts:646`）检测 `input.agent` 变化 → `setAgentModel`（`prompt.ts:692`）持久化 → loop 每 step 读 `session.agent`（`prompt.ts:1282`）→ 当轮第一个 step 即用新 agent 的 system/tools/permission。
+2. **用户消息建议显式携带 `agent` 字段**。不携带时沿用 `session.agent`（`input.agent ?? current.agent`）；两者皆无时回退 default agent。
+3. **session.agent 是唯一权威的"当前角色"**：loop 每轮从 `sessions.get().agent` 实时解析 agent（`prompt.ts:1282`），system/tools/permission 均基于该实时值。
+4. **跨 turn 持久化依赖 `session.agent`**（`session.ts` setAgentModel/patch 持久化），而非 `lastUser.agent`（仅当次 user message 快照）。
+5. **指定不存在的 agent 会报错**（`agents.sessionGet` 返回 undefined → `NamedError`），编排层须确保 agent 名称在 `session_agents` 表中存在。
+
+---
+
+## 单元测试
+
+> 代码位置：`packages/opencode/test/session/session-agent-switch.test.ts`
+
+| 用例 | 验证点 |
+|------|--------|
+| `setAgentModel` 多次切换 | build→plan→build，每次 `session.get` 立即读到新值 |
+| `setAgent` 纯 agent 切换 | spec→build，不涉及 model |
+| 切换持久化（durable） | setAgentModel 后 reload，agent + model 都正确 |
+
+运行：`cd packages/opencode && bun test test/session/session-agent-switch.test.ts`
