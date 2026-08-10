@@ -1,8 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Globe, MonitorPlay, Plus, RefreshCw, Trash2 } from 'lucide-react'
-import VncScreen from './components/VncScreen'
+import { Globe, MonitorPlay, Plus, Trash2 } from 'lucide-react'
+import type { Agent } from './lib/api'
+import { api } from './lib/api'
+import AgentHome from './components/AgentHome'
+import AgentSession from './components/AgentSession'
+import BrowserManager from './components/BrowserManager'
 import { Button } from './components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './components/ui/card'
+import { Separator } from './components/ui/separator'
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup, useDefaultLayout } from './components/ui/resizable'
 import {
   Dialog,
   DialogContent,
@@ -11,15 +16,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from './components/ui/dialog'
-import { Badge } from './components/ui/badge'
-import { Separator } from './components/ui/separator'
 import { cn } from './lib/utils'
 
-interface Sandbox {
-  id: string
-  createdAt: string
-  status: string
-}
+type View = 'home' | 'agent' | 'browsers'
 
 const formatTime = (iso: string) => {
   const date = new Date(iso)
@@ -33,41 +32,35 @@ const formatTime = (iso: string) => {
 }
 
 function App() {
-  const [sandboxes, setSandboxes] = useState<Sandbox[]>([])
-  const [activeId, setActiveId] = useState<string | null>(null)
-  const [creating, setCreating] = useState(false)
+  const [view, setView] = useState<View>('home')
+  const [agents, setAgents] = useState<Agent[]>([])
+  const [activeAgentId, setActiveAgentId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [pendingDelete, setPendingDelete] = useState<Sandbox | null>(null)
+  const [pendingDelete, setPendingDelete] = useState<Agent | null>(null)
   const [deleting, setDeleting] = useState(false)
 
-  const refreshList = useCallback(async () => {
-    const res = await fetch('/api/sandboxes')
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    setSandboxes((await res.json()) as Sandbox[])
+  const refreshAgents = useCallback(async () => {
+    try {
+      setAgents(await api.listAgents())
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    }
   }, [])
 
   useEffect(() => {
-    refreshList().catch((err) =>
-      setError(err instanceof Error ? err.message : String(err)),
-    )
-  }, [refreshList])
+    refreshAgents()
+  }, [refreshAgents])
 
-  async function createSandbox() {
-    setCreating(true)
+  async function handleCreateAgent(prompt: string) {
     setError(null)
     try {
-      const res = await fetch('/api/sandboxes', { method: 'POST' })
-      if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { error?: string }
-        throw new Error(body.error || `HTTP ${res.status}`)
-      }
-      const sandbox = (await res.json()) as Sandbox
-      setSandboxes((prev) => [...prev, sandbox])
-      setActiveId(sandbox.id)
+      const agent = await api.createAgent(prompt)
+      await refreshAgents()
+      setActiveAgentId(agent.id)
+      setView('agent')
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
-    } finally {
-      setCreating(false)
+      throw err
     }
   }
 
@@ -76,15 +69,12 @@ function App() {
     setDeleting(true)
     setError(null)
     try {
-      const res = await fetch(`/api/sandboxes/${pendingDelete.id}`, {
-        method: 'DELETE',
-      })
-      if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { error?: string }
-        throw new Error(body.error || `HTTP ${res.status}`)
+      await api.deleteAgent(pendingDelete.id)
+      setAgents((prev) => prev.filter((a) => a.id !== pendingDelete.id))
+      if (activeAgentId === pendingDelete.id) {
+        setActiveAgentId(null)
+        setView('home')
       }
-      setSandboxes((prev) => prev.filter((s) => s.id !== pendingDelete.id))
-      if (activeId === pendingDelete.id) setActiveId(null)
       setPendingDelete(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
@@ -93,9 +83,18 @@ function App() {
     }
   }
 
+  const activeAgent = agents.find((a) => a.id === activeAgentId) ?? null
+  const layout = useDefaultLayout({ id: 'cloud-browser-layout' })
+
   return (
-    <div className="flex h-screen bg-background text-foreground">
-      <aside className="flex w-72 shrink-0 flex-col border-r bg-card">
+    <div className="h-screen bg-background text-foreground">
+      <ResizablePanelGroup
+        orientation="horizontal"
+        defaultLayout={layout.defaultLayout}
+        onLayoutChanged={layout.onLayoutChanged}
+      >
+        <ResizablePanel defaultSize="16" minSize="12" maxSize="30">
+          <aside className="flex h-full flex-col border-r bg-card">
         <div className="flex items-center gap-3 p-4">
           <div className="flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
             <Globe className="size-5" />
@@ -106,76 +105,73 @@ function App() {
           </div>
         </div>
         <Separator />
+
         <div className="p-4">
-          <Button onClick={createSandbox} disabled={creating} className="w-full">
-            {creating ? (
-              <>
-                <RefreshCw className="size-4 animate-spin" />
-                创建中...
-              </>
-            ) : (
-              <>
-                <Plus />
-                新建浏览器
-              </>
-            )}
+          <Button
+            className="w-full"
+            onClick={() => {
+              setActiveAgentId(null)
+              setView('home')
+            }}
+          >
+            <Plus />
+            New Agent
           </Button>
         </div>
-        <div className="flex-1 space-y-2 overflow-y-auto px-4 pb-4">
-          <p className="px-1 text-xs font-medium text-muted-foreground">
-            会话列表
-          </p>
-          {sandboxes.length === 0 ? (
-            <Card className="mx-1">
-              <CardContent className="py-8 text-center text-sm text-muted-foreground">
-                暂无会话
-              </CardContent>
-            </Card>
+
+        <nav className="px-4 pb-2">
+          <button
+            onClick={() => setView('browsers')}
+            className={cn(
+              'flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors',
+              view === 'browsers'
+                ? 'bg-accent font-medium'
+                : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground',
+            )}
+          >
+            <MonitorPlay className="size-4" />
+            Browsers
+          </button>
+        </nav>
+
+        <div className="flex-1 space-y-1 overflow-y-auto px-4 pb-4">
+          <p className="px-1 pb-1 text-xs font-medium text-muted-foreground">History</p>
+          {agents.length === 0 ? (
+            <p className="px-1 py-4 text-center text-xs text-muted-foreground">暂无会话</p>
           ) : (
-            sandboxes.map((sandbox) => (
-              <Card
-                key={sandbox.id}
-                size="sm"
+            agents.map((agent) => (
+              <div
+                key={agent.id}
                 className={cn(
-                  'transition-colors',
-                  sandbox.id === activeId && 'bg-accent',
+                  'group flex items-center gap-1 rounded-lg px-2 py-1.5 transition-colors',
+                  agent.id === activeAgentId && view === 'agent'
+                    ? 'bg-accent'
+                    : 'hover:bg-accent/50',
                 )}
               >
-                <CardHeader className="flex-row items-center justify-between">
-                  <CardTitle className="font-mono text-xs">
-                    {sandbox.id.slice(0, 12)}
-                  </CardTitle>
-                  <Badge variant="secondary" className="gap-1">
-                    <span className="size-1.5 rounded-full bg-emerald-500" />
-                    运行中
-                  </Badge>
-                </CardHeader>
-                <CardDescription className="px-4">
-                  创建于 {formatTime(sandbox.createdAt)}
-                </CardDescription>
-                <CardContent className="flex gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="flex-1"
-                    onClick={() => setActiveId(sandbox.id)}
-                  >
-                    <MonitorPlay />
-                    连接
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="text-muted-foreground hover:text-destructive"
-                    onClick={() => setPendingDelete(sandbox)}
-                  >
-                    <Trash2 />
-                  </Button>
-                </CardContent>
-              </Card>
+                <button
+                  onClick={() => {
+                    setActiveAgentId(agent.id)
+                    setView('agent')
+                  }}
+                  className="min-w-0 flex-1 text-left"
+                >
+                  <p className="truncate text-sm">{agent.title}</p>
+                  <p className="text-[10px] text-muted-foreground">
+                    {formatTime(agent.createdAt)}
+                  </p>
+                </button>
+                <button
+                  onClick={() => setPendingDelete(agent)}
+                  className="hidden rounded p-1 text-muted-foreground hover:text-destructive group-hover:block"
+                >
+                  <Trash2 className="size-3.5" />
+                </button>
+              </div>
             ))
           )}
         </div>
+
         {error && (
           <div className="border-t p-4">
             <p className="break-words rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">
@@ -183,56 +179,34 @@ function App() {
             </p>
           </div>
         )}
-      </aside>
+          </aside>
+        </ResizablePanel>
+        <ResizableHandle withHandle />
 
-      <main className="flex flex-1 flex-col overflow-hidden">
-        {activeId ? (
-          <>
-            <div className="flex items-center gap-2 border-b bg-card px-4 py-2">
-              <span className="size-2 rounded-full bg-emerald-500" />
-              <span className="font-mono text-xs text-muted-foreground">
-                {activeId}
-              </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="ml-auto"
-                onClick={() => setActiveId(null)}
-              >
-                关闭
-              </Button>
-            </div>
-            <VncScreen sandboxId={activeId} />
-          </>
-        ) : (
-          <div className="flex flex-1 items-center justify-center">
-            <Card className="w-full max-w-sm border-none bg-transparent shadow-none">
-              <CardContent className="flex flex-col items-center gap-3 py-12 text-center">
-                <div className="flex size-14 items-center justify-center rounded-2xl bg-muted">
-                  <Globe className="size-7 text-muted-foreground" />
-                </div>
-                <div>
-                  <CardTitle className="text-lg">欢迎使用 Cloud Browser</CardTitle>
-                  <CardDescription className="mt-1">
-                    点击左侧「新建浏览器」创建一个云端 Chrome 沙箱
-                  </CardDescription>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-      </main>
+        <ResizablePanel defaultSize="84">
+          <main className="flex h-full min-w-0 flex-col overflow-hidden">
+            {view === 'home' && <AgentHome onSubmit={handleCreateAgent} />}
+            {view === 'agent' && activeAgent && (
+              <AgentSession
+                key={activeAgent.id}
+                agent={activeAgent}
+                onAgentUpdated={refreshAgents}
+              />
+            )}
+            {view === 'browsers' && <BrowserManager />}
+          </main>
+        </ResizablePanel>
+      </ResizablePanelGroup>
 
-      <Dialog open={pendingDelete !== null} onOpenChange={(open) => !open && setPendingDelete(null)}>
+      <Dialog
+        open={pendingDelete !== null}
+        onOpenChange={(open) => !open && setPendingDelete(null)}
+      >
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle>删除沙箱</DialogTitle>
+            <DialogTitle>删除会话</DialogTitle>
             <DialogDescription>
-              确定要删除沙箱{' '}
-              <span className="font-mono text-foreground">
-                {pendingDelete?.id.slice(0, 12)}
-              </span>{' '}
-              吗？该操作会销毁云端浏览器，不可撤销。
+              确定要删除会话「{pendingDelete?.title}」吗？关联的云端浏览器也会被销毁。
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -243,11 +217,7 @@ function App() {
             >
               取消
             </Button>
-            <Button
-              variant="destructive"
-              onClick={confirmDelete}
-              disabled={deleting}
-            >
+            <Button variant="destructive" onClick={confirmDelete} disabled={deleting}>
               {deleting ? '删除中...' : '确认删除'}
             </Button>
           </DialogFooter>

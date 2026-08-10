@@ -7,6 +7,7 @@ RUN apt-get update \
         fonts-noto-cjk \
         fonts-noto-color-emoji \
         websockify \
+        socat \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --chmod=755 cloud-browser-entrypoint.sh /cloud-browser-entrypoint.sh
