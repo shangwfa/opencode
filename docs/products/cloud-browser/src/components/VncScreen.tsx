@@ -17,7 +17,6 @@ export default function VncScreen({ sandboxId, onRebuild }: Props) {
   const [state, setState] = useState<ConnectionState>('connecting')
   const [message, setMessage] = useState('正在连接云端浏览器...')
   const [retryCount, setRetryCount] = useState(0)
-  const [sandboxGone, setSandboxGone] = useState(false)
   const [rebuilding, setRebuilding] = useState(false)
 
   useEffect(() => {
@@ -26,29 +25,23 @@ export default function VncScreen({ sandboxId, onRebuild }: Props) {
 
     setState('connecting')
     setMessage('正在连接云端浏览器...')
-    setSandboxGone(false)
 
     let rfb: RFB | null = null
     let cancelled = false
 
-    async function connect() {
-      try {
-        const res = await fetch(`/api/sandboxes/${sandboxId}`)
-        if (cancelled) return
-        if (!res.ok) {
-          setSandboxGone(true)
-          setState('error')
-          setMessage('浏览器沙箱已过期或被销毁')
-          return
-        }
-      } catch {
-        if (!cancelled) {
-          setState('error')
-          setMessage('无法连接服务器')
-        }
-        return
-      }
+    const onConnect = () => setState('connected')
+    const onDisconnect = (event: Event) => {
+      const detail = (event as RFBDisconnectEvent).detail
+      setState(detail.clean ? 'disconnected' : 'error')
+      setMessage(detail.clean ? '连接已断开' : 'VNC 连接失败')
+    }
+    const onSecurityFailure = (event: Event) => {
+      const detail = (event as RFBSecurityFailureEvent).detail
+      setState('error')
+      setMessage(detail.reason || 'VNC 安全协商失败')
+    }
 
+    async function connect() {
       if (cancelled) return
       const target = containerRef.current
       if (!target) return
@@ -62,24 +55,21 @@ export default function VncScreen({ sandboxId, onRebuild }: Props) {
       rfb.resizeSession = false
       rfb.focusOnClick = true
 
-      rfb.addEventListener('connect', () => setState('connected'))
-      rfb.addEventListener('disconnect', (event) => {
-        const detail = (event as RFBDisconnectEvent).detail
-        setState(detail.clean ? 'disconnected' : 'error')
-        setMessage(detail.clean ? '连接已断开' : 'VNC 连接失败')
-      })
-      rfb.addEventListener('securityfailure', (event) => {
-        const detail = (event as RFBSecurityFailureEvent).detail
-        setState('error')
-        setMessage(detail.reason || 'VNC 安全协商失败')
-      })
+      rfb.addEventListener('connect', onConnect)
+      rfb.addEventListener('disconnect', onDisconnect)
+      rfb.addEventListener('securityfailure', onSecurityFailure)
     }
 
     connect()
 
     return () => {
       cancelled = true
-      rfb?.disconnect()
+      if (rfb) {
+        rfb.removeEventListener('connect', onConnect)
+        rfb.removeEventListener('disconnect', onDisconnect)
+        rfb.removeEventListener('securityfailure', onSecurityFailure)
+        rfb.disconnect()
+      }
       container.replaceChildren()
     }
   }, [sandboxId, retryCount])
@@ -104,7 +94,7 @@ export default function VncScreen({ sandboxId, onRebuild }: Props) {
                     <MonitorX className="size-6 text-destructive" />
                   </div>
                   <p className="text-sm text-muted-foreground">{message}</p>
-                  {sandboxGone && onRebuild ? (
+                  {onRebuild ? (
                     <Button
                       variant="outline"
                       size="sm"
@@ -122,15 +112,13 @@ export default function VncScreen({ sandboxId, onRebuild }: Props) {
                       重建浏览器
                     </Button>
                   ) : (
-                    !sandboxGone && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setRetryCount((c) => c + 1)}
-                      >
-                        重新连接
-                      </Button>
-                    )
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setRetryCount((c) => c + 1)}
+                    >
+                      重新连接
+                    </Button>
                   )}
                 </>
               )}
