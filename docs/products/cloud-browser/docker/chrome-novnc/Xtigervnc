@@ -1,2 +1,13 @@
 #!/bin/sh
-exec /usr/bin/Xtigervnc "$@" -SecurityTypes None
+# /entrypoint 二进制写死了 -geometry 1280x1024，这里拦截替换为 1920x1080，
+# 提高 noVNC 缩放后的清晰度（Retina/高 DPI 屏幕下尤为明显）。
+# 同时必须追加 -SecurityTypes None（原基础镜像包装脚本所做），
+# 否则 Xtigervnc 默认要求 VNC 密码，noVNC 握手会一直卡住。
+args=""
+for arg in "$@"; do
+  case "$arg" in
+    1280x1024) arg="1920x1080" ;;
+  esac
+  args="$args $arg"
+done
+exec /usr/bin/Xtigervnc.real $args -SecurityTypes None

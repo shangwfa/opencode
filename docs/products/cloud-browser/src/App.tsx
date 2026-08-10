@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Globe, MonitorPlay, Plus, Trash2 } from 'lucide-react'
 import type { Agent } from './lib/api'
-import { api } from './lib/api'
+import { api, getSavedModel } from './lib/api'
 import AgentHome from './components/AgentHome'
 import AgentSession from './components/AgentSession'
 import BrowserManager from './components/BrowserManager'
@@ -38,6 +38,9 @@ function App() {
   const [error, setError] = useState<string | null>(null)
   const [pendingDelete, setPendingDelete] = useState<Agent | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [model, setModel] = useState<{ providerID: string; modelID: string } | null>(
+    () => getSavedModel(),
+  )
 
   const refreshAgents = useCallback(async () => {
     try {
@@ -54,7 +57,7 @@ function App() {
   async function handleCreateAgent(prompt: string) {
     setError(null)
     try {
-      const agent = await api.createAgent(prompt)
+      const agent = await api.createAgent(prompt, model ?? undefined)
       await refreshAgents()
       setActiveAgentId(agent.id)
       setView('agent')
@@ -185,12 +188,20 @@ function App() {
 
         <ResizablePanel defaultSize="84">
           <main className="flex h-full min-w-0 flex-col overflow-hidden">
-            {view === 'home' && <AgentHome onSubmit={handleCreateAgent} />}
+            {view === 'home' && (
+              <AgentHome
+                onSubmit={handleCreateAgent}
+                model={model}
+                onModelChange={setModel}
+              />
+            )}
             {view === 'agent' && activeAgent && (
               <AgentSession
                 key={activeAgent.id}
                 agent={activeAgent}
                 onAgentUpdated={refreshAgents}
+                model={model}
+                onModelChange={setModel}
               />
             )}
             {view === 'browsers' && <BrowserManager />}

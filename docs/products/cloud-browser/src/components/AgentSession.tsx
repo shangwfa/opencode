@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ArrowUp, Files, Loader2, MonitorPlay } from 'lucide-react'
+import { ArrowUp, Files, Loader2, MonitorPlay, Square } from 'lucide-react'
 import type { Agent, Message } from '../lib/api'
 import { api } from '../lib/api'
 import { MessageList } from './MessageList'
 import VncScreen from './VncScreen'
+import FilesPanel from './FilesPanel'
+import ModelSelector from './ModelSelector'
 import { Button } from './ui/button'
 import { Badge } from './ui/badge'
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup, useDefaultLayout } from './ui/resizable'
@@ -12,16 +14,20 @@ import { cn } from '../lib/utils'
 interface Props {
   agent: Agent
   onAgentUpdated: () => void
+  model: { providerID: string; modelID: string } | null
+  onModelChange: (model: { providerID: string; modelID: string }) => void
 }
 
 type Tab = 'browser' | 'files'
 
-export default function AgentSession({ agent, onAgentUpdated }: Props) {
+export default function AgentSession({ agent, onAgentUpdated, model, onModelChange }: Props) {
   const [messages, setMessages] = useState<Message[]>([])
-  const [running, setRunning] = useState(agent.status === 'running')
+  const [running, setRunning] = useState(false)
   const [tab, setTab] = useState<Tab>('browser')
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
+  const [fileCount, setFileCount] = useState(0)
+  const abortedRef = useRef(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
 
@@ -29,6 +35,10 @@ export default function AgentSession({ agent, onAgentUpdated }: Props) {
     try {
       const list = await api.listMessages(agent.id)
       setMessages(list)
+      if (!abortedRef.current) {
+        const { busy } = await api.getAgentStatus(agent.id)
+        setRunning(busy)
+      }
     } catch (err) {
       console.error('fetch messages failed:', err)
     }
@@ -47,9 +57,14 @@ export default function AgentSession({ agent, onAgentUpdated }: Props) {
         }
         if (type === 'session.idle') {
           setRunning(false)
+          abortedRef.current = false
           refreshMessages()
+          api
+            .listFiles(agent.id)
+            .then((files) => setFileCount(files.length))
+            .catch(() => {})
         }
-        if (type === 'session.status') {
+        if (type === 'session.status' && !abortedRef.current) {
           setRunning(true)
         }
       } catch {
@@ -60,6 +75,13 @@ export default function AgentSession({ agent, onAgentUpdated }: Props) {
   }, [agent.id, refreshMessages])
 
   useEffect(() => {
+    api
+      .listFiles(agent.id)
+      .then((files) => setFileCount(files.length))
+      .catch(() => {})
+  }, [agent.id])
+
+  useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, running])
 
@@ -68,15 +90,27 @@ export default function AgentSession({ agent, onAgentUpdated }: Props) {
     if (!text || sending) return
     setSending(true)
     setInput('')
+    abortedRef.current = false
     setRunning(true)
     try {
-      await api.sendMessage(agent.id, text)
+      await api.sendMessage(agent.id, text, model ?? undefined)
       await refreshMessages()
     } catch (err) {
       console.error('send failed:', err)
       setRunning(false)
     } finally {
       setSending(false)
+    }
+  }
+
+  async function handleAbort() {
+    try {
+      await api.abortAgent(agent.id)
+      abortedRef.current = true
+      setRunning(false)
+      await refreshMessages()
+    } catch (err) {
+      console.error('abort failed:', err)
     }
   }
 
@@ -89,7 +123,7 @@ export default function AgentSession({ agent, onAgentUpdated }: Props) {
       onLayoutChanged={layout.onLayoutChanged}
       className="flex-1"
     >
-      <ResizablePanel defaultSize="55" minSize="30">
+      <ResizablePanel defaultSize="40" minSize="30">
         <div className="flex h-full min-w-0 flex-col">
           <div className="flex items-center gap-2 border-b px-4 py-2.5">
             <h2 className="truncate text-sm font-medium">{agent.title}</h2>
@@ -116,15 +150,28 @@ export default function AgentSession({ agent, onAgentUpdated }: Props) {
                 rows={2}
                 className="w-full resize-none rounded-t-xl bg-transparent px-3 py-2.5 text-sm outline-none placeholder:text-muted-foreground"
               />
-              <div className="flex items-center justify-end px-2 py-1.5">
-                <Button
-                  size="icon-sm"
-                  onClick={handleSend}
-                  disabled={!input.trim() || sending}
-                  className="rounded-full"
-                >
-                  {sending ? <Loader2 className="animate-spin" /> : <ArrowUp />}
-                </Button>
+              <div className="flex items-center justify-between px-2 py-1.5">
+                <ModelSelector value={model} onChange={onModelChange} />
+                {running ? (
+                  <Button
+                    size="icon-sm"
+                    variant="outline"
+                    onClick={handleAbort}
+                    title="中断执行"
+                    className="rounded-full"
+                  >
+                    <Square />
+                  </Button>
+                ) : (
+                  <Button
+                    size="icon-sm"
+                    onClick={handleSend}
+                    disabled={!input.trim() || sending}
+                    className="rounded-full"
+                  >
+                    {sending ? <Loader2 className="animate-spin" /> : <ArrowUp />}
+                  </Button>
+                )}
               </div>
             </div>
           </div>
@@ -132,7 +179,7 @@ export default function AgentSession({ agent, onAgentUpdated }: Props) {
       </ResizablePanel>
       <ResizableHandle withHandle />
 
-      <ResizablePanel defaultSize="45" minSize="25">
+      <ResizablePanel defaultSize="60" minSize="25">
         <div className="flex h-full flex-col border-l">
           <div className="flex items-center gap-1 border-b px-3 py-2">
             <button
@@ -157,7 +204,7 @@ export default function AgentSession({ agent, onAgentUpdated }: Props) {
               )}
             >
               <Files className="size-3.5" />
-              Files
+              Files{fileCount > 0 && ` (${fileCount})`}
             </button>
           </div>
           <div className="flex flex-1 overflow-hidden">
@@ -170,9 +217,7 @@ export default function AgentSession({ agent, onAgentUpdated }: Props) {
                 }}
               />
             ) : (
-              <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
-                暂无文件
-              </div>
+              <FilesPanel agentId={agent.id} onCountChange={setFileCount} />
             )}
           </div>
         </div>

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Brain, ChevronDown, ChevronRight, Loader2, Terminal, Wrench } from 'lucide-react'
+import { Streamdown } from 'streamdown'
 import type { Message, MessagePart } from '../lib/api'
 
 function ToolCall({ part }: { part: MessagePart }) {
@@ -96,9 +97,12 @@ function MessageItem({ message }: { message: Message }) {
       {message.parts.map((part, i) => {
         if (part.type === 'text' && part.text?.trim()) {
           return (
-            <p key={part.id ?? i} className="text-sm leading-relaxed whitespace-pre-wrap">
+            <Streamdown
+              key={part.id ?? i}
+              className="text-sm leading-relaxed [&>*+*]:mt-3 [&_table]:my-4"
+            >
               {part.text}
-            </p>
+            </Streamdown>
           )
         }
         if (part.type === 'reasoning' && part.text?.trim()) {

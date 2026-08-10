@@ -11,7 +11,11 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --chmod=755 cloud-browser-entrypoint.sh /cloud-browser-entrypoint.sh
-COPY --chmod=755 Xtigervnc /usr/local/bin/Xtigervnc
+
+# /entrypoint 调用 /usr/bin/Xtigervnc 时写死 -geometry 1280x1024；
+# 备份原二进制并用包装脚本替换，将分辨率提升到 1920x1080。
+RUN mv /usr/bin/Xtigervnc /usr/bin/Xtigervnc.real
+COPY --chmod=755 Xtigervnc /usr/bin/Xtigervnc
 
 USER chrome
 

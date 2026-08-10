@@ -61,11 +61,13 @@ curl -s --noproxy '*' -X POST ${apiBase}/api/sandboxes/${sandboxId}/browser/navi
   -H 'Content-Type: application/json' -d '{"url": "https://example.com"}'
 \`\`\`
 
-### 2. 获取页面可交互元素（核心！返回带 ref 标号的元素列表）
+### 2. 获取页面可交互元素 + 页面摘要（核心！）
 \`\`\`bash
 curl -s --noproxy '*' ${apiBase}/api/sandboxes/${sandboxId}/browser/snapshot
 \`\`\`
-返回格式（每行一个元素）：
+返回 \`{snapshot, summary, url, title}\`：
+- \`summary\`：页面正文前 800 字符（快速了解页面内容）
+- \`snapshot\`：可交互元素列表（每行一个，带 ref 标号）：
 \`\`\`
 [e1] a "登录" -> https://...
 [e2] input type=text "搜索..."
@@ -84,45 +86,108 @@ curl -s --noproxy '*' -X POST ${apiBase}/api/sandboxes/${sandboxId}/browser/type
   -H 'Content-Type: application/json' -d '{"ref": "e2", "text": "要输入的内容"}'
 \`\`\`
 
-### 5. 按键（Enter/Tab/Escape 等）
+### 5. 下拉框选择
+\`\`\`bash
+curl -s --noproxy '*' -X POST ${apiBase}/api/sandboxes/${sandboxId}/browser/select \\
+  -H 'Content-Type: application/json' -d '{"ref": "e3", "value": "选项文本或value"}'
+\`\`\`
+
+### 6. 按键（Enter/Tab/Escape 等）
 \`\`\`bash
 curl -s --noproxy '*' -X POST ${apiBase}/api/sandboxes/${sandboxId}/browser/key \\
   -H 'Content-Type: application/json' -d '{"key": "Enter"}'
 \`\`\`
 
-### 6. 滚动页面
+### 7. 滚动页面
 \`\`\`bash
 curl -s --noproxy '*' -X POST ${apiBase}/api/sandboxes/${sandboxId}/browser/scroll \\
   -H 'Content-Type: application/json' -d '{"direction": "down", "amount": 600}'
 \`\`\`
 direction: up / down / left / right
 
-### 7. 读取页面正文文本
+### 8. 读取页面正文文本
 \`\`\`bash
-curl -s --noproxy '*' ${apiBase}/api/sandboxes/${sandboxId}/browser/text
+curl -s --noproxy '*' '${apiBase}/api/sandboxes/${sandboxId}/browser/text?max=8000'
 \`\`\`
 
-### 8. 当前状态（URL + 标题）
+### 9. 当前状态（URL + 标题）
 \`\`\`bash
 curl -s --noproxy '*' ${apiBase}/api/sandboxes/${sandboxId}/browser/state
 \`\`\`
 
-### 9. 截图（返回 base64 JPEG）
+### 10. 等待元素/文本出现
+\`\`\`bash
+curl -s --noproxy '*' -X POST ${apiBase}/api/sandboxes/${sandboxId}/browser/wait \\
+  -H 'Content-Type: application/json' -d '{"text": "加载完成", "timeoutMs": 10000}'
+\`\`\`
+也支持 \`{"selector": ".result-list"}\`。不带参数则等待 timeoutMs 毫秒。
+
+### 11. 执行任意 JavaScript（兜底能力）
+\`\`\`bash
+curl -s --noproxy '*' -X POST ${apiBase}/api/sandboxes/${sandboxId}/browser/eval \\
+  -H 'Content-Type: application/json' -d '{"script": "document.querySelectorAll(\".item\").length"}'
+\`\`\`
+返回 \`{"result": ...}\`。script 在页面上下文执行，可读取/操作 DOM。
+
+### 12. 后退
+\`\`\`bash
+curl -s --noproxy '*' -X POST ${apiBase}/api/sandboxes/${sandboxId}/browser/go-back
+\`\`\`
+
+### 13. 标签页管理
+\`\`\`bash
+curl -s --noproxy '*' ${apiBase}/api/sandboxes/${sandboxId}/browser/tabs
+curl -s --noproxy '*' -X POST ${apiBase}/api/sandboxes/${sandboxId}/browser/switch-tab \\
+  -H 'Content-Type: application/json' -d '{"index": 1}'
+\`\`\`
+
+### 14. 下载文件（点击下载按钮并保存）
+\`\`\`bash
+curl -s --noproxy '*' -X POST ${apiBase}/api/sandboxes/${sandboxId}/browser/download \\
+  -H 'Content-Type: application/json' -d '{"ref": "e5", "timeoutMs": 30000}'
+\`\`\`
+返回 \`{"filename": "orders.xlsx", "size": 12345, "downloadUrl": "..."}\`。
+然后用 downloadUrl 把文件下载到你的沙箱：
+\`\`\`bash
+curl -s --noproxy '*' -o /workspace/orders.xlsx "${apiBase}/api/sandboxes/${sandboxId}/browser/files/orders.xlsx"
+\`\`\`
+
+### 15. 上传文件到上传框
+\`\`\`bash
+curl -s --noproxy '*' -X POST ${apiBase}/api/sandboxes/${sandboxId}/browser/upload \\
+  -H 'Content-Type: application/json' -d '{"ref": "e6", "filename": "orders.xlsx"}'
+\`\`\`
+filename 是之前 download 保存的文件名（服务端已存）。也可直接传 base64：
+\`\`\`bash
+# 先把沙箱里的文件 base64 编码再上传
+B64=$(base64 -w0 /workspace/local-file.csv)
+curl -s --noproxy '*' -X POST ${apiBase}/api/sandboxes/${sandboxId}/browser/upload \\
+  -H 'Content-Type: application/json' -d "{\"ref\": \"e6\", \"filename\": \"local-file.csv\", \"contentBase64\": \"$B64\"}"
+\`\`\`
+
+### 16. 截图（返回 base64 JPEG）
 \`\`\`bash
 curl -s --noproxy '*' ${apiBase}/api/sandboxes/${sandboxId}/browser/screenshot
 \`\`\`
+返回 \`{"image": "<base64>", "mimeType": "image/jpeg"}\`。如需查看截图内容：
+\`\`\`bash
+curl -s --noproxy '*' ${apiBase}/api/sandboxes/${sandboxId}/browser/screenshot | python3 -c "import json,sys,base64; open('/workspace/screenshot.jpg','wb').write(base64.b64decode(json.load(sys.stdin)['image']))"
+\`\`\`
+然后用 read 工具查看 \`/workspace/screenshot.jpg\`。**必须保存到 /workspace**（沙箱工作目录），其他路径会触发权限限制。
 
 ## 标准工作流程
 1. \`navigate\` 打开目标页面，然后 \`sleep 2\` 等页面加载
-2. \`snapshot\` 获取可交互元素列表
-3. \`click\` / \`type\` / \`key\` 操作元素
+2. \`snapshot\` 获取页面摘要 + 可交互元素
+3. \`click\` / \`type\` / \`select\` / \`key\` 操作元素
 4. 每次操作后重新 \`snapshot\`（ref 标号会变化）
 5. 用 \`text\` 或 \`state\` 提取结果
 
 ## 注意事项
 - **每次操作后 ref 会失效**，必须重新 snapshot 获取新标号
-- 页面跳转/加载后等待 1-3 秒再 snapshot
-- 如果遇到登录/验证码，用 screenshot 查看页面并告知用户
+- 页面跳转/加载后等待 1-3 秒再 snapshot；动态内容用 \`wait\` 等待元素出现
+- 点击打开新标签页时，用 \`tabs\` + \`switch-tab\` 切换
+- 遇到登录/验证码，用 screenshot 查看页面并告知用户
+- snapshot 里没有的元素可以用 \`eval\` 直接操作 DOM
 - 需要等待时直接用 bash \`sleep N\`
 `
 }
@@ -130,6 +195,7 @@ curl -s --noproxy '*' ${apiBase}/api/sandboxes/${sandboxId}/browser/screenshot
 export async function createAgent(
   config: ServerConfig,
   prompt: string,
+  model?: { providerID: string; modelID: string },
 ): Promise<AgentSession> {
   const sandboxInfo = await createSandbox(config)
   const sandboxId = sandboxInfo.id
@@ -170,7 +236,7 @@ export async function createAgent(
         body: JSON.stringify({
           parts: [{ type: 'text', text: prompt }],
           skills: [SKILL_NAME],
-          model: config.saas.model,
+          model: model ?? config.saas.model,
         }),
       },
     )
@@ -205,6 +271,7 @@ export async function sendAgentMessage(
   config: ServerConfig,
   agentId: string,
   text: string,
+  model?: { providerID: string; modelID: string },
 ): Promise<void> {
   const agent = getAgent(agentId)
   if (!agent) throw new Error(`Agent ${agentId} not found`)
@@ -215,11 +282,24 @@ export async function sendAgentMessage(
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         parts: [{ type: 'text', text }],
-        model: config.saas.model,
+        model: model ?? config.saas.model,
       }),
     },
   )
   if (!res.ok) throw new Error(`send message failed: HTTP ${res.status}`)
+}
+
+export async function abortAgent(
+  config: ServerConfig,
+  agentId: string,
+): Promise<void> {
+  const agent = getAgent(agentId)
+  if (!agent) throw new Error(`Agent ${agentId} not found`)
+  const res = await fetch(
+    `${config.saas.baseUrl}/session/${agent.sessionId}/abort`,
+    { method: 'POST' },
+  )
+  if (!res.ok) throw new Error(`abort failed: HTTP ${res.status}`)
 }
 
 export async function destroyAgent(

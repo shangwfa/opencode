@@ -1,10 +1,13 @@
 import { useState } from 'react'
 import { ArrowUp, Globe, Loader2 } from 'lucide-react'
 import { Button } from './ui/button'
+import ModelSelector from './ModelSelector'
 import { cn } from '../lib/utils'
 
 interface Props {
   onSubmit: (prompt: string) => Promise<void>
+  model: { providerID: string; modelID: string } | null
+  onModelChange: (model: { providerID: string; modelID: string }) => void
 }
 
 const EXAMPLES = [
@@ -13,7 +16,7 @@ const EXAMPLES = [
   '搜索最新的 AI 新闻并整理成列表',
 ]
 
-export default function AgentHome({ onSubmit }: Props) {
+export default function AgentHome({ onSubmit, model, onModelChange }: Props) {
   const [prompt, setPrompt] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
@@ -56,7 +59,10 @@ export default function AgentHome({ onSubmit }: Props) {
             className="w-full resize-none rounded-t-2xl bg-transparent px-4 py-3 text-sm outline-none placeholder:text-muted-foreground"
           />
           <div className="flex items-center justify-between border-t px-3 py-2">
-            <span className="text-xs text-muted-foreground">⌘+Enter 发送</span>
+            <div className="flex items-center gap-2">
+              <ModelSelector value={model} onChange={onModelChange} />
+              <span className="text-xs text-muted-foreground">⌘+Enter 发送</span>
+            </div>
             <Button
               size="icon"
               onClick={handleSubmit}
