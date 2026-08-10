@@ -85,6 +85,13 @@ async function attachSandbox(
     sandboxId: row.id,
     skipHealthCheck: true,
   })
+  // OpenSandbox server 不感知容器被回收，getInfo/connect 都会假阳性成功；
+  // isHealthy 会真正 ping 沙箱 execd，容器已死则返回 false
+  const healthy = await sandbox.isHealthy().catch(() => false)
+  if (!healthy) {
+    await sandbox.close().catch(() => {})
+    throw new Error(`sandbox ${row.id} is not healthy (container gone)`)
+  }
   const vncEndpoint = await sandbox.getEndpoint(6080)
   const cdpEndpoint = await sandbox.getEndpoint(9223)
   const info: SandboxInfo = {

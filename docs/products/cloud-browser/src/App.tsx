@@ -54,6 +54,14 @@ function App() {
     refreshAgents()
   }, [refreshAgents])
 
+  useEffect(() => {
+    if (model) return
+    api
+      .listModels()
+      .then(({ current }) => setModel(current))
+      .catch(() => {})
+  }, [model])
+
   async function handleCreateAgent(prompt: string) {
     setError(null)
     try {

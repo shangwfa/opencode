@@ -87,7 +87,7 @@ export default function VncScreen({ sandboxId, onRebuild }: Props) {
   const showOverlay = state !== 'connected'
 
   return (
-    <div className="relative flex-1 bg-black">
+    <div className="relative flex-1 bg-white">
       <div ref={containerRef} className="h-full w-full" />
       {showOverlay && (
         <div className="absolute inset-0 flex items-center justify-center bg-background/95">
