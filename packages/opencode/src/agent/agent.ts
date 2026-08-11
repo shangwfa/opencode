@@ -42,7 +42,7 @@ import { Location } from "@opencode-ai/core/location"
 import { PluginV2 } from "@opencode-ai/core/plugin"
 
 export const Info = Schema.Struct({
-  name: Schema.String,
+  name: Schema.NonEmptyString,
   description: Schema.optional(Schema.String),
   mode: Schema.Literals(["subagent", "primary", "all"]),
   native: Schema.optional(Schema.Boolean),
@@ -59,7 +59,7 @@ export const Info = Schema.Struct({
   ),
   variant: Schema.optional(Schema.String),
   prompt: Schema.optional(Schema.String),
-  options: Schema.Record(Schema.String, Schema.Unknown),
+  options: Schema.Record(Schema.String, Schema.Json),
   steps: Schema.optional(Schema.Finite),
 }).annotate({ identifier: "Agent" })
 export type Info = DeepMutable<Schema.Schema.Type<typeof Info>>
@@ -71,7 +71,7 @@ const GeneratedAgent = Schema.Struct({
 })
 
 export const CreateInput = Schema.Struct({
-  name: Schema.String,
+  name: Schema.NonEmptyString,
   description: Schema.optional(Schema.String),
   mode: Schema.Literals(["subagent", "primary", "all"]),
   prompt: Schema.optional(Schema.String),
@@ -82,7 +82,7 @@ export const CreateInput = Schema.Struct({
   steps: Schema.optional(Schema.Finite),
   color: Schema.optional(Schema.String),
   variant: Schema.optional(Schema.String),
-  options: Schema.optional(Schema.Record(Schema.String, Schema.Unknown)),
+  options: Schema.optional(Schema.Record(Schema.String, Schema.Json)),
 })
 export type CreateInput = Schema.Schema.Type<typeof CreateInput>
 
@@ -560,8 +560,9 @@ const layer = Layer.effect(
         return base
       }, Effect.orDie),
       sessionCreate: Effect.fn("Agent.sessionCreate")(function* (session: SessionID, input: CreateInput) {
-        if (!Flag.OPENCODE_DATABASE_URL) throw new Error("Session agents are only available in SaaS mode")
-        if (input.name === "compaction" || input.name === "title" || input.name === "summary") {
+        if (!Flag.OPENCODE_DATABASE_URL) return yield* Effect.die("Session agents are only available in SaaS mode")
+        const reserved = new Set(["compaction", "title", "summary", "build", "plan", "general", "explore"])
+        if (reserved.has(input.name)) {
           throw new InvalidError({ message: `Cannot override internal agent: ${input.name}` })
         }
         const custom = input.permission ? Permission.fromConfig(input.permission) : []
@@ -569,15 +570,15 @@ const layer = Layer.effect(
         const permission = Permission.merge(user, custom)
         const row = yield* sessionAgent.upsert(session, { ...input, permission })
         return mergeInfo(row, yield* InstanceState.useEffect(state, (s) => s.get(input.name)))
-      }, Effect.orDie),
+      }),
       sessionUnload: Effect.fn("Agent.sessionUnload")(function* (session: SessionID, name: string) {
-        if (!Flag.OPENCODE_DATABASE_URL) throw new Error("Session agents are only available in SaaS mode")
+        if (!Flag.OPENCODE_DATABASE_URL) return yield* Effect.die("Session agents are only available in SaaS mode")
         yield* sessionAgent.remove(session, name)
-      }, Effect.orDie),
+      }),
       sessionClear: Effect.fn("Agent.sessionClear")(function* (session: SessionID) {
-        if (!Flag.OPENCODE_DATABASE_URL) throw new Error("Session agents are only available in SaaS mode")
+        if (!Flag.OPENCODE_DATABASE_URL) return yield* Effect.die("Session agents are only available in SaaS mode")
         yield* sessionAgent.removeAll(session)
-      }, Effect.orDie),
+      }),
     })
   }),
 )

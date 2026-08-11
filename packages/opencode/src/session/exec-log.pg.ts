@@ -5,6 +5,53 @@ import type { SessionID } from "./schema"
 import * as Database from "../storage/db"
 import { eq, desc } from "drizzle-orm"
 
+export type ExecLogSource =
+  | "exec"
+  | "exec-async"
+  | "keep-alive"
+  | "kill-sandbox"
+  | "patch"
+  | "agent-create"
+  | "agent-delete"
+  | "agent-clear"
+  | "session-create"
+  | "session-delete"
+  | "session-fork"
+  | "session-abort"
+  | "session-init"
+  | "session-share"
+  | "session-unshare"
+  | "session-summarize"
+  | "session-prompt"
+  | "session-prompt-async"
+  | "session-command"
+  | "session-shell"
+  | "session-revert"
+  | "session-unrevert"
+  | "permission-respond"
+  | "message-delete"
+  | "part-delete"
+  | "part-update"
+  | "skill-create"
+  | "skill-load"
+  | "skill-delete"
+  | "skill-clear"
+  | "mcp-create"
+  | "mcp-delete"
+  | "mcp-clear"
+  | "tool-create"
+  | "tool-delete"
+  | "tool-clear"
+  | "command-create"
+  | "command-delete"
+  | "command-clear"
+  | "agentsmd-create"
+  | "agentsmd-clear"
+  | "plugin-create"
+  | "plugin-delete"
+  | "plugin-clear"
+  | "dotopencode-load"
+
 export const ExecLogTable = pgTable(
   "exec_log",
   {
@@ -20,7 +67,7 @@ export const ExecLogTable = pgTable(
     stdout: text(),
     stderr: text(),
     error: text(),
-    source: text().$type<"exec" | "exec-async" | "keep-alive" | "kill-sandbox" | "patch">().notNull(),
+    source: text().$type<ExecLogSource>().notNull(),
     time_started: bigint({ mode: "number" }).notNull(),
     time_finished: bigint({ mode: "number" }),
     ...Timestamps,
