@@ -16,6 +16,7 @@ db.exec(`
     prompt TEXT NOT NULL,
     title TEXT NOT NULL,
     status TEXT NOT NULL,
+    mode TEXT NOT NULL DEFAULT 'playwright',
     created_at TEXT NOT NULL
   );
 
@@ -30,3 +31,9 @@ db.exec(`
     new_id TEXT NOT NULL
   );
 `)
+
+try {
+  db.exec("ALTER TABLE agent ADD COLUMN mode TEXT NOT NULL DEFAULT 'playwright'")
+} catch {
+  // column already exists
+}

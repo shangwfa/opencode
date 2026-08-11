@@ -11,6 +11,7 @@ export interface ServerConfig {
   }
   agent: {
     apiBase: string
+    browserMode: 'playwright' | 'agent-browser'
   }
 }
 
@@ -32,6 +33,7 @@ export function loadServerConfig(env: Record<string, string | undefined>): Serve
     },
     agent: {
       apiBase: env.CLOUD_BROWSER_API_BASE ?? 'http://host.docker.internal:5173',
+      browserMode: (env.AGENT_BROWSER_MODE as 'playwright' | 'agent-browser') ?? 'playwright',
     },
   }
 }

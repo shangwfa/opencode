@@ -8,7 +8,11 @@ RUN apt-get update \
         fonts-noto-color-emoji \
         websockify \
         socat \
+        nodejs \
+        npm \
     && rm -rf /var/lib/apt/lists/*
+
+RUN npm install -g agent-browser
 
 COPY --chmod=755 cloud-browser-entrypoint.sh /cloud-browser-entrypoint.sh
 

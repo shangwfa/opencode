@@ -62,10 +62,10 @@ function App() {
       .catch(() => {})
   }, [model])
 
-  async function handleCreateAgent(prompt: string) {
+  async function handleCreateAgent(prompt: string, mode?: 'playwright' | 'agent-browser') {
     setError(null)
     try {
-      const agent = await api.createAgent(prompt, model ?? undefined)
+      const agent = await api.createAgent(prompt, model ?? undefined, mode)
       await refreshAgents()
       setActiveAgentId(agent.id)
       setView('agent')

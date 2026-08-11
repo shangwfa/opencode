@@ -1,11 +1,11 @@
 import { useState } from 'react'
-import { ArrowUp, Globe, Loader2 } from 'lucide-react'
+import { ArrowUp, Globe, Loader2, Terminal, Cpu } from 'lucide-react'
 import { Button } from './ui/button'
 import ModelSelector from './ModelSelector'
 import { cn } from '../lib/utils'
 
 interface Props {
-  onSubmit: (prompt: string) => Promise<void>
+  onSubmit: (prompt: string, mode?: 'playwright' | 'agent-browser') => Promise<void>
   model: { providerID: string; modelID: string } | null
   onModelChange: (model: { providerID: string; modelID: string }) => void
 }
@@ -19,13 +19,14 @@ const EXAMPLES = [
 export default function AgentHome({ onSubmit, model, onModelChange }: Props) {
   const [prompt, setPrompt] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [mode, setMode] = useState<'playwright' | 'agent-browser'>('playwright')
 
   async function handleSubmit() {
     const text = prompt.trim()
     if (!text || submitting) return
     setSubmitting(true)
     try {
-      await onSubmit(text)
+      await onSubmit(text, mode)
     } finally {
       setSubmitting(false)
     }
@@ -61,6 +62,32 @@ export default function AgentHome({ onSubmit, model, onModelChange }: Props) {
           <div className="flex items-center justify-between border-t px-3 py-2">
             <div className="flex items-center gap-2">
               <ModelSelector value={model} onChange={onModelChange} />
+              <div className="flex items-center gap-0.5 rounded-lg border bg-muted/50 p-0.5">
+                <button
+                  onClick={() => setMode('playwright')}
+                  className={cn(
+                    'flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition-colors',
+                    mode === 'playwright'
+                      ? 'bg-card text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground',
+                  )}
+                >
+                  <Cpu className="size-3" />
+                  Playwright
+                </button>
+                <button
+                  onClick={() => setMode('agent-browser')}
+                  className={cn(
+                    'flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition-colors',
+                    mode === 'agent-browser'
+                      ? 'bg-card text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground',
+                  )}
+                >
+                  <Terminal className="size-3" />
+                  agent-browser
+                </button>
+              </div>
               <span className="text-xs text-muted-foreground">⌘+Enter 发送</span>
             </div>
             <Button

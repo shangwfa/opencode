@@ -11,6 +11,7 @@ export interface AgentSession {
   title: string
   createdAt: string
   status: 'running' | 'idle' | 'error'
+  mode: 'playwright' | 'agent-browser'
 }
 
 interface AgentRow {
@@ -21,6 +22,7 @@ interface AgentRow {
   prompt: string
   title: string
   status: string
+  mode: string
   created_at: string
 }
 
@@ -36,10 +38,11 @@ function rowToAgent(row: AgentRow): AgentSession {
     title: row.title,
     createdAt: row.created_at,
     status: row.status as AgentSession['status'],
+    mode: (row.mode ?? 'playwright') as 'playwright' | 'agent-browser',
   }
 }
 
-function buildSkillContent(sandboxId: string, apiBase: string): string {
+function buildPlaywrightSkillContent(sandboxId: string, apiBase: string): string {
   return `---
 name: cloud-browser
 description: 控制云端 Chrome 浏览器完成网页任务：打开页面、读取内容、点击、输入、滚动、截图。当任务需要访问/操作网页时使用。
@@ -159,7 +162,6 @@ curl -s --noproxy '*' -X POST ${apiBase}/api/sandboxes/${sandboxId}/browser/uplo
 \`\`\`
 filename 是之前 download 保存的文件名（服务端已存）。也可直接传 base64：
 \`\`\`bash
-# 先把沙箱里的文件 base64 编码再上传
 B64=$(base64 -w0 /workspace/local-file.csv)
 curl -s --noproxy '*' -X POST ${apiBase}/api/sandboxes/${sandboxId}/browser/upload \\
   -H 'Content-Type: application/json' -d "{\"ref\": \"e6\", \"filename\": \"local-file.csv\", \"contentBase64\": \"$B64\"}"
@@ -192,10 +194,97 @@ curl -s --noproxy '*' ${apiBase}/api/sandboxes/${sandboxId}/browser/screenshot |
 `
 }
 
+function buildAgentBrowserSkillContent(sandboxId: string, apiBase: string): string {
+  const cdpWsUrl = apiBase.replace('http://', 'ws://') + `/ws/cdp/${sandboxId}`
+  return `---
+name: cloud-browser
+description: 控制云端 Chrome 浏览器完成网页任务：打开页面、读取内容、点击、输入、滚动、截图。使用 agent-browser CLI 直接连接 CDP。
+---
+
+# Cloud Browser 浏览器控制（agent-browser 直连）
+
+本机的 \`agent-browser\` CLI 已安装（版本 0.33.2），可以直接通过 CDP 连接控制云端 Chrome 浏览器。
+
+**当前浏览器 sandbox id**: \`${sandboxId}\`
+
+## 连接方式
+
+### 第一步：连接 CDP
+\`\`\`bash
+agent-browser connect ${cdpWsUrl}
+\`\`\`
+
+### 第二步：打开网页
+\`\`\`bash
+agent-browser open https://example.com
+\`\`\`
+
+### 第三步：获取可交互元素
+\`\`\`bash
+agent-browser wait --load networkidle && agent-browser snapshot -i
+\`\`\`
+
+### 第四步：交互
+\`\`\`bash
+agent-browser click @e1
+agent-browser fill @e2 "text"
+agent-browser press Enter
+agent-browser scroll down 500
+\`\`\`
+
+### 截图
+\`\`\`bash
+agent-browser screenshot --annotate
+\`\`\`
+
+### 获取页面信息
+\`\`\`bash
+agent-browser get url
+agent-browser get title
+agent-browser get text @e1
+\`\`\`
+
+### 等待
+\`\`\`bash
+agent-browser wait --load networkidle
+agent-browser wait @e1
+agent-browser wait 2000
+\`\`\`
+
+### 执行 JavaScript
+\`\`\`bash
+agent-browser eval 'document.title'
+\`\`\`
+
+## 多浏览器控制（可选）
+
+\`\`\`bash
+# 创建新沙箱
+curl -s --noproxy '*' -X POST ${cdpWsUrl.replace('/ws/cdp/', '/api/sandboxes/').replace('ws://', 'http://').split('/api')[0] + '/api/sandboxes'}
+
+# 用 --session 区分不同浏览器
+agent-browser --session B connect ws://host:port/ws/cdp/<new-sandbox-id>
+agent-browser --session B open https://other-site.com
+\`\`\`
+
+## 注意事项
+- 先 \`connect\` 再执行其他命令
+- 每次操作后 ref 会失效，重新 \`snapshot -i\`
+- 截图保存到 \`/workspace\` 后用 read 工具查看
+`
+}
+
+function buildSkillContent(sandboxId: string, apiBase: string, mode: 'playwright' | 'agent-browser'): string {
+  if (mode === 'agent-browser') {
+    return buildAgentBrowserSkillContent(sandboxId, apiBase)
+  }
+  return buildPlaywrightSkillContent(sandboxId, apiBase)
+}
 export async function createAgent(
   config: ServerConfig,
   prompt: string,
   model?: { providerID: string; modelID: string },
+  mode?: 'playwright' | 'agent-browser',
 ): Promise<AgentSession> {
   const sandboxInfo = await createSandbox(config)
   const sandboxId = sandboxInfo.id
@@ -211,6 +300,8 @@ export async function createAgent(
     }
     const session = (await sessionRes.json()) as { id: string; directory?: string }
 
+    const resolvedMode = mode ?? config.agent.browserMode
+
     const skillRes = await fetch(
       `${config.saas.baseUrl}/session/${session.id}/skills/create`,
       {
@@ -220,7 +311,7 @@ export async function createAgent(
           name: SKILL_NAME,
           description:
             '控制云端 Chrome 浏览器完成网页任务：打开页面、读取内容、点击、输入、滚动、截图。当任务需要访问/操作网页时使用。',
-          content: buildSkillContent(sandboxId, config.agent.apiBase),
+          content: buildSkillContent(sandboxId, config.agent.apiBase, resolvedMode),
         }),
       },
     )
@@ -246,8 +337,8 @@ export async function createAgent(
 
     const createdAt = new Date().toISOString()
     db.prepare(
-      `INSERT INTO agent (id, sandbox_id, session_id, directory, prompt, title, status, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO agent (id, sandbox_id, session_id, directory, prompt, title, status, mode, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(
       session.id,
       sandboxId,
@@ -256,10 +347,11 @@ export async function createAgent(
       prompt,
       prompt.slice(0, 30),
       'running',
+      resolvedMode,
       createdAt,
     )
 
-    console.log(`[agent] created: ${session.id}, sandbox: ${sandboxId}`)
+    console.log(`[agent] created: ${session.id}, sandbox: ${sandboxId}, mode: ${resolvedMode}`)
     return getAgent(session.id)!
   } catch (err) {
     await destroySandbox(sandboxId).catch(() => {})
@@ -357,7 +449,7 @@ export async function rebuildAgentBrowser(
         name: SKILL_NAME,
         description:
           '控制云端 Chrome 浏览器完成网页任务：打开页面、读取内容、点击、输入、滚动、截图。当任务需要访问/操作网页时使用。',
-        content: buildSkillContent(newSandboxId, config.agent.apiBase),
+        content: buildSkillContent(newSandboxId, config.agent.apiBase, agent.mode),
       }),
     },
   ).catch((err) => console.warn('[agent] skill re-register failed:', err))

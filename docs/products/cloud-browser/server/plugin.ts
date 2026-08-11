@@ -226,6 +226,7 @@ async function handleBrowserApi(
   }
 }
 
+
 function proxySaasSse(
   req: IncomingMessage,
   res: ServerResponse,
@@ -356,12 +357,14 @@ async function handleApi(
         return true
       }
       const model = body.model as { providerID?: string; modelID?: string } | undefined
+      const mode = body.mode === 'agent-browser' ? 'agent-browser' as const : 'playwright' as const
       const agent = await createAgent(
         config,
         prompt,
         model?.providerID && model.modelID
           ? { providerID: model.providerID, modelID: model.modelID }
           : undefined,
+        mode,
       )
       json(res, 201, agent)
       return true
@@ -517,20 +520,35 @@ function setupWebSocketForwarding(server: ViteDevServer, config: ServerConfig) {
 
   httpServer.on('upgrade', (request, socket, head) => {
     const url = new URL(request.url ?? '/', `http://${request.headers.host}`)
-    if (!url.pathname.startsWith('/ws/vnc/')) return
-
-    const id = url.pathname.split('/').pop() ?? ''
-
-    void requireSandbox(config, id).then((entry) => {
-      if (!entry) {
-        socket.write('HTTP/1.1 403 Forbidden\r\n\r\n')
-        socket.destroy()
-        return
-      }
-      wss.handleUpgrade(request, socket, head, (ws) => {
-        forwardVncConnection(ws, request, entry, config)
+    if (url.pathname.startsWith('/ws/vnc/')) {
+      const id = url.pathname.split('/').pop() ?? ''
+      void requireSandbox(config, id).then((entry) => {
+        if (!entry) {
+          socket.write('HTTP/1.1 403 Forbidden\r\n\r\n')
+          socket.destroy()
+          return
+        }
+        wss.handleUpgrade(request, socket, head, (ws) => {
+          forwardVncConnection(ws, request, entry, config)
+        })
       })
-    })
+      return
+    }
+
+    if (url.pathname.startsWith('/ws/cdp/')) {
+      const id = url.pathname.split('/').pop() ?? ''
+      void requireSandbox(config, id).then((entry) => {
+        if (!entry) {
+          socket.write('HTTP/1.1 403 Forbidden\r\n\r\n')
+          socket.destroy()
+          return
+        }
+        wss.handleUpgrade(request, socket, head, (ws) => {
+          forwardCdpConnection(ws, request, entry, config)
+        })
+      })
+      return
+    }
   })
 
   return wss
@@ -588,6 +606,107 @@ function forwardVncConnection(
   upstream.on('close', closeBoth)
   ws.on('error', closeBoth)
   ws.on('close', closeBoth)
+}
+
+function forwardCdpConnection(
+  ws: WebSocket,
+  request: IncomingMessage,
+  entry: SandboxEntry,
+  config: ServerConfig,
+) {
+  const url = new URL(request.url ?? '/', `http://${request.headers.host}`)
+  const id = url.pathname.split('/').pop() ?? ''
+
+  const cdpTarget = new URL(`http://${entry.cdpEndpoint.endpoint}`)
+  const headers = {
+    'OPEN-SANDBOX-API-KEY': config.sandbox.apiKey,
+    ...entry.cdpEndpoint.headers,
+  }
+
+  let upstream: WebSocket | null = null
+  let upstreamReady = false
+  const pendingMessages: Array<{ data: WebSocket.RawData; isBinary: boolean }> = []
+
+  // 立即注册客户端消息（先缓存，等 upstream 就绪后转发）
+  ws.on('message', (data, isBinary) => {
+    if (upstreamReady && upstream && upstream.readyState === WebSocket.OPEN) {
+      upstream.send(data, { binary: isBinary })
+    } else {
+      pendingMessages.push({ data, isBinary })
+    }
+  })
+
+  ws.on('error', () => {})
+  ws.on('close', () => {
+    if (upstream && upstream.readyState === WebSocket.OPEN) upstream.close()
+  })
+
+  // 1. 通过 HTTP 发现 CDP WebSocket URL
+  const discoverPath = `${cdpTarget.pathname}/json/version`
+  console.log(`[cdp] discovering: ${cdpTarget.hostname}:${cdpTarget.port}${discoverPath}`)
+  const discoverReq = httpRequest(
+    {
+      hostname: cdpTarget.hostname,
+      port: cdpTarget.port,
+      path: discoverPath,
+      method: 'GET',
+      headers,
+      timeout: 10000,
+    },
+    (discoverRes) => {
+      let body = ''
+      discoverRes.on('data', (chunk: string) => { body += chunk })
+      discoverRes.on('end', () => {
+        try {
+          const info = JSON.parse(body) as { webSocketDebuggerUrl?: string }
+          const wsUrl = info.webSocketDebuggerUrl
+          console.log(`[cdp] discovered wsUrl: ${wsUrl}`)
+          if (!wsUrl) {
+            console.error(`[cdp] no webSocketDebuggerUrl for ${id}`)
+            ws.close()
+            return
+          }
+          const wsPath = new URL(wsUrl).pathname
+          const upstreamUrl = `ws://${entry.cdpEndpoint.endpoint}${wsPath}`
+          console.log(`[cdp] connecting upstream: ${upstreamUrl}`)
+          upstream = new WebSocket(upstreamUrl, undefined, { headers })
+
+          upstream.on('open', () => {
+            console.log(`[cdp] connected: ${id}`)
+            upstreamReady = true
+            // 转发缓存的客户端消息
+            for (const msg of pendingMessages) {
+              upstream!.send(msg.data, { binary: msg.isBinary })
+            }
+            pendingMessages.length = 0
+          })
+
+          upstream.on('message', (data, isBinary) => {
+            if (ws.readyState === WebSocket.OPEN) {
+              ws.send(data, { binary: isBinary })
+            }
+          })
+
+          upstream.on('error', (err) => {
+            console.error(`[cdp] upstream error (${id}):`, err.message, `url=${upstreamUrl}`)
+            ws.close()
+          })
+          upstream.on('close', () => {
+            if (ws.readyState === WebSocket.OPEN) ws.close()
+          })
+        } catch (err) {
+          console.error(`[cdp] parse error (${id}):`, err)
+          ws.close()
+        }
+      })
+    },
+  )
+
+  discoverReq.on('error', (err) => {
+    console.error(`[cdp] discover error (${id}):`, err.message, `path=${discoverPath}`)
+    ws.close()
+  })
+  discoverReq.end()
 }
 
 export function cloudBrowser(): Plugin {

@@ -7,6 +7,7 @@ export interface Agent {
   title: string
   createdAt: string
   status: 'running' | 'idle' | 'error'
+  mode: 'playwright' | 'agent-browser'
 }
 
 export interface MessagePart {
@@ -46,10 +47,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   listAgents: () => request<Agent[]>('/api/agents'),
-  createAgent: (prompt: string, model?: { providerID: string; modelID: string }) =>
+  createAgent: (prompt: string, model?: { providerID: string; modelID: string }, mode?: 'playwright' | 'agent-browser') =>
     request<Agent>('/api/agents', {
       method: 'POST',
-      body: JSON.stringify({ prompt, ...(model ? { model } : {}) }),
+      body: JSON.stringify({ prompt, ...(model ? { model } : {}), ...(mode ? { mode } : {}) }),
     }),
   getAgent: (id: string) => request<Agent>(`/api/agents/${id}`),
   deleteAgent: (id: string) =>
