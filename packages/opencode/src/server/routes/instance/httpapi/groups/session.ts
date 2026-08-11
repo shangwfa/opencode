@@ -675,6 +675,7 @@ export const SessionApi = HttpApi.make("session")
           query: WorkspaceRoutingQuery,
           payload: AgentCreatePayload,
           success: described(Agent.Info, "Created session agent"),
+          error: [HttpApiError.BadRequest, ApiNotFoundError],
         }).annotateMerge(
           OpenApi.annotations({
             identifier: "session.agents.create",

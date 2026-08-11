@@ -144,6 +144,203 @@ console.log("poet count:", agents.filter(a => a.name === "poet").length, "(expec
 > **PG 验证**：`docker exec ai-nova-postgres psql -U postgres -d opencode -c "SELECT description, temperature FROM session_agents WHERE session_id='$SID' AND name='poet';"`+ `docker exec ai-nova-postgres psql -U postgres -d opencode -t -A -c "SELECT COUNT(*) FROM session_agents WHERE session_id='$SID' AND name='poet';"`
 > 期望：description=更新版-七言律诗, temperature=0.7, COUNT=1
 
+### T16.3a 全字段更新验证（含 permission 对象格式、model、color）
+
+**验证目标**：创建带完整字段（permission 对象格式、model、color、temperature）的 agent，然后同名更新所有字段，验证更新在 API 响应和 PG 中都生效
+
+```bash
+bun -e '
+const BASE = "http://localhost:14096"
+const SID = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) })).json()
+console.log("SID:", SID.id)
+
+// Step 1: 创建完整 agent
+const created = await (await fetch(BASE + "/session/" + SID.id + "/agents/create", {
+  method: "POST", headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    name: "troubleshooter",
+    description: "旧版-问题排查 Agent",
+    mode: "primary",
+    prompt: "你是旧版 troubleshooter，只分析不修改。",
+    temperature: 0.3,
+    color: "#ef4444",
+    permission: {
+      read: "allow",
+      bash: "allow",
+      grep: "allow",
+      glob: "allow",
+      edit: "deny",
+      write: "deny",
+      task: "allow",
+      external_directory: { "/tmp/opencode/**": "allow", "/*": "allow" },
+    },
+    model: { providerID: "zhipuai", modelID: "glm-5.1" },
+  }),
+})).json()
+console.log("Step1 created:", created.name, "desc:", created.description)
+console.log("Step1 permission count:", created.permission?.length || "N/A")
+console.log("Step1 model:", JSON.stringify(created.model))
+console.log("Step1 color:", created.color)
+
+// 验证 PG 写入
+const pg1 = await (await fetch(BASE + "/session/" + SID.id + "/agents")).json()
+const pgAgent1 = pg1.find(a => a.name === "troubleshooter")
+console.log("Step1 PG verify:", pgAgent1 ? pgAgent1.description : "NOT FOUND")
+
+// Step 2: 同名更新所有字段
+const updated = await (await fetch(BASE + "/session/" + SID.id + "/agents/create", {
+  method: "POST", headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    name: "troubleshooter",
+    description: "新版-问题排查 Agent（支持三层超时、CodeGraph 优先、xbot-v3 优先扫描）",
+    mode: "primary",
+    prompt: "你是新版 troubleshooter。\n\n## 三层超时规则\n--connect-timeout < --max-time < timeout < 120\n\n## 优先使用 CodeGraph\n先符号后文本\n\n## 仓库扫描优先级\n只扫描 xbot-v3\n\n## 强制证据格式\n日志文件名: 第X行 [HH:MM:SS] -> 现象 -> 推断\n\n## 输出模板\n结论 -> 关键证据 -> 根因 -> 排查建议 -> 修复建议",
+    temperature: 0.2,
+    color: "#ff0000",
+    permission: {
+      read: "allow",
+      bash: { "*": "allow", "*mkdir -p /tmp/opencode*": "allow" },
+      grep: "allow",
+      glob: "allow",
+      edit: "deny",
+      write: "deny",
+      task: "allow",
+      external_directory: {
+        "/tmp/opencode/**": "allow",
+        "/tmp/opencode/*": "allow",
+        "/tmp/opencode/extracted/*": "allow",
+        "/*": "allow",
+      },
+    },
+    model: { providerID: "moonshotai-cn", modelID: "kimi-k2.7-code" },
+  }),
+})).json()
+console.log("Step2 updated desc:", updated.description)
+console.log("Step2 updated temp:", updated.temperature)
+console.log("Step2 updated color:", updated.color)
+console.log("Step2 updated model:", JSON.stringify(updated.model))
+console.log("Step2 permission count:", updated.permission?.length || "N/A")
+
+// 验证更新后数据
+const pass = (
+  updated.description !== "旧版-问题排查 Agent" &&
+  updated.temperature === 0.2 &&
+  updated.color === "#ff0000" &&
+  updated.model?.modelID === "kimi-k2.7-code"
+)
+console.log("Step2 字段更新正确:", pass)
+
+// 验证列表中仍只有 1 个同名 agent
+const agents = await (await fetch(BASE + "/session/" + SID.id + "/agents")).json()
+const troubleshooterAgents = agents.filter(a => a.name === "troubleshooter")
+console.log("同名 agent 数量:", troubleshooterAgents.length, "(expect 1)")
+
+// Step 3: 验证更新后 prompt 和 permission 完整
+const fromList = troubleshooterAgents[0]
+console.log("Step3 prompt 包含三层超时:", fromList.prompt?.includes("三层超时"))
+console.log("Step3 permission 包含 bash 粒度:", JSON.stringify(fromList.permission).includes("*mkdir -p"))
+console.log("Step3 external_directory 包含 extracted:", JSON.stringify(fromList.permission).includes("extracted"))
+'
+```
+**期望**：Step1 创建成功，Step2 所有字段更新，`temperature=0.2`、`color=#ff0000`、`model.modelID="kimi-k2.7-code"`，列表中同名 agent 只有 1 个，prompt/permission 完整保留
+
+> **PG 验证**：`PGPASSWORD=8zuhlMLd4gaeUG5k psql -h 172.18.32.14 -p 5432 -U app -d opencode -c "SELECT name, description, temperature, color, model, jsonb_array_length(permission) as perm_count FROM session_agents WHERE session_id='$SID' AND name='troubleshooter';" -x`
+> 期望：description 为新版，temperature=0.2，color=#ff0000，model 含 kimi-k2.7-code，perm_count>=6
+>
+> **exec_log 验证**：`PGPASSWORD=8zuhlMLd4gaeUG5k psql -h 172.18.32.14 -p 5432 -U app -d opencode -c "SELECT source, command FROM exec_log WHERE session_id='$SID' AND source IN ('agent-create','agent-delete','agent-clear') ORDER BY time_created;"`
+> 期望：agent-create 2 条（创建+更新），source 分别为 `agent-create`
+
+### T16.3b 更新后 agent 实际生效验证
+
+**验证目标**：同名更新 agent 后，用新 agent 发送消息验证使用的是新 prompt
+
+```bash
+bun -e '
+const BASE = "http://localhost:14096"
+const MODEL = { providerID: "zhipuai", modelID: "glm-5.1" }
+const SID = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) })).json()
+console.log("SID:", SID.id)
+
+// 创建 agent - 旧版 prompt
+await fetch(BASE + "/session/" + SID.id + "/agents/create", {
+  method: "POST", headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    name: "test-agent", description: "测试用", mode: "primary",
+    prompt: "你是一个测试 agent。无论用户说什么，你都回复：OLD_VERSION",
+    temperature: 0.3,
+  }),
+})
+
+// 更新为新版 prompt
+await fetch(BASE + "/session/" + SID.id + "/agents/create", {
+  method: "POST", headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    name: "test-agent", description: "测试用-已更新", mode: "primary",
+    prompt: "你是一个测试 agent。无论用户说什么，你都回复：NEW_VERSION",
+    temperature: 0.3,
+  }),
+})
+
+// 发消息验证使用的是新 prompt
+async function sendAndWait(sid, body, timeout = 60000) {
+  return new Promise(async (resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("timeout")), timeout)
+    const eventRes = await fetch(BASE + "/event?sessionID=" + sid)
+    const reader = eventRes.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ""
+    const readLoop = async () => {
+      while (true) {
+        const { value, done } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        while (buffer.includes("\n")) {
+          const idx = buffer.indexOf("\n")
+          const line = buffer.slice(0, idx)
+          buffer = buffer.slice(idx + 1)
+          if (line.startsWith("data: ")) {
+            try {
+              const evt = JSON.parse(line.slice(6))
+              if (evt.type === "server.connected" || evt.type === "server.heartbeat") continue
+              if (evt.type === "session.idle") {
+                const s = evt.properties?.sessionID || evt.sessionID
+                if (!s || s === sid) {
+                  clearTimeout(timer)
+                  const msgs = await (await fetch(BASE + "/session/" + sid + "/message")).json()
+                  const lastAi = [...msgs].reverse().find(m => m.info?.role === "assistant")
+                  reader.cancel()
+                  resolve(lastAi)
+                  return
+                }
+              }
+            } catch {}
+          }
+        }
+      }
+    }
+    readLoop()
+    await fetch(BASE + "/session/" + sid + "/prompt_async", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    })
+  })
+}
+
+const msg = await sendAndWait(SID.id, {
+  parts: [{ type: "text", text: "hello" }],
+  agent: "test-agent", model: MODEL,
+})
+const text = msg.parts.filter(p => p.type === "text").map(p => p.text).join("")
+console.log("AI回复:", text.slice(0, 200))
+console.log("使用新版 prompt:", text.includes("NEW_VERSION"))
+console.log("未使用旧版 prompt:", !text.includes("OLD_VERSION"))
+'
+```
+**期望**：AI 回复包含 `NEW_VERSION`，不包含 `OLD_VERSION`，证明更新后的 agent prompt 实际生效
+
+> **PG 验证**：`PGPASSWORD=8zuhlMLd4gaeUG5k psql -h 172.18.32.14 -p 5432 -U app -d opencode -c "SELECT name, description, prompt FROM session_agents WHERE session_id='$SID' AND name='test-agent';" -x`
+> 期望：prompt 包含 NEW_VERSION
+
 ### T16.4 删除单个会话 agent
 
 ```bash
@@ -205,6 +402,7 @@ await fetch(BASE + "/session/" + SID.id + "/agents/create", {
   body: JSON.stringify({
     name: "analyst", description: "数据分析师", mode: "primary",
     prompt: "你是一个数据分析师。无论用户问什么，你都用 JSON 格式回答。", temperature: 0.3,
+    permission: { read: "allow", bash: "allow", grep: "allow", glob: "allow" },
   }),
 })
 
@@ -656,22 +854,23 @@ console.log("Session:", SID.id)
 
 await fetch(BASE + "/session/" + SID.id + "/agents/create", {
   method: "POST", headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ name: "manager", description: "项目经理", mode: "primary", prompt: "你是项目经理。用 @translator 调用翻译子 agent，用 @coder 调用代码子 agent。", temperature: 0.3 }),
+  body: JSON.stringify({ name: "manager", description: "项目经理", mode: "primary", prompt: "你是项目经理。用 @translator 调用翻译子 agent，用 @coder 调用代码子 agent。", temperature: 0.3, permission: { read: "allow", bash: "allow", grep: "allow", glob: "allow", task: "allow" } }),
 })
 await fetch(BASE + "/session/" + SID.id + "/agents/create", {
   method: "POST", headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ name: "translator", description: "翻译专家", mode: "subagent", prompt: "翻译成地道英文，只输出结果。", temperature: 0.5 }),
+  body: JSON.stringify({ name: "translator", description: "翻译专家", mode: "subagent", prompt: "翻译成地道英文，只输出结果。", temperature: 0.5, permission: { read: "allow", bash: "allow" } }),
 })
 await fetch(BASE + "/session/" + SID.id + "/agents/create", {
   method: "POST", headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ name: "coder", description: "代码专家", mode: "subagent", prompt: "写 Python 代码，只输出代码。", temperature: 0.4 }),
+  body: JSON.stringify({ name: "coder", description: "代码专家", mode: "subagent", prompt: "写 Python 代码，只输出代码。", temperature: 0.4, permission: { read: "allow", bash: "allow" } }),
 })
 
 const agents = await (await fetch(BASE + "/session/" + SID.id + "/agents")).json()
 const custom = agents.filter(a => ["manager", "translator", "coder"].includes(a.name))
 console.log("自定义agent数:", custom.length, "(expect 3)")
 
-async function sendAndWait(sid, body, timeout = 60000) {
+// 多 agent 协作较慢，需要 300s 超时
+async function sendAndWait(sid, body, timeout = 300000) {
   return new Promise(async (resolve, reject) => {
     const timer = setTimeout(() => reject(new Error("timeout")), timeout)
     const eventRes = await fetch(BASE + "/event?sessionID=" + sid)
@@ -812,7 +1011,7 @@ async function sendAndWait(sid, body, timeout = 60000) {
             const e = JSON.parse(line.slice(6))
             logEvent(e)
             if (!matchSession(e)) continue
-            if (e.type === "finish") {
+            if (e.type === "session.idle") {
               clearTimeout(timer)
               const msgs = await (await fetch(BASE + "/session/" + sid + "/message")).json()
               const lastAi = msgs.filter(m => m.info.role === "assistant").pop()
@@ -842,6 +1041,7 @@ async function test() {
       description: "A session-level translator agent",
       mode: "all",
       prompt: "You are a translator. Translate user text to English. Only output the translation, nothing else.",
+      permission: { read: "allow", bash: "allow" },
     }),
   })
   console.log("创建 agent:", agentRes.status)
@@ -899,7 +1099,7 @@ async function sendAndWait(sid, body, timeout = 60000) {
             const e = JSON.parse(line.slice(6))
             if (e.type === "server.connected" || e.type === "server.heartbeat") continue
             console.log("  [SSE] " + e.type)
-            if (e.type === "finish") {
+            if (e.type === "session.idle") {
               clearTimeout(timer)
               const msgs = await (await fetch(BASE + "/session/" + sid + "/message")).json()
               const lastAi = msgs.filter(m => m.info.role === "assistant").pop()
@@ -930,6 +1130,7 @@ async function test() {
       prompt: "You are a creative writer. Write exactly one haiku about the topic.",
       model: CUSTOM_MODEL,
       temperature: 0.9,
+      permission: { read: "allow", bash: "allow" },
     }),
   })
   console.log("创建 agent:", agentRes.status)
