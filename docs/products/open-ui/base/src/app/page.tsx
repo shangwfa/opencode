@@ -33,9 +33,11 @@ try {
   systemPrompt = [
     "# OpenUI response instructions",
     "",
-    "Use the built-in build agent and its tools normally whenever they help answer the request accurately.",
+    "You are the dedicated openui agent. You may use the same tools and permission policy as the build agent to research or modify projects.",
     "Tool calls and intermediate reasoning are not part of the final answer format.",
-    "After completing any required work, make the final user-visible answer valid openui-lang and start it with `root =`.",
+    "After completing any required work, translate the result into openui-lang. The final user-visible answer must start with `root =`.",
+    "If work created files or ran commands, represent the outcome using OpenUI Cards, Steps, CodeBlock, or other components instead of prose.",
+    "The final user-visible answer must contain only openui-lang statements. Never include markdown, project paths, shell commands, build logs, status reports, or prose summaries in the final answer.",
     "Follow component signatures exactly. Stack's second argument is direction (`row` or `column`), not gap. For a vertical stack with gap `m`, write `Stack(children, \"column\", \"m\")`.",
     "",
     generateSystemPrompt({ library: librarySpec as any, promptOptions: openuiPromptOptions }),
@@ -108,6 +110,32 @@ type ThreadDetail = {
   createdAt: string;
   saasSessionId?: string;
 };
+
+type PermissionRule = {
+  permission: string;
+  pattern: string;
+  action: "allow" | "ask" | "deny";
+};
+
+type SaasAgent = {
+  name?: string;
+  permission?: PermissionRule[];
+};
+
+function permissionConfig(rules: PermissionRule[] = []) {
+  return rules.reduce<Record<string, string | Record<string, string>>>((result, rule) => {
+    if (rule.pattern === "*") {
+      result[rule.permission] = rule.action;
+      return result;
+    }
+    const existing = result[rule.permission];
+    result[rule.permission] = {
+      ...(typeof existing === "object" ? existing : {}),
+      [rule.pattern]: rule.action,
+    };
+    return result;
+  }, {});
+}
 
 async function request(url: string, init?: RequestInit) {
   const response = await fetch(url, init);
@@ -476,12 +504,26 @@ const CustomAssistantMessage = ({ message, isStreaming }: { message: AssistantMe
   return (
     <>
       <ThinkingBlock content={thinking} isStreaming={isStreaming} />
-      {code && (
+      {code ? (
         <Renderer
           response={code}
           library={openuiLibraryWithGfm}
           isStreaming={isStreaming}
         />
+      ) : !isStreaming && (
+        <div
+          style={{
+            border: "1px solid #f0caca",
+            background: "#fff7f7",
+            color: "#8f3a3a",
+            borderRadius: 10,
+            padding: "12px 14px",
+            fontSize: 14,
+            lineHeight: 1.5,
+          }}
+        >
+          模型响应没有生成有效的 OpenUI 界面。请重新发送，或在原需求后补充“请只输出 openui-lang”。
+        </div>
       )}
     </>
   );
@@ -496,6 +538,24 @@ const llm = {
     const saasSessionId = await resolveSaasSession(threadId);
     const infoResponse = await request(`${SAAS_URL}/session/${saasSessionId}`);
     const info = (await infoResponse.json()) as SaasSession;
+    const agents = (await (await request(`${SAAS_URL}/agent`)).json()) as SaasAgent[];
+    const sessionAgents = (await (await request(`${SAAS_URL}/session/${saasSessionId}/agents`)).json()) as SaasAgent[];
+    if (!sessionAgents.some((agent) => agent.name === "openui")) {
+      const buildPermission = agents.find((agent) => agent.name === "build")?.permission ?? [];
+      await request(`${SAAS_URL}/session/${saasSessionId}/agents/create`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: "openui",
+          description: "OpenUI Lang generator",
+          prompt: systemPrompt,
+          mode: "primary",
+          model,
+          permission: permissionConfig(buildPermission),
+        }),
+        signal,
+      });
+    }
     const agentsMdResponse = await request(`${SAAS_URL}/session/${saasSessionId}/agents-md`);
     if ((await agentsMdResponse.json()) === null) {
       await request(`${SAAS_URL}/session/${saasSessionId}/agents-md/create`, {
@@ -564,6 +624,8 @@ const llm = {
               body: JSON.stringify({
                 parts: [{ type: "text", text: lastUserMessage.content }],
                 model,
+                agent: "openui",
+                system: systemPrompt,
               }),
             }).then((response) => {
               if (!response.ok) fail(new Error("prompt_async failed: " + response.status));
