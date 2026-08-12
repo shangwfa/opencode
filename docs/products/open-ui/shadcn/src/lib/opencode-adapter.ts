@@ -4,6 +4,7 @@ export const RENDER_BOUNDARY = "\n<!-- openui-render-boundary -->\n";
 export const TRAILING_TRACE_BOUNDARY = "\n<!-- opencode-trailing-trace -->\n";
 export const TRACE_PREFIX = "<!-- opencode-trace:";
 export const TRACE_SUFFIX = " -->";
+export const SESSION_PENDING_MARKER = "<!-- opencode-session-pending -->";
 
 const SAAS_URL = process.env.NEXT_PUBLIC_OPENCODE_SAAS_URL ?? "http://localhost:14096";
 const MODEL = process.env.NEXT_PUBLIC_OPENCODE_MODEL ?? '{"providerID":"zhipuai","modelID":"glm-5.1"}';
@@ -282,8 +283,21 @@ export function createOpenCodeAdapter(systemPrompt: string) {
       },
       async getMessages(threadId) {
         const saasSessionId = await resolveSaasSession(threadId);
-        const messages = (await (await request(`${SAAS_URL}/session/${saasSessionId}/message`)).json()) as SaasMessage[];
-        return messagesFromSaas(messages);
+        const [messages, statuses] = await Promise.all([
+          request(`${SAAS_URL}/session/${saasSessionId}/message`).then((response) => response.json()) as Promise<SaasMessage[]>,
+          request(`${SAAS_URL}/session/status`)
+            .then((response) => response.json() as Promise<Record<string, { type?: string }>>)
+            .catch((): Record<string, { type?: string }> => ({})),
+        ]);
+        const result = messagesFromSaas(messages);
+        if (!statuses[saasSessionId] || statuses[saasSessionId].type === "idle") return result;
+        const marked = result.map((message) => message.role === "assistant"
+          ? { ...message, content: (message.content ?? "") + SESSION_PENDING_MARKER }
+          : message
+        );
+        return marked.some((message) => message.role === "assistant")
+          ? marked
+          : [...marked, { id: `status-${saasSessionId}`, role: "assistant", content: SESSION_PENDING_MARKER }];
       },
       async updateThread(thread) {
         return (await (await request(`/api/threads/update/${thread.id}`, {

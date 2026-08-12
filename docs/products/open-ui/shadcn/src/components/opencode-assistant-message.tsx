@@ -2,7 +2,7 @@
 
 import { type AssistantMessage } from "@openuidev/react-headless";
 import { Renderer } from "@openuidev/react-lang";
-import { normalizeOpenUiCode, parseThinking, RENDER_BOUNDARY, TRAILING_TRACE_BOUNDARY, type TraceItem } from "@/lib/opencode-adapter";
+import { normalizeOpenUiCode, parseThinking, RENDER_BOUNDARY, SESSION_PENDING_MARKER, TRAILING_TRACE_BOUNDARY, type TraceItem } from "@/lib/opencode-adapter";
 import { shadcnChatLibrary } from "@/lib/shadcn-genui";
 import { ChevronRight, CircleAlert, Clock3 } from "lucide-react";
 import { useState } from "react";
@@ -86,7 +86,8 @@ function TraceDetail({ label, value }: { label: string; value: string }) {
 }
 
 export function ShadcnAssistantMessage({ message, isStreaming }: { message: AssistantMessage; isStreaming: boolean }) {
-  const content = message.content ?? "";
+  const isRecovering = (message.content ?? "").includes(SESSION_PENDING_MARKER);
+  const content = (message.content ?? "").replace(SESSION_PENDING_MARKER, "");
   const boundaryIndex = content.indexOf(RENDER_BOUNDARY);
   const trailingTraceIndex = content.indexOf(TRAILING_TRACE_BOUNDARY);
   const lineStartMatch = /(^|\n)root\s*=/.exec(content);
@@ -102,15 +103,17 @@ export function ShadcnAssistantMessage({ message, isStreaming }: { message: Assi
     ? content.slice(trailingTraceIndex + TRAILING_TRACE_BOUNDARY.length).trim()
     : "";
   const thinking = [leadingThinking, trailingThinking].filter(Boolean).join("\n\n");
+  const parsedThinking = parseThinking(thinking);
+  const isPending = parsedThinking.items.some((item) => item.status === "pending" || item.status === "running");
   const code = rootIndex >= 0
     ? normalizeOpenUiCode(content.slice(rootIndex, trailingTraceIndex >= 0 ? trailingTraceIndex : undefined))
     : "";
   return (
     <>
-      <ThinkingBlock content={thinking} isStreaming={isStreaming} />
-      {code ? (
-        <Renderer response={code} library={shadcnChatLibrary} isStreaming={isStreaming} />
-      ) : !isStreaming && (
+      <ThinkingBlock content={thinking} isStreaming={isStreaming || isPending || isRecovering} />
+      {code && !isStreaming && !isRecovering ? (
+        <Renderer response={code} library={shadcnChatLibrary} isStreaming={false} />
+      ) : !isStreaming && !isPending && !isRecovering && (
         <div className="flex items-start gap-2 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
           <CircleAlert className="mt-0.5 size-4" />
           <span>模型响应没有生成有效的 OpenUI 界面。请重新发送，或在原需求后补充“请只输出 openui-lang”。</span>
