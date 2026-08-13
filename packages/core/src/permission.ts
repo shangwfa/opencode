@@ -3,6 +3,7 @@ export * as PermissionV2 from "./permission"
 import { makeLocationNode } from "./effect/app-node"
 import { Context, Deferred, Effect as EffectRuntime, Layer, Schema } from "effect"
 import { Permission } from "@opencode-ai/schema/permission"
+import { PermissionV1 } from "../v1/permission"
 import { EventV2 } from "./event"
 import { Location } from "./location"
 import { AgentV2 } from "./agent"
@@ -89,6 +90,14 @@ export function merge(...rulesets: Permission.Ruleset[]): Permission.Ruleset {
   return rulesets.flat()
 }
 
+function v1ToV2Rules(rules: PermissionV1.Ruleset): Permission.Ruleset {
+  return rules.map((rule) => ({
+    action: rule.permission,
+    resource: rule.pattern,
+    effect: rule.action as Permission.Effect,
+  }))
+}
+
 export interface Interface {
   readonly ask: (input: AssertInput) => EffectRuntime.Effect<AskResult, SessionV2.NotFoundError>
   readonly assert: (input: AssertInput) => EffectRuntime.Effect<void, Error | SessionV2.NotFoundError>
@@ -141,7 +150,9 @@ const layer = Layer.effect(
       const session = yield* sessions.get(sessionID)
       if (!session) return yield* new SessionV2.NotFoundError({ sessionID })
       const agent = yield* agents.resolve(agentID ?? session.agent)
-      return agent?.permissions ?? missingAgentPermissions
+      const agentRules = agent?.permissions ?? missingAgentPermissions
+      if (!session.permission) return agentRules
+      return [...agentRules, ...v1ToV2Rules(session.permission)]
     })
 
     function denied(input: AssertInput, rules: Permission.Ruleset) {
