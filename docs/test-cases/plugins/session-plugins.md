@@ -224,7 +224,7 @@ SID=$(curl -s --noproxy '*' -X POST "$BASE/session" -H 'Content-Type: applicatio
 # 不注册任何 plugin，直接发消息
 curl -s --noproxy '*' --max-time 30 -X POST "$BASE/session/$SID/message" \
   -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"hello"}],"model":{"providerID":"zhipuai","modelID":"glm-5.1"}}' \
+  -d '{"parts":[{"type":"text","text":"hello"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}}' \
   -w '\nHTTP %{http_code}\n'
 ```
 
@@ -240,7 +240,7 @@ curl -s --noproxy '*' -X POST "$BASE/session/$SID/plugins/create" \
 
 curl -s --noproxy '*' --max-time 30 -X POST "$BASE/session/$SID/message" \
   -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"hello"}],"model":{"providerID":"zhipuai","modelID":"glm-5.1"}}' \
+  -d '{"parts":[{"type":"text","text":"hello"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}}' \
   -w '\nHTTP %{http_code}\n'
 ```
 
@@ -323,7 +323,7 @@ curl -s --noproxy '*' -X POST "$BASE/session/$SID/plugins/create" \
 
 curl -s --noproxy '*' --max-time 30 -X POST "$BASE/session/$SID/message" \
   -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"hello"}],"model":{"providerID":"zhipuai","modelID":"glm-5.1"}}' \
+  -d '{"parts":[{"type":"text","text":"hello"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}}' \
   -w '\nHTTP %{http_code}\n'
 ```
 
@@ -342,7 +342,7 @@ curl -s --noproxy '*' -X POST "$BASE/session/$SID/plugins/create" \
 # 确认 disabled 时不报错
 curl -s --noproxy '*' --max-time 30 -X POST "$BASE/session/$SID/message" \
   -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"hello"}],"model":{"providerID":"zhipuai","modelID":"glm-5.1"}}' \
+  -d '{"parts":[{"type":"text","text":"hello"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}}' \
   -o /dev/null -w 'disabled: HTTP %{http_code}\n'
 
 # 启用 plugin（upsert enabled=true）
@@ -353,7 +353,7 @@ curl -s --noproxy '*' -X POST "$BASE/session/$SID/plugins/create" \
 # 确认 enabled 后 hook 生效
 curl -s --noproxy '*' --max-time 30 -X POST "$BASE/session/$SID/message" \
   -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"hello"}],"model":{"providerID":"zhipuai","modelID":"glm-5.1"}}' \
+  -d '{"parts":[{"type":"text","text":"hello"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}}' \
   -o /dev/null -w 'enabled: HTTP %{http_code}\n'
 ```
 
@@ -392,7 +392,7 @@ curl -s --noproxy '*' -X POST "$BASE/session/$SID/plugins/create" \
 
 curl -s --noproxy '*' --max-time 30 -X POST "$BASE/session/$SID/message" \
   -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"hello"}],"model":{"providerID":"zhipuai","modelID":"glm-5.1"}}' \
+  -d '{"parts":[{"type":"text","text":"hello"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}}' \
   -w '\nHTTP %{http_code}\n'
 ```
 
@@ -416,7 +416,7 @@ curl -s --noproxy '*' -X POST "$BASE/session/$SID/plugins/create" \
 # 验证修正后的 plugin 可正常工作
 curl -s --noproxy '*' --max-time 30 -X POST "$BASE/session/$SID/message" \
   -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"hello"}],"model":{"providerID":"zhipuai","modelID":"glm-5.1"}}' \
+  -d '{"parts":[{"type":"text","text":"hello"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}}' \
   -w '\nHTTP %{http_code}\n'
 ```
 
@@ -439,7 +439,7 @@ curl -s --noproxy '*' -X POST "$BASE/session/$SID/plugins/create" \
 
 curl -s --noproxy '*' --max-time 30 -X POST "$BASE/session/$SID/message" \
   -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"hello"}],"model":{"providerID":"zhipuai","modelID":"glm-5.1"}}' \
+  -d '{"parts":[{"type":"text","text":"hello"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}}' \
   -w '\nHTTP %{http_code}\n'
 ```
 
@@ -460,7 +460,7 @@ done
 
 curl -s --noproxy '*' --max-time 30 -X POST "$BASE/session/$SID/message" \
   -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"hello"}],"model":{"providerID":"zhipuai","modelID":"glm-5.1"}}' \
+  -d '{"parts":[{"type":"text","text":"hello"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}}' \
   -w '\nHTTP %{http_code}\n'
 ```
 
@@ -840,7 +840,7 @@ export default async () => ({
 
 > **2026-08-02 容器重建后重跑**：T35.1-10（CRUD+PG）15/15、T35.11-19（Runtime Hook 含 MSGHOOK77 下游 + enabled 切换）8/8、T35.20-25（缓存失效/语法错误/veto info.error/多 plugin 顺序）8/8、T35.62（chat.message 历史消费 + text.complete 下游 TEXT_COMPLETE_MARKER）全部通过。核心链路与 2026-07-22 结论一致。npm 类用例（T35.52-61）此前已实测，本次未重跑。
 
-执行时间：2026-07-22。测试服务：`http://localhost:14096`，本地 PG + OpenSandbox，模型 `zhipuai/glm-5.2`。
+执行时间：2026-07-22。测试服务：`http://localhost:14096`，本地 PG + OpenSandbox，模型 `Yd-DeepSeek/deepseek-v4-flash`。
 
 ### 已通过
 

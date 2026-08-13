@@ -54,7 +54,7 @@
 # —— 环境变量（组合 3：本地 PG + 本地 OpenSandbox）——
 export BASE="http://localhost:14096"
 export PG_URL="postgresql://local@127.0.0.1:15432/opencode"
-export MODEL='{"providerID":"zhipuai","modelID":"glm-5.1"}'
+export MODEL='{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}'
 export NO_PROXY=localhost,127.0.0.1
 
 # —— 辅助函数 ——
@@ -345,7 +345,7 @@ psql "$PG_URL" -t -c "SELECT data->>'tool', data->'state'->>'status' FROM part W
 # 环境（组合 3：本地 PG + 本地 OpenSandbox）
 export BASE="http://localhost:14096"
 export PG_URL="postgresql://local@127.0.0.1:15432/opencode"
-export MODEL='{"providerID":"zhipuai","modelID":"glm-5.1"}'
+export MODEL='{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}'
 export NO_PROXY=localhost,127.0.0.1
 new_sid() {
   local sid

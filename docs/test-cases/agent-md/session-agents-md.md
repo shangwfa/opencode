@@ -242,7 +242,7 @@ curl -s --noproxy '*' --max-time 300 \
   -H 'Content-Type: application/json' \
   -d '{
     "parts":[{"type":"text","text":"请在当前工作区创建一个 Vite React TypeScript 项目，实现一个小需求：做一个简洁的任务清单页面，支持输入任务、添加任务、点击切换完成状态，并运行必要的安装或检查命令。严格遵守当前 Session 的 AGENTS.md，完成后检查项目文件和 README。"}],
-    "model":{"providerID":"zhipuai","modelID":"glm-5.1"}
+    "model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}
   }' | python3 -m json.tool
 ```
 

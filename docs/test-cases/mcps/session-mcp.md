@@ -125,7 +125,7 @@ npx -y supergateway --stdio "npx @modelcontextprotocol/server-everything" --port
 ```bash
 bun -e '
 const BASE = "http://localhost:14096"
-const MODEL = { providerID: "zhipuai", modelID: "glm-5.1" }
+const MODEL = { providerID: "Yd-DeepSeek", modelID: "deepseek-v4-flash" }
 
 async function waitForTool(sessionID, prefix, expected, timeoutMs = 90000) {
   const start = Date.now()
@@ -185,7 +185,7 @@ if (!ok) process.exit(1)
 ```bash
 bun -e '
 const BASE = "http://localhost:14096"
-const MODEL = { providerID: "zhipuai", modelID: "glm-5.1" }
+const MODEL = { providerID: "Yd-DeepSeek", modelID: "deepseek-v4-flash" }
 
 const SID = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "mcp-exec-local" }) })).json()
 
@@ -276,7 +276,7 @@ for (const text of messages) {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       parts: [{ type: "text", text }],
-      model: { providerID: "zhipuai", modelID: "glm-5.1" },
+      model: { providerID: "Yd-DeepSeek", modelID: "deepseek-v4-flash" },
     }),
   })
   console.log(text.slice(0, 40), "→", res.status)
@@ -339,7 +339,7 @@ for (const [label, body] of cases) {
 ```bash
 bun -e '
 const BASE = "http://localhost:14096"
-const MODEL = { providerID: "zhipuai", modelID: "glm-5.1" }
+const MODEL = { providerID: "Yd-DeepSeek", modelID: "deepseek-v4-flash" }
 const SID = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "mcp-env-injection" }) })).json()
 
 await fetch(BASE + "/session/" + SID.id + "/keep-alive", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled: true }) })
@@ -375,7 +375,7 @@ console.log("env file:", JSON.stringify((check.stdout || "").trim()), "(expect h
 ```bash
 bun -e '
 const BASE = "http://localhost:14096"
-const MODEL = { providerID: "zhipuai", modelID: "glm-5.1" }
+const MODEL = { providerID: "Yd-DeepSeek", modelID: "deepseek-v4-flash" }
 const SID = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "mcp-shell-safety" }) })).json()
 
 await fetch(BASE + "/session/" + SID.id + "/keep-alive", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled: true }) })
@@ -411,7 +411,7 @@ console.log(check.stdout)
 ```bash
 bun -e '
 const BASE = "http://localhost:14096"
-const MODEL = { providerID: "zhipuai", modelID: "glm-5.1" }
+const MODEL = { providerID: "Yd-DeepSeek", modelID: "deepseek-v4-flash" }
 const SID = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "mcp-pid-cleanup" }) })).json()
 
 await fetch(BASE + "/session/" + SID.id + "/keep-alive", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled: true }) })

@@ -23,7 +23,7 @@
 ```bash
 BASE="http://127.0.0.1:14096"
 PG_URL="postgresql://local@127.0.0.1:15432/opencode"
-MODEL='{"providerID":"zhipuai","modelID":"glm-5.1"}'
+MODEL='{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}'
 WORKDIR="/workspace/proma-codegraph"   # 沙箱内工作目录
 ```
 

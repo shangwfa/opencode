@@ -53,7 +53,7 @@ API `/session/:id/agents/create` 接受**对象语法**（经 `fromConfig` 转�
 ```bash
 bun -e '
 const BASE = "http://localhost:14096"
-const MODEL = { providerID: "zhipuai", modelID: "glm-5.1" }
+const MODEL = { providerID: "Yd-DeepSeek", modelID: "deepseek-v4-flash" }
 
 async function sendAndWait(sid, body, timeout = 60000) {
   return new Promise(async (resolve, reject) => {
@@ -163,7 +163,7 @@ test().catch(e => { console.error(e); process.exit(1) })
 ```bash
 bun -e '
 const BASE = "http://localhost:14096"
-const MODEL = { providerID: "zhipuai", modelID: "glm-5.1" }
+const MODEL = { providerID: "Yd-DeepSeek", modelID: "deepseek-v4-flash" }
 
 async function sendAndWait(sid, body, timeout = 60000) {
   return new Promise(async (resolve, reject) => {
@@ -263,7 +263,7 @@ test().catch(e => { console.error(e); process.exit(1) })
 ```bash
 bun -e '
 const BASE = "http://localhost:14096"
-const MODEL = { providerID: "zhipuai", modelID: "glm-5.1" }
+const MODEL = { providerID: "Yd-DeepSeek", modelID: "deepseek-v4-flash" }
 
 async function sendAndWait(sid, body, timeout = 60000) {
   return new Promise(async (resolve, reject) => {
@@ -356,7 +356,7 @@ test().catch(e => { console.error(e); process.exit(1) })
 ```bash
 bun -e '
 const BASE = "http://localhost:14096"
-const MODEL = { providerID: "zhipuai", modelID: "glm-5.1" }
+const MODEL = { providerID: "Yd-DeepSeek", modelID: "deepseek-v4-flash" }
 
 async function test() {
   const sid = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" })).json()
@@ -448,7 +448,7 @@ test().catch(e => { console.error(e); process.exit(1) })
 ```bash
 bun -e '
 const BASE = "http://localhost:14096"
-const MODEL = { providerID: "zhipuai", modelID: "glm-5.1" }
+const MODEL = { providerID: "Yd-DeepSeek", modelID: "deepseek-v4-flash" }
 
 async function sendAndWait(sid, body, timeout = 60000) {
   return new Promise(async (resolve, reject) => {
@@ -641,7 +641,7 @@ test().catch(e => { console.error(e); process.exit(1) })
 ```bash
 bun -e '
 const BASE = "http://localhost:14096"
-const MODEL = { providerID: "zhipuai", modelID: "glm-5.1" }
+const MODEL = { providerID: "Yd-DeepSeek", modelID: "deepseek-v4-flash" }
 
 async function test() {
   const sid = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" })).json()
@@ -751,7 +751,7 @@ test().catch(e => { console.error(e); process.exit(1) })
 ```bash
 bun -e '
 const BASE = "http://localhost:14096"
-const MODEL = { providerID: "zhipuai", modelID: "glm-5.1" }
+const MODEL = { providerID: "Yd-DeepSeek", modelID: "deepseek-v4-flash" }
 const newSid = () => fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }).then(r => r.json()).then(d => d.id)
 const createAgent = (sid, body) => fetch(BASE + "/session/" + sid + "/agents/create", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(r => r.json())
 const exec = (sid, cmd) => fetch(BASE + "/session/" + sid + "/exec", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ command: cmd }) }).then(r => r.json())
@@ -803,7 +803,7 @@ test().catch(e => { console.error(e); process.exit(1) })
 ```bash
 bun -e '
 const BASE = "http://localhost:14096"
-const MODEL = { providerID: "zhipuai", modelID: "glm-5.1" }
+const MODEL = { providerID: "Yd-DeepSeek", modelID: "deepseek-v4-flash" }
 const newSid = () => fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }).then(r => r.json()).then(d => d.id)
 const createAgent = (sid, body) => fetch(BASE + "/session/" + sid + "/agents/create", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(r => r.json())
 
@@ -858,7 +858,7 @@ test().catch(e => { console.error(e); process.exit(1) })
 ```bash
 bun -e '
 const BASE = "http://localhost:14096"
-const MODEL = { providerID: "zhipuai", modelID: "glm-5.1" }
+const MODEL = { providerID: "Yd-DeepSeek", modelID: "deepseek-v4-flash" }
 const newSid = () => fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }).then(r => r.json()).then(d => d.id)
 const createAgent = (sid, body) => fetch(BASE + "/session/" + sid + "/agents/create", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(r => r.json())
 const exec = (sid, cmd) => fetch(BASE + "/session/" + sid + "/exec", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ command: cmd }) }).then(r => r.json())
@@ -956,7 +956,7 @@ test().catch(e => { console.error(e); process.exit(1) })
 ```bash
 bun -e '
 const BASE = "http://localhost:14096"
-const MODEL = { providerID: "zhipuai", modelID: "glm-5.1" }
+const MODEL = { providerID: "Yd-DeepSeek", modelID: "deepseek-v4-flash" }
 const ID = "t29-" + Date.now().toString(36)
 
 async function sendAndWait(sid, body, timeout = 90000) {
@@ -1055,7 +1055,7 @@ console.log("═".repeat(60))
 ```bash
 bun -e '
 const BASE = "http://localhost:14096"
-const MODEL = { providerID: "zhipuai", modelID: "glm-5.1" }
+const MODEL = { providerID: "Yd-DeepSeek", modelID: "deepseek-v4-flash" }
 const UUID = "best-" + Date.now().toString(36)
 const results = []
 
@@ -1190,7 +1190,7 @@ console.log("═".repeat(60))
 ```bash
 bun -e '
 const BASE = "http://localhost:14096"
-const MODEL = { providerID: "zhipuai", modelID: "glm-5.1" }
+const MODEL = { providerID: "Yd-DeepSeek", modelID: "deepseek-v4-flash" }
 const UUID = "multi-" + Date.now().toString(36)
 const results = []
 const newSid = () => fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }).then(r => r.json()).then(d => d.id)
@@ -1273,7 +1273,7 @@ console.log(`\n${ok?"✅":"❌"} T26.52: deny*@${denyIdx} allow-git@${allowGitId
 ```bash
 bun -e '
 const BASE = "http://localhost:14096"
-const MODEL = { providerID: "zhipuai", modelID: "glm-5.1" }
+const MODEL = { providerID: "Yd-DeepSeek", modelID: "deepseek-v4-flash" }
 const UUID = "mix-" + Date.now().toString(36)
 const newSid = () => fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }).then(r => r.json()).then(d => d.id)
 const createAgent = (sid, body) => fetch(BASE + "/session/" + sid + "/agents/create", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(r => r.json())
@@ -1608,7 +1608,7 @@ test().catch(e => { console.error(e); process.exit(1) })
 ```bash
 bun -e '
 const BASE = "http://localhost:14096"
-const MODEL = { providerID: "zhipuai", modelID: "glm-5.1" }
+const MODEL = { providerID: "Yd-DeepSeek", modelID: "deepseek-v4-flash" }
 const AID = "t34fix-" + Date.now().toString(36)
 
 async function sendAndWait(sid, body, timeout = 90000) {

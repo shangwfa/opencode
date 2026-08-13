@@ -34,8 +34,8 @@
 ```bash
 export BASE="http://localhost:14096"
 export PG_URL="postgresql://local@127.0.0.1:15432/opencode"
-export PROVIDER_ID="zhipuai"
-export MODEL_ID="glm-5.2"
+export PROVIDER_ID="Yd-DeepSeek"
+export MODEL_ID="deepseek-v4-flash"
 ```
 
 以下辅助程序使用同步 `POST /session/:id/message`。响应体只包含最终 assistant message，工具调用位于同一轮的中间 message，因此程序按 message ID 差集收集完整证据并保存到 `/tmp/cm-last.json`。不能只按消息数量切片，否则异步落盘会造成跨轮竞态。

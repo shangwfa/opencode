@@ -7,7 +7,7 @@
 - 容器：`opencode-saas-test`（localhost:14096）
 - PG：本地 PostgreSQL（host.docker.internal:15432）
 - Sandbox：远端 K8s Sandbox API（host.docker.internal:30040）
-- 模型：zhipuai/glm-5.2
+- 模型：Yd-DeepSeek/deepseek-v4-flash
 
 ## MCP Server 信息
 
@@ -57,7 +57,7 @@ SELECT name, type, enabled FROM session_mcps WHERE session_id='$SID';
 ```bash
 curl -s --max-time 120 -X POST "$BASE/session/$SID/message" \
   -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"请列出你当前所有以 antd_ 开头的 MCP 工具名称和功能。"}],"model":{"providerID":"zhipuai","modelID":"glm-5.1"}}'
+  -d '{"parts":[{"type":"text","text":"请列出你当前所有以 antd_ 开头的 MCP 工具名称和功能。"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}}'
 ```
 
 **AI 回复**：
@@ -84,7 +84,7 @@ curl -s --max-time 120 -X POST "$BASE/session/$SID/message" \
 ```bash
 curl -s --max-time 120 -X POST "$BASE/session/$SID/message" \
   -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"用 antd_antd_list 工具列出所有可用的 antd 组件，只列出组件名"}],"model":{"providerID":"zhipuai","modelID":"glm-5.1"}}'
+  -d '{"parts":[{"type":"text","text":"用 antd_antd_list 工具列出所有可用的 antd 组件，只列出组件名"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}}'
 ```
 
 **PG 验证**：
@@ -102,7 +102,7 @@ SELECT data->>'tool', data->'state'->>'status' FROM part WHERE session_id='$SID'
 ```bash
 curl -s --max-time 120 -X POST "$BASE/session/$SID/message" \
   -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"用 antd_antd_info 工具查看 Button 组件的 API 信息"}],"model":{"providerID":"zhipuai","modelID":"glm-5.1"}}'
+  -d '{"parts":[{"type":"text","text":"用 antd_antd_info 工具查看 Button 组件的 API 信息"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}}'
 ```
 
 **PG 验证**：

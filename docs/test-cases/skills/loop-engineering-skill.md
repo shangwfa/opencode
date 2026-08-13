@@ -52,7 +52,7 @@
 ```bash
 export BASE="http://localhost:14096"
 export PG_URL="postgresql://app:8zuhlMLd4gaeUG5k@127.0.0.1:15432/opencode"
-export MODEL='{"providerID":"zhipuai","modelID":"glm-5.1"}'
+export MODEL='{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}'
 export NO_PROXY=localhost,127.0.0.1
 
 jexec() { python3 -c "import json,sys; d=json.load(sys.stdin, strict=False); print($1)" 2>/dev/null; }
@@ -488,7 +488,7 @@ exec_in_sandbox "$SID" "find $RESOURCE_DIR -type f | wc -l"
 # 环境
 export BASE="http://localhost:14096"
 export PG_URL="postgresql://app:8zuhlMLd4gaeUG5k@127.0.0.1:15432/opencode"
-export MODEL='{"providerID":"zhipuai","modelID":"glm-5.1"}'
+export MODEL='{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}'
 export NO_PROXY=localhost,127.0.0.1
 
 # 1. 创建 session + 启沙箱
@@ -539,7 +539,7 @@ psql "$PG_URL" -t -c "SELECT data->>'tool', data->'state'->>'status' FROM part W
 
 ## 重跑记录 2026-08-08
 
-> **环境**：本地 PG `postgresql://postgres:postgres@127.0.0.1:5433/opencode_test` + 容器 `opencode-saas-test` @ localhost:14096。model=zhipuai/glm-5.1。
+> **环境**：本地 PG `postgresql://postgres:postgres@127.0.0.1:5433/opencode_test` + 容器 `opencode-saas-test` @ localhost:14096。model=Yd-DeepSeek/deepseek-v4-flash。
 >
 > **结果**：核心链路重跑通过（T49.1/3/4/5/11），与验收汇总一致。
 

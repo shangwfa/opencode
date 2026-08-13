@@ -520,7 +520,7 @@ SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}
 
 curl -s --max-time 60 -X POST "$BASE/session/$SID/message" \
   -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"用 bash 执行 ls /workspace/src/"}],"model":{"providerID":"zhipuai","modelID":"glm-5.1"}}' \
+  -d '{"parts":[{"type":"text","text":"用 bash 执行 ls /workspace/src/"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}}' \
   | python3 -c "import json,sys;[print(p['text'][:100]) for p in json.load(sys.stdin).get('parts',[]) if p.get('type')=='text']"
 
 # 2. 从 PG 查询该 bash part 的耗时

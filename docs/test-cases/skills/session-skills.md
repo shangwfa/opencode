@@ -259,7 +259,7 @@ names=[b['name'] for b in bundles]
 msg=api('POST',f'/session/{sid}/message',{
  'parts':[{'type':'text','text':'请验证当前从 SkillsMP 默认排序提取的 10 个 skills 是否可用。要求：按名称列出每个 skill；每个 skill 用一句话说明用途；如果有 resources，列出至少一个资源路径；最后总结这些 skills 覆盖的能力范围。'}],
  'skills':names,
- 'model':{'providerID':'zhipuai','modelID':'glm-5.1'}
+ 'model':{'providerID':'Yd-DeepSeek','modelID':'deepseek-v4-flash'}
 })
 text='\n'.join(p.get('text','') for p in msg.get('parts',[]) if p.get('type')=='text')
 print(text[:5000])
