@@ -93,12 +93,12 @@ def create_session(title=None):
 
 def send_prompt(sid, text, timeout=120):
     """Send sync prompt and return response"""
-    body = {"parts": [{"type": "text", "text": text}], "model": {"providerID": "zhipuai", "modelID": "glm-5.1"}}
+    body = {"parts": [{"type": "text", "text": text}], "model": {"providerID": "Yd-DeepSeek", "modelID": "deepseek-v4-flash"}}
     return req("POST", f"/session/{sid}/message", body, timeout=timeout)
 
 def send_prompt_async(sid, text):
     """Send async prompt via /prompt_async endpoint, return True if 204/200"""
-    body = {"parts": [{"type": "text", "text": text}], "model": {"providerID": "zhipuai", "modelID": "glm-5.1"}}
+    body = {"parts": [{"type": "text", "text": text}], "model": {"providerID": "Yd-DeepSeek", "modelID": "deepseek-v4-flash"}}
     r = req("POST", f"/session/{sid}/prompt_async", body, timeout=30)
     return r["status"] in [200, 204]
 
@@ -347,7 +347,7 @@ def batch4():
 
     # T8.2 切换模型
     sid2 = create_session()
-    body = {"parts": [{"type": "text", "text": "回复模型测试"}], "model": {"providerID": "zhipuai", "modelID": "glm-5.1"}}
+    body = {"parts": [{"type": "text", "text": "回复模型测试"}], "model": {"providerID": "Yd-DeepSeek", "modelID": "deepseek-v4-flash"}}
     r = req("POST", f"/session/{sid2}/message", body, timeout=60)
     check("T8.2", r["ok"], "model switch ok")
 
@@ -793,7 +793,7 @@ def batch13():
     sid = create_session()
     body = {
         "parts": [{"type": "text", "text": "回复OK"}],
-        "model": {"providerID": "zhipuai", "modelID": "glm-5.1"},
+        "model": {"providerID": "Yd-DeepSeek", "modelID": "deepseek-v4-flash"},
         "userName": "alice",
         "userId": "user-123"
     }
@@ -822,7 +822,7 @@ def batch13():
     # T26.P.1 permission deny
     sid2 = create_session()
     r = req("POST", f"/session/{sid2}/agents/create", {
-        "name": "build",
+        "name": "restricted-agent",
         "description": "Restricted agent",
         "mode": "primary",
         "prompt": "You are a restricted agent.",

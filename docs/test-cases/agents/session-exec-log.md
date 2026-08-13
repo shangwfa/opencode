@@ -509,6 +509,80 @@ echo "model=$MODEL_ID provider=$PROV_ID temperature=$TEMP"
 
 ---
 
+### T17.25 沙箱创建记录 exec_log（含开始时间与耗时）
+
+> 沙箱创建是 SaaS 模式的关键生命周期事件。验证 `SandboxProvider.createSandbox` 在创建沙箱时记录 `source=sandbox-create` 的 exec_log，且 `time_started` / `time_finished` 有真实时间差（耗时）。
+
+```bash
+# 创建 session（沙箱惰性创建，需先触发 AI 工具调用或 exec）
+SID=$(curl -s --noproxy '*' -X POST "$BASE/session" \
+  -H 'Content-Type: application/json' -d '{"title":"sandbox-create-timing"}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+echo "SID: $SID"
+
+# 触发沙箱创建：发 AI 消息让模型调 bash 工具（或直接用 exec API）
+curl -s --noproxy '*' --max-time 120 -X POST "$BASE/session/$SID/message" \
+  -H 'Content-Type: application/json' \
+  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"用 bash 执行 echo sandbox-timing-test\"}],\"model\":$MODEL}" > /dev/null
+sleep 5
+
+# 验证 sandbox-create 记录
+psql "$PG_URL" -c "
+SELECT id, source, status,
+       time_started, time_finished,
+       (time_finished - time_started) as duration_ms,
+       command
+FROM exec_log
+WHERE session_id='$SID' AND source='sandbox-create'
+ORDER BY time_created DESC;
+"
+```
+
+**期望**：
+- `source=sandbox-create` 存在至少 1 条记录
+- `status=completed`
+- `time_started` 非空，`time_finished` 非空
+- `time_finished > time_started`（`duration_ms > 0`），沙箱创建有真实耗时
+- `command` 字段（JSON）含 `sandboxID`、`image`、`durationMs`
+
+### T17.26 沙箱创建耗时合理性验证
+
+> 验证沙箱创建耗时在合理范围内（通常 < 30s），且多次创建的耗时可以被聚合统计。
+
+```bash
+# 统计沙箱创建耗时分布
+psql "$PG_URL" -c "
+SELECT COUNT(*) as total,
+       ROUND(AVG(time_finished - time_started)) as avg_duration_ms,
+       MIN(time_finished - time_started) as min_duration_ms,
+       MAX(time_finished - time_started) as max_duration_ms
+FROM exec_log
+WHERE source='sandbox-create' AND time_finished > time_started;
+"
+
+# 按耗时区间分组
+psql "$PG_URL" -c "
+SELECT
+  CASE
+    WHEN (time_finished - time_started) < 1000 THEN '0-1s'
+    WHEN (time_finished - time_started) < 5000 THEN '1-5s'
+    WHEN (time_finished - time_started) < 30000 THEN '5-30s'
+    ELSE '30s+'
+  END as bucket,
+  COUNT(*) as count
+FROM exec_log
+WHERE source='sandbox-create' AND time_finished > time_started
+GROUP BY bucket
+ORDER BY bucket;
+"
+```
+
+**期望**：
+- `avg_duration_ms` 在合理范围（通常 1-10s）
+- 无异常超长耗时（除非远端沙箱网络抖动）
+- 所有记录 `time_finished > time_started`（无负耗时）
+
+---
+
 ### 运行与验证
 
 ```bash
