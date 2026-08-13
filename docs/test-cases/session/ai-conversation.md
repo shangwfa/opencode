@@ -20,7 +20,7 @@ echo "SID: $SID"
 ```bash
 curl -s --max-time 30 -X POST "$BASE/session/$SID/message" \
   -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"1+1等于几"}],"model":{"providerID":"zhipuai","modelID":"glm-5.1"}}'
+  -d '{"parts":[{"type":"text","text":"1+1等于几"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}}'
 ```
 **期望**：AI 返回包含 `2` 的文本
 
@@ -29,12 +29,12 @@ curl -s --max-time 30 -X POST "$BASE/session/$SID/message" \
 # 第一轮
 curl -s --max-time 30 -X POST "$BASE/session/$SID/message" \
   -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"记住我叫张三"}],"model":{"providerID":"zhipuai","modelID":"glm-5.1"}}'
+  -d '{"parts":[{"type":"text","text":"记住我叫张三"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}}'
 
 # 第二轮
 curl -s --max-time 30 -X POST "$BASE/session/$SID/message" \
   -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"我叫什么？"}],"model":{"providerID":"zhipuai","modelID":"glm-5.1"}}'
+  -d '{"parts":[{"type":"text","text":"我叫什么？"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}}'
 ```
 **期望**：第二轮回复中含「张三」
 
@@ -43,7 +43,7 @@ curl -s --max-time 30 -X POST "$BASE/session/$SID/message" \
 # 发送消息
 curl -s --max-time 60 -X POST "$BASE/session/$SID/message" \
   -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"在 /workspace 创建 t4-3.txt 内容是 hello"}],"model":{"providerID":"zhipuai","modelID":"glm-5.1"}}'
+  -d '{"parts":[{"type":"text","text":"在 /workspace 创建 t4-3.txt 内容是 hello"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}}'
 
 # 验证工具调用（POST /message 返回的是文字总结，工具调用在前一条消息中）
 curl -s "$BASE/session/$SID/message" | python3 -c "
@@ -63,7 +63,7 @@ print('tools:', tools if tools else '❌ NO TOOLS')
 ```bash
 curl -s --max-time 30 -X POST "$BASE/session/$SID/message" \
   -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"读 /workspace/t4-3.txt"}],"model":{"providerID":"zhipuai","modelID":"glm-5.1"}}'
+  -d '{"parts":[{"type":"text","text":"读 /workspace/t4-3.txt"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}}'
 ```
 **期望**：`tools` 包含 `read(completed)`；回复中含 `hello`
 
@@ -71,7 +71,7 @@ curl -s --max-time 30 -X POST "$BASE/session/$SID/message" \
 ```bash
 curl -s --max-time 30 -X POST "$BASE/session/$SID/message" \
   -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"执行 ls /workspace 命令"}],"model":{"providerID":"zhipuai","modelID":"glm-5.1"}}'
+  -d '{"parts":[{"type":"text","text":"执行 ls /workspace 命令"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}}'
 ```
 **期望**：`tools` 包含 `bash(completed)` 或 `read(completed)`；回复中含文件列表或 `t4-3.txt`
 
@@ -79,7 +79,7 @@ curl -s --max-time 30 -X POST "$BASE/session/$SID/message" \
 ```bash
 curl -s -o /dev/null -w "%{http_code}" -X POST "$BASE/session/$SID/prompt_async" \
   -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"写一首五言绝句"}],"model":{"providerID":"zhipuai","modelID":"glm-5.1"}}'
+  -d '{"parts":[{"type":"text","text":"写一首五言绝句"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}}'
 ```
 **期望**：`status: 204`
 
@@ -88,7 +88,7 @@ curl -s -o /dev/null -w "%{http_code}" -X POST "$BASE/session/$SID/prompt_async"
 # 先异步发送一个长任务
 curl -s -X POST "$BASE/session/$SID/prompt_async" \
   -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"写一篇1万字的文章"}],"model":{"providerID":"zhipuai","modelID":"glm-5.1"}}'
+  -d '{"parts":[{"type":"text","text":"写一篇1万字的文章"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}}'
 
 # 立即中断
 sleep 1 && curl -s -X POST "$BASE/session/$SID/abort"

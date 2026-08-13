@@ -480,7 +480,7 @@ for i in $(seq 1 20); do grep -q server.connected /tmp/t919.log 2>/dev/null && b
 
 curl -s --max-time 15 -X POST "$BASE/session/$SID/message" \
   -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"hi"}],"model":{"providerID":"zhipuai","modelID":"nonexistent-model-xyz"}}' > /dev/null
+  -d '{"parts":[{"type":"text","text":"hi"}],"model":{"providerID":"Yd-DeepSeek","modelID":"nonexistent-model-xyz"}}' > /dev/null
 wait $SSE_PID
 
 grep -m1 '"type":"session.error"' /tmp/t919.log | jexec "d['properties'].get('error',{}).get('name')"
@@ -533,7 +533,7 @@ for i in $(seq 1 20); do grep -q server.connected /tmp/t921.log 2>/dev/null && b
 
 # PATCH model 不会触发 session.model.switched（UpdatePayload 不支持 model 字段）
 curl -s -X PATCH "$BASE/session/$SID" -H 'Content-Type: application/json' \
-  -d '{"model":{"providerID":"zhipuai","modelID":"glm-4.6"}}' > /dev/null
+  -d '{"model":{"providerID":"Yd-DeepSeek","modelID":"glm-4.6"}}' > /dev/null
 wait $SSE_PID
 
 echo "model.switched count: $(grep -c '"type":"session.model.switched"' /tmp/t921.log) (期望 0，见说明)"
@@ -555,7 +555,7 @@ for i in $(seq 1 20); do grep -q server.connected /tmp/t922.log 2>/dev/null && b
 
 # 创建并执行自定义命令（CommandCreatePayload 用 template 字段；执行 payload 必填 command 字段）
 curl -s -X POST "$BASE/session/$SID/commands/create" \
-  -H 'Content-Type: application/json' -d '{"name":"sse-test-cmd","description":"t","template":"say hi","agent":"build","model":"zhipuai/glm-5.1"}' > /dev/null
+  -H 'Content-Type: application/json' -d '{"name":"sse-test-cmd","description":"t","template":"say hi","agent":"build","model":"Yd-DeepSeek/deepseek-v4-flash"}' > /dev/null
 curl -s -X POST "$BASE/session/$SID/command" \
   -H 'Content-Type: application/json' -d '{"command":"sse-test-cmd","arguments":""}' > /dev/null
 wait $SSE_PID

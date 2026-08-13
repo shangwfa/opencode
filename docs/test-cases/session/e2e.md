@@ -21,7 +21,7 @@ echo "SID: $SID"
 # Step 1: 创建项目骨架（4 个文件）
 curl -s --max-time 120 -X POST "$BASE/session/$SID/message" \
   -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"Create a Python project at /workspace/myapp with:\n1. myapp/__init__.py (empty)\n2. myapp/main.py with def main(): print(\"hello\")\n3. tests/__init__.py (empty)\n4. tests/test_main.py that imports myapp.main\nUse the write tool for each file."}],"model":{"providerID":"zhipuai","modelID":"glm-5.1"}}' \
+  -d '{"parts":[{"type":"text","text":"Create a Python project at /workspace/myapp with:\n1. myapp/__init__.py (empty)\n2. myapp/main.py with def main(): print(\"hello\")\n3. tests/__init__.py (empty)\n4. tests/test_main.py that imports myapp.main\nUse the write tool for each file."}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}}' \
   | python3 -c "import json,sys;d=json.load(sys.stdin, strict=False);[print(p.get('text','')[:200]) for p in d.get('parts',[]) if p.get('type')=='text']"
 ```
 
@@ -57,7 +57,7 @@ echo "SID: $SID"
 # Step 1: 创建初始文件
 curl -s --max-time 120 -X POST "$BASE/session/$SID/message" \
   -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"Use the write tool to create /workspace/calc.py with:\ndef add(a, b): return a + b\ndef multiply(a, b): return a * b"}],"model":{"providerID":"zhipuai","modelID":"glm-5.1"}}' \
+  -d '{"parts":[{"type":"text","text":"Use the write tool to create /workspace/calc.py with:\ndef add(a, b): return a + b\ndef multiply(a, b): return a * b"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}}' \
   | python3 -c "import json,sys;d=json.load(sys.stdin, strict=False);[print(p.get('text','')[:200]) for p in d.get('parts',[]) if p.get('type')=='text']"
 ```
 
@@ -65,7 +65,7 @@ curl -s --max-time 120 -X POST "$BASE/session/$SID/message" \
 # Step 2: 修改代码（添加 subtract 函数）
 curl -s --max-time 120 -X POST "$BASE/session/$SID/message" \
   -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"Use the edit tool to add a subtract function to /workspace/calc.py: def subtract(a, b): return a - b"}],"model":{"providerID":"zhipuai","modelID":"glm-5.1"}}' \
+  -d '{"parts":[{"type":"text","text":"Use the edit tool to add a subtract function to /workspace/calc.py: def subtract(a, b): return a - b"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}}' \
   | python3 -c "import json,sys;d=json.load(sys.stdin, strict=False);[print(p.get('text','')[:200]) for p in d.get('parts',[]) if p.get('type')=='text']"
 ```
 
@@ -104,7 +104,7 @@ setTimeout(async () => {
   // 先创建文件
   await fetch(BASE + '/session/' + SID + '/message', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ parts: [{ type: 'text', text: 'Use the write tool to create /workspace/hello.py with: print(\"hello from SSE test\")' }], model: { providerID: 'zhipuai', modelID: 'glm-5.1' } })
+    body: JSON.stringify({ parts: [{ type: 'text', text: 'Use the write tool to create /workspace/hello.py with: print(\"hello from SSE test\")' }], model: { providerID: 'Yd-DeepSeek', modelID: 'deepseek-v4-flash' } })
   })
 }, 500)
 
@@ -168,14 +168,14 @@ echo "SID: $SID"
 echo "=== Round 1 ==="
 curl -s --max-time 60 -X POST "$BASE/session/$SID/message" \
   -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"Remember this secret number: 42. Just reply OK."}],"model":{"providerID":"zhipuai","modelID":"glm-5.1"}}' \
+  -d '{"parts":[{"type":"text","text":"Remember this secret number: 42. Just reply OK."}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}}' \
   | python3 -c "import json,sys;d=json.load(sys.stdin, strict=False);[print(p.get('text','')[:100]) for p in d.get('parts',[]) if p.get('type')=='text']"
 
 # Round 2: 验证记忆
 echo "=== Round 2 ==="
 curl -s --max-time 60 -X POST "$BASE/session/$SID/message" \
   -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"What was the secret number I told you?"}],"model":{"providerID":"zhipuai","modelID":"glm-5.1"}}' \
+  -d '{"parts":[{"type":"text","text":"What was the secret number I told you?"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}}' \
   | python3 -c "import json,sys;d=json.load(sys.stdin, strict=False);[print(p.get('text','')[:100]) for p in d.get('parts',[]) if p.get('type')=='text']"
 ```
 **期望**：Round 2 回答包含 `42`
