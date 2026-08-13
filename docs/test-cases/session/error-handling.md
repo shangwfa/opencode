@@ -20,7 +20,7 @@ bun -e "fetch('http://localhost:14096/session/$SID/message',{method:'POST',heade
 
 ### T7.2 不存在的 session 发消息
 ```bash
-bun -e "fetch('http://localhost:14096/session/ses_NOTEXIST/message',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({parts:[{type:'text',text:'hi'}],model:{providerID:'zhipuai',modelID:'glm-5.1'}})}).then(r=>console.log('status:',r.status))"
+bun -e "fetch('http://localhost:14096/session/ses_NOTEXIST/message',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({parts:[{type:'text',text:'hi'}],model:{providerID:'Yd-DeepSeek',modelID:'deepseek-v4-flash'}})}).then(r=>console.log('status:',r.status))"
 ```
 **期望**：404（session 不存在时明确返回 404）
 
@@ -40,7 +40,7 @@ bun -e "fetch('http://localhost:14096/session/$SID/message',{method:'POST',heade
 
 ### T7.5 超长消息
 ```bash
-bun -e "const big='x'.repeat(100000);fetch('http://localhost:14096/session/$SID/message',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({parts:[{type:'text',text:big}],model:{providerID:'zhipuai',modelID:'glm-5.1'}})}).then(r=>console.log('status:',r.status))"
+bun -e "const big='x'.repeat(100000);fetch('http://localhost:14096/session/$SID/message',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({parts:[{type:'text',text:big}],model:{providerID:'Yd-DeepSeek',modelID:'deepseek-v4-flash'}})}).then(r=>console.log('status:',r.status))"
 ```
 **期望**：能处理或返回明确的长度错误，不应 hang 死
 

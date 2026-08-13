@@ -346,7 +346,7 @@ for SID in $SIDS; do
 import json
 payload = {
     "parts": [{"type": "text", "text": "$TASK"}],
-    "model": {"providerID": "zhipuai", "modelID": "glm-5.1"}
+    "model": {"providerID": "Yd-DeepSeek", "modelID": "deepseek-v4-flash"}
 }
 print(json.dumps(payload))
 EOF

@@ -47,7 +47,7 @@ echo "SID=$SID"
 # 发送带用户标识的异步消息
 curl -s -X POST "$BASE/session/$SID/prompt_async" \
   -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"hello"}],"model":{"providerID":"zhipuai","modelID":"glm-5.1"},"userName":"alice","userId":"user-123"}' \
+  -d '{"parts":[{"type":"text","text":"hello"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"},"userName":"alice","userId":"user-123"}' \
   -o /dev/null -w "status: %{http_code}\n"
 ```
 
@@ -90,7 +90,7 @@ SID2=$(curl -s -X POST "$BASE/session" | python3 -c "import json,sys; print(json
 # 发送不带用户标识的消息
 curl -s -X POST "$BASE/session/$SID2/prompt_async" \
   -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"hello"}],"model":{"providerID":"zhipuai","modelID":"glm-5.1"}}' \
+  -d '{"parts":[{"type":"text","text":"hello"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}}' \
   -o /dev/null -w "status: %{http_code}\n"
 
 # 等待完成并验证
@@ -124,7 +124,7 @@ SID3=$(curl -s -X POST "$BASE/session" | python3 -c "import json,sys; print(json
 # 使用同步接口发送（POST /message）
 RESULT=$(curl -s --max-time 120 -X POST "$BASE/session/$SID3/message" \
   -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"1+1等于几"}],"model":{"providerID":"zhipuai","modelID":"glm-5.1"},"userName":"bob","userId":"user-456"}')
+  -d '{"parts":[{"type":"text","text":"1+1等于几"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"},"userName":"bob","userId":"user-456"}')
 
 # 验证消息列表中的用户字段
 curl -s "$BASE/session/$SID3/message" | python3 -c "
@@ -153,7 +153,7 @@ SID4=$(curl -s -X POST "$BASE/session" | python3 -c "import json,sys; print(json
 # 第一轮：alice
 curl -s -X POST "$BASE/session/$SID4/prompt_async" \
   -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"记住我叫 alice"}],"model":{"providerID":"zhipuai","modelID":"glm-5.1"},"userName":"alice","userId":"user-111"}' \
+  -d '{"parts":[{"type":"text","text":"记住我叫 alice"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"},"userName":"alice","userId":"user-111"}' \
   -o /dev/null -w "status: %{http_code}\n"
 
 wait_for_finish "$SID4"
@@ -161,7 +161,7 @@ wait_for_finish "$SID4"
 # 第二轮：bob
 curl -s -X POST "$BASE/session/$SID4/prompt_async" \
   -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"我是谁？"}],"model":{"providerID":"zhipuai","modelID":"glm-5.1"},"userName":"bob","userId":"user-222"}' \
+  -d '{"parts":[{"type":"text","text":"我是谁？"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"},"userName":"bob","userId":"user-222"}' \
   -o /dev/null -w "status: %{http_code}\n"
 
 wait_for_finish "$SID4"
@@ -202,7 +202,7 @@ curl -s -X POST "$BASE/session/$TEAM_SID/prompt_async" \
   -H 'Content-Type: application/json' \
   -d '{
     "parts":[{"type":"text","text":"我需要一个用户登录功能，支持邮箱和手机号登录，请给出技术方案"}],
-    "model":{"providerID":"zhipuai","modelID":"glm-5.1"},
+    "model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"},
     "userName":"alice",
     "userId":"pm-001"
   }' -o /dev/null -w "status: %{http_code}\n"
@@ -216,7 +216,7 @@ curl -s -X POST "$BASE/session/$TEAM_SID/prompt_async" \
   -H 'Content-Type: application/json' \
   -d '{
     "parts":[{"type":"text","text":"前端需要 OAuth 第三方登录（GitHub/Google），另外登录页要有记住我功能，请在方案中补充前端部分的接口约定"}],
-    "model":{"providerID":"zhipuai","modelID":"glm-5.1"},
+    "model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"},
     "userName":"bob",
     "userId":"fe-002"
   }' -o /dev/null -w "status: %{http_code}\n"
@@ -230,7 +230,7 @@ curl -s -X POST "$BASE/session/$TEAM_SID/prompt_async" \
   -H 'Content-Type: application/json' \
   -d '{
     "parts":[{"type":"text","text":"后端用 Node.js + PostgreSQL，需要考虑 token 刷新机制和密码加密存储，请在方案中补充后端实现细节"}],
-    "model":{"providerID":"zhipuai","modelID":"glm-5.1"},
+    "model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"},
     "userName":"carol",
     "userId":"be-003"
   }' -o /dev/null -w "status: %{http_code}\n"
@@ -343,7 +343,7 @@ echo "CROSS_SID=$CROSS_SID"
 echo "=== alice 发起 ==="
 curl -s -X POST "$BASE/session/$CROSS_SID/prompt_async" \
   -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"列出 REST API 设计的最佳实践"}],"model":{"providerID":"zhipuai","modelID":"glm-5.1"},"userName":"alice","userId":"pm-001"}' \
+  -d '{"parts":[{"type":"text","text":"列出 REST API 设计的最佳实践"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"},"userName":"alice","userId":"pm-001"}' \
   -o /dev/null -w "status: %{http_code}\n"
 
 wait_for_finish "$CROSS_SID" 90
@@ -352,7 +352,7 @@ wait_for_finish "$CROSS_SID" 90
 echo "=== bob 追问 ==="
 curl -s -X POST "$BASE/session/$CROSS_SID/prompt_async" \
   -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"补充一下 GraphQL 的对比"}],"model":{"providerID":"zhipuai","modelID":"glm-5.1"},"userName":"bob","userId":"fe-002"}' \
+  -d '{"parts":[{"type":"text","text":"补充一下 GraphQL 的对比"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"},"userName":"bob","userId":"fe-002"}' \
   -o /dev/null -w "status: %{http_code}\n"
 
 wait_for_finish "$CROSS_SID" 90
@@ -361,7 +361,7 @@ wait_for_finish "$CROSS_SID" 90
 echo "=== alice 再次追问 ==="
 curl -s -X POST "$BASE/session/$CROSS_SID/prompt_async" \
   -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"给出一个 REST 和 GraphQL 混合架构的例子"}],"model":{"providerID":"zhipuai","modelID":"glm-5.1"},"userName":"alice","userId":"pm-001"}' \
+  -d '{"parts":[{"type":"text","text":"给出一个 REST 和 GraphQL 混合架构的例子"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"},"userName":"alice","userId":"pm-001"}' \
   -o /dev/null -w "status: %{http_code}\n"
 
 wait_for_finish "$CROSS_SID" 90

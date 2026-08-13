@@ -18,13 +18,13 @@
 SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jq -r .id)
 # 触发 sandbox 创建 + 长命令
 curl -s -X POST "$BASE/session/$SID/message" -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"用 bash 执行 sleep 20 && echo done"}],"model":{"providerID":"zhipuai","modelID":"glm-5.1"}}' &
+  -d '{"parts":[{"type":"text","text":"用 bash 执行 sleep 20 && echo done"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}}' &
 # 并发 destroy
 sleep 5
 curl -s -X POST "$BASE/session/$SID/kill-sandbox" | jq .
 # 再次发消息，sandbox 应重建而非崩溃
 curl -s -X POST "$BASE/session/$SID/message" -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"用 bash 执行 echo rebuilt-ok"}],"model":{"providerID":"zhipuai","modelID":"glm-5.1"}}' | jq -r '.parts[] | select(.type=="text") | .text'
+  -d '{"parts":[{"type":"text","text":"用 bash 执行 echo rebuilt-ok"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}}' | jq -r '.parts[] | select(.type=="text") | .text'
 ```
 
 **期望**：第二条消息正常返回 `rebuilt-ok`，无 "runInSession failed" 或进程崩溃。
@@ -37,13 +37,13 @@ curl -s -X POST "$BASE/session/$SID/message" -H 'Content-Type: application/json'
 SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jq -r .id)
 # 创建 sandbox
 curl -s -X POST "$BASE/session/$SID/message" -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"用 bash 执行 echo warmup"}],"model":{"providerID":"zhipuai","modelID":"glm-5.1"}}' > /dev/null
+  -d '{"parts":[{"type":"text","text":"用 bash 执行 echo warmup"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}}' > /dev/null
 # 获取 sandbox ID
 SB_ID=$(psql "$PG_URL" -t -A -c "SELECT id FROM sandbox WHERE session_id='$SID' AND state='running'")
 # 并发：destroyById + 工具调用
 curl -s -X POST "$BASE/session/$SID/kill-sandbox" &
 curl -s -X POST "$BASE/session/$SID/message" -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"用 bash 执行 echo concurrent-test"}],"model":{"providerID":"zhipuai","modelID":"glm-5.1"}}' | jq -r '.parts[] | select(.type=="text") | .text'
+  -d '{"parts":[{"type":"text","text":"用 bash 执行 echo concurrent-test"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}}' | jq -r '.parts[] | select(.type=="text") | .text'
 wait
 ```
 
@@ -61,13 +61,13 @@ wait
 SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jq -r .id)
 # 启动长命令
 curl -s -X POST "$BASE/session/$SID/prompt_async" -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"用 bash 执行 sleep 30 && echo long-done"}],"model":{"providerID":"zhipuai","modelID":"glm-5.1"}}'
+  -d '{"parts":[{"type":"text","text":"用 bash 执行 sleep 30 && echo long-done"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}}'
 sleep 3
 # abort
 curl -s -X POST "$BASE/session/$SID/abort" | jq .
 # 立即发新命令
 curl -s --max-time 60 -X POST "$BASE/session/$SID/message" -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"用 bash 执行 echo after-abort"}],"model":{"providerID":"zhipuai","modelID":"glm-5.1"}}' | jq -r '.parts[] | select(.type=="text") | .text'
+  -d '{"parts":[{"type":"text","text":"用 bash 执行 echo after-abort"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}}' | jq -r '.parts[] | select(.type=="text") | .text'
 ```
 
 **期望**：`after-abort` 正常返回，无输出混乱或 execd panic。
@@ -78,13 +78,13 @@ curl -s --max-time 60 -X POST "$BASE/session/$SID/message" -H 'Content-Type: app
 SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jq -r .id)
 for i in 1 2 3; do
   curl -s -X POST "$BASE/session/$SID/message" -H 'Content-Type: application/json' \
-    -d "{\"parts\":[{\"type\":\"text\",\"text\":\"用 bash 执行 echo round-$i\"}],\"model\":{\"providerID\":\"zhipuai\",\"modelID\":\"glm-5.1\"}}" > /dev/null
+    -d "{\"parts\":[{\"type\":\"text\",\"text\":\"用 bash 执行 echo round-$i\"}],\"model\":{\"providerID\":\"Yd-DeepSeek\",\"modelID\":\"deepseek-v4-flash\"}}" > /dev/null
   curl -s -X POST "$BASE/session/$SID/kill-sandbox" > /dev/null
   sleep 2
 done
 # 最终一次命令验证
 curl -s -X POST "$BASE/session/$SID/message" -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"用 bash 执行 echo final-check"}],"model":{"providerID":"zhipuai","modelID":"glm-5.1"}}' | jq -r '.parts[] | select(.type=="text") | .text'
+  -d '{"parts":[{"type":"text","text":"用 bash 执行 echo final-check"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}}' | jq -r '.parts[] | select(.type=="text") | .text'
 ```
 
 **期望**：每次 kill 后重建 sandbox，`final-check` 正常返回。
@@ -102,7 +102,7 @@ SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}
 # 并发 3 条消息（不同模型调用但同一 session）
 for i in 1 2 3; do
   curl -s -X POST "$BASE/session/$SID/prompt_async" -H 'Content-Type: application/json' \
-    -d "{\"parts\":[{\"type\":\"text\",\"text\":\"回复 $i\"}],\"model\":{\"providerID\":\"zhipuai\",\"modelID\":\"glm-5.1\"}}" &
+    -d "{\"parts\":[{\"type\":\"text\",\"text\":\"回复 $i\"}],\"model\":{\"providerID\":\"Yd-DeepSeek\",\"modelID\":\"deepseek-v4-flash\"}}" &
 done
 wait
 sleep 30
@@ -121,7 +121,7 @@ for i in 1 2 3; do
   S=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jq -r .id)
   SIDS+=($S)
   curl -s -X POST "$BASE/session/$S/prompt_async" -H 'Content-Type: application/json' \
-    -d "{\"parts\":[{\"type\":\"text\",\"text\":\"回复 session-$i\"}],\"model\":{\"providerID\":\"zhipuai\",\"modelID\":\"glm-5.1\"}}" &
+    -d "{\"parts\":[{\"type\":\"text\",\"text\":\"回复 session-$i\"}],\"model\":{\"providerID\":\"Yd-DeepSeek\",\"modelID\":\"deepseek-v4-flash\"}}" &
 done
 wait
 sleep 30
@@ -143,13 +143,13 @@ done
 SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jq -r .id)
 # 创建 sandbox
 curl -s -X POST "$BASE/session/$SID/message" -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"用 bash 执行 echo create"}],"model":{"providerID":"zhipuai","modelID":"glm-5.1"}}' > /dev/null
+  -d '{"parts":[{"type":"text","text":"用 bash 执行 echo create"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}}' > /dev/null
 SB_ID=$(psql "$PG_URL" -t -A -c "SELECT id FROM sandbox WHERE session_id='$SID' AND state='running'")
 # 并发 destroyById + 消息
 curl -s -X POST "$BASE/session/$SID/kill-sandbox" &
 sleep 1
 curl -s -X POST "$BASE/session/$SID/message" -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"用 bash 执行 echo after-destroyById"}],"model":{"providerID":"zhipuai","modelID":"glm-5.1"}}' | jq -r '.parts[] | select(.type=="text") | .text'
+  -d '{"parts":[{"type":"text","text":"用 bash 执行 echo after-destroyById"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}}' | jq -r '.parts[] | select(.type=="text") | .text'
 wait
 ```
 
@@ -165,7 +165,7 @@ wait
 SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jq -r .id)
 # 创建 sandbox
 curl -s -X POST "$BASE/session/$SID/message" -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"用 bash 执行 echo create-sandbox"}],"model":{"providerID":"zhipuai","modelID":"glm-5.1"}}' > /dev/null
+  -d '{"parts":[{"type":"text","text":"用 bash 执行 echo create-sandbox"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}}' > /dev/null
 sleep 2
 STATE_BEFORE=$(psql "$PG_URL" -t -A -c "SELECT state FROM sandbox WHERE session_id='$SID'")
 echo "before delete: sandbox state=$STATE_BEFORE"
@@ -184,7 +184,7 @@ echo "after delete: sandbox state=$STATE_AFTER"
 SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jq -r .id)
 # 发异步消息（LLM 正在生成）
 curl -s -X POST "$BASE/session/$SID/prompt_async" -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"写一首 500 字的诗"}],"model":{"providerID":"zhipuai","modelID":"glm-5.1"}}'
+  -d '{"parts":[{"type":"text","text":"写一首 500 字的诗"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}}'
 sleep 2
 MSG_BEFORE=$(psql "$PG_URL" -t -A -c "SELECT count(*) FROM message WHERE session_id='$SID'")
 # 立即删除
@@ -202,7 +202,7 @@ echo "messages: before_delete=$MSG_BEFORE after_20s=$MSG_AFTER"
 ```bash
 SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jq -r .id)
 curl -s -X POST "$BASE/session/$SID/message" -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"用 bash 执行 echo orphan-test"}],"model":{"providerID":"zhipuai","modelID":"glm-5.1"}}' > /dev/null
+  -d '{"parts":[{"type":"text","text":"用 bash 执行 echo orphan-test"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}}' > /dev/null
 sleep 3
 curl -s -X DELETE "$BASE/session/$SID" > /dev/null
 sleep 5
