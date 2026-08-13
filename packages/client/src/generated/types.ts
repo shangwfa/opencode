@@ -662,6 +662,7 @@ export type SessionsContextOutput = {
         readonly reason: "auto" | "manual"
         readonly summary: string
         readonly recent: string
+        readonly historyPath?: string
         readonly id: string
         readonly metadata?: { readonly [x: string]: JsonValue }
         readonly time: { readonly created: number }
@@ -1083,6 +1084,7 @@ export type SessionsHistoryOutput = {
           readonly reason: "auto" | "manual"
           readonly text: string
           readonly recent: string
+          readonly historyPath?: string
         }
       }
     | {
@@ -1541,6 +1543,7 @@ export type SessionsEventsOutput =
         readonly reason: "auto" | "manual"
         readonly text: string
         readonly recent: string
+        readonly historyPath?: string
       }
     }
   | {
@@ -1740,6 +1743,7 @@ export type SessionsMessageOutput = {
         readonly reason: "auto" | "manual"
         readonly summary: string
         readonly recent: string
+        readonly historyPath?: string
         readonly id: string
         readonly metadata?: { readonly [x: string]: JsonValue }
         readonly time: { readonly created: number }
@@ -1912,6 +1916,7 @@ export type MessagesListOutput = {
         readonly reason: "auto" | "manual"
         readonly summary: string
         readonly recent: string
+        readonly historyPath?: string
         readonly id: string
         readonly metadata?: { readonly [x: string]: JsonValue }
         readonly time: { readonly created: number }
