@@ -7,6 +7,7 @@ import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { EventV2 } from "@opencode-ai/core/event"
 import { Location } from "@opencode-ai/core/location"
 import { PermissionV2 } from "@opencode-ai/core/permission"
+import { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import { PermissionTable } from "@opencode-ai/core/permission/sql"
 import { PermissionSaved } from "@opencode-ai/core/permission/saved"
 import { Project } from "@opencode-ai/core/project"
@@ -72,6 +73,30 @@ function setRules(rules: PermissionV2.Ruleset) {
         agent.permissions = [...rules]
       }),
     )
+  })
+}
+
+function setSessionPermission(rules: PermissionV1.Ruleset) {
+  return Effect.gen(function* () {
+    const { db } = yield* Database.Service
+    yield* db
+      .update(SessionTable)
+      .set({ permission: rules })
+      .where(eq(SessionTable.id, SessionV2.ID.make("ses_test")))
+      .run()
+      .pipe(Effect.orDie)
+  })
+}
+
+function clearSessionPermission() {
+  return Effect.gen(function* () {
+    const { db } = yield* Database.Service
+    yield* db
+      .update(SessionTable)
+      .set({ permission: null })
+      .where(eq(SessionTable.id, SessionV2.ID.make("ses_test")))
+      .run()
+      .pipe(Effect.orDie)
   })
 }
 
@@ -280,6 +305,94 @@ describe("PermissionV2", () => {
           ),
         ).toBe(true)
       expect(yield* service.list()).toEqual([])
+    }),
+  )
+
+  it.effect("uses session-level permission rules when set", () =>
+    Effect.gen(function* () {
+      yield* setup([{ action: "read", resource: "*", effect: "deny" }])
+      yield* setSessionPermission([{ permission: "read", pattern: "src/index.ts", action: "allow" }])
+      const service = yield* PermissionV2.Service
+      expect(yield* service.ask(assertion())).toEqual({ id: PermissionV2.ID.create("per_test"), effect: "allow" })
+    }),
+  )
+
+  it.effect("session-level deny overrides agent-level allow", () =>
+    Effect.gen(function* () {
+      yield* setup([{ action: "read", resource: "*", effect: "allow" }])
+      yield* setSessionPermission([{ permission: "read", pattern: "src/index.ts", action: "deny" }])
+      const service = yield* PermissionV2.Service
+      expect(yield* service.ask(assertion())).toEqual({ id: PermissionV2.ID.create("per_test"), effect: "deny" })
+    }),
+  )
+
+  it.effect("session-level deny on external_directory blocks agent-level allow", () =>
+    Effect.gen(function* () {
+      yield* setup([{ action: "external_directory", resource: "*", effect: "allow" }])
+      yield* setSessionPermission([{ permission: "external_directory", pattern: "/tmp/*", action: "deny" }])
+      const service = yield* PermissionV2.Service
+      expect(
+        yield* service.ask(
+          assertion({ action: "external_directory", resources: ["/tmp/foo"] }),
+        ),
+      ).toEqual({ id: PermissionV2.ID.create("per_test"), effect: "deny" })
+    }),
+  )
+
+  it.effect("session-level allow on external_directory overrides agent-level deny", () =>
+    Effect.gen(function* () {
+      yield* setup([{ action: "external_directory", resource: "*", effect: "deny" }])
+      yield* setSessionPermission([{ permission: "external_directory", pattern: "/tmp/*", action: "allow" }])
+      const service = yield* PermissionV2.Service
+      expect(
+        yield* service.ask(
+          assertion({ action: "external_directory", resources: ["/tmp/foo"] }),
+        ),
+      ).toEqual({ id: PermissionV2.ID.create("per_test"), effect: "allow" })
+    }),
+  )
+
+  it.effect("falls back to agent rules when no session permission is set", () =>
+    Effect.gen(function* () {
+      yield* setup([{ action: "read", resource: "*", effect: "deny" }])
+      const service = yield* PermissionV2.Service
+      expect(yield* service.ask(assertion())).toEqual({ id: PermissionV2.ID.create("per_test"), effect: "deny" })
+      yield* setRules([{ action: "read", resource: "*", effect: "allow" }])
+      expect(yield* service.ask(assertion())).toEqual({ id: PermissionV2.ID.create("per_test"), effect: "allow" })
+    }),
+  )
+
+  it.effect("session permission with ask still prompts", () =>
+    Effect.gen(function* () {
+      yield* setup([{ action: "read", resource: "*", effect: "allow" }])
+      yield* setSessionPermission([{ permission: "read", pattern: "src/index.ts", action: "ask" }])
+      const service = yield* PermissionV2.Service
+      expect(yield* service.ask(assertion())).toEqual({ id: PermissionV2.ID.create("per_test"), effect: "ask" })
+      expect(yield* service.get(PermissionV2.ID.create("per_test"))).toBeDefined()
+    }),
+  )
+
+  it.effect("cleared session permission falls back to agent-only evaluation", () =>
+    Effect.gen(function* () {
+      yield* setup([{ action: "read", resource: "*", effect: "deny" }])
+      yield* setSessionPermission([{ permission: "read", pattern: "src/index.ts", action: "allow" }])
+      const service = yield* PermissionV2.Service
+      expect(yield* service.ask(assertion())).toEqual({ id: PermissionV2.ID.create("per_test"), effect: "allow" })
+      yield* clearSessionPermission()
+      expect(yield* service.ask(assertion())).toEqual({ id: PermissionV2.ID.create("per_test"), effect: "deny" })
+    }),
+  )
+
+  it.effect("session permission specific pattern does not match unrelated resources", () =>
+    Effect.gen(function* () {
+      yield* setup([{ action: "read", resource: "*", effect: "ask" }])
+      yield* setSessionPermission([{ permission: "read", pattern: "src/index.ts", action: "allow" }])
+      const service = yield* PermissionV2.Service
+      expect(yield* service.ask(assertion({ resources: ["src/other.ts"] }))).toEqual({
+        id: PermissionV2.ID.create("per_test"),
+        effect: "ask",
+      })
+      expect(yield* service.get(PermissionV2.ID.create("per_test"))).toBeDefined()
     }),
   )
 
