@@ -21,36 +21,36 @@ function ThinkingBlock({ reasoning, traces, isStreaming }: { reasoning: string; 
   const hasContent = Boolean(reasoning.trim()) || items.length > 0 || hasStats || isStreaming;
   if (!hasContent) return null;
   return (
-    <div className="mb-4 overflow-hidden rounded-xl border border-border bg-muted/30">
+    <div className="mb-4 overflow-hidden rounded-xl border border-border bg-muted/40">
       <button
         type="button"
         onClick={() => setExpanded((value) => !value)}
         aria-expanded={effectiveExpanded}
-        className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
+        className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-[13px] text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
       >
-        <ChevronRight className={`size-4 transition-transform ${effectiveExpanded ? "rotate-90" : ""}`} />
-        <span className="font-medium text-foreground">{isStreaming ? "正在思考" : "已深度思考"}</span>
-        <Clock3 className="ml-auto size-4 opacity-60" />
+        <ChevronRight className={`size-3.5 transition-transform duration-200 ${effectiveExpanded ? "rotate-90" : ""}`} />
+        <span className="font-medium text-foreground/90">{isStreaming ? "正在思考" : "已深度思考"}</span>
+        <Clock3 className="ml-auto size-3.5 opacity-60" />
       </button>
       {effectiveExpanded && (
-        <div className="border-t border-border px-4 py-4 text-sm leading-6 text-muted-foreground">
+        <div className="border-t border-border px-4 py-4 text-[13px] leading-6 text-muted-foreground">
           {reasoning.trim() && (
-            <div className="border-l-2 border-border pl-3 whitespace-pre-wrap">{reasoning.trim()}</div>
+            <div className="border-l-2 border-primary/30 pl-3 whitespace-pre-wrap">{reasoning.trim()}</div>
           )}
           {items.length > 0 && (
-            <div className={`grid gap-2 ${reasoning.trim() ? "mt-4" : ""}`}>
+            <div className={`grid gap-1.5 ${reasoning.trim() ? "mt-4" : ""}`}>
               {items.map((item) => (
                 <TraceRow key={item.id} item={item} />
               ))}
             </div>
           )}
           {hasStats && (
-            <div className="mt-3 text-xs text-muted-foreground/80">
+            <div className="mt-3 text-xs text-muted-foreground/70">
               {`输入 ${stats.tokens.input.toLocaleString()} · 输出 ${stats.tokens.output.toLocaleString()} · 推理 ${stats.tokens.reasoning.toLocaleString()} · 缓存读取 ${stats.tokens.cacheRead.toLocaleString()} · ${stats.steps} 个步骤`}
             </div>
           )}
           {isStreaming && !reasoning.trim() && items.length === 0 && !hasStats && (
-            <div className="text-muted-foreground">正在等待 OpenCode 返回执行进度…</div>
+            <div className="text-muted-foreground/80">正在等待 OpenCode 返回执行进度…</div>
           )}
         </div>
       )}

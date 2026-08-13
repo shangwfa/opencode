@@ -27,7 +27,7 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
-import { MessageSquare, Plus, Send, Square } from "lucide-react";
+import { Plus, Send, Square } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const STARTERS = [
@@ -56,6 +56,11 @@ function upsertTrace(traces: TraceItem[], item: TraceItem): TraceItem[] {
     return next;
   }
   return [...traces, item];
+}
+
+function displayTitle(title: string | undefined) {
+  if (!title || title.startsWith("New session")) return "新会话";
+  return title;
 }
 
 type ThreadState = {
@@ -283,30 +288,30 @@ export function ChatApp() {
     <SidebarProvider>
       <div className="flex h-screen w-screen overflow-hidden">
         <Sidebar>
-          <SidebarHeader className="px-3 py-2.5">
-            <span className="text-sm font-semibold">OpenCode shadcn</span>
+          <SidebarHeader className="px-4 py-3.5">
+            <span className="text-[15px] font-semibold tracking-tight">OpenCode shadcn</span>
           </SidebarHeader>
           <SidebarContent>
             <SidebarGroup>
               <SidebarGroupContent>
-                <div className="px-2 pb-2">
-                  <SidebarMenuButton className="w-full" onClick={createThread}>
+                <div className="px-2 pb-3">
+                  <SidebarMenuButton className="w-full" variant="outline" onClick={createThread}>
                     <Plus className="size-4" />
-                    <span>New Chat</span>
+                    <span className="font-medium">New Chat</span>
                   </SidebarMenuButton>
                 </div>
-                <ScrollArea className="h-[calc(100vh-8rem)]">
-                  <SidebarMenu>
+                <ScrollArea className="h-[calc(100vh-8.5rem)]">
+                  <SidebarMenu className="gap-1.5 px-1">
                     {threads.map((thread) => (
                       <SidebarMenuItem key={thread.id}>
                         <SidebarMenuButton
                           isActive={thread.id === selectedThreadId}
                           onClick={() => selectThread(thread.id)}
+                          className="h-9"
                         >
-                          <MessageSquare className="size-3.5 shrink-0 opacity-60" />
-                          <span>{thread.title || "New conversation"}</span>
+                          <span className="truncate text-[13px]">{displayTitle(thread.title)}</span>
                         </SidebarMenuButton>
-                        <SidebarMenuAction onClick={() => deleteThread(thread.id)}>
+                        <SidebarMenuAction onClick={() => deleteThread(thread.id)} showOnHover>
                           ×
                         </SidebarMenuAction>
                       </SidebarMenuItem>
@@ -320,38 +325,38 @@ export function ChatApp() {
 
         <SidebarInset>
           <div className="flex flex-col h-screen">
-            <header className="flex h-12 items-center gap-2 border-b px-4">
-              <SidebarTrigger />
-              <span className="text-sm font-medium">{threads.find((t) => t.id === selectedThreadId)?.title ?? "New conversation"}</span>
+            <header className="flex h-12 shrink-0 items-center gap-2 border-b px-4">
+              <SidebarTrigger className="-ml-1" />
+              <span className="truncate text-sm font-medium">{threads.find((t) => t.id === selectedThreadId)?.title ? displayTitle(threads.find((t) => t.id === selectedThreadId)!.title) : "New conversation"}</span>
             </header>
 
             <div ref={scrollRef} className="flex-1 overflow-y-auto">
               {messages.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center gap-6 p-8">
-                  <div className="text-center space-y-1">
+                <div className="h-full flex flex-col items-center justify-center gap-8 p-8">
+                  <div className="text-center space-y-2">
                     <h2 className="text-2xl font-semibold tracking-tight">OpenCode shadcn</h2>
                     <p className="text-sm text-muted-foreground">Choose a starter or type your query below</p>
                   </div>
-                  <div className="grid gap-2 sm:grid-cols-3 max-w-2xl w-full">
+                  <div className="grid gap-3 sm:grid-cols-3 max-w-2xl w-full">
                     {STARTERS.map((starter) => (
                       <Card
                         key={starter.displayText}
-                        className="cursor-pointer hover:bg-muted/50 transition-colors"
+                        className="cursor-pointer transition-all hover:bg-muted/50 hover:shadow-sm"
                         onClick={() => sendMessage(starter.prompt)}
                       >
                         <CardContent className="p-4">
-                          <span className="text-sm font-medium">{starter.displayText}</span>
+                          <span className="text-sm font-medium leading-snug">{starter.displayText}</span>
                         </CardContent>
                       </Card>
                     ))}
                   </div>
                 </div>
               ) : (
-                <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
+                <div className="max-w-3xl mx-auto px-6 py-6 space-y-7">
                   {messages.map((message) =>
                     message.role === "user" ? (
                       <div key={message.id} className="flex justify-end">
-                        <div className="rounded-2xl bg-primary text-primary-foreground px-4 py-2.5 max-w-[80%] text-sm whitespace-pre-wrap">
+                        <div className="rounded-2xl rounded-br-md bg-primary text-primary-foreground px-4 py-2.5 max-w-[80%] text-sm leading-relaxed whitespace-pre-wrap">
                           {message.content}
                         </div>
                       </div>
@@ -369,38 +374,40 @@ export function ChatApp() {
             </div>
 
             {recovering && (
-              <div className="fixed bottom-5 right-5 z-50 flex items-center gap-3 rounded-xl border border-border bg-background/95 px-3 py-2 shadow-lg backdrop-blur">
+              <div className="fixed bottom-5 right-5 z-50 flex items-center gap-3 rounded-full border border-border bg-background/95 px-3.5 py-2 shadow-lg backdrop-blur">
                 <div className="flex gap-1">
                   {[0, 1, 2].map((i) => (
                     <div key={i} className="size-1.5 rounded-full bg-primary/60 animate-pulse" style={{ animationDelay: `${i * 150}ms` }} />
                   ))}
                 </div>
-                <span className="text-sm text-muted-foreground">后台继续生成中</span>
-                <Button size="icon" variant="default" className="size-7" onClick={stopRecovery}>
-                  <Square className="size-3 fill-current" />
+                <span className="text-xs text-muted-foreground">后台继续生成中</span>
+                <Button size="icon" variant="default" className="size-6 rounded-full" onClick={stopRecovery}>
+                  <Square className="size-2.5 fill-current" />
                 </Button>
               </div>
             )}
 
-            <div className="border-t bg-background/95 backdrop-blur p-4">
-              <div className="max-w-3xl mx-auto flex gap-2 items-end">
-                <Textarea
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder="Type your query here"
-                  className="min-h-[44px] max-h-32 resize-none"
-                  rows={1}
-                  disabled={phase !== "idle"}
-                />
-                <Button
-                  size="icon"
-                  className="size-11 shrink-0"
-                  disabled={phase !== "idle" || !input.trim()}
-                  onClick={() => { sendMessage(input); setInput(""); }}
-                >
-                  {phase !== "idle" ? <Square className="size-4 fill-current" /> : <Send className="size-4" />}
-                </Button>
+            <div className="shrink-0 border-t bg-background/95 backdrop-blur">
+              <div className="max-w-3xl mx-auto p-4">
+                <div className="flex items-end gap-2 rounded-2xl border border-input bg-background shadow-sm transition-shadow focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/20 px-3 py-2">
+                  <Textarea
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder="Type your query here"
+                    className="min-h-[28px] max-h-32 resize-none border-0 bg-transparent px-0 py-1 !shadow-none focus-visible:border-0 focus-visible:ring-0 focus-visible:ring-offset-0"
+                    rows={1}
+                    disabled={phase !== "idle"}
+                  />
+                  <Button
+                    size="icon"
+                    className="size-8 shrink-0 rounded-lg"
+                    disabled={phase !== "idle" || !input.trim()}
+                    onClick={() => { sendMessage(input); setInput(""); }}
+                  >
+                    {phase !== "idle" ? <Square className="size-3.5 fill-current" /> : <Send className="size-4" />}
+                  </Button>
+                </div>
               </div>
             </div>
           </div>
