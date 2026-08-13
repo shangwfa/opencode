@@ -2,8 +2,10 @@ export * as SessionCompaction from "./compaction"
 
 import { LLM, LLMError, LLMEvent, Message, type LLMRequest, type Model } from "@opencode-ai/llm"
 import { DateTime, Effect, Stream } from "effect"
+import path from "path"
 import type { Config } from "../config"
 import type { EventV2 } from "../event"
+import { FSUtil } from "../fs-util"
 import { SessionEvent } from "./event"
 import { SessionMessage } from "./message"
 import { SessionSchema } from "./schema"
@@ -62,6 +64,8 @@ type Dependencies = {
     readonly stream: (request: LLMRequest) => Stream.Stream<LLMEvent, LLMError>
   }
   readonly config: readonly Config.Entry[]
+  readonly fs: FSUtil.Interface
+  readonly historyDir: string
 }
 
 type Input = {
@@ -83,7 +87,7 @@ export const serializeToolContent = (content: SessionMessage.ToolStateCompleted[
     )
     .join("\n")
 
-const serialize = (message: SessionMessage.Message) => {
+export const serialize = (message: SessionMessage.Message, full = false) => {
   if (message.type === "user") {
     const files = message.files?.map((file) => `[Attached ${file.mime}: ${file.name ?? file.uri}]`) ?? []
     return [`[User]: ${message.text}`, ...files].join("\n")
@@ -97,7 +101,9 @@ const serialize = (message: SessionMessage.Message) => {
         if (part.state.status === "completed")
           return [
             `[Assistant tool call]: ${part.name}(${input})`,
-            `[Tool result]: ${truncate(serializeToolContent(part.state.content))}`,
+            `[Tool result]: ${
+              full ? serializeToolContent(part.state.content) : truncate(serializeToolContent(part.state.content))
+            }`,
           ]
         if (part.state.status === "error")
           return [`[Assistant tool call]: ${part.name}(${input})`, `[Tool error]: ${part.state.error.message}`]
@@ -107,8 +113,13 @@ const serialize = (message: SessionMessage.Message) => {
   }
   if (message.type === "system") return `[System update]: ${message.text}`
   if (message.type === "synthetic") return `[Synthetic context]: ${message.text}`
-  if (message.type === "shell") return `[Shell]: ${message.command}\n${truncate(message.output)}`
+  if (message.type === "shell") return `[Shell]: ${message.command}\n${full ? message.output : truncate(message.output)}`
   return ""
+}
+
+export const serializeHistory = (message: SessionMessage.Message) => {
+  const created = new Date(DateTime.toEpochMillis(message.time.created)).toISOString()
+  return `## ${message.id} | ${message.type} | ${created}\n${serialize(message, true)}`
 }
 
 const settings = (documents: readonly Config.Entry[]) => {
@@ -128,23 +139,23 @@ const settings = (documents: readonly Config.Entry[]) => {
 const select = (
   entries: readonly Entry[],
   tokens: number,
-): { readonly head: string; readonly recent: string } | undefined => {
+): { readonly head: string; readonly recent: string; readonly headEntries: readonly Entry[] } | undefined => {
   const conversation = entries
     .filter((entry) => entry.message.type !== "compaction")
-    .map((entry) => serialize(entry.message))
-    .filter(Boolean)
+    .map((entry) => ({ entry, text: serialize(entry.message) }))
+    .filter((item) => item.text.length > 0)
   if (conversation.length === 0) return
   let total = 0
   let split = conversation.length
   let splitPrefix = ""
   let splitSuffix = ""
   for (let index = conversation.length - 1; index >= 0; index--) {
-    const next = total + Token.estimate(conversation[index])
+    const next = total + Token.estimate(conversation[index].text)
     if (next > tokens) {
       const remaining = Math.max(0, tokens - total) * 4
       if (remaining > 0) {
-        splitPrefix = conversation[index].slice(0, -remaining)
-        splitSuffix = conversation[index].slice(-remaining)
+        splitPrefix = conversation[index].text.slice(0, -remaining)
+        splitSuffix = conversation[index].text.slice(-remaining)
         split = index + 1
       }
       break
@@ -153,8 +164,9 @@ const select = (
     split = index
   }
   return {
-    head: [...conversation.slice(0, split), splitPrefix].filter(Boolean).join("\n\n"),
-    recent: [splitSuffix, ...conversation.slice(split)].filter(Boolean).join("\n\n"),
+    head: [...conversation.slice(0, split).map((item) => item.text), splitPrefix].filter(Boolean).join("\n\n"),
+    recent: [splitSuffix, ...conversation.slice(split).map((item) => item.text)].filter(Boolean).join("\n\n"),
+    headEntries: conversation.slice(0, split).map((item) => item.entry),
   }
 }
 
@@ -169,6 +181,18 @@ export const buildPrompt = (input: { readonly previousSummary?: string; readonly
 
 export const make = (dependencies: Dependencies) => {
   const config = settings(dependencies.config)
+  const writeHistory: (input: {
+    messageID: SessionMessage.ID
+    entries: readonly Entry[]
+  }) => Effect.Effect<string | undefined, FSUtil.Error> = Effect.fn(
+    "SessionCompaction.writeHistory",
+  )(function* (input) {
+    const text = input.entries.map((entry) => serializeHistory(entry.message)).join("\n\n")
+    const file = path.join(dependencies.historyDir, `tool_history_${input.messageID}.md`)
+    yield* dependencies.fs.ensureDir(dependencies.historyDir)
+    yield* dependencies.fs.writeFileString(file, text)
+    return file
+  })
   const compactAfterOverflow = Effect.fn("SessionCompaction.compactAfterOverflow")(function* (input: Input) {
     const context = input.model.route.defaults.limits?.context
     if (context === undefined || context <= 0) return false
@@ -212,6 +236,16 @@ export const make = (dependencies: Dependencies) => {
       )
     const summary = chunks.join("")
     if (!summarized || failed || !summary.trim()) return false
+    const historyPath =
+      selected.headEntries.length > 0
+        ? yield* writeHistory({ messageID, entries: selected.headEntries }).pipe(
+            Effect.catch((error) =>
+              Effect.logWarning("failed to write compaction history", { error: String(error) }).pipe(
+                Effect.as(undefined),
+              ),
+            ),
+          )
+        : undefined
     yield* dependencies.events.publish(SessionEvent.Compaction.Ended, {
       sessionID: input.sessionID,
       messageID,
@@ -219,6 +253,7 @@ export const make = (dependencies: Dependencies) => {
       reason: "auto",
       text: summary,
       recent: selected.recent,
+      historyPath,
     })
     return true
   })

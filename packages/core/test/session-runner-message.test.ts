@@ -139,6 +139,30 @@ Recent work
     ])
   })
 
+  test("appends a retrieval hint to the checkpoint when historyPath is set", () => {
+    const messages = toLLMMessages(
+      [
+        SessionMessage.Compaction.make({
+          id: id("compaction"),
+          type: "compaction",
+          reason: "auto",
+          summary: "Earlier work",
+          recent: "Recent work",
+          historyPath: "/data/opencode/tool-output/tool_history_msg_x.md",
+          time: { created },
+        }),
+      ],
+      model,
+    )
+
+    const text = (messages[0]!.content as Array<{ type: "text"; text: string }>)[0]!.text
+    expect(text).toContain(
+      "The full record of the compacted conversation is available at /data/opencode/tool-output/tool_history_msg_x.md.",
+    )
+    expect(text).toContain("search that file with Grep or Read (offset/limit). Do NOT read the whole file - it may be very large.")
+    expect(text).toContain("<conversation-checkpoint>")
+  })
+
   test("replays durable tool media into canonical tool messages without structured base64", () => {
     const messages = toLLMMessages(
       [

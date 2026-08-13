@@ -9,10 +9,13 @@ import {
   type ProviderErrorEvent,
 } from "@opencode-ai/llm"
 import { Cause, DateTime, Effect, FiberSet, Layer, Option, Semaphore, Stream } from "effect"
+import path from "path"
 import { AgentV2 } from "../../agent"
 import { Config } from "../../config"
 import { Database } from "../../database/database"
 import { EventV2 } from "../../event"
+import { FSUtil } from "../../fs-util"
+import { Global } from "../../global"
 import { Location } from "../../location"
 import { ModelV2 } from "../../model"
 import { PermissionV2 } from "../../permission"
@@ -106,7 +109,14 @@ const layer = Layer.effect(
     const config = yield* Config.Service
     const snapshots = yield* Snapshot.Service
     const db = (yield* Database.Service).db
-    const compaction = SessionCompaction.make({ events, llm, config: yield* config.entries() })
+    const fs = yield* FSUtil.Service
+    const compaction = SessionCompaction.make({
+      events,
+      llm,
+      config: yield* config.entries(),
+      fs,
+      historyDir: path.join(Global.Path.data, "tool-output"),
+    })
     const getSession = Effect.fn("SessionRunner.getSession")(function* (sessionID: SessionSchema.ID) {
       const session = yield* store.get(sessionID)
       if (!session) return yield* Effect.die(`Session not found: ${sessionID}`)
@@ -428,5 +438,6 @@ export const node = makeLocationNode({
     Config.node,
     Snapshot.node,
     Database.node,
+    FSUtil.node,
   ],
 })

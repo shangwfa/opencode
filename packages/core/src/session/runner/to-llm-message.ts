@@ -182,7 +182,9 @@ ${message.summary}
 <recent-context>
 ${message.recent}
 </recent-context>
-</conversation-checkpoint>`,
+${message.historyPath
+  ? `\nThe full record of the compacted conversation is available at ${message.historyPath}. If the summary misses details you need, search that file with Grep or Read (offset/limit). Do NOT read the whole file - it may be very large.\n`
+  : ""}</conversation-checkpoint>`,
           metadata: message.metadata,
         }),
       ]
