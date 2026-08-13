@@ -41,7 +41,7 @@ export const RadioGroup = defineComponent({
     const fieldName = props.name as string;
     const value = (getFieldValue(formName, fieldName) as string | undefined) ?? "";
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const items = ((props.items ?? []) as any[]).filter((item) => item?.props?.value);
+    const items = (Array.isArray(props.items) ? (props.items as any[]) : []).filter((item) => item?.props?.value);
 
     return (
       <ShadcnRadioGroup

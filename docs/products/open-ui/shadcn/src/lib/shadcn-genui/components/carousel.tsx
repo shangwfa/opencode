@@ -22,7 +22,7 @@ export const Carousel = defineComponent({
   description:
     'Horizontal sliding content. slides: array of slide arrays. variant: "default" | "card".',
   component: ({ props, renderNode }) => {
-    const slides = (props.slides ?? []) as unknown[][];
+    const slides = Array.isArray(props.slides) ? props.slides : [];
     const isCard = props.variant === "card";
 
     return (

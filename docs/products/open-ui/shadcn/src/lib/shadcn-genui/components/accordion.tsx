@@ -34,8 +34,18 @@ export const Accordion = defineComponent({
   description: 'Collapsible sections. type: "single" | "multiple". items: AccordionItem[].',
   component: ({ props, renderNode }) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const items = (props.items ?? []) as any[];
-    const type = props.type ?? "multiple";
+    const rawProps = props as { items?: unknown; type?: unknown };
+    // Older streamed responses can place the optional type before items.
+    const items = Array.isArray(rawProps.items)
+      ? rawProps.items
+      : Array.isArray(rawProps.type)
+        ? rawProps.type
+        : [];
+    const type = rawProps.items === "single" || rawProps.items === "multiple"
+      ? rawProps.items
+      : rawProps.type === "single" || rawProps.type === "multiple"
+        ? rawProps.type
+        : "multiple";
 
     if (type === "single") {
       return (

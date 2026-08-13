@@ -30,7 +30,7 @@ export const Tabs = defineComponent({
   description: "Tabbed content. items: TabItem[]. defaultValue: initially active tab.",
   component: ({ props, renderNode }) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const rawItems = (props.items ?? []) as any[];
+    const rawItems = Array.isArray(props.items) ? (props.items as any[]) : [];
 
     const items = rawItems.filter(
       (item) => item?.props?.value != null && item?.props?.trigger != null,
@@ -48,21 +48,31 @@ export const Tabs = defineComponent({
     if (items.length === 0) return null;
 
     return (
-      <ShadcnTabs value={activeTab} onValueChange={setUserSelected}>
-        <TabsList>
-          {items.map((item) => {
-            const val = String(item.props.value);
-            return (
-              <TabsTrigger key={val} value={val}>
-                {String(item.props.trigger)}
-              </TabsTrigger>
-            );
-          })}
-        </TabsList>
+      <ShadcnTabs value={activeTab} onValueChange={setUserSelected} className="gap-3">
+        <div className="-mx-1 overflow-x-auto px-1 pb-1 [scrollbar-width:thin]">
+          <TabsList className="h-auto min-w-max justify-start gap-1 rounded-xl p-1.5">
+            {items.map((item) => {
+              const val = String(item.props.value);
+              return (
+                <TabsTrigger
+                  key={val}
+                  value={val}
+                  className="shrink-0 rounded-lg px-3 py-2 text-sm font-medium whitespace-nowrap data-[state=active]:shadow-sm"
+                >
+                  {String(item.props.trigger)}
+                </TabsTrigger>
+              );
+            })}
+          </TabsList>
+        </div>
         {items.map((item) => {
           const val = String(item.props.value);
           return (
-            <TabsContent key={val} value={val} className="space-y-3">
+            <TabsContent
+              key={val}
+              value={val}
+              className="space-y-3 rounded-xl border bg-muted/20 px-4 py-4 sm:px-5"
+            >
               {renderNode(item.props.content)}
             </TabsContent>
           );

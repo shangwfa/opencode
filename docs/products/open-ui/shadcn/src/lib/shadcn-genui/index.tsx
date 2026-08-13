@@ -167,6 +167,7 @@ export const shadcnComponentGroups: ComponentGroup[] = [
     components: ["Tabs", "TabItem", "Accordion", "AccordionItem", "Carousel"],
     notes: [
       "- Use Tabs to present alternative views — each TabItem has a value id, trigger label, and content array.",
+      '- Accordion argument order is Accordion([AccordionItem(...)], "single" | "multiple"). Never put the type before the items array.',
       "- Carousel takes an array of slides, where each slide is an array of content.",
       "- IMPORTANT: Every slide in a Carousel must have the same structure.",
     ],
@@ -311,10 +312,13 @@ root = Card([title, desc, cal])
 title = TextContent("Select Travel Dates", "large-heavy")
 desc = TextContent("Choose your check-in and check-out dates.", "small")
 cal = CalendarBlock("range", "2025-06-01", 2)`,
+
 ];
 
 export const shadcnAdditionalRules: string[] = [
   "Every response is a single Card(children) — children stack vertically automatically.",
+  "Every visible component definition must be included in Card's children array. When a Heading introduces Tabs, Accordion, Table, or chart content, include that content reference immediately after the Heading.",
+  'Every string argument must close with a double quote. For a two-dimensional Table rows array, close the final cell string before closing rows as `...", "..."]]` - never end a rows definition with `)]`.',
   "Card is the only layout container. Do NOT use Stack. Use Tabs to switch between sections, Carousel for horizontal scroll.",
   "Use FollowUpBlock at the END of a Card to suggest what the user can do or ask next.",
   "Carousel takes an array of slides, where each slide is an array of content.",

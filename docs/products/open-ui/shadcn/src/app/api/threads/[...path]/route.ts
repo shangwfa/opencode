@@ -67,6 +67,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pat
     return NextResponse.json(toThreadShape(record));
   }
 
+  if (path[0] === "abort" && path.length === 2) {
+    const record = db.getThreadRecord(path[1]);
+    if (!record) return NextResponse.json({ error: "not found" }, { status: 404 });
+    const response = await fetch(`${SAAS_URL}/session/${record.saasSessionId}/abort`, { method: "POST" });
+    if (!response.ok) return NextResponse.json({ error: "SaaS session abort failed" }, { status: response.status });
+    return new NextResponse(null, { status: 204 });
+  }
+
   return NextResponse.json({ error: "not found" }, { status: 404 });
 }
 

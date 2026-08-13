@@ -1,17 +1,25 @@
 "use client";
 
-import { type AssistantMessage } from "@openuidev/react-headless";
-import { Renderer } from "@openuidev/react-lang";
-import { normalizeOpenUiCode, parseThinking, RENDER_BOUNDARY, SESSION_PENDING_MARKER, TRAILING_TRACE_BOUNDARY, type TraceItem } from "@/lib/opencode-adapter";
+import { BuiltinActionType, type ActionEvent, Renderer } from "@openuidev/react-lang";
+import {
+  aggregateStats,
+  type ChatMessage,
+  type Phase,
+  normalizeOpenUiCode,
+  type TraceItem,
+} from "@/lib/opencode-adapter";
 import { shadcnChatLibrary } from "@/lib/shadcn-genui";
 import { ChevronRight, CircleAlert, Clock3 } from "lucide-react";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 
-function ThinkingBlock({ content, isStreaming }: { content: string; isStreaming?: boolean }) {
+function ThinkingBlock({ reasoning, traces, isStreaming }: { reasoning: string; traces: TraceItem[]; isStreaming?: boolean }) {
   const [expanded, setExpanded] = useState(false);
   const effectiveExpanded = isStreaming ? true : expanded;
-  const thinking = parseThinking(content);
-  if (!content?.trim()) return null;
+  const items = traces.filter((item) => item.kind !== "stats");
+  const stats = aggregateStats(traces);
+  const hasStats = stats.steps > 0;
+  const hasContent = Boolean(reasoning.trim()) || items.length > 0 || hasStats || isStreaming;
+  if (!hasContent) return null;
   return (
     <div className="mb-4 overflow-hidden rounded-xl border border-border bg-muted/30">
       <button
@@ -26,20 +34,23 @@ function ThinkingBlock({ content, isStreaming }: { content: string; isStreaming?
       </button>
       {effectiveExpanded && (
         <div className="border-t border-border px-4 py-4 text-sm leading-6 text-muted-foreground">
-          {thinking.reasoning && (
-            <div className="border-l-2 border-border pl-3 whitespace-pre-wrap">{thinking.reasoning}</div>
+          {reasoning.trim() && (
+            <div className="border-l-2 border-border pl-3 whitespace-pre-wrap">{reasoning.trim()}</div>
           )}
-          {thinking.items.some((item) => item.kind !== "stats") && (
-            <div className={`grid gap-2 ${thinking.reasoning ? "mt-4" : ""}`}>
-              {thinking.items.filter((item) => item.kind !== "stats").map((item) => (
+          {items.length > 0 && (
+            <div className={`grid gap-2 ${reasoning.trim() ? "mt-4" : ""}`}>
+              {items.map((item) => (
                 <TraceRow key={item.id} item={item} />
               ))}
             </div>
           )}
-          {thinking.items.some((item) => item.kind === "stats") && (
+          {hasStats && (
             <div className="mt-3 text-xs text-muted-foreground/80">
-              {thinking.items.filter((item) => item.kind === "stats").map((item) => `${item.title}${item.output ? ` · ${item.output}` : ""}`).join(" · ")}
+              {`输入 ${stats.tokens.input.toLocaleString()} · 输出 ${stats.tokens.output.toLocaleString()} · 推理 ${stats.tokens.reasoning.toLocaleString()} · 缓存读取 ${stats.tokens.cacheRead.toLocaleString()} · ${stats.steps} 个步骤`}
             </div>
+          )}
+          {isStreaming && !reasoning.trim() && items.length === 0 && !hasStats && (
+            <div className="text-muted-foreground">正在等待 OpenCode 返回执行进度…</div>
           )}
         </div>
       )}
@@ -85,38 +96,44 @@ function TraceDetail({ label, value }: { label: string; value: string }) {
   );
 }
 
-export function ShadcnAssistantMessage({ message, isStreaming }: { message: AssistantMessage; isStreaming: boolean }) {
-  const isRecovering = (message.content ?? "").includes(SESSION_PENDING_MARKER);
-  const content = (message.content ?? "").replace(SESSION_PENDING_MARKER, "");
-  const boundaryIndex = content.indexOf(RENDER_BOUNDARY);
-  const trailingTraceIndex = content.indexOf(TRAILING_TRACE_BOUNDARY);
-  const lineStartMatch = /(^|\n)root\s*=/.exec(content);
-  let rootIndex = boundaryIndex >= 0
-    ? boundaryIndex + RENDER_BOUNDARY.length
-    : lineStartMatch ? lineStartMatch.index + lineStartMatch[1].length : -1;
-  if (rootIndex === -1 && !isStreaming) {
-    const looseMatches = [...content.matchAll(/root\s*=\s*Card\s*\(/g)];
-    if (looseMatches.length > 0) rootIndex = looseMatches[looseMatches.length - 1]!.index!;
-  }
-  const leadingThinking = rootIndex === -1 ? content : content.slice(0, boundaryIndex >= 0 ? boundaryIndex : rootIndex).trim();
-  const trailingThinking = trailingTraceIndex >= 0
-    ? content.slice(trailingTraceIndex + TRAILING_TRACE_BOUNDARY.length).trim()
-    : "";
-  const thinking = [leadingThinking, trailingThinking].filter(Boolean).join("\n\n");
-  const parsedThinking = parseThinking(thinking);
-  const isPending = parsedThinking.items.some((item) => item.status === "pending" || item.status === "running");
-  const code = rootIndex >= 0
-    ? normalizeOpenUiCode(content.slice(rootIndex, trailingTraceIndex >= 0 ? trailingTraceIndex : undefined))
-    : "";
+export function ShadcnAssistantMessage({
+  message,
+  phase,
+  onFollowUp,
+}: {
+  message: ChatMessage;
+  phase: Phase;
+  onFollowUp: (text: string) => void;
+}) {
+  const isGenerating = message.status === "generating";
+  const isRecovering = message.recovering ?? false;
+  const isThinking = (isGenerating && phase === "thinking") || isRecovering;
+  const isRendering = isGenerating && phase === "rendering";
+  const isStreaming = isRendering || isRecovering;
+
+  const reasoning = message.reasoning ?? "";
+  const traces = message.traces ?? [];
+  const code = message.code ? normalizeOpenUiCode(message.code) : "";
+
+  const handleAction = useCallback((event: ActionEvent) => {
+    if (event.type === BuiltinActionType.OpenUrl) {
+      const url = event.params?.url;
+      if (typeof url === "string") window.open(url, "_blank");
+      return;
+    }
+    if (event.type !== BuiltinActionType.ContinueConversation) return;
+    onFollowUp(event.humanFriendlyMessage ?? "");
+  }, [onFollowUp]);
+
   return (
     <>
-      <ThinkingBlock content={thinking} isStreaming={isStreaming || isPending || isRecovering} />
-      {code && !isStreaming && !isRecovering ? (
-        <Renderer response={code} library={shadcnChatLibrary} isStreaming={false} />
-      ) : !isStreaming && !isPending && !isRecovering && (
+      <ThinkingBlock reasoning={reasoning} traces={traces} isStreaming={isThinking} />
+      {code ? (
+        <Renderer response={code} library={shadcnChatLibrary} isStreaming={isStreaming} onAction={handleAction} />
+      ) : message.error && !isGenerating && !isRecovering && (
         <div className="flex items-start gap-2 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
           <CircleAlert className="mt-0.5 size-4" />
-          <span>模型响应没有生成有效的 OpenUI 界面。请重新发送，或在原需求后补充“请只输出 openui-lang”。</span>
+          <span>{message.error}</span>
         </div>
       )}
     </>

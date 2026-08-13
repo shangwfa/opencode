@@ -26,7 +26,7 @@ export const FollowUpBlock = defineComponent({
   component: ({ props }) => {
     const triggerAction = useTriggerAction();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const items = (props.items ?? []) as any[];
+    const items = Array.isArray(props.items) ? (props.items as any[]) : [];
 
     return (
       <div className="flex flex-wrap gap-2">
