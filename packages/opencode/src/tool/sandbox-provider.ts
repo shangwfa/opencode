@@ -10,6 +10,7 @@ import { resolveSandboxOpts } from "../session/sandbox-opts"
 import { SessionTable } from "../session/session.pg"
 import { Database } from "../storage/db"
 import { SandboxTable } from "./sandbox.pg"
+import { ExecLogTable } from "../session/exec-log"
 
 export namespace SandboxConfig {
   export interface Interface {
@@ -965,6 +966,7 @@ export namespace SandboxProvider {
           const resolved = opts ?? (yield* Effect.promise(() => resolveSandboxOpts(sessionID)))
           const resource = resolved.sandbox ?? config.resourceLimits
           log.info("creating sandbox", { sessionID, volumeType: config.volumeType, timeoutSeconds, keepAlive: isKept, pvcMode: resolved.pvcMode, resource })
+          const timeStarted = Date.now()
           const volumes = buildVolumes({ sessionID, pvcMode: resolved.pvcMode, appId: resolved.appId }, config)
           const sb = yield* Effect.tryPromise({
             try: () =>
@@ -985,6 +987,23 @@ export namespace SandboxProvider {
           yield* Effect.tryPromise(() => sb.commands.run("git config --global core.fsmonitor true && git config --global core.untrackedcache true")).pipe(
             Effect.catchCause(() => Effect.void),
           )
+          const timeFinished = Date.now()
+          yield* Effect.tryPromise({
+            try: () =>
+              pgDb
+                .insert(ExecLogTable)
+                .values({
+                  id: `sandbox-create-${timeStarted}`,
+                  session_id: sessionID,
+                  command: JSON.stringify({ sandboxID: sb.id, image: config.image, durationMs: timeFinished - timeStarted }),
+                  status: "completed",
+                  source: "sandbox-create",
+                  time_started: timeStarted,
+                  time_finished: timeFinished,
+                })
+                .run(),
+            catch: () => null,
+          }).pipe(Effect.catchCause(() => Effect.void))
           const host = `http://${config.domain}`
           // 远程创建期间 keepAlive 可能已并发设置（async 场景），upsert 前重新读取
           // latest 的 keep_alive，避免用创建前的快照覆盖掉刚设置的 keepAlive。

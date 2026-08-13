@@ -2,6 +2,7 @@ import { NamedError } from "@opencode-ai/core/util/error"
 import { ConfigErrorV1 } from "@opencode-ai/core/v1/config/error"
 import { Cause, Effect, Option } from "effect"
 import { HttpRouter, HttpServerError, HttpServerRespondable, HttpServerResponse, HttpServerRequest } from "effect/unstable/http"
+import { Agent } from "@/agent/agent"
 
 function extractSessionID(url: string): string | undefined {
   const m = url.match(/\/session\/([^/?]+)/)
@@ -28,7 +29,8 @@ export const errorLayer = HttpRouter.middleware<{ handles: unknown }>()((effect)
           ConfigErrorV1.JsonError.isInstance(error) ||
           ConfigErrorV1.InvalidError.isInstance(error) ||
           ConfigErrorV1.FrontmatterError.isInstance(error) ||
-          ConfigErrorV1.DirectoryTypoError.isInstance(error)
+          ConfigErrorV1.DirectoryTypoError.isInstance(error) ||
+          Agent.InvalidError.isInstance(error)
         ) {
           return Effect.succeed(HttpServerResponse.jsonUnsafe(error.toObject(), { status: 400 }))
         }
