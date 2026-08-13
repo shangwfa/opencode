@@ -74,7 +74,7 @@ send_and_verify "$SID" "用 bash 执行: cd /workspace/tool-regression && rg --v
 
 ### T18.3 编辑工具分支验证
 
-> opencode 会按模型过滤编辑工具：部分 GPT 模型启用 `apply_patch`，其他模型启用 `edit/write`。SaaS 当前常用 `glm-5.1`，默认应覆盖 `edit/write`；如果切换 GPT 模型，需要覆盖 `apply_patch`。
+> opencode 会按模型过滤编辑工具：部分 GPT 模型启用 `apply_patch`，其他模型启用 `edit/write`。SaaS 当前常用 `deepseek-v4-flash`，默认应覆盖 `edit/write`；如果切换 GPT 模型，需要覆盖 `apply_patch`。
 
 ```bash
 send_and_verify "$SID" "把 /workspace/tool-regression/src/search-target.ts 里的 PROFILE_CARD_SENTINEL 改成 PROFILE_CARD_PATCHED" "T18.3a: edit 或 apply_patch 修改"

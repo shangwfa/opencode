@@ -12,7 +12,7 @@ template 支持 `$ARGUMENTS`（全部参数）、`$1`/`$2`/…（位置参数，
 
 ```js
 const BASE = "http://localhost:14096"
-const MODEL = { providerID: "zhipuai", modelID: "glm-5.1" }
+const MODEL = { providerID: "Yd-DeepSeek", modelID: "deepseek-v4-flash" }
 ```
 
 ### 辅助函数
@@ -210,7 +210,7 @@ console.log("hints:", JSON.stringify(res.hints), "(expect [\"custom\"])")
 ```bash
 bun -e '
 const BASE = "http://localhost:14096"
-const MODEL = { providerID: "zhipuai", modelID: "glm-5.1" }
+const MODEL = { providerID: "Yd-DeepSeek", modelID: "deepseek-v4-flash" }
 const SID = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "cmd-exec" }) })).json()
 
 await fetch(BASE + "/session/" + SID.id + "/commands/create", {
@@ -356,7 +356,7 @@ console.log("期望: 0")
 ```bash
 bun -e '
 const BASE = "http://localhost:14096"
-const MODEL = { providerID: "zhipuai", modelID: "glm-5.1" }
+const MODEL = { providerID: "Yd-DeepSeek", modelID: "deepseek-v4-flash" }
 const SID = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "cmd-full-workflow" }) })).json()
 
 // Step 1: 创建 command
@@ -561,15 +561,15 @@ const SID = await (await fetch(BASE + "/session", { method: "POST", headers: { "
 
 const created = await (await fetch(BASE + "/session/" + SID.id + "/commands/create", {
   method: "POST", headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ name: "smart-analysis", template: "Analyze codebase.", description: "Custom model", model: "zhipuai/glm-5.1" }),
+  body: JSON.stringify({ name: "smart-analysis", template: "Analyze codebase.", description: "Custom model", model: "Yd-DeepSeek/deepseek-v4-flash" }),
 })).json()
-console.log("created model:", created.model, "(expect zhipuai/glm-5.1)")
+console.log("created model:", created.model, "(expect Yd-DeepSeek/deepseek-v4-flash)")
 
 const list = await (await fetch(BASE + "/session/" + SID.id + "/commands")).json()
-console.log("list model:", list.find(c => c.name === "smart-analysis")?.model, "(expect zhipuai/glm-5.1)")
+console.log("list model:", list.find(c => c.name === "smart-analysis")?.model, "(expect Yd-DeepSeek/deepseek-v4-flash)")
 '
 ```
-**期望**：创建返回和列表中 `model=zhipuai/glm-5.1`
+**期望**：创建返回和列表中 `model=Yd-DeepSeek/deepseek-v4-flash`
 
 ### T33.27 Shell 输出注入命令（!`cmd`）
 
@@ -645,7 +645,7 @@ console.log("template:", cmd?.template)
 ```bash
 bun -e '
 const BASE = "http://localhost:14096"
-const MODEL = "zhipuai/glm-5.1"
+const MODEL = "Yd-DeepSeek/deepseek-v4-flash"
 const SID = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "multi-cmd" }) })).json()
 const runCommand = (command, args = "") =>
   fetch(BASE + "/session/" + SID.id + "/command", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ command, arguments: args, model: MODEL }) }).then(r => r.json())
@@ -664,7 +664,7 @@ console.log("cmd2:", t2.slice(0, 40), "| contains STEP2_OK:", t2.includes("STEP2
 console.log("✅ 方式一 多命令串行编排:", t1.includes("STEP1_OK") && t2.includes("STEP2_OK"))
 
 // 方式二：单次 message 提交多命令（应不触发命令）
-const msgRes = await fetch(BASE + "/session/" + SID.id + "/message", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ parts: [{ type: "text", text: "/step-one\\n/step-two" }], model: { providerID: "zhipuai", modelID: "glm-5.1" } }) }).then(r => r.json())
+const msgRes = await fetch(BASE + "/session/" + SID.id + "/message", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ parts: [{ type: "text", text: "/step-one\\n/step-two" }], model: { providerID: "Yd-DeepSeek", modelID: "deepseek-v4-flash" } }) }).then(r => r.json())
 const msgText = (msgRes.parts || []).filter(p => p.type === "text").map(p => p.text).join(" ")
 const triggeredAsCommand = msgText.includes("STEP1_OK")
 console.log("单次 message 提交多命令被当命令执行:", triggeredAsCommand, "（期望 false — 服务端不解析命令前缀）")

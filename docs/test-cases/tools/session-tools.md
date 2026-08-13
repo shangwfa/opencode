@@ -26,7 +26,7 @@ export default tool({
 
 ```js
 const BASE = "http://localhost:14096"
-const MODEL = { providerID: "zhipuai", modelID: "glm-5.1" }
+const MODEL = { providerID: "Yd-DeepSeek", modelID: "deepseek-v4-flash" }
 ```
 
 ### 辅助函数
@@ -121,7 +121,7 @@ async function sendAndWait(sid, body, timeout = 60000) {
 ```bash
 bun -e '
 const BASE = "http://localhost:14096"
-const MODEL = { providerID: "zhipuai", modelID: "glm-5.1" }
+const MODEL = { providerID: "Yd-DeepSeek", modelID: "deepseek-v4-flash" }
 const SID = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "tool-merge" }) })).json()
 
 const code = `import { tool } from "@opencode-ai/plugin"
@@ -205,7 +205,7 @@ async function sendAndWait(sid, body, timeout = 60000) {
 ```bash
 bun -e '
 const BASE = "http://localhost:14096"
-const MODEL = { providerID: "zhipuai", modelID: "glm-5.1" }
+const MODEL = { providerID: "Yd-DeepSeek", modelID: "deepseek-v4-flash" }
 const SID = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "tool-override" }) })).json()
 
 // 创建一个名为 "echo" 的 session tool（覆盖可能不存在的内置 echo，验证 Map 覆盖语义）
@@ -298,7 +298,7 @@ async function sendAndWait(sid, body, timeout = 60000) {
 ```bash
 bun -e '
 const BASE = "http://localhost:14096"
-const MODEL = { providerID: "zhipuai", modelID: "glm-5.1" }
+const MODEL = { providerID: "Yd-DeepSeek", modelID: "deepseek-v4-flash" }
 const SID = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "bad-code" }) })).json()
 
 // 创建一个语法错误的 tool
@@ -381,7 +381,7 @@ async function sendAndWait(sid, body, timeout = 60000) {
 ```bash
 bun -e '
 const BASE = "http://localhost:14096"
-const MODEL = { providerID: "zhipuai", modelID: "glm-5.1" }
+const MODEL = { providerID: "Yd-DeepSeek", modelID: "deepseek-v4-flash" }
 const SID = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "full-workflow" }) })).json()
 
 // Step 1: 创建 tool
@@ -525,7 +525,7 @@ console.log("empty name:", empty.status, "(实际 200；若改为 NonEmptyString
 ```bash
 bun -e '
 const BASE = "http://localhost:14096"
-const MODEL = { providerID: "zhipuai", modelID: "glm-5.1" }
+const MODEL = { providerID: "Yd-DeepSeek", modelID: "deepseek-v4-flash" }
 const SID = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "zero-impact" }) })).json()
 
 // 添加多个 session tools
@@ -664,7 +664,7 @@ console.log("still empty:", list.length === 0)
 ```bash
 bun -e '
 const BASE = "http://localhost:14096"
-const MODEL = { providerID: "zhipuai", modelID: "glm-5.1" }
+const MODEL = { providerID: "Yd-DeepSeek", modelID: "deepseek-v4-flash" }
 const SID = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "exec-error" }) })).json()
 
 // 创建一个会抛异常的 tool
@@ -763,7 +763,7 @@ console.log("session not crashed:", msg !== undefined)
 ```bash
 bun -e '
 const BASE = "http://localhost:14096"
-const MODEL = { providerID: "zhipuai", modelID: "glm-5.1" }
+const MODEL = { providerID: "Yd-DeepSeek", modelID: "deepseek-v4-flash" }
 const SID = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "title-test" }) })).json()
 
 const code = `import { tool } from "@opencode-ai/plugin"
@@ -845,7 +845,7 @@ console.log("output correct:", toolCall?.state?.output === "Hello, World!")
 ```bash
 bun -e '
 const BASE = "http://localhost:14096"
-const MODEL = { providerID: "zhipuai", modelID: "glm-5.1" }
+const MODEL = { providerID: "Yd-DeepSeek", modelID: "deepseek-v4-flash" }
 const SID = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "multi-tool" }) })).json()
 
 // 创建两个不同功能的 tools
@@ -975,7 +975,7 @@ console.log("期望: 0")
 ```bash
 bun -e '
 const BASE = "http://localhost:14096"
-const MODEL = { providerID: "zhipuai", modelID: "glm-5.1" }
+const MODEL = { providerID: "Yd-DeepSeek", modelID: "deepseek-v4-flash" }
 const SID = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "override-builtin-bash" }) })).json()
 
 const overrideCode = `import { tool } from "@opencode-ai/plugin"
@@ -1066,7 +1066,7 @@ async function sendAndWait(sid, body, timeout = 90000) {
 ```bash
 bun -e '
 const BASE = "http://localhost:14096"
-const MODEL = { providerID: "zhipuai", modelID: "glm-5.1" }
+const MODEL = { providerID: "Yd-DeepSeek", modelID: "deepseek-v4-flash" }
 const SID = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "invalid-definition" }) })).json()
 
 await fetch(BASE + "/session/" + SID.id + "/tools/create", {
@@ -1108,7 +1108,7 @@ console.log("builtin still visible:", text.includes("bash") || text.includes("re
 ```bash
 bun -e '
 const BASE = "http://localhost:14096"
-const MODEL = { providerID: "zhipuai", modelID: "glm-5.1" }
+const MODEL = { providerID: "Yd-DeepSeek", modelID: "deepseek-v4-flash" }
 const SID = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "code-cache-update" }) })).json()
 
 function versionCode(version) {

@@ -32,7 +32,7 @@
 > ```bash
 > curl -s --max-time 180 -X POST "$BASE/session/$SID/command" \
 >   -H 'Content-Type: application/json' \
->   -d '{"command":"goal","arguments":"<condition 或 clear/reset>","model":"zhipuai/glm-5.1"}'
+>   -d '{"command":"goal","arguments":"<condition 或 clear/reset>","model":"Yd-DeepSeek/deepseek-v4-flash"}'
 > ```
 > 其中 `arguments` 为 `clear` / `reset` / 空字符串时清除 goal（见 `prompt.ts:1514-1527`），否则设置 condition。
 
@@ -552,7 +552,7 @@ print(f'Has system-reminder: {has_reminder}')
 
 ## 十二、真实场景测试
 
-> 以下场景在 **本地 PG + 远程沙箱** 环境下执行，模型 `zhipuai/glm-5.1`。
+> 以下场景在 **本地 PG + 远程沙箱** 环境下执行，模型 `Yd-DeepSeek/deepseek-v4-flash`。
 > 使用 `POST /session/:id/command`（非 `message`），`model` 字段为字符串格式 `"provider/model"`。
 
 ### T34.25 Bug 修复（TS 编译错误）
@@ -569,7 +569,7 @@ EOF"
 # 设定 goal
 curl -s --max-time 180 -X POST "$BASE/session/$SID/command" \
   -H 'Content-Type: application/json' \
-  -d '{"command":"goal","arguments":"fix the TypeScript compilation error in /workspace/buggy.ts and verify it compiles","model":"zhipuai/glm-5.1"}'
+  -d '{"command":"goal","arguments":"fix the TypeScript compilation error in /workspace/buggy.ts and verify it compiles","model":"Yd-DeepSeek/deepseek-v4-flash"}'
 ```
 
 **结果（2026-07-11）**：✅ PASS
@@ -586,7 +586,7 @@ curl -s --max-time 180 -X POST "$BASE/session/$SID/command" \
 SID=$(new_sid -k)
 curl -s --max-time 300 -X POST "$BASE/session/$SID/command" \
   -H 'Content-Type: application/json' \
-  -d '{"command":"goal","arguments":"create /workspace/calc.ts with add(a,b), create /workspace/calc.test.ts, run npx tsx /workspace/calc.test.ts to verify","model":"zhipuai/glm-5.1"}'
+  -d '{"command":"goal","arguments":"create /workspace/calc.ts with add(a,b), create /workspace/calc.test.ts, run npx tsx /workspace/calc.test.ts to verify","model":"Yd-DeepSeek/deepseek-v4-flash"}'
 ```
 
 **结果（2026-07-11）**：✅ PASS
@@ -610,7 +610,7 @@ EOF"
 
 curl -s --max-time 300 -X POST "$BASE/session/$SID/command" \
   -H 'Content-Type: application/json' \
-  -d '{"command":"goal","arguments":"fix /workspace/fib.ts so fib(10) returns 55, verify by running it","model":"zhipuai/glm-5.1"}'
+  -d '{"command":"goal","arguments":"fix /workspace/fib.ts so fib(10) returns 55, verify by running it","model":"Yd-DeepSeek/deepseek-v4-flash"}'
 ```
 
 **结果（2026-07-11）**：✅ PASS
@@ -627,7 +627,7 @@ SID=$(new_sid -k)
 # 设置复杂 goal
 curl -s -X POST "$BASE/session/$SID/command" \
   -H 'Content-Type: application/json' \
-  -d '{"command":"goal","arguments":"build a complete React todo app","model":"zhipuai/glm-5.1"}'
+  -d '{"command":"goal","arguments":"build a complete React todo app","model":"Yd-DeepSeek/deepseek-v4-flash"}'
 
 # 立即清除
 curl -s -X POST "$BASE/session/$SID/command" \
@@ -648,7 +648,7 @@ curl -s -X POST "$BASE/session/$SID/command" \
 SID=$(new_sid -k)
 curl -s --max-time 300 -X POST "$BASE/session/$SID/command" \
   -H 'Content-Type: application/json' \
-  -d '{"command":"goal","arguments":"create /workspace/vite-test/index.js with multiply(a,b), create test.js, run node test.js and verify","model":"zhipuai/glm-5.1"}'
+  -d '{"command":"goal","arguments":"create /workspace/vite-test/index.js with multiply(a,b), create test.js, run node test.js and verify","model":"Yd-DeepSeek/deepseek-v4-flash"}'
 ```
 
 **结果（2026-07-11）**：✅ PASS
@@ -660,8 +660,8 @@ curl -s --max-time 300 -X POST "$BASE/session/$SID/command" \
 
 ### 测试发现
 
-1. **glm-5.1 对简单任务一次性完成**：5 个场景中模型均在单轮内完成任务，judge 直接判定 satisfied，未触发 system-reminder 注入路径。
-2. **command API 的 model 字段**：`POST /session/:id/command` 的 `model` 是字符串（如 `"zhipuai/glm-5.1"`），不是对象。`POST /session/:id/message` 的 model 是对象。
+1. **deepseek-v4-flash 对简单任务一次性完成**：5 个场景中模型均在单轮内完成任务，judge 直接判定 satisfied，未触发 system-reminder 注入路径。
+2. **command API 的 model 字段**：`POST /session/:id/command` 的 `model` 是字符串（如 `"Yd-DeepSeek/deepseek-v4-flash"`），不是对象。`POST /session/:id/message` 的 model 是对象。
 3. **goalGate agent 检查修复**：原迁移代码检查 `agent === "main"`，但 opencode 默认 agent 是 `"build"`，导致 goalGate 永远不触发。已移除 agent 检查——subagent session 天然无 goal（`goal.get` 返回 undefined），不需要额外过滤。
 
 ---
@@ -677,7 +677,7 @@ curl -s --max-time 300 -X POST "$BASE/session/$SID/command" \
 | T34.5 | `/goal clear` 清除 | E2E | ✅ PASS | PG 删除正确 |
 | T34.6 | `/goal`（空）同 clear | E2E | ✅ PASS | |
 | T34.7 | `/goal reset` 同 clear | E2E | ✅ PASS | |
-| T34.8 | Goal 未满足 → 继续 | E2E | ⚠️ 代码已实现 | glm-5.1 一次完成，未自然触发 system-reminder 路径 |
+| T34.8 | Goal 未满足 → 继续 | E2E | ⚠️ 代码已实现 | deepseek-v4-flash 一次完成，未自然触发 system-reminder 路径 |
 | T34.9 | Goal 已满足 → 停止 | E2E | ✅ PASS | 5 个真实场景验证 |
 | T34.10 | Goal 不可能 → 停止 | E2E | ✅ PASS | 模型解释不可能性后 judge 判定 satisfied |
 | T34.11 | MAX_GOAL_REACT 上限 | E2E | ⚠️ 代码已实现 | 需 12 次 judge not-ok，耗时极长 |

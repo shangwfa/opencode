@@ -174,7 +174,7 @@ const created = await (await fetch(BASE + "/session/" + SID.id + "/agents/create
       task: "allow",
       external_directory: { "/tmp/opencode/**": "allow", "/*": "allow" },
     },
-    model: { providerID: "zhipuai", modelID: "glm-5.1" },
+    model: { providerID: "Yd-DeepSeek", modelID: "deepseek-v4-flash" },
   }),
 })).json()
 console.log("Step1 created:", created.name, "desc:", created.description)
@@ -257,7 +257,7 @@ console.log("Step3 external_directory 包含 extracted:", JSON.stringify(fromLis
 ```bash
 bun -e '
 const BASE = "http://localhost:14096"
-const MODEL = { providerID: "zhipuai", modelID: "glm-5.1" }
+const MODEL = { providerID: "Yd-DeepSeek", modelID: "deepseek-v4-flash" }
 const SID = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) })).json()
 console.log("SID:", SID.id)
 
@@ -394,7 +394,7 @@ console.log("build remains:", agents.some(a => a.name === "build"))
 ```bash
 bun -e '
 const BASE = "http://localhost:14096"
-const MODEL = { providerID: "zhipuai", modelID: "glm-5.1" }
+const MODEL = { providerID: "Yd-DeepSeek", modelID: "deepseek-v4-flash" }
 const SID = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "agent-msg-test" }) })).json()
 
 await fetch(BASE + "/session/" + SID.id + "/agents/create", {
@@ -475,7 +475,7 @@ console.log("包含JSON:", text.includes("{") && text.includes("}"))
 ```bash
 bun -e '
 const BASE = "http://localhost:14096"
-const MODEL = { providerID: "zhipuai", modelID: "glm-5.1" }
+const MODEL = { providerID: "Yd-DeepSeek", modelID: "deepseek-v4-flash" }
 const SID = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) })).json()
 
 const res = await (await fetch(BASE + "/session/" + SID.id + "/agents/create", {
@@ -565,7 +565,7 @@ for (const p of msg.parts) {
 ```bash
 bun -e '
 const BASE = "http://localhost:14096"
-const MODEL = { providerID: "zhipuai", modelID: "glm-5.1" }
+const MODEL = { providerID: "Yd-DeepSeek", modelID: "deepseek-v4-flash" }
 const SID = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) })).json()
 
 await fetch(BASE + "/session/" + SID.id + "/agents/create", {
@@ -699,7 +699,7 @@ console.log("to-delete gone:", !after.some?.(a => a.name === "to-delete"))
 ```bash
 bun -e '
 const BASE = "http://localhost:14096"
-const MODEL = { providerID: "zhipuai", modelID: "glm-5.1" }
+const MODEL = { providerID: "Yd-DeepSeek", modelID: "deepseek-v4-flash" }
 const SID = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "full-workflow" }) })).json()
 
 async function sendAndWait(sid, body, timeout = 60000) {
@@ -848,7 +848,7 @@ console.log("error includes name:", JSON.stringify(body).includes("name"))
 ```bash
 bun -e '
 const BASE = "http://localhost:14096"
-const MODEL = { providerID: "zhipuai", modelID: "glm-5.1" }
+const MODEL = { providerID: "Yd-DeepSeek", modelID: "deepseek-v4-flash" }
 const SID = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "multi-agent-collab" }) })).json()
 console.log("Session:", SID.id)
 
@@ -943,7 +943,7 @@ console.log("验证: 包含翻译+代码 =", hasEng)
 ```bash
 bun -e '
 const BASE = process.env.BASE || "http://localhost:14096"
-const MODEL = { providerID: "zhipuai", modelID: "glm-5.1" }
+const MODEL = { providerID: "Yd-DeepSeek", modelID: "deepseek-v4-flash" }
 
 async function test() {
   const sid = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" })).json()
@@ -979,7 +979,7 @@ test().catch(e => { console.error(e); process.exit(1) })
 ```bash
 bun -e '
 const BASE = process.env.BASE || "http://localhost:14096"
-const MODEL = { providerID: "zhipuai", modelID: "glm-5.1" }
+const MODEL = { providerID: "Yd-DeepSeek", modelID: "deepseek-v4-flash" }
 
 async function sendAndWait(sid, body, timeout = 60000) {
   return new Promise(async (resolve, reject) => {
@@ -1076,8 +1076,8 @@ test().catch(e => { console.error(e); process.exit(1) })
 ```bash
 bun -e '
 const BASE = process.env.BASE || "http://localhost:14096"
-const MODEL = { providerID: "zhipuai", modelID: "glm-5.1" }
-const CUSTOM_MODEL = { providerID: "zhipuai", modelID: "glm-5.1" }
+const MODEL = { providerID: "Yd-DeepSeek", modelID: "deepseek-v4-flash" }
+const CUSTOM_MODEL = { providerID: "Yd-DeepSeek", modelID: "deepseek-v4-flash" }
 
 async function sendAndWait(sid, body, timeout = 60000) {
   return new Promise(async (resolve, reject) => {
@@ -1157,7 +1157,7 @@ test().catch(e => { console.error(e); process.exit(1) })
 **期望**：agent 创建返回正确的 model 和 temperature，AI 使用该 agent 回复
 
 > **PG 验证**：`docker exec ai-nova-postgres psql -U postgres -d opencode -c "SELECT name, model, temperature FROM session_agents WHERE session_id='$SID';"`
-> 期望：model 含 glm-5.1，temperature=0.9
+> 期望：model 含 deepseek-v4-flash，temperature=0.9
 
 ---
 
@@ -1168,7 +1168,7 @@ test().catch(e => { console.error(e); process.exit(1) })
 ```bash
 bun -e '
 const BASE = process.env.BASE || "http://localhost:14096"
-const MODEL = { providerID: "zhipuai", modelID: "glm-5.1" }
+const MODEL = { providerID: "Yd-DeepSeek", modelID: "deepseek-v4-flash" }
 
 async function test() {
   // 创建一个没有任何自定义 agent 的 session
@@ -1227,7 +1227,7 @@ bun run docs/test-cases/scripts/sandbox-shared-test.mjs
 ```bash
 #!/usr/bin/env node
 const BASE = "http://localhost:14096"
-const MODEL = { providerID: "zhipuai", modelID: "glm-5.1" }
+const MODEL = { providerID: "Yd-DeepSeek", modelID: "deepseek-v4-flash" }
 
 const SID = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "sandbox-shared-test" }) })).json()
 console.log("SID:", SID.id)
@@ -1390,7 +1390,7 @@ bun run docs/test-cases/scripts/vcs-diff-sandbox-test.mjs
 ```bash
 #!/usr/bin/env node
 const BASE = "http://localhost:14096"
-const MODEL = { providerID: "zhipuai", modelID: "glm-5.1" }
+const MODEL = { providerID: "Yd-DeepSeek", modelID: "deepseek-v4-flash" }
 const GIT_TOKEN = "eY8gCHMpNWrJpRLHDvK3f286MQp1OmJiCA.01.0y10q698d"
 const GIT_REPO = `https://oauth2:${GIT_TOKEN}@gitlab.shadow-rpa.net/frontend/xybot-front-home-v3.git`
 
@@ -1507,7 +1507,7 @@ console.log("═".repeat(50))
 | T16.16 | ✅ | @translator subagent 调度成功，翻译输出 Hello World |
 | T16.17 | ✅ | compaction/title/summary 均返回 500 |
 | T16.18 | ✅ | AI 直接翻译"The weather is very nice today"（subagent dispatch 未触发） |
-| T16.19 | ✅ | model=glm-5.1, temp=0.9 |
+| T16.19 | ✅ | model=deepseek-v4-flash, temp=0.9 |
 | T16.20 | ✅ | 无自定义 agent, 全局 build/explore 等 7 个正常 |
 
 
@@ -1576,7 +1576,7 @@ console.log("═".repeat(50))
 | T16.16 | ✅ | 多 agent 协作：translator+coder 均完成，输出含翻译+代码 |
 | T16.17 | ✅ | 保留名 compaction/title/summary 返回 500 |
 | T16.18 | ✅ | task 工具调度 my-translator 翻译 "The weather is very good today." |
-| T16.19 | ✅ | 自定义 model=glm-5.1, temp=0.9 持久化正确 |
+| T16.19 | ✅ | 自定义 model=deepseek-v4-flash, temp=0.9 持久化正确 |
 | T16.20 | ✅ | 全局 agent 回退正常，build/explore 等 7 个 |
 | T16.21 | ✅ | 字符串简写权限持久化正确（edit:deny, write:deny 规则存在） |
 | T16.22 | ✅ | 粒度路径权限持久化（edit:deny *, edit:allow docs/*.md） |
@@ -1607,7 +1607,7 @@ curl -s -X POST "$BASE/session/$SID/agents/create" -H 'Content-Type: application
 
 curl -s --max-time 120 -X POST "$BASE/session/$SID/message" \
   -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"@translator 翻译：你好世界"}],"model":{"providerID":"zhipuai","modelID":"glm-5.1"}}' > /dev/null
+  -d '{"parts":[{"type":"text","text":"@translator 翻译：你好世界"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}}' > /dev/null
 
 curl -s "$BASE/session/$SID/message" | python3 -c "
 import json,sys
@@ -1661,7 +1661,7 @@ curl -s -X POST "$BASE/session/$SID/agents/create" -H 'Content-Type: application
 
 curl -s -o /dev/null -X POST "$BASE/session/$SID/prompt_async" \
   -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"1. @translator 翻译「你好」 2. @coder 写 def add(a,b)"}],"model":{"providerID":"zhipuai","modelID":"glm-5.1"}}'
+  -d '{"parts":[{"type":"text","text":"1. @translator 翻译「你好」 2. @coder 写 def add(a,b)"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}}'
 
 # 轮询等待完成
 for i in $(seq 1 18); do
@@ -1696,7 +1696,7 @@ curl -s -X POST "$BASE/session/$SID/agents/create" -H 'Content-Type: application
 
 curl -s --max-time 180 -X POST "$BASE/session/$SID/message" \
   -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"@slow 1+1=?"}],"model":{"providerID":"zhipuai","modelID":"glm-5.1"}}' > /dev/null
+  -d '{"parts":[{"type":"text","text":"@slow 1+1=?"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}}' > /dev/null
 
 curl -s "$BASE/session/$SID/message" | python3 -c "
 import json,sys
@@ -1751,7 +1751,7 @@ curl -s -X POST "$BASE/session/$SID/agents/create" -H 'Content-Type: application
 
 curl -s --max-time 120 -X POST "$BASE/session/$SID/message" \
   -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"@broken 帮我写代码"}],"model":{"providerID":"zhipuai","modelID":"glm-5.1"}}' > /dev/null
+  -d '{"parts":[{"type":"text","text":"@broken 帮我写代码"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}}' > /dev/null
 
 curl -s "$BASE/session/$SID/message" | python3 -c "
 import json,sys

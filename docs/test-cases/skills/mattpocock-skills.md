@@ -74,7 +74,7 @@ mattpocock/tdd/
 ```bash
 export BASE="http://localhost:14096"
 export PG_URL="postgresql://local@127.0.0.1:15432/opencode"
-export MODEL='{"providerID":"zhipuai","modelID":"glm-5.1"}'
+export MODEL='{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}'
 export NO_PROXY=localhost,127.0.0.1
 
 jexec() { python3 -c "import json,sys; d=json.load(sys.stdin, strict=False); print($1)" 2>/dev/null; }
@@ -541,7 +541,7 @@ console.log(skillCalls.includes("grill-me") ? "✅ 精确切换到 grill-me" : "
 # 环境（组合 3）
 export BASE="http://localhost:14096"
 export PG_URL="postgresql://local@127.0.0.1:15432/opencode"
-export MODEL='{"providerID":"zhipuai","modelID":"glm-5.1"}'
+export MODEL='{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}'
 export NO_PROXY=localhost,127.0.0.1
 new_sid() {
   local sid
@@ -611,7 +611,7 @@ curl -s -X POST "$BASE/session/$SID/prompt_async" -H 'Content-Type: application/
 
 ## 重跑记录 2026-08-08
 
-> **环境**：本地 PG `postgresql://postgres:postgres@127.0.0.1:5433/opencode_test` + 容器 `opencode-saas-test` @ localhost:14096。model=zhipuai/glm-5.1。
+> **环境**：本地 PG `postgresql://postgres:postgres@127.0.0.1:5433/opencode_test` + 容器 `opencode-saas-test` @ localhost:14096。model=Yd-DeepSeek/deepseek-v4-flash。
 >
 > **结果**：核心链路重跑通过（T47.3/4/5/13），与验收汇总一致。
 

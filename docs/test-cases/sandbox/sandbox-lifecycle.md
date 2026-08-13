@@ -8,7 +8,7 @@
 # 环境变量（测试环境）
 export BASE=http://localhost:14096
 export PG_URL='postgresql://app:<password>@127.0.0.1:15432/opencode'
-export MODEL='{"modelID":"glm-5.1","providerID":"zhipuai"}'
+export MODEL='{"modelID":"deepseek-v4-flash","providerID":"Yd-DeepSeek"}'
 export NO_PROXY=localhost,127.0.0.1
 LOG=/home/opencode/.local/share/opencode/log/opencode.log
 ```

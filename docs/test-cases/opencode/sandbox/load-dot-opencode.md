@@ -665,7 +665,7 @@ curl -s --noproxy '*' -X POST "$BASE/session/$SID/prompt_async" \
   -H 'Content-Type: application/json' \
   -d '{
     "parts": [{"type": "text", "text": "加载 reviewer skill，然后列出你收到的所有配置指令标记。"}],
-    "model": {"providerID": "zhipuai", "modelID": "glm-5.1"},
+    "model": {"providerID": "Yd-DeepSeek", "modelID": "deepseek-v4-flash"},
     "agent": "reviewer"
   }'
 ```
@@ -703,7 +703,7 @@ curl -s --noproxy '*' --max-time 60 -X POST "$BASE/session/$SID/command" \
     "command": "review",
     "arguments": "",
     "agent": "reviewer",
-    "model": "zhipuai/glm-5.1"
+    "model": "Yd-DeepSeek/deepseek-v4-flash"
   }'
 ```
 
@@ -734,7 +734,7 @@ curl -s --noproxy '*' -X POST "$BASE/session/$SID/prompt_async" \
   -H 'Content-Type: application/json' \
   -d '{
     "parts": [{"type": "text", "text": "请调用 marker 工具，告诉我它返回了什么。"}],
-    "model": {"providerID": "zhipuai", "modelID": "glm-5.1"},
+    "model": {"providerID": "Yd-DeepSeek", "modelID": "deepseek-v4-flash"},
     "agent": "reviewer"
   }'
 ```
@@ -826,7 +826,7 @@ curl -s --noproxy '*' -X POST "$BASE/session/$SID/mcps/create" \
 # 问 AI 有哪些工具
 curl -s --noproxy '*' -X POST "$BASE/session/$SID/prompt_async" \
   -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"列出你所有 antd_ 和 codegraph_ 开头的工具名称，每行一个。"}],"model":{"providerID":"zhipuai","modelID":"glm-5.1"}}'
+  -d '{"parts":[{"type":"text","text":"列出你所有 antd_ 和 codegraph_ 开头的工具名称，每行一个。"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}}'
 ```
 
 AI 实际回复：

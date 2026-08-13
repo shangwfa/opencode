@@ -259,7 +259,7 @@ curl -s -X POST "$BASE/session/$SID/exec" -H 'Content-Type: application/json' \
 > **关键 1**：daemon 在沙箱容器内监听 `localhost:20877`，宿主机无法直连。验证 daemon 必须用 `exec` API 从容器**内部** curl。
 > **关键 2**：daemon 由 opencode 主进程在**首次 LSP 工具调用**（write/edit/apply_patch/lsp 的 sandbox 分支）时通过 `runDetached` 自动启动。`exec` API 直接在沙箱执行 shell，**不经过工具层**，因此单靠 exec 写文件**不会**触发 daemon。步骤 4 必须用 `send_and_verify`（AI 调 write 工具）才能拉起 daemon。
 
-> `send_and_verify` 已在上方准备段定义；`$MODEL` 须与 `local-test-env.md` 一致（`zhipuai/glm-5.1`）。后续 T27.8–T27.12 用例直接复用该函数与 `$BASE` / `$SID`。
+> `send_and_verify` 已在上方准备段定义；`$MODEL` 须与 `local-test-env.md` 一致（`Yd-DeepSeek/deepseek-v4-flash`）。后续 T27.8–T27.12 用例直接复用该函数与 `$BASE` / `$SID`。
 
 ---
 

@@ -11,7 +11,7 @@ COMBO="${1:-3}"
 
 # 三种组合共享
 export BASE="http://localhost:14096"
-export MODEL='{"providerID":"zhipuai","modelID":"glm-5.1"}'
+export MODEL='{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}'
 export KIMI_MODEL='{"providerID":"moonshotai-cn","modelID":"kimi-k3"}'
 export NO_PROXY=localhost,127.0.0.1
 

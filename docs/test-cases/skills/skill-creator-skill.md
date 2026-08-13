@@ -66,7 +66,7 @@
 ```bash
 export BASE="http://localhost:14096"
 export PG_URL="postgresql://local@127.0.0.1:15432/opencode"
-export MODEL='{"providerID":"zhipuai","modelID":"glm-5.1"}'
+export MODEL='{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}'
 export NO_PROXY=localhost,127.0.0.1
 
 jexec() { python3 -c "import json,sys; d=json.load(sys.stdin, strict=False); print($1)" 2>/dev/null; }
@@ -535,7 +535,7 @@ else console.log(`⚠️ 加载了 ${skillCalls.length} 次: ${JSON.stringify(sk
 ```bash
 export BASE="http://localhost:14096"
 export PG_URL="postgresql://local@127.0.0.1:15432/opencode"
-export MODEL='{"providerID":"zhipuai","modelID":"glm-5.1"}'
+export MODEL='{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}'
 export NO_PROXY=localhost,127.0.0.1
 new_sid() {
   local sid
@@ -594,7 +594,7 @@ psql "$PG_URL" -t -c "SELECT data->>'tool', data->'state'->>'status', substring(
 
 ## 重跑记录 2026-08-08
 
-> **环境**：本地 PG `postgresql://postgres:postgres@127.0.0.1:5433/opencode_test` + 容器 `opencode-saas-test` @ localhost:14096。model=zhipuai/glm-5.1。
+> **环境**：本地 PG `postgresql://postgres:postgres@127.0.0.1:5433/opencode_test` + 容器 `opencode-saas-test` @ localhost:14096。model=Yd-DeepSeek/deepseek-v4-flash。
 >
 > **结果**：本文档首次执行。核心链路（T49.1-4 + T49.11-14 progressive disclosure）**全部通过**；T49.5-10 依赖 claude CLI 的子 agent/viewer/打包环节未重跑（沙箱无 claude CLI）。
 

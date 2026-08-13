@@ -388,17 +388,17 @@ RES=$(curl -s --noproxy '*' -X POST "$BASE/session/$SID/agents/create" \
     "prompt": "You are a test agent.",
     "temperature": 0.5,
     "color": "#ff0000",
-    "model": {"providerID": "zhipuai", "modelID": "glm-5.1"}
+    "model": {"providerID": "Yd-DeepSeek", "modelID": "deepseek-v4-flash"}
   }')
 
 COLOR=$(echo "$RES" | jexec "d.get('color','')")
 MODEL=$(echo "$RES" | jexec "d.get('model',{}).get('modelID','')")
 TEMP=$(echo "$RES" | jexec "d.get('temperature','')")
 echo "color=$COLOR model=$MODEL temperature=$TEMP"
-[ "$COLOR" = "#ff0000" ] && [ "$MODEL" = "glm-5.1" ] && [ "$TEMP" = "0.5" ] && pass "T17.19" || fail "T17.19" "full field agent not persisted correctly"
+[ "$COLOR" = "#ff0000" ] && [ "$MODEL" = "deepseek-v4-flash" ] && [ "$TEMP" = "0.5" ] && pass "T17.19" || fail "T17.19" "full field agent not persisted correctly"
 ```
 
-**期望**：`color=#ff0000`、`model.modelID=glm-5.1`、`temperature=0.5`
+**期望**：`color=#ff0000`、`model.modelID=deepseek-v4-flash`、`temperature=0.5`
 
 ### T17.20 空字符串 name 被拒绝
 
