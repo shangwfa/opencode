@@ -11,6 +11,7 @@ import { SessionTable } from "../session/session.pg"
 import { Database } from "../storage/db"
 import { SandboxTable } from "./sandbox.pg"
 import { ExecLogTable } from "../session/exec-log"
+import { LocalAgentChannel } from "@/agent-local/channel"
 
 export namespace SandboxConfig {
   export interface Interface {
@@ -1639,6 +1640,209 @@ export namespace SandboxProvider {
   export const node = LayerNode.make({
     service: Service,
     layer: defaultLayer,
+    deps: [],
+  })
+}
+
+function createLocalAgentSandbox(sessionID: string): Sandbox {
+  const ch = LocalAgentChannel.instance
+  const id = `local-${sessionID}`
+  return {
+    id,
+    files: {
+      readFile: (path: string, opts?: Record<string, unknown>) =>
+        Effect.runPromise(ch.fsRead(sessionID, { path, ...(opts as object) })).then((r) => r.data),
+      readBytes: (path: string, opts?: Record<string, unknown>) =>
+        Effect.runPromise(ch.fsReadBytes(sessionID, { path, ...(opts as object) })).then((r) =>
+          Uint8Array.from(Buffer.from(r.data, "base64")),
+        ),
+      readBytesStream: (path: string, opts?: Record<string, unknown>) => {
+        async function* gen() {
+          const r = await Effect.runPromise(ch.fsReadBytes(sessionID, { path, ...(opts as object) }))
+          yield Uint8Array.from(Buffer.from(r.data, "base64"))
+        }
+        return gen()
+      },
+      writeFiles: (entries: { path: string; data: string }[]) =>
+        Effect.runPromise(ch.fsWrite(sessionID, { entries })),
+      getFileInfo: (paths: string[]) => Effect.runPromise(ch.fsStat(sessionID, { paths })),
+    },
+    commands: {
+      createSession: () => Promise.resolve(`local-${sessionID}`),
+      runInSession: (
+        _sessionId: string,
+        command: string,
+        options?: { workingDirectory?: string; timeoutSeconds?: number },
+        handlers?: {
+          onStdout?: (msg: { text: string }) => void | Promise<void>
+          onStderr?: (msg: { text: string }) => void | Promise<void>
+        },
+        signal?: AbortSignal,
+      ) =>
+        Effect.runPromise(
+          ch.exec(
+            sessionID,
+            {
+              cwd: options?.workingDirectory ?? "/workspace",
+              command,
+              timeoutMs: options?.timeoutSeconds ? options.timeoutSeconds * 1000 : undefined,
+            },
+            (stream) => {
+              if (stream.event === "stdout") handlers?.onStdout?.({ text: stream.text })
+              if (stream.event === "stderr") handlers?.onStderr?.({ text: stream.text })
+            },
+            signal,
+          ),
+        ),
+      deleteSession: () => Promise.resolve(),
+      interrupt: () => Promise.resolve(),
+      run: (command: string) => Effect.runPromise(ch.exec(sessionID, { cwd: "/workspace", command })),
+    },
+    getEndpointUrl: (port: number) => Effect.runPromise(ch.getEndpoint(sessionID, port)),
+    isHealthy: () => Promise.resolve(true),
+    kill: () => Promise.resolve(),
+    close: () => Promise.resolve(),
+    getInfo: () => Promise.resolve({ id, status: { state: "running" } }),
+  } as unknown as Sandbox
+}
+
+export namespace LocalAgentRouterProvider {
+  export const layer = Layer.effect(SandboxProvider.Service, Effect.gen(function* () {
+    const remote = yield* SandboxProvider.Service
+    const localSandboxes = new Map<string, Sandbox>()
+
+    function tryLocal(sessionID: SessionID): Effect.Effect<Sandbox | null> {
+      return Effect.gen(function* () {
+        const available = yield* LocalAgentChannel.instance.isAvailable(sessionID)
+        if (!available) return null
+        let sb = localSandboxes.get(sessionID)
+        if (!sb) {
+          sb = createLocalAgentSandbox(sessionID)
+          localSandboxes.set(sessionID, sb)
+        }
+        return sb
+      })
+    }
+
+    return SandboxProvider.Service.of({
+      getOrCreate: (sessionID, opts) =>
+        Effect.gen(function* () {
+          const local = yield* tryLocal(sessionID)
+          if (local) return local
+          return yield* remote.getOrCreate(sessionID, opts)
+        }),
+
+      get: (sessionID) =>
+        Effect.gen(function* () {
+          const local = yield* tryLocal(sessionID)
+          if (local) return local
+          return yield* remote.get(sessionID)
+        }),
+
+      destroy: (sessionID) =>
+        Effect.gen(function* () {
+          localSandboxes.delete(sessionID)
+          if (yield* LocalAgentChannel.instance.isAvailable(sessionID)) return
+          yield* remote.destroy(sessionID)
+        }),
+
+      destroyById: (sandboxID) => remote.destroyById(sandboxID),
+      destroyAll: () =>
+        Effect.gen(function* () {
+          localSandboxes.clear()
+          yield* remote.destroyAll()
+        }),
+
+      cleanupSessionVolume: (sessionID) => remote.cleanupSessionVolume(sessionID),
+
+      keepAlive: (sessionID) =>
+        Effect.gen(function* () {
+          if (yield* LocalAgentChannel.instance.isAvailable(sessionID)) return
+          yield* remote.keepAlive(sessionID)
+        }),
+
+      touch: (sessionID) =>
+        Effect.gen(function* () {
+          if (yield* LocalAgentChannel.instance.isAvailable(sessionID)) return
+          yield* remote.touch(sessionID)
+        }),
+
+      release: (sessionID) =>
+        Effect.gen(function* () {
+          if (yield* LocalAgentChannel.instance.isAvailable(sessionID)) return
+          yield* remote.release(sessionID)
+        }),
+
+      isKeepAlive: (sessionID) =>
+        Effect.gen(function* () {
+          if (yield* LocalAgentChannel.instance.isAvailable(sessionID)) return false
+          return yield* remote.isKeepAlive(sessionID)
+        }),
+
+      runInSession: (sessionID, command, options, handlers, signal) =>
+        Effect.gen(function* () {
+          if (yield* LocalAgentChannel.instance.isAvailable(sessionID)) {
+            return (yield* LocalAgentChannel.instance.exec(
+              sessionID,
+              {
+                cwd: options?.workingDirectory ?? "/workspace",
+                command,
+                timeoutMs: options?.timeoutSeconds ? options.timeoutSeconds * 1000 : undefined,
+              },
+              (stream) => {
+                if (stream.event === "stdout") handlers?.onStdout?.({ text: stream.text })
+                if (stream.event === "stderr") handlers?.onStderr?.({ text: stream.text })
+              },
+              signal,
+            )) as CommandExecution
+          }
+          return yield* remote.runInSession(sessionID, command, options, handlers, signal)
+        }),
+
+      runDetached: (sessionID, command, options, handlers, signal) =>
+        Effect.gen(function* () {
+          if (yield* LocalAgentChannel.instance.isAvailable(sessionID)) {
+            return (yield* LocalAgentChannel.instance.exec(
+              sessionID,
+              {
+                cwd: options?.workingDirectory ?? "/workspace",
+                command,
+                timeoutMs: options?.timeoutSeconds ? options.timeoutSeconds * 1000 : undefined,
+              },
+              (stream) => {
+                if (stream.event === "stdout") handlers?.onStdout?.({ text: stream.text })
+                if (stream.event === "stderr") handlers?.onStderr?.({ text: stream.text })
+              },
+              signal,
+            )) as CommandExecution
+          }
+          return yield* remote.runDetached(sessionID, command, options, handlers, signal)
+        }),
+
+      interrupt: (sessionID) =>
+        Effect.gen(function* () {
+          if (yield* LocalAgentChannel.instance.isAvailable(sessionID)) {
+            yield* LocalAgentChannel.instance.interruptSession(sessionID)
+            return
+          }
+          yield* remote.interrupt(sessionID)
+        }),
+
+      register: (sessionID, sb) => remote.register(sessionID, sb),
+
+      getEndpoint: (sessionID, port) =>
+        Effect.gen(function* () {
+          if (yield* LocalAgentChannel.instance.isAvailable(sessionID)) {
+            return yield* LocalAgentChannel.instance.getEndpoint(sessionID, port).pipe(Effect.orDie)
+          }
+          return yield* remote.getEndpoint(sessionID, port)
+        }),
+    })
+  })).pipe(Layer.provide(SandboxProvider.defaultLayer))
+
+  export const node = LayerNode.make({
+    service: SandboxProvider.Service,
+    layer,
     deps: [],
   })
 }

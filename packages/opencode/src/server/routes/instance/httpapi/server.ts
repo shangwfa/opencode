@@ -81,7 +81,7 @@ import { Workspace } from "@/control-plane/workspace"
 import { CorsConfig, type CorsOptions } from "@/server/cors"
 import { serveUIEffect } from "@/server/shared/ui"
 import { ServerAuth } from "@/server/auth"
-import { SandboxProvider } from "@/tool/sandbox-provider"
+import { SandboxProvider, LocalAgentRouterProvider } from "@/tool/sandbox-provider"
 import { sandboxProxyRoute } from "@/server/sandbox-proxy"
 import { InstanceHttpApi, RootHttpApi } from "./api"
 import { Api } from "@opencode-ai/server/api"
@@ -210,7 +210,7 @@ const ptyRuntimeLayer: Layer.Layer<
   never,
   EventV2.Service | Session.Service | LocationServiceMap.Service
 > = Flag.OPENCODE_SANDBOX_ENABLED
-  ? SandboxPtyRuntime.defaultLayer.pipe(Layer.provide(SandboxProvider.defaultLayer))
+  ? SandboxPtyRuntime.defaultLayer.pipe(Layer.provide(LocalAgentRouterProvider.layer))
   : Layer.unwrap(
       Effect.promise(async () => {
         const { LocalPtyRuntime } = await import("@/pty/local-runtime")
@@ -341,7 +341,7 @@ export function createRoutes(
       Flag.OPENCODE_DATABASE_URL ? SessionTool.pgLayer : SessionTool.noopLayer,
       Flag.OPENCODE_DATABASE_URL ? SessionCommand.pgLayer : SessionCommand.noopLayer,
       Flag.OPENCODE_DATABASE_URL ? SessionPlugin.pgLayer : SessionPlugin.noopLayer,
-      SandboxProvider.defaultLayer,
+      LocalAgentRouterProvider.layer,
       LspAgent.layer,
       FetchHttpClient.layer,
       AppNodeBuilderV1.build(MoveSession.node, [[LocationServiceMap.node, locationServiceMapV2]]),

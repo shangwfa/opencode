@@ -58,7 +58,7 @@ import { BackgroundJob } from "@/background/job"
 import { RuntimeFlags } from "@/effect/runtime-flags"
 import { ProviderV2 } from "@opencode-ai/core/provider"
 import { ModelV2 } from "@opencode-ai/core/model"
-import { SandboxProvider } from "./sandbox-provider"
+import { SandboxProvider, LocalAgentRouterProvider } from "./sandbox-provider"
 import { RepositoryCache } from "@opencode-ai/core/repository-cache"
 import { SessionTool, importToolCode } from "./session-tool"
 import { MCP } from "@/mcp"
@@ -538,7 +538,7 @@ export const defaultLayer = Layer.suspend(() =>
       Layer.provide(LayerNode.compile(CrossSpawnSpawner.node)),
       Layer.provide(LayerNode.compile(Truncate.node)),
       Layer.provide(Flag.OPENCODE_DATABASE_URL ? SessionTool.pgLayer : SessionTool.noopLayer),
-      Layer.provide(SandboxProvider.defaultLayer),
+      Layer.provide(LocalAgentRouterProvider.layer),
     )
     .pipe(
       Layer.provide(Database.defaultLayer),
@@ -653,7 +653,7 @@ export const node = LayerNode.make({
     MCP.node,
     Database.node,
     RepositoryCache.node,
-    SandboxProvider.node,
+    LocalAgentRouterProvider.node,
     Ripgrep.node,
     sessionToolNode,
   ] as any,

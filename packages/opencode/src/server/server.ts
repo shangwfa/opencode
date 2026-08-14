@@ -12,7 +12,9 @@ import { disposeMiddleware } from "./routes/instance/httpapi/lifecycle"
 import { WebSocketTracker } from "./routes/instance/httpapi/websocket-tracker"
 import { PublicApi } from "./routes/instance/httpapi/public"
 import type { CorsOptions } from "./cors"
+import { Flag } from "@/flag/flag"
 import { lazy } from "@/util/lazy"
+import { attachAgentWs } from "@/agent-local/ws"
 
 // @ts-ignore This global is needed to prevent ai-sdk from logging warnings to stdout https://github.com/vercel/ai/blob/2dc67e0ef538307f21368db32d5a12345d98831b/packages/ai/src/logger/log-warnings.ts#L85
 globalThis.AI_SDK_LOG_WARNINGS = false
@@ -190,6 +192,7 @@ function forceClose(state: ListenerState) {
 
 function serverLayer(opts: { port: number; hostname: string }) {
   const server = createServer()
+  attachAgentWs(server)
   const serverRef = { closeStarted: false, forceStop: false }
   const close = server.close.bind(server)
   // Keep shutdown owned by NodeHttpServer, but honor listener.stop(true) by

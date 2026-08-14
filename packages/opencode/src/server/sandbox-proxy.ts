@@ -16,6 +16,7 @@ import { resolveSandboxOpts } from "@/session/sandbox-opts"
 import { insertExecLog, updateExecLog, queryExecLogsBySession, queryExecLog, type ExecLog } from "@/session/exec-log"
 import { ExecFailed } from "@/sandbox/exec-failed"
 import { toSandboxCwd } from "@/tool/sandbox-path"
+import { LocalAgentChannel } from "@/agent-local/channel"
 
 type ProxyError = {
   type: "runtime" | "network" | "compile"
@@ -155,6 +156,9 @@ const ExecBody = Schema.Struct({
 const KeepAliveBody = Schema.Struct({
   enabled: Schema.optional(Schema.Boolean),
   boot: Schema.optional(Schema.Boolean),
+})
+const LocalAgentBody = Schema.Struct({
+  agentID: Schema.String,
 })
 
 type ExecSseEvent =
@@ -696,6 +700,37 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
         const healthy = yield* Effect.tryPromise(() => sb.isHealthy()).pipe(Effect.catch(() => Effect.succeed(false)))
         if (!healthy) return HttpServerResponse.jsonUnsafe({ sessionID: params.sessionID, sandboxId: null })
         return HttpServerResponse.jsonUnsafe({ sessionID: params.sessionID, sandboxId: sb.id })
+      }),
+    )
+
+    // ── local agent: 浏览器检测到本地 Agent 后绑定/解绑会话 ──────────
+    yield* router.add("POST", "/session/:sessionID/local-agent",
+      Effect.gen(function* () {
+        const params = yield* HttpRouter.schemaPathParams(SessionParams)
+        const body = yield* HttpServerRequest.schemaBodyJson(LocalAgentBody)
+        const agents = LocalAgentChannel.instance.listAgents()
+        if (!agents.some((a) => a.agentID === body.agentID)) {
+          return HttpServerResponse.jsonUnsafe({ error: "agent not connected" }, { status: 404 })
+        }
+        // 工具层用 root session ID 查询（子会话共享沙箱），绑 root
+        const rootID = yield* resolveRootSessionID(params.sessionID)
+        yield* LocalAgentChannel.instance.bindAgent(rootID, body.agentID)
+        return HttpServerResponse.jsonUnsafe({ sessionID: params.sessionID, rootSessionID: rootID, agentID: body.agentID })
+      }),
+    )
+
+    yield* router.add("DELETE", "/session/:sessionID/local-agent",
+      Effect.gen(function* () {
+        const params = yield* HttpRouter.schemaPathParams(SessionParams)
+        const rootID = yield* resolveRootSessionID(params.sessionID)
+        yield* LocalAgentChannel.instance.unbindAgent(rootID)
+        return HttpServerResponse.jsonUnsafe({ sessionID: params.sessionID, agentID: null })
+      }),
+    )
+
+    yield* router.add("GET", "/local-agents",
+      Effect.gen(function* () {
+        return HttpServerResponse.jsonUnsafe({ agents: LocalAgentChannel.instance.listAgents() })
       }),
     )
 
