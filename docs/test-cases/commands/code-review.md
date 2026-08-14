@@ -20,7 +20,6 @@
 ## 二、前置条件
 
 - SaaS 容器正常运行（`http://localhost:14096`）
-- 已通过 `PUT /auth/zhipuai` 设置 API key
 - 已通过 `PATCH /global/config` 配置权限（bash/write/edit/read allow）
 - sandbox 内有 git 仓库和可审查的代码改动
 

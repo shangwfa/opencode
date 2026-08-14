@@ -12,8 +12,6 @@ SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}
 echo "SID: $SID"
 ```
 
-> ⚠️ **前提**：SaaS 容器必须设置 `ZHIPU_API_KEY` 环境变量（或通过 `PUT /auth/zhipuai` 配置 credential）。否则所有 AI 调用返回 `UnknownError`。详见 [`local-test-env.md`](../local-test-env.md) §7.4。
-
 ## 四、AI 对话与工具调用
 
 ### T4.1 简单文本对话

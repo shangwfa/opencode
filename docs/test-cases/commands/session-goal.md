@@ -20,7 +20,6 @@
 ## 二、前置条件
 
 - SaaS 容器正常运行（`http://localhost:14096`）
-- 已设置 AI provider（`ZHIPU_API_KEY` 或 `PUT /auth/zhipuai`）
 - 已配置权限（bash/write/edit/read allow）
 - 环境变量已加载：`source test-env.sh 3 && source test-lib.sh`
 
