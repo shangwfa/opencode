@@ -1,12 +1,32 @@
 #!/usr/bin/env bun
 import { WebSocket } from "ws"
 import { resolve } from "node:path"
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
+import { homedir } from "node:os"
 import { AgentHandler } from "./handler"
 import { PathMapper } from "./path"
 import { startLocalServer } from "./local-server"
 import type { AgentMessage } from "./protocol"
 
 const AGENT_VERSION = "0.0.1"
+
+// 稳定 agentID：持久化在本地，重连/SaaS 重启后 PG 绑定关系仍有效
+function loadStableAgentID(): string {
+  const dir = resolve(homedir(), ".local/share/opencode")
+  const file = resolve(dir, "agent.id")
+  try {
+    if (existsSync(file)) {
+      const id = readFileSync(file, "utf8").trim()
+      if (id) return id
+    }
+    mkdirSync(dir, { recursive: true })
+    const id = `agent-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+    writeFileSync(file, id, "utf8")
+    return id
+  } catch {
+    return `agent-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+  }
+}
 
 function parseArgs(): { server: string; cwd: string } {
   const args = process.argv.slice(2)
@@ -46,6 +66,7 @@ The agent also starts a local HTTP server on port 17790 for browser detection.
 function main() {
   const { server, cwd } = parseArgs()
   const mapper = new PathMapper(cwd)
+  const stableID = loadStableAgentID()
 
   const health = startLocalServer(mapper, AGENT_VERSION)
   console.log(`[agent] connecting to ${server}, workdir=${cwd}`)
@@ -78,6 +99,7 @@ function main() {
         type: "hello",
         workdir: cwd,
         agentVersion: AGENT_VERSION,
+        agentID: stableID,
       }
       ws!.send(JSON.stringify(hello))
       // 心跳：25s 一次 ping，SaaS 侧 60s 无任何消息会主动断开

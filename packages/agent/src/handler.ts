@@ -1,7 +1,7 @@
 import { spawn, type ChildProcess } from "node:child_process"
 import * as fs from "node:fs/promises"
 import * as path from "node:path"
-import { PathMapper } from "./path"
+import { PathMapper, SessionMapper } from "./path"
 import type { PtyManager } from "./pty-manager"
 import type {
   AgentMessage,
@@ -24,11 +24,23 @@ type PendingExec = {
 export class AgentHandler {
   private ptyManager: PtyManager | null = null
   private pendingExecs = new Map<string, PendingExec>()
+  private sessionMappers = new Map<string, SessionMapper>()
 
   constructor(
     private mapper: PathMapper,
     private send: (msg: AgentMessage) => void,
   ) {}
+
+  // 会话隔离：每个 sessionID 独立工作区（首次使用时创建目录）
+  private session(sessionID: string): SessionMapper {
+    let m = this.sessionMappers.get(sessionID)
+    if (!m) {
+      m = this.mapper.forSession(sessionID)
+      this.sessionMappers.set(sessionID, m)
+    }
+    m.ensure()
+    return m
+  }
 
   async handle(msg: AgentMessage): Promise<void> {
     switch (msg.type) {
@@ -63,8 +75,9 @@ export class AgentHandler {
 
   private handleExec(id: string, req: ExecReq): void {
     const started = Date.now()
-    const cwd = this.mapper.toReal(req.cwd)
-    const proc = spawn("sh", ["-c", this.mapper.rewriteCommand(req.command)], {
+    const mapper = this.session(req.sessionID)
+    const cwd = mapper.toReal(req.cwd)
+    const proc = spawn("sh", ["-c", mapper.rewriteCommand(req.command)], {
       cwd,
       env: { ...process.env, ...req.env },
       stdio: ["pipe", "pipe", "pipe"],
@@ -90,7 +103,7 @@ export class AgentHandler {
       this.pendingExecs.delete(id)
       const durationMs = Date.now() - started
       console.log(
-        `[exec] ${exitCode ?? "err"} ${durationMs}ms cwd=${req.cwd} cmd=${JSON.stringify(req.command.slice(0, 120))}` +
+        `[exec] ${exitCode ?? "err"} ${durationMs}ms ses=${req.sessionID.slice(-8)} cwd=${req.cwd} cmd=${JSON.stringify(req.command.slice(0, 120))}` +
           (error ? ` error=${error.name}: ${error.value.slice(0, 80)}` : ""),
       )
       this.send({
@@ -140,7 +153,8 @@ export class AgentHandler {
 
   private async handleFsRead(id: string, req: FsReadReq): Promise<void> {
     try {
-      const filePath = this.mapper.toReal(req.path)
+      const mapper = this.session(req.sessionID)
+      const filePath = mapper.toReal(req.path)
       const stat = await fs.stat(filePath)
       if (stat.isDirectory()) {
         const entries = await fs.readdir(filePath)
@@ -167,7 +181,8 @@ export class AgentHandler {
 
   private async handleFsReadBytes(id: string, req: FsReadBytesReq): Promise<void> {
     try {
-      const filePath = this.mapper.toReal(req.path)
+      const mapper = this.session(req.sessionID)
+      const filePath = mapper.toReal(req.path)
       let buf: Buffer
       if (req.range) {
         buf = await this.readRange(filePath, req.range)
@@ -188,7 +203,8 @@ export class AgentHandler {
   // 分片流式读取：512KB/块 base64 逐块回传，大文件避免全量驻留内存
   private async handleFsReadBytesStream(id: string, req: FsReadBytesReq): Promise<void> {
     try {
-      const filePath = this.mapper.toReal(req.path)
+      const mapper = this.session(req.sessionID)
+      const filePath = mapper.toReal(req.path)
       const stat = await fs.stat(filePath)
       const total = stat.size
       const start = req.offset ?? 0
@@ -215,8 +231,9 @@ export class AgentHandler {
 
   private async handleFsWrite(id: string, req: FsWriteReq): Promise<void> {
     try {
+      const mapper = this.session(req.sessionID)
       for (const entry of req.entries) {
-        const filePath = this.mapper.toReal(entry.path)
+        const filePath = mapper.toReal(entry.path)
         await fs.mkdir(path.dirname(filePath), { recursive: true })
         await fs.writeFile(filePath, entry.data, "utf8")
         console.log(`[write] ${entry.path} ${Buffer.byteLength(entry.data)}B`)
@@ -230,9 +247,10 @@ export class AgentHandler {
 
   private async handleFsStat(id: string, req: FsStatReq): Promise<void> {
     try {
+      const mapper = this.session(req.sessionID)
       const res: Record<string, { mode: number; size: number; mtime: number; isDirectory: boolean } | null> = {}
       for (const p of req.paths) {
-        const realPath = this.mapper.toReal(p)
+        const realPath = mapper.toReal(p)
         try {
           const stat = await fs.stat(realPath)
           res[p] = {
@@ -251,13 +269,13 @@ export class AgentHandler {
     }
   }
 
-  private async handlePtyCreate(id: string, req: PtyCreateReq): Promise<void> {
+  private async handlePtyCreate(id: string, req: PtyCreateReq & { sessionID?: string }): Promise<void> {
     try {
       if (!this.ptyManager) {
         const { PtyManager } = await import("./pty-manager")
         this.ptyManager = new PtyManager(this.send.bind(this))
       }
-      const cwd = this.mapper.toReal(req.cwd)
+      const cwd = this.session(req.sessionID ?? "default").toReal(req.cwd)
       const ptyId = await this.ptyManager.create({ ...req, cwd })
       this.send({ id, type: "pty.create.result", res: { ptyId } })
     } catch (err) {

@@ -18,9 +18,9 @@ function settle(conn: ReturnType<typeof registerAgent>["conn"], id: string, data
 
 describe("LocalAgentChannel", () => {
   test("未绑定会话：isAvailable=false，请求失败", async () => {
-    expect(Effect.runSync(LocalAgentChannel.instance.isAvailable("ses_none"))).toBe(false)
+    expect(await Effect.runPromise(LocalAgentChannel.instance.isAvailable("ses_none"))).toBe(false)
     const result = await Effect.runPromiseExit(
-      LocalAgentChannel.instance.exec("ses_none", { cwd: "/workspace", command: "true" }),
+      LocalAgentChannel.instance.exec("ses_none", { sessionID: "ses_none", cwd: "/workspace", command: "true" }),
     )
     expect(result._tag).toBe("Failure")
   })
@@ -29,7 +29,7 @@ describe("LocalAgentChannel", () => {
     const { conn, sent } = registerAgent()
     try {
       const promise = Effect.runPromise(
-        LocalAgentChannel.instance.exec(SESSION, { cwd: "/workspace", command: "echo hi" }),
+        LocalAgentChannel.instance.exec(SESSION, { sessionID: SESSION, cwd: "/workspace", command: "echo hi" }),
       )
       // 等待请求入队并出现在 pending 表
       let reqID: string | undefined
@@ -56,7 +56,7 @@ describe("LocalAgentChannel", () => {
     try {
       const controller = new AbortController()
       const exitPromise = Effect.runPromiseExit(
-        LocalAgentChannel.instance.exec(SESSION, { cwd: "/workspace", command: "sleep 1" }, undefined, controller.signal),
+        LocalAgentChannel.instance.exec(SESSION, { sessionID: SESSION, cwd: "/workspace", command: "sleep 1" }, undefined, controller.signal),
       )
       await Bun.sleep(20)
       const reqID = Array.from(conn.pending.keys())[0]!
@@ -75,7 +75,7 @@ describe("LocalAgentChannel", () => {
     const { conn, sent } = registerAgent()
     try {
       const exitPromise = Effect.runPromiseExit(
-        LocalAgentChannel.instance.exec(SESSION, { cwd: "/workspace", command: "sleep 10" }),
+        LocalAgentChannel.instance.exec(SESSION, { sessionID: SESSION, cwd: "/workspace", command: "sleep 10" }),
       )
       await Bun.sleep(20)
       const req = sent.find((m) => m.type === "exec")!

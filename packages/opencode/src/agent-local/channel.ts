@@ -81,7 +81,9 @@ function request<T>(
       }
       conn.pending.set(id, entry)
 
-      conn.send({ id, type, ...payload })
+      // 请求体统一携带 sessionID（注入 req 内层）：Agent 端按会话隔离工作区
+      const body = payload.req && typeof payload.req === "object" ? { ...payload, req: { ...payload.req, sessionID } } : payload
+      conn.send({ id, type, ...body })
 
       const timer = setTimeout(() => {
         conn.pending.delete(id)

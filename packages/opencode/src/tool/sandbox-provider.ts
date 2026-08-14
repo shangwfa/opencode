@@ -1651,21 +1651,21 @@ function createLocalAgentSandbox(sessionID: string): Sandbox {
     id,
     files: {
       readFile: (path: string, opts?: Record<string, unknown>) =>
-        Effect.runPromise(ch.fsRead(sessionID, { path, ...(opts as object) })).then((r) => r.data),
+        Effect.runPromise(ch.fsRead(sessionID, { sessionID, path, ...(opts as object) })).then((r) => r.data),
       readBytes: (path: string, opts?: Record<string, unknown>) =>
-        Effect.runPromise(ch.fsReadBytes(sessionID, { path, ...(opts as object) })).then((r) =>
+        Effect.runPromise(ch.fsReadBytes(sessionID, { sessionID, path, ...(opts as object) })).then((r) =>
           Uint8Array.from(Buffer.from(r.data, "base64")),
         ),
       readBytesStream: (path: string, opts?: Record<string, unknown>) => {
         async function* gen() {
-          const buf = await ch.fsReadBytesStream(sessionID, { path, ...(opts as object) })
+          const buf = await ch.fsReadBytesStream(sessionID, { sessionID, path, ...(opts as object) })
           yield buf
         }
         return gen()
       },
       writeFiles: (entries: { path: string; data: string }[]) =>
-        Effect.runPromise(ch.fsWrite(sessionID, { entries })),
-      getFileInfo: (paths: string[]) => Effect.runPromise(ch.fsStat(sessionID, { paths })),
+        Effect.runPromise(ch.fsWrite(sessionID, { sessionID, entries })),
+      getFileInfo: (paths: string[]) => Effect.runPromise(ch.fsStat(sessionID, { sessionID, paths })),
     },
     commands: {
       createSession: () => Promise.resolve(`local-${sessionID}`),
@@ -1683,6 +1683,7 @@ function createLocalAgentSandbox(sessionID: string): Sandbox {
           ch.exec(
             sessionID,
             {
+              sessionID,
               cwd: options?.workingDirectory ?? "/workspace",
               command,
               timeoutMs: options?.timeoutSeconds ? options.timeoutSeconds * 1000 : undefined,
@@ -1696,7 +1697,7 @@ function createLocalAgentSandbox(sessionID: string): Sandbox {
         ),
       deleteSession: () => Promise.resolve(),
       interrupt: () => Promise.resolve(),
-      run: (command: string) => Effect.runPromise(ch.exec(sessionID, { cwd: "/workspace", command })),
+      run: (command: string) => Effect.runPromise(ch.exec(sessionID, { sessionID, cwd: "/workspace", command })),
     },
     getEndpointUrl: (port: number) => Effect.runPromise(ch.getEndpoint(sessionID, port)),
     isHealthy: () => Promise.resolve(true),
@@ -1785,6 +1786,7 @@ export namespace LocalAgentRouterProvider {
             return (yield* LocalAgentChannel.instance.exec(
               sessionID,
               {
+                sessionID,
                 cwd: options?.workingDirectory ?? "/workspace",
                 command,
                 timeoutMs: options?.timeoutSeconds ? options.timeoutSeconds * 1000 : undefined,
@@ -1805,6 +1807,7 @@ export namespace LocalAgentRouterProvider {
             return (yield* LocalAgentChannel.instance.exec(
               sessionID,
               {
+                sessionID,
                 cwd: options?.workingDirectory ?? "/workspace",
                 command,
                 timeoutMs: options?.timeoutSeconds ? options.timeoutSeconds * 1000 : undefined,

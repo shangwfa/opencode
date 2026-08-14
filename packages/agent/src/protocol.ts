@@ -1,5 +1,5 @@
 export type AgentMessage =
-  | { id: string; type: "hello"; workdir: string; agentVersion: string }
+  | { id: string; type: "hello"; workdir: string; agentVersion: string; agentID?: string }
   | { id: string; type: "hello.ack"; agentID: string }
   | { id: string; type: "ping"; ts: number }
   | { id: string; type: "pong"; ts: number }
@@ -31,6 +31,7 @@ export type AgentMessage =
   | { id: string; type: "error"; message: string }
 
 export type ExecReq = {
+  sessionID: string
   cwd: string
   command: string
   timeoutMs?: number
@@ -48,6 +49,7 @@ export type CommandExecution = {
 }
 
 export type FsReadReq = {
+  sessionID: string
   path: string
   encoding?: string
   range?: string
@@ -61,6 +63,7 @@ export type FsReadRes = {
 }
 
 export type FsReadBytesReq = {
+  sessionID: string
   path: string
   range?: string
   offset?: number
@@ -73,10 +76,12 @@ export type FsReadBytesRes = {
 }
 
 export type FsWriteReq = {
+  sessionID: string
   entries: { path: string; data: string }[]
 }
 
 export type FsStatReq = {
+  sessionID: string
   paths: string[]
 }
 

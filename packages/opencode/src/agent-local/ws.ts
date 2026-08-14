@@ -55,7 +55,7 @@ function handleConnection(ws: WebSocket): void {
     if (msg.type === "hello") {
       connection = AgentRegistry.instance.register(msg.workdir, (out) => {
         if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(out))
-      })
+      }, msg.agentID)
       log.info("agent hello received", { agentID: connection.id, workdir: msg.workdir, version: msg.agentVersion })
       connection.send({ id: msg.id, type: "hello.ack", agentID: connection.id })
       return
