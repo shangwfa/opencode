@@ -42,18 +42,21 @@ source ../test-env.sh 3 && source ../test-lib.sh
 export TOOL_OUTPUT="$HOME/.local/share/opencode/tool-output"
 ```
 
-触发方式说明：V2 的 `compact` 手动操作当前返回 `OperationUnavailableError`，compaction 由 runner **自动/overflow** 触发（上下文超限时）。端到端用例需用低 context 上限的模型并累积长会话。
+触发方式说明：historyPath 落盘仅在 **V2 SessionRunner** 路径生效（`packages/core/src/session/compaction.ts` 的 `compactAfterOverflow` → `writeHistory`）。当前仓库主链路走 **V1 SessionPrompt**（`packages/opencode/src/session/prompt.ts`），V1 的 overflow compaction 调用 `buildPrompt` from core 但**不含** historyPath 落盘逻辑。因此 T-CX.2~6 端到端用例在当前架构下无法触发，需等 V2 主链路上线。
 
 ## 验收层级
 
-| 层级 | 用例 | 验证目标 |
-|------|------|----------|
-| L0 单元 | T-CX.1 | 纯函数与落盘/透传/提示注入的单元测试 |
-| L1 落盘 | T-CX.2 | 触发 compaction 后历史文件生成、命名、内容完整 |
-| L2 持久化 | T-CX.3 | `Compaction` 消息带 `historyPath` 且落库 |
-| L3 效果 | T-CX.4 | 模型能通过历史文件检索回摘要丢失的细节 |
-| L4 可靠性 | T-CX.5 | 落盘失败优雅降级；head 为空不产生文件 |
-| L5 清理 | T-CX.6 | `tool_*` 文件进入 7 天清理 |
+| 层级 | 用例 | 验证目标 | 状态 |
+|------|------|----------|------|
+| L0 单元 | T-CX.1 | 纯函数与落盘/透传/提示注入的单元测试 | ✅ 可执行（25 pass） |
+| L1 落盘 | T-CX.2 | 触发 compaction 后历史文件生成、命名、内容完整 | ⏸️ blocked by V2 |
+| L2 持久化 | T-CX.3 | `Compaction` 消息带 `historyPath` 且落库 | ⏸️ blocked by V2 |
+| L3 效果 | T-CX.4 | 模型能通过历史文件检索回摘要丢失的细节 | ⏸️ blocked by V2 |
+| L4 可靠性 | T-CX.5 | 落盘失败优雅降级；head 为空不产生文件 | ⏸️ blocked by V2（降级路径已由 T-CX.1 单测覆盖） |
+| L5 清理 | T-CX.6 | `tool_*` 文件进入 7 天清理 | ⏸️ blocked by V2（清理实现待补直接回归测试） |
+| L3 实战 | T-CX.7 | 二次 compaction 后仍可沿历史文件链找回第一次压缩的细节 | ✅ 单测覆盖；端到端 blocked by V2 |
+
+> **T-CX.2~6 当前无法端到端执行**：historyPath 落盘仅在 V2 SessionRunner 路径生效（`packages/core/src/session/compaction.ts`），而当前仓库主链路走 V1 SessionPrompt（`packages/opencode/src/session/prompt.ts`），V1 的 overflow compaction 不含 historyPath 逻辑。V2 SessionRunner / SessionExecution 在当前仓库生产代码中未被引用。需等 V2 主链路上线后才能跑这些用例。
 
 ## 测试用例
 
@@ -73,6 +76,7 @@ bun test test/session-compaction.test.ts test/session-runner-message.test.ts
 - 落盘失败降级：`historyPath` 为 `undefined`，compaction 仍发布摘要
 - `message-updater`：`historyPath` 透传 / 无字段时省略
 - `to-llm-message`：checkpoint 附检索提示
+- 连续 compaction：新历史文件包含前一历史文件路径，Agent 可沿链检索更早的完整记录
 
 ### T-CX.2 触发 compaction 并验证历史文件落盘（L1）
 
@@ -135,8 +139,22 @@ touch -t "$(date -v-8d +%Y%m%d%H%M)" "$TOOL_OUTPUT/tool_history_stale.md"
 
 **期望**：8 天前的 `tool_history_stale.md` 在下一轮清理中被删除；7 天内的文件保留；清理不影响数据库中的 compaction 摘要与 `historyPath`（文件删除后 Agent 仅失去检索能力，会话数据不丢）。
 
+### T-CX.7 实战：两次 compaction 后检索第一次细节（L3）
+
+> 当前 V2 主链路未上线，此用例暂不能端到端运行；`session-compaction.test.ts` 已覆盖相同场景。
+
+1. 在第一次 compaction 前读取或生成唯一细节，例如 `FIRST_COMPACTION_SECRET=violet-owl-42`。
+2. 触发第一次 compaction，记录其历史文件 `tool_history_<first>.md`。
+3. 再累积足够长的会话并触发第二次 compaction，记录 `tool_history_<second>.md`。
+4. 在第二个文件中执行 `grep -n "Earlier compacted history\|tool_history_<first>" "$TOOL_OUTPUT/tool_history_<second>.md"`。
+5. 让 Agent 回答第一次压缩前的唯一细节。
+
+**期望**：第二个历史文件声明并引用第一个文件路径；Agent 从最新 checkpoint 的 historyPath 开始，可沿引用检索到 `violet-owl-42` 并正确回答。不会因只保留最新 compaction 消息而丢失早期完整历史的可达性。
+
 ## 已知限制
 
-- V2 手动 `/compact` 未实现（`OperationUnavailableError`），只能通过自动/overflow compaction 触发本功能。
+- **V2 主链路未上线**：historyPath 功能仅存在于 V2 SessionRunner 路径（core 包），当前仓库主链路走 V1 SessionPrompt，V1 compaction 不含此功能。V2 手动 `/compact` 也未实现（`OperationUnavailableError`）。T-CX.2~6 需等 V2 上线后才能端到端验证。
 - 历史文件有 7 天保留期；过期后文件被清理，但被压缩历史的原始数据仍在 PG 的 `session_message` 表。
 - 历史文件含明文对话，可能很大；Agent 被提示用 Grep/Read 而非整读。
+- **TOOL_OUTPUT 路径因平台/运行方式而异**：文档示例写 `$HOME/.local/share/opencode/tool-output`（Linux/SaaS 容器），macOS 宿主机直跑时为 `~/Library/Application Support/opencode/tool-output`。端到端用例应从 `Global.Path.data` 动态获取，而非硬编码。
+- **清理回归测试待补**：`truncate.ts` 实现以 `tool_` 前缀和 7 天 RETENTION 清理文件；目前尚无直接单测覆盖 T-CX.6 的过期文件删除行为。

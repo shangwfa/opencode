@@ -184,10 +184,19 @@ export const make = (dependencies: Dependencies) => {
   const writeHistory: (input: {
     messageID: SessionMessage.ID
     entries: readonly Entry[]
+    previousHistoryPath?: string
   }) => Effect.Effect<string | undefined, FSUtil.Error> = Effect.fn(
     "SessionCompaction.writeHistory",
   )(function* (input) {
-    const text = input.entries.map((entry) => serializeHistory(entry.message)).join("\n\n")
+    const text = [
+      ...(input.previousHistoryPath
+        ? [
+            "## Earlier compacted history",
+            `The full record before this compaction is available at ${input.previousHistoryPath}. Search that file with Grep or Read (offset/limit) if needed.`,
+          ]
+        : []),
+      ...input.entries.map((entry) => serializeHistory(entry.message)),
+    ].join("\n\n")
     const file = path.join(dependencies.historyDir, `tool_history_${input.messageID}.md`)
     yield* dependencies.fs.ensureDir(dependencies.historyDir)
     yield* dependencies.fs.writeFileString(file, text)
@@ -238,7 +247,11 @@ export const make = (dependencies: Dependencies) => {
     if (!summarized || failed || !summary.trim()) return false
     const historyPath =
       selected.headEntries.length > 0
-        ? yield* writeHistory({ messageID, entries: selected.headEntries }).pipe(
+        ? yield* writeHistory({
+            messageID,
+            entries: selected.headEntries,
+            previousHistoryPath: previousSummary?.type === "compaction" ? previousSummary.historyPath : undefined,
+          }).pipe(
             Effect.catch((error) =>
               Effect.logWarning("failed to write compaction history", { error: String(error) }).pipe(
                 Effect.as(undefined),

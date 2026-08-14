@@ -132,6 +132,73 @@ test("compaction writes the compacted history to a file and reports historyPath"
   expect(ended!.recent).toContain("Message 11")
 })
 
+test("compaction links the prior history file when compacted repeatedly", async () => {
+  const historyDir = await mkdtemp(join(tmpdir(), "opencode-compaction-"))
+  const writes = new Map<string, string>()
+  const fs = {
+    ensureDir: () => Effect.void,
+    writeFileString: (file: string, text: string) =>
+      Effect.sync(() => {
+        writes.set(file, text)
+      }),
+  } as unknown as FSUtil.Interface
+  let historyPath: string | undefined
+  const events = {
+    publish: (definition: { type: string }, data: { historyPath?: string }) =>
+      Effect.sync(() => {
+        if (definition.type === "session.next.compaction.ended") historyPath = data.historyPath
+      }),
+  } as unknown as EventV2.Interface
+  const model = Model.make({
+    id: "fake-model",
+    provider: "fake",
+    route: OpenAIChat.route.with({ limits: { context: 500_000, output: 500 } }),
+  })
+  const previousHistoryPath = "/data/tool-output/tool_history_msg_previous.md"
+  const entries = [
+    {
+      seq: 1,
+      message: SessionMessage.Compaction.make({
+        id: SessionMessage.ID.create(),
+        type: "compaction",
+        reason: "auto",
+        summary: "previous summary",
+        recent: "previous recent context",
+        historyPath: previousHistoryPath,
+        time: { created },
+      }),
+    },
+    ...Array.from({ length: 3 }, (_, index) => ({
+      seq: index + 2,
+      message: SessionMessage.User.make({
+        id: SessionMessage.ID.create(),
+        type: "user",
+        text: `Message ${index} ${"x".repeat(20_000)}`,
+        time: { created },
+      }),
+    })),
+  ]
+
+  const result = await Effect.runPromise(
+    SessionCompaction.make({
+      events,
+      llm: { stream: () => Stream.succeed(LLMEvent.textDelta({ id: "t-1", text: "## Objective\n- test summary" })) },
+      config: [],
+      fs,
+      historyDir,
+    }).compactAfterOverflow({
+      sessionID: SessionSchema.ID.make("ses_test"),
+      entries,
+      model,
+      request: LLM.request({ model, messages: [Message.user("test")], generation: { maxTokens: 500 } }),
+    }),
+  )
+
+  expect(result).toBe(true)
+  expect(historyPath).toBeDefined()
+  expect(writes.get(historyPath!)).toContain(previousHistoryPath)
+})
+
 test("serializeHistory includes the complete tool output without truncation", () => {
   const output = "x".repeat(5_000)
   const out = SessionCompaction.serializeHistory(assistant([tool(output)]))

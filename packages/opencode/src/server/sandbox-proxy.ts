@@ -14,6 +14,8 @@ import { WebSocketTracker } from "./routes/instance/httpapi/websocket-tracker"
 import { ProxyUtil } from "@/server/proxy-util"
 import { resolveSandboxOpts } from "@/session/sandbox-opts"
 import { insertExecLog, updateExecLog, queryExecLogsBySession, queryExecLog, type ExecLog } from "@/session/exec-log"
+import { ExecFailed } from "@/sandbox/exec-failed"
+import { toSandboxCwd } from "@/tool/sandbox-path"
 
 type ProxyError = {
   type: "runtime" | "network" | "compile"
@@ -326,17 +328,18 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
 
         const command = body.command
         const workingDirectory = body.workingDirectory ?? session.directory
+        const sandboxWorkingDirectory = toSandboxCwd(workingDirectory, session.directory)
         const t0 = Date.now()
         const execId = `exec-${++execCounter}-${t0}`
         const result = yield* sandbox.runInSession(
           root.id,
           command,
-          { workingDirectory, timeoutSeconds: body.timeoutSeconds },
+          { workingDirectory: sandboxWorkingDirectory, timeoutSeconds: body.timeoutSeconds },
           {},
         ).pipe(Effect.catch((err) => Effect.succeed(null as any)))
 
         const stdout = result?.logs?.stdout.map((m: any) => m.text).join("\n") ?? ""
-        const stderr = result?.logs?.stderr.map((m: any) => m.text).join("\n") ?? ""
+        const stderr = result?.logs?.stderr.map((m: any) => m.text).join("\n") ?? "Sandbox execution failed"
 
         yield* Effect.promise(() => insertExecLog({
           id: execId,
@@ -352,6 +355,27 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
           time_started: t0,
           time_finished: Date.now(),
         })).pipe(Effect.catch(() => Effect.void))
+
+        const syncStatus: "completed" | "failed" | "timed_out" =
+          result?.error?.name === "TimeoutError"
+            ? "timed_out"
+            : !result || (result.exitCode !== null && result.exitCode !== 0)
+              ? "failed"
+              : "completed"
+        if (syncStatus !== "completed") {
+          yield* ExecFailed.maybeTrigger({
+            provider: sandbox,
+            rootID: root.id,
+            directory: session.directory,
+            execId,
+            command,
+            workingDirectory: sandboxWorkingDirectory,
+            exitCode: result?.exitCode ?? null,
+            status: syncStatus,
+            stdout,
+            stderr,
+          })
+        }
 
         if (!result) return HttpServerResponse.jsonUnsafe({ error: "execution failed" }, { status: 502 })
 
@@ -386,6 +410,7 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
         }
 
         const sid = root.id
+        const workingDirectory = body.workingDirectory ?? session.directory
         const execId = `exec-${++execCounter}-${Date.now()}`
         const q = yield* Queue.unbounded<ExecSseEvent>()
         const state: ExecState = {
@@ -407,7 +432,7 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
           id: execId,
           session_id: sid,
           command: body.command,
-          working_directory: body.workingDirectory ?? session.directory,
+          working_directory: workingDirectory,
           status: "running",
           source: "exec-async",
           time_started: state.startedAt,
@@ -431,7 +456,10 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
         }
 
         const cmd = body.command
-        const opts = { workingDirectory: body.workingDirectory ?? session.directory, timeoutSeconds: body.timeoutSeconds }
+        const opts = {
+          workingDirectory: toSandboxCwd(workingDirectory, session.directory),
+          timeoutSeconds: body.timeoutSeconds,
+        }
 
         const handlers = {
           onStdout: (msg: { text: string }) => {
@@ -455,14 +483,24 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
             Effect.catch(() => Effect.succeed(null as any)),
           )
           if (state.status === "killed") return
+          let fullStdout = ""
+          let fullStderr = ""
           if (result) {
+            fullStdout = result.logs.stdout.map((m: any) => m.text).join("\n")
+            fullStderr = result.logs.stderr.map((m: any) => m.text).join("\n")
             state.exitCode = result.exitCode
-            state.stdout = truncateOutput(result.logs.stdout.map((m: any) => m.text).join("\n")) ?? ""
-            state.stderr = truncateOutput(result.logs.stderr.map((m: any) => m.text).join("\n")) ?? ""
+            state.stdout = truncateOutput(fullStdout) ?? ""
+            state.stderr = truncateOutput(fullStderr) ?? ""
             if (result.error) state.error = { name: result.error.name, value: result.error.value, traceback: result.error.traceback }
-            state.status = result.error?.name === "TimeoutError" ? "timed_out" : "completed"
+            state.status =
+              result.error?.name === "TimeoutError"
+                ? "timed_out"
+                : result.exitCode !== null && result.exitCode !== 0
+                  ? "failed"
+                  : "completed"
           } else {
             state.status = "failed"
+            fullStderr = "Sandbox execution failed"
           }
           state.finishedAt = Date.now()
           yield* Effect.promise(() => updateExecLog(execId, {
@@ -473,6 +511,20 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
             error: state.error ? JSON.stringify({ name: state.error.name, value: state.error.value }) : null,
             time_finished: state.finishedAt,
           })).pipe(Effect.catch(() => Effect.void))
+          if (state.status !== "completed") {
+            yield* ExecFailed.maybeTrigger({
+              provider: sandbox,
+              rootID: sid,
+              directory: session.directory,
+              execId,
+              command: body.command,
+              workingDirectory: opts.workingDirectory,
+              exitCode: state.exitCode,
+              status: state.status,
+              stdout: fullStdout,
+              stderr: fullStderr,
+            })
+          }
           Queue.offerUnsafe(q, { _tag: "done" as const, exitCode: state.exitCode, stdout: state.stdout, stderr: state.stderr })
           Queue.endUnsafe(q as any)
         }).pipe(Effect.catch(() => Effect.gen(function* () {

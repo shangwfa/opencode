@@ -43,6 +43,7 @@ import { ProviderAuth } from "@/provider/auth"
 import { ModelsDev } from "@opencode-ai/core/models-dev"
 import { Provider } from "@/provider/provider"
 import { PtyTicket } from "@opencode-ai/core/pty/ticket"
+import { ExecRepair } from "@/sandbox/exec-repair"
 import { Question } from "@/question"
 import { Session } from "@/session/session"
 import { SessionCompaction } from "@/session/compaction"
@@ -308,6 +309,7 @@ const app = LayerNode.group([
   ProjectCopy.node,
   RepositoryCache.node,
   PtyTicket.node,
+  ExecRepair.node,
 ])
 
 export function createRoutes(
