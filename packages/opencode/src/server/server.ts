@@ -192,7 +192,7 @@ function forceClose(state: ListenerState) {
 
 function serverLayer(opts: { port: number; hostname: string }) {
   const server = createServer()
-  attachAgentWs(server)
+  const closeAgentWs = attachAgentWs(server)
   const serverRef = { closeStarted: false, forceStop: false }
   const close = server.close.bind(server)
   // Keep shutdown owned by NodeHttpServer, but honor listener.stop(true) by
@@ -210,6 +210,8 @@ function serverLayer(opts: { port: number; hostname: string }) {
     Layer.succeed(ListenerServerService)(
       ListenerServerService.of({
         closeAll: Effect.sync(() => {
+          // 停机时一并关闭 agent ws：否则 registry 残留假在线，Agent 侧无感知
+          closeAgentWs()
           serverRef.forceStop = true
           if (serverRef.closeStarted) server.closeAllConnections()
         }),

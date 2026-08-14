@@ -65,19 +65,28 @@ function request<T>(
 
     return yield* Effect.callback<T, Error>((resume) => {
       const untrack = type === "exec" ? trackExec(sessionID, id) : null
-      // Effect 的 resume 只允许调用一次；timeout/abort 先结束后，迟到的
-      // agent 响应不能再 resolve/reject，否则抛 defect 并拖垮 ws 连接。
+      // Effect 的 resume 只允许调用一次；所有结算路径共用幂等 settle：
+      // 统一清理 timer、abort listener、pending 表与 exec 跟踪
       let settled = false
+      let timer: ReturnType<typeof setTimeout> | undefined
+      const cleanup = () => {
+        if (timer) clearTimeout(timer)
+        timer = undefined
+        if (onAbort) signal?.removeEventListener("abort", onAbort)
+        conn.pending.delete(id)
+        untrack?.()
+      }
       const settle = (effect: Effect.Effect<T, Error>) => {
         if (settled) return
         settled = true
+        cleanup()
         resume(effect)
       }
+      let onAbort: (() => void) | undefined
       const entry = {
         resolve: (data: unknown) => settle(Effect.succeed(data as T)),
         reject: (err: Error) => settle(Effect.fail(err)),
         onStream,
-        onSettle: untrack ?? undefined,
       }
       conn.pending.set(id, entry)
 
@@ -85,18 +94,16 @@ function request<T>(
       const body = payload.req && typeof payload.req === "object" ? { ...payload, req: { ...payload.req, sessionID } } : payload
       conn.send({ id, type, ...body })
 
-      const timer = setTimeout(() => {
-        conn.pending.delete(id)
-        untrack?.()
-        entry.reject(new Error(`Agent request ${type} timed out after ${REQUEST_TIMEOUT_MS}ms`))
+      // 超时必须通知 Agent 取消：只丢弃 pending 会让命令在用户机器上继续
+      // 执行成幽灵副作用（SaaS 已放弃等待但本地仍在跑）
+      timer = setTimeout(() => {
+        conn.send({ id, type: "interrupt" })
+        settle(Effect.fail(new Error(`Agent request ${type} timed out after ${REQUEST_TIMEOUT_MS}ms`)))
       }, REQUEST_TIMEOUT_MS)
 
-      const onAbort = () => {
-        clearTimeout(timer)
-        conn.pending.delete(id)
-        untrack?.()
+      onAbort = () => {
         conn.send({ id, type: "interrupt" })
-        entry.reject(new Error("Aborted"))
+        settle(Effect.fail(new Error("Aborted")))
       }
 
       if (signal) {
@@ -106,6 +113,10 @@ function request<T>(
         }
         signal.addEventListener("abort", onAbort, { once: true })
       }
+
+      // fiber 被 timeout/interrupt 打断时同样走 settle 清理（Effect.callback
+      // 返回的 Effect 作为中断 finalizer 运行）
+      return Effect.sync(() => settle(Effect.fail(new Error("Cancelled"))))
     })
   })
 }

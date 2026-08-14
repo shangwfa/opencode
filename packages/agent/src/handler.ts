@@ -18,35 +18,18 @@ type PendingExec = {
   proc: ChildProcess
   stdout: { text: string }[]
   stderr: { text: string }[]
+  bytes: number
+  truncated: boolean
   timer?: ReturnType<typeof setTimeout>
-  truncated?: boolean
+  kill: (sig?: NodeJS.Signals) => void
 }
 
-// exec 硬性保护：输出环形上限与默认超时，防止 yes 类命令拖垮 agent
+// exec 硬性保护：输出环形上限与默认超时，防止 yes 类命令拖垮 agent。
+// 上限在接收 chunk 时实时生效（超限即终止进程、停止缓存与发送）。
 const MAX_OUTPUT_CHARS = 10 * 1024 * 1024
 const DEFAULT_EXEC_TIMEOUT_MS = 10 * 60 * 1000
-
-function clampLogs(pending: PendingExec) {
-  let total = 0
-  for (const item of pending.stdout) total += item.text.length
-  let stderrTotal = 0
-  for (const item of pending.stderr) stderrTotal += item.text.length
-  if (total + stderrTotal <= MAX_OUTPUT_CHARS) return false
-  pending.truncated = true
-  for (const arr of [pending.stdout, pending.stderr]) {
-    let kept = 0
-    const budget = Math.floor(MAX_OUTPUT_CHARS / 2)
-    const keep: { text: string }[] = []
-    for (let i = arr.length - 1; i >= 0; i--) {
-      kept += arr[i].text.length
-      keep.unshift(arr[i])
-      if (kept >= budget) break
-    }
-    arr.length = 0
-    arr.push(...keep)
-  }
-  return true
-}
+// interrupt 先 SIGINT 进程组；忽略信号的进程（trap '' INT）在宽限期后升级 SIGKILL
+const INTERRUPT_GRACE_MS = 5_000
 
 export class AgentHandler {
   private ptyManager: PtyManager | null = null
@@ -101,10 +84,16 @@ export class AgentHandler {
   }
 
   private handleExec(id: string, req: ExecReq): void {
+    // 重复请求 ID 直接拒绝：静默覆盖会让第二个请求的结果被幂等守卫丢弃、
+    // 且调用方收到第一个命令的串线输出
+    if (this.pendingExecs.has(id)) {
+      this.send({ id, type: "error", message: `duplicate exec request id: ${id}` })
+      return
+    }
     const started = Date.now()
     const mapper = this.session(req.sessionID)
     const cwd = mapper.toReal(req.cwd)
-    // detached：独立进程组，超时/中断时 kill(-pid) 能清掉 sh 的子进程
+    // detached：独立进程组，超时/中断/收尾时 kill(-pid) 能清掉 sh 的子进程
     const proc = spawn("sh", ["-c", mapper.rewriteCommand(req.command)], {
       cwd,
       env: { ...process.env, ...req.env },
@@ -112,40 +101,52 @@ export class AgentHandler {
       detached: true,
     })
 
-    const pending: PendingExec = { proc, stdout: [], stderr: [] }
+    const pending: PendingExec = {
+      proc,
+      stdout: [],
+      stderr: [],
+      bytes: 0,
+      truncated: false,
+      kill: (sig: NodeJS.Signals = "SIGKILL") => {
+        try {
+          if (proc.pid != null) process.kill(-proc.pid, sig)
+        } catch {
+          proc.kill(sig)
+        }
+      },
+    }
     this.pendingExecs.set(id, pending)
 
-    const killGroup = (sig: NodeJS.Signals = "SIGKILL") => {
-      try {
-        if (proc.pid != null) process.kill(-proc.pid, sig)
-      } catch {
-        proc.kill(sig)
+    const onChunk = (arr: { text: string }[], event: "stdout" | "stderr") => (chunk: Buffer) => {
+      const text = chunk.toString("utf8")
+      pending.bytes += text.length
+      // 运行期实时上限：超限后立即终止进程，不再缓存、不再发送，
+      // 防止内存线性增长与 exec.stream 风暴拖垮 SaaS
+      if (pending.bytes > MAX_OUTPUT_CHARS) {
+        if (!pending.truncated) {
+          pending.truncated = true
+          pending.kill("SIGKILL")
+        }
+        return
       }
+      arr.push({ text })
+      this.send({ id, type: "exec.stream", stream: { event, text } })
     }
-
-    proc.stdout?.on("data", (chunk: Buffer) => {
-      const text = chunk.toString("utf8")
-      pending.stdout.push({ text })
-      this.send({ id, type: "exec.stream", stream: { event: "stdout", text } })
-    })
-
-    proc.stderr?.on("data", (chunk: Buffer) => {
-      const text = chunk.toString("utf8")
-      pending.stderr.push({ text })
-      this.send({ id, type: "exec.stream", stream: { event: "stderr", text } })
-    })
+    proc.stdout?.on("data", onChunk(pending.stdout, "stdout"))
+    proc.stderr?.on("data", onChunk(pending.stderr, "stderr"))
 
     // 幂等守卫：timeout/interrupt 先结束后，迟到的 exit 事件不得再发第二条 result
     const finish = (exitCode: number | null, error?: CommandExecution["error"]) => {
       if (!this.pendingExecs.has(id)) return
       if (pending.timer) clearTimeout(pending.timer)
       this.pendingExecs.delete(id)
-      if (error == null) clampLogs(pending)
+      // 正常退出后清理进程组：后台子进程（(sleep 600 &) 类）不得成为孤儿
+      if (exitCode != null) pending.kill("SIGKILL")
       const durationMs = Date.now() - started
       const errOut: CommandExecution["error"] | undefined =
-        error == null && pending.truncated
+        error ?? (pending.truncated
           ? { name: "TruncatedError", value: "output truncated", timestamp: Date.now(), traceback: [] }
-          : error
+          : undefined)
       console.log(
         `[exec] ${exitCode ?? "err"} ${durationMs}ms ses=${req.sessionID.slice(-8)} cwd=${req.cwd} cmd=${JSON.stringify(req.command.slice(0, 120))}` +
           (errOut ? ` error=${errOut.name}: ${errOut.value.slice(0, 80)}` : ""),
@@ -172,7 +173,7 @@ export class AgentHandler {
 
     const timeoutMs = req.timeoutMs ?? DEFAULT_EXEC_TIMEOUT_MS
     pending.timer = setTimeout(() => {
-      killGroup("SIGKILL")
+      pending.kill("SIGKILL")
       finish(null, {
         name: "TimeoutError",
         value: `Command timed out after ${timeoutMs}ms`,
@@ -189,12 +190,10 @@ export class AgentHandler {
       return
     }
     if (pending.timer) clearTimeout(pending.timer)
-    this.pendingExecs.delete(id)
-    try {
-      if (pending.proc.pid != null) process.kill(-pending.proc.pid, "SIGINT")
-    } catch {
-      pending.proc.kill("SIGINT")
-    }
+    // 保留 tracking：SIGINT 后设置升级定时器，忽略信号的进程在宽限期后
+    // 被 SIGKILL，exit 事件触发 finish 收尾；立即回 interrupted 不阻塞调用方
+    pending.timer = setTimeout(() => pending.kill("SIGKILL"), INTERRUPT_GRACE_MS)
+    pending.kill("SIGINT")
     this.send({ id, type: "interrupted" })
   }
 
@@ -208,18 +207,21 @@ export class AgentHandler {
         this.send({ id, type: "fs.read.result", res: { data: entries.join("\n"), truncated: false } })
         return
       }
-      let content: string
+      // offset/limit 作用于原始字节（base64 场景先切字节再编码）
+      let buf: Buffer
       if (req.range) {
-        const buf = await this.readRange(filePath, req.range)
-        content = buf.toString(req.encoding === "base64" ? "base64" : "utf8")
+        buf = await this.readRange(filePath, req.range)
       } else {
-        content = await fs.readFile(filePath, (req.encoding as BufferEncoding) ?? "utf8")
+        buf = await fs.readFile(filePath)
       }
+      const offset = Math.max(0, req.offset ?? 0)
+      if (offset > 0) buf = buf.subarray(offset)
       let truncated = false
-      if (req.limit !== undefined && content.length > req.limit) {
-        content = content.slice(0, req.limit)
+      if (req.limit !== undefined && buf.length > req.limit) {
+        buf = buf.subarray(0, req.limit)
         truncated = true
       }
+      const content = buf.toString(req.encoding === "base64" ? "base64" : "utf8")
       this.send({ id, type: "fs.read.result", res: { data: content, truncated } })
     } catch (err) {
       this.send({ id, type: "error", message: `fs.read failed: ${err instanceof Error ? err.message : String(err)}` })
@@ -362,8 +364,9 @@ export class AgentHandler {
   private async readRange(filePath: string, range: string): Promise<Buffer> {
     const stat = await fs.stat(filePath)
     const match = range.match(/^bytes=(\d+)-(\d*)$/)
-    if (!match) return fs.readFile(filePath)
-    const start = parseInt(match[1], 10)
+    // 非法 range 直接报错：静默回退整读会让大文件请求绕过限制撑爆内存
+    if (!match) throw new Error(`invalid range header: ${JSON.stringify(range)}`)
+    const start = parseInt(match[1]!, 10)
     const end = Math.min(match[2] ? parseInt(match[2], 10) : stat.size - 1, stat.size - 1)
     const fd = await fs.open(filePath, "r")
     try {
@@ -384,11 +387,7 @@ export class AgentHandler {
   dispose(): void {
     for (const [, pending] of this.pendingExecs) {
       if (pending.timer) clearTimeout(pending.timer)
-      try {
-        if (pending.proc.pid != null) process.kill(-pending.proc.pid, "SIGKILL")
-      } catch {
-        pending.proc.kill("SIGKILL")
-      }
+      pending.kill("SIGKILL")
     }
     this.pendingExecs.clear()
     this.ptyManager?.dispose()

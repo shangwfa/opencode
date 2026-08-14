@@ -57,4 +57,36 @@ describe("AgentRegistry", () => {
     Effect.runSync(AgentRegistry.instance.bindSession("ses_x", "agent-none"))
     expect(await Effect.runPromise(AgentRegistry.instance.getForSession("ses_x"))).toBeNull()
   })
+
+  test("改绑 A→B 时旧 Agent 的 boundSessions 被移除（L4.5）", async () => {
+    const { send: sendA } = makeSend()
+    const { send: sendB } = makeSend()
+    const connA = AgentRegistry.instance.register("/tmp/a", sendA)
+    const connB = AgentRegistry.instance.register("/tmp/b", sendB)
+    const sid = "ses_rebind"
+    Effect.runSync(AgentRegistry.instance.bindSession(sid, connA.id))
+    Effect.runSync(AgentRegistry.instance.bindSession(sid, connB.id))
+    // 新 owner 持有绑定
+    expect((await Effect.runPromise(AgentRegistry.instance.getForSession(sid)))?.id).toBe(connB.id)
+    // 旧 owner 的 boundSessions 不得残留（否则重连/替换时路由漂移回 A）
+    expect(connA.boundSessions.has(sid)).toBe(false)
+    expect(connB.boundSessions.has(sid)).toBe(true)
+    Effect.runSync(AgentRegistry.instance.unregister(connA.id))
+    Effect.runSync(AgentRegistry.instance.unregister(connB.id))
+  })
+
+  test("register 替换同 ID 连接时调用旧连接 close（L4.4）", async () => {
+    const { send: send1 } = makeSend()
+    const conn1 = AgentRegistry.instance.register("/tmp/x", send1, "agent-stable-1")
+    let closed = false
+    conn1.close = () => {
+      closed = true
+    }
+    const { send: send2 } = makeSend()
+    const conn2 = AgentRegistry.instance.register("/tmp/y", send2, "agent-stable-1")
+    expect(closed).toBe(true)
+    expect((await Effect.runPromise(AgentRegistry.instance.getForSession("ses_z")))).toBeNull()
+    Effect.runSync(AgentRegistry.instance.unregister("agent-stable-1"))
+    expect(closed).toBe(true)
+  })
 })

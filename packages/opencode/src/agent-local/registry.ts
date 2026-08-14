@@ -9,11 +9,12 @@ export interface AgentConnection {
   readonly id: string
   readonly workdir: string
   readonly send: (msg: unknown) => void
+  // 由 ws 层注入：registry 替换同 ID 连接时主动关闭旧 ws（防幽灵 Agent）
+  close?: () => void
   readonly pending: Map<string, {
     resolve: (data: unknown) => void
     reject: (err: Error) => void
     onStream?: (data: unknown) => void
-    onSettle?: () => void
   }>
   boundSessions: Set<string>
 }
@@ -80,7 +81,8 @@ async function pgDeleteBinding(sessionID: string) {
   })
 }
 
-async function pgGetBinding(sessionID: string): Promise<string | null> {
+// PG 查询结果：undefined = 查询失败（不可当"无绑定"缓存），null = 确认无绑定
+async function pgGetBinding(sessionID: string): Promise<string | null | undefined> {
   if (!isPg) return null
   try {
     const { LocalAgentBindingTable } = await import("./binding.pg")
@@ -94,7 +96,7 @@ async function pgGetBinding(sessionID: string): Promise<string | null> {
     return rows[0]?.agent_id ?? null
   } catch (err) {
     log.warn("pg get binding failed", { sessionID, error: err instanceof Error ? err.message : String(err) })
-    return null
+    return undefined
   }
 }
 
@@ -129,6 +131,9 @@ export const instance: RegistryInterface = {
     const prev = connections.get(id)
     if (prev) {
       for (const pending of prev.pending.values()) pending.reject(new Error("Agent reconnected"))
+      // 服务端主动关闭被替换的旧 ws：否则旧连接成幽灵（进程活着、ws 挂着，
+      // 但已除名，不会自动恢复），其 close 回调因 owner 校验不会误删新连接
+      prev.close?.()
       conn.boundSessions = prev.boundSessions
     }
     connections.set(id, conn)
@@ -169,6 +174,10 @@ export const instance: RegistryInterface = {
   bindSession: (sessionID, agentID) =>
     Effect.sync(() => {
       noBindingCache.delete(sessionID)
+      // 改绑时原子移除旧 owner 的残留：否则旧 Agent 的 boundSessions 仍含该
+      // 会话，其重连/被抢占替换时会把路由写回旧 owner（绑定漂移）
+      const prevID = sessionBindings.get(sessionID)
+      if (prevID && prevID !== agentID) connections.get(prevID)?.boundSessions.delete(sessionID)
       const conn = connections.get(agentID)
       if (conn) {
         sessionBindings.set(sessionID, agentID)
@@ -196,7 +205,10 @@ export const instance: RegistryInterface = {
 
       // 内存 miss（进程重启/新实例）：查 PG，agent 在线则重建缓存
       const pgAgentID = yield* Effect.promise(() => pgGetBinding(sessionID))
-      if (!pgAgentID) {
+      // PG 查询失败：按无绑定处理但不写负缓存（区分 NotFound 与暂时性错误，
+      // 否则一次数据库抖动会让该会话永远 fallback 远程）
+      if (pgAgentID === undefined) return null
+      if (pgAgentID === null) {
         if (isPg) noBindingCache.add(sessionID)
         return null
       }

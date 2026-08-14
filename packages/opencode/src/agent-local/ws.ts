@@ -10,9 +10,13 @@ const log = Log.create({ service: "agent-local-ws" })
 const AGENT_WS_PATH = "/agent-ws"
 // Agent 25s 一次 ping；60s 无任何消息视为死连接（NAT/LB 静默掐断场景）
 const IDLE_KILL_MS = 60_000
+// ws 帧上限：覆盖 10MB 输出/base64 文件读取的合法峰值，拒绝异常超大消息
+const MAX_WS_PAYLOAD = 32 * 1024 * 1024
+// 服务端主动关闭：同 ID 新连接替换旧连接（Agent 收到后退出，防抢占乒乓）
+const CLOSE_REPLACED = 4000
 
-export function attachAgentWs(server: import("node:http").Server): void {
-  const wss = new WebSocketServer({ noServer: true })
+export function attachAgentWs(server: import("node:http").Server): () => void {
+  const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_WS_PAYLOAD })
 
   server.on("upgrade", (req: IncomingMessage, socket: import("node:net").Socket, head: Buffer) => {
     const url = new URL(req.url ?? "", "http://localhost")
@@ -22,6 +26,11 @@ export function attachAgentWs(server: import("node:http").Server): void {
       handleConnection(ws as WebSocket)
     })
   })
+
+  return () => {
+    for (const client of wss.clients) client.terminate()
+    wss.close()
+  }
 }
 
 function handleConnection(ws: WebSocket): void {
@@ -53,9 +62,22 @@ function handleConnection(ws: WebSocket): void {
     }
 
     if (msg.type === "hello") {
+      if (typeof msg.workdir !== "string" || msg.workdir.length === 0 || msg.workdir.length > 4096) {
+        log.warn("hello with invalid workdir, closing connection")
+        ws.close(1008, "invalid hello")
+        return
+      }
+      // 同连接重复 hello：先注销旧注册再注册新的，否则旧 connection 引用被
+      // 覆盖后永远无人清理，registry 留下假在线僵尸条目
+      if (connection) {
+        log.warn("duplicate hello on same connection, re-registering", { agentID: connection.id })
+        Effect.runSync(AgentRegistry.instance.unregister(connection.id, connection))
+      }
       connection = AgentRegistry.instance.register(msg.workdir, (out) => {
         if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(out))
       }, msg.agentID)
+      // registry 替换同 ID 旧连接时通过此回调主动关闭旧 ws（防幽灵 Agent）
+      connection.close = () => ws.close(CLOSE_REPLACED, "replaced")
       log.info("agent hello received", { agentID: connection.id, workdir: msg.workdir, version: msg.agentVersion })
       connection.send({ id: msg.id, type: "hello.ack", agentID: connection.id })
       return
@@ -126,7 +148,6 @@ function resolvePending(conn: AgentConnection, id: string, data: unknown): void 
   if (pending) {
     conn.pending.delete(id)
     pending.resolve(data)
-    pending.onSettle?.()
   }
 }
 
@@ -135,6 +156,5 @@ function rejectPending(conn: AgentConnection, id: string, message: string): void
   if (pending) {
     conn.pending.delete(id)
     pending.reject(new Error(message))
-    pending.onSettle?.()
   }
 }

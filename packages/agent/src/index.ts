@@ -9,6 +9,10 @@ import { startLocalServer } from "./local-server"
 import type { AgentMessage } from "./protocol"
 
 const AGENT_VERSION = "0.0.1"
+// 与 SaaS 侧 ws.ts 的 MAX_WS_PAYLOAD 保持一致：拒绝异常超大消息
+const MAX_WS_PAYLOAD = 32 * 1024 * 1024
+// SaaS 主动关闭码：同 ID 新连接替换旧连接，旧进程应退出而非无限重连互抢
+const CLOSE_REPLACED = 4000
 
 // 稳定 agentID：持久化在本地，重连/SaaS 重启后 PG 绑定关系仍有效
 function loadStableAgentID(): string {
@@ -86,7 +90,7 @@ function main() {
   }
 
   function connect() {
-    ws = new WebSocket(server)
+    ws = new WebSocket(server, { maxPayload: MAX_WS_PAYLOAD })
 
     ws.on("open", () => {
       console.log("[agent] connected")
@@ -136,12 +140,17 @@ function main() {
       })
     })
 
-    ws.on("close", () => {
+    ws.on("close", (code) => {
       console.log("[agent] disconnected")
       stopHeartbeat()
       handler?.dispose()
       handler = null
       if (closed) return
+      if (code === CLOSE_REPLACED) {
+        console.log("[agent] replaced by another agent with the same ID, exiting")
+        closed = true
+        process.exit(0)
+      }
       setTimeout(() => {
         if (closed) return
         console.log(`[agent] reconnecting in ${reconnectDelay}ms...`)
