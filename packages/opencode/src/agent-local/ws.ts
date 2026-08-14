@@ -8,6 +8,8 @@ import type { AgentMessage } from "@opencode-ai/agent/src/protocol"
 const log = Log.create({ service: "agent-local-ws" })
 
 const AGENT_WS_PATH = "/agent-ws"
+// Agent 25s 一次 ping；60s 无任何消息视为死连接（NAT/LB 静默掐断场景）
+const IDLE_KILL_MS = 60_000
 
 export function attachAgentWs(server: import("node:http").Server): void {
   const wss = new WebSocketServer({ noServer: true })
@@ -24,13 +26,29 @@ export function attachAgentWs(server: import("node:http").Server): void {
 
 function handleConnection(ws: WebSocket): void {
   let connection: AgentConnection | null = null
+  let lastSeen = Date.now()
+
+  const idleTimer = setInterval(() => {
+    if (Date.now() - lastSeen > IDLE_KILL_MS) {
+      log.warn("agent idle, terminating connection", { agentID: connection?.id, idleMs: Date.now() - lastSeen })
+      ws.terminate()
+    }
+  }, 15_000)
+
+  ws.on("close", () => clearInterval(idleTimer))
 
   ws.on("message", (raw: Buffer) => {
+    lastSeen = Date.now()
     let msg: AgentMessage
     try {
       msg = JSON.parse(raw.toString("utf8")) as AgentMessage
     } catch {
       log.warn("invalid message from agent")
+      return
+    }
+
+    if (msg.type === "ping") {
+      connection?.send({ id: msg.id, type: "pong", ts: msg.ts })
       return
     }
 
@@ -65,6 +83,9 @@ function routeMessage(conn: AgentConnection, msg: AgentMessage): void {
   switch (msg.type) {
     case "exec.stream":
       conn.pending.get(msg.id)?.onStream?.(msg.stream)
+      break
+    case "fs.readBytes.stream":
+      conn.pending.get(msg.id)?.onStream?.({ chunk: msg.chunk, offset: msg.offset, total: msg.total })
       break
     case "exec.result":
       resolvePending(conn, msg.id, msg.res)

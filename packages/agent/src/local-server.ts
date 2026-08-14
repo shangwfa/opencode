@@ -7,6 +7,14 @@ export function startLocalServer(mapper: PathMapper, agentVersion: string) {
   let agentID: string | null = null
 
   const server = createServer((req, res) => {
+    // 防 DNS rebinding：只允许 localhost Host 访问本机检测端点
+    const host = (req.headers.host ?? "").split(":")[0]
+    if (host !== "localhost" && host !== "127.0.0.1") {
+      res.writeHead(403)
+      res.end("Forbidden")
+      return
+    }
+
     res.setHeader("Access-Control-Allow-Origin", "*")
     res.setHeader("Access-Control-Allow-Headers", "Content-Type")
     res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS")

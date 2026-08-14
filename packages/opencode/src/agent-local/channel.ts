@@ -44,6 +44,7 @@ export interface ChannelInterface {
   readonly interruptSession: (sessionID: string) => Effect.Effect<void>
   readonly fsRead: (sessionID: string, req: FsReadReq) => Effect.Effect<FsReadRes, Error>
   readonly fsReadBytes: (sessionID: string, req: FsReadBytesReq) => Effect.Effect<FsReadBytesRes, Error>
+  readonly fsReadBytesStream: (sessionID: string, req: FsReadBytesReq) => Promise<Uint8Array>
   readonly fsWrite: (sessionID: string, req: FsWriteReq) => Effect.Effect<void, Error>
   readonly fsStat: (sessionID: string, req: FsStatReq) => Effect.Effect<FsStatRes, Error>
   readonly getEndpoint: (sessionID: string, port: number) => Effect.Effect<string, Error>
@@ -144,6 +145,20 @@ export const instance: ChannelInterface = {
 
   fsRead: (sessionID, req) => request<FsReadRes>(sessionID, "fs.read", { req }),
   fsReadBytes: (sessionID, req) => request<FsReadBytesRes>(sessionID, "fs.readBytes", { req }),
+
+  // 分片流式读取：Agent 逐块回传 fs.readBytes.stream，result 信号结束
+  fsReadBytesStream: (sessionID, req) =>
+    new Promise<Uint8Array>((resolve, reject) => {
+      const chunks: Buffer[] = []
+      request<FsReadBytesRes>(sessionID, "fs.readStream", { req }, (data) => {
+        const ev = data as { chunk?: string }
+        if (ev.chunk) chunks.push(Buffer.from(ev.chunk, "base64"))
+      }).pipe(Effect.runPromiseExit).then((exit) => {
+        if (exit._tag === "Failure") reject(new Error("fs.readStream failed"))
+        else resolve(Buffer.concat(chunks))
+      })
+    }),
+
   fsWrite: (sessionID, req) => request<void>(sessionID, "fs.write", { req }),
   fsStat: (sessionID, req) => request<FsStatRes>(sessionID, "fs.stat", { req }),
 

@@ -40,6 +40,8 @@ export class AgentHandler {
         return this.handleFsRead(msg.id, msg.req)
       case "fs.readBytes":
         return this.handleFsReadBytes(msg.id, msg.req)
+      case "fs.readStream":
+        return this.handleFsReadBytesStream(msg.id, msg.req)
       case "fs.write":
         return this.handleFsWrite(msg.id, msg.req)
       case "fs.stat":
@@ -60,6 +62,7 @@ export class AgentHandler {
   }
 
   private handleExec(id: string, req: ExecReq): void {
+    const started = Date.now()
     const cwd = this.mapper.toReal(req.cwd)
     const proc = spawn("sh", ["-c", this.mapper.rewriteCommand(req.command)], {
       cwd,
@@ -85,6 +88,11 @@ export class AgentHandler {
     const finish = (exitCode: number | null, error?: CommandExecution["error"]) => {
       if (pending.timer) clearTimeout(pending.timer)
       this.pendingExecs.delete(id)
+      const durationMs = Date.now() - started
+      console.log(
+        `[exec] ${exitCode ?? "err"} ${durationMs}ms cwd=${req.cwd} cmd=${JSON.stringify(req.command.slice(0, 120))}` +
+          (error ? ` error=${error.name}: ${error.value.slice(0, 80)}` : ""),
+      )
       this.send({
         id,
         type: "exec.result",
@@ -177,15 +185,45 @@ export class AgentHandler {
     }
   }
 
+  // 分片流式读取：512KB/块 base64 逐块回传，大文件避免全量驻留内存
+  private async handleFsReadBytesStream(id: string, req: FsReadBytesReq): Promise<void> {
+    try {
+      const filePath = this.mapper.toReal(req.path)
+      const stat = await fs.stat(filePath)
+      const total = stat.size
+      const start = req.offset ?? 0
+      const end = Math.min(start + (req.limit ?? total - start), total)
+      const fd = await fs.open(filePath, "r")
+      const CHUNK = 512 * 1024
+      try {
+        for (let pos = start; pos < end; pos += CHUNK) {
+          const len = Math.min(CHUNK, end - pos)
+          const buf = Buffer.alloc(len)
+          await fd.read(buf, 0, len, pos)
+          this.send({ id, type: "fs.readBytes.stream", chunk: buf.toString("base64"), offset: pos, total })
+        }
+      } finally {
+        await fd.close()
+      }
+      console.log(`[read-stream] ${req.path} ${end - start}B`)
+      this.send({ id, type: "fs.readBytes.result", res: { data: "", truncated: false } })
+    } catch (err) {
+      console.error(`[read-stream] failed ${req.path}:`, err instanceof Error ? err.message : err)
+      this.send({ id, type: "error", message: `fs.readBytes.stream failed: ${err instanceof Error ? err.message : String(err)}` })
+    }
+  }
+
   private async handleFsWrite(id: string, req: FsWriteReq): Promise<void> {
     try {
       for (const entry of req.entries) {
         const filePath = this.mapper.toReal(entry.path)
         await fs.mkdir(path.dirname(filePath), { recursive: true })
         await fs.writeFile(filePath, entry.data, "utf8")
+        console.log(`[write] ${entry.path} ${Buffer.byteLength(entry.data)}B`)
       }
       this.send({ id, type: "fs.write.result" })
     } catch (err) {
+      console.error(`[write] failed ${req.entries.map((e) => e.path).join(",")}:`, err instanceof Error ? err.message : err)
       this.send({ id, type: "error", message: `fs.write failed: ${err instanceof Error ? err.message : String(err)}` })
     }
   }

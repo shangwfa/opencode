@@ -1,6 +1,8 @@
 export type AgentMessage =
   | { id: string; type: "hello"; workdir: string; agentVersion: string }
   | { id: string; type: "hello.ack"; agentID: string }
+  | { id: string; type: "ping"; ts: number }
+  | { id: string; type: "pong"; ts: number }
   | { id: string; type: "exec"; req: ExecReq }
   | { id: string; type: "exec.stream"; stream: ExecStream }
   | { id: string; type: "exec.result"; res: CommandExecution }
@@ -10,6 +12,8 @@ export type AgentMessage =
   | { id: string; type: "fs.read.result"; res: FsReadRes }
   | { id: string; type: "fs.readBytes"; req: FsReadBytesReq }
   | { id: string; type: "fs.readBytes.result"; res: FsReadBytesRes }
+  | { id: string; type: "fs.readStream"; req: FsReadBytesReq }
+  | { id: string; type: "fs.readBytes.stream"; chunk: string; offset: number; total: number }
   | { id: string; type: "fs.write"; req: FsWriteReq }
   | { id: string; type: "fs.write.result" }
   | { id: string; type: "fs.stat"; req: FsStatReq }

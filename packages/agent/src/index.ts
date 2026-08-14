@@ -55,6 +55,15 @@ function main() {
   let reconnectDelay = 1000
   let closed = false
 
+  let heartbeatTimer: ReturnType<typeof setInterval> | null = null
+
+  function stopHeartbeat() {
+    if (heartbeatTimer) {
+      clearInterval(heartbeatTimer)
+      heartbeatTimer = null
+    }
+  }
+
   function connect() {
     ws = new WebSocket(server)
 
@@ -71,6 +80,13 @@ function main() {
         agentVersion: AGENT_VERSION,
       }
       ws!.send(JSON.stringify(hello))
+      // 心跳：25s 一次 ping，SaaS 侧 60s 无任何消息会主动断开
+      stopHeartbeat()
+      heartbeatTimer = setInterval(() => {
+        if (ws?.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ id: `ping-${Date.now()}`, type: "ping", ts: Date.now() }))
+        }
+      }, 25_000)
     })
 
     ws.on("message", (data) => {
@@ -86,6 +102,7 @@ function main() {
         console.log(`[agent] registered as ${msg.agentID}`)
         return
       }
+      if (msg.type === "pong") return
       handler?.handle(msg).catch((err) => {
         console.error("[agent] handler error:", err)
       })
@@ -93,6 +110,7 @@ function main() {
 
     ws.on("close", () => {
       console.log("[agent] disconnected")
+      stopHeartbeat()
       handler?.dispose()
       handler = null
       if (closed) return
@@ -111,6 +129,7 @@ function main() {
 
   process.on("SIGINT", () => {
     closed = true
+    stopHeartbeat()
     handler?.dispose()
     ws?.close()
     process.exit(0)
@@ -118,6 +137,7 @@ function main() {
 
   process.on("SIGTERM", () => {
     closed = true
+    stopHeartbeat()
     handler?.dispose()
     ws?.close()
     process.exit(0)

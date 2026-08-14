@@ -1658,8 +1658,8 @@ function createLocalAgentSandbox(sessionID: string): Sandbox {
         ),
       readBytesStream: (path: string, opts?: Record<string, unknown>) => {
         async function* gen() {
-          const r = await Effect.runPromise(ch.fsReadBytes(sessionID, { path, ...(opts as object) }))
-          yield Uint8Array.from(Buffer.from(r.data, "base64"))
+          const buf = await ch.fsReadBytesStream(sessionID, { path, ...(opts as object) })
+          yield buf
         }
         return gen()
       },
