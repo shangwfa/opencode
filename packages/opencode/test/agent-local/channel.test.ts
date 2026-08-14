@@ -82,8 +82,12 @@ describe("LocalAgentChannel", () => {
       Effect.runSync(LocalAgentChannel.instance.interruptSession(SESSION))
       const interrupt = sent.find((m) => m.type === "interrupt" && m.id === req.id)
       expect(interrupt).toBeDefined()
-      // 模拟 agent 确认中断 → interrupted resolve
-      conn.pending.get(req.id)?.resolve({ interrupted: true })
+      // 模拟 agent 确认中断 → interrupted 合成规范 InterruptedError 结构
+      conn.pending.get(req.id)?.resolve({
+        logs: { stdout: [], stderr: [] },
+        exitCode: null,
+        error: { name: "InterruptedError", value: "Command interrupted", timestamp: Date.now(), traceback: [] },
+      })
       const exit = await exitPromise
       expect(exit._tag).toBe("Success")
     } finally {

@@ -1,4 +1,4 @@
-import { Effect, Duration } from "effect"
+import { Effect } from "effect"
 import { AgentRegistry } from "./registry"
 import type {
   CommandExecution,
@@ -107,12 +107,7 @@ function request<T>(
         signal.addEventListener("abort", onAbort, { once: true })
       }
     })
-  }).pipe(
-    Effect.timeoutOrElse({
-      duration: Duration.millis(REQUEST_TIMEOUT_MS),
-      orElse: () => Effect.fail(new Error(`Agent request ${type} timed out`)),
-    }),
-  )
+  })
 }
 
 export const instance: ChannelInterface = {

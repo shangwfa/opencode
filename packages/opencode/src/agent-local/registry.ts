@@ -20,7 +20,7 @@ export interface AgentConnection {
 
 export interface RegistryInterface {
   readonly register: (workdir: string, send: (msg: unknown) => void, agentID?: string) => AgentConnection
-  readonly unregister: (agentID: string) => Effect.Effect<void>
+  readonly unregister: (agentID: string, owner?: AgentConnection) => Effect.Effect<void>
   readonly bindSession: (sessionID: string, agentID: string) => Effect.Effect<void>
   readonly unbindSession: (sessionID: string) => Effect.Effect<void>
   readonly getForSession: (sessionID: string) => Effect.Effect<AgentConnection | null>
@@ -34,34 +34,50 @@ const noBindingCache = new Set<string>()
 
 const isPg = !!process.env["OPENCODE_DATABASE_URL"]
 
+// 按 sessionID 串行化 PG 写入：防 bind→unbind 并发时 upsert/delete 落库乱序产生幽灵绑定
+const pgWriteChains = new Map<string, Promise<void>>()
+
+function serializePgWrite(sessionID: string, op: () => Promise<void>): Promise<void> {
+  const prev = pgWriteChains.get(sessionID) ?? Promise.resolve()
+  const next = prev.then(op).catch(() => undefined).finally(() => {
+    if (pgWriteChains.get(sessionID) === next) pgWriteChains.delete(sessionID)
+  })
+  pgWriteChains.set(sessionID, next)
+  return next
+}
+
 async function pgUpsertBinding(sessionID: string, agentID: string) {
   if (!isPg) return
-  try {
-    const { LocalAgentBindingTable } = await import("./binding.pg")
-    const db = Database.Client() as any
-    const now = Date.now()
-    await db
-      .insert(LocalAgentBindingTable)
-      .values({ session_id: sessionID, agent_id: agentID, time_created: now, time_updated: now })
-      .onConflictDoUpdate({
-        target: LocalAgentBindingTable.session_id,
-        set: { agent_id: agentID, time_updated: now },
-      })
-      .run()
-  } catch (err) {
-    log.warn("pg upsert binding failed", { sessionID, agentID, error: err instanceof Error ? err.message : String(err) })
-  }
+  await serializePgWrite(sessionID, async () => {
+    try {
+      const { LocalAgentBindingTable } = await import("./binding.pg")
+      const db = Database.Client() as any
+      const now = Date.now()
+      await db
+        .insert(LocalAgentBindingTable)
+        .values({ session_id: sessionID, agent_id: agentID, time_created: now, time_updated: now })
+        .onConflictDoUpdate({
+          target: LocalAgentBindingTable.session_id,
+          set: { agent_id: agentID, time_updated: now },
+        })
+        .run()
+    } catch (err) {
+      log.warn("pg upsert binding failed", { sessionID, agentID, error: err instanceof Error ? err.message : String(err) })
+    }
+  })
 }
 
 async function pgDeleteBinding(sessionID: string) {
   if (!isPg) return
-  try {
-    const { LocalAgentBindingTable } = await import("./binding.pg")
-    const db = Database.Client() as any
-    await db.delete(LocalAgentBindingTable).where(eq(LocalAgentBindingTable.session_id, sessionID)).run()
-  } catch (err) {
-    log.warn("pg delete binding failed", { sessionID, error: err instanceof Error ? err.message : String(err) })
-  }
+  await serializePgWrite(sessionID, async () => {
+    try {
+      const { LocalAgentBindingTable } = await import("./binding.pg")
+      const db = Database.Client() as any
+      await db.delete(LocalAgentBindingTable).where(eq(LocalAgentBindingTable.session_id, sessionID)).run()
+    } catch (err) {
+      log.warn("pg delete binding failed", { sessionID, error: err instanceof Error ? err.message : String(err) })
+    }
+  })
 }
 
 async function pgGetBinding(sessionID: string): Promise<string | null> {
@@ -133,17 +149,18 @@ export const instance: RegistryInterface = {
     return conn
   },
 
-  unregister: (agentID) =>
+  unregister: (agentID, owner) =>
     Effect.sync(() => {
       const conn = connections.get(agentID)
-      if (conn) {
-        for (const [, pending] of conn.pending) {
-          pending.reject(new Error("Agent disconnected"))
-        }
-        // 只清内存连接与缓存；PG 绑定保留——稳定 ID 重连后自动恢复
-        for (const sid of conn.boundSessions) {
-          if (sessionBindings.get(sid) === agentID) sessionBindings.delete(sid)
-        }
+      // 属主校验：同稳定 ID 重连后旧连接被覆盖，僵死旧连接的 close
+      // 不得注销当前在线的新连接（否则误杀在途请求并回退远程沙箱）
+      if (!conn || (owner && conn !== owner)) return
+      for (const [, pending] of conn.pending) {
+        pending.reject(new Error("Agent disconnected"))
+      }
+      // 只清内存连接与缓存；PG 绑定保留——稳定 ID 重连后自动恢复
+      for (const sid of conn.boundSessions) {
+        if (sessionBindings.get(sid) === agentID) sessionBindings.delete(sid)
       }
       connections.delete(agentID)
       log.info("agent unregistered", { agentID })

@@ -19,6 +19,33 @@ type PendingExec = {
   stdout: { text: string }[]
   stderr: { text: string }[]
   timer?: ReturnType<typeof setTimeout>
+  truncated?: boolean
+}
+
+// exec 硬性保护：输出环形上限与默认超时，防止 yes 类命令拖垮 agent
+const MAX_OUTPUT_CHARS = 10 * 1024 * 1024
+const DEFAULT_EXEC_TIMEOUT_MS = 10 * 60 * 1000
+
+function clampLogs(pending: PendingExec) {
+  let total = 0
+  for (const item of pending.stdout) total += item.text.length
+  let stderrTotal = 0
+  for (const item of pending.stderr) stderrTotal += item.text.length
+  if (total + stderrTotal <= MAX_OUTPUT_CHARS) return false
+  pending.truncated = true
+  for (const arr of [pending.stdout, pending.stderr]) {
+    let kept = 0
+    const budget = Math.floor(MAX_OUTPUT_CHARS / 2)
+    const keep: { text: string }[] = []
+    for (let i = arr.length - 1; i >= 0; i--) {
+      kept += arr[i].text.length
+      keep.unshift(arr[i])
+      if (kept >= budget) break
+    }
+    arr.length = 0
+    arr.push(...keep)
+  }
+  return true
 }
 
 export class AgentHandler {
@@ -77,14 +104,24 @@ export class AgentHandler {
     const started = Date.now()
     const mapper = this.session(req.sessionID)
     const cwd = mapper.toReal(req.cwd)
+    // detached：独立进程组，超时/中断时 kill(-pid) 能清掉 sh 的子进程
     const proc = spawn("sh", ["-c", mapper.rewriteCommand(req.command)], {
       cwd,
       env: { ...process.env, ...req.env },
       stdio: ["pipe", "pipe", "pipe"],
+      detached: true,
     })
 
     const pending: PendingExec = { proc, stdout: [], stderr: [] }
     this.pendingExecs.set(id, pending)
+
+    const killGroup = (sig: NodeJS.Signals = "SIGKILL") => {
+      try {
+        if (proc.pid != null) process.kill(-proc.pid, sig)
+      } catch {
+        proc.kill(sig)
+      }
+    }
 
     proc.stdout?.on("data", (chunk: Buffer) => {
       const text = chunk.toString("utf8")
@@ -98,18 +135,25 @@ export class AgentHandler {
       this.send({ id, type: "exec.stream", stream: { event: "stderr", text } })
     })
 
+    // 幂等守卫：timeout/interrupt 先结束后，迟到的 exit 事件不得再发第二条 result
     const finish = (exitCode: number | null, error?: CommandExecution["error"]) => {
+      if (!this.pendingExecs.has(id)) return
       if (pending.timer) clearTimeout(pending.timer)
       this.pendingExecs.delete(id)
+      if (error == null) clampLogs(pending)
       const durationMs = Date.now() - started
+      const errOut: CommandExecution["error"] | undefined =
+        error == null && pending.truncated
+          ? { name: "TruncatedError", value: "output truncated", timestamp: Date.now(), traceback: [] }
+          : error
       console.log(
         `[exec] ${exitCode ?? "err"} ${durationMs}ms ses=${req.sessionID.slice(-8)} cwd=${req.cwd} cmd=${JSON.stringify(req.command.slice(0, 120))}` +
-          (error ? ` error=${error.name}: ${error.value.slice(0, 80)}` : ""),
+          (errOut ? ` error=${errOut.name}: ${errOut.value.slice(0, 80)}` : ""),
       )
       this.send({
         id,
         type: "exec.result",
-        res: { logs: { stdout: pending.stdout, stderr: pending.stderr }, exitCode, error },
+        res: { logs: { stdout: pending.stdout, stderr: pending.stderr }, exitCode, error: errOut },
       })
     }
 
@@ -126,17 +170,16 @@ export class AgentHandler {
       finish(code)
     })
 
-    if (req.timeoutMs) {
-      pending.timer = setTimeout(() => {
-        proc.kill("SIGKILL")
-        finish(null, {
-          name: "TimeoutError",
-          value: `Command timed out after ${req.timeoutMs}ms`,
-          timestamp: Date.now(),
-          traceback: [],
-        })
-      }, req.timeoutMs)
-    }
+    const timeoutMs = req.timeoutMs ?? DEFAULT_EXEC_TIMEOUT_MS
+    pending.timer = setTimeout(() => {
+      killGroup("SIGKILL")
+      finish(null, {
+        name: "TimeoutError",
+        value: `Command timed out after ${timeoutMs}ms`,
+        timestamp: Date.now(),
+        traceback: [],
+      })
+    }, timeoutMs)
   }
 
   private handleInterrupt(id: string): void {
@@ -146,8 +189,12 @@ export class AgentHandler {
       return
     }
     if (pending.timer) clearTimeout(pending.timer)
-    pending.proc.kill("SIGINT")
     this.pendingExecs.delete(id)
+    try {
+      if (pending.proc.pid != null) process.kill(-pending.proc.pid, "SIGINT")
+    } catch {
+      pending.proc.kill("SIGINT")
+    }
     this.send({ id, type: "interrupted" })
   }
 
@@ -215,8 +262,20 @@ export class AgentHandler {
         for (let pos = start; pos < end; pos += CHUNK) {
           const len = Math.min(CHUNK, end - pos)
           const buf = Buffer.alloc(len)
-          await fd.read(buf, 0, len, pos)
-          this.send({ id, type: "fs.readBytes.stream", chunk: buf.toString("base64"), offset: pos, total })
+          // 短读保护：网络文件系统可能一次读不满，循环补齐防尾部静默补零
+          let filled = 0
+          while (filled < len) {
+            const { bytesRead } = await fd.read(buf, filled, len - filled, pos + filled)
+            if (bytesRead === 0) break
+            filled += bytesRead
+          }
+          this.send({
+            id,
+            type: "fs.readBytes.stream",
+            chunk: buf.subarray(0, filled).toString("base64"),
+            offset: pos,
+            total,
+          })
         }
       } finally {
         await fd.close()
@@ -305,12 +364,18 @@ export class AgentHandler {
     const match = range.match(/^bytes=(\d+)-(\d*)$/)
     if (!match) return fs.readFile(filePath)
     const start = parseInt(match[1], 10)
-    const end = match[2] ? parseInt(match[2], 10) : stat.size - 1
+    const end = Math.min(match[2] ? parseInt(match[2], 10) : stat.size - 1, stat.size - 1)
     const fd = await fs.open(filePath, "r")
     try {
-      const buf = Buffer.alloc(end - start + 1)
-      await fd.read(buf, 0, buf.length, start)
-      return buf
+      const buf = Buffer.alloc(Math.max(0, end - start + 1))
+      // 短读保护：循环补齐，防尾部静默补零
+      let filled = 0
+      while (filled < buf.length) {
+        const { bytesRead } = await fd.read(buf, filled, buf.length - filled, start + filled)
+        if (bytesRead === 0) break
+        filled += bytesRead
+      }
+      return buf.subarray(0, filled)
     } finally {
       await fd.close()
     }
@@ -319,7 +384,11 @@ export class AgentHandler {
   dispose(): void {
     for (const [, pending] of this.pendingExecs) {
       if (pending.timer) clearTimeout(pending.timer)
-      pending.proc.kill("SIGKILL")
+      try {
+        if (pending.proc.pid != null) process.kill(-pending.proc.pid, "SIGKILL")
+      } catch {
+        pending.proc.kill("SIGKILL")
+      }
     }
     this.pendingExecs.clear()
     this.ptyManager?.dispose()

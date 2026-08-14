@@ -70,7 +70,7 @@ function handleConnection(ws: WebSocket): void {
   })
 
   ws.on("close", () => {
-    if (connection) Effect.runSync(AgentRegistry.instance.unregister(connection.id))
+    if (connection) Effect.runSync(AgentRegistry.instance.unregister(connection.id, connection))
     log.info("agent ws closed", { agentID: connection?.id })
   })
 
@@ -91,7 +91,13 @@ function routeMessage(conn: AgentConnection, msg: AgentMessage): void {
       resolvePending(conn, msg.id, msg.res)
       break
     case "interrupted":
-      resolvePending(conn, msg.id, { interrupted: true })
+      // 中断也要返回规范 CommandExecution 结构，避免下游把 {interrupted:true}
+      // 强转后读到 undefined 的 exitCode/logs
+      resolvePending(conn, msg.id, {
+        logs: { stdout: [], stderr: [] },
+        exitCode: null,
+        error: { name: "InterruptedError", value: "Command interrupted", timestamp: Date.now(), traceback: [] },
+      })
       break
     case "fs.read.result":
     case "fs.readBytes.result":

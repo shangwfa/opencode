@@ -92,7 +92,13 @@ function main() {
       console.log("[agent] connected")
       reconnectDelay = 1000
       handler = new AgentHandler(mapper, (msg) => {
-        ws?.send(JSON.stringify(msg))
+        // send 保护：ws 关闭窗口期（dispose 与进程退出之间）残余回调不得崩溃进程
+        if (ws?.readyState !== WebSocket.OPEN) return
+        try {
+          ws.send(JSON.stringify(msg))
+        } catch {
+          // 已断开：丢弃即可，重连机制会恢复
+        }
       })
       const hello: AgentMessage = {
         id: `hello-${Date.now()}`,
