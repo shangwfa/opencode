@@ -90,14 +90,26 @@ export class AgentHandler {
       this.send({ id, type: "error", message: `duplicate exec request id: ${id}` })
       return
     }
+    // 会话目录创建/校验失败（只读 cwd、被删根等）必须显式回错：
+    // 吞掉会让请求挂死到 SaaS 侧 120s 超时
+    let mapper: SessionMapper
+    let cwd: string
+    try {
+      mapper = this.session(req.sessionID)
+      cwd = mapper.toReal(req.cwd)
+    } catch (err) {
+      this.send({ id, type: "error", message: `session workspace unavailable: ${err instanceof Error ? err.message : String(err)}` })
+      return
+    }
     const started = Date.now()
-    const mapper = this.session(req.sessionID)
-    const cwd = mapper.toReal(req.cwd)
-    // detached：独立进程组，超时/中断/收尾时 kill(-pid) 能清掉 sh 的子进程
+    // detached：独立进程组，超时/中断/收尾时 kill(-pid) 能清掉 sh 的子进程。
+    // stdin 用 ignore 而非 pipe：Bun 在 macOS 的 pipe 是 unix socketpair 且
+    // 不发 EOF，rg 等工具探测到"可读 stdin"会进入 stdin 模式并永久挂死
+    // （rg pattern | head 场景实测）；/dev/null 使其回退到目录搜索模式
     const proc = spawn("sh", ["-c", mapper.rewriteCommand(req.command)], {
       cwd,
       env: { ...process.env, ...req.env },
-      stdio: ["pipe", "pipe", "pipe"],
+      stdio: ["ignore", "pipe", "pipe"],
       detached: true,
     })
 
@@ -167,6 +179,8 @@ export class AgentHandler {
       })
     })
 
+    // exit 即结算（后台子进程继承 stdout 会让 close 永不触发）；
+    // finish 内会清理进程组，孤儿释放的输出流随之关闭
     proc.on("exit", (code) => {
       finish(code)
     })

@@ -12,6 +12,14 @@ import type { AgentMessage } from "../src/protocol"
 
 const root = mkdtempSync(join(tmpdir(), "agent-exec-test-"))
 
+// 供 rg 回归用例复用的 handler 实例
+const rgPair = (() => {
+  const sent: AgentMessage[] = []
+  const h = new AgentHandler(new PathMapper(root), (m) => sent.push(m))
+  return { h, sent }
+})()
+const { h: h0, sent: sent0 } = rgPair
+
 function makeHandler() {
   const sent: AgentMessage[] = []
   const h = new AgentHandler(new PathMapper(root), (m) => sent.push(m))
@@ -77,22 +85,39 @@ describe("AgentHandler exec 资源与进程管理", () => {
   test("正常退出后后台子进程不残留（L3.4）", async () => {
     const { h, sent } = makeHandler()
     const id = "t-orphan"
-    await h.handle({ id, type: "exec", req: { sessionID: "ses_orphan", cwd: "/workspace", command: "(sleep 300 &) ; echo done" } })
+    await h.handle({ id, type: "exec", req: { sessionID: "ses_orphan", cwd: "/workspace", command: "(sleep 4444 &) ; echo done" } })
     for (let i = 0; i < 50 && !lastOf(sent, id, "exec.result"); i++) await sleep(100)
     await sleep(500)
-    const out = Bun.spawnSync(["pgrep", "-f", "sleep 300"])
+    const out = Bun.spawnSync(["pgrep", "-f", "sleep 4444"])
     expect(out.stdout.toString().trim()).toBe("")
   })
 
   test("dispose 清理全部在途进程", async () => {
     const { h } = makeHandler()
-    await h.handle({ id: "d1", type: "exec", req: { sessionID: "ses_dispose", cwd: "/workspace", command: "sleep 60", timeoutMs: 120_000 } })
+    await h.handle({ id: "d1", type: "exec", req: { sessionID: "ses_dispose", cwd: "/workspace", command: "sleep 5555", timeoutMs: 120_000 } })
     await sleep(300)
     h.dispose()
     await sleep(300)
-    const out = Bun.spawnSync(["pgrep", "-f", "sleep 60"])
+    const out = Bun.spawnSync(["pgrep", "-f", "sleep 5555"])
     expect(out.stdout.toString().trim()).toBe("")
   })
+
+  test(
+    "rg | head 不挂死（Bun socketpair stdin 陷阱回归）",
+    async () => {
+      // 准备带匹配文件的目录
+      await h0.handle({ id: "rg-setup", type: "exec", req: { sessionID: "ses_rg", cwd: "/workspace", command: "mkdir -p proj && echo agent-local > proj/a.ts && echo other > proj/b.ts" } })
+      for (let i = 0; i < 30 && !lastOf(sent0, "rg-setup", "exec.result"); i++) await sleep(100)
+      const id = "t-rg"
+      await h0.handle({ id, type: "exec", req: { sessionID: "ses_rg", cwd: "/workspace/proj", command: "rg -l agent-local | head -3", timeoutMs: 8_000 } })
+      for (let i = 0; i < 90 && !lastOf(sent0, id, "exec.result"); i++) await sleep(100)
+      const result = lastOf(sent0, id, "exec.result") as { res: { logs: { stdout: { text: string }[] }; exitCode: number | null; error?: { name: string } } } | undefined
+      expect(result).toBeDefined()
+      expect(result!.res.error?.name).not.toBe("TimeoutError")
+      expect(result!.res.logs.stdout[0]?.text).toContain("a.ts")
+    },
+    15_000,
+  )
 })
 
 // 清理测试根目录（可能残留会话目录）
