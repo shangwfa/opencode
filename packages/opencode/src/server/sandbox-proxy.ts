@@ -6,7 +6,7 @@ import { ConnectionConfig } from "@alibaba-group/opensandbox"
 import { Bus } from "@/bus"
 import { Session } from "@/session/session"
 import { SessionID } from "@/session/schema"
-import { SandboxProvider } from "@/tool/sandbox-provider"
+import { SandboxProvider, LocalAgentRouterProvider } from "@/tool/sandbox-provider"
 import * as Database from "@/storage/db"
 import { SessionTable } from "@/session/session.pg"
 import { eq } from "drizzle-orm"
@@ -340,7 +340,18 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
           command,
           { workingDirectory: sandboxWorkingDirectory, timeoutSeconds: body.timeoutSeconds },
           {},
-        ).pipe(Effect.catch((err) => Effect.succeed({ _transportError: err instanceof Error ? `${err.name}: ${err.message}` : String(err) } as any)))
+        ).pipe(
+          Effect.catch((err) => {
+            const detail = err instanceof Error ? `${err.name}: ${err.message}` : String(err)
+            // 本地链路故障（Agent 掉线/超时/不可用）时明确告知前端数据面状态，
+            // 而非静默 502；后续请求会自动 fallback 远程
+            const isLocalRoute = /agent (disconnected|reconnected)|local agent|timed out after/i.test(detail)
+            return Effect.succeed({
+              _transportError: detail,
+              _fallbackHint: isLocalRoute ? "local agent unavailable; subsequent requests fall back to the remote sandbox" : undefined,
+            } as any)
+          }),
+        )
 
         const stdout = result?.logs?.stdout.map((m: any) => m.text).join("\n") ?? ""
         const stderr = result?.logs?.stderr.map((m: any) => m.text).join("\n") ?? "Sandbox execution failed"
@@ -383,7 +394,11 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
 
         if (!result || "_transportError" in (result ?? {}))
           return HttpServerResponse.jsonUnsafe(
-            { error: "execution failed", detail: (result as any)?._transportError ?? "no result" },
+            {
+              error: "execution failed",
+              detail: (result as any)?._transportError ?? "no result",
+              fallbackHint: (result as any)?._fallbackHint,
+            },
             { status: 502 },
           )
 
@@ -718,8 +733,21 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
         }
         // 工具层用 root session ID 查询（子会话共享沙箱），绑 root
         const rootID = yield* resolveRootSessionID(params.sessionID)
+        // 切到本地前回收旧远程沙箱：避免数据面分叉（U4.4）与资源泄漏
+        const remoteDestroyed = yield* LocalAgentRouterProvider.destroyRemote(rootID).pipe(
+          Effect.map(() => true),
+          Effect.catch(() => Effect.succeed(false)),
+        )
         yield* LocalAgentChannel.instance.bindAgent(rootID, body.agentID)
-        return HttpServerResponse.jsonUnsafe({ sessionID: params.sessionID, rootSessionID: rootID, agentID: body.agentID })
+        return HttpServerResponse.jsonUnsafe({
+          sessionID: params.sessionID,
+          rootSessionID: rootID,
+          agentID: body.agentID,
+          // 前端提示数据面切换（U4.3）：远程文件不随绑定迁移
+          route: "local",
+          remoteSandboxDestroyed: remoteDestroyed,
+          notice: "switched to local execution; files created on the previous (remote) sandbox are not available locally",
+        })
       }),
     )
 
@@ -728,7 +756,27 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
         const params = yield* HttpRouter.schemaPathParams(SessionParams)
         const rootID = yield* resolveRootSessionID(params.sessionID)
         yield* LocalAgentChannel.instance.unbindAgent(rootID)
-        return HttpServerResponse.jsonUnsafe({ sessionID: params.sessionID, agentID: null })
+        return HttpServerResponse.jsonUnsafe({
+          sessionID: params.sessionID,
+          agentID: null,
+          route: "remote",
+          notice: "switched to remote sandbox execution; local-only files are not available remotely",
+        })
+      }),
+    )
+
+    // 数据面路由状态：前端展示「本地/远程」与 Agent 在线信息的依据
+    yield* router.add("GET", "/session/:sessionID/sandbox-route",
+      Effect.gen(function* () {
+        const params = yield* HttpRouter.schemaPathParams(SessionParams)
+        const rootID = yield* resolveRootSessionID(params.sessionID)
+        const local = yield* LocalAgentChannel.instance.isAvailable(rootID)
+        if (local) {
+          const agents = LocalAgentChannel.instance.listAgents()
+          const bound = agents.find((a) => a.boundSessions.includes(rootID))
+          return HttpServerResponse.jsonUnsafe({ sessionID: params.sessionID, route: "local", agentID: bound?.agentID ?? null, workdir: bound?.workdir ?? null })
+        }
+        return HttpServerResponse.jsonUnsafe({ sessionID: params.sessionID, route: "remote", agentID: null })
       }),
     )
 

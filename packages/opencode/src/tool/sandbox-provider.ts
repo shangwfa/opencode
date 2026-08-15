@@ -1709,8 +1709,17 @@ function createLocalAgentSandbox(sessionID: string): Sandbox {
 
 export namespace LocalAgentRouterProvider {
   const log = Log.create({ service: "local-agent-router" })
+  // 底层远程 provider 引用：绑定本地会话时即时回收旧远程沙箱用。
+  // layer 是模块级单例，这里用可变引用转发；多 layer 实例仅出现在测试场景
+  let remoteRef: typeof SandboxProvider.Service.Service | null = null
+
+  // 只销毁远程沙箱（不走路由），bind 本地时调用，避免数据面分叉与资源泄漏
+  export const destroyRemote = (sessionID: SessionID): Effect.Effect<void> =>
+    Effect.suspend(() => remoteRef?.destroy(sessionID) ?? Effect.void)
+
   export const layer = Layer.effect(SandboxProvider.Service, Effect.gen(function* () {
     const remote = yield* SandboxProvider.Service
+    remoteRef = remote
     const localSandboxes = new Map<string, Sandbox>()
 
     function tryLocal(sessionID: SessionID): Effect.Effect<Sandbox | null> {
