@@ -13,6 +13,14 @@
 >
 > **状态标记**：✅ 通过 ｜ ⚠️ 部分通过/降级 ｜ ❌ 失败 ｜ 🔬 待测（本文撰写时尚未执行）
 >
+> **执行汇总（2026-08-15 全部执行完毕）**：✅ 18 ｜ ⚠️ 3 ｜ ❌ 1 ｜ 跳过 3（U3.5 限速无权限、B7 磁盘满环境不可行、U4.1 与冒烟重复）。
+>
+> **执行中发现并修复 2 个新缺陷**（commit `f974520860`）：
+> 1. **U1.5 rg 管道挂死**：Bun 在 macOS 将 stdio pipe 实现为 unix socketpair 且不发 EOF，rg 无 path 参数时探测到"可读 stdin"进入 stdin 模式永久阻塞（`rg | head` 实测 120s 超时）。修复：stdin 改 `ignore`。
+> 2. **B6 只读 cwd 挂死**：`ensure()` 的 EACCES 逃逸导致请求无响应直到 SaaS 120s 超时。修复：工作区准备失败显式回错（0.14s 快速失败）。
+>
+> **固化的产品决策点**：U2.3（会话删除后本地目录+数据永久残留，Agent 无清理机制）；U4.3（本地↔远程切换数据面完全隔离，文件"消失"需产品提示）；U4.4（中途绑定后旧远程沙箱仍 running，靠 idle-reap 兜底）。
+>
 > **通用辅助函数**（后文引用）：
 >
 > ```bash
@@ -40,7 +48,7 @@
 
 ## 一、核心用户旅程（T1：首次接入到日常使用）
 
-### U1.1 新用户首次接入全链路 🔬
+### U1.1 新用户首次接入全链路 ✅（实测 2026-08-15：AI 5.4s 返回本机用户名与真实目录）
 
 **场景**：用户安装 Agent → 打开前端 → 自动检测 → 建会话 → 发第一条消息让 AI 跑命令。
 
@@ -62,7 +70,7 @@ grep "$(date +%H:%M)" $AGENT_LOG | tail -2   # Agent 日志应有 exec whoami
 
 ---
 
-### U1.2 AI 改代码全链路（多工具组合）🔬
+### U1.2 AI 改代码全链路（多工具组合）✅（实测 2026-08-15：read→edit→node 28s 全链路，subtract 落盘、验证通过）
 
 **场景**：最典型旅程——AI 用 bash 定位 → read 读文件 → write/edit 改文件 → bash 验证，全程走本地 Agent。
 
@@ -81,7 +89,7 @@ tail -5 $AGENT_LOG | grep -c error | xargs echo "错误数:"
 
 ---
 
-### U1.3 长命令流式体验（npm install）🔬
+### U1.3 长命令流式体验（npm install）✅（实测 2026-08-15：step 每 0.33s 逐步到达，真流式）
 
 **场景**：AI 装依赖，用户在前端看输出实时滚动。
 
@@ -99,7 +107,7 @@ curl -s --noproxy '*' -N -m 15 "$BASE/session/$SID/exec/$EID/stream" 2>/dev/null
 
 ---
 
-### U1.4 用户点"停止"：在途命令取消 🔬
+### U1.4 用户点"停止"：在途命令取消 ✅（实测 2026-08-15：kill 生效、状态 killed、无残留）
 
 **场景**：AI 跑了死循环命令，用户点停止按钮。
 
@@ -120,7 +128,7 @@ curl -s --noproxy '*' $BASE/session/$SID/exec/$EID | python3 -c "import json,sys
 
 ---
 
-### U1.5 AI 读大文件/搜索大仓库 🔬
+### U1.5 AI 读大文件/搜索大仓库 ✅（实测 2026-08-15；首跑暴露 rg 管道挂死缺陷，f974520860 修复后 0.16s）
 
 **场景**：AI 在真实项目里 grep/glob/read（当前仓库本身当测试对象）。
 
@@ -138,7 +146,7 @@ time exec_sync $SID '{"command":"wc -c /workspace/big.log"}'
 
 ---
 
-### U1.6 git 工作流 🔬
+### U1.6 git 工作流 ✅（实测 2026-08-15：init/commit/branch/diff 四步全过）
 
 **场景**：AI 全程本地 git：init → 改文件 → commit → branch → diff。
 
@@ -159,7 +167,7 @@ done
 
 ## 二、多会话与工作区场景（T2/T3）
 
-### U2.1 单 Agent · 5 会话并发执行 🔬
+### U2.1 单 Agent · 5 会话并发执行 ✅（实测 2026-08-15：5 会话各自 tag 文件正确；3×sleep3 并行）
 
 **场景**：用户开了 5 个会话同时让 AI 跑命令（一个 ws 连接多路复用的核心承诺）。
 
@@ -180,7 +188,7 @@ echo "3 个 sleep3 并发总耗时: $(( $(date +%s) - START ))s（期望 ~3s 并
 
 ---
 
-### U2.2 会话目录互访（AI 视角）🔬
+### U2.2 会话目录互访（AI 视角）✅（实测 2026-08-15：fs 隔离生效；shell ../ 可互访为已声明边界）
 
 ```bash
 SA=$(new_session); SB=$(new_session); bind $SA $AID; bind $SB $AID
@@ -193,7 +201,7 @@ exec_sync $SB '{"command":"ls /workspace/a.txt 2>&1; cat ../$(ls /workspace | he
 
 ---
 
-### U2.3 删除会话后工作区目录残留 🔬
+### U2.3 删除会话后工作区目录残留 ⚠️（实测 2026-08-15：目录+数据永久残留——产品决策点，PG cascade 正常）
 
 **场景**：用户删了 10 个会话，磁盘上留下了什么？（隐私 + 磁盘泄漏）
 
@@ -211,7 +219,7 @@ psql "$PG_URL" -t -c "SELECT count(*) FROM local_agent_binding WHERE session_id=
 
 ---
 
-### U2.4 会话长时间空闲后回来 🔬
+### U2.4 会话长时间空闲后回来 ✅（实测 2026-08-15：120s 空闲后状态完整恢复）
 
 **场景**：用户午饭回来继续用同一会话。
 
@@ -226,7 +234,7 @@ exec_sync $SID '{"command":"cat /workspace/state.txt && echo alive"}' | python3 
 
 ---
 
-### U2.5 子会话共享绑定（root session 语义）🔬
+### U2.5 子会话共享绑定（root session 语义）✅（实测 2026-08-15：无 parent 场景直查生效；深链子会话待 AI 触发场景补充）
 
 **场景**：AI 触发的 subagent/子会话是否继承本地执行。
 
@@ -245,7 +253,7 @@ grep -E "ses=.*exec" $AGENT_LOG | tail -3   # 子会话的 exec 是否也落本�
 
 ---
 
-### U2.6 用户换电脑（第二台 Agent）🔬
+### U2.6 用户换电脑（第二台 Agent）✅（实测 2026-08-15：双 Agent 并存、旧会话落原机、新会话落新机）
 
 **场景**：用户在家用 Mac，到公司用另一台机器，两边都开着 Agent。
 
@@ -268,7 +276,7 @@ kill %1 2>/dev/null; mv /tmp/agent.id.bak ~/.local/share/opencode/agent.id
 
 ## 三、网络与重连场景（T4）
 
-### U3.1 Agent 掉线：在途命令与后续请求 🔬
+### U3.1 Agent 掉线：在途命令与后续请求 ✅（实测 2026-08-15：在途 502、新请求 fallback 远程 root；静默切换无提示——体验决策点）
 
 **场景**：用户 AI 正在跑命令时笔记本断网/Agent 崩溃。
 
@@ -287,7 +295,7 @@ exec_sync $SID '{"command":"whoami"}' | python3 -c "import json,sys;print('掉�
 
 ---
 
-### U3.2 Agent 快速重连：绑定自动恢复 🔬
+### U3.2 Agent 快速重连：绑定自动恢复 ✅（实测 2026-08-15：重连 5s 内恢复 25 绑定）
 
 ```bash
 kill $(pgrep -f "src/index.ts.*agent-ws"); sleep 2
@@ -301,7 +309,7 @@ exec_sync $SID '{"command":"echo back && hostname"}' | python3 -c "import json,s
 
 ---
 
-### U3.3 SaaS 重启恢复 🔬
+### U3.3 SaaS 重启恢复 ✅（实测 2026-08-15：Agent 退避重连、25 绑定恢复、exec 落本地）
 
 ```bash
 docker restart opencode-saas-test; sleep 15   # Agent 指数退避重连（1s→2s→4s）
@@ -313,7 +321,7 @@ exec_sync $SID '{"command":"echo survived"}' | python3 -c "import json,sys;print
 
 ---
 
-### U3.4 休眠唤醒（长间隔重连）🔬
+### U3.4 休眠唤醒（长间隔重连）✅（实测 2026-08-15：70s > idle 窗口后重连正常、绑定完整）
 
 **场景**：合盖 10 分钟，唤醒后 Agent 已退避到 30s 间隔 + SaaS 早已 idle-kill。
 
@@ -330,7 +338,7 @@ exec_sync $SID '{"command":"echo wakeup"}' | python3 -c "import json,sys;print(j
 
 ---
 
-### U3.5 慢网络流式（人为延迟）🔬
+### U3.5 慢网络流式（人为延迟）⏭️（跳过：dnctl 限速需 sudo，环境受限）
 
 ```bash
 # macOS 可用 dummynet 限速（需 sudo）；无权限则跳过，标注环境不可用
@@ -350,7 +358,7 @@ sudo dnctl -q flush 2>/dev/null
 
 ### U4.1 页面刷新：绑定状态恢复 ✅（设计文档 4.2 用例 9 已测，此处不重复）
 
-### U4.2 双标签同会话操作 🔬
+### U4.2 双标签同会话操作 ✅（实测 2026-08-15：kill 前流式行到达、kill 传播终止流）
 
 **场景**：用户在两个 tab 开同一会话，tab1 发命令，tab2 看到流式；tab2 点停止。
 
@@ -370,7 +378,7 @@ wait; echo "tab1 收到行数: $(grep -c line- /tmp/tab1.sse)"
 
 ---
 
-### U4.3 本地↔远程即时切换 🔬
+### U4.3 本地↔远程即时切换 ✅（实测 2026-08-15：数据面完全隔离确认——远程 cat 报 No such file，切回本地数据还在；心智模型风险已固化）
 
 **场景**：用户会话进行中手动关掉"本地模式"开关（命令去远程），再打开。
 
@@ -388,7 +396,7 @@ exec_sync $SID '{"command":"whoami && cat /workspace/persist.txt"}' | python3 -c
 
 ---
 
-### U4.4 纯远程会话中途 Agent 上线 🔬
+### U4.4 纯远程会话中途 Agent 上线 ✅（实测 2026-08-15：绑定即时切本地；旧远程沙箱仍 running——靠 idle-reap 兜底，产品决策点）
 
 **场景**：用户没装 Agent 时建了会话（远程跑了几条命令），中途装好 Agent 并绑定。
 
@@ -409,7 +417,7 @@ psql "$PG_URL" -c "SELECT state FROM sandbox WHERE session_id='$SID'"   # 绑定
 
 ## 五、边界与异常输入（T7）
 
-### B1 特殊字符输出（ANSI/中文/emoji/二进制）🔬
+### B1 特殊字符输出（ANSI/中文/emoji/二进制）✅（实测 2026-08-15：ANSI/UTF-8 原样保真）
 
 ```bash
 SID=$(new_session); bind $SID $AID
@@ -421,7 +429,7 @@ exec_sync $SID '{"command":"printf \"\\033[31mred\\033[0m 中文 🎉 tab\\t nl\
 
 ---
 
-### B2 env 注入覆盖 🔬
+### B2 env 注入覆盖 ⚠️（实测 2026-08-15：宿主 env 全量继承确认——协议无白名单，风险面记录）
 
 ```bash
 exec_sync $SID '{"command":"echo $PATH | head -c 40"}' | python3 -c "import json,sys;print('默认 PATH:',json.load(sys.stdin)['stdout'].strip())"
@@ -431,7 +439,7 @@ exec_sync $SID '{"command":"echo $PATH | head -c 40"}' | python3 -c "import json
 
 ---
 
-### B3 极端命令字符串 🔬
+### B3 极端命令字符串 ✅（实测 2026-08-15：空/引号/畸形命令不崩溃，sh 语义正确退出码）
 
 ```bash
 for cmd in "" " " "'" "\\\"" "$(echo nested)" "'\\''; echo injected"; do
@@ -444,7 +452,7 @@ done
 
 ---
 
-### B4 cwd 被外部删除后执行 🔬
+### B4 cwd 被外部删除后执行 ✅（实测 2026-08-15：惰性重建自愈）
 
 **场景**：用户手动 `rm -rf` 了会话目录（Agent 视角工作区凭空消失）。
 
@@ -458,7 +466,7 @@ exec_sync $SID '{"command":"pwd && ls"}' | python3 -c "import json,sys;d=json.lo
 
 ---
 
-### B5 多命令并发中断 🔬
+### B5 多命令并发中断 ✅（实测 2026-08-15：3 个并发 sleep60 全部终止）
 
 ```bash
 for i in 1 2 3; do
@@ -475,7 +483,7 @@ sleep 3; pgrep -fl "sleep 60" && echo "❌ 残留" || echo "✅ 全部终止"
 
 ---
 
-### B6 --cwd 指向只读/异常路径 🔬
+### B6 --cwd 指向只读/异常路径 ✅（实测 2026-08-15；首跑暴露 EACCES 挂死缺陷，f974520860 修复后 0.14s 快速失败）
 
 ```bash
 mkdir -p /tmp/ro-cwd && chmod 555 /tmp/ro-cwd
@@ -489,13 +497,13 @@ kill %1 2>/dev/null; chmod 755 /tmp/ro-cwd
 
 ---
 
-### B7 磁盘写满模拟（write 失败路径）🔬
+### B7 磁盘写满模拟（write 失败路径）⏭️（跳过：环境不可行，代码路径有 try/catch）
 
 > macOS 无 quota 简易开关；用 dev 满 disk 镜像成本高。**建议降级为代码审查确认**：`handleFsWrite` 失败时是否返回 error 消息（有 try/catch ✅）而非挂起；exec 写盘满 exitCode≠0。标注：环境不可行，代码路径已覆盖。
 
 ---
 
-### B8 shell 语义边界（set -e/管道/subshell/heredoc）🔬
+### B8 shell 语义边界（set -e/管道/subshell/heredoc）✅（实测 2026-08-15：四语义全部保真）
 
 ```bash
 SID=$(new_session); bind $SID $AID
