@@ -1,5 +1,6 @@
 import { spawn, type ChildProcess } from "node:child_process"
 import * as fs from "node:fs/promises"
+import { rmSync } from "node:fs"
 import * as path from "node:path"
 import { PathMapper, SessionMapper } from "./path"
 import type { PtyManager } from "./pty-manager"
@@ -12,6 +13,7 @@ import type {
   FsWriteReq,
   FsStatReq,
   PtyCreateReq,
+  SessionCleanupReq,
 } from "./protocol"
 
 type PendingExec = {
@@ -80,6 +82,22 @@ export class AgentHandler {
         return this.handleEndpoint(msg.id, msg.req.port)
       case "health":
         return this.send({ id: msg.id, type: "health.result", res: { ok: true } })
+      case "session.cleanup":
+        return this.handleSessionCleanup(msg.id, msg.req)
+    }
+  }
+
+  // 会话删除后的工作区回收：只允许删除 {root}/sessions/{sessionID} 本身，
+  // 且目录必须真实位于 sessions 根之下（复用 PathMapper 的 sessionID 白名单）
+  private handleSessionCleanup(id: string, req: SessionCleanupReq): void {
+    try {
+      const ses = this.mapper.forSession(req.sessionID)
+      rmSync(ses.dir, { recursive: true, force: true })
+      this.sessionMappers.delete(req.sessionID)
+      console.log(`[cleanup] session ${req.sessionID.slice(-8)} workspace removed`)
+      this.send({ id, type: "session.cleanup.result" })
+    } catch (err) {
+      this.send({ id, type: "error", message: `session.cleanup failed: ${err instanceof Error ? err.message : String(err)}` })
     }
   }
 

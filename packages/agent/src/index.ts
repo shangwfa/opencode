@@ -13,9 +13,33 @@ const AGENT_VERSION = "0.0.1"
 const MAX_WS_PAYLOAD = 32 * 1024 * 1024
 // SaaS 主动关闭码：同 ID 新连接替换旧连接，旧进程应退出而非无限重连互抢
 const CLOSE_REPLACED = 4000
+// 本地锁：防同机误启第二个同 ID Agent（静默互替、无任何用户可见提示）。
+// 锁按 agentID 分文件——不同 ID（如测试注入）互不阻塞
+function acquireInstanceLock(dataDir: string, agentID: string): boolean {
+  const file = resolve(dataDir, `agent-${agentID}.lock`)
+  try {
+    const pid = parseInt(readFileSync(file, "utf8").trim(), 10)
+    if (Number.isFinite(pid)) {
+      // 0 信号探测：进程存活则拒绝启动
+      process.kill(pid, 0)
+      return false
+    }
+  } catch (err) {
+    // ENOENT（无锁）或 ESRCH（旧进程已死）都视为可获取
+    if ((err as NodeJS.ErrnoException).code === "EPERM") return false
+  }
+  try {
+    writeFileSync(file, String(process.pid), "utf8")
+  } catch {
+    // 锁不可写（只读目录等）：跳过防呆，不阻塞启动
+  }
+  return true
+}
 
 // 稳定 agentID：持久化在本地，重连/SaaS 重启后 PG 绑定关系仍有效
 function loadStableAgentID(): string {
+  // 测试/多实例注入（e2e 用独立 ID 避免抢占用户 Agent）
+  if (process.env.AGENT_ID_OVERRIDE) return process.env.AGENT_ID_OVERRIDE
   const dir = resolve(homedir(), ".local/share/opencode")
   const file = resolve(dir, "agent.id")
   try {
@@ -69,8 +93,14 @@ The agent also starts a local HTTP server on port 17790 for browser detection.
 
 function main() {
   const { server, cwd } = parseArgs()
-  const mapper = new PathMapper(cwd)
+  const dataDir = resolve(homedir(), ".local/share/opencode")
   const stableID = loadStableAgentID()
+  if (!acquireInstanceLock(dataDir, stableID)) {
+    console.error(`Error: another agent with agentID ${stableID} is already running (see ${resolve(dataDir, `agent-${stableID}.lock`)}).`)
+    console.error("If this is stale, remove the lock file or kill the old process.")
+    process.exit(1)
+  }
+  const mapper = new PathMapper(cwd)
 
   const health = startLocalServer(mapper, AGENT_VERSION)
   console.log(`[agent] connecting to ${server}, workdir=${cwd}`)

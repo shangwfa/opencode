@@ -1708,6 +1708,7 @@ function createLocalAgentSandbox(sessionID: string): Sandbox {
 }
 
 export namespace LocalAgentRouterProvider {
+  const log = Log.create({ service: "local-agent-router" })
   export const layer = Layer.effect(SandboxProvider.Service, Effect.gen(function* () {
     const remote = yield* SandboxProvider.Service
     const localSandboxes = new Map<string, Sandbox>()
@@ -1743,7 +1744,18 @@ export namespace LocalAgentRouterProvider {
       destroy: (sessionID) =>
         Effect.gen(function* () {
           localSandboxes.delete(sessionID)
-          if (yield* LocalAgentChannel.instance.isAvailable(sessionID)) return
+          if (yield* LocalAgentChannel.instance.isAvailable(sessionID)) {
+            // 本地命中时同步回收 Agent 侧工作区（磁盘+隐私不残留），
+            // 失败仅告警——远端 fallback 会话不受影响
+            yield* LocalAgentChannel.instance.cleanupSession(sessionID).pipe(
+              Effect.catchCause((cause) =>
+                Effect.sync(() => {
+                  log.warn("local agent session cleanup failed", { sessionID, cause: Cause.pretty(cause) })
+                }),
+              ),
+            )
+            return
+          }
           yield* remote.destroy(sessionID)
         }),
 

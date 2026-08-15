@@ -10,9 +10,14 @@ import type {
   FsWriteReq,
   FsStatReq,
   FsStatRes,
+  SessionCleanupReq,
 } from "@opencode-ai/agent/src/protocol"
 
+// 请求超时上限；exec 等携带自身 deadline 的请求按 deadline 推导，
+// 使 Agent 侧超时先于 SaaS 放弃等待（合法长命令不会被提前掐断）
 const REQUEST_TIMEOUT_MS = 120_000
+// agent 超时回包在网络上的宽限
+const REQUEST_GRACE_MS = 5_000
 
 // sessionID → 活跃 exec 请求 ID 集合（用于会话级中断）
 const activeExecs = new Map<string, Set<string>>()
@@ -47,6 +52,7 @@ export interface ChannelInterface {
   readonly fsReadBytesStream: (sessionID: string, req: FsReadBytesReq) => Promise<Uint8Array>
   readonly fsWrite: (sessionID: string, req: FsWriteReq) => Effect.Effect<void, Error>
   readonly fsStat: (sessionID: string, req: FsStatReq) => Effect.Effect<FsStatRes, Error>
+  readonly cleanupSession: (sessionID: string) => Effect.Effect<void, Error>
   readonly getEndpoint: (sessionID: string, port: number) => Effect.Effect<string, Error>
 }
 
@@ -56,12 +62,16 @@ function request<T>(
   payload: Record<string, unknown>,
   onStream?: (data: unknown) => void,
   signal?: AbortSignal,
+  timeoutMs?: number,
 ): Effect.Effect<T, Error> {
   return Effect.gen(function* () {
     const conn = yield* AgentRegistry.instance.getForSession(sessionID)
     if (!conn) return yield* Effect.fail(new Error(`No local agent for session ${sessionID}`))
 
     const id = `${type}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    // 带 deadline 的请求：SaaS 等待窗口 = agent deadline + 网络宽限，
+    // 保证 Agent 侧先超时并回 TimeoutError，而不是 SaaS 先放弃
+    const waitMs = timeoutMs ? Math.min(timeoutMs + REQUEST_GRACE_MS, REQUEST_TIMEOUT_MS + REQUEST_GRACE_MS) : REQUEST_TIMEOUT_MS
 
     return yield* Effect.callback<T, Error>((resume) => {
       const untrack = type === "exec" ? trackExec(sessionID, id) : null
@@ -98,8 +108,8 @@ function request<T>(
       // 执行成幽灵副作用（SaaS 已放弃等待但本地仍在跑）
       timer = setTimeout(() => {
         conn.send({ id, type: "interrupt" })
-        settle(Effect.fail(new Error(`Agent request ${type} timed out after ${REQUEST_TIMEOUT_MS}ms`)))
-      }, REQUEST_TIMEOUT_MS)
+        settle(Effect.fail(new Error(`Agent request ${type} timed out after ${waitMs}ms`)))
+      }, waitMs)
 
       onAbort = () => {
         conn.send({ id, type: "interrupt" })
@@ -138,7 +148,7 @@ export const instance: ChannelInterface = {
     request<CommandExecution>(sessionID, "exec", { req }, (data) => {
       const stream = data as { event: string; text?: string }
       if (onStream && stream.text) onStream({ event: stream.event, text: stream.text })
-    }, signal),
+    }, signal, req.timeoutMs),
 
   interruptSession: (sessionID) =>
     Effect.gen(function* () {
@@ -169,6 +179,10 @@ export const instance: ChannelInterface = {
 
   fsWrite: (sessionID, req) => request<void>(sessionID, "fs.write", { req }),
   fsStat: (sessionID, req) => request<FsStatRes>(sessionID, "fs.stat", { req }),
+
+  // 会话删除后的工作区回收（session.remove → destroy → 此处）
+  cleanupSession: (sessionID) =>
+    request<void>(sessionID, "session.cleanup", { req: { sessionID } satisfies SessionCleanupReq }),
 
   getEndpoint: (sessionID, port) =>
     Effect.gen(function* () {

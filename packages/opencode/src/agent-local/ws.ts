@@ -131,6 +131,9 @@ function routeMessage(conn: AgentConnection, msg: AgentMessage): void {
     case "fs.write.result":
       resolvePending(conn, msg.id, undefined)
       break
+    case "session.cleanup.result":
+      resolvePending(conn, msg.id, undefined)
+      break
     case "health.result":
       resolvePending(conn, msg.id, (msg as { res: unknown }).res)
       break

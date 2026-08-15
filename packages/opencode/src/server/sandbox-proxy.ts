@@ -340,7 +340,7 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
           command,
           { workingDirectory: sandboxWorkingDirectory, timeoutSeconds: body.timeoutSeconds },
           {},
-        ).pipe(Effect.catch((err) => Effect.succeed(null as any)))
+        ).pipe(Effect.catch((err) => Effect.succeed({ _transportError: err instanceof Error ? `${err.name}: ${err.message}` : String(err) } as any)))
 
         const stdout = result?.logs?.stdout.map((m: any) => m.text).join("\n") ?? ""
         const stderr = result?.logs?.stderr.map((m: any) => m.text).join("\n") ?? "Sandbox execution failed"
@@ -381,7 +381,11 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
           })
         }
 
-        if (!result) return HttpServerResponse.jsonUnsafe({ error: "execution failed" }, { status: 502 })
+        if (!result || "_transportError" in (result ?? {}))
+          return HttpServerResponse.jsonUnsafe(
+            { error: "execution failed", detail: (result as any)?._transportError ?? "no result" },
+            { status: 502 },
+          )
 
         return HttpServerResponse.jsonUnsafe({
           id: execId,

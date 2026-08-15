@@ -28,6 +28,8 @@ export type AgentMessage =
   | { id: string; type: "endpoint.result"; res: { url: string } }
   | { id: string; type: "health" }
   | { id: string; type: "health.result"; res: { ok: boolean } }
+  | { id: string; type: "session.cleanup"; req: SessionCleanupReq }
+  | { id: string; type: "session.cleanup.result" }
   | { id: string; type: "error"; message: string }
 
 export type ExecReq = {
@@ -89,6 +91,10 @@ export type FsStatRes = Record<
   string,
   { mode: number; size: number; mtime: number; isDirectory: boolean } | null
 >
+
+export type SessionCleanupReq = {
+  sessionID: string
+}
 
 export type PtyCreateReq = {
   cwd: string
