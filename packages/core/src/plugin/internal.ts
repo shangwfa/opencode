@@ -33,6 +33,7 @@ import { ModelsDevPlugin } from "./models-dev"
 import { ProviderPlugins } from "./provider"
 import { SkillPlugin } from "./skill"
 import { VariantPlugin } from "./variant"
+import { VisionToolkitPlugin } from "./vision-toolkit"
 
 export type Requirements =
   | AgentV2.Service
@@ -119,6 +120,7 @@ const layer = Layer.effectDiscard(
         yield* add(ConfigExternalPlugin.Plugin)
         yield* add(ConfigProviderPlugin.Plugin)
         yield* add(VariantPlugin.Plugin)
+        yield* add(VisionToolkitPlugin)
       }),
     ).pipe(Effect.withSpan("PluginInternal.boot"), Effect.forkScoped({ startImmediately: true }))
   }),

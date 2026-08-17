@@ -12,7 +12,7 @@
 > |---|---|---|
 > | 用户 / 密码 | `app` / `8zuhlMLd4gaeUG5k` | `local` / 无密码 |
 > | 连接串 | `postgresql://app:8zuhlMLd4gaeUG5k@host.docker.internal:15432/opencode` | `postgresql://local@host.docker.internal:15432/opencode` |
-> | 数据完整度 | account/auth/provider 历史数据完整 | 全空，需手动补 credential + `ZHIPU_API_KEY` |
+> | 数据完整度 | account/auth/provider 历史数据完整 | 全空，需手动配置 provider 认证 |
 
 > **Docker runtime**：推荐使用 [OrbStack](https://orbstack.dev/) 替代 Docker Desktop——更轻量、启动快、镜像存储稳定。如果 Docker Desktop 出现 blob I/O error，切换到 OrbStack 即可（`docker context use orbstack`）。
 
@@ -202,7 +202,6 @@ sleep 10 && docker logs opencode-saas-test 2>&1 | tail -3
 #        opencode server listening on http://0.0.0.0:4096
 ```
 
-> **API key 说明（远端 PG）**：组合 1/2 使用远端 PG，provider API key 已持久化在 `credential` 表（历史数据完整），**容器启动无需 `-e ZHIPU_API_KEY`**，server 启动时会从 PG 加载并激活 credential。仅组合 3（本地 PG 全空）才必须传 `-e ZHIPU_API_KEY`。验证方式：`docker exec opencode-saas-test env | grep ZHIPU` 可能为空，但只要 `/message` 能收到 AI 回复即说明 credential 加载正常（2026-08-07 实测）。
 
 **Step 4：基础验证**
 
@@ -219,7 +218,7 @@ echo "SID: $SID"
 # 验证 AI provider（期望看到 AI 文字回复）
 curl -s --noproxy '*' --max-time 30 -X POST "http://localhost:14096/session/$SID/message" \
   -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"hello"}],"model":{"providerID":"zhipuai","modelID":"glm-5.1"}}' \
+  -d '{"parts":[{"type":"text","text":"hello"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}}' \
   | python3 -c "
 import json,sys
 d=json.load(sys.stdin)
@@ -363,7 +362,7 @@ echo "SID: $SID"
 
 curl -s --noproxy '*' --max-time 30 -X POST "http://localhost:14096/session/$SID/message" \
   -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"hello"}],"model":{"providerID":"zhipuai","modelID":"glm-5.1"}}' \
+  -d '{"parts":[{"type":"text","text":"hello"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}}' \
   | python3 -c "
 import json,sys
 d=json.load(sys.stdin)
@@ -385,7 +384,6 @@ psql postgres -c "CREATE USER local SUPERUSER;" -c "CREATE DATABASE opencode OWN
 ```
 
 > 首次创建 session 前可能需修复 SQLite schema（`pvc_mode`/`app_id` 列），见常见问题表。
-> **credential 激活时机**：opencode server 首次启动时会从 `~/.local/share/opencode/auth.json` 导入 credential 到 PG（默认未激活）。需在 Step 4 容器启动**之后**执行激活：`psql postgresql://local@127.0.0.1:5432/opencode -c "UPDATE credential SET active = true WHERE connector_id = 'zhipuai';"`。若已传 `-e ZHIPU_API_KEY`（Step 4），provider 可直接用环境变量 key，激活非必须。
 
 **Step 2：启动本地 OpenSandbox server**
 
@@ -454,15 +452,11 @@ docker run -d --name opencode-saas-test \
   -e OPENCODE_SANDBOX_DOMAIN=host.docker.internal:8080 \
   -e OPENCODE_SANDBOX_USE_SERVER_PROXY=true \
   -e OPENCODE_SANDBOX_IMAGE=opencode-opensandbox:local \
-  -e ZHIPU_API_KEY \
   opencode-saas-sandbox-test:v2fix
 
 sleep 10 && docker logs opencode-saas-test 2>&1 | tail -3
 ```
 
-> 本地 PG 场景注意：
-> - `-e ZHIPU_API_KEY` 必传（本地 PG credential → 环境变量映射链路不完整，见 7.4）。
-> - 若发消息报 `ProviderModelNotFoundError`，确认 key 已传入容器：`docker exec opencode-saas-test env | grep ZHIPU`。
 
 **Step 5：基础验证**
 
@@ -476,7 +470,7 @@ echo "SID: $SID"
 
 curl -s --noproxy '*' --max-time 30 -X POST "http://localhost:14096/session/$SID/message" \
   -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"hello"}],"model":{"providerID":"zhipuai","modelID":"glm-5.1"}}' \
+  -d '{"parts":[{"type":"text","text":"hello"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}}' \
   | python3 -c "
 import json,sys
 d=json.load(sys.stdin)
@@ -523,13 +517,13 @@ env \
 # 若项目不存在，先创建（只需一次）：
 curl -s --max-time 300 -X POST "http://localhost:14096/session/$SID/message" \
   -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"用 bash 执行: npx create-vite@5 /workspace/vite-app --template react-ts --yes && cd /workspace/vite-app && npm install"}],"model":{"providerID":"zhipuai","modelID":"glm-5.1"}}' \
+  -d '{"parts":[{"type":"text","text":"用 bash 执行: npx create-vite@5 /workspace/vite-app --template react-ts --yes && cd /workspace/vite-app && npm install"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}}' \
   | python3 -c "import json,sys;[print(p['text'][:200]) for p in json.load(sys.stdin).get('parts',[]) if p.get('type')=='text']"
 
 # 启动 Vite（background:true）
 curl -s --max-time 60 -X POST "http://localhost:14096/session/$SID/message" \
   -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"用 bash 工具执行，background 必须设为 true: cd /workspace/vite-app && npx vite --host 0.0.0.0 --port 5173"}],"model":{"providerID":"zhipuai","modelID":"glm-5.1"}}' \
+  -d '{"parts":[{"type":"text","text":"用 bash 工具执行，background 必须设为 true: cd /workspace/vite-app && npx vite --host 0.0.0.0 --port 5173"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}}' \
   | python3 -c "import json,sys;[print(p['text'][:200]) for p in json.load(sys.stdin).get('parts',[]) if p.get('type')=='text']"
 
 sleep 10
@@ -540,13 +534,13 @@ curl -s http://localhost:14096/session/$SID/proxy/5173/ -o /dev/null -w "Vite: %
 # 若项目不存在，先创建（只需一次）：
 curl -s --max-time 300 -X POST "http://localhost:14096/session/$SID/message" \
   -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"用 bash 执行: npx create-next-app@14 /workspace/next-app --js --app --no-eslint --no-tailwind --no-src-dir --no-import-alias --yes && cd /workspace/next-app && npm install"}],"model":{"providerID":"zhipuai","modelID":"glm-5.1"}}' \
+  -d '{"parts":[{"type":"text","text":"用 bash 执行: npx create-next-app@14 /workspace/next-app --js --app --no-eslint --no-tailwind --no-src-dir --no-import-alias --yes && cd /workspace/next-app && npm install"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}}' \
   | python3 -c "import json,sys;[print(p['text'][:200]) for p in json.load(sys.stdin).get('parts',[]) if p.get('type')=='text']"
 
 # 启动 Next.js（background:true）
 curl -s --max-time 60 -X POST "http://localhost:14096/session/$SID/message" \
   -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"用 bash 工具执行，background 必须设为 true: cd /workspace/next-app && npx next dev -H 0.0.0.0 -p 3000"}],"model":{"providerID":"zhipuai","modelID":"glm-5.1"}}' \
+  -d '{"parts":[{"type":"text","text":"用 bash 工具执行，background 必须设为 true: cd /workspace/next-app && npx next dev -H 0.0.0.0 -p 3000"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}}' \
   | python3 -c "import json,sys;[print(p['text'][:200]) for p in json.load(sys.stdin).get('parts',[]) if p.get('type')=='text']"
 
 sleep 20
@@ -649,14 +643,14 @@ PVC 卷上的文件会保留，容器重启后只需重新启动 dev server 进�
 SID="ses_1d53684f0ffeG7NMWxbffMudcs"
 curl -s --max-time 60 -X POST "http://localhost:14096/session/$SID/message" \
   -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"用 bash 工具执行，background 必须设为 true: cd /workspace/vite-app && npx vite --host 0.0.0.0 --port 5173"}],"model":{"providerID":"zhipuai","modelID":"glm-5.1"}}' \
+  -d '{"parts":[{"type":"text","text":"用 bash 工具执行，background 必须设为 true: cd /workspace/vite-app && npx vite --host 0.0.0.0 --port 5173"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}}' \
   | python3 -c "import json,sys;[print(p['text'][:200]) for p in json.load(sys.stdin).get('parts',[]) if p.get('type')=='text']"
 
 # Next.js
 SID="ses_1d52f1c8cffeiSZAgZNA8XElBE"
 curl -s --max-time 60 -X POST "http://localhost:14096/session/$SID/message" \
   -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"用 bash 工具执行，background 必须设为 true: cd /workspace/next-app && npx next dev -H 0.0.0.0 -p 3000"}],"model":{"providerID":"zhipuai","modelID":"glm-5.1"}}' \
+  -d '{"parts":[{"type":"text","text":"用 bash 工具执行，background 必须设为 true: cd /workspace/next-app && npx next dev -H 0.0.0.0 -p 3000"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}}' \
   | python3 -c "import json,sys;[print(p['text'][:200]) for p in json.load(sys.stdin).get('parts',[]) if p.get('type')=='text']"
 ```
 
@@ -710,7 +704,7 @@ POST /session/:sessionID/exec {"command":"nohup npx vite ... &"}
 | opencode 二进制 `required file not found` | Ubuntu/glibc 基础镜像复制了 `*-musl` 二进制 | `packages/opencode/docker/Dockerfile` 应复制 `dist/opencode-linux-arm64/bin/opencode` 或 `dist/opencode-linux-x64-baseline/bin/opencode` |
 | 本地 OpenSandbox 找不到镜像 | SaaS 容器指定的 image 名称不是 Docker daemon 中的本地镜像名 | 先 `docker images | grep opencode-opensandbox`，并设置 `OPENCODE_SANDBOX_IMAGE=opencode-opensandbox:local` |
 | 401 MISSING_API_KEY | proxy fetch 未带 API key | 检查代码是否有 `Flag.OPENCODE_SANDBOX_API_KEY` header 注入 |
-| ProviderModelNotFoundError | AI provider 未配置 | 确认容器连的是远端 PG（含 account 数据），或设置 `ZHIPU_API_KEY` 环境变量 |
+| ProviderModelNotFoundError | AI provider 未配置 | 确认容器连的是远端 PG（含 account 数据）|
 | 所有 API 返回 500 UnknownError | 宿主机 HTTP 代理（`http_proxy`）拦截 curl 请求 | curl 加 `--noproxy '*'`，或 `export NO_PROXY=localhost,127.0.0.1` |
 | POST /session 返回 500，错误 `table session has no column named pvc_mode` | SQLite migration 缺少合并后新增的 `pvc_mode`/`app_id` 列 | 手动添加列：`docker exec -u 0 <container> bun -e 'const {Database}=require("bun:sqlite");const d=new Database("/home/opencode/.local/share/opencode/opencode-local.db");d.run("ALTER TABLE session ADD COLUMN pvc_mode TEXT");d.run("ALTER TABLE session ADD COLUMN app_id TEXT");d.close()'` |
 | pg_advisory_lock 启动失败 | 远端 PG 被另一个 opencode 实例占用 | 等另一个实例退出，或停掉远端 SaaS |
@@ -774,13 +768,6 @@ net.createServer(c => {
 
 **症状**：发送 AI 消息返回 `ProviderModelNotFoundError`。
 
-**根因**：credential 表有 API key（从 `~/.local/share/opencode/auth.json` 导入），但 provider 需要 `ZHIPU_API_KEY` 等环境变量。SaaS 容器内 PG credential → 环境变量的映射链路不完整。
-
-**解法**：容器启动时直接设环境变量。
-
-```bash
-docker run -e ZHIPU_API_KEY='your-api-key' ...
-```
 
 > 查看已有 credential：`psql postgresql://local@127.0.0.1:15432/opencode -c "SELECT connector_id, active FROM credential WHERE active = true"`
 
@@ -790,7 +777,7 @@ docker run -e ZHIPU_API_KEY='your-api-key' ...
 
 **根因**：本地 PG 是全新数据库，远端 PG 有长期积累的 account、auth、模型配置。credential 表数据来自 `legacyImportLayer` 从 `~/.local/share/opencode/auth.json` 导入，但 account / auth 表不会被导入。
 
-**解法**：手动激活 credential（`UPDATE credential SET active = true WHERE connector_id = 'zhipuai'`）+ 设环境变量 API key（见 7.4）。
+**解法**：手动激活 credential（`UPDATE credential SET active = true`）+ 通过环境变量传入 API key。
 
 ### 7.6 私有 registry 不可达 + 镜像重建
 
