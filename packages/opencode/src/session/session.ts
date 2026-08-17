@@ -338,6 +338,7 @@ export type ListInput = {
   scope?: "project"
   path?: string
   workspaceID?: WorkspaceV2.ID
+  appId?: string
   roots?: boolean
   start?: number
   search?: string
@@ -1083,6 +1084,9 @@ function listByProject(
 
   if (input.workspaceID) {
     conditions.push(eq(SessionTable.workspace_id, input.workspaceID))
+  }
+  if (input.appId) {
+    conditions.push(eq(SessionTable.app_id, input.appId))
   }
   if (input.path !== undefined) {
     if (input.path) {
