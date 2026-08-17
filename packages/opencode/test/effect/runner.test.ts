@@ -250,6 +250,56 @@ describe("Runner", () => {
     }),
   )
 
+  // --- stale run takeover ---
+
+  it.live(
+    "ensureRunning takes over a stale run after the takeover timeout",
+    Effect.gen(function* () {
+      const s = yield* Scope.Scope
+      const started = yield* Deferred.make<void>()
+      const interrupted = yield* Deferred.make<void>()
+      const runner = Runner.make<string>(s, { staleAfterSec: 0.1 })
+      const ghost = Effect.gen(function* () {
+        yield* Deferred.succeed(started, undefined)
+        return yield* Effect.never.pipe(
+          Effect.as("never"),
+          Effect.onInterrupt(() => Deferred.succeed(interrupted, undefined)),
+        )
+      })
+      const a = yield* runner.ensureRunning(ghost).pipe(Effect.forkChild)
+      yield* Deferred.await(started)
+
+      const b = yield* runner.ensureRunning(Effect.succeed("recovered")).pipe(Effect.timeout("2 seconds"))
+
+      expect(b).toBe("recovered")
+      expect(runner.state._tag).toBe("Idle")
+      yield* Deferred.await(interrupted).pipe(Effect.timeout("250 millis"))
+      yield* Fiber.await(a).pipe(Effect.timeout("250 millis"))
+    }),
+  )
+
+  it.live(
+    "queued work behind a shell is not cancelled by the takeover timeout",
+    Effect.gen(function* () {
+      const s = yield* Scope.Scope
+      const gate = yield* Deferred.make<void>()
+      const runner = Runner.make<string>(s, { staleAfterSec: 0.1 })
+
+      const sh = yield* runner.startShell(Deferred.await(gate).pipe(Effect.as("shell"))).pipe(Effect.forkChild)
+      yield* waitForState(runner, "Shell")
+
+      const run = yield* runner.ensureRunning(Effect.succeed("after-shell")).pipe(Effect.forkChild)
+      yield* Effect.sleep("300 millis")
+      expect(runner.state._tag).toBe("ShellThenRun")
+
+      yield* Deferred.succeed(gate, undefined)
+      yield* Fiber.await(sh)
+      const exit = yield* Fiber.await(run).pipe(Effect.timeout("250 millis"))
+      expect(Exit.isSuccess(exit)).toBe(true)
+      if (Exit.isSuccess(exit)) expect(exit.value).toBe("after-shell")
+    }),
+  )
+
   // --- shell semantics ---
 
   it.live(

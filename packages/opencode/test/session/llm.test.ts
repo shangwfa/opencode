@@ -2113,3 +2113,124 @@ describe("session.llm.stream", () => {
     },
   )
 })
+
+describe("session.llm.withStallTimeout", () => {
+  const delayed = <T>(value: T, ms: number) => new Promise<T>((resolve) => setTimeout(() => resolve(value), ms))
+
+  const collect = async <T>(iterable: AsyncIterable<T>) => {
+    const out: T[] = []
+    for await (const item of iterable) out.push(item)
+    return out
+  }
+
+  test("passes values through unchanged when the source is fast", async () => {
+    const source = async function* () {
+      yield "a"
+      yield "b"
+      yield "c"
+    }
+    const out = await collect(LLM.withStallTimeout(source(), 10_000))
+    expect(out).toEqual(["a", "b", "c"])
+  })
+
+  test("does not trigger on values that arrive before the timeout", async () => {
+    const source = async function* () {
+      yield await delayed("slow", 30)
+      yield await delayed("slower", 60)
+    }
+    const out = await collect(LLM.withStallTimeout(source(), 5_000))
+    expect(out).toEqual(["slow", "slower"])
+  })
+
+  test("rejects when a pull stalls past the timeout", async () => {
+    const never = new Promise<IteratorResult<string>>(() => {})
+    const source: AsyncIterable<string> = {
+      [Symbol.asyncIterator]: () => {
+        let first = true
+        return {
+          next: () => {
+            if (!first) return never
+            first = false
+            return Promise.resolve({ done: false as const, value: "only" })
+          },
+        }
+      },
+    }
+    const wrapped = LLM.withStallTimeout(source, 50)
+    const iter = wrapped[Symbol.asyncIterator]()
+    expect((await iter.next()).value).toBe("only")
+    let error: unknown
+    try {
+      await iter.next()
+    } catch (e) {
+      error = e
+    }
+    expect(error).toBeInstanceOf(Error)
+    expect((error as Error).message).toContain("LLM stream stalled")
+    expect((error as Error).message).toContain("0s")
+  })
+
+  test("timeout is per-pull: resets after each received value", async () => {
+    const source = async function* () {
+      yield await delayed("a", 10)
+      yield await delayed("b", 10)
+      yield await delayed("c", 10)
+    }
+    // Each pull takes 10ms; a 50ms cap must never fire across three pulls.
+    const out = await collect(LLM.withStallTimeout(source(), 50))
+    expect(out).toEqual(["a", "b", "c"])
+  })
+
+  test("propagates source errors untouched", async () => {
+    const source = async function* () {
+      yield "ok"
+      throw new Error("provider exploded")
+    }
+    let error: unknown
+    try {
+      await collect(LLM.withStallTimeout(source(), 10_000))
+    } catch (e) {
+      error = e
+    }
+    expect(error).toBeInstanceOf(Error)
+    expect((error as Error).message).toBe("provider exploded")
+  })
+
+  test("early return delegates to the source iterator", async () => {
+    let returned: unknown
+    const source: AsyncIterable<string> = {
+      [Symbol.asyncIterator]: () => ({
+        next: () => Promise.resolve({ done: false as const, value: "x" }),
+        return: (value?: unknown) => {
+          returned = value ?? "default"
+          return Promise.resolve({ done: true as const, value: undefined as any })
+        },
+      }),
+    }
+    const iter = LLM.withStallTimeout(source, 10_000)[Symbol.asyncIterator]()
+    await iter.next()
+    const fin = await iter.return?.("stop")
+    expect(fin?.done).toBe(true)
+    expect(returned).toBe("stop")
+  })
+
+  test("no unhandled rejection when the timeout wins the race", async () => {
+    let rejectPull: ((reason: Error) => void) | undefined
+    const source: AsyncIterable<string> = {
+      [Symbol.asyncIterator]: () => ({
+        next: () =>
+          new Promise<IteratorResult<string>>((_resolve, reject) => {
+            rejectPull = reject
+          }),
+      }),
+    }
+    const iter = LLM.withStallTimeout(source, 20)[Symbol.asyncIterator]()
+    // The pull never resolves; the timeout must reject without leaving an unhandled
+    // rejection behind on the abandoned pull promise.
+    await expect(iter.next()).rejects.toThrow("LLM stream stalled")
+    // Give the abandoned promise a late rejection; it must be swallowed.
+    await delayed(undefined, 5)
+    rejectPull?.(new Error("late failure"))
+    await delayed(undefined, 10)
+  })
+})

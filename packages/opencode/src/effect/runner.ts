@@ -1,4 +1,5 @@
-import { Cause, Deferred, Effect, Exit, Fiber, Latch, Schema, Scope, SynchronizedRef } from "effect"
+import { Cause, Deferred, Duration, Effect, Exit, Fiber, Latch, Option, Schema, Scope, SynchronizedRef } from "effect"
+import { Flag } from "@/flag/flag"
 
 export interface Runner<A, E = never> {
   readonly state: State<A, E>
@@ -30,6 +31,11 @@ interface PendingHandle<A, E> {
   work: Effect.Effect<A, E>
 }
 
+interface RunTicket<A, E> {
+  readonly done: Deferred.Deferred<A, E | Cancelled>
+  readonly behindRun: boolean
+}
+
 export type State<A, E> =
   | { readonly _tag: "Idle" }
   | { readonly _tag: "Running"; readonly run: RunHandle<A, E> }
@@ -42,12 +48,14 @@ export const make = <A, E = never>(
     onIdle?: Effect.Effect<void>
     onBusy?: Effect.Effect<void>
     onInterrupt?: Effect.Effect<A, E>
+    staleAfterSec?: number
   },
 ): Runner<A, E> => {
   const ref = SynchronizedRef.makeUnsafe<State<A, E>>({ _tag: "Idle" })
   const idle = opts?.onIdle ?? Effect.void
   const onBusy = opts?.onBusy ?? Effect.void
   const onInterrupt = opts?.onInterrupt
+  const staleAfterSec = opts?.staleAfterSec ?? Flag.OPENCODE_SESSION_STALE_RUN_SEC ?? 1800
   let ids = 0
 
   const state = () => SynchronizedRef.getUnsafe(ref)
@@ -112,30 +120,55 @@ export const make = <A, E = never>(
       yield* Fiber.interrupt(shell.fiber)
     })
 
-  const ensureRunning = (work: Effect.Effect<A, E>) =>
+  const ensureRunning = (work: Effect.Effect<A, E>): Effect.Effect<A, E> =>
+    Effect.gen(function* () {
+      while (true) {
+        const ticket = yield* enqueue(work)
+        // Waits behind a shell are unbounded: interactive shells legitimately run long.
+        if (!ticket.behindRun) return yield* awaitDone(ticket.done)
+        const outcome = yield* Effect.timeoutOption(awaitDone(ticket.done), Duration.seconds(staleAfterSec))
+        if (Option.isSome(outcome)) return outcome.value
+        const st = state()
+        if (st._tag !== "Running" || st.run.done !== ticket.done) continue
+        // The current run is stale (e.g. hung provider stream); cancel it so our prompt can run.
+        yield* Effect.logWarning("SessionRunner: cancelling stale run after takeover timeout")
+        yield* cancel
+      }
+    })
+
+  const enqueue = (work: Effect.Effect<A, E>): Effect.Effect<RunTicket<A, E>> =>
     SynchronizedRef.modifyEffect(
       ref,
       Effect.fnUntraced(function* (st) {
         switch (st._tag) {
-          case "Running":
-          case "ShellThenRun":
-            return [awaitDone(st.run.done), st] as const
+          case "Running": {
+            const ticket: RunTicket<A, E> = { done: st.run.done, behindRun: true }
+            return [ticket, st] as const
+          }
+          case "ShellThenRun": {
+            const ticket: RunTicket<A, E> = { done: st.run.done, behindRun: false }
+            return [ticket, st] as const
+          }
           case "Shell": {
             const run = {
               id: next(),
               done: yield* Deferred.make<A, E | Cancelled>(),
               work,
             } satisfies PendingHandle<A, E>
-            return [awaitDone(run.done), { _tag: "ShellThenRun", shell: st.shell, run }] as const
+            const ticket: RunTicket<A, E> = { done: run.done, behindRun: false }
+            const queued: State<A, E> = { _tag: "ShellThenRun", shell: st.shell, run }
+            return [ticket, queued] as const
           }
           case "Idle": {
             const done = yield* Deferred.make<A, E | Cancelled>()
             const run = yield* startRun(work, done)
-            return [awaitDone(done), { _tag: "Running", run }] as const
+            const ticket: RunTicket<A, E> = { done, behindRun: false }
+            const started: State<A, E> = { _tag: "Running", run }
+            return [ticket, started] as const
           }
         }
       }),
-    ).pipe(Effect.flatten)
+    )
 
   const startShell = (work: Effect.Effect<A, E>, ready?: Latch.Latch): Effect.Effect<A, E | Busy> =>
     SynchronizedRef.modifyEffect(
