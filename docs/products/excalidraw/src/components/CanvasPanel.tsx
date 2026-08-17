@@ -41,6 +41,7 @@ async function renderMermaid(
 
 export default function CanvasPanel({ canvasId, onSaasEvent }: Props) {
   const [excalidrawAPI, setExcalidrawAPI] = useState<ExcalidrawImperativeAPI | null>(null)
+  const [drawing, setDrawing] = useState(false)
   const apiRef = useRef<ExcalidrawImperativeAPI | null>(null)
   apiRef.current = excalidrawAPI
 
@@ -71,7 +72,9 @@ export default function CanvasPanel({ canvasId, onSaasEvent }: Props) {
           onCanvasUpdate(data.state ?? 'mermaid', data.mermaid ?? '', data.elements ?? [])
           return
         }
-        if (data.type?.startsWith('message.') || data.type === 'session.idle' || data.type === 'session.status') {
+        if (data.type === 'session.status' || data.type === 'session.busy') setDrawing(true)
+        if (data.type === 'session.idle' || data.type === 'session.error') setDrawing(false)
+        if (data.type?.startsWith('message.') || data.type === 'session.idle' || data.type === 'session.status' || data.type === 'session.error') {
           onSaasEvent(data.type ?? '')
         }
       } catch {
@@ -195,12 +198,18 @@ export default function CanvasPanel({ canvasId, onSaasEvent }: Props) {
   }
 
   return (
-    <div className="h-full flex-1">
+    <div className="relative h-full flex-1">
       <Excalidraw
         excalidrawAPI={(api) => setExcalidrawAPI(api)}
         onChange={(elements) => handleChange(elements)}
         UIOptions={{ canvasActions: { loadScene: false } }}
       />
+      {drawing && (
+        <div className="absolute right-4 top-4 z-10 flex items-center gap-2 rounded-full border bg-background/90 px-3 py-1.5 text-xs text-muted-foreground shadow-sm backdrop-blur">
+          <span className="size-1.5 animate-pulse rounded-full bg-primary" />
+          AI 正在绘制…
+        </div>
+      )}
     </div>
   )
 }

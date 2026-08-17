@@ -184,158 +184,194 @@ description: ${SKILL_DESCRIPTION}
 
 **必须用追加写（>>），每行一个完整 JSON。**
 
-## 写入方法
+推荐使用带幂等 ID 的 envelope：\`{"schemaVersion":1,"operationId":"本次操作唯一ID","operation":{"op":"render","mermaid":"graph TD\\nA-->B"}}\`
+- operationId 重试时必须保持不变
+- baseRevision 仅当用户消息中出现 \`[画布 revision: N]\` 时才填 N；**没有画布状态信息时不要编造，省略该字段**
+- 旧的裸 op 格式仍兼容
 
-有两种 op，根据内容类型选择：
+## op 选择（关键）——所有内容都是手绘元素，没有图表引擎
 
-### 方式一：render —— 结构化图表（流程/架构/时序/ER/类图/状态机）
-\`\`\`bash
-cat >> /workspace/canvas-ops.jsonl <<'EOF'
-{"op":"render","mermaid":"graph TD\\n  A([开始]) --> B[输入账号密码]\\n  B --> C{校验通过?}\\n  C -->|成功| D[登录成功]"}
-EOF
-\`\`\`
-mermaid 字符串内的换行必须写成 \\n（JSON 转义）。布局由引擎自动计算，**不要给坐标**。
+| 内容 | op |
+|------|-----|
+| 流程图/架构图/时序图/状态机/关系图（节点+连线） | **draw**（shape 节点 + arrow 连线，布局法见下） |
+| UI 原型/线框/示意图/数据图 | **draw**（自由绘制，遵守硬规则） |
+| 文档/PRD/报告/说明书 | **card**（卡片自动排版）+ draw（大标题/表格） |
+| 修改已有内容 | **patch / delete**（按 id 增量，优先用，不要重画） |
 
-### 方式二：draw —— 自由绘制（UI原型/示意图/数据图/文档排版）
+## 替换 vs 追加语义（必须分清，用错会销毁内容）
+
+**文件永远追加写（>>）**；替换/追加由 op 语义决定：
+
+| op | 画布语义 |
+|----|---------|
+| draw + clear:true | **全量替换**：先清空再画（画全新内容时用） |
+| draw（无 clear） | **追加**：在现有元素上叠加 |
+| card | **追加**：新卡片自动避让已有元素 |
+| patch / delete | **增量修改**：只动目标元素 |
+
+铁律：
+- 画全新内容 → draw 带 clear:true；往现有画布加内容 → draw/card **不带** clear
+- 修改画布（用户消息附带的元素清单非空时）**优先 patch/delete**，不要整画布重画
+
+## draw 硬规则（防重叠的关键，逐条遵守）
+
+### 坐标系
+- 有效范围 -200~1200，视觉中心 (400, 300)；坐标取 10 的倍数
+- x/y 是元素**左上角**；text 的 x 是文字**左边缘**
+- arrow/line 的 points 是相对 (x,y) 的增量坐标：\`[[0,0],[100,0]]\` 表示向右画 100
+- elements 数组顺序 = 出场动画顺序 = z-order（背景最先，前景最后）
+
+### 硬尺寸（低于下限不可读）
+- 独立文字：正文 fontSize ≥ 18；小节标题 ≥ 24；大标题 ≥ 32；辅助注释最少 14（少用）
+- 带文字 shape ≥ 120×60；元素间距 ≥ 30；区块间距 ≥ 60
+- shape 会按文字自动撑大（给的 width/height 是最小值），但给宽一点更保险
+
+### 文字宽度估算（定 shape 宽度前必算）
+每个中文/全角字符 ≈ fontSize × 1.0，ASCII ≈ fontSize × 0.55。
+shape 宽度 ≥ 文字宽度 + 40。例：8 个中文 @16 ≈ 128px → shape 宽 ≥ 168。
+
+### 配色（同一图内语义一致）
+- 主色（描边/强调文字）：蓝 #1971c2 主操作｜绿 #2f9e44 成功｜红 #e03131 错误｜橙 #e8590c 警告｜紫 #7048e8 强调
+- 填充（shape 背景）：#a5d8ff 输入/主节点｜#b2f2bb 成功/输出｜#ffd8a8 警告/外部｜#d0bfff 处理/中间件｜#ffc9c9 错误｜#fff3bf 决策/备注｜#c3fae8 存储/数据｜#f8f9fa 卡片底色
+- 输入框：#ffffff 填充 + #868e96 描边
+- 分区底色（大背景块）：#dbe4ff 前端层｜#e5dbff 逻辑层｜#d3f9d8 数据层
+- 文字一律深色 #1e1e1e 配浅底；禁止深底深字
+
+### 元素字段速查
+- rectangle/ellipse/diamond：x/y/width/height/text/backgroundColor/strokeColor；**文字对齐**：默认居中（流程图节点）；表格单元格、标签条、列表项等传 \`textAlign:"left"\`（可加 \`verticalAlign:"top"\`）——**按内容语义选**
+- text：x/y/text/fontSize/strokeColor（x 是文字左边缘）
+- line/arrow：x/y + points（相对增量坐标）/strokeColor/strokeStyle（"dashed"）/endArrowhead
+- **每个元素都要语义 id**（如 title/btn-1）：后续 patch/delete 靠 id 引用
+
+### 排版纪律（防重叠核心）
+自上而下逐行排布，**写下一个元素的 y 前，先算上一元素的底边 y+height**：
+- 同列下一行 y ≥ 上一行 y + height + 30
+- 多列：先定各列 x（列间距 ≥ 60），每列内自上而下
+- 高度拿不准就多留 60，宁可稀疏勿重叠
+
+### 常见错误（每次写入前自查）
+1. 两元素 y 太近 → 重叠。原因：没算上一行底边
+2. 文字溢出 shape → 没按宽度公式估算
+3. points 写成绝对坐标 → 线飞出画布
+4. 深色填充+深色文字 → 看不清，用浅填充深描边
+5. 忘了给 id → 后续无法 patch。**每个元素都要有语义 id**
+
+### 完整示例：登录页（无重叠坐标示范）
 \`\`\`bash
 cat >> /workspace/canvas-ops.jsonl <<'EOF'
 {"op":"draw","clear":true,"elements":[
-  {"type":"text","id":"title","x":200,"y":80,"text":"登录","fontSize":24},
-  {"type":"rectangle","id":"card","x":200,"y":100,"width":400,"height":300},
-  {"type":"rectangle","id":"btn","x":240,"y":320,"width":320,"height":48,"text":"登 录","backgroundColor":"#1971c2"}
+  {"type":"rectangle","id":"page","x":200,"y":80,"width":360,"height":490,"backgroundColor":"#f8f9fa"},
+  {"type":"text","id":"title","x":332,"y":120,"text":"用户登录","fontSize":24},
+  {"type":"text","id":"lb-account","x":240,"y":180,"text":"账号","fontSize":16},
+  {"type":"rectangle","id":"in-account","x":240,"y":230,"width":280,"height":44,"backgroundColor":"#ffffff","strokeColor":"#868e96"},
+  {"type":"text","id":"lb-password","x":240,"y":304,"text":"密码","fontSize":16},
+  {"type":"rectangle","id":"in-password","x":240,"y":354,"width":280,"height":44,"backgroundColor":"#ffffff","strokeColor":"#868e96"},
+  {"type":"rectangle","id":"btn-login","x":240,"y":428,"width":280,"height":52,"text":"登 录","backgroundColor":"#a5d8ff"},
+  {"type":"text","id":"link-forgot","x":340,"y":510,"text":"忘记密码？","fontSize":16,"strokeColor":"#1971c2"}
 ]}
 EOF
 \`\`\`
-- elements 支持：rectangle/ellipse/diamond（带 text/backgroundColor）、text（fontSize）、line/arrow（points 相对坐标）
-- **给每个元素起 id**（如 title/btn-1）：后续修改直接用 id 引用，不用重画
-- **坐标你定**：以 (400, 300) 为视觉中心布局，间距 20 的倍数，画布有效范围约 -200~1200
-- clear:true 先清空再画（全新内容时）；追加内容不带 clear
+坐标依据（照此推算）：标题 4 字 @24 = 96px 宽，容器中心 x=380 → x=380-48=332；每行 y 都 ≥ 上一行底边+30；"忘记密码？"5 字 @16 = 80px → x=380-40=340。
 
-### 方式三：patch / delete —— 增量修改（画布上已有内容时）
+## 文档排版（PRD/报告/说明书）——card op
+
+**不要手动排卡片内文字**——card op 只给标题和正文，排版引擎自动计算文字位置与卡片高度，绝不重叠：
+
 \`\`\`bash
-# 改单个元素（只写要改的字段）
 cat >> /workspace/canvas-ops.jsonl <<'EOF'
-{"op":"patch","id":"title","text":"新标题","fontSize":28}
-{"op":"patch","id":"btn","backgroundColor":"#e03131"}
-{"op":"delete","ids":["card","btn"]}
+{"op":"draw","clear":true,"elements":[{"type":"text","id":"doc-title","x":200,"y":80,"text":"电商客服系统 PRD","fontSize":36}]}
+{"op":"card","id":"sec1","x":200,"y":180,"width":800,"title":"1. 需求背景","body":"业务痛点：\\n· 用户数据分散在 5+ 系统\\n· 客服处理工单效率低"}
+{"op":"card","id":"sec2","x":200,"y":390,"width":800,"title":"2. 产品目标","body":"· 统一用户数据视图\\n· 客服效率提升 50%"}
 EOF
 \`\`\`
-- 用户消息会附带当前画布元素清单（id 和内容）——修改时**优先用 patch/delete**，不要重画整个画布
 
-## 怎么选（关键）
+- 高度估算（title 22 / body 16 时）：卡片高 ≈ 110 + 20 × body 行数（宽 800 时 body 不换行）
+- y 按估算累加即可；**若与已有卡片重叠，系统会自动下移避让**（每张卡保证 ≥40px 间距），所以 y 估算偏小也不会重叠
+- 下一张卡 y = 本卡 y + 高度 + 40；拿不准直接 +240。示例：sec1 body 3 行 → 高约 170 → sec2 y = 180+170+40 ≈ 390
+- body 内换行写 \\n；title/body 都可选
+- 大标题用 draw 的独立 text（fontSize 36）；表格用 draw 的 rectangle 网格
+- **禁止**在卡片上手叠 text（坐标必错）——卡片内容一律 card op
 
-- 流程/架构/时序/数据关系/类图/状态机 → **render**（布局引擎自动排版，最美观）
-- UI 原型、页面线框、示意草图、简单数据图（柱状/对比） → **draw**
-- **文档/PRD/报告/说明书 → draw（文档排版）**
-- 拿不准时：有"节点+连线"关系用 render；是"画面布局/文档排版"用 draw
+## patch / delete —— 增量修改
 
-## draw 文档排版模板（PRD/报告/说明书）
+\`\`\`bash
+cat >> /workspace/canvas-ops.jsonl <<'EOF'
+{"op":"patch","id":"btn-login","backgroundColor":"#ffc9c9"}
+{"op":"patch","id":"title","text":"新标题"}
+{"op":"delete","ids":["link-forgot"]}
+EOF
+\`\`\`
+- patch 可改：text / x / y / width / height / backgroundColor / strokeColor / fontSize（只写要改的字段）
+- 用户消息会附带当前画布元素清单（id/坐标/文本）——**修改优先 patch/delete，禁止整画布重画**
 
-把文档画成"卡片墙"：主标题 + 各章节卡片，自上而下排列。
+## 结构图画法（流程图/架构图/时序图/状态机）——节点 + 连线
 
+一切"节点+连线"类图表都用 draw 的 shape + arrow 手绘。**没有布局引擎，坐标全部你算**，套用下面的布局模板：
+
+### 纵向流程图（默认，步骤类需求）
+节点 rectangle 统一 160×60，同列居中对齐，垂直间距 120（节点高 60 + 箭头 60）：
 \`\`\`bash
 cat >> /workspace/canvas-ops.jsonl <<'EOF'
 {"op":"draw","clear":true,"elements":[
-  {"type":"text","x":200,"y":80,"text":"用户管理系统 PRD","fontSize":36},
-  {"type":"line","x":200,"y":140,"points":[[0,0],[800,0]]},
-  {"type":"rectangle","x":200,"y":180,"width":800,"height":140,"backgroundColor":"#f8f9fa","text":""},
-  {"type":"text","x":230,"y":200,"text":"1. 需求背景","fontSize":22},
-  {"type":"text","x":230,"y":240,"text":"业务痛点：\\n- 客服处理工单效率低\\n- 用户数据分散","fontSize":16},
-  {"type":"rectangle","x":200,"y":360,"width":800,"height":140,"backgroundColor":"#f8f9fa","text":""},
-  {"type":"text","x":230,"y":380,"text":"2. 功能范围","fontSize":22},
-  {"type":"text","x":230,"y":420,"text":"用户列表 / 详情 / 权限 / 批量操作","fontSize":16}
+  {"type":"rectangle","id":"n1","x":320,"y":100,"width":160,"height":60,"text":"开始","backgroundColor":"#b2f2bb"},
+  {"type":"rectangle","id":"n2","x":320,"y":220,"width":160,"height":60,"text":"处理数据","backgroundColor":"#a5d8ff"},
+  {"type":"rectangle","id":"n3","x":320,"y":340,"width":160,"height":60,"text":"完成","backgroundColor":"#b2f2bb"},
+  {"type":"arrow","id":"e1","x":400,"y":160,"points":[[0,0],[0,60]]},
+  {"type":"arrow","id":"e2","x":400,"y":280,"points":[[0,0],[0,60]]}
 ]}
 EOF
 \`\`\`
+要点：节点 x 相同（本例 320，中心 x=400）；箭头 x=节点中心 x，y=上一节点底边，points=[[0,0],[0,60]]（向下 60 = 间距-节点高）。节点文字自动居中，不用单独 text。
 
-排版规则：
-- 页面左边距 x=200，内容宽度 800；主标题 fontSize 36，章节标题 22，正文 16
-- 章节用浅色背景卡片（rectangle backgroundColor #f8f9fa），标题+正文要点 text 叠在卡片上（text 的 x = 卡片x+30）
-- 正文要点用 \n 换行（多行 text）；y 坐标按内容高度递增，卡片间留 40px
-- 表格用多个 rectangle 网格（表头深色底 #e9ecef）+ 单元格 text
-- 文档内容多时分多个 draw op 追加写（不要 clear，累加往下排）
+### 分支流程图（判断节点）
+菱形 diamond 做判断，分支标签用小 text 放在箭头旁：
+- 主干节点 y 每层 +120；分支节点横向错开 x（列间距 ≥ 260），横向箭头 points=[[0,0],[100,0]]
+- 判断分支菱形 160×80；"是/否"标签 fontSize 14 放箭头上方 10px
 
-## mermaid 语法（支持的图类型）
+### 横向架构图（分层系统）
+- 各层分区：大背景 rectangle（宽 1000，高 120，间距 40，填充分区底色 #dbe4ff/#e5dbff/#d3f9d8，opacity 不用改）
+- 层名 text 放分区左上角；组件节点 160×60 在分区内横向排（间距 ≥ 40）
+- 跨层调用用 arrow 从上层组件底边连到下层组件顶边
 
-根据需求选择图类型，**写对应的 mermaid 定义**：
+### 时序图（角色+消息）
+- 顶部角色 rectangle 130×40 横向排（间距 80）；每个角色下方画虚线生命线：line points=[[0,0],[0,H]]，strokeStyle:"dashed"，颜色 #adb5bd
+- 消息箭头：arrow 从左角色生命线 x 指向右角色 x，y 逐条 +50；消息名用 fontSize 14 text 放箭头上方
 
-### 1. flowchart — 流程图 / 架构图 / 组织结构（最常用）
-\`\`\`
-graph TD
-  A([开始]) --> B[输入账号密码]
-  B --> C{校验通过?}
-  C -->|成功| D[登录成功]
-  C -->|失败| E[登录失败]
-\`\`\`
-- \`graph TD\` 自上而下（架构图可用 \`graph LR\` 从左到右）
-- 形状：\`[文本]\`矩形 \`{文本}\`菱形(判断) \`([文本])\`椭圆(起止) \`[(文本)]\`圆柱(存储)
-- 标签连线：\`A -->|是| B\`；分组：\`subgraph 名称 ... end\`（名称用英文或拼音）
+### 状态机
+状态用 ellipse 160×60，迁移箭头连接，事件名 text 放箭头旁（同分支标签做法）。
 
-### 2. sequenceDiagram — 时序图 / 交互流程
-\`\`\`
-sequenceDiagram
-  participant U as 用户
-  participant S as 服务端
-  U->>S: 提交登录
-  S-->>U: 返回令牌
-\`\`\`
-
-### 3. classDiagram — UML 类图
-\`\`\`
-classDiagram
-  class User { +String name +login() }
-  class Admin { +banUser() }
-  User <|-- Admin
-\`\`\`
-
-### 4. erDiagram — 实体关系图
-\`\`\`
-erDiagram
-  USER ||--o{ ORDER : places
-  ORDER ||--|{ ITEM : contains
-\`\`\`
-
-### 5. stateDiagram-v2 — 状态机
-\`\`\`
-stateDiagram-v2
-  [*] --> 待支付
-  待支付 --> 已支付: 付款
-  已支付 --> [*]
-\`\`\`
-
-规则：
-- 节点 id 用简单字母/英文（A、User…），显示文本写在括号里
-- flowchart 的分支必须带标签（是/否、成功/失败）
-- **不支持** mindmap/gantt/journey/pie——若用户需求是这些，用最接近的已支持类型表达（如思维导图→flowchart 层级、时间线→flowchart LR）
+### 连线通则
+- 箭头永远从源节点**边缘**到目标节点**边缘**（底边中心 → 顶边中心最常见），起点 x/y 是绝对坐标、points 是增量
+- 连线不穿节点：被挡时用两段折线（elbow）或调整节点布局
+- 连线颜色默认 #1e1e1e；强调流向可用主色
 
 ## 工作流程
 
-1. **首次画图**：直接构思 → 一次 cat 写入一个 render op
-   - 图较大时（>12 节点）可分两步：先写主干版本，再写完整增强版本（每版都必须是完整可渲染的 mermaid）
-2. **修改画布**：用户消息会附带当前 mermaid，基于它修改后**输出完整新版本**（不要只输出 diff）
-3. **重新画**：输出全新的 mermaid（自然覆盖旧图）
-4. 完成后用文字简要说明图的结构
+1. **首次画图**：按 op 选择表选画法，先在脑中排出网格（每层 y / 每列 x），再一次 cat 写入 draw（clear:true）
+   - 复杂画面可分多次追加（不带 clear），每次追加都自查间距；card 会被自动避让，y 估算偏小无妨
+2. **修改画布**：用户消息会附带当前画布元素清单（id/坐标/文本）——**优先 patch/delete**（改文字 patch text、挪位置 patch x/y、删元素 delete），局部重画才用 draw
+3. **重新画**：draw + clear:true 重画
+4. 完成后用文字简要说明结构
 
 ## 核心原则（重要）
 
-**用户只要提出"画/绘制/生成图"类需求，就必须写入 canvas-ops.jsonl 在画布出图**——不要只在对话里用文字描述或用文字说明"只能画流程图"。任何内容都能用某种图类型表达：
-- 流程/步骤/操作 → flowchart
-- 系统架构/模块关系 → flowchart（LR 或 TD + subgraph 分组）
-- 组织/层级/分类结构 → flowchart 树形
-- 交互/调用时序 → sequenceDiagram
-- 数据表关系 → erDiagram
-- 状态流转 → stateDiagram-v2
-- 类/接口设计 → classDiagram
-- UI 原型/页面线框/示意草图/数据对比图 → draw（自由绘制）
-- 文档/PRD/报告/说明书 → draw（文档排版，用上方模板）
+**用户只要提出"画/绘制/生成图"类需求，就必须写入 canvas-ops.jsonl 在画布出图**——不要只在对话里用文字描述。任何内容都能手绘表达：
+- 流程/步骤/操作 → 纵向流程图模板（分支用菱形）
+- 系统架构/模块关系 → 横向架构图模板（分区+组件）
+- 组织/层级/分类结构 → 树形（根在上，每层 y+120，子节点横向均分）
+- 交互/调用时序 → 时序图模板（角色+生命线+消息箭头）
+- 数据表/实体关系 → 节点+连线（实体 rectangle，关系 arrow+标签）
+- 状态流转 → 状态机模板
+- UI 原型/页面线框/示意草图/数据对比图 → draw 自由绘制
+- 文档/PRD/报告/说明书 → card 卡片排版 + 独立大标题 text
 
-即使内容不是典型图表（比如"画个小鸭子"），也用 draw 画出示意草图；要"生成文档/PRD/报告"就用文档排版模板画到画布，让画布始终有产出。
+即使内容不是典型图表（比如"画个小鸭子"），也用 draw 画出示意草图；要"生成文档/PRD/报告"就用 card 排版画到画布，让画布始终有产出。
 
 ## 禁止
 
 - **不要反问用户、不要使用 question 工具**——根据需求直接产出，信息不足时做合理假设并继续
-- render 模式不要输出坐标——布局由引擎自动计算
-- render 只用上面 5 种图类型；subgraph 名称避免纯中文（用英文/拼音，显示文本可中文）
+- **禁止使用 mermaid/render op**——一切图表都用手绘 draw（布局模板见上），没有例外
+- draw 不要在深色背景上放深色文字；不要跳过宽度/底边估算直接拍坐标
 - 不要在一次 op 里塞非 JSON 内容
 `
 }

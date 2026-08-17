@@ -26,6 +26,10 @@ export interface Message {
     role: string
     time?: { created?: number; completed?: number }
     finish?: string
+    error?: {
+      name?: string
+      data?: { message?: string }
+    }
   }
   parts: MessagePart[]
 }

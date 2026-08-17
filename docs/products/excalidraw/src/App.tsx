@@ -43,6 +43,10 @@ export default function App() {
         setRunning(false)
         refreshMessages()
       }
+      if (type === 'session.error') {
+        setRunning(false)
+        refreshMessages()
+      }
       if (type === 'session.status') setRunning(true)
     },
     [refreshMessages],

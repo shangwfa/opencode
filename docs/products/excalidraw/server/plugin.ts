@@ -108,8 +108,8 @@ function canvasSummaryText(canvasId: string): string | null {
   const canvas = getCanvas(canvasId)
   if (!canvas) return null
   // mermaid 态注入 mermaid；manual 态注入元素清单（patch/delete 按 id 引用）
-  if (canvas.state === 'manual') return elementsSummary(canvas)
-  return canvasContextForAI(canvas)
+  const content = canvas.state === 'manual' ? elementsSummary(canvas) : canvasContextForAI(canvas)
+  return content ? `[画布 revision: ${canvas.revision}]\n${content}` : `[画布 revision: ${canvas.revision}]`
 }
 
 async function handleApi(req: IncomingMessage, res: ServerResponse, config: ServerConfig): Promise<boolean> {

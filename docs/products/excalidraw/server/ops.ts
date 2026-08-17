@@ -1,47 +1,148 @@
 import type { ServerConfig, SessionRecord } from './sessions.ts'
-import { deleteElements, drawElements, getCanvas, patchElement, setMermaid } from './canvas.ts'
-import type { DrawElement, PatchInput } from './canvas.ts'
+import { deleteElements, drawCard, drawElements, getCanvas, patchElement, persistCanvas, resolveCardPlacement } from './canvas.ts'
+import type { CanvasRecord } from './canvas.ts'
+import { parseCanvasOperation } from './schema.ts'
+import type { CanvasOp, CanvasOperation } from './schema.ts'
 
 // AI 写入 /workspace/canvas-ops.jsonl，一行一个 JSON op（允许多行 pretty JSON，按括号配平解析）
 // {"op":"render","mermaid":"..."}      结构化图表全量（流程/架构/时序/ER/类/状态机）
 // {"op":"draw","elements":[...]}       自由绘制追加（UI原型/文档/示意图），可带 clear
+// {"op":"card","title":"...","body":"..."}  文档卡片（标题/正文自动排版，推荐用于文档）
 // {"op":"patch","id":"...","text":..}  增量修改单个元素（按 id）
 // {"op":"delete","ids":[...]}          增量删除（按 id）
 
-export type CanvasOp =
-  | { op: 'render'; mermaid: string }
-  | { op: 'draw'; elements: DrawElement[]; clear?: boolean }
-  | { op: 'patch' } & PatchInput
-  | { op: 'delete'; ids: string[] }
-
 export function applyOp(canvasId: string, raw: unknown): string | null {
+  return applyBatch(canvasId, [raw]).error
+}
+
+export interface ApplyBatchResult {
+  applied: number
+  skipped: number
+  error: string | null
+}
+
+export function applyBatch(
+  canvasId: string,
+  raw: unknown[],
+  checkpoint?: { sourceId: string; offset: number },
+): ApplyBatchResult {
   const canvas = getCanvas(canvasId)
-  if (!canvas) return 'canvas not found'
-  const op = raw as CanvasOp
-  try {
-    if (op.op === 'render') {
-      if (typeof op.mermaid !== 'string') return 'render 缺少 mermaid 字段'
-      setMermaid(canvas, op.mermaid)
-      return null
+  if (!canvas) return { applied: 0, skipped: 0, error: 'canvas not found' }
+  const parsed = raw.map(parseCanvasOperation)
+  const invalid = parsed.find((result) => !result.ok)
+  if (invalid && !invalid.ok) {
+    saveCheckpoint(canvas, checkpoint)
+    return { applied: 0, skipped: 0, error: invalid.error }
+  }
+  const known = new Set(canvas.appliedOperationIds)
+  const batchIds = new Set<string>()
+  const operations = parsed
+    .filter((result): result is Extract<typeof result, { ok: true }> => result.ok)
+    .map((result) => result.value)
+    .filter((item) => {
+      if (!item.operationId) return true
+      if (known.has(item.operationId) || batchIds.has(item.operationId)) return false
+      batchIds.add(item.operationId)
+      return true
+    })
+  const skipped = raw.length - operations.length
+  const validationError = validateBatch(canvas, operations)
+  if (validationError) {
+    saveCheckpoint(canvas, checkpoint)
+    return { applied: 0, skipped, error: validationError }
+  }
+  if (operations.length === 0) {
+    saveCheckpoint(canvas, checkpoint)
+    return { applied: 0, skipped, error: null }
+  }
+
+  const draft = structuredClone(canvas)
+  for (const item of operations) {
+    const error = applyValidatedOperation(draft, item.operation)
+    if (error) {
+      saveCheckpoint(canvas, checkpoint)
+      return { applied: 0, skipped, error }
     }
+  }
+  draft.appliedOperationIds = [...draft.appliedOperationIds, ...batchIds].slice(-1000)
+  if (checkpoint) draft.sourceOffsets[checkpoint.sourceId] = checkpoint.offset
+  persistCanvas(draft, true)
+  return { applied: operations.length, skipped, error: null }
+}
+
+function saveCheckpoint(canvas: CanvasRecord, checkpoint: { sourceId: string; offset: number } | undefined) {
+  if (!checkpoint || canvas.sourceOffsets[checkpoint.sourceId] === checkpoint.offset) return
+  canvas.sourceOffsets[checkpoint.sourceId] = checkpoint.offset
+  persistCanvas(canvas)
+}
+
+function validateBatch(canvas: CanvasRecord, operations: CanvasOperation[]) {
+  // 旧 mermaid 画布守卫：mermaid 图无法增量改（元素尚未渲染），仅允许 clear 重画
+  if (canvas.state === 'mermaid' && canvas.mermaid.trim()) {
+    const nonClear = operations.find((item) => !(item.operation.op === 'draw' && item.operation.clear))
+    if (nonClear) {
+      return `画布当前是旧版 mermaid 图（不支持增量修改）。请用 {"op":"draw","clear":true,...} 手绘重画整图`
+    }
+  }
+  const allIds = new Set(canvas.elements.map((element) => element.id))
+  const liveIds = new Set(canvas.elements.filter((element) => !element.isDeleted).map((element) => element.id))
+  const startRevision = canvas.revision
+  for (const item of operations) {
+    if (item.baseRevision !== undefined && item.baseRevision !== startRevision) {
+      return `revision conflict: expected ${startRevision}, received ${item.baseRevision}`
+    }
+    const op = item.operation
     if (op.op === 'draw') {
-      if (!Array.isArray(op.elements)) return 'draw 缺少 elements 数组'
-      if (op.clear) canvas.elements = []
-      drawElements(canvas, op.elements)
-      return null
+      if (op.clear) {
+        allIds.clear()
+        liveIds.clear()
+      }
+      for (const element of op.elements) {
+        if (!element.id) continue
+        if (allIds.has(element.id)) return `元素 id 已存在: ${element.id}`
+        allIds.add(element.id)
+        liveIds.add(element.id)
+      }
+      continue
+    }
+    if (op.op === 'card') {
+      if (!op.id) continue
+      const cardIds = [op.id, ...(op.title ? [`${op.id}-title`] : []), ...(op.body ? [`${op.id}-body`] : [])]
+      const duplicate = cardIds.find((id) => allIds.has(id))
+      if (duplicate) return `元素 id 已存在: ${duplicate}`
+      cardIds.forEach((id) => {
+        allIds.add(id)
+        liveIds.add(id)
+      })
+      continue
     }
     if (op.op === 'patch') {
-      if (typeof op.id !== 'string') return 'patch 缺少 id'
-      return patchElement(canvas, op as PatchInput)
+      if (!liveIds.has(op.id)) return `未找到元素: ${op.id}`
+      continue
     }
-    if (op.op === 'delete') {
-      if (!Array.isArray(op.ids)) return 'delete 缺少 ids 数组'
-      return deleteElements(canvas, op.ids)
-    }
-    return `未知 op: ${String((op as { op?: string }).op)}`
-  } catch (err) {
-    return err instanceof Error ? err.message : String(err)
+    const missing = op.ids.find((id) => !liveIds.has(id))
+    if (missing) return `未找到元素: ${missing}`
+    op.ids.forEach((id) => liveIds.delete(id))
   }
+  return null
+}
+
+function applyValidatedOperation(canvas: CanvasRecord, op: CanvasOp): string | null {
+  if (op.op === 'draw') {
+    if (op.clear) {
+      canvas.elements = []
+      canvas.mermaid = ''
+    }
+    drawElements(canvas, op.elements, false)
+    return null
+  }
+  if (op.op === 'card') {
+    // sanitize：碰撞检测自动避让（AI 的 y 估算不准时由程序兜底）
+    drawCard(canvas, resolveCardPlacement(canvas, op), false)
+    return null
+  }
+  if (op.op === 'patch') return patchElement(canvas, op, false)
+  return deleteElements(canvas, op.ids, false)
 }
 
 // ---- exec 轮询器 ----
@@ -111,20 +212,21 @@ async function doTick(config: ServerConfig, session: SessionRecord, state: Polle
   }
   state.emptyTicks = 0
 
-  for (const op of objects.complete) {
-    const err = applyOp(session.canvasId, op)
-    console.log(`[ops] ${session.id} 应用 op: ${(op as {op?:string}).op} err=${err}`)
-    if (err) console.warn(`[ops] ${session.id}: ${err}`)
-  }
-  // offset 按已消费的字符数推进（半截对象留到下次重读）
-  if (objects.consumedChars > 0) state.offset += objects.consumedChars
+  // 整批先校验，再一次提交；checkpoint 与画布写入同一份持久化记录。
+  const nextOffset = state.offset + objects.consumedBytes
+  const applied = applyBatch(session.canvasId, objects.complete, { sourceId: session.id, offset: nextOffset })
+  console.log(`[ops] ${session.id} 批次 applied=${applied.applied} skipped=${applied.skipped} err=${applied.error}`)
+  if (applied.error) console.warn(`[ops] ${session.id}: ${applied.error}`)
+  if (objects.consumedChars > 0) state.offset = nextOffset
 }
 
 // 从文本流中提取完整 JSON 对象（括号配平，容忍多行/半截）
-function splitJsonObjects(text: string): { complete: unknown[]; consumedChars: number } {
+// consumedBytes 按字节结算（tail -c 是字节偏移；中文 UTF-8 占 3 字节，用字符数会推进不足导致重复消费）
+// 结算规则：已配平对象（含中间垃圾）计入；尾部不含 { 的垃圾片段整体跳过（offset 落在字符串内容中间时自愈）
+export function splitJsonObjects(text: string): { complete: unknown[]; consumedBytes: number } {
   const complete: unknown[] = []
-  let i = text.indexOf('{')
   let consumed = 0
+  let i = text.indexOf('{')
   while (i >= 0) {
     let depth = 0
     let inString = false
@@ -152,25 +254,27 @@ function splitJsonObjects(text: string): { complete: unknown[]; consumedChars: n
     if (depth === 0 && j < text.length) {
       try {
         complete.push(JSON.parse(text.slice(i, j + 1)))
-        consumed = j + 1
       } catch {
-        // 配平但解析失败（不应发生），跳过
+        // 配平但解析失败（append-only 下不会自愈），跳过
       }
+      consumed = Buffer.byteLength(text.slice(0, j + 1), 'utf8')
       i = text.indexOf('{', j + 1)
       continue
     }
     // 未配平：后续内容不完整，下次重读
     break
   }
-  return { complete, consumedChars: consumed }
+  if (text.indexOf('{') === -1) consumed = Buffer.byteLength(text, 'utf8')
+  return { complete, consumedBytes: consumed }
 }
 
 export function startPolling(config: ServerConfig, session: SessionRecord) {
   const existing = pollers.get(session.id)
   if (existing?.timer) return // 幂等：已在轮询
-  console.log(`[ops] startPolling ${session.id} canvas=${session.canvasId} saas=${session.saasSessionId} offset=${existing?.offset ?? 1}`)
+  const offset = existing?.offset ?? getCanvas(session.canvasId)?.sourceOffsets[session.id] ?? 1
+  console.log(`[ops] startPolling ${session.id} canvas=${session.canvasId} saas=${session.saasSessionId} offset=${offset}`)
   const state: PollerState = {
-    offset: existing?.offset ?? 1,
+    offset,
     timer: null,
     emptyTicks: 0,
     execFailures: 0,

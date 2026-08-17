@@ -40,6 +40,7 @@ function ToolLine({ part }: { part: Message['parts'][number] }) {
 
 function MessageItem({ message }: { message: Message }) {
   const isUser = message.info.role === 'user'
+  const error = message.info.error?.data?.message
   const text = message.parts
     .filter((p) => p.type === 'text' && p.text)
     .map((p) => p.text)
@@ -63,6 +64,11 @@ function MessageItem({ message }: { message: Message }) {
       {text && (
         <div className="prose prose-sm max-w-none text-sm [&_p]:leading-relaxed">
           <Streamdown>{text}</Streamdown>
+        </div>
+      )}
+      {error && (
+        <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          生成失败：{error}
         </div>
       )}
     </div>
