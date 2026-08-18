@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Globe, MonitorPlay, Plus, Trash2 } from 'lucide-react'
 import type { Agent } from './lib/api'
-import { api, getSavedModel } from './lib/api'
+import { api, getSavedModel, saveModel } from './lib/api'
 import AgentHome from './components/AgentHome'
 import AgentSession from './components/AgentSession'
 import BrowserManager from './components/BrowserManager'
@@ -19,6 +19,8 @@ import {
 import { cn } from './lib/utils'
 
 type View = 'home' | 'agent' | 'browsers'
+
+const DEFAULT_MODEL = { providerID: 'Yd-KiMi', modelID: 'kimi-k3' }
 
 const formatTime = (iso: string) => {
   const date = new Date(iso)
@@ -38,8 +40,8 @@ function App() {
   const [error, setError] = useState<string | null>(null)
   const [pendingDelete, setPendingDelete] = useState<Agent | null>(null)
   const [deleting, setDeleting] = useState(false)
-  const [model, setModel] = useState<{ providerID: string; modelID: string } | null>(
-    () => getSavedModel(),
+  const [model, setModel] = useState<{ providerID: string; modelID: string }>(
+    () => getSavedModel() ?? DEFAULT_MODEL,
   )
 
   const refreshAgents = useCallback(async () => {
@@ -55,10 +57,18 @@ function App() {
   }, [refreshAgents])
 
   useEffect(() => {
-    if (model) return
+    if (!model) return
     api
       .listModels()
-      .then(({ current }) => setModel(current))
+      .then(({ models }) => {
+        const available = models.some(
+          (m) => m.providerID === model.providerID && m.modelID === model.modelID,
+        )
+        if (!available) {
+          setModel(DEFAULT_MODEL)
+          saveModel(DEFAULT_MODEL)
+        }
+      })
       .catch(() => {})
   }, [model])
 
