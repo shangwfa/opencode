@@ -31,6 +31,7 @@ const db = Database.Client()
 const lifecycleRequests: Array<{ method: string; path: string }> = []
 const failedDeletes = new Set<string>()
 const failedConnects = new Set<string>()
+let deleteSucceeds = false
 let nextSandboxID: string | undefined
 let activeCommand: ReadableStreamDefaultController<Uint8Array> | undefined
 let createDelayMs = 0
@@ -44,6 +45,9 @@ const lifecycle = Bun.serve({
     }
     if (request.method === "DELETE" && Array.from(failedDeletes).some((id) => path.includes(id))) {
       return Response.json({ code: "DELETE_FAILED", message: "simulated delete failure" }, { status: 500 })
+    }
+    if (request.method === "DELETE" && deleteSucceeds && nextSandboxID && path.includes(`/v1/sandboxes/${nextSandboxID}`)) {
+      return new Response(null, { status: 200 })
     }
     if (request.method === "POST" && path === "/v1/sandboxes" && nextSandboxID) {
       if (createDelayMs > 0) await Bun.sleep(createDelayMs)
@@ -398,9 +402,59 @@ describe.skipIf(!enabled)("pgLayer - idle reap: 空闲沙箱定期回收", () =>
     await dbCleanup(SID)
   }, 20_000)
 
+  // detached/async 长命令不维持心跳：跨越 idle 阈值后沙箱仍会被 idle-reap 回收
+  test("detached 长命令不阻止 idle-reap 回收", async () => {
+    const SID = sid("ses_reap_detached_heartbeat")
+    nextSandboxID = `sb_detached_${SID}`
+    deleteSucceeds = true
+    const sandbox = await Sandbox.create({
+      connectionConfig: new ConnectionConfig({
+        domain: lifecycle.url.host,
+        protocol: "http",
+      }),
+      image: "fake",
+      timeoutSeconds: 300,
+    })
+    await Effect.runPromise(
+      Effect.gen(function* () {
+        const svc = yield* SandboxProvider.Service
+        yield* svc.register(SID, sandbox)
+      }).pipe(Effect.provide(context as Context.Context<SandboxProvider.Service>)),
+    )
+    const running = Effect.runPromise(
+      Effect.gen(function* () {
+        const svc = yield* SandboxProvider.Service
+        return yield* svc.runDetached(SID, "sleep 10")
+      }).pipe(Effect.provide(context as Context.Context<SandboxProvider.Service>)),
+    ).catch(() => undefined)
+
+    for (let i = 0; i < 100 && !activeCommand; i++) await Bun.sleep(50)
+    expect(activeCommand).toBeDefined()
+    const before = (await db.select({ time_updated: SandboxTable.time_updated })
+      .from(SandboxTable)
+      .where(eq(SandboxTable.session_id, SID))
+      .limit(1))[0]?.time_updated
+    // 无心跳：阈值内（idleReapMs=5s）time_updated 不被刷新
+    await Bun.sleep(3_500)
+    const after = (await db.select({ time_updated: SandboxTable.time_updated })
+      .from(SandboxTable)
+      .where(eq(SandboxTable.session_id, SID))
+      .limit(1))[0]?.time_updated
+    expect(after).toBe(before ?? 0)
+    // 跨过 idleReapMs=5s 后沙箱被 idle-reap 回收（detached 命令不阻止回收）
+    expect(await waitForState(SID, "destroyed")).toBe(true)
+
+    activeCommand?.close()
+    activeCommand = undefined
+    await running
+    await sandbox.close()
+    nextSandboxID = undefined
+    deleteSucceeds = false
+    await dbCleanup(SID)
+  }, 20_000)
+
   // 额外预检：全新记录不应被误回收
-  test("未超时记录（time_updated < idleReapMs）不被回收", async () => {
-    const SID = sid("ses_reap_fresh")
+  test("未超时记录（time_updated < idleReapMs）不被回收", async () => {    const SID = sid("ses_reap_fresh")
     await insertSandbox(SID, { ageMs: 0 })
 
     await Bun.sleep(3_000)

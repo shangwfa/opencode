@@ -1420,7 +1420,9 @@ export namespace SandboxProvider {
           detachedCommandSessions.set(sessionID, detached)
           let completed = false
           try {
-            const result = yield* withCommandHeartbeat(sessionID, sb.id, withExecTimeout(
+          // async/detached 命令不维持心跳：后台命令不应阻止 idle-reap 回收无人使用的会话沙箱。
+          // 防误杀只保留给前台命令（runInSession，AI 正在同步等待）。
+          const result = yield* withExecTimeout(
               Effect.tryPromise({
                 try: () => runCommandEarlyExit(sb, detachedSessionId, command, { ...options, workingDirectory }, handlers, signal),
                 catch: (e) => new Error(`runDetached failed: ${String(e)}`),
@@ -1432,7 +1434,7 @@ export namespace SandboxProvider {
                 ),
               ),
               options?.timeoutSeconds,
-            ))
+            )
             if (result.error?.name === "TimeoutError") {
               yield* Effect.tryPromise(() => sb.commands.interrupt(detachedSessionId)).pipe(Effect.ignore)
             }

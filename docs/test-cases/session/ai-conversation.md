@@ -95,4 +95,16 @@ sleep 1 && curl -s -X POST "$BASE/session/$SID/abort"
 
 **2026-07-22 实测**：等待 session 进入 `busy` 后调用 abort，返回 `true`，随后 session 从 busy status 列表移除；本次中断发生在首个 assistant message 落库前，因此没有 `finish` 字段，符合上述早期中断语义。
 
+**2026-08-19 复测**（镜像 `dd06ab0`，commit dd06ab076b，T4.1–T4.7 全部通过）：
+
+| 用例 | 结果 | 备注 |
+|---|---|---|
+| T4.1 简单文本对话 | ✅ | 回复 `2` |
+| T4.2 多轮上下文记忆 | ✅ | 第二轮回复「张三」 |
+| T4.3 写文件工具 | ✅ | `write(completed)` |
+| T4.4 读文件工具 | ✅ | 回复含 `hello` |
+| T4.5 bash 命令执行 | ✅ | 回复含 `t4-3.txt` |
+| T4.6 异步消息 | ✅ | HTTP 204 |
+| T4.7 中断会话 | ✅ | abort 返回 `true`；中断发生在 assistant message 落库后，`finish` 为空，parts 数量 8s 内无增长，确认已停止生成 |
+
 ---

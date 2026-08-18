@@ -22,7 +22,7 @@ LOG=/home/opencode/.local/share/opencode/log/opencode.log
 ─────────────────  ───────────────────────────  ─────────────────────────────
 会话创建            exec / AI 工具使用             onIdle（非 keepAlive → 即时销毁）
   │                │  ├─ dbTouchSandbox          idle-reap（超 idleReapMs → 兜底）
-  └─ keepAlive         │  └─ 命令 heartbeat          zombie（崩溃恢复，keep_alive=false）
+  └─ keepAlive         │  └─ 前台命令 heartbeat（detached/async 不心跳）          zombie（崩溃恢复，keep_alive=false）
      boot=true          │                              session 删除（destroy → Deleted）
      → getOrCreate ┘                                  destroy（显式 / dispose）
      boot=false                                       TTL 远程自杀 → reconnect 404 自愈重建
@@ -434,14 +434,47 @@ echo "BEFORE=$BEFORE AFTER=$AFTER"; [ "$AFTER" -gt "$BEFORE" ] && echo "PASS: ti
 
 ---
 
-### T30.6 命令 heartbeat 防误回收
+### T30.6 命令 heartbeat 防误回收（仅前台命令）
 
 **验证点**：长命令执行期间，heartbeat 每 `COMMAND_HEARTBEAT_MS`（不超过 `idleReapMs/3`）刷新 `time_updated`，跨越 idle 阈值不被回收。
+
+> **2026-08-19 语义变更**：heartbeat 仅覆盖**前台命令**（`runInSession`，AI 同步等待中）；`runDetached`（`exec/async` 后台命令）**不再心跳**——后台命令不阻止 idle-reap，无人使用的会话沙箱 30 分钟后连同后台命令一起回收（对应单测「detached 长命令不阻止 idle-reap 回收」）。
 
 ```bash
 # 集成测试覆盖（单元）："长命令跨越 idle 阈值时 heartbeat 防止误回收"
 OPENCODE_DATABASE_URL=$PG_URL bun test test/tool/sandbox-idle-reap.test.ts -t "heartbeat"
 ```
+
+---
+
+### T30.11 detached/async 长命令不阻止 idle-reap 回收（2026-08-19 新增）
+
+**验证点**：`exec/async` 启动的后台长命令（如 dev server）**不维持心跳**——`time_updated` 不被刷新，无人使用的会话沙箱超过 `idleReapMs` 后被 idle-reap 回收（连同后台命令）。
+
+```bash
+# 加速验证：容器启动时设 OPENCODE_SANDBOX_IDLE_REAP_SEC=120（扫描间隔硬编码 300s）
+SID=$(curl -s --noproxy '*' -X POST $BASE/session -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+curl -s --noproxy '*' -m 90 -X POST "$BASE/session/$SID/exec" -H 'Content-Type: application/json' -d '{"command":"echo init"}' > /dev/null
+# 启动后台长命令后不再做任何操作（模拟无人使用）
+curl -s --noproxy '*' -m 15 -X POST "$BASE/session/$SID/exec/async" -H 'Content-Type: application/json' -d '{"command":"sleep 3600","timeoutSeconds":3600}' > /dev/null
+
+# 轮询：观察 time_updated 不再刷新（idle_age 持续增长），最终 state 变 destroyed
+for i in $(seq 1 60); do
+  sleep 15
+  ROW=$(psql "$PG_URL" -t -A -F'|' -c "SELECT state, time_updated FROM sandbox WHERE session_id='$SID'")
+  ST=${ROW%%|*}; TU=${ROW##*|}
+  AGE=$(( ($(date +%s) - TU/1000) ))
+  echo "[$i] state=$ST idle_age=${AGE}s"
+  [ "$ST" = "destroyed" ] && { echo "PASS: reaped"; break; }
+done
+```
+**期望**：`idle_age` 持续增长（无 ~20-60s 周期的心跳刷新）；超过阈值 + 一个扫描周期（≤300s）内 `state=destroyed`。
+
+> **动机**：历史行为中 detached 命令也包 `withCommandHeartbeat`，导致「AI 会话早已结束、但 async dev server 让沙箱永不空闲」——实测有会话挂了 8+ 小时直到 10h TTL。2026-08-19 起 `runDetached` 去掉心跳包装（`sandbox-provider.ts` runDetached 内，注释「async/detached 命令不维持心跳」），防误杀只保留给 `runInSession`（AI 同步等待的前台命令）。
+
+**2026-08-19 实测**（镜像 `detached-no-heartbeat`，本地 IDLE_REAP_SEC=120）：async `sleep 3600` 启动后 idle_age 持续增长（20s → 82s，无心跳刷新），约 97s 后 `state=destroyed`。前台命令心跳保护由单测「长命令跨越 idle 阈值时 heartbeat 防止误回收」（runInSession）继续覆盖。
+
+> **实测注意（共享 PG 多实例干扰）**：回收方不一定是本地容器——共享同一 PG 的**远端 K8s 实例**（test-opencode，同 Dockerfile，内置 `IDLE_KILL_SEC=30` → zombie 阈值 60s）也会回收 `keep_alive=false` 的沙箱，可能在本地 idle-reap（120s）之前抢先命中。本地容器日志无 `reap scan`/`zombie cleanup` 记录而 state 已变 `destroyed` 即为此情况。核心断言（detached 无心跳 → idle_age 持续增长 + 最终回收）不受影响；**纯 idle-reap 路径**的精确验证依赖单测（`sandbox-idle-reap.test.ts`「detached 长命令不阻止 idle-reap 回收」）。若要本地独占验证，需远端实例停服或使用独立 PG。
 
 ---
 
@@ -535,7 +568,8 @@ bun test test/tool/sandbox-idle-reap.test.ts
 | 创建期间并发 keepAlive 不会被 upsert 覆盖 | keepAlive 持久（T12.16） | ✅ 通过 |
 | destroy 保留 keepAlive，重建后仍保持 keepAlive | keepAlive 持久（T12.14） | ✅ 通过 |
 | 多个 pgLayer 同时扫描只会 claim 和删除一次 | 多实例并发（T30.9） | ✅ 通过 |
-| 长命令跨越 idle 阈值时 heartbeat 防止误回收 | heartbeat（T30.6） | ✅ 通过 |
+| 长命令跨越 idle 阈值时 heartbeat 防止误回收 | heartbeat（T30.6，仅 runInSession） | ✅ 通过 |
+| detached 长命令不阻止 idle-reap 回收 | detached 无心跳（T30.11） | ✅ 通过 |
 | 未超时记录（time_updated < idleReapMs）不被回收 | 阈值边界（T30.3） | ✅ 通过 |
 | 持续更新 time_updated 的沙箱不被误杀（CAS 保护） | CAS（T30.4） | ✅ 通过 |
 | 阈值边界：低于阈值不被回收，超过被回收 | 边界 | ✅ 通过 |
@@ -558,12 +592,12 @@ bun test test/tool/sandbox-idle-reap.test.ts
 | kill-sandbox 后重建丢失 keepAlive | destroy 曾清 keep_alive（已修复） | T12.14 | `sandbox-provider.ts:1263` 不再 dbSetKeepAlive(false) |
 | 删除会话后 sandbox 残留 | session.remove 未关沙箱（已修复） | T12.15 | `session.ts:660-676` remove 前置 destroy |
 | 远端沙箱已死但本地 running | TTL 自杀 / 外部删除 | T30.10 | `sandbox no longer exists; rebuilding` |
-| 命令执行中沙箱被回收 | heartbeat 周期 > idle 阈值 | T30.6 | `withCommandHeartbeat` |
+| 命令执行中沙箱被回收 | detached/async 命令不再心跳（2026-08-19 起，设计行为） | T30.6 | `withCommandHeartbeat` 仅 `runInSession` |
 | destroyed 记录再次被扫 | 查询条件缺 `state=running` | T30.1 | `count` 不应含 destroyed |
 
 ---
 
-## 六、结果汇总（2026-08-08 复测，全量执行）
+## 六、结果汇总（2026-08-19 复测，全量执行，镜像 `dd06ab0` / commit dd06ab076b）
 
 | 用例 | 状态 | 说明 |
 |------|------|------|
@@ -586,7 +620,11 @@ bun test test/tool/sandbox-idle-reap.test.ts
 | T12.17 boot=true/false | ✅ | boot=true 立即创建 running/true；boot=false pending destroyed/true；懒创建后 running/true；release→false |
 | T30.5 time_updated 刷新 | ✅ | exec 后 time_updated 刷新（远大于调旧值），state=running |
 | T30.7 可观测性 | ✅ | scan 日志正常运行（无超时候选时 count=0 不落日志） |
-| 单测全量 | ✅ | sandbox-idle-reap.test.ts 16 + sandbox-provider-pg.test.ts 13 + concurrency/lazy/queue 22 = 51 pass / 0 fail |
+| 单测全量 | ✅ | idle-reap 17（含 detached 无心跳新用例）+ provider-pg/concurrency/lazy/queue 35 = 52 pass / 0 fail（2026-08-19 临时本地 PG `opencode_test`，5 文件合跑 3 轮均 52/0） |
+
+> 2026-08-19 复测补充：
+> - 全部 T12.x（含 T12.1–T12.15、T12.17）+ T30.5/T30.7 通过；T12.16/T30.x 单测覆盖部分在临时本地 PG（`docker run postgres:16-alpine` + `/opencode_test`）上通过（远端 PG `app` 用户无 CREATE DATABASE 权限，无法使用共享库跑单测 guard）。
+> - 代码核对：`sandbox-proxy.ts` keep-alive 端点实际位于 :661-677（文档旧引用 :615-625，行号漂移，逻辑一致）；`createSandbox` latest keep_alive 读取实际位于 :1009-1016（文档旧引用 :989-997，逻辑一致）；`isKept` TTL 放大（:962-965）、zombie 判定 `idleKillMs*2`（:1511）、heartbeat ≤ `idleReapMs/3`（:1094）、run-state onIdle `!keep` 才 destroy、session.remove 前置 destroy 均与文档描述一致。
 
 > **备注**：
 > - 容器内实际日志文件为 `opencode.log`（文档旧路径 `dev.log` 不存在）；INFO 级 sandbox 生命周期日志未落盘，断言以 PG `sandbox` 表为准。
