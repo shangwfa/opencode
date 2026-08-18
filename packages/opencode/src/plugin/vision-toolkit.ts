@@ -106,7 +106,7 @@ async function describeImage(
 
   const isAnthropic = config.protocol === "anthropic"
 
-  const retries = 2
+  const retries = 1
   for (let attempt = 0; attempt <= retries; attempt++) {
     let response: Response
     try {
@@ -131,7 +131,7 @@ async function describeImage(
               ],
             }],
           }),
-          signal: AbortSignal.timeout(180_000),
+          signal: AbortSignal.timeout(30_000),
         })
       } else {
         response = await fetch(config.baseUrl + "/chat/completions", {
@@ -151,7 +151,7 @@ async function describeImage(
               ],
             }],
           }),
-          signal: AbortSignal.timeout(180_000),
+          signal: AbortSignal.timeout(30_000),
         })
       }
     } catch (err) {
@@ -269,8 +269,31 @@ async function rewriteMessages(
       results.set(cacheKey(job.imageUrl, job.prompt), failureText(config.error))
     }
   } else {
-    const unique = new Map<string, typeof jobs[0]>()
+    // 远程 URL 先在本地下载转 base64——vision API 未必能访问任意外网 URL（OSS 防盗链/地域限制），
+    // 而本服务所在网络通常可达。下载失败时直接生成 failureText，不再透传原始 URL。
+    const prepared: typeof jobs = []
     for (const job of describable) {
+      if (!/^https?:/.test(job.imageUrl)) {
+        prepared.push(job)
+        continue
+      }
+      try {
+        const res = await fetch(job.imageUrl, { signal: AbortSignal.timeout(20_000) })
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const mime = (res.headers.get("content-type") || "image/png").split(";")[0]
+        const buf = new Uint8Array(await res.arrayBuffer())
+        if (buf.byteLength > 10_485_760) throw new Error("image larger than 10 MiB")
+        job.imageUrl = `data:${mime};base64,${Buffer.from(buf).toString("base64")}`
+        prepared.push(job)
+      } catch (err) {
+        results.set(
+          cacheKey(job.imageUrl, job.prompt),
+          failureText("the remote image could not be downloaded (" + (err instanceof Error ? err.message : String(err)) + ")."),
+        )
+      }
+    }
+    const unique = new Map<string, typeof jobs[0]>()
+    for (const job of prepared) {
       const key = cacheKey(job.imageUrl, job.prompt)
       if (!_cache.has(key) && !unique.has(key)) unique.set(key, job)
     }
