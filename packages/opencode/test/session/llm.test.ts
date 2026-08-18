@@ -2233,4 +2233,62 @@ describe("session.llm.withStallTimeout", () => {
     rejectPull?.(new Error("late failure"))
     await delayed(undefined, 10)
   })
+
+  test("question tool in flight suspends the stall timer", async () => {
+    // Mirrors the question tool: the AI SDK runs tool execute() between the
+    // tool-call and tool-result events, and question waits on the user, which
+    // may take minutes. The stall timer must not fire while it is pending.
+    const source = async function* () {
+      yield { type: "text-delta", text: "hi" } as const
+      yield { type: "tool-call", toolCallId: "call_q", toolName: "question" } as const
+      yield await delayed({ type: "tool-result", toolCallId: "call_q" } as const, 120)
+    }
+    const out = await collect(LLM.withStallTimeout(source(), 50))
+    expect(out).toEqual([
+      { type: "text-delta", text: "hi" },
+      { type: "tool-call", toolCallId: "call_q", toolName: "question" },
+      { type: "tool-result", toolCallId: "call_q" },
+    ])
+  })
+
+  test("stall timer keeps running for non-question tools", async () => {
+    // Only question suspends the timer; a bash tool stuck for longer than the
+    // cap must still fail the pull.
+    const source = async function* () {
+      yield { type: "tool-call", toolCallId: "call_b", toolName: "bash" } as const
+      yield await delayed({ type: "tool-result", toolCallId: "call_b" } as const, 150)
+    }
+    let error: unknown
+    try {
+      await collect(LLM.withStallTimeout(source(), 50))
+    } catch (e) {
+      error = e
+    }
+    expect((error as Error).message).toContain("LLM stream stalled")
+  })
+
+  test("stall timer resumes after the question tool settles", async () => {
+    const never = new Promise<IteratorResult<{ type: string; toolCallId?: string }>>(() => {})
+    let first = true
+    const source: AsyncIterable<{ type: string; toolCallId?: string }> = {
+      [Symbol.asyncIterator]: () => ({
+        next: () => {
+          if (first) {
+            first = false
+            return Promise.resolve({ done: false as const, value: { type: "tool-result", toolCallId: "call_q" } })
+          }
+          return never
+        },
+      }),
+    }
+    const iter = LLM.withStallTimeout(source, 50)[Symbol.asyncIterator]()
+    let error: unknown
+    try {
+      await iter.next()
+      await iter.next()
+    } catch (e) {
+      error = e
+    }
+    expect((error as Error).message).toContain("LLM stream stalled")
+  })
 })

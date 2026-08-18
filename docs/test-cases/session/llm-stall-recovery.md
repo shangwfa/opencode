@@ -7,6 +7,7 @@
 > 修复内容：
 > 1. `packages/opencode/src/session/llm.ts` — `withStallTimeout` 包装 `fullStream`，单次 pull 停滞超过 `OPENCODE_LLM_STALL_TIMEOUT_SEC`（默认 300s）自动断流报错。
 > 2. `packages/opencode/src/effect/runner.ts` — `ensureRunning` 排队等待已有 run 超过 `OPENCODE_SESSION_STALE_RUN_SEC`（默认 1800s）时，取消陈旧 run 并用新 prompt 接管重试；shell 后排队（交互式终端合法长跑）不受超时影响。
+> 3. `packages/opencode/src/session/llm.ts` — **question 工具豁免 stall 计时**（2026-08-18 补充）：工具在 AI SDK `fullStream` 内部执行（`tool-call` → execute → `tool-result`），question 等待用户作答是合法无限期等待，却被 stall 保护误杀（2026-08-17 晚事故：`LLM stream stalled: no events for 300s` → `Tool execution aborted`，question `interrupted: true`）。修复：按 `toolCallId` 跟踪 `toolName === "question"` 的 in-flight 调用，pending 非空时不启动 stall 计时器，question 结束后自动恢复；其他工具不受豁免。
 
 ## 公共环境
 
@@ -21,6 +22,8 @@ bun test test/effect/runner.test.ts test/session/llm.test.ts
 覆盖：
 - `runner.test.ts` — 陈旧 run 接管恢复、shell 后排队不被误杀（2 例）
 - `llm.test.ts` — `withStallTimeout` 透传/超时/per-pull 重置/错误透传/return 委托/无 unhandled rejection（7 例）
+- `llm.test.ts` — question 豁免（2026-08-18 补充，3 例）：question in-flight 挂起计时器（等待超过上限不断流）、非 question 工具（bash）不豁免照常断流、question 结束后计时器恢复
+- 触发方式：`bun test test/session/llm.test.ts -t "withStallTimeout"`
 
 以下为 HTTP 层集成用例（需重建 SaaS 镜像后执行）。
 
@@ -67,6 +70,51 @@ curl -s --max-time 60 -X POST "$BASE/session/$SID/message" -H 'Content-Type: app
 - 第 3 步消息在 ~5s 后失败（返回错误或 error 事件），**而非无限挂起**
 - 第 4 步正常返回 assistant 回复——run 未被挂死流永久占用
 - server 日志出现 `LLM stream stalled: no events for 5s`
+
+### T40.1.2 question 工具等待用户期间不被 stall 保护误杀（2026-08-18）
+
+**场景**：question 工具的 execute 在 AI SDK `fullStream` 内部运行，等待用户通过 SSE/HTTP 作答。设置短超时 `OPENCODE_LLM_STALL_TIMEOUT_SEC=10`，让 AI 调用 question 后**不作答**，静默超过 10s——验证 stall 计时器被挂起，question 不被 abort。
+
+```bash
+# 1. 短 stall 超时启动 server（容器场景：docker run -e 传入；宿主机直跑见 T40.1.1）
+env OPENCODE_LLM_STALL_TIMEOUT_SEC=10 \
+  OPENCODE_DATABASE_URL='postgresql://local@127.0.0.1:15432/opencode' \
+  bun run --conditions=browser ./src/index.ts serve --hostname 127.0.0.1 --port 14097 --print-logs --pure &
+
+# 2. 发消息诱导 question（agent prompt 明确要求先问再动）
+SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jq -r .id)
+
+# 3. 后台监听 SSE，捕获 question part 及其 requestID/answers 端点后**不回应**
+curl -s -N "$BASE/session/$SID/event" > /tmp/sse-question.log &
+curl -s --max-time 120 -X POST "$BASE/session/$SID/message" -H 'Content-Type: application/json' \
+  -d '{"parts":[{"type":"text","text":"先调用 question 工具问我喜欢什么颜色，得到答案后再回答"}],"model":$MODEL}' &
+sleep 30   # 远超 10s stall 上限，期间不作答
+
+# 4. 验证 question part 未被 abort
+psql "$PG_URL" -P pager=off -c "
+SELECT p.data->>'tool' as tool, p.data->'state'->>'status' as status,
+  p.data->'state'->>'error' as error
+FROM part p WHERE p.session_id='$SID' AND p.data->>'tool'='question';"
+
+# 5. 静默期后作答，验证 run 正常继续
+#    （从 SSE 的 question 事件取 answers 端点，或用 permission 式回复接口）
+# curl -s -X POST "$BASE/session/$SID/question/$REQUEST_ID" -d '{"answers":[["蓝色"]]}' -H 'Content-Type: application/json'
+```
+
+**期望**：
+- 第 4 步：question part `status` 仍为 `running`（或 `pending`），**无** `Tool execution aborted` / `interrupted: true`
+- server 日志在 question 等待期间**无** `LLM stream stalled`
+- 第 5 步作答后 AI 基于答案继续回复，run 正常完成
+- 对照组（修复前行为）：10s 后 `LLM stream stalled: no events for 10s` + question `status=error, interrupted=true`（2026-08-17 晚 `ses_ff06aa6bfffej9qAulJF7Zn5iP` 事故形态）
+
+### T40.1.3 非 question 工具长跑仍受 stall 保护（豁免不扩大）
+
+**场景**：确认豁免仅限 question——bash 等工具在流内执行超过 stall 上限时仍被断流（防止工具挂死拖垮会话）。单测已覆盖（`stall timer keeps running for non-question tools`），HTTP 层可选验证：诱导长 bash + 短超时，超时后应报 `LLM stream stalled` 而非无限等待。
+
+**期望**：
+- bash 挂起超过 `OPENCODE_LLM_STALL_TIMEOUT_SEC` 后流被切断，run 失败可见错误
+- 会话可继续发消息（run 已释放）
+- **无** pending 计时器泄漏：question 结束后流停滞照常触发 stall
 
 ---
 
@@ -166,12 +214,19 @@ curl -s --max-time 60 -X POST "$BASE/session/$SID/message" -H 'Content-Type: app
 | 日期 | 用例 | 结果 | 备注 |
 |---|---|---|---|
 | 2026-08-17 | 单测（runner 2 例 + llm 7 例） | ✅ 62 pass | `bun test test/effect/runner.test.ts test/session/llm.test.ts` |
+| 2026-08-18 | 单测（question 豁免 3 例新增） | ✅ 38 pass / 0 fail | `bun test test/session/llm.test.ts`；question 挂起计时、bash 不豁免、question 结束后计时恢复。注：`keeps supported OpenAI models` 用例偶发 5s 超时抖动，stash 前后复现，与改动无关 |
+| 2026-08-18 | typecheck | ✅ | 基线 41 个既有错误，无新增（基线由 39 → 41 为上游合并漂移，llm.ts 无错误） |
 | 2026-08-17 | typecheck | ✅ | 基线 39 个既有错误，无新增 |
 | 2026-08-17 | T40.1.1 stall 断开+恢复（容器 14098，STALL=5） | ✅ | stall 消息 ~10s 返回 `LLM stream stalled: no events for 5s`；同 session 后续 Yd-GLM 消息正常回复 `ok` |
 | 2026-08-17 | T40.2.1 接管（容器，STALL=600/STALE=30） | ⚠️ 改由单测覆盖 | **发现**：HTTP 层 `withSessionLock` 先于 Runner 串行——`promptAsync` 的 fork 在锁内，幽灵 run 持锁期间第二条消息卡在 `waitForSessionLock`（50ms 无限轮询），到不了 Runner。Runner 接管只对绕过 HTTP 锁的内部调用方（subagent/background job 直调 prompt）生效。见下方「分层发现」 |
 | 2026-08-17 | T40.2.2 正常长 run 不误杀（容器，STALL=600/STALE=30） | ✅ | 长消息（数到 30）运行期间排队消息正常返回 `done`；`cancelling stale run` 日志 0 条 |
 | 2026-08-17 | T40.2.3 shell 不受影响 | ✅ 单测覆盖 | `runner.test.ts` "queued work behind a shell is not cancelled"（staleAfterSec=0.1s + shell 长驻 300ms 验证不被误杀）；HTTP pty websocket 集成未跑 |
 | 2026-08-17 | T40.3.1 事故复现+重启恢复（容器，STALL=600） | ✅ | 幽灵 run 后续消息 curl 28 超时（事故形态复现）；`docker restart` 后同 session 消息 12s 恢复回复 |
+| 2026-08-18 | T40.1.2 question 不被 stall 误杀 | ✅ | 容器（STALL=5，镜像 stall-fix-97544cf64e）：诱导 question 后静默 25s，part 仍 `running` 无 error/`interrupted`；经 `POST /question/:requestID/reply` 作答后 run 正常完成（AI 基于答案回复）。修复前 5s 即被斩 |
+| 2026-08-18 | T40.1.3 非 question 工具仍受保护 | ✅ | 容器（STALL=5）：30s bash 消息 ~15s 报 `LLM stream stalled: no events for 5s`（豁免未扩大）；同 session 后续消息正常回复 `ok` |
+| 2026-08-18 | T40.2.1 幽灵 run 接管 | ⚠️ 同 2026-08-17 | HTTP 层 `waitForSessionLock` 先卡（第二条 120s curl 超时），与上次记录一致；Runner 接管仍由单测覆盖 |
+| 2026-08-18 | T40.2.2 正常长 run 不误杀 | ✅ | 容器（STALL=600/STALE=30）：20s bash 长消息期间排队消息 41s 返回 `ok`；`cancelling stale run` 0 条 |
+| 2026-08-18 | T40.3.1 事故复现+重启恢复 | ✅ | 容器（STALL=600）：幽灵 run 持锁，新消息 HTTP 000 超时（事故形态复现）；`docker restart` 后同 session 消息 ~10s 恢复回复 `ok` |
 
 ## 分层发现（2026-08-17 实测）
 

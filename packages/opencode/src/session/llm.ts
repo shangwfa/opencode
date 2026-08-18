@@ -394,25 +394,44 @@ export const hasToolCalls = LLMRequestPrep.hasToolCalls
 
 // A stalled provider connection (TCP alive but no events forever) otherwise hangs the
 // prompt run and permanently blocks the session runner. Fail the pull after the cap.
+//
+// Exception: the question tool waits for the user to answer, which is a legitimate
+// unbounded wait, not a provider stall. While a question tool call is in flight the
+// stall timer is suspended; it resumes once the tool settles. Other tools stay under
+// the stall cap so a hung tool cannot drag the run down with it.
 export function withStallTimeout<T>(iterable: AsyncIterable<T>, timeoutMs: number): AsyncIterable<T> {
   return {
     [Symbol.asyncIterator]: () => {
       const iterator = iterable[Symbol.asyncIterator]()
+      const pendingQuestionCalls = new Set<string>()
       return {
         async next() {
           const pull = iterator.next()
           pull.catch(() => {})
           let timer: ReturnType<typeof setTimeout> | undefined
           try {
-            return await Promise.race([
-              pull,
+            const raced = await Promise.race([
+              pull.then((result) => {
+                if (result.done !== true) {
+                  const event = result.value as { type?: string; toolCallId?: string; toolName?: string }
+                  if (event.type === "tool-call" && event.toolName === "question" && event.toolCallId) {
+                    pendingQuestionCalls.add(event.toolCallId)
+                  } else if (event.type === "tool-result" && event.toolCallId) {
+                    pendingQuestionCalls.delete(event.toolCallId)
+                  }
+                }
+                return result
+              }),
               new Promise<never>((_, reject) => {
-                timer = setTimeout(
-                  () => reject(new Error(`LLM stream stalled: no events for ${Math.round(timeoutMs / 1000)}s`)),
-                  timeoutMs,
-                )
+                if (pendingQuestionCalls.size === 0) {
+                  timer = setTimeout(
+                    () => reject(new Error(`LLM stream stalled: no events for ${Math.round(timeoutMs / 1000)}s`)),
+                    timeoutMs,
+                  )
+                }
               }),
             ])
+            return raced
           } finally {
             if (timer !== undefined) clearTimeout(timer)
           }
