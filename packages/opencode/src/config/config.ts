@@ -19,8 +19,7 @@ import type { ConsoleState } from "@opencode-ai/core/v1/config/console-state"
 import { FSUtil } from "@opencode-ai/core/fs-util"
 import { InstanceState } from "@/effect/instance-state"
 import { Context, Duration, Effect, Exit, Fiber, Layer, Option, Schema } from "effect"
-import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/unstable/http"
-import { EffectFlock } from "@opencode-ai/core/util/effect-flock"
+import { HttpClient, HttpClientRequest } from "effect/unstable/http"
 import { containsPath, type InstanceContext } from "../project/instance-context"
 import { ConfigV1 } from "@opencode-ai/core/v1/config/config"
 import { RemoteAuthError } from "@opencode-ai/core/v1/config/error"
@@ -35,6 +34,7 @@ import { ConfigPlugin } from "./plugin"
 import { ConfigVariable } from "./variable"
 import { Npm } from "@opencode-ai/core/npm"
 import { withTransientReadRetry } from "@/util/effect-http-client"
+import { Database } from "@/storage/db"
 
 // Custom merge function that concatenates array fields instead of replacing them
 // Keep remeda's deep conditional merge type out of hot config-loading paths; TS profiling showed it dominates here.
@@ -258,6 +258,18 @@ const layer = Layer.effect(
       result = mergeConfig(result, yield* loadFile(path.join(Global.Path.config, "config.json"), env))
       result = mergeConfig(result, yield* loadFile(path.join(Global.Path.config, "opencode.json"), env))
       result = mergeConfig(result, yield* loadFile(path.join(Global.Path.config, "opencode.jsonc"), env))
+
+      // SaaS global patches are shared through PG. Image/local files remain
+      // the immutable base (providers, defaults), while the DB row is the
+      // mutable cluster-wide overlay.
+      if (process.env["OPENCODE_DATABASE_URL"]) {
+        const client = (Database.Client() as any).$client
+        const rows = yield* Effect.promise(
+          () => client`SELECT data FROM cluster_state WHERE key = 'config'` as Promise<Array<{ data: unknown }>>,
+        )
+        const data = rows[0]?.data
+        if (data) result = mergeConfig(result, (typeof data === "string" ? JSON.parse(data) : data) as Info)
+      }
 
       const legacy = path.join(Global.Path.config, "config")
       if (existsSync(legacy)) {
@@ -635,6 +647,31 @@ const layer = Layer.effect(
     })
 
     const updateGlobal = Effect.fn("Config.updateGlobal")(function* (config: Info) {
+      if (process.env["OPENCODE_DATABASE_URL"]) {
+        const patch = writableGlobal(config)
+        const client = (Database.Client() as any).$client
+        const result = yield* Effect.promise<{ info: Info; changed: boolean }>(() =>
+          client.begin(async (sql: any) => {
+            await sql`SELECT pg_advisory_xact_lock(20260819)`
+            const rows = await sql`SELECT data FROM cluster_state WHERE key = 'config' FOR UPDATE`
+            const raw = rows[0]?.data
+            const existing = raw ? (typeof raw === "string" ? JSON.parse(raw) : raw) : {}
+            const next = mergeDeep(writable(existing), patch) as Info
+            const changed = JSON.stringify(next) !== JSON.stringify(existing)
+            if (changed) {
+              await sql`INSERT INTO cluster_state (key, revision, data, time_updated)
+                VALUES ('config', 1, ${JSON.stringify(next)}::jsonb, ${Date.now()})
+                ON CONFLICT (key) DO UPDATE SET
+                  revision = cluster_state.revision + 1,
+                  data = EXCLUDED.data,
+                  time_updated = EXCLUDED.time_updated`
+            }
+            return { info: next, changed }
+          }),
+        )
+        if (result.changed) yield* invalidate()
+        return result
+      }
       const file = globalConfigFile()
       const before = (yield* readConfigFile(file)) ?? "{}"
       const patch = writableGlobal(config)

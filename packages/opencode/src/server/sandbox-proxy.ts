@@ -2,9 +2,6 @@ import { Effect, Schema, Queue, Stream, Fiber, Duration, Option } from "effect"
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
 import * as Socket from "effect/unstable/socket/Socket"
 import * as Sse from "effect/unstable/encoding/Sse"
-import { ConnectionConfig } from "@alibaba-group/opensandbox"
-import { Bus } from "@/bus"
-import { Session } from "@/session/session"
 import { SessionID } from "@/session/schema"
 import { SandboxProvider } from "@/tool/sandbox-provider"
 import * as Database from "@/storage/db"
@@ -16,6 +13,10 @@ import { resolveSandboxOpts } from "@/session/sandbox-opts"
 import { insertExecLog, updateExecLog, queryExecLogsBySession, queryExecLog, type ExecLog } from "@/session/exec-log"
 import { ExecFailed } from "@/sandbox/exec-failed"
 import { toSandboxCwd } from "@/tool/sandbox-path"
+import { withSessionLock } from "./routes/instance/httpapi/handlers/session-lock"
+import { randomUUID } from "node:crypto"
+import { EffectBridge } from "@/effect/bridge"
+import { BusBridge } from "@/bus/bus-bridge"
 
 type ProxyError = {
   type: "runtime" | "network" | "compile"
@@ -175,6 +176,7 @@ type ExecState = {
   sessionID: string
   command: string
   fiber: Fiber.Fiber<void, unknown> | null
+  commandStarted: boolean
   queuedOutputSize: number
 }
 const execStore = new Map<string, ExecState>()
@@ -191,7 +193,36 @@ function truncateOutput(s: string | undefined): string | undefined {
 export const sandboxProxyRoute = HttpRouter.use((router) =>
   Effect.gen(function* () {
     const sandbox = yield* SandboxProvider.Service
-    const bus = yield* Bus.Service
+    const effectBridge = yield* EffectBridge.make()
+
+    const killLocalExec = (execId: string, sessionID: string) => Effect.gen(function* () {
+      const state = execStore.get(execId)
+      if (!state || state.sessionID !== sessionID || state.status !== "running") return false
+      state.status = "killed"
+      state.finishedAt = Date.now()
+      state.exitCode = null
+      yield* Effect.promise(() => updateExecLog(execId, {
+        status: "killed",
+        time_finished: state.finishedAt,
+      })).pipe(Effect.catch(() => Effect.void))
+      Queue.offerUnsafe(state.queue, { _tag: "done" as const, exitCode: null, stdout: state.stdout, stderr: state.stderr })
+      Queue.endUnsafe(state.queue as any)
+      const fiberInterrupt = state.fiber
+        ? Fiber.interrupt(state.fiber).pipe(Effect.catch(() => Effect.void))
+        : Effect.void
+      yield* Effect.all([
+        state.commandStarted
+          ? sandbox.interrupt(SessionID.make(sessionID)).pipe(Effect.timeout(Duration.seconds(10)), Effect.catch(() => Effect.void))
+          : Effect.void,
+        fiberInterrupt,
+      ], { concurrency: "unbounded", discard: true })
+      return true
+    })
+
+    const unsubscribeExecKill = BusBridge.subscribeExecKill((execID, sessionID) => {
+      effectBridge.fork(killLocalExec(execID, sessionID))
+    })
+    yield* Effect.addFinalizer(() => Effect.sync(unsubscribeExecKill))
 
     const requireSession = (sessionID: SessionID) =>
       Effect.promise(() =>
@@ -330,13 +361,16 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
         const workingDirectory = body.workingDirectory ?? session.directory
         const sandboxWorkingDirectory = toSandboxCwd(workingDirectory, session.directory)
         const t0 = Date.now()
-        const execId = `exec-${++execCounter}-${t0}`
-        const result = yield* sandbox.runInSession(
-          root.id,
-          command,
-          { workingDirectory: sandboxWorkingDirectory, timeoutSeconds: body.timeoutSeconds },
-          {},
-        ).pipe(Effect.catch((err) => Effect.succeed(null as any)))
+        const execId = `exec-${randomUUID()}`
+        const result = yield* withSessionLock(
+          SessionID.make(root.id),
+          sandbox.runInSession(
+            root.id,
+            command,
+            { workingDirectory: sandboxWorkingDirectory, timeoutSeconds: body.timeoutSeconds },
+            {},
+          ),
+        ).pipe(Effect.catch(() => Effect.succeed(null as any)))
 
         const stdout = result?.logs?.stdout.map((m: any) => m.text).join("\n") ?? ""
         const stderr = result?.logs?.stderr.map((m: any) => m.text).join("\n") ?? "Sandbox execution failed"
@@ -411,7 +445,7 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
 
         const sid = root.id
         const workingDirectory = body.workingDirectory ?? session.directory
-        const execId = `exec-${++execCounter}-${Date.now()}`
+        const execId = `exec-${randomUUID()}`
         const q = yield* Queue.unbounded<ExecSseEvent>()
         const state: ExecState = {
           status: "running",
@@ -425,6 +459,7 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
           sessionID: sid,
           command: body.command,
           fiber: null,
+          commandStarted: false,
           queuedOutputSize: 0,
         }
         execStore.set(execId, state)
@@ -478,7 +513,10 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
           },
         }
 
+        // Async exec is intentionally detached: long-lived dev servers must
+        // not hold the session conversation lock for their full lifetime.
         const runAsync = Effect.gen(function* () {
+          state.commandStarted = true
           const result = yield* sandbox.runDetached(sid, cmd, opts, handlers).pipe(
             Effect.catch(() => Effect.succeed(null as any)),
           )
@@ -527,7 +565,7 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
           }
           Queue.offerUnsafe(q, { _tag: "done" as const, exitCode: state.exitCode, stdout: state.stdout, stderr: state.stderr })
           Queue.endUnsafe(q as any)
-        }).pipe(Effect.catch(() => Effect.gen(function* () {
+        }).pipe(Effect.catchCause(() => Effect.gen(function* () {
           if (state.status === "killed") return
           state.status = "failed"
           state.finishedAt = Date.now()
@@ -571,7 +609,20 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
         const params = yield* HttpRouter.schemaPathParams(ExecIdParams)
         const rootID = yield* resolveRootSessionID(params.sessionID)
         const state = execStore.get(params.execId)
-        if (!state || state.sessionID !== rootID) return HttpServerResponse.jsonUnsafe({ error: "execId not found" }, { status: 404 })
+        if (!state || state.sessionID !== rootID) {
+          const log = yield* Effect.promise(() => queryExecLog(params.execId))
+          if (!log || log.session_id !== rootID) {
+            return HttpServerResponse.jsonUnsafe({ error: "execId not found" }, { status: 404 })
+          }
+          return HttpServerResponse.jsonUnsafe(
+            {
+              error: log.status === "running"
+                ? "exec stream is connected to another pod; poll the status endpoint"
+                : "exec stream is no longer available; use the status endpoint",
+            },
+            { status: 409 },
+          )
+        }
 
         const q = state.queue
 
@@ -612,30 +663,24 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
         const params = yield* HttpRouter.schemaPathParams(ExecIdParams)
         const rootID = yield* resolveRootSessionID(params.sessionID)
         const state = execStore.get(params.execId)
-        if (!state || state.sessionID !== rootID) return HttpServerResponse.jsonUnsafe({ error: "execId not found" }, { status: 404 })
+        if (!state || state.sessionID !== rootID) {
+          const log = yield* Effect.promise(() => queryExecLog(params.execId))
+          if (!log || log.session_id !== rootID) {
+            return HttpServerResponse.jsonUnsafe({ error: "execId not found" }, { status: 404 })
+          }
+          if (log.status !== "running") return HttpServerResponse.jsonUnsafe({ error: "exec not running" }, { status: 409 })
+          yield* Effect.promise(() => BusBridge.notifyExecKill(params.execId, rootID))
+          for (let i = 0; i < 30; i++) {
+            yield* Effect.sleep("100 millis")
+            const current = yield* Effect.promise(() => queryExecLog(params.execId))
+            if (current?.status === "killed") {
+              return HttpServerResponse.jsonUnsafe({ execId: params.execId, status: "killed" })
+            }
+          }
+          return HttpServerResponse.jsonUnsafe({ error: "exec owner pod did not acknowledge kill" }, { status: 503 })
+        }
         if (state.status !== "running") return HttpServerResponse.jsonUnsafe({ error: "exec not running" }, { status: 409 })
-
-        state.status = "killed"
-        state.finishedAt = Date.now()
-        state.exitCode = null
-        yield* Effect.promise(() => updateExecLog(params.execId, {
-          status: "killed",
-          time_finished: state.finishedAt,
-        })).pipe(Effect.catch(() => Effect.void))
-        Queue.offerUnsafe(state.queue, { _tag: "done" as const, exitCode: null, stdout: state.stdout, stderr: state.stderr })
-        Queue.endUnsafe(state.queue as any)
-
-        // 并发 interrupt sandbox 命令 + fiber，加超时保护
-        const fiberInterrupt = state.fiber
-          ? Fiber.interrupt(state.fiber).pipe(Effect.catch(() => Effect.void))
-          : Effect.void
-        yield* Effect.all([
-          sandbox.interrupt(rootID).pipe(
-            Effect.timeout(Duration.seconds(10)),
-            Effect.catch(() => Effect.void),
-          ),
-          fiberInterrupt,
-        ], { concurrency: "unbounded" }).pipe(Effect.catch(() => Effect.void))
+        yield* killLocalExec(params.execId, rootID)
 
         return HttpServerResponse.jsonUnsafe({ execId: params.execId, status: "killed" })
       }),

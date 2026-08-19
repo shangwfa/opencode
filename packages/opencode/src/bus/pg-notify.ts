@@ -1,4 +1,5 @@
 import { Flag } from "@opencode-ai/core/flag/flag"
+import postgres from "postgres"
 
 const log = {
   info(msg: string, data?: Record<string, unknown>) { console.info(`[pg-notify] ${msg}`, data ?? "") },
@@ -9,17 +10,25 @@ const log = {
 const CHANNEL = "opencode_event"
 
 export namespace PgNotify {
-  const callbacks = new Set<(event: any) => void>()
+  const callbacks = new Set<(event: any) => void | Promise<void>>()
   let listener: any = null
   let started = false
   let abort: AbortController | null = null
 
+  // Dedicated connection for LISTEN: the shared Database pool recycles idle
+  // connections (idle_timeout 30s / max_lifetime 600s), which silently kills
+  // the listener. This connection must never be recycled.
+  let notifyClient: any = null
   function getClient() {
-    // In PG mode, Database.Client() returns a PG drizzle instance
-    // whose .$client is the postgres.js tagged-template client
-    // which supports .listen() / .notify().
-    const { Database } = require("../storage/db") as typeof import("../storage/db")
-    return (Database.Client() as any).$client
+    if (!notifyClient) {
+      notifyClient = postgres(Flag.OPENCODE_DATABASE_URL!, {
+        max: 1,
+        idle_timeout: null,
+        max_lifetime: null,
+        connect_timeout: 10,
+      } as any)
+    }
+    return notifyClient
   }
 
   function sleep(ms: number, signal?: AbortSignal) {
@@ -44,7 +53,9 @@ export namespace PgNotify {
     }
     for (const cb of callbacks) {
       try {
-        cb(event)
+        Promise.resolve(cb(event)).catch((e) =>
+          log.error("PG NOTIFY subscriber rejected", { error: e instanceof Error ? e.message : String(e) }),
+        )
       } catch (e) {
         log.error("PG NOTIFY subscriber threw", { error: e instanceof Error ? e.message : String(e) })
       }
@@ -76,28 +87,84 @@ export namespace PgNotify {
     }
   }
 
-  export async function publish(event: { type: string; properties: any }) {
+  export async function publish(message: unknown) {
     try {
       const client = getClient()
-      await client.notify(CHANNEL, JSON.stringify(event))
+      await client.notify(CHANNEL, JSON.stringify(message))
     } catch (e) {
       log.error("notify failed", { error: e instanceof Error ? e.message : String(e) })
+      throw e
     }
   }
 
-  export async function start() {
+  export async function revisions() {
+    const client = getClient()
+    const rows = await client`SELECT key, revision FROM cluster_state WHERE key IN ('auth', 'config')`
+    return rows.map((row: { key: string; revision: number | string }) => ({
+      key: row.key,
+      revision: Number(row.revision),
+    }))
+  }
+
+  export async function requestSessionAbort(sessionID: string) {
+    const client = getClient()
+    const rows = await client`INSERT INTO session_abort (session_id, directory, generation, time_updated)
+      SELECT id, directory, 1, ${Date.now()} FROM session WHERE id = ${sessionID}
+      ON CONFLICT (session_id) DO UPDATE SET
+        directory = EXCLUDED.directory,
+        generation = session_abort.generation + 1,
+        time_updated = EXCLUDED.time_updated
+      RETURNING generation, directory`
+    if (!rows[0]) return undefined
+    return { generation: Number(rows[0].generation), directory: String(rows[0].directory) }
+  }
+
+  export async function abortGenerations() {
+    const client = getClient()
+    const rows = await client`SELECT session_id, directory, generation FROM session_abort`
+    return rows.map((row: { session_id: string; directory: string; generation: number | string }) => ({
+      sessionID: row.session_id,
+      directory: row.directory,
+      generation: Number(row.generation),
+    }))
+  }
+
+  export async function storeLargeEvent(id: string, origin: string, event: unknown) {
+    const client = getClient()
+    const now = Date.now()
+    await client.begin(async (sql: any) => {
+      await sql`DELETE FROM cluster_bus_event WHERE time_created < ${now - 10 * 60_000}`
+      await sql`INSERT INTO cluster_bus_event (id, origin, event, time_created)
+        VALUES (${id}, ${origin}, ${JSON.stringify(event)}::jsonb, ${now})`
+    })
+    await publish({ type: "event.ref", origin, eventID: id })
+  }
+
+  export async function loadLargeEvent(id: string) {
+    const client = getClient()
+    const rows = await client`SELECT event FROM cluster_bus_event WHERE id = ${id}`
+    const event = rows[0]?.event
+    return typeof event === "string" ? JSON.parse(event) : event
+  }
+
+  export function start() {
     if (started || abort) return
     if (Flag.OPENCODE_DATABASE_URL === undefined) return
 
     const ac = new AbortController()
     abort = ac
-    try {
-      log.info("starting PG LISTEN", { channel: CHANNEL })
-      const ok = await connect(ac.signal)
-      if (ok && !ac.signal.aborted) started = true
-    } finally {
-      if (abort === ac && !started) abort = null
-    }
+    log.info("starting PG LISTEN", { channel: CHANNEL })
+    void connect(ac.signal)
+      .then((ok) => {
+        if (ok && !ac.signal.aborted) started = true
+      })
+      .finally(() => {
+        if (abort === ac && !started) abort = null
+      })
+  }
+
+  export function isStarted() {
+    return started
   }
 
   export async function stop() {
@@ -115,12 +182,16 @@ export namespace PgNotify {
       }
       log.info("PG LISTEN stopped")
     }
+    if (notifyClient) {
+      const client = notifyClient
+      notifyClient = null
+      await client.end({ timeout: 1 }).catch((e: unknown) =>
+        log.error("PG notify client close failed", { error: e instanceof Error ? e.message : String(e) }),
+      )
+    }
   }
 
-  export function subscribe(callback: (event: any) => void): () => void {
-    if (!started) {
-      log.warn("subscribe called before PG LISTEN started")
-    }
+  export function subscribe(callback: (event: any) => void | Promise<void>): () => void {
     callbacks.add(callback)
     return () => {
       callbacks.delete(callback)

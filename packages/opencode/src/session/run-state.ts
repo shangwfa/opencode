@@ -16,7 +16,7 @@ const log = Log.create({ service: "run-state" })
 
 export interface Interface {
   readonly assertNotBusy: (sessionID: SessionID) => Effect.Effect<void, Session.BusyError>
-  readonly cancel: (sessionID: SessionID) => Effect.Effect<void>
+  readonly cancel: (sessionID: SessionID) => Effect.Effect<boolean>
   readonly ensureRunning: (
     sessionID: SessionID,
     onInterrupt: Effect.Effect<SessionV1.WithParts>,
@@ -112,9 +112,10 @@ const layer = Layer.effect(
       const existing = data.runners.get(sessionID)
       if (!existing) {
         yield* status.set(sessionID, { type: "idle" })
-        return
+        return false
       }
       yield* existing.cancel
+      return true
     })
 
     const ensureRunning = Effect.fn("SessionRunState.ensureRunning")(function* (

@@ -8,6 +8,7 @@ import { SessionPrompt } from "@/session/prompt"
 import { InstanceStore } from "@/project/instance-store"
 import { InstanceRef } from "@/effect/instance-ref"
 import type { InstanceContext } from "@/project/instance-context"
+import { pollWithTimeout } from "../lib/effect"
 
 /**
  * The exec-repair listener is now a GLOBAL layer that subscribes to GlobalBus
@@ -99,7 +100,10 @@ describe("ExecRepair listener", () => {
         yield* Effect.yieldNow
       }
 
-      const fired = yield* Ref.get(calls)
+      const fired = yield* pollWithTimeout(
+        Ref.get(calls).pipe(Effect.map((items) => items.length === MAX_ATTEMPTS ? items : undefined)),
+        "repair prompts were not admitted",
+      )
       expect(fired.length).toBe(MAX_ATTEMPTS)
       expect(fired[0]).toContain(command)
       expect(fired[0]).toContain("full output saved to: /workspace/.opencode/exec-logs/exec-x.log")
@@ -125,7 +129,11 @@ describe("ExecRepair listener", () => {
       yield* Effect.yieldNow
 
       // cmd-a exhausted (3), cmd-b fires once (1) → 4 total.
-      expect((yield* Ref.get(calls))).toBe(MAX_ATTEMPTS + 1)
+      const count = yield* pollWithTimeout(
+        Ref.get(calls).pipe(Effect.map((value) => value === MAX_ATTEMPTS + 1 ? value : undefined)),
+        "independent repair prompts were not admitted",
+      )
+      expect(count).toBe(MAX_ATTEMPTS + 1)
     }).pipe(Effect.scoped, Effect.runPromise))
 
   it("includes the failure summary when no sandbox log is available", () =>
@@ -141,9 +149,10 @@ describe("ExecRepair listener", () => {
         hostOutputPath: "/host/unavailable/.opencode/exec-logs/exec-x.log",
         errorSummary: "Error: sandbox is unavailable",
       })
-      yield* Effect.yieldNow
-
-      const [prompt] = yield* Ref.get(calls)
+      const prompt = yield* pollWithTimeout(
+        Ref.get(calls).pipe(Effect.map((items) => items[0])),
+        "repair prompt was not admitted",
+      )
       expect(prompt).toContain("package.json exists")
       expect(prompt).toContain("Error: sandbox is unavailable")
       expect(prompt).not.toContain("full output saved to")

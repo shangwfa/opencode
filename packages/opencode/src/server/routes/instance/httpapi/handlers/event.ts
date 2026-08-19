@@ -1,6 +1,6 @@
 import { EventV2Bridge } from "@/event-v2-bridge"
 import { InstanceState } from "@/effect/instance-state"
-import { GlobalBus } from "@/bus/global"
+import { GlobalBus, type GlobalEvent } from "@/bus/global"
 import { EventV2 } from "@opencode-ai/core/event"
 import { Effect, Queue } from "effect"
 import * as Stream from "effect/Stream"
@@ -22,42 +22,35 @@ function eventID() {
   return EventV2.ID.create()
 }
 
-function eventResponse(events: EventV2.Interface) {
+function eventResponse() {
   return Effect.gen(function* () {
     const instance = yield* InstanceState.context
     const workspaceID = yield* InstanceState.workspaceID
-    // Listener registration is eager, so events published after this point cannot
-    // be lost while the HTTP body fiber is starting or emitting server.connected.
-    const queue = yield* Queue.unbounded<EventV2.Payload>()
-    const unsubscribe = yield* events.listen((event) => Effect.sync(() => Queue.offerUnsafe(queue, event)))
-    yield* Effect.addFinalizer(() => unsubscribe)
-    const stream = Stream.fromQueue(queue).pipe(
-      Stream.filter(
-        (event) =>
-          event.location?.directory === instance.directory &&
-          (event.location.workspaceID === undefined || event.location.workspaceID === workspaceID),
-      ),
-      Stream.map((event) => ({ id: event.id, type: event.type, properties: event.data })),
-    )
-    const disposed = Stream.callback<{ id: string; type: string; properties: unknown }>((queue) => {
-      const listener = (event: {
-        directory?: string
-        payload: { id?: string; type?: string; properties?: unknown }
-      }) => {
-        if (event.directory !== instance.directory || event.payload.type !== "server.instance.disposed") return
-        Queue.offerUnsafe(queue, {
-          id: event.payload.id ?? eventID(),
-          type: "server.instance.disposed",
-          properties: event.payload.properties ?? {},
-        })
-      }
-      return Effect.acquireRelease(
-        Effect.sync(() => GlobalBus.on("event", listener)),
-        () => Effect.sync(() => GlobalBus.off("event", listener)),
-      )
-    })
-    const output = stream.pipe(
-      Stream.merge(disposed, { haltStrategy: "left" }),
+    // Stream from the GlobalBus rather than the in-memory EventV2 PubSub:
+    // local events are mirrored onto the GlobalBus by EventV2Bridge, and
+    // events produced on other pods (shared PG) are injected by the bus-bridge
+    // — both reach SSE clients through a single subscription.
+    // Register eagerly before server.connected is emitted, otherwise events
+    // can be lost while the lazy response body fiber is starting.
+    // Bound per-client memory. Under sustained backpressure the oldest events
+    // are dropped; clients can resync durable state from the HTTP APIs.
+    const queue = yield* Queue.sliding<{ id: string; type: string; properties: unknown }>(1024)
+    const listener = (event: GlobalEvent) => {
+      if (event.directory !== instance.directory) return
+      if (event.workspace !== undefined && event.workspace !== workspaceID) return
+      const payload = event.payload as { id?: string; type?: string; properties?: unknown }
+      // sync is an internal durable-journal envelope and was not part of the
+      // previous instance SSE contract.
+      if (payload.type === undefined || payload.type === "sync") return
+      Queue.offerUnsafe(queue, {
+        id: payload.id ?? eventID(),
+        type: payload.type,
+        properties: payload.properties ?? {},
+      })
+    }
+    GlobalBus.on("event", listener)
+    yield* Effect.addFinalizer(() => Effect.sync(() => GlobalBus.off("event", listener)))
+    const output = Stream.fromQueue(queue).pipe(
       Stream.takeUntil((event) => event.type === "server.instance.disposed"),
     )
     const heartbeat = Stream.tick("10 seconds").pipe(
@@ -88,11 +81,11 @@ function eventResponse(events: EventV2.Interface) {
 
 export const eventHandlers = HttpApiBuilder.group(EventApi, "event", (handlers) =>
   Effect.gen(function* () {
-    const events = yield* EventV2Bridge.Service
+    yield* EventV2Bridge.Service
     return handlers.handleRaw(
       "subscribe",
       Effect.fn("EventHttpApi.subscribe")(function* () {
-        return yield* eventResponse(events)
+        return yield* eventResponse()
       }),
     )
   }),

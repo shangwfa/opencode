@@ -4,6 +4,9 @@ import { EffectBridge } from "@/effect/bridge"
 import { EventV2 } from "@opencode-ai/core/event"
 import { Installation } from "@/installation"
 import { disposeAllInstancesAndEmitGlobalDisposed } from "@/server/global-lifecycle"
+import { BusBridge } from "@/bus/bus-bridge"
+import { PgNotify } from "@/bus/pg-notify"
+import { Database } from "@/storage/db"
 import { InstallationVersion } from "@opencode-ai/core/installation/version"
 import { Effect, Queue, Schema } from "effect"
 import * as Stream from "effect/Stream"
@@ -33,13 +36,11 @@ function parseBody(body: string) {
 function eventResponse() {
   return Effect.gen(function* () {
     yield* Effect.logInfo("global event connected")
-    const events = Stream.callback<GlobalBusEvent>((queue) => {
-      const handler = (event: GlobalBusEvent) => Queue.offerUnsafe(queue, event)
-      return Effect.acquireRelease(
-        Effect.sync(() => GlobalBus.on("event", handler)),
-        () => Effect.sync(() => GlobalBus.off("event", handler)),
-      )
-    })
+    const queue = yield* Queue.sliding<GlobalBusEvent>(1024)
+    const handler = (event: GlobalBusEvent) => Queue.offerUnsafe(queue, event)
+    GlobalBus.on("event", handler)
+    yield* Effect.addFinalizer(() => Effect.sync(() => GlobalBus.off("event", handler)))
+    const events = Stream.fromQueue(queue)
     const heartbeat = Stream.tick("10 seconds").pipe(
       Stream.drop(1),
       Stream.map(() => ({ payload: { id: EventV2.ID.create(), type: "server.heartbeat", properties: {} } })),
@@ -70,8 +71,22 @@ export const globalHandlers = HttpApiBuilder.group(RootHttpApi, "global", (handl
     const config = yield* Config.Service
     const installation = yield* Installation.Service
     const bridge = yield* EffectBridge.make()
+    const unsubscribeDispose = BusBridge.subscribeDispose((reason) => {
+      bridge.fork(
+        Effect.gen(function* () {
+          if (reason === "config") yield* config.invalidate()
+          yield* disposeAllInstancesAndEmitGlobalDisposed({ swallowErrors: true })
+        }),
+      )
+    })
+    yield* Effect.addFinalizer(() => Effect.sync(unsubscribeDispose))
 
     const health = Effect.fn("GlobalHttpApi.health")(function* () {
+      yield* Effect.tryPromise({
+        try: () => ((Database.Client() as any).$client`SELECT 1` as Promise<unknown>),
+        catch: (cause) => cause,
+      }).pipe(Effect.orDie)
+      if (!PgNotify.isStarted()) return yield* Effect.die(new Error("PG event bridge is not ready"))
       return { healthy: true as const, version: InstallationVersion }
     })
 
@@ -85,7 +100,11 @@ export const globalHandlers = HttpApiBuilder.group(RootHttpApi, "global", (handl
 
     const configUpdate = Effect.fn("GlobalHttpApi.configUpdate")(function* (ctx) {
       const result = yield* config.updateGlobal(ctx.payload)
-      if (result.changed) bridge.fork(disposeAllInstancesAndEmitGlobalDisposed({ swallowErrors: true }))
+      if (result.changed) {
+        bridge.fork(disposeAllInstancesAndEmitGlobalDisposed({ swallowErrors: true }))
+        // Tell other pods (shared PG) to drop their instance caches too
+        yield* Effect.promise(() => BusBridge.notifyDisposeAll("config"))
+      }
       return result.info
     })
 

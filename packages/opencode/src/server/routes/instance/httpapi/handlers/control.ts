@@ -5,6 +5,8 @@ import { HttpApiBuilder } from "effect/unstable/httpapi"
 import { RootHttpApi } from "../api"
 import { LogInput } from "../groups/control"
 import { ProviderV2 } from "@opencode-ai/core/provider"
+import { disposeAllInstancesAndEmitGlobalDisposed } from "@/server/global-lifecycle"
+import { notifyDisposeAll } from "@/bus/bus-bridge"
 
 export const controlHandlers = HttpApiBuilder.group(RootHttpApi, "control", (handlers) =>
   Effect.gen(function* () {
@@ -15,6 +17,10 @@ export const controlHandlers = HttpApiBuilder.group(RootHttpApi, "control", (han
       payload: Auth.Info
     }) {
       yield* auth.set(ctx.params.providerID, ctx.payload).pipe(Effect.orDie)
+      // Hot reload: drop local instance caches so the new credential is picked
+      // up, and tell other pods (shared PG) to do the same.
+      yield* disposeAllInstancesAndEmitGlobalDisposed({ swallowErrors: true })
+      yield* Effect.promise(() => notifyDisposeAll("auth"))
       return true
     })
 
@@ -22,6 +28,8 @@ export const controlHandlers = HttpApiBuilder.group(RootHttpApi, "control", (han
       params: { providerID: ProviderV2.ID }
     }) {
       yield* auth.remove(ctx.params.providerID).pipe(Effect.orDie)
+      yield* disposeAllInstancesAndEmitGlobalDisposed({ swallowErrors: true })
+      yield* Effect.promise(() => notifyDisposeAll("auth"))
       return true
     })
 

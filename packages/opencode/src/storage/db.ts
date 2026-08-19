@@ -3,7 +3,6 @@ import { migrate } from "drizzle-orm/bun-sqlite/migrator"
 import { type SQLiteTransaction } from "drizzle-orm/sqlite-core"
 import { sql } from "drizzle-orm"
 export * from "drizzle-orm"
-import { RuntimeFlags } from "@/effect/runtime-flags"
 import { LocalContext } from "@/util/local-context"
 import { lazy } from "@/util/lazy"
 import { Global } from "@opencode-ai/core/global"
@@ -14,7 +13,7 @@ import { Flag } from "@opencode-ai/core/flag/flag"
 import { InstallationChannel } from "@opencode-ai/core/installation/version"
 import { EffectBridge } from "@/effect/bridge"
 import { init as initSqlite } from "#db"
-import { Effect, Schema } from "effect"
+import { Schema } from "effect"
 import { createHash } from "crypto"
 
 declare const OPENCODE_MIGRATIONS: { sql: string; timestamp: number; name: string }[] | undefined
@@ -110,7 +109,11 @@ function migrations(dir: string): Journal {
 // PG custom migration executor
 async function migratePg(db: any, entries: Journal) {
   const lockId = 20191001
-  await db.execute(sql`SELECT pg_advisory_lock(${lockId})`)
+  // Session-level advisory locks belong to one physical backend. Reserve that
+  // connection for acquire/unlock; pooled db.execute calls may use different
+  // backends and permanently leak the migration lock.
+  const lock = await db.$client.reserve()
+  await lock`SELECT pg_advisory_lock(${lockId})`
   try {
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS __drizzle_migrations (
@@ -134,7 +137,9 @@ async function migratePg(db: any, entries: Journal) {
     }
   } finally {
     try {
-      await db.execute(sql`SELECT pg_advisory_unlock(${lockId})`)
+      const rows = await lock`SELECT pg_advisory_unlock(${lockId}) AS unlocked`
+      lock.release()
+      if (rows[0]?.unlocked !== true) log.error("PG migration advisory lock was not held by its reserved connection")
     } catch {}
   }
 }

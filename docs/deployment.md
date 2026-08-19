@@ -151,6 +151,8 @@ docker run -d \
 | `OPENCODE_ENABLE_QUESTION_TOOL` | 否 | `false` | 设为 `true` 启用 question 工具（HTTP API 模式下建议开启） |
 | `OPENCODE_MODELS_URL` | 否 | - | 自定义 models.json URL，可用于管控可用模型列表 |
 | `OPENCODE_SKIP_MIGRATIONS` | 否 | `false` | 设为 `true` 跳过数据库迁移（已手动迁移时使用） |
+| `OPENCODE_SESSION_LOCK_TIMEOUT_SEC` | 否 | `120` | 等待同 session cluster lock 的最大秒数 |
+| `OPENCODE_SESSION_LOCK_POOL_SIZE` | 否 | `8` | 每 Pod 可并发持有的 session lock 数，应匹配单 Pod 最大 run 并发 |
 | `OPENCODE_EXPERIMENTAL_WORKSPACES` | 否 | `false` | 设为 `true` 启用多 workspace 支持 |
 | `OPENCODE_EXPERIMENTAL_BASH_DEFAULT_TIMEOUT_MS` | 否 | - | bash 命令默认超时（毫秒） |
 | `OPENCODE_EXPERIMENTAL_OUTPUT_TOKEN_MAX` | 否 | - | LLM 输出 token 上限 |
@@ -309,6 +311,13 @@ postgresql://user:pass@host.docker.internal:15432/opencode
 | Sandbox 命令队列 `Semaphore(1)` | 每 session 串行化，防止并发冲突 |
 | PG FK 全部 `DEFERRABLE INITIALLY DEFERRED` | 解决事务内 FK 约束顺序问题 |
 | PVC 6 subPath 挂载 | K8s PVC 存储分离，session 维度隔离 |
+
+### 多 Pod 发布约束
+
+- 所有 Pod 必须连接同一 PG；默认连接预算约 `31 × Pod 数`，另留迁移/运维余量。
+- 首次升级到支持 cluster lock/bridge 的版本时，旧 Pod 不理解新协议，必须用 `Recreate`（先缩旧版本到 0，再启动新版本），不能滚动混跑。
+- PG URL、sandbox API key、server password 必须来自 K8s Secret；镜像不内置环境凭证。
+- 所有 Pod 的 `OPENCODE_SANDBOX_IDLE_*`、lock timeout/pool 配置必须一致。
 
 ## 十、故障排查
 

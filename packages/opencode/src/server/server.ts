@@ -87,6 +87,12 @@ const listenEffect: (opts: ListenOptions) => Effect.Effect<EffectListener, unkno
     const listenerUrl = makeURL(opts.hostname, address.port)
     url = listenerUrl
 
+    // Start after the HTTP listener is bound. PG outages must not prevent the
+    // liveness endpoint from coming up; PgNotify retries in the background.
+    const { BusBridge } = yield* Effect.promise(() => import("@/bus/bus-bridge"))
+    yield* Effect.promise(() => BusBridge.startBusBridge())
+    yield* Scope.addFinalizer(state.scope, Effect.promise(() => BusBridge.stopBusBridge()))
+
     const unpublishMdns = yield* setupMdns(opts, address.port, state.scope)
 
     return {

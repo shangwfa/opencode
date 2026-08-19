@@ -15,16 +15,18 @@ import { Command } from "@/command"
 import { InstanceRef } from "@/effect/instance-ref"
 import { Permission } from "@/permission"
 import { InstanceStore } from "@/project/instance-store"
+import { EffectBridge } from "@/effect/bridge"
+import { BusBridge } from "@/bus/bus-bridge"
 import { SessionShare } from "@/share/session"
 import { Session } from "@/session/session"
 import { SessionCompaction } from "@/session/compaction"
 import { MessageV2 } from "@/session/message-v2"
 import { SessionPrompt } from "@/session/prompt"
 import { SessionRevert } from "@/session/revert"
-import { SessionRunState } from "@/session/run-state"
 import { insertExecLog, type ExecLogSource } from "@/session/exec-log"
 import { SessionStatus } from "@/session/status"
 import { SessionSummary } from "@/session/summary"
+import { SessionRunState } from "@/session/run-state"
 import { Todo } from "@/session/todo"
 import { MessageID, PartID, SessionID } from "@/session/schema"
 import { Skill } from "@/skill"
@@ -59,6 +61,7 @@ import {
 import { ApiNotFoundError, PermissionNotFoundError, notFound } from "../errors"
 import * as SessionError from "./session-errors"
 import { withSessionLock, waitForSessionLock } from "./session-lock"
+import { resolveSandboxOpts } from "@/session/sandbox-opts"
 
 const tryParseJson = (text: string) =>
   Effect.try({
@@ -73,7 +76,6 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
     const promptSvc = yield* SessionPrompt.Service
     const revertSvc = yield* SessionRevert.Service
     const compactSvc = yield* SessionCompaction.Service
-    const runState = yield* SessionRunState.Service
     const agentSvc = yield* Agent.Service
     const agentsMdSvc = yield* SessionAgentsMd.Service
     const permissionSvc = yield* Permission.Service
@@ -87,9 +89,26 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
     const commandSvc = yield* Command.Service
     const skillSvc = yield* Skill.Service
     const summary = yield* SessionSummary.Service
+    const runState = yield* SessionRunState.Service
     const sessionLoadDotOpencodeSvc = yield* SessionLoadDotOpencode.Service
     const events = yield* EventV2Bridge.Service
     const scope = yield* Scope.Scope
+    const withClusterLock = <A, E, R>(sessionID: SessionID, effect: Effect.Effect<A, E, R>) =>
+      Effect.promise(() => resolveSandboxOpts(sessionID)).pipe(
+        Effect.flatMap((root) => withSessionLock(root.id, effect)),
+      )
+    const instanceStore = yield* InstanceStore.Service
+    const effectBridge = yield* EffectBridge.make()
+    const cancelRun = (sessionID: SessionID) => Effect.gen(function* () {
+      for (let i = 0; i < 20; i++) {
+        if (yield* runState.cancel(sessionID)) return
+        yield* Effect.sleep("50 millis")
+      }
+    })
+    const unsubscribeAbort = BusBridge.subscribeSessionAbort((sessionID, directory) => {
+      effectBridge.fork(instanceStore.provide({ directory }, cancelRun(SessionID.make(sessionID))))
+    })
+    yield* Effect.addFinalizer(() => Effect.sync(unsubscribeAbort))
     const sandboxProvider = Option.getOrUndefined(yield* Effect.serviceOption(SandboxProvider.Service))
 
     const list = Effect.fn("SessionHttpApi.list")(function* (ctx: { query: typeof ListQuery.Type }) {
@@ -277,39 +296,49 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
     })
 
     const remove = Effect.fn("SessionHttpApi.remove")(function* (ctx: { params: { sessionID: SessionID } }) {
-      yield* SessionError.mapStorageNotFound(session.remove(ctx.params.sessionID))
-      yield* pluginRuntime.dispose(ctx.params.sessionID)
-      // session-delete not logged here — FK cascade removes exec_log along with session
-      return true
+      return yield* withClusterLock(
+        ctx.params.sessionID,
+        Effect.gen(function* () {
+          yield* SessionError.mapStorageNotFound(session.remove(ctx.params.sessionID))
+          yield* pluginRuntime.dispose(ctx.params.sessionID)
+          // session-delete not logged here — FK cascade removes exec_log along with session
+          return true
+        }),
+      )
     })
 
     const update = Effect.fn("SessionHttpApi.update")(function* (ctx: {
       params: { sessionID: SessionID }
       payload: typeof UpdatePayload.Type
     }) {
-      const current = yield* requireSession(ctx.params.sessionID)
-      if (ctx.payload.directory !== undefined) {
-        const store = yield* InstanceStore.Service
-        yield* withSessionLock(ctx.params.sessionID, store.reload({ directory: ctx.payload.directory }))
-        yield* session.setDirectory({ sessionID: ctx.params.sessionID, directory: ctx.payload.directory })
-      }
-      if (ctx.payload.title !== undefined) {
-        yield* session.setTitle({ sessionID: ctx.params.sessionID, title: ctx.payload.title })
-      }
-      if (ctx.payload.metadata !== undefined) {
-        yield* session.setMetadata({ sessionID: ctx.params.sessionID, metadata: ctx.payload.metadata })
-      }
-      if (ctx.payload.permission !== undefined) {
-        yield* session.setPermission({
-          sessionID: ctx.params.sessionID,
-          permission: Permission.merge(current.permission ?? [], ctx.payload.permission),
-        })
-      }
-      if (ctx.payload.time?.archived !== undefined) {
-        yield* session.setArchived({ sessionID: ctx.params.sessionID, time: ctx.payload.time.archived })
-      }
-      yield* logAction(ctx.params.sessionID, "patch", ctx.payload)
-      return yield* requireSession(ctx.params.sessionID)
+      return yield* withClusterLock(
+        ctx.params.sessionID,
+        Effect.gen(function* () {
+          const current = yield* requireSession(ctx.params.sessionID)
+          if (ctx.payload.directory !== undefined) {
+            const store = yield* InstanceStore.Service
+            yield* store.reload({ directory: ctx.payload.directory })
+            yield* session.setDirectory({ sessionID: ctx.params.sessionID, directory: ctx.payload.directory })
+          }
+          if (ctx.payload.title !== undefined) {
+            yield* session.setTitle({ sessionID: ctx.params.sessionID, title: ctx.payload.title })
+          }
+          if (ctx.payload.metadata !== undefined) {
+            yield* session.setMetadata({ sessionID: ctx.params.sessionID, metadata: ctx.payload.metadata })
+          }
+          if (ctx.payload.permission !== undefined) {
+            yield* session.setPermission({
+              sessionID: ctx.params.sessionID,
+              permission: Permission.merge(current.permission ?? [], ctx.payload.permission),
+            })
+          }
+          if (ctx.payload.time?.archived !== undefined) {
+            yield* session.setArchived({ sessionID: ctx.params.sessionID, time: ctx.payload.time.archived })
+          }
+          yield* logAction(ctx.params.sessionID, "patch", ctx.payload)
+          return yield* requireSession(ctx.params.sessionID)
+        }),
+      )
     })
 
     const fork = Effect.fn("SessionHttpApi.fork")(function* (ctx: {
@@ -341,27 +370,33 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
     })
 
     const abort = Effect.fn("SessionHttpApi.abort")(function* (ctx: { params: { sessionID: SessionID } }) {
-      yield* promptSvc.cancel(ctx.params.sessionID)
+      yield* cancelRun(ctx.params.sessionID)
+      yield* Effect.promise(() => BusBridge.notifySessionAbort(ctx.params.sessionID))
       yield* logAction(ctx.params.sessionID, "session-abort", {})
-      return true
+      return true as const
     })
 
     const init = Effect.fn("SessionHttpApi.init")(function* (ctx: {
       params: { sessionID: SessionID }
       payload: typeof InitPayload.Type
     }) {
-      yield* requireSession(ctx.params.sessionID)
-      yield* promptSvc
-        .command({
-          sessionID: ctx.params.sessionID,
-          messageID: ctx.payload.messageID,
-          model: `${ctx.payload.providerID}/${ctx.payload.modelID}`,
-          command: Command.Default.INIT,
-          arguments: "",
-        })
-        .pipe(Effect.mapError(() => new HttpApiError.BadRequest({})))
-      yield* logAction(ctx.params.sessionID, "session-init", ctx.payload)
-      return true
+      return yield* withClusterLock(
+        ctx.params.sessionID,
+        Effect.gen(function* () {
+          yield* requireSession(ctx.params.sessionID)
+          yield* promptSvc
+            .command({
+              sessionID: ctx.params.sessionID,
+              messageID: ctx.payload.messageID,
+              model: `${ctx.payload.providerID}/${ctx.payload.modelID}`,
+              command: Command.Default.INIT,
+              arguments: "",
+            })
+            .pipe(Effect.mapError(() => new HttpApiError.BadRequest({})))
+          yield* logAction(ctx.params.sessionID, "session-init", ctx.payload)
+          return true
+        }),
+      )
     })
 
     const loadDotOpencode = Effect.fn("SessionHttpApi.loadDotOpencode")(function* (ctx: {
@@ -403,23 +438,28 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       params: { sessionID: SessionID }
       payload: typeof SummarizePayload.Type
     }) {
-      yield* revertSvc.cleanup(yield* requireSession(ctx.params.sessionID))
-      const messages = yield* SessionError.mapStorageNotFound(session.messages({ sessionID: ctx.params.sessionID }))
-      const defaultAgent = yield* agentSvc.defaultAgent()
-      const currentAgent = messages.findLast((message) => message.info.role === "user")?.info.agent ?? defaultAgent
+      return yield* withClusterLock(
+        ctx.params.sessionID,
+        Effect.gen(function* () {
+          yield* revertSvc.cleanup(yield* requireSession(ctx.params.sessionID))
+          const messages = yield* SessionError.mapStorageNotFound(session.messages({ sessionID: ctx.params.sessionID }))
+          const defaultAgent = yield* agentSvc.defaultAgent()
+          const currentAgent = messages.findLast((message) => message.info.role === "user")?.info.agent ?? defaultAgent
 
-      yield* compactSvc.create({
-        sessionID: ctx.params.sessionID,
-        agent: currentAgent,
-        model: {
-          providerID: ctx.payload.providerID,
-          modelID: ctx.payload.modelID,
-        },
-        auto: ctx.payload.auto ?? false,
-      })
-      yield* promptSvc.loop({ sessionID: ctx.params.sessionID })
-      yield* logAction(ctx.params.sessionID, "session-summarize", ctx.payload)
-      return true
+          yield* compactSvc.create({
+            sessionID: ctx.params.sessionID,
+            agent: currentAgent,
+            model: {
+              providerID: ctx.payload.providerID,
+              modelID: ctx.payload.modelID,
+            },
+            auto: ctx.payload.auto ?? false,
+          })
+          yield* promptSvc.loop({ sessionID: ctx.params.sessionID })
+          yield* logAction(ctx.params.sessionID, "session-summarize", ctx.payload)
+          return true
+        }),
+      )
     })
 
     const prompt = Effect.fn("SessionHttpApi.prompt")(function* (ctx: {
@@ -428,7 +468,7 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
     }) {
       yield* requireSession(ctx.params.sessionID)
       yield* waitForSessionLock(ctx.params.sessionID)
-      const message = yield* withSessionLock(ctx.params.sessionID, promptSvc.prompt({
+      const message = yield* withClusterLock(ctx.params.sessionID, promptSvc.prompt({
         ...ctx.payload,
         sessionID: ctx.params.sessionID,
       })).pipe(Effect.mapError(() => new HttpApiError.BadRequest({})))
@@ -444,7 +484,7 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
     }) {
       yield* requireSession(ctx.params.sessionID)
       yield* waitForSessionLock(ctx.params.sessionID)
-      yield* withSessionLock(ctx.params.sessionID, promptSvc.prompt({ ...ctx.payload, sessionID: ctx.params.sessionID })).pipe(
+      yield* withClusterLock(ctx.params.sessionID, promptSvc.prompt({ ...ctx.payload, sessionID: ctx.params.sessionID })).pipe(
         Effect.catchCause((cause) =>
           Effect.gen(function* () {
             yield* Effect.logError("prompt_async failed", { sessionID: ctx.params.sessionID, cause })
@@ -466,7 +506,7 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
     }) {
       yield* requireSession(ctx.params.sessionID)
       yield* waitForSessionLock(ctx.params.sessionID)
-      const result = yield* withSessionLock(ctx.params.sessionID, promptSvc
+      const result = yield* withClusterLock(ctx.params.sessionID, promptSvc
         .command({ ...ctx.payload, sessionID: ctx.params.sessionID }))
         .pipe(Effect.mapError(() => new HttpApiError.BadRequest({})))
       yield* logAction(ctx.params.sessionID, "session-command", ctx.payload)
@@ -477,27 +517,42 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       params: { sessionID: SessionID }
       payload: typeof ShellPayload.Type
     }) {
-      yield* requireSession(ctx.params.sessionID)
-      const result = yield* SessionError.mapBusy(promptSvc.shell({ ...ctx.payload, sessionID: ctx.params.sessionID }))
-      yield* logAction(ctx.params.sessionID, "session-shell", ctx.payload)
-      return result
+      return yield* withClusterLock(
+        ctx.params.sessionID,
+        Effect.gen(function* () {
+          yield* requireSession(ctx.params.sessionID)
+          const result = yield* SessionError.mapBusy(promptSvc.shell({ ...ctx.payload, sessionID: ctx.params.sessionID }))
+          yield* logAction(ctx.params.sessionID, "session-shell", ctx.payload)
+          return result
+        }),
+      )
     })
 
     const revert = Effect.fn("SessionHttpApi.revert")(function* (ctx: {
       params: { sessionID: SessionID }
       payload: typeof RevertPayload.Type
     }) {
-      yield* requireSession(ctx.params.sessionID)
-      const result = yield* SessionError.mapBusy(revertSvc.revert({ sessionID: ctx.params.sessionID, ...ctx.payload }))
-      yield* logAction(ctx.params.sessionID, "session-revert", ctx.payload)
-      return result
+      return yield* withClusterLock(
+        ctx.params.sessionID,
+        Effect.gen(function* () {
+          yield* requireSession(ctx.params.sessionID)
+          const result = yield* SessionError.mapBusy(revertSvc.revert({ sessionID: ctx.params.sessionID, ...ctx.payload }))
+          yield* logAction(ctx.params.sessionID, "session-revert", ctx.payload)
+          return result
+        }),
+      )
     })
 
     const unrevert = Effect.fn("SessionHttpApi.unrevert")(function* (ctx: { params: { sessionID: SessionID } }) {
-      yield* requireSession(ctx.params.sessionID)
-      const result = yield* SessionError.mapBusy(revertSvc.unrevert({ sessionID: ctx.params.sessionID }))
-      yield* logAction(ctx.params.sessionID, "session-unrevert", {})
-      return result
+      return yield* withClusterLock(
+        ctx.params.sessionID,
+        Effect.gen(function* () {
+          yield* requireSession(ctx.params.sessionID)
+          const result = yield* SessionError.mapBusy(revertSvc.unrevert({ sessionID: ctx.params.sessionID }))
+          yield* logAction(ctx.params.sessionID, "session-unrevert", {})
+          return result
+        }),
+      )
     })
 
     const permissionRespond = Effect.fn("SessionHttpApi.permissionRespond")(function* (ctx: {
@@ -522,38 +577,52 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
     const deleteMessage = Effect.fn("SessionHttpApi.deleteMessage")(function* (ctx: {
       params: { sessionID: SessionID; messageID: MessageID }
     }) {
-      yield* requireSession(ctx.params.sessionID)
-      yield* SessionError.mapBusy(runState.assertNotBusy(ctx.params.sessionID))
-      yield* session.removeMessage(ctx.params)
-      yield* logAction(ctx.params.sessionID, "message-delete", ctx.params)
-      return true
+      return yield* withClusterLock(
+        ctx.params.sessionID,
+        Effect.gen(function* () {
+          yield* requireSession(ctx.params.sessionID)
+          yield* session.removeMessage(ctx.params)
+          yield* logAction(ctx.params.sessionID, "message-delete", ctx.params)
+          return true
+        }),
+      )
     })
 
     const deletePart = Effect.fn("SessionHttpApi.deletePart")(function* (ctx: {
       params: { sessionID: SessionID; messageID: MessageID; partID: PartID }
     }) {
-      yield* requireSession(ctx.params.sessionID)
-      yield* session.removePart(ctx.params)
-      yield* logAction(ctx.params.sessionID, "part-delete", ctx.params)
-      return true
+      return yield* withClusterLock(
+        ctx.params.sessionID,
+        Effect.gen(function* () {
+          yield* requireSession(ctx.params.sessionID)
+          yield* session.removePart(ctx.params)
+          yield* logAction(ctx.params.sessionID, "part-delete", ctx.params)
+          return true
+        }),
+      )
     })
 
     const updatePart = Effect.fn("SessionHttpApi.updatePart")(function* (ctx: {
       params: { sessionID: SessionID; messageID: MessageID; partID: PartID }
       payload: typeof SessionV1.Part.Type
     }) {
-      yield* requireSession(ctx.params.sessionID)
-      const payload = ctx.payload as SessionV1.Part
-      if (
-        payload.id !== ctx.params.partID ||
-        payload.messageID !== ctx.params.messageID ||
-        payload.sessionID !== ctx.params.sessionID
-      ) {
-        return yield* new HttpApiError.BadRequest({})
-      }
-      const result = yield* session.updatePart(payload)
-      yield* logAction(ctx.params.sessionID, "part-update", ctx.params)
-      return result
+      return yield* withClusterLock(
+        ctx.params.sessionID,
+        Effect.gen(function* () {
+          yield* requireSession(ctx.params.sessionID)
+          const payload = ctx.payload as SessionV1.Part
+          if (
+            payload.id !== ctx.params.partID ||
+            payload.messageID !== ctx.params.messageID ||
+            payload.sessionID !== ctx.params.sessionID
+          ) {
+            return yield* new HttpApiError.BadRequest({})
+          }
+          const result = yield* session.updatePart(payload)
+          yield* logAction(ctx.params.sessionID, "part-update", ctx.params)
+          return result
+        }),
+      )
     })
 
     const listSkills = Effect.fn("SessionHttpApi.skills")(function* (ctx: { params: { sessionID: SessionID } }) {

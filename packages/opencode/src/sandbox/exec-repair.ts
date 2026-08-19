@@ -9,6 +9,8 @@ import { SessionPrompt } from "@/session/prompt"
 import { SessionID } from "@/session/schema"
 import { ExecFailed } from "@/sandbox/exec-failed"
 import { SandboxProvider } from "@/tool/sandbox-provider"
+import { withSessionLock } from "@/server/routes/instance/httpapi/handlers/session-lock"
+import { BusBridge } from "@/bus/bus-bridge"
 
 /**
  * Maximum self-repair attempts for the same (session, command) before giving up.
@@ -42,6 +44,9 @@ export const layer = Layer.effectDiscard(
     const key = (sessionID: string, command: string) => `${sessionID}\0${command}`
 
     const handler = (event: GlobalEvent) => {
+      // The owner Pod already handles this failure. Replayed bridge events
+      // must not enqueue one repair prompt per replica.
+      if (BusBridge.isRemoteEvent(event)) return
       const payload = event.payload
       if (!payload || payload.type !== ExecFailed.EVENT_TYPE) return
       const props = payload.properties as ExecFailed.Event
@@ -80,10 +85,13 @@ export const layer = Layer.effectDiscard(
         store
           .provide(
             { directory },
-            promptSvc.prompt({
-              sessionID: SessionID.make(props.sessionID),
-              parts: [{ type: "text", text: lines, synthetic: true }],
-            }),
+            withSessionLock(
+              SessionID.make(props.sessionID),
+              promptSvc.prompt({
+                sessionID: SessionID.make(props.sessionID),
+                parts: [{ type: "text", text: lines, synthetic: true }],
+              }),
+            ),
           )
           .pipe(
             Effect.catch(() =>
