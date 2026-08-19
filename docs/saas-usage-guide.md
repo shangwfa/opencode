@@ -224,6 +224,86 @@ Skill 统一使用 bundle 模型：简单 skill 是 `resources: []` 的 bundle�
 | POST | `/instance/dispose` | 销毁当前 instance 的所有沙箱（PVC 保留） |
 | POST | `/global/dispose` | 销毁所有实例 |
 
+### 3.7 沙箱文件管理
+
+直接操作沙箱文件系统（不经 AI 消息）。沙箱不存在时自动创建（app 模式挂对应 PVC subPath）；`path` 参数为沙箱内绝对路径（`/workspace/...`），也接受 session 目录形式的 host 路径。
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| POST | `/session/:sessionID/files/mkdir?path=/workspace/newdir` | 创建目录（含多级，类似 `mkdir -p`） |
+| POST | `/session/:sessionID/files/create?path=/workspace/foo.txt` | 创建文件（body 为文件内容原始字节，可空） |
+| GET | `/session/:sessionID/files/download?path=/workspace/foo` | 下载指定文件或目录（目录自动打包） |
+| POST | `/session/:sessionID/files/upload?path=/workspace/dir&filename=foo.bin` | 上传文件到指定目录（body 为原始字节） |
+
+#### 创建目录
+
+```bash
+curl -X POST "https://test-opencode.shadow-rpa.net/session/$SID/files/mkdir?path=/workspace/project/src"
+# → {"sessionID":"ses_xxx","path":"/workspace/project/src","created":true}
+```
+
+多级目录自动递归创建，已存在不报错（幂等）。
+
+#### 创建文件
+
+```bash
+# body 为文件内容（可为空，创建空文件）
+curl -X POST "https://test-opencode.shadow-rpa.net/session/$SID/files/create?path=/workspace/project/src/app.py" \
+  --data-binary 'print("hello")'
+# → {"sessionID":"ses_xxx","path":"/workspace/project/src/app.py","size":15,"created":true}
+```
+
+父目录自动创建，同路径已存在时覆盖写。单文件上限 512MB，超限返回 413。
+
+#### 下载
+
+```bash
+# 文件：返回原始字节，Content-Type 按扩展名推断（mime-types），带 Content-Disposition
+curl -o report.md "https://test-opencode.shadow-rpa.net/session/$SID/files/download?path=/workspace/report.md"
+
+# 目录：沙箱内用 python zipfile 打包为 zip 后流式返回，带 Content-Length
+curl -o project.zip "https://test-opencode.shadow-rpa.net/session/$SID/files/download?path=/workspace/project"
+```
+
+支持任意格式文件（文本/图片/PDF/二进制等，Content-Type 用 `mime-types` 按扩展名推断，未知回退 `application/octet-stream`）。目录**统一打包为 zip**（沙箱内 python `zipfile` 实现，不依赖系统 zip 命令；空目录也含根条目）。打包在沙箱 `/tmp`（overlay，不占 PVC）完成，回传后自动清理临时文件。path 不存在返回 404。
+
+#### 上传
+
+```bash
+# body 为文件原始字节（非 multipart）
+curl -X POST "https://test-opencode.shadow-rpa.net/session/$SID/files/upload?path=/workspace/data&filename=model.bin" \
+  --data-binary @model.bin
+# → {"sessionID":"ses_xxx","path":"/workspace/data/model.bin","filename":"model.bin","size":1048576}
+```
+
+目标目录不存在时自动创建（含多级）。流式写入，单文件上限 512MB，超限返回 413。`filename` 必须是纯文件名（不含 `/`）。上传同路径文件为覆盖写。
+
+#### 前端 fetch 示例
+
+```typescript
+// 创建目录
+await fetch(`${baseURL}/session/${sid}/files/mkdir?path=/workspace/project`, { method: "POST" })
+
+// 创建文件
+await fetch(`${baseURL}/session/${sid}/files/create?path=/workspace/project/app.py`, {
+  method: "POST",
+  body: "print('hello')",
+})
+
+// 上传
+await fetch(`${baseURL}/session/${sid}/files/upload?path=/workspace/data&filename=model.bin`, {
+  method: "POST",
+  body: file,  // File/Blob 直接作为 body
+})
+
+// 下载（触发浏览器保存）
+const a = document.createElement("a")
+a.href = `${baseURL}/session/${sid}/files/download?path=${encodeURIComponent(path)}`
+a.click()
+```
+
+四个接口都会在 `exec_log` 表留下 `file-mkdir` / `file-create` / `file-download` / `file-upload` 记录，可通过 `GET /session/:id/execs` 审计。
+
 ---
 
 ## 四、核心使用模式
@@ -817,9 +897,20 @@ async function processBatch(tasks: string[]) {
 
 **场景**：把客户端本地文件传到沙箱 `/workspace`，让 AI 处理。
 
-opencode **没有直接的文件上传 API**——所有文件操作都通过 AI 的工具调用完成。三种实用方法：
+#### 方法 A：文件上传 API（推荐，支持大文件流式上传）
 
-#### 方法 A：base64 内联写入（推荐，小文件 < 1MB）
+```typescript
+// body 直接传 File/Blob，不经过 AI 消息，无模型消耗
+await fetch(`${baseURL}/session/${sid}/files/upload?path=/workspace&filename=data.csv`, {
+  method: "POST",
+  body: file,
+})
+// → {"sessionID":"ses_xxx","path":"/workspace/data.csv","filename":"data.csv","size":12345}
+```
+
+目录不存在自动创建，单文件上限 512MB。详见 [3.7 沙箱文件管理](#37-沙箱文件管理)。
+
+#### 方法 B：base64 内联写入（小文件 < 1MB，不想直接调文件 API 时）
 
 ```typescript
 import { readFileSync } from "fs"
@@ -831,7 +922,7 @@ echo '${b64}' | base64 -d > /workspace/data.csv
 `)
 ```
 
-#### 方法 B：从外部 URL 下载（推荐，大文件 / 已托管）
+#### 方法 C：从外部 URL 下载（大文件 / 已托管）
 
 ```typescript
 await chat(sid, `
@@ -842,7 +933,7 @@ wget -O /workspace/data.csv 'https://example.com/data.csv'
 
 适合：从 S3、CDN、对象存储下载。
 
-#### 方法 C：FilePart 多模态附件（图片/PDF）
+#### 方法 D：FilePart 多模态附件（图片/PDF）
 
 把图片或 PDF 通过 `FilePart` 直接传给 AI 分析（不写入沙箱文件系统）：
 
@@ -882,9 +973,21 @@ await fetch(`/session/${sid}/message`, {
 
 ### 4.8 文件从沙箱下载
 
-同样**没有直接 API**，通过 AI 工具完成：
+#### 方法 A：文件下载 API（推荐，二进制安全、目录可打包）
 
-#### 方法 A：让 AI 读出文件内容
+```typescript
+// 单文件：返回原始字节，直接保存
+const res = await fetch(`${baseURL}/session/${sid}/files/download?path=/workspace/report.md`)
+fs.writeFileSync("./report.md", Buffer.from(await res.arrayBuffer()))
+
+// 目录：自动打包 zip（或 tar.gz）下载
+const res2 = await fetch(`${baseURL}/session/${sid}/files/download?path=/workspace/project`)
+fs.writeFileSync("./project.zip", Buffer.from(await res2.arrayBuffer()))
+```
+
+详见 [3.7 沙箱文件管理](#37-沙箱文件管理)。
+
+#### 方法 B：让 AI 读出文件内容（文本小文件）
 
 ```typescript
 const result = await chat(sid, "使用 bash 工具执行 cat /workspace/report.txt")
@@ -894,19 +997,7 @@ const fileContent = result.tools[0]?.state?.output
 
 适合：文本文件、小数据。
 
-#### 方法 B：base64 编码后取出（二进制文件）
-
-```typescript
-const result = await chat(sid, `
-使用 bash 工具执行：
-base64 /workspace/output.png
-`)
-const b64 = result.tools[0]?.state?.output
-const buffer = Buffer.from(b64, "base64")
-fs.writeFileSync("./output.png", buffer)
-```
-
-#### 方法 C：上传到外部存储
+#### 方法 C：上传到外部存储（大文件、批量）
 
 ```typescript
 await chat(sid, `

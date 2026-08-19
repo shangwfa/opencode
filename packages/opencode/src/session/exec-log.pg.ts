@@ -52,6 +52,10 @@ export type ExecLogSource =
   | "plugin-clear"
   | "dotopencode-load"
   | "sandbox-create"
+  | "file-mkdir"
+  | "file-create"
+  | "file-download"
+  | "file-upload"
 
 export const ExecLogTable = pgTable(
   "exec_log",

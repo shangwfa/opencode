@@ -15,7 +15,8 @@ import { ProxyUtil } from "@/server/proxy-util"
 import { resolveSandboxOpts } from "@/session/sandbox-opts"
 import { insertExecLog, updateExecLog, queryExecLogsBySession, queryExecLog, type ExecLog } from "@/session/exec-log"
 import { ExecFailed } from "@/sandbox/exec-failed"
-import { toSandboxCwd } from "@/tool/sandbox-path"
+import { toSandboxCwd, toSandboxPath } from "@/tool/sandbox-path"
+import path from "path"
 
 type ProxyError = {
   type: "runtime" | "network" | "compile"
@@ -158,6 +159,24 @@ const KeepAliveBody = Schema.Struct({
   enabled: Schema.optional(Schema.Boolean),
   boot: Schema.optional(Schema.Boolean),
 })
+
+// ── files API（创建目录 / 创建文件 / 下载 / 上传）────────────────
+const FilePathQuery = Schema.Struct({
+  path: Schema.String,
+})
+const FileUploadQuery = Schema.Struct({
+  path: Schema.optional(Schema.String),
+  filename: Schema.String,
+})
+const MAX_UPLOAD_BYTES = 512 * 1024 * 1024
+
+function shellQuote(value: string) {
+  return "'" + value.replace(/'/g, "'\\''") + "'"
+}
+
+function encodeDownloadFilename(value: string) {
+  return encodeURIComponent(value).replace(/[!'()*]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`)
+}
 
 type ExecSseEvent =
   | { _tag: "stdout"; text: string }
@@ -705,6 +724,306 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
         return HttpServerResponse.jsonUnsafe({ sessionID: params.sessionID, destroyed: true })
       }),
     )
+
+    // ── files API: 创建目录 / 创建文件 / 下载 / 上传 ──────────────
+    // 解析 root session 的 sandbox（app 模式 PVC subPath 需要 root）
+    const resolveSandbox = (sessionID: SessionID) =>
+      Effect.gen(function* () {
+        const session = yield* requireSession(sessionID).pipe(Effect.catch(() => Effect.fail(HttpServerResponse.jsonUnsafe({ error: "session not found" }, { status: 404 }))))
+        const root = yield* Effect.promise(() => resolveSandboxOpts(sessionID))
+        const sb = yield* sandbox.getOrCreate(root.id, {
+          pvcMode: root.pvcMode,
+          appId: root.appId,
+          sandbox: root.sandbox,
+        }).pipe(Effect.mapError(() => HttpServerResponse.jsonUnsafe({ error: "sandbox unavailable" }, { status: 502 })))
+        return { root, sb, session }
+      })
+
+    yield* router.add("POST", "/session/:sessionID/files/mkdir",
+      Effect.gen(function* () {
+        const params = yield* HttpRouter.schemaPathParams(SessionParams)
+        const query = yield* HttpServerRequest.schemaSearchParams(FilePathQuery).pipe(
+          Effect.catch(() => Effect.fail(HttpServerResponse.jsonUnsafe({ error: "invalid query" }, { status: 400 }))),
+        )
+        const { root, sb, session } = yield* resolveSandbox(params.sessionID)
+        const sandboxPath = toSandboxPath(query.path, session.directory)
+        const dir = path.posix.normalize(sandboxPath)
+        if (!path.posix.isAbsolute(dir))
+          return HttpServerResponse.jsonUnsafe({ error: "path must be absolute" }, { status: 400 })
+
+        yield* Effect.tryPromise({
+          try: () => sb.files.createDirectories([{ path: dir, mode: 755 }]),
+          catch: (e) => new Error(`mkdir failed: ${e instanceof Error ? e.message : String(e)}`),
+        }).pipe(
+          Effect.mapError((error) => HttpServerResponse.jsonUnsafe({ error: error.message }, { status: 502 })),
+        )
+
+        yield* Effect.promise(() => insertExecLog({
+          id: `action-${++execCounter}-${Date.now()}`,
+          session_id: root.id,
+          command: JSON.stringify({ path: dir }),
+          status: "completed",
+          source: "file-mkdir",
+          time_started: Date.now(),
+          time_finished: Date.now(),
+        })).pipe(Effect.catch(() => Effect.void))
+
+        return HttpServerResponse.jsonUnsafe({ sessionID: params.sessionID, path: dir, created: true })
+      }),
+    )
+
+    yield* router.add("POST", "/session/:sessionID/files/create",
+      Effect.gen(function* () {
+        const params = yield* HttpRouter.schemaPathParams(SessionParams)
+        const query = yield* HttpServerRequest.schemaSearchParams(FilePathQuery).pipe(
+          Effect.catch(() => Effect.fail(HttpServerResponse.jsonUnsafe({ error: "invalid query" }, { status: 400 }))),
+        )
+        const request = yield* HttpServerRequest.HttpServerRequest
+        const sourceBody = request.source instanceof Request ? request.source.body : null
+
+        const { root, sb, session } = yield* resolveSandbox(params.sessionID)
+        const sandboxPath = toSandboxPath(query.path, session.directory)
+        const target = path.posix.normalize(sandboxPath)
+        if (!path.posix.isAbsolute(target))
+          return HttpServerResponse.jsonUnsafe({ error: "path must be absolute" }, { status: 400 })
+        const parent = path.posix.dirname(target)
+
+        let size = 0
+        const t0 = Date.now()
+        let data: AsyncGenerator<Uint8Array> | ArrayBuffer
+        if (sourceBody) {
+          data = (async function* () {
+            const reader = sourceBody.getReader()
+            try {
+              while (true) {
+                const { done, value } = await reader.read()
+                if (done) break
+                size += value.byteLength
+                if (size > MAX_UPLOAD_BYTES) throw new Error(`file exceeds ${MAX_UPLOAD_BYTES} byte limit`)
+                yield value
+              }
+            } finally {
+              reader.releaseLock()
+            }
+          })()
+        } else {
+          const buffer = yield* Effect.orDie(request.arrayBuffer)
+          if (buffer.byteLength > MAX_UPLOAD_BYTES)
+            return HttpServerResponse.jsonUnsafe({ error: `file exceeds ${MAX_UPLOAD_BYTES} byte limit` }, { status: 413 })
+          size = buffer.byteLength
+          data = buffer
+        }
+
+        yield* Effect.tryPromise({
+          try: () =>
+            sb.files
+              .createDirectories([{ path: parent, mode: 755 }])
+              .then(() => sb.files.writeFiles([{ path: target, data, mode: 644 }])),
+          catch: (e) => new Error(`create failed: ${e instanceof Error ? e.message : String(e)}`),
+        }).pipe(
+          Effect.mapError((error) =>
+            error.message.startsWith("file exceeds")
+              ? HttpServerResponse.jsonUnsafe({ error: error.message }, { status: 413 })
+              : HttpServerResponse.jsonUnsafe({ error: error.message }, { status: 502 }),
+          ),
+        )
+
+        yield* Effect.promise(() => insertExecLog({
+          id: `action-${++execCounter}-${Date.now()}`,
+          session_id: root.id,
+          command: JSON.stringify({ path: target, size }),
+          status: "completed",
+          source: "file-create",
+          time_started: t0,
+          time_finished: Date.now(),
+        })).pipe(Effect.catch(() => Effect.void))
+
+        return HttpServerResponse.jsonUnsafe({ sessionID: params.sessionID, path: target, size, created: true })
+      }),
+    )
+
+    yield* router.add("GET", "/session/:sessionID/files/download",
+      Effect.gen(function* () {
+        const params = yield* HttpRouter.schemaPathParams(SessionParams)
+        const query = yield* HttpServerRequest.schemaSearchParams(FilePathQuery).pipe(
+          Effect.catch(() => Effect.fail(HttpServerResponse.jsonUnsafe({ error: "invalid query" }, { status: 400 }))),
+        )
+        const { root, sb, session } = yield* resolveSandbox(params.sessionID)
+        const sandboxPath = toSandboxPath(query.path, session.directory)
+        const target = path.posix.normalize(sandboxPath)
+        if (!path.posix.isAbsolute(target))
+          return HttpServerResponse.jsonUnsafe({ error: "path must be absolute" }, { status: 400 })
+
+        // execd 的 getFileInfo 不保证返回类型位/type 字段（远程实现 mode 为纯权限位），
+        // 存在性用 getFileInfo 确认，文件/目录类型用 exec 判断（与 tree 一致）。
+        const info = yield* Effect.tryPromise({
+          try: async () => (await sb.files.getFileInfo([target]))[target],
+          catch: () => undefined,
+        }).pipe(Effect.orElseSucceed(() => undefined))
+        if (!info) return HttpServerResponse.jsonUnsafe({ error: `path not found: ${target}` }, { status: 404 })
+
+        const kindCmd = `if [ -d ${shellQuote(target)} ]; then echo dir; elif [ -f ${shellQuote(target)} ]; then echo file; else echo other; fi`
+        const kind = yield* sandbox.runInSession(root.id, kindCmd, { timeoutSeconds: 10 }).pipe(
+          Effect.mapError(() => HttpServerResponse.jsonUnsafe({ error: "sandbox unavailable" }, { status: 502 })),
+        )
+        const isDir = kind.logs.stdout.map((m: any) => m.text).join("").trim() === "dir"
+
+        const downloadName = path.posix.basename(target) || "download"
+        const disposition = `attachment; filename="download"; filename*=UTF-8''${encodeDownloadFilename(downloadName)}`
+        const logDownload = (detail: Record<string, unknown>) =>
+          Effect.promise(() => insertExecLog({
+            id: `action-${++execCounter}-${Date.now()}`,
+            session_id: root.id,
+            command: JSON.stringify({ path: target, ...detail }),
+            status: "completed",
+            source: "file-download",
+            time_started: Date.now(),
+            time_finished: Date.now(),
+          })).pipe(Effect.catch(() => Effect.void))
+
+        // 文件：流式返回原始字节，Content-Type 用 mime-types 推断
+        if (!isDir) {
+          const size = typeof info.size === "number" ? info.size : undefined
+          yield* logDownload({ type: "file", size })
+          const { lookup } = yield* Effect.promise(() => import("mime-types"))
+          return HttpServerResponse.stream(
+            Stream.fromAsyncIterable(sb.files.readBytesStream(target), (cause) => cause),
+            {
+              contentType: lookup(downloadName) || "application/octet-stream",
+              contentLength: size,
+              headers: {
+                "Content-Disposition": disposition,
+                "X-Content-Type-Options": "nosniff",
+              },
+            },
+          )
+        }
+
+        // 目录：沙箱内用 python zipfile 打包为 zip（沙箱必有 python3，不依赖系统 zip/tar），
+        // 归档写到 /tmp（overlay，避开 PVC），流式回传后清理。
+        const archiveId = `oc-dl-${Date.now()}-${++execCounter}`
+        const archivePath = `/tmp/${archiveId}.zip`
+        const zipScript = [
+          "import base64,zipfile,os,sys",
+          "target=base64.b64decode(sys.argv[1]).decode()",
+          "out=sys.argv[2]",
+          "base=os.path.basename(target.rstrip('/')) or 'download'",
+          "count=[0]",
+          "with zipfile.ZipFile(out,'w',zipfile.ZIP_DEFLATED) as z:",
+          "    for root,dirs,files in os.walk(target):",
+          "        for f in files:",
+          "            p=os.path.join(root,f)",
+          "            z.write(p, os.path.join(base, os.path.relpath(p,target)))",
+          "            count[0]+=1",
+          "        for d in dirs:",
+          "            p=os.path.join(root,d)",
+          "            z.writestr(zipfile.ZipInfo(os.path.join(base, os.path.relpath(p,target))+'/'), b'')",
+          "            count[0]+=1",
+          "    if count[0]==0:",
+          "        z.writestr(zipfile.ZipInfo(base+'/'), b'')",
+          "print(os.path.getsize(out))",
+        ].join("\n")
+        const zipCmd = `python3 -c "import base64,sys;exec(base64.b64decode('${Buffer.from(zipScript).toString("base64")}').decode())" ${shellQuote(Buffer.from(target).toString("base64"))} ${shellQuote(archivePath)}`
+        const pack = yield* sandbox.runInSession(root.id, zipCmd, { timeoutSeconds: 180 }).pipe(
+          Effect.mapError(() => HttpServerResponse.jsonUnsafe({ error: "archive failed" }, { status: 502 })),
+        )
+        if (pack.exitCode !== 0)
+          return HttpServerResponse.jsonUnsafe({ error: "archive failed", stderr: pack.logs.stderr.map((m: any) => m.text).join("\n").slice(0, 1024) }, { status: 502 })
+
+        const archiveSize = Number.parseInt(pack.logs.stdout.map((m: any) => m.text).join("").trim(), 10)
+        yield* logDownload({ type: "directory", archive: "zip", size: Number.isNaN(archiveSize) ? undefined : archiveSize })
+
+        const cleanup = Effect.promise(() => sb.files.deleteFiles([archivePath]).catch(() => undefined))
+        return HttpServerResponse.stream(
+          Stream.fromAsyncIterable(sb.files.readBytesStream(archivePath), (cause) => cause).pipe(
+            Stream.ensuring(cleanup),
+          ),
+          {
+            contentType: "application/zip",
+            contentLength: Number.isNaN(archiveSize) ? undefined : archiveSize,
+            headers: {
+              "Content-Disposition": `attachment; filename="download"; filename*=UTF-8''${encodeDownloadFilename(`${downloadName}.zip`)}`,
+              "X-Content-Type-Options": "nosniff",
+            },
+          },
+        )
+      }),
+    )
+
+    yield* router.add("POST", "/session/:sessionID/files/upload",
+      Effect.gen(function* () {
+        const params = yield* HttpRouter.schemaPathParams(SessionParams)
+        const query = yield* HttpServerRequest.schemaSearchParams(FileUploadQuery).pipe(
+          Effect.catch(() => Effect.fail(HttpServerResponse.jsonUnsafe({ error: "invalid query" }, { status: 400 }))),
+        )
+        const filename = query.filename.trim()
+        if (!filename || filename.includes("/") || filename.includes("\0") || filename === "." || filename === "..")
+          return HttpServerResponse.jsonUnsafe({ error: "filename must be a bare file name" }, { status: 400 })
+
+        const request = yield* HttpServerRequest.HttpServerRequest
+        const sourceBody = request.source instanceof Request ? request.source.body : null
+
+        const { root, sb, session } = yield* resolveSandbox(params.sessionID)
+        const sandboxPath = toSandboxPath(query.path || "/workspace", session.directory)
+        const dir = path.posix.normalize(sandboxPath)
+        if (!path.posix.isAbsolute(dir))
+          return HttpServerResponse.jsonUnsafe({ error: "path must be absolute" }, { status: 400 })
+        const target = `${dir}/${filename}`
+
+        let size = 0
+        const t0 = Date.now()
+        let data: AsyncGenerator<Uint8Array> | ArrayBuffer
+        if (sourceBody) {
+          data = (async function* () {
+            const reader = sourceBody.getReader()
+            try {
+              while (true) {
+                const { done, value } = await reader.read()
+                if (done) break
+                size += value.byteLength
+                if (size > MAX_UPLOAD_BYTES) throw new Error(`upload exceeds ${MAX_UPLOAD_BYTES} byte limit`)
+                yield value
+              }
+            } finally {
+              reader.releaseLock()
+            }
+          })()
+        } else {
+          const buffer = yield* Effect.orDie(request.arrayBuffer)
+          if (buffer.byteLength > MAX_UPLOAD_BYTES)
+            return HttpServerResponse.jsonUnsafe({ error: `upload exceeds ${MAX_UPLOAD_BYTES} byte limit` }, { status: 413 })
+          size = buffer.byteLength
+          data = buffer
+        }
+
+        yield* Effect.tryPromise({
+          try: () =>
+            sb.files
+              .createDirectories([{ path: dir, mode: 755 }])
+              .then(() => sb.files.writeFiles([{ path: target, data, mode: 644 }])),
+          catch: (e) => new Error(`upload failed: ${e instanceof Error ? e.message : String(e)}`),
+        }).pipe(
+          Effect.mapError((error) =>
+            error.message.startsWith("upload exceeds")
+              ? HttpServerResponse.jsonUnsafe({ error: error.message }, { status: 413 })
+              : HttpServerResponse.jsonUnsafe({ error: error.message }, { status: 502 }),
+          ),
+        )
+
+        yield* Effect.promise(() => insertExecLog({
+          id: `action-${++execCounter}-${Date.now()}`,
+          session_id: root.id,
+          command: JSON.stringify({ path: target, size, filename }),
+          status: "completed",
+          source: "file-upload",
+          time_started: t0,
+          time_finished: Date.now(),
+        })).pipe(Effect.catch(() => Effect.void))
+
+        return HttpServerResponse.jsonUnsafe({ sessionID: params.sessionID, path: target, filename, size })
+      }),
+    )
+
 
     yield* router.add("*", "/session/:sessionID/proxy/:port/*",
       Effect.gen(function* () {
