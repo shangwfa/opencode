@@ -116,6 +116,46 @@ FROM part p WHERE p.session_id='$SID' AND p.data->>'tool'='question';"
 - 会话可继续发消息（run 已释放）
 - **无** pending 计时器泄漏：question 结束后流停滞照常触发 stall
 
+### T40.1.4 MCP 工具权限询问挂起不被 stall 误杀（2026-08-19 事故场景）
+
+**场景**：MCP 工具（如 `codegraph_codegraph_explore`）每次执行前必发 `ctx.ask({permission: key, patterns: ["*"]})`（`session/tools.ts:530`）。若会话权限无匹配规则（如只设了 `external_directory: * allow`，通配不上工具名），ask 挂起等人工授权 → `fullStream` 零事件 → stall 保护在 300s 后斩杀该工具（`Tool execution aborted` / `interrupted: true`）——**人工根本来不及点「允许一次」**（2026-08-19 `ses_fe76d6edaffeqduKwo76qF2rBM` / `ses_fe821da55ffe6v4dZbkJKfDq5K` 事故形态）。
+
+这是 question 豁免的同类问题但**未被豁免覆盖**：stall 计时器只按 `toolName === "question"` 判断，不感知「工具正卡在 permission.ask 等授权」。等待人工授权是合法无限期等待，应与 question 同等豁免。
+
+**修复方向**（复测前需先实现）：把 stall 豁免从「question 工具名」推广为「存在 in-flight permission.ask 即挂起计时器」——permission.ask 挂起/恢复时同步增删 pending 集合，与 `pendingQuestionCalls` 同逻辑。
+
+**复现**（修复前行为）：
+
+```bash
+# 短 stall 超时启动 server（容器场景：docker run -e 传入）
+env OPENCODE_LLM_STALL_TIMEOUT_SEC=10 \
+  OPENCODE_DATABASE_URL='postgresql://local@127.0.0.1:15432/opencode' \
+  bun run --conditions=browser ./src/index.ts serve --hostname 127.0.0.1 --port 14097 --print-logs --pure &
+
+# 会话只设 external_directory 规则（不匹配 MCP 工具名）
+SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jq -r .id)
+curl -s -X PATCH "$BASE/session/$SID" -H 'Content-Type: application/json' \
+  -d '{"permission":[{"permission":"external_directory","pattern":"*","action":"allow"}]}' > /dev/null
+
+# 诱导调用 codegraph，不响应授权（SSE 会看到 permission.asked 事件，人工不做任何操作）
+curl -s -N "$BASE/session/$SID/event" > /tmp/sse-perm-stall.log &
+curl -s --max-time 120 -X POST "$BASE/session/$SID/message" -H 'Content-Type: application/json' \
+  -d '{"parts":[{"type":"text","text":"使用 codegraph_codegraph_explore 工具查询任意符号"}],"model":$MODEL}' &
+sleep 30   # 远超 10s stall 上限，期间不点授权
+
+# 检查 codegraph part 状态
+psql "$PG_URL" -P pager=off -c "
+SELECT p.data->>'tool' as tool, p.data->'state'->>'status' as status,
+  p.data->'state'->>'error' as error, p.data->'state'->'metadata'->>'interrupted' as interrupted
+FROM part p WHERE p.session_id='$SID' AND p.data->>'tool' LIKE 'codegraph%';"
+```
+
+**期望（修复后）**：
+- codegraph part `status` 仍为 `running`（等授权中），**无** `Tool execution aborted` / `interrupted: true`
+- server 日志在授权挂起期间**无** `LLM stream stalled`
+- 人工点「允许一次」（`POST /permission/:requestID/reply`）后工具正常继续，run 完成
+- **对照组（修复前）**：~10s 后 `LLM stream stalled: no events for 10s` + codegraph `status=error, interrupted=true`（事故形态）
+
 ---
 
 ## ST-2: 陈旧 run 接管（兜底修复）
@@ -227,6 +267,7 @@ curl -s --max-time 60 -X POST "$BASE/session/$SID/message" -H 'Content-Type: app
 | 2026-08-18 | T40.2.1 幽灵 run 接管 | ⚠️ 同 2026-08-17 | HTTP 层 `waitForSessionLock` 先卡（第二条 120s curl 超时），与上次记录一致；Runner 接管仍由单测覆盖 |
 | 2026-08-18 | T40.2.2 正常长 run 不误杀 | ✅ | 容器（STALL=600/STALE=30）：20s bash 长消息期间排队消息 41s 返回 `ok`；`cancelling stale run` 0 条 |
 | 2026-08-18 | T40.3.1 事故复现+重启恢复 | ✅ | 容器（STALL=600）：幽灵 run 持锁，新消息 HTTP 000 超时（事故形态复现）；`docker restart` 后同 session 消息 ~10s 恢复回复 `ok` |
+| 2026-08-19 | T40.1.4 MCP 工具权限询问挂起被 stall 误杀 | ⚠️ 待修复复测 | 复现确认（`ses_fe76d6edaffeqduKwo76qF2rBM`）：会话只设 `external_directory:* allow`，codegraph ask 挂起 300s 被斩（`Tool execution aborted`/`interrupted: true`）。豁免未覆盖「in-flight permission.ask」，需先实现修复再复测 |
 
 ## 分层发现（2026-08-17 实测）
 

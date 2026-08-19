@@ -370,6 +370,35 @@ send_and_verify "$SID" "读取 /tmp/allow-this/test.txt 文件内容（如果文
 - `/tmp/allow-this/` 下的路径匹配具体 `allow` 规则，工具执行成功
 - 其他 `/tmp/` 路径匹配通配符 `deny` 规则，工具被拒绝
 
+### T5.10 会话 `permission: "*"` 通配放行一切（含 MCP 工具）
+
+**场景**：MCP 工具（如 `codegraph_codegraph_explore`）的权限询问 `permission` 类型是工具名本身（`session/tools.ts:530`），`external_directory: *` 这类规则**不匹配**它。验证 `{"permission":"*","pattern":"*","action":"allow"}` 通配规则能跨类型放行，MCP 工具调用不再挂起等人工授权（2026-08-19 `ses_fe76d6edaffeqduKwo76qF2rBM` 事故场景）。
+
+```bash
+source test-lib.sh
+
+SID=$(new_sid -kb)
+
+# 通配规则：放行任何 permission 类型、任何 pattern
+curl -s -X PATCH "$BASE/session/$SID" \
+  -H 'Content-Type: application/json' \
+  -d '{"permission":[{"permission":"*","pattern":"*","action":"allow"}]}' > /dev/null
+
+# 诱导调用 codegraph MCP 工具（该工具每次执行前必发 ctx.ask({permission:"codegraph_codegraph_explore", patterns:["*"]})）
+send_and_verify "$SID" "使用 codegraph_codegraph_explore 工具在 /workspace 中查询任意符号" "T5.10 MCP 工具免授权"
+
+# 对比组：不设该规则的会话调 codegraph 会挂起等授权（permission.asked 事件 + 无响应）
+```
+
+**期望**：
+- codegraph 工具调用**直接执行**（status=completed 或业务 error），**无** `permission.asked` 挂起、无「需要权限」人工干预
+- 对照组（仅设 `external_directory: * allow`）：codegraph 调用挂起等授权，300s 后被 stall 保护误杀（`Tool execution aborted` / `interrupted: true`）
+- PG 验证：`session.permission` 存为 `[{permission:"*",pattern:"*",action:"allow"}]`
+
+**注意事项**：
+- `permission: "*"` 是「本会话放弃一切权限防护」——bash 命令、read、任何 MCP 工具全免授权。生产环境建议收敛为精确规则：`{"permission":"codegraph_codegraph_explore","pattern":"*","action":"allow"}`
+- 若测试环境无 codegraph MCP 服务，可用任意已注册的 MCP 工具替代
+
 ---
 
 ## 验收汇总
@@ -396,5 +425,6 @@ send_and_verify "$SID" "读取 /tmp/allow-this/test.txt 文件内容（如果文
 | T5.7 read 拒绝 | — | — | read 被拒绝 | |
 | T5.8 bash 拒绝 | — | — | bash 被拒绝 | |
 | T5.9 规则优先级 | — | — | 具体 allow > 通配 deny | |
+| T5.10 `permission:"*"` 通配放行一切（含 MCP 工具） | — | — | MCP 工具免授权直接执行 | |
 
 ---
