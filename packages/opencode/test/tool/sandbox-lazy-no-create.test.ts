@@ -120,4 +120,63 @@ describe("Lazy sandbox: getSandbox pattern", () => {
     // 7 unused tools never triggered context
     expect(contextCalls).toBe(3)
   })
+
+  test("lazy sandbox getter defers creation until first access", () => {
+    let getSandboxCalls = 0
+    let sandbox: Promise<unknown> | null | undefined
+    const ctx = {
+      get sandbox() {
+        if (sandbox === undefined) {
+          getSandboxCalls++
+          sandbox = Promise.resolve({ id: "sb" })
+        }
+        return sandbox
+      },
+    }
+
+    // Context construction never touches the getter
+    expect(getSandboxCalls).toBe(0)
+    expect(sandbox).toBeUndefined()
+
+    // First access creates once
+    const p1 = ctx.sandbox
+    expect(getSandboxCalls).toBe(1)
+
+    // Repeated access reuses the memoized promise
+    const p2 = ctx.sandbox
+    expect(getSandboxCalls).toBe(1)
+    expect(p2).toBe(p1)
+  })
+
+  test("prototype-based context inheritance does not trigger the lazy getter", () => {
+    let getSandboxCalls = 0
+    let memo: Promise<unknown> | undefined
+    const parent = {
+      callID: "parent-call",
+      get sandbox() {
+        getSandboxCalls++
+        if (!memo) memo = Promise.resolve({ id: "sb" })
+        return memo
+      },
+    }
+
+    // The resolveTools pattern: Object.assign(Object.create(parent), overrides)
+    const child = Object.assign(Object.create(parent) as typeof parent, {
+      callID: "child-call",
+    })
+
+    // Building the child context must not evaluate the parent's sandbox getter
+    expect(getSandboxCalls).toBe(0)
+    expect(child.callID).toBe("child-call")
+
+    // Prototype chain still reaches the lazy getter on first use
+    const p = child.sandbox
+    expect(getSandboxCalls).toBe(1)
+    expect(p).toBeDefined()
+
+    // Spread copies WOULD have triggered the getter — guard against regression
+    const spread = { ...parent }
+    expect(getSandboxCalls).toBe(2)
+    expect(spread.sandbox === memo).toBe(true)
+  })
 })

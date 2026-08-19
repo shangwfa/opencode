@@ -77,6 +77,9 @@ export const GrepTool = Tool.define(
             const escapedInclude = params.include.replace(/'/g, "'\\''")
             cmd += ` --glob '${escapedInclude}'`
           }
+          // The second rg reads one stdin stream, so -m is a global match
+          // limit and closes the pipe before the first rg scans the full tree.
+          cmd += ` | rg -m ${limit + 1} '"type":"match"'`
 
           const result = yield* sandboxProvider.runDetached(ctx.sandboxSessionID ?? ctx.sessionID, cmd, { timeoutSeconds: 30 })
           const stdout = result.logs.stdout

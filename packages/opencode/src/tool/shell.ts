@@ -411,11 +411,6 @@ export const ShellTool = Tool.define(
             ctx.abort,
           )
         : yield* Effect.gen(function* () {
-            const sb = yield* Effect.tryPromise({
-              try: () => ctx.sandbox!,
-              catch: (e) =>
-                new Error(`Initialization failed: ${e instanceof Error ? e.message : String(e)}`),
-            })
             return yield* sandboxProvider.runInSession(
               ctx.sandboxSessionID ?? ctx.sessionID,
               fullCommand,

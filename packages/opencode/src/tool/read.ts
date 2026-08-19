@@ -12,7 +12,7 @@ import { isPdfAttachment, sniffAttachmentMime } from "@/util/media"
 import { toSandboxPath } from "./sandbox-path"
 import { SandboxProvider } from "./sandbox-provider"
 import { ToolAttachment } from "./attachment"
-import type { Sandbox } from "@alibaba-group/opensandbox"
+import { SandboxApiException, type FileInfo, type Sandbox } from "@alibaba-group/opensandbox"
 
 const DEFAULT_READ_LIMIT = 2000
 const MAX_LINE_LENGTH = 2000
@@ -22,7 +22,11 @@ const MAX_BYTES_LABEL = `${MAX_BYTES / 1024} KB`
 const SAMPLE_BYTES = 4096
 const SUPPORTED_IMAGE_MIMES = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"])
 const MAX_READ_BYTES = 50 * 1024
-const FILE_OP_TIMEOUT = Duration.seconds(60)
+// files API calls can hang indefinitely (half-open connection, sandbox being
+// torn down). Fail fast and retry once instead of waiting for the 120s
+// session watchdog to kill the call.
+const FAST_FILE_OP_TIMEOUT = Duration.seconds(15)
+const FILE_OP_RETRY = { times: 1 as const }
 const INVALID_UTF8_RATIO = 0.3
 
 function hasExcessiveInvalidUtf8(bytes: Uint8Array): boolean {
@@ -35,6 +39,7 @@ function hasExcessiveInvalidUtf8(bytes: Uint8Array): boolean {
 }
 
 class ReadStop extends Schema.TaggedErrorClass<ReadStop>()("ReadStop", {}) {}
+class SandboxReadTimeout extends Schema.TaggedErrorClass<SandboxReadTimeout>()("SandboxReadTimeout", {}) {}
 
 // `offset` and `limit` were originally `z.coerce.number()` — the runtime
 // coercion was useful when the tool was called from a shell but serves no
@@ -255,10 +260,32 @@ export const ReadTool = Tool.define<
       const instance = yield* InstanceState.context
       const sandboxPath = toSandboxPath(filepath, instance.directory)
 
+      // Distinguish "file does not exist" from "files API failed". A 404 (or a
+      // missing result entry) means the file is simply absent → undefined.
+      // Network/transport errors propagate; timeouts become a tagged error so
+      // only they are retried and (on exhaustion) trigger sandbox teardown.
       const info = yield* Effect.tryPromise({
-        try: async () => (await sb.files.getFileInfo([sandboxPath]))[sandboxPath],
-        catch: () => undefined,
-      }).pipe(Effect.catchCause(() => Effect.succeed(undefined)))
+        try: async () => {
+          const result = await sb.files.getFileInfo([sandboxPath]).catch((cause) => {
+            if (cause instanceof SandboxApiException && cause.statusCode === 404) return {} as Record<string, FileInfo>
+            throw cause
+          })
+          return result[sandboxPath] ?? undefined
+        },
+        catch: (cause) =>
+          new Error(`getFileInfo failed: ${sandboxPath}: ${cause instanceof Error ? cause.message : String(cause)}`),
+      }).pipe(
+        Effect.timeoutOrElse({
+          duration: FAST_FILE_OP_TIMEOUT,
+          orElse: () => Effect.fail(new SandboxReadTimeout()),
+        }),
+        Effect.retry({ ...FILE_OP_RETRY, while: (error) => error instanceof SandboxReadTimeout }),
+        Effect.catchTag("SandboxReadTimeout", () =>
+          provider
+            .destroy(ctx.sandboxSessionID ?? ctx.sessionID)
+            .pipe(Effect.catchCause(() => Effect.void), Effect.andThen(Effect.fail(new Error(`Read timed out: ${sandboxPath}`)))),
+        ),
+      )
 
       const isDirectory = typeof info?.mode === "number" && (info.mode & 0o170000) === 0o040000
 
@@ -350,13 +377,15 @@ export const ReadTool = Tool.define<
       }).pipe(
         Effect.catchCause(() => Effect.succeed(undefined)),
         Effect.timeoutOrElse({
-          duration: FILE_OP_TIMEOUT,
-          orElse: () =>
-            provider.destroy(ctx.sandboxSessionID ?? ctx.sessionID).pipe(
-              Effect.catchCause(() => Effect.void),
-              Effect.andThen(Effect.fail(new Error(`Read timed out: ${sandboxPath}`))),
-            ),
+          duration: FAST_FILE_OP_TIMEOUT,
+          orElse: () => Effect.fail(new SandboxReadTimeout()),
         }),
+        Effect.retry({ ...FILE_OP_RETRY, while: (error) => error instanceof SandboxReadTimeout }),
+        Effect.catchTag("SandboxReadTimeout", () =>
+          provider
+            .destroy(ctx.sandboxSessionID ?? ctx.sessionID)
+            .pipe(Effect.catchCause(() => Effect.void), Effect.andThen(Effect.fail(new Error(`Read timed out: ${sandboxPath}`)))),
+        ),
       )
 
       if (header) {
@@ -403,7 +432,14 @@ export const ReadTool = Tool.define<
           return yield* Effect.fail(new Error(`File is not valid UTF-8: ${sandboxPath}`))
         }
         const page = yield* Effect.tryPromise({
-          try: () => readTextPage(sb.files.readBytesStream(sandboxPath), start + 1, limit),
+          try: () =>
+            readTextPage(
+              typeof info?.size === "number" && info.size <= header.length
+                ? streamBytes(header)
+                : sb.files.readBytesStream(sandboxPath),
+              start + 1,
+              limit,
+            ),
           catch: (cause) => {
             if (cause instanceof BinaryContentError) return new Error(`Cannot read binary file: ${sandboxPath}`)
             if (cause instanceof TypeError) return new Error(`File is not valid UTF-8: ${sandboxPath}`)
@@ -411,13 +447,15 @@ export const ReadTool = Tool.define<
           },
         }).pipe(
           Effect.timeoutOrElse({
-            duration: FILE_OP_TIMEOUT,
-            orElse: () =>
-              provider.destroy(ctx.sandboxSessionID ?? ctx.sessionID).pipe(
-                Effect.catchCause(() => Effect.void),
-                Effect.andThen(Effect.fail(new Error(`Read timed out: ${sandboxPath}`))),
-              ),
+            duration: FAST_FILE_OP_TIMEOUT,
+            orElse: () => Effect.fail(new SandboxReadTimeout()),
           }),
+          Effect.retry({ ...FILE_OP_RETRY, while: (error) => error instanceof SandboxReadTimeout }),
+          Effect.catchTag("SandboxReadTimeout", () =>
+            provider
+              .destroy(ctx.sandboxSessionID ?? ctx.sessionID)
+              .pipe(Effect.catchCause(() => Effect.void), Effect.andThen(Effect.fail(new Error(`Read timed out: ${sandboxPath}`)))),
+          ),
         )
         const loaded = yield* instruction.resolve(ctx.messages, filepath, ctx.messageID)
 
@@ -668,6 +706,10 @@ async function readTextPage(stream: AsyncIterable<Uint8Array>, offset: number, l
 }
 
 class BinaryContentError extends Error {}
+
+async function* streamBytes(bytes: Uint8Array) {
+  yield bytes
+}
 
 function shellQuote(value: string) {
   return `'${value.replaceAll("'", `'"'"'`)}'`

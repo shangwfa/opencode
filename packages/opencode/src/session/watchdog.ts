@@ -19,7 +19,10 @@ export interface Config {
 }
 
 export const defaultConfig: Config = {
-  scanInterval: Duration.seconds(60),
+  // Keep the scan interval well below the timeout so a stuck tool is marked
+  // (and its failure persisted) soon after crossing the threshold, not up to
+  // a full interval later.
+  scanInterval: Duration.seconds(Flag.OPENCODE_WATCHDOG_SCAN_INTERVAL_SEC),
   initialDelay: Duration.seconds(10),
   timeoutMs: Flag.OPENCODE_WATCHDOG_TIMEOUT_SEC * 1000,
   orphanTimeoutMs: 15 * 60 * 1000,

@@ -88,40 +88,46 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
       .catch(() => null)
   }
 
-  const context = (args: Record<string, unknown>, options: ExecutionOptions): Tool.Context => ({
-    sessionID: input.session.id,
-    sandboxSessionID,
-    abort: options.abortSignal!,
-    messageID: input.processor.message.id,
-    callID: options.toolCallId,
-    extra: { model: input.model, bypassAgentCheck: input.bypassAgentCheck, promptOps: input.promptOps },
-    agent: input.agent.name,
-    messages: input.messages,
-    sandbox: getSandbox(),
-    metadata: (val) =>
-      input.processor.updateToolCall(options.toolCallId, (match) => {
-        if (!["running", "pending"].includes(match.state.status)) return match
-        return {
-          ...match,
-          state: {
-            title: val.title,
-            metadata: val.metadata,
-            status: "running",
-            input: args,
-            time: { start: Date.now() },
-          },
-        }
-      }),
-    ask: (req) =>
-      permission
-        .ask({
-          ...req,
-          sessionID: input.session.id,
-          tool: { messageID: input.processor.message.id, callID: options.toolCallId },
-          ruleset: Permission.merge(input.agent.permission, input.session.permission ?? []),
-        })
-        .pipe(Effect.orDie),
-  })
+  const context = (args: Record<string, unknown>, options: ExecutionOptions): Tool.Context => {
+    let sandbox: Promise<unknown> | null | undefined
+    return {
+      sessionID: input.session.id,
+      sandboxSessionID,
+      abort: options.abortSignal!,
+      messageID: input.processor.message.id,
+      callID: options.toolCallId,
+      extra: { model: input.model, bypassAgentCheck: input.bypassAgentCheck, promptOps: input.promptOps },
+      agent: input.agent.name,
+      messages: input.messages,
+      get sandbox() {
+        if (sandbox === undefined) sandbox = getSandbox()
+        return sandbox
+      },
+      metadata: (val) =>
+        input.processor.updateToolCall(options.toolCallId, (match) => {
+          if (!["running", "pending"].includes(match.state.status)) return match
+          return {
+            ...match,
+            state: {
+              title: val.title,
+              metadata: val.metadata,
+              status: "running",
+              input: args,
+              time: { start: Date.now() },
+            },
+          }
+        }),
+      ask: (req) =>
+        permission
+          .ask({
+            ...req,
+            sessionID: input.session.id,
+            tool: { messageID: input.processor.message.id, callID: options.toolCallId },
+            ruleset: Permission.merge(input.agent.permission, input.session.permission ?? []),
+          })
+          .pipe(Effect.orDie),
+    }
+  }
 
   const invoke = Effect.fnUntraced(function* (
     item: Tool.Def,
@@ -153,9 +159,15 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
           : options.abortSignal ?? parent!.abort,
       }
       const base = parent
-        ? { ...parent, callID: options.toolCallId, abort: executionOptions.abortSignal, metadata: () => Effect.void }
+        ? Object.assign(Object.create(parent) as Tool.Context, {
+            callID: options.toolCallId,
+            abort: executionOptions.abortSignal,
+            metadata: () => Effect.void,
+          })
         : context(transformed.args, executionOptions)
-      const ctx = !parent && item.id === "execute" ? { ...base, orchestration: { extensions: codeModeExtensions } } : base
+      const ctx = !parent && item.id === "execute"
+        ? Object.assign(Object.create(base) as Tool.Context, { orchestration: { extensions: codeModeExtensions } })
+        : base
       const execution = MONITORED_TOOLS.some((tool) => tool === item.id)
         ? Effect.raceFirst(
             item.execute(transformed.args, ctx),

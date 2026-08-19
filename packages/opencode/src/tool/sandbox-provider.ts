@@ -1,4 +1,4 @@
-import { Effect, Context, Layer, Cause, Deferred, Ref, Semaphore, Schedule, Duration } from "effect"
+import { Effect, Context, Layer, Cause, Deferred, Ref, Semaphore, Schedule, Duration, Scope, Exit } from "effect"
 import { Sandbox, ConnectionConfig, SandboxApiException, SandboxManager } from "@alibaba-group/opensandbox"
 import type { CommandExecution, Volume } from "@alibaba-group/opensandbox"
 import { and, asc, eq, lt, or, sql } from "drizzle-orm"
@@ -636,6 +636,11 @@ export namespace SandboxProvider {
       const commandSemaphores = new Map<string, Semaphore.Semaphore>()
       const detachedCommandSessions = new Map<string, Set<string>>()
       const createRef = yield* Ref.make(new Map<string, Deferred.Deferred<Sandbox, Error>>())
+      // Sandbox creations outlive the caller that triggered them: when a
+      // waiter times out, the creation fiber keeps running here until the
+      // layer is disposed.
+      const creationScope = yield* Scope.make()
+      yield* Effect.addFinalizer(() => Scope.close(creationScope, Exit.succeed(undefined)))
       const sbCache = new Map<string, { sb: Sandbox; cachedAt: number; sandboxID: string }>()
       const SB_CACHE_TTL_MS = 300_000
       const CLEANUP_BATCH_SIZE = 100
@@ -1136,7 +1141,12 @@ export namespace SandboxProvider {
             return yield* Deferred.await(winner).pipe(Effect.orDie)
           }
 
-          return yield* Effect.gen(function* () {
+          // The creation body runs in a background (scoped) fiber: when a
+          // waiter (e.g. getOrCreate's 90s timeout) gives up, the creation
+          // keeps going instead of being cancelled, so a retry joins the
+          // in-flight creation via createRef/Deferred or the sandbox cache
+          // rather than starting from scratch.
+          yield* Effect.gen(function* () {
             const row = yield* dbGet(sessionID).pipe(Effect.orElseSucceed(() => null))
 
             const sb = yield* Effect.gen(function* () {
@@ -1240,7 +1250,6 @@ export namespace SandboxProvider {
             yield* Deferred.succeed(myToken, sb)
             cacheSandbox(sessionID, sb)
             log.info("getOrCreate done", { sessionID, sandboxID: sb.id, totalMs: Date.now() - t0 })
-            return sb
           }).pipe(
             Effect.ensuring(
               Effect.gen(function* () {
@@ -1252,7 +1261,10 @@ export namespace SandboxProvider {
                 if (removed) yield* Deferred.fail(myToken, new Error(`Sandbox creation interrupted: ${sessionID}`)).pipe(Effect.catchCause(() => Effect.void))
               }),
             ),
+            Effect.forkIn(creationScope),
           )
+
+          return yield* Deferred.await(myToken).pipe(Effect.orDie)
         })
       }
 
@@ -1309,11 +1321,12 @@ export namespace SandboxProvider {
             const current = yield* dbGetById(sandboxID).pipe(Effect.orElseSucceed(() => null))
             if (!current || current.id !== sandboxID || (current.state !== "running" && current.state !== "killed")) return
             if (current.state === "running") yield* dbSetStateFor(current.session_id, current.id, "killed")
-            yield* Ref.modify(createRef, (m) => {
+            const inFlight = yield* Ref.modify(createRef, (m) => {
               const d = m.get(current.session_id)
               if (d) m.delete(current.session_id)
-              return [undefined, m] as const
+              return [d, m] as const
             })
+            if (inFlight) yield* Deferred.fail(inFlight, new Error(`Sandbox destroyed while creating: ${current.session_id}`))
             yield* cleanupSandbox({ ...current, state: "killed" })
           }))
         }).pipe(Effect.withSpan("SandboxProvider.destroyById"))
@@ -1365,7 +1378,6 @@ export namespace SandboxProvider {
       const runInSession: Interface["runInSession"] = (sessionID, command, options, handlers, signal) =>
         Effect.gen(function* () {
           const sb = yield* lock(sessionID, getOrCreateUnlocked(sessionID))
-          yield* dbTouchSandbox(sessionID, sb.id).pipe(Effect.catchCause(() => Effect.void))
           const workingDirectory = options?.workingDirectory ?? (yield* dbGetSessionDirectory(sessionID)) ?? "/workspace"
 
           const row = yield* dbGet(sessionID).pipe(Effect.orElseSucceed(() => null))
@@ -1409,7 +1421,6 @@ export namespace SandboxProvider {
       const runDetached: Interface["runDetached"] = (sessionID, command, options, handlers, signal) =>
         Effect.gen(function* () {
           const sb = yield* lock(sessionID, getOrCreateUnlocked(sessionID))
-          yield* dbTouchSandbox(sessionID, sb.id).pipe(Effect.catchCause(() => Effect.void))
           const workingDirectory = options?.workingDirectory ?? (yield* dbGetSessionDirectory(sessionID)) ?? "/workspace"
           const detachedSessionId = yield* Effect.tryPromise({
             try: () => sb.commands.createSession({ workingDirectory }),

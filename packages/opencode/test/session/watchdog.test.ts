@@ -10,6 +10,10 @@ import { ApplyPatchTool } from "../../src/tool/apply_patch"
 import { GlobTool } from "../../src/tool/glob"
 import { GrepTool } from "../../src/tool/grep"
 import { ListTool } from "../../src/tool/ls"
+import { LspTool } from "../../src/tool/lsp"
+import { TodoWriteTool } from "../../src/tool/todo"
+
+const REGISTERED_TOOLS = [ReadTool, WriteTool, EditTool, ApplyPatchTool, GlobTool, GrepTool, ListTool, LspTool, TodoWriteTool]
 
 const TIMEOUT_MS = 5 * 60 * 1000
 
@@ -83,7 +87,7 @@ describe("SessionWatchdog runningToolCondition", () => {
       const startBefore = NOW - TIMEOUT_MS
       const oldStart = NOW - TIMEOUT_MS - 1000
 
-      for (const tool of ["read", "write", "edit", "apply_patch", "glob", "grep", "list"]) {
+      for (const tool of ["read", "write", "edit", "apply_patch", "glob", "grep", "list", "lsp", "todowrite"]) {
         insertToolPart(`p-${tool}`, tool, "running", oldStart)
       }
 
@@ -93,7 +97,9 @@ describe("SessionWatchdog runningToolCondition", () => {
         "p-glob",
         "p-grep",
         "p-list",
+        "p-lsp",
         "p-read",
+        "p-todowrite",
         "p-write",
       ])
     })
@@ -107,7 +113,6 @@ describe("SessionWatchdog runningToolCondition", () => {
       insertToolPart("p-webfetch", "webfetch", "running", oldStart)
       insertToolPart("p-websearch", "websearch", "running", oldStart)
       insertToolPart("p-mcp", "mcp__server__tool", "running", oldStart)
-      insertToolPart("p-lsp", "lsp", "running", oldStart)
       insertToolPart("p-ls", "ls", "running", oldStart)
 
       expect(queryStuckIds(startBefore)).toEqual([])
@@ -199,14 +204,12 @@ describe("SessionWatchdog runningToolCondition", () => {
 describe("MONITORED_TOOLS whitelist linkage", () => {
   test("every whitelisted tool id maps to a real registered Tool", () => {
     const whitelist: string[] = [...MONITORED_TOOLS]
-    const registered: string[] = [ReadTool, WriteTool, EditTool, ApplyPatchTool, GlobTool, GrepTool, ListTool].map(
-      (t) => t.id,
-    )
+    const registered: string[] = REGISTERED_TOOLS.map((t) => t.id)
     expect(whitelist.sort()).toEqual(registered.sort())
   })
 
   test("no MONITORED_TOOLS entry references a non-existent tool id", () => {
-    const registered = new Set([ReadTool, WriteTool, EditTool, ApplyPatchTool, GlobTool, GrepTool, ListTool].map((t) => t.id))
+    const registered = new Set(REGISTERED_TOOLS.map((t) => t.id))
     for (const tool of MONITORED_TOOLS) {
       expect(registered.has(tool)).toBe(true)
     }

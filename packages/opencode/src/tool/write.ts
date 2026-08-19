@@ -18,7 +18,7 @@ import * as LSPClient from "@/lsp/client"
 import { Agent as LspAgent } from "@/lsp/agent"
 import { FSUtil } from "@opencode-ai/core/fs-util"
 import * as Bom from "@/util/bom"
-import type { Sandbox } from "@alibaba-group/opensandbox"
+import { SandboxApiException, type Sandbox } from "@alibaba-group/opensandbox"
 
 const writeLog = Log.create({ service: "write-tool" })
 const FILE_WRITE_TIMEOUT = Duration.seconds(60)
@@ -129,15 +129,22 @@ export const WriteTool = Tool.define(
           const sb = maybeSandbox
           const sandboxPath = toSandboxPath(filepath, instance.directory)
 
-          const rawOld = yield* Effect.tryPromise(() => sb.files.readFile(sandboxPath) as Promise<string>).pipe(
-            Effect.catch(() => Effect.succeed("")),
+          const previous = yield* Effect.tryPromise({
+            try: async () => ({ exists: true, raw: await (sb.files.readFile(sandboxPath) as Promise<string>) }),
+            catch: (cause) => cause instanceof Error ? cause : new Error(String(cause)),
+          }).pipe(
+            Effect.catch((error) =>
+              error instanceof SandboxApiException && error.statusCode === 404
+                ? Effect.succeed({ exists: false, raw: "" })
+                : Effect.fail(error),
+            ),
             Effect.timeoutOrElse({
               duration: FILE_WRITE_TIMEOUT,
-              orElse: () => Effect.succeed(""),
+              orElse: () => Effect.fail(new Error(`Read before write timed out: ${sandboxPath}`)),
             }),
           )
-          const exists = !!rawOld
-          const source = exists ? Bom.split(rawOld) : { bom: false, text: "" }
+          const exists = previous.exists
+          const source = exists ? Bom.split(previous.raw) : { bom: false, text: "" }
           const next = Bom.split(params.content)
           const desiredBom = source.bom || next.bom
           const contentOld = source.text
@@ -173,7 +180,12 @@ export const WriteTool = Tool.define(
           if (format) {
             const commands = yield* format.command(filepath).pipe(Effect.catch(() => Effect.succeed([] as string[][])))
             const sandboxProvider = Option.getOrUndefined(yield* Effect.serviceOption(SandboxProvider.Service))
-            if (sandboxProvider) {
+            if (sandboxProvider && commands.length > 0) {
+              // Formatting rewrites the file on disk before the tool returns,
+              // so the published watcher event and diagnostics below describe
+              // the final state. Run it synchronously; a background fork on a
+              // tool-scoped fiber would be interrupted as soon as the tool
+              // returns, silently skipping formatting.
               for (const cmd of commands) {
                 const replaced = cmd.map((x) => x.replace("$FILE", sandboxPath))
                 const shell = replaced.map((x) => `'${x.replaceAll("'", "'\\''")}'`).join(" ")

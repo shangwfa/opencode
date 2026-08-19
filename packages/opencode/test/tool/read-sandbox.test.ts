@@ -24,6 +24,8 @@ function makeExecution(stdout: string[], exitCode = 0): Execution {
 }
 
 // In-memory sandbox: files stored as Map, directories inferred from paths.
+// Tracks readBytesStream invocations and provider destroys so tests can assert
+// the single-flight read path and that only timeouts tear down the sandbox.
 function makeSandbox(files: Map<string, Uint8Array | string>): Sandbox {
   const fileMap = new Map<string, Uint8Array>()
   for (const [k, v] of files) fileMap.set(k, typeof v === "string" ? new TextEncoder().encode(v) : v)
@@ -57,6 +59,7 @@ function makeSandbox(files: Map<string, Uint8Array | string>): Sandbox {
         return data
       },
       readBytesStream: async function* (p: string) {
+        ;(sb as any).streamCalls = ((sb as any).streamCalls ?? 0) + 1
         const data = fileMap.get(p)
         if (!data) throw new Error(`File not found: ${p}`)
         const chunkSize = 4096
@@ -124,10 +127,13 @@ function makeSandbox(files: Map<string, Uint8Array | string>): Sandbox {
 }
 
 function makeProvider(sandbox: Sandbox): SandboxProvider.Interface {
-  return {
+  const provider = {
     getOrCreate: () => Effect.succeed(sandbox),
     get: () => Effect.succeed(sandbox),
-    destroy: () => Effect.void,
+    destroy: () =>
+      Effect.sync(() => {
+        ;(provider as any).destroyCount = ((provider as any).destroyCount ?? 0) + 1
+      }),
     destroyById: () => Effect.void,
     destroyAll: () => Effect.void,
     cleanupSessionVolume: () => Effect.void,
@@ -144,7 +150,13 @@ function makeProvider(sandbox: Sandbox): SandboxProvider.Interface {
     register: () => Effect.void,
     getEndpoint: () => Effect.succeed("http://localhost:0"),
   } as unknown as SandboxProvider.Interface
+  return provider
 }
+
+// Most recent instances used by execRead, so tests can assert side effects
+// (sandbox destroys, stream usage) without changing every existing call site.
+let lastSandbox: Sandbox
+let lastProvider: ReturnType<typeof makeProvider> & { destroyCount?: number }
 
 const baseCtx = {
   sessionID: SessionID.make("ses_test"),
@@ -166,6 +178,8 @@ function makeCtx(sandbox: Sandbox) {
 
 function makeLayers(sandbox: Sandbox) {
   const provider = makeProvider(sandbox)
+  lastSandbox = sandbox
+  lastProvider = provider as any
   return Layer.mergeAll(
     LayerNode.compile(FSUtil.node),
     Layer.succeed(SandboxProvider.Service, provider),
@@ -408,5 +422,33 @@ describe("read tool (sandbox mode)", () => {
     const result = await execRead(sb, "/workspace/diagram.svg")
     expect(result.metadata.kind).toBe("svg")
     expect(result.attachments).toBeUndefined()
+  })
+
+  test("small file reuses the header read without a second stream fetch", async () => {
+    const files = new Map<string, Uint8Array>([["/workspace/small.txt", text("hello single flight\nsecond line")]])
+    const sb = makeSandbox(files)
+    const result = await execRead(sb, "/workspace/small.txt")
+    expect(result.output).toContain("hello single flight")
+    // File fits entirely in the 64KB header readBytes, so readBytesStream must
+    // never be invoked (one fewer files-API round trip).
+    expect((sb as any).streamCalls ?? 0).toBe(0)
+  })
+
+  test("large file still streams beyond the header window", async () => {
+    const big = Array.from({ length: 3000 }, (_, i) => `line-${i}-${"x".repeat(30)}`).join("\n")
+    const files = new Map<string, Uint8Array>([["/workspace/big.txt", text(big)]])
+    const sb = makeSandbox(files)
+    const result = await execRead(sb, "/workspace/big.txt")
+    expect(result.output).toContain("line-0-")
+    expect(((sb as any).streamCalls ?? 0) >= 1).toBe(true)
+  })
+
+  test("out-of-range offset fails without destroying the sandbox", async () => {
+    const files = new Map<string, Uint8Array>([["/workspace/short.txt", text("only\na\nfew\nlines")]])
+    const sb = makeSandbox(files)
+    const err = await execReadError(sb, "/workspace/short.txt", { offset: 9999 })
+    expect(err.message).toContain("out of range")
+    // Only timeouts may tear down the sandbox; input errors must not.
+    expect(lastProvider?.destroyCount ?? 0).toBe(0)
   })
 })
