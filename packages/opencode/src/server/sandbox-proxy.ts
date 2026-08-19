@@ -151,6 +151,8 @@ const ExecBody = Schema.Struct({
   command: Schema.String,
   workingDirectory: Schema.optional(Schema.String),
   timeoutSeconds: Schema.optional(Schema.Number),
+  // async exec opt-in: 失败时是否注入自修复提示到会话。默认不开启，由调用方显式声明
+  repairOnFailure: Schema.optional(Schema.Boolean),
 })
 const KeepAliveBody = Schema.Struct({
   enabled: Schema.optional(Schema.Boolean),
@@ -356,27 +358,7 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
           time_finished: Date.now(),
         })).pipe(Effect.catch(() => Effect.void))
 
-        const syncStatus: "completed" | "failed" | "timed_out" =
-          result?.error?.name === "TimeoutError"
-            ? "timed_out"
-            : !result || (result.exitCode !== null && result.exitCode !== 0)
-              ? "failed"
-              : "completed"
-        if (syncStatus !== "completed") {
-          yield* ExecFailed.maybeTrigger({
-            provider: sandbox,
-            rootID: root.id,
-            directory: session.directory,
-            execId,
-            command,
-            workingDirectory: sandboxWorkingDirectory,
-            exitCode: result?.exitCode ?? null,
-            status: syncStatus,
-            stdout,
-            stderr,
-          })
-        }
-
+        // 同步 exec 的失败结果直接返回给调用方，不触发自修复注入
         if (!result) return HttpServerResponse.jsonUnsafe({ error: "execution failed" }, { status: 502 })
 
         return HttpServerResponse.jsonUnsafe({
@@ -511,7 +493,7 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
             error: state.error ? JSON.stringify({ name: state.error.name, value: state.error.value }) : null,
             time_finished: state.finishedAt,
           })).pipe(Effect.catch(() => Effect.void))
-          if (state.status !== "completed") {
+          if (state.status !== "completed" && body.repairOnFailure === true) {
             yield* ExecFailed.maybeTrigger({
               provider: sandbox,
               rootID: sid,
