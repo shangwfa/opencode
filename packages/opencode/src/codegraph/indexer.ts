@@ -156,8 +156,10 @@ const runIncremental = (scope: Scope, sb: Sandbox) =>
       const old = byPath.get(s.path)
       if (!old || old.size !== s.size || old.mtime_ms !== s.mtime_ms) changed.push(s.path)
     }
-    if (changed.length === 0) return Effect.void
+    // Deleted files (in ledger, not live) must be dropped even when nothing
+    // else changed — this must run BEFORE the early return below.
     yield* Effect.tryPromise(() => S.dropMissingFiles(scope, [...live]))
+    if (changed.length === 0) return Effect.void
 
     log.info("incremental", { scope, changed: changed.length })
     // Publish the pending-change set BEFORE re-extracting so tools can tell the
