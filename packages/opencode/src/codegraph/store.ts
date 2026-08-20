@@ -140,16 +140,49 @@ export const finishIndex = (scope: Scope, nodes: number, edges: number) =>
   use((d: any) =>
     d
       .insert(CodegraphIndexTable)
-      .values({ scope, state: "ready", node_count: nodes, edge_count: edges, files_done: 0, heartbeat_at: Date.now(), stale_files: [] })
+      .values({ scope, state: "ready", node_count: nodes, edge_count: edges, files_done: 0, heartbeat_at: Date.now(), stale_files: [], error: null })
       .onConflictDoUpdate({
         target: CodegraphIndexTable.scope,
-        set: { state: "ready", node_count: nodes, edge_count: edges, files_done: sql`codegraph_index.files_total`, heartbeat_at: Date.now(), stale_files: [] },
+        set: {
+          state: "ready",
+          node_count: nodes,
+          edge_count: edges,
+          files_done: sql`codegraph_index.files_total`,
+          heartbeat_at: Date.now(),
+          stale_files: [],
+          error: null,
+        },
       })
       .run(),
   )
 
+/** Recount nodes/edges for scope and mark ready (used after incremental replaceFiles). */
+export const finishIndexRecount = async (scope: Scope) => {
+  const counts = await use(async (d: any) => {
+    const nodes = await d
+      .select({ n: sql<number>`count(*)::int` })
+      .from(CodegraphNodeTable)
+      .where(sql`scope = ${scope}`)
+      .get()
+    const edges = await d
+      .select({ n: sql<number>`count(*)::int` })
+      .from(CodegraphEdgeTable)
+      .where(sql`scope = ${scope}`)
+      .get()
+    return { nodes: Number(nodes?.n ?? 0), edges: Number(edges?.n ?? 0) }
+  })
+  await finishIndex(scope, counts.nodes, counts.edges)
+  return counts
+}
+
 export const failIndex = (scope: Scope, error: string) =>
-  use((d: any) => d.update(CodegraphIndexTable).set({ state: "failed", error, heartbeat_at: Date.now() }).where(sql`scope = ${scope}`).run())
+  use((d: any) =>
+    d
+      .update(CodegraphIndexTable)
+      .set({ state: "failed", error: error.slice(0, 2000), heartbeat_at: Date.now() })
+      .where(sql`scope = ${scope}`)
+      .run(),
+  )
 
 export const setStaleFiles = (scope: Scope, files: string[]) =>
   use((d: any) => d.update(CodegraphIndexTable).set({ stale_files: files, heartbeat_at: Date.now() }).where(sql`scope = ${scope}`).run())
@@ -202,9 +235,14 @@ export const replaceGraph = async (scope: Scope, snap: ExtractSnapshot) => {
 
 /**
  * Incremental variant: delete+reinsert only the given files' nodes/edges/refs
- * (nodes carry file_path so scoping deletes by path is exact).
+ * (nodes carry file_path so scoping deletes by path is exact). Always recounts
+ * and marks the index ready so tools see accurate node/edge totals.
  */
 export const replaceFiles = async (scope: Scope, paths: string[], snap: ExtractSnapshot) => {
+  if (paths.length === 0 && snap.nodes.length === 0 && snap.edges.length === 0 && snap.files.length === 0) {
+    await finishIndexRecount(scope)
+    return
+  }
   await use(async (d: any) => {
     await d.transaction(async (tx: any) => {
       await lockScope(tx, scope)
@@ -221,6 +259,7 @@ export const replaceFiles = async (scope: Scope, paths: string[], snap: ExtractS
       await insertBatches(tx, CodegraphRefTable, snap.refs)
     })
   })
+  await finishIndexRecount(scope)
 }
 
 // ---------------------------------------------------------------------------
@@ -421,8 +460,62 @@ export const incomingEdges = (scope: Scope, nodeId: string, kinds?: string[]) =>
 // do not count as dependency).
 // ---------------------------------------------------------------------------
 
-/** Edge kinds that constitute "a call" (codegraph getCallers/getCallees set). */
-const CALL_KINDS = ["calls", "references", "imports", "instantiates"]
+/**
+ * Edge kinds that constitute "a call" for callers/callees.
+ * `imports` is structural module linkage, not a call — excluded (noise).
+ * `instantiates` counts as a call (codegraph GraphTraverser parity).
+ */
+const CALL_KINDS = ["calls", "references", "instantiates"]
+
+/** File-level dependency edges for blast-radius / affected (not structure). */
+const DEPENDENT_FILE_EDGE_KINDS = [
+  "calls",
+  "references",
+  "instantiates",
+  "extends",
+  "implements",
+  "overrides",
+  "type_depends",
+]
+
+/**
+ * Normalize a user/tool path against indexed `file_path` values.
+ * Accepts `./src/x.ts`, `src/x.ts`, `/workspace/repo/src/x.ts`, or path suffix
+ * (must match on a `/` boundary — bare `ar.ts` must not match `bar.ts`).
+ */
+export const pathMatches = (indexed: string, wanted: string): boolean => {
+  const a = indexed.replace(/^\.\//, "").replace(/\/+/g, "/")
+  const b = wanted.replace(/^\.\//, "").replace(/^\/workspace\//, "").replace(/\/+/g, "/")
+  if (!b) return false
+  if (a === b) return true
+  if (a.endsWith("/" + b)) return true
+  if (b.endsWith("/" + a)) return true
+  // basename-only: "tree-sitter.ts" matches ".../tree-sitter.ts"
+  if (!b.includes("/") && a.endsWith("/" + b)) return true
+  return false
+}
+
+/** Filter nodes whose file_path matches a user-supplied path fragment. */
+export const filterNodesByFile = (nodes: GraphNode[], file?: string): GraphNode[] => {
+  if (!file) return nodes
+  const wanted = file.replace(/^\.\//, "")
+  const narrowed = nodes.filter((n) => pathMatches(n.file_path, wanted))
+  return narrowed.length > 0 ? narrowed : nodes
+}
+
+/** Resolve a user path to the indexed file_path(s) present in the graph. */
+export const resolveIndexedPaths = async (scope: Scope, paths: string[]): Promise<string[]> => {
+  if (paths.length === 0) return []
+  const files = await listFiles(scope)
+  const out = new Set<string>()
+  for (const raw of paths) {
+    const wanted = raw.replace(/^\.\//, "").replace(/^\/workspace\//, "")
+    for (const f of files) {
+      if (pathMatches(f.path, wanted)) out.add(f.path)
+    }
+  }
+  return [...out]
+}
 
 type TraversalResult = { node: GraphNode; edge: GraphEdge }[]
 
@@ -485,14 +578,16 @@ export const getCallees = (scope: Scope, nodeId: string, maxDepth = 1): Promise<
   return collectCallees(scope, nodeId, maxDepth, out, new Set(), 0).then(() => out)
 }
 
-/** Impact radius: every incoming dependency edge (excluding `contains`). */
-export const getImpact = async (scope: Scope, nodeId: string, maxDepth = 3): Promise<TraversalResult> => {  const out: TraversalResult = []
+/** Impact radius: incoming dependency edges (excludes structural contains/imports). */
+export const getImpact = async (scope: Scope, nodeId: string, maxDepth = 3): Promise<TraversalResult> => {
+  const out: TraversalResult = []
   const visited = new Set<string>()
+  const skip = new Set(["contains", "imports"])
 
   const walk = async (id: string, depth: number): Promise<void> => {
     if (depth >= maxDepth || visited.has(id)) return
     visited.add(id)
-    const edges = (await incomingEdges(scope, id)).filter((e) => e.kind !== "contains")
+    const edges = (await incomingEdges(scope, id)).filter((e) => !skip.has(e.kind))
     if (edges.length === 0) return
     const nodes = await batchNodes(scope, edges.map((e) => e.source))
     for (const e of edges) {
@@ -510,19 +605,23 @@ export const getImpact = async (scope: Scope, nodeId: string, maxDepth = 3): Pro
 /**
  * Files that depend on `filePath` via the resolved symbol graph: every edge
  * whose target is a node in `filePath`, grouped by the source node's file.
- * This is the blast-radius / `affected` signal (calls/references/instantiates/
- * extends/... are all cross-file dependency edges; `contains`/`imports` are not).
+ * Blast-radius / `affected` signal — only DEPENDENT_FILE_EDGE_KINDS
+ * (`contains`/`imports` excluded as structural, not dependency).
+ * `filePath` may be a user fragment; resolved against indexed paths first.
  */
 export const getDependentFilePaths = async (scope: Scope, filePath: string): Promise<string[]> => {
+  const resolved = await resolveIndexedPaths(scope, [filePath])
+  const targets = resolved.length > 0 ? resolved : [filePath.replace(/^\.\//, "")]
   const fileNodes = await use((d) =>
     d
-      .select({ id: CodegraphNodeTable.id })
+      .select({ id: CodegraphNodeTable.id, file_path: CodegraphNodeTable.file_path })
       .from(CodegraphNodeTable)
-      .where(and(eq(CodegraphNodeTable.scope, scope), eq(CodegraphNodeTable.file_path, filePath)))
-      .all() as { id: string }[],
+      .where(and(eq(CodegraphNodeTable.scope, scope), inArray(CodegraphNodeTable.file_path, targets)))
+      .all() as { id: string; file_path: string }[],
   )
   if (fileNodes.length === 0) return []
   const ids = fileNodes.map((n) => n.id)
+  const targetFiles = new Set(fileNodes.map((n) => n.file_path))
   const rows = await use((d) =>
     d
       .select({ source: CodegraphEdgeTable.source })
@@ -531,7 +630,7 @@ export const getDependentFilePaths = async (scope: Scope, filePath: string): Pro
         and(
           eq(CodegraphEdgeTable.scope, scope),
           inArray(CodegraphEdgeTable.target, ids),
-          notInArray(CodegraphEdgeTable.kind, ["contains"]),
+          inArray(CodegraphEdgeTable.kind, DEPENDENT_FILE_EDGE_KINDS),
         ),
       )
       .all() as { source: string }[],
@@ -539,16 +638,15 @@ export const getDependentFilePaths = async (scope: Scope, filePath: string): Pro
   if (rows.length === 0) return []
   const sourceIds = [...new Set(rows.map((r) => r.source))]
   const sources = await getNodesByIds(scope, sourceIds)
-  return [...new Set(sources.map((n) => n.file_path).filter((p) => p !== filePath))]
+  return [...new Set(sources.map((n) => n.file_path).filter((p) => !targetFiles.has(p)))]
 }
 
 /** Direct `contains` children of a container node. */
-export const getChildren = async (scope: Scope, nodeId: string): Promise<GraphNode[]> => {  const edges = await outgoingEdges(scope, nodeId, ["contains"])
+export const getChildren = async (scope: Scope, nodeId: string): Promise<GraphNode[]> => {
+  const edges = await outgoingEdges(scope, nodeId, ["contains"])
   if (edges.length === 0) return []
   const nodes = await getNodesByIds(scope, edges.map((e) => e.target))
-  return edges
-    .map((e) => nodes.find((n) => n.id === e.target))
-    .filter((n): n is GraphNode => !!n)
+  return edges.map((e) => nodes.find((n) => n.id === e.target)).filter((n): n is GraphNode => !!n)
 }
 
 /**

@@ -19,12 +19,7 @@ export const Parameters = Schema.Struct({
 const containerKinds = new Set(["class", "struct", "interface", "trait", "protocol", "enum", "namespace", "module"])
 
 const pickByFileLine = (nodes: S.GraphNode[], file?: string, line?: number) => {
-  let pool = nodes
-  if (file) {
-    const wanted = file.replace(/^\.\//, "")
-    const narrowed = pool.filter((n) => n.file_path === wanted || n.file_path.endsWith(wanted) || n.file_path.endsWith(`/${wanted}`))
-    if (narrowed.length > 0) pool = narrowed
-  }
+  let pool = S.filterNodesByFile(nodes, file)
   if (line !== undefined && pool.length > 1) {
     const at = pool.filter((n) => n.start_line <= line && n.end_line >= line)
     if (at.length > 0) pool = at

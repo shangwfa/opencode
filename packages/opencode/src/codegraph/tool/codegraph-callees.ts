@@ -30,9 +30,7 @@ export const CodegraphCalleesTool = Tool.define(
           const limit = Math.min(Math.max(params.limit ?? 20, 1), 100)
           const note = yield* Effect.promise(() => indexStateNote(scope))
           const all = yield* Effect.promise(() => S.findNodesByName(scope, params.symbol))
-          const defs = params.file
-            ? all.filter((n) => n.file_path === params.file || n.file_path.endsWith(params.file!))
-            : all
+          const defs = S.filterNodesByFile(all, params.file)
           if (defs.length === 0) {
             return { title: "codegraph_callees", metadata: {}, output: `${note}未找到 "${params.symbol}"。` }
           }

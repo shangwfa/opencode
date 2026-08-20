@@ -1,29 +1,15 @@
 /**
- * Sandbox-side codegraph extraction script (kernel-only, no wasm fallback).
+ * Sandbox-side codegraph extraction script.
  *
- * Runs INSIDE the sandbox via `bun main.ts index ...` (exec API). Reads source
- * files under --root, extracts via the codegraph Rust kernel, and writes an
- * ndjson snapshot (gzip) that the server streams back and persists to PG —
- * the sandbox never touches PG itself.
+ * Production path (server indexer):
+ *   node main.ts full --root /workspace --out /tmp/cg.ndjson.gz --progress ...
+ *   node main.ts full ... --incremental   # codegraph sync() + neighborhood export
+ *   bun  main.ts stat --root /workspace --out /tmp/cg-stats.ndjson
  *
- * Output records (one JSON object per line, snake_case to match the store's
- * insert types):
- *   {t:"file", path, content_hash, language, size, node_count, indexed_at, mtime_ms}
- *   {t:"node", id, kind, name, qualified_name, file_path, language, start_line, ...}
- *   {t:"edge", source, target, kind, metadata?, line?, col?, provenance?}
- *   {t:"ref",  from_node_id, reference_name, reference_kind, line, col, file_path, language}
+ * Legacy (unused by indexer — kernel-only extract without resolveReferences):
+ *   bun main.ts index --root /workspace --out ... [--files ...]
  *
- * Usage:
- *   bun main.ts index --root /workspace --out /tmp/cg.ndjson.gz \
- *                     --progress /tmp/cg-progress.json [--files /tmp/cg-files.json]
- *   bun main.ts stat  --root /workspace --out /tmp/cg-stats.ndjson
- *
- *   index: full extraction (or --files: re-extract only those paths).
- *   stat:  fast filesystem sweep emitting one line per source file:
- *          {"t":"stat", "path":..., "size":..., "mtime_ms":...} — used by the
- *          server to diff against the codegraph_file ledger without reading
- *          file contents (git status is never trusted: it is blind to
- *          committed changes after pull/checkout).
+ * The sandbox never touches PG; the server streams ndjson back and persists.
  */
 
 import * as fs from "fs"

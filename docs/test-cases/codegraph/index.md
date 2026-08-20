@@ -326,3 +326,4 @@ OPENCODE_DATABASE_URL=$PG_URL bun /tmp/cg-explore-low.ts
 | 2026-08-20 | explore 分配算法移植 | ✅ | `extractFromSource` → spine 文件（tree-sitter.ts + Extractor 实现）全量；`data handler flow` → 25 文件裁剪到 4 + cliff 列名 + LOW_CONFIDENCE |
 | 2026-08-20 | callees/files 工具 | ✅ | callees 30 个被调用者；files 577 文件多语言分布 |
 | 2026-08-20 | affected 工具 | ✅ | tree-sitter.ts → 40 依赖者、17 测试文件（kernel-parity 套件）；生产/测试分离 |
+| 2026-08-20 | P0/P1 硬化 | ✅ | heartbeat 改读沙箱 progress；失败 failIndex；增量 claim+stat 预检；replaceFiles 后 finishIndexRecount；CALL_KINDS 去 imports；affected 路径归一 pathMatches；typecheck codegraph 路径无新增错误 |

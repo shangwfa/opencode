@@ -253,38 +253,38 @@ explore 的查询只命中常见词/无区分度词（如 "data"、"handler"）�
 
 ```
 packages/opencode/src/codegraph/
-├── codegraph.pg.ts          # 5 张表定义
-├── index.ts                 # self-export 模块（export * as Codegraph）
-├── store.ts                 # PG 读写：批量落库、advisory lock、四层搜索、图遍历查询
-├── resolver.ts              # 移植的 ReferenceResolver（服务端跑）
-├── indexer.ts               # CodegraphIndexer：注入/exec/回传/落库/增量循环（Effect）
+├── codegraph.pg.ts          # 5 张表（node/edge/file/ref/index）；ref 表保留兼容，full 路径几乎不写
+├── store.ts                 # PG 读写：claim/heartbeat/fail/finishRecount、replaceGraph/Files、
+│                            #   四层搜索、路径归一、callers/callees/impact/affected 遍历
+├── indexer.ts               # CodegraphIndexer：30s 轮询、沙箱读 progress、全量/增量均 claim、失败 failIndex
+├── search.ts                # 多信号重评分 + LOW_CONFIDENCE + isTestFile（纯函数）
+├── scope.ts                 # resolveScopeOrGuide + indexStateNote
 ├── script/
-│   └── main.ts              # 沙箱内提取脚本入口（依赖 @colbymchenry/codegraph，
-│                            #   bun build 打包，含 kernel prebuild + wasm 双资产）
-├── search/                  # 移植的查询解析/评分（纯函数）
-└── tool/
-    ├── codegraph-search.ts + .txt
-    ├── codegraph-node.ts + .txt
-    ├── codegraph-callers.ts + .txt
-    ├── codegraph-explore.ts + .txt
-    └── codegraph-impact.ts + .txt   # 5 个工具，registry.ts 注册
+│   └── main.ts              # full（生产）/ stat / index（遗留 kernel-only）
+└── tool/                    # 8 工具 + .txt，registry.ts 注册
+    ├── codegraph-search|node|callers|callees|impact|explore|files|affected
 ```
 
-构建：`package.json` 加 `build:codegraph-script`（bun build 产物进 `docker/` 或运行时从服务端文件系统读）。wasm 语法文件随提取脚本打包。
+构建：`scripts/build-codegraph-extractor.sh --target <arch>` → 沙箱镜像 COPY 到 `/opt/codegraph-extractor`。
 
-风格对齐 opencode AGENTS.md：self-export、避免解构、Effect 内具名 service、注释只写非显然约束。移植文件顶部保留 codegraph MIT 版权与来源注释。
+正确性约束（2026-08-20 修复）：
+1. heartbeat 经 `sb.files.readFile` 读沙箱 progress（非服务端本地盘）
+2. 失败必 `failIndex`；增量 `replaceFiles` 后 `finishIndexRecount`
+3. 全量/增量均 `claimIndexing`；ready 路径先 stat 预检再 claim（避免空闲 tick 翻 indexing）
+4. 路径 `pathMatches` / `filterNodesByFile` / `resolveIndexedPaths` 统一工具入参
+5. CALL_KINDS 不含 imports；affected 仅 DEPENDENT_FILE_EDGE_KINDS
 
 ## 8. 实施阶段
 
 | 阶段 | 内容 | 验收 | 状态 |
 |---|---|---|---|
-|---|---|---|
 | P1 | 表 + 迁移 + store.ts（CRUD/搜索/遍历查询）+ 冒烟 | 本地 PG：migration 跑通；四层搜索与 CLI 输出一致 | ✅ |
 | P2 | 沙箱脚本（codegraph kernel，双平台 bundle）+ 打包 | 沙箱内 kernel 加载成功；ndjson 符号数一致 | ✅ |
 | P3 | indexer.ts（Effect 服务，claim/heartbeat/zombie 自愈）挂载 AppLayer | 会话启动 → 索引自动到 ready | ✅ |
-| P4 | 5 个内置 tool + registry 注册 | Agent 会话内调用返回符合预期；无 appId 返回引导文本 | ✅ |
-| P5 | 增量循环（stat+hash 对比）+ stale 文件集 + 单写者 + 删除清理 | 改文件 20s 内落库；删除文件首循环清理 | ✅ |
-| P6 | Dockerfile 集成（双平台 bundle 入镜像）+ 端到端验证 | 组合 3 端到端跑通（Agent 实测 codegraph_search 返回精确定位） | ✅ |
+| P4 | 8 个内置 tool + registry 注册 | Agent 会话内调用返回符合预期；无 appId 返回引导文本 | ✅ |
+| P5 | 增量循环（stat+sync+replaceFiles）+ stale + 单写者 + 删除清理 | 改文件落库；删除全量重建；计数刷新 | ✅ |
+| P6 | Dockerfile 集成（extractor 入镜像）+ 端到端验证 | 组合 3 端到端跑通 | ✅ |
+| P7 | 状态机/并发/路径语义硬化 | heartbeat 读沙箱、failIndex、增量 claim、路径归一 | ✅ |
 
 ## 9. 风险与开放问题
 

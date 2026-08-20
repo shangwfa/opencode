@@ -38,9 +38,19 @@ export const CodegraphAffectedTool = Tool.define(
           const limit = Math.min(Math.max(params.limit ?? 50, 1), 200)
           const note = yield* Effect.promise(() => indexStateNote(scope))
 
-          // BFS over file dependents.
+          // Resolve user paths (src/x.ts) → indexed paths (repo/src/x.ts) first.
+          const seeds = yield* Effect.promise(() => S.resolveIndexedPaths(scope, params.files))
+          if (seeds.length === 0) {
+            return {
+              title: "codegraph_affected",
+              metadata: {},
+              output: `${note}未在索引中找到这些文件：${params.files.join(", ")}。可用 codegraph_files 查看已索引路径。`,
+            }
+          }
+
+          // BFS over file dependents (getDependentFilePaths resolves fragments too).
           const affected = new Map<string, number>()
-          const frontier = params.files.map((f) => f.replace(/^\.\//, ""))
+          const frontier = [...seeds]
           const visited = new Set(frontier)
           let currentDepth = 0
           while (frontier.length > 0 && currentDepth < depth) {

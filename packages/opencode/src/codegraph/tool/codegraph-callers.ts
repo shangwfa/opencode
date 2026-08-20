@@ -16,16 +16,6 @@ export const Parameters = Schema.Struct({
   }),
 })
 
-const pickByFile = (nodes: S.GraphNode[], file?: string) => {
-  let pool = nodes
-  if (file) {
-    const wanted = file.replace(/^\.\//, "")
-    const narrowed = pool.filter((n) => n.file_path === wanted || n.file_path.endsWith(wanted) || n.file_path.endsWith(`/${wanted}`))
-    if (narrowed.length > 0) pool = narrowed
-  }
-  return pool
-}
-
 export const CodegraphCallersTool = Tool.define(
   "codegraph_callers",
   Effect.gen(function* () {
@@ -40,7 +30,7 @@ export const CodegraphCallersTool = Tool.define(
           const limit = Math.min(Math.max(params.limit ?? 20, 1), 100)
           const note = yield* Effect.promise(() => indexStateNote(scope))
           const all = yield* Effect.promise(() => S.findNodesByName(scope, params.symbol))
-          const defs = pickByFile(all, params.file)
+          const defs = S.filterNodesByFile(all, params.file)
           if (defs.length === 0) {
             return { title: "codegraph_callers", metadata: {}, output: `${note}未找到 "${params.symbol}"。` }
           }

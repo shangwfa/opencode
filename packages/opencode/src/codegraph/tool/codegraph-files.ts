@@ -36,8 +36,8 @@ export const CodegraphFilesTool = Tool.define(
 
           let filtered = files
           if (params.path) {
-            const p = params.path.replace(/^\.\//, "")
-            filtered = files.filter((f) => f.path.startsWith(p))
+            const p = params.path.replace(/^\.\//, "").replace(/^\/workspace\//, "")
+            filtered = files.filter((f) => S.pathMatches(f.path, p) || f.path.includes("/" + p) || f.path.startsWith(p + "/") || f.path.startsWith(p))
             if (filtered.length === 0) {
               return { title: "codegraph_files", metadata: {}, output: `${note}目录 "${params.path}" 下无索引文件。` }
             }

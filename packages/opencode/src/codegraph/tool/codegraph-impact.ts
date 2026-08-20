@@ -30,9 +30,7 @@ export const CodegraphImpactTool = Tool.define(
           const depth = Math.min(Math.max(params.depth ?? 2, 1), 5)
           const note = yield* Effect.promise(() => indexStateNote(scope))
           const all = yield* Effect.promise(() => S.findNodesByName(scope, params.symbol))
-          const defs = all.filter((n) =>
-            params.file ? n.file_path === params.file || n.file_path.endsWith(params.file!) : true,
-          )
+          const defs = S.filterNodesByFile(all, params.file)
           if (defs.length === 0) {
             return { title: "codegraph_impact", metadata: {}, output: `${note}未找到 "${params.symbol}"。` }
           }
