@@ -3,6 +3,7 @@ import DESCRIPTION from "./codegraph-explore.txt"
 import * as Tool from "../../tool/tool"
 import { CodegraphStore as S } from "../store"
 import { indexStateNote, resolveScopeOrGuide } from "../scope"
+import { isLowConfidenceQuery } from "../search"
 
 export const Parameters = Schema.Struct({
   query: Schema.String.annotate({
@@ -28,11 +29,12 @@ export const CodegraphExploreTool = Tool.define(
           const limit = Math.min(Math.max(params.maxSymbols ?? 30, 1), 100)
           const note = yield* Effect.promise(() => indexStateNote(scope))
           const results = yield* Effect.promise(() => S.searchNodes(scope, params.query, { limit }))
+          const lowConfidence = isLowConfidenceQuery(params.query)
           if (results.length === 0) {
             return {
               title: "codegraph_explore",
               metadata: {},
-            output: `${note}未找到与 "${params.query}" 相关的符号。\n请换用更具体的符号名（如 camelCase/snake_case 的真实符号），或用 codegraph_search 试相似名。`,
+              output: `${note}未找到与 "${params.query}" 相关的符号。\n请换用更具体的符号名（如 camelCase/snake_case 的真实符号），或用 codegraph_search 试相似名。`,
             }
           }
 
@@ -76,6 +78,10 @@ export const CodegraphExploreTool = Tool.define(
           }
 
           parts.push("(以上仅为符号位置清单；源码正文请按 file:line 用 read 工具读取。若结果似偏靶，改用真实符号名重试。)")
+          if (lowConfidence) {
+            parts.push("")
+            parts.push("⚠️ LOW_CONFIDENCE：本查询仅由常见词构成，命中符号可能与真实目标偏差较大。请改用真实的 camelCase/snake_case 符号名（可用 codegraph_search 先确认）再查一次。")
+          }
           return { title: "codegraph_explore", metadata: {}, output: parts.join("\n").trimEnd() }
         }),
     }

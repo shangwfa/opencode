@@ -1,6 +1,7 @@
 import { and, eq, inArray, notInArray, or, sql } from "drizzle-orm"
 import { CodegraphEdgeTable, CodegraphFileTable, CodegraphIndexTable, CodegraphNodeTable, CodegraphRefTable } from "./codegraph.pg"
 import { Database, dialect } from "../storage/db"
+import { kindBonus, nameMatchBonus, scorePathRelevance, isLowConfidenceQuery } from "./search"
 
 /**
  * PG-only read/write layer for the codegraph tables (PG is the only SaaS
@@ -275,6 +276,9 @@ export type SearchOptions = { kind?: string; limit?: number }
 
 export const searchNodes = async (scope: Scope, query: string, opts: SearchOptions = {}) => {
   const limit = Math.min(Math.max(opts.limit ?? 10, 1), 100)
+  // Fetch a wider candidate pool than the final limit so the TS re-rank
+  // (name/kind/path bonuses) has room to promote good matches above noise.
+  const pool = limit * 3
   const kindFilter = opts.kind ? sql` and kind = ${opts.kind}` : sql``
   return use(async (d: any) => {
     const rows: GraphNode[] = []
@@ -297,38 +301,48 @@ export const searchNodes = async (scope: Scope, query: string, opts: SearchOptio
           .from(CodegraphNodeTable)
           .where(sql`scope = ${scope}${kindFilter} and fts @@ to_tsquery('simple', ${tsq})`)
           .orderBy(sql`ts_rank('{0.05,0.1,0.25,1.0}', fts, to_tsquery('simple', ${tsq})) desc`)
-          .limit(limit)
+          .limit(pool)
           .all(),
       )
     }
     // ④ exact name supplement — cheapest precise layer, run early so exact
     // matches are never pushed out by approximate layers below.
-    push(await d.select().from(CodegraphNodeTable).where(sql`scope = ${scope}${kindFilter} and name = ${query}`).limit(limit).all())
+    push(await d.select().from(CodegraphNodeTable).where(sql`scope = ${scope}${kindFilter} and name = ${query}`).limit(pool).all())
 
     // ② substring (ILIKE, trgm GIN)
-    if (rows.length < limit)
+    if (rows.length < pool)
       push(
         await d
           .select()
           .from(CodegraphNodeTable)
           .where(sql`scope = ${scope}${kindFilter} and name ilike ${"%" + query.replace(/[%_]/g, "") + "%"}`)
-          .limit(limit - rows.length)
+          .limit(pool - rows.length)
           .all(),
       )
 
     // ③ trigram similarity
-    if (rows.length < limit)
+    if (rows.length < pool)
       push(
         await d
           .select()
           .from(CodegraphNodeTable)
           .where(sql`scope = ${scope}${kindFilter} and similarity(name, ${query}) > 0.3`)
           .orderBy(sql`similarity(name, ${query}) desc`)
-          .limit(limit - rows.length)
+          .limit(pool - rows.length)
           .all(),
       )
 
-    return rows.slice(0, limit)
+    // Multi-signal re-rank (codegraph searchNodes parity): exact-name / token
+    // match dominates, then kind preference, then path relevance (which also
+    // dampens test files). SQL ordering above only seeds the candidate pool.
+    const scored = rows
+      .map((n) => ({
+        node: n,
+        score: nameMatchBonus(n.name, query) + kindBonus(n.kind) + scorePathRelevance(n.file_path, query),
+      }))
+      .sort((a, b) => b.score - a.score)
+
+    return scored.slice(0, limit).map((s) => s.node)
   })
 }
 

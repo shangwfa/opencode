@@ -4,6 +4,8 @@
 > 决策记录：全异步实现；FTS 用 tsvector + pg_trgm 结合并对齐 codegraph 搜索行为；**按 `appId` 隔离（scope = `app:{appId}`，不感知 pvcMode）**；**不开发独立 API，查询能力以内置 tool 提供**（工具根据会话 ID 解析出 appId 再查图）。
 >
 > **实现状态（2026-08-20）：P1–P6 全部完成并通过端到端验证**（组合 3 本地 PG + 本地沙箱，codegraph 仓库 570 文件 → `ready` 12,141 节点 / 13,343 边；增量、删除清理、多会话复用、Agent 调用 codegraph_search 均验证）。实现落点：`packages/opencode/src/codegraph/` + `migration-pg/20260820*_codegraph*` + `scripts/build-codegraph-extractor.sh` + `docs/test-cases/codegraph/`。
+>
+> **复盘补齐（同日）**：搜索多信号重评分（`src/codegraph/search.ts`：`nameMatchBonus`/`kindBonus`/`scorePathRelevance`/测试文件降权）已接入 `store.searchNodes`；explore 接入真实 LOW_CONFIDENCE 检测（`isLowConfidenceQuery`）。实测 `extract` 搜索无测试文件混入、精确名优先。
 > 参考实现：`~/code/codegraph`（colbymchenry/codegraph v1.5.0，MIT，仅作移植来源，不直接依赖该包）。
 
 ## 1. 背景与目标
@@ -273,7 +275,7 @@ packages/opencode/src/codegraph/
 | 3 | 增量检测 git 盲区 | stat+hash 文件对比（不信任 git status）；删除文件清理 bug（`changed=0` 提前 return 导致 dropMissingFiles 不执行）已修复 |
 | 4 | tsquery 特殊字符注入/抛错 | 清洗函数 + 单测覆盖（`c++`、`a&&b` 等） |
 | 5 | explore 无源码正文，Agent 多一次 read 往返 | 工具返回精确 file:line，Agent 用 read 单次区间读取；二期可选 codegraph_file 加 content 列 |
-| 6 | 同 appId 会话的代码是否同一份 | codegraph 只认 appId，不感知 pvcMode。若业务上同 appId 的会话未共享同一份代码（卷配置问题），索引会以首个索引时快照为准——代码一致性由业务侧的 appId 使用约定保证 |
+| 6 | 同 appId 会话的代码是否同一份 | codegraph 只认 appId，不感知 pvcMode。若业务上同 appId 的会话未共享同一份代码（卷配置问题），索引会以首个索引时快照为准——代码一致性由业务侧的 appId 使用约定保证。本地 docker PVC 不跨容器共享 subPath，共享语义以远端 K8s PVC 为准 |
 | 7 | 大仓库首次索引分钟级 | 不阻塞会话（forkScoped 后台跑），期间工具返回"索引中(进度 x/y)"提示文本，Agent 可先用 read/grep |
 | 8 | codegraph 上游演进 / kernel ABI | pin 包版本；升级走集成测试（符号数对拍） |
 | 9 | kernel 偶发重复 node id（Dart 嵌套函数等） | store 落库前去重（保留首个）；实测 12,141 节点去重 6 个 |
