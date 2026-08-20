@@ -70,11 +70,19 @@ const loadExtraction = (): Upstream => {
 
 const MAX_FILE_SIZE = 1024 * 1024
 
+const FLAG_KEYS = new Set(["incremental", "done"])
+
 const parseArgs = (argv: string[]) => {
   const args: Record<string, string> = {}
   for (let i = 0; i < argv.length; i++) {
-    if (argv[i].startsWith("--")) args[argv[i].slice(2)] = argv[i + 1] ?? ""
-    i++
+    if (!argv[i].startsWith("--")) continue
+    const key = argv[i].slice(2)
+    if (FLAG_KEYS.has(key)) {
+      args[key] = "1"
+    } else {
+      args[key] = argv[i + 1] ?? ""
+      i++
+    }
   }
   return args
 }
@@ -321,11 +329,17 @@ const runFullAnalysis = async (root: string, args: Record<string, string>) => {
   }
 
   let filesTotal = 0
-  if (args.incremental && args.files) {
-    const changed = JSON.parse(fs.readFileSync(args.files, "utf-8")) as string[]
-    filesTotal = changed.length
-    await graph.indexFiles(changed)
+  let changedFiles: string[] = []
+  if (args.incremental) {
+    // codegraph's sync(): content-hash diff → indexFiles(changed) → resolve
+    // ONLY the changed files' refs (getUnresolvedReferencesByFiles). The
+    // SQLite graph stays fully current; we export just the changed files'
+    // neighborhood below so the server replaces only that slice.
+    const r = await graph.sync()
+    changedFiles = (r.changedFilePaths ?? []) as string[]
+    filesTotal = changedFiles.length
     writeProgress({ files_total: filesTotal, files_done: filesTotal, done: false })
+    console.log(`codegraph incremental: changed=${changedFiles.length} (${changedFiles.slice(0, 3).join(", ")}...)`)
   } else {
     const idx = await graph.indexAll({ onProgress: (p: { files_total?: number; files_done?: number }) => {
       if (p.files_total) {
@@ -334,10 +348,9 @@ const runFullAnalysis = async (root: string, args: Record<string, string>) => {
       }
     }})
     if (!idx.success) throw new Error(`codegraph indexAll failed: ${JSON.stringify(idx.errors ?? {}).slice(0, 500)}`)
+    const res = await graph.resolveReferences()
+    console.log(`codegraph full: files=${idx.filesIndexed} resolved=${(res as any)?.resolved ?? "?"}`)
   }
-
-  const res = await graph.resolveReferences()
-  console.log(`codegraph ${args.incremental ? "incremental" : "full"}: files=${filesTotal} resolved=${(res as any)?.resolved ?? "?"}`)
 
   const { createGzip } = require("zlib") as typeof import("zlib")
   const outFile = fs.createWriteStream(outPath)
@@ -348,6 +361,65 @@ const runFullAnalysis = async (root: string, args: Record<string, string>) => {
 
   // files
   const crypto = require("crypto") as typeof import("crypto")
+  if (args.incremental) {
+    // Incremental: export only the changed files' neighborhood.
+    //   - changed files (file records)
+    //   - their nodes
+    //   - edges where source OR target is a changed-file node
+    // The server replaceFiles() deletes source/target∈file edges + reinserts,
+    // which keeps cross-file in-edges correct (dropped when their target node
+    // disappears, kept otherwise).
+    const changedSet = new Set(changedFiles)
+    const writeFile = (p: string) => {
+      let mtimeMs = 0
+      let hash = ""
+      try {
+        const st = fs.statSync(path.join(root, p))
+        mtimeMs = Math.round(st.mtimeMs)
+        hash = crypto.createHash("sha256").update(fs.readFileSync(path.join(root, p))).digest("hex")
+      } catch { /* deleted during run */ }
+      write({ t: "file", path: p, content_hash: hash, language: "", size: 0, node_count: 0, indexed_at: now, mtime_ms: mtimeMs })
+    }
+    let nodeCount = 0
+    let edgeCount = 0
+    const changedNodeIds = new Set<string>()
+    for (const p of changedFiles) {
+      writeFile(p)
+      const nodes = graph.getNodesInFile(p) as Array<Record<string, unknown>>
+      for (const n of nodes) {
+        changedNodeIds.add(n.id as string)
+        nodeCount++
+        write({ t: "node", id: n.id, kind: n.kind, name: n.name, qualified_name: n.qualifiedName, file_path: n.filePath, language: n.language, start_line: n.startLine, end_line: n.endLine, start_col: n.startColumn, end_col: n.endColumn, docstring: n.docstring ?? null, signature: n.signature ?? null, visibility: n.visibility ?? null, is_exported: n.isExported ? 1 : 0, is_async: n.isAsync ? 1 : 0, is_static: n.isStatic ? 1 : 0, is_abstract: n.isAbstract ? 1 : 0, decorators: n.decorators ?? null, type_parameters: n.typeParameters ?? null, return_type: n.returnType ?? null, time_updated: now })
+      }
+    }
+    // edges where source OR target ∈ changed nodes (out + in).
+    const seenEdges = new Set<string>()
+    for (const id of changedNodeIds) {
+      for (const e of graph.getOutgoingEdges(id) as Array<Record<string, unknown>>) {
+        const key = `${e.source}|${e.target}|${e.kind}|${e.line ?? ""}`
+        if (seenEdges.has(key)) continue
+        seenEdges.add(key)
+        edgeCount++
+        write({ t: "edge", source: e.source, target: e.target, kind: e.kind, metadata: e.metadata ?? null, line: e.line ?? null, col: e.column ?? null, provenance: e.provenance ?? "resolver" })
+      }
+      for (const e of graph.getIncomingEdges(id) as Array<Record<string, unknown>>) {
+        const key = `${e.source}|${e.target}|${e.kind}|${e.line ?? ""}`
+        if (seenEdges.has(key)) continue
+        seenEdges.add(key)
+        edgeCount++
+        write({ t: "edge", source: e.source, target: e.target, kind: e.kind, metadata: e.metadata ?? null, line: e.line ?? null, col: e.column ?? null, provenance: e.provenance ?? "resolver" })
+      }
+    }
+    await new Promise<void>((resolve, reject) => {
+      gz.end(() => outFile.end(() => resolve()))
+      outFile.on("error", reject)
+    })
+    writeProgress({ files_total: nodeCount, files_done: nodeCount, done: true })
+    console.log(`codegraph incremental: ${changedFiles.length} files, ${nodeCount} nodes, ${edgeCount} edges → ${outPath}`)
+    graph.close()
+    return
+  }
+
   for (const f of graph.getFiles() as Array<{ path: string; language: string; size: number; node_count: number }>) {
     let mtimeMs = 0
     let hash = ""

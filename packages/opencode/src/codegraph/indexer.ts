@@ -29,6 +29,11 @@ const EXEC_TIMEOUT_SECONDS = 900
 const LOOP_INTERVAL = Duration.seconds(30)
 const HEARTBEAT_EVERY_MS = 5000
 
+// Extractors skip files over 1MB (MAX_FILE_SIZE) — they're never indexed, so
+// they must not drive incremental changed/deleted decisions (a 23MB vendored
+// parser.c would otherwise re-enter `changed` every cycle).
+const MAX_INDEX_FILE_SIZE = 1024 * 1024
+
 const ENGINE_VERSION = "codegraph-extractor-1"
 
 // The extractor is baked into the sandbox image at /opt/codegraph-extractor
@@ -38,7 +43,6 @@ const ENGINE_VERSION = "codegraph-extractor-1"
 const EXTRACTOR_DIR = "/opt/codegraph-extractor"
 const INDEX_OUT = "/tmp/cg.ndjson.gz"
 const STAT_OUT = "/tmp/cg-stats.ndjson"
-const FILES_LIST = "/tmp/cg-files.json"
 const PROGRESS = "/tmp/cg-progress.json"
 
 // Runtime location of the prebuilt extractor tarballs (P6: baked into the image).
@@ -96,10 +100,9 @@ const extract = (scope: Scope, sb: Sandbox, filesArg: string | null, progressPat
     // the sandbox (node:sqlite + full resolver + framework resolvers) so ALL
     // edges — cross-file calls, route→handler, component usages, receiver-method
     // — are produced consistently with source available. node (not bun) is
-    // required for node:sqlite. Incremental reuses the sandbox's SQLite graph
-    // (--incremental --files) instead of rebuilding it.
-    const cmd = filesArg
-      ? `node ${EXTRACTOR_DIR}/main.ts full --root /workspace --out ${INDEX_OUT} --progress ${progressPath} --incremental --files ${filesArg}`
+    // required for node:sqlite.
+    const cmd = filesArg === "incremental"
+      ? `node ${EXTRACTOR_DIR}/main.ts full --root /workspace --out ${INDEX_OUT} --progress ${progressPath} --incremental`
       : `node ${EXTRACTOR_DIR}/main.ts full --root /workspace --out ${INDEX_OUT} --progress ${progressPath}`
 
     yield* Effect.gen(function* () {
@@ -148,6 +151,7 @@ const runIncremental = (scope: Scope, sb: Sandbox) =>
     const changed: string[] = []
     let deleted = false
     for (const s of stats) {
+      if (s.size > MAX_INDEX_FILE_SIZE) continue // never indexed → never drives sync
       live.add(s.path)
       const old = byPath.get(s.path)
       if (!old || old.size !== s.size || old.mtime_ms !== s.mtime_ms) changed.push(s.path)
@@ -156,6 +160,7 @@ const runIncremental = (scope: Scope, sb: Sandbox) =>
     // sandbox rebuild — the sandbox's SQLite graph doesn't drop deleted files
     // automatically, so an incremental indexFiles would leave stale nodes.
     for (const f of ledger) {
+      if (f.size > MAX_INDEX_FILE_SIZE) continue
       if (!live.has(f.path)) {
         deleted = true
         break
@@ -168,12 +173,19 @@ const runIncremental = (scope: Scope, sb: Sandbox) =>
     // Publish the pending-change set BEFORE re-extracting so tools can tell the
     // agent "these files just changed, read them directly" during the sync gap.
     yield* Effect.tryPromise(() => S.setStaleFiles(scope, changed.length ? changed : []) )
-    yield* Effect.tryPromise(() => sb.files.writeFiles([{ path: FILES_LIST, data: Buffer.from(JSON.stringify(changed)), mode: 644 }]))
-    // Incremental reuses the sandbox SQLite (--incremental); deletions force a
-    // full rebuild (no --incremental). Either way the exported snapshot is the
-    // COMPLETE latest graph — replaceGraph wholesale so edges stay consistent.
-    const snap = yield* extract(scope, sb, deleted ? null : FILES_LIST, PROGRESS)
-    yield* Effect.tryPromise(() => S.replaceGraph(scope, snap))
+    // Incremental: sandbox sync() detects changes itself (--incremental) and
+    // exports only the changed files' neighborhood; the server replaceFiles()
+    // swaps just that slice. Deletions force a full rebuild (SQLite won't drop
+    // deleted files from the graph on its own).
+    const snap = yield* extract(scope, sb, deleted ? null : "incremental", PROGRESS)
+    if (deleted) {
+      yield* Effect.tryPromise(() => S.replaceGraph(scope, snap))
+    } else {
+      // The changed set is what sync() reported; pass it so replaceFiles knows
+      // which files' edges to drop. The snapshot's file records carry the paths.
+      const changedPaths = (snap.files ?? []).map((f) => f.path)
+      yield* Effect.tryPromise(() => S.replaceFiles(scope, changedPaths, snap))
+    }
     yield* Effect.tryPromise(() => S.setStaleFiles(scope, []))
     return Effect.void
   })
