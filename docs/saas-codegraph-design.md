@@ -256,8 +256,9 @@ packages/opencode/src/codegraph/
 ├── codegraph.pg.ts          # 5 张表（node/edge/file/ref/index）；ref 表保留兼容，full 路径几乎不写
 ├── store.ts                 # PG 读写：claim/heartbeat/fail/finishRecount、replaceGraph/Files、
 │                            #   四层搜索、路径归一、callers/callees/impact/affected 遍历
+├── path.ts                  # pathMatches / filterByFilePath（纯函数，单测覆盖）
 ├── indexer.ts               # CodegraphIndexer：30s 轮询、沙箱读 progress、全量/增量均 claim、失败 failIndex
-├── search.ts                # 多信号重评分 + LOW_CONFIDENCE + isTestFile（纯函数）
+├── search.ts                # 多信号重评分 + LOW_CONFIDENCE + isTestFile（纯函数，单测覆盖）
 ├── scope.ts                 # resolveScopeOrGuide + indexStateNote
 ├── script/
 │   └── main.ts              # full（生产）/ stat / index（遗留 kernel-only）

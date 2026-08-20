@@ -2,6 +2,7 @@ import { and, eq, inArray, notInArray, or, sql } from "drizzle-orm"
 import { CodegraphEdgeTable, CodegraphFileTable, CodegraphIndexTable, CodegraphNodeTable, CodegraphRefTable } from "./codegraph.pg"
 import { Database, dialect } from "../storage/db"
 import { kindBonus, nameMatchBonus, scorePathRelevance, isLowConfidenceQuery } from "./search"
+import { pathMatches, filterByFilePath } from "./path"
 
 /**
  * PG-only read/write layer for the codegraph tables (PG is the only SaaS
@@ -478,30 +479,10 @@ const DEPENDENT_FILE_EDGE_KINDS = [
   "type_depends",
 ]
 
-/**
- * Normalize a user/tool path against indexed `file_path` values.
- * Accepts `./src/x.ts`, `src/x.ts`, `/workspace/repo/src/x.ts`, or path suffix
- * (must match on a `/` boundary — bare `ar.ts` must not match `bar.ts`).
- */
-export const pathMatches = (indexed: string, wanted: string): boolean => {
-  const a = indexed.replace(/^\.\//, "").replace(/\/+/g, "/")
-  const b = wanted.replace(/^\.\//, "").replace(/^\/workspace\//, "").replace(/\/+/g, "/")
-  if (!b) return false
-  if (a === b) return true
-  if (a.endsWith("/" + b)) return true
-  if (b.endsWith("/" + a)) return true
-  // basename-only: "tree-sitter.ts" matches ".../tree-sitter.ts"
-  if (!b.includes("/") && a.endsWith("/" + b)) return true
-  return false
-}
+export { pathMatches } from "./path"
 
 /** Filter nodes whose file_path matches a user-supplied path fragment. */
-export const filterNodesByFile = (nodes: GraphNode[], file?: string): GraphNode[] => {
-  if (!file) return nodes
-  const wanted = file.replace(/^\.\//, "")
-  const narrowed = nodes.filter((n) => pathMatches(n.file_path, wanted))
-  return narrowed.length > 0 ? narrowed : nodes
-}
+export const filterNodesByFile = (nodes: GraphNode[], file?: string): GraphNode[] => filterByFilePath(nodes, file)
 
 /** Resolve a user path to the indexed file_path(s) present in the graph. */
 export const resolveIndexedPaths = async (scope: Scope, paths: string[]): Promise<string[]> => {

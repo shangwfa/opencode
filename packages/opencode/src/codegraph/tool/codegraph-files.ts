@@ -75,10 +75,10 @@ export const CodegraphFilesTool = Tool.define(
               const base = slash > 0 ? f.path.slice(slash + 1) : f.path
               if (dir && !indented.has(dir)) {
                 const depth = dir.split("/").length
-                indented.set(dir, `${"  ".repeat(depth - 1)}📁 ${dir.split("/").pop()}/`)
+                indented.set(dir, `${"  ".repeat(depth - 1)}${dir.split("/").pop()}/`)
               }
-              const depth = (slash > 0 ? dir.split("/").length : 0)
-              treeLines.push(`${"  ".repeat(depth)}📄 ${base} (${f.node_count})`)
+              const depth = slash > 0 ? dir.split("/").length : 0
+              treeLines.push(`${"  ".repeat(depth)}${base} (${f.node_count})`)
             }
             for (const d of indented.values()) lines.push(d)
             lines.push(...treeLines)
