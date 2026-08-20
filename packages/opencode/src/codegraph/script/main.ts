@@ -28,6 +28,11 @@
 
 import * as fs from "fs"
 import * as path from "path"
+import { createRequire } from "module"
+
+// full mode runs under `node` (node:sqlite) which executes this .ts as ESM —
+// provide require for the codegraph SDK and built-ins. bun tolerates it too.
+const require = createRequire(import.meta.url)
 
 // The per-platform bundle carries the Rust kernel (lib/kernel/*.node) and the
 // compiled extraction API. Resolved by platform so the same script runs on a
@@ -95,6 +100,11 @@ const main = async () => {
     }
     await new Promise<void>((resolve) => out.end(() => resolve()))
     console.log(`codegraph stat: ${files.length} files → ${outPath}`)
+    return
+  }
+
+  if (mode === "full") {
+    await runFullAnalysis(root, args)
     return
   }
 
@@ -257,6 +267,125 @@ const main = async () => {
   })
   writeProgress({ files_total: files.length, files_done: done, done: true })
   console.log(`codegraph extractor: ${done} files → ${outPath}`)
+}
+
+// ---------------------------------------------------------------------------
+// full mode — complete codegraph analysis inside the sandbox.
+//
+// Runs codegraph's OWN local pipeline (node:sqlite index + full resolver +
+// framework resolvers + name-matcher) so every edge codegraph can produce —
+// cross-file calls, route→handler references, component usages, receiver
+// method calls via local type inference — lands in the snapshot. The server
+// then only persists; it never re-resolves without source.
+//
+// Exports (snake_case, matching store insert types):
+//   {t:"file", path, content_hash, language, size, node_count, indexed_at, mtime_ms}
+//   {t:"node", id, kind, name, qualified_name, file_path, ...}
+//   {t:"edge", source, target, kind, metadata, line, col, provenance}
+// ---------------------------------------------------------------------------
+
+const NODE_KINDS = [
+  "file", "module", "class", "struct", "interface", "trait", "protocol",
+  "function", "method", "property", "field", "variable", "constant", "enum",
+  "enum_member", "type_alias", "namespace", "parameter", "import", "export",
+  "route", "component",
+]
+
+const runFullAnalysis = async (root: string, args: Record<string, string>) => {
+  const outPath = args.out ?? "/tmp/cg-full.ndjson.gz"
+  const progressPath = args.progress ?? "/tmp/cg-full-progress.json"
+
+  const pkgPath = require.resolve(`${PLATFORM_PKG}/package.json`)
+  const lib = path.join(path.dirname(pkgPath), "lib", "dist", "index.js")
+  const cg = require(lib) as {
+    CodeGraph: {
+      initSync: (root: string) => any
+    }
+  }
+
+  const writeProgress = (p: object) => fs.writeFileSync(progressPath, JSON.stringify(p))
+  writeProgress({ files_total: 0, files_done: 0, done: false })
+
+  // initSync creates .codegraph/ + SQLite; clear a stale one first (this is a
+  // fresh full rebuild each run).
+  try {
+    fs.rmSync(path.join(root, ".codegraph"), { recursive: true, force: true })
+  } catch { /* not present */ }
+
+  const graph = cg.CodeGraph.initSync(root)
+
+  const idx = await graph.indexAll({ onProgress: (p: { files_total?: number; files_done?: number }) => {
+    if (p.files_total) writeProgress({ files_total: p.files_total, files_done: p.files_done ?? 0, done: false })
+  }})
+  if (!idx.success) throw new Error(`codegraph indexAll failed: ${JSON.stringify(idx.errors ?? {}).slice(0, 500)}`)
+
+  const res = await graph.resolveReferences()
+  console.log(`codegraph full: files=${idx.filesIndexed} nodes=${idx.nodesCreated} edges=${idx.edgesCreated} resolved=${(res as any)?.resolved ?? "?"}`)
+
+  const { createGzip } = require("zlib") as typeof import("zlib")
+  const outFile = fs.createWriteStream(outPath)
+  const gz = createGzip({ level: 6 })
+  gz.pipe(outFile)
+  const write = (rec: object) => gz.write(JSON.stringify(rec) + "\n")
+  const now = Date.now()
+
+  // files
+  const crypto = require("crypto") as typeof import("crypto")
+  for (const f of graph.getFiles() as Array<{ path: string; language: string; size: number; node_count: number }>) {
+    let mtimeMs = 0
+    let hash = ""
+    try {
+      const st = fs.statSync(path.join(root, f.path))
+      mtimeMs = Math.round(st.mtimeMs)
+      hash = crypto.createHash("sha256").update(fs.readFileSync(path.join(root, f.path))).digest("hex")
+    } catch { /* deleted during run */ }
+    write({ t: "file", path: f.path, content_hash: hash, language: f.language, size: f.size, node_count: f.node_count ?? 0, indexed_at: now, mtime_ms: mtimeMs })
+  }
+
+  // nodes (by kind — avoids N+1 per file)
+  let nodeCount = 0
+  for (const kind of NODE_KINDS) {
+    const nodes = graph.getNodesByKind(kind) as Array<Record<string, unknown>>
+    for (const n of nodes) {
+      nodeCount++
+      write({
+        t: "node",
+        id: n.id, kind: n.kind, name: n.name, qualified_name: n.qualifiedName,
+        file_path: n.filePath, language: n.language,
+        start_line: n.startLine, end_line: n.endLine, start_col: n.startColumn, end_col: n.endColumn,
+        docstring: n.docstring ?? null, signature: n.signature ?? null, visibility: n.visibility ?? null,
+        is_exported: n.isExported ? 1 : 0, is_async: n.isAsync ? 1 : 0, is_static: n.isStatic ? 1 : 0, is_abstract: n.isAbstract ? 1 : 0,
+        decorators: n.decorators ?? null, type_parameters: n.typeParameters ?? null, return_type: n.returnType ?? null,
+        time_updated: now,
+      })
+    }
+  }
+
+  // edges (outgoing from each node covers every edge once)
+  let edgeCount = 0
+  for (const kind of NODE_KINDS) {
+    const nodes = graph.getNodesByKind(kind) as Array<{ id: string }>
+    for (const n of nodes) {
+      const edges = graph.getOutgoingEdges(n.id) as Array<Record<string, unknown>>
+      for (const e of edges) {
+        edgeCount++
+        write({
+          t: "edge",
+          source: e.source, target: e.target, kind: e.kind,
+          metadata: e.metadata ?? null, line: e.line ?? null, col: e.column ?? null,
+          provenance: e.provenance ?? "resolver",
+        })
+      }
+    }
+  }
+
+  await new Promise<void>((resolve, reject) => {
+    gz.end(() => outFile.end(() => resolve()))
+    outFile.on("error", reject)
+  })
+  writeProgress({ files_total: nodeCount, files_done: nodeCount, done: true })
+  console.log(`codegraph full: ${nodeCount} nodes, ${edgeCount} edges → ${outPath}`)
+  graph.close()
 }
 
 main().catch((err) => {

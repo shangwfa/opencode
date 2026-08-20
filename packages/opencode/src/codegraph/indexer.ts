@@ -94,7 +94,13 @@ type IndexSnapshot = {
 const extract = (scope: Scope, sb: Sandbox, filesArg: string | null, progressPath: string) =>
   Effect.gen(function* () {
     const filesFlag = filesArg ? ` --files ${filesArg}` : ""
-    const cmd = `bun ${EXTRACTOR_DIR}/main.ts index --root /workspace --out ${INDEX_OUT} --progress ${progressPath}${filesFlag}`
+    // Full rebuild uses codegraph's OWN pipeline (node:sqlite + full resolver +
+    // framework resolvers) so route→handler / component-usage / receiver-method
+    // edges land. node (not bun) is required: node:sqlite. Incremental re-extract
+    // stays on the fast kernel path.
+    const runtime = filesArg ? "bun" : "node"
+    const mode = filesArg ? "index" : "full"
+    const cmd = `${runtime} ${EXTRACTOR_DIR}/main.ts ${mode} --root /workspace --out ${INDEX_OUT} --progress ${progressPath}${filesFlag}`
 
     yield* Effect.gen(function* () {
       yield* Effect.repeat(
@@ -126,8 +132,8 @@ const runFullIndex = (scope: Scope, sb: Sandbox) =>
   Effect.gen(function* () {
     const snap = yield* extract(scope, sb, null, PROGRESS)
     yield* Effect.tryPromise(() => S.replaceGraph(scope, snap))
-    // Cross-file reference resolution → calls/references/extends edges.
-    yield* Effect.tryPromise(() => CodegraphResolver.resolveRefs(scope))
+    // full mode already ran codegraph's complete resolver inside the sandbox —
+    // no server-side re-resolution needed.
     return Effect.void
   })
 
