@@ -300,27 +300,44 @@ const runFullAnalysis = async (root: string, args: Record<string, string>) => {
   const cg = require(lib) as {
     CodeGraph: {
       initSync: (root: string) => any
+      openSync: (root: string) => any
     }
   }
 
   const writeProgress = (p: object) => fs.writeFileSync(progressPath, JSON.stringify(p))
   writeProgress({ files_total: 0, files_done: 0, done: false })
 
-  // initSync creates .codegraph/ + SQLite; clear a stale one first (this is a
-  // fresh full rebuild each run).
-  try {
-    fs.rmSync(path.join(root, ".codegraph"), { recursive: true, force: true })
-  } catch { /* not present */ }
+  // initSync creates .codegraph/ + SQLite. Full rebuild clears a stale one;
+  // incremental reuses it (only the changed files are re-indexed) so the SQLite
+  // graph stays the latest and resolveReferences sees the whole repo.
+  let graph: any
+  if (args.incremental) {
+    graph = cg.CodeGraph.openSync(root)
+  } else {
+    try {
+      fs.rmSync(path.join(root, ".codegraph"), { recursive: true, force: true })
+    } catch { /* not present */ }
+    graph = cg.CodeGraph.initSync(root)
+  }
 
-  const graph = cg.CodeGraph.initSync(root)
-
-  const idx = await graph.indexAll({ onProgress: (p: { files_total?: number; files_done?: number }) => {
-    if (p.files_total) writeProgress({ files_total: p.files_total, files_done: p.files_done ?? 0, done: false })
-  }})
-  if (!idx.success) throw new Error(`codegraph indexAll failed: ${JSON.stringify(idx.errors ?? {}).slice(0, 500)}`)
+  let filesTotal = 0
+  if (args.incremental && args.files) {
+    const changed = JSON.parse(fs.readFileSync(args.files, "utf-8")) as string[]
+    filesTotal = changed.length
+    await graph.indexFiles(changed)
+    writeProgress({ files_total: filesTotal, files_done: filesTotal, done: false })
+  } else {
+    const idx = await graph.indexAll({ onProgress: (p: { files_total?: number; files_done?: number }) => {
+      if (p.files_total) {
+        filesTotal = p.files_total
+        writeProgress({ files_total: p.files_total, files_done: p.files_done ?? 0, done: false })
+      }
+    }})
+    if (!idx.success) throw new Error(`codegraph indexAll failed: ${JSON.stringify(idx.errors ?? {}).slice(0, 500)}`)
+  }
 
   const res = await graph.resolveReferences()
-  console.log(`codegraph full: files=${idx.filesIndexed} nodes=${idx.nodesCreated} edges=${idx.edgesCreated} resolved=${(res as any)?.resolved ?? "?"}`)
+  console.log(`codegraph ${args.incremental ? "incremental" : "full"}: files=${filesTotal} resolved=${(res as any)?.resolved ?? "?"}`)
 
   const { createGzip } = require("zlib") as typeof import("zlib")
   const outFile = fs.createWriteStream(outPath)

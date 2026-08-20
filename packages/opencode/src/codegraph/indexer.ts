@@ -9,7 +9,6 @@ import { resolveSandboxOpts } from "../session/sandbox-opts"
 import { SandboxProvider } from "../tool/sandbox-provider"
 import type { Sandbox } from "@alibaba-group/opensandbox"
 import { CodegraphStore as S } from "./store"
-import { CodegraphResolver } from "./resolver"
 import type { Scope } from "./store"
 
 /**
@@ -93,14 +92,15 @@ type IndexSnapshot = {
 
 const extract = (scope: Scope, sb: Sandbox, filesArg: string | null, progressPath: string) =>
   Effect.gen(function* () {
-    const filesFlag = filesArg ? ` --files ${filesArg}` : ""
-    // Full rebuild uses codegraph's OWN pipeline (node:sqlite + full resolver +
-    // framework resolvers) so route→handler / component-usage / receiver-method
-    // edges land. node (not bun) is required: node:sqlite. Incremental re-extract
-    // stays on the fast kernel path.
-    const runtime = filesArg ? "bun" : "node"
-    const mode = filesArg ? "index" : "full"
-    const cmd = `${runtime} ${EXTRACTOR_DIR}/main.ts ${mode} --root /workspace --out ${INDEX_OUT} --progress ${progressPath}${filesFlag}`
+    // Both full and incremental rebuilds run codegraph's OWN pipeline inside
+    // the sandbox (node:sqlite + full resolver + framework resolvers) so ALL
+    // edges — cross-file calls, route→handler, component usages, receiver-method
+    // — are produced consistently with source available. node (not bun) is
+    // required for node:sqlite. Incremental reuses the sandbox's SQLite graph
+    // (--incremental --files) instead of rebuilding it.
+    const cmd = filesArg
+      ? `node ${EXTRACTOR_DIR}/main.ts full --root /workspace --out ${INDEX_OUT} --progress ${progressPath} --incremental --files ${filesArg}`
+      : `node ${EXTRACTOR_DIR}/main.ts full --root /workspace --out ${INDEX_OUT} --progress ${progressPath}`
 
     yield* Effect.gen(function* () {
       yield* Effect.repeat(
@@ -146,25 +146,34 @@ const runIncremental = (scope: Scope, sb: Sandbox) =>
     const live = new Set<string>()
 
     const changed: string[] = []
+    let deleted = false
     for (const s of stats) {
       live.add(s.path)
       const old = byPath.get(s.path)
       if (!old || old.size !== s.size || old.mtime_ms !== s.mtime_ms) changed.push(s.path)
     }
-    // Deleted files (in ledger, not live) must be dropped even when nothing
-    // else changed — this must run BEFORE the early return below.
+    // Deleted files (in ledger, not live): drop from PG, and force a full
+    // sandbox rebuild — the sandbox's SQLite graph doesn't drop deleted files
+    // automatically, so an incremental indexFiles would leave stale nodes.
+    for (const f of ledger) {
+      if (!live.has(f.path)) {
+        deleted = true
+        break
+      }
+    }
     yield* Effect.tryPromise(() => S.dropMissingFiles(scope, [...live]))
-    if (changed.length === 0) return Effect.void
+    if (changed.length === 0 && !deleted) return Effect.void
 
-    log.info("incremental", { scope, changed: changed.length })
+    log.info("incremental", { scope, changed: changed.length, deleted })
     // Publish the pending-change set BEFORE re-extracting so tools can tell the
     // agent "these files just changed, read them directly" during the sync gap.
-    yield* Effect.tryPromise(() => S.setStaleFiles(scope, changed))
+    yield* Effect.tryPromise(() => S.setStaleFiles(scope, changed.length ? changed : []) )
     yield* Effect.tryPromise(() => sb.files.writeFiles([{ path: FILES_LIST, data: Buffer.from(JSON.stringify(changed)), mode: 644 }]))
-    const snap = yield* extract(scope, sb, FILES_LIST, PROGRESS)
-    yield* Effect.tryPromise(() => S.replaceFiles(scope, changed, snap))
-    // Re-resolve refs of the changed files only (their edges were dropped).
-    yield* Effect.tryPromise(() => CodegraphResolver.resolveRefs(scope, changed))
+    // Incremental reuses the sandbox SQLite (--incremental); deletions force a
+    // full rebuild (no --incremental). Either way the exported snapshot is the
+    // COMPLETE latest graph — replaceGraph wholesale so edges stay consistent.
+    const snap = yield* extract(scope, sb, deleted ? null : FILES_LIST, PROGRESS)
+    yield* Effect.tryPromise(() => S.replaceGraph(scope, snap))
     yield* Effect.tryPromise(() => S.setStaleFiles(scope, []))
     return Effect.void
   })
