@@ -45,22 +45,60 @@ export const fileHandlers = HttpApiBuilder.group(InstanceHttpApi, "file", (handl
     })
 
     const findFile = Effect.fn("FileHttpApi.findFile")(function* (ctx: {
-      query: { query: string; dirs?: "true" | "false"; type?: "file" | "directory"; limit?: number }
+      query: {
+        query: string
+        sessionID: string
+        dirs?: "true" | "false"
+        type?: "file" | "directory"
+        limit?: number
+      }
     }) {
-      const directory = (yield* InstanceState.context).directory
       const limit = ctx.query.limit ?? 10
-      const type = ctx.query.type ?? (ctx.query.dirs === "false" ? "file" : undefined)
+      const type = ctx.query.type ?? (ctx.query.dirs === "false" ? "file" : ctx.query.dirs === "true" ? undefined : "file")
       const started = performance.now()
-      const found = yield* filesystem(FileSystem.Service.use((fs) => fs.find({ query: ctx.query.query, limit, type })))
-      yield* Effect.logInfo("find file", {
+
+      const sessionID = ctx.query.sessionID as SessionID
+      const sp = yield* Effect.serviceOption(SandboxProvider.Service)
+      if (sp._tag === "None")
+        return yield* Effect.die(new Error("SandboxProvider not available"))
+
+      const escapedQuery = ctx.query.query.replace(/'/g, "'\\''")
+      const wantsFiles = type !== "directory"
+      const wantsDirs = type === "directory" || ctx.query.dirs === "true"
+      const cmds: string[] = []
+      if (wantsFiles)
+        cmds.push(`rg --files --hidden /workspace 2>/dev/null | grep -iF -- '${escapedQuery}' | head -${limit}`)
+      if (wantsDirs)
+        cmds.push(
+          `find /workspace -type d -not -path '*/.git/*' 2>/dev/null | sed 's|/workspace/||; s|$|/|' | grep -iF -- '${escapedQuery}' | head -${limit}`,
+        )
+      const cmd = cmds.join("; ")
+      const result = yield* sp.value.runInSession(sessionID, cmd, { timeoutSeconds: 15 }).pipe(Effect.orDie)
+      const stdout = result.logs.stdout.map((line: any) => (typeof line === "string" ? line : line.text)).join("\n").trim()
+      const items = Array.from(
+        new Set(
+          stdout
+            .split("\n")
+            .filter(Boolean)
+            .map((line: string) => line.replace(/^\/workspace\//, "").trim())
+            .filter(Boolean),
+        ),
+      ).slice(0, limit)
+      yield* Effect.logInfo("find file (sandbox)", {
         query: ctx.query.query,
         type,
-        directory,
+        sessionID,
         limit,
-        results: found.length,
+        results: items.length,
         duration: Math.round(performance.now() - started),
       })
-      return found.map((item) => item.path)
+      return items.map((entry: string) => ({
+        name: path.basename(entry),
+        path: entry,
+        absolute: path.posix.join("/workspace", entry),
+        type: entry.endsWith("/") ? ("directory" as const) : ("file" as const),
+        ignored: false,
+      }))
     })
 
     const findSymbol = Effect.fn("FileHttpApi.findSymbol")(function* () {

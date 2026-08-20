@@ -59,6 +59,7 @@ export type ExecLogSource =
   | "file-create"
   | "file-download"
   | "file-upload"
+  | "file-remove"
 
 export const ExecLogTable = pgTable(
   "exec_log",

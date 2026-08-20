@@ -29,6 +29,7 @@ type FilesCalls = {
   writeFiles: Array<{ path: string; data: unknown; mode?: number }[]>
   getFileInfo: string[][]
   deleteFiles: string[][]
+  deleteDirectories: string[][]
 }
 
 function makeSandbox(calls: FilesCalls) {
@@ -53,6 +54,10 @@ function makeSandbox(calls: FilesCalls) {
         })(),
       deleteFiles: (paths: string[]) => {
         calls.deleteFiles.push(paths)
+        return Promise.resolve()
+      },
+      deleteDirectories: (paths: string[]) => {
+        calls.deleteDirectories.push(paths)
         return Promise.resolve()
       },
     },
@@ -160,7 +165,7 @@ function request(path: string, init?: RequestInit) {
 
 describe("files API - mkdir", () => {
   it.live("creates directory (multi-level) via sandbox createDirectories", () => {
-          const calls: FilesCalls = { createDirectories: [], writeFiles: [], getFileInfo: [], deleteFiles: [] }
+          const calls: FilesCalls = { createDirectories: [], writeFiles: [], getFileInfo: [], deleteFiles: [], deleteDirectories: [] }
     return Effect.gen(function* () {
 
       const sid = yield* Effect.promise(insertSession)
@@ -174,7 +179,7 @@ describe("files API - mkdir", () => {
   })
 
   it.live("returns 400 when path is missing", () => {
-          const calls: FilesCalls = { createDirectories: [], writeFiles: [], getFileInfo: [], deleteFiles: [] }
+          const calls: FilesCalls = { createDirectories: [], writeFiles: [], getFileInfo: [], deleteFiles: [], deleteDirectories: [] }
     return Effect.gen(function* () {
 
       const sid = yield* Effect.promise(insertSession)
@@ -185,7 +190,7 @@ describe("files API - mkdir", () => {
   })
 
   it.live("returns 404 when session does not exist", () => {
-          const calls: FilesCalls = { createDirectories: [], writeFiles: [], getFileInfo: [], deleteFiles: [] }
+          const calls: FilesCalls = { createDirectories: [], writeFiles: [], getFileInfo: [], deleteFiles: [], deleteDirectories: [] }
     return Effect.gen(function* () {
 
       const res = yield* request(`/session/ses_files_missing/files/mkdir?path=/workspace/x`, { method: "POST" })
@@ -197,7 +202,7 @@ describe("files API - mkdir", () => {
 
 describe("files API - create", () => {
   it.live("writes file with parent dir creation", () => {
-          const calls: FilesCalls = { createDirectories: [], writeFiles: [], getFileInfo: [], deleteFiles: [] }
+          const calls: FilesCalls = { createDirectories: [], writeFiles: [], getFileInfo: [], deleteFiles: [], deleteDirectories: [] }
     return Effect.gen(function* () {
 
       const sid = yield* Effect.promise(insertSession)
@@ -217,7 +222,7 @@ describe("files API - create", () => {
   })
 
   it.live("creates empty file with size 0", () => {
-          const calls: FilesCalls = { createDirectories: [], writeFiles: [], getFileInfo: [], deleteFiles: [] }
+          const calls: FilesCalls = { createDirectories: [], writeFiles: [], getFileInfo: [], deleteFiles: [], deleteDirectories: [] }
     return Effect.gen(function* () {
 
       const sid = yield* Effect.promise(insertSession)
@@ -232,7 +237,7 @@ describe("files API - create", () => {
   })
 
   it.live("returns 400 when path is missing", () => {
-          const calls: FilesCalls = { createDirectories: [], writeFiles: [], getFileInfo: [], deleteFiles: [] }
+          const calls: FilesCalls = { createDirectories: [], writeFiles: [], getFileInfo: [], deleteFiles: [], deleteDirectories: [] }
     return Effect.gen(function* () {
 
       const sid = yield* Effect.promise(insertSession)
@@ -245,7 +250,7 @@ describe("files API - create", () => {
 
 describe("files API - download", () => {
   it.live("streams file bytes with mime from extension", () => {
-          const calls: FilesCalls = { createDirectories: [], writeFiles: [], getFileInfo: [], deleteFiles: [] }
+          const calls: FilesCalls = { createDirectories: [], writeFiles: [], getFileInfo: [], deleteFiles: [], deleteDirectories: [] }
     return Effect.gen(function* () {
 
       const sid = yield* Effect.promise(insertSession)
@@ -260,7 +265,7 @@ describe("files API - download", () => {
   })
 
   it.live("falls back to octet-stream for unknown extension", () => {
-          const calls: FilesCalls = { createDirectories: [], writeFiles: [], getFileInfo: [], deleteFiles: [] }
+          const calls: FilesCalls = { createDirectories: [], writeFiles: [], getFileInfo: [], deleteFiles: [], deleteDirectories: [] }
     return Effect.gen(function* () {
 
       const sid = yield* Effect.promise(insertSession)
@@ -270,7 +275,7 @@ describe("files API - download", () => {
   })
 
   it.live("returns 404 when file does not exist", () => {
-          const calls: FilesCalls = { createDirectories: [], writeFiles: [], getFileInfo: [], deleteFiles: [] }
+          const calls: FilesCalls = { createDirectories: [], writeFiles: [], getFileInfo: [], deleteFiles: [], deleteDirectories: [] }
     const sb = makeSandbox(calls)
     sb.files.getFileInfo = async () => ({})
     return Effect.gen(function* () {
@@ -281,7 +286,7 @@ describe("files API - download", () => {
   })
 
   it.live("returns 400 when path is missing", () => {
-          const calls: FilesCalls = { createDirectories: [], writeFiles: [], getFileInfo: [], deleteFiles: [] }
+          const calls: FilesCalls = { createDirectories: [], writeFiles: [], getFileInfo: [], deleteFiles: [], deleteDirectories: [] }
     return Effect.gen(function* () {
 
       const sid = yield* Effect.promise(insertSession)
@@ -291,7 +296,7 @@ describe("files API - download", () => {
   })
 
   it.live("downloads a directory as a zip archive and cleans it up", () => {
-          const calls: FilesCalls = { createDirectories: [], writeFiles: [], getFileInfo: [], deleteFiles: [] }
+          const calls: FilesCalls = { createDirectories: [], writeFiles: [], getFileInfo: [], deleteFiles: [], deleteDirectories: [] }
     const runInSessionFn = (_sid: SessionID, command: string) =>
       Effect.succeed({
         logs: {
@@ -315,7 +320,7 @@ describe("files API - download", () => {
 
 describe("files API - upload", () => {
   it.live("uploads with dir auto-create", () => {
-          const calls: FilesCalls = { createDirectories: [], writeFiles: [], getFileInfo: [], deleteFiles: [] }
+          const calls: FilesCalls = { createDirectories: [], writeFiles: [], getFileInfo: [], deleteFiles: [], deleteDirectories: [] }
     return Effect.gen(function* () {
 
       const sid = yield* Effect.promise(insertSession)
@@ -335,7 +340,7 @@ describe("files API - upload", () => {
   })
 
   it.live("defaults path to /workspace", () => {
-          const calls: FilesCalls = { createDirectories: [], writeFiles: [], getFileInfo: [], deleteFiles: [] }
+          const calls: FilesCalls = { createDirectories: [], writeFiles: [], getFileInfo: [], deleteFiles: [], deleteDirectories: [] }
     return Effect.gen(function* () {
 
       const sid = yield* Effect.promise(insertSession)
@@ -352,7 +357,7 @@ describe("files API - upload", () => {
   })
 
   it.live("rejects path-traversal filenames", () => {
-          const calls: FilesCalls = { createDirectories: [], writeFiles: [], getFileInfo: [], deleteFiles: [] }
+          const calls: FilesCalls = { createDirectories: [], writeFiles: [], getFileInfo: [], deleteFiles: [], deleteDirectories: [] }
     return Effect.gen(function* () {
 
       const sid = yield* Effect.promise(insertSession)
@@ -368,7 +373,7 @@ describe("files API - upload", () => {
   })
 
   it.live("returns 400 when filename is missing", () => {
-          const calls: FilesCalls = { createDirectories: [], writeFiles: [], getFileInfo: [], deleteFiles: [] }
+          const calls: FilesCalls = { createDirectories: [], writeFiles: [], getFileInfo: [], deleteFiles: [], deleteDirectories: [] }
     return Effect.gen(function* () {
 
       const sid = yield* Effect.promise(insertSession)
