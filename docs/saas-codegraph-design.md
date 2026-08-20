@@ -142,9 +142,22 @@ codegraph v1.5+ 提供双层提取引擎，**自动优先 Rust kernel，缺失/�
 | 生成文件识别 | `extraction/generated-detection.ts` | 纯函数原样移植 |
 | 图遍历语义 | `graph/traversal.ts` | BFS/callers/impact 的语义参考（服务端 PG 版重写） |
 
-### 4.2 沙箱内提取脚本
+### 4.2 沙箱内提取/完整分析（full 模式）
 
-`bun build --target=bun` 打包提取脚本（内嵌依赖 codegraph 包 + kernel prebuild/wasm），产物含 `.node` 与 wasm 双份语法资产（体积换确定性）。
+沙箱脚本 `node main.ts full`（node 必须——`node:sqlite`），用 codegraph SDK 在沙箱内跑**完整本地管线**：
+
+```
+full (全量)  : rm .codegraph → initSync → indexAll（kernel 提取 + 框架检测产 route 节点）
+               → resolveReferences（name-matcher + framework resolvers + 局部类型推断）
+               → 导出全部 nodes/edges/files（gzip ndjson）→ 服务端 replaceGraph
+incremental  : openSync → graph.sync()（content-hash diff → indexFiles(changed)
+               → 只 resolve 变更文件 refs）→ 导出变更文件邻域（节点 + source/target 边）
+               → 服务端 replaceFiles（按文件删旧插新）
+```
+
+- **沙箱内有源码**，所以 codegraph 的全部能力都生效：跨文件 calls、route→handler references、组件 usage、变量 receiver 方法调用（局部类型推断）。
+- 镜像内置：extractor 由沙箱镜像 COPY 到 `/opt/codegraph-extractor`（构建沙箱镜像前跑 `scripts/build-codegraph-extractor.sh --target <arch>`），indexer 直接 exec，无运行时注入。
+- 服务端只落库，不解析（无源码时 26% 解析率的下限方案已移除，全量/增量统一沙箱内完整解析）。
 
 服务端流程（`CodegraphIndexer`）：
 
@@ -170,9 +183,10 @@ codegraph v1.5+ 提供双层提取引擎，**自动优先 Rust kernel，缺失/�
 1. 启动时查 `codegraph_index`：`ready` 且工作区无大变 → 直接进增量循环。
 2. `/workspace` 为空且无索引 → 不建空索引，进 watch 循环（30s）。
 3. 循环内检测：工作区「空 → 大量文件」或新出现 `.git` → 触发全量索引（④⑤ 落库见 4.2）。
-4. 已有索引 → **变更检测不依赖 git status**（git 盲区：`git pull`/`checkout`/`merge` 后工作树 clean，status 为空，codegraph 为此专门用文件系统对比）：沙箱脚本输出 stat 清单（path, size, mtime），服务端与 `codegraph_file.content_hash` 对比——(size, mtime) 未变直接跳过，变了再读文件 hash 确认 → 仅真实变更文件重提取，ndjson 回传。
-5. 服务端按文件级 delete+insert（同 scope advisory lock 事务内），ref 增量 resolve。
-6. 沙箱空闲/回收判定复用 idle-reap 的 zombie 判定：沙箱已被回收则循环自动退出，等下次 getOrCreate 重建（此时回到第 1 步，ready 的索引直接复用）。
+4. 已有索引 → **变更检测不依赖 git status**（git 盲区：`git pull`/`checkout`/`merge` 后工作树 clean）：沙箱脚本 stat 清单（path, size, mtime）+ 服务端与 `codegraph_file` 对比（>1MB 文件跳过——从未索引，不驱动变更判定）。
+5. **增量走 codegraph 原生 `sync()`**：content-hash diff → indexFiles(changed) → 只 resolve 变更文件 refs → 导出变更文件邻域（节点 + source/target 边）→ 服务端 `replaceFiles` 按文件删旧插新（入边正确性由"删 target∈文件边"保证：目标节点还在则保留、删除则清除）。
+6. 删除文件 → 强制全量重建（SQLite 不自动从图里删文件）。
+7. 沙箱空闲/回收判定复用 idle-reap 的 zombie 判定：沙箱已被回收则循环自动退出，等下次 getOrCreate 重建（此时回到第 1 步，ready 的索引直接复用）。
 
 ## 5. 触发与调度
 
@@ -200,15 +214,18 @@ codegraph v1.5+ 提供双层提取引擎，**自动优先 Rust kernel，缺失/�
 2. 无 appId → 返回说明文本，**不是 isError**（对齐 codegraph 的 NotIndexedError 设计：避免 Agent 学习到工具坏了而永久弃用）。
 3. 结果按 sessionID 缓存（LRU，短 TTL），避免每次工具调用查 session 表。
 
-### 6.2 工具清单（对齐 codegraph 默认 4 工具 + impact）
+### 6.2 工具清单（8 个，对齐 codegraph MCP + CLI）
 
-| 工具 | 参数 | 行为（对齐 codegraph MCP） |
+| 工具 | 参数 | 行为（对齐 codegraph） |
 |---|---|---|
-| `codegraph_search` | `query, kind?, limit?`（默认 10，clamp 1..100） | 四层搜索 + 重评分，返回符号位置清单（无源码） |
-| `codegraph_node` | `symbol, file?, line?` | 符号详情：位置 + 签名 + docstring + caller/callee 概要；同名符号多定义时全部返回（对齐"返回 EVERY matching definition"）；**不返回源码正文**，附 `file:line` 供 read 工具取 |
-| `codegraph_callers` | `symbol, file?, limit?`（默认 20） | 调用者枚举，含 file:line、回调注册标注；同名定义按文件分组 |
-| `codegraph_explore` | `query, maxFiles?` | 一次调用返回相关符号清单（file:line + 签名）+ 调用路径 + 关系概要 + "相关文件"列表；输出预算对齐 codegraph 的分级预算表（按文件数分档限流） |
-| `codegraph_impact` | `symbol, file?, depth?`（默认 2） | 影响半径（重构前自查） |
+| `codegraph_search` | `query, kind?, limit?` | 四层搜索 + 多信号重评分，返回符号位置清单（无源码） |
+| `codegraph_node` | `symbol, file?, line?` | 符号详情：位置 + 签名 + docstring + caller/callee 概要；同名多定义全返回；附 `file:line` 供 read |
+| `codegraph_callers` | `symbol, file?, limit?` | 调用者枚举（含调用类型标签），同名定义按文件分组 |
+| `codegraph_callees` | `symbol, file?, limit?` | 被调用者枚举（原版 MCP 工具，补齐） |
+| `codegraph_impact` | `symbol, file?, depth?` | 影响半径（重构前自查） |
+| `codegraph_explore` | `query, maxSymbols?` | **移植原版分配算法**：RELEVANCE_KIND_WEIGHT 评分 + 弱 kind usage 隔离探测 + rankPenalty（测试/生成降权）+ spine 调用路径加权 + CLIFF_FRACTION 相对裁剪 + MIN 保底/权重分剩余（预算单位=符号数）；cliff 文件仍列名；LOW_CONFIDENCE 检测 |
+| `codegraph_files` | `path?, format?`（tree/flat/grouped）, limit? | 索引文件树（语言+符号数），快于 Glob |
+| `codegraph_affected` | `files[], includeTests?, depth?, limit?` | 变更文件影响分析：BFS 文件依赖传播，生产/测试分离（测试选择），对齐原版 CLI `affected` |
 
 每个工具配 `codegraph_*.txt` 描述文件（对齐仓库 tool.ts + tool.txt 惯例），描述里写明：数据可能滞后于最新编辑（增量 30s 周期）、索引进度中时的行为、源码请用 read。
 
