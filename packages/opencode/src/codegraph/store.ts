@@ -507,9 +507,43 @@ export const getImpact = async (scope: Scope, nodeId: string, maxDepth = 3): Pro
   return out
 }
 
+/**
+ * Files that depend on `filePath` via the resolved symbol graph: every edge
+ * whose target is a node in `filePath`, grouped by the source node's file.
+ * This is the blast-radius / `affected` signal (calls/references/instantiates/
+ * extends/... are all cross-file dependency edges; `contains`/`imports` are not).
+ */
+export const getDependentFilePaths = async (scope: Scope, filePath: string): Promise<string[]> => {
+  const fileNodes = await use((d) =>
+    d
+      .select({ id: CodegraphNodeTable.id })
+      .from(CodegraphNodeTable)
+      .where(and(eq(CodegraphNodeTable.scope, scope), eq(CodegraphNodeTable.file_path, filePath)))
+      .all() as { id: string }[],
+  )
+  if (fileNodes.length === 0) return []
+  const ids = fileNodes.map((n) => n.id)
+  const rows = await use((d) =>
+    d
+      .select({ source: CodegraphEdgeTable.source })
+      .from(CodegraphEdgeTable)
+      .where(
+        and(
+          eq(CodegraphEdgeTable.scope, scope),
+          inArray(CodegraphEdgeTable.target, ids),
+          notInArray(CodegraphEdgeTable.kind, ["contains"]),
+        ),
+      )
+      .all() as { source: string }[],
+  )
+  if (rows.length === 0) return []
+  const sourceIds = [...new Set(rows.map((r) => r.source))]
+  const sources = await getNodesByIds(scope, sourceIds)
+  return [...new Set(sources.map((n) => n.file_path).filter((p) => p !== filePath))]
+}
+
 /** Direct `contains` children of a container node. */
-export const getChildren = async (scope: Scope, nodeId: string): Promise<GraphNode[]> => {
-  const edges = await outgoingEdges(scope, nodeId, ["contains"])
+export const getChildren = async (scope: Scope, nodeId: string): Promise<GraphNode[]> => {  const edges = await outgoingEdges(scope, nodeId, ["contains"])
   if (edges.length === 0) return []
   const nodes = await getNodesByIds(scope, edges.map((e) => e.target))
   return edges
