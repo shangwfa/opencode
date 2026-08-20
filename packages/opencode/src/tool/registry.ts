@@ -15,6 +15,8 @@ import { CodegraphNodeTool } from "@/codegraph/tool/codegraph-node"
 import { CodegraphCallersTool } from "@/codegraph/tool/codegraph-callers"
 import { CodegraphExploreTool } from "@/codegraph/tool/codegraph-explore"
 import { CodegraphImpactTool } from "@/codegraph/tool/codegraph-impact"
+import { CodegraphCalleesTool } from "@/codegraph/tool/codegraph-callees"
+import { CodegraphFilesTool } from "@/codegraph/tool/codegraph-files"
 import { TaskTool } from "./task"
 import { Database } from "@opencode-ai/core/database/database"
 import { SessionRunState } from "@/session/run-state"
@@ -134,6 +136,8 @@ const layer = Layer.effect(
     const codegraphCallers = yield* CodegraphCallersTool
     const codegraphExplore = yield* CodegraphExploreTool
     const codegraphImpact = yield* CodegraphImpactTool
+    const codegraphCallees = yield* CodegraphCalleesTool
+    const codegraphFiles = yield* CodegraphFilesTool
     const patchtool = yield* ApplyPatchTool
     const skilltool = yield* SkillTool
     const agent = yield* Agent.Service
@@ -243,6 +247,8 @@ const layer = Layer.effect(
           codegraph_callers: Tool.init(codegraphCallers),
           codegraph_explore: Tool.init(codegraphExplore),
           codegraph_impact: Tool.init(codegraphImpact),
+          codegraph_callees: Tool.init(codegraphCallees),
+          codegraph_files: Tool.init(codegraphFiles),
           edit: Tool.init(edit),
           write: Tool.init(writetool),
           task: Tool.init(task),
@@ -272,6 +278,8 @@ const layer = Layer.effect(
           tool.codegraph_callers,
           tool.codegraph_explore,
           tool.codegraph_impact,
+          tool.codegraph_callees,
+          tool.codegraph_files,
           tool.edit,
           tool.write,
           tool.task,

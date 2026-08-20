@@ -239,6 +239,21 @@ export const listFileStats = (scope: Scope) =>
         .all() as { path: string; content_hash: string; size: number; mtime_ms: number }[],
   )
 
+/** File tree browsing: indexed files with language + node counts. */
+export const listFiles = (scope: Scope) =>
+  use(
+    (d) =>
+      d
+        .select({
+          path: CodegraphFileTable.path,
+          language: CodegraphFileTable.language,
+          node_count: CodegraphFileTable.node_count,
+        })
+        .from(CodegraphFileTable)
+        .where(sql`scope = ${scope}`)
+        .all() as { path: string; language: string; node_count: number }[],
+  )
+
 /** Paths known to the graph but absent from the sandbox stat list → deleted files. */
 export const dropMissingFiles = (scope: Scope, livePaths: string[]) =>
   use(async (d: any) => {
