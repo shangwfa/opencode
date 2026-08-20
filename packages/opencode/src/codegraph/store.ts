@@ -17,6 +17,7 @@ export type Scope = string
 export type GraphNode = typeof CodegraphNodeTable.$inferSelect
 export type GraphEdge = typeof CodegraphEdgeTable.$inferSelect
 export type GraphFile = typeof CodegraphFileTable.$inferSelect
+export type GraphRef = typeof CodegraphRefTable.$inferSelect
 
 /** scope = "app:" + appId — the application dimension (see codegraph.pg.ts). */
 export const scopeFor = (appId: string) => `app:${appId}`
@@ -353,6 +354,70 @@ export const getNodesByIds = (scope: Scope, ids: string[]) =>
   ids.length === 0
     ? Promise.resolve([] as GraphNode[])
     : use((d) => d.select().from(CodegraphNodeTable).where(and(eq(CodegraphNodeTable.scope, scope), inArray(CodegraphNodeTable.id, ids))).all() as GraphNode[])
+
+export const getNodeById = (scope: Scope, id: string) =>
+  use((d) => d.select().from(CodegraphNodeTable).where(and(eq(CodegraphNodeTable.scope, scope), eq(CodegraphNodeTable.id, id))).get() as GraphNode | undefined)
+
+export const getNodesByQualifiedName = (scope: Scope, qn: string) =>
+  use((d) => d.select().from(CodegraphNodeTable).where(sql`scope = ${scope} and qualified_name = ${qn}`).all() as GraphNode[])
+
+// ---------------------------------------------------------------------------
+// Reference-resolution support: keyset-paginated pending refs + the two
+// resolver writes (resolver edges and ref status), each in one locked
+// transaction so a concurrent resolver can never observe a torn state.
+// ---------------------------------------------------------------------------
+
+/** Pending refs after `afterId`, ascending id — keyset pagination avoids the
+ * O(n²) offset scan on 80k+ ref scopes. */
+export const listPendingRefs = (scope: Scope, opts: { limit: number; afterId: number; filePaths?: string[] }) =>
+  use(
+    (d) =>
+      d
+        .select()
+        .from(CodegraphRefTable)
+        .where(
+          and(
+            eq(CodegraphRefTable.scope, scope),
+            eq(CodegraphRefTable.status, "pending"),
+            opts.filePaths && opts.filePaths.length > 0 ? inArray(CodegraphRefTable.file_path, opts.filePaths) : undefined,
+            sql`${CodegraphRefTable.id} > ${opts.afterId}`,
+          ),
+        )
+        .orderBy(CodegraphRefTable.id)
+        .limit(opts.limit)
+        .all() as GraphRef[],
+  )
+
+/**
+ * Idempotent resolver-edge commit: inside one advisory-locked transaction,
+ * drop prior `provenance='resolver'` edges (scope-wide, or restricted to the
+ * given files' nodes for incremental runs) then insert the fresh batch.
+ */
+export const replaceResolverEdges = (scope: Scope, edges: ExtractEdge[], filePaths?: string[]) =>
+  use(async (d: any) => {
+    await d.transaction(async (tx: any) => {
+      await lockScope(tx, scope)
+      const inFiles = sql`(select id from ${CodegraphNodeTable} where scope = ${scope} and ${inArray(CodegraphNodeTable.file_path, filePaths ?? [])})`
+      const delWhere = and(
+        eq(CodegraphEdgeTable.scope, scope),
+        eq(CodegraphEdgeTable.provenance, "resolver"),
+        filePaths && filePaths.length > 0
+          ? or(inArray(CodegraphEdgeTable.source, inFiles), inArray(CodegraphEdgeTable.target, inFiles))
+          : undefined,
+      )
+      await tx.delete(CodegraphEdgeTable).where(delWhere).run()
+      await insertBatches(tx, CodegraphEdgeTable, edges)
+    })
+  })
+
+export const markRefsStatus = (scope: Scope, ids: number[], status: string) =>
+  use(async (d: any) => {
+    for (let i = 0; i < ids.length; i += BATCH) {
+      const slice = ids.slice(i, i + BATCH)
+      if (slice.length > 0)
+        await d.update(CodegraphRefTable).set({ status }).where(and(eq(CodegraphRefTable.scope, scope), inArray(CodegraphRefTable.id, slice))).run()
+    }
+  })
 
 // ---------------------------------------------------------------------------
 // Graph traversal primitives (callers implement BFS/callers/impact on top).

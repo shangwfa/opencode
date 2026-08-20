@@ -9,6 +9,7 @@ import { resolveSandboxOpts } from "../session/sandbox-opts"
 import { SandboxProvider } from "../tool/sandbox-provider"
 import type { Sandbox } from "@alibaba-group/opensandbox"
 import { CodegraphStore as S } from "./store"
+import { CodegraphResolver } from "./resolver"
 import type { Scope } from "./store"
 
 /**
@@ -125,6 +126,8 @@ const runFullIndex = (scope: Scope, sb: Sandbox) =>
   Effect.gen(function* () {
     const snap = yield* extract(scope, sb, null, PROGRESS)
     yield* Effect.tryPromise(() => S.replaceGraph(scope, snap))
+    // Cross-file reference resolution → calls/references/extends edges.
+    yield* Effect.tryPromise(() => CodegraphResolver.resolveRefs(scope))
     return Effect.void
   })
 
@@ -154,6 +157,8 @@ const runIncremental = (scope: Scope, sb: Sandbox) =>
     yield* Effect.tryPromise(() => sb.files.writeFiles([{ path: FILES_LIST, data: Buffer.from(JSON.stringify(changed)), mode: 644 }]))
     const snap = yield* extract(scope, sb, FILES_LIST, PROGRESS)
     yield* Effect.tryPromise(() => S.replaceFiles(scope, changed, snap))
+    // Re-resolve refs of the changed files only (their edges were dropped).
+    yield* Effect.tryPromise(() => CodegraphResolver.resolveRefs(scope, changed))
     yield* Effect.tryPromise(() => S.setStaleFiles(scope, []))
     return Effect.void
   })
