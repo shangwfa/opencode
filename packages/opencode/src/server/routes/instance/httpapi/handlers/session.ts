@@ -276,6 +276,25 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       return yield* create({ payload })
     })
 
+    const snapshot = Effect.fn("SessionHttpApi.snapshot")(function* (ctx: { params: { sessionID: SessionID } }) {
+      yield* requireSession(ctx.params.sessionID)
+      const sp = Option.getOrUndefined(yield* Effect.serviceOption(SandboxProvider.Service))
+      if (!sp?.createSnapshot) {
+        return { state: "unavailable", reason: "snapshot not enabled" }
+      }
+      const id = yield* sp.createSnapshot(ctx.params.sessionID)
+      if (!id) return { state: "unavailable", reason: "no running sandbox or snapshot failed to start" }
+      return { snapshotId: id, state: "creating" }
+    })
+
+    const getSnapshot = Effect.fn("SessionHttpApi.getSnapshot")(function* (ctx: { params: { sessionID: SessionID } }) {
+      yield* requireSession(ctx.params.sessionID)
+      const sp = Option.getOrUndefined(yield* Effect.serviceOption(SandboxProvider.Service))
+      const row = yield* (sp?.getLatestSnapshot ? sp.getLatestSnapshot(ctx.params.sessionID) : Effect.succeed(null))
+      if (!row) return { state: "none" }
+      return { snapshotId: row.id, state: row.state, reason: row.reason }
+    })
+
     const remove = Effect.fn("SessionHttpApi.remove")(function* (ctx: { params: { sessionID: SessionID } }) {
       yield* SessionError.mapStorageNotFound(session.remove(ctx.params.sessionID))
       yield* pluginRuntime.dispose(ctx.params.sessionID)
@@ -838,6 +857,8 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       .handle("abort", abort)
       .handle("init", init)
       .handle("loadDotOpencode", loadDotOpencode)
+      .handle("snapshot", snapshot)
+      .handle("getSnapshot", getSnapshot)
       .handle("share", share)
       .handle("unshare", unshare)
       .handle("summarize", summarize)

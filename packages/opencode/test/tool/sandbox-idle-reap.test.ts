@@ -87,6 +87,9 @@ const config = SandboxConfig.Service.of({
   resourceLimits: { cpu: "1", memory: "2Gi" },
   volumeType: "none" as const,
   pvcClaimName: "",
+  snapshotEnabled: false,
+  snapshotTtlMs: 7 * 86400_000,
+  snapshotWaitMs: 900_000,
   idleKillMs: 3_600_000,
   idleReapMs: 5_000,
   idleReapIntervalMs: 500,
@@ -212,6 +215,21 @@ describe.skipIf(!enabled)("pgLayer - idle reap: 空闲沙箱定期回收", () =>
     expect(await waitForState(SID, "destroyed")).toBe(true)
     await dbCleanup(SID)
   }, 30_000)
+
+  test("idle 回收 reconnect 返回 500 时保持 killed 且不发送 DELETE", async () => {
+    const SID = sid("ses_reap_connect_failure")
+    const sandboxID = `sb_${SID}`
+    failedConnects.add(sandboxID)
+    await insertSandbox(SID, { ageMs: 6_000 })
+
+    expect(await waitForState(SID, "killed")).toBe(true)
+    await Bun.sleep(1_000)
+    expect((await getSandboxState(SID))?.state).toBe("killed")
+    expect(lifecycleRequests.some((request) => request.method === "DELETE" && request.path.includes(sandboxID))).toBe(false)
+
+    failedConnects.delete(sandboxID)
+    await dbCleanup(SID)
+  }, 20_000)
 
   test("reconnect 返回 404 时自动重建并替换 lifecycle 记录", async () => {
     const SID = sid("ses_reap_reconnect_404")

@@ -73,7 +73,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
   const maybeSandboxProvider = Option.getOrUndefined(yield* Effect.serviceOption(SandboxProvider.Service))
   const root = maybeSandboxProvider
     ? yield* Effect.promise(() => resolveSandboxOpts(input.session.id))
-    : { id: input.session.id }
+    : { id: input.session.id, pvcMode: undefined, appId: undefined }
   const sandboxSessionID = root.id
   const useApp = root.pvcMode === "app" && !!root.appId?.trim()
 

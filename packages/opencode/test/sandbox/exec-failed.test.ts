@@ -126,6 +126,7 @@ function fakeProvider(sb: Sandbox): SandboxProvider.Interface {
     touch: () => Effect.void,
     release: () => Effect.void,
     isKeepAlive: () => Effect.succeed(false),
+    isSnapshotSession: () => Effect.succeed(false),
     runInSession: () => Effect.succeed({} as any),
     runDetached: () => Effect.succeed({} as any),
     interrupt: () => Effect.void,

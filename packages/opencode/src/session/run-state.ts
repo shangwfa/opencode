@@ -8,7 +8,7 @@ import * as Log from "@opencode-ai/core/util/log"
 import { Session } from "./session"
 import { SessionID } from "./schema"
 import { SessionStatus } from "./status"
-import { SandboxProvider } from "@/tool/sandbox-provider"
+import { SandboxProvider, SandboxConfig } from "@/tool/sandbox-provider"
 import { MCP } from "@/mcp"
 import { Agent as LspAgent } from "@/lsp/agent"
 
@@ -70,7 +70,10 @@ const layer = Layer.effect(
           let destroyed = false
           if (sandbox._tag === "Some") {
             const keep = yield* sandbox.value.isKeepAlive(sessionID).pipe(Effect.orDie)
-            if (!keep) {
+            // 快照会话：workspace 在沙箱 rootfs，onIdle 立即销毁会丢数据且每轮交互都触发一次
+            // docker commit（~70s）——改用 idle reap（超时真空闲）统一快照+回收，onIdle 保留沙箱。
+            const snapshotMode = yield* sandbox.value.isSnapshotSession(sessionID).pipe(Effect.orDie)
+            if (!keep && !snapshotMode) {
               const agent = yield* Effect.serviceOption(LspAgent.Service)
               if (agent._tag === "Some") {
                 yield* agent.value.shutdown(sessionID).pipe(Effect.catchCause(() => Effect.void))

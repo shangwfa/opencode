@@ -10,6 +10,7 @@ import { resolveSandboxOpts } from "../session/sandbox-opts"
 import { SessionTable } from "../session/session.pg"
 import { Database } from "../storage/db"
 import { SandboxTable } from "./sandbox.pg"
+import { SessionSnapshot } from "./session-snapshot"
 import { ExecLogTable } from "../session/exec-log"
 
 export namespace SandboxConfig {
@@ -21,8 +22,11 @@ export namespace SandboxConfig {
     readonly image: string
     readonly timeoutSeconds: number
     readonly resourceLimits: Record<string, string>
-    readonly volumeType: "none" | "pvc" | "host"
+    readonly volumeType: "none" | "pvc" | "host" | "snapshot"
     readonly pvcClaimName: string
+    readonly snapshotEnabled: boolean
+    readonly snapshotTtlMs: number
+    readonly snapshotWaitMs: number
     readonly idleKillMs: number
     readonly idleReapMs: number
     readonly idleReapIntervalMs: number
@@ -43,6 +47,9 @@ export namespace SandboxConfig {
     resourceLimits: { cpu: "1", memory: "2Gi" },
     volumeType: Flag.OPENCODE_SANDBOX_VOLUME_TYPE,
     pvcClaimName: Flag.OPENCODE_SANDBOX_PVC_CLAIM,
+    snapshotEnabled: Flag.OPENCODE_SANDBOX_SNAPSHOT_ENABLED,
+    snapshotTtlMs: Flag.OPENCODE_SANDBOX_SNAPSHOT_TTL_SEC * 1000,
+    snapshotWaitMs: Flag.OPENCODE_SANDBOX_SNAPSHOT_WAIT_SEC * 1000,
     idleKillMs: Flag.OPENCODE_SANDBOX_IDLE_KILL_SEC * 1000,
     idleReapMs: Flag.OPENCODE_SANDBOX_IDLE_REAP_SEC * 1000,
     idleReapIntervalMs: 300_000,
@@ -63,15 +70,38 @@ export interface VolumeScope {
   readonly sessionID: string
   readonly pvcMode?: "session" | "app"
   readonly appId?: string
+  /** 会话级持久化方式（缺省回退全局 volumeType，兼容旧调用） */
+  readonly persistMode?: "pvc" | "snapshot"
+}
+
+export function validateSnapshotConfig(config: Pick<SandboxConfig.Interface, "volumeType" | "snapshotEnabled">) {
+  // 全局默认是 snapshot 时必须开能力，否则所有缺省会话创建即失败
+  if (config.volumeType === "snapshot" && config.snapshotEnabled !== true) {
+    throw new Error("OPENCODE_SANDBOX_VOLUME_TYPE=snapshot 需要 OPENCODE_SANDBOX_SNAPSHOT_ENABLED=true")
+  }
 }
 
 export function buildVolumes(scope: VolumeScope, config: SandboxConfig.Interface): Volume[] {
-  if (config.volumeType === "none") return []
+  // 会话级 persistMode 优先，缺省回退全局 volumeType（兼容 pvc/host/none）
+  const mode = scope.persistMode ?? config.volumeType
+  // snapshot 模式：workspace 留在沙箱 rootfs（随快照持久化，见 docs/sandbox-snapshot-design.md），
+  // 只挂跨会话共享的 package-cache；pvcMode/appId 不参与（app 卷不挂，参数自然失效）。
+  if (mode === "snapshot") {
+    if (!config.pvcClaimName.trim()) return []
+    return [{
+      name: "package-cache",
+      mountPath: requirePackageCacheMount(config.packageCacheMount, []),
+      subPath: "shared/package-cache",
+      pvc: { claimName: config.pvcClaimName },
+    }]
+  }
+
+  if (mode === "none") return []
 
   if (scope.pvcMode === "app" && !scope.appId?.trim()) {
     throw new Error(`app 模式缺少 appId，拒绝创建 sandbox（sessionID=${scope.sessionID}）`)
   }
-  const useApp = config.volumeType === "pvc" && scope.pvcMode === "app"
+  const useApp = mode === "pvc" && scope.pvcMode === "app"
   const prefix = useApp ? `apps/${scope.appId!.trim()}` : `sessions/${scope.sessionID}`
   const mounts = [
     { name: "workspace", mountPath: "/workspace", sub: `${prefix}/workspace` },
@@ -85,7 +115,7 @@ export function buildVolumes(scope: VolumeScope, config: SandboxConfig.Interface
 
   const result = mounts.map((m) => {
     const base: Volume = { name: m.name, mountPath: m.mountPath, subPath: m.sub }
-    if (config.volumeType === "pvc") {
+    if (mode === "pvc") {
       base.pvc = { claimName: config.pvcClaimName }
     } else {
       base.host = { path: `/var/opencode/sessions/${scope.sessionID}/${m.name}` }
@@ -93,7 +123,7 @@ export function buildVolumes(scope: VolumeScope, config: SandboxConfig.Interface
     return base
   })
 
-  if (config.volumeType === "pvc") {
+  if (mode === "pvc") {
     const packageCacheMount = requirePackageCacheMount(config.packageCacheMount, mounts.map((m) => m.mountPath))
     result.push({
       name: "package-cache",
@@ -255,17 +285,24 @@ export namespace SandboxProvider {
   export interface Interface {
     readonly getOrCreate: (
       sessionID: SessionID,
-      opts?: { pvcMode?: "session" | "app"; appId?: string; sandbox?: { cpu: string; memory: string } },
+      opts?: { pvcMode?: "session" | "app"; appId?: string; sandbox?: { cpu: string; memory: string; image?: string; snapshotId?: string } },
     ) => Effect.Effect<Sandbox>
     readonly get: (sessionID: SessionID) => Effect.Effect<Sandbox | null>
     readonly destroy: (sessionID: SessionID) => Effect.Effect<void>
     readonly destroyById: (sandboxID: string) => Effect.Effect<void>
     readonly destroyAll: () => Effect.Effect<void>
     readonly cleanupSessionVolume: (sessionID: SessionID) => Effect.Effect<void>
+    readonly purgeSnapshots?: (sessionID: SessionID) => Effect.Effect<void>
+    /** 显式快照：对会话当前沙箱发起快照（异步，不等 Ready），返回快照 id；无沙箱/失败返回 null */
+    readonly createSnapshot?: (sessionID: SessionID) => Effect.Effect<string | null>
+    /** 会话最新快照状态（无则 null） */
+    readonly getLatestSnapshot?: (sessionID: SessionID) => Effect.Effect<{ id: string; state: string; reason: string | null } | null>
     readonly keepAlive: (sessionID: SessionID) => Effect.Effect<void>
     readonly touch: (sessionID: SessionID) => Effect.Effect<void>
     readonly release: (sessionID: SessionID) => Effect.Effect<void>
     readonly isKeepAlive: (sessionID: SessionID) => Effect.Effect<boolean>
+    /** 会话是否为快照持久化模式（创建时固化；onIdle 保留沙箱与否的依据） */
+    readonly isSnapshotSession: (sessionID: SessionID) => Effect.Effect<boolean>
     readonly runInSession: (
       sessionID: SessionID,
       command: string,
@@ -341,13 +378,13 @@ export namespace SandboxProvider {
         return Ref.modify(entries, (m) => { m.delete(sessionID); return [undefined, m] as const })
       }
 
-      function createSandbox(sessionID: SessionID, opts?: { pvcMode?: "session" | "app"; appId?: string; sandbox?: { cpu: string; memory: string } }) {
+      function createSandbox(sessionID: SessionID, opts?: { pvcMode?: "session" | "app"; appId?: string; persistMode?: "pvc" | "snapshot"; sandbox?: { cpu: string; memory: string; image?: string; snapshotId?: string } }) {
         return Effect.gen(function* () {
           const resolved = opts ?? (yield* Effect.promise(() => resolveSandboxOpts(sessionID)))
           const timeoutSeconds = hasVolume ? config.maxTtlSeconds : config.timeoutSeconds
           const resource = resolved.sandbox ?? config.resourceLimits
           log.info("creating sandbox", { sessionID, volumeType: config.volumeType, timeoutSeconds, pvcMode: resolved.pvcMode, resource })
-          const volumes = buildVolumes({ sessionID, pvcMode: resolved.pvcMode, appId: resolved.appId }, config)
+          const volumes = buildVolumes({ sessionID, pvcMode: resolved.pvcMode, appId: resolved.appId, persistMode: resolved.persistMode }, config)
           const sb = yield* Effect.tryPromise({
             try: () =>
               Sandbox.create({
@@ -506,6 +543,9 @@ export namespace SandboxProvider {
 
       const isKeepAlive: Interface["isKeepAlive"] = (sessionID) => Effect.sync(() => false)
 
+      const isSnapshotSession: Interface["isSnapshotSession"] = (sessionID) =>
+        Effect.succeed(config.volumeType === "snapshot")
+
       const runInSession: Interface["runInSession"] = (sessionID, command, options, handlers, signal) =>
         Effect.gen(function* () {
           const sb = yield* getOrCreate(sessionID)
@@ -620,9 +660,10 @@ export namespace SandboxProvider {
       }
 
       return Service.of({
-        getOrCreate, get, destroy, destroyById, destroyAll, keepAlive, touch, release, isKeepAlive,
+        getOrCreate, get, destroy, destroyById, destroyAll, keepAlive, touch, release, isKeepAlive, isSnapshotSession,
         runInSession, runDetached, interrupt, register, getEndpoint,
         cleanupSessionVolume: (sessionID) => cleanupSessionVolume(sessionID, config, connectionConfig),
+        purgeSnapshots: () => Effect.void,
       })
     }),
   )
@@ -632,6 +673,10 @@ export namespace SandboxProvider {
     Service,
     Effect.gen(function* () {
       const config = yield* SandboxConfig.Service
+      yield* Effect.try({
+        try: () => validateSnapshotConfig(config),
+        catch: (error) => error instanceof Error ? error : new Error(String(error)),
+      }).pipe(Effect.orDie)
       const runPromise = Effect.runPromiseWith(yield* Effect.context())
       const commandSemaphores = new Map<string, Semaphore.Semaphore>()
       const detachedCommandSessions = new Map<string, Set<string>>()
@@ -678,12 +723,21 @@ export namespace SandboxProvider {
       const hasVolume = config.volumeType !== "none"
 
       const pgDb: any = Database.Client()
+      // 快照模块（OPENCODE_SANDBOX_SNAPSHOT_ENABLED 时启用；所有方法吞错，不影响回收/创建主流程）
+      const snapshots = config.snapshotEnabled
+        ? SessionSnapshot.create({
+          pgDb,
+          connectionConfig,
+          ttlMs: config.snapshotTtlMs,
+          waitMs: config.snapshotWaitMs,
+        })
+        : null
 
       type Row = {
         id: string
         session_id: string
         host: string
-        state: "running" | "killed" | "destroyed"
+        state: "running" | "snapshotting" | "killed" | "destroyed"
         keep_alive: boolean
         command_session_id: string | null
         time_created: number
@@ -712,6 +766,21 @@ export namespace SandboxProvider {
             .then((rows: { directory: string }[]) => rows[0]?.directory ?? null) as Promise<string | null>,
           catch: () => null as null,
         }).pipe(Effect.orElseSucceed(() => null))
+      }
+
+      // 会话级持久化方式（固化在 sandbox JSON 的 persistMode；未固化旧行回退全局 volumeType）
+      function dbResolvePersistMode(sessionID: string) {
+        const fallback = config.volumeType === "snapshot" ? "snapshot" as const : "pvc" as const
+        return Effect.tryPromise({
+          try: () => pgDb
+            .select({ sandbox: SessionTable.sandbox })
+            .from(SessionTable)
+            .where(eq(SessionTable.id, sessionID as SessionID))
+            .limit(1)
+            .then((rows: { sandbox: { persistMode?: "pvc" | "snapshot" } | null }[]) =>
+              rows[0]?.sandbox?.persistMode ?? fallback),
+          catch: () => fallback,
+        }).pipe(Effect.orElseSucceed(() => fallback))
       }
 
       function dbGetById(id: string) {
@@ -797,6 +866,27 @@ export namespace SandboxProvider {
         }).pipe(Effect.orDie)
       }
 
+      function dbTransitionState(
+        sessionID: string,
+        id: string,
+        from: "running" | "snapshotting" | "killed",
+        to: "running" | "snapshotting" | "killed",
+      ) {
+        return Effect.tryPromise({
+          try: () => pgDb
+            .update(SandboxTable)
+            .set({ state: to, time_updated: Date.now() })
+            .where(and(
+              eq(SandboxTable.session_id, sessionID),
+              eq(SandboxTable.id, id),
+              eq(SandboxTable.state, from),
+            ))
+            .returning({ id: SandboxTable.id })
+            .then((rows: Array<{ id: string }>) => rows.length > 0),
+          catch: (e) => new Error(`db.transitionState failed: ${String(e)}`),
+        }).pipe(Effect.orDie)
+      }
+
       function dbSetKeepAlive(sessionID: string, val: boolean) {
         return Effect.tryPromise({
           try: () => pgDb
@@ -837,6 +927,7 @@ export namespace SandboxProvider {
 
       function dbClaimIdleSandbox(sessionID: string, id: string, threshold: number, keepAlive?: boolean) {
         const retryBefore = Date.now() - CLEANUP_RETRY_MS
+        const snapshottingBefore = Date.now() - config.snapshotWaitMs - 60_000
         return Effect.tryPromise({
           try: () => pgDb
             .update(SandboxTable)
@@ -853,6 +944,10 @@ export namespace SandboxProvider {
                 and(
                   eq(SandboxTable.state, "killed"),
                   lt(SandboxTable.time_updated, retryBefore),
+                ),
+                and(
+                  eq(SandboxTable.state, "snapshotting"),
+                  lt(SandboxTable.time_updated, snapshottingBefore),
                 ),
               ),
             ))
@@ -961,7 +1056,7 @@ export namespace SandboxProvider {
         })
       }
 
-      function createSandbox(sessionID: SessionID, opts?: { pvcMode?: "session" | "app"; appId?: string; sandbox?: { cpu: string; memory: string } }) {
+      function createSandbox(sessionID: SessionID, opts?: { pvcMode?: "session" | "app"; appId?: string; persistMode?: "pvc" | "snapshot"; sandbox?: { cpu: string; memory: string; image?: string; snapshotId?: string } }) {
         return Effect.gen(function* () {
           const existingRow = yield* dbGet(sessionID).pipe(Effect.orElseSucceed(() => null))
           const isKept = existingRow?.keep_alive === true
@@ -969,22 +1064,62 @@ export namespace SandboxProvider {
           // keepAlive sandbox 使用 10x TTL，确保远程 sandbox 不会在保活期间自杀
           const timeoutSeconds = isKept ? Math.max(baseTtl, config.maxTtlSeconds) * 10 : baseTtl
           const resolved = opts ?? (yield* Effect.promise(() => resolveSandboxOpts(sessionID)))
+          const persistMode = resolved.persistMode ?? (config.volumeType === "snapshot" ? "snapshot" : "pvc")
           const resource = resolved.sandbox ?? config.resourceLimits
-          log.info("creating sandbox", { sessionID, volumeType: config.volumeType, timeoutSeconds, keepAlive: isKept, pvcMode: resolved.pvcMode, resource })
           const timeStarted = Date.now()
-          const volumes = buildVolumes({ sessionID, pvcMode: resolved.pvcMode, appId: resolved.appId }, config)
-          const sb = yield* Effect.tryPromise({
-            try: () =>
-              Sandbox.create({
-                connectionConfig,
-                image: config.image,
-                timeoutSeconds,
-                resource,
-                ...(volumes.length > 0 ? { volumes } : {}),
-              }),
-            catch: (e) => new Error(`Sandbox.create failed: ${e instanceof Error ? e.message : String(e)}`),
-          })
-          if (!hasVolume) {
+          const volumes = buildVolumes({ sessionID, pvcMode: resolved.pvcMode, appId: resolved.appId, persistMode }, config)
+          // 会话级沙箱参数（SandboxResource）：镜像覆盖 + 显式恢复源
+          const sessionImage = resolved.sandbox?.image?.trim() || config.image
+          const explicitSnapshotId = resolved.sandbox?.snapshotId?.trim() || null
+
+          // 快照恢复优先：显式 snapshotId > 会话快照表最新 ready|stale；恢复失败在 catch 分支降级镜像
+          const snapshotId = snapshots && persistMode === "snapshot"
+            ? (explicitSnapshotId ?? (yield* Effect.promise(() => snapshots.resolveForCreate(sessionID))))
+            : explicitSnapshotId
+          const createFromSnapshot = (id: string) =>
+            Effect.tryPromise({
+              try: () =>
+                Sandbox.create({
+                  connectionConfig,
+                  snapshotId: id,
+                  timeoutSeconds,
+                  resource,
+                  ...(volumes.length > 0 ? { volumes } : {}),
+                }),
+              catch: (e) => new Error(`Sandbox.create failed: ${e instanceof Error ? e.message : String(e)}`),
+            })
+          const createFromImage = () =>
+            Effect.tryPromise({
+              try: () =>
+                Sandbox.create({
+                  connectionConfig,
+                  image: sessionImage,
+                  timeoutSeconds,
+                  resource,
+                  ...(volumes.length > 0 ? { volumes } : {}),
+                }),
+              catch: (e) => new Error(`Sandbox.create failed: ${e instanceof Error ? e.message : String(e)}`),
+            })
+          // 快照恢复优先：有快照则从快照拉起（秒级）；恢复失败（快照被 GC/层损坏）
+          // 标记 failed 并降级镜像冷启动，不阻塞会话创建
+          const created = yield* (snapshotId
+            ? createFromSnapshot(snapshotId).pipe(
+                Effect.map((sb) => ({ sb, restoredFromSnapshot: true })),
+                Effect.catchIf(
+                  (err): err is Error => err instanceof Error,
+                  (err) =>
+                    Effect.andThen(
+                      snapshots
+                        ? Effect.promise(() => snapshots.markRestoreFailed(sessionID, snapshotId!, err.message))
+                        : Effect.void,
+                      createFromImage().pipe(Effect.map((sb) => ({ sb, restoredFromSnapshot: false }))),
+                    ),
+                ),
+              )
+            : createFromImage().pipe(Effect.map((sb) => ({ sb, restoredFromSnapshot: false }))))
+          const sb = created.sb
+          // snapshot 模式冷启动（无快照可恢复）时 /workspace 在 rootfs 上，需手动创建
+          if (!hasVolume || (persistMode === "snapshot" && !created.restoredFromSnapshot)) {
             yield* Effect.tryPromise(() => sb.commands.run("mkdir -p /workspace")).pipe(
               Effect.catchCause(() => Effect.void),
             )
@@ -1031,7 +1166,12 @@ export namespace SandboxProvider {
               }),
             ),
           )
-          log.info("sandbox created", { sessionID, sandboxID: sb.id })
+          // 恢复成功：会话快照标记 stale（已消费，保留作回退直到被新快照替代）；
+          // 显式指定的快照（可能来自其他会话，派生语义）状态由其属主会话管理，不动
+          if (created.restoredFromSnapshot && snapshotId && snapshots && !explicitSnapshotId) {
+            yield* Effect.promise(() => snapshots!.markConsumed(snapshotId)).pipe(Effect.catchCause(() => Effect.void))
+          }
+          log.info("sandbox created", { sessionID, sandboxID: sb.id, restoreFrom: snapshotId ?? null })
           return sb
         }).pipe(
           Effect.timeoutOrElse({
@@ -1075,11 +1215,34 @@ export namespace SandboxProvider {
         }).pipe(Effect.withSpan("SandboxProvider.destroySandbox"))
       }
 
-      function cleanupSandbox(row: Row) {
+      function cleanupSandbox(row: Row, opts?: { snapshot?: boolean }) {
         return Effect.gen(function* () {
           invalidateCachedSandbox(row.session_id)
-          const sb = yield* reconnect(row).pipe(Effect.orElseSucceed(() => null))
-          if (sb) return yield* destroySandbox(sb, row.session_id)
+          const sb = yield* reconnectIfPresent(row)
+          if (sb) {
+            if (opts?.snapshot && snapshots) {
+              // 快照+销毁异步化：锁内仅发起，后台 fiber 等快照 Ready 后才 kill 源沙箱。
+              // 代码安全承诺：快照未成功不销毁——失败/超时保留沙箱（行保持 killed，300s 后
+              // idle reap 重试快照）；沙箱由 TTL 兜底最终回收，重试期间不阻塞会话恢复。
+              yield* Effect.gen(function* () {
+                const snapshotId = yield* Effect.promise(() => snapshots.startSnapshot(sb, row.session_id))
+                if (!snapshotId) {
+                  log.warn("snapshot start failed; keeping sandbox for retry", { sessionID: row.session_id, sandboxID: sb.id })
+                  yield* Effect.tryPromise(() => sb.close()).pipe(Effect.catchCause(() => Effect.void))
+                  return
+                }
+                const result = yield* Effect.promise(() => snapshots.awaitSnapshot(row.session_id, snapshotId))
+                if (result !== "ready") {
+                  log.warn("snapshot not ready; keeping sandbox for retry", { sessionID: row.session_id, sandboxID: sb.id, snapshotId })
+                  yield* Effect.tryPromise(() => sb.close()).pipe(Effect.catchCause(() => Effect.void))
+                  return
+                }
+                yield* destroySandbox(sb, row.session_id).pipe(Effect.catchCause(() => Effect.void))
+              }).pipe(Effect.forkIn(creationScope))
+              return
+            }
+            return yield* destroySandbox(sb, row.session_id)
+          }
           yield* killByID(row.id, row.session_id)
           yield* dbMarkDestroyed(row.session_id, row.id)
           log.info("sandbox destroyed by id", { sessionID: row.session_id, sandboxID: row.id })
@@ -1121,7 +1284,7 @@ export namespace SandboxProvider {
 
       // ── Interface 实装 ────────────────────────────────────────────────
 
-      function getOrCreateUnlocked(sessionID: SessionID, opts?: { pvcMode?: "session" | "app"; appId?: string; sandbox?: { cpu: string; memory: string } }) {
+      function getOrCreateUnlocked(sessionID: SessionID, opts?: { pvcMode?: "session" | "app"; appId?: string; sandbox?: { cpu: string; memory: string; image?: string; snapshotId?: string } }) {
         return Effect.gen(function* () {
           const cached = getCachedSandbox(sessionID)
           if (cached) {
@@ -1162,9 +1325,10 @@ export namespace SandboxProvider {
 
                 if (existing) {
                   const tHealth = Date.now()
-                  const healthy = yield* Effect.tryPromise(() => existing.isHealthy()).pipe(
-                    Effect.catch(() => Effect.succeed(false)),
-                  )
+                  const healthy = yield* Effect.tryPromise({
+                    try: () => existing.isHealthy(),
+                    catch: (error) => new Error(`Sandbox health check failed: ${String(error)}`),
+                  })
                   log.info("isHealthy done", {
                     sessionID,
                     sandboxID: row.id,
@@ -1187,15 +1351,26 @@ export namespace SandboxProvider {
                   }
                   log.warn("sandbox unhealthy after reconnect, rebuilding", { sessionID })
                   yield* dbSetStateFor(sessionID, row.id, "killed")
+                  if (snapshots && (yield* dbResolvePersistMode(sessionID)) === "snapshot") {
+                    yield* Effect.tryPromise(() => existing.close()).pipe(Effect.catchCause(() => Effect.void))
+                    yield* cleanupSandbox({ ...row, state: "killed" }, { snapshot: true })
+                    return yield* Effect.fail(new Error(`Sandbox cleanup pending: ${sessionID}/${row.id}`))
+                  }
                   yield* destroySandbox(existing, sessionID)
                 } else {
                   invalidateCachedSandbox(sessionID)
                   log.info("sandbox no longer exists; rebuilding", { sessionID, sandboxID: row.id })
                 }
               }
+              if (row?.state === "snapshotting") {
+                return yield* Effect.fail(new Error(`Sandbox snapshot pending: ${sessionID}/${row.id}`))
+              }
               if (row?.state === "killed") {
                 log.info("retrying killed sandbox cleanup before recreation", { sessionID, sandboxID: row.id })
-                yield* cleanupSandbox(row)
+                // 快照保护：killed 行可能是上次快照未完成保留的沙箱，重试同样先快照再销毁
+                // （异步 fork；快照未完成期间本函数走下方 "cleanup pending" 失败，下次重试恢复）
+                const snapshotSession = snapshots && (yield* dbResolvePersistMode(sessionID)) === "snapshot"
+                yield* cleanupSandbox(row, snapshotSession ? { snapshot: true } : undefined)
                 const pending = yield* dbGet(sessionID).pipe(Effect.orElseSucceed(() => null))
                 if (pending?.id === row.id && pending.state === "killed") {
                   return yield* Effect.fail(new Error(`Sandbox cleanup pending: ${sessionID}/${row.id}`))
@@ -1303,8 +1478,8 @@ export namespace SandboxProvider {
           })
           if (inFlight) yield* Deferred.fail(inFlight, new Error(`Sandbox destroyed while creating: ${sessionID}`))
           const row = yield* dbGet(sessionID).pipe(Effect.orElseSucceed(() => null))
-          if (row?.state === "running" || row?.state === "killed") {
-            if (row.state === "running") yield* dbSetStateFor(sessionID, row.id, "killed")
+          if (row?.state === "running" || row?.state === "snapshotting" || row?.state === "killed") {
+            if (row.state !== "killed") yield* dbSetStateFor(sessionID, row.id, "killed")
             const sb = yield* reconnect(row).pipe(Effect.orElseSucceed(() => null))
             if (sb) yield* destroySandbox(sb, sessionID).pipe(Effect.catchCause(() => Effect.void))
             else yield* cleanupSandbox({ ...row, state: "killed" })
@@ -1314,13 +1489,13 @@ export namespace SandboxProvider {
       const destroyById: Interface["destroyById"] = (sandboxID) =>
         Effect.gen(function* () {
           const row = yield* dbGetById(sandboxID).pipe(Effect.orElseSucceed(() => null))
-          if (!row || (row.state !== "running" && row.state !== "killed")) return
+          if (!row || (row.state !== "running" && row.state !== "snapshotting" && row.state !== "killed")) return
           invalidateCachedSandbox(row.session_id)
           yield* lock(row.session_id, Effect.gen(function* () {
             invalidateCachedSandbox(row.session_id)
             const current = yield* dbGetById(sandboxID).pipe(Effect.orElseSucceed(() => null))
-            if (!current || current.id !== sandboxID || (current.state !== "running" && current.state !== "killed")) return
-            if (current.state === "running") yield* dbSetStateFor(current.session_id, current.id, "killed")
+            if (!current || current.id !== sandboxID || (current.state !== "running" && current.state !== "snapshotting" && current.state !== "killed")) return
+            if (current.state !== "killed") yield* dbSetStateFor(current.session_id, current.id, "killed")
             const inFlight = yield* Ref.modify(createRef, (m) => {
               const d = m.get(current.session_id)
               if (d) m.delete(current.session_id)
@@ -1551,6 +1726,7 @@ export namespace SandboxProvider {
               lock(row.session_id, Effect.gen(function* () {
                 const claimed = yield* dbClaimIdleSandbox(row.session_id, row.id, threshold, false)
                 if (!claimed) return
+                const snapshotSession = !!snapshots && (yield* dbResolvePersistMode(row.session_id)) === "snapshot"
                 const sb = yield* reconnect(row).pipe(Effect.orElseSucceed(() => null))
                 if (sb) {
                   // reconcile：用 getInfo 验证 sandbox 实际状态，已终止的跳过 kill 直接回收 DB
@@ -1562,12 +1738,16 @@ export namespace SandboxProvider {
                     yield* dbMarkDestroyed(row.session_id, row.id).pipe(Effect.catchCause(() => Effect.void))
                     return
                   }
-                  yield* destroySandbox(sb, row.session_id).pipe(
-                    Effect.catchCause(() => Effect.void),
-                  )
-                  return
+                  if (!snapshotSession) {
+                    yield* destroySandbox(sb, row.session_id).pipe(Effect.catchCause(() => Effect.void))
+                    return
+                  }
+                  // zombie 判定只基于 time_updated 超时，沙箱可能实际存活（与 idle 场景重叠）。
+                  // 快照会话与 idle reap 同一语义：快照 Ready 才 kill，失败保留沙箱重试。
+                  // 关闭本次探测连接，cleanupSandbox 内部会重新 connect。
+                  yield* Effect.tryPromise(() => sb.close()).pipe(Effect.catchCause(() => Effect.void))
                 }
-                yield* cleanupSandbox({ ...row, state: "killed" })
+                yield* cleanupSandbox({ ...row, state: "killed" }, snapshotSession ? { snapshot: true } : undefined)
               })).pipe(Effect.catchCause((cause) => {
                 log.error("zombie sandbox candidate failed", { sessionID: row.session_id, cause: Cause.pretty(cause) })
                 return Effect.void
@@ -1590,6 +1770,7 @@ export namespace SandboxProvider {
           Effect.gen(function* () {
             const threshold = Date.now() - idleReapMs
             const retryBefore = Date.now() - CLEANUP_RETRY_MS
+            const snapshottingBefore = Date.now() - config.snapshotWaitMs - 60_000
             const rows = yield* Effect.tryPromise({
               try: () => pgDb
                 .select()
@@ -1603,6 +1784,10 @@ export namespace SandboxProvider {
                     eq(SandboxTable.state, "killed"),
                     lt(SandboxTable.time_updated, retryBefore),
                   ),
+                  and(
+                    eq(SandboxTable.state, "snapshotting"),
+                    lt(SandboxTable.time_updated, snapshottingBefore),
+                  ),
                 ))
                 .orderBy(asc(SandboxTable.time_updated))
                 .limit(CLEANUP_BATCH_SIZE)
@@ -1613,13 +1798,17 @@ export namespace SandboxProvider {
               return Effect.succeed([] as Row[])
             }))
 
+            // 顺带执行快照 GC + 对账（吞错；独立于本轮是否有 idle 沙箱）
+            if (snapshots) yield* Effect.promise(() => snapshots.gc()).pipe(Effect.catchCause(() => Effect.void))
+
             if (rows.length === 0) return
             log.info("idle sandbox reap scan", { count: rows.length })
             yield* Effect.forEach(rows, (row) =>
               lock(row.session_id, Effect.gen(function* () {
                 const claimed = yield* dbClaimIdleSandbox(row.session_id, row.id, threshold)
                 if (!claimed) return
-                yield* cleanupSandbox({ ...row, state: "killed" })
+                const snapshotSession = !!snapshots && (yield* dbResolvePersistMode(row.session_id)) === "snapshot"
+                yield* cleanupSandbox({ ...row, state: "killed" }, snapshotSession ? { snapshot: true } : undefined)
               })).pipe(Effect.catchCause((cause) => {
                 log.error("idle sandbox candidate failed", { sessionID: row.session_id, cause: Cause.pretty(cause) })
                 return Effect.void
@@ -1639,8 +1828,53 @@ export namespace SandboxProvider {
 
       return Service.of({
         getOrCreate, get, destroy, destroyById, destroyAll, keepAlive, touch, release, isKeepAlive,
+        isSnapshotSession: (sessionID) => dbResolvePersistMode(sessionID).pipe(Effect.map((mode) => mode === "snapshot")),
         runInSession, runDetached, interrupt, register, getEndpoint,
         cleanupSessionVolume: (sessionID) => cleanupSessionVolume(sessionID, config, connectionConfig),
+        // 会话删除联动：清理该会话全部快照记录与远端快照（含用户数据，不留存）
+        purgeSnapshots: (sessionID) =>
+          snapshots
+            ? Effect.promise(() => snapshots.deleteAllForSession(sessionID)).pipe(Effect.catchCause(() => Effect.void))
+            : Effect.void,
+        // 显式快照：先 fence sandbox，阻止新写入；终态后恢复 running，源沙箱不销毁。
+        createSnapshot: (sessionID) =>
+          lock(sessionID, Effect.gen(function* () {
+            if (!snapshots) return null
+            // 仅快照会话支持显式快照（pvc 会话 workspace 在共享卷，快照无意义）
+            if ((yield* dbResolvePersistMode(sessionID)) !== "snapshot") return null
+            const row = yield* dbGet(sessionID).pipe(Effect.orElseSucceed(() => null))
+            if (!row || row.state !== "running") return null
+            const claimed = yield* dbTransitionState(sessionID, row.id, "running", "snapshotting")
+            if (!claimed) return null
+            const sb = yield* reconnectIfPresent(row).pipe(
+              Effect.tapError(() => dbTransitionState(sessionID, row.id, "snapshotting", "running")),
+            )
+            if (!sb) {
+              yield* dbMarkDestroyed(sessionID, row.id)
+              return null
+            }
+            const id = yield* Effect.promise(() => snapshots.startSnapshot(sb, sessionID))
+            if (!id) {
+              yield* dbTransitionState(sessionID, row.id, "snapshotting", "running")
+              yield* Effect.tryPromise(() => sb.close()).pipe(Effect.catchCause(() => Effect.void))
+              return null
+            }
+            yield* Effect.promise(() => snapshots.awaitSnapshot(sessionID, id)).pipe(
+              Effect.ensuring(Effect.gen(function* () {
+                yield* dbTransitionState(sessionID, row.id, "snapshotting", "running").pipe(Effect.catchCause(() => Effect.void))
+                yield* Effect.tryPromise(() => sb.close()).pipe(Effect.catchCause(() => Effect.void))
+              })),
+              Effect.forkIn(creationScope),
+            )
+            return id
+          })).pipe(Effect.catchCause(() => Effect.succeed(null))),
+        getLatestSnapshot: (sessionID) =>
+          snapshots
+            ? Effect.promise(() => snapshots.getLatest(sessionID)).pipe(
+                Effect.map((row) => row ? { id: row.id, state: row.state, reason: row.reason } : null),
+                Effect.catchCause(() => Effect.succeed(null)),
+              )
+            : Effect.succeed(null),
       })
     }),
   )
@@ -1669,6 +1903,7 @@ export namespace NoopSandboxProvider {
       touch: () => Effect.void,
       release: () => Effect.void,
       isKeepAlive: () => Effect.succeed(false),
+      isSnapshotSession: () => Effect.succeed(false),
       runInSession: () => Effect.fail(new Error("Sandbox is disabled")),
       runDetached: () => Effect.fail(new Error("Sandbox is disabled")),
       interrupt: () => Effect.void,

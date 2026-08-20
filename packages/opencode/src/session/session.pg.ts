@@ -51,7 +51,7 @@ export const SessionTable = pgTable(
     time_archived: bigint({ mode: "number" }),
     pvc_mode: text().$type<"session" | "app">(),
     app_id: text(),
-    sandbox: jsonb().$type<{ cpu: string; memory: string }>(),
+    sandbox: jsonb().$type<{ cpu: string; memory: string; persistMode?: "pvc" | "snapshot" }>(),
   },
   (table) => [
     index("session_project_idx").on(table.project_id),

@@ -89,7 +89,7 @@ docker build -t opencode-saas-sandbox-test:v2fix -f Dockerfile .
 
 ### 2.1.1 构建 OpenSandbox 沙箱镜像（组合 2、3 需要）
 
-组合 2、3 使用本地 OpenSandbox server + Docker runtime 创建沙箱，需要本节构建沙箱镜像（组合 1 走远端 K8s 沙箱，可跳过）。沙箱镜像基于 `opensandbox/code-interpreter:latest`，内置 `ripgrep`、多版本 Node.js（mise 管理）和 LSP daemon，**不含 opencode 主二进制**（opencode server 跑在 SaaS 容器，不在沙箱内）。与上方 SaaS 服务镜像是**完全不同的两个镜像**（见总览表）。
+组合 2、3 使用本地 OpenSandbox server + Docker runtime 创建沙箱，需要本节构建沙箱镜像（组合 1 走远端 K8s 沙箱，可跳过）。沙箱镜像基于 `opensandbox/code-interpreter:v1.1.0`（**固定版本**，勿用 `latest`，避免基础镜像漂移导致构建不可复现），内置 `ripgrep`、多版本 Node.js（mise 管理）和 LSP daemon，**不含 opencode 主二进制**（opencode server 跑在 SaaS 容器，不在沙箱内）。与上方 SaaS 服务镜像是**完全不同的两个镜像**（见总览表）。
 
 > 私有 registry `registry.shadow-rpa.net` 不可达时，用公共镜像替代构建（见 7.6）：
 > ```bash

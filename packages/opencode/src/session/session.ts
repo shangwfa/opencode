@@ -46,6 +46,7 @@ import { Global } from "@opencode-ai/core/global"
 import { Effect, Layer, Option, Context, Schema, Types } from "effect"
 import { NonNegativeInt, optional } from "@opencode-ai/core/schema"
 import { RuntimeFlags } from "@/effect/runtime-flags"
+import { Flag } from "@/flag/flag"
 import { LocationServiceMap } from "@opencode-ai/core/location-service-map"
 
 import { ProviderV2 } from "@opencode-ai/core/provider"
@@ -243,9 +244,18 @@ export type PvcMode = Schema.Schema.Type<typeof PvcMode>
 const CpuPattern = /^\d+(\.\d+)?m?$/
 const MemoryPattern = /^\d+(Ki|Mi|Gi|Ti|K|M|G|T)$/
 
+export const PersistMode = Schema.Literals(["pvc", "snapshot"])
+export type PersistMode = Schema.Schema.Type<typeof PersistMode>
+
 export const SandboxResource = Schema.Struct({
   cpu: Schema.String,
   memory: Schema.String,
+  /** 指定沙箱镜像（缺省用 OPENCODE_SANDBOX_IMAGE） */
+  image: Schema.optional(Schema.String),
+  /** 指定恢复源快照 ID（优先于会话快照表查找） */
+  snapshotId: Schema.optional(Schema.String),
+  /** workspace 持久化方式：pvc（NFS 卷）/ snapshot（沙箱本地盘 + 快照）；缺省回退全局 VOLUME_TYPE，创建时固化 */
+  persistMode: Schema.optional(PersistMode),
 })
 export type SandboxResource = Schema.Schema.Type<typeof SandboxResource>
 
@@ -666,6 +676,10 @@ export const layer: Layer.Layer<
         const sandboxProvider = yield* Effect.serviceOption(SandboxProvider.Service)
         if (sandboxProvider._tag === "Some") {
           yield* sandboxProvider.value.destroy(sessionID).pipe(Effect.catchCause(() => Effect.void))
+          // 快照含用户数据：会话删除必须联动清理（远端快照 + 记录）
+          if (sandboxProvider.value.purgeSnapshots) {
+            yield* sandboxProvider.value.purgeSnapshots(sessionID).pipe(Effect.catchCause(() => Effect.void))
+          }
         }
 
         const hasInstance = yield* InstanceState.directory.pipe(
@@ -740,6 +754,7 @@ export const layer: Layer.Layer<
       workspaceID?: WorkspaceV2.ID
       pvcMode?: PvcMode
       appId?: string
+      persistMode?: PersistMode
       sandbox?: SandboxResource
     }) {
       if (input?.pvcMode === "app" && !input.appId?.trim()) {
@@ -771,6 +786,17 @@ export const layer: Layer.Layer<
         if (!sandbox && parent?.sandbox) {
           sandbox = parent.sandbox
         }
+      }
+      // persistMode 固化到 sandbox JSON：显式传入 > 父会话继承 > 全局 VOLUME_TYPE 默认。
+      // 未传 sandbox 块的会话不固化，运行时按全局默认解析。
+      // 快照模式与 pvcMode 无关：workspace 落 rootfs，不挂 app/session PVC 卷，app 参数自然失效。
+      if (sandbox) {
+        const persistMode = sandbox.persistMode
+          ?? (Flag.OPENCODE_SANDBOX_VOLUME_TYPE === "snapshot" ? "snapshot" : "pvc")
+        if (persistMode === "snapshot" && !Flag.OPENCODE_SANDBOX_SNAPSHOT_ENABLED) {
+          return yield* new InvalidPvcConfigError({ message: "persistMode=snapshot 需要 OPENCODE_SANDBOX_SNAPSHOT_ENABLED=true（快照能力未开启）" })
+        }
+        sandbox = { ...sandbox, persistMode }
       }
       const ctx = yield* InstanceState.context
       const workspace = yield* InstanceState.workspaceID

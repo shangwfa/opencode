@@ -27,7 +27,7 @@ describe("sandbox PTY runtime", () => {
     release: () => Effect.sync(() => state.release++).pipe(Effect.asVoid),
   })
   const scope = Layer.mock(SandboxPtyScope.Service)({
-    resolve: (sessionID) => Effect.succeed({ id: sessionID }),
+    resolve: (sessionID) => Effect.succeed({ id: sessionID, persistMode: "pvc" }),
   })
   const credential = Layer.mock(SandboxPtyCredential.Service)({ token: () => "test-token" })
   const it = testEffect(

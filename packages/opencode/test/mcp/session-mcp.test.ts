@@ -129,6 +129,7 @@ function recordingSandboxLayer() {
       touch: () => Effect.void,
       release: () => Effect.void,
       isKeepAlive: () => Effect.succeed(false),
+      isSnapshotSession: () => Effect.succeed(false),
       getEndpoint: (sid: string, port: number) =>
         Effect.sync(() => { sandboxEndpointCalls.push({ sessionID: sid, port }) }).pipe(
           Effect.andThen(() => Effect.succeed("http://10.0.0.1:9999")),

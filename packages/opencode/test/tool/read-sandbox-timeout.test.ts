@@ -103,6 +103,7 @@ function mockSandboxProvider(runInSessionFn: (sessionID: string, command: string
       touch: () => Effect.void,
       release: () => Effect.void,
       isKeepAlive: () => Effect.succeed(false),
+      isSnapshotSession: () => Effect.succeed(false),
       getEndpoint: () => Effect.die(new Error("not implemented")),
       cleanupSessionVolume: () => Effect.void,
       runDetached: () => Effect.succeed({} as any),

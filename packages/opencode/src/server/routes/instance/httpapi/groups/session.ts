@@ -167,6 +167,7 @@ export const SessionPaths = {
   share: `${root}/:sessionID/share`,
   init: `${root}/:sessionID/init`,
   loadDotOpencode: `${root}/:sessionID/dot-opencode/load`,
+  snapshot: `${root}/:sessionID/snapshot`,
   summarize: `${root}/:sessionID/summarize`,
   prompt: `${root}/:sessionID/message`,
   promptAsync: `${root}/:sessionID/prompt_async`,
@@ -395,6 +396,44 @@ export const SessionApi = HttpApi.make("session")
             identifier: "session.load_dot_opencode",
             summary: "Load project .opencode configuration",
             description: "Load the current project's .opencode configuration into the session.",
+          }),
+        ),
+        HttpApiEndpoint.post("snapshot", SessionPaths.snapshot, {
+          params: { sessionID: SessionID },
+          query: WorkspaceRoutingQuery,
+          success: described(
+            Schema.Struct({
+              snapshotId: Schema.optional(Schema.String),
+              state: Schema.String,
+              reason: Schema.optional(Schema.NullOr(Schema.String)),
+            }),
+            "Snapshot creation accepted (async) or latest snapshot state",
+          ),
+          error: [HttpApiError.BadRequest, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.snapshot",
+            summary: "Create sandbox snapshot for session",
+            description:
+              "Create a snapshot of the session sandbox filesystem (async; poll state via GET). Snapshot id can be used as sandbox.snapshotId to derive new sessions.",
+          }),
+        ),
+        HttpApiEndpoint.get("getSnapshot", SessionPaths.snapshot, {
+          params: { sessionID: SessionID },
+          query: WorkspaceRoutingQuery,
+          success: described(
+            Schema.Struct({
+              snapshotId: Schema.optional(Schema.String),
+              state: Schema.String,
+              reason: Schema.optional(Schema.NullOr(Schema.String)),
+            }),
+            "Latest snapshot state for the session",
+          ),
+          error: [HttpApiError.BadRequest, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.get_snapshot",
+            summary: "Get latest sandbox snapshot state",
           }),
         ),
         HttpApiEndpoint.post("share", SessionPaths.share, {

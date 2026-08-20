@@ -15,6 +15,8 @@ SaaS 沙箱支持两种 PVC（持久化卷）模式：
 | **session**（默认） | 每会话独立空间 | 独立开发、临时任务 |
 | **app** | 同应用共享空间 + worktree 隔离 | 同一项目的多需求并行开发 |
 
+> ⚠️ **与快照模式互斥**：部署开启 `OPENCODE_SANDBOX_VOLUME_TYPE=snapshot`（沙箱本地盘 + 快照持久化，见 `sandbox-snapshot-design.md`）时，`pvcMode=app` 创建会话会被拒绝——app 模式的共享 workspace 卷语义与快照模式（workspace 在 rootfs）不兼容。快照模式下同环境复制需求请使用 `sandbox.snapshotId` 派生。
+
 ### session 模式（现有行为）
 
 每个会话独占一份 PVC 空间，互不干扰：

@@ -99,8 +99,12 @@ export namespace Flag {
 
   export const OPENCODE_SANDBOX_API_KEY = process.env["OPENCODE_SANDBOX_API_KEY"] ?? ""
   export const OPENCODE_SANDBOX_USE_SERVER_PROXY = truthy("OPENCODE_SANDBOX_USE_SERVER_PROXY")
-  export const OPENCODE_SANDBOX_VOLUME_TYPE = (process.env["OPENCODE_SANDBOX_VOLUME_TYPE"] ?? "pvc") as "none" | "pvc" | "host"
+  export const OPENCODE_SANDBOX_VOLUME_TYPE = (process.env["OPENCODE_SANDBOX_VOLUME_TYPE"] ??
+    "pvc") as "none" | "pvc" | "host" | "snapshot"
   export const OPENCODE_SANDBOX_PVC_CLAIM = process.env["OPENCODE_SANDBOX_PVC_CLAIM"] ?? "sandbox-test"
+  export const OPENCODE_SANDBOX_SNAPSHOT_ENABLED = truthy("OPENCODE_SANDBOX_SNAPSHOT_ENABLED")
+  export const OPENCODE_SANDBOX_SNAPSHOT_TTL_SEC = number("OPENCODE_SANDBOX_SNAPSHOT_TTL_SEC") ?? 7 * 86400
+  export const OPENCODE_SANDBOX_SNAPSHOT_WAIT_SEC = number("OPENCODE_SANDBOX_SNAPSHOT_WAIT_SEC") ?? 900
   export const OPENCODE_SANDBOX_IDLE_KILL_SEC = number("OPENCODE_SANDBOX_IDLE_KILL_SEC") ?? 3600
   export const OPENCODE_SANDBOX_IDLE_REAP_SEC = number("OPENCODE_SANDBOX_IDLE_REAP_SEC") ?? 1800
   export const OPENCODE_SANDBOX_MAX_TTL_SEC = number("OPENCODE_SANDBOX_MAX_TTL_SEC") ?? 3600
