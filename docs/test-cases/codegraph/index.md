@@ -5,7 +5,9 @@
 > 实现：
 > - `packages/opencode/src/codegraph/`：`codegraph.pg.ts`（表）、`store.ts`（读写/四层搜索/图遍历/状态机）、`indexer.ts`（30s 守护索引 + 增量 stat-diff）、`script/main.ts`（沙箱内 kernel 提取）、`tool/`（5 个内置工具）
 > - `packages/opencode/migration-pg/20260820120000_codegraph/` + `20260820130000_codegraph_file_mtime/`
-> - `scripts/build-codegraph-extractor.sh`（双平台 linux-x64/arm64 bundle）
+> - `scripts/build-codegraph-extractor.sh`（单平台目录 + 双平台 tar）
+>
+> **镜像内置（2026-08-20 改造）**：extractor 由沙箱镜像 Dockerfile COPY 到 `/opt/codegraph-extractor`（构建沙箱镜像前先跑 `scripts/build-codegraph-extractor.sh --target <arch>`），indexer 直接 exec `/opt/codegraph-extractor/main.ts`，**不再运行时注入**。解决了"沙箱重建后增量路径缺 extractor"的 bug。
 >
 > **关键设计**：
 > 1. codegraph 只认 `appId`（不看 pvcMode），scope = `app:{appId}`；无 appId 的会话工具返回引导文本（非 isError）。
@@ -180,6 +182,7 @@ psql "$PG_URL" -t -A -c "SELECT count(*) FROM codegraph_node WHERE scope='app:ot
 | 日期 | 用例 | 结果 | 备注 |
 |---|---|---|---|
 | 2026-08-20 | T42.1.1/1.2/1.3 全量索引 + 落库 | ✅ | 组合 3 本地沙箱；codegraph 仓库 570 文件 → `ready`，12,141 节点 / 13,343 边 |
+| 2026-08-20 | 镜像内置改造 | ✅ | extractor 放沙箱 `/opt/codegraph-extractor` 后 indexer 直接 exec 成功（stat 572 文件）；走 /opt 路径全量重建 `ready` 12019 节点；无 /opt 的旧镜像沙箱增量报错（证明沙箱必须内置） |
 | 2026-08-20 | T42.2.1/2.2/2.3 搜索 + 遍历 + 引导文本 | ✅ | 四层搜索命中 `extractFromSource`；scope 解析 `app:cg-e2e`；无 appId 返回引导 |
 | 2026-08-20 | Agent 实测 codegraph_search | ✅ | 消息让模型查 `extractFromSource` → 回复「repo/src/extraction/tree-sitter.ts 第 6684 行」，与 store 直查一致（Yd-DeepSeek/deepseek-v4-flash） |
 | 2026-08-20 | T42.3.1 增量同步 | ✅ | 改 `src/index.ts` 加 `cgIncrementalProbe` → 20s 内落库（日志 `changed=1 incremental`） |
