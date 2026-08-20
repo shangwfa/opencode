@@ -119,3 +119,9 @@ RUN mkdir -p /opt/opencode-pty-agent \
     && cd /opt/opencode-pty-agent \
     && bun add bun-pty@0.4.8
 COPY docker/opt/opencode-pty-agent.ts /opt/opencode-pty-agent/index.ts
+
+# ── 14b. codegraph extractor (baked in; no runtime injection) ──
+# build/codegraph-extractor must be generated BEFORE building this image:
+#   scripts/build-codegraph-extractor.sh   (from packages/opencode)
+# The indexer execs /opt/codegraph-extractor/main.ts directly.
+COPY build/codegraph-extractor /opt/codegraph-extractor

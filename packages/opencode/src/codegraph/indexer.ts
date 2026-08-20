@@ -25,39 +25,26 @@ import type { Scope } from "./store"
 
 const log = Log.create({ service: "codegraph-indexer" })
 
-const EXTRACTOR_DIR = "/tmp/codegraph-extractor"
-const EXTRACTOR_TAR = "/tmp/codegraph-extractor.tar.gz"
-const INDEX_OUT = "/tmp/cg.ndjson.gz"
-const STAT_OUT = "/tmp/cg-stats.ndjson"
-const FILES_LIST = "/tmp/cg-files.json"
-const PROGRESS = "/tmp/cg-progress.json"
-
 const EXEC_TIMEOUT_SECONDS = 900
 const LOOP_INTERVAL = Duration.seconds(30)
 const HEARTBEAT_EVERY_MS = 5000
 
 const ENGINE_VERSION = "codegraph-extractor-1"
 
-// Runtime location of the prebuilt extractor tarballs (P6: baked into the image).
-// Per-arch so K8s (amd64) and local Apple-Silicon (arm64) sandboxes both work.
-const extractorTarPath = (arch: "x64" | "arm64") =>
-  process.env.CODEGRAPH_EXTRACTOR_TAR ?? `build/codegraph-extractor-linux-${arch}.tar.gz`
+// The extractor is baked into the sandbox image at /opt/codegraph-extractor
+// (docker/Dockerfile COPY build/codegraph-extractor → /opt/codegraph-extractor),
+// so no runtime injection is needed — every sandbox has it on boot. The arch is
+// resolved from the extracted main.ts's own bundle at runtime.
+const EXTRACTOR_DIR = "/opt/codegraph-extractor"
+const INDEX_OUT = "/tmp/cg.ndjson.gz"
+const STAT_OUT = "/tmp/cg-stats.ndjson"
+const FILES_LIST = "/tmp/cg-files.json"
+const PROGRESS = "/tmp/cg-progress.json"
 
+// Runtime location of the prebuilt extractor tarballs (P6: baked into the image).
 // ---------------------------------------------------------------------------
 // Sandbox I/O helpers
 // ---------------------------------------------------------------------------
-
-const ensureExtractor = async (sb: Sandbox) => {
-  const info = await sb.files.getFileInfo([`${EXTRACTOR_DIR}/main.ts`]).catch(() => ({} as Record<string, unknown>))
-  if ((info as any)[`${EXTRACTOR_DIR}/main.ts`]?.exists) return
-  const archExec = await sb.commands.run("uname -m", { timeoutSeconds: 15 })
-  const archOut = (archExec.logs?.stdout ?? []).map((m: any) => m.data ?? m.content ?? "").join("")
-  const arch: "x64" | "arm64" = archOut.trim() === "aarch64" ? "arm64" : "x64"
-  const tar = await readFile(extractorTarPath(arch))
-  await sb.files.createDirectories([{ path: EXTRACTOR_DIR, mode: 755 }])
-  await sb.files.writeFiles([{ path: EXTRACTOR_TAR, data: tar, mode: 644 }])
-  await runCommand(sb, `mkdir -p ${EXTRACTOR_DIR} && tar xzf ${EXTRACTOR_TAR} -C ${EXTRACTOR_DIR} --strip-components=1 && rm ${EXTRACTOR_TAR}`)
-}
 
 const runCommand = async (sb: Sandbox, command: string) => {
   const execution = await sb.commands.run(command, { workingDirectory: "/workspace", timeoutSeconds: EXEC_TIMEOUT_SECONDS })
@@ -136,7 +123,6 @@ const extract = (scope: Scope, sb: Sandbox, filesArg: string | null, progressPat
 
 const runFullIndex = (scope: Scope, sb: Sandbox) =>
   Effect.gen(function* () {
-    yield* Effect.tryPromise(() => ensureExtractor(sb))
     const snap = yield* extract(scope, sb, null, PROGRESS)
     yield* Effect.tryPromise(() => S.replaceGraph(scope, snap))
     return Effect.void

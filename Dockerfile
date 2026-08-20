@@ -39,9 +39,8 @@ ENV OPENCODE_SANDBOX_MAX_TTL_SEC=3600
 ENV OPENCODE_SANDBOX_IDLE_KILL_SEC=30
 ENV OPENCODE_DISABLE_EMBEDDED_WEB_UI=1
 ENV OPENCODE_DISABLE_AUTOUPDATE=1
-# codegraph SaaS extractor payloads (both linux-x64 + linux-arm64, built by
-# scripts/build-codegraph-extractor.sh before `docker build`; baked into
-# packages/opencode/build/ and picked by sandbox arch at runtime)
+# codegraph extractor is baked into the SANDBOX image at /opt/codegraph-extractor
+# (packages/opencode/docker/Dockerfile), not the server image.
 ENV OPENCODE_DATABASE_URL=postgresql://app:8zuhlMLd4gaeUG5k@172.18.32.14:5432/opencode
 ENV OPENCODE_SANDBOX_DOMAIN=172.18.32.15:30040
 ENV OPENCODE_SANDBOX_API_KEY=H68idVYzjadx
