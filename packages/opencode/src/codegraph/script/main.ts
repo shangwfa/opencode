@@ -316,26 +316,39 @@ const runFullAnalysis = async (root: string, args: Record<string, string>) => {
 
   let filesTotal = 0
   let changedFiles: string[] = []
+  let filesRemoved = 0
+  let isIncremental = !!args.incremental
   if (args.incremental) {
     // codegraph's sync(): content-hash diff → indexFiles(changed) → resolve
     // ONLY the changed files' refs (getUnresolvedReferencesByFiles). The
     // SQLite graph stays fully current; we export just the changed files'
     // neighborhood below so the server replaces only that slice.
+    // Deletions are special: removal can rebind callers in UNCHANGED files
+    // (definitionDelta / orphan sweep), so the changed-file slice is
+    // incomplete — fall through to a full export to converge PG without a
+    // kernel re-parse of every file.
     const r = await graph.sync()
     changedFiles = (r.changedFilePaths ?? []) as string[]
+    filesRemoved = (r as any).filesRemoved ?? 0
     filesTotal = changedFiles.length
     writeProgress({ files_total: filesTotal, files_done: filesTotal, done: false })
-    console.log(`codegraph incremental: changed=${changedFiles.length} (${changedFiles.slice(0, 3).join(", ")}...)`)
-  } else {
-    const idx = await graph.indexAll({ onProgress: (p: { files_total?: number; files_done?: number }) => {
-      if (p.files_total) {
-        filesTotal = p.files_total
-        writeProgress({ files_total: p.files_total, files_done: p.files_done ?? 0, done: false })
-      }
-    }})
-    if (!idx.success) throw new Error(`codegraph indexAll failed: ${JSON.stringify(idx.errors ?? {}).slice(0, 500)}`)
-    const res = await graph.resolveReferences()
-    console.log(`codegraph full: files=${idx.filesIndexed} resolved=${(res as any)?.resolved ?? "?"}`)
+    console.log(`codegraph incremental: changed=${changedFiles.length} removed=${filesRemoved} (${changedFiles.slice(0, 3).join(", ")}...)`)
+    if (filesRemoved > 0) isIncremental = false // deletion → full PG dump from current SQLite state
+  }
+  if (!args.incremental || !isIncremental) {
+    if (!isIncremental && args.incremental) {
+      // incremental deletion path already synced; skip indexAll, just dump
+    } else {
+      const idx = await graph.indexAll({ onProgress: (p: { files_total?: number; files_done?: number }) => {
+        if (p.files_total) {
+          filesTotal = p.files_total
+          writeProgress({ files_total: p.files_total, files_done: p.files_done ?? 0, done: false })
+        }
+      }})
+      if (!idx.success) throw new Error(`codegraph indexAll failed: ${JSON.stringify(idx.errors ?? {}).slice(0, 500)}`)
+      const res = await graph.resolveReferences()
+      console.log(`codegraph full: files=${idx.filesIndexed} resolved=${(res as any)?.resolved ?? "?"}`)
+    }
   }
 
   const { createGzip } = require("zlib") as typeof import("zlib")
@@ -347,7 +360,7 @@ const runFullAnalysis = async (root: string, args: Record<string, string>) => {
 
   // files
   const crypto = require("crypto") as typeof import("crypto")
-  if (args.incremental) {
+  if (isIncremental) {
     // Incremental: export only the changed files' neighborhood.
     //   - changed files (file records)
     //   - their nodes

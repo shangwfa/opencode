@@ -204,16 +204,17 @@ docker logs opencode-saas-test 2>&1 | grep -iE "incremental" | tail -3
 
 **期望**：增量日志 `changed` 不含 parser.c（服务端 stat 对比过滤 >1MB）。
 
-### T42.5.3 删除文件 → 强制全量重建
+### T42.5.3 删除文件 → 切片清理（无全量 rebuild）
 
 ```bash
 curl -s --max-time 60 -X POST "$BASE/session/$SID/exec" -H 'Content-Type: application/json' \
   -d '{"command":"rm /workspace/repo/src/index.ts && echo R"}'
 sleep 60
 psql "$PG_URL" -t -A -c "SELECT count(*) FROM codegraph_node WHERE scope='app:$APP' AND file_path='repo/src/index.ts'"
+# 日志: incremental deletion → full dump（sync 处理删除 + full PG dump 捕获 rebinds，无 kernel 重解析）
 ```
 
-**期望**：`0`（删除后全量重建，SQLite 图不含已删文件）。
+**期望**：`0`（切片：`dropMissingFiles` + incremental sync + full PG dump，`isFullDump` 判定）。
 
 ---
 
@@ -328,3 +329,5 @@ OPENCODE_DATABASE_URL=$PG_URL bun /tmp/cg-explore-low.ts
 | 2026-08-20 | affected 工具 | ✅ | tree-sitter.ts → 40 依赖者、17 测试文件（kernel-parity 套件）；生产/测试分离 |
 | 2026-08-20 | P0/P1 硬化 | ✅ | heartbeat 改读沙箱 progress；失败 failIndex；增量 claim+stat 预检；replaceFiles 后 finishIndexRecount；CALL_KINDS 去 imports；affected 路径归一 pathMatches；typecheck codegraph 路径无新增错误 |
 | 2026-08-20 | 单测 path+search | ✅ | `bun test test/codegraph/path-search.test.ts` 8 pass（pathMatches 边界、filterByFilePath、isTestFile、name/kind/path 评分、LOW_CONFIDENCE） |
+| 2026-08-20 | 删除切片 | ✅ | 删文件不再全量 rebuild：incremental sync + full dump（捕获 definitionDelta rebinds），PG 按 dropMissingFiles + replaceGraph（无 kernel 重解析）；`T42.5.3` 改为 `deletedPaths` 列表 + isFullDump 判定 |
+| 2026-08-20 | Agent E2E 新工具 | ✅ | `codegraph_callees`→30 被调用者（含 `detectLanguage`）、`codegraph_files`→54 文件（flat）、`codegraph_affected`→23 生产文件（tree-sitter.ts depth1）、`codegraph_explore`→`extractFromSource` 核心+6提取器（Yd-DeepSeek v4-pro, app:cg-init-test） |

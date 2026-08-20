@@ -187,8 +187,8 @@ incremental  : openSync → graph.sync()（content-hash diff → indexFiles(chan
 2. `/workspace` 为空且无索引 → 不建空索引，进 watch 循环（30s）。
 3. 循环内检测：工作区「空 → 大量文件」或新出现 `.git` → 触发全量索引（④⑤ 落库见 4.2）。
 4. 已有索引 → **变更检测不依赖 git status**（git 盲区：`git pull`/`checkout`/`merge` 后工作树 clean）：沙箱脚本 stat 清单（path, size, mtime）+ 服务端与 `codegraph_file` 对比（>1MB 文件跳过——从未索引，不驱动变更判定）。
-5. **增量走 codegraph 原生 `sync()`**：content-hash diff → indexFiles(changed) → 只 resolve 变更文件 refs → 导出变更文件邻域（节点 + source/target 边）→ 服务端 `replaceFiles` 按文件删旧插新（入边正确性由"删 target∈文件边"保证：目标节点还在则保留、删除则清除）。
-6. 删除文件 → 强制全量重建（SQLite 不自动从图里删文件）。
+5. **增量走 codegraph 原生 `sync()`**：content-hash diff → indexFiles(changed) → 只 resolve 变更文件 refs → 导出变更文件邻域 → 服务端 `replaceFiles` 按文件删旧插新。
+6. **删除切片**：`statDiff` 产 `deletedPaths` 列表；`dropMissingFiles` 即时清理 PG；沙箱 `sync()` 原生处理删除（resurrect 入边 + definitionDelta rebinds）；脚本检测 `filesRemoved>0` 则切到 **full PG dump**（无 kernel 重解析，仅 SQLite 全量导出 + PG `replaceGraph`），保证 UNCHANGED 文件的 rebind 不丢失。
 7. 沙箱空闲/回收判定复用 idle-reap 的 zombie 判定：沙箱已被回收则循环自动退出，等下次 getOrCreate 重建（此时回到第 1 步，ready 的索引直接复用）。
 
 ## 5. 触发与调度
@@ -283,7 +283,7 @@ packages/opencode/src/codegraph/
 | P2 | 沙箱脚本（codegraph kernel，双平台 bundle）+ 打包 | 沙箱内 kernel 加载成功；ndjson 符号数一致 | ✅ |
 | P3 | indexer.ts（Effect 服务，claim/heartbeat/zombie 自愈）挂载 AppLayer | 会话启动 → 索引自动到 ready | ✅ |
 | P4 | 8 个内置 tool + registry 注册 | Agent 会话内调用返回符合预期；无 appId 返回引导文本 | ✅ |
-| P5 | 增量循环（stat+sync+replaceFiles）+ stale + 单写者 + 删除清理 | 改文件落库；删除全量重建；计数刷新 | ✅ |
+| P5 | 增量循环（stat+sync+replaceFiles）+ stale + 单写者 + 删除切片 | 改文件落库；删除切片（sync+full dump，无重解析）；计数刷新 | ✅ |
 | P6 | Dockerfile 集成（extractor 入镜像）+ 端到端验证 | 组合 3 端到端跑通 | ✅ |
 | P7 | 状态机/并发/路径语义硬化 | heartbeat 读沙箱、failIndex、增量 claim、路径归一 | ✅ |
 

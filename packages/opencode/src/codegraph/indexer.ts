@@ -146,7 +146,7 @@ const runFullIndex = (scope: Scope, sb: Sandbox) =>
     return Effect.void
   })
 
-type StatDiff = { changed: string[]; deleted: boolean; live: string[] }
+type StatDiff = { changed: string[]; deletedPaths: string[]; live: string[] }
 
 const statDiff = (scope: Scope, sb: Sandbox) =>
   Effect.gen(function* () {
@@ -158,7 +158,7 @@ const statDiff = (scope: Scope, sb: Sandbox) =>
     const byPath = new Map(ledger.map((f) => [f.path, f]))
     const live = new Set<string>()
     const changed: string[] = []
-    let deleted = false
+    const deletedPaths: string[] = []
     for (const s of stats) {
       if (s.size > MAX_INDEX_FILE_SIZE) continue
       live.add(s.path)
@@ -167,30 +167,31 @@ const statDiff = (scope: Scope, sb: Sandbox) =>
     }
     for (const f of ledger) {
       if (f.size > MAX_INDEX_FILE_SIZE) continue
-      if (!live.has(f.path)) {
-        deleted = true
-        break
-      }
+      if (!live.has(f.path)) deletedPaths.push(f.path)
     }
-    return { changed, deleted, live: [...live] } satisfies StatDiff
+    return { changed, deletedPaths, live: [...live] } satisfies StatDiff
   })
 
 const runIncremental = (scope: Scope, sb: Sandbox, diff: StatDiff) =>
   Effect.gen(function* () {
+    const hasDeleted = diff.deletedPaths.length > 0
     yield* Effect.tryPromise(() => S.dropMissingFiles(scope, diff.live))
-    if (diff.changed.length === 0 && !diff.deleted) {
-      // Restore ready if we claimed for a race that turned into a no-op.
+    if (diff.changed.length === 0 && !hasDeleted) {
       yield* Effect.tryPromise(() => S.finishIndexRecount(scope))
       return Effect.void
     }
 
-    log.info("incremental", { scope, changed: diff.changed.length, deleted: diff.deleted })
-    yield* Effect.tryPromise(() => S.setStaleFiles(scope, diff.changed.length ? diff.changed : []))
+    log.info("incremental", { scope, changed: diff.changed.length, deleted: diff.deletedPaths.length })
+    yield* Effect.tryPromise(() => S.setStaleFiles(scope, diff.changed.length ? diff.changed : diff.deletedPaths.slice(0, 5)))
 
-    // Prefer sandbox sync()'s changed set for replaceFiles; server stat is a
-    // cheap prefilter. Empty snap.files → content-hash no-op (mtime noise).
-    const snap = yield* extract(scope, sb, diff.deleted ? "full" : "incremental", PROGRESS)
-    if (diff.deleted) {
+    // Incremental sync in sandbox handles deletions via content-hash + full
+    // re-resolution; the script exports a full PG dump when deletions occurred
+    // (to capture definitionDelta rebinds in UNCHANGED files), otherwise a
+    // changed-file neighborhood for replaceFiles.
+    const snap = yield* extract(scope, sb, "incremental", PROGRESS)
+    const isFullDump = hasDeleted && snap.files.length > diff.changed.length + 5
+    if (isFullDump) {
+      log.info("incremental deletion → full dump", { scope, files: snap.files.length, nodes: snap.nodes.length })
       yield* Effect.tryPromise(() => S.replaceGraph(scope, snap))
     } else {
       const changedPaths = (snap.files ?? []).map((f) => f.path as string)
@@ -226,8 +227,7 @@ const ensureIndexed = (scope: Scope, sb: Sandbox) =>
     if (!needsFull) {
       // ready + same engine: precheck without claim
       const diff = yield* statDiff(scope, sb)
-      if (diff.changed.length === 0 && !diff.deleted) {
-        // Still drop missing if any ledger drift (should be rare with empty changed)
+      if (diff.changed.length === 0 && diff.deletedPaths.length === 0) {
         yield* Effect.tryPromise(() => S.dropMissingFiles(scope, diff.live))
         return Effect.void
       }
