@@ -170,6 +170,7 @@ psql "$PG_URL" -t -A -c "SELECT count(*) FROM codegraph_node WHERE scope='app:ot
 
 ## 已知问题
 
+- **引用解析无源码限制**：`obj.method()`（变量 receiver）无法解析——我们只存节点元数据不存源码，codegraph 原版靠局部变量类型推断（需读源码）。显式限定形态（`Class::method`/qualified_name 后缀）已覆盖；变量 receiver 形态是架构边界，解析率上限约 26-30%。
 - **远端沙箱不稳定**（组合 1）：`Sandbox.kill` 对已死沙箱可能超时（`Request timed out`），导致 getOrCreate 卡在清理阶段无法重建。绕过：`psql "$PG_URL" -c "DELETE FROM sandbox WHERE session_id='$SID'"` 清掉卡死行。**本地沙箱（组合 3）无此问题**。
 - **keep-alive 沙箱 + idle-reap**：`OPENCODE_SANDBOX_IDLE_KILL_SEC=30` 时非 keep-alive 沙箱 30s 即回收，索引长任务可能被打断。**跑 codegraph 用例务必先 keep-alive**（`new_sid -k`）。
 - **codegraph kernel 偶发重复 node id**：部分语言（如 Dart 嵌套函数）同一符号以 `hostFn::localFn` 与 `localFn` 两个 qualified_name 产出相同 id hash → PG 主键冲突。store 层已按 id 去重（保留首个）。
@@ -183,6 +184,7 @@ psql "$PG_URL" -t -A -c "SELECT count(*) FROM codegraph_node WHERE scope='app:ot
 |---|---|---|---|
 | 2026-08-20 | T42.1.1/1.2/1.3 全量索引 + 落库 | ✅ | 组合 3 本地沙箱；codegraph 仓库 570 文件 → `ready`，12,141 节点 / 13,343 边 |
 | 2026-08-20 | 镜像内置改造 | ✅ | extractor 放沙箱 `/opt/codegraph-extractor` 后 indexer 直接 exec 成功（stat 572 文件）；走 /opt 路径全量重建 `ready` 12019 节点；无 /opt 的旧镜像沙箱增量报错（证明沙箱必须内置） |
+| 2026-08-20 | 引用解析（name-matcher 移植） | ✅ | 88,583 refs → 解析 23,604（26.65%）；产 15,182 calls 边；`extractFromSource` callers 510、`GraphTraverser` callers 15；增量单文件 224ms；幂等无重复边 |
 | 2026-08-20 | T42.2.1/2.2/2.3 搜索 + 遍历 + 引导文本 | ✅ | 四层搜索命中 `extractFromSource`；scope 解析 `app:cg-e2e`；无 appId 返回引导 |
 | 2026-08-20 | Agent 实测 codegraph_search | ✅ | 消息让模型查 `extractFromSource` → 回复「repo/src/extraction/tree-sitter.ts 第 6684 行」，与 store 直查一致（Yd-DeepSeek/deepseek-v4-flash） |
 | 2026-08-20 | T42.3.1 增量同步 | ✅ | 改 `src/index.ts` 加 `cgIncrementalProbe` → 20s 内落库（日志 `changed=1 incremental`） |
