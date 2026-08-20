@@ -1,18 +1,18 @@
-# codegraph SaaS 集成用例（沙箱提取 → PG → 内置工具）
+# codegraph SaaS 集成用例（沙箱完整分析 → PG → 内置工具）
 
-> 验证 `feat/saas-codegraph`：app 模式会话的沙箱启动后自动对 `/workspace` 代码做符号级索引（codegraph Rust kernel），结果写 PG（`codegraph_*` 表，按 `scope=app:{appId}` 隔离），并通过 5 个内置工具（`codegraph_search/node/callers/explore/impact`）暴露给 Agent。
+> 验证 `feat/saas-codegraph`：app 模式会话的沙箱启动后自动对 `/workspace` 代码做**完整分析**（codegraph kernel 提取 + 框架检测 + resolveReferences），结果写 PG（`codegraph_*` 表，按 `scope=app:{appId}` 隔离），并通过 8 个内置工具（`codegraph_search/node/callers/callees/impact/explore/files/affected`）暴露给 Agent。
 >
 > 实现：
-> - `packages/opencode/src/codegraph/`：`codegraph.pg.ts`（表）、`store.ts`（读写/四层搜索/图遍历/状态机）、`indexer.ts`（30s 守护索引 + 增量 stat-diff）、`script/main.ts`（沙箱内 kernel 提取）、`tool/`（5 个内置工具）
+> - `packages/opencode/src/codegraph/`：`codegraph.pg.ts`（表）、`store.ts`（读写/四层搜索/图遍历/状态机）、`indexer.ts`（30s 守护索引 + 增量 `sync()`）、`script/main.ts`（沙箱内完整分析：kernel + framework + resolver）、`tool/`（8 个内置工具）
 > - `packages/opencode/migration-pg/20260820120000_codegraph/` + `20260820130000_codegraph_file_mtime/`
 > - `scripts/build-codegraph-extractor.sh`（单平台目录 + 双平台 tar）
 >
-> **镜像内置（2026-08-20 改造）**：extractor 由沙箱镜像 Dockerfile COPY 到 `/opt/codegraph-extractor`（构建沙箱镜像前先跑 `scripts/build-codegraph-extractor.sh --target <arch>`），indexer 直接 exec `/opt/codegraph-extractor/main.ts`，**不再运行时注入**。解决了"沙箱重建后增量路径缺 extractor"的 bug。
+> **镜像内置**：extractor 由沙箱镜像 Dockerfile COPY 到 `/opt/codegraph-extractor`（构建沙箱镜像前跑 `scripts/build-codegraph-extractor.sh --target <arch>`），indexer 直接 exec `node /opt/codegraph-extractor/main.ts full`，无运行时注入。
 >
 > **关键设计**：
 > 1. codegraph 只认 `appId`（不看 pvcMode），scope = `app:{appId}`；无 appId 的会话工具返回引导文本（非 isError）。
-> 2. 沙箱内只解析，PG 写由服务端做（沙箱不连 PG）。
-> 3. 增量检测用文件系统 stat（mtime/size），**不信任 git status**（pull/checkout 后工作树 clean，git 盲区）。
+> 2. **完整解析在沙箱内**（有源码）：`full`（全量）/`--incremental`（`graph.sync()` 增量）都由 codegraph 自身管线产出全部边，服务端只落库。
+> 3. 增量检测用文件系统 stat（mtime/size），**不信任 git status**；>1MB 文件（从未索引）不参与变更判定。
 > 4. kernel 偶发重复 node id，落库前去重。
 
 ## 公共环境
@@ -168,6 +168,136 @@ psql "$PG_URL" -t -A -c "SELECT count(*) FROM codegraph_node WHERE scope='app:ot
 
 ---
 
+## CG-5: 增量精确同步（codegraph sync + replaceFiles）
+
+> 增量不再全量替换：沙箱内 `graph.sync()`（content-hash diff → indexFiles(changed) → 只 resolve 变更文件 refs）→ 导出变更文件邻域 → 服务端 `replaceFiles` 按文件替换。
+
+### T42.5.1 单文件修改 → 变更集精确 + 按文件落库
+
+```bash
+SID=$(new_sid -k)   # app 模式 + keep-alive，沙箱克隆代码后等索引 ready
+APP=$(psql "$PG_URL" -t -A -c "SELECT app_id FROM session WHERE id='$SID'")
+
+# 改一个文件
+curl -s --max-time 60 -X POST "$BASE/session/$SID/exec" -H 'Content-Type: application/json' \
+  -d '{"command":"echo '\''function cgSyncProbe() { return 1; }'\'' >> /workspace/repo/src/index.ts && echo W"}'
+
+# 等 indexer 增量（30s 轮询 + sync + replaceFiles）
+for i in $(seq 1 8); do
+  N=$(psql "$PG_URL" -t -A -c "SELECT count(*) FROM codegraph_node WHERE scope='app:$APP' AND name='cgSyncProbe'")
+  [ "$N" = "1" ] && break; sleep 10
+done
+echo "probe=$N"; psql "$PG_URL" -t -A -c "SELECT count(*) FROM codegraph_edge WHERE scope='app:$APP'"
+```
+
+**期望**：`probe=1`；边总数变化极小（只按变更文件替换，非全量重写）。日志 `service=codegraph-indexer ... incremental` 显示 `changed=1`。
+
+### T42.5.2 大文件不污染变更集（>1MB 跳过）
+
+```bash
+# codegraph 仓库含 23MB vendored parser.c——不应进 changed
+curl -s --max-time 60 -X POST "$BASE/session/$SID/exec" -H 'Content-Type: application/json' \
+  -d '{"command":"touch /workspace/repo/codegraph-kernel/grammars/dart/parser.c && echo T"}'
+sleep 60
+docker logs opencode-saas-test 2>&1 | grep -iE "incremental" | tail -3
+```
+
+**期望**：增量日志 `changed` 不含 parser.c（服务端 stat 对比过滤 >1MB）。
+
+### T42.5.3 删除文件 → 强制全量重建
+
+```bash
+curl -s --max-time 60 -X POST "$BASE/session/$SID/exec" -H 'Content-Type: application/json' \
+  -d '{"command":"rm /workspace/repo/src/index.ts && echo R"}'
+sleep 60
+psql "$PG_URL" -t -A -c "SELECT count(*) FROM codegraph_node WHERE scope='app:$APP' AND file_path='repo/src/index.ts'"
+```
+
+**期望**：`0`（删除后全量重建，SQLite 图不含已删文件）。
+
+---
+
+## CG-6: 新工具面（callees/files/affected）
+
+> 工具是 Agent 内部机制，本组验证工具**后端**（store 查询 + 输出逻辑），等价于工具 execute 核心路径。
+
+### T42.6.1 callees（被调用者）
+
+```bash
+# 直接查 store.getCallees 等价 SQL：findById 等方法调用了谁
+psql "$PG_URL" -t -A -c "
+SELECT DISTINCT n2.qualified_name, n2.file_path
+FROM codegraph_edge e JOIN codegraph_node n1 ON n1.id=e.source AND n1.scope=e.scope
+     JOIN codegraph_node n2 ON n2.id=e.target AND n2.scope=e.scope
+WHERE e.scope='app:$APP' AND e.kind='calls' AND n1.name='extractFromSource' LIMIT 5;"
+```
+
+**期望**：列出 extractFromSource 直接调用的符号（如 detectLanguage、各 extract 方法）。
+
+### T42.6.2 files（文件树）
+
+```bash
+psql "$PG_URL" -t -A -c "SELECT count(*), count(DISTINCT language) FROM codegraph_file WHERE scope='app:$APP'"
+```
+
+**期望**：文件数 >0，多语言（typescript/yaml/go 等）。
+
+### T42.6.3 affected（变更影响 + 测试选择）
+
+```bash
+# 某被广泛引用文件（tree-sitter.ts）的依赖者 + 测试文件占比
+psql "$PG_URL" -t -A -c "
+SELECT count(DISTINCT e.source) AS dependents
+FROM codegraph_edge e JOIN codegraph_node n ON n.id=e.target AND n.scope=e.scope
+WHERE e.scope='app:$APP' AND n.file_path='repo/src/extraction/tree-sitter.ts' AND e.kind != 'contains';"
+# 测试文件依赖者（isTestFile 语义的子集：__tests__ 目录）
+psql "$PG_URL" -t -A -c "
+SELECT count(DISTINCT s.file_path) FROM codegraph_edge e
+JOIN codegraph_node n ON n.id=e.target AND n.scope=e.scope
+JOIN codegraph_node s ON s.id=e.source AND s.scope=e.scope
+WHERE e.scope='app:$APP' AND n.file_path='repo/src/extraction/tree-sitter.ts' AND e.kind != 'contains'
+  AND s.file_path LIKE '%__tests__%';"
+```
+
+**期望**：dependents>0（实测 40），测试文件依赖者>0（实测 17，kernel-parity 套件）。
+
+---
+
+## CG-7: explore 分配算法（对齐原版输出预算）
+
+> explore 移植原版分配算法：RELEVANCE_KIND_WEIGHT 评分 + spine 调用路径加权 + CLIFF 相对裁剪 + MIN 保底。
+
+### T42.7.1 精确查询 → spine 文件优先 + 预算分配
+
+```bash
+# 等价逻辑：query="extractFromSource"，spine 文件（tree-sitter.ts 定义 + Extractor 实现）应全量展示
+# 验证输出含 spine 标记与文件分组（本地验证脚本方式）:
+cat > /tmp/cg-explore-verify.ts <<'EOF'
+import { runCodegraphExplore } from "/Users/ruomu/code/opencode/packages/opencode/src/codegraph/tool/codegraph-explore"
+const out = await runCodegraphExplore("app:$APP", "extractFromSource", 30)
+console.log(out.includes("[spine]") ? "SPINE_OK" : "NO_SPINE")
+console.log(out.slice(0, 200))
+EOF
+OPENCODE_DATABASE_URL=$PG_URL bun /tmp/cg-explore-verify.ts
+```
+
+**期望**：输出含 `[spine]` 文件（tree-sitter.ts 定义 + Extractor 实现）；调用关系段清晰。
+
+### T42.7.2 低置信查询 → 裁剪 + cliff 列名 + LOW_CONFIDENCE
+
+```bash
+cat > /tmp/cg-explore-low.ts <<'EOF'
+import { runCodegraphExplore } from "/Users/ruomu/code/opencode/packages/opencode/src/codegraph/tool/codegraph-explore"
+const out = await runCodegraphExplore("app:$APP", "data handler flow", 30)
+console.log("LOW:", out.includes("LOW_CONFIDENCE"))
+console.log("cliff:", out.includes("未展示") || out.includes("cliff"))
+EOF
+OPENCODE_DATABASE_URL=$PG_URL bun /tmp/cg-explore-low.ts
+```
+
+**期望**：`LOW: true`（低置信标记）；大量文件被裁剪/cliff 只列名（25 文件 → 展示 ~4）。
+
+---
 ## 已知问题
 
 - ~~引用解析无源码限制~~（**已消除**）：full 模式在沙箱内（有源码）跑 codegraph 完整 resolver，`obj.method()`/route→handler/组件 usage 全部可解析。服务端不再做解析，只落库。
@@ -191,3 +321,8 @@ psql "$PG_URL" -t -A -c "SELECT count(*) FROM codegraph_node WHERE scope='app:ot
 | 2026-08-20 | T42.3.1 增量同步 | ✅ | 改 `src/index.ts` 加 `cgIncrementalProbe` → 20s 内落库（日志 `changed=1 incremental`） |
 | 2026-08-20 | T42.3.2 删除清理 | ✅ | `rm src/index.ts` → 容器重启后首循环清掉 117 节点（修复 dropMissingFiles 提前 return 的 bug） |
 | 2026-08-20 | T42.4.1/4.2 多会话复用 + 隔离 | ✅ | 同 app 第二会话沙箱启动后 `ready nodes=12141` 稳定不重建；`app:other-app` 0 节点（本地 docker PVC 不跨容器共享 subPath，代码共享待远端 K8s 验证） |
+| 2026-08-20 | 增量精确（sync + replaceFiles） | ✅ | 单文件增量 3.4s（vs 全量 24.6s）；写放大 44,815→2,556 边（1/17）；>1MB parser.c 不再污染 changed；改文件 probe 落库 + 边按 slice 再平衡 |
+| 2026-08-20 | 服务端简化 resolver 移除 | ✅ | 增量/全量统一沙箱内完整解析，resolver.ts 删除 |
+| 2026-08-20 | explore 分配算法移植 | ✅ | `extractFromSource` → spine 文件（tree-sitter.ts + Extractor 实现）全量；`data handler flow` → 25 文件裁剪到 4 + cliff 列名 + LOW_CONFIDENCE |
+| 2026-08-20 | callees/files 工具 | ✅ | callees 30 个被调用者；files 577 文件多语言分布 |
+| 2026-08-20 | affected 工具 | ✅ | tree-sitter.ts → 40 依赖者、17 测试文件（kernel-parity 套件）；生产/测试分离 |

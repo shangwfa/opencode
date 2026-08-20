@@ -3,9 +3,12 @@
 > 分支：`feat/saas-codegraph`（基于 `feat/opencode-1.18.18`）
 > 决策记录：全异步实现；FTS 用 tsvector + pg_trgm 结合并对齐 codegraph 搜索行为；**按 `appId` 隔离（scope = `app:{appId}`，不感知 pvcMode）**；**不开发独立 API，查询能力以内置 tool 提供**（工具根据会话 ID 解析出 appId 再查图）。
 >
-> **实现状态（2026-08-20）：P1–P6 全部完成并通过端到端验证**（组合 3 本地 PG + 本地沙箱，codegraph 仓库 570 文件 → `ready` 12,141 节点 / 13,343 边；增量、删除清理、多会话复用、Agent 调用 codegraph_search 均验证）。实现落点：`packages/opencode/src/codegraph/` + `migration-pg/20260820*_codegraph*` + `scripts/build-codegraph-extractor.sh` + `docs/test-cases/codegraph/`。
->
-> **复盘补齐（同日）**：搜索多信号重评分（`src/codegraph/search.ts`：`nameMatchBonus`/`kindBonus`/`scorePathRelevance`/测试文件降权）已接入 `store.searchNodes`；explore 接入真实 LOW_CONFIDENCE 检测（`isLowConfidenceQuery`）。实测 `extract` 搜索无测试文件混入、精确名优先。
+> **实现状态（2026-08-20，最终）**：
+> - 索引：沙箱内 codegraph 完整管线（kernel + 框架检测 + resolveReferences），**12,802 节点 / 44,815 边**（calls 21,726 / imports 3,765 / extends 84）
+> - 增量：codegraph 原生 `sync()` + `replaceFiles` 按文件替换（1 文件 3.4s，写放大 1/17）
+> - 工具：**8 个**（search/node/callers/callees/impact/explore/files/affected），explore 含原版分配算法
+> - 服务端简化 resolver（26% 下限）已移除；extractor 镜像内置（`/opt/codegraph-extractor`）
+> - 实现落点：`packages/opencode/src/codegraph/` + `migration-pg/20260820*_codegraph*` + `scripts/build-codegraph-extractor.sh` + `docs/test-cases/codegraph/`
 > 参考实现：`~/code/codegraph`（colbymchenry/codegraph v1.5.0，MIT，仅作移植来源，不直接依赖该包）。
 
 ## 1. 背景与目标
@@ -296,4 +299,6 @@ packages/opencode/src/codegraph/
 | 7 | 大仓库首次索引分钟级 | 不阻塞会话（forkScoped 后台跑），期间工具返回"索引中(进度 x/y)"提示文本，Agent 可先用 read/grep |
 | 8 | codegraph 上游演进 / kernel ABI | pin 包版本；升级走集成测试（符号数对拍） |
 | 9 | kernel 偶发重复 node id（Dart 嵌套函数等） | store 落库前去重（保留首个）；实测 12,141 节点去重 6 个 |
+| 10 | 增量写放大 | **已解决**：增量走 codegraph `sync()` + `replaceFiles` 按文件替换（1 文件 3.4s vs 全量 24.6s，写放大 1/17） |
+| 11 | ~~无源码解析限制~~ | **已消除**：完整解析在沙箱内（有源码）由 codegraph 自身管线完成，服务端只落库 |
 | 10 | 本地 docker PVC 不跨容器共享 subPath | 本地组合 3 下同 app 第二会话沙箱看不到代码（不影响索引复用，`ready` 数据稳定）；共享语义以远端 K8s PVC 为准 |
