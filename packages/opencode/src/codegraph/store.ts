@@ -555,4 +555,99 @@ export const getChildren = async (scope: Scope, nodeId: string): Promise<GraphNo
     .filter((n): n is GraphNode => !!n)
 }
 
+/**
+ * Type hierarchy: ancestors (what this extends/implements) and descendants
+ * (what extends/implements this), both transitive via extends/implements edges.
+ */
+export const getTypeHierarchy = async (scope: Scope, nodeId: string): Promise<{ ancestors: GraphNode[]; descendants: GraphNode[] }> => {
+  const ancestors: GraphNode[] = []
+  const descendants: GraphNode[] = []
+
+  const walkUp = async (id: string, visited: Set<string>): Promise<void> => {
+    if (visited.has(id)) return
+    visited.add(id)
+    const edges = await outgoingEdges(scope, id, ["extends", "implements"])
+    if (edges.length === 0) return
+    const nodes = await getNodesByIds(scope, edges.map((e) => e.target))
+    for (const e of edges) {
+      const n = nodes.find((x) => x.id === e.target)
+      if (n && !visited.has(n.id)) {
+        ancestors.push(n)
+        await walkUp(n.id, visited)
+      }
+    }
+  }
+
+  const walkDown = async (id: string, visited: Set<string>): Promise<void> => {
+    if (visited.has(id)) return
+    visited.add(id)
+    const edges = await incomingEdges(scope, id, ["extends", "implements"])
+    if (edges.length === 0) return
+    const nodes = await getNodesByIds(scope, edges.map((e) => e.source))
+    for (const e of edges) {
+      const n = nodes.find((x) => x.id === e.source)
+      if (n && !visited.has(n.id)) {
+        descendants.push(n)
+        await walkDown(n.id, visited)
+      }
+    }
+  }
+
+  const upVisited = new Set<string>([nodeId])
+  const downVisited = new Set<string>([nodeId])
+  await walkUp(nodeId, upVisited)
+  await walkDown(nodeId, downVisited)
+  return { ancestors, descendants }
+}
+
+/** Containment chain from node up to its file root. */
+export const getAncestors = async (scope: Scope, nodeId: string): Promise<GraphNode[]> => {
+  const out: GraphNode[] = []
+  const visited = new Set<string>()
+  let current = nodeId
+  while (!visited.has(current)) {
+    visited.add(current)
+    const edges = await incomingEdges(scope, current, ["contains"])
+    if (edges.length === 0) break
+    const parent = await getNodeById(scope, edges[0].source)
+    if (!parent) break
+    out.push(parent)
+    current = parent.id
+  }
+  return out
+}
+
+/** Shortest path between two nodes via BFS over outgoing edges. */
+export const findPath = async (
+  scope: Scope,
+  fromId: string,
+  toId: string,
+  edgeKinds?: string[],
+): Promise<Array<{ node: GraphNode; edge: GraphEdge | null }> | null> => {
+  const start = await getNodeById(scope, fromId)
+  const target = await getNodeById(scope, toId)
+  if (!start || !target) return null
+
+  const visited = new Set<string>([fromId])
+  const queue: Array<{ nodeId: string; path: Array<{ node: GraphNode; edge: GraphEdge | null }> }> = [
+    { nodeId: fromId, path: [{ node: start, edge: null }] },
+  ]
+  while (queue.length > 0) {
+    const { nodeId, path } = queue.shift()!
+    if (nodeId === toId) return path
+    const edges = await outgoingEdges(scope, nodeId, edgeKinds)
+    const want = edges.map((e) => e.target).filter((id) => !visited.has(id))
+    const nodes = await getNodesByIds(scope, want)
+    const byId = new Map(nodes.map((n) => [n.id, n]))
+    for (const e of edges) {
+      const n = byId.get(e.target)
+      if (n && !visited.has(e.target)) {
+        visited.add(e.target)
+        queue.push({ nodeId: e.target, path: [...path, { node: n, edge: e }] })
+      }
+    }
+  }
+  return null
+}
+
 export * as CodegraphStore from "./store"
