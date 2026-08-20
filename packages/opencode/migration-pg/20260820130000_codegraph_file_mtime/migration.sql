@@ -1,0 +1,1 @@
+ALTER TABLE "codegraph_file" ADD COLUMN IF NOT EXISTS "mtime_ms" bigint NOT NULL DEFAULT 0;

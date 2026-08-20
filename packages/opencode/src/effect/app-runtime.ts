@@ -7,6 +7,8 @@ import { Database } from "@opencode-ai/core/database/database"
 import { Flag } from "@opencode-ai/core/flag/flag"
 import { RepositoryCache } from "@opencode-ai/core/repository-cache"
 import { Bus } from "@/bus"
+import { CodegraphIndexer } from "@/codegraph/indexer"
+import { SandboxProvider } from "@/tool/sandbox-provider"
 
 // SaaS PG mode: replace core Database.defaultLayer globally so that every
 // module that does `Layer.provide(Database.defaultLayer)` transparently goes
@@ -157,6 +159,7 @@ export const AppLayer = AppNodeBuilderV1.build(
       Layer.provide(SessionTools.defaultLayer, AppNodeBuilderV1.build(EventV2Bridge.node)),
     ),
   ),
+  Layer.provideMerge(Layer.provide(CodegraphIndexer.layer, SandboxProvider.defaultLayer)),
 )
 
 const rt = ManagedRuntime.make(AppLayer, { memoMap })

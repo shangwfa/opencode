@@ -10,6 +10,11 @@ import { EditTool } from "./edit"
 import { GlobTool } from "./glob"
 import { GrepTool } from "./grep"
 import { ReadTool } from "./read"
+import { CodegraphSearchTool } from "@/codegraph/tool/codegraph-search"
+import { CodegraphNodeTool } from "@/codegraph/tool/codegraph-node"
+import { CodegraphCallersTool } from "@/codegraph/tool/codegraph-callers"
+import { CodegraphExploreTool } from "@/codegraph/tool/codegraph-explore"
+import { CodegraphImpactTool } from "@/codegraph/tool/codegraph-impact"
 import { TaskTool } from "./task"
 import { Database } from "@opencode-ai/core/database/database"
 import { SessionRunState } from "@/session/run-state"
@@ -124,6 +129,11 @@ const layer = Layer.effect(
     const writetool = yield* WriteTool
     const edit = yield* EditTool
     const greptool = yield* GrepTool
+    const codegraphSearch = yield* CodegraphSearchTool
+    const codegraphNode = yield* CodegraphNodeTool
+    const codegraphCallers = yield* CodegraphCallersTool
+    const codegraphExplore = yield* CodegraphExploreTool
+    const codegraphImpact = yield* CodegraphImpactTool
     const patchtool = yield* ApplyPatchTool
     const skilltool = yield* SkillTool
     const agent = yield* Agent.Service
@@ -228,6 +238,11 @@ const layer = Layer.effect(
           read: Tool.init(read),
           glob: Tool.init(globtool),
           grep: Tool.init(greptool),
+          codegraph_search: Tool.init(codegraphSearch),
+          codegraph_node: Tool.init(codegraphNode),
+          codegraph_callers: Tool.init(codegraphCallers),
+          codegraph_explore: Tool.init(codegraphExplore),
+          codegraph_impact: Tool.init(codegraphImpact),
           edit: Tool.init(edit),
           write: Tool.init(writetool),
           task: Tool.init(task),
@@ -252,6 +267,11 @@ const layer = Layer.effect(
           tool.read,
           tool.glob,
           tool.grep,
+          tool.codegraph_search,
+          tool.codegraph_node,
+          tool.codegraph_callers,
+          tool.codegraph_explore,
+          tool.codegraph_impact,
           tool.edit,
           tool.write,
           tool.task,
