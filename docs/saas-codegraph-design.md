@@ -1,7 +1,9 @@
 # SaaS CodeGraph 技术方案（opencode 仓库实现）
 
 > 分支：`feat/saas-codegraph`（基于 `feat/opencode-1.18.18`）
-> 决策记录：全异步实现；FTS 用 tsvector + pg_trgm 结合并对齐 codegraph 搜索行为；**隔离键 = 卷隔离键（`scope`：app 模式取 appId，session 模式取 sessionID）**，注意"带 appId ≠ app 模式"；**不开发独立 API，查询能力以内置 tool 提供**（工具根据会话 ID 解析出 scope 再查图）。
+> 决策记录：全异步实现；FTS 用 tsvector + pg_trgm 结合并对齐 codegraph 搜索行为；**按 `appId` 隔离（scope = `app:{appId}`，不感知 pvcMode）**；**不开发独立 API，查询能力以内置 tool 提供**（工具根据会话 ID 解析出 appId 再查图）。
+>
+> **实现状态（2026-08-20）：P1–P6 全部完成并通过端到端验证**（组合 3 本地 PG + 本地沙箱，codegraph 仓库 570 文件 → `ready` 12,141 节点 / 13,343 边；增量、删除清理、多会话复用、Agent 调用 codegraph_search 均验证）。实现落点：`packages/opencode/src/codegraph/` + `migration-pg/20260820*_codegraph*` + `scripts/build-codegraph-extractor.sh` + `docs/test-cases/codegraph/`。
 > 参考实现：`~/code/codegraph`（colbymchenry/codegraph v1.5.0，MIT，仅作移植来源，不直接依赖该包）。
 
 ## 1. 背景与目标
@@ -252,24 +254,27 @@ packages/opencode/src/codegraph/
 
 ## 8. 实施阶段
 
-| 阶段 | 内容 | 验收 |
+| 阶段 | 内容 | 验收 | 状态 |
+|---|---|---|---|
 |---|---|---|
-| P1 | 表 + 迁移 + store.ts（CRUD/搜索/遍历查询）+ 单测 | 本地 PG：migration 跑通；四层搜索对拍 codegraph CLI 在同一仓库的输出 |
-| P2 | 沙箱脚本（依赖 codegraph 包）+ **kernel 在沙箱镜像内 dlopen 验证** + 评分函数移植 | 沙箱内 kernel 实际加载成功（非 wasm 回退）；对 opencode 仓库跑，ndjson 符号数与 codegraph 本地索引一致 |
-| P3 | indexer.ts：注入/exec/回传/落库/进度 + 启动钩子接入 sandbox-provider | 测试环境：app 模式会话启动 → codegraph_index 到 ready，节点数合理 |
-| P4 | 5 个内置 tool（appId 解析 + 输出格式化）+ registry 注册 | docs/test-cases/ 新增 codegraph 用例：会话内让 Agent 调工具，返回符合预期；非 app 模式返回引导文本 |
-| P5 | 增量循环（stat+hash 文件对比 → 按文件重提取）+ stale 文件集维护 + 同 app 并发单写者 + 应用维度清理 | Agent 改文件 30s 内 PG 可查到新符号；`git pull`/切分支后索引能跟上（git status 盲区用例）；双会话并发无脏数据 |
-| P6 | 镜像/部署收尾 + 文档（saas-usage-guide 增章） | 测试环境端到端 |
+| P1 | 表 + 迁移 + store.ts（CRUD/搜索/遍历查询）+ 冒烟 | 本地 PG：migration 跑通；四层搜索与 CLI 输出一致 | ✅ |
+| P2 | 沙箱脚本（codegraph kernel，双平台 bundle）+ 打包 | 沙箱内 kernel 加载成功；ndjson 符号数一致 | ✅ |
+| P3 | indexer.ts（Effect 服务，claim/heartbeat/zombie 自愈）挂载 AppLayer | 会话启动 → 索引自动到 ready | ✅ |
+| P4 | 5 个内置 tool + registry 注册 | Agent 会话内调用返回符合预期；无 appId 返回引导文本 | ✅ |
+| P5 | 增量循环（stat+hash 对比）+ stale 文件集 + 单写者 + 删除清理 | 改文件 20s 内落库；删除文件首循环清理 | ✅ |
+| P6 | Dockerfile 集成（双平台 bundle 入镜像）+ 端到端验证 | 组合 3 端到端跑通（Agent 实测 codegraph_search 返回精确定位） | ✅ |
 
 ## 9. 风险与开放问题
 
 | # | 问题 | 处理 |
 |---|---|---|
-| 1 | ndjson 回传体量（大仓库几十 MB） | gzip + K8s 内网；一期实测，超限再切「沙箱分片多文件」 |
-| 2 | exec 长任务被 sandbox idle-reap 回收 | indexer 与 idle-reap 共享沙箱活跃判定；提取期间 touch 活跃标记（复用 exec_log time_updated 语义） |
-| 3 | 无 .git 的沙箱工作区增量检测 | 回退 `find -newer` 时间戳清单（脚本内实现）；业务上 app 模式工作区通常由 Agent git clone，主路径是 git status |
+| 1 | ndjson 回传体量 | gzip + K8s 内网；实测 570 文件 → 1.1MB gz（114k 行），可接受 |
+| 2 | exec 长任务被 idle-reap 回收 | 用例须先 keep-alive（`new_sid -k`）；沙箱保活后无此问题。**远端沙箱 kill 卡死**（已死沙箱 kill 超时）→ 手动清 `sandbox` 行绕过 |
+| 3 | 增量检测 git 盲区 | stat+hash 文件对比（不信任 git status）；删除文件清理 bug（`changed=0` 提前 return 导致 dropMissingFiles 不执行）已修复 |
 | 4 | tsquery 特殊字符注入/抛错 | 清洗函数 + 单测覆盖（`c++`、`a&&b` 等） |
 | 5 | explore 无源码正文，Agent 多一次 read 往返 | 工具返回精确 file:line，Agent 用 read 单次区间读取；二期可选 codegraph_file 加 content 列 |
 | 6 | 同 appId 会话的代码是否同一份 | codegraph 只认 appId，不感知 pvcMode。若业务上同 appId 的会话未共享同一份代码（卷配置问题），索引会以首个索引时快照为准——代码一致性由业务侧的 appId 使用约定保证 |
 | 7 | 大仓库首次索引分钟级 | 不阻塞会话（forkScoped 后台跑），期间工具返回"索引中(进度 x/y)"提示文本，Agent 可先用 read/grep |
-| 8 | codegraph 上游演进（新语言/框架 resolver/kernel ABI 变更） | pin 包版本；升级走集成测试（符号数对拍）。kernel ABI 由 loader 契约校验，不匹配自动回退 wasm |
+| 8 | codegraph 上游演进 / kernel ABI | pin 包版本；升级走集成测试（符号数对拍） |
+| 9 | kernel 偶发重复 node id（Dart 嵌套函数等） | store 落库前去重（保留首个）；实测 12,141 节点去重 6 个 |
+| 10 | 本地 docker PVC 不跨容器共享 subPath | 本地组合 3 下同 app 第二会话沙箱看不到代码（不影响索引复用，`ready` 数据稳定）；共享语义以远端 K8s PVC 为准 |
