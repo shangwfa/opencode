@@ -1,6 +1,6 @@
-# 沙箱文件管理 API：创建目录 / 创建文件 / 下载 / 上传
+# 沙箱文件管理 API：创建目录 / 创建文件 / 下载 / 上传 / 删除 / 搜索
 
-> 仅适用于 opencode SaaS。验证 `POST /session/:id/files/mkdir`、`POST /session/:id/files/create`、`GET /session/:id/files/download`、`POST /session/:id/files/upload` 四个接口（实现于 `packages/opencode/src/server/sandbox-proxy.ts`）。
+> 仅适用于 opencode SaaS。验证 `POST /session/:id/files/mkdir`、`POST /session/:id/files/create`、`GET /session/:id/files/download`、`POST /session/:id/files/upload`、`POST /session/:id/files/remove` 五个 sandbox-proxy 接口，以及 `GET /find/file` 文件搜索接口（实现于 `packages/opencode/src/server/sandbox-proxy.ts` 和 `packages/opencode/src/server/routes/instance/httpapi/handlers/file.ts`）。
 > 环境变量 `$BASE $PG_URL $MODEL` 由 `test-env.sh` 提供；本组用例不依赖 `$MODEL`（不经 AI 消息）。
 
 ```bash
@@ -403,7 +403,143 @@ curl -s --noproxy '*' -X DELETE "$BASE/session/$SID_APP2" >/dev/null
 
 ---
 
-## 六、清理
+## 六、删除 `POST /session/:sessionID/files/remove`
+
+### T-FILE-50 删除单个文件
+
+```bash
+curl -s --noproxy '*' -m 30 -X POST "$BASE/session/$SID/files/create?path=/workspace/delete-me.txt" \
+  --data-binary 'to-be-deleted' >/dev/null
+
+curl -s --noproxy '*' -m 30 -X POST "$BASE/session/$SID/files/remove?path=/workspace/delete-me.txt" \
+  | python3 -m json.tool
+# 期望: {"sessionID":"...","path":"/workspace/delete-me.txt","removed":true,"type":"file"}
+
+test "$(curl -s --noproxy '*' -o /dev/null -w '%{http_code}' \
+  "$BASE/session/$SID/files/download?path=/workspace/delete-me.txt")" = 404
+```
+
+**期望**：返回 `removed:true`、`type:file`；删除后 download 返回 404。
+
+### T-FILE-51 递归删除目录
+
+```bash
+curl -s --noproxy '*' -X POST "$BASE/session/$SID/exec" -H 'Content-Type: application/json' \
+  -d '{"command":"mkdir -p /workspace/rmdir/sub && touch /workspace/rmdir/sub/a.txt && touch /workspace/rmdir/sub/b.txt"}' >/dev/null
+
+curl -s --noproxy '*' -m 30 -X POST "$BASE/session/$SID/files/remove?path=/workspace/rmdir" \
+  | python3 -c "import json,sys; d=json.load(sys.stdin); assert d['removed'] and d['type']=='directory', d; print('dir removed ok')"
+
+test "$(curl -s --noproxy '*' -o /dev/null -w '%{http_code}' \
+  "$BASE/session/$SID/files/download?path=/workspace/rmdir")" = 404
+```
+
+**期望**：目录递归删除成功，子目录和文件全部清除。
+
+### T-FILE-52 不存在路径返回 404
+
+```bash
+test "$(curl -s --noproxy '*' -o /dev/null -w '%{http_code}' \
+  -X POST "$BASE/session/$SID/files/remove?path=/workspace/no-such-file")" = 404
+```
+
+### T-FILE-53 参数校验
+
+```bash
+test "$(curl -s --noproxy '*' -m 10 -o /dev/null -w '%{http_code}' \
+  -X POST "$BASE/session/$SID/files/remove")" = 400
+```
+
+### T-FILE-54 session 不存在返回 404
+
+```bash
+test "$(curl -s --noproxy '*' -m 10 -o /dev/null -w '%{http_code}' \
+  -X POST "$BASE/session/ses_nonexistent/files/remove?path=/workspace/x")" = 404
+```
+
+### T-FILE-55 删除后 exec_log 审计
+
+```bash
+psql "$PG_URL" -t -A -c "
+  SELECT command FROM exec_log
+  WHERE session_id='$SID' AND source='file-remove'
+  ORDER BY time_created;
+"
+```
+
+**期望**：至少一条 `source=file-remove` 记录，`command` 为 JSON（含 path 和 type）。
+
+---
+
+## 八、文件搜索 `GET /find/file`
+
+> 实现于 `packages/opencode/src/server/routes/instance/httpapi/handlers/file.ts`（HttpApi 路由，与 sandbox-proxy 同端口）。沙箱内搜索走 `rg --files --hidden | grep -iF` + `find -type d | grep -iF`，返回结构化条目。
+
+### T-FILE-60 文件名搜索
+
+```bash
+curl -s --noproxy '*' -m 30 -X POST "$BASE/session/$SID/files/create?path=/workspace/auth-middleware.ts" \
+  --data-binary 'export function auth() {}' >/dev/null
+
+curl -s --noproxy '*' -m 30 "$BASE/find/file?sessionID=$SID&query=auth&type=file" \
+  | python3 -m json.tool
+# 期望: [{"name":"auth-middleware.ts","path":"auth-middleware.ts","absolute":"/workspace/auth-middleware.ts","type":"file","ignored":false}]
+```
+
+**期望**：返回包含 `auth-middleware.ts` 的 LegacyEntry 数组，`name`/`path`/`absolute`/`type`/`ignored` 字段完整。
+
+### T-FILE-61 隐藏文件搜索
+
+```bash
+curl -s --noproxy '*' -X POST "$BASE/session/$SID/exec" -H 'Content-Type: application/json' \
+  -d '{"command":"touch /workspace/.env /workspace/.gitignore"}' >/dev/null
+
+curl -s --noproxy '*' -m 30 "$BASE/find/file?sessionID=$SID&query=.env&type=file" \
+  | python3 -c "import json,sys; d=json.load(sys.stdin); assert any(e['name']=='.env' for e in d), d; print('hidden file found ok')"
+```
+
+**期望**：`rg --files --hidden` 包含 `.env` 等隐藏文件，搜索结果中能匹配到。
+
+### T-FILE-62 目录搜索
+
+```bash
+curl -s --noproxy '*' -X POST "$BASE/session/$SID/exec" -H 'Content-Type: application/json' \
+  -d '{"command":"mkdir -p /workspace/sub/dir"}' >/dev/null
+
+curl -s --noproxy '*' -m 30 "$BASE/find/file?sessionID=$SID&query=sub&dirs=true" \
+  | python3 -c "import json,sys; d=json.load(sys.stdin); assert any(e['type']=='directory' for e in d), d; print('dir search ok')"
+```
+
+**期望**：`dirs=true` 时返回目录条目，`type` 为 `"directory"`。
+
+### T-FILE-63 无匹配返回空数组
+
+```bash
+test "$(curl -s --noproxy '*' -o /dev/null -w '%{http_code}' \
+  "$BASE/find/file?sessionID=$SID&query=zzz_nonexistent_zzz&type=file")" = 200
+test "$(curl -s --noproxy '*' "$BASE/find/file?sessionID=$SID&query=zzz_nonexistent_zzz&type=file")" = '[]'
+```
+
+### T-FILE-64 返回结构化 LegacyEntry
+
+```bash
+ENTRY=$(curl -s --noproxy '*' "$BASE/find/file?sessionID=$SID&query=auth&type=file" | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+if d:
+    e=d[0]
+    assert 'name' in e and 'path' in e and 'absolute' in e and 'type' in e and 'ignored' in e, e
+    assert e['type'] in ('file','directory'), e
+    print('valid entry')
+")
+test "$ENTRY" = 'valid entry'
+```
+
+**期望**：每条结果包含 `name`、`path`、`absolute`、`type`、`ignored` 五个字段，`type` 取值 `"file"` 或 `"directory"`。
+
+---
+
+## 九、清理
 
 ```bash
 curl -s --noproxy '*' -X POST "$BASE/session/$SID/keep-alive" -H 'Content-Type: application/json' -d '{"enabled":false}' >/dev/null
@@ -427,6 +563,8 @@ summary
 | T-FILE-20~22 | 下载 | 多格式 Content-Type（mime-types）、字节完整、Content-Length 一致、目录统一 zip（含空目录根条目）、404 |
 | T-FILE-30~35 | 上传 | 目录自动创建、二进制完整、覆盖写、path 缺省、特殊字符 filename、`.`/`..` 拒绝、危险 filename 拒绝 |
 | T-FILE-40~44 | 横切 | exec_log 审计、临时文件清理、PVC 持久、host 路径兼容、app 模式共享卷 |
+| T-FILE-50~55 | 删除 | 文件删除、目录递归删除、不存在返回 404、参数校验、session 不存在 404、exec_log 审计 |
+| T-FILE-60~64 | 文件搜索 | 文件名搜索、隐藏文件搜索、目录搜索、无匹配空数组、LegacyEntry 结构化响应 |
 
 ## 复测记录
 

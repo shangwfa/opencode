@@ -26,6 +26,7 @@ export const FindTextQuery = Schema.Struct({
 export const FindFileQuery = Schema.Struct({
   ...WorkspaceRoutingQueryFields,
   query: Schema.String,
+  sessionID: Schema.String,
   dirs: Schema.optional(Schema.Literals(["true", "false"])),
   type: Schema.optional(Schema.Literals(["file", "directory"])),
   limit: Schema.optional(
@@ -119,7 +120,7 @@ export const FileApi = HttpApi.make("file")
         ),
         HttpApiEndpoint.get("findFile", FilePaths.findFile, {
           query: FindFileQuery,
-          success: described(Schema.Array(Schema.String), "File paths"),
+          success: described(Schema.Array(LegacyEntry), "Files and directories"),
           error: [HttpApiError.BadRequest],
         }).annotateMerge(
           OpenApi.annotations({

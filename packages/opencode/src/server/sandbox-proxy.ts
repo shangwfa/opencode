@@ -1025,6 +1025,52 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
     )
 
 
+    yield* router.add("POST", "/session/:sessionID/files/remove",
+      Effect.gen(function* () {
+        const params = yield* HttpRouter.schemaPathParams(SessionParams)
+        const query = yield* HttpServerRequest.schemaSearchParams(FilePathQuery).pipe(
+          Effect.catch(() => Effect.fail(HttpServerResponse.jsonUnsafe({ error: "invalid query" }, { status: 400 }))),
+        )
+        const { root, sb, session } = yield* resolveSandbox(params.sessionID)
+        const sandboxPath = toSandboxPath(query.path, session.directory)
+        const target = path.posix.normalize(sandboxPath)
+        if (!path.posix.isAbsolute(target))
+          return HttpServerResponse.jsonUnsafe({ error: "path must be absolute" }, { status: 400 })
+
+        const info = yield* Effect.tryPromise({
+          try: async () => (await sb.files.getFileInfo([target]))[target],
+          catch: () => undefined,
+        }).pipe(Effect.orElseSucceed(() => undefined))
+        if (!info) return HttpServerResponse.jsonUnsafe({ error: `path not found: ${target}` }, { status: 404 })
+
+        const kindCmd = `if [ -d ${shellQuote(target)} ]; then echo dir; elif [ -f ${shellQuote(target)} ]; then echo file; else echo other; fi`
+        const kind = yield* sandbox.runInSession(root.id, kindCmd, { timeoutSeconds: 10 }).pipe(
+          Effect.mapError(() => HttpServerResponse.jsonUnsafe({ error: "sandbox unavailable" }, { status: 502 })),
+        )
+        const isDir = kind.logs.stdout.map((m: any) => m.text).join("").trim() === "dir"
+
+        yield* Effect.tryPromise({
+          try: () => isDir ? sb.files.deleteDirectories([target]) : sb.files.deleteFiles([target]),
+          catch: (e) => new Error(`remove failed: ${e instanceof Error ? e.message : String(e)}`),
+        }).pipe(
+          Effect.mapError((error) => HttpServerResponse.jsonUnsafe({ error: error.message }, { status: 502 })),
+        )
+
+        yield* Effect.promise(() => insertExecLog({
+          id: `action-${++execCounter}-${Date.now()}`,
+          session_id: root.id,
+          command: JSON.stringify({ path: target, type: isDir ? "directory" : "file" }),
+          status: "completed",
+          source: "file-remove",
+          time_started: Date.now(),
+          time_finished: Date.now(),
+        })).pipe(Effect.catch(() => Effect.void))
+
+        return HttpServerResponse.jsonUnsafe({ sessionID: params.sessionID, path: target, removed: true, type: isDir ? "directory" : "file" })
+      }),
+    )
+
+
     yield* router.add("*", "/session/:sessionID/proxy/:port/*",
       Effect.gen(function* () {
         const request = yield* HttpServerRequest.HttpServerRequest
