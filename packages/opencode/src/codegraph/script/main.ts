@@ -36,7 +36,8 @@ const PLATFORM_PKG = `@colbymchenry/codegraph-${process.platform}-${process.arch
 
 type Upstream = {
   initGrammars: () => Promise<void>
-  extractFromSource: (filePath: string, source: string) => any
+  extractFromSource: (filePath: string, source: string, language?: string, frameworkNames?: string[]) => any
+  detectFrameworks?: (context: unknown) => Array<{ name?: string }>
   scanDirectory: (root: string) => string[]
   hashContent: (content: string) => string
   isSourceFile: (p: string) => boolean
@@ -46,7 +47,20 @@ type Upstream = {
 const loadExtraction = (): Upstream => {
   const pkgPath = require.resolve(`${PLATFORM_PKG}/package.json`)
   const entry = path.join(path.dirname(pkgPath), "lib", "dist", "extraction", "index.js")
-  return require(entry) as Upstream
+  const ex = require(entry) as Upstream
+  // Framework detection lives in resolution/frameworks (extraction doesn't
+  // re-export it). Attach it so the extractor can run framework extractors.
+  if (!ex.detectFrameworks) {
+    try {
+      const fw = require(path.join(path.dirname(pkgPath), "lib", "dist", "resolution", "frameworks", "index.js")) as {
+        detectFrameworks?: (context: unknown) => Array<{ name?: string }>
+      }
+      if (fw.detectFrameworks) ex.detectFrameworks = fw.detectFrameworks
+    } catch {
+      /* framework detection unavailable — extraction still works */
+    }
+  }
+  return ex
 }
 
 const MAX_FILE_SIZE = 1024 * 1024
@@ -112,6 +126,37 @@ const main = async () => {
     ? (JSON.parse(fs.readFileSync(args.files, "utf-8")) as string[]).filter((f) => ex.isSourceFile(f))
     : ex.scanDirectory(root)
 
+  // Detect frameworks (Express/Rails/NestJS/React/…) so framework extractors
+  // (route nodes, component refs, middleware) run after the tree-sitter pass.
+  // detect() only consults the file system, which the sandbox has.
+  let frameworkNames: string[] = []
+  if (ex.detectFrameworks) {
+    const fwContext = {
+      getNodesInFile: () => [],
+      getNodesByName: () => [],
+      getNodesByQualifiedName: () => [],
+      getNodesByKind: () => [],
+      getNodesByLowerName: () => [],
+      getImportMappings: () => [],
+      getAllFiles: () => files,
+      getProjectRoot: () => root,
+      fileExists: (p: string) => { try { return fs.existsSync(path.join(root, p)) } catch { return false } },
+      readFile: (p: string) => { try { return fs.readFileSync(path.join(root, p), "utf-8") } catch { return null } },
+      listDirectories: (p: string) => {
+        try {
+          const dir = p === "." || p === "" ? root : path.join(root, p)
+          return fs.readdirSync(dir, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name)
+        } catch { return [] }
+      },
+    }
+    try {
+      frameworkNames = ex.detectFrameworks(fwContext).map((r: { name?: string }) => r.name ?? "")
+      if (frameworkNames.length > 0) console.log(`detected frameworks: ${frameworkNames.join(", ")}`)
+    } catch (err) {
+      console.error(`framework detection failed: ${err instanceof Error ? err.message : String(err)}`)
+    }
+  }
+
   // Grammar set must cover every language we will parse; load lazily per file
   // is kernel-fast (no wasm), but unsupported files are skipped up front.
   writeProgress({ files_total: files.length, files_done: 0, done: false })
@@ -133,7 +178,7 @@ const main = async () => {
         continue
       }
       const content = fs.readFileSync(abs, "utf-8")
-      const result = ex.extractFromSource(rel, content)
+      const result = ex.extractFromSource(rel, content, undefined, frameworkNames)
       const nodes = result.nodes ?? []
       write({
         t: "file",
