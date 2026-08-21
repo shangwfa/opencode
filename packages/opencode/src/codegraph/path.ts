@@ -11,14 +11,12 @@ export const pathMatches = (indexed: string, wanted: string): boolean => {
   if (a === b) return true
   if (a.endsWith("/" + b)) return true
   if (b.endsWith("/" + a)) return true
-  if (!b.includes("/") && a.endsWith("/" + b)) return true
   return false
 }
 
-/** Filter items with a `file_path` field by user-supplied path fragment. */
+/** Filter items with a `file_path` field by user-supplied path fragment. Returns empty if no match (caller should handle). */
 export const filterByFilePath = <T extends { file_path: string }>(items: T[], file?: string): T[] => {
   if (!file) return items
   const wanted = file.replace(/^\.\//, "")
-  const narrowed = items.filter((n) => pathMatches(n.file_path, wanted))
-  return narrowed.length > 0 ? narrowed : items
+  return items.filter((n) => pathMatches(n.file_path, wanted))
 }

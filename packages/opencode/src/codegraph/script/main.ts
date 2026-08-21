@@ -304,10 +304,14 @@ const runFullAnalysis = async (root: string, args: Record<string, string>) => {
   // initSync creates .codegraph/ + SQLite. Full rebuild clears a stale one;
   // incremental reuses it (only the changed files are re-indexed) so the SQLite
   // graph stays the latest and resolveReferences sees the whole repo.
+  // Fresh checkout without .codegraph state cannot sync (openSync throws) —
+  // fall back to a full build; the export below then dumps everything.
+  const doIncremental = !!args.incremental && fs.existsSync(path.join(root, ".codegraph"))
   let graph: any
-  if (args.incremental) {
+  if (doIncremental) {
     graph = cg.CodeGraph.openSync(root)
   } else {
+    if (args.incremental) console.log("codegraph: no .codegraph state, incremental falls back to full build")
     try {
       fs.rmSync(path.join(root, ".codegraph"), { recursive: true, force: true })
     } catch { /* not present */ }
@@ -317,8 +321,9 @@ const runFullAnalysis = async (root: string, args: Record<string, string>) => {
   let filesTotal = 0
   let changedFiles: string[] = []
   let filesRemoved = 0
-  let isIncremental = !!args.incremental
-  if (args.incremental) {
+  let isIncremental = doIncremental
+  let deletionDowngrade = false
+  if (doIncremental) {
     // codegraph's sync(): content-hash diff → indexFiles(changed) → resolve
     // ONLY the changed files' refs (getUnresolvedReferencesByFiles). The
     // SQLite graph stays fully current; we export just the changed files'
@@ -333,11 +338,14 @@ const runFullAnalysis = async (root: string, args: Record<string, string>) => {
     filesTotal = changedFiles.length
     writeProgress({ files_total: filesTotal, files_done: filesTotal, done: false })
     console.log(`codegraph incremental: changed=${changedFiles.length} removed=${filesRemoved} (${changedFiles.slice(0, 3).join(", ")}...)`)
-    if (filesRemoved > 0) isIncremental = false // deletion → full PG dump from current SQLite state
+    if (filesRemoved > 0) {
+      isIncremental = false // deletion → full PG dump from current SQLite state
+      deletionDowngrade = true
+    }
   }
-  if (!args.incremental || !isIncremental) {
-    if (!isIncremental && args.incremental) {
-      // incremental deletion path already synced; skip indexAll, just dump
+  if (!doIncremental || !isIncremental) {
+    if (deletionDowngrade) {
+      // deletion path already synced the SQLite graph; skip indexAll, just dump
     } else {
       const idx = await graph.indexAll({ onProgress: (p: { files_total?: number; files_done?: number }) => {
         if (p.files_total) {

@@ -23,14 +23,14 @@ describe("codegraph.pathMatches", () => {
     expect(pathMatches("repo/src/foo/bar.ts", "oo/bar.ts")).toBe(false)
   })
 
-  test("filterByFilePath narrows when match exists, else keeps all", () => {
+  test("filterByFilePath narrows when match exists, returns empty on no match", () => {
     const nodes = [
       { file_path: "repo/src/a.ts", id: "1" },
       { file_path: "repo/src/b.ts", id: "2" },
       { file_path: "other/src/a.ts", id: "3" },
     ]
     expect(filterByFilePath(nodes, "src/a.ts").map((n) => n.id)).toEqual(["1", "3"])
-    expect(filterByFilePath(nodes, "missing.ts").map((n) => n.id)).toEqual(["1", "2", "3"])
+    expect(filterByFilePath(nodes, "missing.ts").map((n) => n.id)).toEqual([])
     expect(filterByFilePath(nodes, undefined).length).toBe(3)
   })
 })

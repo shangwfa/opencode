@@ -156,6 +156,7 @@ full (全量)  : rm .codegraph → initSync → indexAll（kernel 提取 + 框�
 incremental  : openSync → graph.sync()（content-hash diff → indexFiles(changed)
                → 只 resolve 变更文件 refs）→ 导出变更文件邻域（节点 + source/target 边）
                → 服务端 replaceFiles（按文件删旧插新）
+               （无 .codegraph 状态时自动回退全量，日志 "falls back to full build"）
 ```
 
 - **沙箱内有源码**，所以 codegraph 的全部能力都生效：跨文件 calls、route→handler references、组件 usage、变量 receiver 方法调用（局部类型推断）。

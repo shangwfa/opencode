@@ -216,6 +216,19 @@ psql "$PG_URL" -t -A -c "SELECT count(*) FROM codegraph_node WHERE scope='app:$A
 
 **期望**：`0`（切片：`dropMissingFiles` + incremental sync + full PG dump，`isFullDump` 判定）。
 
+### T42.5.4 增量无 .codegraph 状态 → 回退全量（fresh checkout）
+
+```bash
+# 模拟 fresh checkout：PVC 代码在但沙箱无 SQLite 状态（PG ledger 却 ready）
+curl -s --max-time 30 -X POST "$BASE/session/$SID/exec" -H 'Content-Type: application/json' \
+  -d '{"command":"rm -rf /workspace/.codegraph && echo cleared"}'
+# 手动触发增量命令（或改一个文件等 30s 循环）
+curl -s --max-time 300 -X POST "$BASE/session/$SID/exec" -H 'Content-Type: application/json' \
+  -d '{"command":"cd /workspace && node /opt/codegraph-extractor/main.ts full --root /workspace --out /tmp/cg.ndjson.gz --progress /tmp/cg-progress.json --incremental"}'
+```
+
+**期望**：exit 0，日志含 `no .codegraph state, incremental falls back to full build`，输出节点数与全量一致（修复前 `openSync` 直接抛错 → failIndex → 下一循环全量自愈）。
+
 ---
 
 ## CG-6: 新工具面（callees/files/affected）
@@ -331,3 +344,7 @@ OPENCODE_DATABASE_URL=$PG_URL bun /tmp/cg-explore-low.ts
 | 2026-08-20 | 单测 path+search | ✅ | `bun test test/codegraph/path-search.test.ts` 8 pass（pathMatches 边界、filterByFilePath、isTestFile、name/kind/path 评分、LOW_CONFIDENCE） |
 | 2026-08-20 | 删除切片 | ✅ | 删文件不再全量 rebuild：incremental sync + full dump（捕获 definitionDelta rebinds），PG 按 dropMissingFiles + replaceGraph（无 kernel 重解析）；`T42.5.3` 改为 `deletedPaths` 列表 + isFullDump 判定 |
 | 2026-08-20 | Agent E2E 新工具 | ✅ | `codegraph_callees`→30 被调用者（含 `detectLanguage`）、`codegraph_files`→54 文件（flat）、`codegraph_affected`→23 生产文件（tree-sitter.ts depth1）、`codegraph_explore`→`extractFromSource` 核心+6提取器（Yd-DeepSeek v4-pro, app:cg-init-test） |
+| 2026-08-21 | exec 端点修复 | ✅ | 根因：`OPENCODE_SANDBOX_IMAGE` 默认指向私有 registry 镜像（本地 404 → 沙箱创建挂死 → exec UnknownError）；容器显式传 `OPENCODE_SANDBOX_IMAGE=opencode-opensandbox:slim` 后 exec 恢复 |
+| 2026-08-21 | T42.5.3 删除切片 E2E | ✅ | 建 probe（3 节点 12809/44822）→ `rm` → 下一循环 `changed=0 deleted=4 incremental` → `incremental deletion → full dump`（6s，vs 全量 ~25s）→ PG 精确回基线 12806/44819，probe 节点/文件记录全清 |
+| 2026-08-21 | T42.5.4 fresh checkout 回退 | ✅ | 修复前：无 `.codegraph` 时 `openSync` 抛错 → failIndex → 下一循环全量自愈（浪费一轮）；修复后：检测状态缺失 → 日志 `falls back to full build` → 全量 577 文件 12806 节点 exit 0 |
+| 2026-08-21 | filterByFilePath 语义修正 + 单测扩充 | ✅ | 无匹配从「返回全部」改为「返回空 + 工具提示未找到」（callers/callees/impact/node 四工具行为更准确）；`store-traversal.test.ts` 20 pass（isZombie 边界、CALL_KINDS/DEPENDENT_FILE_EDGE_KINDS 语义、BFS 深度/环安全/自环、impact 排结构边） |
