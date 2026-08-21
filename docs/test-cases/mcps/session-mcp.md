@@ -473,6 +473,8 @@ console.log("after cleanup:", check.stdout || "")
 
 > **2026-08-08 全量重跑记录**（容器 `opencode-saas-test`，`OPENCODE_EXPERIMENTAL_CODE_MODE=mcp`）：T22.1-12/16 纯 API CRUD 全通过（含 PG 持久化与级联）；T22.17 env 注入 `/tmp/mcp-env-test`=`hello-env-value`；T22.18 shell 安全（SAFE_MARKER 存在、无注入）；T22.19 pid/log abort 后删除、进程归零；T22.13 remote MCP `test-tools.echo` 经 code-mode `execute` 内嵌调用（metadata.toolCalls 记录 completed，PG 一致）；T22.15 多轮 3/3 全成功。T22.13/14 环境为 `CODE_MODE=mcp`，MCP 工具经 `execute` 嵌套调用（非顶层 part），行为与文档记录一致。
 
+> **2026-08-21 全量重跑记录**（容器 `opencode-saas-test:13b750953b`，本地 PG `opencode` + 本地 OpenSandbox `opencode-opensandbox:mini` 3.53G，模型 `opencode/muse-spark-1.2-contributor-free`，`CODE_MODE=mcp`）：T22.1 local/remote 创建、列表、upsert、隔离均 PASS；T22.10-12/16 输入校验全 400；T22.13 remote `test-tools.echo` 5s 内完成 `hello-mcp`；T22.14 local `sandbox-everything` 5s 内完成 `hello-sandbox-mcp`；T22.18 shell 安全 `SAFE_MARKER` 存在、`NAME_PWNED/ENV_PWNED` 无；mini 镜像下 MCP 链路无回归。
+
 ## 单元测试覆盖
 
 Service 层单测（内存 mock）：`packages/opencode/test/mcp/session-mcp-crud.test.ts`（16 用例）

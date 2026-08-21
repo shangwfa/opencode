@@ -38,12 +38,14 @@ NFS 本身无故障（近一周 exec_log 零 stale handle / EIO），是架构�
 
 | 环节 | 实测 | 说明 |
 |---|---|---|
-| 快照创建（REST `POST /sandboxes/{id}/snapshots`） | **70.2s** | 15.7GB 基础镜像容器 diff commit；异步不阻塞 |
-| 快照恢复（`Sandbox.create({ snapshotId })`） | **491ms** | 对比重建+重装 30~120s，两个数量级提升 |
+| 快照创建（REST `POST /sandboxes/{id}/snapshots`） | **70.2s**（15.7GB 镜像）/ **86s**（slim 9.8G，中位）/ **58s**（lean 8.57G 手动 commit） | 基础镜像容器 diff commit；异步不阻塞 |
+| 快照恢复（`Sandbox.create({ snapshotId }）` | **491ms** | 对比重建+重装 30~120s，两个数量级提升 |
 | `/tmp/pnpm-vs` 缓存 | **随快照保留** | 依赖缓存陪葬问题从根上解决 |
 | 进程/内存 | 不保留 | FS-only 语义（同 Daytona cold snapshot），dev server 需重启 |
 
 **关键坑**：快照 `Creating` 期间 kill 源容器 → commit 引用的 diff snapshot 失效 → 快照 Failed。必须保证 **快照 Ready 之后才允许销毁源沙箱**。
+
+**性能瓶颈与优化（2026-08-21）**：docker commit 耗时与容器 rootfs 体积**近似线性**（实测 alpine 5MB→0.24s，slim 9.8G→73s），与可写层 diff 无关。`packages/opencode/docker/Dockerfile` 已做精简（`opencode-opensandbox:lean`）：只留 node@24（原 18/20/22/24 四版本 ~4G）、只留 pnpm@10（原 8/9/10/11 四版本）、清理 `/root/go`+go-build 缓存+pnpm/pip/mise 缓存，rootfs 9.8G→8.57G，手动 commit 73s→58s（**-21%**）。剩余大头为基础镜像自带（/usr/lib/jvm 937M、/opt/python 2G、/opt/go 770M）。进一步提速需换更小基础镜像或改 tar 增量快照（方案 B，架构级）。
 
 ---
 

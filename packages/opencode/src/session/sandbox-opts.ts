@@ -26,8 +26,7 @@ export async function resolveSandboxOpts(sessionID: SessionID): Promise<SandboxO
         .get(),
     )
     if (!row?.parent_id) {
-      const raw = row?.sandbox
-      const sandbox = typeof raw === "string" ? safeParse(raw) : raw
+      const sandbox = parseSandboxColumn(row?.sandbox)
       const persistMode = sandbox?.persistMode
         ?? (Flag.OPENCODE_SANDBOX_VOLUME_TYPE === "snapshot" ? "snapshot" : "pvc")
       return {
@@ -49,15 +48,27 @@ export async function resolveSandboxOpts(sessionID: SessionID): Promise<SandboxO
   }
 }
 
-function safeParse(s: string): { cpu: string; memory: string; image?: string; snapshotId?: string; persistMode?: "pvc" | "snapshot" } | undefined {
+export type SandboxResource = { cpu: string; memory: string; image?: string; snapshotId?: string; persistMode?: "pvc" | "snapshot" }
+
+/**
+ * sandbox 列值统一解析。PG bridge 下 jsonb 以原始 JSON 字符串返回（db.pg.ts jsonb parse 恒等），
+ * SQLite 侧为对象——消费方必须兼容两种形态，否则 persistMode 等字段静默丢失回退全局默认。
+ */
+export function parseSandboxColumn(raw: unknown): SandboxResource | undefined {
+  if (typeof raw !== "string") {
+    return raw && typeof raw === "object" && typeof (raw as SandboxResource).cpu === "string"
+      ? (raw as SandboxResource)
+      : undefined
+  }
   try {
-    const v = JSON.parse(s)
+    const v = JSON.parse(raw)
     if (v && typeof v.cpu === "string" && typeof v.memory === "string") {
       return {
         cpu: v.cpu,
         memory: v.memory,
         ...(typeof v.image === "string" ? { image: v.image } : {}),
         ...(typeof v.snapshotId === "string" ? { snapshotId: v.snapshotId } : {}),
+        ...(v.persistMode === "snapshot" || v.persistMode === "pvc" ? { persistMode: v.persistMode } : {}),
       }
     }
   } catch {}

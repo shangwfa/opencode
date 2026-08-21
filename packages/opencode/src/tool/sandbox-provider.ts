@@ -6,7 +6,7 @@ import * as Log from "@opencode-ai/core/util/log"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { Flag } from "@/flag/flag"
 import type { SessionID } from "../session/schema"
-import { resolveSandboxOpts } from "../session/sandbox-opts"
+import { parseSandboxColumn, resolveSandboxOpts } from "../session/sandbox-opts"
 import { SessionTable } from "../session/session.pg"
 import { Database } from "../storage/db"
 import { SandboxTable } from "./sandbox.pg"
@@ -777,8 +777,7 @@ export namespace SandboxProvider {
             .from(SessionTable)
             .where(eq(SessionTable.id, sessionID as SessionID))
             .limit(1)
-            .then((rows: { sandbox: { persistMode?: "pvc" | "snapshot" } | null }[]) =>
-              rows[0]?.sandbox?.persistMode ?? fallback),
+            .then((rows: { sandbox: unknown }[]) => parseSandboxColumn(rows[0]?.sandbox)?.persistMode ?? fallback),
           catch: () => fallback,
         }).pipe(Effect.orElseSucceed(() => fallback))
       }
@@ -1171,7 +1170,7 @@ export namespace SandboxProvider {
           if (created.restoredFromSnapshot && snapshotId && snapshots && !explicitSnapshotId) {
             yield* Effect.promise(() => snapshots!.markConsumed(snapshotId)).pipe(Effect.catchCause(() => Effect.void))
           }
-          log.info("sandbox created", { sessionID, sandboxID: sb.id, restoreFrom: snapshotId ?? null })
+          log.info("sandbox created", { sessionID, sandboxID: sb.id, restoreFrom: created.restoredFromSnapshot ? snapshotId : null })
           return sb
         }).pipe(
           Effect.timeoutOrElse({
@@ -1410,7 +1409,10 @@ export namespace SandboxProvider {
             }).pipe(
               Effect.catchCause((cause) =>
                 Effect.gen(function* () {
-                  yield* Deferred.fail(myToken, new Error("Sandbox creation failed")).pipe(Effect.catchCause(() => Effect.void))
+                  // 保留原始失败信息（如 "Sandbox snapshot pending"），避免 waiter 拿到无意义的通用文案
+                  const failReason = cause.reasons.find(Cause.isFailReason)
+                  const message = failReason?.error?.message ?? Cause.pretty(cause)
+                  yield* Deferred.fail(myToken, new Error(message)).pipe(Effect.catchCause(() => Effect.void))
                   return yield* Effect.failCause(cause)
                 }),
               ),
@@ -1439,7 +1441,7 @@ export namespace SandboxProvider {
             Effect.forkIn(creationScope),
           )
 
-          return yield* Deferred.await(myToken).pipe(Effect.orDie)
+          return yield* Deferred.await(myToken)
         })
       }
 
@@ -1839,22 +1841,37 @@ export namespace SandboxProvider {
         // 显式快照：先 fence sandbox，阻止新写入；终态后恢复 running，源沙箱不销毁。
         createSnapshot: (sessionID) =>
           lock(sessionID, Effect.gen(function* () {
-            if (!snapshots) return null
+            if (!snapshots) {
+              log.info("snapshot request rejected", { sessionID, reason: "snapshot disabled" })
+              return null
+            }
             // 仅快照会话支持显式快照（pvc 会话 workspace 在共享卷，快照无意义）
-            if ((yield* dbResolvePersistMode(sessionID)) !== "snapshot") return null
+            const mode = yield* dbResolvePersistMode(sessionID)
+            if (mode !== "snapshot") {
+              log.info("snapshot request rejected", { sessionID, reason: `persistMode=${mode}` })
+              return null
+            }
             const row = yield* dbGet(sessionID).pipe(Effect.orElseSucceed(() => null))
-            if (!row || row.state !== "running") return null
+            if (!row || row.state !== "running") {
+              log.info("snapshot request rejected", { sessionID, reason: `sandbox state=${row?.state ?? "none"}` })
+              return null
+            }
             const claimed = yield* dbTransitionState(sessionID, row.id, "running", "snapshotting")
-            if (!claimed) return null
+            if (!claimed) {
+              log.info("snapshot request rejected", { sessionID, reason: "state transition running->snapshotting lost race" })
+              return null
+            }
             const sb = yield* reconnectIfPresent(row).pipe(
               Effect.tapError(() => dbTransitionState(sessionID, row.id, "snapshotting", "running")),
             )
             if (!sb) {
+              log.warn("snapshot request failed; sandbox gone on server", { sessionID, sandboxID: row.id })
               yield* dbMarkDestroyed(sessionID, row.id)
               return null
             }
             const id = yield* Effect.promise(() => snapshots.startSnapshot(sb, sessionID))
             if (!id) {
+              log.warn("snapshot request failed; startSnapshot error", { sessionID, sandboxID: row.id })
               yield* dbTransitionState(sessionID, row.id, "snapshotting", "running")
               yield* Effect.tryPromise(() => sb.close()).pipe(Effect.catchCause(() => Effect.void))
               return null
@@ -1867,7 +1884,10 @@ export namespace SandboxProvider {
               Effect.forkIn(creationScope),
             )
             return id
-          })).pipe(Effect.catchCause(() => Effect.succeed(null))),
+          })).pipe(Effect.catchCause((cause) => {
+            log.error("createSnapshot failed", { sessionID, cause: Cause.pretty(cause) })
+            return Effect.succeed(null)
+          })),
         getLatestSnapshot: (sessionID) =>
           snapshots
             ? Effect.promise(() => snapshots.getLatest(sessionID)).pipe(

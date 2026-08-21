@@ -299,6 +299,12 @@ export namespace SessionSnapshot {
         try {
           state = (await manager.getSnapshot(row.id)).status.state
         } catch (error) {
+          if (error instanceof SandboxApiException && error.statusCode === 404) {
+            // 远端已不存在（被 sibling 清理/TTL/人工删除）——不可能再 Ready，标 failed 终止重试
+            await setState(row.id, "failed", "reconcile: not found on server", ["creating"]).catch(() => undefined)
+            log.warn("snapshot reconcile: gone on server; marked failed", { snapshotId: row.id, sessionID: row.session_id })
+            continue
+          }
           log.warn("snapshot reconcile query failed; keeping creating", { snapshotId: row.id, sessionID: row.session_id, error: String(error) })
           continue
         }

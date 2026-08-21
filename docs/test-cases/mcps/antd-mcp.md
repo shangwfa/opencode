@@ -182,6 +182,8 @@ curl -s --max-time 120 -X POST "$BASE/session/$SID/message" \
 
 > **2026-08-08 全量重跑记录**（容器 `opencode-saas-test`，`OPENCODE_EXPERIMENTAL_CODE_MODE=mcp`）：T40.1-6 全通过。PG 持久化 `antd|local|true`；T40.3 AI 列出 8 个 antd_ 工具；T40.4 `antd_list` 返回 71 组件；T40.5 `antd_info` 返回 Button 完整 API；T40.6 `antd_list×2 + antd_info×4 + antd_demo×6` 全 completed，`write` 生成 `/workspace/Dashboard.tsx`（165 行）。MCP 进程 `antd-9100.{pid,log}` 正常。工具经 code-mode `execute` 内嵌调用（state.metadata.toolCalls 记录 `antd.antd_*|completed`，PG `part` 表持久化一致，排序列为 `time_created`）。
 
+> **2026-08-21 重跑记录**（容器 `opencode-saas-test:13b750953b`，本地 PG `opencode` + 本地 OpenSandbox `opencode-opensandbox:mini` 3.53G 默认淘宝源，模型 `opencode/muse-spark-1.2-contributor-free`）：T40.1 **PASS**（`antd|local|true`）；T40.2 CRUD/隔离 PASS；T40.3 **PASS**（列出 8 个 antd_ 工具，首次调用超时后 MCP 预热重试成功）；T40.4 **PASS**（`antd_list` completed 返回 74 组件）；T40.5 **PASS**（`antd_info` completed Button API）；T40.6 **PASS**（`antd_list×1 + antd_info×5 + antd_demo×8` 全 completed，`write` 生成 `/workspace/Dashboard.tsx` **524 行**，含 Card/Statistic/Table/Layout/useToken）。mini 镜像下 MCP 链路无回归。
+
 **验证层级**：
 
 | 层级 | 标准 | 结果 |

@@ -47,7 +47,7 @@
 
 ## 测试与验证
 
-- **集成用例（SaaS 功能首选）**：`docs/test-cases/`，按域分目录（session 15 篇 / sandbox 10 篇 / skills 8 篇 / mcps / agents / pvc / lsp / tools 等）。
+- **集成用例（SaaS 功能首选）**：`docs/test-cases/`，按域分目录（session 17 篇 / sandbox 10 篇 / skills 8 篇 / mcps / agents / pvc / lsp / tools 等）。
   ```bash
   source docs/test-cases/test-env.sh [1|2|3]   # 加载 $BASE $PG_URL $MODEL
   source docs/test-cases/test-lib.sh           # pass/fail/summary/jexec/new_sid 等函数库
@@ -63,7 +63,7 @@
 - PG bridge 下 drizzle `$onUpdate` **不生效**：`PATCH /session/:id` 改标题不刷新 `time_updated`；「最后活动时间」只由发消息等显式 `touch` 刷新。
 - exec/action 记录：handler 层 `logAction` 无序号前缀（`action-<ts>`），sandbox-proxy 的带计数器（`exec-<n>-<ts>`）——计数器量级可区分不同实例。
 - 消息 ID 前缀是时间编码，跨回绕边界后字典序翻转，**UI 排序勿按 ID**，用 `time_created`。
-- LLM 流有 stall 保护（`OPENCODE_LLM_STALL_TIMEOUT_SEC`，默认 300s）、Runner 有陈旧 run 接管（`OPENCODE_SESSION_STALE_RUN_SEC`，默认 1800s），见 `docs/test-cases/session/llm-stall-recovery.md`；HTTP 层 `waitForSessionLock` 仍无超时。
+- LLM 流有 stall 保护（`OPENCODE_LLM_STALL_TIMEOUT_SEC`，默认 300s）、Runner 有陈旧 run 接管（`OPENCODE_SESSION_STALE_RUN_SEC`，默认 1800s），见 `docs/test-cases/session/llm-stall-recovery.md`；HTTP 层 `waitForSessionLock` 有超时（`OPENCODE_SESSION_LOCK_TIMEOUT_SEC`，默认 60s，超时返回 503），PG 连接带语句级超时（`OPENCODE_PG_STATEMENT_TIMEOUT_MS`，默认 30000ms）防 run 挂死占锁。
 
 ## 代码风格指南
 

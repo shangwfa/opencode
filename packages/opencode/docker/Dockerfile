@@ -1,67 +1,43 @@
 # syntax=docker/dockerfile:1
-ARG OPENSANDBOX_BASE=opensandbox/code-interpreter:latest
-FROM ${OPENSANDBOX_BASE}
+# OpenSandbox 沙箱镜像 —— 极简版（路线 1）
+#
+# 基于 ubuntu:24.04 + 单版本 Node 构建，剥离 code-interpreter 自带的多语言运行时
+# （Python/Go/JVM）与预装依赖缓存，rootfs 从 ~9.8G 压到 ~1.7G。
+# 快照（docker commit）耗时与 rootfs 体积近似线性：9.8G→86s，1.7G→~15-20s。
+#
+# 依赖 OpenSandbox server 注入 bootstrap.sh（entrypoint 被其接管，见调研结论），
+# 镜像自身 ENTRYPOINT 不参与 execd 启动，仅提供运行环境（bash/node/pnpm/git 等）。
+FROM ubuntu:24.04
 
 USER root
 
-# ── 1. Install mise (runtime version manager) ──
-ENV MISE_DATA_DIR="/root/.local/share/mise"
-ENV MISE_CONFIG_DIR="/root/.config/mise"
-ENV MISE_CACHE_DIR="/root/.cache/mise"
-ENV MISE_INSTALL_PATH="/usr/local/bin/mise"
-RUN curl https://mise.run | sh
+# ── 1. 基础工具 ──
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates curl wget git unzip zip tar bash xz-utils ripgrep util-linux \
+    && rm -rf /var/lib/apt/lists/*
 
-# ── 2. Configure mise: trust all paths, enable idiomatic version files ──
-RUN mkdir -p "$MISE_CONFIG_DIR" \
-  && cat > "$MISE_CONFIG_DIR/config.toml" <<'EOF'
-[tools]
-node = "24"
+# ── 2. Node.js 24（官方二进制，单版本）──
+ENV NODE_ROOT=/opt/node
+RUN mkdir -p $NODE_ROOT \
+    && curl -fsSL https://nodejs.org/dist/v24.19.0/node-v24.19.0-linux-arm64.tar.xz | tar -xJ -C $NODE_ROOT \
+    && mv $NODE_ROOT/node-v24.19.0-linux-arm64 $NODE_ROOT/24
+ENV PATH="$NODE_ROOT/24/bin:/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin"
 
-[settings]
-trusted_config_paths = ["/"]
-idiomatic_version_file_enable_tools = ["node", "pnpm", "npm", "bun"]
-status = { show_env = false, show_tools = false }
-EOF
+# ── 3. pnpm@10 ──
+RUN npm config set registry https://registry.npmmirror.com --global \
+    && npm install -g pnpm@10 \
+    && pnpm config set registry https://registry.npmmirror.com --global
 
-# ── 3. Install multiple Node.js versions ──
-RUN mise install node@18 node@20 node@22 node@24
+# ── 4. 全局 npm 工具（MCP / agent-browser / LSP 相关）──
+RUN npm install -g supergateway agent-browser bun typescript pyright
 
-# ── 4. Set node@24 as default first (needed for npm registry config) ──
-RUN mise use -g node@24
-RUN mise reshim
-ENV PATH="$MISE_DATA_DIR/shims:$MISE_DATA_DIR/installs/node/24/bin:/usr/local/bin:$PATH"
-
-# ── 5. Configure npm registry (npmmirror) before installing pnpm via npm backend ──
-RUN npm config set registry https://registry.npmmirror.com \
-    && npm config set cache /opt/package-cache-base/npm
-
-# ── 6. Install multiple pnpm versions (via npm backend, uses npmmirror) ──
-# Default backend (aqua) downloads from GitHub which is slow/blocked in China.
-# npm backend downloads from npm registry (npmmirror) instead.
-RUN mise settings npm.shell_out=true \
-  && mise install npm:pnpm@8 npm:pnpm@9 npm:pnpm@10 npm:pnpm@11
-
-# ── 7. Set default versions (node@24 + pnpm@10) and refresh shims ──
-RUN mise use -g npm:pnpm@10 && mise reshim
-
-# ── 8. Install global npm tools + ripgrep ──
-RUN npm install -g supergateway agent-browser bun
-RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
-    --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    apt-get update \
-  && apt-get install -y --no-install-recommends ripgrep util-linux \
-  && rm -rf /var/lib/apt/lists/*
-
-# ── 8a. Install Chromium via Playwright (supports arm64 + x86_64) ──
-# agent-browser requires Chrome; Playwright bundles a real Chromium binary
-# that works in containers (unlike Ubuntu snap chromium).
+# ── 5. Chromium via Playwright（agent-browser 需要）──
 RUN npx playwright install --with-deps chromium \
-  && ln -sf /root/.cache/ms-playwright/chromium-*/chrome-linux*/chrome /usr/local/bin/chromium
+    && ln -sf /root/.cache/ms-playwright/chromium-*/chrome-linux*/chrome /usr/local/bin/chromium
 ENV CHROME_PATH=/usr/local/bin/chromium
 
-# ── 8b. Install codegraph (self-contained Node bundle, no extra runtime) ──
-# Pre-installed to avoid per-session `curl install.sh | sh` (saves ~5s + network).
-# Bundle ships its own Node runtime; installed to /opt/codegraph, symlinked to /usr/local/bin.
+# ── 6. codegraph（自包含 Node bundle）──
 ENV CODEGRAPH_VERSION=v1.4.1
 ENV CODEGRAPH_INSTALL_DIR=/opt/codegraph
 RUN curl -fsSL https://raw.githubusercontent.com/colbymchenry/codegraph/main/install.sh \
@@ -69,53 +45,25 @@ RUN curl -fsSL https://raw.githubusercontent.com/colbymchenry/codegraph/main/ins
   && codegraph --version \
   && which codegraph
 
-# ── 8c. Install context-mode (context window optimization for AI agents) ──
-# Registered as session plugin with source: "code" wrapper (sets CONTEXT_MODE_PLATFORM=opencode).
-# --allow-scripts: required for better-sqlite3 prebuild-install (FTS5 native module).
-RUN npm install -g context-mode zod --allow-scripts
-
-# ── 9. Symlink mise-managed binaries to OpenSandbox's expected PATH ──
-# OpenSandbox bootstrap may reset PATH; ensure node/pnpm/npm are always findable.
-RUN OLD_NODE_BIN=$(dirname $(readlink -f $(which node) 2>/dev/null) 2>/dev/null || echo "/usr/local/bin") \
-  && for bin in node npm npx pnpm pnpx supergateway; do \
-       target=$(mise which "$bin" 2>/dev/null || echo ""); \
-       [ -n "$target" ] && ln -sf "$target" "$OLD_NODE_BIN/$bin" 2>/dev/null || true; \
-     done
-
-# ── 10. Configure pnpm: store + virtual-store on overlay (fast) instead of NFS ──
-# When /workspace is NFS-mounted (PVC), pnpm's default store lands on NFS (slow).
-# By pointing store-dir to /opt/pnpm-store (overlay, image layer) and
-# virtual-store-dir to /tmp/pnpm-vs (overlay, ephemeral), all heavy IO
-# stays on fast local disk. NFS only receives lightweight symlinks.
-# /opt and /tmp are both overlay → same filesystem → hardlink works.
-RUN pnpm config set store-dir /opt/pnpm-store --global \
-  && pnpm config set virtual-store-dir /tmp/pnpm-vs --global
-
-# ── 11. Pre-populate pnpm store via workspace templates ──
-# pnpm store pre-populated at /opt/pnpm-store (content-addressable).
-# Only pnpm@10 (default version) store is pre-populated.
-COPY docker/packages/ /tmp/preload/packages/
-COPY docker/pnpm-workspace.yaml docker/package.json /tmp/preload/
-RUN cd /tmp/preload \
-    && mkdir -p /opt/pnpm-store \
-    && for dir in packages/*/; do \
-         echo "==> Pre-populating pnpm store: $dir" \
-         && (cd "$dir" && pnpm install --ignore-scripts || true); \
-       done \
-    && rm -rf /tmp/preload /tmp/pnpm-vs
-
-# ── 12. Install opencode LSP daemon + TypeScript + pyright ──
-# TS 7.x native binary speaks LSP directly (--lsp --stdio); typescript-language-server no longer needed
+# ── 7. opencode LSP daemon + TypeScript/pyright ──
 COPY docker/opt/opencode-lsp-daemon/ /opt/opencode-lsp-daemon/
-RUN npm install -g typescript pyright \
+RUN chmod +x /opt/opencode-lsp-daemon/index.js \
     && ln -sf /opt/opencode-lsp-daemon/index.js /usr/local/bin/opencode-lsp-agent
 
-# ── 13. Pre-install sandbox-plugin-agent (session plugin daemon for V2 sandbox execution) ──
+# ── 8. 沙箱 session 插件 agent（V2 sandbox 执行）──
 COPY docker/opt/sandbox-plugin-agent.ts /opt/sandbox-plugin-agent.ts
 COPY docker/opt/sandbox-plugin-npm.ts /opt/sandbox-plugin-npm.ts
 
-# ── 14. Pre-install interactive PTY agent ──
+# ── 9. 交互式 PTY agent ──
 RUN mkdir -p /opt/opencode-pty-agent \
     && cd /opt/opencode-pty-agent \
     && bun add bun-pty@0.4.8
 COPY docker/opt/opencode-pty-agent.ts /opt/opencode-pty-agent/index.ts
+
+# ── 10. 瘦身清理（快照提速：commit 全量导出 rootfs）──
+# 保留 Chromium（功能必需）；清 npm/playwright 之外的可再生缓存。
+RUN rm -rf /root/.npm /root/.cache/pip \
+    && rm -rf /usr/local/lib/node_modules/.cache
+
+ENTRYPOINT ["/bin/bash"]
+WORKDIR /workspace

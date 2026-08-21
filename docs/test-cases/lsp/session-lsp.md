@@ -1500,3 +1500,40 @@ for m in msgs[-2:]:
 9. **edit.ts sandbox 并发锁**：sandbox 分支已加 per-file 锁，与本地分支一致，防止并发编辑同一文件的竞争条件
 10. **lsp.ts 工具能力全接入**：sandbox 分支已接入全部 9 个 LSP 操作 —— `hover` / `goToDefinition` / `findReferences` / `goToImplementation` / `documentSymbol` / `workspaceSymbol` / `prepareCallHierarchy` / `incomingCalls` / `outgoingCalls`，与本地分支 100% 对齐，不再有 "not yet supported" 降级路径
 11. **app 模式（worktree）LSP 路径链路（T27.23–T27.27 覆盖）**：app 模式下沙箱内文件位于 `/workspace/worktrees/<rootSessionID>/...`（git worktree），而非 session 模式的 `/workspace/...`。LSP 链路依赖 `toSandboxPath`（`sandbox-path.ts:33`）的 `isSandboxPath` 提前返回——当传入路径已是 `/workspace/...` 前缀时，**原样透传不剥离 worktree 段**，daemon 收到完整 worktree 路径并成功 `readFile`。daemon 的 `LSP_WORKSPACE_ROOT` 默认 `/workspace`，`detectRoot`（`lsp-manager.ts:248-259`）从 worktree 文件向上查找 root marker，停在含 `tsconfig.json` 的 worktree 目录。该路径链路此前无测试覆盖（代码审查中多次误判「app 模式路径错位」），已由 T27.23–T27.27 补齐。注意：app 模式需 PVC 环境（`OPENCODE_SANDBOX_VOLUME_TYPE=pvc`）+ repo 已 init+commit，否则 `worktreeScript` 跳过 worktree 创建、文件落在 `/workspace`（T27.26 降级场景）
+
+---
+
+## 十、复测记录（2026-08-21，mini 镜像 + Muse Spark 1.2 Free）
+
+> 路径 A/B 在 `opencode-opensandbox:mini`（2.28G）+ `组合 3（本地 PG + 本地 OpenSandbox）` + `Muse Spark 1.2 Free` 环境下复测。
+
+### 路径 A（daemon 单元测试，宿主机直连 20877）
+
+| 用例 | 结果 | 备注 |
+|------|------|------|
+| T27.1 status (warmup) | ✅ | `{"servers":[{"id":"typescript","status":"running"}]}`，需 `LSP_WORKSPACE_ROOT=/tmp/lsp-test` |
+| T27.2 touch | ✅ | `{"version":0}` |
+| T27.3 diagnostics | ⚠️ | 1 条 `TS2322`（`x: string = 123`），预期 2 条中的 `return a` 因函数未调用未触发 |
+| T27.4 hover | ✅ | `const x: string` |
+| T27.5 definition | ✅ | 1 位置 → test.ts line 0 |
+| T27.7.1 impl | ✅ | Greeter → impl.ts HelloGreeter |
+| T27.7.2 docSymbol | ✅ | Greeter/HelloGreeter/greet |
+| T27.7.3 workspaceSymbol | ✅ | 2 条 |
+| T27.7.4 prepareCallHierarchy | ✅ | ch=50 时 `greet` item |
+| T27.19 越界 400 | ✅ | `../../../etc/passwd` → 400 |
+| T27.20 大请求 413 | ✅ | 2MB → 413 |
+| T27.21 非法 JSON 400 | ✅ | `invalid JSON` |
+
+### 路径 B（SaaS 端到端，Muse Spark）
+
+| 用例 | 结果 | 备注 |
+|------|------|------|
+| T27.8 write 诊断 | ✅ | `finish:stop`，`LSP errors detected` 含 `Type 'string' is not assignable` |
+| T27.9 edit 诊断 | ✅ | `finish:stop` |
+| T27.9.2 lsp (hover/def) | ✅ | `finish:stop` |
+| T27.12 非 TS | ✅ | `finish:stop`，无 LSP 误触发 |
+| T27.13 bundle 自包含 | ✅ | `OK:self-contained`，75K |
+| T27.14 镜像 | ✅ | node v24.19.0 / tsc 7.0.2 / pyright / symlink 均正常 |
+| T27.22 重建自愈 | ✅ | kill-sandbox 后 `finish:stop`，LSP 自愈 |
+
+**结论**：mini 镜像下 LSP 核心功能无回归；路径 A 需 `LSP_WORKSPACE_ROOT` 覆盖工作区是已知约束。
