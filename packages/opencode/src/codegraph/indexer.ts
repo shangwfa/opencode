@@ -143,6 +143,7 @@ const runFullIndex = (scope: Scope, sb: Sandbox) =>
   Effect.gen(function* () {
     const snap = yield* extract(scope, sb, "full", PROGRESS)
     yield* Effect.tryPromise(() => S.replaceGraph(scope, snap))
+    log.info("full rebuild done", { scope, nodes: snap.nodes.length, edges: snap.edges.length })
     return Effect.void
   })
 

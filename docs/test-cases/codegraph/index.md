@@ -52,7 +52,7 @@ done
 psql "$PG_URL" -t -A -c "SELECT state, node_count, edge_count, files_done, files_total FROM codegraph_index WHERE scope='app:$APP_ID'"
 ```
 
-**期望**：`state=ready`，`node_count>0`，`edge_count>0`（codegraph 仓库预期 ~1.2 万节点 / 1.3 万边）。
+**期望**：`state=ready`，`node_count>0`，`edge_count>0`（codegraph 仓库完整解析预期 ~1.28 万节点 / ~4.48 万边；注意边数是早期轻量方案 1.3 万的 3.3 倍——完整 resolveReferences 产 calls/imports/instantiates 全量边）。
 
 > 注：`$APP_ID` 由用例开头创建会话时捕获（`curl ... | jq -r .appId`）。如果没显式传 appId，可改用会话的 app_id：`psql "$PG_URL" -t -A -c "SELECT app_id FROM session WHERE id='$SID'"`。
 
@@ -106,12 +106,15 @@ LIMIT 5;"
 
 ```bash
 SID2=$(new_sid)   # 不带 appId
-# 工具在无 appId 会话中返回引导文本而非报错（NotIndexedError 语义）
-# 触发一次 AI 消息让其尝试调用 codegraph_search，或直接验证 scope 解析:
-psql "$PG_URL" -t -A -c "SELECT app_id FROM session WHERE id='$SID2'"
+# 直接调用工具入口逻辑 resolveScopeOrGuide（等价工具 execute 的第一分支）
+OPENCODE_DATABASE_URL=$PG_URL bun -e "
+import { resolveScopeOrGuide } from '$(git rev-parse --show-toplevel)/packages/opencode/src/codegraph/scope'
+const { scope, guidance } = await resolveScopeOrGuide('$SID2')
+console.log('scope:', scope, '| guidance:', guidance)
+"
 ```
 
-**期望**：`app_id` 为空 → 工具返回「当前会话未绑定应用，codegraph 不可用」引导文本，且**不是** `isError`。
+**期望**：`scope: null`，guidance 含「未绑定应用」；工具返回该文本且**不是** `isError`（工具源码 `if (!scope) return {...output: guidance}`，无 fail 路径）。
 
 ---
 
@@ -285,14 +288,14 @@ WHERE e.scope='app:$APP' AND n.file_path='repo/src/extraction/tree-sitter.ts' AN
 
 ```bash
 # 等价逻辑：query="extractFromSource"，spine 文件（tree-sitter.ts 定义 + Extractor 实现）应全量展示
-# 验证输出含 spine 标记与文件分组（本地验证脚本方式）:
+# 验证输出含 spine 标记与文件分组（本地验证脚本方式，REPO_ROOT = 本仓库根目录）:
 cat > /tmp/cg-explore-verify.ts <<'EOF'
-import { runCodegraphExplore } from "/Users/ruomu/code/opencode/packages/opencode/src/codegraph/tool/codegraph-explore"
-const out = await runCodegraphExplore("app:$APP", "extractFromSource", 30)
+import { runCodegraphExplore } from "${process.env.REPO_ROOT}/packages/opencode/src/codegraph/tool/codegraph-explore"
+const out = await runCodegraphExplore(process.env.CG_SCOPE, "extractFromSource", 30)
 console.log(out.includes("[spine]") ? "SPINE_OK" : "NO_SPINE")
 console.log(out.slice(0, 200))
 EOF
-OPENCODE_DATABASE_URL=$PG_URL bun /tmp/cg-explore-verify.ts
+REPO_ROOT=$(git rev-parse --show-toplevel) CG_SCOPE="app:$APP" OPENCODE_DATABASE_URL=$PG_URL bun /tmp/cg-explore-verify.ts
 ```
 
 **期望**：输出含 `[spine]` 文件（tree-sitter.ts 定义 + Extractor 实现）；调用关系段清晰。
@@ -301,17 +304,225 @@ OPENCODE_DATABASE_URL=$PG_URL bun /tmp/cg-explore-verify.ts
 
 ```bash
 cat > /tmp/cg-explore-low.ts <<'EOF'
-import { runCodegraphExplore } from "/Users/ruomu/code/opencode/packages/opencode/src/codegraph/tool/codegraph-explore"
-const out = await runCodegraphExplore("app:$APP", "data handler flow", 30)
+import { runCodegraphExplore } from "${process.env.REPO_ROOT}/packages/opencode/src/codegraph/tool/codegraph-explore"
+const out = await runCodegraphExplore(process.env.CG_SCOPE, "data handler flow", 30)
 console.log("LOW:", out.includes("LOW_CONFIDENCE"))
 console.log("cliff:", out.includes("未展示") || out.includes("cliff"))
 EOF
-OPENCODE_DATABASE_URL=$PG_URL bun /tmp/cg-explore-low.ts
+REPO_ROOT=$(git rev-parse --show-toplevel) CG_SCOPE="app:$APP" OPENCODE_DATABASE_URL=$PG_URL bun /tmp/cg-explore-low.ts
 ```
 
 **期望**：`LOW: true`（低置信标记）；大量文件被裁剪/cliff 只列名（25 文件 → 展示 ~4）。
+---
+
+## CG-8: 索引器状态机（失败自愈 / 并发单写者 / 版本升级）
+
+> 全部通过**手动 UPDATE codegraph_index 制造状态 + 观察下一循环（30s）**低成本构造，无需真实故障注入。前提：scope 已 ready（跑完 CG-1），沙箱存活。
+
+### T42.8.1 failed → 下一循环自愈全量
+
+```bash
+NOW=$(python3 -c 'import time; print(int(time.time()*1000))')   # macOS date 无 %3N，用 python
+psql "$PG_URL" -c "UPDATE codegraph_index SET state='failed', error='manually injected' WHERE scope='app:$APP'"
+for i in $(seq 1 15); do
+  ST=$(psql "$PG_URL" -t -A -c "SELECT state FROM codegraph_index WHERE scope='app:$APP'")
+  [ "$ST" = "ready" ] && break; sleep 10
+done
+psql "$PG_URL" -t -A -c "SELECT state, node_count, edge_count, error, engine_version FROM codegraph_index WHERE scope='app:$APP'"
+docker logs opencode-saas-test 2>&1 | grep codegraph-indexer | tail -2
+```
+
+**期望**：回到 `ready`，`error` 为 NULL，node/edge_count 与基线一致，日志含 `full rebuild done`（`ensureIndexed` 的 `state.state === "failed" → needsFull`）。
+
+### T42.8.2 僵尸接管（indexing + 心跳过期 > 120s）
+
+```bash
+NOW=$(python3 -c 'import time; print(int(time.time()*1000))')
+# 心跳拨回 5 分钟前，模拟写者死亡
+psql "$PG_URL" -c "UPDATE codegraph_index SET state='indexing', files_done=3, files_total=577, heartbeat_at=$((NOW-300000)) WHERE scope='app:$APP'"
+for i in $(seq 1 15); do
+  ST=$(psql "$PG_URL" -t -A -c "SELECT state FROM codegraph_index WHERE scope='app:$APP'")
+  [ "$ST" = "ready" ] && break; sleep 10
+done
+psql "$PG_URL" -t -A -c "SELECT state, node_count FROM codegraph_index WHERE scope='app:$APP'"
+```
+
+**期望**：`ready`（`claimIndexing` 的 `setWhere` 允许接管 `heartbeat_at < now-120s` 的 indexing 行 → 全量重建）。
+
+### T42.8.3 claimIndexing 单写者语义（活写者不被抢占）
+
+> 直接用 psql 复刻 store.claimIndexing 的 UPSERT（含 `setWhere`）。注意：`time_created/time_updated` 是 ORM 层 `$default`，DDL 无默认值，手写 SQL 必须显式提供；阈值须与行内心跳分开取值（同值会使 `<` 恒假）。
+
+```bash
+NOW=$(python3 -c 'import time; print(int(time.time()*1000))')
+THRESH=$((NOW-120000))   # 等价线上 setWhere 阈值 now-120s
+STALE=$((NOW-300000))    # 行内心跳 = now-5min
+CLAIM() { psql "$PG_URL" -t -A -c "
+INSERT INTO codegraph_index (scope, state, files_total, files_done, engine_version, heartbeat_at, time_created, time_updated)
+VALUES ('app:$APP','indexing',0,0,'codegraph-extractor-1',$NOW,$NOW,$NOW)
+ON CONFLICT (scope) DO UPDATE SET state='indexing', files_total=0, files_done=0, error=NULL,
+  engine_version='codegraph-extractor-1', heartbeat_at=$NOW
+WHERE codegraph_index.state != 'indexing' OR codegraph_index.heartbeat_at < $THRESH
+RETURNING scope;"; }
+# ① 活写者（indexing + 新鲜心跳）→ 期望 0 行
+psql "$PG_URL" -c "UPDATE codegraph_index SET state='indexing', heartbeat_at=$NOW WHERE scope='app:$APP'" >/dev/null
+CLAIM   # 应无输出
+# ② 僵尸（indexing + 心跳过期）→ 期望 1 行 app:$APP
+psql "$PG_URL" -c "UPDATE codegraph_index SET heartbeat_at=$STALE WHERE scope='app:$APP'" >/dev/null
+CLAIM   # 应输出 app:$APP
+# ③ ready 行 → 期望 1 行（增量路径 claim）
+psql "$PG_URL" -c "UPDATE codegraph_index SET state='ready' WHERE scope='app:$APP'" >/dev/null
+CLAIM
+# 清场：置僵尸心跳留给下一循环接管自愈
+psql "$PG_URL" -c "UPDATE codegraph_index SET heartbeat_at=$STALE WHERE scope='app:$APP'" >/dev/null
+```
+
+**期望**：①空（多 pod 下活写者独占，另一 pod claim 失败转读共享）；②③各 1 行。
+
+### T42.8.4 engine_version 不匹配 → 强制全量
+
+```bash
+psql "$PG_URL" -c "UPDATE codegraph_index SET state='ready', engine_version='codegraph-extractor-0' WHERE scope='app:$APP'"
+for i in $(seq 1 15); do
+  EV=$(psql "$PG_URL" -t -A -c "SELECT engine_version FROM codegraph_index WHERE scope='app:$APP'")
+  [ "$EV" = "codegraph-extractor-1" ] && break; sleep 10
+done
+docker logs opencode-saas-test 2>&1 | grep codegraph-indexer | tail -2
+psql "$PG_URL" -t -A -c "SELECT state, engine_version FROM codegraph_index WHERE scope='app:$APP'"
+```
+
+**期望**：日志含 `full rebuild done`（非 `changed=` 增量行）；`engine_version` 回到 `codegraph-extractor-1`，state=ready（升级 extractor 后旧索引自动重建的保障）。
+
+### T42.8.5 heartbeat 存活 + 进度落盘
+
+```bash
+psql "$PG_URL" -c "UPDATE codegraph_index SET state='ready', engine_version='probe-0' WHERE scope='app:$APP'"
+# 触发全量（engine 不匹配），轮询 heartbeat_at 与进度
+for i in $(seq 1 30); do
+  psql "$PG_URL" -t -A -c "SELECT state || ' ' || files_done || '/' || files_total || ' hb=' || heartbeat_at FROM codegraph_index WHERE scope='app:$APP'"
+  sleep 1
+done | awk '!seen[$0]++'
+```
+
+**期望**：序列中 `indexing` 期间 `hb=` 时间戳持续变化（heartbeat fiber 每 5s 读沙箱 progress 回写——P0 修复点回归）。**注意**：`files_done` 中间递增仅在大仓库（分钟级索引）可观测——577 文件仓库 indexAll 本体仅 1-2s，采样窗口抓不到中间态属正常；沙箱侧 progress 文件结尾为 `{"files_total":N,"files_done":N,"done":true}` 可作落盘验证。
 
 ---
+
+## CG-9: 工具面补齐（impact / node / search kind 过滤）
+
+### T42.9.1 impact（transitive 影响半径 + 结构边排除）
+
+```bash
+# 等价 getImpact(depth=2)：先取 extractFromSource 直接依赖者，再取它们的依赖者（排 contains/imports）
+psql "$PG_URL" -t -A -c "
+WITH t AS (SELECT id FROM codegraph_node WHERE scope='app:$APP' AND name='extractFromSource' LIMIT 1),
+d1 AS (SELECT DISTINCT e.source FROM codegraph_edge e WHERE e.scope='app:$APP' AND e.target=(SELECT id FROM t) AND e.kind NOT IN ('contains','imports')),
+d2 AS (SELECT DISTINCT e.source FROM codegraph_edge e, d1
+       JOIN codegraph_node n ON n.id=d1.source AND n.scope='app:$APP'
+       WHERE e.scope='app:$APP' AND e.target=n.id AND e.kind NOT IN ('contains','imports'))
+SELECT (SELECT count(*) FROM d1) AS direct, (SELECT count(*) FROM d2) AS transitive;"
+```
+
+**期望**：direct>0，transitive≥direct（二级展开有新增；若 0 需检查 BFS 深度语义）。工具侧 `depth≤5` 上限由 `getImpact` 的 `maxDepth` clamp 保证。
+
+### T42.9.2 node（容器成员 + file/line 二级过滤）
+
+```bash
+# 容器成员：class/interface 的 contains 直接子节点
+psql "$PG_URL" -t -A -c "
+WITH c AS (SELECT id, qualified_name FROM codegraph_node WHERE scope='app:$APP' AND kind='class' AND name='CodeGraph' LIMIT 1)
+SELECT c.qualified_name, count(e.target) AS members
+FROM c JOIN codegraph_edge e ON e.source=c.id AND e.scope='app:$APP' AND e.kind='contains'
+GROUP BY c.qualified_name;"
+# file+line 过滤（pickByFileLine 语义）：行号落在节点区间内才算命中
+psql "$PG_URL" -t -A -c "
+SELECT name, start_line, end_line FROM codegraph_node
+WHERE scope='app:$APP' AND file_path='repo/src/extraction/tree-sitter.ts'
+  AND start_line <= 100 AND end_line >= 100 ORDER BY start_line LIMIT 3;"
+```
+
+**期望**：members>0（类成员展开）；第二查询返回包含第 100 行的最内层节点（区间命中而非全文件命中）。
+
+### T42.9.3 search kind 过滤（type → type_alias 映射）
+
+```bash
+# 工具入参 kind="type" 在 codegraph-search.ts 映射为 "type_alias"；验证图中该 kind 有数据
+psql "$PG_URL" -t -A -c "SELECT count(*) FROM codegraph_node WHERE scope='app:$APP' AND kind='type_alias'"
+psql "$PG_URL" -t -A -c "SELECT DISTINCT kind FROM codegraph_node WHERE scope='app:$APP' ORDER BY kind"
+```
+
+**期望**：type_alias 数 >0；kind 集合含 function/class/method/interface/route 等多值（过滤维度真实可用）。
+
+---
+
+## CG-10: 数据正确性（幂等 / stale 提示 / 级联清理）
+
+### T42.10.1 两轮增量幂等（边不重复、计数不漂移）
+
+```bash
+# 基线
+E0=$(psql "$PG_URL" -t -A -c "SELECT count(*) FROM codegraph_edge WHERE scope='app:$APP'")
+# 第 1 轮：改文件 A
+curl -s --max-time 60 -X POST "$BASE/session/$SID/exec" -H 'Content-Type: application/json' \
+  -d '{"command":"echo \"function cgIdemProbe1(){}\" >> /workspace/repo/src/index.ts && echo W1"}'
+sleep 45
+# 第 2 轮：再改同一文件
+curl -s --max-time 60 -X POST "$BASE/session/$SID/exec" -H 'Content-Type: application/json' \
+  -d '{"command":"echo \"function cgIdemProbe2(){}\" >> /workspace/repo/src/index.ts && echo W2"}'
+sleep 45
+# 结果：两个 probe 都在；该文件参与的边无重复；总边数稳定（±个位数）
+psql "$PG_URL" -t -A -c "
+SELECT name FROM codegraph_node WHERE scope='app:$APP' AND name IN ('cgIdemProbe1','cgIdemProbe2') ORDER BY name;"
+# 重复判定 key 必须含 line/col：同符号多处调用是合法多行（(source,target,kind) 粗 key 会误报数百组）
+psql "$PG_URL" -t -A -c "
+SELECT count(*) FROM (
+  SELECT source, target, kind, line, col, count(*) c FROM codegraph_edge
+  WHERE scope='app:$APP' AND (source IN (SELECT id FROM codegraph_node WHERE scope='app:$APP' AND file_path='repo/src/index.ts')
+      OR target IN (SELECT id FROM codegraph_node WHERE scope='app:$APP' AND file_path='repo/src/index.ts'))
+  GROUP BY source, target, kind, line, col HAVING count(*) > 1) dup;"
+psql "$PG_URL" -t -A -c "SELECT count(*) FROM codegraph_edge WHERE scope='app:$APP'"
+```
+
+**期望**：probe1+probe2 都索引；`dup=0`（精确 key：replaceFiles 按文件删旧插新，无累积重复）；总边数与 E0 差值 ≤ 单文件边数（不漂移）。
+
+### T42.10.2 stale_files 工具提示（indexStateNote 分支）
+
+```bash
+# 手动注入 stale_files（等价增量开始时 indexer 的 setStaleFiles），验证工具提示文本
+psql "$PG_URL" -c "UPDATE codegraph_index SET stale_files='[\"repo/src/index.ts\"]' WHERE scope='app:$APP'"
+OPENCODE_DATABASE_URL=$PG_URL bun -e "
+import { indexStateNote } from '$(git rev-parse --show-toplevel)/packages/opencode/src/codegraph/scope'
+const note = await indexStateNote('app:$APP')
+console.log(JSON.stringify(note))"
+psql "$PG_URL" -c "UPDATE codegraph_index SET stale_files='[]' WHERE scope='app:$APP'"   # 清场
+```
+
+**期望**：输出含「刚被编辑、索引尚未同步」+ 文件名（scope.ts `stale_files.length` 分支）；清场后输出空串。其余分支（indexing 进度/failed 错误）可同法注入验证。
+
+### T42.10.3 purgeScope 级联清理（5 表全空）
+
+```bash
+# 建议对一个废弃 scope 执行（勿对正跑用例的 scope；先确认该 scope 无 running 沙箱会触发重建）。
+# 例：曾卡在 indexing 的僵尸 scope app:cg-e2e
+psql "$PG_URL" -t -A -c "SELECT count(*) FROM sandbox s JOIN session sess ON sess.id=s.session_id WHERE sess.app_id='cg-e2e' AND s.state='running'"   # 期望 0
+OPENCODE_DATABASE_URL=$PG_URL bun -e "
+import { CodegraphStore as S } from '$(git rev-parse --show-toplevel)/packages/opencode/src/codegraph/store'
+await S.purgeScope('app:cg-e2e')
+await S.purgeScope('app:cg-e2e')   // 幂等重跑
+console.log('purged')"
+psql "$PG_URL" -t -A <<SQL
+SELECT 'node', count(*) FROM codegraph_node WHERE scope='app:cg-e2e'
+UNION ALL SELECT 'edge', count(*) FROM codegraph_edge WHERE scope='app:cg-e2e'
+UNION ALL SELECT 'file', count(*) FROM codegraph_file WHERE scope='app:cg-e2e'
+UNION ALL SELECT 'ref', count(*) FROM codegraph_ref WHERE scope='app:cg-e2e'
+UNION ALL SELECT 'index', count(*) FROM codegraph_index WHERE scope='app:cg-e2e';
+SQL
+```
+
+**期望**：5 行全 0（应用删除场景的数据级联；对不存在/已清 scope 幂等）。注意若直接 psql 预置 index 行需显式给 `time_created/time_updated`（DDL 无默认，仅 ORM 层 `$default`）。
+
+---
+
 ## 已知问题
 
 - ~~引用解析无源码限制~~（**已消除**）：full 模式在沙箱内（有源码）跑 codegraph 完整 resolver，`obj.method()`/route→handler/组件 usage 全部可解析。服务端不再做解析，只落库。
@@ -319,6 +530,8 @@ OPENCODE_DATABASE_URL=$PG_URL bun /tmp/cg-explore-low.ts
 - **keep-alive 沙箱 + idle-reap**：`OPENCODE_SANDBOX_IDLE_KILL_SEC=30` 时非 keep-alive 沙箱 30s 即回收，索引长任务可能被打断。**跑 codegraph 用例务必先 keep-alive**（`new_sid -k`）。
 - **codegraph kernel 偶发重复 node id**：部分语言（如 Dart 嵌套函数）同一符号以 `hostFn::localFn` 与 `localFn` 两个 qualified_name 产出相同 id hash → PG 主键冲突。store 层已按 id 去重（保留首个）。
 - **本地沙箱架构**：Apple Silicon 沙箱是 arm64，需 `build/codegraph-extractor-linux-arm64.tar.gz`（build 脚本已产双平台）；indexer 按 `uname -m` 选 bundle。
+- **勿手动并发跑 extractor**：两个进程同时 `rm/init` 同一 `.codegraph` SQLite 会互拆表（实测 `no such table: unresolved_refs`）。indexer 的 claimIndexing 单写者已防并发；手动调试前确认无 indexer 任务进行中（state 非 indexing / 等一轮循环）。
+- **`codegraph_index.time_created/time_updated` DDL 无默认值**：仅 drizzle ORM `$default` 填充。psql 手写 INSERT/UPSERT（如 T42.8.3 复刻 claim）必须显式提供两列。
 
 ---
 
@@ -348,3 +561,6 @@ OPENCODE_DATABASE_URL=$PG_URL bun /tmp/cg-explore-low.ts
 | 2026-08-21 | T42.5.3 删除切片 E2E | ✅ | 建 probe（3 节点 12809/44822）→ `rm` → 下一循环 `changed=0 deleted=4 incremental` → `incremental deletion → full dump`（6s，vs 全量 ~25s）→ PG 精确回基线 12806/44819，probe 节点/文件记录全清 |
 | 2026-08-21 | T42.5.4 fresh checkout 回退 | ✅ | 修复前：无 `.codegraph` 时 `openSync` 抛错 → failIndex → 下一循环全量自愈（浪费一轮）；修复后：检测状态缺失 → 日志 `falls back to full build` → 全量 577 文件 12806 节点 exit 0 |
 | 2026-08-21 | filterByFilePath 语义修正 + 单测扩充 | ✅ | 无匹配从「返回全部」改为「返回空 + 工具提示未找到」（callers/callees/impact/node 四工具行为更准确）；`store-traversal.test.ts` 20 pass（isZombie 边界、CALL_KINDS/DEPENDENT_FILE_EDGE_KINDS 语义、BFS 深度/环安全/自环、impact 排结构边） |
+| 2026-08-21 | CG-8 状态机四用例 | ✅ | T42.8.1 failed→60s 自愈回 ready 基线；T42.8.2 僵尸（心跳-5min）→80s 接管全量；T42.8.3 claim UPSERT 三态：活写者 0 行/僵尸 1 行/ready 1 行；T42.8.4 engine 不匹配→强制全量回 extractor-1；T42.8.5 heartbeat 存活（hb 每 5s 推进，进度中间态 577 文件仓库 <2s 不可采样，progress 落盘 done:true 验证）。附带：runFullIndex 补 `full rebuild done` 日志 |
+| 2026-08-21 | CG-9 工具面补齐 | ✅ | T42.9.1 impact：extractFromSource direct=34 / transitive 新增 2；T42.9.2 node：CodeGraph 类 92 成员、file/line 区间命中内层节点 extractNameRaw(98-192)；T42.9.3 type_alias=540、kind 25 种 |
+| 2026-08-21 | CG-10 数据正确性 | ✅ | T42.10.1 两轮增量幂等：probe1+2 都在、精确 key（含 line/col）dup=0——注意粗 key (s,t,kind) 会把多处调用点误报为重复（全库 calls 2808 组「重复」实为合法多行）；T42.10.2 stale/indexing 提示文本两分支验证；T42.10.3 purgeScope 幂等、5 表全 0（僵尸 scope app:cg-e2e 顺带清理） |
