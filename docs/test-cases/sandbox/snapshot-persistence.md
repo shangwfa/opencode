@@ -572,3 +572,44 @@ done
 ### 附带发现
 
 - `session_snapshot.session_id` 外键 `ON DELETE CASCADE`：`DELETE /session/:id` 会级联删除该会话全部快照记录（远端快照成孤儿，靠 TTL 清理）。**已确认维持现状**（2026-08-22）：「删会话=放弃一切」语义成立；正常恢复路径（session 存续 + 沙箱回收）不受影响，仅删会话后不可再恢复，孤儿快照由远端 TTL 过期兜底。
+
+---
+
+## 复测记录（2026-08-22 晚，resourceLimits 泄漏修复后全量回归）
+
+> **根因修复**（`a5c4a91d01`）：`SandboxResource` 的会话级字段（persistMode/image/snapshotId）被整块塞进
+> `resourceLimits` 传给远端，远端按非法资源规格处理 → Pod 永久 Pending → 服务端 60s 超时。
+> 复现：同一请求体带 `"persistMode":"snapshot"` 于 resourceLimits → 61s 超时；剔除后 24s Running。
+> 此前所有「池化排队/多副本/PG 切换」假设均为烟雾弹——之前没问题是因为旧会话从不传 sandbox.persistMode。
+
+环境：本地 PG + 远程 K8s 沙箱（useServerProxy=true），镜像含 resource 泄漏修复 + snapshot 无卷 + SDK 默认超时。
+
+| 用例 | 结果 | 备注 |
+|---|---|---|
+| T25.1 冷启动 | PASS | 5.3s，mini v1.0.0（snapshotImage 分离生效），快照表 0 记录 |
+| T25.9 显式快照 | PASS | creating→ready ~20s，源沙箱保持 running |
+| T25.3b 恢复来源真伪 | PASS | restoredFromSnapshot=true 且 marker 完整（真·快照恢复）；无 PVC（mount=0） |
+| T25.3 快照恢复 | PASS | 杀沙箱→恢复 6.4s，restoreFrom=<id>，快照转 stale |
+| T25.2 idle 自动快照 | PASS | 90s（idle 60s + 快照 15s + 销毁源沙箱），superseded 清理联动正确 |
+| T25.5 同会话多快照 | PASS | S1 deleted\|superseded、S2 ready，仅保留最新 |
+| T25.13 metadata 回填 | PASS | metadata.sandboxSnapshot 与最新 ready 一致 |
+| T25.14 keepAlive 共存 | PASS | keep_alive=t，快照后源沙箱 running 不销毁 |
+| T25.17 stale 回退 | PASS | 显式 kill 后从 stale 恢复，V2 数据完整，restored=true |
+| T25.19 坏 snapshotId 降级 | PASS | 假 ID → 冷启动 9s，restored=false |
+| T25.10 会话级 image 覆盖 | PASS | sandbox.image=session-terminal 实际生效（覆盖 mini 默认） |
+| T25.11 app 参数失效 | PASS | pvcMode=app 创建 200，参数不报错 |
+| T25.12 子会话继承 | PASS | 子会话 persistMode=snapshot 继承 |
+| T25.15 端到端 | PASS | 开发→快照→杀→恢复 24s→续写 feature-v2 全链路 |
+| T25.22 重启接管 | PASS | server 重启后 exec 0s 接管原沙箱（feature-v2 完整） |
+| T25.23 混合部署 | PASS | 全局 pvc + 会话级 snapshot 并存互不影响 |
+| T25.21 creating 期间路径 | PASS | creating 期间 exec 被拒/挂起，ready 后沙箱 running |
+| T25.6 删除清理 | PASS | 删会话 PG 快照级联清零；远端快照不可查询（404） |
+| T25.18 TTL GC | 未跑 | TTL 7 天，需专项环境缩短验证 |
+
+### 遗留与观察
+
+- **远端 `/v1` BatchSandbox 波动**：同会话两次快照恢复一次 6.4s 一次 >30s（SDK 默认超时失败→降级冷启动）。
+  fail-fast 兜底工作正常；如需消除偶发降级，可评估调大 SDK requestTimeoutSeconds（当前维持默认 30s）。
+- **K8s 多副本快照 NOT_FOUND**（见上方根因分析）：本轮未复现（可能运气命中副本），仍待运维侧根治。
+- snapshot 会话不再挂 package-cache 卷：T25.3 的 pnpm VS 断言不再适用（依赖缓存随快照 rootfs 持久化，
+  首次冷启动无缓存属预期）。

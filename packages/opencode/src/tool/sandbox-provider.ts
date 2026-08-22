@@ -277,9 +277,7 @@ async function runCommandEarlyExit(
 
 export namespace SandboxProvider {
   const log = Log.create({ service: "sandbox-provider" })
-  // 远端 BatchSandbox 池化分配时 POST /sandboxes 会排队等待，SDK 默认 30s 太短。
-  // SDK 请求超时放 90s；Effect 层上限留 120s 缓冲（必须 > SDK，否则先被 Effect 砍）。
-  const CREATE_TIMEOUT_SECONDS = 120
+  const CREATE_TIMEOUT_SECONDS = 60
 
   export interface Interface {
     readonly getOrCreate: (
@@ -356,7 +354,6 @@ export namespace SandboxProvider {
         protocol: config.protocol,
         ...(config.apiKey ? { apiKey: config.apiKey } : {}),
         useServerProxy: config.useServerProxy,
-        requestTimeoutSeconds: 90,
       })
 
       const hasVolume = config.volumeType !== "none"
@@ -399,7 +396,6 @@ export namespace SandboxProvider {
                 image: sessionImage,
                 timeoutSeconds,
                 resource,
-                readyTimeoutSeconds: 90,
                 ...(volumes.length > 0 ? { volumes } : {}),
               }),
             catch: (e) => new Error(`Sandbox.create failed: ${e instanceof Error ? e.message : String(e)}`),
@@ -726,7 +722,6 @@ export namespace SandboxProvider {
         protocol: config.protocol,
         ...(config.apiKey ? { apiKey: config.apiKey } : {}),
         useServerProxy: config.useServerProxy,
-        requestTimeoutSeconds: 90,
       })
 
       const hasVolume = config.volumeType !== "none"
@@ -1098,22 +1093,20 @@ export namespace SandboxProvider {
                   snapshotId: id,
                   timeoutSeconds,
                   resource,
-                  readyTimeoutSeconds: 90,
                   ...(volumes.length > 0 ? { volumes } : {}),
                 }),
               catch: (e) => new Error(`Sandbox.create failed: ${e instanceof Error ? e.message : String(e)}`),
             })
           const createFromImage = () =>
             Effect.tryPromise({
-               try: () =>
-                 Sandbox.create({
-                   connectionConfig,
-                   image: sessionImage,
-                   timeoutSeconds,
-                   resource,
-                   readyTimeoutSeconds: 90,
-                   ...(volumes.length > 0 ? { volumes } : {}),
-                 }),
+              try: () =>
+                Sandbox.create({
+                  connectionConfig,
+                  image: sessionImage,
+                  timeoutSeconds,
+                  resource,
+                  ...(volumes.length > 0 ? { volumes } : {}),
+                }),
               catch: (e) => new Error(`Sandbox.create failed: ${e instanceof Error ? e.message : String(e)}`),
             })
           // 快照恢复优先：有快照则从快照拉起（秒级）；恢复失败（快照被 GC/层损坏）
