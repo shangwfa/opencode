@@ -268,6 +268,7 @@ curl -s --max-time 60 -X POST "$BASE/session/$SID/message" -H 'Content-Type: app
 | 2026-08-18 | T40.2.2 正常长 run 不误杀 | ✅ | 容器（STALL=600/STALE=30）：20s bash 长消息期间排队消息 41s 返回 `ok`；`cancelling stale run` 0 条 |
 | 2026-08-18 | T40.3.1 事故复现+重启恢复 | ✅ | 容器（STALL=600）：幽灵 run 持锁，新消息 HTTP 000 超时（事故形态复现）；`docker restart` 后同 session 消息 ~10s 恢复回复 `ok` |
 | 2026-08-19 | T40.1.4 MCP 工具权限询问挂起被 stall 误杀 | ⚠️ 待修复复测 | 复现确认（`ses_fe76d6edaffeqduKwo76qF2rBM`）：会话只设 `external_directory:* allow`，codegraph ask 挂起 300s 被斩（`Tool execution aborted`/`interrupted: true`）。豁免未覆盖「in-flight permission.ask」，需先实现修复再复测 |
+| 2026-08-21 | 遗留问题「waitForSessionLock 无超时」 | ✅ 已修复 | 见 [`lock-timeout-recovery.md`](./lock-timeout-recovery.md)：`waitForSessionLock` 加超时（`OPENCODE_SESSION_LOCK_TIMEOUT_SEC` 默认 60s，超时 503 + logError）+ PG `statement_timeout` 兜底（`OPENCODE_PG_STATEMENT_TIMEOUT_MS` 默认 30000ms）。事故 `ses_fdde248abffeCC7VIONSebVhdg` 复现链路即此遗留问题：PG 连接抖动 → run 内写挂死 → 锁不释放 → 无限 padding |
 
 ## 分层发现（2026-08-17 实测）
 
@@ -280,7 +281,7 @@ HTTP handler: waitForSessionLock（进程内存 Map，50ms 无限轮询，无超
 
 - **根因修复（stall 断流）已足够解除用户可见挂死**：stalled 流默认 300s 报错 → run 结束 → session lock 释放 → 会话恢复。T40.1.1 实测 5s 配置下 ~10s 恢复。
 - **Runner 接管是纵深防御**：保护直调 prompt 的内部调用方（不经 HTTP 锁）。HTTP 路径的排队消息在锁释放前根本进不了 Runner。
-- 遗留问题（未修，建议后续）：`waitForSessionLock` 无超时无日志——幽灵持锁期间 waiter fiber 无限累积；建议加超时 + 观测日志。
+- 遗留问题（已修复 2026-08-21，见 [`lock-timeout-recovery.md`](./lock-timeout-recovery.md)）：`waitForSessionLock` 无超时无日志——幽灵持锁期间 waiter fiber 无限累积。修复：加超时（`OPENCODE_SESSION_LOCK_TIMEOUT_SEC`，默认 60s，超时返回 503 + logError），并配套 PG `statement_timeout`（`OPENCODE_PG_STATEMENT_TIMEOUT_MS`，默认 30000ms）兜底 run 内 PG 写挂死，从源头消除「run 挂死不释放锁」。
 
 ## 测试环境备注（2026-08-17）
 

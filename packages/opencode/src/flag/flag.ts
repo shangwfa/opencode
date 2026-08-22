@@ -95,18 +95,28 @@ export namespace Flag {
   export const OPENCODE_SANDBOX_IMAGE =
     process.env["OPENCODE_SANDBOX_IMAGE"] ??
     "crpi-hlpnu8kiweghie0r.cn-hangzhou.personal.cr.aliyuncs.com/shangwfa/opencode-sandbox:session-terminal"
+  // snapshot 模式冷启动/降级用的精简镜像（rootfs 小、快照快）；默认（pvc）模式用 OPENCODE_SANDBOX_IMAGE
+  export const OPENCODE_SANDBOX_SNAPSHOT_IMAGE =
+    process.env["OPENCODE_SANDBOX_SNAPSHOT_IMAGE"] ??
+    "crpi-hlpnu8kiweghie0r.cn-hangzhou.personal.cr.aliyuncs.com/shangwfa/opencode-sandbox:v1.0.0"
   export const OPENCODE_SANDBOX_TIMEOUT = number("OPENCODE_SANDBOX_TIMEOUT") ?? 600
 
   export const OPENCODE_SANDBOX_API_KEY = process.env["OPENCODE_SANDBOX_API_KEY"] ?? ""
   export const OPENCODE_SANDBOX_USE_SERVER_PROXY = truthy("OPENCODE_SANDBOX_USE_SERVER_PROXY")
-  export const OPENCODE_SANDBOX_VOLUME_TYPE = (process.env["OPENCODE_SANDBOX_VOLUME_TYPE"] ?? "pvc") as "none" | "pvc" | "host"
+  export const OPENCODE_SANDBOX_VOLUME_TYPE = (process.env["OPENCODE_SANDBOX_VOLUME_TYPE"] ??
+    "pvc") as "none" | "pvc" | "host" | "snapshot"
   export const OPENCODE_SANDBOX_PVC_CLAIM = process.env["OPENCODE_SANDBOX_PVC_CLAIM"] ?? "sandbox-test"
+  export const OPENCODE_SANDBOX_SNAPSHOT_ENABLED = truthy("OPENCODE_SANDBOX_SNAPSHOT_ENABLED")
+  export const OPENCODE_SANDBOX_SNAPSHOT_TTL_SEC = number("OPENCODE_SANDBOX_SNAPSHOT_TTL_SEC") ?? 7 * 86400
+  export const OPENCODE_SANDBOX_SNAPSHOT_WAIT_SEC = number("OPENCODE_SANDBOX_SNAPSHOT_WAIT_SEC") ?? 900
   export const OPENCODE_SANDBOX_IDLE_KILL_SEC = number("OPENCODE_SANDBOX_IDLE_KILL_SEC") ?? 3600
   export const OPENCODE_SANDBOX_IDLE_REAP_SEC = number("OPENCODE_SANDBOX_IDLE_REAP_SEC") ?? 1800
   export const OPENCODE_SANDBOX_MAX_TTL_SEC = number("OPENCODE_SANDBOX_MAX_TTL_SEC") ?? 3600
   export const OPENCODE_WATCHDOG_TIMEOUT_SEC = number("OPENCODE_WATCHDOG_TIMEOUT_SEC") ?? 120
   export const OPENCODE_WATCHDOG_SCAN_INTERVAL_SEC = number("OPENCODE_WATCHDOG_SCAN_INTERVAL_SEC") ?? 15
   export const OPENCODE_SESSION_STALE_RUN_SEC = number("OPENCODE_SESSION_STALE_RUN_SEC") ?? 1800
+  export const OPENCODE_SESSION_LOCK_TIMEOUT_SEC = number("OPENCODE_SESSION_LOCK_TIMEOUT_SEC") ?? 60
+  export const OPENCODE_PG_STATEMENT_TIMEOUT_MS = number("OPENCODE_PG_STATEMENT_TIMEOUT_MS") ?? 30000
   export const OPENCODE_SANDBOX_PACKAGE_CACHE_MOUNT =
     process.env["OPENCODE_SANDBOX_PACKAGE_CACHE_MOUNT"] ?? "/opt/pnpm-store"
 

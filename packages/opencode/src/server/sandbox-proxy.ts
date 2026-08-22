@@ -357,17 +357,17 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
           command,
           { workingDirectory: sandboxWorkingDirectory, timeoutSeconds: body.timeoutSeconds },
           {},
-        ).pipe(Effect.catch((err) => Effect.succeed(null as any)))
+        ).pipe(Effect.catch((err) => Effect.succeed({ err } as any)))
 
         const stdout = result?.logs?.stdout.map((m: any) => m.text).join("\n") ?? ""
-        const stderr = result?.logs?.stderr.map((m: any) => m.text).join("\n") ?? "Sandbox execution failed"
+        const stderr = result?.logs?.stderr.map((m: any) => m.text).join("\n") ?? (result?.err?.message ?? "Sandbox execution failed")
 
         yield* Effect.promise(() => insertExecLog({
           id: execId,
           session_id: root.id,
           command,
           working_directory: workingDirectory,
-          status: result?.error?.name === "TimeoutError" ? "timed_out" : result ? "completed" : "failed",
+          status: result?.error?.name === "TimeoutError" ? "timed_out" : (result && !result.err) ? "completed" : "failed",
           exit_code: result?.exitCode ?? null,
           stdout: truncateOutput(stdout),
           stderr: truncateOutput(stderr),

@@ -103,6 +103,8 @@ curl -s -X POST "$BASE/session/$SID/exec" \
 
 > **2026-08-08 全量重跑记录**（容器 `opencode-saas-test`，`OPENCODE_EXPERIMENTAL_CODE_MODE=mcp`）：T41.1-4 全通过。PG 持久化 `mastra|local|true`；T41.2 AI 列出 mastra 工具表；T41.3 `mastra.getMastraHelp + searchMastraDocs + listMastraPackages + mastraDocs×4` 全 completed；T41.4 write 生成 `/workspace/src/mastra/`（weather-tool.ts + weather-agent.ts + index.ts），工具经 code-mode `execute` 内嵌调用（PG `part` 表记录 `mastra.*|completed`）。
 
+> **2026-08-21 重跑记录**（容器 `opencode-saas-test:13b750953b`，本地 PG `opencode` + 本地 OpenSandbox `opencode-opensandbox:mini` 3.53G，模型 `opencode/muse-spark-1.2-contributor-free`）：T41.1 **PASS**（`mastra|local` PG 持久化）；T41.2-41.4 初测超时（响应空，疑似 MCP 首次启动慢 + 模型调用超时），简单对话验证模型正常（`finish:stop`）。设置沙箱 npm 为淘宝源（`registry.npmmirror.com`）后重测：T41.2 **PASS**（列出 13 个 mastra 工具）、T41.3 **PASS**（`mastraDocs×2` completed）、T41.4 **PASS**（生成 `my-agent.ts` 2762 字节，含 `Agent` 定义）。mini 镜像已默认淘宝源（`opencode-opensandbox:mini` 重建，`npm/pnpm config get registry` 均为 `npmmirror`）。
+
 **验证层级**：
 
 | 层级 | 标准 | 结果 |

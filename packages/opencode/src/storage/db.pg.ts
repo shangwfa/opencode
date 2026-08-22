@@ -1,5 +1,6 @@
 import postgres from "postgres"
 import { drizzle } from "drizzle-orm/postgres-js"
+import { Flag } from "@/flag/flag"
 
 // SQLite Drizzle exposes `.run()`, `.get()`, `.all()` on query objects;
 // the PG driver does not. To keep business code portable across dialects,
@@ -74,6 +75,13 @@ export function init(url: string) {
     connect_timeout: 10,
     idle_timeout: 30,
     max_lifetime: 600,
+    // statement_timeout guards against network half-open connections leaving
+    // queries pending forever (a hung PG write keeps the session run alive and
+    // its lock held). lock_timeout bounds advisory-lock waits in migrations.
+    connection: {
+      statement_timeout: Flag.OPENCODE_PG_STATEMENT_TIMEOUT_MS,
+      lock_timeout: Flag.OPENCODE_PG_STATEMENT_TIMEOUT_MS,
+    },
     types: {
       bigint: {
         to: OID_INT8,

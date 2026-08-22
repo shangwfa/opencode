@@ -1,13 +1,16 @@
 import type { SessionID } from "@/session/schema"
-import * as Database from "@/storage/db"
-import { SessionTable } from "@/session/session.pg"
+import * as Database from "../storage/db"
+import { SessionTable } from "../session/session.pg"
+import { Flag } from "@/flag/flag"
 import { eq } from "drizzle-orm"
 
 export interface SandboxOpts {
   id: SessionID
   pvcMode?: "session" | "app"
   appId?: string
-  sandbox?: { cpu: string; memory: string }
+  /** workspace 持久化方式（创建时固化到 session.persist_mode；旧行缺省回退全局 VOLUME_TYPE） */
+  persistMode: "pvc" | "snapshot"
+  sandbox?: { cpu: string; memory: string; image?: string; snapshotId?: string; persistMode?: "pvc" | "snapshot" }
 }
 
 export async function resolveSandboxOpts(sessionID: SessionID): Promise<SandboxOpts> {
@@ -23,18 +26,50 @@ export async function resolveSandboxOpts(sessionID: SessionID): Promise<SandboxO
         .get(),
     )
     if (!row?.parent_id) {
-      const raw = row?.sandbox
-      const sandbox = typeof raw === "string" ? safeParse(raw) : raw
-      return { id: current, pvcMode: (row?.pvc_mode as "session" | "app") ?? undefined, appId: row?.app_id ?? undefined, sandbox: sandbox ?? undefined }
+      const sandbox = parseSandboxColumn(row?.sandbox)
+      const persistMode = sandbox?.persistMode
+        ?? (Flag.OPENCODE_SANDBOX_VOLUME_TYPE === "snapshot" ? "snapshot" : "pvc")
+      return {
+        id: current,
+        pvcMode: (row?.pvc_mode as "session" | "app") ?? undefined,
+        appId: row?.app_id ?? undefined,
+        persistMode,
+        sandbox: sandbox ?? undefined,
+      }
     }
     current = row.parent_id as SessionID
   }
-  return { id: current }
+  return {
+    id: current,
+    pvcMode: undefined,
+    appId: undefined,
+    persistMode: Flag.OPENCODE_SANDBOX_VOLUME_TYPE === "snapshot" ? "snapshot" : "pvc",
+    sandbox: undefined,
+  }
 }
 
-function safeParse(s: string): { cpu: string; memory: string } | undefined {
+export type SandboxResource = { cpu: string; memory: string; image?: string; snapshotId?: string; persistMode?: "pvc" | "snapshot" }
+
+/**
+ * sandbox 列值统一解析。PG bridge 下 jsonb 以原始 JSON 字符串返回（db.pg.ts jsonb parse 恒等），
+ * SQLite 侧为对象——消费方必须兼容两种形态，否则 persistMode 等字段静默丢失回退全局默认。
+ */
+export function parseSandboxColumn(raw: unknown): SandboxResource | undefined {
+  if (typeof raw !== "string") {
+    return raw && typeof raw === "object" && typeof (raw as SandboxResource).cpu === "string"
+      ? (raw as SandboxResource)
+      : undefined
+  }
   try {
-    const v = JSON.parse(s)
-    if (v && typeof v.cpu === "string" && typeof v.memory === "string") return v
+    const v = JSON.parse(raw)
+    if (v && typeof v.cpu === "string" && typeof v.memory === "string") {
+      return {
+        cpu: v.cpu,
+        memory: v.memory,
+        ...(typeof v.image === "string" ? { image: v.image } : {}),
+        ...(typeof v.snapshotId === "string" ? { snapshotId: v.snapshotId } : {}),
+        ...(v.persistMode === "snapshot" || v.persistMode === "pvc" ? { persistMode: v.persistMode } : {}),
+      }
+    }
   } catch {}
 }

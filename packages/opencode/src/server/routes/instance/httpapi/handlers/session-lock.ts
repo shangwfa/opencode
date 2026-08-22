@@ -1,4 +1,6 @@
 import { Effect, Exit } from "effect"
+import { HttpApiError } from "effect/unstable/httpapi"
+import { Flag } from "@/flag/flag"
 import { SessionID } from "@/session/schema"
 
 const locks = new Map<SessionID, number>()
@@ -15,11 +17,18 @@ export function withSessionLock<A, E, R>(sessionID: SessionID, effect: Effect.Ef
   })
 }
 
-export function waitForSessionLock(sessionID: SessionID): Effect.Effect<void> {
+export function waitForSessionLock(
+  sessionID: SessionID,
+  timeoutSec: number = Flag.OPENCODE_SESSION_LOCK_TIMEOUT_SEC ?? 60,
+): Effect.Effect<void, HttpApiError.ServiceUnavailable> {
   return Effect.gen(function* () {
-    if ((locks.get(sessionID) ?? 0) > 0) {
+    const deadline = Date.now() + timeoutSec * 1000
+    while ((locks.get(sessionID) ?? 0) > 0) {
+      if (Date.now() >= deadline) {
+        yield* Effect.logError("waitForSessionLock timed out", { sessionID, heldSec: timeoutSec })
+        return yield* new HttpApiError.ServiceUnavailable({})
+      }
       yield* Effect.sleep("50 millis")
-      yield* waitForSessionLock(sessionID)
     }
   })
 }

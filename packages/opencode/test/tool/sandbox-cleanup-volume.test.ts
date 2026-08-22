@@ -14,6 +14,9 @@ const noneConfig: SandboxConfig.Interface = {
   resourceLimits: { cpu: "1", memory: "2Gi" },
   volumeType: "none",
   pvcClaimName: "",
+  snapshotEnabled: false,
+  snapshotTtlMs: 7 * 86400_000,
+  snapshotWaitMs: 900_000,
   idleKillMs: 3_600_000,
   idleReapMs: 1_800_000,
   idleReapIntervalMs: 60_000,
@@ -122,13 +125,13 @@ describe("cleanupSessionVolume session isolation", () => {
 })
 
 describe("cleanupSessionVolume vs buildVolumes", () => {
-  test("cleanup mount has single volume, buildVolumes has 6", () => {
+  test("cleanup mount has single volume, buildVolumes has 7", () => {
     const sid = "ses_compare"
     const normalVols = buildVolumes({ sessionID: sid }, pvcConfig)
     const cleanupVols = [
       { name: "cleanup-root", mountPath: "/cleanup", pvc: { claimName: pvcConfig.pvcClaimName } },
     ]
-    expect(normalVols.length).toBe(7)
+    expect(normalVols.length).toBe(8)
     expect(cleanupVols.length).toBe(1)
   })
 
@@ -156,7 +159,7 @@ describe("cleanupSessionVolume vs buildVolumes", () => {
       const parts = v.subPath!.split("/")
       return parts[parts.length - 1]
     })
-    expect(subDirs.sort()).toEqual(["cache", "config", "home", "local", "tmp", "workspace"])
+    expect(subDirs.sort()).toEqual(["cache", "config", "home", "local", "resources", "tmp", "workspace"])
     const rmTarget = `sessions/${sid}`
     for (const v of sessionVols) {
       expect(v.subPath!.startsWith(rmTarget + "/")).toBe(true)

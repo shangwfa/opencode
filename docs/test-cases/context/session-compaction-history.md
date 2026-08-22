@@ -158,3 +158,15 @@ touch -t "$(date -v-8d +%Y%m%d%H%M)" "$TOOL_OUTPUT/tool_history_stale.md"
 - 历史文件含明文对话，可能很大；Agent 被提示用 Grep/Read 而非整读。
 - **TOOL_OUTPUT 路径因平台/运行方式而异**：文档示例写 `$HOME/.local/share/opencode/tool-output`（Linux/SaaS 容器），macOS 宿主机直跑时为 `~/Library/Application Support/opencode/tool-output`。端到端用例应从 `Global.Path.data` 动态获取，而非硬编码。
 - **清理回归测试待补**：`truncate.ts` 实现以 `tool_` 前缀和 7 天 RETENTION 清理文件；目前尚无直接单测覆盖 T-CX.6 的过期文件删除行为。
+
+## 复测记录
+
+### 2026-08-21 重跑（mini 镜像环境）
+
+| 用例 | 结果 | 备注 |
+|---|---|---|
+| T-CX.1 单元测试（L0） | ✅ **25 pass / 0 fail** | `bun test test/session-compaction.test.ts test/session-runner-message.test.ts`（packages/core 目录），覆盖 serializeHistory 完整落盘、降级（disk full 模拟日志可见）、checkpoint 提示注入、连续 compaction 链 |
+| T-CX.2-6 端到端 | ⏸️ 维持 blocked by V2 | 复核确认：V1 主链路 `packages/opencode/src/session/compaction.ts` 的 `processCompaction` 无 `writeHistory`/`historyPath`；`compactAfterOverflow`/`compactIfNeeded` 仅被 core `runner/llm.ts`（V2）引用，opencode 生产代码未调用。与文档说明一致 |
+| T-CX.7 二次 compaction | ✅ 单测覆盖 / ⏸️ 端到端 blocked | 同上 |
+
+**结论**：L0 单测全通过（含降级路径），端到端用例维持 V2 未上线状态，无变化。

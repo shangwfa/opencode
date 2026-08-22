@@ -84,3 +84,19 @@ curl -s --max-time 60 -X POST "$BASE/session/$SID/exec" \
 **期望**：stdout 含 `DEEP`，证明 PVC 目录结构持久化
 
 ---
+
+## 复测记录
+
+### 2026-08-21（commit 13b750953b，快照功能合入后回归）
+
+环境：SaaS 容器（本地 PG `opencode` 库 + 远端 K8s Sandbox），默认 `VOLUME_TYPE=pvc`、无快照开关，镜像 `opencode-saas-sandbox-test:13b750953b`。
+
+| 用例 | 结果 | 备注 |
+|---|---|---|
+| T5.1 写入文件 | PASS | exitCode 0，stdout `12345` |
+| T5.2 销毁沙箱 | PASS | `{"destroyed":true}` |
+| T5.3 重建后文件存在 | PASS | stdout `12345`，PVC 跨沙箱实例持久化正常 |
+| T5.4 多文件批量 | PASS | a/b/c 三文件内容均在 |
+| T5.5 目录持久化 | PASS | 深层目录 `DEEP` 完整 |
+
+附带验证：全程 `session_snapshot` 表 0 新增记录——快照代码路径不影响默认 PVC 模式。结论：**默认模式不受快照功能影响**。

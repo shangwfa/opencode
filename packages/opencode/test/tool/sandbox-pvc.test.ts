@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { buildVolumes, SandboxConfig } from "../../src/tool/sandbox-provider"
+import { buildVolumes, SandboxConfig, validateSnapshotConfig } from "../../src/tool/sandbox-provider"
 import type { SandboxConfig as SandboxConfigType } from "../../src/tool/sandbox-provider"
 
 const baseConfig: SandboxConfigType.Interface = {
@@ -12,6 +12,9 @@ const baseConfig: SandboxConfigType.Interface = {
   resourceLimits: { cpu: "1", memory: "2Gi" },
   volumeType: "none",
   pvcClaimName: "",
+  snapshotEnabled: false,
+  snapshotTtlMs: 7 * 86400_000,
+  snapshotWaitMs: 900_000,
   idleKillMs: 3_600_000,
   idleReapMs: 1_800_000,
   idleReapIntervalMs: 60_000,
@@ -19,15 +22,59 @@ const baseConfig: SandboxConfigType.Interface = {
   packageCacheMount: "/xybot-front/cache",
 }
 
+describe("buildVolumes snapshot mode", () => {
+  test("snapshot volume and snapshot service config rules", () => {
+    expect(() => validateSnapshotConfig({ volumeType: "snapshot", snapshotEnabled: false })).toThrow(/SNAPSHOT_ENABLED/)
+    // pvc 默认 + 能力开关开启 = 会话级可选快照，合法
+    expect(() => validateSnapshotConfig({ volumeType: "pvc", snapshotEnabled: true })).not.toThrow()
+    expect(() => validateSnapshotConfig({ volumeType: "snapshot", snapshotEnabled: true })).not.toThrow()
+    expect(() => validateSnapshotConfig({ volumeType: "pvc", snapshotEnabled: false })).not.toThrow()
+  })
+
+  test("buildVolumes honors per-session persistMode over global volumeType", () => {
+    const snapshotCfg = { ...baseConfig, volumeType: "snapshot" as const, snapshotEnabled: true, pvcClaimName: "shared-pvc" }
+    // 全局 pvc，会话显式 snapshot
+    expect(buildVolumes({ sessionID: "ses_a", persistMode: "snapshot" }, snapshotCfg)).toHaveLength(1)
+    // 全局 snapshot，会话显式 pvc
+    expect(buildVolumes({ sessionID: "ses_b", persistMode: "pvc" }, snapshotCfg)).toHaveLength(8)
+    // 未指定回退全局（snapshot）
+    expect(buildVolumes({ sessionID: "ses_c" }, snapshotCfg)).toHaveLength(1)
+    // 无 claimName 时 snapshot 会话不挂任何卷
+    expect(buildVolumes({ sessionID: "ses_d", persistMode: "snapshot" }, baseConfig)).toEqual([])
+  })
+
+  test("snapshot: only shared package-cache volume, workspace stays on rootfs", () => {
+    const cfg = { ...baseConfig, volumeType: "snapshot" as const, pvcClaimName: "shared-pvc" }
+    const vols = buildVolumes({ sessionID: "ses_snap" }, cfg)
+    expect(vols.length).toBe(1)
+    expect(vols[0]!.name).toBe("package-cache")
+    expect(vols[0]!.mountPath).toBe("/xybot-front/cache")
+    expect(vols[0]!.subPath).toBe("shared/package-cache")
+    expect(vols[0]!.pvc?.claimName).toBe("shared-pvc")
+  })
+
+  test("snapshot without pvcClaimName returns empty (no volumes at all)", () => {
+    const cfg = { ...baseConfig, volumeType: "snapshot" as const, pvcClaimName: "  " }
+    expect(buildVolumes({ sessionID: "ses_snap" }, cfg)).toEqual([])
+  })
+
+  test("snapshot ignores pvcMode=app (no app volume mounted, params inert)", () => {
+    const cfg = { ...baseConfig, volumeType: "snapshot" as const, snapshotEnabled: true, pvcClaimName: "shared-pvc" }
+    const vols = buildVolumes({ sessionID: "ses_snap", pvcMode: "app", appId: "app1" }, cfg)
+    expect(vols).toHaveLength(1)
+    expect(vols[0]!.name).toBe("package-cache")
+  })
+})
+
 describe("buildVolumes", () => {
   test("none returns empty", () => {
     expect(buildVolumes({ sessionID: "ses_1" }, baseConfig)).toEqual([])
   })
 
-  test("pvc: 7 volumes (6 session + 1 shared cache), same claimName, different subPaths", () => {
+  test("pvc: 8 volumes (7 session + 1 shared cache), same claimName, different subPaths", () => {
     const cfg = { ...baseConfig, volumeType: "pvc" as const, pvcClaimName: "my-pvc" }
     const vols = buildVolumes({ sessionID: "ses_abc" }, cfg)
-    expect(vols.length).toBe(7)
+    expect(vols.length).toBe(8)
     for (const v of vols) {
       expect(v.pvc!.claimName).toBe("my-pvc")
       expect(v.host).toBeUndefined()
@@ -37,16 +84,16 @@ describe("buildVolumes", () => {
       expect(v.subPath!.startsWith("sessions/ses_abc/")).toBe(true)
     }
     expect(vols.map((v) => v.mountPath)).toEqual([
-      "/workspace", "/home/sandbox", "/home/sandbox/.cache",
+      "/workspace", "/resources", "/home/sandbox", "/home/sandbox/.cache",
       "/home/sandbox/.config", "/home/sandbox/.local", "/home/sandbox/tmp",
       "/xybot-front/cache",
     ])
   })
 
-  test("host: 6 volumes with different host paths", () => {
+  test("host: 7 volumes with different host paths", () => {
     const cfg = { ...baseConfig, volumeType: "host" as const }
     const vols = buildVolumes({ sessionID: "ses_xyz" }, cfg)
-    expect(vols.length).toBe(6)
+    expect(vols.length).toBe(7)
     for (const v of vols) {
       expect(v.host!.path.startsWith("/var/opencode/sessions/ses_xyz/")).toBe(true)
       expect(v.pvc).toBeUndefined()
@@ -103,9 +150,9 @@ describe("buildVolumes", () => {
 describe("buildVolumes app mode (pvcMode=app)", () => {
   const appCfg = { ...baseConfig, volumeType: "pvc" as const, pvcClaimName: "shared-pvc" }
 
-  test("app mode: subPath prefix is apps/{appId}, 7 volumes, same claimName", () => {
+  test("app mode: subPath prefix is apps/{appId}, 8 volumes, same claimName", () => {
     const vols = buildVolumes({ sessionID: "ses_x", pvcMode: "app", appId: "app-42" }, appCfg)
-    expect(vols.length).toBe(7)
+    expect(vols.length).toBe(8)
     for (const v of vols) {
       expect(v.pvc!.claimName).toBe("shared-pvc")
       expect(v.host).toBeUndefined()
@@ -147,10 +194,10 @@ describe("buildVolumes app mode (pvcMode=app)", () => {
     expect(vols[0].subPath).toBe("sessions/ses_x/workspace")
   })
 
-  test("app mode ignored when volumeType=host", () => {
+  test("app mode ignored when volumeType=host (7 host volumes)", () => {
     const cfg = { ...baseConfig, volumeType: "host" as const }
     const vols = buildVolumes({ sessionID: "ses_x", pvcMode: "app", appId: "app-1" }, cfg)
-    expect(vols.length).toBe(6)
+    expect(vols.length).toBe(7)
     for (const v of vols) {
       expect(v.host!.path.startsWith("/var/opencode/sessions/ses_x/")).toBe(true)
       expect(v.pvc).toBeUndefined()

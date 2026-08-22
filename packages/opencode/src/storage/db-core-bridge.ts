@@ -11,8 +11,25 @@
 import { Effect, Layer } from "effect"
 import { Database } from "@opencode-ai/core/database/database"
 import { Database as SaasDb } from "./db"
+import { Flag } from "@/flag/flag"
 
 const TERMINALS = new Set(["get", "run", "all"])
+
+// postgres.js has no socket-level read/write timeout. A query issued on a
+// connection that is half-open (TCP alive after a network blip, but data no
+// longer flowing) hangs forever: server-side `statement_timeout` never fires
+// because the request never arrives. Guard every terminal query with a client
+// timeout so the run fails and releases its session lock instead of pinning it.
+// The leaked half-open connection is reclaimed by postgres.js `max_lifetime`.
+export function withQueryTimeout<A, E, R>(
+  effect: Effect.Effect<A, E, R>,
+  timeoutMs: number = Flag.OPENCODE_PG_STATEMENT_TIMEOUT_MS ?? 30000,
+): Effect.Effect<A, E | Error, R> {
+  return Effect.timeoutOrElse(effect, {
+    duration: `${timeoutMs} millis`,
+    orElse: () => Effect.fail(new Error(`PG query timed out after ${timeoutMs}ms`)),
+  })
+}
 
 function wrap(target: any): any {
   if (target == null || typeof target !== "object") return target
@@ -27,7 +44,7 @@ function wrap(target: any): any {
           if (typeof val !== "function") return Effect.succeed(undefined)
           const result = val.apply(obj, args)
           if (result && typeof result.then === "function") {
-            return Effect.promise(() => result)
+            return withQueryTimeout(Effect.promise(() => result))
           }
           return Effect.succeed(result)
         }
@@ -88,11 +105,13 @@ function createBridgeDb(): any {
           // If called with a drizzle sql template (has .sql/.params), use execute
           const arg = args[0]
           if (arg && typeof arg === "object" && ("sql" in arg || "queryChunks" in arg)) {
-            return Effect.promise(async () => {
-              const rows = await pgDb.execute(arg)
-              if (prop === "get") return Array.isArray(rows) ? rows[0] : rows
-              return rows
-            })
+            return withQueryTimeout(
+              Effect.promise(async () => {
+                const rows = await pgDb.execute(arg)
+                if (prop === "get") return Array.isArray(rows) ? rows[0] : rows
+                return rows
+              }),
+            )
           }
           // Otherwise delegate to the wrapped proxy (query builder terminal)
           return obj[prop](...args)

@@ -163,9 +163,26 @@ curl -s https://test-opencode.shadow-rpa.net/provider/auth | jq '.["openai"]'
 | POST | `/session` | 创建 session |
 | GET | `/session/:sessionID` | 详情 |
 | PATCH | `/session/:sessionID` | 修改 title 等 |
-| DELETE | `/session/:sessionID` | 删除 session + 关联 PVC volume |
+| DELETE | `/session/:sessionID` | 删除 session + 关联 PVC volume + 全部快照 |
 | POST | `/session/:sessionID/fork` | fork 一个新 session |
 | POST | `/session/:sessionID/share` | 生成分享链接 |
+| POST | `/session/:sessionID/snapshot` | 沙箱快照（快照模式下，异步创建） |
+| GET | `/session/:sessionID/snapshot` | 最新快照状态查询 |
+
+**创建参数（body 可选字段）**：`parentID` / `title` / `agent` / `model` / `metadata` / `permission` / `workspaceID` / `pvcMode` / `appId` / `sandbox`
+
+`sandbox` 对象（沙箱资源与启动源，子会话自动继承）：
+
+```json
+{
+  "sandbox": {
+    "cpu": "1",              // 必填：如 "1" / "0.5" / "500m"
+    "memory": "2Gi",         // 必填：如 "2Gi" / "512Mi"
+    "image": "registry/…",   // 可选：会话级沙箱镜像（覆盖部署默认值）
+    "snapshotId": "uuid"     // 可选：从指定快照恢复（环境派生/回滚，优先级最高）
+  }
+}
+```
 
 ### 3.4 消息
 
@@ -763,6 +780,39 @@ await sendMessage(sid, "cat /workspace/app.py")
 | 内部轮询间隔 | `30` 秒（硬编码） | 检查频率，最坏额外等待 30s |
 
 **实际回收延迟**：30~60 秒（空闲阈值 + 轮询窗口）。
+
+### 4.6a 快照模式（沙箱本地盘持久化）
+
+> **会话级可选**：创建会话时 `sandbox.persistMode: "snapshot" | "pvc"` 按会话选择持久化方式，创建时固化（fork/子会话继承）；缺省回退部署默认 `OPENCODE_SANDBOX_VOLUME_TYPE`。快照能力总开关 `OPENCODE_SANDBOX_SNAPSHOT_ENABLED=true`（未开时会话选 snapshot 返回 400；全局默认为 snapshot 时也必须开，否则服务拒绝启动）。详见 `docs/sandbox-snapshot-design.md`。
+
+```bash
+# 会话级指定快照模式（全局默认 pvc 时）
+curl -X POST $BASE/session -d '{"sandbox":{"cpu":"1","memory":"2Gi","persistMode":"snapshot"}}'
+# 会话级指定 PVC 模式（全局默认 snapshot 时）
+curl -X POST $BASE/session -d '{"sandbox":{"cpu":"1","memory":"2Gi","persistMode":"pvc"}}'
+```
+
+**行为变化**：
+
+- workspace 在沙箱本地盘（rootfs），不再挂 NFS PVC——小文件/元数据性能大幅提升
+- 空闲回收前**自动快照**：**快照 Ready 才销毁沙箱**（失败保留沙箱重试，代码不丢），下次发消息**从快照秒级恢复**（数据 + 依赖缓存完整）
+- 快照 Ready 后快照 id 自动写入 `metadata.sandboxSnapshot`（`GET /session` 可见）
+- 会话删除自动清理全部快照（含用户数据不留存）；同会话只保留最新快照（TTL 默认 7 天）
+
+**业务侧用法**：
+
+```bash
+# 1. 关键节点手动快照（AI 完成重要任务后；沙箱继续运行不销毁）
+curl -X POST $BASE/session/$SID/snapshot
+# → {"snapshotId":"9629…","state":"creating"}，GET 同路径轮询到 ready
+
+# 2. 从快照派生新会话（环境复用/时间点回滚）
+curl -X POST $BASE/session -d '{"sandbox":{"cpu":"1","memory":"2Gi","snapshotId":"<id>"}}'
+```
+
+**沙箱启动优先级**：`sandbox.snapshotId`（显式）→ 会话自动快照 → `sandbox.image`（会话级镜像）→ 部署默认镜像；任一级失败自动降级到下一级。
+
+**注意**：快照不保留进程/内存（dev server 需重启，但 node_modules 在，秒级）；`pvcMode` 是 PVC 模式内部的维度（session/app 卷粒度），快照会话传 `pvcMode`/`appId` 不生效也不报错。
 
 ---
 

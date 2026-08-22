@@ -6,6 +6,11 @@ import { SessionID } from "../../src/session/schema"
 const sid = "sess_001" as SessionID
 const sid2 = "sess_002" as SessionID
 
+async function pollUntil(pred: () => boolean, ms: number) {
+  const deadline = Date.now() + ms
+  while (!pred() && Date.now() < deadline) await Bun.sleep(5)
+}
+
 afterEach(() => {
   _clearLocks()
 })
@@ -87,6 +92,26 @@ describe("waitForSessionLock", () => {
       ),
     )
     expect(waited).toBe(true)
+  })
+
+  test("fails with ServiceUnavailable when lock is held past timeout", async () => {
+    Effect.runFork(withSessionLock(sid, Effect.sleep("300 millis")))
+    await pollUntil(() => _getLockCount(sid) === 1, 1000)
+    expect(_getLockCount(sid)).toBe(1)
+
+    const exit = await Effect.runPromiseExit(waitForSessionLock(sid, 0.05))
+    expect(Exit.isFailure(exit)).toBe(true)
+    expect(Exit.isFailure(exit) && JSON.stringify(exit.cause)).toContain("ServiceUnavailable")
+
+    await pollUntil(() => _getLockCount(sid) === 0, 2000)
+    expect(_getLockCount(sid)).toBe(0)
+  })
+
+  test("succeeds within timeout after lock release", async () => {
+    Effect.runFork(withSessionLock(sid, Effect.sleep("100 millis")))
+    await pollUntil(() => _getLockCount(sid) === 0, 2000)
+    const exit = await Effect.runPromiseExit(waitForSessionLock(sid, 5))
+    expect(Exit.isSuccess(exit)).toBe(true)
   })
 })
 
