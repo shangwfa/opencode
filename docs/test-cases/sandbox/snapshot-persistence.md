@@ -527,4 +527,4 @@ done
 
 ### 附带发现
 
-- `session_snapshot.session_id` 外键 `ON DELETE CASCADE`：`DELETE /session/:id` 会级联删除该会话全部快照记录（远端快照成孤儿，靠 TTL 清理）。「删会话=放弃一切」语义成立但与「destroy 触发快照保存」直觉冲突，待产品确认是否改为 SET NULL 或保留记录。
+- `session_snapshot.session_id` 外键 `ON DELETE CASCADE`：`DELETE /session/:id` 会级联删除该会话全部快照记录（远端快照成孤儿，靠 TTL 清理）。**已确认维持现状**（2026-08-22）：「删会话=放弃一切」语义成立；正常恢复路径（session 存续 + 沙箱回收）不受影响，仅删会话后不可再恢复，孤儿快照由远端 TTL 过期兜底。
