@@ -503,6 +503,7 @@ execd_image = "opensandbox/execd:v1.0.21"   # 以本地 docker images 实际版�
   - POST 恢复 8 次 → `NOT_FOUND OK NOT_FOUND OK …`，OK 的沙箱均真实创建且 Running
   - 即负载均衡打到持有快照数据的副本则成功，打到另一副本则报 NOT_FOUND。老快照（源沙箱早已销毁）同样「列表 Ready / 单查 404 交替」。
 - 附带发现：快照列表中存在 `Failed | RegistryNotConfigured | snapshot-registry not configured in controller manager` 记录——远端未配置 snapshot-registry，快照 image 无法推送到共享仓库，这是副本间数据不共享的直接原因。
+- **快照真实性验证**（2026-08-22 内容级对照实验）：纯 curl 绕开 opencode 全链路——建 mini 源沙箱 → proxy exec 写 `/workspace/mark.txt` → 快照 Ready → 删源沙箱 → 反复恢复 10 次（✓✗✓✗✓✗✓✗✓✗）→ 对 5 个恢复成功的沙箱逐一 `cat /workspace/mark.txt`：**全部输出 `REAL-SNAP-MARKER-822`，内容完整**。结论：快照数据是真的、rootfs 物化完整、恢复出的沙箱可用——缺陷纯粹在控制面元数据可见性（一半副本查无此快照），数据面无损。
 - 排除过程：手动 curl 直连远端复现（排除 SDK/server 侧）；对比本地/远端 openapi.json 的 CreateSandboxRequest 字段一致（均有 snapshotId）；name/id 两种引用均报错。
 - 我方语义保持 fail-fast：有就恢复、没有就走 markRestoreFailed + 镜像冷启动降级（已验证工作正常），不做重试绕过。
 
