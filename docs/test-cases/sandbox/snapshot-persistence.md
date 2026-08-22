@@ -495,12 +495,35 @@ execd_image = "opensandbox/execd:v1.0.21"   # 以本地 docker images 实际版�
 
 实测（exec_log `sandbox-create` 记录，现记录实际镜像 + restoredFromSnapshot 标志）：pvc → session-terminal ✓；snapshot 冷启动 → v1.0.0 ✓（5.3s）。
 
-### 远端 K8s 快照恢复 NOT_FOUND（新发现问题，非本次改动引入）
+### 远端 K8s 快照恢复 NOT_FOUND（根因已定位：多副本快照元数据不共享，待运维侧修复）
 
 - 现象：快照 Ready（GET `/snapshots/{id}` 200，"Kubernetes snapshot image created successfully"）→ POST `/sandboxes` `{snapshotId}` 返回 `SNAPSHOT::NOT_FOUND`。
-- 手动 curl 直连远端复现，排除 SDK/server 侧问题；name 与 id 均报 NOT_FOUND。
-- server 降级链路工作正常：markRestoreFailed → mini 镜像冷启动，会话继续可用（restoredFromSnapshot=false）。
-- 历史：T25.3 恢复 PASS 是在**本地 OpenSandbox**（8080, python 0.2.2）验证的；T25.8 K8s 场景当时即 BLOCKED（RBAC 403）。K8s 模式快照消费链路属远端服务侧待查（疑似快照 image 节点调度可见性或索引问题）。
+- **根因实锤**（2026-08-22 受控实验）：远端 OpenSandbox 为**双副本部署且快照元数据副本本地化、不共享**。同一请求连续重放呈完美 50% 交替：
+  - GET 同一快照 12 次 → `404 200 404 200 …`（严格交替）
+  - POST 恢复 8 次 → `NOT_FOUND OK NOT_FOUND OK …`，OK 的沙箱均真实创建且 Running
+  - 即负载均衡打到持有快照数据的副本则成功，打到另一副本则报 NOT_FOUND。老快照（源沙箱早已销毁）同样「列表 Ready / 单查 404 交替」。
+- 附带发现：快照列表中存在 `Failed | RegistryNotConfigured | snapshot-registry not configured in controller manager` 记录——远端未配置 snapshot-registry，快照 image 无法推送到共享仓库，这是副本间数据不共享的直接原因。
+- 排除过程：手动 curl 直连远端复现（排除 SDK/server 侧）；对比本地/远端 openapi.json 的 CreateSandboxRequest 字段一致（均有 snapshotId）；name/id 两种引用均报错。
+- 我方语义保持 fail-fast：有就恢复、没有就走 markRestoreFailed + 镜像冷启动降级（已验证工作正常），不做重试绕过。
+
+**运维侧处理建议**（二选一，推荐 b）：
+
+1. OpenSandbox controller/API 收敛为单副本（快照数据天然一致；容量允许时最简单）
+2. 配置 `snapshot-registry`（controller manager 启动参数）：快照物化 image 推送共享镜像仓库，所有副本/节点均可拉取——同时消除上面 RegistryNotConfigured 的 Failed 快照问题
+
+修复后验证方法：
+
+```bash
+SNAP=<ready状态的快照id>; KEY=<OPEN-SANDBOX-API-KEY>
+for i in $(seq 1 8); do
+  curl -s -X POST http://<opensandbox>/sandboxes -H "OPEN-SANDBOX-API-KEY: $KEY" \
+    -H 'Content-Type: application/json' \
+    -d "{\"snapshotId\":\"$SNAP\",\"timeoutSeconds\":600,\"resourceLimits\":{\"cpu\":\"1\",\"memory\":\"2Gi\"}}" | head -c 80; echo
+done
+# 期望：8 次全部返回 sandbox id，无 SNAPSHOT::NOT_FOUND
+```
+
+- 历史：T25.3 恢复 PASS 是在**本地 OpenSandbox 单实例**（8080, python 0.2.2）验证的；T25.8 K8s 场景当时即 BLOCKED（RBAC 403）。K8s 多副本场景本次为首次实测。
 
 ### 附带发现
 
