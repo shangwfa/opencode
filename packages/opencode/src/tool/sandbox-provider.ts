@@ -382,7 +382,11 @@ export namespace SandboxProvider {
         return Effect.gen(function* () {
           const resolved = opts ?? (yield* Effect.promise(() => resolveSandboxOpts(sessionID)))
           const timeoutSeconds = hasVolume ? config.maxTtlSeconds : config.timeoutSeconds
-          const resource = resolved.sandbox ?? config.resourceLimits
+          // 只透传 cpu/memory 给远端：SandboxResource 里的 image/snapshotId/persistMode 是
+          // opencode 会话级语义，泄漏进 resourceLimits 会被远端按非法资源处理（实测 Pending 60s 超时）
+          const resource = resolved.sandbox
+            ? { cpu: resolved.sandbox.cpu, memory: resolved.sandbox.memory }
+            : config.resourceLimits
           log.info("creating sandbox", { sessionID, volumeType: config.volumeType, timeoutSeconds, pvcMode: resolved.pvcMode, resource })
           const volumes = buildVolumes({ sessionID, pvcMode: resolved.pvcMode, appId: resolved.appId, persistMode: resolved.persistMode }, config)
           const persistMode = resolved.persistMode ?? (config.volumeType === "snapshot" ? "snapshot" : "pvc")
@@ -1069,7 +1073,11 @@ export namespace SandboxProvider {
           const timeoutSeconds = isKept ? Math.max(baseTtl, config.maxTtlSeconds) * 10 : baseTtl
           const resolved = opts ?? (yield* Effect.promise(() => resolveSandboxOpts(sessionID)))
           const persistMode = resolved.persistMode ?? (config.volumeType === "snapshot" ? "snapshot" : "pvc")
-          const resource = resolved.sandbox ?? config.resourceLimits
+          // 只透传 cpu/memory 给远端：SandboxResource 里的 image/snapshotId/persistMode 是
+          // opencode 会话级语义，泄漏进 resourceLimits 会被远端按非法资源处理（实测 Pending 60s 超时）
+          const resource = resolved.sandbox
+            ? { cpu: resolved.sandbox.cpu, memory: resolved.sandbox.memory }
+            : config.resourceLimits
           const timeStarted = Date.now()
           const volumes = buildVolumes({ sessionID, pvcMode: resolved.pvcMode, appId: resolved.appId, persistMode }, config)
           // 会话级沙箱参数（SandboxResource）：镜像覆盖 + 显式恢复源；
