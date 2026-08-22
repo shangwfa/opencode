@@ -88,15 +88,10 @@ export function buildVolumes(scope: VolumeScope, config: SandboxConfig.Interface
   const mode = scope.persistMode ?? config.volumeType
   // snapshot 模式：workspace 留在沙箱 rootfs（随快照持久化，见 docs/sandbox-snapshot-design.md），
   // 只挂跨会话共享的 package-cache；pvcMode/appId 不参与（app 卷不挂，参数自然失效）。
-  if (mode === "snapshot") {
-    if (!config.pvcClaimName.trim()) return []
-    return [{
-      name: "package-cache",
-      mountPath: requirePackageCacheMount(config.packageCacheMount, []),
-      subPath: "shared/package-cache",
-      pvc: { claimName: config.pvcClaimName },
-    }]
-  }
+  // 快照模式不挂任何卷：workspace 已随快照 rootfs 持久化，node_modules 也在快照内。
+  // package-cache PVC 是 RWO——同会话快照重建/多沙箱并存时第二个挂载者会被
+  // 调度到无卷节点而 Pending（实测服务端 60s 超时），故快照会话不传 volumes。
+  if (mode === "snapshot") return []
 
   if (mode === "none") return []
 
@@ -282,7 +277,9 @@ async function runCommandEarlyExit(
 
 export namespace SandboxProvider {
   const log = Log.create({ service: "sandbox-provider" })
-  const CREATE_TIMEOUT_SECONDS = 60
+  // 远端 BatchSandbox 池化分配时 POST /sandboxes 会排队等待，SDK 默认 30s 太短。
+  // SDK 请求超时放 90s；Effect 层上限留 120s 缓冲（必须 > SDK，否则先被 Effect 砍）。
+  const CREATE_TIMEOUT_SECONDS = 120
 
   export interface Interface {
     readonly getOrCreate: (
@@ -359,6 +356,7 @@ export namespace SandboxProvider {
         protocol: config.protocol,
         ...(config.apiKey ? { apiKey: config.apiKey } : {}),
         useServerProxy: config.useServerProxy,
+        requestTimeoutSeconds: 90,
       })
 
       const hasVolume = config.volumeType !== "none"
@@ -397,6 +395,7 @@ export namespace SandboxProvider {
                 image: sessionImage,
                 timeoutSeconds,
                 resource,
+                readyTimeoutSeconds: 90,
                 ...(volumes.length > 0 ? { volumes } : {}),
               }),
             catch: (e) => new Error(`Sandbox.create failed: ${e instanceof Error ? e.message : String(e)}`),
@@ -723,6 +722,7 @@ export namespace SandboxProvider {
         protocol: config.protocol,
         ...(config.apiKey ? { apiKey: config.apiKey } : {}),
         useServerProxy: config.useServerProxy,
+        requestTimeoutSeconds: 90,
       })
 
       const hasVolume = config.volumeType !== "none"
@@ -1090,20 +1090,22 @@ export namespace SandboxProvider {
                   snapshotId: id,
                   timeoutSeconds,
                   resource,
+                  readyTimeoutSeconds: 90,
                   ...(volumes.length > 0 ? { volumes } : {}),
                 }),
               catch: (e) => new Error(`Sandbox.create failed: ${e instanceof Error ? e.message : String(e)}`),
             })
           const createFromImage = () =>
             Effect.tryPromise({
-              try: () =>
-                Sandbox.create({
-                  connectionConfig,
-                  image: sessionImage,
-                  timeoutSeconds,
-                  resource,
-                  ...(volumes.length > 0 ? { volumes } : {}),
-                }),
+               try: () =>
+                 Sandbox.create({
+                   connectionConfig,
+                   image: sessionImage,
+                   timeoutSeconds,
+                   resource,
+                   readyTimeoutSeconds: 90,
+                   ...(volumes.length > 0 ? { volumes } : {}),
+                 }),
               catch: (e) => new Error(`Sandbox.create failed: ${e instanceof Error ? e.message : String(e)}`),
             })
           // 快照恢复优先：有快照则从快照拉起（秒级）；恢复失败（快照被 GC/层损坏）
