@@ -441,3 +441,45 @@ bun test src/context/terminal.test.ts \
 自动化分别覆盖 session/server-scoped cache、`pty.deleted` 幂等删除、clone 清理旧 ID、clone 期间 tab 被删除，以及 WebSocket close 后 get=200 重连/get=404 clone。浏览器刷新与完整远端恢复另设 App E2E，不由纯状态单测代替。
 
 **期望**：不串 Session、不遗留远端 PTY、不保留僵尸 tab，重连不重复完整 buffer。
+
+---
+
+## 复测记录（2026-08-22，PTY drain 修复后全量回归）
+
+> 环境：本地 PG + 远端 K8s Sandbox（`useServerProxy=true`，PTY 走 proxy WS），镜像含修复 `d4407bce89`。
+
+### 修复摘要（本次回归的前置）
+
+- **根因**：PTY connect handler 的 drain 循环在 `socket.bufferedAmount`（effect Socket 封装，Node ws 适配器）上永久挂起——写完首帧 replay 后 fiber 卡死，meta binary 帧与实时输出全部滞留 outbox，客户端只收到 1 帧。
+- **修复**（`d4407bce89`）：移除 drain 循环的 bufferedAmount 背压检查；慢客户端保护由 offer 侧 `queued>2MiB` overflowed 标志（1013 close）+ agent 侧 `closeOnBackpressureLimit` 兜底。
+- **旁证**：远端 OpenSandbox proxy 实测支持 WS（裸握手 `101 Switching Protocols`；宿主机/server 容器经 proxy 连 agent 均能收到 replay+meta 两帧）——proxy 与 agent 均无问题，缺陷在 server handler 内部。
+
+### 用例结果
+
+| 用例 | 结果 | 备注 |
+|---|---|---|
+| PTY-1 CRUD | PASS | 创建 running/cwd=/workspace、更新、删除后 404 |
+| PTY-2 沙箱放置 | PASS | PTY 进程 pid=44 在沙箱内（`ps` 可见）、Server 容器 CLEAN、PG running |
+| PTY-3 Session 隔离 | PASS | B 对 A 的 PTY get/update/delete 均 404，A 保持 running |
+| PTY-4 WS 输入输出 + meta | **PASS** | META{cursor:124} + echo 实时输出（修复前仅 1 帧 replay） |
+| PTY-5 cursor 重连 | PASS* | 重连收到 cursor 后新输出（MARKER_NEW）、cursor 递增；replay 范围偏大（含旧内容）为 agent buffer 起点已知差异，待排查 |
+| PTY-6 退出态保留 | PASS | status=exited/exitCode=23；DELETE 后 404 |
+| PTY-7 lease 释放 | PASS | keep_alive t→f（最后一个 running PTY 删除后） |
+| PTY-9 ticket scope | PASS | 替换 sessionID → 连接后零帧（等效拒绝）；篡改 ticket 同样零帧 |
+| PTY-19 缺 sessionID 不回退本地 | PASS | POST /pty 无 sessionID → 500 |
+| PTY-20 current/legacy 一致性 | PASS | /api/pty 返回 location wrapper + 相同 PTY ID |
+| PTY-21 自动化回归 | PASS | core 22/22、opencode httpapi-pty 8/8、pty-shell 2/2、agent bundle 构建成功；app 层 6/7（1 fail 为 solid-js server 构建环境问题，与 PTY 无关） |
+| PTY-22 只读不建沙箱 | PASS | list=[]、随机 ID 404、PG 无 running sandbox |
+| PTY-24 resize 真实 TTY | PASS | `stty size` → `37 119` |
+| PTY-25 exited 上限 | PASS | 26 个退出 PTY → 列表恰 25、第 1 个 404 |
+| PTY-26 ticket 强制鉴权 | PASS | 无 ticket/篡改 ticket → 零帧；合法 ticket → meta；mint 缺 header → 403 |
+| PTY-30 快速退出不泄漏 lease | PASS | 1s 内 keep_alive=f 收敛 |
+| PTY-33 父子 root 路由 | PASS | 共享 root sandbox 但 owner 隔离（子 list=0、get 404） |
+| PTY-8/10/11/13/14/15/16 | 未跑 | 需双 Pod / SSE 断链注入 / 心跳长周期等专项环境 |
+| PTY-23 agent health | PASS（旁证） | 内网 health ready（含 protocolVersion/instanceID）；公网边界未测 |
+| PTY-27/28/29/32/34 | 未跑 | 需专项注入（大 replay/慢客户端/agent 重启/App E2E） |
+
+### 遗留
+
+- PTY-5 replay 范围偏大（agent 侧 buffer 起点计算），核心 cursor 补发语义正确，待专项排查。
+- app 层 terminal 单测 1 fail 为 solid-js 模块解析环境问题（基线，与 PTY 无关）。
