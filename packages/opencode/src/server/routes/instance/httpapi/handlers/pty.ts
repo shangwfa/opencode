@@ -186,10 +186,9 @@ export const ptyConnectHandlers = HttpApiBuilder.group(PtyConnectApi, "pty-conne
               queued -= packet.size
               yield* write(packet.item)
               if (packet.item instanceof Socket.CloseEvent) return yield* Effect.never
-              if ((yield* socket.bufferedAmount) <= 2 * 1024 * 1024) continue
-              overflowed = true
-              yield* write(new Socket.CloseEvent(1013, "client too slow"))
-              return yield* Effect.never
+              // effect Socket.bufferedAmount 封装在 Node ws 上会挂起（drain 卡死，
+              // meta/live 全堵队列，实测 PTY 只到 replay 帧）。跳过该检查：
+              // 慢客户端保护由 offer 侧 queued>2MB 的 overflowed 标志兜底。
             }
           })
         yield* Effect.race(
