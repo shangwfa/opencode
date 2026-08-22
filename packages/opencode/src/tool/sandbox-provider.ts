@@ -20,6 +20,7 @@ export namespace SandboxConfig {
     readonly apiKey: string
     readonly useServerProxy: boolean
     readonly image: string
+    readonly snapshotImage: string
     readonly timeoutSeconds: number
     readonly resourceLimits: Record<string, string>
     readonly volumeType: "none" | "pvc" | "host" | "snapshot"
@@ -43,6 +44,7 @@ export namespace SandboxConfig {
     apiKey: Flag.OPENCODE_SANDBOX_API_KEY,
     useServerProxy: Flag.OPENCODE_SANDBOX_USE_SERVER_PROXY,
     image: Flag.OPENCODE_SANDBOX_IMAGE,
+    snapshotImage: Flag.OPENCODE_SANDBOX_SNAPSHOT_IMAGE,
     timeoutSeconds: Flag.OPENCODE_SANDBOX_TIMEOUT,
     resourceLimits: { cpu: "1", memory: "2Gi" },
     volumeType: Flag.OPENCODE_SANDBOX_VOLUME_TYPE,
@@ -385,11 +387,14 @@ export namespace SandboxProvider {
           const resource = resolved.sandbox ?? config.resourceLimits
           log.info("creating sandbox", { sessionID, volumeType: config.volumeType, timeoutSeconds, pvcMode: resolved.pvcMode, resource })
           const volumes = buildVolumes({ sessionID, pvcMode: resolved.pvcMode, appId: resolved.appId, persistMode: resolved.persistMode }, config)
+          const persistMode = resolved.persistMode ?? (config.volumeType === "snapshot" ? "snapshot" : "pvc")
+          const sessionImage = resolved.sandbox?.image?.trim()
+            || (persistMode === "snapshot" ? config.snapshotImage : config.image)
           const sb = yield* Effect.tryPromise({
             try: () =>
               Sandbox.create({
                 connectionConfig,
-                image: config.image,
+                image: sessionImage,
                 timeoutSeconds,
                 resource,
                 ...(volumes.length > 0 ? { volumes } : {}),
@@ -1067,8 +1072,10 @@ export namespace SandboxProvider {
           const resource = resolved.sandbox ?? config.resourceLimits
           const timeStarted = Date.now()
           const volumes = buildVolumes({ sessionID, pvcMode: resolved.pvcMode, appId: resolved.appId, persistMode }, config)
-          // 会话级沙箱参数（SandboxResource）：镜像覆盖 + 显式恢复源
-          const sessionImage = resolved.sandbox?.image?.trim() || config.image
+          // 会话级沙箱参数（SandboxResource）：镜像覆盖 + 显式恢复源；
+          // snapshot 模式冷启动/恢复失败降级用精简镜像（rootfs 小、快照快），默认（pvc）用原镜像
+          const sessionImage = resolved.sandbox?.image?.trim()
+            || (persistMode === "snapshot" ? config.snapshotImage : config.image)
           const explicitSnapshotId = resolved.sandbox?.snapshotId?.trim() || null
 
           // 快照恢复优先：显式 snapshotId > 会话快照表最新 ready|stale；恢复失败在 catch 分支降级镜像
@@ -1134,7 +1141,7 @@ export namespace SandboxProvider {
                 .values({
                   id: `sandbox-create-${timeStarted}`,
                   session_id: sessionID,
-                  command: JSON.stringify({ sandboxID: sb.id, image: config.image, durationMs: timeFinished - timeStarted }),
+                  command: JSON.stringify({ sandboxID: sb.id, image: sessionImage, restoredFromSnapshot: created.restoredFromSnapshot, durationMs: timeFinished - timeStarted }),
                   status: "completed",
                   source: "sandbox-create",
                   time_started: timeStarted,

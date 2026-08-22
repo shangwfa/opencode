@@ -12,6 +12,8 @@
 #   OPENCODE_SANDBOX_SNAPSHOT_ENABLED=true       启用快照（idle 回收前快照、创建时恢复）
 #   OPENCODE_SANDBOX_SNAPSHOT_WAIT_SEC=300       快照 Ready 等待上限
 #   OPENCODE_SANDBOX_IDLE_REAP_SEC=60            （测试用）缩短 idle 回收阈值
+#   OPENCODE_SANDBOX_SNAPSHOT_IMAGE=<ref>        快照模式冷启动/降级镜像（默认 mini v1.0.0；
+#                                                默认 pvc 模式仍用 OPENCODE_SANDBOX_IMAGE 原镜像）
 # 注意：确保同一本地 PG 只有单实例 opencode server（双实例会互相回收对方沙箱）
 export BASE=http://127.0.0.1:14097
 export PG_URL='postgresql://local@127.0.0.1:5432/opencode'
@@ -472,3 +474,34 @@ execd_image = "opensandbox/execd:v1.0.21"   # 以本地 docker images 实际版�
 | T25.4/4b/7/8 | 未跑 | 单测覆盖（同前）；T25.8 维持 BLOCKED |
 
 **结论**：修复（parseSandboxColumn / createSnapshot 日志 / reconcile 404→failed / snapshot pending 文案 / restoreFrom 日志）全部经复测验证生效；mini 镜像快照提速 ~85%（86s→10s）且功能无回归。
+
+---
+
+## 复测记录（2026-08-22，snapshotImage 分离 + 远端 K8s 实测）
+
+环境：本地 PG + 远端 K8s 沙箱（useServerProxy=true），镜像含 snapshotImage 改动。
+
+### snapshotImage 镜像分离
+
+新增 `OPENCODE_SANDBOX_SNAPSHOT_IMAGE`（默认 `…opencode-sandbox:v1.0.0` mini 精简镜像）。镜像选择规则：
+
+| 场景 | 镜像 |
+|---|---|
+| pvc/none 模式创建 | `OPENCODE_SANDBOX_IMAGE`（原镜像 session-terminal） |
+| snapshot 模式冷启动（无快照） | `OPENCODE_SANDBOX_SNAPSHOT_IMAGE`（mini） |
+| snapshot 模式恢复失败降级 | 同上（mini），保持后续快照一致性 |
+| 快照恢复成功 | 不传 image（快照自带 rootfs） |
+| 会话显式 `sandbox.image` | 最高优先，覆盖上述全部 |
+
+实测（exec_log `sandbox-create` 记录，现记录实际镜像 + restoredFromSnapshot 标志）：pvc → session-terminal ✓；snapshot 冷启动 → v1.0.0 ✓（5.3s）。
+
+### 远端 K8s 快照恢复 NOT_FOUND（新发现问题，非本次改动引入）
+
+- 现象：快照 Ready（GET `/snapshots/{id}` 200，"Kubernetes snapshot image created successfully"）→ POST `/sandboxes` `{snapshotId}` 返回 `SNAPSHOT::NOT_FOUND`。
+- 手动 curl 直连远端复现，排除 SDK/server 侧问题；name 与 id 均报 NOT_FOUND。
+- server 降级链路工作正常：markRestoreFailed → mini 镜像冷启动，会话继续可用（restoredFromSnapshot=false）。
+- 历史：T25.3 恢复 PASS 是在**本地 OpenSandbox**（8080, python 0.2.2）验证的；T25.8 K8s 场景当时即 BLOCKED（RBAC 403）。K8s 模式快照消费链路属远端服务侧待查（疑似快照 image 节点调度可见性或索引问题）。
+
+### 附带发现
+
+- `session_snapshot.session_id` 外键 `ON DELETE CASCADE`：`DELETE /session/:id` 会级联删除该会话全部快照记录（远端快照成孤儿，靠 TTL 清理）。「删会话=放弃一切」语义成立但与「destroy 触发快照保存」直觉冲突，待产品确认是否改为 SET NULL 或保留记录。

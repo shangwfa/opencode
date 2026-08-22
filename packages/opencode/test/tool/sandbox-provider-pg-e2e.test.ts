@@ -48,6 +48,7 @@ const configLayer = Layer.succeed(
     apiKey: process.env.OPENCODE_SANDBOX_API_KEY ?? "",
     useServerProxy: process.env.OPENCODE_SANDBOX_USE_SERVER_PROXY === "true",
     image: IMAGE,
+    snapshotImage: IMAGE,
     timeoutSeconds: 300,
     resourceLimits: { cpu: "1", memory: "2Gi" },
     volumeType: "none" as const,

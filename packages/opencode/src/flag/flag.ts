@@ -95,6 +95,10 @@ export namespace Flag {
   export const OPENCODE_SANDBOX_IMAGE =
     process.env["OPENCODE_SANDBOX_IMAGE"] ??
     "crpi-hlpnu8kiweghie0r.cn-hangzhou.personal.cr.aliyuncs.com/shangwfa/opencode-sandbox:session-terminal"
+  // snapshot 模式冷启动/降级用的精简镜像（rootfs 小、快照快）；默认（pvc）模式用 OPENCODE_SANDBOX_IMAGE
+  export const OPENCODE_SANDBOX_SNAPSHOT_IMAGE =
+    process.env["OPENCODE_SANDBOX_SNAPSHOT_IMAGE"] ??
+    "crpi-hlpnu8kiweghie0r.cn-hangzhou.personal.cr.aliyuncs.com/shangwfa/opencode-sandbox:v1.0.0"
   export const OPENCODE_SANDBOX_TIMEOUT = number("OPENCODE_SANDBOX_TIMEOUT") ?? 600
 
   export const OPENCODE_SANDBOX_API_KEY = process.env["OPENCODE_SANDBOX_API_KEY"] ?? ""
