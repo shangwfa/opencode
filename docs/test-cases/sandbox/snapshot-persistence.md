@@ -60,6 +60,48 @@ curl -s --max-time 60 -X POST "$BASE/session/$SID/exec" -H 'Content-Type: applic
 
 > **本地实测**（2026-08-20）：PASS — restoreFrom=dee6406c…，恢复+exec（含 rm node_modules + 重装）3.2s，重装 702ms，快照标 stale|restored
 
+### T25.3b 恢复来源真伪：真·快照恢复 vs 镜像冷启动
+
+场景：`Sandbox.create(snapshotId)` 与 `Sandbox.create(image)` 都会返回一个 Running 沙箱——**状态无法区分来源**。本用例验证「声称从快照恢复」的沙箱确实携带快照数据，而非悄悄降级成了镜像冷启动；同时反向对照冷启动路径的数据为空。
+
+```bash
+# ── 方式 A：opencode HTTP 全链路 ──
+# 1) snapshot 会话写入特征文件 → 快照 ready → 杀远端沙箱（或 idle 回收）
+curl -s -X POST "$BASE/session/$SID/exec" -d '{"command":"echo SNAPSHOT-EVIDENCE-$RANDOM > /workspace/origin.txt"}'
+curl -s -X POST "$BASE/session/$SID/snapshot"; sleep 40   # 等 ready
+psql "$PG_URL" -tAc "DELETE FROM sandbox WHERE session_id='$SID'"  # 或直接杀远端
+# 2) 触发重建，取三重证据
+curl -s -X POST "$BASE/session/$SID/exec" -d '{"command":"cat /workspace/origin.txt"}'   # 数据面
+psql "$PG_URL" -tAc "SELECT command FROM exec_log WHERE session_id='$SID' AND source='sandbox-create' ORDER BY time_created DESC LIMIT 1"
+```
+
+**期望**（快照恢复路径）：① exec 输出含 `SNAPSHOT-EVIDENCE-*`（数据随快照回来）；② exec_log `"restoredFromSnapshot":true`；③ 创建耗时显著低于该镜像冷启动基线（mini ≈5s，快照恢复应秒级）。
+**反向对照**（降级冷启动路径）：marker 不存在（`No such file`）且 `"restoredFromSnapshot":false` —— 两标志必须**一致**；若出现 `true 但无 marker` 即「假恢复」，属严重缺陷。
+
+```bash
+# ── 方式 B：纯 curl 直连 OpenSandbox（绕开 opencode，定位服务侧行为）──
+K=http://<opensandbox>; AUTH="OPEN-SANDBOX-API-KEY: <key>"
+IMG=crpi-hlpnu8kiweghie0r.cn-hangzhou.personal.cr.aliyuncs.com/shangwfa/opencode-sandbox:v1.0.0
+S=$(curl -s -X POST $K/sandboxes -H "$AUTH" -H 'Content-Type: application/json' \
+  -d "{\"image\":{\"uri\":\"$IMG\"},\"entrypoint\":[\"tail\",\"-f\",\"/dev/null\"],\"timeoutSeconds\":3600,\"resourceLimits\":{\"cpu\":\"1\",\"memory\":\"2Gi\"}}" | jq -r .id)
+# 写特征文件（经 execd proxy，端口 44772）
+curl -s -X POST $K/sandboxes/$S/proxy/44772/command -H "$AUTH" -H 'Content-Type: application/json' \
+  -d '{"command":"mkdir -p /workspace && echo REAL-SNAP-MARKER > /workspace/mark.txt && sync"}'
+SNAP=$(curl -s -X POST $K/sandboxes/$S/snapshots -H "$AUTH" -H 'Content-Type: application/json' -d '{"name":"restore-origin-check"}' | jq -r .id)
+sleep 40   # 等 Ready（GET /snapshots/$SNAP 轮询 status.state）
+curl -s -X DELETE $K/sandboxes/$S -H "$AUTH"   # 删源沙箱
+# 反复恢复（多副本部署下有 NOT_FOUND 交替问题，见下方复测记录）→ 对成功的沙箱验证内容
+R=$(curl -s -X POST $K/sandboxes -H "$AUTH" -H 'Content-Type: application/json' \
+  -d "{\"snapshotId\":\"$SNAP\",\"timeoutSeconds\":3600,\"resourceLimits\":{\"cpu\":\"1\",\"memory\":\"2Gi\"}}" | jq -r '.id // empty')
+curl -s -X POST $K/sandboxes/$R/proxy/44772/command -H "$AUTH" -H 'Content-Type: application/json' \
+  -d '{"command":"cat /workspace/mark.txt"}'   # stdout 必须输出 REAL-SNAP-MARKER
+```
+
+**期望**：stdout 含 `REAL-SNAP-MARKER` = 真·快照恢复；空/No such file = 实际是镜像冷启动。
+
+> **远端 K8s 实测**（2026-08-22，方式 B）：PASS — 恢复成功 5/5 个沙箱均 cat 出完整 marker，快照 rootfs 物化真实有效。注意多副本部署下恢复请求约 50% 报 `SNAPSHOT::NOT_FOUND`（控制面元数据副本本地化，见上方根因分析），需重试至命中持有副本。
+> **本地实测**（2026-08-20，方式 A 思路）：T25.3 的 marker+pnpm store 断言即隐式覆盖此真伪检查。
+
 ### T25.4 快照失败降级（源容器已死）
 
 场景：快照 Creating 期间源容器被外部回收（如实例重启窗口的孤儿清理）→ server 端 commit 失效。
@@ -411,6 +453,7 @@ curl -s -X POST "$BASE/session/$SID/snapshot" -d '{}' -H 'Content-Type: applicat
 | T25.1 冷启动 rootfs | PASS | /workspace overlay，marker 写入，快照表 0 记录，冷启动秒级 |
 | T25.2 idle 自动快照 | PASS | ~130s 进 creating（期间 sandbox killed 保留），76s 后 ready → destroyed，日志 `snapshot ready` |
 | T25.3 快照恢复 | PASS | restoreFrom=d10db4e8…，MARKER 完整，快照 stale\|restored；VS_NA（slim 无 /tmp/pnpm-vs，同 08-20） |
+| T25.3b 恢复来源真伪 | PASS | 方式 B 纯 curl 直连：恢复成功 5/5 沙箱均含完整 marker（真·快照恢复，非镜像降级假恢复）；多副本 NOT_FOUND 交替需重试命中（见根因分析） |
 | T25.5 同会话多快照 | PASS | 新快照 ready 后旧快照 deleting\|superseded；**docker 镜像父子层冲突**（新快照 commit 基于旧快照镜像层）致删除报 conflict、queued for retry，会话删除链路中全部收敛 deleted；「每 session 至多一个有效快照」始终满足 |
 | T25.6 会话删除清理 | PASS | deleted\|session deleted / superseded 全量收敛，远端 /v1/snapshots 0 残留 |
 | T25.9 显式快照 | PASS* | keepAlive boot 拉起后 POST 返回 creating，70s ready，源沙箱全程 running 未销毁；派生会话（snapshotId 参数）marker/marker2 完整；快照期间 exec 被拒（getOrCreate → Sandbox creation failed，语义符合「snapshotting 期间拒绝新请求」）但 HTTP 表现为 500 UnknownError，未显式 "snapshot pending" 文案——文案待改进 |
