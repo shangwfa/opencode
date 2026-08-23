@@ -781,6 +781,32 @@ await sendMessage(sid, "cat /workspace/app.py")
 
 **实际回收延迟**：30~60 秒（空闲阈值 + 轮询窗口）。
 
+### 4.6b Session Plugins 生命周期（重要）
+
+> **插件在沙箱内执行**：会话插件（`POST /session/:id/plugins/create`）的代码不在主服务进程运行，而是由**会话沙箱内**的 plugin-agent（`:9200`）加载执行，主服务通过沙箱代理 HTTP 调用 hook。因此**插件的存活与沙箱生命周期严格绑定**。
+
+```typescript
+// 1. 注册插件后首次发消息/触发 hook 时，主服务在沙箱内启动 plugin-agent（首次约 5~10 秒）
+await createPlugin(sid, { name: "my-hook", code: "export default async () => ({...})" })
+await sendMessage(sid, "hello")   // 本次请求若在 agent 就绪前到达，hook 静默跳过（不报错）
+
+// 2. 非 keepAlive 会话：沙箱空闲回收后，插件 agent 随沙箱销毁
+//    （默认 IDLE_KILL_SEC 后回收；message 结束到回收窗口内 agent 仍在）
+// 3. 下次请求沙箱重建 → plugin-agent 重新启动并重新加载插件（有插件列表的会话自动完成）
+```
+
+**产品语义**：
+
+| 场景 | 行为 |
+|---|---|
+| keepAlive 会话 | 沙箱常驻 → agent 常驻，hook 稳定生效（**推荐开启**：`POST /session/:id/keep-alive {"enabled":true}`） |
+| 非 keepAlive 会话 | agent 随沙箱回收销毁；下次请求重建沙箱+agent，hook 重新可用，但每次重建有 ~5-10s 启动窗口 |
+| agent 启动窗口内到达的请求 | hook 静默跳过（返回未修改的 output，**不报错不阻塞**） |
+| 插件 hook 代码抛异常 | 降级返回未修改 output + 服务端 logError（`session plugin hook failed`），**不会 500 请求** |
+| 插件更新（同名 upsert） | agent 自动 reload 新版本（约 1s TTL 检测），无需重启会话 |
+| 快照模式会话 | agent 不入快照（沙箱重建后按 PG 中的插件记录重新启动加载） |
+
+
 ### 4.6a 快照模式（沙箱本地盘持久化）
 
 > **会话级可选**：创建会话时 `sandbox.persistMode: "snapshot" | "pvc"` 按会话选择持久化方式，创建时固化（fork/子会话继承）；缺省回退部署默认 `OPENCODE_SANDBOX_VOLUME_TYPE`。快照能力总开关 `OPENCODE_SANDBOX_SNAPSHOT_ENABLED=true`（未开时会话选 snapshot 返回 400；全局默认为 snapshot 时也必须开，否则服务拒绝启动）。详见 `docs/sandbox-snapshot-design.md`。
@@ -1522,6 +1548,7 @@ await client.chatStream(sid, "分析一下 /workspace 下的所有文件", part 
 | 空 parts 数组返回 200 空 body | 同上 | 客户端校验非空 |
 | 部分模型（kimi-k2.6）要求 temperature=1 | 默认 0.5 会被 API 拒绝 | PATCH `/global/config` 配 agent.temperature=1 |
 | 沙箱冷启动 ~2-3 秒延迟 | 首次发消息变慢 | 业务层 loading 提示 |
+| Session 插件 agent 随沙箱回收销毁 | 非 keepAlive 会话插件时有时无（重建窗口 ~5-10s 内 hook 跳过） | 用插件的会话开启 keepAlive（见 4.6b） |
 | LLM 工具幻觉 | 模型可能假装调用工具但实际没调 | prompt 明确指定工具名 |
 | 所有 session 共享一个 PVC | 容量共享 / 单租户场景下够用 | 多租户需按租户拆 PVC 或拆实例（见 4.13.5） |
 
@@ -1538,6 +1565,7 @@ await client.chatStream(sid, "分析一下 /workspace 下的所有文件", part 
 - 一次性任务用 `try/finally` 模式保证 dispose
 - 不需要的 session 调 DELETE 清理（避免列表变大、释放 PVC 空间）
 - **不要每条消息都 dispose** —— 会增加冷启动开销
+- **使用 Session 插件的会话开 keepAlive** —— 插件 agent 随沙箱存活，dispose/回收后需等重建（见 4.6b）
 
 **错误处理**：
 - 客户端做前置校验（session 存在、provider 连通、parts 非空）

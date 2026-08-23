@@ -130,6 +130,7 @@ function createSandboxRuntime(
             `SESSION_ID='${sessionID}' PLUGINS_BASE64='${encoded}' PLUGIN_CONTEXT_BASE64='${pluginContext}' ` +
             `setsid bun /opt/sandbox-plugin-agent.ts > /tmp/plugin-agent.log 2>&1 &`,
         )
+        .pipe(Effect.tapCause((cause) => Effect.logError("plugin-agent launch command failed", { sessionID, cause: String(cause) })))
         .pipe(Effect.catch(() => Effect.void))
 
       for (let attempt = 0; attempt < 15; attempt++) {

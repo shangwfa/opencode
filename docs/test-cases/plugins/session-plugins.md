@@ -818,6 +818,51 @@ export default async () => ({
 
 **实测**：通过，`chat.message` 修改被模型消费，`experimental.text.complete` 最终输出为 `TEXT_COMPLETE_MARKER`。
 
+### T35.63 快模型下 agent 启动完整性（2026-08-23 新增）
+
+> 回归 `fix(plugin): session-plugin agent never starts`（startAgent 被请求 fiber 中断，infinity-TTL 缓存永不重跑）。触发条件：模型响应快（请求完成时间 < 15 次 health 轮询），agent 在轮询完成前随请求中断而半启动。
+
+```bash
+SID=$(curl -s --noproxy '*' -X POST "$BASE/session" -d '{}' | python3 -c 'import json,sys;print(json.load(sys.stdin)["id"])')
+curl -s --noproxy '*' -X POST "$BASE/session/$SID/keep-alive" -H 'Content-Type: application/json' -d '{"enabled":true}' >/dev/null
+curl -s --noproxy '*' -X POST "$BASE/session/$SID/plugins/create" -H 'Content-Type: application/json' \
+  -d '{"name":"persist","code":"export default async () => ({\"chat.headers\": async (_i,o)=>{ o.headers.x=\"1\" }})"}' >/dev/null
+
+# 连续 3 次快速 message（必须用响应快的模型，如 opencode/hy3-free，单次 ~4s < 15s 轮询）
+for i in 1 2 3; do
+  curl -s --noproxy '*' -m 120 -X POST "$BASE/session/$SID/message" \
+    -H 'Content-Type: application/json' \
+    -d '{"parts":[{"type":"text","text":"hi"}],"model":{"providerID":"opencode","modelID":"hy3-free"}}' \
+    -w "msg$i:%{http_code} "
+done
+
+# 验证 agent 真正存活（而非静默 fallback）
+curl -s --noproxy '*' -X POST "$BASE/session/$SID/exec" -H 'Content-Type: application/json' \
+  -d '{"command":"cat /tmp/plugin-agent.log 2>/dev/null | head -2; ps aux | grep plugin-agent | grep -v grep | wc -l"}'
+```
+
+**期望**：3 次 message 均 200；沙箱内 agent 存活（`ps` 计数 ≥1，日志含 `loaded:` + `listening on :9200`）。
+
+> ⚠️ **必须用 keepAlive 会话**。非 keepAlive 会话沙箱在 message 完成 ~10s 后回收，agent 随沙箱销毁——这是产品语义（见 `docs/saas-usage-guide.md` 4.6b），不能用该场景断言「agent 未启动」。
+
+### T35.64 Session Plugin hook 抛异常 → 降级不 500（2026-08-23 新增）
+
+> 回归 `fix(plugin): hook errors 500 the request`。修复前 agent 返回 `x-opencode-plugin-error` 时 runtime `Effect.die` → `/message`、`/summarize` 直接 500。
+
+```bash
+SID=$(curl -s --noproxy '*' -X POST "$BASE/session" -d '{}' | python3 -c 'import json,sys;print(json.load(sys.stdin)["id"])')
+curl -s --noproxy '*' -X POST "$BASE/session/$SID/keep-alive" -H 'Content-Type: application/json' -d '{"enabled":true}' >/dev/null
+curl -s --noproxy '*' -X POST "$BASE/session/$SID/plugins/create" -H 'Content-Type: application/json' \
+  -d '{"name":"throws","code":"export default async () => ({\"experimental.session.compacting\": async () => { throw new Error(\"BOOM\") }})"}' >/dev/null
+
+curl -s --noproxy '*' -m 120 -X POST "$BASE/session/$SID/message" \
+  -H 'Content-Type: application/json' -d '{"parts":[{"type":"text","text":"hi"}],"model":{"providerID":"opencode","modelID":"hy3-free"}}' -w 'message:%{http_code}'
+curl -s --noproxy '*' -m 180 -X POST "$BASE/session/$SID/summarize" \
+  -H 'Content-Type: application/json' -d '{"providerID":"opencode","modelID":"hy3-free","auto":false}' -w 'summarize:%{http_code}'
+```
+
+**期望**：message 200、summarize 200（body `true`）；hook 异常被降级（服务端 `session plugin hook failed` 日志），**不得 500**。
+
 ---
 
 ## 九、验收标准
@@ -833,8 +878,10 @@ export default async () => ({
 | npm Session Plugin | T35.52-T35.57 | 默认最新、指定版本、版本失效、scoped 包、安装错误、多导出与 allowlist |
 | npm Plugin 功能验证 | T35.58-T35.61 | Renamer 下游消息修改、Helicone header、DCP 消息裁剪、真实包兼容性分类 |
 | 新接入 Hook | T35.62 | `chat.message` 和 `experimental.text.complete` 下游效果 |
+| agent 启动完整性 | T35.63 | 快模型 + keepAlive 下 agent 稳定存活（回归中断 bug） |
+| hook 异常降级 | T35.64 | hook 抛错 → 200 不 500（回归 500 bug） |
 
-> **总计 62 个用例**。其中 T35.32、T35.49、T35.50 和 T35.51 明确区分 legacy/V2、普通实例 Plugin 和 Session Plugin Runtime；T35.52-T35.62 覆盖 Session Plugin 的 npm 安装和真实功能验证。
+> **总计 64 个用例**。其中 T35.32、T35.49、T35.50 和 T35.51 明确区分 legacy/V2、普通实例 Plugin 和 Session Plugin Runtime；T35.52-T35.62 覆盖 Session Plugin 的 npm 安装和真实功能验证；T35.63-T35.64 覆盖 2026-08-23 修复的 agent 启动完整性与 hook 异常降级。
 
 ## 十、本轮执行结果
 
@@ -874,3 +921,56 @@ export default async () => ({
 - T35.60-T35.61 依赖外部 npm 包、服务和凭据，本轮未执行功能验收。
 
 > 本轮修复了空 code 校验、`shell.env` 下游注入、npm 安装与版本解析、Agent degraded health 和 V2 `PluginInput` 上下文。未执行或只做源码审计的项目保持未宣称通过。
+
+---
+
+## 复测记录（2026-08-23，session-plugin agent 启动修复）
+
+> **背景**：T35.48 压缩 hook 复测时发现两个缺陷（SaaS 自研代码，自该功能引入即存在，与 upstream merge 无关）：
+>
+> 1. **agent 启动被请求 fiber 中断切断**：`startAgent` 的 15 次 health 轮询跑在 message/summarize 请求的 fiber 上，请求完成即中断（实测日志：4 次 `sandbox endpoint resolved` 后戛然而止，无 started/failed 日志）；infinity-TTL 缓存不会重跑 → agent 永远起不来，hook 永久静默跳过。
+> 2. **hook 报错 500 整个请求**：agent 返回 `x-opencode-plugin-error` 时 runtime `Effect.die` → `/message`、`/summarize` 直接 500（实测 `err_49f307e9`、`err_ec7495bc`）。
+>
+> **修复**（session-plugin-runtime.ts）：startAgent 主体 `Effect.uninterruptible`；hook 错误降级为 logError + 返回原 output；runInSession 失败加 tapCause 日志。
+
+**环境**：本地 PG + 远端 K8s 沙箱（host.docker.internal:30040），LLM `opencode/hy3-free`，镜像含修复（feat/session-snapshot 分支工作区）。
+
+| 验证 | 结果 | 备注 |
+|---|---|---|
+| agent 启动（keepAlive 会话） | ✅ | 沙箱内 `[plugin-agent] listening on :9200`，插件 `loaded: ka-diag (1 hooks)` |
+| 插件热更新 | ✅ | 同会话注册第二个插件后 agent 日志出现 `loaded: side-effect (2 hook types)` |
+| hook 真实执行 | ✅ | `chat.message` hook 在沙箱内写 `/tmp/hook-fired.txt` 成功 |
+| compacting hook（T35.48 路径） | ✅ | summarize 200，无 500；hook 静默降级路径不再炸请求 |
+| hook 错误降级 | ✅ | 坏插件不再 500 message（die→logError） |
+| 非 keepAlive 会话 | ⚠️ 产品语义 | message 完成后沙箱按生命周期回收，agent 随之销毁；下次请求重建（~5-10s 窗口内 hook 跳过）。已写入 `docs/saas-usage-guide.md` 4.6b（用插件建议开 keepAlive） |
+
+**根因排查链**（供后续参考）：容器日志无 plugin 相关日志（AGENTS.md 已知盲区）→ 用 `sandbox endpoint resolved` 次数定位轮询中断 → SDK 直连测试排除网络/镜像因素 → keepAlive 对照实验分离「启动中断」与「沙箱回收」两个变量。
+
+### 2026-08-23 全量重跑（feat/session-snapshot + 修复，hy3-free LLM）
+
+> 环境：本地 PG + 远端 K8s 沙箱，`opencode/hy3-free`（Yd 网关不可达 + zen 额度用尽后替代），容器含 session-plugin 修复。全部 message/summarize 的 model 参数替换为 `{"providerID":"opencode","modelID":"hy3-free"}`。
+
+| 用例 | 结果 | 备注 |
+|---|---|---|
+| T35.1-6 CRUD | ✅ | 创建/列表脱敏/upsert/删除/清空 200、空 name/code 400 |
+| T35.7-8 PG 持久化 | ✅ | 写入 + upsert 后 time_updated 变化 |
+| T35.9 级联删除 | ✅ | 删会话插件行清零 |
+| T35.10 多 Session 隔离 | ✅ | SID2 插件数 0 |
+| T35.11-14 hook 基础 | ✅ | 空 runtime/chat.params/headers/system.transform 均 200 |
+| T35.15 MSGHOOK77 | ✅ | 模型实际回复 `MSGHOOK77`（text part 验证） |
+| T35.16 tool.execute | ✅ | 200 |
+| T35.17 command hook | ⏸️ | 无确定性 command fixture（文档已标注） |
+| T35.18-19 enabled 切换 | ✅ | disabled 不报错 / enabled 正常 |
+| T35.20-21 失效 | ✅ | 更新/删除后均 200 |
+| T35.22-23 语法错误 | ✅ | 跳过不影响 / 修正后重载 200 |
+| T35.24 hook 抛错隔离 | ✅ 行为变化 | 修复后异常被**隔离降级**（不再 veto 停止链路），message 200 无 error——比原「veto+error」语义更 fail-soft，与 2026-08-23 修复一致 |
+| T35.25-26 顺序/隔离 | ✅ | 3 插件不冲突 / 双 session 各 200 |
+| T35.27 不存在 Session | ✅ | 404 |
+| T35.28 实例 hook 过滤 | ⏸️ | 依赖 command fixture（T35.17 同因） |
+| T35.29-30 脱敏 | ✅ | 列表/创建响应均无源码 |
+| T35.31 非法导出 | ✅ | 坏插件跳过，message 200 |
+| T35.63 agent 启动完整性 | ✅ | 快模型连续 3 次 message，agent 存活（`listening on :9200` + 进程 1） |
+| T35.64 hook 异常降级 | ✅ | 抛错插件 message 200 + summarize 200(true)，无 500 |
+| T35.32-62 | ⏸️ | 源码审计类（T35.32-51）依赖命令/npm fixture；npm 类（T35.52-61）依赖外部包与凭据，与文档标注一致未执行 |
+
+**关键结论**：本次全量执行确认 2026-08-23 的两个修复在真实链路生效；新增 T35.63/T35.64 用例防止回归。非 keepAlive 场景 agent 随沙箱回收属产品语义（已文档化），T35.63 明确要求 keepAlive。
