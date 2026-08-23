@@ -78,7 +78,15 @@ const it = testEffect(
           dirs: () => Effect.succeed([]),
           available: () => Effect.succeed(skills),
           sessionList: () => Effect.succeed([]),
-          sessionCreate: () => Effect.die("not implemented"),
+          sessionCreate: (_session, input) =>
+            Effect.succeed(
+              skills.find((skill) => skill.name === input.name) ?? {
+                name: input.name,
+                description: "",
+                location: "",
+                content: "",
+              },
+            ),
           sessionLoad: () => Effect.succeed([]),
           sessionUnload: () => Effect.void,
           sessionClear: () => Effect.void,
@@ -104,6 +112,13 @@ describe("session.system", () => {
       expect(prompt).toContain("powered by Muse Glimmer,")
       expect(prompt).toContain("using Meta Muse Glimmer.")
       expect(prompt).not.toContain("{{MODEL_NAME}}")
+    }
+  })
+
+  test("selects the Kimi prompt for official provider model IDs", () => {
+    for (const providerID of ["kimi-for-coding", "moonshotai", "moonshotai-cn"]) {
+      const prompt = SystemPrompt.provider({ providerID, api: { id: "k3" } } as Provider.Model)[0]
+      expect(prompt).toContain("# Prompt and Tool Use")
     }
   })
 

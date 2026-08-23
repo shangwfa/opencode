@@ -44,8 +44,11 @@ describe("websearch provider", () => {
     expect(selectWebSearchProvider(SESSION_ID, { exa: false, parallel: false, zhipu: true })).toBe("zhipu")
   })
 
-  test("is only enabled for opencode, zhipu, or explicit websearch provider flags", () => {
+  test("is only enabled for opencode, zhipu, opencode-go, or explicit websearch provider flags", () => {
     expect(webSearchEnabled(ProviderV2.ID.opencode, { exa: false, parallel: false, zhipu: false })).toBe(true)
+    expect(webSearchEnabled(ProviderV2.ID.make("opencode-go"), { exa: false, parallel: false, zhipu: false })).toBe(
+      true,
+    )
     expect(webSearchEnabled(ProviderV2.ID.openai, { exa: false, parallel: false, zhipu: false })).toBe(false)
     expect(webSearchEnabled(ProviderV2.ID.openai, { exa: true, parallel: false, zhipu: false })).toBe(true)
     expect(webSearchEnabled(ProviderV2.ID.openai, { exa: false, parallel: true, zhipu: false })).toBe(true)
