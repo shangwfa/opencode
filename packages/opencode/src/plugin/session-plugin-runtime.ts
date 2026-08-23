@@ -99,6 +99,10 @@ function createSandboxRuntime(
     let revision: string | undefined
     let startFailed = false
 
+    // uninterruptible: startAgent runs on the caller's fiber (message/summarize request).
+    // Without this, a fast-completing request interrupts the 15s health-poll loop mid-way,
+    // leaving the agent half-started and the cached state permanently broken (agent never
+    // recovers because the TTL cache never re-runs the effect).
     const startAgent = Effect.gen(function* () {
       if (disposed || agentUrl) return
       startFailed = false
@@ -148,7 +152,7 @@ function createSandboxRuntime(
       }
       startFailed = true
       yield* Effect.logWarning("sandbox plugin-agent failed to start", { sessionID })
-    })
+    }).pipe(Effect.uninterruptible)
 
     const [ensureAgent, invalidateAgent] = yield* Effect.cachedInvalidateWithTTL(startAgent, Duration.infinity)
     const [refresh] = yield* Effect.cachedInvalidateWithTTL(
@@ -213,7 +217,13 @@ function createSandboxRuntime(
       Effect.gen(function* () {
         const first = yield* send(name, input, output)
         if (first.ok) return first.value
-        if (first.error) return yield* Effect.die(new Error(first.error))
+        // Plugin hooks are user code executing in the sandbox agent. A hook error must
+        // degrade to the unmodified output instead of die-ing the host request
+        // (message/summarize returned 500 when a plugin hook threw).
+        if (first.error) {
+          yield* Effect.logError("session plugin hook failed", { name, error: first.error })
+          return output
+        }
         if (!retry || disposed || empty) return output
         if (!first.url && startFailed) {
           startFailed = false
@@ -225,7 +235,10 @@ function createSandboxRuntime(
           yield* invalidateAgent
         }
         const second = yield* send(name, input, output)
-        if (!second.ok && second.error) return yield* Effect.die(new Error(second.error))
+        if (!second.ok && second.error) {
+          yield* Effect.logError("session plugin hook failed", { name, error: second.error })
+          return output
+        }
         if (!second.ok && startFailed) {
           startFailed = false
           yield* invalidateAgent
