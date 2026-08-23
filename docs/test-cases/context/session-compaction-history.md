@@ -161,12 +161,14 @@ touch -t "$(date -v-8d +%Y%m%d%H%M)" "$TOOL_OUTPUT/tool_history_stale.md"
 
 ## 复测记录
 
-### 2026-08-21 重跑（mini 镜像环境）
+### 2026-08-23 重跑（merge upstream v1.18.21 后，hy3-free LLM）
 
 | 用例 | 结果 | 备注 |
 |---|---|---|
-| T-CX.1 单元测试（L0） | ✅ **25 pass / 0 fail** | `bun test test/session-compaction.test.ts test/session-runner-message.test.ts`（packages/core 目录），覆盖 serializeHistory 完整落盘、降级（disk full 模拟日志可见）、checkpoint 提示注入、连续 compaction 链 |
-| T-CX.2-6 端到端 | ⏸️ 维持 blocked by V2 | 复核确认：V1 主链路 `packages/opencode/src/session/compaction.ts` 的 `processCompaction` 无 `writeHistory`/`historyPath`；`compactAfterOverflow`/`compactIfNeeded` 仅被 core `runner/llm.ts`（V2）引用，opencode 生产代码未调用。与文档说明一致 |
-| T-CX.7 二次 compaction | ✅ 单测覆盖 / ⏸️ 端到端 blocked | 同上 |
+| T-CX.1 单元测试（L0） | ✅ **26 pass / 0 fail** | merge 后 `buildPrompt` 对齐 upstream 结构（`<conversation>` 标签包装 + 新指令 + `<prior-summary>` 分支），修复了 2 个 merge 组合回归（原 24 pass 2 fail → 26 pass）；保留我方 `select()` headEntries/splitPrefix 超集 |
+| T-CX.2-6 端到端 | ⏸️ 维持 blocked by V2 | 复核确认：V1 主链路 `packages/opencode/src/session/compaction.ts` 的 `processCompaction` 无 `writeHistory`/`historyPath`；`compactAfterOverflow`/`compactIfNeeded` 仅被 core `runner/llm.ts`（V2）引用，opencode 生产代码未调用 |
+| 手动 summarize 触发 | ✅ | `POST /session/:id/summarize`（opencode/hy3-free）→ compaction 消息正常生成（summary=true, mode=compaction, input 19.5K tokens），compaction 链路可用 |
+| LLM 通路 | ⚠️ | Yd 网关（claude.shadow-rpa.net）不可达 + opencode-go workspace 额度用尽 → 用例改用 **opencode/hy3-free**（zen v1 免费模型，验证可用） |
 
-**结论**：L0 单测全通过（含降级路径），端到端用例维持 V2 未上线状态，无变化。
+**结论**：L0 单测全通过（含 merge 回归修复），端到端用例维持 V2 未上线状态；LLM 测试通路已切换至 hy3-free。
+
