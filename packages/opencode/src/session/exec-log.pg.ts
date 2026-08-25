@@ -3,7 +3,10 @@ import { Timestamps } from "../storage/schema.pg"
 import { SessionTable } from "./session.pg"
 import type { SessionID } from "./schema"
 import * as Database from "../storage/db"
+import { Log } from "@opencode-ai/core/util/log"
 import { eq, desc } from "drizzle-orm"
+
+const log = Log.create({ service: "exec-log" })
 
 export type ExecLogSource =
   | "exec"
@@ -85,11 +88,24 @@ export type ExecLog = typeof ExecLogTable.$inferSelect
 export type NewExecLog = typeof ExecLogTable.$inferInsert
 
 export async function insertExecLog(row: NewExecLog) {
-  try { await Database.use((db) => db.insert(ExecLogTable).values(row)) } catch {}
+  try {
+    await Database.use((db) => db.insert(ExecLogTable).values(row))
+  } catch (error) {
+    log.error("failed to insert exec log", {
+      id: row.id,
+      sessionID: row.session_id,
+      source: row.source,
+      error,
+    })
+  }
 }
 
 export async function updateExecLog(id: string, patch: Partial<NewExecLog>) {
-  try { await Database.use((db) => db.update(ExecLogTable).set(patch).where(eq(ExecLogTable.id, id))) } catch {}
+  try {
+    await Database.use((db) => db.update(ExecLogTable).set(patch).where(eq(ExecLogTable.id, id)))
+  } catch (error) {
+    log.error("failed to update exec log", { id, error })
+  }
 }
 
 export async function queryExecLogsBySession(sessionID: string) {
