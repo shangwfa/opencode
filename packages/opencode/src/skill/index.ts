@@ -459,10 +459,20 @@ const layerImpl = Layer.effect(
     })
 
     const sessionCreate = Effect.fn("Skill.sessionCreate")(function* (session: string, value: CreateInput) {
+      const skipped = (value.resources ?? []).filter((resource) => SkillResource.isBinaryContent(resource.content))
+      if (skipped.length > 0) {
+        yield* Effect.logWarning("Skipped binary skill resources", {
+          paths: skipped.map((resource) => resource.path),
+        })
+      }
       const resources = yield* Effect.try({
         try: () => {
           requireName(value.name)
-          return SkillResource.validateBundle((value.resources ?? []).map(SkillResource.make))
+          return SkillResource.validateBundle(
+            (value.resources ?? [])
+              .filter((resource) => !SkillResource.isBinaryContent(resource.content))
+              .map(SkillResource.make),
+          )
         },
         catch: (error) => error as Error,
       })

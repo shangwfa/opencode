@@ -16,6 +16,15 @@ describe("SkillResource", () => {
     expect(SkillResource.kind(resource.path)).toBe("script")
   })
 
+  test("rejects binary resource content", () => {
+    expect(SkillResource.isBinaryContent("\x00\x01binary")).toBe(true)
+    expect(SkillResource.isBinaryContent("a,b\r\n1,2\n")).toBe(false)
+    expect(() => SkillResource.make({ path: "scripts/run.pyc", type: "asset", content: "\x00\x01binary" })).toThrow(
+      "Binary resource content is not supported",
+    )
+    expect(() => SkillResource.make({ path: "data/table.csv", type: "asset", content: "a,b\r\n1,2\n" })).not.toThrow()
+  })
+
   test.each(["", "/absolute", "../escape", "refs/../escape", "refs\\escape.md", "refs//escape.md"])(
     "rejects invalid resource path %p",
     (resourcePath) => {
