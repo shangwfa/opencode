@@ -22,6 +22,10 @@ export const Input = Schema.Struct({
 })
 export type Input = Schema.Schema.Type<typeof Input>
 
+export function isBinaryContent(content: string) {
+  return /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/.test(content)
+}
+
 export const Stored = Schema.Struct({
   path: Schema.String,
   type: Type,
@@ -41,6 +45,9 @@ export type Info = Schema.Schema.Type<typeof Info>
 
 export function make(input: Input): Stored {
   const resourcePath = normalizePath(input.path)
+  if (isBinaryContent(input.content)) {
+    throw new InvalidResourceError({ message: "Binary resource content is not supported", path: resourcePath })
+  }
   const size = Buffer.byteLength(input.content)
   if (size > MAX_SIZE) {
     throw new InvalidResourceError({ message: `Skill resource exceeds ${MAX_SIZE} bytes`, path: resourcePath })

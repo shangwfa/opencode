@@ -1060,6 +1060,65 @@ curl -s --max-time 180 -X POST "$BASE/session/$SID/message" \
 ```
 **期望**：API 的 `has_content=False` 且 size/digest 完整；PG 和物化文件中的 Unicode、emoji、中文、引号、反斜杠和尖括号均完整保留。
 
+### T15.23a 二进制 resource 跳过但 Skill 注册成功
+
+验证资源内容包含 NUL 等二进制控制字符时，只跳过该 resource，不影响整个 Skill 注册；正常文本 resource 仍应写入 PG。
+
+```bash
+# 环境变量 $BASE $PG_URL $MODEL 由 test-env.sh 全局提供（source test-env.sh [1|2|3]）
+
+SID=$(curl -s -X POST "$BASE/session" \
+  -H 'Content-Type: application/json' \
+  -d '{"title":"binary-resource-test"}' \
+  | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+
+BODY=$(python3 - <<'PY'
+import json
+
+print(json.dumps({
+    "name": "binary-resource-skill",
+    "description": "二进制资源跳过测试",
+    "content": "# Binary Resource Test",
+    "resources": [
+        {"path": "valid.md", "type": "doc", "content": "正常文本资源"},
+        {"path": "scripts/cache.pyc", "type": "asset", "content": "\u0000\u0001\u0002binary"},
+    ],
+}, ensure_ascii=False))
+PY
+)
+
+RESPONSE_FILE=$(mktemp)
+STATUS=$(curl -s -o "$RESPONSE_FILE" -w '%{http_code}' \
+  -X POST "$BASE/session/$SID/skills/create" \
+  -H 'Content-Type: application/json' \
+  -d "$BODY")
+echo "HTTP $STATUS"
+cat "$RESPONSE_FILE"
+
+# API 应成功注册，且只返回正常 resource 的 metadata
+test "$STATUS" = "200"
+python3 - "$RESPONSE_FILE" <<'PY'
+import json
+import sys
+
+skill = json.load(open(sys.argv[1]))
+resources = skill.get("resources", [])
+assert skill["name"] == "binary-resource-skill"
+assert [resource["path"] for resource in resources] == ["valid.md"]
+assert "content" not in resources[0]
+PY
+
+# PG 应有 Skill，resources 数量为 1，二进制 resource 不得落库
+psql "$PG_URL" -t -A -c \
+  "SELECT name, jsonb_array_length(resources::jsonb) FROM session_skill WHERE session_id='$SID' AND name='binary-resource-skill';"
+psql "$PG_URL" -t -A -c \
+  "SELECT COUNT(*) FROM session_skill, jsonb_array_elements(resources) r WHERE session_id='$SID' AND name='binary-resource-skill' AND r->>'path'='scripts/cache.pyc';"
+
+rm -f "$RESPONSE_FILE"
+```
+
+**期望**：HTTP `200`；Skill 已注册；API 和 PG 均只包含 `valid.md`；二进制 `scripts/cache.pyc` 被跳过，不导致 HTTP 500，也不写入 PG。
+
 
 ---
 
@@ -1383,6 +1442,7 @@ curl -s -X POST "$BASE/session/$SID/exec" \
 | T15.21 | ✅ | 空/超长(300)/路径/斜杠/空格/`<>`/中文/大写/连字符边界 全部 400 拒绝，PG 无残留（2026-08-08 重跑通过，正则 `^[a-z0-9][a-z0-9-]*$` 长度≤64） |
 | T15.22 | ✅ | 5 并发 PG COUNT=1, upsert 安全（2026-08-08 重跑通过） |
 | T15.23 | ✅ | API metadata-only；Unicode/emoji/中文在 PG 和物化文件中字节级完整保留（2026-08-08 重跑通过） |
+| T15.23a | ✅ | 2026-08-25 重跑通过：Session `ses_fc7e0d251ffegJvYwRZaPZ3Zvw` 返回 HTTP 200，API/PG 仅保留 `valid.md`（resource_count=1），`.pyc` 路径未落库 |
 | T15.24 | ✅ | 创建 agent-browser 会话 skill（2026-08-08 重跑通过：agent-browser 0.31.1 mise shim + Chromium 151.0.7922.34 + headless 渲染 + skill 创建） |
 | T15.25 | ✅ | 使用 agent-browser 浏览网页（2026-08-08 重跑通过：open/snapshot/get title/get url/close 全流程，PG 确认 5 次 bash 命令） |
 | T15.26 | ✅ | agent-browser + page-summarizer 共存（2026-08-08 重跑通过：依次加载两 skill，AI 先浏览 JSON 页再用 page-summarizer 结构化总结，含 [PAGE-SUMMARIZER] 前缀；目标由 httpbin 改 jsonplaceholder 因 httpbin 当日 503） |

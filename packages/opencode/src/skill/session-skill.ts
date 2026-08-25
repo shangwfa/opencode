@@ -61,7 +61,11 @@ export namespace SessionSkill {
       upsert: (_sessionID, input) =>
         Effect.try({
           try: () => {
-            const resources = SkillResource.validateBundle((input.resources ?? []).map(SkillResource.make))
+            const resources = SkillResource.validateBundle(
+              (input.resources ?? [])
+                .filter((resource) => !SkillResource.isBinaryContent(resource.content))
+                .map(SkillResource.make),
+            )
             return {
               id: id(),
               session_id: _sessionID as string,
@@ -122,8 +126,19 @@ export namespace SessionSkill {
 
         upsert: Effect.fn("SessionSkill.upsert")(function* (sessionID, input) {
           const now = Date.now()
+          const skipped = (input.resources ?? []).filter((resource) => SkillResource.isBinaryContent(resource.content))
+          if (skipped.length > 0) {
+            yield* Effect.logWarning("Skipped binary skill resources", {
+              paths: skipped.map((resource) => resource.path),
+            })
+          }
           const resources = yield* Effect.try({
-            try: () => SkillResource.validateBundle((input.resources ?? []).map(SkillResource.make)),
+            try: () =>
+              SkillResource.validateBundle(
+                (input.resources ?? [])
+                  .filter((resource) => !SkillResource.isBinaryContent(resource.content))
+                  .map(SkillResource.make),
+              ),
             catch: (error) => error as Error,
           })
           const row = {
