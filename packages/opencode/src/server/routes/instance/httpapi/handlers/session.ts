@@ -22,7 +22,7 @@ import { MessageV2 } from "@/session/message-v2"
 import { SessionPrompt } from "@/session/prompt"
 import { SessionRevert } from "@/session/revert"
 import { SessionRunState } from "@/session/run-state"
-import { insertExecLog, type ExecLogSource } from "@/session/exec-log"
+import { insertExecLog, updateExecLog, type ExecLogSource } from "@/session/exec-log"
 import { SessionStatus } from "@/session/status"
 import { SessionSummary } from "@/session/summary"
 import { Todo } from "@/session/todo"
@@ -133,19 +133,8 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       return String(error)
     }
 
-    const logActionFailure = (sessionID: SessionID, source: ExecLogSource, command: unknown, error: unknown) =>
-      Effect.promise(() =>
-        insertExecLog({
-          id: `action-${Date.now()}`,
-          session_id: sessionID,
-          command: typeof command === "string" ? command : JSON.stringify(command),
-          status: "failed" as const,
-          error: errorDetails(error),
-          source,
-          time_started: Date.now(),
-          time_finished: Date.now(),
-        }),
-      ).pipe(Effect.catch(() => Effect.void))
+    const updateAction = (id: string, patch: Parameters<typeof updateExecLog>[1]) =>
+      Effect.promise(() => updateExecLog(id, patch)).pipe(Effect.catch(() => Effect.void))
 
     const get = Effect.fn("SessionHttpApi.get")(function* (ctx: { params: { sessionID: SessionID } }) {
       return yield* requireSession(ctx.params.sessionID)
@@ -585,26 +574,38 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       payload: typeof SkillCreatePayload.Type
     }) {
       yield* requireSession(ctx.params.sessionID)
+      const actionID = `action-${Date.now()}`
+      const actionStarted = Date.now()
+      const actionCommand = {
+        name: ctx.payload.name,
+        contentLength: ctx.payload.content.length,
+        resourceCount: ctx.payload.resources?.length ?? 0,
+      }
+      yield* Effect.promise(() =>
+        insertExecLog({
+          id: actionID,
+          session_id: ctx.params.sessionID,
+          command: JSON.stringify(actionCommand),
+          status: "running" as const,
+          source: "skill-create",
+          time_started: actionStarted,
+        }),
+      ).pipe(Effect.catch(() => Effect.void))
       const result = Skill.publicInfo(
         yield* skillSvc
           .sessionCreate(ctx.params.sessionID, ctx.payload)
           .pipe(
             Effect.tapError((error) =>
-              logActionFailure(
-                ctx.params.sessionID,
-                "skill-create",
-                {
-                  name: ctx.payload.name,
-                  contentLength: ctx.payload.content.length,
-                  resourceCount: ctx.payload.resources?.length ?? 0,
-                },
-                error,
-              ),
+              updateAction(actionID, {
+                status: "failed",
+                error: errorDetails(error),
+                time_finished: Date.now(),
+              }),
             ),
           )
           .pipe(Effect.mapError(() => new HttpApiError.BadRequest({}))),
       )
-      yield* logAction(ctx.params.sessionID, "skill-create", ctx.payload)
+      yield* updateAction(actionID, { status: "completed", time_finished: Date.now() })
       return result
     })
 
