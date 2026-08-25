@@ -127,6 +127,26 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
         }),
       ).pipe(Effect.catch(() => Effect.void))
 
+    const errorDetails = (error: unknown) => {
+      if (error instanceof Error) return error.stack ?? `${error.name}: ${error.message}`
+      if (typeof error === "object" && error !== null) return JSON.stringify(error) ?? String(error)
+      return String(error)
+    }
+
+    const logActionFailure = (sessionID: SessionID, source: ExecLogSource, command: unknown, error: unknown) =>
+      Effect.promise(() =>
+        insertExecLog({
+          id: `action-${Date.now()}`,
+          session_id: sessionID,
+          command: typeof command === "string" ? command : JSON.stringify(command),
+          status: "failed" as const,
+          error: errorDetails(error),
+          source,
+          time_started: Date.now(),
+          time_finished: Date.now(),
+        }),
+      ).pipe(Effect.catch(() => Effect.void))
+
     const get = Effect.fn("SessionHttpApi.get")(function* (ctx: { params: { sessionID: SessionID } }) {
       return yield* requireSession(ctx.params.sessionID)
     })
@@ -568,6 +588,20 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       const result = Skill.publicInfo(
         yield* skillSvc
           .sessionCreate(ctx.params.sessionID, ctx.payload)
+          .pipe(
+            Effect.tapError((error) =>
+              logActionFailure(
+                ctx.params.sessionID,
+                "skill-create",
+                {
+                  name: ctx.payload.name,
+                  contentLength: ctx.payload.content.length,
+                  resourceCount: ctx.payload.resources?.length ?? 0,
+                },
+                error,
+              ),
+            ),
+          )
           .pipe(Effect.mapError(() => new HttpApiError.BadRequest({}))),
       )
       yield* logAction(ctx.params.sessionID, "skill-create", ctx.payload)
