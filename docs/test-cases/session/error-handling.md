@@ -44,5 +44,42 @@ bun -e "const big='x'.repeat(100000);fetch('http://localhost:14096/session/$SID/
 ```
 **期望**：能处理或返回明确的长度错误，不应 hang 死
 
+### T7.6 unknown finish 继续（v1.18.20）
+
+> 验证：模型返回 `finish_reason="unknown"` 时 session 不提前停止，继续生成后续内容。
+
+```bash
+SID=$(curl -s --noproxy '*' -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+curl -s --noproxy '*' -X POST "$BASE/session/$SID/keep-alive" -H 'Content-Type: application/json' -d '{"enabled":true}' -o /dev/null
+curl -s --noproxy '*' -m 180 -X POST "$BASE/session/$SID/message" -H 'Content-Type: application/json' \
+  -d '{"parts":[{"type":"text","text":"回复OK即可"}],"model":{"providerID":"opencode","modelID":"hy3-free"}}' -o /dev/null -w "msg:%{http_code}\n"
+psql "$PG_URL" -t -A -c "SELECT data->>'finish' FROM message WHERE session_id='$SID' AND data->>'role'='assistant' ORDER BY id DESC LIMIT 1"
+```
+
+**期望**：message 200，assistant 的 finish 为 `stop` 或 `tool-calls`（不应为 `unknown` 截断）。
+
+### T7.7 network_error finish 重试链路（v1.18.19）
+
+> 验证：finish_reason=network_error 时触发重试而非直接失败。该逻辑在 `ai-sdk.ts:89` 将 `network_error` 映射为 `ProviderError.ResponseStreamError`，由 `retry.ts` 捕获重试。
+
+```bash
+# 单测覆盖（核心验证路径）
+cd packages/opencode
+bun test test/session/retry.test.ts -t "network_error"
+```
+
+**期望**：单测通过，覆盖 `network_error` finish reason 的 retryable 判定。
+
+### T7.8 retry patterns 网络错误变体（v1.18.19）
+
+> 验证：`RETRYABLE_MESSAGE_PATTERNS` 覆盖 `network-error`、`network_error`、`network error` 三种变体，以及 `at capacity` 等新 pattern。
+
+```bash
+cd packages/opencode
+bun test test/session/retry.test.ts -t "network-error\|network_error\|at capacity"
+```
+
+**期望**：单测通过，验证超集 patterns 全部生效（`network[-_\s]error` 统一匹配）。
+
 ---
 

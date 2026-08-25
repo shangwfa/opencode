@@ -129,6 +129,45 @@ curl -s -X DELETE "$BASE/auth/moonshotai-cn" > /dev/null
 | T3.3 设置凭据 | `true` | PG 记录存在 | ✅ |
 | T3.4 删除凭据 | `true` | PG `COUNT=0` | ✅ |
 | T3.5 持久化 | 重启后 `connected` 仍含 | PG 记录保留 | ✅ |
+| T3.6 connected 含 credentials 的 provider（v1.18.18） | `connected` 包含配置了凭据的 provider | — | 见下方 |
+
+### T3.6 connected 包含凭据 provider（v1.18.18）
+
+> 验证：`GET /provider` 的 `connected` 字段不仅包含 `provider.list()` 的输出，还包含 `authStore.all()` 中配置了凭据的 provider（`provider.ts handler` 的 `connected: Object.keys(providers).filter((id) => id in connected || credentials[id])`）。
+
+```bash
+# 1) 找一个未连接的 provider ID（如 hpc-ai、ai-router 等）
+UNCONNECTED=$(curl -s "$BASE/provider" | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+all_ids=[p['id'] for p in d.get('all',[])]
+connected=d.get('connected',[])
+unconnected=[x for x in all_ids if x not in connected]
+print(unconnected[0] if unconnected else '')
+")
+echo "测试 provider: $UNCONNECTED"
+
+# 2) 设置凭据
+curl -s -X PUT "$BASE/auth/$UNCONNECTED" \
+  -H 'Content-Type: application/json' \
+  -d '{"type":"api","key":"test-key"}' > /dev/null
+
+# 3) 查询 provider，验证 connected 包含该凭据的 provider
+curl -s "$BASE/provider" | python3 -c "
+import json,sys
+d=json.load(sys.stdin, strict=False)
+connected = d.get('connected', [])
+has_test = '$UNCONNECTED' in connected
+print(f'connected: {connected}')
+print(f'$UNCONNECTED 在 connected 中: {has_test}')
+print('✅ T3.6 PASS' if has_test else '❌ T3.6 FAIL')
+"
+
+# 4) 清理
+curl -s -X DELETE "$BASE/auth/$UNCONNECTED" > /dev/null
+```
+
+**期望**：凭据设置后，即使该 provider 未通过 `provider.list()` 连接，也出现在 `connected` 中。
 
 ---
 

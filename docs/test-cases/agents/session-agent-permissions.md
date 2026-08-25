@@ -2081,3 +2081,37 @@ SSE 日志:
 | 切换持久化（durable） | setAgentModel 后 reload，agent + model 都正确 |
 
 运行：`cd packages/opencode && bun test test/session/session-agent-switch.test.ts`
+
+---
+
+## 附：v1.18.19/v1.18.18 新增功能
+
+### T26.66 子 agent 权限回答（v1.18.19）
+
+> 验证：`opencode run` 中子 agent 触发的权限请求能正确路由到父 session 的 `permission.ask` 处理流程，不再因权限请求未处理而阻塞。
+
+```bash
+# 创建 session 并设置子 agent 权限
+SID=$(curl -s --noproxy '*' -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+curl -s --noproxy '*' -X PATCH "$BASE/session/$SID" -H 'Content-Type: application/json' \
+  -d '{"permission":[{"permission":"external_directory","pattern":"*","action":"allow"}]}' -o /dev/null
+
+# 验证 permission 规则持久化
+psql "$PG_URL" -t -A -c "SELECT permission FROM session WHERE id='$SID'" | grep -c "allow" | xargs echo "权限规则:"
+```
+
+**期望**：子 agent 继承父 session 的 permission 规则，权限请求不阻塞。
+
+### T26.67 子 agent resumable task_id（v1.18.19）
+
+> 验证：子 agent 失败时返回 `task_id`，主 agent 可通过该 ID 恢复任务。
+
+```bash
+# 单测覆盖（核心验证路径）
+cd packages/opencode
+bun test test/tool/task.test.ts -t "resumable"
+```
+
+**期望**：单测通过，覆盖 `task_id` 持久化与恢复链路。
+
+---
