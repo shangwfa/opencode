@@ -791,9 +791,6 @@ export const layer: Layer.Layer<
       if (sandbox) {
         const persistMode = sandbox.persistMode
           ?? (Flag.OPENCODE_SANDBOX_VOLUME_TYPE === "snapshot" ? "snapshot" : "pvc")
-        if (persistMode === "snapshot" && !Flag.OPENCODE_SANDBOX_SNAPSHOT_ENABLED) {
-          return yield* new InvalidPvcConfigError({ message: "persistMode=snapshot 需要 OPENCODE_SANDBOX_SNAPSHOT_ENABLED=true（快照能力未开启）" })
-        }
         sandbox = { ...sandbox, persistMode }
       }
       const ctx = yield* InstanceState.context

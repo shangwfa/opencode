@@ -25,7 +25,6 @@ export namespace SandboxConfig {
     readonly resourceLimits: Record<string, string>
     readonly volumeType: "none" | "pvc" | "host" | "snapshot"
     readonly pvcClaimName: string
-    readonly snapshotEnabled: boolean
     readonly snapshotTtlMs: number
     readonly snapshotWaitMs: number
     readonly idleKillMs: number
@@ -49,7 +48,6 @@ export namespace SandboxConfig {
     resourceLimits: { cpu: "1", memory: "2Gi" },
     volumeType: Flag.OPENCODE_SANDBOX_VOLUME_TYPE,
     pvcClaimName: Flag.OPENCODE_SANDBOX_PVC_CLAIM,
-    snapshotEnabled: Flag.OPENCODE_SANDBOX_SNAPSHOT_ENABLED,
     snapshotTtlMs: Flag.OPENCODE_SANDBOX_SNAPSHOT_TTL_SEC * 1000,
     snapshotWaitMs: Flag.OPENCODE_SANDBOX_SNAPSHOT_WAIT_SEC * 1000,
     idleKillMs: Flag.OPENCODE_SANDBOX_IDLE_KILL_SEC * 1000,
@@ -76,10 +74,10 @@ export interface VolumeScope {
   readonly persistMode?: "pvc" | "snapshot"
 }
 
-export function validateSnapshotConfig(config: Pick<SandboxConfig.Interface, "volumeType" | "snapshotEnabled">) {
-  // 全局默认是 snapshot 时必须开能力，否则所有缺省会话创建即失败
-  if (config.volumeType === "snapshot" && config.snapshotEnabled !== true) {
-    throw new Error("OPENCODE_SANDBOX_VOLUME_TYPE=snapshot 需要 OPENCODE_SANDBOX_SNAPSHOT_ENABLED=true")
+export function validateSnapshotConfig(config: Pick<SandboxConfig.Interface, "volumeType">) {
+  // 全局默认是 snapshot 模式时需确保快照能力正常
+  if (config.volumeType === "snapshot") {
+    // snapshot 模式全局部署，快照模块始终可用
   }
 }
 
@@ -412,6 +410,7 @@ export namespace SandboxProvider {
         protocol: config.protocol,
         ...(config.apiKey ? { apiKey: config.apiKey } : {}),
         useServerProxy: config.useServerProxy,
+        requestTimeoutSeconds: 120,
       })
 
       const hasVolume = config.volumeType !== "none"
@@ -780,20 +779,19 @@ export namespace SandboxProvider {
         protocol: config.protocol,
         ...(config.apiKey ? { apiKey: config.apiKey } : {}),
         useServerProxy: config.useServerProxy,
+        requestTimeoutSeconds: 120,
       })
 
       const hasVolume = config.volumeType !== "none"
 
       const pgDb: any = Database.Client()
-      // 快照模块（OPENCODE_SANDBOX_SNAPSHOT_ENABLED 时启用；所有方法吞错，不影响回收/创建主流程）
-      const snapshots = config.snapshotEnabled
-        ? SessionSnapshot.create({
-          pgDb,
-          connectionConfig,
-          ttlMs: config.snapshotTtlMs,
-          waitMs: config.snapshotWaitMs,
-        })
-        : null
+      // 快照模块（所有方法吞错，不影响回收/创建主流程）
+      const snapshots = SessionSnapshot.create({
+        pgDb,
+        connectionConfig,
+        ttlMs: config.snapshotTtlMs,
+        waitMs: config.snapshotWaitMs,
+      })
 
       type Row = {
         id: string

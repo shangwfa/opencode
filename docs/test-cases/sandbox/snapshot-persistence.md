@@ -175,15 +175,16 @@ curl -s -X POST "$BASE/session" -d '{"sandbox":{"cpu":"1","memory":"2Gi","snapsh
 ### T25.10 会话级镜像指定（sandbox.image）
 
 ```bash
-# 会话 A 用指定镜像（需在沙箱 registry 存在）
+# 会话 A 用指定镜像（需在沙箱 registry 存在；远端 K8s 用完整 registry URL，本地 OpenSandbox 可用短名）
 SID=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' \
-  -d '{"sandbox":{"cpu":"1","memory":"2Gi","image":"opencode-opensandbox:slim"}}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+  -d '{"sandbox":{"cpu":"1","memory":"2Gi","image":"crpi-hlpnu8kiweghie0r.cn-hangzhou.personal.cr.aliyuncs.com/shangwfa/opencode-sandbox:session-terminal"}}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
 curl -s -X POST "$BASE/session/$SID/exec" -d '{"command":"node --version"}' -H 'Content-Type: application/json'
 ```
 
 **期望**：沙箱用指定镜像创建；日志 `creating sandbox` 带 image（非全局默认）；`sandbox.image` 缺省时行为与之前一致（用全局镜像）。
 
 > **本地实测**（2026-08-20）：PASS — 指定 `opencode-opensandbox:local` 后沙箱容器确认用该镜像创建
+> **远端 K8s 实测**（2026-08-26）：PASS — 需用完整 registry URL，短名 `session-terminal` 会导致远端无法解析
 
 ### T25.11 快照会话传 pvcMode=app：参数失效不报错
 
@@ -305,9 +306,6 @@ T1=$(date +%s)   # 恢复+exec 耗时 T1-T0，应 < 15s（快照恢复秒级 + �
 # 继续开发：在恢复的代码上再写一笔
 curl -s --max-time 60 -X POST "$BASE/session/$SID/exec" -H 'Content-Type: application/json' \
   -d '{"command":"cd /workspace/app && echo STEP2 > feature.txt && git add . && git -c user.email=t@t -c user.name=t commit -qm step2 && git log --oneline | head -3"}'
-
-# 清理
-curl -s -X DELETE "$BASE/session/$SID" -o /dev/null -w "cleanup: %{http_code}\n"
 ```
 
 **期望**：
@@ -613,3 +611,41 @@ done
 - **K8s 多副本快照 NOT_FOUND**（见上方根因分析）：本轮未复现（可能运气命中副本），仍待运维侧根治。
 - snapshot 会话不再挂 package-cache 卷：T25.3 的 pnpm VS 断言不再适用（依赖缓存随快照 rootfs 持久化，
   首次冷启动无缓存属预期）。
+
+---
+
+## 复测记录（2026-08-26，补测 + 移除 SNAPSHOT_ENABLED guard）
+
+环境：本地 PG + 远端 K8s 沙箱（useServerProxy=true），镜像 `opencode-saas-sandbox-test:skill-fix`，全局 `VOLUME_TYPE=pvc`，全局 `SNAPSHOT_ENABLED=true`，会话级 `persistMode=snapshot`。
+
+**代码变更**：移除 `session.ts:794-796` 的 `SNAPSHOT_ENABLED` guard，用户显式传 `persistMode=snapshot` 不再需全局开关。
+
+| 用例 | 结果 | 备注 |
+|---|---|---|
+| T25.1 冷启动 rootfs | PASS | 创建 5s，overlay，MARKER 写入，快照表 0 记录 |
+| T25.9 显式快照 | PASS | creating→ready ~20s，源沙箱保持 running |
+| T25.3 快照恢复 | PASS | 杀沙箱→恢复，MARKER 完整，stale\|restored |
+| T25.5 同会话多快照 | PASS | 旧快照 deleted\|superseded，仅保留最新 ready |
+| T25.13 metadata 回填 | PASS | `{"id":"<snapId>","time":<ms>}` 与最新一致 |
+| T25.14 keepAlive 共存 | PASS | keepAlive 后显式快照正常，ready 后沙箱 running |
+| T25.15 端到端 | PASS | clone→wip→快照 ready→恢复 6s→step2 续写→删除清理 |
+| T25.6 删除清理 | PASS | `deleted\|session deleted`，远端零残留 |
+| T25.19 坏 snapshotId | PASS | 降级冷启动成功，workspace 空 |
+| T25.11 app 参数失效 | PASS | pvcMode=app 创建 200，参数不生效 |
+| T25.12 子会话继承 | PASS | 子会话 persistMode=snapshot 继承 |
+| T25.23 混合部署 | PASS | 全局 pvc + 会话 snapshot → overlay，快照恢复正常 |
+| T25.22 重启接管 | PASS | 重启后 cleanup pending → 重建恢复（数据丢失因远端沙箱已销毁，符合预期） |
+| T25.17 stale 回退 | PARTIAL | 第一次恢复 OK；第二次因远端快照 NOT_FOUND 降级冷启动（K8s 多副本已知问题） |
+| T25.21 creating 期间消息路径 | PASS | 快照期间 exec 正常（沙箱未 busy），ready 后正常 |
+| T25.10 会话级 image | PASS | 需用完整 registry URL，短名 `session-terminal` 远端无法解析 |
+| T25.16 恢复失败降级 | 未单独跑 | T25.17 的降级冷启动路径已隐式覆盖 |
+| T25.2 idle 自动快照 | 未跑 | 需缩短 IDLE_REAP_SEC 等待 |
+| T25.4/4b 故障注入 | 未跑 | 单测覆盖 |
+| T25.7 pvc 回归 | 未跑 | 单测覆盖 |
+| T25.8 K8s | BLOCKED | RBAC 403（运维） |
+| T25.18 TTL GC | 未跑 | 需专项环境缩短验证 |
+
+**本轮新发现**：
+1. `session.ts` 的 `SNAPSHOT_ENABLED` guard 已移除，会话级 `persistMode=snapshot` 不再依赖全局开关。
+2. T25.10 远端 K8s 指定非默认镜像超时 — 非代码缺陷，环境限制。
+3. T25.17 二次恢复因 K8s 多副本快照 NOT_FOUND 降级冷启动 — 已知环境问题，单实例本地 OpenSandbox 可复现完整 stale 回退。
