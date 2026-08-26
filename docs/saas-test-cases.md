@@ -1,5 +1,9 @@
 # OpenCode SaaS 测试用例集
 
+> **⚠️ 行为变更（2026-08-25）**：`bash` 工具的 `background:true` 不再自动触发 keepAlive（已从 `shell.ts` 移除），
+> 保活唯一入口是 keep-alive API。本文档中 T11.9、T12.3 及所有"background 必须设为 true 以保活"的表述已过时；
+> 现行用例以 [`test-cases/`](./test-cases/) 目录为准。
+
 所有用例在容器内通过 `bun -e` 执行，端口默认 `4096`。请把 `SID` 替换为实际 sessionID。
 
 ## 测试环境

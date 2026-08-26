@@ -10,7 +10,7 @@
 | 僵尸清理 | 后台周期扫描 | 120 min (`idleKillMs*2`) | ❌ 只扫 `keep_alive=false` | `tool/sandbox-provider.ts:1297-1350` |
 | Session 删除 | 显式调用 | 即时 | ✅ | `session/session.ts:660` |
 
-**缺口**：`keep_alive=true` 的沙箱（`background=true` 的 bash 命令触发，`shell.ts:437`），在会话 idle 后不会被即时销毁，也不会被僵尸清理扫描。需要新增一轮 **30 分钟无活跃即销毁** 的后台扫描，覆盖所有存活沙箱。
+**缺口**：`keep_alive=true` 的沙箱（keep-alive API 或 PTY 活跃触发；历史上 `background=true` 的 bash 命令也曾触发，该自动保活已于 2026-08-25 移除），在会话 idle 后不会被即时销毁，也不会被僵尸清理扫描。需要新增一轮 **60 分钟无活跃即销毁** 的后台扫描，覆盖所有存活沙箱。
 
 ## 二、总体架构
 
@@ -39,10 +39,10 @@
 | 决策 | 选择 | 理由 |
 |------|------|------|
 | 活跃判定依据 | `SandboxTable.time_updated` | 沙箱使用入口主动 touch 该字段，反映最后使用沙箱的时间；只需扫一张表，查询高效 |
-| keepAlive 处理 | 全部纳入清理 | 30 分钟无沙箱活动说明用户已不在，应释放资源；与 onIdle/僵尸清理形成互补 |
+| keepAlive 处理 | 全部纳入清理 | 60 分钟无沙箱活动说明用户已不在，应释放资源；与 onIdle/僵尸清理形成互补 |
 | 实现位置 | 扩展 `sandbox-provider.ts` pgLayer | 沙箱表查询天然属于 sandbox-provider；复用现有 `lock`/`reconnect`/`destroySandbox`/`dbMarkDestroyed` 基础设施 |
 | 适用范围 | 仅 PG 模式 | SQLite 模式用内存 Map 管理，onIdle 即时销毁已覆盖本地场景 |
-| 阈值 | 默认 30 分钟，可配置 | 通过 `OPENCODE_SANDBOX_IDLE_REAP_SEC` 环境变量控制 |
+| 阈值 | 默认 60 分钟，可配置 | 通过 `OPENCODE_SANDBOX_IDLE_REAP_SEC` 环境变量控制 |
 
 ## 四、配置变更
 
@@ -51,7 +51,7 @@
 **文件**：`packages/opencode/src/flag/flag.ts`（行 100-101 附近）
 
 ```
-export const OPENCODE_SANDBOX_IDLE_REAP_SEC = number("OPENCODE_SANDBOX_IDLE_REAP_SEC") ?? 1800
+export const OPENCODE_SANDBOX_IDLE_REAP_SEC = number("OPENCODE_SANDBOX_IDLE_REAP_SEC") ?? 3600
 ```
 
 ### 4.2 SandboxConfig 新增字段
@@ -227,7 +227,7 @@ yield* Effect.gen(function* () {
 | 风险 | 影响 | 缓解 |
 |------|------|------|
 | 长时间 AI 推理（无工具调用）期间沙箱被误杀 | 沙箱重建有 5-10s 延迟 | 可接受：`time_updated` 不更新说明无沙箱操作；重建走 `getOrCreate` 自动恢复 |
-| 后台 bash 任务还在跑但沙箱被杀 | 后台任务中断 | 可接受：30 分钟无活动说明用户已不在；不修改 keep_alive 标志，用户重启会话时可重建沙箱继续 |
+| 后台 bash 任务还在跑但沙箱被杀 | 后台任务中断 | 可接受：60 分钟无活动说明用户已不在；不修改 keep_alive 标志，用户重启会话时可重建沙箱继续 |
 | 多实例并发扫描同一沙箱 | 重复 destroy | 已由 per-session `Semaphore(1)` + CAS 校验覆盖；跨进程由 PG row 状态校验兜底 |
 | 5 分钟扫描间隔的 DB 查询开销 | 轻微 DB 负载 | 查询走 `state + time_updated`，数据量小；可按需调间隔 |
 
@@ -250,7 +250,7 @@ packages/opencode/src/tool/sandbox-provider.ts  # SandboxConfig 新增 idleReapM
         ▼
   Idle Reap 扫描（每 5 分钟，L1）
         │
-        ├─ 查 SandboxTable: state=running AND time_updated < now - 30min
+        ├─ 查 SandboxTable: state=running AND time_updated < now - 60min
         │
         ├─ lock + CAS 校验（防止误杀活跃沙箱）
         │

@@ -3,8 +3,9 @@
 > **仅适用于 opencode SaaS（PostgreSQL）**。
 > 公共测试环境和配置请参考 `docs/local-test-env.md`。
 
-> **本文档含两个主题**：
+> **本文档含三个主题**：
 > - **一、沙箱缓存性能**（T28.1-T28.4, T28.6-T28.8）：`getOrCreate` 缓存、并发、超时、日志——属于沙箱对象访问性能优化
+> - **二、PG 命令生命周期超时**（T28.15-T28.22）：command session、semaphore、前台/后台命令、清理和恢复——仅验证 PG provider
 > - **二、Part Watchdog 工具超时兜底**（T28.5, T28.5b, T28.9-T28.14）：扫描超时 tool part 并标记 error——与沙箱生命周期无关
 >
 > **与其他文档的关系**：
@@ -25,7 +26,7 @@
 
 | 文件 | 改动 | 防御层 |
 |------|------|--------|
-| `packages/opencode/src/tool/sandbox-provider.ts` | 加 `sbCache`（5 分钟 TTL，`SB_CACHE_TTL_MS=300_000`）+ getOrCreate 90s 超时 + 各阶段 `log.info` | 缓存（治本）+ 超时（防单点）+ 日志（诊断）|
+| `packages/opencode/src/tool/sandbox-provider.ts` | PG provider 的沙箱获取 90s 超时、command session/信号量/命令/清理超时 + 各阶段 `log.info` | 缓存（治本）+ 超时（防单点）+ 日志（诊断）|
 | `packages/opencode/src/session/mark-timed-out.ts`（原 tools.ts 拆出）| `SessionTools.markTimedOut()` lifecycle 方法；PG 模式 CAS + retry attempt + durable event 同事务（`pg_advisory_xact_lock(message_id)`）；`transitionRunningTool` CAS | 错误不再静默；tool lifecycle 统一超时标记；事件原子性 |
 | `packages/opencode/src/session/watchdog.ts`（**新建**）| 每 60s 扫描候选 running tool；本进程 callID + lease 过期 + orphan 兜底三路判定；调用 `SessionTools.markTimedOut()` | Watchdog（发现）+ lease recovery + orphan recovery |
 | `packages/opencode/src/session/watchdog-sql.ts`（**新建**）| `runningToolCondition`（基础 SQL 条件）+ `watchdogToolCondition`（含 lease/orphan 的三路条件）+ `MONITORED_TOOLS` 白名单 | SQL 筛选层 |
@@ -47,7 +48,9 @@
 | `heartbeatInterval` | 30s | `tool-execution-lease.ts:11` | lease 续租间隔 |
 | `MAX_AGENT_RETRY_ATTEMPTS` | 2 | `mark-timed-out.ts:169` | 同一 message 内 watchdog 超时重试上限 |
 | `SB_CACHE_TTL_MS` | 5 分钟（300_000ms） | `sandbox-provider.ts` | 沙箱对象缓存 TTL |
-| `CREATE_TIMEOUT_SECONDS` | 90s | `sandbox-provider.ts` | getOrCreate 超时 |
+| `CREATE_TIMEOUT_SECONDS` | 60s | `sandbox-provider.ts` | 底层 `Sandbox.create` 超时 |
+| `GET_OR_CREATE_TIMEOUT_SECONDS` | 90s | `sandbox-provider.ts` | PG 命令入口的锁 + `getOrCreate` 总超时 |
+| `COMMAND_CLEANUP_TIMEOUT_SECONDS` | 10s | `sandbox-provider.ts` | detached command session 删除超时 |
 
 > **lease PG-only**：`tool-execution-lease.ts` 的 `refresh`/`maintain` 在非 PG 模式返回 `Effect.succeed(false)` / `Effect.never`（无副作用）。SaaS PG 模式下才真正写入 lease 元数据。
 
@@ -194,9 +197,9 @@ echo "重新缓存: ${T4}s"
 
 ---
 
-### T28.4 getOrCreate 90s 超时
+### T28.4 PG 命令入口的沙箱获取 90s 超时
 
-**验证点**：缓存 miss 时整个 getOrCreate 流程（含 lock + reconnect + isHealthy + 可能的 destroy + createSandbox）总耗时上限为 90 秒，超过则 fail 并释放 lock。
+**验证点**：PG provider 的命令入口对 `lock(sessionID) + getOrCreate` 增加 90 秒总超时，覆盖 reconnect、isHealthy、可能的 destroy 和 createSandbox。超时后请求失败并释放 PG 锁；底层 `Sandbox.create` 仍有独立的 60 秒超时。该用例通过真实命令入口验证，不直接调用 provider 内部函数。
 
 ```bash
 # 此用例需要模拟"远端沙箱不可达"场景。两种方法：
@@ -239,11 +242,181 @@ docker rm -f opencode-saas-test-timeout
 **期望**：
 - HTTP 状态码非 200（500 或类似）
 - 总耗时 < 120s（90s 超时 + 一些 buffer）
-- 容器日志含 `Sandbox getOrCreate timeout after 90s`
+- 错误或容器日志含 `get or create sandbox timed out after 90s`（具体 HTTP 错误包装可能不同）
 
 ---
 
-## 二、Part Watchdog：工具执行超时兜底
+## 二、PG 命令生命周期超时
+
+> 本节只验证 PostgreSQL provider。不要用内存 provider 的 fake layer 代替；需要通过 `/exec`、`/exec/async` 或 PG 集成测试验证真实的 PG lock、command session 记录和清理行为。
+
+### T28.15 PG command session 创建超时
+
+**验证点**：command session 创建长时间不返回时，`runInSession` 在调用方 `timeoutSeconds` 内失败，不会一直占用 PG command session 创建路径。
+
+**执行方式**：使用 PG 集成测试注入一个永不完成的 `sb.commands.createSession`；不要通过普通 `sleep` 命令模拟，因为 `sleep` 发生在 command session 创建成功之后。
+
+```bash
+cd packages/opencode
+OPENCODE_DATABASE_URL="$PG_URL" bun test test/tool/sandbox-provider-pg.test.ts --timeout 30000
+```
+
+**期望**：
+- 返回错误包含 `create command session timed out` 或 `prepare command session timed out`。
+- 测试不会超过 30 秒。
+- PG 中不存在错误写入的 `command_session_id`。
+
+### T28.16 PG command semaphore 排队超时
+
+**验证点**：同一 Session 的第一个命令占用 command semaphore 时，第二个命令等待 semaphore 超时；不会重复创建 command session。
+
+```bash
+SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' \
+  | python3 -c "import json,sys; print(json.load(sys.stdin)['id'])")
+
+# 先建立 PG command session，并让第一个命令占用 semaphore
+curl -s --max-time 30 -X POST "$BASE/session/$SID/exec" \
+  -H 'Content-Type: application/json' \
+  -d '{"command":"sleep 5","timeoutSeconds":10}' > /tmp/t28-16-first.json &
+FIRST_PID=$!
+sleep 1
+
+# 第二个命令的 1 秒超时应包含 semaphore 等待时间
+SECOND=$(curl -s --max-time 10 -X POST "$BASE/session/$SID/exec" \
+  -H 'Content-Type: application/json' \
+  -d '{"command":"echo second","timeoutSeconds":1}')
+wait "$FIRST_PID"
+echo "$SECOND" | python3 -m json.tool
+
+psql "$PG_URL" -c "SELECT id, session_id, command_session_id FROM sandbox WHERE session_id='$SID'"
+```
+
+**期望**：
+- 第二个请求在约 1 秒后返回，不等待第一个命令完成。
+- 不产生第二条 command session。
+- 第一个命令完成后，后续 `echo recovered` 可以成功执行。
+
+> **实现说明（2026-08-25）**：`Semaphore.withPermit` 在 Effect v4 中不可被外层 timeout 打断，
+> PG provider 改用 `withPermitsIfAvailable + 10ms 轮询`，排队预算为 `timeoutSeconds + 5s 宽限`
+> （宽限保证执行阶段 `withExecTimeout` 先到期，避免把执行超时误判成排队超时）。
+> 排队超时错误文本为 `command queue wait timed out after Ns`；生命周期锁等待为
+> `sandbox lock wait timed out after Ns`。诊断日志 `command permit acquired waitedMs=` 可观察实际排队时长。
+
+### T28.17 PG 前台命令整体超时
+
+**验证点**：同步 `/exec` 的命令执行、semaphore 等待和前台命令生命周期受同一个 `timeoutSeconds` 约束，并写入 `exec_log.status=timed_out`。
+
+```bash
+RESULT=$(curl -s --max-time 10 -X POST "$BASE/session/$SID/exec" \
+  -H 'Content-Type: application/json' \
+  -d '{"command":"sleep 10","timeoutSeconds":2}')
+echo "$RESULT" | python3 -m json.tool
+
+psql "$PG_URL" -c "SELECT id, status, error FROM exec_log WHERE session_id='$SID' ORDER BY time_started DESC LIMIT 1"
+```
+
+**期望**：
+- HTTP 请求在 10 秒内结束。
+- 返回结果的 `error.name=TimeoutError`，或 `exec_log.status=timed_out`。
+- PG 中 `time_finished` 已写入，不能保持无限期 running。
+
+> **超时后回收（2026-08-25）**：前台命令执行超时后，底层命令仍在沙箱运行且 SDK `interrupt`
+> 会使持久 command session 进入立即 EOF 的报废状态（实测后续命令秒回空结果）。
+> 因此 PG provider 超时后改为 `deleteSession + 清空 command_session_id`，
+> 下一条命令自动重建干净 session。注意：若命令总耗时接近 `timeoutSeconds`，
+> 该命令结束后 session 会被回收，紧随其后的第一条命令会有一次性的 session 重建开销。
+
+### T28.18 PG detached 命令超时与中断
+
+**验证点**：`/exec/async` 使用 PG provider 的 detached command；命令超时后触发 `interrupt`，最终状态可查询。
+
+```bash
+START=$(curl -s -X POST "$BASE/session/$SID/exec/async" \
+  -H 'Content-Type: application/json' \
+  -d '{"command":"sleep 20","timeoutSeconds":2}')
+EXEC_ID=$(echo "$START" | python3 -c "import json,sys; print(json.load(sys.stdin)['execId'])")
+sleep 5
+curl -s "$BASE/session/$SID/exec/$EXEC_ID" | python3 -m json.tool
+```
+
+**期望**：
+- 初始响应立即返回 `status=running` 和 `execId`。
+- 约 2 秒后状态不再是 running，通常为 `timed_out` 或 `failed`。
+- 沙箱仍可执行后续命令，不能因为 detached 超时进入不可用状态。
+
+### T28.19 PG detached session 清理超时
+
+**验证点**：`deleteSession` 不返回时，清理最多等待 `COMMAND_CLEANUP_TIMEOUT_SECONDS=10s`，不会永久阻塞请求完成或本地 detached session 状态清理。
+
+**执行方式**：在 PG provider 集成测试中注入只阻塞 `sb.commands.deleteSession` 的 fake SDK；命令本身必须先完成。
+
+```bash
+cd packages/opencode
+OPENCODE_DATABASE_URL="$PG_URL" bun test test/tool/sandbox-provider-pg.test.ts --timeout 30000
+```
+
+**期望**：
+- 主流程在清理超时后结束。
+- 清理超时被忽略，不覆盖命令本身的成功结果。
+- detached session 的本地跟踪记录被移除。
+
+### T28.20 PG 沙箱锁等待超时
+
+**验证点**：PG `lock(sessionID)` 或 `getOrCreateUnlocked` 卡住时，命令入口在 90 秒内失败，并且不会留下永久锁。
+
+**执行方式**：使用 PG 集成测试注入永不完成的沙箱获取操作；生产黑盒测试可将 Sandbox API 指向不可达地址复测 T28.4。
+
+**期望**：
+- 返回错误包含 `get or create sandbox timed out after 90s`。
+- 同一 Session 的后续请求在沙箱服务恢复后可以重新获取锁并执行。
+- PG sandbox 记录不会被错误标记为新的 running command session。
+
+### T28.21 PG 超时后的命令恢复
+
+**验证点**：一次前台命令超时后，PG 中的 command session 记录和 provider 内存 semaphore 状态仍可用于下一次命令；必要时允许重新创建。
+
+```bash
+curl -s --max-time 10 -X POST "$BASE/session/$SID/exec" \
+  -H 'Content-Type: application/json' \
+  -d '{"command":"sleep 10","timeoutSeconds":1}' > /tmp/t28-21-timeout.json
+
+RECOVERED=$(curl -s --max-time 30 -X POST "$BASE/session/$SID/exec" \
+  -H 'Content-Type: application/json' \
+  -d '{"command":"echo recovered","timeoutSeconds":10}')
+echo "$RECOVERED" | python3 -m json.tool
+```
+
+**期望**：
+- 超时请求结束后，恢复命令返回 `exitCode=0` 且 stdout 含 `recovered`。
+- PG 中同一 sandbox 的 command session 记录保持一致，或旧 session 失效后只产生一条新的有效记录。
+- 不出现后续命令永久排队。
+
+### T28.22 PG keep-alive 与 idle-reap 回归
+
+**验证点**：命令操作超时包装不改变 `keep_alive` 和 idle-reap 语义。
+
+```bash
+# keep-alive=true 时，超时命令之后沙箱仍可用
+curl -s -X POST "$BASE/session/$SID/keep-alive" \
+  -H 'Content-Type: application/json' -d '{"enabled":true}' > /dev/null
+curl -s --max-time 10 -X POST "$BASE/session/$SID/exec" \
+  -H 'Content-Type: application/json' \
+  -d '{"command":"sleep 10","timeoutSeconds":1}' > /dev/null
+curl -s --max-time 30 -X POST "$BASE/session/$SID/exec" \
+  -H 'Content-Type: application/json' \
+  -d '{"command":"echo keep-alive-ok"}' | python3 -m json.tool
+
+psql "$PG_URL" -c "SELECT id, session_id, state, keep_alive, command_session_id FROM sandbox WHERE session_id='$SID'"
+```
+
+**期望**：
+- `keep_alive=true` 时超时不会触发沙箱销毁。
+- 后续命令可以成功执行。
+- 按 T19.8/T19.9 和 T30 的 idle-reap 配置复测释放 keep-alive 后的正常回收。
+
+---
+
+## 三、Part Watchdog：工具执行超时兜底
 
 > 本节与沙箱生命周期无关。Part Watchdog 每 60s 扫描超时的 tool part 并标记 error，**不销毁沙箱**（沙箱回收见 T12/T30）。
 
@@ -309,7 +482,7 @@ LIMIT 3;
 
 ---
 
-## 三、缓存性能：缓存失效与日志（续一）
+## 四、缓存性能：缓存失效与日志（续一）
 
 > T28.6-T28.8 属于「一、沙箱缓存性能优化」主题（缓存失效、init 失败日志、阶段耗时日志），物理位置在此，逻辑归属「一」。
 
@@ -419,7 +592,7 @@ INFO ... getOrCreate done    totalMs=XXX          sessionID=ses_... sandboxID=..
 
 ---
 
-## 四、Part Watchdog：CAS 幂等与配置（续二）
+## 五、Part Watchdog：CAS 幂等与配置（续二）
 
 > T28.9-T28.13 属于「二、Part Watchdog」主题（markTimedOut CAS 防覆盖、多实例幂等、配置注入、未超时不处理、可观测性）。
 
@@ -685,7 +858,12 @@ ORDER BY time_created;
 | 文件接口并发请求变串行 | 缓存失效或被清 | T28.2 | `getOrCreate start` 出现多次（应该只有 1 次）|
 | 沙箱销毁后调用失败 | 缓存返回陈旧对象 | T28.6 | kill-sandbox 后立刻调用应该 > 0.5s |
 | 错误看不到原因 | tools.ts 静默吞错 | T28.7 | `ERROR ... sandbox init failed` |
-| 卡 90s+ 才报错 | getOrCreate 超时生效 | T28.4 | `Sandbox getOrCreate timeout after 90s` |
+| 卡 90s+ 才报错 | PG 命令入口沙箱获取超时 | T28.4/T28.20 | `get or create sandbox timed out after 90s` |
+| 同 Session 后续命令排队 | command session semaphore 等待超时 | T28.16 | `prepare command session timed out` / `run command timed out` |
+| 前台命令返回后 PG 仍 running | exec 生命周期未收敛 | T28.17 | `exec_log.status=timed_out` 且有 `time_finished` |
+| detached 命令超时后仍占用资源 | interrupt 或 deleteSession 未执行 | T28.18/T28.19 | `exec-async` 状态收敛，detached session 清理结束 |
+| 超时后下一条命令继续排队 | semaphore/session 状态未释放 | T28.21 | 恢复命令 `exitCode=0` |
+| keep-alive 超时后沙箱被误回收 | 命令超时误触发 idle-reap | T28.22 | PG `keep_alive=true` 且后续 exec 成功 |
 | scan 标记数/耗时不可见 | 结果丢弃或未记日志 | T28.13 | `watchdog scan completed ... marked= durationMs= orphaned=` |
 | 超时后 Session 不继续 | 已标记 error 的 tool call 未 settle | T28.14 | `metadata.retry.strategy=agent`，后续出现新 callID |
 | 写入操作被重复执行 | 服务端直接重放或 Agent 未检查现场 | T28.14 | `requiresVerification=true`，重试前应先 read |
@@ -693,7 +871,7 @@ ORDER BY time_created;
 ## 改动文件清单
 
 ```
-packages/opencode/src/tool/sandbox-provider.ts        # 缓存 + 超时 + 日志 + reconnect 404/500 + heartbeat + idle-reap + zombie
+packages/opencode/src/tool/sandbox-provider.ts        # PG 命令生命周期超时 + 缓存/日志 + reconnect/heartbeat/idle-reap
 packages/opencode/src/session/mark-timed-out.ts         # SessionTools.markTimedOut（CAS + PG 同事务 event + retry attempt + pg_advisory_xact_lock）
 packages/opencode/src/session/watchdog.ts               # watchdog 扫描（三路判定：本进程 callID + lease 过期 + orphan 兜底）
 packages/opencode/src/session/watchdog-sql.ts           # SQL 条件（runningToolCondition + watchdogToolCondition + MONITORED_TOOLS）
@@ -727,7 +905,7 @@ raceAbort 包裹执行：工具不响应 AbortSignal 时调用边界仍能退出
   ↓
 如果某个工具卡住（极端情况）
   ↓
-getOrCreate 90s 超时 → fail → 释放 lock
+  PG 命令入口 getOrCreate 90s 超时 → fail → 释放 lock
   ↓
 如果工具 fiber 仍卡（更极端）
   ↓
@@ -745,7 +923,7 @@ PG 事务内：pg_advisory_xact_lock(message_id) → 串行分配 retry attempt
   ↓
 ToolExecution.interrupt(sessionID, callID) → abort controller.signal
   ↓
-command 类工具额外 sandbox.interrupt（10s 超时）
+  command 类工具额外 sandbox.interrupt；detached session 删除最多等待 10s
   ↓
 Processor 检测已 timeout 的 part（isWatchdogTimeout）→ settleWatchdogTimeout
   ↓
@@ -763,7 +941,7 @@ Code Agent 检查现场并决定是否重试（最多 2 次；写入操作先验
 | T28.1 缓存命中 | ✅ | 后续 exec 0.31-0.37s（缓存 hit） |
 | T28.2 并发绕过 lock | ✅ | 5 并发 exec 总耗时 1.2s（不串行排队） |
 | T28.3 缓存 TTL 过期 | ⏭️ SKIP | 需 5 分钟等待（`SB_CACHE_TTL_MS=300_000`），逻辑由代码保证 |
-| T28.4 getOrCreate 90s 超时 | ✅ | 代码确认 `Effect.timeoutOrElse(90s)`（`sandbox-provider.ts:1242-1244`） |
+| T28.4 PG 命令入口沙箱获取 90s 超时 | ⏭️ 待当前 PG 版本复测 | 需验证 PG lock + getOrCreate 总超时和锁释放；底层 Sandbox.create 为 60s |
 | T28.5 Part Watchdog 超时标记 | ✅ | PG 有 333 条 `timeout=true` 的 part，全部 `status=error`；retry 元数据（strategy/eligible/attempt）由单测覆盖 |
 | T28.5b 事件同步可见性 | ✅ | PG `event` 表有 17 条 `message.part.updated` 含 `timeout=true` |
 | T28.6 销毁后缓存失效 | ✅ | kill 后 exec 4.06s（重建，非缓存） |
@@ -775,6 +953,17 @@ Code Agent 检查现场并决定是否重试（最多 2 次；写入操作先验
 | T28.12 未超时不处理 | ✅ | PG 验证：131 个 running tool part，0 个被误标 `timeout=true` |
 | T28.13 可观测性 | ✅ | PG 验证 timeout part 分布（question 97, read 73, task 61...）；单测覆盖 `scan completed ... scanned/stuck/marked/orphaned/durationMs` |
 | T28.14 Agent 恢复重试 | ✅ | 单测覆盖 retry 元数据完整性（strategy/eligible/attempt/maxAttempts/requiresVerification） |
+| T28.15 PG command session 创建超时 | ⏭️ 待复测 | 需要 PG provider 注入卡住的 `createSession` |
+| T28.16 PG command semaphore 排队超时 | ✅ PASS | 单测覆盖排队超时（5.05s 预算准时 fail）；生产日志 `command permit acquired waitedMs=` 证实串行化与排队预算生效。注意黑盒复测需避开 idle-reap（30s 无活动回收持锁数秒）与远端流关闭延迟干扰 |
+| T28.17 PG 前台命令整体超时 | ✅ PASS | `sleep 10` + `timeoutSeconds=2` 返回 `TimeoutError`，PG `exec_log.status=timed_out` 且有 `time_finished`；超时后自动回收 command session |
+| T28.18 PG detached 命令超时与中断 | ✅ PASS | `/exec/async` 返回 running，约 2s 后 PG/查询状态为 `timed_out` |
+| T28.19 PG detached session 清理超时 | ⏭️ 待复测 | 需要注入卡住的 `deleteSession`，确认 10s 上限 |
+| T28.20 PG 沙箱锁等待超时 | ⏭️ 待复测 | 验证 90s 超时和后续请求可恢复 |
+| T28.21 PG 超时后的命令恢复 | ✅ PASS | 超时回收 session 后 `echo recovered` 返回 `exitCode=0`（session 自动重建） |
+| T28.22 PG keep-alive 与 idle-reap 回归 | ✅ PASS | `keep_alive=true` 时超时后 `keep-alive-ok` 成功；测试结束已释放并销毁沙箱 |
+
+> **2026-08-25 修复轮补充单测**：`sandbox-provider-timeout.test.ts` 4 pass（无 timeout 直通 / 卡住操作带操作名 fail / 预算内完成 / semaphore 排队超时），`sandbox-provider-concurrency.test.ts` 9 pass。
+> **已知边界**：命令总时长接近 `timeoutSeconds` 时，前台超时回收会清除 `command_session_id`，紧随其后的第一条命令有一次性的 session 重建开销（见 T28.17 说明）。
 
 > **单测**：watchdog.test.ts 10 pass + tool-execution.test.ts 4 pass + processor-watchdog.test.ts 2 pass + watchdog-pg.test.ts 7 pass = **23 pass / 0 fail**
 >

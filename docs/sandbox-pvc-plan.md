@@ -23,8 +23,8 @@ ensureRunning(sessionID)          ← run-state.ts
     │               ├─ entry 是 killed → 重建（PVC 挂回，文件还在）
     │               └─ entry 不存在 → 新建 Sandbox.create()
     │
-    ├─ bash background:true → keepAlive(sessionID)
-    │                           leases.add(sessionID)
+    ├─ keep-alive API / PTY 活跃 → keepAlive(sessionID)
+    │                           （bash background:true 不再自动保活）
     │
     ▼
 AI 回复完成 → Runner.onIdle()

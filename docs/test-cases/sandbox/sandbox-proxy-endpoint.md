@@ -117,7 +117,9 @@ curl -s -o /dev/null -w "%{http_code}\n" "$BASE/session/$SID/proxy-errors"
 ```
 **期望**：均 200
 
-### T11.9 background:true keepAlive 验证
+### T11.9 keepAlive 阻止 idle 回收验证
+
+> 前置步骤已通过 keep-alive API 设置保活（`bash background:true` 不再自动保活）。
 
 ```bash
 curl -s "$BASE/session/$SID/proxy/5173/" -o /dev/null

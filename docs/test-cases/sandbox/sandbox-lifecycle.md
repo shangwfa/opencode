@@ -34,13 +34,13 @@ LOG=/home/opencode/.local/share/opencode/log/opencode.log
 | 机制 | 触发 | 阈值 | 覆盖 keep_alive |
 |------|------|------|----------------|
 | `onIdle` 即时销毁 | Runner 转入 idle（AI loop 退出） | 即时 | ❌ 跳过 |
-| Idle Reap | 后台周期扫描 | `idleReapMs`（`OPENCODE_SANDBOX_IDLE_REAP_SEC`，默认 1800s）超时未活跃 | ✅ |
+| Idle Reap | 后台周期扫描 | `idleReapMs`（`OPENCODE_SANDBOX_IDLE_REAP_SEC`，默认 3600s）超时未活跃 | ✅ |
 | Zombie 清理 | 后台周期扫描 | `idleKillMs`（`OPENCODE_SANDBOX_IDLE_KILL_SEC`，默认 3600s，判定 ×2） | ❌ 只扫 `keep_alive=false` |
 
 **关键常量（`sandbox-provider.ts`）**：
 - `timeoutSeconds`=`OPENCODE_SANDBOX_TIMEOUT`（默认 600s，无 PVC 时的远程 TTL）
 - `maxTtlSeconds`=`OPENCODE_SANDBOX_MAX_TTL_SEC`（默认 3600s，有 PVC 时的远程 TTL）
-- `idleReapMs`=默认 1800s（30 分钟），`idleReapIntervalMs`=300_000（5 分钟，硬编码）
+- `idleReapMs`=默认 3600s（60 分钟，2026-08-26 由 30 分钟上调），`idleReapIntervalMs`=300_000（5 分钟，硬编码）
 - `idleKillMs`=默认 3600s（1 小时），zombie 判定 `idleKillMs*2`
 - keepAlive 沙箱创建时 TTL 放大 10 倍（`Math.max(baseTtl, maxTtlSeconds) * 10`）
 
@@ -438,7 +438,7 @@ echo "BEFORE=$BEFORE AFTER=$AFTER"; [ "$AFTER" -gt "$BEFORE" ] && echo "PASS: ti
 
 **验证点**：长命令执行期间，heartbeat 每 `COMMAND_HEARTBEAT_MS`（不超过 `idleReapMs/3`）刷新 `time_updated`，跨越 idle 阈值不被回收。
 
-> **2026-08-19 语义变更**：heartbeat 仅覆盖**前台命令**（`runInSession`，AI 同步等待中）；`runDetached`（`exec/async` 后台命令）**不再心跳**——后台命令不阻止 idle-reap，无人使用的会话沙箱 30 分钟后连同后台命令一起回收（对应单测「detached 长命令不阻止 idle-reap 回收」）。
+> **2026-08-19 语义变更**：heartbeat 仅覆盖**前台命令**（`runInSession`，AI 同步等待中）；`runDetached`（`exec/async` 后台命令）**不再心跳**——后台命令不阻止 idle-reap，无人使用的会话沙箱 60 分钟后连同后台命令一起回收（对应单测「detached 长命令不阻止 idle-reap 回收」）。
 
 ```bash
 # 集成测试覆盖（单元）："长命令跨越 idle 阈值时 heartbeat 防止误回收"
@@ -491,7 +491,7 @@ docker exec opencode-saas-test sh -c 'grep "idle sandbox reap scan" '"$LOG"' | t
 
 ### T30.8 配置注入：OPENCODE_SANDBOX_IDLE_REAP_SEC
 
-**验证点**：`OPENCODE_SANDBOX_IDLE_REAP_SEC=60` 覆盖默认 1800s，1 分钟前的记录被回收。
+**验证点**：`OPENCODE_SANDBOX_IDLE_REAP_SEC=60` 覆盖默认 3600s，1 分钟前的记录被回收。
 
 ```bash
 # 启动容器时设 OPENCODE_SANDBOX_IDLE_REAP_SEC=60；插入 time_updated=90s ago 的记录，等待回收
@@ -523,6 +523,75 @@ OPENCODE_DATABASE_URL=$PG_URL bun test test/tool/sandbox-idle-reap.test.ts -t "4
 
 ---
 
+### T30.12 挂起恢复自愈：失效 command session 自动重建并重试（2026-08-26 新增）
+
+> 机制说明见上文「挂起恢复自愈」。解决场景：question/permission 长时间等待用户期间沙箱或
+> command session 被 idle-reap 回收，恢复执行的第一条命令命中陈旧状态。
+> 旧行为：SDK 静默返回空流（秒回、无 exitCode、无输出）；新行为：检测后自动重建并重试成功。
+
+**验证点**：command session 失效后，第一条命令自动重建 session 并正确执行；后续命令继续正常。
+
+```bash
+SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' \
+  | python3 -c "import json,sys; print(json.load(sys.stdin)['id'])")
+
+# 1. warmup：创建沙箱与 command session
+curl -s --max-time 60 -X POST "$BASE/session/$SID/exec" -H 'Content-Type: application/json' \
+  -d '{"command":"echo warmup","timeoutSeconds":15}'
+
+# 2. 模拟挂起期间被回收：篡改 command_session_id 为不存在的值
+psql "$PG_URL" -c "UPDATE sandbox SET command_session_id='00000000-dead-beef-0000-000000000000' WHERE session_id='$SID'"
+
+# 3. 恢复执行：应自动重建并成功（旧行为此处返回静默空结果）
+curl -s --max-time 60 -X POST "$BASE/session/$SID/exec" -H 'Content-Type: application/json' \
+  -d '{"command":"echo self-heal-ok","timeoutSeconds":15}'
+
+# 4. 后续命令继续正常
+curl -s --max-time 30 -X POST "$BASE/session/$SID/exec" -H 'Content-Type: application/json' \
+  -d '{"command":"echo still-working","timeoutSeconds":10}'
+```
+
+**期望**：
+- 步骤 3 返回 `exitCode=0` 且 stdout 含 `self-heal-ok`；
+- PG 中该行的 `command_session_id` 已被替换为新值（非注入的假值）；
+- 步骤 4 正常执行；
+- 容器日志含 `empty execution stream; command session likely stale` 与
+  `sandbox gone; recreating and retrying command once`。
+
+**分类器单测**（防误伤业务错误）：
+
+```bash
+cd packages/opencode && bun test test/tool/sandbox-provider-timeout.test.ts -t "classifies"
+```
+
+期望：`Sandbox is no longer running` / 命令前缀+`not found|404` 判定为真；
+`File not found` / `command not found: pnpm` / `Command timed out` 判定为假。
+
+---
+
+### T30.13 bash background:true 不再自动保活（2026-08-25 行为变更）
+
+**验证点**：`background:true` 仅将命令后台化，不再调用 `keepAlive()`。保活唯一入口是
+keep-alive API 与 PTY 连接（见 `local-test-env.md` 第五章）。
+
+```bash
+# 加速验证：容器启动时设 OPENCODE_SANDBOX_IDLE_REAP_SEC=120
+
+# 会话 A：background bash 启动长驻进程，但不设置 keep-alive
+curl -s -X POST "$BASE/session/$SID_A/message" -H 'Content-Type: application/json' \
+  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"用 bash 工具，background 设为 true 执行: nohup sleep 3600 & echo started\"}],\"model\":$MODEL}" > /dev/null
+
+# 等待超过 reap 阈值后检查
+psql "$PG_URL" -tAc "SELECT state, keep_alive FROM sandbox WHERE session_id='$SID_A'"
+```
+
+**期望**：
+- background 命令后 PG `keep_alive=false`（旧行为会变 true）；
+- 超过阈值后沙箱照常回收（`state=destroyed`），未保活的长驻进程随之结束；
+- 对照组：相同操作前先调 keep-alive API 的会话不受影响（见 T19.8/T19.9）。
+
+---
+
 ## 三、keep_alive 状态机（2026-08-08 梳理）
 
 keep_alive 是 **session 维度的持久偏好**：一旦设置就持续生效，后续 sandbox 创建/重建都继承；只有显式 `release()` 才能清除。
@@ -535,7 +604,7 @@ keep_alive 是 **session 维度的持久偏好**：一旦设置就持续生效�
 销毁 destroy()    ── 只销毁 sandbox，不改 keepAlive     ← 修复：不再清 keepAlive
 创建/重建 createSandbox ── keep_alive = latest ?? existingRow ?? false（upsert 前读最新）
 onIdle           ── 仅当 !isKeepAlive 才 destroy        ← keepAlive=true 不即时销毁
-idle-reap(30min) ── 含 keep_alive=true 兜底回收，dbMarkDestroyed 保行 keep_alive 不变
+idle-reap(60min) ── 含 keep_alive=true 兜底回收，dbMarkDestroyed 保行 keep_alive 不变
 zombie           ── 仅清理 keep_alive=false 的 running 僵尸
 ```
 
@@ -544,9 +613,27 @@ zombie           ── 仅清理 keep_alive=false 的 running 僵尸
 - **持久**：keepAlive 记录在 `sandbox` 行上；所有销毁路径（`destroy`/idle-reap/zombie/session 删除）都用 `dbMarkDestroyed`（保留行、只改 state），`keep_alive` 不丢。只有 `release()` 置 false。
 - **继承**：`createSandbox` 在 `Sandbox.create` 完成后、`dbUpsert` 前重新读取 latest `keep_alive`（`sandbox-provider.ts:989-997`），创建期间并发设置的 keepAlive 不丢；destroy 后重建继承 destroyed 行的 keep_alive。
 - **清除**：`release()` 是唯一途径；`destroy()`/kill-sandbox 不再隐式清除（`sandbox-provider.ts:1263`）。
-- **兜底**：keepAlive=true 的沙箱不随 onIdle 销毁，但超过 `idleReapMs`（默认 30min）仍会被 idle-reap 回收（T30.2）。
+- **兜底**：keepAlive=true 的沙箱不随 onIdle 销毁，但超过 `idleReapMs`（默认 60min）仍会被 idle-reap 回收（T30.2）。
 - **TTL 放大时机**：`createSandbox` 的 `isKept` 用**创建前** `existingRow` 判定（`:961`）。`boot=true`（先设置再创建）→ `isKept=true` → TTL 10 倍 ✅；`async` 创建期间并发设置（T12.4）→ `isKept=false` → TTL 不放大（`latest` 只保证 `keep_alive` 写入，不影响已创建的远端 TTL）。
 - **会话删除**：`session.remove` 在发布 Deleted 事件前无条件 `SandboxProvider.destroy`（`session.ts:660-676`），不依赖 instance 上下文，避免孤儿。
+
+### 挂起恢复自愈（2026-08-26 新增）
+
+question/permission 长时间等待用户期间，沙箱可能已被 idle-reap 回收；恢复后第一条命令会命中陈旧的
+command session。SDK 对失效 session **不报错而是静默返回空流**（无 complete/error/exitCode）。
+PG provider 现已闭环处理：
+
+```
+命令失败且 isSandboxGone(err)          # "Sandbox is no longer running" /
+                                      # runInSession|runDetached|Failed to create ... + not found/404
+                                      # 或空执行流（转成 not found 失败）
+  → 清除陈旧 command_session_id（PG）
+  → invalidateCachedSandbox
+  → 强制重建沙箱/command session 并重试一次
+```
+
+重试安全：沙箱已消失时命令不可能已在远端执行，无副作用重复风险；分类器刻意收窄，
+业务级 `File not found` / `command not found` 不触发重试。
 
 ---
 
@@ -620,7 +707,14 @@ bun test test/tool/sandbox-idle-reap.test.ts
 | T12.17 boot=true/false | ✅ | boot=true 立即创建 running/true；boot=false pending destroyed/true；懒创建后 running/true；release→false |
 | T30.5 time_updated 刷新 | ✅ | exec 后 time_updated 刷新（远大于调旧值），state=running |
 | T30.7 可观测性 | ✅ | scan 日志正常运行（无超时候选时 count=0 不落日志） |
+| T30.12 挂起恢复自愈 | ✅ | 篡改 command_session_id 后首条命令自动重建并 `self-heal-ok`；分类器单测 8 断言通过（2026-08-26，镜像 selfheal2） |
+| T30.13 background 不再保活 | ⏭️ 待复测 | 行为变更已落地（shell.ts 移除自动 keepAlive）；对照实验需独立容器加速验证 |
 | 单测全量 | ✅ | idle-reap 17（含 detached 无心跳新用例）+ provider-pg/concurrency/lazy/queue 35 = 52 pass / 0 fail（2026-08-19 临时本地 PG `opencode_test`，5 文件合跑 3 轮均 52/0） |
+
+> **2026-08-26 行为变更**：
+> - `OPENCODE_SANDBOX_IDLE_REAP_SEC` 默认值 1800s → **3600s**（空闲回收阈值 30 分钟上调至 60 分钟，T30.2/T30.8 阈值口径同步）。
+> - `bash` 工具 `background:true` 不再自动触发 keepAlive（保活唯一入口为 keep-alive API 与 PTY），详见 T30.13 与 `local-test-env.md` 第五章。
+> - 新增挂起恢复自愈闭环（T30.12）：`isSandboxGone` 分类 + 空流检测 + 强制重建重试一次。
 
 > 2026-08-19 复测补充：
 > - 全部 T12.x（含 T12.1–T12.15、T12.17）+ T30.5/T30.7 通过；T12.16/T30.x 单测覆盖部分在临时本地 PG（`docker run postgres:16-alpine` + `/opencode_test`）上通过（远端 PG `app` 用户无 CREATE DATABASE 权限，无法使用共享库跑单测 guard）。

@@ -512,7 +512,13 @@ env \
 
 **在沙箱中启动 dev server**
 
-> ⚠️ **必须使用 `background:true`**，否则 AI 消息完成后沙箱立即被销毁，dev server 进程消失。
+> ⚠️ **保活必须显式调用 keep-alive API**：`bash` 的 `background:true` 只负责把命令后台化，
+> **不再自动触发沙箱保活**。未设置 keep-alive 时，AI 消息完成后沙箱会被空闲回收，dev server 进程消失。
+> 启动 dev server 前先执行：
+> ```bash
+> curl -s -X POST "http://localhost:14096/session/$SID/keep-alive" \
+>   -H 'Content-Type: application/json' -d '{"enabled":true}'
+> ```
 
 ```bash
 # --- Vite ---
@@ -522,10 +528,10 @@ curl -s --max-time 300 -X POST "http://localhost:14096/session/$SID/message" \
   -d '{"parts":[{"type":"text","text":"用 bash 执行: npx create-vite@5 /workspace/vite-app --template react-ts --yes && cd /workspace/vite-app && npm install"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}}' \
   | python3 -c "import json,sys;[print(p['text'][:200]) for p in json.load(sys.stdin).get('parts',[]) if p.get('type')=='text']"
 
-# 启动 Vite（background:true）
+# 启动 Vite（background:true 仅后台化；保活靠上方 keep-alive）
 curl -s --max-time 60 -X POST "http://localhost:14096/session/$SID/message" \
   -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"用 bash 工具执行，background 必须设为 true: cd /workspace/vite-app && npx vite --host 0.0.0.0 --port 5173"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}}' \
+  -d '{"parts":[{"type":"text","text":"用 bash 工具执行，background 设为 true: cd /workspace/vite-app && npx vite --host 0.0.0.0 --port 5173"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}}' \
   | python3 -c "import json,sys;[print(p['text'][:200]) for p in json.load(sys.stdin).get('parts',[]) if p.get('type')=='text']"
 
 sleep 10
@@ -539,10 +545,10 @@ curl -s --max-time 300 -X POST "http://localhost:14096/session/$SID/message" \
   -d '{"parts":[{"type":"text","text":"用 bash 执行: npx create-next-app@14 /workspace/next-app --js --app --no-eslint --no-tailwind --no-src-dir --no-import-alias --yes && cd /workspace/next-app && npm install"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}}' \
   | python3 -c "import json,sys;[print(p['text'][:200]) for p in json.load(sys.stdin).get('parts',[]) if p.get('type')=='text']"
 
-# 启动 Next.js（background:true）
+# 启动 Next.js（background:true 仅后台化；保活靠上方 keep-alive）
 curl -s --max-time 60 -X POST "http://localhost:14096/session/$SID/message" \
   -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"用 bash 工具执行，background 必须设为 true: cd /workspace/next-app && npx next dev -H 0.0.0.0 -p 3000"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}}' \
+  -d '{"parts":[{"type":"text","text":"用 bash 工具执行，background 设为 true: cd /workspace/next-app && npx next dev -H 0.0.0.0 -p 3000"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}}' \
   | python3 -c "import json,sys;[print(p['text'][:200]) for p in json.load(sys.stdin).get('parts',[]) if p.get('type')=='text']"
 
 sleep 20
@@ -645,14 +651,14 @@ PVC 卷上的文件会保留，容器重启后只需重新启动 dev server 进�
 SID="ses_1d53684f0ffeG7NMWxbffMudcs"
 curl -s --max-time 60 -X POST "http://localhost:14096/session/$SID/message" \
   -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"用 bash 工具执行，background 必须设为 true: cd /workspace/vite-app && npx vite --host 0.0.0.0 --port 5173"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}}' \
+  -d '{"parts":[{"type":"text","text":"用 bash 工具执行，background 设为 true: cd /workspace/vite-app && npx vite --host 0.0.0.0 --port 5173"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}}' \
   | python3 -c "import json,sys;[print(p['text'][:200]) for p in json.load(sys.stdin).get('parts',[]) if p.get('type')=='text']"
 
 # Next.js
 SID="ses_1d52f1c8cffeiSZAgZNA8XElBE"
 curl -s --max-time 60 -X POST "http://localhost:14096/session/$SID/message" \
   -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"用 bash 工具执行，background 必须设为 true: cd /workspace/next-app && npx next dev -H 0.0.0.0 -p 3000"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}}' \
+  -d '{"parts":[{"type":"text","text":"用 bash 工具执行，background 设为 true: cd /workspace/next-app && npx next dev -H 0.0.0.0 -p 3000"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}}' \
   | python3 -c "import json,sys;[print(p['text'][:200]) for p in json.load(sys.stdin).get('parts',[]) if p.get('type')=='text']"
 ```
 
@@ -660,20 +666,8 @@ curl -s --max-time 60 -X POST "http://localhost:14096/session/$SID/message" \
 
 ## 五、keepAlive 机制说明
 
-有两种方式触发 keepAlive：
-
-### 方式一：bash 工具 `background:true`（AI 消息触发）
-
-```
-bash.ts (background:true)
-  → 命令执行完后调用 sandboxProvider.keepAlive(sessionID)
-    → leases.add(sessionID)
-    → run-state.ts onIdle 时检查 isKeepAlive
-      → true：跳过销毁，sandbox 保持
-      → false：destroy(sessionID)，sandbox 立即销毁
-```
-
-### 方式二：exec + keep-alive API（程序化触发，推荐）
+> **变更（2026-08-25）**：`bash` 工具的 `background:true` 不再自动触发 keepAlive，
+> 只负责把命令后台化。保活唯一入口是 keep-alive API。
 
 ```
 POST /session/:sessionID/keep-alive {"enabled":true}
@@ -687,10 +681,14 @@ POST /session/:sessionID/keep-alive {"enabled":true,"boot":true}
 POST /session/:sessionID/exec {"command":"nohup npx vite ... &"}
   → 直接在沙箱中执行命令，启动 dev server 等
   → 配合 keepAlive 保证沙箱不被回收
+
+POST /session/:sessionID/keep-alive {"enabled":false}
+  → release(sessionID)，恢复空闲即回收
 ```
 
-> 方式二不依赖 AI 模型是否正确传递 `background:true`，更适合自动化测试和程序化控制。
-> `boot:true` 适合需要预热情景——调用后沙箱立即可用，`sandboxId` 返回在响应中；boot 失败不影响 keepAlive 设置，`sandboxId` 返回 `null`。
+> keepAlive 是**会话级意愿标记**：销毁沙箱实例（kill-sandbox）不会撤销它；
+> 撤销意愿必须显式 `{"enabled":false}`。`boot:true` 适合预热场景——调用后沙箱立即可用，
+> `sandboxId` 返回在响应中；boot 失败不影响 keepAlive 设置，`sandboxId` 返回 `null`。
 
 ---
 
@@ -698,7 +696,7 @@ POST /session/:sessionID/exec {"command":"nohup npx vite ... &"}
 
 | 症状 | 原因 | 解决 |
 |---|---|---|
-| 502 sandbox unreachable | sandbox 被回收（没有 keepAlive）| 重新发消息用 `background:true` 启动 dev server |
+| 502 sandbox unreachable | sandbox 被回收（没有 keepAlive）| 重新设置 keep-alive 并重新启动 dev server |
 | 502 "All connection attempts failed" | TCP 转发进程死了 | 重新执行对应组合的 TCP 转发步骤 |
 | 404 from sandbox server proxy | `OPENCODE_SANDBOX_USE_SERVER_PROXY` 未设置 | 重新启动容器加 `-e OPENCODE_SANDBOX_USE_SERVER_PROXY=true` |
 | 本地 OpenSandbox `commands.run()` 502 | sandbox 镜像覆盖了 `code-interpreter` entrypoint，或 execd 崩溃 | 确认 sandbox 镜像继承 `/opt/opensandbox/code-interpreter.sh`，不要设置 `ENTRYPOINT ["opencode"]` |

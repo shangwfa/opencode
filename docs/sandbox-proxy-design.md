@@ -499,7 +499,7 @@ const router = createRouter({
 | `src/server/instance/index.ts` | 路由注册入口 | `.route("/", SandboxProxyRoutes(upgrade))` 挂载，kill-sandbox 时调用 `clearProxyErrors` |
 | `src/session/index.ts` | `Session.Event.ProxyError` 事件定义 | Bus 事件 |
 | `src/tool/sandbox-provider.ts` | `get(sessionID)` 只读取已存在沙箱，`getOrCreate` 仅在工具执行时调用 | proxy 路由不触发沙箱创建 |
-| `src/tool/bash.ts` | `background: true` 后台化 + keepAlive | 已有 |
+| `src/tool/bash.ts` | `background: true` 后台化（不自动保活） | 已有 |
 | `src/session/run-state.ts` | `onIdle` 检查 keepAlive | 已有 |
 
 ---
@@ -513,7 +513,7 @@ POST /session/{sid}/message
 {"parts":[{"type":"text","text":"bash background:true 在 /workspace/my-app 执行 npm run dev -- --host 0.0.0.0 --port 3000"}]}
 ```
 
-`background:true` 让进程后台运行，沙箱不会空闲回收。
+`background:true` 让进程后台运行。沙箱保活需显式调用 keep-alive API（见 14.1）。
 
 ### 2. 浏览器访问
 
@@ -556,13 +556,22 @@ AI 内部流程：`curl __errors` → 分析 → 修改代码 → dev server 热
 
 ### 14.1 通过 SaaS API 启动 dev server 并测试
 
-> **重要**：必须通过 AI 执行 `bash` 工具并以 `background:true` 启动 dev server。`bash.ts` 中 `background:true` 会自动调用 `sandboxProvider.keepAlive(ctx.sessionID)`，防止沙箱被空闲回收。直接发 HTTP 请求到 proxy 不会触发 sandbox 创建。
+> **重要**：沙箱保活需显式调用 keep-alive API（`bash` 的 `background:true` 不再自动保活，只负责后台化）：
+>
+> ```bash
+> curl -X POST http://localhost:14096/session/$SID/keep-alive \
+>   -H 'Content-Type: application/json' -d '{"enabled":true}'
+> ```
+>
+> 直接发 HTTP 请求到 proxy 不会触发 sandbox 创建。
 
 ```bash
-# 1. 创建 session
+# 1. 创建 session + 设置保活
 SID=$(curl -s -X POST http://localhost:14096/session -H 'Content-Type: application/json' -d '{}' | jq -r .id)
+curl -X POST http://localhost:14096/session/$SID/keep-alive \
+  -H 'Content-Type: application/json' -d '{"enabled":true,"boot":true}'
 
-# 2. 让 AI 在沙箱里创建项目并启动 Vite（background:true 触发 keepalive）
+# 2. 让 AI 在沙箱里创建项目并启动 Vite（background:true 仅后台化）
 curl -X POST http://localhost:14096/session/$SID/message \
   -H 'Content-Type: application/json' \
   -d '{
@@ -581,16 +590,15 @@ curl http://localhost:14096/session/$SID/proxy-errors
 #### keepalive 机制说明
 
 ```
-bash.ts (background:true)
+POST /session/:sessionID/keep-alive {"enabled":true}
   → sandboxProvider.keepAlive(sessionID)
-    → leases.add(sessionID)
     → run-state.ts onIdle 检查 isKeepAlive → 跳过回收
 ```
 
 | 场景 | sandbox 行为 |
 |---|---|
-| 未启动 keepalive | AI 消息处理完成后（`session.idle`）立即销毁 |
-| `background:true` 执行命令 | keepalive 激活，sandbox 不回收 |
+| 未设置 keepalive | AI 消息处理完成后（`session.idle`）立即销毁 |
+| keep-alive API 已设置 | sandbox 不回收，直到 release 或 idle-reap 兜底（60min 无活跃） |
 | `POST /instance/dispose` | 强制销毁所有 sandbox（即使 keepalive） |
 
 > `OPENCODE_SANDBOX_IDLE_KILL_SEC=30` 在 opencode 代码中**未被实际使用**，回收由 `run-state.ts` `onIdle` 回调控制（session runner 空闲 + 无 keepAlive 时销毁）。
@@ -638,7 +646,7 @@ Docker 容器重启后内存中的 sandbox Map 清空，需要：
 - 容器必须使用远端 PG（`172.18.32.14:5432`，含 AI provider key），不能用本地 PG
 - 必须设置 `OPENCODE_SANDBOX_USE_SERVER_PROXY=true`
 - Docker 容器无法直连远端 IP，需要宿主机 TCP 转发（`host.docker.internal:15432/30040`）
-- 启动 dev server **必须用 `background:true`**，否则 sandbox 被立即回收
+- 启动 dev server **必须先设置 keep-alive**（`background:true` 只负责后台化，不再自动保活），否则 sandbox 被立即回收
 
 
 ### 14.3 静态验证（不需要沙箱）
