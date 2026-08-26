@@ -57,6 +57,7 @@ import {
   UpdatePayload,
 } from "../groups/session"
 import { ApiNotFoundError, PermissionNotFoundError, notFound } from "../errors"
+import { SkillCreateError } from "../groups/session"
 import * as SessionError from "./session-errors"
 import { withSessionLock, waitForSessionLock } from "./session-lock"
 
@@ -603,7 +604,14 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
               }),
             ),
           )
-          .pipe(Effect.mapError(() => new HttpApiError.BadRequest({}))),
+          .pipe(
+            Effect.mapError(
+              (error): SkillCreateError | HttpApiError.BadRequest =>
+                error instanceof Error && (error as any)._tag === "SkillInvalidResourceError"
+                  ? new SkillCreateError({ name: "SkillCreateError", data: { message: error.message } })
+                  : new HttpApiError.BadRequest({}),
+            ),
+          ),
       )
       yield* updateAction(actionID, { status: "completed", time_finished: Date.now() })
       return result
