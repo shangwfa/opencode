@@ -2,9 +2,11 @@ import { createHash } from "crypto"
 import path from "path"
 import { Schema } from "effect"
 
-export const MAX_SIZE = 512 * 1024
-export const MAX_BUNDLE_SIZE = 1024 * 1024
-export const MAX_COUNT = 64
+export const MAX_SIZE = 1024 * 1024
+// 数据密集型 skill（如自带 CSV/JSON 数据集）单个包可达数 MB；resources 存 PG 并按需物化，
+// 不进 prompt，放大上限不影响推理成本。TTL 兜底见 session-skill 生命周期。
+export const MAX_BUNDLE_SIZE = 16 * 1024 * 1024
+export const MAX_COUNT = 128
 export const SANDBOX_ROOT = "/home/sandbox/.local/share/opencode/session-skills"
 
 export const Type = Schema.Literals(["doc", "script", "template", "asset"])

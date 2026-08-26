@@ -28,6 +28,14 @@ import { ApiNotFoundError, PermissionNotFoundError, SessionBusyError } from "../
 import { described } from "./metadata"
 import { QueryBoolean } from "./query"
 import { ProviderV2 } from "@opencode-ai/core/provider"
+
+export class SkillCreateError extends Schema.ErrorClass<SkillCreateError>("SkillCreateError")(
+  {
+    name: Schema.Literal("SkillCreateError"),
+    data: Schema.Struct({ message: Schema.String }),
+  },
+  { httpApiStatus: 400 },
+) {}
 import { ModelV2 } from "@opencode-ai/core/model"
 import { ToolAttachment } from "@/tool/attachment"
 
@@ -618,7 +626,7 @@ export const SessionApi = HttpApi.make("session")
           query: WorkspaceRoutingQuery,
           payload: SkillCreatePayload,
           success: described(Skill.PublicInfo, "Created session skill"),
-          error: [HttpApiError.BadRequest, ApiNotFoundError],
+          error: [SkillCreateError, HttpApiError.BadRequest, ApiNotFoundError],
         }).annotateMerge(
           OpenApi.annotations({
             identifier: "session.skills.create",
