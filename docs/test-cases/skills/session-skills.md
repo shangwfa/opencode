@@ -493,12 +493,14 @@ for p in d.get('parts',[]):
 
 ### T15.11 resources 边界：超大 resource 与超多 resources
 
-验证单个超大 resource（>512KiB，实际限制见 `packages/opencode/src/skill/resource.ts` 的 `MAX_SIZE`）和超多 resources（>64 个）会被拒绝，且 PG 不留下部分数据。
+> **阈值变更历史（2026-08-26）**：`MAX_SIZE` 512KB→1MB，`MAX_BUNDLE_SIZE` 1MB→16MB，`MAX_COUNT` 64→128。
+
+验证单个超大 resource（>1MB）和超多 resources（>128 个）会被拒绝，且错误信息被透传。
 
 ```bash
 # 环境变量 $BASE $PG_URL $MODEL 由 test-env.sh 全局提供（source test-env.sh [1|2|3]）
 
-# === T15.11a: 超大 resource (600KB > 512KB 上限) ===
+# === T15.11a: 超大 resource (1.2MB > 1MB 上限) ===
 SID_A=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{"title":"boundary-large-test"}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
 
 python3 - <<'PY' >/tmp/t15-11a-request.json
@@ -507,23 +509,23 @@ print(json.dumps({
     "name": "huge-skill",
     "description": "超大 resource 测试",
     "content": "# Huge Skill",
-    "resources": [{"path": "big.md", "type": "doc", "content": "x" * 600000}],
+    "resources": [{"path": "big.md", "type": "doc", "content": "x" * 1200000}],
 }, ensure_ascii=False))
 PY
-STATUS_A=$(curl -s -o /tmp/t15-11a.json -w '%{http_code}' -X POST "$BASE/session/$SID_A/skills/create" \
+RESP_A=$(curl -s -o /tmp/t15-11a.json -w '%{http_code}' -X POST "$BASE/session/$SID_A/skills/create" \
   -H 'Content-Type: application/json' \
   --data-binary @/tmp/t15-11a-request.json)
-echo "large_status=$STATUS_A body=$(cat /tmp/t15-11a.json)"
+echo "large_status=$RESP_A body=$(cat /tmp/t15-11a.json)"
 
 psql "$PG_URL" -c \
-  "SELECT name, jsonb_array_length(resources) as res_count, length(resources->0->>'content') as first_res_size, pg_column_size(resources) as total_jsonb_size FROM session_skill WHERE session_id='$SID_A';"
+  "SELECT name, jsonb_array_length(resources) as res_count FROM session_skill WHERE session_id='$SID_A';"
 
-# === T15.11b: 超多 resources (70个) ===
+# === T15.11b: 超多 resources (150个 > 128 上限) ===
 SID_B=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{"title":"boundary-many-test"}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
 
 RESOURCES=$(python3 -c "
 import json
-resources = [{'path':f'file_{i}.md','type':'doc','content':f'content of file {i}'} for i in range(70)]
+resources = [{'path':f'file_{i}.md','type':'doc','content':f'content of file {i}'} for i in range(150)]
 print(json.dumps(resources))
 ")
 
@@ -537,9 +539,69 @@ psql "$PG_URL" -c \
 ```
 
 **期望**：
-- T15.11a、T15.11b 的 HTTP 状态均为非 2xx；
-- 错误信息分别指出单文件 512KiB 和最多 64 个资源限制；
+- T15.11a、T15.11b 的 HTTP 状态均为 400；
+- 响应 body 格式为 `{"name":"SkillCreateError","data":{"message":"..."}}`，分别指出单文件 1MB 和最多 128 个资源限制；
 - PG 查询返回 0 行，没有写入部分 skill 快照。
+
+---
+
+### T15.11c 数据密集型 skill bundle 注册（大资源包）
+
+验证 `res2.json` 类型的完整 skill bundle（3.8MB，69 个资源，含 CSV/JSON 数据集）在放宽后的限制下注册成功。
+
+```bash
+# 环境变量 $BASE $PG_URL $MODEL 由 test-env.sh 全局提供（source test-env.sh [1|2|3]）
+
+SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+
+# 使用 docs/test-cases/skills/res2.json（3.8MB，69 resources）
+RESP=$(curl -s -X POST "$BASE/session/$SID/skills/create" \
+  -H 'Content-Type: application/json' \
+  -d @docs/test-cases/skills/res2.json)
+echo "body=$(echo "$RESP" | python3 -c "import json,sys;d=json.load(sys.stdin);print({'name':d.get('name'),'resources':len(d.get('resources',[]))})")"
+
+# PG 验证
+psql "$PG_URL" -c "SELECT name, jsonb_array_length(resources) as res_count FROM session_skill WHERE session_id='$SID';"
+```
+
+**期望**：
+- HTTP 200；
+- `resources` 数为 69；
+- PG 中 `res_count=69`。
+
+---
+
+### T15.23 skill 注册错误信息透传
+
+验证创建失败时错误信息以 `SkillCreateError` 格式返回，而非裸 `400 BadRequest`。
+
+```bash
+# 环境变量 $BASE $PG_URL $MODEL 由 test-env.sh 全局提供（source test-env.sh [1|2|3]）
+
+SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+
+# 超量资源（150 个）触发 MAX_COUNT 限制
+RESOURCES=$(python3 -c "
+import json; resources = [{'path':f'f{i}.md','type':'doc','content':'x'} for i in range(150)]
+print(json.dumps(resources))
+")
+RESP=$(curl -s -o /tmp/t15-23.json -w '%{http_code}' -X POST "$BASE/session/$SID/skills/create" \
+  -H 'Content-Type: application/json' \
+  -d "{\"name\":\"err-test\",\"description\":\"t\",\"content\":\"# t\",\"resources\":$RESOURCES}")
+echo "status=$RESP body=$(cat /tmp/t15-23.json)"
+
+# 超大文件触发 MAX_SIZE 限制
+RESP2=$(curl -s -o /tmp/t15-23b.json -w '%{http_code}' -X POST "$BASE/session/$SID/skills/create" \
+  -H 'Content-Type: application/json' \
+  -d "{\"name\":\"err-test2\",\"description\":\"t\",\"content\":\"# t\",\"resources\":[{\"path\":\"big.md\",\"type\":\"doc\",\"content\":\"$(python3 -c \"print('x'*1200000)\")\"}]}")
+echo "status2=$RESP2 body=$(cat /tmp/t15-23b.json)"
+```
+
+**期望**：
+- 两个请求均返回 400；
+- body 格式为 `{"name":"SkillCreateError","data":{"message":"..."}}`；
+- 错误信息分别包含“128 个资源”、“1048576 bytes”等具体限制值；
+- PG 无残留记录。
 
 ---
 
