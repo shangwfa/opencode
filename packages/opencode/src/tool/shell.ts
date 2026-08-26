@@ -435,8 +435,6 @@ export const ShellTool = Tool.define(
             )
           })
 
-      if (input.background) yield* sandboxProvider.keepAlive(ctx.sandboxSessionID ?? ctx.sessionID)
-
       const exitCode = result.exitCode ?? null
       if (exitCode === null) expired = true
 
