@@ -1,4 +1,4 @@
-import { Effect, Context, Layer, Cause, Deferred, Ref, Semaphore, Schedule, Duration, Scope, Exit } from "effect"
+import { Effect, Context, Layer, Cause, Deferred, Ref, Semaphore, Schedule, Duration, Scope, Exit, Option } from "effect"
 import { Sandbox, ConnectionConfig, SandboxApiException, SandboxManager } from "@alibaba-group/opensandbox"
 import type { CommandExecution, Volume } from "@alibaba-group/opensandbox"
 import { and, asc, eq, lt, or, sql } from "drizzle-orm"
@@ -174,6 +174,62 @@ export function withExecTimeout(
   )
 }
 
+export function withCommandOperationTimeout<A>(
+  effect: Effect.Effect<A, Error>,
+  timeoutSeconds: number | undefined,
+  operation: string,
+) {
+  if (!timeoutSeconds) return effect
+  return effect.pipe(
+    Effect.timeoutOrElse({
+      duration: Duration.seconds(timeoutSeconds),
+      orElse: () => Effect.fail(new Error(`${operation} timed out after ${timeoutSeconds}s`)),
+    }),
+  )
+}
+
+const COMMAND_PERMIT_UNAVAILABLE = new Error("command semaphore unavailable")
+// 外层预算 = timeoutSeconds + 宽限。排队通常毫秒级完成；宽限保证执行阶段的
+// withExecTimeout 总是先到期，避免外层把执行超时误判成排队超时
+const COMMAND_QUEUE_GRACE_SECONDS = 5
+const queueLog = Log.create({ service: "sandbox-provider" })
+
+// 沙箱级消失错误：沙箱/命令会话在挂起期间被回收等场景，强制重建后重试是安全的
+// （命令不可能已在远端执行）。刻意收窄匹配，绝不误伤业务级 "File not found" 等错误。
+export function isSandboxGone(error: unknown): boolean {
+  const msg = error instanceof Error ? error.message : String(error)
+  if (msg.includes("Sandbox is no longer running")) return true
+  return /^runInSession failed:|^runDetached failed:|^Failed to create (command|detached) session:/i.test(msg) &&
+    /not found|\b404\b/i.test(msg)
+}
+
+export function withCommandSemaphoreTimeout<A>(
+  semaphore: Semaphore.Semaphore,
+  effect: Effect.Effect<A, Error>,
+  timeoutSeconds: number | undefined,
+  operation: string,
+) {
+  if (!timeoutSeconds) return semaphore.withPermit(effect)
+  const t0 = Date.now()
+  return withCommandOperationTimeout(
+    semaphore.withPermitsIfAvailable(1)(effect).pipe(
+      Effect.flatMap((result) => {
+        if (Option.isSome(result)) {
+          queueLog.info("command permit acquired", { operation, waitedMs: Date.now() - t0 })
+          return Effect.succeed(result.value)
+        }
+        return Effect.fail(COMMAND_PERMIT_UNAVAILABLE)
+      }),
+      Effect.retry({
+        while: (error) => error === COMMAND_PERMIT_UNAVAILABLE,
+        schedule: Schedule.spaced(Duration.millis(10)),
+      }),
+    ),
+    timeoutSeconds + COMMAND_QUEUE_GRACE_SECONDS,
+    operation,
+  )
+}
+
 export function cleanupSessionVolume(
   sessionID: string,
   config: SandboxConfig.Interface,
@@ -278,6 +334,8 @@ async function runCommandEarlyExit(
 export namespace SandboxProvider {
   const log = Log.create({ service: "sandbox-provider" })
   const CREATE_TIMEOUT_SECONDS = 60
+  const GET_OR_CREATE_TIMEOUT_SECONDS = 90
+  const COMMAND_CLEANUP_TIMEOUT_SECONDS = 10
 
   export interface Interface {
     readonly getOrCreate: (
@@ -901,7 +959,7 @@ export namespace SandboxProvider {
         }).pipe(Effect.orDie)
       }
 
-      function dbSetCommandSession(sessionID: string, id: string, cmdSessionID: string) {
+      function dbSetCommandSession(sessionID: string, id: string, cmdSessionID: string | null) {
         return Effect.tryPromise({
           try: () => pgDb
             .update(SandboxTable)
@@ -1015,6 +1073,15 @@ export namespace SandboxProvider {
           }
           return yield* sem.withPermits(1)(effect)
         })
+      }
+
+      function lockWithTimeout<A>(sessionID: string, effect: Effect.Effect<A, Error>, timeoutSeconds: number) {
+        let sem = lockSemaphores.get(sessionID)
+        if (!sem) {
+          sem = Effect.runSync(Semaphore.make(1))
+          lockSemaphores.set(sessionID, sem)
+        }
+        return withCommandSemaphoreTimeout(sem, effect, timeoutSeconds, "sandbox lock wait")
       }
 
       // ── Sandbox 生命周期 ──────────────────────────────────────────────
@@ -1562,9 +1629,33 @@ export namespace SandboxProvider {
           return row?.keep_alive === true
         })
 
+      // 挂起恢复自愈：question/permission 长时间等待用户期间沙箱可能已被 idle-reap 回收，
+      // 恢复后的第一次命令会命中陈旧状态而失败。检测到沙箱级消失错误时强制重建并重试一次，
+      // 让「隔了很久才回来」的用户无感继续任务（重试安全：沙箱已消失时命令不可能已在远端执行）。
+      const withRecreateRetry = <A>(sessionID: SessionID, attempt: () => Effect.Effect<A, Error>) =>
+        attempt().pipe(
+          Effect.catchIf(isSandboxGone, () =>
+            Effect.gen(function* () {
+              log.warn("sandbox gone; recreating and retrying command once", { sessionID })
+              // 陈旧的 command session 记录也要清掉，否则重试仍复用失效 ID
+              const stale = yield* dbGet(sessionID).pipe(Effect.orElseSucceed(() => null))
+              if (stale?.command_session_id) {
+                yield* dbSetCommandSession(sessionID, stale.id, null).pipe(Effect.catchCause(() => Effect.void))
+              }
+              invalidateCachedSandbox(sessionID)
+              return yield* attempt()
+            }),
+          ),
+        )
+
       const runInSession: Interface["runInSession"] = (sessionID, command, options, handlers, signal) =>
+        withRecreateRetry(sessionID, () =>
         Effect.gen(function* () {
-          const sb = yield* lock(sessionID, getOrCreateUnlocked(sessionID))
+          const operationTimeoutSeconds = options?.timeoutSeconds
+            ? Math.min(options.timeoutSeconds, GET_OR_CREATE_TIMEOUT_SECONDS)
+            : GET_OR_CREATE_TIMEOUT_SECONDS
+          const sb = yield* lockWithTimeout(sessionID, getOrCreateUnlocked(sessionID), operationTimeoutSeconds)
+          yield* dbTouchSandbox(sessionID, sb.id).pipe(Effect.catchCause(() => Effect.void))
           const workingDirectory = options?.workingDirectory ?? (yield* dbGetSessionDirectory(sessionID)) ?? "/workspace"
 
           const row = yield* dbGet(sessionID).pipe(Effect.orElseSucceed(() => null))
@@ -1574,21 +1665,27 @@ export namespace SandboxProvider {
           if (!sem) { sem = Effect.runSync(Semaphore.make(1)); commandSemaphores.set(sessionID, sem) }
 
           if (!cmdSessionID) {
-            cmdSessionID = yield* sem.withPermit(Effect.gen(function* () {
-              const row2 = yield* dbGet(sessionID).pipe(Effect.orElseSucceed(() => null))
-              const existing = (row2?.id === sb.id ? row2?.command_session_id : null) ?? null
-              if (existing) return existing
+            cmdSessionID = yield* withCommandSemaphoreTimeout(
+              sem,
+              Effect.gen(function* () {
+                const row2 = yield* dbGet(sessionID).pipe(Effect.orElseSucceed(() => null))
+                const existing = (row2?.id === sb.id ? row2?.command_session_id : null) ?? null
+                if (existing) return existing
 
-              const newSession = yield* Effect.tryPromise({
-                try: () => sb.commands.createSession({ workingDirectory }),
-                catch: (e) => new Error(`Failed to create command session: ${String(e)}`),
-              })
-              yield* dbSetCommandSession(sessionID, sb.id, newSession).pipe(Effect.catchCause(() => Effect.void))
-              return newSession
-            }))
+                const newSession = yield* withCommandOperationTimeout(Effect.tryPromise({
+                  try: () => sb.commands.createSession({ workingDirectory }),
+                  catch: (e) => new Error(`Failed to create command session: ${String(e)}`),
+                }), options?.timeoutSeconds, "create command session")
+                yield* dbSetCommandSession(sessionID, sb.id, newSession).pipe(Effect.catchCause(() => Effect.void))
+                return newSession
+              }),
+              options?.timeoutSeconds,
+              "prepare command session",
+            )
           }
 
-          return yield* sem.withPermit(
+          return yield* withCommandSemaphoreTimeout(
+            sem,
             withCommandHeartbeat(sessionID, sb.id, withExecTimeout(
               Effect.tryPromise({
                 try: () => runCommandEarlyExit(sb, cmdSessionID!, command, { ...options, workingDirectory }, handlers, signal),
@@ -1601,18 +1698,53 @@ export namespace SandboxProvider {
                 ),
               ),
               options?.timeoutSeconds,
+            // 超时后旧命令仍在沙箱执行，且 SDK interrupt 会让持久 session 进入
+            // 立即 EOF 的报废状态：改为销毁 command session 并清 PG 记录，
+            // 下条命令自动重建干净 session（同时隔离旧进程输出交叉）
+            ).pipe(
+              Effect.tap((result) => {
+                if (result.error?.name !== "TimeoutError") return Effect.void
+                log.warn("foreground command timed out; recycling command session", { sessionID, sandboxID: sb.id })
+                return withCommandOperationTimeout(
+                  Effect.tryPromise({
+                    try: () => sb.commands.deleteSession(cmdSessionID!),
+                    catch: (e) => new Error(`delete timed-out session failed: ${String(e)}`),
+                  }),
+                  COMMAND_CLEANUP_TIMEOUT_SECONDS,
+                  "recycle timed-out command session",
+                ).pipe(
+                  Effect.catchCause(() => Effect.void),
+                  Effect.andThen(dbSetCommandSession(sessionID, sb.id, null).pipe(Effect.catchCause(() => Effect.void))),
+                )
+              }),
+              // SDK 对失效的 command session 不报错而是静默返回空流（无 complete/error/exitCode），
+              // 转成 isSandboxGone 可识别的失败，交由外层重建重试
+              Effect.tap((result) => {
+                if (result.complete || result.error || result.exitCode != null) return Effect.void
+                log.warn("empty execution stream; command session likely stale", { sessionID, cmdSessionID })
+                return Effect.fail(new Error(`runInSession failed: command session ${cmdSessionID} not found (empty execution stream)`))
+              }),
             )),
+            options?.timeoutSeconds,
+            // 外层预算覆盖排队等待 + 执行；执行超时走 TimeoutError 结果路径，此处 fail 多为纯排队超时
+            "command queue wait",
           )
-        }).pipe(Effect.withSpan("SandboxProvider.runInSession"))
+        }).pipe(Effect.withSpan("SandboxProvider.runInSession")),
+        )
 
       const runDetached: Interface["runDetached"] = (sessionID, command, options, handlers, signal) =>
+        withRecreateRetry(sessionID, () =>
         Effect.gen(function* () {
-          const sb = yield* lock(sessionID, getOrCreateUnlocked(sessionID))
+          const operationTimeoutSeconds = options?.timeoutSeconds
+            ? Math.min(options.timeoutSeconds, GET_OR_CREATE_TIMEOUT_SECONDS)
+            : GET_OR_CREATE_TIMEOUT_SECONDS
+          const sb = yield* lockWithTimeout(sessionID, getOrCreateUnlocked(sessionID), operationTimeoutSeconds)
+          yield* dbTouchSandbox(sessionID, sb.id).pipe(Effect.catchCause(() => Effect.void))
           const workingDirectory = options?.workingDirectory ?? (yield* dbGetSessionDirectory(sessionID)) ?? "/workspace"
-          const detachedSessionId = yield* Effect.tryPromise({
+          const detachedSessionId = yield* withCommandOperationTimeout(Effect.tryPromise({
             try: () => sb.commands.createSession({ workingDirectory }),
             catch: (e) => new Error(`Failed to create detached session: ${String(e)}`),
-          })
+          }), options?.timeoutSeconds, "create detached command session")
           const detached = detachedCommandSessions.get(sessionID) ?? new Set<string>()
           detached.add(detachedSessionId)
           detachedCommandSessions.set(sessionID, detached)
@@ -1632,6 +1764,13 @@ export namespace SandboxProvider {
                 ),
               ),
               options?.timeoutSeconds,
+            // detached 同样可能命中失效 session 的静默空流，转成可重试失败
+            ).pipe(
+              Effect.tap((result) => {
+                if (result.complete || result.error || result.exitCode != null) return Effect.void
+                log.warn("empty detached execution stream; session likely stale", { sessionID, detachedSessionId })
+                return Effect.fail(new Error(`runDetached failed: command session ${detachedSessionId} not found (empty execution stream)`))
+              }),
             )
             if (result.error?.name === "TimeoutError") {
               yield* Effect.tryPromise(() => sb.commands.interrupt(detachedSessionId)).pipe(Effect.ignore)
@@ -1640,11 +1779,16 @@ export namespace SandboxProvider {
             return result
           } finally {
             if (!completed) yield* Effect.tryPromise(() => sb.commands.interrupt(detachedSessionId)).pipe(Effect.ignore)
-            yield* Effect.tryPromise(() => sb.commands.deleteSession(detachedSessionId)).pipe(Effect.ignore)
+            yield* withCommandOperationTimeout(
+              Effect.tryPromise(() => sb.commands.deleteSession(detachedSessionId)),
+              COMMAND_CLEANUP_TIMEOUT_SECONDS,
+              "delete detached command session",
+            ).pipe(Effect.ignore)
             detached.delete(detachedSessionId)
             if (detached.size === 0) detachedCommandSessions.delete(sessionID)
           }
-        }).pipe(Effect.withSpan("SandboxProvider.runDetached"))
+        }).pipe(Effect.withSpan("SandboxProvider.runDetached")),
+        )
 
       const interrupt: Interface["interrupt"] = (sessionID) =>
         Effect.gen(function* () {
