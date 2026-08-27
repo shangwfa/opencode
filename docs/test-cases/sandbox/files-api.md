@@ -571,3 +571,4 @@ summary
 | 日期 | 环境 | 结果 | 备注 |
 |---|---|---|---|
 | 2026-08-19 | 本地 PG + 远程沙箱（组合 1 沙箱 + 组合 3 PG） | PASS | T-FILE-01~44 全过（24 个用例 PASS / 0 FAIL）；含 T-FILE-05/34/35 边界用例、Content-Length 一致性断言、`filename=.`/`..` 400 校验 |
+| 2026-08-27 | 组合 1（远端 PG + 远端 K8s 沙箱，镜像 `opencode-saas-sandbox-test:8714a81`，feat/opencode-1.18.21 迁移后） | PASS | 全量回归 T-FILE-01~55 + 60~64 共 39 断言全过：mkdir/create/download/upload 段、横切段（审计/PVC 重建/host 路径）、删除段、搜索段；特殊字符路径需 URL 编码后请求（脚本直传原始字符会 curl 本地错误，非产品问题） |

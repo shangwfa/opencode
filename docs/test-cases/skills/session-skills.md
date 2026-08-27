@@ -1509,3 +1509,7 @@ curl -s -X POST "$BASE/session/$SID/exec" \
 | T15.25 | ✅ | 使用 agent-browser 浏览网页（2026-08-08 重跑通过：open/snapshot/get title/get url/close 全流程，PG 确认 5 次 bash 命令） |
 | T15.26 | ✅ | agent-browser + page-summarizer 共存（2026-08-08 重跑通过：依次加载两 skill，AI 先浏览 JSON 页再用 page-summarizer 结构化总结，含 [PAGE-SUMMARIZER] 前缀；目标由 httpbin 改 jsonplaceholder 因 httpbin 当日 503） |
 | T15.27 | ✅ | 120KB 脚本不进入上下文（tool output 536B 不泄漏），kill-sandbox 重建后 PVC 物化文件保留，两次执行均 LARGE_SCRIPT_OK（2026-08-08 重跑通过） |
+| T15.11b | ✅ | 150 resources → 400 `SkillCreateError`（message: `Skill has more than 128 resources`），PG 无残留快照；单文件 1.2MB → 400 含 `1048576 bytes`（2026-08-27 迁移后复测，限制放宽至 1MB/128 个资源后错误信息正常透传） |
+| T15.11-new | ✅ | 放宽后正向行为：600KB 单资源（旧 512KB 上限会拒）与 70 resources（旧 64 上限会拒）均注册成功 HTTP 200（2026-08-27 迁移后复测，组合 1） |
+| T15.1/T15.2/T15.3 | ✅ | 迁移后复测（2026-08-27，组合 1）：创建/复杂 bundle 元数据无正文泄漏（PG digest=64）/AI 引用资源路径/删除与清空 204 均通过 |
+| 全量 T15.1~T15.23a、T15.27 | ✅ | 2026-08-27 组合 1（镜像 `8714a81`）全量回归 28 用例组全过（跳过 T15.5 SkillsMP 外网与 T15.24~26 agent-browser 外网安装）。注意：① 查 PG tool part 时工具名字段是 `data->>'tool'`（不是 `name`，后者为空）；② `POST /message` 只返回最后一条消息，AI 中间消息（如 skill 激活标记）需查 PG part 表；③ 隔离类查询须用唯一名避免历史数据干扰；④ T15.9 AI 回复「SESSION版」即覆盖生效 |
