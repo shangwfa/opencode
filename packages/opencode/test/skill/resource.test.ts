@@ -77,8 +77,12 @@ describe("SkillResource", () => {
   })
 
   test("rejects bundle over limit with typed error", () => {
-    const make = (path: string, size: number) => SkillResource.make({ path, type: "doc", content: "x".repeat(size) })
-    const items = Array.from({ length: 5 }, (_, i) => make(`f${i}.md`, Math.ceil(SkillResource.MAX_BUNDLE_SIZE / 4)))
+    // Each resource stays within MAX_SIZE while the total exceeds MAX_BUNDLE_SIZE.
+    const per = SkillResource.MAX_SIZE
+    const count = Math.ceil(SkillResource.MAX_BUNDLE_SIZE / per) + 1
+    const items = Array.from({ length: count }, (_, i) =>
+      SkillResource.make({ path: `f${i}.md`, type: "doc", content: "x".repeat(per) }),
+    )
     expect(() => SkillResource.validateBundle(items)).toThrow(SkillResource.InvalidResourceError)
   })
 
@@ -135,6 +139,9 @@ describe("session skill materialization", () => {
       abort: AbortSignal.any([]),
       messages: [],
       sandbox: Promise.resolve({
+        commands: {
+          run: async () => ({ exitCode: 0 }),
+        },
         files: {
           createDirectories: async (entries: Array<{ path: string }>) => {
             directories.push(...entries.map((entry) => entry.path))
