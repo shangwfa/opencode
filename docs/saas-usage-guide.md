@@ -241,7 +241,8 @@ Skill 统一使用 bundle 模型：简单 skill 是 `resources: []` 的 bundle�
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| POST | `/session/:sessionID/kill-sandbox` | **按 session 销毁沙箱**（PVC 保留，文件不丢） |
+| POST | `/session/:sessionID/kill-sandbox` | **按 session 销毁沙箱**（PVC 保留，文件不丢；snapshot 模式会话先快照成功再销毁） |
+| POST | `/sandbox/:sandboxID/kill` | **按沙箱 ID 销毁沙箱**（返回所属 sessionID；未知/killed/destroyed 的 sandboxID 返回 404；快照语义同 kill-sandbox） |
 | POST | `/instance/dispose` | 销毁当前 instance 的所有沙箱（PVC 保留） |
 | POST | `/global/dispose` | 销毁所有实例 |
 
@@ -967,6 +968,7 @@ async function processBatch(tasks: string[]) {
 | API | 范围 | 用途 |
 |---|---|---|
 | `POST /session/:id/kill-sandbox` | 指定 session 的沙箱 | 按 session 精确销毁（推荐） |
+| `POST /sandbox/:sandboxID/kill` | 指定沙箱 ID（返回 404 若不存在/已销毁） | 按沙箱精确销毁（有 sandboxID 时使用） |
 | `POST /instance/dispose` | 当前 instance 的所有 session 沙箱 | 单个用户结束工作 |
 | `POST /global/dispose` | 所有 instance 全部销毁 | 运维清理、紧急回收 |
 | `DELETE /session/:id` | 删 session + 清 PVC subPath | 彻底删除（不可恢复） |
@@ -978,6 +980,7 @@ async function processBatch(tasks: string[]) {
 - **dispose 后续作**：再次发消息会自动创建新沙箱挂回同一 PVC，**冷启动延迟 2-3 秒**
 - **频繁 dispose 会增加冷启动**：如果一个 session 高频对话，**不要每条消息都 dispose**
 - **idle 兜底**：即使忘记 dispose，30~60 秒后也会自动回收，**不会无限占用资源**
+- **snapshot 模式会话**（创建时 `sandbox.persistMode:"snapshot"`）：kill-sandbox / kill by ID 都会**先对沙箱做快照，快照 Ready 后才销毁**（失败/超时保留沙箱重试，workspace 数据不丢）；pvc 模式直接销毁
 
 ### 4.7 文件上传到沙箱
 

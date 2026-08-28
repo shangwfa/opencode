@@ -68,7 +68,8 @@
 | GET | `/session/:sid/proxy/:port/__errors` | 查询该 port 的浏览器错误 |
 | GET | `/session/:sid/proxy/:port/__error_report?e=...` | 浏览器错误上报（img beacon） |
 | GET | `/session/:sid/proxy-errors` | 聚合该 session 所有端口的错误 |
-| POST | `/session/:sid/kill-sandbox` | 按 session 销毁沙箱（PVC 保留） |
+| POST | `/session/:sid/kill-sandbox` | 按 session 销毁沙箱（PVC 保留；snapshot 模式先快照成功再销毁） |
+| POST | `/sandbox/:sandboxID/kill` | 按沙箱 ID 销毁沙箱（返回所属 sessionID；404 若不存在/已销毁；快照语义同 kill-sandbox） |
 | POST | `/instance/dispose` | 销毁所有沙箱 + 实例 |
 
 ### 路径映射

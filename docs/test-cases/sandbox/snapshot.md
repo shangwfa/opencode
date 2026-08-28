@@ -117,6 +117,8 @@ curl -s -X POST $K/sandboxes/$R/proxy/44772/command -H "$AUTH" -H 'Content-Type:
 
 **期望**：沙箱**不被销毁**（保留代码），sandbox 行保持 killed；idle reap 的 killed 重试分支（每轮，≥300s）重试快照；期间用户消息返回 "cleanup pending" 错误（不无快照杀沙箱）；沙箱 server 侧 TTL 兜底最终回收。三条销毁路径（idle reap / zombie / killed 重试）语义一致。
 
+> **扩展（2026-08-28）**：显式关闭接口同样遵守该承诺——`POST /session/:id/kill-sandbox`（T12.20）与 `POST /sandbox/:sandboxID/kill`（T12.19）对 snapshot 会话均**先快照 Ready 再销毁**，失败保留沙箱重试；单测 `sandbox-provider-destroy-by-id.test.ts` 覆盖（快照 Failed → 无 DELETE、行保持 killed）。
+
 > **状态**：代码级验证 + 自动化测试（2026-08-20）：`test/tool/sandbox-idle-reap.test.ts` 18 pass（含 reconnect 500 保持 killed 不 DELETE）、`test/tool/session-snapshot-pg.test.ts` 3 pass（跨实例 creating 去重、getSnapshot 瞬时 500 重试后 Ready 落库、DELETE 500 保持 deleting 由 GC 收敛）；HTTP 层故障注入待补
 
 ### T25.5 同会话多快照只保留最新

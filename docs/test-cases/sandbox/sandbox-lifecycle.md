@@ -355,6 +355,101 @@ curl -s --noproxy '*' "$BASE/session/$SID_B/keep-alive" | python3 -c "import jso
 
 ---
 
+### T12.18 按沙箱 ID 关闭：POST /sandbox/:sandboxID/kill（pvc 会话）（2026-08-28 新增）
+
+**验证点**：管理接口按 sandboxID 销毁沙箱（`sandbox-proxy.ts` 路由 → `destroyById`）。返回所属 sessionID；行转 `destroyed`；重复 kill 与未知 ID 返回 404（状态检查只接受 `running/snapshotting`，killed 重入是 idle-reap 专属路径）。
+
+```bash
+# 1. 创建 pvc 会话并创建沙箱
+SID=$(curl -s --noproxy '*' -X POST $BASE/session -H 'Content-Type: application/json' \
+  -d '{"title":"t1218","sandbox":{"cpu":"2","memory":"4Gi","persistMode":"pvc"}}' \
+  | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+curl -s --noproxy '*' -m 90 -X POST "$BASE/session/$SID/exec" -H 'Content-Type: application/json' -d '{"command":"echo init"}' > /dev/null
+SBID=$(curl -s --noproxy '*' "$BASE/session/$SID/sandbox" | python3 -c "import json,sys;print(json.load(sys.stdin).get('sandboxId',''))")
+echo "SBID=$SBID"
+
+# 2. 按沙箱 ID 关闭
+curl -s --noproxy '*' -X POST "$BASE/sandbox/$SBID/kill" -w "\nHTTP %{http_code}\n"
+# 期望: {"sandboxID":"...","sessionID":"$SID","destroyed":true} HTTP 200
+
+# 3. DB 行转 destroyed；exec_log 落 kill-sandbox 记录（command 含 sandboxID）
+sleep 3
+psql "$PG_URL" -t -A -c "SELECT state FROM sandbox WHERE session_id='$SID'"   # 期望 destroyed
+psql "$PG_URL" -t -A -c "SELECT command FROM exec_log WHERE session_id='$SID' AND source='kill-sandbox' ORDER BY time_created DESC LIMIT 1"
+
+# 4. 幂等：重复 kill → 404；未知 ID → 404
+curl -s --noproxy '*' -X POST "$BASE/sandbox/$SBID/kill" -o /dev/null -w "repeat: %{http_code}\n"        # 404
+curl -s --noproxy '*' -X POST "$BASE/sandbox/00000000-0000-0000-0000-000000000000/kill" -o /dev/null -w "unknown: %{http_code}\n"  # 404
+```
+
+**期望**：kill 返回 200 且 `sessionID` 正确；行 `destroyed`；`exec_log` 含 `destroy sandbox <SBID>`；重复/未知 ID 均 404 `{"error":"sandbox not found"}`。
+
+> **代码路径**：`destroyById` 返回 `SessionID | null`（找到→所属会话；killed/destroyed/不存在→null）。pvc 会话直接销毁，无快照分支。
+
+---
+
+### T12.19 按沙箱 ID 关闭（snapshot 会话）：快照 Ready 后才销毁（2026-08-28 新增）
+
+**验证点**：snapshot 会话的沙箱经 `POST /sandbox/:id/kill` 关闭时，先发起快照并等 Ready，**成功后才 kill 源沙箱**（复用 `cleanupSandbox({snapshot:true})` 安全路径：失败/超时保留沙箱待重试）。
+
+```bash
+# 1. 创建 snapshot 会话并 boot 沙箱
+SID=$(curl -s --noproxy '*' -X POST $BASE/session -H 'Content-Type: application/json' \
+  -d '{"title":"t1219","sandbox":{"cpu":"2","memory":"4Gi","persistMode":"snapshot"},"appId":"<业务appId>"}' \
+  | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+SBID=$(curl -s --noproxy '*' -m 120 -X POST "$BASE/session/$SID/keep-alive" -H 'Content-Type: application/json' \
+  -d '{"enabled":true,"boot":true}' | python3 -c "import json,sys;print(json.load(sys.stdin).get('sandboxId') or '')")
+echo "SID=$SID SBID=$SBID"
+
+# 2. 按沙箱 ID 关闭（快照模式）
+curl -s --noproxy '*' -X POST "$BASE/sandbox/$SBID/kill" -w "\nHTTP %{http_code}\n"   # 200
+
+# 3. 快照表出现 ready 行；销毁完成后行转 destroyed
+sleep 5
+psql "$PG_URL" -c "SELECT id, state FROM session_snapshot WHERE session_id='$SID' ORDER BY time_created DESC LIMIT 2"
+# 期望: state=ready
+psql "$PG_URL" -t -A -c "SELECT state FROM sandbox WHERE session_id='$SID'"   # destroyed
+
+# 4. 日志顺序：snapshot ready 先于 destroying sandbox（docker logs 覆盖 sandbox-provider service）
+docker logs opencode-saas-test 2>&1 | grep -E "sessionID=$SID" | grep -E "snapshot ready|destroying sandbox|sandbox destroyed"
+# 期望顺序: snapshot ready (snapshotId=snap_xxx, waitedMs=...) → destroying sandbox → sandbox destroyed
+```
+
+**期望**：kill 立即返回 200（快照+销毁在后台 fiber 执行）；`session_snapshot` 有 `ready` 行；日志中 `snapshot ready` 时间戳早于 `destroying sandbox`；销毁完成后行 `destroyed`。
+
+> **说明**：快照安全路径保证「成功才 kill、失败保留」——失败/超时时沙箱不被销毁、行保持 `killed` 等待重试（单测 `sandbox-provider-destroy-by-id.test.ts`「快照失败（轮询到 Failed）：沙箱保留（无 DELETE）」覆盖）；快照成功销毁后行置 `destroyed`。核心断言是**快照行 ready + 日志先快照后销毁**。
+
+---
+
+### T12.20 按会话 ID 关闭（kill-sandbox）snapshot 会话：同样先快照后销毁（2026-08-28 行为变更）
+
+**验证点**：`POST /session/:id/kill-sandbox`（`destroy(sessionID)`）与按 ID 关闭语义对齐——原实现 reconnect 成功后**直接销毁、漏快照**；现在查会话 `persistMode`，snapshot 会话走同一条快照安全路径；pvc 会话行为不变（直接销毁）。
+
+```bash
+# 1. snapshot 会话创建沙箱
+SID=$(curl -s --noproxy '*' -X POST $BASE/session -H 'Content-Type: application/json' \
+  -d '{"title":"t1220","sandbox":{"cpu":"2","memory":"4Gi","persistMode":"snapshot"}}' \
+  | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+curl -s --noproxy '*' -m 90 -X POST "$BASE/session/$SID/exec" -H 'Content-Type: application/json' -d '{"command":"echo init"}' > /dev/null
+
+# 2. 按会话 ID 关闭
+curl -s --noproxy '*' -m 10 -X POST "$BASE/session/$SID/kill-sandbox" -w "\nHTTP %{http_code}\n"   # {"sessionID":"...","destroyed":true} 200
+
+# 3. 快照 ready + 先快照后销毁
+sleep 5
+psql "$PG_URL" -t -A -c "SELECT state FROM session_snapshot WHERE session_id='$SID' ORDER BY time_created DESC LIMIT 1"   # ready
+docker logs opencode-saas-test 2>&1 | grep "sessionID=$SID" | grep -E "snapshot ready|sandbox destroyed"
+
+# 4. keepAlive 语义回归（T12.14）：destroy 不清 keepAlive（先设 keep-alive 再 kill 的对照实验）
+curl -s --noproxy '*' "$BASE/session/$SID/keep-alive" | python3 -c "import json,sys;print('keepAlive:',json.load(sys.stdin).get('keepAlive'))"
+```
+
+**期望**：kill-sandbox 200；快照行 `ready`；日志先 `snapshot ready` 后 `sandbox destroyed`；行 `destroyed`；keepAlive 语义与 T12.14 一致（对照实验实测 kill 后 `keepAlive=True`）。
+
+> **回归边界**：pvc 会话的 kill-sandbox 行为不变（T12.9 PVC 持久、T12.13 sandboxId 置 null、T12.14 keepAlive 保留均继续成立）。
+
+---
+
 ## 二、空闲沙箱定期回收（原 T30）
 
 > **推荐**：以下真实环境用例需等待扫描周期（默认 5 分钟），可用 **单测短阈值**（`sandbox-idle-reap.test.ts`，`idleReapMs=5s`）加速验证核心逻辑；PG 冒烟用例保留用于验证真实链路。
@@ -666,6 +761,27 @@ bun test test/tool/sandbox-idle-reap.test.ts
 
 其它相关测试：`test/tool/sandbox-provider-pg.test.ts`（DB CRUD/keep_alive/版本保护）、`test/tool/sandbox-provider-concurrency.test.ts`、`test/tool/sandbox-lazy-no-create.test.ts`、`test/tool/sandbox-command-queue.test.ts`。
 
+**按 ID / 按会话关闭 × 快照语义（`packages/opencode/test/tool/sandbox-provider-destroy-by-id.test.ts`，2026-08-28 新增）**：
+
+```bash
+OPENCODE_DATABASE_URL="$PG_URL" \
+bun test test/tool/sandbox-provider-destroy-by-id.test.ts
+```
+
+| 用例 | 验证 | 状态 |
+|------|------|------|
+| destroyById（pvc）：返回 sessionID，行转 destroyed | T12.18 | ✅ 通过 |
+| destroyById（snapshot）：POST snapshots 先于 DELETE sandboxes（顺序断言） | T12.19 | ✅ 通过 |
+| destroyById（snapshot）快照 Failed：无 DELETE，行保持 killed | T12.19 对照 | ✅ 通过 |
+| destroyById：killed 行返回 null 且无销毁请求 | T12.18 幂等 | ✅ 通过 |
+| destroyById：destroyed 行与不存在 ID 返回 null | T12.18 幂等 | ✅ 通过 |
+| destroy（pvc）：销毁 + DELETE + 行转 destroyed | T12.20 回归 | ✅ 通过 |
+| destroy（snapshot）：快照先于销毁（顺序断言） | T12.20 | ✅ 通过 |
+| destroy（snapshot）快照 Failed：无 DELETE，行保持 killed | T12.20 对照 | ✅ 通过 |
+| destroy（无沙箱行）：无副作用 | 边界 | ✅ 通过 |
+
+> 测试基建：真实 pgLayer + 本地 PG（`opencode_test`）+ fake OpenSandbox lifecycle server（`Bun.serve` 模拟创建/删除/快照 API）；`Database.Client()` 在 `beforeAll` 初始化（仅 PG 模式，避免合跑时误触发 SQLite 路径）。
+
 ---
 
 ## 五、排查场景对照表
@@ -709,7 +825,16 @@ bun test test/tool/sandbox-idle-reap.test.ts
 | T30.7 可观测性 | ✅ | scan 日志正常运行（无超时候选时 count=0 不落日志） |
 | T30.12 挂起恢复自愈 | ✅ | 篡改 command_session_id 后首条命令自动重建并 `self-heal-ok`；分类器单测 8 断言通过（2026-08-26，镜像 selfheal2） |
 | T30.13 background 不再保活 | ⏭️ 待复测 | 行为变更已落地（shell.ts 移除自动 keepAlive）；对照实验需独立容器加速验证 |
+| T12.18 kill by sandboxID（pvc） | ✅ | kill 200+sessionID；行 destroyed；exec_log 落 `destroy sandbox <SBID>`；重复/未知 404（2026-08-28 实测，镜像 kill-snap） |
+| T12.19 kill by sandboxID（snapshot） | ✅ | session_snapshot `ready`（waitedMs=10220）；日志先 `snapshot ready` 后 `sandbox destroyed`；行 destroyed；重复 404（2026-08-28 实测） |
+| T12.20 kill-sandbox（snapshot） | ✅ | 快照 ready（waitedMs=15386）→ 销毁；行 destroyed；keepAlive 对照实验 kill 后仍 True（2026-08-28 行为变更落地实测） |
+| destroy-by-id 单测（9 用例） | ✅ | 单文件 9 pass；三文件合跑 24 pass / 0 fail（3 连跑稳定） |
 | 单测全量 | ✅ | idle-reap 17（含 detached 无心跳新用例）+ provider-pg/concurrency/lazy/queue 35 = 52 pass / 0 fail（2026-08-19 临时本地 PG `opencode_test`，5 文件合跑 3 轮均 52/0） |
+
+> **2026-08-28 行为变更**：
+> - 新增 `POST /sandbox/:sandboxID/kill`：按沙箱 ID 关闭（原仅 service 层 `destroyById`，未暴露 HTTP）。返回 `SessionID | null`，HTTP 层 null → 404（T12.18）。
+> - **快照安全对齐**：`destroy(sessionID)`（kill-sandbox）原实现 reconnect 成功后直接销毁、漏快照；现与 `destroyById` 一致——查会话 `persistMode`，snapshot 会话先快照（Ready 后才 kill 源沙箱，失败保留重试），pvc 会话行为不变（T12.19/T12.20）。
+> - `destroyById` 状态检查收窄为 `running/snapshotting`：killed/destroyed/不存在返回 null（killed 重入属 idle-reap 专属路径，管理接口不重入）。
 
 > **2026-08-26 行为变更**：
 > - `OPENCODE_SANDBOX_IDLE_REAP_SEC` 默认值 1800s → **3600s**（空闲回收阈值 30 分钟上调至 60 分钟，T30.2/T30.8 阈值口径同步）。

@@ -690,6 +690,11 @@ POST /session/:sessionID/keep-alive {"enabled":false}
 > 撤销意愿必须显式 `{"enabled":false}`。`boot:true` 适合预热场景——调用后沙箱立即可用，
 > `sandboxId` 返回在响应中；boot 失败不影响 keepAlive 设置，`sandboxId` 返回 `null`。
 
+> **关闭沙箱接口（2026-08-28）**：
+> - `POST /session/:sessionID/kill-sandbox` — 按会话销毁；snapshot 模式会话**先快照 Ready 再销毁**（失败保留重试），pvc 直接销毁
+> - `POST /sandbox/:sandboxID/kill` — 按沙箱 ID 销毁，响应含所属 `sessionID`；未知/已销毁 ID 返回 404
+> - 两者都不撤销 keepAlive 意愿（T12.14/T12.20）
+
 ---
 
 ## 六、常见问题
