@@ -146,6 +146,7 @@ function headersToRecord(headers: Headers): Record<string, string> {
 const MAX_BODY = 5 * 1024 * 1024
 const PathParams = Schema.Struct({ sessionID: SessionID, port: Schema.String })
 const SessionParams = Schema.Struct({ sessionID: SessionID })
+const SandboxParams = Schema.Struct({ sandboxID: Schema.String })
 const ExecIdParams = Schema.Struct({ sessionID: SessionID, execId: Schema.String })
 const ErrorReportQuery = Schema.Struct({ e: Schema.optional(Schema.String) })
 const ExecBody = Schema.Struct({
@@ -722,6 +723,24 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
           time_finished: Date.now(),
         })).pipe(Effect.catch(() => Effect.void))
         return HttpServerResponse.jsonUnsafe({ sessionID: params.sessionID, destroyed: true })
+      }),
+    )
+
+    yield* router.add("POST", "/sandbox/:sandboxID/kill",
+      Effect.gen(function* () {
+        const params = yield* HttpRouter.schemaPathParams(SandboxParams)
+        const sessionID = yield* sandbox.destroyById(params.sandboxID).pipe(Effect.catch(() => Effect.succeed(null)))
+        if (!sessionID) return HttpServerResponse.jsonUnsafe({ error: "sandbox not found", sandboxID: params.sandboxID }, { status: 404 })
+        yield* Effect.promise(() => insertExecLog({
+          id: `action-${++execCounter}-${Date.now()}`,
+          session_id: sessionID,
+          command: `destroy sandbox ${params.sandboxID}`,
+          status: "completed",
+          source: "kill-sandbox",
+          time_started: Date.now(),
+          time_finished: Date.now(),
+        })).pipe(Effect.catch(() => Effect.void))
+        return HttpServerResponse.jsonUnsafe({ sandboxID: params.sandboxID, sessionID, destroyed: true })
       }),
     )
 

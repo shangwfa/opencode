@@ -131,9 +131,10 @@ const fakeProvider = Layer.effect(
         for (const [sid, s] of sandboxes) {
           if (s.id === _sandboxID) {
             yield* destroy(sid)
-            return
+            return sid as SessionID
           }
         }
+        return null
       })
 
     const runInSession = (sessionID: string) =>

@@ -342,7 +342,7 @@ export namespace SandboxProvider {
     ) => Effect.Effect<Sandbox>
     readonly get: (sessionID: SessionID) => Effect.Effect<Sandbox | null>
     readonly destroy: (sessionID: SessionID) => Effect.Effect<void>
-    readonly destroyById: (sandboxID: string) => Effect.Effect<void>
+    readonly destroyById: (sandboxID: string) => Effect.Effect<SessionID | null>
     readonly destroyAll: () => Effect.Effect<void>
     readonly cleanupSessionVolume: (sessionID: SessionID) => Effect.Effect<void>
     readonly purgeSnapshots?: (sessionID: SessionID) => Effect.Effect<void>
@@ -572,8 +572,12 @@ export namespace SandboxProvider {
       const destroyById: Interface["destroyById"] = (sandboxID) =>
         Effect.gen(function* () {
           for (const [sid, s] of sandboxes) {
-            if (s.id === sandboxID) return yield* destroy(sid as SessionID)
+            if (s.id === sandboxID) {
+              yield* destroy(sid as SessionID)
+              return sid as SessionID
+            }
           }
+          return null
         }).pipe(Effect.withSpan("SandboxProvider.destroyById"))
 
       const destroyAll: Interface["destroyAll"] = () =>
@@ -1557,30 +1561,33 @@ export namespace SandboxProvider {
           const row = yield* dbGet(sessionID).pipe(Effect.orElseSucceed(() => null))
           if (row?.state === "running" || row?.state === "snapshotting" || row?.state === "killed") {
             if (row.state !== "killed") yield* dbSetStateFor(sessionID, row.id, "killed")
-            const sb = yield* reconnect(row).pipe(Effect.orElseSucceed(() => null))
-            if (sb) yield* destroySandbox(sb, sessionID).pipe(Effect.catchCause(() => Effect.void))
-            else yield* cleanupSandbox({ ...row, state: "killed" })
+            const snapshotSession = !!snapshots && (yield* dbResolvePersistMode(sessionID)) === "snapshot"
+            // 快照会话必须经 cleanupSandbox 的快照安全路径：快照 Ready 后才 kill 源沙箱，
+            // 失败/超时保留沙箱待重试；pvc 会话在该路径下等价于直接销毁。
+            yield* cleanupSandbox({ ...row, state: "killed" }, snapshotSession ? { snapshot: true } : undefined)
           }
         })).pipe(Effect.withSpan("SandboxProvider.destroy"))
 
       const destroyById: Interface["destroyById"] = (sandboxID) =>
         Effect.gen(function* () {
           const row = yield* dbGetById(sandboxID).pipe(Effect.orElseSucceed(() => null))
-          if (!row || (row.state !== "running" && row.state !== "snapshotting" && row.state !== "killed")) return
+          if (!row || (row.state !== "running" && row.state !== "snapshotting")) return null
           invalidateCachedSandbox(row.session_id)
+          const snapshotSession = !!snapshots && (yield* dbResolvePersistMode(row.session_id)) === "snapshot"
           yield* lock(row.session_id, Effect.gen(function* () {
             invalidateCachedSandbox(row.session_id)
             const current = yield* dbGetById(sandboxID).pipe(Effect.orElseSucceed(() => null))
-            if (!current || current.id !== sandboxID || (current.state !== "running" && current.state !== "snapshotting" && current.state !== "killed")) return
-            if (current.state !== "killed") yield* dbSetStateFor(current.session_id, current.id, "killed")
+            if (!current || current.id !== sandboxID || (current.state !== "running" && current.state !== "snapshotting")) return
+            yield* dbSetStateFor(current.session_id, current.id, "killed")
             const inFlight = yield* Ref.modify(createRef, (m) => {
               const d = m.get(current.session_id)
               if (d) m.delete(current.session_id)
               return [d, m] as const
             })
             if (inFlight) yield* Deferred.fail(inFlight, new Error(`Sandbox destroyed while creating: ${current.session_id}`))
-            yield* cleanupSandbox({ ...current, state: "killed" })
+            yield* cleanupSandbox({ ...current, state: "killed" }, snapshotSession ? { snapshot: true } : undefined)
           }))
+          return row.session_id as SessionID
         }).pipe(Effect.withSpan("SandboxProvider.destroyById"))
 
       const destroyAll: Interface["destroyAll"] = () =>
@@ -2069,7 +2076,7 @@ export namespace NoopSandboxProvider {
       getOrCreate: () => Effect.succeed(null as unknown as Sandbox),
       get: () => Effect.succeed(null),
       destroy: () => Effect.void,
-      destroyById: () => Effect.void,
+      destroyById: () => Effect.succeed(null),
       destroyAll: () => Effect.void,
       keepAlive: () => Effect.void,
       touch: () => Effect.void,
