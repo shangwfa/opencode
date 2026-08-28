@@ -15,9 +15,27 @@ export interface Frame {
 
 export type ViewerStatus = "idle" | "connecting" | "live" | "down"
 
+interface CdpMessage {
+  id?: number
+  method?: string
+  error?: { message: string }
+  result?: Record<string, unknown>
+  params?: {
+    data?: string
+    sessionId?: string
+    metadata?: { deviceWidth?: number; deviceHeight?: number }
+    frame?: { url?: string; parentId?: string }
+  }
+}
+
+interface NavigationHistory {
+  currentIndex: number
+  entries: Array<{ id: number; url: string }>
+}
+
 const SCREENCAST_PARAMS = { format: "jpeg", quality: 65, maxWidth: 1920, maxHeight: 1080, everyNthFrame: 1 }
 
-// CDP 连接生命周期：/cdp/:sessionId 同源代理 -> sandbox-proxy -> cdp-gateway -> Chromium
+// CDP 连接生命周期：/cdp/:sessionId 同源代理 -> cdp-gateway -> Chromium
 export function useCdpViewer(sessionId: string) {
   const [targets, setTargets] = useState<TargetInfo[]>([])
   const [currentId, setCurrentId] = useState<string | null>(null)
@@ -26,10 +44,13 @@ export function useCdpViewer(sessionId: string) {
   const [frame, setFrame] = useState<Frame | null>(null)
   const [fps, setFps] = useState(0)
   const [error, setError] = useState<string | null>(null)
+  const [canGoBack, setCanGoBack] = useState(false)
+  const [canGoForward, setCanGoForward] = useState(false)
 
   const wsRef = useRef<WebSocket | null>(null)
   const currentRef = useRef<string | null>(null)
   const msgIdRef = useRef(0)
+  const pendingRef = useRef(new Map<number, (msg: CdpMessage) => void>())
   const frameCountRef = useRef(0)
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const keepaliveTimer = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -37,10 +58,34 @@ export function useCdpViewer(sessionId: string) {
   const base = `/cdp/${sessionId}`
 
   const send = useCallback((method: string, params?: Record<string, unknown>) => {
-    const ws = wsRef.current
-    if (!ws || ws.readyState !== WebSocket.OPEN) return
-    ws.send(JSON.stringify({ id: ++msgIdRef.current, method, params }))
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return
+    wsRef.current.send(JSON.stringify({ id: ++msgIdRef.current, method, params }))
   }, [])
+
+  const request = useCallback(
+    <T = Record<string, unknown>,>(method: string, params?: Record<string, unknown>): Promise<T> => {
+      return new Promise((resolve, reject) => {
+        const ws = wsRef.current
+        if (!ws || ws.readyState !== WebSocket.OPEN) {
+          reject(new Error("cdp not connected"))
+          return
+        }
+        const id = ++msgIdRef.current
+        pendingRef.current.set(id, (msg) => {
+          if (msg.error) reject(new Error(msg.error.message))
+          else resolve((msg.result ?? {}) as T)
+        })
+        ws.send(JSON.stringify({ id, method, params }))
+        setTimeout(() => {
+          if (pendingRef.current.has(id)) {
+            pendingRef.current.delete(id)
+            reject(new Error(`cdp request timeout: ${method}`))
+          }
+        }, 10_000)
+      })
+    },
+    [],
+  )
 
   const loadTargets = useCallback(async (): Promise<TargetInfo[]> => {
     try {
@@ -54,6 +99,18 @@ export function useCdpViewer(sessionId: string) {
     }
   }, [base])
 
+  const refreshHistory = useCallback(async () => {
+    try {
+      const history = await request<NavigationHistory>("Page.getNavigationHistory")
+      const canBack = history.currentIndex > 0
+      const canForward = history.currentIndex < history.entries.length - 1
+      setCanGoBack(canBack)
+      setCanGoForward(canForward)
+      const current = history.entries[history.currentIndex]
+      if (current?.url) setCurrentUrl(current.url)
+    } catch {}
+  }, [request])
+
   const stopScreencastLoop = useCallback(() => {
     if (keepaliveTimer.current) clearInterval(keepaliveTimer.current)
     keepaliveTimer.current = null
@@ -66,6 +123,8 @@ export function useCdpViewer(sessionId: string) {
       setStatus("connecting")
       setError(null)
       setFrame(null)
+      setCanGoBack(false)
+      setCanGoForward(false)
       if (reconnectTimer.current) clearTimeout(reconnectTimer.current)
 
       wsRef.current?.close()
@@ -73,26 +132,24 @@ export function useCdpViewer(sessionId: string) {
       const url = `${proto}${location.host}${base}/devtools/page/${targetId}`
       const ws = new WebSocket(url)
       wsRef.current = ws
-      ws.onerror = () => ws.close()
 
       ws.onopen = () => {
         setStatus("live")
         send("Page.enable")
         send("Runtime.enable")
         send("Page.startScreencast", SCREENCAST_PARAMS)
+        void refreshHistory()
         stopScreencastLoop()
         // 导航等场景 screencast 可能停发，周期性重发兜底
         keepaliveTimer.current = setInterval(() => send("Page.startScreencast", SCREENCAST_PARAMS), 8000)
       }
       ws.onmessage = (ev) => {
-        const msg = JSON.parse(ev.data) as {
-          method?: string
-          params?: Record<string, never> & {
-            data?: string
-            sessionId?: string
-            metadata?: { deviceWidth?: number; deviceHeight?: number }
-            frame?: { url?: string; parentId?: string }
-          }
+        const msg = JSON.parse(ev.data) as CdpMessage
+        if (msg.id && pendingRef.current.has(msg.id)) {
+          const resolve = pendingRef.current.get(msg.id)!
+          pendingRef.current.delete(msg.id)
+          resolve(msg)
+          return
         }
         if (msg.method === "Page.screencastFrame" && msg.params?.data) {
           setFrame({
@@ -104,6 +161,9 @@ export function useCdpViewer(sessionId: string) {
           send("Page.screencastFrameAck", { sessionId: msg.params.sessionId })
         } else if (msg.method === "Page.frameNavigated" && msg.params?.frame && !msg.params.frame.parentId) {
           setCurrentUrl(msg.params.frame.url ?? "")
+          void refreshHistory()
+        } else if (msg.method === "Page.navigatedWithinDocument") {
+          void refreshHistory()
         }
       }
       ws.onclose = () => {
@@ -116,7 +176,7 @@ export function useCdpViewer(sessionId: string) {
       }
       ws.onerror = () => ws.close()
     },
-    [base, send, stopScreencastLoop],
+    [base, send, refreshHistory, stopScreencastLoop],
   )
 
   const switchTarget = useCallback(
@@ -145,6 +205,38 @@ export function useCdpViewer(sessionId: string) {
     },
     [send],
   )
+
+  const goBack = useCallback(async () => {
+    const history = await request<NavigationHistory>("Page.getNavigationHistory")
+    if (history.currentIndex > 0) {
+      send("Page.navigateToHistoryEntry", { entryId: history.entries[history.currentIndex - 1].id })
+    }
+  }, [request, send])
+
+  const goForward = useCallback(async () => {
+    const history = await request<NavigationHistory>("Page.getNavigationHistory")
+    if (history.currentIndex < history.entries.length - 1) {
+      send("Page.navigateToHistoryEntry", { entryId: history.entries[history.currentIndex + 1].id })
+    }
+  }, [request, send])
+
+  const reload = useCallback(() => send("Page.reload", { ignoreCache: false }), [send])
+
+  const screenshot = useCallback(async (): Promise<void> => {
+    const { data } = await request<{ data: string }>("Page.captureScreenshot", {
+      format: "png",
+      captureBeyondViewport: true,
+    })
+    const bin = atob(data)
+    const bytes = new Uint8Array(bin.length)
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+    const blob = new Blob([bytes], { type: "image/png" })
+    const link = document.createElement("a")
+    link.href = URL.createObjectURL(blob)
+    link.download = `browser-cdp-${Date.now()}.png`
+    link.click()
+    URL.revokeObjectURL(link.href)
+  }, [request])
 
   const newTab = useCallback(async () => {
     try {
@@ -239,9 +331,15 @@ export function useCdpViewer(sessionId: string) {
     frame,
     fps,
     error,
+    canGoBack,
+    canGoForward,
     switchTarget,
     refreshTargets,
     navigate,
+    goBack,
+    goForward,
+    reload,
+    screenshot,
     newTab,
     closeTab,
     dispatchMouse,

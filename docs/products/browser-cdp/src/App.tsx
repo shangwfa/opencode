@@ -1,19 +1,11 @@
 import { useCallback, useEffect, useState } from "react"
-import { Viewer } from "./components/Viewer"
-
-interface SessionEntry {
-  id: string
-  title: string
-  timeUpdated: number | null
-  sandbox: { image?: string } | null
-}
-
-interface SessionStatus {
-  sessionId: string
-  sandboxId: string | null
-  sandbox: { image?: string } | null
-  ready: boolean
-}
+import { MonitorPlay } from "lucide-react"
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable"
+import { SessionSidebar } from "@/components/SessionSidebar"
+import { BrowserView } from "@/components/BrowserView"
+import { ChatPanel } from "@/components/ChatPanel"
+import { Card, CardContent } from "@/components/ui/card"
+import type { SessionEntry, SessionStatus } from "@/lib/api"
 
 interface Config {
   image: string
@@ -37,7 +29,7 @@ export default function App() {
   }, [])
 
   const loadSessions = useCallback(async () => {
-    setSessions(await api("/api/sessions"))
+    setSessions(await api<SessionEntry[]>("/api/sessions"))
   }, [api])
 
   const loadStatus = useCallback(
@@ -62,29 +54,32 @@ export default function App() {
   }, [api, loadSessions])
 
   useEffect(() => {
-    if (!currentSid) return
+    if (!currentSid) return undefined
     void loadStatus(currentSid)
     const timer = setInterval(() => void loadStatus(currentSid), 5000)
     return () => clearInterval(timer)
   }, [currentSid, loadStatus])
 
-  const run = async (label: string, fn: () => Promise<void>) => {
-    setBusy(label)
-    setMessage(null)
-    try {
-      await fn()
-    } catch (err) {
-      setMessage(`${label}失败: ${String(err)}`)
-    } finally {
-      setBusy(null)
-    }
-  }
+  const run = useCallback(
+    async (label: string, fn: () => Promise<void>) => {
+      setBusy(label)
+      setMessage(null)
+      try {
+        await fn()
+      } catch (err) {
+        setMessage(`${label}失败: ${String(err)}`)
+      } finally {
+        setBusy(null)
+      }
+    },
+    [],
+  )
 
-  const createSession = () =>
+  const createSession = (imageOverride?: string) =>
     run("创建会话", async () => {
       const created = await api<{ sessionId: string; ready: boolean; error: string | null }>("/api/sessions", {
         method: "POST",
-        body: JSON.stringify({ image: image.trim() || undefined }),
+        body: JSON.stringify({ image: imageOverride ?? undefined }),
       })
       await loadSessions()
       setCurrentSid(created.sessionId)
@@ -114,79 +109,48 @@ export default function App() {
   const ready = status?.ready ?? false
 
   return (
-    <div className="flex h-screen flex-col bg-zinc-950 text-zinc-200">
-      <header className="flex flex-none flex-wrap items-center gap-2 border-b border-zinc-800 bg-zinc-900 px-4 py-2">
-        <h1 className="mr-2 text-sm font-semibold text-zinc-100">browser-cdp 测试台</h1>
-        <select
-          className="max-w-72 rounded border border-zinc-700 bg-zinc-800 px-2 py-1 text-sm"
-          value={currentSid}
-          onChange={(e) => setCurrentSid(e.target.value)}
-        >
-          <option value="">选择会话…</option>
-          {sessions.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.title || s.id}
-              {s.sandbox?.image ? ` — ${s.sandbox.image.split("/").pop()}` : ""}
-            </option>
-          ))}
-        </select>
-        <input
-          className="w-64 rounded border border-zinc-700 bg-zinc-800 px-2 py-1 text-sm placeholder:text-zinc-600"
-          placeholder={`镜像（默认 ${config?.image ?? ""}）`}
-          value={image}
-          onChange={(e) => setImage(e.target.value)}
-        />
-        <button
-          className="rounded border border-emerald-700 bg-emerald-800 px-3 py-1 text-sm hover:bg-emerald-700 disabled:opacity-40"
-          disabled={busy !== null}
-          onClick={createSession}
-        >
-          {busy === "创建会话" ? "创建中…" : "新建会话"}
-        </button>
-        <button
-          className="rounded border border-zinc-700 bg-zinc-800 px-3 py-1 text-sm hover:bg-zinc-700 disabled:opacity-40"
-          disabled={!currentSid || busy !== null}
-          onClick={startBrowser}
-        >
-          启动浏览器
-        </button>
-        <button
-          className="rounded border border-zinc-700 bg-zinc-800 px-3 py-1 text-sm hover:bg-zinc-700 disabled:opacity-40"
-          disabled={!currentSid || busy !== null}
-          onClick={stopBrowser}
-        >
-          停止
-        </button>
-        <button
-          className="rounded border border-red-900 bg-red-950 px-3 py-1 text-sm hover:bg-red-900 disabled:opacity-40"
-          disabled={!currentSid || busy !== null}
-          onClick={killSandbox}
-        >
-          销毁沙箱
-        </button>
-        <span className="text-xs text-zinc-500">
-          {currentSid ? `CDP: ${ready ? "就绪" : "未就绪"}` : `SaaS: ${config?.saasBaseUrl ?? "…"}`}
-        </span>
-      </header>
+    <div className="h-screen bg-background text-foreground">
+      <ResizablePanelGroup orientation="horizontal">
+        <ResizablePanel defaultSize="18" minSize="14" maxSize="32">
+          <SessionSidebar
+            sessions={sessions}
+            currentSid={currentSid}
+            config={config}
+            image={image}
+            onImageChange={setImage}
+            busy={busy}
+            message={message}
+            ready={ready}
+            onClearMessage={() => setMessage(null)}
+            onSelect={setCurrentSid}
+            onCreate={() => void createSession()}
+            onStart={startBrowser}
+            onStop={stopBrowser}
+            onKill={killSandbox}
+          />
+        </ResizablePanel>
+        <ResizableHandle withHandle />
 
-      {message && (
-        <div className="flex-none bg-zinc-900 px-4 py-1.5 text-xs text-amber-300">
-          {message}
-          <button className="ml-2 text-zinc-500 hover:text-zinc-300" onClick={() => setMessage(null)}>
-            ×
-          </button>
-        </div>
-      )}
-
-      {currentSid && ready ? (
-        <Viewer key={currentSid} sessionId={currentSid} />
-      ) : (
-        <main className="flex flex-1 items-center justify-center">
-          <p className="text-sm text-zinc-600">
-            {currentSid ? "CDP 未就绪：点击「启动浏览器」，或等待沙箱完成创建。" : "选择或新建一个会话开始测试。"}
-          </p>
-        </main>
-      )}
+        <ResizablePanel defaultSize="82" minSize="55">
+          <ResizablePanelGroup orientation="horizontal">
+            <ResizablePanel defaultSize="38" minSize="28">
+              {currentSid ? <ChatPanel key={currentSid} sessionId={currentSid} ready={ready} /> : (
+                <div className="flex h-full items-center justify-center text-sm text-muted-foreground">创建或选择一个会话开始聊天</div>
+              )}
+            </ResizablePanel>
+            <ResizableHandle withHandle />
+            <ResizablePanel defaultSize="62" minSize="35">
+              <main className="flex h-full min-w-0 flex-col overflow-hidden">
+                {currentSid && ready ? <BrowserView key={currentSid} sessionId={currentSid} /> : (
+                  <div className="flex flex-1 items-center justify-center">
+                    <Card className="border-none shadow-none"><CardContent className="flex flex-col items-center gap-3 py-12 text-center"><div className="flex size-14 items-center justify-center rounded-2xl bg-muted"><MonitorPlay className="size-7 text-muted-foreground" /></div><p className="max-w-xs text-sm text-muted-foreground">{currentSid ? "CDP 未就绪：点击「启动浏览器」。" : "创建或选择一个会话，查看浏览器预览。"}</p></CardContent></Card>
+                  </div>
+                )}
+              </main>
+            </ResizablePanel>
+          </ResizablePanelGroup>
+        </ResizablePanel>
+      </ResizablePanelGroup>
     </div>
   )
 }

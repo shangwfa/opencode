@@ -35,6 +35,16 @@ async function saas(config: ServerConfig, path: string, init?: RequestInit): Pro
   return text ? (JSON.parse(text) as Record<string, unknown>) : {}
 }
 
+async function proxySaasJson(config: ServerConfig, path: string, init?: RequestInit) {
+  const res = await fetch(`${config.saasBaseUrl}${path}`, {
+    signal: AbortSignal.timeout(120_000),
+    ...init,
+  })
+  const text = await res.text()
+  if (!res.ok) throw new Error(`SaaS ${path} -> ${res.status}: ${text.slice(0, 300)}`)
+  return text ? JSON.parse(text) : {}
+}
+
 async function cdpReady(config: ServerConfig, sessionId: string): Promise<boolean> {
   try {
     const res = await fetch(`${await cdpBase(config, sessionId)}/json/version`, {
@@ -294,6 +304,31 @@ export function browserCdp(): Plugin {
                 await new Promise((r) => setTimeout(r, 1000))
               }
               json(res, 200, { ready: await cdpReady(config, sessionId) })
+              return
+            }
+            if (action === "/messages" && req.method === "GET") {
+              const query = url.search ? url.search : ""
+              json(res, 200, await proxySaasJson(config, `/session/${sessionId}/message${query}`))
+              return
+            }
+            if (action === "/messages" && req.method === "POST") {
+              const body = await readJson(req)
+              json(
+                res,
+                200,
+                await proxySaasJson(config, `/session/${sessionId}/prompt_async`, {
+                  method: "POST",
+                  headers: JSON_HEADERS,
+                  body: JSON.stringify({
+                    parts: [{ type: "text", text: String(body.text ?? "") }],
+                    ...(body.model ? { model: body.model } : {}),
+                  }),
+                }),
+              )
+              return
+            }
+            if (action === "/abort" && req.method === "POST") {
+              json(res, 200, await proxySaasJson(config, `/session/${sessionId}/abort`, { method: "POST" }))
               return
             }
             if (action === "/browser/stop" && req.method === "POST") {
