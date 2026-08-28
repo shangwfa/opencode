@@ -329,6 +329,34 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
       }),
     )
 
+    // ── host-ip: 沙箱自身上报的 IP 列表（K8s pod-ip / docker 容器-ip）。
+    // OpenSandbox endpoint API 只提供 ingress 形态地址（不转发 WebSocket），
+    // 需要 WS 直连沙箱内服务的场景（如 CDP）用本接口拿裸 IP。
+    yield* router.add("GET", "/session/:sessionID/host-ip",
+      Effect.gen(function* () {
+        const params = yield* HttpRouter.schemaPathParams(SessionParams)
+        const sb = yield* sandbox.get(params.sessionID).pipe(Effect.catch(() => Effect.succeed(undefined)))
+        if (!sb) return HttpServerResponse.jsonUnsafe({ error: "sandbox unreachable" }, { status: 502 })
+
+        const result = yield* sandbox
+          .runInSession(params.sessionID, "hostname -I 2>/dev/null || hostname -i", { workingDirectory: "/tmp", timeoutSeconds: 15 }, {})
+          .pipe(
+            Effect.tapError((err) => Effect.sync(() => console.error("[host-ip] runInSession failed:", err))),
+            Effect.catch(() => Effect.succeed(undefined as any)),
+          )
+        if (!result) return HttpServerResponse.jsonUnsafe({ error: "host-ip lookup failed" }, { status: 502 })
+        if (result.err) {
+          const message = result.err instanceof Error ? result.err.message : String(result.err?.message ?? result.err)
+          return HttpServerResponse.jsonUnsafe({ error: `host-ip lookup failed: ${message}` }, { status: 502 })
+        }
+        const stdout = (result.logs?.stdout.map((m: any) => m.text).join(" ") ?? "") as string
+        const ips = stdout.trim().split(/\s+/).filter((ip: string) => /^[0-9a-f.:]+$/i.test(ip))
+        if (!ips.length) return HttpServerResponse.jsonUnsafe({ error: "no ip reported" }, { status: 502 })
+
+        return HttpServerResponse.jsonUnsafe({ ip: ips[0], ips, sandboxId: sb.id })
+      }),
+    )
+
     yield* router.add("POST", "/session/:sessionID/exec",
       Effect.gen(function* () {
         const params = yield* HttpRouter.schemaPathParams(SessionParams)
