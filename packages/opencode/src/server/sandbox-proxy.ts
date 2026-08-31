@@ -62,6 +62,7 @@ export function clearProxyErrors(sessionID: string) {
 const INJECT_SCRIPT = (prefix: string) => `<script>;(function(){
 var P="${prefix}";
 window.__OC_PROXY_PREFIX__=P;
+try{var _yd=window.YD||{};Object.defineProperty(window,"YD",{configurable:true,get:function(){return _yd},set:function(v){_yd=Object.assign({},_yd,v)}});if(_yd.__PROJECT_APP_BASE_ROUTE__===undefined)_yd.__PROJECT_APP_BASE_ROUTE__=P}catch(e){}
 function f(u){return typeof u==="string"&&u.charAt(0)==="/"&&u.charAt(1)!=="/"&&!u.startsWith(P)?P+u:u}
  function fUrl(u){if(typeof u!=="string")return u;if(u.charAt(0)==="/"&&u.charAt(1)!=="/")return P+u;try{var x=new URL(u);if((x.protocol==="ws:"||x.protocol==="wss:")&&x.pathname.charAt(0)==="/"&&!x.pathname.startsWith(P)){var p=location.protocol==="https:"?"wss:":"ws:";return p+"//"+location.host+P+x.pathname+x.search+x.hash}if(x.host===location.host&&x.pathname.charAt(0)==="/"&&!x.pathname.startsWith(P))return x.origin+P+x.pathname+x.search+x.hash}catch(e){}return u}
 var _ws=window.WebSocket;
