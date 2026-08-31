@@ -36,3 +36,14 @@ python3 -m http.server 8088
 - Vite HMR WebSocket 握手必须带 `Sec-WebSocket-Protocol: vite-hmr`，否则 Vite 静默忽略 upgrade
 - `exec/async` 的 `timeoutSeconds` 到期会连带杀掉启动的 dev server；长驻进程需 `nohup` 脱离
 - node_modules 依赖模块不做 BrowserRouter 替换（避免 react-router-dom 内部重复声明崩溃）
+
+## 实测记录
+
+| 日期 | 对象 | 端口 | 结果 |
+|---|---|---|---|
+| 2026-08-31 | 内置 3 路由 demo 模板 | 5174 | 连接/初始化/启动/多路由（Home/About/Contact + deep-link）/HMR v1→v2 无刷新/资源 193×200+18×304 零失败 ✅ |
+| 2026-08-31 | xybot 真实业务项目（新增 about/contact 页面） | 5173 | deep-link `/about`、`/contact`、HMR 无刷新、资源 377×200+52×304 零失败 ✅ |
+
+详见 [sandbox-proxy-endpoint.md 复测记录第四轮](../sandbox-proxy-endpoint.md)。
+
+> **注意**：`previewUrl` 在「连接」时按端口计算；改端口后需**重新点「连接」**，iframe 才指向新端口（「启动 dev server」「触发 HMR」用的是输入框当前端口，与 iframe 所示端口可能不同）。
