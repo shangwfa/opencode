@@ -92,6 +92,8 @@ export namespace Flag {
   export const OPENCODE_EVENT_BUS = process.env["OPENCODE_EVENT_BUS"] ?? "local"
   export const OPENCODE_SANDBOX_ENABLED = truthy("OPENCODE_SANDBOX_ENABLED")
   export const OPENCODE_SANDBOX_DOMAIN = process.env["OPENCODE_SANDBOX_DOMAIN"] ?? "localhost:8080"
+  // 浏览器等外部客户端可达的 sandbox server 地址（预览代理地址用）；缺省回退 OPENCODE_SANDBOX_DOMAIN
+  export const OPENCODE_SANDBOX_PUBLIC_DOMAIN = process.env["OPENCODE_SANDBOX_PUBLIC_DOMAIN"] ?? OPENCODE_SANDBOX_DOMAIN
   export const OPENCODE_SANDBOX_IMAGE =
     process.env["OPENCODE_SANDBOX_IMAGE"] ??
     "crpi-hlpnu8kiweghie0r.cn-hangzhou.personal.cr.aliyuncs.com/shangwfa/opencode-sandbox:session-terminal"

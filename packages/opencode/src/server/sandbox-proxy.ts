@@ -1,4 +1,4 @@
-import { Effect, Schema, Queue, Stream, Fiber, Duration, Option } from "effect"
+import { Effect, Schema, Queue, Stream, Fiber, Duration, Option, Layer } from "effect"
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
 import * as Socket from "effect/unstable/socket/Socket"
 import * as Sse from "effect/unstable/encoding/Sse"
@@ -7,11 +7,11 @@ import { Bus } from "@/bus"
 import { Session } from "@/session/session"
 import { SessionID } from "@/session/schema"
 import { SandboxProvider } from "@/tool/sandbox-provider"
+import { Flag } from "@/flag/flag"
 import * as Database from "@/storage/db"
 import { SessionTable } from "@/session/session.pg"
 import { eq } from "drizzle-orm"
-import { WebSocketTracker } from "./routes/instance/httpapi/websocket-tracker"
-import { ProxyUtil } from "@/server/proxy-util"
+import { websocket } from "./routes/instance/httpapi/middleware/proxy"
 import { resolveSandboxOpts } from "@/session/sandbox-opts"
 import { insertExecLog, updateExecLog, queryExecLogsBySession, queryExecLog, type ExecLog } from "@/session/exec-log"
 import { ExecFailed } from "@/sandbox/exec-failed"
@@ -62,7 +62,7 @@ export function clearProxyErrors(sessionID: string) {
 const INJECT_SCRIPT = (prefix: string) => `<script>;(function(){
 var P="${prefix}";
 function f(u){return typeof u==="string"&&u.charAt(0)==="/"&&u.charAt(1)!=="/"&&!u.startsWith(P)?P+u:u}
-function fUrl(u){if(typeof u!=="string")return u;if(u.charAt(0)==="/"&&u.charAt(1)!=="/")return P+u;try{var x=new URL(u);if(x.host===location.host&&x.pathname.charAt(0)==="/"&&!x.pathname.startsWith(P))return x.origin+P+x.pathname+x.search+x.hash}catch(e){}return u}
+ function fUrl(u){if(typeof u!=="string")return u;if(u.charAt(0)==="/"&&u.charAt(1)!=="/")return P+u;try{var x=new URL(u);if((x.protocol==="ws:"||x.protocol==="wss:")&&x.pathname.charAt(0)==="/"&&!x.pathname.startsWith(P)){var p=location.protocol==="https:"?"wss:":"ws:";return p+"//"+location.host+P+x.pathname+x.search+x.hash}if(x.host===location.host&&x.pathname.charAt(0)==="/"&&!x.pathname.startsWith(P))return x.origin+P+x.pathname+x.search+x.hash}catch(e){}return u}
 var _ws=window.WebSocket;
 window.WebSocket=function(u,pr){if(typeof u==="string")u=fUrl(u);return pr?new _ws(u,pr):new _ws(u)};
 window.WebSocket.prototype=_ws.prototype;
@@ -90,9 +90,12 @@ window.addEventListener("unhandledrejection",function(e){try{__ocReport([{type:"
 function __ocReport(errs){var img=new Image();img.src=P+"/__error_report?e="+encodeURIComponent(JSON.stringify(errs))}
 })();</script>`
 
+const VITE_CLIENT_BUST = `oc=${Date.now().toString(36)}`
+
 function rewriteHtml(prefix: string, text: string) {
   const htmlSrcHref = new RegExp("((?:src|href)\\s*=\\s*[\"'])/(?!/)", "g")
   let rewritten = text.replace(htmlSrcHref, `$1${prefix}/`)
+  rewritten = rewritten.replace(`${prefix}/@vite/client`, `${prefix}/@vite/client?${VITE_CLIENT_BUST}`)
   rewritten = rewritten.replace(
     /(<script[^>]*>)([\s\S]*?)(<\/script>)/gi,
     (_, open, code, close) => {
@@ -109,10 +112,33 @@ function rewriteHtml(prefix: string, text: string) {
   return rewritten
 }
 
-function rewriteJs(prefix: string, text: string) {
+function rewriteJs(prefix: string, text: string, isDependency = false, isViteClient = false) {
   let rewritten = text.replace(new RegExp(`((?:import|from)\\s*(?:["']))/(?!/)`, "g"), `$1${prefix}/`)
   rewritten = rewritten.replace(/__webpack_require__\.p\s*=\s*"\/(?!\/)/g, `__webpack_require__.p="${prefix}/`)
-  rewritten = rewritten.replace(/\bBrowserRouter\b/g, "HashRouter")
+  rewritten = rewritten.replace(/__HMR_BASE__/g, JSON.stringify(prefix + "/"))
+  rewritten = rewritten.replace(/__BASE__/g, JSON.stringify(prefix + "/"))
+  if (isViteClient) {
+    rewritten = rewritten.replace('${"/"}', '${"' + prefix + '/"}')
+    rewritten = rewritten.replace(/__HMR_CONFIG_NAME__/g, "undefined")
+    rewritten = rewritten.replace(/__HMR_PROTOCOL__/g, "undefined")
+    rewritten = rewritten.replace(/__HMR_PORT__/g, "undefined")
+    rewritten = rewritten.replace(/__HMR_HOSTNAME__/g, "undefined")
+    rewritten = rewritten.replace(/__HMR_DIRECT_TARGET__/g, "undefined")
+    rewritten = rewritten.replace(/__HMR_TIMEOUT__/g, "30000")
+    rewritten = rewritten.replace(/__HMR_ENABLE_OVERLAY__/g, "true")
+    rewritten = rewritten.replace(/__SERVER_HOST__/g, '"localhost"')
+    rewritten = rewritten.replace(/__WS_TOKEN__/g, '""')
+  }
+  // 依赖包（react-router-dom 等）内部同时定义 BrowserRouter 与 HashRouter，
+  // 全局替换会产生重复声明导致库崩溃，只替换应用源码
+  if (!isDependency) rewritten = rewritten.replace(/\bBrowserRouter\b/g, "HashRouter")
+  // 模块 import 的 /@vite/client 与 HTML script 引用统一 cache-bust，
+  // 避免浏览器用旧缓存 client（base 无代理前缀）处理 HMR 消息
+  const escapedPrefix = prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+  rewritten = rewritten.replace(
+    new RegExp(`(${escapedPrefix}/@vite/client)(?!\\?)`, "g"),
+    `$1?${VITE_CLIENT_BUST}`,
+  )
   return rewritten
 }
 
@@ -306,7 +332,10 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
         })
 
         const proxyUrl = yield* Effect.tryPromise({
-          try: () => sb.getEndpointUrl(port),
+          try: async () => {
+            const ep = await (sb as any).sandboxes.getSandboxEndpoint(sb.id, port, true)
+            return `${protocol}://${ep.endpoint}`
+          },
           catch: () => undefined as string | undefined,
         })
 
@@ -317,11 +346,17 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
         const mode = reqMode === "proxy" ? "proxy" : reqMode === "direct" ? "direct" : directUrl ? "direct" : "proxy"
         const url = mode === "proxy" ? (proxyUrl ?? fallback) : (directUrl ?? proxyUrl ?? fallback)
 
+        // 完整的外部可访问代理地址（基于浏览器可达的 public domain），预览前端拿到即可直接访问
+        const previewUrl = proxyUrl
+          ? proxyUrl.replace(/^https?:\/\/[^/]+/, `${protocol}://${Flag.OPENCODE_SANDBOX_PUBLIC_DOMAIN}`)
+          : undefined
+
         return HttpServerResponse.jsonUnsafe({
           mode,
           url,
           directUrl,
           proxyUrl,
+          previewUrl,
           port,
           sandboxId: sb.id,
           fallback,
@@ -1107,7 +1142,10 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
         }
 
         const endpoint = yield* Effect.tryPromise({
-          try: () => sb.getEndpointUrl(port),
+          try: async () => {
+            const ep = await (sb as any).sandboxes.getSandboxEndpoint(sb.id, port, Flag.OPENCODE_SANDBOX_USE_SERVER_PROXY)
+            return `http://${ep.endpoint}`
+          },
           catch: () => undefined,
         })
         if (!endpoint) {
@@ -1115,77 +1153,22 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
           return HttpServerResponse.jsonUnsafe({ error: "sandbox unreachable" }, { status: 502 })
         }
 
-        if (isWs) { yield* proxyWebSocket(request, endpoint, subPath); return HttpServerResponse.empty() }
+        if (isWs) {
+          const targetQuery = request.url ? (() => { try { return new URL(request.url, "http://localhost").search } catch { return "" } })() : ""
+          return yield* websocket(request, endpoint + subPath + targetQuery)
+        }
 
         return yield* proxyHttp(request, params.sessionID, port, prefix, subPath, endpoint)
       }).pipe(Effect.catch(() => Effect.succeed(HttpServerResponse.empty({ status: 502 })))),
     )
   }),
-)
+).pipe(Layer.provide(Socket.layerWebSocketConstructorGlobal))
 
 function rejectWs(request: HttpServerRequest.HttpServerRequest, code: number, reason: string) {
   return Effect.gen(function* () {
     const inbound = yield* Effect.orDie(request.upgrade)
     const write = yield* inbound.writer
     yield* write(new Socket.CloseEvent(code, reason)).pipe(Effect.catch(() => Effect.void))
-  })
-}
-
-function proxyWebSocket(
-  request: HttpServerRequest.HttpServerRequest,
-  endpoint: string,
-  subPath: string,
-) {
-  return Effect.gen(function* () {
-    const wsUrl = ProxyUtil.websocketTargetURL(endpoint + subPath)
-    const inbound = yield* Effect.orDie(request.upgrade)
-    const outbound = yield* Socket.makeWebSocket(wsUrl, {
-      protocols: ProxyUtil.websocketProtocols(request.headers),
-    })
-    const writeInbound = yield* inbound.writer
-    const writeOutbound = yield* outbound.writer
-
-    const closeSocket = (socket: Socket.Socket, write: (event: Socket.CloseEvent) => Effect.Effect<void, unknown>) =>
-      socket.runRaw(() => Effect.void, {
-        onOpen: write(WebSocketTracker.SERVER_CLOSING_EVENT()).pipe(Effect.catch(() => Effect.void)),
-      }).pipe(
-        Effect.timeout("1 second"),
-        Effect.catchReason("SocketError", "SocketCloseError", () => Effect.void),
-        Effect.catch(() => Effect.void),
-      )
-
-    const closeAccepted = Effect.all(
-      [closeSocket(inbound, writeInbound), closeSocket(outbound, writeOutbound)],
-      { concurrency: "unbounded", discard: true },
-    )
-
-    const registered = yield* WebSocketTracker.register(
-      Effect.all(
-        [writeInbound(WebSocketTracker.SERVER_CLOSING_EVENT()), writeOutbound(WebSocketTracker.SERVER_CLOSING_EVENT())],
-        { concurrency: "unbounded", discard: true },
-      ),
-    )
-    if (!registered) {
-      yield* closeAccepted
-      return
-    }
-
-    yield* outbound
-      .runRaw((message) => writeInbound(message))
-      .pipe(
-        Effect.catchReason("SocketError", "SocketCloseError", (reason) =>
-          writeInbound(new Socket.CloseEvent(reason.code, reason.closeReason)).pipe(Effect.catch(() => Effect.void)),
-        ),
-        Effect.catch(() => writeInbound(new Socket.CloseEvent(1011, "proxy error")).pipe(Effect.catch(() => Effect.void))),
-        Effect.forkScoped,
-      )
-
-    yield* inbound
-      .runRaw((message) => writeOutbound(typeof message === "string" ? message : message.slice()))
-      .pipe(
-        Effect.catch(() => Effect.void),
-        Effect.ensuring(writeOutbound(new Socket.CloseEvent()).pipe(Effect.catch(() => Effect.void))),
-      )
   })
 }
 
@@ -1258,7 +1241,10 @@ function proxyHttp(
     if (isJs) {
       const text = yield* Effect.tryPromise(() => res.text())
       resHeaders.delete("content-encoding")
-      const rewritten = text.length > MAX_BODY ? text : rewriteJs(prefix, text)
+      const isDependency = target.pathname.includes("/node_modules/")
+      const isViteClient = subPath === "/@vite/client" || target.pathname.endsWith("/@vite/client")
+      if (isViteClient) resHeaders.set("cache-control", "no-cache")
+      const rewritten = text.length > MAX_BODY ? text : rewriteJs(prefix, text, isDependency, isViteClient)
       return HttpServerResponse.text(rewritten, {
         status: res.status, statusText: res.statusText || undefined,
         headers: headersToRecord(resHeaders),

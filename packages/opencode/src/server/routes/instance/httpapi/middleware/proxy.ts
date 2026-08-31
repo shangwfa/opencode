@@ -18,58 +18,47 @@ export function websocket(
   return Effect.scoped(
     Effect.gen(function* () {
       const inbound = yield* Effect.orDie(request.upgrade)
-      const outbound = yield* Socket.makeWebSocket(ProxyUtil.websocketTargetURL(target), {
-        protocols: ProxyUtil.websocketProtocols(request.headers),
-      })
+      // Effect 的 Socket.makeWebSocket 在部分 raw route 场景下 outbound 握手不完成，
+      // 改用原生 WebSocket 建立上游连接，双向桥接到 Effect inbound socket
+      const outbound = yield* Effect.tryPromise({
+        try: () => new Promise<WebSocket>((resolve, reject) => {
+          const socket = new WebSocket(ProxyUtil.websocketTargetURL(target), ProxyUtil.websocketProtocols(request.headers))
+          socket.binaryType = "arraybuffer"
+          socket.onopen = () => resolve(socket)
+          socket.onerror = () => reject(new Error("outbound websocket connection failed"))
+        }),
+        catch: (error) => error,
+      }).pipe(Effect.orDie)
       const writeInbound = yield* inbound.writer
-      const writeOutbound = yield* outbound.writer
-      const closeSocket = (socket: Socket.Socket, write: (event: Socket.CloseEvent) => Effect.Effect<void, unknown>) =>
-        socket
-          .runRaw(() => Effect.void, {
-            onOpen: write(WebSocketTracker.SERVER_CLOSING_EVENT()).pipe(Effect.catch(() => Effect.void)),
-          })
-          .pipe(
-            Effect.timeout("1 second"),
-            Effect.catchReason("SocketError", "SocketCloseError", () => Effect.void),
-            Effect.catch(() => Effect.void),
-          )
-      const closeAccepted = Effect.all([closeSocket(inbound, writeInbound), closeSocket(outbound, writeOutbound)], {
-        concurrency: "unbounded",
-        discard: true,
-      })
-      const registered = yield* WebSocketTracker.register(
-        Effect.all(
-          [
-            writeInbound(WebSocketTracker.SERVER_CLOSING_EVENT()),
-            writeOutbound(WebSocketTracker.SERVER_CLOSING_EVENT()),
-          ],
-          { concurrency: "unbounded", discard: true },
-        ),
-      )
+      const registered = yield* WebSocketTracker.register(writeInbound(WebSocketTracker.SERVER_CLOSING_EVENT()))
       if (!registered) {
-        yield* closeAccepted
+        outbound.close(1011, "proxy closed")
         return HttpServerResponse.empty()
       }
 
-      yield* outbound
-        .runRaw((message) => writeInbound(message))
-        .pipe(
-          Effect.catchReason("SocketError", "SocketCloseError", (reason) =>
-            writeInbound(new Socket.CloseEvent(reason.code, reason.closeReason)).pipe(Effect.catch(() => Effect.void)),
-          ),
-          Effect.catch(() =>
-            writeInbound(new Socket.CloseEvent(1011, "proxy error")).pipe(Effect.catch(() => Effect.void)),
-          ),
-          Effect.forkScoped,
-        )
+      outbound.onmessage = (event) => {
+        const data = event.data
+        if (data instanceof Blob) {
+          void data.arrayBuffer().then((value) => Effect.runFork(writeInbound(new Uint8Array(value))))
+          return
+        }
+        Effect.runFork(writeInbound(typeof data === "string" ? data : new Uint8Array(data)))
+      }
+      outbound.onclose = (event) => Effect.runFork(writeInbound(new Socket.CloseEvent(event.code, event.reason)))
+      outbound.onerror = () => Effect.runFork(writeInbound(new Socket.CloseEvent(1011, "proxy error")))
 
       yield* inbound
         .runRaw((message) => {
-          return writeOutbound(typeof message === "string" ? message : message.slice())
+          if (message instanceof Socket.CloseEvent) {
+            outbound.close(message.code, message.reason)
+            return Effect.void
+          }
+          if (outbound.readyState === WebSocket.OPEN) outbound.send(typeof message === "string" ? message : message.slice())
+          return Effect.void
         })
         .pipe(
           Effect.catch(() => Effect.void),
-          Effect.ensuring(writeOutbound(new Socket.CloseEvent()).pipe(Effect.catch(() => Effect.void))),
+          Effect.ensuring(Effect.sync(() => outbound.close())),
         )
       return HttpServerResponse.empty()
     }).pipe(Effect.orDie),
