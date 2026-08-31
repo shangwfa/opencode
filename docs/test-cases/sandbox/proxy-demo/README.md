@@ -24,7 +24,7 @@ python3 -m http.server 8088
 
 ## 验证要点
 
-- **多路由**：预览中点击 Home / About / Contact 导航，URL 为 `#/about` 形式（初始化时模板写入 HashRouter），刷新不丢路由
+- **多路由**：预览中点击 Home / About / Contact 导航，URL 为 `/about` 形式（BrowserRouter + `window.__OC_PROXY_PREFIX__` basename 适配），刷新不丢路由
 - **热更新**：点击 HMR 按钮后，iframe 内 About 页自动变化；控制台无 `[vite] failed to connect to websocket` 报错说明 HMR WebSocket（经 SaaS proxy → Sandbox Server Proxy → 沙箱）链路正常
 
 ## 已知实现要点（对应 sandbox-proxy.ts）

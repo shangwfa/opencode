@@ -138,28 +138,21 @@ echo "unchanged: $([ "$SB1" = "$SB2" ] && echo YES || echo NO)"
 ```
 **期望**：`unchanged: YES`
 
-### T11.6 BrowserRouter → HashRouter 自动替换
+### T11.6 BrowserRouter basename 代理适配
 
-> 验证 proxy 注入逻辑将 `BrowserRouter` 替换为 `HashRouter`，使 SPA 在 proxy prefix 下路由不丢失。
+> 验证应用可用原生 `BrowserRouter` 在 proxy prefix 下正常路由：proxy 注入脚本暴露 `window.__OC_PROXY_PREFIX__`（见 `sandbox-proxy.ts` INJECT_SCRIPT），应用将其作为 `basename` 传入。
 >
-> **前提**：项目需安装 `react-router-dom`。Vite 默认 react-ts 模板不含 router，需手动安装。
+> **前提**：项目需安装 `react-router-dom`，main.tsx 使用 `<BrowserRouter basename={window.__OC_PROXY_PREFIX__ ?? "/"}>`。
 
 ```bash
-# 安装 react-router-dom
+# 检查 main.tsx 的 basename 写法（应引用 __OC_PROXY_PREFIX__）
 curl -s --max-time 60 -X POST "$BASE/session/$SID/exec" -H 'Content-Type: application/json' \
-  -d '{"command":"cd /workspace/vite-app && npm install react-router-dom 2>&1 | tail -1"}' \
-  | python3 -c "import json,sys;print('install:', json.load(sys.stdin).get('exitCode'))"
+  -d '{"command":"grep -c \"__OC_PROXY_PREFIX__\" /workspace/vite-app/src/main.tsx"}' \
+  | python3 -c "import json,sys;print('basename refs:', json.load(sys.stdin).get('stdout','').strip())"
 
-# 获取 main.tsx 并检查 router 类型
-MAIN=$(curl -s "$BASE/session/$SID/proxy/5173/" | grep -o "src=\"/session/$SID/proxy/5173/src/main.tsx[^\"]*\"" | head -1 | sed 's/src="//;s/"//')
-curl -s "$BASE$MAIN" | python3 -c "
-import sys
-js=sys.stdin.read()
-print('HashRouter:', js.count('HashRouter'))
-print('BrowserRouter(should be 0):', js.count('BrowserRouter'))
-"
+# 浏览器验证：刷新 /session/:id/proxy/5173/about，应渲染 About Page（Vite SPA fallback + basename 剥离前缀）
 ```
-**期望**：`HashRouter >= 1`，`BrowserRouter = 0`
+**期望**：basename 引用存在；直接刷新 `/session/:id/proxy/5173/about` 渲染 About Page，无 "No routes matched" 告警
 
 ### T11.7 CSS url() 路径重写
 
@@ -507,7 +500,7 @@ print('after kill:', d.get('error') or d.get('url'))
 | T11.3 | ✅ | src/href 全部 prefixed |
 | T11.4 | ✅ | @react-refresh PREFIXED: True |
 | T11.5 | ✅ | JS import 全部 prefixed |
-| T11.6 | ✅ | HashRouter=2, BrowserRouter=0（装 react-router-dom 后） |
+| T11.6 | ✅ | basename 引用 __OC_PROXY_PREFIX__，BrowserRouter 路由正常 |
 | T11.7 | ✅ | Vite 默认模板无外部 CSS 引用（不适用） |
 | T11.8 | ✅ | proxy errors / proxy-errors 均 200 |
 | T11.9 | ✅ | keepAlive 阻止 idle 回收 |
@@ -548,7 +541,7 @@ print('after kill:', d.get('error') or d.get('url'))
 | T11.3 | ✅ | 3 个 src/href 全 prefixed |
 | T11.4 | ✅ | PREFIXED=True, UNPREFIXED=False |
 | T11.5 | ✅ | main.tsx 200, imports 全 prefixed |
-| T11.6 | ✅ | HashRouter=2, BrowserRouter=0。**注意**：create-vite@5 新模板 main.tsx 默认不含 router 代码，仅装 react-router-dom 不生效，需在 main.tsx 实际写入 `BrowserRouter` 后再验证替换 |
+| T11.6 | ✅ | main.tsx basename 引用 `__OC_PROXY_PREFIX__`；刷新 `/session/:id/proxy/5173/about` 直达 About Page |
 | T11.7 | — | 不适用（Vite 默认模板无外部 CSS link） |
 | T11.8 | ✅ | 200/200 |
 | T11.9 | ✅ | idle 12s 后仍 200（keepAlive 保活） |
@@ -567,7 +560,7 @@ print('after kill:', d.get('error') or d.get('url'))
 
 ### 复测记录（2026-08-31 第二轮：HMR WebSocket 修复，组合 1）
 
-> 镜像 `opencode-saas-sandbox-test:hmr-clean`（含本节全部修复）。测试会话 `ses_fa9abc16affe4DkwuY4l7grH4R`，沙箱 `a42fce55-a578-49de-a17a-d215ad141b1d`（Vite 5.4.21 + React + HashRouter，默认 base）。
+> 镜像 `opencode-saas-sandbox-test:hmr-clean`（含本节全部修复）。测试会话 `ses_fa9abc16affe4DkwuY4l7grH4R`，沙箱 `a42fce55-a578-49de-a17a-d215ad141b1d`（Vite 5.4.21 + React + BrowserRouter basename 适配，默认 base）。
 
 | 验证项 | 结果 | 说明 |
 |--------|------|------|

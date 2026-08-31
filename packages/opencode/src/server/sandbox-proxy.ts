@@ -61,6 +61,7 @@ export function clearProxyErrors(sessionID: string) {
 
 const INJECT_SCRIPT = (prefix: string) => `<script>;(function(){
 var P="${prefix}";
+window.__OC_PROXY_PREFIX__=P;
 function f(u){return typeof u==="string"&&u.charAt(0)==="/"&&u.charAt(1)!=="/"&&!u.startsWith(P)?P+u:u}
  function fUrl(u){if(typeof u!=="string")return u;if(u.charAt(0)==="/"&&u.charAt(1)!=="/")return P+u;try{var x=new URL(u);if((x.protocol==="ws:"||x.protocol==="wss:")&&x.pathname.charAt(0)==="/"&&!x.pathname.startsWith(P)){var p=location.protocol==="https:"?"wss:":"ws:";return p+"//"+location.host+P+x.pathname+x.search+x.hash}if(x.host===location.host&&x.pathname.charAt(0)==="/"&&!x.pathname.startsWith(P))return x.origin+P+x.pathname+x.search+x.hash}catch(e){}return u}
 var _ws=window.WebSocket;
@@ -112,7 +113,7 @@ function rewriteHtml(prefix: string, text: string) {
   return rewritten
 }
 
-function rewriteJs(prefix: string, text: string, isDependency = false, isViteClient = false) {
+function rewriteJs(prefix: string, text: string, isViteClient = false) {
   let rewritten = text.replace(new RegExp(`((?:import|from)\\s*(?:["']))/(?!/)`, "g"), `$1${prefix}/`)
   rewritten = rewritten.replace(/__webpack_require__\.p\s*=\s*"\/(?!\/)/g, `__webpack_require__.p="${prefix}/`)
   rewritten = rewritten.replace(/__HMR_BASE__/g, JSON.stringify(prefix + "/"))
@@ -130,8 +131,8 @@ function rewriteJs(prefix: string, text: string, isDependency = false, isViteCli
     rewritten = rewritten.replace(/__WS_TOKEN__/g, '""')
   }
   // 依赖包（react-router-dom 等）内部同时定义 BrowserRouter 与 HashRouter，
-  // 全局替换会产生重复声明导致库崩溃，只替换应用源码
-  if (!isDependency) rewritten = rewritten.replace(/\bBrowserRouter\b/g, "HashRouter")
+  // 全局替换会产生重复声明导致库崩溃；应用侧用 window.__OC_PROXY_PREFIX__
+  // （见 INJECT_SCRIPT）作为 BrowserRouter basename 适配代理前缀
   // 模块 import 的 /@vite/client 与 HTML script 引用统一 cache-bust，
   // 避免浏览器用旧缓存 client（base 无代理前缀）处理 HMR 消息
   const escapedPrefix = prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
@@ -1241,10 +1242,9 @@ function proxyHttp(
     if (isJs) {
       const text = yield* Effect.tryPromise(() => res.text())
       resHeaders.delete("content-encoding")
-      const isDependency = target.pathname.includes("/node_modules/")
       const isViteClient = subPath === "/@vite/client" || target.pathname.endsWith("/@vite/client")
       if (isViteClient) resHeaders.set("cache-control", "no-cache")
-      const rewritten = text.length > MAX_BODY ? text : rewriteJs(prefix, text, isDependency, isViteClient)
+      const rewritten = text.length > MAX_BODY ? text : rewriteJs(prefix, text, isViteClient)
       return HttpServerResponse.text(rewritten, {
         status: res.status, statusText: res.statusText || undefined,
         headers: headersToRecord(resHeaders),
