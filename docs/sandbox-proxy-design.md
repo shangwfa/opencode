@@ -55,7 +55,8 @@
 | 版本 | 服务端职责 | 客户端职责 |
 |---|---|---|
 | v1（初始） | HTTP 转发 + HTML/JS 正则路径重写 + HTML 注入 | WS 拦截 + 错误上报 |
-| **v2（当前）** | HTTP 转发 + HTML 注入 + **HTML 内联 `<script>` import 重写** + JS `import`/`from` 重写 | **13 个 API 拦截**（路径改写在客户端运行时完成）+ WS 拦截 + 错误上报 |
+| v2 | HTTP 转发 + HTML 注入 + **HTML 内联 `<script>` import 重写** + JS `import`/`from` 重写 | **13 个 API 拦截**（路径改写在客户端运行时完成）+ WS 拦截 + 错误上报 |
+| **v3（当前）** | v2 全部 + **原生 WebSocket bridge 替换 `Socket.makeWebSocket`** + **Vite client 占位符全量替换**（`__BASE__`/`__HMR_*__` 等） + **`@vite/client` cache-bust** + 注入 `window.__OC_PROXY_PREFIX__`（BrowserRouter basename）+ endpoint API `previewUrl` | v2 全部不变 |
 
 ---
 
@@ -431,6 +432,10 @@ WebSocket upgrade 成功
 | 13 | Next.js 字体加载失败 OTS parsing error | CSS `@font-face { src: url(/_next/static/media/xxx.woff) }` 中的路径未被重写，浏览器请求了错误路径返回 HTML | 增加 CSS `url()` 路径重写分支 |
 | 14 | SPA 客户端路由（React Router）路径不匹配 | 路由框架读 `location.pathname` 看到带 proxy prefix 的路径，匹配不到 `/about` 等路由 | **不可透明解决**：patch `location.pathname` getter 会导致 `replaceState` 无限递归；`replaceState` 去 prefix 会导致刷新 404。需应用侧配 `basename`（见下方说明）|
 | 15 | webpack publicPath 未重写 | `__webpack_require__.p = "/_next/"` 在 JS 文件中，动态 chunk 加载路径错误 | JS 重写中匹配 webpack publicPath |
+| 16 | `Socket.makeWebSocket` outbound 握手静默挂起 | Effect Socket 在 raw route 场景下 outbound 连接永不完成（无报错无日志），HMR ws 永远 pending | **v3 改用原生 `new WebSocket` + `Effect.tryPromise` 包装 open 事件**，双向桥接到 Effect inbound socket |
+| 17 | `ReferenceError: __HMR_CONFIG_NAME__ is not defined` | Vite client 源码含占位符，只替换 `__BASE__`/`__HMR_BASE__` 其余残留，任一残留中断整个 client 执行 | **全量替换**（见 §十五占位符表）；`__PURE__` 是压缩注释无需处理 |
+| 18 | HMR 模块请求打到根路径仍返回 200 | SaaS catch-all 以 200 + HTML 兜底，动态 import 解析 HTML 失败报 `Failed to reload`——被 200 迷惑排查方向 | 现象层修复靠 §十五占位符替换；排查时认清 catch-all 兜底行为 |
+| 19 | 占位符已替换但浏览器仍用旧 client | `@vite/client` 有 HTML script 与模块 import 两个加载入口，缓存键不同；浏览器磁盘缓存的旧版 client（base=`/`）由旧实例处理 HMR 消息 | 启动时间戳 `VITE_CLIENT_BUST` 统一追加到两处引用 + 响应 `Cache-Control: no-cache` |
 
 ---
 
@@ -457,19 +462,21 @@ SPA 框架（React Router、Vue Router）通过 `window.location.pathname` 匹�
 对于需要 SPA 路由的项目，应用侧需要配置 `basename`：
 
 ```tsx
-// React Router — 从注入的 data-oc-prefix 读取
-const prefix = document.querySelector("script[data-oc-prefix]")?.getAttribute("data-oc-prefix") || ""
-<BrowserRouter basename={prefix}>
+// React Router — proxy 注入脚本已暴露 window.__OC_PROXY_PREFIX__（INJECT_SCRIPT）
+<BrowserRouter basename={window.__OC_PROXY_PREFIX__ ?? "/"}>
+// 直连（非代理）场景前缀未定义，回退 "/"，同一份代码两端通用
 
-// Vue Router
+// Vue Router（如需）
 const router = createRouter({
-  history: createWebHistory(document.querySelector("script[data-oc-prefix]")?.getAttribute("data-oc-prefix") || "/"),
+  history: createWebHistory(window.__OC_PROXY_PREFIX__ ?? "/"),
 })
 
 // Next.js — 不需要，SSR 框架路由由服务端处理，proxy 已通过 RSC 数据重写解决
 ```
 
 > **注意**：Next.js App Router **不受此限制**，因为路由由服务端 RSC 数据驱动，proxy 已通过内联 script JSON 路径重写解决（见踩坑 #6）。
+
+> **落地状态（2026-08-31）**：`__OC_PROXY_PREFIX__` 方案已在 `INJECT_SCRIPT` 中实现并在 Vite + React Router demo 上验证通过——deep-link 刷新 `/session/{sid}/proxy/5173/about` 直达 About Page（Vite SPA fallback + basename 剥离前缀）。同时 v3 已删除旧版「BrowserRouter→HashRouter 服务端强制替换」（依赖包内重复声明风险 + `#` 路径不优雅）。详见 §十五。
 
 ---
 
@@ -496,7 +503,7 @@ const router = createRouter({
 
 | 文件 | 职责 | 说明 |
 |---|---|---|
-| `src/server/instance/sandbox-proxy.ts` | 代理核心模块（~330行） | HTTP 代理（HTML 三层重写 + JS import 重写）+ WS 代理 + 错误收集。导出 `SandboxProxyRoutes(upgrade)` + `clear(sessionID)` |
+| `src/server/sandbox-proxy.ts` | 代理核心模块 | HTTP 代理（HTML/JS/CSS 重写 + INJECT_SCRIPT 注入 + Vite client 占位符/cache-bust）+ WS 分流 + 错误收集 + endpoint/keep-alive/exec/files 等扩展 API。导出 `sandboxProxyRoute` + `clearProxyErrors` |
 | `src/server/instance/index.ts` | 路由注册入口 | `.route("/", SandboxProxyRoutes(upgrade))` 挂载，kill-sandbox 时调用 `clearProxyErrors` |
 | `src/session/index.ts` | `Session.Event.ProxyError` 事件定义 | Bus 事件 |
 | `src/tool/sandbox-provider.ts` | `get(sessionID)` 只读取已存在沙箱，`getOrCreate` 仅在工具执行时调用 | proxy 路由不触发沙箱创建 |
@@ -856,3 +863,78 @@ async function openSandbox(sessionID: string, port: number) {
 | **bilibili/carocut** | 服务端 path-prefix + 客户端 JS 注入（混合） | 9 个 | 单 session 单端口（Remotion Studio），无错误上报 |
 | **zts212653/clowder-ai** | 混合方案，query param 路由 | 部分 | 有 WS 修补脚本 |
 | **本方案 (v2)** | 服务端 path-prefix + 客户端 JS 注入（混合） | **13 个** | 多端口支持 + 错误上报 + img beacon |
+
+---
+
+## 十七、Vite HMR WebSocket 修复（v3，2026-08-31）
+
+> 本轮将 HMR 从「页面可用但热更新失败」推进到「端到端无刷新热更新」。验证环境：组合 1，Vite 5.4.21 + React + react-router-dom，镜像 `opencode-saas-sandbox-test:browserrouter`。测试记录见 [sandbox-proxy-endpoint.md](./sandbox-proxy-endpoint.md) 复测记录第二轮。
+
+### 17.1 问题分层
+
+HMR 失败是四层问题叠加，必须逐层剥离：
+
+```
+浏览器                          SaaS proxy                        沙箱 Vite
+  │  ws upgrade (vite-hmr)        │                                │
+  ├──────────────────────────────►│  Socket.makeWebSocket 挂起 ✗   │
+  │  (层1: outbound 握手挂起)       │───────────────────────────────►│
+  │                                │                                │
+  │  ◄── ws 连上后 client 执行 ReferenceError ✗                     │
+  │  (层2: Vite client 占位符残留)                                  │
+  │                                │                                │
+  │  HMR 模块请求 /src/About.tsx（根路径，base 未替换）✗              │
+  │  (层3: __BASE__ 未替换 → catch-all 返回 200 HTML)               │
+  │                                │                                │
+  │  浏览器磁盘缓存旧版 client ✗     │                                │
+  │  (层4: 旧实例 base="/" 处理 HMR 消息)                            │
+```
+
+### 17.2 修复内容
+
+**① 原生 WebSocket bridge**（`middleware/proxy.ts`）
+
+`Socket.makeWebSocket` 在 raw route 场景下 outbound 握手静默挂起（无报错无日志，连接永远 pending；同 URL 用原生 WebSocket 立即 OPEN，容器内 bun 亦 OPEN——三分法定位）。改为原生 `new WebSocket`，open 事件用 `Effect.tryPromise` 包装，双向桥接：
+
+- outbound `onmessage`（string/ArrayBuffer/Blob → Uint8Array 归一化）→ `Effect.runFork(writeInbound)`
+- inbound `runRaw` → `outbound.send`；`Socket.CloseEvent` → `outbound.close(code, reason)`
+- subprotocol（`vite-hmr` 必需）与 query 透传，`WebSocketTracker` + `Effect.scoped` 生命周期不变
+
+**② Vite client 占位符全量替换**（`sandbox-proxy.ts rewriteJs`，仅 `@vite/client` 响应）
+
+| 占位符 | 替换值 |
+|---|---|
+| `__HMR_BASE__` / `__BASE__` | `"{prefix}/"`（HMR ws 路径 + 模块请求 base） |
+| `__HMR_CONFIG_NAME__` | `undefined` |
+| `__HMR_PROTOCOL__` / `__HMR_PORT__` / `__HMR_HOSTNAME__` / `__HMR_DIRECT_TARGET__` | `undefined`（缺省由 location 推导） |
+| `__HMR_TIMEOUT__` / `__HMR_ENABLE_OVERLAY__` | `30000` / `true` |
+| `__SERVER_HOST__` | `"localhost"`（仅错误展示用） |
+| `__WS_TOKEN__` | `""`（OpenSandbox 不校验） |
+
+任一可执行占位符残留 → `ReferenceError` 中断整个 client（`__PURE__` 为压缩注释，无需处理）。
+
+**③ 判定细节**：`isViteClient` 必须用 `subPath`（剥离 SaaS 前缀后），不能用 `target.pathname`——后者是拼了 endpoint 的完整代理路径，`=== "/@vite/client"` 永远 false，替换会静默失效。
+
+**④ cache-bust**：client 有 HTML script 与模块 import 两个加载入口、两个缓存键。旧会话磁盘缓存的旧版 client（base=`/`）可能在模块入口命中并由旧实例处理 HMR 消息 → 更新请求打根路径 → SaaS catch-all 返回 200 HTML → `Failed to reload`。修复：`VITE_CLIENT_BUST = oc={启动时间戳36进制}` 统一追加到两处引用 + `@vite/client` 响应 `Cache-Control: no-cache`。服务每次重启 bust 必变，旧缓存键自然失效。
+
+### 17.3 BrowserRouter basename 落地
+
+落地旧文档 §十 的推荐方案：`INJECT_SCRIPT` 暴露 `window.__OC_PROXY_PREFIX__`，应用侧：
+
+```tsx
+<BrowserRouter basename={window.__OC_PROXY_PREFIX__ ?? "/"}>
+```
+
+deep-link 刷新 `/session/{sid}/proxy/5173/about` → Vite SPA fallback 返回 index.html → basename 剥离前缀 → 路由匹配 `/about`。同时删除 v2 的「BrowserRouter→HashRouter 服务端强制替换」（依赖包内重复声明风险 + `#` 路径不优雅）。
+
+### 17.4 验证结果
+
+- 路由：`/`、`/about`、`/contact` SPA 导航 + **deep-link 直接刷新**全部正常（真实路径，无 `#`）
+- HMR：exec 修改 `About.tsx` → 页面**无需刷新**自动更新（hot-demo v15→v16），console 零报错
+- 资源：全部 200/304 带前缀，样式生效，无失败请求
+- typecheck：无新增错误
+
+### 17.5 配套产出
+
+- 预览工具：[proxy-demo](./proxy-demo/README.md)（零依赖静态页：SaaS proxy iframe 预览 + boot/init/start/HMR 一键流程）
+- 测试记录：[sandbox-proxy-endpoint.md](./sandbox-proxy-endpoint.md) 复测记录第二轮 + T11.6 用例更新
