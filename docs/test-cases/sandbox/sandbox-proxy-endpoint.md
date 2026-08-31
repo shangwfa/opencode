@@ -578,3 +578,19 @@ print('after kill:', d.get('error') or d.get('url'))
    - 占位符残留会以 `ReferenceError: __XXX__ is not defined` 形式中断 client 执行，需全量替换（`__PURE__` 为压缩注释，无需处理）。
    - HMR 模块请求打到根路径且返回 200 HTML（SaaS catch-all），现象是 `Failed to reload` 而非 404——排查时不要被 200 迷惑。
    - 页面同时存在 script 标签与模块 import 两个 client 实例，二者 URL 必须一致（同一缓存键），否则旧实例处理 HMR 消息。
+
+### 复测记录（2026-08-31 第三轮：真实业务项目，组合 1）
+
+用 **xybot-front-micro-shasha-personal-dashboard**（GitLab 真实仓库，React 18 + Vite 5 + antd 6 + react-router-dom 6 + pnpm，前后端一体 `xybot dev`，页面请求数 ~280）替代 demo 项目验证代理能力：
+
+| 步骤 | 结果 |
+|---|---|
+| 沙箱内 git clone + pnpm install（31s） | ✅ |
+| `nohup pnpm dev`（5173 被占自动落 5174） | ✅ Vite ready |
+| SaaS proxy 页面加载（278 请求） | ✅ 全部 200/304，零失败，HMR `connected` |
+| **无注入对照组**（OpenSandbox server proxy 直开） | ❌ 白屏（root 空）——反证 SaaS proxy 重写必要性 |
+| **SPA basename 适配** | 应用独立运行 basename 为空，`No routes matched`。应用侧一行 fallback 修复：`baseroute: window.__MICRO_APP_BASE_ROUTE__ \|\| window.__OC_PROXY_PREFIX__ \|\| ''`（`src/.xybot/index.ts`），与 §十 结论一致：**basename 需应用读取注入前缀，proxy 无法透明解决** |
+| **HMR**：exec 改 `src/pages/index.tsx` 文案 | ✅ Vite `hmr update`，浏览器**未手动刷新**内容即更新；改 router 相关文件时 Vite 正确降级整页刷新（`hmr invalidate`） |
+| basename 修复后整页刷新（deep-link） | ✅ Welcome 页正常渲染，零失败请求 |
+
+结论：SaaS proxy 对真实重型业务项目（含微前端、UI 库、大量依赖预构建）端到端可用；应用侧唯一适配点是 baseroute/basename 读取 `__OC_PROXY_PREFIX__`。
