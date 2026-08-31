@@ -108,3 +108,17 @@ sleep 1 && curl -s -X POST "$BASE/session/$SID/abort"
 | T4.7 中断会话 | ✅ | abort 返回 `true`；中断发生在 assistant message 落库后，`finish` 为空，parts 数量 8s 内无增长，确认已停止生成 |
 
 ---
+
+**2026-08-31 复测**（镜像 `basesroute`，commit `cc0d5fecda` + docs `7aab8b011f`，组合 1，全新 session `ses_fa87b0780ffe…`，T4.1–T4.7 全部通过）：
+
+| 用例 | 结果 | 备注 |
+|---|---|---|
+| T4.1 简单文本对话 | ✅ | 回复 `2` |
+| T4.2 多轮上下文记忆 | ✅ | 第二轮回复「张三」 |
+| T4.3 写文件工具 | ✅ | `write(completed)`；沙箱内 `cat` 实锤内容 `hello` |
+| T4.4 读文件工具 | ✅ | `read(completed)`，回复含 `hello` |
+| T4.5 bash 命令执行 | ✅ | 回复含 `t4-3.txt` |
+| T4.6 异步消息 | ✅ | HTTP 204，异步完成后五言绝句正常落库 |
+| T4.7 中断会话 | ✅ | abort 返回 `true`；中断发生在 assistant message 落库后（parts=`step-start`,`reasoning`，无 `step-finish`），`finish` 为空，parts 8s 内无增长，确认停止生成 |
+
+> ⚠️ 发现：`GET /session?is_busy=true` 的过滤参数**未生效**（与无参数请求同样返回全量 100 条，limit 截断），无法用于 busy 判定。T4.7 改用文档期望的替代判据（abort=true + 最后 assistant 消息 `finish` 为空 + parts 停止增长）。该接口问题与本次改动无关（既有行为），建议后续修复或改用其他状态查询端点。
