@@ -594,3 +594,37 @@ print('after kill:', d.get('error') or d.get('url'))
 | basename 修复后整页刷新（deep-link） | ✅ Welcome 页正常渲染，零失败请求 |
 
 结论：SaaS proxy 对真实重型业务项目（含微前端、UI 库、大量依赖预构建）端到端可用；应用侧唯一适配点是 baseroute/basename 读取 `__OC_PROXY_PREFIX__`。
+
+### 复测记录（2026-08-31 第四轮：proxy-demo 预览台双项目验证，组合 1）
+
+全程通过 [proxy-demo 预览台](./proxy-demo/README.md) UI 操作（连接 → 初始化 → 启动 → iframe 预览 → HMR 按钮）。沙箱实例 `f3f764de…`（SaaS 容器重启后新建）。
+
+#### A. demo 项目（proxy-demo 内置 3 路由模板，端口 5174）
+
+| 步骤 | 结果 |
+|---|---|
+| 连接（endpoint 获取 + preview probe） | ✅ 200，badge 显示沙箱 ID |
+| 「初始化」create-vite + react-router-dom + 模板文件 | ✅ exit=0 |
+| 「启动 dev server」（nohup 脱离 exec） | ✅ 沙箱内 200，iframe 自动加载 |
+| 路由 `/`（Home Page） | ✅ 截图确认 |
+| deep-link `/about`、`/contact`（iframe src 直接导航） | ✅ basename 剥离前缀，页面正确渲染 |
+| 「修改代码（触发 HMR）」×2 | ✅ `hot-demo-v1 @ …` → `hot-demo-v2 @ …`，iframe **无刷新**更新 |
+| 资源加载 | ✅ 193×200 + 18×304，**0 失败**（另 2 个 502 为沙箱重启前旧端口历史记录） |
+
+#### B. xybot 真实业务项目（`xybot-front-micro-shasha-personal-dashboard`，端口 5173）
+
+xybot 为文件式路由（`src/pages/<name>/index.tsx` → `/<name>`），原仓库仅 `/` 单路由。测试时新增 `about`、`contact` 两个页面（仅测试用，未提交仓库），Vite 立即 `hmr update main.tsx` 识别新路由。
+
+| 步骤 | 结果 |
+|---|---|
+| 重连 5173 → iframe 加载（YD baseroute 注入生效） | ✅ Welcome 页渲染 |
+| deep-link `/about` | ✅ About Page (xybot)，xybot 全局 ConfigProvider/i18n 生效，Document 200 |
+| deep-link `/contact` | ✅ Contact Page (xybot) |
+| HMR：exec 修改 about 页文案 | ✅ iframe **无刷新**自动出现 `(XYBOT-HMR-OK)` |
+| 资源加载 | ✅ 377×200 + 52×304，**0 失败** |
+
+#### 结论与备注
+
+- 真实业务项目（微前端体系 + 大型依赖树）与模板项目在 proxy 链路上能力一致：多路由、deep-link、HMR、资源全通过。
+- **工具使用注意**：`previewUrl` 在「连接」时按端口计算，「启动 dev server」/「触发 HMR」用的是输入框当前端口——**改端口后需重新点「连接」**，iframe 才指向新端口。
+- xybot 的 about/contact 页面文件仅存在于沙箱 `/workspace/xybot-dashboard`，未回馈 GitLab 仓库；如需保留可作为接入方多路由示例。
