@@ -536,3 +536,52 @@ print('after kill:', d.get('error') or d.get('url'))
 | T17.6 | ✅ | 销毁后 sandbox unreachable |
 
 > **验证环境**：组合 1（远端 PG + 远端 K8s Sandbox），2026-08-07 实测全量通过。T11.6 需先 `pnpm add react-router-dom`。T11.11 的 /about /contact 404 是 create-next-app 默认无此路由，非 proxy 问题（首页 200 已验证 Next.js 代理）。T17.5 直连注入检查中 `prefix=True` 表示"无注入"为 True（逻辑正确）。
+
+### 复测记录（2026-08-31，组合 1：远端 PG + 远端 K8s Sandbox）
+
+> 使用优化后镜像：`/proxy` 路由显式经 Sandbox Server Proxy（`getSandboxEndpoint(..., useServerProxy)`），`/endpoint` 的 `proxyUrl` 显式传 `true`。测试会话 `ses_faa7f7a0cffeyq94I2Y5M4zb21`，沙箱 `437218f6-c22f-4f60-8ffc-54c65d539847`。
+
+| 用例 | 结果 | 说明 |
+|------|------|------|
+| T11.1 | ✅ | HTTP 200 |
+| T11.2 | ✅ | prefix/inject/fetch/ws/xhr 全 True |
+| T11.3 | ✅ | 3 个 src/href 全 prefixed |
+| T11.4 | ✅ | PREFIXED=True, UNPREFIXED=False |
+| T11.5 | ✅ | main.tsx 200, imports 全 prefixed |
+| T11.6 | ✅ | HashRouter=2, BrowserRouter=0。**注意**：create-vite@5 新模板 main.tsx 默认不含 router 代码，仅装 react-router-dom 不生效，需在 main.tsx 实际写入 `BrowserRouter` 后再验证替换 |
+| T11.7 | — | 不适用（Vite 默认模板无外部 CSS link） |
+| T11.8 | ✅ | 200/200 |
+| T11.9 | ✅ | idle 12s 后仍 200（keepAlive 保活） |
+| T11.10 | ✅ | 200 |
+| T11.11 | ✅ | `/` 200；/about /contact 404（项目默认无此路由，非 proxy 问题） |
+| T11.12 | ✅ | `__webpack_require__.p="/session/{sid}/proxy/3000/_next/"` |
+| T11.13 | ✅ | RSC 路径全 prefixed |
+| T11.15 | ✅ | 200（非 401/502） |
+| T11.20 | ✅ | sandboxId 不变（437218f6） |
+| T11.30 | ✅ | main.tsx 2098B 无注入；@vite/client 200 + text/javascript |
+| T11.31 | ✅ | WebSocket patch 存在并重定向到 proxy 路径 |
+| T11.32 | ✅ | /src/main.tsx、/@vite/client、/src/App.tsx 全 200 |
+| T11.33 | ✅ | 502 |
+| T11.34 | ✅ | 5173/3000 均返回 direct URL（同 Pod IP） |
+| T11.35 | ✅ | proxy JSON 正确且无注入；endpoint direct 访问 JSON 正确 |
+
+### 复测记录（2026-08-31 第二轮：HMR WebSocket 修复，组合 1）
+
+> 镜像 `opencode-saas-sandbox-test:hmr-clean`（含本节全部修复）。测试会话 `ses_fa9abc16affe4DkwuY4l7grH4R`，沙箱 `a42fce55-a578-49de-a17a-d215ad141b1d`（Vite 5.4.21 + React + HashRouter，默认 base）。
+
+| 验证项 | 结果 | 说明 |
+|--------|------|------|
+| 页面代理渲染 | ✅ | Home/About/Contact 三路由正常，`#/about` 刷新保持 |
+| HMR WebSocket 握手 | ✅ | `ws://…/session/:id/proxy/:port/` + `vite-hmr` 协议 101，原生 WebSocket bridge |
+| HMR 端到端 | ✅ | exec 修改 About.tsx 后页面**无需刷新**自动更新（hot-demo-v15→v16），console 无报错 |
+| 修复后语义 | — | 见下方「修复说明」 |
+
+**修复说明（本节对应的代码变更）**：
+
+1. **`middleware/proxy.ts`**：outbound 连接从 `Socket.makeWebSocket`（在 raw route 场景下握手挂起）改为原生 `WebSocket`，双向桥接到 Effect inbound socket（文本/二进制/close/error）。
+2. **`sandbox-proxy.ts` rewriteJs**：对 `@vite/client` 响应补齐 Vite 占位符替换（`__BASE__`/`__HMR_BASE__`/`__HMR_*__`/`__SERVER_HOST__`/`__WS_TOKEN__`），使 HMR client 的 ws 地址与模块请求都走 SaaS proxy 前缀。注意 `isViteClient` 判断必须用 `subPath`（`target.pathname` 是完整代理路径，永远不等于 `/@vite/client`）。
+3. **cache-bust**：HTML 与 JS 模块中引用的 `@vite/client` 统一追加服务器启动时间戳 query（`?oc=<ts36>`），并对其响应设 `Cache-Control: no-cache`。否则浏览器磁盘缓存的旧版 client（base 无前缀）会处理 HMR 消息导致 `Failed to reload`。
+4. **踩坑记录**：
+   - 占位符残留会以 `ReferenceError: __XXX__ is not defined` 形式中断 client 执行，需全量替换（`__PURE__` 为压缩注释，无需处理）。
+   - HMR 模块请求打到根路径且返回 200 HTML（SaaS catch-all），现象是 `Failed to reload` 而非 404——排查时不要被 200 迷惑。
+   - 页面同时存在 script 标签与模块 import 两个 client 实例，二者 URL 必须一致（同一缓存键），否则旧实例处理 HMR 消息。
