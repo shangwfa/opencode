@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from "react"
-import { MonitorPlay } from "lucide-react"
+import { ArrowUp, Loader2, MonitorPlay, Sparkles } from "lucide-react"
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable"
 import { SessionSidebar } from "@/components/SessionSidebar"
 import { BrowserView } from "@/components/BrowserView"
 import { ChatPanel } from "@/components/ChatPanel"
+import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import type { SessionEntry, SessionStatus } from "@/lib/api"
 
@@ -15,6 +16,7 @@ interface Config {
 export default function App() {
   const [sessions, setSessions] = useState<SessionEntry[]>([])
   const [currentSid, setCurrentSid] = useState<string>("")
+  const [newSession, setNewSession] = useState(false)
   const [status, setStatus] = useState<SessionStatus | null>(null)
   const [config, setConfig] = useState<Config | null>(null)
   const [image, setImage] = useState("")
@@ -60,6 +62,11 @@ export default function App() {
     return () => clearInterval(timer)
   }, [currentSid, loadStatus])
 
+  useEffect(() => {
+    const timer = setInterval(() => void loadSessions(), 10_000)
+    return () => clearInterval(timer)
+  }, [loadSessions])
+
   const run = useCallback(
     async (label: string, fn: () => Promise<void>) => {
       setBusy(label)
@@ -75,7 +82,7 @@ export default function App() {
     [],
   )
 
-  const createSession = (imageOverride?: string) =>
+  const createSession = (prompt: string, imageOverride?: string) =>
     run("创建会话", async () => {
       const created = await api<{ sessionId: string; ready: boolean; error: string | null }>("/api/sessions", {
         method: "POST",
@@ -83,7 +90,14 @@ export default function App() {
       })
       await loadSessions()
       setCurrentSid(created.sessionId)
+      setNewSession(false)
       setMessage(created.ready ? "会话就绪，浏览器已启动" : `会话已创建但未就绪: ${created.error ?? "unknown"}`)
+      if (prompt.trim() && created.ready) {
+        await api(`/api/sessions/${created.sessionId}/messages`, {
+          method: "POST",
+          body: JSON.stringify({ text: prompt.trim(), model: { providerID: "opencode", modelID: "nemotron-3.5-lightning-free" } }),
+        })
+      }
     })
 
   const startBrowser = () =>
@@ -123,7 +137,11 @@ export default function App() {
             ready={ready}
             onClearMessage={() => setMessage(null)}
             onSelect={setCurrentSid}
-            onCreate={() => void createSession()}
+             onCreate={() => {
+               setCurrentSid("")
+               setNewSession(true)
+               setMessage(null)
+             }}
             onStart={startBrowser}
             onStop={stopBrowser}
             onKill={killSandbox}
@@ -131,8 +149,10 @@ export default function App() {
         </ResizablePanel>
         <ResizableHandle withHandle />
 
-        <ResizablePanel defaultSize="82" minSize="55">
-          <ResizablePanelGroup orientation="horizontal">
+          <ResizablePanel defaultSize="82" minSize="55">
+           {newSession ? (
+             <NewSessionHome submitting={busy === "创建会话"} onSubmit={(prompt) => void createSession(prompt)} />
+           ) : <ResizablePanelGroup orientation="horizontal">
             <ResizablePanel defaultSize="38" minSize="28">
               {currentSid ? <ChatPanel key={currentSid} sessionId={currentSid} ready={ready} /> : (
                 <div className="flex h-full items-center justify-center text-sm text-muted-foreground">创建或选择一个会话开始聊天</div>
@@ -148,9 +168,50 @@ export default function App() {
                 )}
               </main>
             </ResizablePanel>
-          </ResizablePanelGroup>
-        </ResizablePanel>
+           </ResizablePanelGroup>}
+         </ResizablePanel>
       </ResizablePanelGroup>
+    </div>
+  )
+}
+
+function NewSessionHome(props: { submitting: boolean; onSubmit: (prompt: string) => void }) {
+  const [prompt, setPrompt] = useState("")
+
+  const submit = () => {
+    if (prompt.trim() && !props.submitting) props.onSubmit(prompt)
+  }
+
+  return (
+    <div className="flex h-full flex-1 flex-col items-center justify-center px-8">
+      <div className="w-full max-w-2xl space-y-8">
+        <div className="flex items-center justify-center gap-3">
+          <div className="flex size-10 items-center justify-center rounded-xl bg-primary text-primary-foreground">
+            <MonitorPlay className="size-5" />
+          </div>
+          <h1 className="font-heading text-2xl font-semibold">Browser CDP Agent</h1>
+        </div>
+        <div className="rounded-2xl border bg-card shadow-sm transition-shadow focus-within:ring-2 focus-within:ring-ring/50">
+          <textarea
+            value={prompt}
+            onChange={(event) => setPrompt(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) submit()
+            }}
+            placeholder="描述你的需求，Agent 将打开浏览器执行..."
+            rows={4}
+            disabled={props.submitting}
+            className="w-full resize-none rounded-t-2xl bg-transparent px-4 py-3 text-sm outline-none placeholder:text-muted-foreground"
+          />
+          <div className="flex items-center justify-between border-t px-3 py-2">
+            <span className="flex items-center gap-1.5 text-xs text-muted-foreground"><Sparkles className="size-3.5" />⌘↵ 发送</span>
+            <Button size="icon" onClick={submit} disabled={!prompt.trim() || props.submitting} className="rounded-full">
+              {props.submitting ? <Loader2 className="animate-spin" /> : <ArrowUp />}
+            </Button>
+          </div>
+        </div>
+        <p className="text-center text-xs text-muted-foreground">例如：打开影刀官网，整理主要产品和功能</p>
+      </div>
     </div>
   )
 }

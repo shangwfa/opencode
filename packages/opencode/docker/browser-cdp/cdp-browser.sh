@@ -17,11 +17,13 @@ UPSTREAM_PORT="${CDP_UPSTREAM_PORT:-9221}"
 WINDOW_SIZE="${CDP_WINDOW_SIZE:-1440,900}"
 START_URL="${CDP_START_URL:-about:blank}"
 LOG_FILE="${CDP_LOG_FILE:-/tmp/cdp-browser.log}"
-PROFILE_DIR="${CDP_PROFILE_DIR:-/tmp/cdp-chromium-profile}"
+# Keep browser state on the session PVC so restarting Chromium does not reset the page.
+PROFILE_DIR="${CDP_PROFILE_DIR:-/workspace/.cache/opencode/cdp-chromium-profile}"
 RUN_DIR="/tmp/cdp-browser"
 GATEWAY_SCRIPT="$(dirname "$0")/cdp-gateway.mjs"
 
 mkdir -p "$RUN_DIR"
+mkdir -p "$PROFILE_DIR"
 
 alive() {
   local pid

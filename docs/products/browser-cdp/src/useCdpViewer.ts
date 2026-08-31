@@ -170,13 +170,16 @@ export function useCdpViewer(sessionId: string) {
         stopScreencastLoop()
         if (currentRef.current !== targetId) return
         setStatus("down")
-        reconnectTimer.current = setTimeout(() => {
-          if (currentRef.current === targetId) connect(targetId)
+        reconnectTimer.current = setTimeout(async () => {
+          if (currentRef.current !== targetId) return
+          const pages = await loadTargets()
+          const next = pages.find((page) => page.id === targetId) ?? pages[0]
+          if (next) connect(next.id)
         }, 2000)
       }
       ws.onerror = () => ws.close()
     },
-    [base, send, refreshHistory, stopScreencastLoop],
+    [base, loadTargets, send, refreshHistory, stopScreencastLoop],
   )
 
   const switchTarget = useCallback(

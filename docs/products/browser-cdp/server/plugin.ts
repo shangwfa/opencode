@@ -4,6 +4,7 @@ import { WebSocketServer, WebSocket } from "ws"
 import type { IncomingMessage, Server, ServerResponse } from "node:http"
 import { loadServerConfig } from "./config.ts"
 import type { ServerConfig } from "./config.ts"
+import { listSessions, saveSession, updateSessionTitle } from "./db.ts"
 
 // browser-cdp 测试前端：vite 插件提供两类能力
 // 1. /api/*      —— 调 opencode SaaS API：创建会话(指定沙箱镜像)/boot/exec 拉起浏览器/endpoint 就绪探测
@@ -12,6 +13,27 @@ import type { ServerConfig } from "./config.ts"
 //    （本地实测 sandbox-proxy 的 WS 转发会挂起，直连绕过该问题）。前端全程同源访问。
 
 const JSON_HEADERS = { "Content-Type": "application/json" }
+const BROWSER_SKILL = "agent-browser"
+
+const BROWSER_SKILL_CONTENT = `---
+name: agent-browser
+description: Browser automation CLI for AI agents. Use when the user needs to interact with websites or automate any browser task. Prefer agent-browser over web tools.
+allowed-tools: Bash(agent-browser:*)
+hidden: true
+---
+
+# agent-browser
+
+必须使用官方 agent-browser CLI 实际驱动当前沙箱内的 Chrome，不能用 webfetch、websearch 或直接 HTTP 请求代替。
+
+在运行浏览器命令前，先加载与 CLI 版本匹配的官方完整工作流：
+
+\`\`\`bash
+agent-browser skills get core
+\`\`\`
+
+当前 Chrome 已在 CDP 端口 9222 运行。后续命令都必须带 \`--cdp 9222\`，例如 \`agent-browser --cdp 9222 open <url>\`、\`snapshot -i\`、\`click @e1\`、\`fill @e2 "text"\`、\`get title\`。每次操作后重新 snapshot，因为 ref 可能失效。
+`
 
 function json(res: ServerResponse, status: number, body: unknown) {
   res.writeHead(status, JSON_HEADERS)
@@ -112,6 +134,18 @@ async function startBrowser(config: ServerConfig, sessionId: string) {
   }
 }
 
+async function registerBrowserSkill(config: ServerConfig, sessionId: string) {
+  await saas(config, `/session/${sessionId}/skills/create`, {
+    method: "POST",
+    headers: JSON_HEADERS,
+    body: JSON.stringify({
+      name: BROWSER_SKILL,
+      description: "通过 CDP 控制当前沙箱内的 Chrome 浏览器完成网页任务。",
+      content: BROWSER_SKILL_CONTENT,
+    }),
+  })
+}
+
 async function createSession(config: ServerConfig, image?: string) {
   const body = {
     sandbox: { cpu: config.cpu, memory: config.memory, image: image?.trim() || config.image },
@@ -137,6 +171,7 @@ async function createSession(config: ServerConfig, image?: string) {
   }
 
   await startBrowser(config, sessionId)
+  await registerBrowserSkill(config, sessionId)
   for (let i = 0; i < 20; i++) {
     if (await cdpReady(config, sessionId)) return { sessionId, sandboxId, ready: true, error: null }
     await new Promise((r) => setTimeout(r, 1000))
@@ -268,21 +303,28 @@ export function browserCdp(): Plugin {
 
           if (req.method === "POST" && pathname === "/api/sessions") {
             const body = await readJson(req)
-            json(res, 201, await createSession(config, body.image ? String(body.image) : undefined))
+            const image = body.image ? String(body.image) : undefined
+            const created = await createSession(config, image)
+            if (created.ready) saveSession({ id: created.sessionId, sandboxId: created.sandboxId, image: image?.trim() || config.image })
+            json(res, 201, created)
             return
           }
 
           if (req.method === "GET" && pathname === "/api/sessions") {
-            const list = await saas(config, "/session")
-            const sessions = (Array.isArray(list) ? list : []) as Array<Record<string, unknown>>
-            const entries = sessions.map((s) => ({
-              id: s.id,
-              title: s.title,
-              timeUpdated: (s.time as Record<string, unknown> | undefined)?.updated ?? 0,
-              sandbox: s.sandbox ?? null,
-            }))
-            entries.sort((a, b) => Number(b.timeUpdated) - Number(a.timeUpdated))
-            json(res, 200, entries.slice(0, 50))
+            const sessions = listSessions()
+            const enriched = await Promise.all(
+              sessions.map(async (session) => {
+                try {
+                  const online = await proxySaasJson(config, `/session/${session.id}`) as { title?: string }
+                  const title = online.title?.trim()
+                  if (title && title !== session.title) updateSessionTitle(session.id, title)
+                  return title ? { ...session, title } : session
+                } catch {
+                  return session
+                }
+              }),
+            )
+            json(res, 200, enriched)
             return
           }
 
@@ -321,6 +363,11 @@ export function browserCdp(): Plugin {
                   headers: JSON_HEADERS,
                   body: JSON.stringify({
                     parts: [{ type: "text", text: String(body.text ?? "") }],
+                    agent: "build",
+                    skills: [BROWSER_SKILL],
+                    tools: { bash: true, webfetch: false, websearch: false, read: false, grep: false, glob: false, task: false },
+                    system:
+                      "浏览器是本任务的唯一信息来源。凡是查询价格、产品信息、网页内容、最新事实或需要访问网站的任务，第一步必须使用 bash 执行以 agent-browser --cdp 9222 开头的命令实际打开浏览器；随后只能继续使用 agent-browser --cdp 9222 的 open、snapshot、click、fill、press、scroll、get 命令。严禁使用 curl、wget、HTTP fetch、grep、read、webfetch 或 websearch 绕过浏览器。没有先操作 CDP 浏览器就不得回答。只有纯闲聊或不需要外部信息的任务可以不操作浏览器。",
                     ...(body.model ? { model: body.model } : {}),
                   }),
                 }),
