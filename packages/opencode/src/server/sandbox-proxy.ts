@@ -1212,7 +1212,11 @@ function proxyHttp(
     }
 
     const resHeaders = new Headers(res.headers)
-    resHeaders.delete("transfer-encoding")
+    // hop-by-hop 头在 HTTP/2 响应中违规（RFC 9113 8.2.2，浏览器报 ERR_HTTP2_PROTOCOL_ERROR）；
+    // date/server 由本层 server 生成，透传会产生重复头
+    for (const h of ["transfer-encoding", "connection", "keep-alive", "proxy-connection", "upgrade", "te", "trailer", "date", "server", "content-encoding"]) {
+      resHeaders.delete(h)
+    }
 
     const location = resHeaders.get("location")
     if (location) {
@@ -1224,7 +1228,6 @@ function proxyHttp(
 
     if (contentType.includes("text/html")) {
       const text = yield* Effect.tryPromise(() => res.text())
-      resHeaders.delete("content-encoding")
       const rewritten = text.length > MAX_BODY ? text : rewriteHtml(prefix, text)
       if (res.status >= 400) {
         push(sessionID, port, [{
@@ -1242,7 +1245,6 @@ function proxyHttp(
       /\.(?:m?js|mjsx|ts|tsx)(?:\?|$)/.test(target.pathname)
     if (isJs) {
       const text = yield* Effect.tryPromise(() => res.text())
-      resHeaders.delete("content-encoding")
       const isViteClient = subPath === "/@vite/client" || target.pathname.endsWith("/@vite/client")
       if (isViteClient) resHeaders.set("cache-control", "no-cache")
       const rewritten = text.length > MAX_BODY ? text : rewriteJs(prefix, text, isViteClient)
@@ -1255,7 +1257,6 @@ function proxyHttp(
     const isCss = contentType.includes("text/css") || /\.css(?:\?|$)/.test(target.pathname)
     if (isCss) {
       const text = yield* Effect.tryPromise(() => res.text())
-      resHeaders.delete("content-encoding")
       const rewritten = text.length > MAX_BODY ? text : rewriteCss(prefix, text)
       return HttpServerResponse.text(rewritten, {
         status: res.status, statusText: res.statusText || undefined,
@@ -1263,7 +1264,6 @@ function proxyHttp(
       })
     }
 
-    resHeaders.delete("content-encoding")
     const body = yield* Effect.tryPromise(() => res.arrayBuffer())
     return HttpServerResponse.uint8Array(new Uint8Array(body), {
       status: res.status, statusText: res.statusText || undefined,
