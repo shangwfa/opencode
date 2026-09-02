@@ -176,7 +176,6 @@ const PathParams = Schema.Struct({ sessionID: SessionID, port: Schema.String })
 const SessionParams = Schema.Struct({ sessionID: SessionID })
 const SandboxParams = Schema.Struct({ sandboxID: Schema.String })
 const ExecIdParams = Schema.Struct({ sessionID: SessionID, execId: Schema.String })
-const ErrorReportQuery = Schema.Struct({ e: Schema.optional(Schema.String) })
 const ExecBody = Schema.Struct({
   command: Schema.String,
   workingDirectory: Schema.optional(Schema.String),
@@ -265,38 +264,6 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
         const port = parsePort(params.port)
         if (!port) return HttpServerResponse.jsonUnsafe({ error: "invalid port" }, { status: 400 })
         return HttpServerResponse.jsonUnsafe(get(params.sessionID, port))
-      }),
-    )
-
-    yield* router.add("GET", "/session/:sessionID/proxy/:port/__error_report",
-      Effect.gen(function* () {
-        const params = yield* HttpRouter.schemaPathParams(PathParams)
-        const port = parsePort(params.port)
-        if (!port) return HttpServerResponse.jsonUnsafe({ ok: true })
-        const query = yield* HttpServerRequest.schemaSearchParams(ErrorReportQuery)
-        const raw = query.e
-        if (!raw || raw.length > 10240) return HttpServerResponse.jsonUnsafe({ ok: true })
-        const key = `${params.sessionID}:${port}`
-        const now = Date.now()
-        if ((reportTs.get(key) ?? 0) + REPORT_INTERVAL > now) return HttpServerResponse.jsonUnsafe({ ok: true })
-        const sb = yield* sandbox.get(params.sessionID).pipe(Effect.catch(() => Effect.succeed(undefined)))
-        if (!sb) return HttpServerResponse.jsonUnsafe({ ok: true })
-        reportTs.set(key, now)
-        try {
-          const parsed = JSON.parse(decodeURIComponent(raw))
-          if (!Array.isArray(parsed)) return HttpServerResponse.jsonUnsafe({ ok: true })
-          const items: ProxyError[] = parsed.slice(0, 10).map((e: any) => ({
-            type: (e.type === "runtime" || e.type === "network" || e.type === "compile") ? e.type : "runtime",
-            message: String(e.message ?? "").slice(0, 2048),
-            url: e.url ? String(e.url).slice(0, 512) : undefined,
-            line: typeof e.line === "number" ? e.line : undefined,
-            col: typeof e.col === "number" ? e.col : undefined,
-            stack: e.stack ? String(e.stack).slice(0, 4096) : undefined,
-            timestamp: typeof e.timestamp === "number" ? e.timestamp : Date.now(),
-          }))
-          push(params.sessionID, port, items)
-        } catch {}
-        return HttpServerResponse.jsonUnsafe({ ok: true })
       }),
     )
 
