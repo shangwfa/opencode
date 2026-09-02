@@ -1217,6 +1217,13 @@ function proxyHttp(
     for (const h of ["transfer-encoding", "connection", "keep-alive", "proxy-connection", "upgrade", "te", "trailer", "date", "server", "content-encoding"]) {
       resHeaders.delete(h)
     }
+    // 预览页面常被平台前端跨域 iframe 嵌入：显式放行跨域资源与嵌入
+    // （允许嵌入的正确方式是不发送 X-Frame-Options，ALLOWALL 等值非标准且部分浏览器按 DENY 处理）
+    for (const h of ["x-frame-options", "cross-origin-resource-policy", "cross-origin-embedder-policy"]) {
+      resHeaders.delete(h)
+    }
+    resHeaders.set("access-control-allow-origin", "*")
+    resHeaders.set("cross-origin-resource-policy", "cross-origin")
 
     const location = resHeaders.get("location")
     if (location) {
