@@ -11,8 +11,9 @@ import { Agent } from "@/agent/agent"
 import { Plugin } from "@/plugin"
 import { Config } from "@/config/config"
 import { NotFoundError } from "@/storage/storage"
+import { SandboxProvider } from "@/tool/sandbox-provider"
 
-import { Effect, Layer, Context } from "effect"
+import { Effect, Layer, Context, Option } from "effect"
 import { InstanceState } from "@/effect/instance-state"
 import { isOverflow as overflow, usable } from "./overflow"
 import { serviceUse } from "@opencode-ai/core/effect/service-use"
@@ -46,12 +47,13 @@ type CompletedCompaction = {
   userIndex: number
   assistantIndex: number
   summary: string | undefined
+  historyPath: string | undefined
 }
 
 const truncate = (value: string) =>
   value.length <= TOOL_OUTPUT_MAX_CHARS ? value : `${value.slice(0, TOOL_OUTPUT_MAX_CHARS)}\n[truncated]`
 
-const serialize = (message: SessionV1.WithParts) => {
+const serialize = (message: SessionV1.WithParts, full = false) => {
   if (message.info.role === "user") {
     const text = message.parts
       .filter((part): part is SessionV1.TextPart => part.type === "text" && !part.ignored)
@@ -75,7 +77,9 @@ const serialize = (message: SessionV1.WithParts) => {
         )
         const output = part.state.time.compacted
           ? "[Old tool result content cleared]"
-          : truncate([part.state.output, ...attachments].join("\n"))
+          : full
+            ? [part.state.output, ...attachments].join("\n")
+            : truncate([part.state.output, ...attachments].join("\n"))
         return [call, `[Tool result]: ${output}`]
       }
       if (part.state.status === "error") return [call, `[Tool error]: ${part.state.error}`]
@@ -94,6 +98,11 @@ function summaryText(message: SessionV1.WithParts) {
   return text || undefined
 }
 
+export const serializeHistory = (message: SessionV1.WithParts) => {
+  const created = new Date(message.info.time.created).toISOString()
+  return `## ${message.info.id} | ${message.info.role} | ${created}\n${serialize(message, true)}`
+}
+
 function completedCompactions(messages: SessionV1.WithParts[]) {
   const users = new Map<MessageID, number>()
   for (let i = 0; i < messages.length; i++) {
@@ -108,7 +117,10 @@ function completedCompactions(messages: SessionV1.WithParts[]) {
     if (!msg.info.summary || !msg.info.finish || msg.info.error) return []
     const userIndex = users.get(msg.info.parentID)
     if (userIndex === undefined) return []
-    return [{ userIndex, assistantIndex, summary: summaryText(msg) }]
+    const compaction = messages[userIndex]?.parts.find(
+      (part): part is SessionV1.CompactionPart => part.type === "compaction",
+    )
+    return [{ userIndex, assistantIndex, summary: summaryText(msg), historyPath: compaction?.historyPath }]
   })
 }
 
@@ -199,6 +211,7 @@ const layer = Layer.effect(
     const provider = yield* Provider.Service
     const events = yield* EventV2Bridge.Service
     const flags = yield* RuntimeFlags.Service
+    const sandbox = yield* Effect.serviceOption(SandboxProvider.Service)
 
     const isOverflow = Effect.fn("SessionCompaction.isOverflow")(function* (input: {
       tokens: SessionV1.Assistant["tokens"]
@@ -266,6 +279,39 @@ const layer = Layer.effect(
         head: input.messages.slice(0, keep.start),
         tail_start_id: keep.id,
       }
+    })
+
+    const writeHistory = Effect.fn("SessionCompaction.writeHistory")(function* (input: {
+      sessionID: SessionID
+      messageID: MessageID
+      messages: SessionV1.WithParts[]
+      previousHistoryPath?: string
+    }) {
+      const text = [
+        ...(input.previousHistoryPath
+          ? [
+              "## Earlier compacted history",
+              `The full record before this compaction is available at ${input.previousHistoryPath}. Search that file with Grep or Read (offset/limit) if needed.`,
+            ]
+          : []),
+        ...input.messages.map(serializeHistory),
+      ].join("\n\n")
+      const filename = `tool_history_${input.messageID}.md`
+      if (Option.isNone(sandbox)) {
+        return yield* Effect.fail(new Error("SandboxProvider is required to write compaction history"))
+      }
+
+      const file = `/workspace/.opencode/tool-output/${filename}`
+      const encoded = Buffer.from(text, "utf8").toString("base64")
+      const result = yield* sandbox.value.runInSession(
+        input.sessionID,
+        `mkdir -p /workspace/.opencode/tool-output && printf '%s' '${encoded}' | base64 -d > '${file}' && find /workspace/.opencode/tool-output -name 'tool_history_*.md' -mtime +7 -delete`,
+        { timeoutSeconds: 30 },
+      )
+      if (result.exitCode !== 0) {
+        return yield* Effect.fail(new Error(`Failed to write compaction history in sandbox: ${file}`))
+      }
+      return file
     })
 
     // goes backwards through parts until there are PRUNE_PROTECT tokens worth of tool
@@ -363,12 +409,31 @@ const layer = Layer.effect(
       const history = compactionPart && messages.at(-1)?.info.id === input.parentID ? messages.slice(0, -1) : messages
       const prior = completedCompactions(history)
       const hidden = new Set(prior.flatMap((item) => [item.userIndex, item.assistantIndex]))
-      const previousSummary = prior.at(-1)?.summary
+      const previous = prior.at(-1)
+      const previousSummary = previous?.summary
       const selected = yield* select({
         messages: history.filter((_, index) => !hidden.has(index)),
         cfg,
         model,
       })
+      const historyPath = yield* writeHistory({
+        sessionID: input.sessionID,
+        messageID: parent.info.id,
+        messages: selected.head,
+        previousHistoryPath: previous?.historyPath,
+      }).pipe(
+        Effect.catch((error) =>
+          Effect.gen(function* () {
+            yield* Effect.logWarning("failed to write compaction history", {
+              error: error instanceof Error ? error.message : String(error),
+            })
+            return undefined
+          }),
+        ),
+      )
+      if (compactionPart && historyPath) {
+        yield* session.updatePart({ ...compactionPart, historyPath })
+      }
       // Allow plugins to inject context or replace compaction prompt.
       const compacting = yield* plugin.trigger(
         "experimental.session.compacting",
@@ -377,7 +442,10 @@ const layer = Layer.effect(
       )
       const msgs = structuredClone(selected.head)
       yield* plugin.trigger("experimental.chat.messages.transform", {}, { messages: msgs })
-      const conversation = msgs.map(serialize).filter(Boolean).join("\n\n")
+      const conversation = msgs
+        .map((message) => serialize(message))
+        .filter(Boolean)
+        .join("\n\n")
       const nextPrompt =
         compacting.prompt ??
         [
@@ -462,6 +530,7 @@ const layer = Layer.effect(
         yield* session.updatePart({
           ...compactionPart,
           tail_start_id: selected.tail_start_id,
+          ...(historyPath ? { historyPath } : {}),
         })
       }
 
@@ -602,6 +671,7 @@ export const node = LayerNode.make({
     Provider.node,
     EventV2Bridge.node,
     RuntimeFlags.node,
+    SandboxProvider.node,
   ],
 })
 

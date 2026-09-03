@@ -26,12 +26,14 @@ WORKDIR /app/packages/opencode
 RUN adduser -D opencode && mkdir -p /workspace && chown opencode:opencode /workspace
 
 COPY opencode.jsonc /home/opencode/.config/opencode/opencode.jsonc
+COPY dcp.jsonc /home/opencode/.config/opencode/dcp.jsonc
 RUN chown -R opencode:opencode /home/opencode
 
 ENV OPENCODE_DEFAULT_DIRECTORY=/workspace
 ENV OPENCODE_SERVER_HOSTNAME=0.0.0.0
 ENV OPENCODE_SERVER_PORT=4096
 ENV OPENCODE_AUTH_PROVIDER=pg
+ENV OPENCODE_DCP_ENABLED=true
 ENV OPENCODE_SANDBOX_ENABLED=true
 ENV OPENCODE_SANDBOX_VOLUME_TYPE=pvc
 ENV OPENCODE_SANDBOX_PVC_CLAIM=sandbox-test

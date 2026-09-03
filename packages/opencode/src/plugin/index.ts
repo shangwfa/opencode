@@ -22,6 +22,7 @@ import { DigitalOceanAuthPlugin } from "./digitalocean"
 import { XaiAuthPlugin } from "./xai"
 import { CerebrasPlugin } from "./cerebras"
 import { SnowflakeCortexAuthPlugin } from "./snowflake-cortex"
+import { DcpPlugin } from "./dcp/index"
 import { Effect, Layer, Context } from "effect"
 import { EffectBridge } from "@/effect/bridge"
 import { InstanceState } from "@/effect/instance-state"
@@ -31,6 +32,8 @@ import { parsePluginSpecifier, readPluginId, readV1Plugin, resolvePluginId } fro
 import { registerAdapter } from "@/control-plane/adapters"
 import type { WorkspaceAdapter } from "@/control-plane/types"
 import { RuntimeFlags } from "@/effect/runtime-flags"
+import { Flag } from "@/flag/flag"
+import { Storage } from "@/storage/storage"
 import { EventV2Bridge } from "@/event-v2-bridge"
 import { InstallationChannel } from "@opencode-ai/core/installation/version"
 
@@ -66,7 +69,7 @@ export function experimentalWebSocketsEnabled(input: { enabled: boolean; channel
 }
 
 // Built-in plugins that are directly imported (not installed from npm)
-function internalPlugins(flags: RuntimeFlags.Info): PluginInstance[] {
+function internalPlugins(flags: RuntimeFlags.Info, dcpStorage?: DcpStorage): PluginInstance[] {
   return [
     // Temporary rollout: pre-release builds use WebSockets by default; releases require explicit opt-in.
     (input) =>
@@ -84,8 +87,11 @@ function internalPlugins(flags: RuntimeFlags.Info): PluginInstance[] {
     XaiAuthPlugin,
     SnowflakeCortexAuthPlugin,
     CerebrasPlugin,
+    ...(Flag.OPENCODE_DCP_ENABLED ? [(input: PluginInput) => DcpPlugin(input, { enabled: true, storage: dcpStorage })] : []),
   ]
 }
+
+type DcpStorage = import("./dcp/lib/state/persistence").DcpStorageBackend
 
 function isServerPlugin(value: unknown): value is PluginInstance {
   return typeof value === "function"
@@ -133,6 +139,24 @@ const layer = Layer.effect(
     const config = yield* Config.Service
     const flags = yield* RuntimeFlags.Service
 
+    const storage = yield* Storage.Service
+    const storageBridge = yield* EffectBridge.make()
+    const dcpStorage = {
+      read: async (key: string[]) => {
+        try {
+          return await storageBridge.promise(
+            storage.read<import("./dcp/lib/state/persistence").PersistedSessionState>(key),
+          )
+        } catch {
+          return null
+        }
+      },
+      write: async (key: string[], content: import("./dcp/lib/state/persistence").PersistedSessionState) => {
+        await storageBridge.promise(storage.write(key, content))
+      },
+      list: async (prefix: string[]) => await storageBridge.promise(storage.list(prefix)),
+    }
+
     const state = yield* InstanceState.make<State>(
       Effect.fn("Plugin.state")(function* (ctx) {
         const hooks: Hooks[] = []
@@ -152,6 +176,7 @@ const layer = Layer.effect(
           ...(serverUrl ? {} : { fetch: async (...args) => Server.Default().app.fetch(...args) }),
         })
         const cfg = yield* config.get()
+
         const input: PluginInput = {
           client,
           project: ctx.project,
@@ -169,7 +194,9 @@ const layer = Layer.effect(
           $: typeof Bun === "undefined" ? undefined : Bun.$,
         }
 
-        for (const plugin of flags.disableDefaultPlugins ? [] : internalPlugins(flags)) {
+        for (const plugin of flags.disableDefaultPlugins
+          ? []
+          : internalPlugins(flags, Flag.OPENCODE_DCP_ENABLED ? dcpStorage : undefined)) {
           const init = yield* Effect.tryPromise({
             try: () => plugin(input),
             catch: errorMessage,
@@ -319,7 +346,7 @@ const layer = Layer.effect(
 export const node = LayerNode.make({
   service: Service,
   layer: layer,
-  deps: [EventV2Bridge.node, Config.node, RuntimeFlags.node],
+  deps: [EventV2Bridge.node, Config.node, RuntimeFlags.node, Storage.node],
 })
 
 export * as Plugin from "."

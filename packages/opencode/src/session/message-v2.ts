@@ -278,7 +278,9 @@ export const toModelMessagesEffect = Effect.fnUntraced(function* (
         if (part.type === "compaction") {
           userMessage.parts.push({
             type: "text",
-            text: "What did we do so far?",
+            text: part.historyPath
+              ? `What did we do so far? The full record of the compacted conversation is available at ${part.historyPath}. If the summary misses details you need, search that file with Grep or Read (offset/limit). Do NOT read the whole file - it may be very large.`
+              : "What did we do so far?",
           })
         }
         if (part.type === "subtask") {
@@ -507,10 +509,11 @@ export const page = Effect.fn("MessageV2.page")(function* (input: {
   if (rows.length === 0) {
     const pgClient = (SaasDb.Client() as any).$client
     // TODO: Effect error type inference issue
-    const rawRows: any[] = yield* (Effect.tryPromise({
-      try: () => pgClient`SELECT * FROM message WHERE session_id = ${input.sessionID} ORDER BY time_created DESC, id DESC LIMIT ${input.limit + 1}`,
+    const rawRows: any[] = yield* Effect.tryPromise({
+      try: () =>
+        pgClient`SELECT * FROM message WHERE session_id = ${input.sessionID} ORDER BY time_created DESC, id DESC LIMIT ${input.limit + 1}`,
       catch: () => [] as any[],
-    }) as Effect.Effect<any[]>)
+    }) as Effect.Effect<any[]>
     if (rawRows.length > 0) {
       rows = rawRows as any
     }

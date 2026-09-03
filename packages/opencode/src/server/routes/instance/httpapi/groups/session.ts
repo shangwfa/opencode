@@ -60,6 +60,18 @@ export const MessagesQuery = Schema.Struct({
   before: Schema.optional(Schema.String),
 })
 export const StatusMap = Schema.Record(Schema.String, SessionStatus.Info)
+export const DcpStats = Schema.Struct({
+  hasState: Schema.Boolean,
+  totalTokensSaved: Schema.Number,
+  prunedTools: Schema.Number,
+  prunedMessages: Schema.Number,
+  compressionBlocks: Schema.Number,
+  activeCompressionBlocks: Schema.Number,
+  compressedTokens: Schema.Number,
+  summaryTokens: Schema.Number,
+  compressionDurationMs: Schema.Number,
+  lastUpdated: Schema.NullOr(Schema.String),
+})
 export const UpdatePayload = Schema.Struct({
   title: Schema.optional(Schema.String),
   directory: Schema.optional(Schema.String),
@@ -160,6 +172,7 @@ export const McpCreatePayload = Schema.Union([
 export const SessionPaths = {
   list: root,
   status: `${root}/status`,
+  dcpStats: `${root}/:sessionID/dcp/stats`,
   get: `${root}/:sessionID`,
   children: `${root}/:sessionID/children`,
   todo: `${root}/:sessionID/todo`,
@@ -245,6 +258,18 @@ export const SessionApi = HttpApi.make("session")
             identifier: "session.get",
             summary: "Get session",
             description: "Retrieve detailed information about a specific OpenCode session.",
+          }),
+        ),
+        HttpApiEndpoint.get("dcpStats", SessionPaths.dcpStats, {
+          params: { sessionID: SessionID },
+          query: WorkspaceRoutingQuery,
+          success: described(DcpStats, "DCP session statistics"),
+          error: [HttpApiError.BadRequest, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.dcpStats",
+            summary: "Get DCP session statistics",
+            description: "Retrieve context compression and pruning statistics for a specific session.",
           }),
         ),
         HttpApiEndpoint.get("children", SessionPaths.children, {
@@ -728,7 +753,8 @@ export const SessionApi = HttpApi.make("session")
           OpenApi.annotations({
             identifier: "session.agents.create",
             summary: "Create session agent",
-            description: "Create or update an inline agent attached to a specific OpenCode session. Only available in SaaS mode.",
+            description:
+              "Create or update an inline agent attached to a specific OpenCode session. Only available in SaaS mode.",
           }),
         ),
         HttpApiEndpoint.delete("agentsDelete", SessionPaths.agentsDelete, {
@@ -820,7 +846,8 @@ export const SessionApi = HttpApi.make("session")
           OpenApi.annotations({
             identifier: "session.tools.create",
             summary: "Create session tool",
-            description: "Create or update a custom tool attached to a specific OpenCode session. Only available in SaaS mode.",
+            description:
+              "Create or update a custom tool attached to a specific OpenCode session. Only available in SaaS mode.",
           }),
         ),
         HttpApiEndpoint.delete("toolsDelete", SessionPaths.toolsDelete, {
@@ -854,7 +881,8 @@ export const SessionApi = HttpApi.make("session")
           OpenApi.annotations({
             identifier: "session.commands",
             summary: "List session commands",
-            description: "Get custom commands attached to a specific OpenCode session, merged with instance-level commands.",
+            description:
+              "Get custom commands attached to a specific OpenCode session, merged with instance-level commands.",
           }),
         ),
         HttpApiEndpoint.post("commandsCreate", SessionPaths.commandsCreate, {
@@ -867,7 +895,8 @@ export const SessionApi = HttpApi.make("session")
           OpenApi.annotations({
             identifier: "session.commands.create",
             summary: "Create session command",
-            description: "Create or update a custom command attached to a specific OpenCode session. Only available in SaaS mode.",
+            description:
+              "Create or update a custom command attached to a specific OpenCode session. Only available in SaaS mode.",
           }),
         ),
         HttpApiEndpoint.delete("commandsDelete", SessionPaths.commandsDelete, {

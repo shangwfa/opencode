@@ -5,6 +5,8 @@ import { FSUtil } from "@opencode-ai/core/fs-util"
 import { Effect, Exit, Layer, Option, RcMap, Schema, Context, TxReentrantLock } from "effect"
 import { NonNegativeInt } from "@opencode-ai/core/schema"
 import { Git } from "@/git"
+import { Flag } from "@/flag/flag"
+import { Database } from "@/storage/db"
 
 type Migration = (dir: string, fs: FSUtil.Interface, git: Git.Interface) => Effect.Effect<void, FSUtil.Error>
 
@@ -219,6 +221,87 @@ const layer = Layer.effect(
       lookup: () => TxReentrantLock.make(),
       idleTimeToLive: 0,
     })
+
+    if (Flag.OPENCODE_DATABASE_URL) {
+      const { StorageDataTable } = yield* Effect.promise(
+        () => import("./schema.pg") as Promise<typeof import("./schema.pg")>,
+      )
+      const { eq, like } = yield* Effect.promise(() => import("drizzle-orm"))
+
+      // Keys come from internal call sites (session IDs, type names) and never
+      // contain LIKE wildcards; the JS-side startsWith re-check is the guard.
+      const encodeKey = (key: string[]) => key.join("/")
+
+      const pgQuery = <A>(fn: (db: any) => Promise<A>) =>
+        Effect.tryPromise({
+          try: () => Database.use(async (db: any) => fn(db)),
+          catch: (error) =>
+            new FSUtil.FileSystemError({
+              method: "storage.pg",
+              cause: error instanceof Error ? error : String(error),
+            }),
+        })
+
+      const pgNotFound = (key: string[]) =>
+        Effect.fail(new NotFoundError({ message: `Resource not found: ${encodeKey(key)}` }))
+
+      const pgRead = Effect.fn("Storage.pgRead")(function* (key: string[]) {
+        const rows = yield* pgQuery<Array<{ data: unknown }>>((db) =>
+          db
+            .select()
+            .from(StorageDataTable)
+            .where(eq(StorageDataTable.key, encodeKey(key)))
+            .limit(1),
+        )
+        const row = rows[0]
+        if (!row) return yield* pgNotFound(key)
+        // postgres.js is configured to return raw jsonb text (see db.pg.ts),
+        // matching the SQLite-oriented decoders used elsewhere.
+        return typeof row.data === "string" ? JSON.parse(row.data) : row.data
+      })
+
+      const pgWrite = Effect.fn("Storage.pgWrite")(function* (key: string[], content: unknown) {
+        yield* pgQuery((db) =>
+          db
+            .insert(StorageDataTable)
+            .values({ key: encodeKey(key), data: content, time_updated: Date.now() })
+            .onConflictDoUpdate({
+              target: StorageDataTable.key,
+              set: { data: content, time_updated: Date.now() },
+            }),
+        )
+      })
+
+      const pgInterface: Interface = {
+        remove: (key: string[]) =>
+          pgQuery((db) => db.delete(StorageDataTable).where(eq(StorageDataTable.key, encodeKey(key)))),
+        read: <T>(key: string[]) => pgRead(key) as Effect.Effect<T, Error>,
+        update: <T>(key: string[], fn: (draft: T) => void) =>
+          Effect.gen(function* () {
+            const value = (yield* pgRead(key)) as T
+            fn(value)
+            yield* pgWrite(key, value)
+            return value
+          }) as Effect.Effect<T, Error>,
+        write: <T>(key: string[], content: T) => pgWrite(key, content) as Effect.Effect<void, FSUtil.Error>,
+        list: (prefix: string[]) =>
+          Effect.gen(function* () {
+            const pattern = `${encodeKey(prefix)}/%`
+            const rows = yield* pgQuery<Array<{ key: string }>>((db) =>
+              db
+                .select({ key: StorageDataTable.key })
+                .from(StorageDataTable)
+                .where(like(StorageDataTable.key, pattern)),
+            )
+            return rows
+              .map((row) => row.key.split("/"))
+              .filter((parts) => parts.join("/").startsWith(`${encodeKey(prefix)}/`))
+              .toSorted((a, b) => a.join("/").localeCompare(b.join("/")))
+          }) as Effect.Effect<string[][], FSUtil.Error>,
+      }
+      return Service.of(pgInterface)
+    }
+
     const state = yield* Effect.cached(
       Effect.gen(function* () {
         const dir = path.join(Global.Path.data, "storage")

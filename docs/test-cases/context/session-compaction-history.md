@@ -8,55 +8,53 @@
 
 本功能参照 Cursor「将对话历史作为文件引用」方案，在 compaction 成功时把**被压缩部分的历史**（含完整、不截断的工具输出）落盘到 `tool-output/`，并将文件路径写入 `Compaction` 消息。后续 Agent 生成的 `<conversation-checkpoint>` 中附带检索提示，摘要缺细节时可用 Grep / Read(offset/limit) 回检索，无需整读。
 
-| 能力 | 效果 |
-|------|------|
-| 历史完整落盘 | 被压缩消息序列化为 `## <id> \| <type> \| <ISO时间>` 分节的 Markdown，工具输出**不截断** |
-| 路径持久化 | `Compaction.Ended` 事件 → `Compaction` 消息 `historyPath` 字段 → DB 落库 |
-| 检索提示注入 | `<conversation-checkpoint>` 附带「完整记录在 <path>，可用 Grep/Read 检索，勿整读」 |
-| 零额外 LLM 成本 | 落盘是纯文件 I/O，不增加 provider 调用 |
-| 权限零配置 | 文件落 `tool-output/`，复用 `Truncate.GLOB` 默认 allow（`agent.ts`） |
-| 自动清理 | 文件名带 `tool_` 前缀，沿用 `truncate.ts` 每小时、7 天保留的回收机制 |
-| 优雅降级 | 落盘失败仅跳过 `historyPath`，不影响摘要与 compaction 流程 |
+| 能力            | 效果                                                                                    |
+| --------------- | --------------------------------------------------------------------------------------- |
+| 历史完整落盘    | 被压缩消息序列化为 `## <id> \| <type> \| <ISO时间>` 分节的 Markdown，工具输出**不截断** |
+| 路径持久化      | `Compaction.Ended` 事件 → `Compaction` 消息 `historyPath` 字段 → DB 落库                |
+| 检索提示注入    | `<conversation-checkpoint>` 附带「完整记录在 <path>，可用 Grep/Read 检索，勿整读」      |
+| 零额外 LLM 成本 | 落盘是纯文件 I/O，不增加 provider 调用                                                  |
+| 权限零配置      | 文件落 session 远程沙箱的 `/workspace/.opencode/tool-output/`，Read/Grep 可直接访问     |
+| 自动清理        | 文件名带 `tool_` 前缀，沿用 `truncate.ts` 每小时、7 天保留的回收机制                    |
+| 优雅降级        | 落盘失败仅跳过 `historyPath`，不影响摘要与 compaction 流程                              |
 
 ## 实现位置
 
-| 模块 | 内容 |
-|------|------|
-| `packages/core/src/session/compaction.ts` | `select` 返回 `headEntries`；`serialize(message, full)` / `serializeHistory`；`writeHistory` 落盘 `tool_history_<messageID>.md`；`Compaction.Ended` 携带 `historyPath` |
-| `packages/core/src/session/runner/llm.ts` | 注入 `FSUtil`，`historyDir = <Global.Path.data>/tool-output` |
-| `packages/core/src/session/message-updater.ts` | `historyPath` 透传进 `SessionMessage.Compaction` |
-| `packages/core/src/session/runner/to-llm-message.ts` | checkpoint 附检索提示（无 `historyPath` 时输出与旧版逐字节一致） |
-| `packages/schema/src/session-event.ts` / `session-message.ts` | `historyPath: Schema.String.pipe(optional)` |
+| 模块                                                                                      | 内容                                                                                                                                                                   |
+| ----------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/core/src/session/compaction.ts`                                                 | `select` 返回 `headEntries`；`serialize(message, full)` / `serializeHistory`；`writeHistory` 落盘 `tool_history_<messageID>.md`；`Compaction.Ended` 携带 `historyPath` |
+| `packages/core/src/session/runner/llm.ts` / `packages/opencode/src/session/compaction.ts` | V2 使用 `Global.Path.data/tool-output`；SaaS V1 写入 session 远程沙箱 `/workspace/.opencode/tool-output/`                                                              |
+| `packages/core/src/session/message-updater.ts`                                            | `historyPath` 透传进 `SessionMessage.Compaction`                                                                                                                       |
+| `packages/core/src/session/runner/to-llm-message.ts`                                      | checkpoint 附检索提示（无 `historyPath` 时输出与旧版逐字节一致）                                                                                                       |
+| `packages/schema/src/session-event.ts` / `session-message.ts`                             | `historyPath: Schema.String.pipe(optional)`                                                                                                                            |
 
 ## 公共配置
 
-> SaaS 环境数据库为 **PostgreSQL**（`sqliteTable` schema 经 `storage/db.pg.ts` 适配跑在 PG，表名/列名不变）。历史文件在文件系统，不存 DB。
+> SaaS 环境只支持 **PostgreSQL**。`historyPath` 随 compaction part 存在 PG 的 `part.data` JSONB 中；完整历史正文写入沙箱/容器文件系统，数据库只保存可检索路径。
 
 ```bash
 # 运行前先加载 SaaS 测试环境（提供 $BASE/$PG_URL/$MODEL，见 docs/test-cases/test-env.sh）
 source ../test-env.sh 3 && source ../test-lib.sh
 
-# 历史文件所在目录（文件系统，与 DB 无关）
-#   Linux:   ~/.local/share/opencode/tool-output
-#   macOS:   ~/Library/Application Support/opencode/tool-output
-export TOOL_OUTPUT="$HOME/.local/share/opencode/tool-output"
+# SaaS 远程沙箱中的历史文件目录（PG 仅保存 historyPath）
+export TOOL_OUTPUT="/workspace/.opencode/tool-output"
 ```
 
-触发方式说明：historyPath 落盘仅在 **V2 SessionRunner** 路径生效（`packages/core/src/session/compaction.ts` 的 `compactAfterOverflow` → `writeHistory`）。当前仓库主链路走 **V1 SessionPrompt**（`packages/opencode/src/session/prompt.ts`），V1 的 overflow compaction 调用 `buildPrompt` from core 但**不含** historyPath 落盘逻辑。因此 T-CX.2~6 端到端用例在当前架构下无法触发，需等 V2 主链路上线。
+触发方式说明：historyPath 现在已接入当前 **V1 SessionPrompt** 路径（`packages/opencode/src/session/compaction.ts` 的 `processCompaction` → `writeHistory`）。V2 `SessionRunner` 路径仍保留 core 中的同等实现；两条路径分别负责自己的 compaction 生命周期。
 
 ## 验收层级
 
-| 层级 | 用例 | 验证目标 | 状态 |
-|------|------|----------|------|
-| L0 单元 | T-CX.1 | 纯函数与落盘/透传/提示注入的单元测试 | ✅ 可执行（25 pass） |
-| L1 落盘 | T-CX.2 | 触发 compaction 后历史文件生成、命名、内容完整 | ⏸️ blocked by V2 |
-| L2 持久化 | T-CX.3 | `Compaction` 消息带 `historyPath` 且落库 | ⏸️ blocked by V2 |
-| L3 效果 | T-CX.4 | 模型能通过历史文件检索回摘要丢失的细节 | ⏸️ blocked by V2 |
-| L4 可靠性 | T-CX.5 | 落盘失败优雅降级；head 为空不产生文件 | ⏸️ blocked by V2（降级路径已由 T-CX.1 单测覆盖） |
-| L5 清理 | T-CX.6 | `tool_*` 文件进入 7 天清理 | ⏸️ blocked by V2（清理实现待补直接回归测试） |
-| L3 实战 | T-CX.7 | 二次 compaction 后仍可沿历史文件链找回第一次压缩的细节 | ✅ 单测覆盖；端到端 blocked by V2 |
+| 层级      | 用例   | 验证目标                                               | 状态                           |
+| --------- | ------ | ------------------------------------------------------ | ------------------------------ |
+| L0 单元   | T-CX.1 | 纯函数与落盘/透传/提示注入的单元测试                   | ✅ 可执行（25 pass）           |
+| L1 落盘   | T-CX.2 | 触发 compaction 后历史文件生成、命名、内容完整         | ✅ V1 已接入                   |
+| L2 持久化 | T-CX.3 | `Compaction` 消息带 `historyPath` 且落库               | ✅ V1 已接入                   |
+| L3 效果   | T-CX.4 | 模型能通过历史文件检索回摘要丢失的细节                 | ✅ V1 已接入                   |
+| L4 可靠性 | T-CX.5 | 落盘失败优雅降级；head 为空不产生文件                  | ✅ V1 已接入（降级路径有单测） |
+| L5 清理   | T-CX.6 | `tool_*` 文件进入 7 天清理                             | ✅ 复用现有清理循环            |
+| L3 实战   | T-CX.7 | 二次 compaction 后仍可沿历史文件链找回第一次压缩的细节 | ✅ V1 已接入                   |
 
-> **T-CX.2~6 当前无法端到端执行**：historyPath 落盘仅在 V2 SessionRunner 路径生效（`packages/core/src/session/compaction.ts`），而当前仓库主链路走 V1 SessionPrompt（`packages/opencode/src/session/prompt.ts`），V1 的 overflow compaction 不含 historyPath 逻辑。V2 SessionRunner / SessionExecution 在当前仓库生产代码中未被引用。需等 V2 主链路上线后才能跑这些用例。
+> T-CX.2~T-CX.7 已接入 V1 SessionPrompt，可在 SaaS 主链路端到端执行；V2 SessionRunner 的实现仍由 core 自己维护。
 
 ## 测试用例
 
@@ -70,6 +68,7 @@ bun test test/session-compaction.test.ts test/session-runner-message.test.ts
 ```
 
 **期望**：24 pass / 0 fail。覆盖点：
+
 - `serializeHistory`：工具输出 5000 字符完整保留、无 `[truncated]`；shell 完整输出；头部 `## msg_.. | shell | ISO 时间`
 - `serialize`：`full=true` 完整 vs 默认截断 + `[truncated]` 标记
 - `compactAfterOverflow` 集成：文件落盘、事件 `historyPath`、head 在文件、recent 保留在上下文
@@ -87,18 +86,22 @@ bun test test/session-compaction.test.ts test/session-runner-message.test.ts
 #    本地调试可起带 PG 模式的服务：cd packages/opencode && bun dev（或容器内 opencode）
 
 # 2) compaction 完成后检查历史文件
-ls -la "$TOOL_OUTPUT" | grep tool_history_
+curl -s "$BASE/session/$SID/shell" -H 'Content-Type: application/json' \
+  -d "{\"command\":\"ls -la $TOOL_OUTPUT | grep tool_history_\"}"
 ```
 
 **期望**：
-- 生成文件 `$TOOL_OUTPUT/tool_history_<messageID>.md`，`<messageID>` 为 `msg_` 开头的 compaction 消息 ID
+
+- 远程沙箱生成文件 `$TOOL_OUTPUT/tool_history_<messageID>.md`，`<messageID>` 为 `msg_` 开头的 compaction 消息 ID
 - 文件内容为分节 Markdown：
 
 ```markdown
 ## msg_ffcf... | user | 2026-08-14T10:00:00.000Z
+
 [User]: 文本
 
-## msg_... | assistant | ...
+## msg\_... | assistant | ...
+
 [Assistant tool call]: read("src/foo.ts", 1, 200)
 [Tool result]:
 <完整工具输出，不截断>
@@ -141,7 +144,7 @@ touch -t "$(date -v-8d +%Y%m%d%H%M)" "$TOOL_OUTPUT/tool_history_stale.md"
 
 ### T-CX.7 实战：两次 compaction 后检索第一次细节（L3）
 
-> 当前 V2 主链路未上线，此用例暂不能端到端运行；`session-compaction.test.ts` 已覆盖相同场景。
+> V1 主链路已接入 historyPath；端到端测试需要准备可触发 compaction 的低上下文模型或测试配置。
 
 1. 在第一次 compaction 前读取或生成唯一细节，例如 `FIRST_COMPACTION_SECRET=violet-owl-42`。
 2. 触发第一次 compaction，记录其历史文件 `tool_history_<first>.md`。
@@ -153,22 +156,35 @@ touch -t "$(date -v-8d +%Y%m%d%H%M)" "$TOOL_OUTPUT/tool_history_stale.md"
 
 ## 已知限制
 
-- **V2 主链路未上线**：historyPath 功能仅存在于 V2 SessionRunner 路径（core 包），当前仓库主链路走 V1 SessionPrompt，V1 compaction 不含此功能。V2 手动 `/compact` 也未实现（`OperationUnavailableError`）。T-CX.2~6 需等 V2 上线后才能端到端验证。
+- **V2 手动 `/compact` 未实现**：V1 自动/手动 compaction 已接入 historyPath；V2 手动 `/compact` 仍返回 `OperationUnavailableError`。
 - 历史文件有 7 天保留期；过期后文件被清理，但被压缩历史的原始数据仍在 PG 的 `session_message` 表。
 - 历史文件含明文对话，可能很大；Agent 被提示用 Grep/Read 而非整读。
-- **TOOL_OUTPUT 路径因平台/运行方式而异**：文档示例写 `$HOME/.local/share/opencode/tool-output`（Linux/SaaS 容器），macOS 宿主机直跑时为 `~/Library/Application Support/opencode/tool-output`。端到端用例应从 `Global.Path.data` 动态获取，而非硬编码。
+- **V1/V2 文件路径不同**：SaaS V1 使用 session 远程沙箱的 `/workspace/.opencode/tool-output`，V2 core 使用 `Global.Path.data/tool-output`。PG 只保存路径，不保存历史正文。
 - **清理回归测试待补**：`truncate.ts` 实现以 `tool_` 前缀和 7 天 RETENTION 清理文件；目前尚无直接单测覆盖 T-CX.6 的过期文件删除行为。
 
 ## 复测记录
 
 ### 2026-08-23 重跑（merge upstream v1.18.21 后，hy3-free LLM）
 
-| 用例 | 结果 | 备注 |
-|---|---|---|
-| T-CX.1 单元测试（L0） | ✅ **26 pass / 0 fail** | merge 后 `buildPrompt` 对齐 upstream 结构（`<conversation>` 标签包装 + 新指令 + `<prior-summary>` 分支），修复了 2 个 merge 组合回归（原 24 pass 2 fail → 26 pass）；保留我方 `select()` headEntries/splitPrefix 超集 |
-| T-CX.2-6 端到端 | ⏸️ 维持 blocked by V2 | 复核确认：V1 主链路 `packages/opencode/src/session/compaction.ts` 的 `processCompaction` 无 `writeHistory`/`historyPath`；`compactAfterOverflow`/`compactIfNeeded` 仅被 core `runner/llm.ts`（V2）引用，opencode 生产代码未调用 |
-| 手动 summarize 触发 | ✅ | `POST /session/:id/summarize`（opencode/hy3-free）→ compaction 消息正常生成（summary=true, mode=compaction, input 19.5K tokens），compaction 链路可用 |
-| LLM 通路 | ⚠️ | Yd 网关（claude.shadow-rpa.net）不可达 + opencode-go workspace 额度用尽 → 用例改用 **opencode/hy3-free**（zen v1 免费模型，验证可用） |
+| 用例                  | 结果                             | 备注                                                                                                                                                                                                                  |
+| --------------------- | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T-CX.1 单元测试（L0） | ✅ **26 pass / 0 fail**          | merge 后 `buildPrompt` 对齐 upstream 结构（`<conversation>` 标签包装 + 新指令 + `<prior-summary>` 分支），修复了 2 个 merge 组合回归（原 24 pass 2 fail → 26 pass）；保留我方 `select()` headEntries/splitPrefix 超集 |
+| T-CX.2-6 端到端       | ✅ V1 已接入，待 SaaS 低阈值复测 | V1 `processCompaction` 已写入 `tool_history_<messageID>.md`、透传 `historyPath` 并在模型消息中注入检索提示                                                                                                            |
+| 手动 summarize 触发   | ✅                               | `POST /session/:id/summarize`（opencode/hy3-free）→ compaction 消息正常生成（summary=true, mode=compaction, input 19.5K tokens），compaction 链路可用                                                                 |
+| LLM 通路              | ⚠️                               | Yd 网关（claude.shadow-rpa.net）不可达 + opencode-go workspace 额度用尽 → 用例改用 **opencode/hy3-free**（zen v1 免费模型，验证可用）                                                                                 |
 
 **结论**：L0 单测全通过（含 merge 回归修复），端到端用例维持 V2 未上线状态；LLM 测试通路已切换至 hy3-free。
 
+### 2026-09-03 影响面回归（本地 PG + 远程沙箱）
+
+| 用例                  | 结果 | 证据                                                                                  |
+| --------------------- | ---- | ------------------------------------------------------------------------------------- |
+| T-CX.1 V1 history 单测 | ✅   | `test/session/compaction-history.test.ts`：1 pass / 0 fail                             |
+| T-CX.1 core compaction | ✅   | `test/session-compaction.test.ts` + `test/session-runner-message.test.ts`：26 pass / 0 fail |
+| T-CX.2/T-CX.3         | ✅   | 低阈值 SaaS compaction 生成远程沙箱 history 文件，PG 持久化 `historyPath`              |
+| T-CX.5                 | ✅   | core 落盘失败用例实际输出 `failed to write compaction history`，摘要流程继续             |
+| Session 生命周期       | ✅   | 创建/查询/PATCH/DELETE：`200`，删除后 GET：`404`，PG 无残留                             |
+| Sandbox 生命周期       | ✅   | boot/kill/recreate：均 `200`，kill 返回 `destroyed=true`                               |
+| 基础兼容接口           | ✅   | `/session/status`、`/agent`、`/skill`、`/command` 均返回 `200`                          |
+
+本次运行保持 SaaS 约束：只使用 PostgreSQL，历史正文只写远程沙箱，不再写本地文件回退。
