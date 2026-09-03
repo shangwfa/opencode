@@ -1,7 +1,12 @@
 import { estimateTokens, type CcrConfig } from "./config"
+import { resizeImageDataUrl } from "./image-resize"
 import { contentHash, type CcrStore } from "./store"
 
 const EXCLUDED_TOOLS = new Set(["edit", "write", "question"])
+
+// Detail-oriented queries need pixels; skip the resize pass this turn.
+const IMAGE_DETAIL_RE =
+  /\bread\b|\bcount\b|\btranscribe\b|\bexact\b|\bserial\b|\bcompare\b|\bzoom\b|读|数|精确|序列|对比|逐|放大|仔细|看清/
 
 interface ToolPartLike {
   type: "tool"
@@ -18,6 +23,7 @@ interface MessageLike {
 export interface CcrTransformStats {
   compressed: number
   tokensSaved: number
+  imagesResized?: number
 }
 
 function extractQuery(messages: MessageLike[]): string | undefined {
@@ -66,6 +72,21 @@ export function createMessageTransform(store: CcrStore, config: CcrConfig) {
       const msg = messages[i]
       const parts = Array.isArray(msg?.parts) ? msg.parts : []
       for (const part of parts) {
+        if (part.type === "file") {
+          // History images past the protection window get resized (Anthropic
+          // bills by pixels); recent ones keep full fidelity. A detail-
+          // oriented query (count/read/exact/serial…) preserves this turn's
+          // images as well — cheap heuristic for the ML router we skip.
+          if (!config.imageResize || IMAGE_DETAIL_RE.test(query ?? "")) continue
+          const filePart = part as { url?: string }
+          if (typeof filePart.url !== "string" || !filePart.url.startsWith("data:image/")) continue
+          const resized = await resizeImageDataUrl(filePart.url)
+          if (resized !== undefined && resized !== filePart.url) {
+            stats.imagesResized = (stats.imagesResized ?? 0) + 1
+            filePart.url = resized
+          }
+          continue
+        }
         if (part.type !== "tool") continue
         const toolPart = part as ToolPartLike
         if (EXCLUDED_TOOLS.has(toolPart.tool)) continue
@@ -97,6 +118,9 @@ export function createMessageTransform(store: CcrStore, config: CcrConfig) {
       console.log(
         `[ccr] compressed ${stats.compressed} tool output(s), ~${stats.tokensSaved} tokens saved`,
       )
+    }
+    if (stats.imagesResized) {
+      console.log(`[ccr] images: ${stats.imagesResized} history screenshot(s) resized to fit 512`)
     }
   }
 }

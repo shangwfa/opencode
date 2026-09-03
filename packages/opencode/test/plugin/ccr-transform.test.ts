@@ -3,7 +3,7 @@ import { createMessageTransform } from "../../src/plugin/ccr/lib/transform"
 import { CcrStore, type CcrStorageBackend } from "../../src/plugin/ccr/lib/store"
 import type { CcrConfig } from "../../src/plugin/ccr/lib/config"
 
-const config: CcrConfig = { minTokens: 200, protectRecent: 2, previewTokens: 300, ttlSeconds: 0 }
+const config: CcrConfig = { minTokens: 200, protectRecent: 2, previewTokens: 300, ttlSeconds: 0, imageResize: true }
 
 function makeBackend() {
   const entries = new Map<string, any>()
@@ -244,4 +244,73 @@ describe("proactive expansion (Headroom context_tracker parity)", () => {
     delete process.env.OPENCODE_CCR_PROTECT_RECENT
     expect(loadCcrConfig().protectRecent).toBe(4)
   })
+})
+
+describe("transform image resize", () => {
+  test("resizes history images, preserves recent ones", async () => {
+    const { resizeImageDataUrl } = await import("../../src/plugin/ccr/lib/image-resize")
+    const photon = await import("@silvia-odwyer/photon-node")
+    const rgba = new Uint8Array(1024 * 1024 * 4)
+    const canvas = new photon.PhotonImage(rgba, 1024, 1024)
+    const bigUrl = `data:image/png;base64,${Buffer.from(canvas.get_bytes()).toString("base64")}`
+    canvas.free()
+
+    const entries = new Map<string, any>()
+    const backend: CcrStorageBackend = {
+      async read(key: string[]) { return entries.get(key.join("/")) ?? null },
+      async write(key: string[], content: any) { entries.set(key.join("/"), content) },
+    }
+    const store = new CcrStore(backend, config)
+    const transform = createMessageTransform(store, config)
+    const messages = buildMessages(8, "tiny output")
+    messages[0].parts[0] = { type: "file", url: bigUrl } as any
+    messages[7].parts[0] = { type: "file", url: bigUrl } as any
+    await transform({}, { messages })
+
+    // idx0 在窗口内（last=5）→ resize；idx7 在保护窗 → 保持原图
+    const url0 = (messages[0].parts[0] as any).url as string
+    const url7 = (messages[7].parts[0] as any).url as string
+    const [w0] = await pngSize(url0)
+    expect(w0).toBe(512)
+    const [w7] = await pngSize(url7)
+    expect(w7).toBe(1024)
+    void resizeImageDataUrl
+  })
+
+  test("detail-oriented query preserves history images this turn", async () => {
+    const photon = await import("@silvia-odwyer/photon-node")
+    const rgba = new Uint8Array(1024 * 1024 * 4)
+    const canvas = new photon.PhotonImage(rgba, 1024, 1024)
+    const bigUrl = `data:image/png;base64,${Buffer.from(canvas.get_bytes()).toString("base64")}`
+    canvas.free()
+
+    const entries = new Map<string, any>()
+    const backend: CcrStorageBackend = {
+      async read(key: string[]) { return entries.get(key.join("/")) ?? null },
+      async write(key: string[], content: any) { entries.set(key.join("/"), content) },
+    }
+    const store = new CcrStore(backend, config)
+    const transform = createMessageTransform(store, config)
+    const messages = buildMessages(8, "tiny output")
+    messages[0].parts[0] = { type: "file", url: bigUrl } as any
+    // 细节类 query → 本轮图像跳过 resize
+    messages[messages.length - 2] = {
+      info: { id: "msg_detail", sessionID: "ses_test", role: "user" },
+      parts: [{ type: "text", text: "请数一下这张截图里有几个按钮，仔细看清楚" }],
+    } as any
+    await transform({}, { messages })
+
+    const url0 = (messages[0].parts[0] as any).url as string
+    expect(url0).toBe(bigUrl)
+  })
+
+  async function pngSize(dataUrl: string): Promise<[number, number]> {
+    const photon = await import("@silvia-odwyer/photon-node")
+    const img = photon.PhotonImage.new_from_byteslice(Buffer.from(dataUrl.slice(dataUrl.indexOf(",") + 1), "base64"))
+    try {
+      return [img.get_width(), img.get_height()]
+    } finally {
+      img.free()
+    }
+  }
 })

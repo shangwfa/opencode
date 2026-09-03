@@ -5,6 +5,12 @@ function numberEnv(key: string): number | undefined {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined
 }
 
+function boolEnv(key: string): boolean | undefined {
+  const raw = process.env[key]
+  if (raw === undefined || raw === "") return undefined
+  return raw !== "0" && raw.toLowerCase() !== "false"
+}
+
 export interface CcrConfig {
   /** Tool outputs below this estimated token count are never compressed.
    *  Headroom parity: min_tokens_to_compress = 250. Compressions that
@@ -21,6 +27,10 @@ export interface CcrConfig {
   /** Entry TTL in seconds (Headroom parity: DEFAULT_CCR_TTL_SECONDS = 1800).
    *  0 means entries live until their session is deleted. */
   ttlSeconds: number
+  /** Resize history images past the protection window to fit 512x512
+   *  (Anthropic bills by pixels; -75% per history screenshot).
+   *  Optional: undefined/false disables the pass. */
+  imageResize?: boolean
 }
 
 export function loadCcrConfig(): CcrConfig {
@@ -29,6 +39,7 @@ export function loadCcrConfig(): CcrConfig {
     protectRecent: numberEnv("OPENCODE_CCR_PROTECT_RECENT") ?? 4,
     previewTokens: numberEnv("OPENCODE_CCR_PREVIEW_TOKENS") ?? 300,
     ttlSeconds: numberEnv("OPENCODE_CCR_TTL_SEC") ?? 1800,
+    imageResize: boolEnv("OPENCODE_CCR_IMAGE_ENABLED") ?? true,
   }
 }
 
