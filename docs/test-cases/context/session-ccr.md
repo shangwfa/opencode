@@ -1,0 +1,112 @@
+# CCR（Compress-Cache-Retrieve 工具输出压缩）
+
+> 借鉴 Headroom 的内容级压缩思路：在每次 LLM 请求前，对**大体积 tool output** 做确定性压缩（JSON / 日志 / 通用文本），原文存入 CCR 存储（PG `storage_data` 表），上下文中只留短 preview + `[ccr:<hash>]` marker，模型可随时调用 `ccr_retrieve` 取回原文。与 DCP（模型自主历史折叠）互补，DCP 兜底复杂历史，CCR 主攻高频大输出的确定性瘦身。
+
+## 功能背景与效果
+
+内置 compaction 整体摘要、DCP 按范围折叠，两者都以「历史消息」为对象；但 agent 会话中 token 大头往往是**单条 tool output**（read 全文件、bash 长日志、glob/mcp 大 JSON）。CCR 在消息视图层对这类输出做内容感知压缩：
+
+| 能力 | 效果 |
+| --- | --- |
+| 环境开关 | `OPENCODE_CCR_ENABLED=true` 注册内置插件；默认关闭，零开销 |
+| 内容感知压缩 | 对照 Headroom 覆盖 **8.5/10 类**：JSON 数组（截断+itemCount+**query 相关性选 item**）、搜索结果（`file:line:content` 锚定+first/last/error+**query 评分**）、结构化配置（注释/空行折叠）、日志（error/fatal+**query 评分**）、**diff（hunk 头+变更行保、上下文行折叠 ≤2/hunk、≤10 hunk/文件）**、**表格（CSV/TSV/管道，列一致性检测+列名摘要）**、**HTML（剥 script/style/head/注释→文本）**、**代码（启发式：保 imports/装饰器/块开签名行，折叠函数体）**、通用文本 head+tail；全部本地确定性、零 LLM 成本、无收益 passthrough |
+| 相关性评分 | 首轮固定版（Headroom SmartCrusher parity）：用当轮 user query（word-overlap + CJK bigram）评分选保留项，选定后随内容 hash 固化——请求视图字节稳定不破坏 |
+| Proactive expansion | Headroom context_tracker 轻量版：当轮 query 与某已压缩 output 原文高相关（score≥2）时，该输出本轮保持完整不折叠——打破「压缩→retrieve→再压缩」循环，不再依赖模型主动 retrieve |
+| 代码语法安全 | Headroom CodeAwareCompressor parity：折叠后输出保持合法语法——保留块关闭行、折叠体用同语言注释占位（Python 额外 `pass` 保证空块可解析） |
+| 日志 back-heavy | Headroom logs_front_weight=0.15 parity：middle 尾部 10% routine 行保留（最近日志常携带结果），error 行 cap 40 内优先 query 相关行 |
+| 保护窗口 | protectRecent 默认 **4**（Headroom protect_recent=4）：最近 4 条消息输出全保真，同时保证 retrieve 取回的内容在后续多轮可见 |
+| CCR 可恢复 | 原文按内容 hash 存 PG（key `plugin/ccr/<sessionID>/<hash>`），多实例共享；`ccr_retrieve(hash)` 工具取回 |
+| Headroom 对齐 | hash=SHA-256[:24]（96bit）、marker `Retrieve original: hash=`、entry 带 compressedTokens/item 数/retrievalCount、多 marker 幂等（含 `<<ccr:`）、miss 结构化 status+hint、可选 TTL、内存 LRU 1000 |
+| 幂等稳定 | 同内容同 hash 同替换字节 → 请求前缀稳定，利于 provider KV cache；含任一已知 marker 形态的输出不再二次压缩（防 hash 孤儿，Headroom #2694） |
+| 收益护栏 | `minTokens` 以下不动、最近 `protectRecent` 条消息不动、edit/write/question 输出不动、preview 需 ≥30% 缩减 |
+| PG 原文只读 | 压缩只改请求视图，`part.state.output` 原文始终留在 PG；session 删除时 CCR 条目同步清理 |
+
+## 实现位置
+
+| 模块 | 内容 |
+| --- | --- |
+| `packages/opencode/src/plugin/ccr/` | 内置插件（高内聚独立模块）：`index.ts` 入口 + `lib/{config,compressors,store,transform}.ts` |
+| `packages/opencode/src/flag/flag.ts` | `OPENCODE_CCR_ENABLED` 开关 |
+| `packages/opencode/src/plugin/index.ts` | `internalPlugins` 注册 + `EffectBridge` 桥接 `Storage.Service` 为 CCR 后端 |
+| `packages/opencode/src/server/routes/instance/httpapi/handlers/session.ts` | session remove 时清理 `plugin/ccr/<sid>` 条目 |
+| `test/plugin/ccr-*.test.ts` | L0 单测（compressors / store / transform 三套件） |
+
+## 配置
+
+| 环境变量 | 默认 | 说明 |
+| --- | --- | --- |
+| `OPENCODE_CCR_ENABLED` | off | 开关注册插件 |
+| `OPENCODE_CCR_MIN_TOKENS` | 1000 | tool output 估算 token 低于该值不压缩 |
+| `OPENCODE_CCR_PROTECT_RECENT` | 2 | 最近 N 条消息的输出保持原样（活跃上下文） |
+| `OPENCODE_CCR_PREVIEW_TOKENS` | 300 | preview 的近似 token 预算 |
+| `OPENCODE_CCR_TTL_SEC` | 0（随 session） | entry 过期秒数；Headroom session-scale 为 1800。过期后 retrieve 返回 expired 状态并提示重跑来源 |
+
+**Marker 格式**（Headroom 对齐）：
+
+```text
+[ccr:<hash>] (json) {"ccr_truncated":true,"total_items":148,"showing":3,"items":[...]}
+[148 items compressed to 3. ~5200 tokens compressed to ~300. Retrieve original: hash=<hash>. Call the ccr_retrieve tool with this hash if you need the full content.]
+```
+
+TTL 启用时追加 ` Expires in 30m.`。幂等识别四种形态：`[ccr:`、`Retrieve original: hash=`、`Retrieve more: hash=`、`<<ccr:`。
+
+## 验收层级
+
+| 层级 | 用例 | 验证目标 | 状态 |
+| --- | --- | --- | --- |
+| L0 单元 | T-CCR.1 | 三套件单测：**9 类压缩器路由与误判防御**（时间戳≠file:line、block scalar 跳过、分隔符一致性、ragged rows、非 HTML/非代码）、**query 相关性选 item/行**、store 元数据/TTL/LRU/retrievalCount/多形态幂等、transform 保护与幂等 | ✅ 51 pass / 0 fail |
+| L1 加载 | T-CCR.2 | env 开关注册插件、`ccr_retrieve` 工具暴露 | ✅ 容器实测（镜像 `ccr`，2026-09-03） |
+| L2 压缩链路 | T-CCR.3 | completed 大 tool output（10KB 日志）在请求视图被替换为 `[ccr:<hash>]` marker，log 策略 6349→391 tokens（省 94%） | ✅ 容器实测 |
+| L3 取回 | T-CCR.4 | 模型真实调用 `ccr_retrieve` 拿到完整原文并回答细节 | ✅ 容器实测 |
+| L4 持久化 | T-CCR.5 | CCR entry 落 PG `storage_data`（key `plugin/ccr/<sid>/<hash>`，含 strategy/tool/tokens/retrievalCount） | ✅ 容器实测 |
+| L5 幂等 | T-CCR.6 | 多轮后同内容不重复建条目（同 hash 覆盖）；PG part 原文 25357 字符原封未动 | ✅ |
+| L6 清理 | T-CCR.7 | 删除会话时 `plugin/ccr/<sid>` 条目同步清理（实测 3→0） | ✅ 容器实测 |
+| L7 开关 | T-CCR.8 | 未设 env 时插件不加载、零副作用 | ✅（无插件容器对照实验） |
+| L8 多实例 | T-CCR.9 | 实例 B 从 PG 取回实例 A 存的原文（本地 14097 与容器 14096 共库，entry 跨实例可见） | ✅（共库可见，双实例 retrieve 待专项） |
+| L9 收益基准 | T-CCR.10 | **provider 真实 usage 对比：未压缩轮 input=16591 tok → 压缩后 271~734 tok（省 95.6%）**；retrieve 轮 8254（原文取回预期内，下轮再折叠） | ✅ 容器实测 |
+| L10 异常路径 | T-CCR.11 | 错误 hash → not_found + 「重跑来源」hint；TTL 过期（注入过去 expiresAt）→ expired + 「不要重试同 hash」hint | ✅ 容器实测 |
+| L11 兼容 | T-CCR.12 | 与 DCP 同开：**CCR 必须先于 DCP 注册**（plugin/index.ts 顺序已固化）——DCP 的 injectMessageIds 会向 tool output 尾部追加 `<dcp-message-id>` tag，污染整体解析型策略（JSON）的输入；CCR 先行则始终基于 PG 原文视图压缩。容器实测 6 类策略全压缩 ✅ | ✅ |
+| L12 重启恢复 | T-CCR.13 | CCR 无状态重放：同内容重新注入同 hash marker（内容寻址） | ✅（机制保证，重启场景待专项） |
+| L13 延迟 | T-CCR.14 | transform 压缩耗时（10KB 输出，毫秒级，无感知延迟） | ✅（请求无延迟劣化） |
+
+> **复测方法**：不依赖沙箱工具执行——直接向 PG seed 一条 `status=completed` 的大 output tool part（模拟历史工具调用），发消息触发 transform。CCR 是纯消息层功能（内存视图压缩 + PG storage_data），与沙箱无关。
+>
+> **测试期间发现的环境问题**（与 CCR 无关，见会话记录）：远端沙箱 172.18.32.15:30040 间歇性 `Sandbox.create` 超时；bash/read 工具 stream 路径输出 >~1KB 挂起且换行被转义为字面 `\n`（exec API 正常）；旧镜像代码导致容器首次验证未触发。
+
+## 公共配置
+
+> **镜像默认开启**：Dockerfile 已内置 `ENV OPENCODE_CCR_ENABLED=true`（与 DCP 同待遇），容器无需额外传参。
+> 生产阈值即代码默认值（`minTokens=1000`、`protectRecent=4`），比测试期（200）保守；需微调时用下表 env 覆盖。
+
+```bash
+source docs/test-cases/test-env.sh 3 && source docs/test-cases/test-lib.sh
+
+# 测试期调低阈值让短会话也能触发（容器测试标准命令）：
+docker rm -f opencode-saas-test
+docker run -d --name opencode-saas-test \
+  -p 14096:4096 \
+  -e OPENCODE_DATABASE_URL="postgresql://local@host.docker.internal:15432/opencode" \
+  -e OPENCODE_DCP_ENABLED=true \
+  -e OPENCODE_CCR_ENABLED=true \
+  -e OPENCODE_CCR_MIN_TOKENS=200 \
+  -e OPENCODE_CCR_PREVIEW_TOKENS=300 \
+  --env-file /tmp/opencode-saas.env \
+  opencode-saas-sandbox-test:<tag> serve --hostname 0.0.0.0 --port 4096
+```
+
+## SaaS 按会话观测
+
+```sql
+-- CCR 条目数与原文 token 统计
+SELECT key, data->>'tool' AS tool, data->>'strategy' AS strategy,
+       (data->>'originalTokens')::numeric AS original_tokens
+FROM storage_data
+WHERE key LIKE 'plugin/ccr/%'
+ORDER BY time_updated DESC LIMIT 20;
+```
+
+## 已知限制
+
+- 压缩发生在请求视图层：`session.messages` API 返回的仍是 PG 原文；与 DCP 行为一致。
+- 日志/文本截断保留 head+tail 与 error 行，中间内容需 retrieve 取回——模型按 marker 提示自行决策。
+- CCR preview 对 provider 是稳定前缀字节，但首次替换该输出时仍会使该点之后缓存失效（与 DCP prune 同级影响）。

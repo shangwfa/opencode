@@ -319,6 +319,11 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       yield* pluginRuntime.dispose(ctx.params.sessionID)
       // DCP state（storage_data 的 plugin/dcp/<sid> 行）随会话删除清理；失败不阻塞删除
       yield* storage.remove(["plugin", "dcp", ctx.params.sessionID]).pipe(Effect.ignore)
+      // CCR entries（storage_data 的 plugin/ccr/<sid>/<hash> 行）随会话删除清理
+      yield* Effect.gen(function* () {
+        const keys = yield* storage.list(["plugin", "ccr", ctx.params.sessionID])
+        yield* Effect.forEach(keys, (key) => storage.remove(key), { discard: true })
+      }).pipe(Effect.ignore)
       // session-delete not logged here — FK cascade removes exec_log along with session
       return true
     })
