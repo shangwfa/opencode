@@ -24,23 +24,38 @@ const config = {
 }
 
 describe("compressJson", () => {
-  test("truncates large arrays with self-describing metadata", () => {
-    const items = Array.from({ length: 500 }, (_, i) => ({
+  test("losslessly folds uniform arrays, keep/drops heterogeneous ones", () => {
+    // 同构数组：lossless csv-schema parity — EVERY item kept, re-encoded
+    const uniform = Array.from({ length: 500 }, (_, i) => ({
       id: i,
       name: `item-${i}`,
       description: "x".repeat(80),
     }))
-    const text = JSON.stringify(items)
+    const text = JSON.stringify(uniform)
     const result = compressJson(text, config)
     expect(result).toBeDefined()
     expect(result!.strategy).toBe("json")
-    const parsed = JSON.parse(result!.preview)
+    const table = JSON.parse(result!.preview)
+    expect(table.ccr_table).toBe(true)
+    expect(table.columns).toEqual(["id", "name", "description"])
+    expect(table.rows).toHaveLength(500)
+    expect(table.rows[42][0]).toBe(42)
+    expect(result!.itemCount).toEqual({ original: 500, compressed: 500 })
+    expect(estimateTokens(result!.preview)).toBeLessThan(estimateTokens(text))
+
+    // 异构数组（键集不一致）：fallback 到 scored keep/drop
+    const mixed = Array.from({ length: 500 }, (_, i) =>
+      i % 2 === 0 ? { id: i, name: `item-${i}` } : { id: i, kind: "odd" },
+    )
+    const result2 = compressJson(JSON.stringify(mixed), config)
+    expect(result2).toBeDefined()
+    const parsed = JSON.parse(result2!.preview)
     expect(parsed.ccr_truncated).toBe(true)
     expect(parsed.total_items).toBe(500)
     expect(parsed.showing).toBeLessThan(500)
     expect(parsed.items.length).toBe(parsed.showing)
-    expect(result!.itemCount).toEqual({ original: 500, compressed: parsed.showing })
-    expect(estimateTokens(result!.preview)).toBeLessThan(estimateTokens(text))
+    expect(result2!.itemCount).toEqual({ original: 500, compressed: parsed.showing })
+    expect(estimateTokens(result2!.preview)).toBeLessThan(estimateTokens(JSON.stringify(mixed)))
   })
 
   test("truncates long string values inside objects", () => {
@@ -91,6 +106,24 @@ describe("compressLog", () => {
     expect(estimateTokens(result!.preview)).toBeLessThan(estimateTokens(text))
   })
 
+  test("caps error lines at max_errors=10 (Headroom parity)", () => {
+    const lines = ["service booting"]
+    for (let i = 0; i < 300; i++) {
+      lines.push(`2026-09-03T10:00:${String(i % 60).padStart(2, "0")} INFO request ${i} handled`)
+    }
+    for (let i = 0; i < 15; i++) {
+      lines.push(`2026-09-03T10:05:${String(i).padStart(2, "0")} ERROR unique failure number ${i}`)
+    }
+    lines.push("service stopped")
+    const text = lines.join("\n")
+
+    const result = compressLog(text)
+    expect(result).toBeDefined()
+    const errorCount = (result!.preview.match(/ERROR unique failure/g) ?? []).length
+    expect(errorCount).toBeLessThanOrEqual(10)
+    expect(errorCount).toBeGreaterThan(0)
+  })
+
   test("returns undefined for short logs", () => {
     expect(compressLog("a\nb\nc")).toBeUndefined()
   })
@@ -109,6 +142,172 @@ describe("compressLines", () => {
 
   test("returns undefined for short text", () => {
     expect(compressLines(Array.from({ length: 10 }, (_, i) => `line ${i}`).join("\n"), config)).toBeUndefined()
+  })
+})
+
+describe("adaptive preview (Plan B)", () => {
+  // ~1300 chars (≈325 tokens): under the old fixed budget (previewTokens*4 =
+  // 1200 chars) the preview kept ~45/50 items → 0.7-ratio gate rejected it.
+  // The adaptive budget (chars/3 ≈ 433) shrinks the preview enough to clear.
+  test("compresses mid-size json arrays the fixed budget used to reject", () => {
+    // 异构（键集交替）确保走 keep/drop 而非 lossless
+    const items = Array.from({ length: 50 }, (_, i) =>
+      i % 2 === 0 ? { id: i, name: `item-${i}` } : { id: i, kind: "odd" },
+    )
+    const text = JSON.stringify(items)
+    expect(estimateTokens(text)).toBeGreaterThanOrEqual(300)
+    const result = compressJson(text, config)
+    expect(result).toBeDefined()
+    const parsed = JSON.parse(result!.preview)
+    expect(parsed.ccr_truncated).toBe(true)
+    expect(parsed.showing).toBeLessThan(50)
+    expect(estimateTokens(result!.preview)).toBeLessThan(estimateTokens(text) * 0.5)
+  })
+
+  test("keeps error items unconditionally even when the query is unrelated", () => {
+    // 15 个 budget 全给「普通」项也不该丢 error——must_keep 硬约束
+    const items = Array.from({ length: 200 }, (_, i) =>
+      i === 150
+        ? { id: i, level: "FATAL", msg: "worker crashed" }
+        : i % 2 === 0
+          ? { id: i, level: "ok", msg: `fine entry ${i}` }
+          : { id: i, status: "ok", note: `entry ${i}` },
+    )
+    const text = JSON.stringify(items)
+    const result = compressJson(text, config, "summarize the payment records")
+    expect(result).toBeDefined()
+    const parsed = JSON.parse(result!.preview)
+    const kept = parsed.items as Array<{ id: number }>
+    expect(kept.some((x) => x.id === 150)).toBe(true)
+  })
+
+  test("anchors first and last items (first_fraction/last_fraction parity)", () => {
+    const items = Array.from({ length: 300 }, (_, i) =>
+      i % 2 === 0 ? { id: i, note: `row ${i} ${"z".repeat(20)}` } : { id: i, kind: `group-${i % 5}` },
+    )
+    const text = JSON.stringify(items)
+    const result = compressJson(text, config)
+    expect(result).toBeDefined()
+    const parsed = JSON.parse(result!.preview)
+    const kept = parsed.items as Array<{ id: number }>
+    const ids = kept.map((x) => x.id)
+    // k_total=15 → first=max(1, round(4.5))=5, last=max(1, round(2.25))=2
+    for (let i = 0; i < 5; i++) expect(ids).toContain(i)
+    expect(ids).toContain(299)
+    expect(ids).toContain(298)
+  })
+
+  test("deduplicates identical items with a count", () => {
+    const items: Array<Record<string, unknown>> = Array.from({ length: 500 }, () => ({
+      status: "ok",
+      message: "success",
+    }))
+    items[0] = { status: "ok", message: "success", seq: 0 }
+    const text = JSON.stringify(items)
+    const result = compressJson(text, config)
+    expect(result).toBeDefined()
+    const parsed = JSON.parse(result!.preview)
+    expect(parsed.deduplicated).toBe(true)
+    expect(parsed.unique_items).toBe(2)
+    expect(parsed.total_items).toBe(500)
+    expect(parsed.showing).toBeLessThanOrEqual(2)
+  })
+
+  test("lossless table survives the mid-size path (full-budget fold)", () => {
+    const items = Array.from({ length: 50 }, (_, i) => ({ id: i, name: `item-${i}` }))
+    const text = JSON.stringify(items)
+    const result = compressJson(text, config)
+    expect(result).toBeDefined()
+    const table = JSON.parse(result!.preview)
+    expect(table.ccr_table).toBe(true)
+    expect(table.rows).toHaveLength(50)
+  })
+
+  // ~30 lines × 40 chars = 1200 chars (≈300 tokens): old maxLines=20 kept
+  // ~800 chars (0.71 ratio, rejected); adaptive maxLines=6 compresses hard.
+  test("compresses mid-size plain text the fixed budget used to reject", () => {
+    const text = Array.from({ length: 30 }, (_, i) => `row ${i} ${"x".repeat(34)}`).join("\n")
+    const result = compressLines(text, config)
+    expect(result).toBeDefined()
+    expect(estimateTokens(result!.preview)).toBeLessThan(estimateTokens(text) * 0.5)
+  })
+
+  // Large outputs keep the full previewTokens budget — the adaptive formula
+  // only shrinks budgets below previewTokens*3 tokens.
+  test("keeps the full budget for large outputs", () => {
+    const items = Array.from({ length: 500 }, (_, i) =>
+      i % 2 === 0
+        ? { id: i, name: `item-${i}`, description: "x".repeat(80) }
+        : { id: i, kind: `variant-${i % 7}` },
+    )
+    const text = JSON.stringify(items)
+    const result = compressJson(text, config)
+    expect(result).toBeDefined()
+    // preview stays well below the full 1200-char budget but far above the
+    // proportional (chars/3) floor — this input is ~45KB so chars/3 would be
+    // ~15KB, while the emitted preview is capped at the full budget.
+    expect(result!.preview.length).toBeLessThan(1400)
+    expect(result!.preview.length).toBeGreaterThan(600)
+  })
+})
+
+describe("compressCode docstring (FIRST_LINE parity)", () => {
+  test("keeps the docstring opening line, folds the rest", () => {
+    const code = [
+      "import os",
+      "from queue import deque",
+      "",
+      "class Worker:",
+      '    """Worker processes queued jobs.',
+      "",
+      "    Long multiline description with a lot of detail",
+      "    about retry semantics and backoff behavior.",
+      '    """',
+      "",
+      "    def process(self, items):",
+      '        results = []',
+      "        for item in items:",
+      "            results.append(item.strip())",
+      "            results = normalize(results)",
+      "            self.check(results)",
+      "            self.metrics.tick()",
+      "        return results",
+      "",
+      "    def drain(self):",
+      "        while self.queue:",
+      "            job = self.queue.popleft()",
+      "            self.process([job])",
+      "            self.metrics.tick()",
+      "        return self.metrics.snapshot()",
+    ].join("\n")
+    const result = compressCode(code, config)
+    expect(result).toBeDefined()
+    expect(result!.preview).toContain("Worker processes queued jobs.")
+    expect(result!.preview).not.toContain("retry semantics")
+    expect(result!.preview).toContain("def process(self, items):")
+    expect(result!.preview).toContain("lines elided")
+  })
+
+  test("keeps a single-line docstring fully", () => {
+    const body = [
+      "import os",
+      "import sys",
+      "",
+      "def run(x):",
+      '    """Run the pipeline."""',
+      "    state = initialize(x)",
+      "    for step in state.steps:",
+      "        state = advance(state, step)",
+      "        log(state)",
+      "    return state",
+    ].join("\n")
+    const fillers = Array.from({ length: 12 }, (_, i) =>
+      [`def helper_${i}(v):`, `    prepared = prepare_${i}(v)`, `    checked = check_${i}(prepared)`, `    return transform_${i}(checked)`].join("\n"),
+    ).join("\n")
+    const code = body + "\n" + fillers
+    const result = compressCode(code, config)
+    expect(result).toBeDefined()
+    expect(result!.preview).toContain('"""Run the pipeline."""')
   })
 })
 
@@ -354,7 +553,11 @@ describe("compressCode", () => {
 
 describe("relevance scoring (first-compression query)", () => {
   test("json array keeps query-relevant items", () => {
-    const items = Array.from({ length: 100 }, (_, i) => ({ id: i, kind: i === 42 ? "database-error" : "ok" }))
+    const items = Array.from({ length: 100 }, (_, i) =>
+      i === 42
+        ? { id: i, kind: "database-error", detail: "connection refused" }
+        : { id: i, status: "ok", note: `entry ${i} fine` },
+    )
     const text = JSON.stringify(items)
     const result = compressJson(text, config, "find the database-error entry")
     expect(result).toBeDefined()

@@ -50,8 +50,11 @@ export function createMessageTransform(store: CcrStore, config: CcrConfig) {
     const query = extractQuery(messages)
     // Proactive expansion (Headroom context_tracker parity): outputs whose
     // stored originals match the current query stay uncompressed this turn.
-    const expandHashes =
+    // max_proactive_expansions = 2 (Headroom parity) — cap per-turn expansions
+    // so one broad query cannot un-compress an unbounded window.
+    const allExpandHashes =
       messages.length > 0 ? await store.expandableHashes(messages[0].info.sessionID, query) : new Set<string>()
+    const expandHashes = new Set([...allExpandHashes].slice(0, 2))
     if (expandHashes.size > 0) {
       console.log(`[ccr] proactive expansion: ${expandHashes.size} output(s) kept full for this query`)
     }

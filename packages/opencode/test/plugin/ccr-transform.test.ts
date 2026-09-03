@@ -197,6 +197,48 @@ describe("proactive expansion (Headroom context_tracker parity)", () => {
     expect(messages[0].parts[0].state!.output).toBe(bigOutput())
   })
 
+  test("caps proactive expansion at 2 outputs per turn (Headroom parity)", async () => {
+    const entries = new Map<string, any>()
+    const backend: CcrStorageBackend = {
+      async read(key) {
+        return entries.get(key.join("/")) ?? null
+      },
+      async write(key, content) {
+        entries.set(key.join("/"), content)
+      },
+      async list(prefix) {
+        return [...entries.entries()].filter(([k]) => k.startsWith(prefix.join("/"))).map(([, v]) => v)
+      },
+    }
+    const store = new CcrStore(backend, config)
+    // 三个不同的、都与 query 相关的已压缩输出
+    const variants = [bigOutput(), bigOutput() + "\nextra variant one", bigOutput() + "\nextra variant two"]
+    for (let v = 0; v < variants.length; v++) {
+      await store.replace({ sessionID: "ses_test", messageID: `old${v}`, tool: "bash", output: variants[v] })
+    }
+
+    const transform = createMessageTransform(store, config)
+    const messages = buildMessages(8, variants[0])
+    // 每条消息的输出各不相同（v0/v1/v2 分布在前 3 条），query 与三者都相关
+    for (let v = 0; v < 3; v++) {
+      messages[v].parts[0] = {
+        type: "tool",
+        tool: "bash",
+        state: { status: "completed", output: variants[v] },
+      } as any
+    }
+    messages[messages.length - 2] = {
+      info: { id: "msg_cap", sessionID: "ses_test", role: "user" },
+      parts: [{ type: "text", text: "please analyze: " + bigOutput().slice(0, 60) }],
+    } as any
+    await transform({}, { messages })
+
+    // 前 2 个命中者保持原文（cap=2），第 3 个仍被压缩
+    expect(messages[0].parts[0].state!.output).toBe(variants[0])
+    expect(messages[1].parts[0].state!.output).toBe(variants[1])
+    expect(messages[2].parts[0].state!.output).toContain("[ccr:")
+  })
+
   test("default protectRecent is 4 (Headroom parity)", () => {
     const { loadCcrConfig } = require("../../src/plugin/ccr/lib/config")
     delete process.env.OPENCODE_CCR_PROTECT_RECENT

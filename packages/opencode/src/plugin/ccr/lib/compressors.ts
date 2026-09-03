@@ -23,14 +23,67 @@ export const CCR_MARKER_PATTERNS = [
 const JSON_STRING_VALUE_LIMIT = 400
 const JSON_STRING_KEEP = 160
 
+// ─── SmartCrusher selection parity (headroom-core smart_crusher) ────────────
+const ERROR_KEYWORDS = [
+  "error",
+  "exception",
+  "failed",
+  "failure",
+  "critical",
+  "fatal",
+  "crash",
+  "panic",
+  "abort",
+  "timeout",
+  "denied",
+  "rejected",
+]
+const MAX_ITEMS_AFTER_CRUSH = 15
+const FIRST_FRACTION = 0.3
+const LAST_FRACTION = 0.15
+const LOSSLESS_MIN_SAVINGS = 0.15
+
+/** Lossless table fold (Headroom compaction parity): only for arrays of plain
+ *  objects sharing one key set with scalar values — anything else returns
+ *  undefined and the caller falls back to the scored keep/drop path. */
+function buildTableRows(value: unknown[]): { columns: string[]; rows: unknown[][] } | undefined {
+  if (value.length === 0) return undefined
+  const first = value[0]
+  if (!first || typeof first !== "object" || Array.isArray(first)) return undefined
+  const columns = Object.keys(first)
+  if (columns.length === 0) return undefined
+  const keySig = [...columns].sort().join("\u0000")
+  const rows: unknown[][] = []
+  for (const item of value) {
+    if (!item || typeof item !== "object" || Array.isArray(item)) return undefined
+    const record = item as Record<string, unknown>
+    const keys = Object.keys(record)
+    if ([...keys].sort().join("\u0000") !== keySig) return undefined
+    const row: unknown[] = []
+    for (const c of columns) {
+      const v = record[c]
+      if (v !== null && typeof v === "object") return undefined
+      row.push(v)
+    }
+    rows.push(row)
+  }
+  return { columns, rows }
+}
+
 const LOG_LEVEL_RE =
   /\b(ERROR|ERR|FATAL|CRITICAL|EXCEPTION|WARN|WARNING|FAILED|FAILURE|PANIC|Traceback|Unhandled)\b/
 const LOG_SHAPE_RE = /^\d{4}-\d{2}-\d{2}[T ]|^\[\d{2}:\d{2}:\d{2}\]|^\d{2}:\d{2}:\d{2}[.,]\d{3}/
 
 const COMPRESSIBLE_LINE_CHAR = 60
 
-function previewCharBudget(config: CcrConfig): number {
-  return Math.max(200, config.previewTokens * 4)
+function previewCharBudget(config: CcrConfig, originalChars: number): number {
+  // Adaptive preview: mid-size outputs get a budget proportional to their own
+  // size (≈1/3) so a low minTokens doesn't eat the savings — every compression
+  // still nets ≈2/3 off before the marker. Outputs at or above
+  // previewTokens*3 tokens keep the full previewTokens budget. The per-
+  // compressor 0.7-ratio gates pass through anything that wouldn't be a win.
+  const full = Math.max(200, config.previewTokens * 4)
+  return Math.min(full, Math.max(200, Math.floor(originalChars / 3)))
 }
 
 function parseJson(text: string): unknown | undefined {
@@ -50,33 +103,53 @@ function compressValue(value: unknown, remainingChars: number, terms?: QueryTerm
   if (remainingChars <= 0) return undefined
 
   if (Array.isArray(value)) {
-    const serialized = value.map((item) => JSON.stringify(item))
-    let order: number[]
-    if (terms) {
-      // Relevance-first (Headroom SmartCrusher parity): score items against the
-      // user query, keep the top scorers, emit them in original order.
-      order = value
-        .map((item, i) => ({ i, score: scoreText(serialized[i] ?? "", terms) }))
-        .sort((a, b) => b.score - a.score || a.i - b.i)
-        .map((x) => x.i)
-    } else {
-      order = value.map((_, i) => i)
+    // Dedup identical items (dedup_identical_items=true parity): canonically-
+    // equal items collapse to their first occurrence and are counted.
+    const canon = new Map<string, number>()
+    const uniqueIdx: number[] = []
+    for (let i = 0; i < value.length; i++) {
+      const s = JSON.stringify(value[i]) ?? ""
+      if (!canon.has(s)) {
+        canon.set(s, i)
+        uniqueIdx.push(i)
+      }
     }
-    const kept: unknown[] = []
+    const serialized = new Map<number, string>()
+    for (const i of uniqueIdx) serialized.set(i, JSON.stringify(value[i]) ?? "")
+
+    // Selection priority (SmartCrusher parity): must-keep errors first, then
+    // first/last anchors, then query-relevant items — all capped at
+    // max_items_after_crush, emitted in original order.
+    const errorIdx = uniqueIdx.filter((i) => {
+      const hay = (serialized.get(i) ?? "").toLowerCase()
+      return ERROR_KEYWORDS.some((k) => hay.includes(k))
+    })
+    const kFirst = Math.max(1, Math.round(MAX_ITEMS_AFTER_CRUSH * FIRST_FRACTION))
+    const kLast = Math.max(1, Math.round(MAX_ITEMS_AFTER_CRUSH * LAST_FRACTION))
+    const firstIdx = uniqueIdx.slice(0, kFirst)
+    const lastIdx = uniqueIdx.slice(-kLast)
+    const relevant = terms
+      ? uniqueIdx
+          .map((i) => ({ i, score: scoreText(serialized.get(i) ?? "", terms) }))
+          .sort((a, b) => b.score - a.score || a.i - b.i)
+          .map((x) => x.i)
+      : uniqueIdx
+
     const keptIdx = new Set<number>()
     let used = 2
-    for (const i of order) {
-      if (kept.length >= value.length) break
-      const len = serialized[i]?.length ?? 0
+    for (const i of [...errorIdx, ...firstIdx, ...lastIdx, ...relevant]) {
+      if (keptIdx.size >= Math.min(value.length, MAX_ITEMS_AFTER_CRUSH)) break
+      const len = serialized.get(i)?.length ?? 0
       if (used + len + 1 > remainingChars) continue
       keptIdx.add(i)
       used += len + 1
-      if (keptIdx.size >= Math.min(value.length, 64)) break
     }
     if (keptIdx.size === 0 || keptIdx.size === value.length) return undefined
+    const deduplicated = uniqueIdx.length < value.length
     return {
       ccr_truncated: true,
       total_items: value.length,
+      ...(deduplicated ? { unique_items: uniqueIdx.length, deduplicated: true } : {}),
       showing: keptIdx.size,
       items: [...keptIdx].sort((a, b) => a - b).map((i) => value[i]),
     }
@@ -124,7 +197,30 @@ export function compressJson(text: string, config: CcrConfig, query?: string): C
   const parsed = parseJson(text)
   if (parsed === undefined) return undefined
 
-  const compressed = compressValue(parsed, previewCharBudget(config), extractQueryTerms(query))
+  // Lossless table fold first (lossless-first parity): uniformly-structured
+  // arrays re-encode to {columns, rows} with EVERY item kept — adopted only
+  // when it saves ≥ 15% of bytes (lossless needs no CCR retrieval round-trip,
+  // so the bar sits below the lossy 0.7-ratio gate).
+  if (Array.isArray(parsed) && parsed.length > 1) {
+    const table = buildTableRows(parsed)
+    if (table) {
+      const rendered = JSON.stringify({
+        ccr_table: true,
+        total_items: table.rows.length,
+        columns: table.columns,
+        rows: table.rows,
+      })
+      if (1 - rendered.length / text.length >= LOSSLESS_MIN_SAVINGS) {
+        return {
+          strategy: "json",
+          preview: rendered,
+          itemCount: { original: table.rows.length, compressed: table.rows.length },
+        }
+      }
+    }
+  }
+
+  const compressed = compressValue(parsed, previewCharBudget(config, text.length), extractQueryTerms(query))
   if (compressed === undefined) return undefined
 
   const preview = JSON.stringify(compressed)
@@ -158,18 +254,20 @@ export function compressLog(text: string, query?: string): CompressionPreview | 
   const headCount = 2
   const tailCount = 5
   const head = lines.slice(0, headCount)
-  const tail = lines.slice(-tailCount)
+  // Tail carries the most recent routine state; error lines are the
+  // important pool's job so max_errors caps the total (Headroom parity).
+  const tail = lines.slice(-tailCount).filter((line) => !LOG_LEVEL_RE.test(line))
   const middle = lines.slice(headCount, lines.length - tailCount)
   const importantAll = middle.filter((line) => LOG_LEVEL_RE.test(line))
-  // Cap at 40 lines, preferring query-relevant rows, output in original order.
+  // Cap at max_errors=10 lines (Headroom parity), preferring query-relevant rows, original order.
   const important =
-    terms && importantAll.length > 40
+    terms && importantAll.length > 10
       ? importantAll
           .map((line, i) => ({ line, i, score: scoreText(line, terms) }))
           .sort((a, b) => b.score - a.score || a.i - b.i)
-          .slice(0, 40)
+          .slice(0, 10)
           .map((x) => x.line)
-      : importantAll.slice(0, 40)
+      : importantAll.slice(0, 10)
   // Back-heavy weighting (Headroom logs_front_weight=0.15): keep a slice of
   // the most recent routine lines — recent entries often carry the outcome.
   const routineKeep = Math.min(10, Math.floor(middle.length * 0.1))
@@ -203,7 +301,7 @@ export function compressLines(text: string, config: CcrConfig): CompressionPrevi
   const lines = text.split("\n")
   if (lines.length < 24) return undefined
 
-  const maxLines = Math.max(12, Math.floor(previewCharBudget(config) / COMPRESSIBLE_LINE_CHAR))
+  const maxLines = Math.max(6, Math.floor(previewCharBudget(config, text.length) / COMPRESSIBLE_LINE_CHAR))
   const headCount = Math.min(lines.length - 8, Math.max(8, Math.floor(maxLines * 0.6)))
   const tailCount = Math.min(lines.length - headCount - 8, Math.max(4, Math.floor(maxLines * 0.25)))
   const removed = lines.length - headCount - tailCount
@@ -470,7 +568,26 @@ export function compressCode(text: string, config: CcrConfig): CompressionPrevie
     }
   }
 
+  // DocstringMode.FIRST_LINE parity: a Python docstring's opening line states
+  // the function's intent — the most valuable elided context — so it survives
+  // the fold while the rest of the string folds away.
+  let docDelim: string | undefined
+
   for (const line of lines) {
+    if (docDelim) {
+      run++
+      elided++
+      if (line.includes(docDelim)) docDelim = undefined
+      continue
+    }
+    const docOpen = /("""|''')/.exec(line)
+    if (docOpen) {
+      const rest = line.slice(docOpen.index + 3)
+      flush()
+      kept.push(line)
+      if (!rest.includes(docOpen[1])) docDelim = docOpen[1]
+      continue
+    }
     if (isStructure(line) || isClose(line)) {
       flush()
       kept.push(line)

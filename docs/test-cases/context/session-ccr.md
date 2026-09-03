@@ -13,12 +13,17 @@
 | 相关性评分 | 首轮固定版（Headroom SmartCrusher parity）：用当轮 user query（word-overlap + CJK bigram）评分选保留项，选定后随内容 hash 固化——请求视图字节稳定不破坏 |
 | Proactive expansion | Headroom context_tracker 轻量版：当轮 query 与某已压缩 output 原文高相关（score≥2）时，该输出本轮保持完整不折叠——打破「压缩→retrieve→再压缩」循环，不再依赖模型主动 retrieve |
 | 代码语法安全 | Headroom CodeAwareCompressor parity：折叠后输出保持合法语法——保留块关闭行、折叠体用同语言注释占位（Python 额外 `pass` 保证空块可解析） |
+| Docstring FIRST_LINE | CodeAwareCompressor `DocstringMode.FIRST_LINE`（默认值）对齐：Python `"""`/`'''` docstring 的首行在折叠中保留（函数意图陈述是最有价值的被折叠上下文），其余行计入折叠。注：Headroom 用 tree-sitter AST 实现且作为可选依赖（`headroom-ai[code]`，~50MB），我们采用行级启发式等价于其 fallback 位。**AST 实现决策：不做**——① 骨架视图的消费者是 LLM 而非编译器，容错高；② CCR 的 retrieve 闭环兜底信息损失；③ 50MB 依赖 + transform 同步链延迟 + 镜像复杂度远超收益（Headroom 自己也把 AST 作为可选，fallback 启发式是官方支持模式）。**重新评估触发条件**（届时按语言渐进，TS/JS 可用 opencode 已有 typescript compiler API）：线上 rets 频繁且集中在 code 类 entry / 任务失败归因到折叠视图误导 / code 类 rets 分布显著异于其他策略 |
 | 日志 back-heavy | Headroom logs_front_weight=0.15 parity：middle 尾部 10% routine 行保留（最近日志常携带结果），error 行 cap 40 内优先 query 相关行 |
 | 保护窗口 | protectRecent 默认 **4**（Headroom protect_recent=4）：最近 4 条消息输出全保真，同时保证 retrieve 取回的内容在后续多轮可见 |
 | CCR 可恢复 | 原文按内容 hash 存 PG（key `plugin/ccr/<sessionID>/<hash>`），多实例共享；`ccr_retrieve(hash)` 工具取回 |
 | Headroom 对齐 | hash=SHA-256[:24]（96bit）、marker `Retrieve original: hash=`、entry 带 compressedTokens/item 数/retrievalCount、多 marker 幂等（含 `<<ccr:`）、miss 结构化 status+hint、可选 TTL、内存 LRU 1000 |
 | 幂等稳定 | 同内容同 hash 同替换字节 → 请求前缀稳定，利于 provider KV cache；含任一已知 marker 形态的输出不再二次压缩（防 hash 孤儿，Headroom #2694） |
 | 收益护栏 | `minTokens` 以下不动、最近 `protectRecent` 条消息不动、edit/write/question 输出不动、preview 需 ≥30% 缩减 |
+| 自适应 preview（方案 B） | 中等输出（< previewTokens×3 tok）的保留预算按自身 1/3 比例收缩（json/lines 两处），使低 `minTokens` 不侵蚀收益——每次压缩仍净省 ≈2/3；大输出预算不变。配合各压缩器 0.7 ratio 门槛，压不出收益的自动透传 |
+| JSON 三路压缩（SmartCrusher 行为对齐） | 按代码级核实（crates/headroom-core）补齐三项行为：① **Lossless-first**——同构数组（键集一致+标量值）重编码为 `ccr_table{columns,rows}`，全部 item 保留，字节节省 ≥15% 才采用（`lossless_min_savings_ratio=0.15`，注意文档写 30% 已过时），否则 fallback；② **keep/drop 五维优先级**——must_keep error（12 关键词硬约束：error/exception/failed/failure/critical/fatal/crash/panic/abort/timeout/denied/rejected）→ first 30%（5 个）→ last 15%（2 个）→ query 相关填充，总 cap 15；③ **dedup_identical_items**——归一化相同的 item 折叠为首现 + `unique_items` 计数。容器实证：uniform 300 item→table 全保留省 49%；400 重复→2 项省 99%；异构 error 数组 error 项必在保留集 |
+| 默认值全量对齐 | 2026-09-04 起 config 默认与 Headroom 逐项一致：`min_tokens_to_compress=250`、`protect_recent=4`、`DEFAULT_CCR_TTL_SECONDS=1800`、`max_items_after_crush=15`（JSON item 上限，原 64）、`max_errors=10`（log error 行 cap，原 40，且 tail 保留区不再混入 error 行）、`max_proactive_expansions=2`（每轮展开上限，原无上限）。LRU 1000、diff context=2/hunks=10 此前已一致 |
+| TTL 语义变化 | `ttlSeconds` 默认从 0（随 session）改为 **1800**（Headroom session-scale）——条目 30 分钟后 retrieve 返回 expired+hint；需要跨长会话检索的场景显式设 `OPENCODE_CCR_TTL_SEC=0` |
 | PG 原文只读 | 压缩只改请求视图，`part.state.output` 原文始终留在 PG；session 删除时 CCR 条目同步清理 |
 
 ## 实现位置
@@ -36,7 +41,7 @@
 | 环境变量 | 默认 | 说明 |
 | --- | --- | --- |
 | `OPENCODE_CCR_ENABLED` | off | 开关注册插件 |
-| `OPENCODE_CCR_MIN_TOKENS` | 1000 | tool output 估算 token 低于该值不压缩 |
+| `OPENCODE_CCR_MIN_TOKENS` | **250** | tool output 估算 token 低于该值不压缩（Headroom `min_tokens_to_compress=250` 对齐） |
 | `OPENCODE_CCR_PROTECT_RECENT` | 2 | 最近 N 条消息的输出保持原样（活跃上下文） |
 | `OPENCODE_CCR_PREVIEW_TOKENS` | 300 | preview 的近似 token 预算 |
 | `OPENCODE_CCR_TTL_SEC` | 0（随 session） | entry 过期秒数；Headroom session-scale 为 1800。过期后 retrieve 返回 expired 状态并提示重跑来源 |
@@ -76,7 +81,7 @@ TTL 启用时追加 ` Expires in 30m.`。幂等识别四种形态：`[ccr:`、`R
 ## 公共配置
 
 > **镜像默认开启**：Dockerfile 已内置 `ENV OPENCODE_CCR_ENABLED=true`（与 DCP 同待遇），容器无需额外传参。
-> 生产阈值即代码默认值（`minTokens=1000`、`protectRecent=4`），比测试期（200）保守；需微调时用下表 env 覆盖。
+> 生产阈值即代码默认值，已与 Headroom 默认配置全量对齐（`minTokens=250`、`protectRecent=4`、`ttlSeconds=1800`、自适应 preview），零 env 配置即生效；需微调时用下表 env 覆盖。
 
 ```bash
 source docs/test-cases/test-env.sh 3 && source docs/test-cases/test-lib.sh
