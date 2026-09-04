@@ -218,4 +218,42 @@ describe("CcrStore.retrieveAlongAncestry", () => {
     })
     expect(result.status).toBe("not_found")
   })
+
+  test("treats a throwing backend.read as not_found instead of propagating", async () => {
+    const store = new CcrStore(
+      {
+        read: async () => {
+          throw new Error("storage unavailable")
+        },
+        write: async () => {},
+      },
+      baseConfig,
+    )
+    expect((await store.retrieve("ses_a", "deadbeefdeadbeefdeadbeef")).status).toBe("not_found")
+    // the guard must also keep the ancestry walk alive: child miss -> parent lookup still runs
+    let parentLookups = 0
+    const result = await store.retrieveAlongAncestry("ses_child", "deadbeefdeadbeefdeadbeef", async (sid) => {
+      if (sid === "ses_child") {
+        parentLookups++
+        return "ses_parent"
+      }
+      return undefined
+    })
+    expect(result.status).toBe("not_found")
+    expect(parentLookups).toBe(1)
+  })
+
+  test("counts the retrieval on the ancestor that actually holds the entry", async () => {
+    const { entries, backend } = makeBackend()
+    const store = new CcrStore(backend, baseConfig)
+    await store.replace({ sessionID: "ses_root", messageID: "m", tool: "bash", output: bigJson })
+    const hash = contentHash(bigJson)
+    const key = ["plugin", "ccr", "ses_root", hash].join("/")
+
+    const result = await store.retrieveAlongAncestry("ses_leaf", hash, async (sid) =>
+      sid === "ses_leaf" ? "ses_root" : undefined,
+    )
+    expect(result.status).toBe("available")
+    expect(entries.get(key)!.retrievalCount).toBe(1)
+  })
 })
