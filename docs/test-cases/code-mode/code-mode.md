@@ -23,11 +23,12 @@
 
 | 条件       | 说明                                                              |
 | ---------- | ----------------------------------------------------------------- |
-| SaaS 容器  | `opencode-saas-sandbox-test`，`OPENCODE_SANDBOX_ENABLED=true`     |
+| SaaS 容器  | `opencode-saas-sandbox-test:ccr`，`OPENCODE_EXPERIMENTAL_CODE_MODE=all`（本文件全套默认在 all 模式跑；T50.27 额外要求 mcp 模式对照） |
+| 组合       | 组合 1（远端 PG + 远端 Sandbox，见 `docs/local-test-env.md`）     |
 | 沙箱转发器 | `0.0.0.0:30040` → `172.18.32.15:30040` 运行中                     |
-| PG         | `postgresql://local@127.0.0.1:15432/opencode`                     |
+| PG         | 远端 `postgresql://app:8zuhlMLd4gaeUG5k@172.18.32.14:5432/opencode`（容器内经 `host.docker.internal:15432` 转发；若转发不可用改直连，见 local-test-env.md） |
 | MCP Server | 需要至少一个 MCP server（本测试用 echo / calculate 类工具）       |
-| 图片模型   | `moonshotai-cn/kimi-k3`，通过 SaaS `PUT /auth/moonshotai-cn` 配置 |
+| 图片模型   | `moonshotai-cn/kimi-k3`，通过 SaaS `PUT /auth/moonshotai-cn` 配置（仅 T50.20 需要，无 key 时跳过） |
 
 图片测试的凭据只写入 SaaS auth，不写入仓库、文档或 shell history：
 
@@ -48,7 +49,7 @@ done
 运行前加载公共环境，并为本文件创建独立 Session。所有步骤必须串行执行，PG 查询通过执行前时间水位限定到本次请求，禁止读取不加边界的“最新一条”记录：
 
 ```bash
-source test-env.sh 3
+source test-env.sh 1
 source test-lib.sh
 
 mark_execute() {
@@ -118,6 +119,20 @@ curl -s "$BASE/session/$SID/mcps" | jq -e '.[] | select(.name=="echo" and .enabl
 ```
 
 **期望**：返回 echo 配置。当前没有 session MCP connection-status HTTP 接口；真实连接由 T50.4 的首次成功调用验证，不使用固定 `sleep` 或 Web UI fallback 路由。
+
+### T50.3b 沙箱测试项目准备（内置工具用例前置）
+
+> ⚠️ **关键**：会话工具在**远端沙箱**内执行，沙箱的 `/workspace` 与 server 容器文件系统隔离。**在 server 容器（docker exec）建文件对沙箱不可见**，必须用 `/session/:id/exec` 写进沙箱。跳过此步会导致所有读文件用例报 `file not found`。
+
+```bash
+curl -s --max-time 120 -X POST "$BASE/session/$SID/exec" -H 'Content-Type: application/json' \
+  -d '{"command":"mkdir -p /workspace/src/config && echo {\"name\":\"code-mode-demo\",\"version\":\"1.0.0\",\"dependencies\":{\"react\":\"^19\",\"zod\":\"^4\"},\"devDependencies\":{\"typescript\":\"^5\"}} > /workspace/package.json && for f in agent provider flag; do echo \"export const $f = 1\" > /workspace/src/config/$f.ts; done && ls -R /workspace"}' \
+  | jq -e '.exitCode == 0'
+```
+
+**期望**：`exitCode == 0`，stdout 含 `package.json` 与 3 个 `.ts` 文件。
+
+> **HTTP 响应陷阱**：`POST /session/:id/message` 同步等待，返回的只是**最后一条 assistant**（常为无 tool part 的总结文本）。含 tool part 的中间 assistant 消息必须查 PG（`execute_state_after` 水位查询），不要用 HTTP 响应断言工具行为。模型也可能幻觉"已调用"（parts 里无 tool）或自主改用直接调用——PG 无 execute part 即判模型未调用，重发 prompt（措辞更直接）而非判功能失败。
 
 ---
 
@@ -432,6 +447,8 @@ execute_state_after "$BEFORE" | jq -e '
 
 ## 九、附件处理
 
+> 仅 T50.20 需要 moonshotai-cn key。无 key 时跳过本节（`curl -sf "$BASE/provider" | jq -e '.connected | index("moonshotai-cn") != null'` 不通过即跳过），不计入 FAIL。
+
 ### T50.20 工具返回图片内容
 
 使用 server-everything 的固定小图片工具和支持图片输入的 Kimi K3，验证 execute 收集附件：
@@ -600,6 +617,85 @@ curl -s -X DELETE "$BASE/session/$SID" >/dev/null
 
 ---
 
+## 十五、all 模式内置工具编排（需 T50.3b 沙箱项目）
+
+> 本组验证 `all` 模式核心价值：`tools.opencode.read/glob/grep` 在脚本内编排。echo MCP 测不出"内置工具输出格式 × 脚本"的真实交互（如 read 返回的 XML-like 行号文本会导致 naive `JSON.parse` 失败，模型需 1-2 轮自我修复收敛——属正常行为，不判失败）。
+
+### T50.28 read + glob 编排真实文件
+
+```bash
+BEFORE=$(mark_execute)
+curl -s --max-time 180 -X POST "$BASE/session/$SID/message" -H 'Content-Type: application/json' \
+  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"用 execute 工具：read /workspace/package.json，glob src/config/*.ts，返回 {name, tsFileCount}。read 返回的是带行号的文本格式，注意先提取再解析。\"}],\"model\":$MODEL}" >/dev/null
+execute_state_after "$BEFORE" | jq -e '
+  .status == "completed" and
+  (.output | contains("code-mode-demo")) and
+  ([.metadata.toolCalls[] | select(.status == "completed")] | length) >= 2
+'
+```
+
+**期望**：硬断言通过。允许模型中途 error 后自我修复（多条 execute part），只断言最终成功的 part。
+
+### T50.29 grep + read 组合定位
+
+```bash
+BEFORE=$(mark_execute)
+curl -s --max-time 180 -X POST "$BASE/session/$SID/message" -H 'Content-Type: application/json' \
+  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"用 execute 工具：grep 找出 src 下包含 export const 的文件，再 read 其中一个，把文件名和第一行返回为 {file, firstLine}。\"}],\"model\":$MODEL}" >/dev/null
+execute_state_after "$BEFORE" | jq -e '
+  .status == "completed" and
+  (.output | contains("src/config/")) and
+  (.output | contains("export const"))
+'
+```
+
+**期望**：硬断言通过，验证跨工具数据流（grep 结果驱动 read 参数）。
+
+---
+
+## 十六、省 token 效果对比
+
+> code-mode 核心卖点"中间结果不进对话"的唯一量化验证：同一任务两种做法的 input token 差。
+
+### T50.30 脚本内汇总 vs 直接调用
+
+```bash
+# 做法 A：execute 脚本内读 3 个文件并汇总（中间输出不出对话）
+BEFORE_A=$(mark_execute)
+curl -s --max-time 180 -X POST "$BASE/session/$SID/message" -H 'Content-Type: application/json' \
+  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"用 execute 工具：read src/config 下全部 3 个 ts 文件，在脚本内拼接它们的内容总字符数，只返回 {totalChars} 一个数字。\"}],\"model\":$MODEL}" >/dev/null
+TOK_A=$(pgval "SELECT data->'tokens'->>'input' FROM message WHERE session_id='$SID' ORDER BY time_created DESC LIMIT 1")
+
+# 做法 B：新 session，直接调用 read 3 次再汇总（中间输出全进对话）
+SID2=$(new_sid -kb)
+curl -s --max-time 120 -X POST "$BASE/session/$SID2/exec" -H 'Content-Type: application/json' \
+  -d '{"command":"mkdir -p /workspace/src/config && for f in agent provider flag; do echo \"export const $f = 1\" > /workspace/src/config/$f.ts; done"}' >/dev/null
+curl -s --max-time 180 -X POST "$BASE/session/$SID2/message" -H 'Content-Type: application/json' \
+  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"逐个 read src/config 下全部 3 个 ts 文件，把它们的内容总字符数返回为 {totalChars}。\"}],\"model\":$MODEL}" >/dev/null
+TOK_B=$(pgval "SELECT data->'tokens'->>'input' FROM message WHERE session_id='$SID2' ORDER BY time_created DESC LIMIT 1")
+
+echo "execute做法input=$TOK_A 直接调用input=$TOK_B"
+curl -s -X DELETE "$BASE/session/$SID2" >/dev/null
+```
+
+**期望**：`TOK_A < TOK_B`（脚本内中间结果不进对话）。差值随文件大小放大，本用例只断言方向不设阈值。
+
+---
+
+## 十七、已知问题（非阻塞记录）
+
+### T50.31 工具自然卡死的 watchdog 行为（观察项）
+
+`read /`（沙箱根目录）在远端沙箱挂起不返回时，watchdog 尝试 mark 超时 → `PG query timed out after 30000ms` → 标记失败 → 约 45s 后重试，形成无限循环并持续占用 PG 连接，期间同实例其他会话的模型行为可能异常（拒调工具/幻觉）。`docker restart` 可清。复现即记录，不判 FAIL：
+
+```bash
+docker logs opencode-saas-test 2>&1 | grep -c "mark timed out failed" || true
+```
+
+**期望**：记录次数与现象。根治（mark 操作熔断/超时 part 强制回收）超出本文件范围，另立议题。
+
+---
+
 ## 测试矩阵
 
 | 编号   | 分类 | 场景             | 关键验证点                      |
@@ -631,6 +727,11 @@ curl -s -X DELETE "$BASE/session/$SID" >/dev/null
 | T50.25 | 限制 | 大输出截断       | truncated + outputPath          |
 | T50.26 | 限制 | 超并发排队       | 12 调用全部完成                 |
 | T50.27 | 清理 | 删除 MCP         | execute 消失                    |
+| T50.3b | 准备 | 沙箱测试项目     | exec 写文件进沙箱               |
+| T50.28 | 内置 | read+glob 编排   | 真实文件，自我修复收敛          |
+| T50.29 | 内置 | grep+read 组合   | 跨工具数据流                    |
+| T50.30 | 收益 | 脚本汇总对比     | input token 方向性更优          |
+| T50.31 | 已知 | 卡死观察         | 记录，不判 FAIL                 |
 
 ## 确定性自动化覆盖
 
