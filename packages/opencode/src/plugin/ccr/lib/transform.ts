@@ -1,12 +1,12 @@
 import { estimateTokens, type CcrConfig } from "./config"
 import { resizeImageDataUrl } from "./image-resize"
-import { contentHash, type CcrStore } from "./store"
+import type { CcrStore } from "./store"
 
 const EXCLUDED_TOOLS = new Set(["edit", "write", "question"])
 
 // Detail-oriented queries need pixels; skip the resize pass this turn.
 const IMAGE_DETAIL_RE =
-  /\bread\b|\bcount\b|\btranscribe\b|\bexact\b|\bserial\b|\bcompare\b|\bzoom\b|读|数|精确|序列|对比|逐|放大|仔细|看清/
+  /\bread\b|\bcount\b|\btranscribe\b|\bexact\b|\bserial\b|\bcompare\b|\bzoom\b|数一下|数量|几个|精确|序列|对比|逐字|逐项|逐个|逐像素|放大|仔细|看清|识别.*(?:文字|文本)/
 
 interface ToolPartLike {
   type: "tool"
@@ -54,18 +54,11 @@ export function createMessageTransform(store: CcrStore, config: CcrConfig) {
     const stats: CcrTransformStats = { compressed: 0, tokensSaved: 0 }
     const lastCompressibleIndex = messages.length - 1 - config.protectRecent
     const query = extractQuery(messages)
-    // Proactive expansion (Headroom context_tracker parity): outputs whose
-    // stored originals match the current query stay uncompressed this turn.
-    // max_proactive_expansions = 2 (Headroom parity) — cap per-turn expansions
-    // so one broad query cannot un-compress an unbounded window.
-    const allExpandHashes =
-      messages.length > 0 ? await store.expandableHashes(messages[0].info.sessionID, query) : new Set<string>()
-    const expandHashes = new Set([...allExpandHashes].slice(0, 2))
-    if (expandHashes.size > 0) {
-      console.log(`[ccr] proactive expansion: ${expandHashes.size} output(s) kept full for this query`)
-    }
     console.log(
-      `[ccr] window: last=${lastCompressibleIndex} ids=${messages.slice(0, lastCompressibleIndex + 1).map((m) => m?.info?.id?.slice(4, 16)).join(",")}`,
+      `[ccr] window: last=${lastCompressibleIndex} ids=${messages
+        .slice(0, lastCompressibleIndex + 1)
+        .map((m) => m?.info?.id?.slice(4, 16))
+        .join(",")}`,
     )
 
     for (let i = 0; i <= lastCompressibleIndex; i++) {
@@ -94,8 +87,6 @@ export function createMessageTransform(store: CcrStore, config: CcrConfig) {
         const outputText = toolPart.state.output
         if (typeof outputText !== "string") continue
         if (estimateTokens(outputText) < config.minTokens) continue
-        if (expandHashes.has(contentHash(outputText))) continue
-
         const replacement = await store.replace({
           sessionID: msg.info.sessionID,
           messageID: msg.info.id,
@@ -104,7 +95,9 @@ export function createMessageTransform(store: CcrStore, config: CcrConfig) {
           query,
         })
         if (replacement === undefined) {
-          console.log(`[ccr] skip: idx=${i} id=${msg.info.id.slice(4, 20)} tool=${toolPart.tool} len=${outputText.length}`)
+          console.log(
+            `[ccr] skip: idx=${i} id=${msg.info.id.slice(4, 20)} tool=${toolPart.tool} len=${outputText.length}`,
+          )
           continue
         }
 
@@ -115,9 +108,7 @@ export function createMessageTransform(store: CcrStore, config: CcrConfig) {
     }
 
     if (stats.compressed > 0) {
-      console.log(
-        `[ccr] compressed ${stats.compressed} tool output(s), ~${stats.tokensSaved} tokens saved`,
-      )
+      console.log(`[ccr] compressed ${stats.compressed} tool output(s), ~${stats.tokensSaved} tokens saved`)
     }
     if (stats.imagesResized) {
       console.log(`[ccr] images: ${stats.imagesResized} history screenshot(s) resized to fit 512`)

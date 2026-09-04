@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { contentHash, CcrStore, type CcrEntry, type CcrStorageBackend } from "../../src/plugin/ccr/lib/store"
-import type { CcrConfig } from "../../src/plugin/ccr/lib/config"
+import { loadCcrConfig, type CcrConfig } from "../../src/plugin/ccr/lib/config"
 
 const baseConfig: CcrConfig = {
   minTokens: 1000,
@@ -73,9 +73,7 @@ describe("CcrStore.replace", () => {
       "[3 items compressed to 1. Retrieve more: hash=abc. Expires in 30m.]",
       "<<ccr:abc,base64,4.5KB>>",
     ]) {
-      expect(
-        await store.replace({ sessionID: "s", messageID: "m", tool: "read", output: marked }),
-      ).toBeUndefined()
+      expect(await store.replace({ sessionID: "s", messageID: "m", tool: "read", output: marked })).toBeUndefined()
     }
   })
 
@@ -87,6 +85,41 @@ describe("CcrStore.replace", () => {
     const second = await store.replace({ sessionID: "s", messageID: "m2", tool: "read", output: bigJson })
     expect(second).toBe(first)
     expect(entries.size).toBe(writesAfterFirst)
+  })
+
+  test("persists identical content separately for each session", async () => {
+    const { entries, backend } = makeBackend()
+    const store = new CcrStore(backend, baseConfig)
+    await store.replace({ sessionID: "ses_a", messageID: "m1", tool: "read", output: bigJson })
+    const replacement = await store.replace({ sessionID: "ses_b", messageID: "m2", tool: "read", output: bigJson })
+
+    expect(replacement).toContain("[ccr:")
+    expect(entries.has(["plugin", "ccr", "ses_b", contentHash(bigJson)].join("/"))).toBe(true)
+    expect((await store.retrieve("ses_b", contentHash(bigJson))).status).toBe("available")
+  })
+
+  test("reuses the persisted replacement across server instances", async () => {
+    const { backend } = makeBackend()
+    const output = [
+      ...Array.from({ length: 60 }, (_, i) => `alpha ${i} ${"a".repeat(80)}`),
+      ...Array.from({ length: 60 }, (_, i) => `beta ${i} ${"b".repeat(80)}`),
+    ].join("\n")
+    const first = await new CcrStore(backend, baseConfig).replace({
+      sessionID: "ses_shared",
+      messageID: "m1",
+      tool: "read",
+      output,
+      query: "alpha",
+    })
+    const second = await new CcrStore(backend, baseConfig).replace({
+      sessionID: "ses_shared",
+      messageID: "m1",
+      tool: "read",
+      output,
+      query: "beta",
+    })
+
+    expect(second).toBe(first)
   })
 
   test("evicts the oldest cached replacement beyond 1000 entries (LRU)", async () => {
@@ -104,18 +137,40 @@ describe("CcrStore.replace", () => {
     expect(await store.replace({ sessionID: "s", messageID: "m", tool: "read", output: dense })).toBeUndefined()
   })
 
-  test("survives backend write failures", async () => {
+  test("passes through on backend write failure and retries later", async () => {
+    let writes = 0
     const failingBackend: CcrStorageBackend = {
       async read() {
         return null
       },
       async write() {
-        throw new Error("pg down")
+        writes++
+        if (writes === 1) throw new Error("pg down")
       },
     }
     const store = new CcrStore(failingBackend, baseConfig)
-    const replacement = await store.replace({ sessionID: "s", messageID: "m", tool: "read", output: bigJson })
-    expect(replacement).toBeDefined()
+    expect(await store.replace({ sessionID: "s", messageID: "m", tool: "read", output: bigJson })).toBeUndefined()
+    expect(await store.replace({ sessionID: "s", messageID: "m", tool: "read", output: bigJson })).toContain("[ccr:")
+    expect(writes).toBe(2)
+  })
+
+  test("keeps entries retrievable when no backend is configured", async () => {
+    const store = new CcrStore(undefined, baseConfig)
+    expect(await store.replace({ sessionID: "s", messageID: "m", tool: "read", output: bigJson })).toContain("[ccr:")
+    expect((await store.retrieve("s", contentHash(bigJson))).status).toBe("available")
+  })
+})
+
+describe("loadCcrConfig", () => {
+  test("accepts zero to disable CCR expiry", () => {
+    const previous = process.env.OPENCODE_CCR_TTL_SEC
+    process.env.OPENCODE_CCR_TTL_SEC = "0"
+    try {
+      expect(loadCcrConfig().ttlSeconds).toBe(0)
+    } finally {
+      if (previous === undefined) delete process.env.OPENCODE_CCR_TTL_SEC
+      else process.env.OPENCODE_CCR_TTL_SEC = previous
+    }
   })
 })
 
@@ -160,9 +215,10 @@ describe("CcrStore.retrieve", () => {
     expect((await store.retrieve("ses_other", contentHash(bigJson))).status).toBe("not_found")
   })
 
-  test("returns not_found without a backend (in-memory mode)", async () => {
+  test("retrieves from the process cache without a backend", async () => {
     const store = new CcrStore(undefined, baseConfig)
-    expect((await store.retrieve("s", contentHash(bigJson))).status).toBe("not_found")
+    await store.replace({ sessionID: "s", messageID: "m", tool: "read", output: bigJson })
+    expect((await store.retrieve("s", contentHash(bigJson))).status).toBe("available")
   })
 })
 

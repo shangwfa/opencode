@@ -13,12 +13,7 @@ export interface CompressionPreview {
 /** Any of these substrings means the text is already compressed output
  *  carrying a live retrieval handle — re-compressing it risks orphaning
  *  the hash (Headroom issue #2694). */
-export const CCR_MARKER_PATTERNS = [
-  "[ccr:",
-  "Retrieve original: hash=",
-  "Retrieve more: hash=",
-  "<<ccr:",
-] as const
+export const CCR_MARKER_PATTERNS = ["[ccr:", "Retrieve original: hash=", "Retrieve more: hash=", "<<ccr:"] as const
 
 const JSON_STRING_VALUE_LIMIT = 400
 const JSON_STRING_KEEP = 160
@@ -70,8 +65,7 @@ function buildTableRows(value: unknown[]): { columns: string[]; rows: unknown[][
   return { columns, rows }
 }
 
-const LOG_LEVEL_RE =
-  /\b(ERROR|ERR|FATAL|CRITICAL|EXCEPTION|WARN|WARNING|FAILED|FAILURE|PANIC|Traceback|Unhandled)\b/
+const LOG_LEVEL_RE = /\b(ERROR|ERR|FATAL|CRITICAL|EXCEPTION|WARN|WARNING|FAILED|FAILURE|PANIC|Traceback|Unhandled)\b/
 const LOG_ERROR_RE = /\b(ERROR|ERR|FATAL|CRITICAL|EXCEPTION|FAILED|FAILURE|PANIC|Traceback|Unhandled)\b/
 const LOG_WARN_RE = /\b(WARN|WARNING|DEPRECATED)\b/
 // Stack trace openers (Python/JS/Go/Rust/Java flavors, Headroom parity)
@@ -259,12 +253,8 @@ export function compressLog(text: string, query?: string): CompressionPreview | 
   const terms = extractQueryTerms(query)
 
   const headCount = 2
-  const tailCount = 5
   const head = lines.slice(0, headCount)
-  // Tail carries the most recent routine state; error lines are the
-  // important pool's job so max_errors caps the total (Headroom parity).
-  const tail = lines.slice(-tailCount).filter((line) => !LOG_LEVEL_RE.test(line))
-  const middle = lines.slice(headCount, lines.length - tailCount)
+  const middle = lines.slice(headCount)
 
   // Log selection (Headroom LogCompressor parity): four pools with their own
   // caps — errors (max_errors=10, first+last anchored), warnings
@@ -280,6 +270,16 @@ export function compressLog(text: string, query?: string): CompressionPreview | 
     const line = middle[i]!
     if (LOG_ERROR_RE.test(line)) {
       errorIdx.push(i)
+      if (traces < 3 && STACK_OPEN_RE.test(line)) {
+        stackKeep.add(i)
+        for (let j = i + 1, n = 1; j < middle.length && n < 20; j++, n++) {
+          const next = middle[j]!
+          if (!/^\s/.test(next) && !/^[\w./\\-]+\.(go|py|java|ts|js|rs|cpp|c):\d+/.test(next) && next.trim() !== "")
+            break
+          stackKeep.add(j)
+        }
+        traces++
+      }
       continue
     }
     if (LOG_WARN_RE.test(line)) {
@@ -299,32 +299,33 @@ export function compressLog(text: string, query?: string): CompressionPreview | 
       stackKeep.add(i)
       for (let j = i + 1, n = 1; j < middle.length && n < 20; j++, n++) {
         const next = middle[j]!
-        if (!/^\s/.test(next) && !/^[\w./\\-]+\.(go|py|java|ts|js|rs|cpp|c):\d+/.test(next) && next.trim() !== "")
-          break
+        if (!/^\s/.test(next) && !/^[\w./\\-]+\.(go|py|java|ts|js|rs|cpp|c):\d+/.test(next) && next.trim() !== "") break
         stackKeep.add(j)
       }
       traces++
     }
   }
-  let important =
+  const important =
     terms && errorIdx.length > 10
       ? [
           errorIdx[0]!,
           ...errorIdx
+            .slice(1, -1)
             .map((idx, k) => ({ idx, k, score: scoreText(middle[idx]!, terms) }))
             .sort((a, b) => b.score - a.score || a.k - b.k)
-            .slice(0, 9)
+            .slice(0, 8)
             .map((x) => x.idx),
           errorIdx[errorIdx.length - 1]!,
         ]
       : [errorIdx[0], ...errorIdx.slice(1, 9), errorIdx[errorIdx.length - 1]].filter((x) => x !== undefined)
-  important = [...new Set(important)].sort((a, b) => a - b)
-  if (important.length > 10) important = important.slice(0, 10)
-  const warnKept = warnIdx.slice(0, 5)
+  const importantSorted = [...new Set(important)].sort((a, b) => a - b)
+  const warnKept = [...new Set([warnIdx[0], ...warnIdx.slice(1, 4), warnIdx[warnIdx.length - 1]])].filter(
+    (idx): idx is number => idx !== undefined,
+  )
 
   // Error context lines (±3 per kept error) get folded into the keep set.
-  const keep = new Set<number>([...important, ...warnKept, ...summaryIdx, ...stackKeep])
-  for (const idx of important) {
+  const keep = new Set<number>([...importantSorted, ...warnKept, ...summaryIdx, ...stackKeep])
+  for (const idx of importantSorted) {
     for (let d = -3; d <= 3; d++) {
       const j = idx + d
       if (j >= 0 && j < middle.length && !LOG_LEVEL_RE.test(middle[j]!)) keep.add(j)
@@ -336,7 +337,7 @@ export function compressLog(text: string, query?: string): CompressionPreview | 
   const routineKeep = Math.min(10, Math.floor(middle.length * 0.1))
   const routineTail = middle.slice(-routineKeep).filter((line) => !LOG_LEVEL_RE.test(line))
   const removed = middle.length - keep.size - routineTail.length
-  if (removed < 8 || important.length === 0) return undefined
+  if (removed < 8 || importantSorted.length === 0) return undefined
 
   const routineSet = new Set(routineTail)
   const previewLines: string[] = [...head]
@@ -353,8 +354,6 @@ export function compressLog(text: string, query?: string): CompressionPreview | 
     folded++
   }
   if (folded > 0) previewLines.push(`[... ${folded} routine lines elided ...]`)
-  previewLines.push(...tail)
-
   const preview = previewLines.join("\n")
   if (estimateTokens(preview) >= estimateTokens(text) * 0.7) return undefined
   return { strategy: "log", preview }
@@ -385,7 +384,7 @@ export function compressLines(text: string, config: CcrConfig, query?: string): 
     const kept = [...keep].sort((a, b) => a - b)
     if (kept.length >= lines.length - 8) return undefined
     const out: string[] = []
-    let prev = -2
+    let prev = -1
     for (const i of kept) {
       if (i - prev > 1) out.push(`[... ${i - prev - 1} lines removed ...]`)
       out.push(lines[i]!)
@@ -433,7 +432,7 @@ export function compressOutput(text: string, config: CcrConfig, query?: string):
   const code = compressCode(text, config)
   if (code) return code
 
-  const log = compressLog(text, query)
+  const log = looksLikeLog(text) ? compressLog(text, query) : undefined
   if (log) return log
 
   return compressLines(text, config, query)
@@ -469,7 +468,7 @@ export function compressDiff(text: string): CompressionPreview | undefined {
   let inHunk = false
 
   for (const line of lines) {
-    if (DIFF_FILE_HEAD_RE.test(line)) {
+    if (DIFF_FILE_HEAD_RE.test(line) && (!inHunk || line.startsWith("diff --git ") || line.startsWith("Index: "))) {
       if (contextRun > 0) {
         previewLines.push(`[... ${contextRun} ctx elided ...]`)
         kept++
@@ -539,7 +538,10 @@ export function compressDiff(text: string): CompressionPreview | undefined {
 const TABULAR_DELIMITERS = [",", "\t", "|"]
 
 function detectDelimiter(text: string): string | undefined {
-  const lines = text.split("\n").filter((l) => l.trim() !== "").slice(0, 20)
+  const lines = text
+    .split("\n")
+    .filter((l) => l.trim() !== "")
+    .slice(0, 20)
   for (const d of TABULAR_DELIMITERS) {
     if (d === "|" && !lines.every((l) => /^\s*\|.*\|\s*$/.test(l))) continue
     const count = (l: string) => (d === "|" ? l.split("|").length - 2 : l.split(d).length)
@@ -609,9 +611,9 @@ export function compressHtml(text: string, config: CcrConfig): CompressionPrevie
     .replace(/<(br|hr|img|input|meta|link)\b[^>]*\/?>/gi, "")
     .replace(/<[^>]+>/g, "\n")
     .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&")
     .split("\n")
     .map((l) => l.trim())
     .filter((l) => l.length > 0)
@@ -628,7 +630,8 @@ export function compressHtml(text: string, config: CcrConfig): CompressionPrevie
 // bodies collapse. Mis-folded lines stay retrievable via CCR.
 
 const CODE_IMPORT_RE = /^\s*(import\b|from\s+\S+\s+import\b|package\s|using\s|require\(|#include|use\s)/
-const CODE_DECL_RE = /^\s*(export\s+)?(default\s+)?(async\s+)?(function\b|class\b|interface\b|type\s+\w+\s*=|enum\b|struct\b|impl\b|trait\b|def\b|fn\b|pub\b|public\b|private\b|protected\b)/
+const CODE_DECL_RE =
+  /^\s*(export\s+)?(default\s+)?(async\s+)?(function\b|class\b|interface\b|type\s+\w+\s*=|enum\b|struct\b|impl\b|trait\b|def\b|fn\b|pub\b|public\b|private\b|protected\b)/
 const CODE_DECORATOR_RE = /^\s*@(?:[A-Za-z_][\w.]*)/
 
 export function looksLikeCode(text: string): boolean {
@@ -651,21 +654,26 @@ export function compressCode(text: string, config: CcrConfig): CompressionPrevie
   // an empty block stays parseable).
   const isPython = /\b(def |elif |self\.|print\()/.test(text)
   const commentPrefix = isPython ? "#" : "//"
-  const placeholder = (n: number) => (isPython ? `pass  # [... ${n} lines elided]` : `${commentPrefix} [... ${n} lines elided]`)
+  const placeholder = (n: number, indent: string) =>
+    `${indent}${isPython ? `pass  # [... ${n} lines elided]` : `${commentPrefix} [... ${n} lines elided]`}`
   const isClose = (line: string): boolean => /^\s*[}\])];?\s*$/.test(line)
 
   const kept: string[] = []
   let elided = 0
   let run = 0
+  let runIndent = ""
   const isStructure = (line: string): boolean =>
-    CODE_IMPORT_RE.test(line) || CODE_DECL_RE.test(line) || CODE_DECORATOR_RE.test(line) ||
+    CODE_IMPORT_RE.test(line) ||
+    CODE_DECL_RE.test(line) ||
+    CODE_DECORATOR_RE.test(line) ||
     // Block-opening signature: indented `name(args...):` / `...{` (methods etc.)
     (/[{(:]\s*$/.test(line) && /\(/.test(line) && !/^\s*[)}\]]/.test(line))
 
   const flush = (): void => {
     if (run > 0) {
-      kept.push(placeholder(run))
+      kept.push(placeholder(run, runIndent))
       run = 0
+      runIndent = ""
     }
   }
 
@@ -676,9 +684,15 @@ export function compressCode(text: string, config: CcrConfig): CompressionPrevie
 
   for (const line of lines) {
     if (docDelim) {
+      if (line.includes(docDelim)) {
+        flush()
+        kept.push(line)
+        docDelim = undefined
+        continue
+      }
+      if (run === 0) runIndent = /^\s*/.exec(line)?.[0] ?? ""
       run++
       elided++
-      if (line.includes(docDelim)) docDelim = undefined
       continue
     }
     const docOpen = /("""|''')/.exec(line)
@@ -698,6 +712,7 @@ export function compressCode(text: string, config: CcrConfig): CompressionPrevie
       if (run === 0) kept.push("")
       continue
     }
+    if (run === 0) runIndent = /^\s*/.exec(line)?.[0] ?? ""
     run++
     elided++
   }
@@ -771,11 +786,13 @@ export function compressSearch(text: string, config: CcrConfig, query?: string):
       indices.add(x.i)
     }
     const selected = [...indices].slice(0, SEARCH_MAX_PER_FILE).sort((a, b) => a - b)
+    let added = 0
     for (const i of selected) {
       if (kept.length >= SEARCH_MAX_TOTAL) break
       kept.push({ file, no: rows[i].no, content: rows[i].content })
+      added++
     }
-    omitted -= selected.length
+    omitted -= added
   }
   omitted = Math.max(0, omitted)
   if (kept.length === 0 || omitted < 8) return undefined
@@ -805,7 +822,7 @@ const CONFIG_COMMENT_YAML_TOML_RE = /^\s*#/
 const CONFIG_COMMENT_INI_RE = /^[#;]/
 const CONFIG_YAML_KEY_RE = /^\s*[A-Za-z_][\w.-]*\s*:(\s|$)/
 const CONFIG_SECTION_RE = /^\s*\[[^\]]+\]\s*$/
-const CONFIG_YAML_BLOCK_SCALAR_RE = /:\s*[|>][+-]?\d*\s*$/m
+const CONFIG_YAML_BLOCK_SCALAR_RE = /:\s*[|>](?:[1-9][+-]?|[+-][1-9]?)?(?:\s+#.*)?$/m
 const CONFIG_TOML_MULTILINE_RE = /"""|'''/
 
 export function looksLikeConfig(text: string): boolean {
@@ -825,7 +842,7 @@ export function compressConfig(text: string): CompressionPreview | undefined {
   if (lines.length < 16) return undefined
   if (CONFIG_YAML_BLOCK_SCALAR_RE.test(text) || CONFIG_TOML_MULTILINE_RE.test(text)) return undefined
 
-  const isIni = lines.some((l) => CONFIG_SECTION_RE.test(l) && CONFIG_COMMENT_INI_RE.test(l))
+  const isIni = lines.some((line) => CONFIG_SECTION_RE.test(line))
   const isComment = (line: string): boolean =>
     isIni ? CONFIG_COMMENT_INI_RE.test(line) : CONFIG_COMMENT_YAML_TOML_RE.test(line)
 

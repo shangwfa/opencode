@@ -127,6 +127,27 @@ describe("compressLog", () => {
   test("returns undefined for short logs", () => {
     expect(compressLog("a\nb\nc")).toBeUndefined()
   })
+
+  test("preserves errors and warnings in the final five lines", () => {
+    const lines = ["service booting", "loaded config"]
+    for (let i = 0; i < 100; i++) lines.push(`2026-09-03T10:00:00 INFO request ${i} handled`)
+    lines.push("routine tail 1", "routine tail 2", "ERROR newest failure", "WARN newest warning", "routine tail 5")
+
+    const result = compressLog(lines.join("\n"))
+    expect(result?.preview).toContain("ERROR newest failure")
+    expect(result?.preview).toContain("WARN newest warning")
+  })
+
+  test("does not route ordinary prose with one ERROR word through log compression", () => {
+    const text = Array.from({ length: 100 }, (_, i) =>
+      i === 20
+        ? "The document discusses an ERROR label in prose."
+        : `Ordinary paragraph ${i} with explanatory content.`,
+    ).join("\n")
+
+    expect(looksLikeLog(text)).toBe(false)
+    expect(compressOutput(text, config)?.strategy).toBe("lines")
+  })
 })
 
 describe("compressLines", () => {
@@ -236,9 +257,7 @@ describe("adaptive preview (Plan B)", () => {
   // only shrinks budgets below previewTokens*3 tokens.
   test("keeps the full budget for large outputs", () => {
     const items = Array.from({ length: 500 }, (_, i) =>
-      i % 2 === 0
-        ? { id: i, name: `item-${i}`, description: "x".repeat(80) }
-        : { id: i, kind: `variant-${i % 7}` },
+      i % 2 === 0 ? { id: i, name: `item-${i}`, description: "x".repeat(80) } : { id: i, kind: `variant-${i % 7}` },
     )
     const text = JSON.stringify(items)
     const result = compressJson(text, config)
@@ -265,7 +284,7 @@ describe("compressCode docstring (FIRST_LINE parity)", () => {
       '    """',
       "",
       "    def process(self, items):",
-      '        results = []',
+      "        results = []",
       "        for item in items:",
       "            results.append(item.strip())",
       "            results = normalize(results)",
@@ -302,7 +321,12 @@ describe("compressCode docstring (FIRST_LINE parity)", () => {
       "    return state",
     ].join("\n")
     const fillers = Array.from({ length: 12 }, (_, i) =>
-      [`def helper_${i}(v):`, `    prepared = prepare_${i}(v)`, `    checked = check_${i}(prepared)`, `    return transform_${i}(checked)`].join("\n"),
+      [
+        `def helper_${i}(v):`,
+        `    prepared = prepare_${i}(v)`,
+        `    checked = check_${i}(prepared)`,
+        `    return transform_${i}(checked)`,
+      ].join("\n"),
     ).join("\n")
     const code = body + "\n" + fillers
     const result = compressCode(code, config)
@@ -326,6 +350,8 @@ describe("log selection pools (Headroom LogCompressor parity)", () => {
     expect(result).toBeDefined()
     expect(result!.preview).toContain("ERROR db connection failed")
     expect(result!.preview).toContain("WARNING slow query 0")
+    expect(result!.preview).toContain("WARNING slow query 7")
+    expect((result!.preview.match(/WARNING slow query/g) ?? []).length).toBeLessThanOrEqual(5)
     expect(result!.preview).toContain("===== 1 failed, 207 passed =====")
   })
 
@@ -394,9 +420,7 @@ describe("lines query-aware extraction (TextCrusher parity)", () => {
 
 describe("compressOutput", () => {
   test("routes json payloads to the json strategy", () => {
-    const text = JSON.stringify(
-      Array.from({ length: 300 }, (_, i) => ({ id: i, data: "d".repeat(100) })),
-    )
+    const text = JSON.stringify(Array.from({ length: 300 }, (_, i) => ({ id: i, data: "d".repeat(100) })))
     const result = compressOutput(text, config)
     expect(result?.strategy).toBe("json")
   })
@@ -509,8 +533,7 @@ describe("compressConfig", () => {
 describe("compressOutput routing", () => {
   test("routes search results to the search strategy", () => {
     const lines: string[] = []
-    for (let f = 0; f < 3; f++)
-      for (let i = 0; i < 20; i++) lines.push(`src/m${f}.ts:${i + 1}: match ${i}`)
+    for (let f = 0; f < 3; f++) for (let i = 0; i < 20; i++) lines.push(`src/m${f}.ts:${i + 1}: match ${i}`)
     expect(compressOutput(lines.join("\n"), config)?.strategy).toBe("search")
   })
 
@@ -549,6 +572,17 @@ describe("compressDiff", () => {
   test("returns undefined for short or non-diff text", () => {
     expect(compressDiff("diff --git a/x b/x\n@@ -1,2 +1,2 @@\n+a\n-b")).toBeUndefined()
     expect(compressDiff(Array.from({ length: 40 }, (_, i) => `random line ${i}`).join("\n"))).toBeUndefined()
+  })
+
+  test("does not treat deleted content beginning with dashes as a file header", () => {
+    const lines = ["diff --git a/app.ts b/app.ts", "--- a/app.ts", "+++ b/app.ts", "@@ -1,30 +1,30 @@"]
+    lines.push(" context before", "--- deleted text")
+    for (let i = 0; i < 18; i++) lines.push(`+added-${i}`)
+    for (let i = 0; i < 100; i++) lines.push(` context-${i} with filler text to make compression worthwhile`)
+
+    const result = compressDiff(lines.join("\n"))
+    expect(result?.preview).toContain("--- deleted text")
+    expect(result?.preview).toContain("+added-17")
   })
 })
 
@@ -654,5 +688,12 @@ describe("relevance scoring (first-compression query)", () => {
     const result = compressSearch(lines.join("\n"), config, "retry backoff timeout")
     expect(result).toBeDefined()
     expect(result!.preview).toContain("retry with backoff")
+  })
+})
+
+describe("estimateTokens", () => {
+  test("counts CJK conservatively while retaining the ASCII approximation", () => {
+    expect(estimateTokens("a".repeat(400))).toBe(100)
+    expect(estimateTokens("中".repeat(400))).toBe(400)
   })
 })

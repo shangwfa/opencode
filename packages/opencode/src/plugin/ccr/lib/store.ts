@@ -1,12 +1,6 @@
 import { createHash } from "node:crypto"
 import { estimateTokens, type CcrConfig } from "./config"
-import { extractQueryTerms, scoreText } from "./relevance"
-import {
-  CCR_MARKER_PATTERNS,
-  compressOutput,
-  type CompressionPreview,
-  type CompressionStrategy,
-} from "./compressors"
+import { CCR_MARKER_PATTERNS, compressOutput, type CompressionPreview, type CompressionStrategy } from "./compressors"
 
 export interface CcrEntry {
   hash: string
@@ -17,6 +11,8 @@ export interface CcrEntry {
   original: string
   originalTokens: number
   compressedTokens: number
+  /** Stable request-view bytes shared by every server instance. */
+  replacement?: string
   /** Item counts for JSON-array compressions (Headroom parity). */
   originalItems?: number
   compressedItems?: number
@@ -29,8 +25,6 @@ export interface CcrEntry {
 export interface CcrStorageBackend {
   read(key: string[]): Promise<CcrEntry | null>
   write(key: string[], content: CcrEntry): Promise<void>
-  /** List all entries for a session (proactive expansion scans these). */
-  list?(prefix: string[]): Promise<CcrEntry[]>
 }
 
 export type CcrRetrieveResult =
@@ -55,12 +49,7 @@ function isExpired(entry: CcrEntry, now: number): boolean {
   return Number.isFinite(expires) && expires <= now
 }
 
-function renderMarker(
-  hash: string,
-  preview: CompressionPreview,
-  originalTokens: number,
-  ttlSeconds: number,
-): string {
+function renderMarker(hash: string, preview: CompressionPreview, originalTokens: number, ttlSeconds: number): string {
   const compressedTokens = estimateTokens(preview.preview)
   const items =
     preview.itemCount !== undefined
@@ -75,7 +64,7 @@ function renderMarker(
 }
 
 export class CcrStore {
-  private replacements = new Map<string, string>()
+  private replacements = new Map<string, { replacement: string; entry: CcrEntry }>()
 
   constructor(
     private backend: CcrStorageBackend | undefined,
@@ -85,8 +74,8 @@ export class CcrStore {
   /** Returns the replacement text for a tool output, or undefined when the
    *  output is not worth compressing. Results are content-addressed: the same
    *  bytes always produce the same marker, keeping the request prefix stable.
-   *  `query` influences item selection only on first compression (cache miss);
-   *  the chosen preview is then fixed by the content hash. */
+   *  `query` influences item selection only on the first successful persistence;
+   *  later processes reuse the stored replacement by session and content hash. */
   async replace(input: {
     sessionID: string
     messageID: string
@@ -97,41 +86,60 @@ export class CcrStore {
     if (CCR_MARKER_PATTERNS.some((pattern) => input.output.includes(pattern))) return undefined
 
     const hash = contentHash(input.output)
-    const cached = this.replacements.get(hash)
-    if (cached) return cached
+    const cacheID = `${input.sessionID}\u0000${hash}`
+    const cached = this.replacements.get(cacheID)
+    if (cached && !isExpired(cached.entry, Date.now())) {
+      this.replacements.delete(cacheID)
+      this.replacements.set(cacheID, cached)
+      return cached.replacement
+    }
+    if (cached) this.replacements.delete(cacheID)
+
+    let existing: CcrEntry | null = null
+    if (this.backend) {
+      try {
+        existing = await this.backend.read(ccrKey(input.sessionID, hash))
+      } catch {
+        return undefined
+      }
+    }
+    if (existing?.replacement && !isExpired(existing, Date.now())) {
+      this.remember(cacheID, existing.replacement, existing)
+      return existing.replacement
+    }
 
     const compressed = compressOutput(input.output, this.config, input.query)
     if (!compressed) return undefined
 
     const originalTokens = estimateTokens(input.output)
     const replacement = renderMarker(hash, compressed, originalTokens, this.config.ttlSeconds)
-    this.replacements.set(hash, replacement)
-    if (this.replacements.size > MAX_CACHE_ENTRIES) {
-      const oldest = this.replacements.keys().next().value
-      if (oldest !== undefined) this.replacements.delete(oldest)
+    const entry: CcrEntry = {
+      hash,
+      sessionID: input.sessionID,
+      messageID: input.messageID,
+      tool: input.tool,
+      strategy: compressed.strategy,
+      original: input.output,
+      originalTokens,
+      compressedTokens: estimateTokens(compressed.preview),
+      replacement,
+      originalItems: compressed.itemCount?.original,
+      compressedItems: compressed.itemCount?.compressed,
+      retrievalCount: 0,
+      createdAt: new Date().toISOString(),
+      ...(this.config.ttlSeconds > 0
+        ? { expiresAt: new Date(Date.now() + this.config.ttlSeconds * 1000).toISOString() }
+        : {}),
     }
 
     if (this.backend) {
-      await this.backend
-        .write(ccrKey(input.sessionID, hash), {
-          hash,
-          sessionID: input.sessionID,
-          messageID: input.messageID,
-          tool: input.tool,
-          strategy: compressed.strategy,
-          original: input.output,
-          originalTokens,
-          compressedTokens: estimateTokens(compressed.preview),
-          originalItems: compressed.itemCount?.original,
-          compressedItems: compressed.itemCount?.compressed,
-          retrievalCount: 0,
-          createdAt: new Date().toISOString(),
-          ...(this.config.ttlSeconds > 0
-            ? { expiresAt: new Date(Date.now() + this.config.ttlSeconds * 1000).toISOString() }
-            : {}),
-        })
-        .catch(() => {})
+      try {
+        await this.backend.write(ccrKey(input.sessionID, hash), entry)
+      } catch {
+        return undefined
+      }
     }
+    this.remember(cacheID, replacement, entry)
     return replacement
   }
 
@@ -142,17 +150,20 @@ export class CcrStore {
     } catch {
       entry = null
     }
+    const cacheID = `${sessionID}\u0000${hash}`
+    if (!entry) entry = this.replacements.get(cacheID)?.entry
     if (!entry) return { status: "not_found" }
 
     if (isExpired(entry, Date.now())) {
       return { status: "expired", ttlSeconds: this.config.ttlSeconds }
     }
 
+    const updated = { ...entry, retrievalCount: entry.retrievalCount + 1 }
     if (this.backend) {
-      await this.backend
-        .write(ccrKey(sessionID, hash), { ...entry, retrievalCount: entry.retrievalCount + 1 })
-        .catch(() => {})
+      await this.backend.write(ccrKey(sessionID, hash), updated).catch(() => {})
     }
+    const replacement = this.replacements.get(cacheID)?.replacement ?? entry.replacement
+    if (replacement) this.remember(cacheID, replacement, updated)
     return {
       status: "available",
       content: entry.original,
@@ -181,24 +192,11 @@ export class CcrStore {
     return { status: "not_found" }
   }
 
-  /** Headroom context_tracker parity (lightweight): return the hashes of
-   *  stored entries whose original content matches the current query, so the
-   *  transform can keep those outputs uncompressed this turn (proactive
-   *  expansion) instead of hiding them behind a marker. */
-  async expandableHashes(sessionID: string, query: string | undefined): Promise<Set<string>> {
-    const out = new Set<string>()
-    if (!query || !this.backend?.list) return out
-    const terms = extractQueryTerms(query)
-    if (!terms) return out
-    try {
-      const entries = await this.backend.list(["plugin", "ccr", sessionID])
-      for (const entry of entries) {
-        if (isExpired(entry, Date.now())) continue
-        if (scoreText(entry.original.slice(0, 4000), terms) >= 2) out.add(entry.hash)
-      }
-    } catch {
-      // Proactive expansion is best-effort; never fail the transform.
-    }
-    return out
+  private remember(cacheID: string, replacement: string, entry: CcrEntry): void {
+    this.replacements.delete(cacheID)
+    this.replacements.set(cacheID, { replacement, entry })
+    if (this.replacements.size <= MAX_CACHE_ENTRIES) return
+    const oldest = this.replacements.keys().next().value
+    if (oldest !== undefined) this.replacements.delete(oldest)
   }
 }

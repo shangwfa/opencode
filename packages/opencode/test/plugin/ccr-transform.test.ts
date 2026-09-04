@@ -126,22 +126,8 @@ describe("createMessageTransform", () => {
   })
 })
 
-describe("proactive expansion (Headroom context_tracker parity)", () => {
-  function makeListBackend(entries: Map<string, any>): CcrStorageBackend {
-    return {
-      async read(key) {
-        return entries.get(key.join("/")) ?? null
-      },
-      async write(key, content) {
-        entries.set(key.join("/"), content)
-      },
-      async list(prefix) {
-        return [...entries.entries()].filter(([k]) => k.startsWith(prefix.join("/"))).map(([, v]) => v)
-      },
-    }
-  }
-
-  test("expandableHashes returns hashes of query-matching stored outputs", async () => {
+describe("stable request view", () => {
+  test("does not expand history by the current query", async () => {
     const entries = new Map<string, any>()
     const backend: CcrStorageBackend = {
       async read(key) {
@@ -150,93 +136,18 @@ describe("proactive expansion (Headroom context_tracker parity)", () => {
       async write(key, content) {
         entries.set(key.join("/"), content)
       },
-      async list(prefix) {
-        return [...entries.entries()].filter(([k]) => k.startsWith(prefix.join("/"))).map(([, v]) => v)
-      },
     }
     const store = new CcrStore(backend, config)
-    await store.replace({ sessionID: "s", messageID: "m", tool: "bash", output: bigOutput() })
-    const { contentHash } = await import("../../src/plugin/ccr/lib/store")
-    const hash = contentHash(bigOutput())
-
-    const hit = await store.expandableHashes("s", "please analyze: " + bigOutput().slice(0, 60))
-    expect(hit.has(hash)).toBe(true)
-
-    const miss = await store.expandableHashes("s", "completely unrelated query about cooking recipes")
-    expect(miss.has(hash)).toBe(false)
-  })
-
-  test("transform keeps query-matching outputs uncompressed this turn", async () => {
-    const entries = new Map<string, any>()
-    const backend: CcrStorageBackend = {
-      async read(key) {
-        return entries.get(key.join("/")) ?? null
-      },
-      async write(key, content) {
-        entries.set(key.join("/"), content)
-      },
-      async list(prefix) {
-        return [...entries.entries()].filter(([k]) => k.startsWith(prefix.join("/"))).map(([, v]) => v)
-      },
-    }
-    const store = new CcrStore(backend, config)
-    // 预先存储（模拟上一轮已压缩）
-    await store.replace({ sessionID: "ses_test", messageID: "old", tool: "bash", output: bigOutput() })
-
     const transform = createMessageTransform(store, config)
     const messages = buildMessages(8, bigOutput())
-    // 最后一条 user 消息的 query 与 bigOutput 内容相关
     messages[messages.length - 2] = {
-      info: { id: "msg_uq", sessionID: "ses_test", role: "user" },
-      parts: [{ type: "text", text: "please analyze: " + bigOutput().slice(0, 60) }],
+      info: { id: "msg_query", sessionID: "ses_test", role: "user" },
+      parts: [{ type: "text", text: "please analyze plain output filler" }],
     } as any
+
     await transform({}, { messages })
 
-    // 该输出因 proactive expansion 保持原文
-    expect(messages[0].parts[0].state!.output).not.toContain("[ccr:")
-    expect(messages[0].parts[0].state!.output).toBe(bigOutput())
-  })
-
-  test("caps proactive expansion at 2 outputs per turn (Headroom parity)", async () => {
-    const entries = new Map<string, any>()
-    const backend: CcrStorageBackend = {
-      async read(key) {
-        return entries.get(key.join("/")) ?? null
-      },
-      async write(key, content) {
-        entries.set(key.join("/"), content)
-      },
-      async list(prefix) {
-        return [...entries.entries()].filter(([k]) => k.startsWith(prefix.join("/"))).map(([, v]) => v)
-      },
-    }
-    const store = new CcrStore(backend, config)
-    // 三个不同的、都与 query 相关的已压缩输出
-    const variants = [bigOutput(), bigOutput() + "\nextra variant one", bigOutput() + "\nextra variant two"]
-    for (let v = 0; v < variants.length; v++) {
-      await store.replace({ sessionID: "ses_test", messageID: `old${v}`, tool: "bash", output: variants[v] })
-    }
-
-    const transform = createMessageTransform(store, config)
-    const messages = buildMessages(8, variants[0])
-    // 每条消息的输出各不相同（v0/v1/v2 分布在前 3 条），query 与三者都相关
-    for (let v = 0; v < 3; v++) {
-      messages[v].parts[0] = {
-        type: "tool",
-        tool: "bash",
-        state: { status: "completed", output: variants[v] },
-      } as any
-    }
-    messages[messages.length - 2] = {
-      info: { id: "msg_cap", sessionID: "ses_test", role: "user" },
-      parts: [{ type: "text", text: "please analyze: " + bigOutput().slice(0, 60) }],
-    } as any
-    await transform({}, { messages })
-
-    // 前 2 个命中者保持原文（cap=2），第 3 个仍被压缩
-    expect(messages[0].parts[0].state!.output).toBe(variants[0])
-    expect(messages[1].parts[0].state!.output).toBe(variants[1])
-    expect(messages[2].parts[0].state!.output).toContain("[ccr:")
+    expect(messages[0].parts[0].state!.output).toContain("[ccr:")
   })
 
   test("default protectRecent is 4 (Headroom parity)", () => {
@@ -257,8 +168,12 @@ describe("transform image resize", () => {
 
     const entries = new Map<string, any>()
     const backend: CcrStorageBackend = {
-      async read(key: string[]) { return entries.get(key.join("/")) ?? null },
-      async write(key: string[], content: any) { entries.set(key.join("/"), content) },
+      async read(key: string[]) {
+        return entries.get(key.join("/")) ?? null
+      },
+      async write(key: string[], content: any) {
+        entries.set(key.join("/"), content)
+      },
     }
     const store = new CcrStore(backend, config)
     const transform = createMessageTransform(store, config)
@@ -286,8 +201,12 @@ describe("transform image resize", () => {
 
     const entries = new Map<string, any>()
     const backend: CcrStorageBackend = {
-      async read(key: string[]) { return entries.get(key.join("/")) ?? null },
-      async write(key: string[], content: any) { entries.set(key.join("/"), content) },
+      async read(key: string[]) {
+        return entries.get(key.join("/")) ?? null
+      },
+      async write(key: string[], content: any) {
+        entries.set(key.join("/"), content)
+      },
     }
     const store = new CcrStore(backend, config)
     const transform = createMessageTransform(store, config)
@@ -302,6 +221,25 @@ describe("transform image resize", () => {
 
     const url0 = (messages[0].parts[0] as any).url as string
     expect(url0).toBe(bigUrl)
+  })
+
+  test("ordinary Chinese technical terms do not preserve history images", async () => {
+    const photon = await import("@silvia-odwyer/photon-node")
+    const canvas = new photon.PhotonImage(new Uint8Array(1024 * 1024 * 4), 1024, 1024)
+    const bigUrl = `data:image/png;base64,${Buffer.from(canvas.get_bytes()).toString("base64")}`
+    canvas.free()
+    const store = new CcrStore(undefined, config)
+    const messages = buildMessages(8, "tiny output")
+    messages[0].parts[0] = { type: "file", url: bigUrl } as any
+    messages[messages.length - 2] = {
+      info: { id: "msg_normal", sessionID: "ses_test", role: "user" },
+      parts: [{ type: "text", text: "请分析数据并检查函数参数" }],
+    } as any
+
+    await createMessageTransform(store, config)({}, { messages })
+
+    const [width] = await pngSize((messages[0].parts[0] as any).url)
+    expect(width).toBe(512)
   })
 
   async function pngSize(dataUrl: string): Promise<[number, number]> {

@@ -91,8 +91,12 @@ function internalPlugins(flags: RuntimeFlags.Info, dcpStorage?: DcpStorage, ccrS
     // CCR 必须在 DCP 之前执行：DCP 的 injectMessageIds 会向 tool part 的 output
     // 尾部追加 <dcp-message-id> tag，污染整体解析型压缩（JSON）的输入。
     // CCR 先基于 PG 原文视图压缩（marker 注入不落库），DCP 在其结果上打 ID tag。
-    ...(Flag.OPENCODE_CCR_ENABLED ? [(input: PluginInput) => CcrPlugin(input, { enabled: true, storage: ccrStorage })] : []),
-    ...(Flag.OPENCODE_DCP_ENABLED ? [(input: PluginInput) => DcpPlugin(input, { enabled: true, storage: dcpStorage })] : []),
+    ...(Flag.OPENCODE_CCR_ENABLED
+      ? [(input: PluginInput) => CcrPlugin(input, { enabled: true, storage: ccrStorage })]
+      : []),
+    ...(Flag.OPENCODE_DCP_ENABLED
+      ? [(input: PluginInput) => DcpPlugin(input, { enabled: true, storage: dcpStorage })]
+      : []),
   ]
 }
 
@@ -166,29 +170,13 @@ const layer = Layer.effect(
       read: async (key: string[]) => {
         try {
           return await storageBridge.promise(storage.read<import("./ccr/lib/store").CcrEntry>(key))
-        } catch {
-          return null
+        } catch (error) {
+          if (Storage.NotFoundError.isInstance(error)) return null
+          throw error
         }
       },
       write: async (key: string[], content: import("./ccr/lib/store").CcrEntry) => {
         await storageBridge.promise(storage.write(key, content))
-      },
-      list: async (prefix: string[]) => {
-        try {
-          const keys = await storageBridge.promise(storage.list(prefix))
-          const entries = await Promise.all(
-            keys.map(async (key) => {
-              try {
-                return await storageBridge.promise(storage.read<import("./ccr/lib/store").CcrEntry>(key))
-              } catch {
-                return null
-              }
-            }),
-          )
-          return entries.filter((e) => e !== null)
-        } catch {
-          return []
-        }
       },
     }
 

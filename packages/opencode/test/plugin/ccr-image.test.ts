@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { resizeImageDataUrl } from "../../src/plugin/ccr/lib/image-resize"
+import { imageResizeCacheSize, resizeImageDataUrl } from "../../src/plugin/ccr/lib/image-resize"
 
 async function makePngDataUrl(size: number, height?: number): Promise<string> {
   const photon = await import("@silvia-odwyer/photon-node")
@@ -69,14 +69,35 @@ describe("resizeImageDataUrl", () => {
     const resized = await resizeImageDataUrl(tall)
     expect(resized).toBeDefined()
     const [w, h] = await pngDimensions(resized!)
-    expect(w * h).toBeLessThanOrEqual(512 * 512 + 2048)
+    expect(w * h).toBeLessThanOrEqual(512 * 512)
     expect(w * h).toBeGreaterThan(512 * 512 - 2048)
     expect(w / h).toBeCloseTo(200 / 1600, 2)
+  })
+
+  test("includes maxPixels in the cache identity", async () => {
+    const original = await makePngDataUrl(700)
+    expect(await resizeImageDataUrl(original, 700 * 700)).toBe(original)
+
+    const resized = await resizeImageDataUrl(original, 256 * 256)
+    expect(resized).toBeDefined()
+    const [width, height] = await pngDimensions(resized!)
+    expect(width * height).toBeLessThanOrEqual(256 * 256)
   })
 
   test("returns undefined for non-image payloads", async () => {
     expect(await resizeImageDataUrl("data:text/plain;base64,SGVsbG8=")).toBeUndefined()
     expect(await resizeImageDataUrl("file:///workspace/shot.png")).toBeUndefined()
     expect(await resizeImageDataUrl("not a url at all")).toBeUndefined()
+  })
+
+  test("bounds the cache for unchanged images", async () => {
+    const small = await makePngDataUrl(1)
+    for (let i = 0; i < 205; i++) await resizeImageDataUrl(`${small}${" ".repeat(i)}`)
+    expect(imageResizeCacheSize()).toBeLessThanOrEqual(200)
+  })
+
+  test("rejects oversized data URLs before decoding", async () => {
+    const oversized = `data:image/png;base64,${"A".repeat(16 * 1024 * 1024)}`
+    expect(await resizeImageDataUrl(oversized)).toBeUndefined()
   })
 })
