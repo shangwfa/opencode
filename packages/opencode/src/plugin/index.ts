@@ -22,7 +22,6 @@ import { DigitalOceanAuthPlugin } from "./digitalocean"
 import { XaiAuthPlugin } from "./xai"
 import { CerebrasPlugin } from "./cerebras"
 import { SnowflakeCortexAuthPlugin } from "./snowflake-cortex"
-import { DcpPlugin } from "./dcp/index"
 import { CcrPlugin } from "./ccr/index"
 import { Effect, Layer, Context } from "effect"
 import { EffectBridge } from "@/effect/bridge"
@@ -70,7 +69,7 @@ export function experimentalWebSocketsEnabled(input: { enabled: boolean; channel
 }
 
 // Built-in plugins that are directly imported (not installed from npm)
-function internalPlugins(flags: RuntimeFlags.Info, dcpStorage?: DcpStorage, ccrStorage?: CcrStorage): PluginInstance[] {
+function internalPlugins(flags: RuntimeFlags.Info, ccrStorage?: CcrStorage): PluginInstance[] {
   return [
     // Temporary rollout: pre-release builds use WebSockets by default; releases require explicit opt-in.
     (input) =>
@@ -88,19 +87,12 @@ function internalPlugins(flags: RuntimeFlags.Info, dcpStorage?: DcpStorage, ccrS
     XaiAuthPlugin,
     SnowflakeCortexAuthPlugin,
     CerebrasPlugin,
-    // CCR 必须在 DCP 之前执行：DCP 的 injectMessageIds 会向 tool part 的 output
-    // 尾部追加 <dcp-message-id> tag，污染整体解析型压缩（JSON）的输入。
-    // CCR 先基于 PG 原文视图压缩（marker 注入不落库），DCP 在其结果上打 ID tag。
     ...(Flag.OPENCODE_CCR_ENABLED
       ? [(input: PluginInput) => CcrPlugin(input, { enabled: true, storage: ccrStorage })]
-      : []),
-    ...(Flag.OPENCODE_DCP_ENABLED
-      ? [(input: PluginInput) => DcpPlugin(input, { enabled: true, storage: dcpStorage })]
       : []),
   ]
 }
 
-type DcpStorage = import("./dcp/lib/state/persistence").DcpStorageBackend
 type CcrStorage = import("./ccr/lib/store").CcrStorageBackend
 
 function isServerPlugin(value: unknown): value is PluginInstance {
@@ -151,21 +143,6 @@ const layer = Layer.effect(
 
     const storage = yield* Storage.Service
     const storageBridge = yield* EffectBridge.make()
-    const dcpStorage = {
-      read: async (key: string[]) => {
-        try {
-          return await storageBridge.promise(
-            storage.read<import("./dcp/lib/state/persistence").PersistedSessionState>(key),
-          )
-        } catch {
-          return null
-        }
-      },
-      write: async (key: string[], content: import("./dcp/lib/state/persistence").PersistedSessionState) => {
-        await storageBridge.promise(storage.write(key, content))
-      },
-      list: async (prefix: string[]) => await storageBridge.promise(storage.list(prefix)),
-    }
     const ccrStorage: CcrStorage = {
       read: async (key: string[]) => {
         try {
@@ -219,11 +196,7 @@ const layer = Layer.effect(
 
         for (const plugin of flags.disableDefaultPlugins
           ? []
-          : internalPlugins(
-              flags,
-              Flag.OPENCODE_DCP_ENABLED ? dcpStorage : undefined,
-              Flag.OPENCODE_CCR_ENABLED ? ccrStorage : undefined,
-            )) {
+          : internalPlugins(flags, Flag.OPENCODE_CCR_ENABLED ? ccrStorage : undefined)) {
           const init = yield* Effect.tryPromise({
             try: () => plugin(input),
             catch: errorMessage,

@@ -34,7 +34,6 @@ export namespace Flag {
   export const OPENCODE_DISABLE_LSP_TOOL = truthy("OPENCODE_DISABLE_LSP_TOOL")
   export const OPENCODE_ENABLE_EXPERIMENTAL_MODELS = truthy("OPENCODE_ENABLE_EXPERIMENTAL_MODELS")
   export const OPENCODE_DISABLE_AUTOCOMPACT = truthy("OPENCODE_DISABLE_AUTOCOMPACT")
-  export const OPENCODE_DCP_ENABLED = truthy("OPENCODE_DCP_ENABLED")
   export const OPENCODE_CCR_ENABLED = truthy("OPENCODE_CCR_ENABLED")
   export const OPENCODE_DISABLE_MODELS_FETCH = truthy("OPENCODE_DISABLE_MODELS_FETCH")
   export const OPENCODE_DISABLE_MOUSE = truthy("OPENCODE_DISABLE_MOUSE")
@@ -107,8 +106,11 @@ export namespace Flag {
 
   export const OPENCODE_SANDBOX_API_KEY = process.env["OPENCODE_SANDBOX_API_KEY"] ?? ""
   export const OPENCODE_SANDBOX_USE_SERVER_PROXY = truthy("OPENCODE_SANDBOX_USE_SERVER_PROXY")
-  export const OPENCODE_SANDBOX_VOLUME_TYPE = (process.env["OPENCODE_SANDBOX_VOLUME_TYPE"] ??
-    "pvc") as "none" | "pvc" | "host" | "snapshot"
+  export const OPENCODE_SANDBOX_VOLUME_TYPE = (process.env["OPENCODE_SANDBOX_VOLUME_TYPE"] ?? "pvc") as
+    | "none"
+    | "pvc"
+    | "host"
+    | "snapshot"
   export const OPENCODE_SANDBOX_PVC_CLAIM = process.env["OPENCODE_SANDBOX_PVC_CLAIM"] ?? "sandbox-test"
   export const OPENCODE_SANDBOX_SNAPSHOT_TTL_SEC = number("OPENCODE_SANDBOX_SNAPSHOT_TTL_SEC") ?? 7 * 86400
   export const OPENCODE_SANDBOX_SNAPSHOT_WAIT_SEC = number("OPENCODE_SANDBOX_SNAPSHOT_WAIT_SEC") ?? 900

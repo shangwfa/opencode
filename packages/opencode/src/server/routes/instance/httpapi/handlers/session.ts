@@ -26,8 +26,6 @@ import { insertExecLog, updateExecLog, type ExecLogSource } from "@/session/exec
 import { SessionStatus } from "@/session/status"
 import { SessionSummary } from "@/session/summary"
 import { Storage } from "@/storage/storage"
-import { Logger } from "@/plugin/dcp/lib/logger"
-import { loadSessionStats } from "@/plugin/dcp/lib/state/persistence"
 import { Todo } from "@/session/todo"
 import { MessageID, PartID, SessionID } from "@/session/schema"
 import { Skill } from "@/skill"
@@ -143,11 +141,6 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
 
     const get = Effect.fn("SessionHttpApi.get")(function* (ctx: { params: { sessionID: SessionID } }) {
       return yield* requireSession(ctx.params.sessionID)
-    })
-
-    const dcpStats = Effect.fn("SessionHttpApi.dcpStats")(function* (ctx: { params: { sessionID: SessionID } }) {
-      yield* requireSession(ctx.params.sessionID)
-      return yield* Effect.promise(() => loadSessionStats(ctx.params.sessionID, new Logger(false)))
     })
 
     const children = Effect.fn("SessionHttpApi.children")(function* (ctx: { params: { sessionID: SessionID } }) {
@@ -317,8 +310,6 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
     const remove = Effect.fn("SessionHttpApi.remove")(function* (ctx: { params: { sessionID: SessionID } }) {
       yield* SessionError.mapStorageNotFound(session.remove(ctx.params.sessionID))
       yield* pluginRuntime.dispose(ctx.params.sessionID)
-      // DCP state（storage_data 的 plugin/dcp/<sid> 行）随会话删除清理；失败不阻塞删除
-      yield* storage.remove(["plugin", "dcp", ctx.params.sessionID]).pipe(Effect.ignore)
       // CCR entries（storage_data 的 plugin/ccr/<sid>/<hash> 行）随会话删除清理
       yield* Effect.gen(function* () {
         const keys = yield* storage.list(["plugin", "ccr", ctx.params.sessionID])
@@ -906,7 +897,6 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       .handle("list", list)
       .handle("status", status)
       .handle("get", get)
-      .handle("dcpStats", dcpStats)
       .handle("children", children)
       .handle("todo", todo)
       .handle("diff", diff)
