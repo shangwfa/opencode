@@ -72,6 +72,13 @@ function buildTableRows(value: unknown[]): { columns: string[]; rows: unknown[][
 
 const LOG_LEVEL_RE =
   /\b(ERROR|ERR|FATAL|CRITICAL|EXCEPTION|WARN|WARNING|FAILED|FAILURE|PANIC|Traceback|Unhandled)\b/
+const LOG_ERROR_RE = /\b(ERROR|ERR|FATAL|CRITICAL|EXCEPTION|FAILED|FAILURE|PANIC|Traceback|Unhandled)\b/
+const LOG_WARN_RE = /\b(WARN|WARNING|DEPRECATED)\b/
+// Stack trace openers (Python/JS/Go/Rust/Java flavors, Headroom parity)
+const STACK_OPEN_RE = /Traceback \(most recent call last\)|panic:|goroutine \d+ \[|Exception in thread|^\s+at /
+// Summary lines (pytest/build/test closers, Headroom parity)
+const SUMMARY_RE =
+  /^(===|---)|\b\d+ (passed|failed|skipped|error|warning)\b|^(Tests?|Suites?):?\s*\d|^(TOTAL|Total|Summary)\b|^(Build|Compile|Test)\b.*(succeeded|failed|complete)/
 const LOG_SHAPE_RE = /^\d{4}-\d{2}-\d{2}[T ]|^\[\d{2}:\d{2}:\d{2}\]|^\d{2}:\d{2}:\d{2}[.,]\d{3}/
 
 const COMPRESSIBLE_LINE_CHAR = 60
@@ -258,28 +265,84 @@ export function compressLog(text: string, query?: string): CompressionPreview | 
   // important pool's job so max_errors caps the total (Headroom parity).
   const tail = lines.slice(-tailCount).filter((line) => !LOG_LEVEL_RE.test(line))
   const middle = lines.slice(headCount, lines.length - tailCount)
-  const importantAll = middle.filter((line) => LOG_LEVEL_RE.test(line))
-  // Cap at max_errors=10 lines (Headroom parity), preferring query-relevant rows, original order.
-  const important =
-    terms && importantAll.length > 10
-      ? importantAll
-          .map((line, i) => ({ line, i, score: scoreText(line, terms) }))
-          .sort((a, b) => b.score - a.score || a.i - b.i)
-          .slice(0, 10)
-          .map((x) => x.line)
-      : importantAll.slice(0, 10)
+
+  // Log selection (Headroom LogCompressor parity): four pools with their own
+  // caps — errors (max_errors=10, first+last anchored), warnings
+  // (max_warnings=5, deduped), stack traces (≤3 traces × 20 lines), summary
+  // lines (kept whole) — plus up to 3 context lines per kept error.
+  const errorIdx: number[] = []
+  const warnSeen = new Set<string>()
+  const warnIdx: number[] = []
+  const summaryIdx: number[] = []
+  const stackKeep = new Set<number>()
+  let traces = 0
+  for (let i = 0; i < middle.length; i++) {
+    const line = middle[i]!
+    if (LOG_ERROR_RE.test(line)) {
+      errorIdx.push(i)
+      continue
+    }
+    if (LOG_WARN_RE.test(line)) {
+      const sig = line.slice(0, 160)
+      if (!warnSeen.has(sig)) {
+        warnSeen.add(sig)
+        warnIdx.push(i)
+      }
+      continue
+    }
+    if (SUMMARY_RE.test(line)) {
+      summaryIdx.push(i)
+      continue
+    }
+    if (traces < 3 && STACK_OPEN_RE.test(line)) {
+      // Contiguous follow lines (indented frames or Go-style frames) up to 20.
+      stackKeep.add(i)
+      for (let j = i + 1, n = 1; j < middle.length && n < 20; j++, n++) {
+        const next = middle[j]!
+        if (!/^\s/.test(next) && !/^[\w./\\-]+\.(go|py|java|ts|js|rs|cpp|c):\d+/.test(next) && next.trim() !== "")
+          break
+        stackKeep.add(j)
+      }
+      traces++
+    }
+  }
+  let important =
+    terms && errorIdx.length > 10
+      ? [
+          errorIdx[0]!,
+          ...errorIdx
+            .map((idx, k) => ({ idx, k, score: scoreText(middle[idx]!, terms) }))
+            .sort((a, b) => b.score - a.score || a.k - b.k)
+            .slice(0, 9)
+            .map((x) => x.idx),
+          errorIdx[errorIdx.length - 1]!,
+        ]
+      : [errorIdx[0], ...errorIdx.slice(1, 9), errorIdx[errorIdx.length - 1]].filter((x) => x !== undefined)
+  important = [...new Set(important)].sort((a, b) => a - b)
+  if (important.length > 10) important = important.slice(0, 10)
+  const warnKept = warnIdx.slice(0, 5)
+
+  // Error context lines (±3 per kept error) get folded into the keep set.
+  const keep = new Set<number>([...important, ...warnKept, ...summaryIdx, ...stackKeep])
+  for (const idx of important) {
+    for (let d = -3; d <= 3; d++) {
+      const j = idx + d
+      if (j >= 0 && j < middle.length && !LOG_LEVEL_RE.test(middle[j]!)) keep.add(j)
+    }
+  }
+  const importantLines = new Set([...keep].map((i) => middle[i]!))
   // Back-heavy weighting (Headroom logs_front_weight=0.15): keep a slice of
   // the most recent routine lines — recent entries often carry the outcome.
   const routineKeep = Math.min(10, Math.floor(middle.length * 0.1))
   const routineTail = middle.slice(-routineKeep).filter((line) => !LOG_LEVEL_RE.test(line))
-  const removed = middle.length - important.length - routineTail.length
+  const removed = middle.length - keep.size - routineTail.length
   if (removed < 8 || important.length === 0) return undefined
 
   const routineSet = new Set(routineTail)
   const previewLines: string[] = [...head]
   let folded = 0
   for (const line of middle) {
-    if (important.includes(line) || routineSet.has(line)) {
+    if (importantLines.has(line) || routineSet.has(line)) {
       if (folded > 0) {
         previewLines.push(`[... ${folded} routine lines elided ...]`)
         folded = 0
@@ -297,9 +360,41 @@ export function compressLog(text: string, query?: string): CompressionPreview | 
   return { strategy: "log", preview }
 }
 
-export function compressLines(text: string, config: CcrConfig): CompressionPreview | undefined {
+export function compressLines(text: string, config: CcrConfig, query?: string): CompressionPreview | undefined {
   const lines = text.split("\n")
   if (lines.length < 24) return undefined
+
+  const terms = extractQueryTerms(query)
+  if (terms) {
+    // TextCrusher-style extractive pass (target_ratio=0.5 parity): keep the
+    // most query-relevant lines verbatim under a 50% token budget, head/tail
+    // anchors pinned. Falls back to head+tail when nothing scores.
+    const total = estimateTokens(text)
+    const budget = total * 0.5
+    const scored = lines.map((line, i) => ({ line, i, score: scoreText(line, terms) }))
+    const keep = new Set<number>([0, 1, lines.length - 2, lines.length - 1])
+    let used = [...keep].reduce((n, i) => n + estimateTokens(lines[i] ?? ""), 0)
+    for (const s of [...scored].sort((a, b) => b.score - a.score || a.i - b.i)) {
+      if (s.score <= 0) break
+      if (keep.has(s.i)) continue
+      const cost = estimateTokens(s.line)
+      if (used + cost > budget) continue
+      keep.add(s.i)
+      used += cost
+    }
+    const kept = [...keep].sort((a, b) => a - b)
+    if (kept.length >= lines.length - 8) return undefined
+    const out: string[] = []
+    let prev = -2
+    for (const i of kept) {
+      if (i - prev > 1) out.push(`[... ${i - prev - 1} lines removed ...]`)
+      out.push(lines[i]!)
+      prev = i
+    }
+    const preview = out.join("\n")
+    if (estimateTokens(preview) >= total * 0.7) return undefined
+    return { strategy: "lines", preview }
+  }
 
   const maxLines = Math.max(6, Math.floor(previewCharBudget(config, text.length) / COMPRESSIBLE_LINE_CHAR))
   const headCount = Math.min(lines.length - 8, Math.max(8, Math.floor(maxLines * 0.6)))
@@ -341,7 +436,7 @@ export function compressOutput(text: string, config: CcrConfig, query?: string):
   const log = compressLog(text, query)
   if (log) return log
 
-  return compressLines(text, config)
+  return compressLines(text, config, query)
 }
 
 // ─── Unified diffs ──────────────────────────────────────────────────────────
@@ -362,11 +457,14 @@ export function compressDiff(text: string): CompressionPreview | undefined {
 
   const MAX_CONTEXT_LINES = 2
   const MAX_HUNKS_PER_FILE = 10
+  const MAX_FILES = 20
 
   const previewLines: string[] = []
   let kept = 0
   let elided = 0
   let hunks = 0
+  let files = 0
+  let beyondFiles = false
   let contextRun = 0
   let inHunk = false
 
@@ -379,6 +477,9 @@ export function compressDiff(text: string): CompressionPreview | undefined {
       }
       inHunk = false
       hunks = 0
+      // max_files parity: keep the header of overflow files as anchors, but
+      // fold their bodies into the elision count.
+      beyondFiles = line.startsWith("diff --git ") ? ++files > MAX_FILES : beyondFiles
       previewLines.push(line)
       kept++
       continue
@@ -396,7 +497,7 @@ export function compressDiff(text: string): CompressionPreview | undefined {
       }
       continue
     }
-    if (!inHunk || hunks > MAX_HUNKS_PER_FILE) {
+    if (!inHunk || hunks > MAX_HUNKS_PER_FILE || beyondFiles) {
       elided++
       continue
     }

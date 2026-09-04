@@ -311,6 +311,87 @@ describe("compressCode docstring (FIRST_LINE parity)", () => {
   })
 })
 
+describe("log selection pools (Headroom LogCompressor parity)", () => {
+  test("keeps warnings in their own pool without crowding out errors", () => {
+    const lines = ["build started"]
+    for (let i = 0; i < 200; i++) {
+      lines.push(`2026-09-03T10:00:${String(i % 60).padStart(2, "0")} INFO step ${i} done`)
+    }
+    lines.push("2026-09-03T10:01:00 ERROR db connection failed")
+    for (let i = 0; i < 8; i++) {
+      lines.push(`2026-09-03T10:02:${String(i).padStart(2, "0")} WARNING slow query ${i}`)
+    }
+    lines.push("===== 1 failed, 207 passed =====")
+    const result = compressLog(lines.join("\n"))
+    expect(result).toBeDefined()
+    expect(result!.preview).toContain("ERROR db connection failed")
+    expect(result!.preview).toContain("WARNING slow query 0")
+    expect(result!.preview).toContain("===== 1 failed, 207 passed =====")
+  })
+
+  test("keeps error context lines and stack frames", () => {
+    const lines = ["svc boot"]
+    for (let i = 0; i < 100; i++) lines.push(`t=${i} INFO heartbeat ok`)
+    lines.push("step: connect db")
+    lines.push("step: auth token")
+    lines.push("ERROR connection reset by peer")
+    lines.push("step: retry scheduled")
+    lines.push("Traceback (most recent call last):")
+    lines.push('  File "db.py", line 42, in connect')
+    lines.push("    sock.connect(addr)")
+    lines.push("ConnectionError: refused")
+    lines.push("===== suite done =====")
+    for (let i = 0; i < 60; i++) lines.push(`t=${100 + i} INFO heartbeat ok`)
+    const result = compressLog(lines.join("\n"))
+    expect(result).toBeDefined()
+    // ±3 context around the error
+    expect(result!.preview).toContain("step: connect db")
+    expect(result!.preview).toContain("step: retry scheduled")
+    // stack trace preserved
+    expect(result!.preview).toContain("Traceback (most recent call last):")
+    expect(result!.preview).toContain('File "db.py", line 42')
+  })
+})
+
+describe("diff max_files (Headroom parity)", () => {
+  test("folds bodies past the 20-file cap, keeps their headers", () => {
+    const parts = []
+    for (let f = 0; f < 25; f++) {
+      parts.push(`diff --git a/f${f}.ts b/f${f}.ts`)
+      parts.push("--- a/f0.ts")
+      parts.push("+++ b/f0.ts")
+      for (let hk = 0; hk < 4; hk++) {
+        parts.push(`@@ -${hk * 20 + 1},12 +${hk * 20 + 1},12 @@ hunk ${f}-${hk}`)
+        for (let c = 0; c < 10; c++) parts.push(` shared context ${f}-${hk}-${c}`)
+        parts.push(`-old ${f}-${hk}`)
+        parts.push(`+new ${f}-${hk}`)
+      }
+    }
+    const text = Array.from({ length: 30 }, (_, i) => `filler line ${i}`).join("\n") + "\n" + parts.join("\n")
+    const result = compressDiff(text)
+    expect(result).toBeDefined()
+    // file 0 body survives, file 24 body folded (header anchor kept)
+    expect(result!.preview).toContain("+new 0")
+    expect(result!.preview).toContain("diff --git a/f24.ts b/f24.ts")
+    expect(result!.preview).not.toContain("+new 24")
+  })
+})
+
+describe("lines query-aware extraction (TextCrusher parity)", () => {
+  test("keeps query-relevant lines under a 50% budget", () => {
+    const lines = ["deployment guide", "overview"]
+    for (let i = 0; i < 40; i++) lines.push(`routine paragraph ${i} about unrelated operational filler text here`)
+    lines.splice(20, 0, "the authentication flow uses rotating refresh tokens")
+    lines.splice(30, 0, "configure authentication retries with exponential backoff")
+    const text = lines.join("\n")
+    const result = compressLines(text, config, "how does authentication work")
+    expect(result).toBeDefined()
+    expect(result!.preview).toContain("authentication flow")
+    expect(result!.preview).toContain("authentication retries")
+    expect(estimateTokens(result!.preview)).toBeLessThan(estimateTokens(text) * 0.7)
+  })
+})
+
 describe("compressOutput", () => {
   test("routes json payloads to the json strategy", () => {
     const text = JSON.stringify(

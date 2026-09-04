@@ -13,6 +13,8 @@
 | 相关性评分 | 首轮固定版（Headroom SmartCrusher parity）：用当轮 user query（word-overlap + CJK bigram）评分选保留项，选定后随内容 hash 固化——请求视图字节稳定不破坏 |
 | Proactive expansion | Headroom context_tracker 轻量版：当轮 query 与某已压缩 output 原文高相关（score≥2）时，该输出本轮保持完整不折叠——打破「压缩→retrieve→再压缩」循环，不再依赖模型主动 retrieve |
 | 代码语法安全 | Headroom CodeAwareCompressor parity：折叠后输出保持合法语法——保留块关闭行、折叠体用同语言注释占位（Python 额外 `pass` 保证空块可解析） |
+| 文本家族补齐（text-and-logs 对齐，Rust 源码为准） | ① diff `max_files=20`（超限文件只留 header 锚点）；② lines query-aware 分支：有 query 时按相关性摘录到 50% token（TextCrusher `target_ratio=0.5` parity），无 query 沿用 head+tail；③ log 四池选择：error（max_errors=10，首尾锚+query 排序）/warning（max_warnings=5 独立池+文本去重，不再挤占 error）/stack（≤3 trace×20 行，Python/JS/Go/Rust/Java opener）/summary（pytest/build 结算行全保）+ 每个保留 error 的 ±3 context 行。容器实证：pytest 大日志 log 5647→259（95%），grep 输出 search 3525→289（query 命中）。Kompress（ONNX ML）明确不做 |
+| Search 全对齐 | 已核实 Rust 默认：5/30/15 + boost_errors + first/last 全一致，无改动 |
 | 图像窗口降清 | Anthropic 协议按像素计费（(w×h)/750）：保护窗外的历史 image part（data URL）resize 到 ≤512×512（photon LANCZOS，-75% token/张），窗口内截图保持全保真。复用 opencode 已有 photon wasm 依赖（零新增），内容寻址缓存（进程内 LRU 200）保证每图只 resize 一次；任何失败原图透传。开关 `OPENCODE_CCR_IMAGE_ENABLED`（默认 true）。
 - **面积法**（优于 Headroom maxEdge）：预算是像素面积 512²（Anthropic 按 (w×h)/750 计费），任意长宽比恒定 ≈349 tok；200×1600 长截图 → 181×1448 而非 64×512 糊条。
 - **意图 preserve**：细节类 query（读/数/精确/序列/对比/transcribe/count/exact/serial…）本轮跳过 resize——启发式替代 ML router。容器实证：细节 query 轮 0 resized，切普通 query 后 resize 3。**评估记录**：ML router（MiniLM/SigLIP）不追（Python ML 栈 vs TS 插件）；曾因测试环境图像占比仅 3.4% 挂起，用户决策实现——成本大头在长会话重发，窗口语义天然匹配「新图看细节、老图看意思」。容器实证：7 消息会话窗口推进后 `images: 1→2 resized`，保护窗内不动 |
