@@ -136,7 +136,12 @@ export class CcrStore {
   }
 
   async retrieve(sessionID: string, hash: string): Promise<CcrRetrieveResult> {
-    const entry = await this.backend?.read(ccrKey(sessionID, hash))
+    let entry: CcrEntry | null | undefined
+    try {
+      entry = await this.backend?.read(ccrKey(sessionID, hash))
+    } catch {
+      entry = null
+    }
     if (!entry) return { status: "not_found" }
 
     if (isExpired(entry, Date.now())) {
@@ -154,6 +159,26 @@ export class CcrStore {
       strategy: entry.strategy,
       originalTokens: entry.originalTokens,
     }
+  }
+
+  /** Retrieve with ancestor fallback for subagents: a task-subagent session
+   *  inherits the parent's compressed markers in its prompt, so a hash can
+   *  legitimately point at an entry stored under the parent session. Walks
+   *  up the parent chain (bounded) and counts the hit against whichever
+   *  ancestor actually holds the entry. */
+  async retrieveAlongAncestry(
+    sessionID: string,
+    hash: string,
+    resolveParent: (sessionID: string) => Promise<string | undefined>,
+    maxDepth = 3,
+  ): Promise<CcrRetrieveResult> {
+    let current: string | undefined = sessionID
+    for (let depth = 0; current !== undefined && depth <= maxDepth; depth++) {
+      const result = await this.retrieve(current, hash)
+      if (result.status !== "not_found") return result
+      current = await resolveParent(current).catch(() => undefined)
+    }
+    return { status: "not_found" }
   }
 
   /** Headroom context_tracker parity (lightweight): return the hashes of

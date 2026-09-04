@@ -165,3 +165,57 @@ describe("CcrStore.retrieve", () => {
     expect((await store.retrieve("s", contentHash(bigJson))).status).toBe("not_found")
   })
 })
+
+describe("CcrStore.retrieveAlongAncestry", () => {
+  test("hits in the own session without touching resolveParent", async () => {
+    const { backend } = makeBackend()
+    const store = new CcrStore(backend, baseConfig)
+    await store.replace({ sessionID: "ses_a", messageID: "m", tool: "bash", output: bigJson })
+    let parentCalls = 0
+    const result = await store.retrieveAlongAncestry("ses_a", contentHash(bigJson), async () => {
+      parentCalls++
+      return undefined
+    })
+    expect(result.status).toBe("available")
+    expect(parentCalls).toBe(0)
+  })
+
+  test("falls back to the parent session entry", async () => {
+    const { backend } = makeBackend()
+    const store = new CcrStore(backend, baseConfig)
+    await store.replace({ sessionID: "ses_parent", messageID: "m", tool: "bash", output: bigJson })
+    const hash = contentHash(bigJson)
+    const result = await store.retrieveAlongAncestry("ses_child", hash, async (sid) =>
+      sid === "ses_child" ? "ses_parent" : undefined,
+    )
+    expect(result.status).toBe("available")
+    if (result.status === "available") expect(result.content).toBe(bigJson)
+    expect((await store.retrieve("ses_parent", hash)).status).toBe("available")
+  })
+
+  test("walks multiple ancestor levels and honors maxDepth", async () => {
+    const { backend } = makeBackend()
+    const store = new CcrStore(backend, baseConfig)
+    await store.replace({ sessionID: "ses_root", messageID: "m", tool: "bash", output: bigJson })
+    const chain: Record<string, string | undefined> = {
+      ses_c: "ses_b",
+      ses_b: "ses_a",
+      ses_a: "ses_root",
+      ses_root: undefined,
+    }
+    const result = await store.retrieveAlongAncestry("ses_c", contentHash(bigJson), async (sid) => chain[sid])
+    expect(result.status).toBe("available")
+
+    const short = await store.retrieveAlongAncestry("ses_c", contentHash(bigJson), async (sid) => chain[sid], 1)
+    expect(short.status).toBe("not_found")
+  })
+
+  test("survives a throwing resolveParent and returns not_found", async () => {
+    const { backend } = makeBackend()
+    const store = new CcrStore(backend, baseConfig)
+    const result = await store.retrieveAlongAncestry("ses_x", "deadbeefdeadbeefdeadbeef", async () => {
+      throw new Error("resolver down")
+    })
+    expect(result.status).toBe("not_found")
+  })
+})
