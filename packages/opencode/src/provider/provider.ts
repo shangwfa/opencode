@@ -12,6 +12,7 @@ import { serviceUse } from "@opencode-ai/core/effect/service-use"
 import { type LanguageModelV3 } from "@ai-sdk/provider"
 import { ModelsDev } from "@opencode-ai/core/models-dev"
 import { Auth } from "../auth"
+import { normalizeUserId } from "../auth/request-user"
 import { Env } from "../env"
 import { InstallationVersion } from "@opencode-ai/core/installation/version"
 import { iife } from "@/util/iife"
@@ -1171,7 +1172,17 @@ export interface Interface {
   readonly list: () => Effect.Effect<Record<ProviderV2.ID, Info>>
   readonly getProvider: (providerID: ProviderV2.ID) => Effect.Effect<Info>
   readonly getModel: (providerID: ProviderV2.ID, modelID: ModelV2.ID) => Effect.Effect<Model, ModelNotFoundError>
+  readonly getModelForUser: (
+    providerID: ProviderV2.ID,
+    modelID: ModelV2.ID,
+    userId?: string,
+  ) => Effect.Effect<Model, ModelNotFoundError>
+  readonly getProviderForUser: (providerID: ProviderV2.ID, userId?: string) => Effect.Effect<Info>
   readonly getLanguage: (model: Model) => Effect.Effect<LanguageModelV3, ModelNotFoundError>
+  readonly getLanguageForUser: (
+    model: Model,
+    userId?: string,
+  ) => Effect.Effect<LanguageModelV3, ModelNotFoundError>
   readonly closest: (
     providerID: ProviderV2.ID,
     query: string[],
@@ -1695,9 +1706,15 @@ const layer = Layer.effect(
 
     const list = Effect.fn("Provider.list")(() => InstanceState.use(state, (s) => s.providers))
 
-    async function resolveSDK(model: Model, s: State, envs: Record<string, string | undefined>) {
+    async function resolveSDK(
+      model: Model,
+      s: State,
+      envs: Record<string, string | undefined>,
+      apiKeyOverride?: string,
+      providerOverride?: Info,
+    ) {
       try {
-        const provider = s.providers[model.providerID]
+        const provider = providerOverride ?? s.providers[model.providerID]
         const options = { ...provider.options }
 
         if (
@@ -1742,7 +1759,8 @@ const layer = Layer.effect(
         })
 
         if (baseURL !== undefined) options["baseURL"] = baseURL
-        if (options["apiKey"] === undefined && provider.key) options["apiKey"] = provider.key
+        const apiKey = apiKeyOverride ?? provider.key
+        if (options["apiKey"] === undefined && apiKey) options["apiKey"] = apiKey
         if (model.headers)
           options["headers"] = {
             ...options["headers"],
@@ -1833,6 +1851,49 @@ const layer = Layer.effect(
       InstanceState.use(state, (s) => s.providers[providerID]),
     )
 
+    const personalAuth = Effect.fn("Provider.personalAuth")(function* (providerID: ProviderV2.ID, user: string) {
+      if (!user) return undefined
+      return yield* auth.get(providerID, user).pipe(Effect.orDie)
+    })
+
+    const personalApiKey = Effect.fn("Provider.personalApiKey")(function* (providerID: ProviderV2.ID, user: string) {
+      const personal = yield* personalAuth(providerID, user)
+      if (personal?.type === "api") return personal.key
+      return undefined
+    })
+
+    const getProviderForUser = Effect.fn("Provider.getProviderForUser")(function* (
+      providerID: ProviderV2.ID,
+      userId?: string,
+    ) {
+      const s = yield* InstanceState.get(state)
+      const existing = s.providers[providerID]
+      if (existing) return existing
+      const user = normalizeUserId(userId)
+      if (!user) return yield* getProvider(providerID)
+      const personal = yield* personalAuth(providerID, user)
+      if (!personal || (personal.type !== "api" && personal.type !== "oauth")) return yield* getProvider(providerID)
+      const catalogItem = s.catalog[providerID]
+      if (!catalogItem) return yield* getProvider(providerID)
+      if (personal.type === "api") return { ...catalogItem, source: "api" as const, key: personal.key }
+      return { ...catalogItem, source: "custom" as const }
+    })
+
+    const getModelForUser = Effect.fn("Provider.getModelForUser")(function* (
+      providerID: ProviderV2.ID,
+      modelID: ModelV2.ID,
+      userId?: string,
+    ) {
+      const found = yield* getModel(providerID, modelID).pipe(Effect.catchIf(ModelNotFoundError.isInstance, () => Effect.succeed(undefined)))
+      if (found) return found
+      const user = normalizeUserId(userId)
+      if (!user) return yield* new ModelNotFoundError({ providerID, modelID })
+      const provider = yield* getProviderForUser(providerID, user)
+      const info = provider?.models[modelID]
+      if (!info) return yield* new ModelNotFoundError({ providerID, modelID })
+      return info
+    })
+
     const getModel = Effect.fn("Provider.getModel")(function* (providerID: ProviderV2.ID, modelID: ModelV2.ID) {
       const s = yield* InstanceState.get(state)
       const provider = s.providers[providerID]
@@ -1874,6 +1935,90 @@ const layer = Layer.effect(
                 {
                   ...provider.options,
                   ...model.options,
+                },
+                model,
+              )
+            : sdk.languageModel(model.api.id)
+          s.models.set(key, language)
+          return language
+        },
+        (cause) =>
+          cause instanceof NoSuchModelError
+            ? new ModelNotFoundError({ modelID: model.id, providerID: model.providerID, cause })
+            : undefined,
+      )
+    })
+
+    const oauthLanguage = Effect.fn("Provider.oauthLanguage")(function* (
+      model: Model,
+      provider: Info,
+      personal: Extract<Auth.Info, { type: "oauth" }>,
+      user: string,
+    ) {
+      const s = yield* InstanceState.get(state)
+      const key = `${model.providerID}/${model.id}#oauth:${Hash.fast(`${user}:${personal.refresh}`)}`
+      if (s.models.has(key)) return s.models.get(key)!
+      const plugins = yield* plugin.list()
+      const hook = plugins.find((item) => item.auth?.provider === model.providerID && item.auth.loader)
+      const loaderOptions = hook?.auth?.loader
+        ? ((yield* Effect.promise(() =>
+            hook.auth!.loader!(async () => personal, toPublicInfo(provider), { userId: user }),
+          )) ?? {})
+        : {}
+      const merged: Info = { ...provider, options: { ...provider.options, ...loaderOptions } }
+      const apiKey = typeof loaderOptions.apiKey === "string" ? loaderOptions.apiKey : undefined
+      const envs = yield* env.all()
+      return yield* EffectPromise.refineRejection(
+        async () => {
+          const sdk = await resolveSDK(model, s, envs, apiKey, merged)
+          const language = s.modelLoaders[model.providerID]
+            ? await s.modelLoaders[model.providerID](
+                sdk,
+                model.api.id,
+                {
+                  ...merged.options,
+                  ...model.options,
+                },
+                model,
+              )
+            : sdk.languageModel(model.api.id)
+          s.models.set(key, language)
+          return language
+        },
+        (cause) =>
+          cause instanceof NoSuchModelError
+            ? new ModelNotFoundError({ modelID: model.id, providerID: model.providerID, cause })
+            : undefined,
+      )
+    })
+
+    const getLanguageForUser = Effect.fn("Provider.getLanguageForUser")(function* (model: Model, userId?: string) {
+      const user = normalizeUserId(userId)
+      if (!user) return yield* getLanguage(model)
+      const s = yield* InstanceState.get(state)
+      const global = s.providers[model.providerID]
+      const personal = yield* personalAuth(model.providerID, user)
+      if (global && (!personal || (personal.type === "api" && personal.key === global.key)))
+        return yield* getLanguage(model)
+      const provider = yield* getProviderForUser(model.providerID, user)
+      if (!provider) return yield* getLanguage(model)
+      if (personal?.type === "oauth") return yield* oauthLanguage(model, provider, personal, user)
+      const personalKey = personal?.type === "api" ? personal.key : undefined
+      if (!personalKey) return yield* getLanguage(model)
+      const key = `${model.providerID}/${model.id}#u:${Hash.fast(`${user}:${personalKey}`)}`
+      if (s.models.has(key)) return s.models.get(key)!
+      const envs = yield* env.all()
+      return yield* EffectPromise.refineRejection(
+        async () => {
+          const sdk = await resolveSDK(model, s, envs, personalKey, provider)
+          const language = s.modelLoaders[model.providerID]
+            ? await s.modelLoaders[model.providerID](
+                sdk,
+                model.api.id,
+                {
+                  ...provider.options,
+                  ...model.options,
+                  apiKey: personalKey,
                 },
                 model,
               )
@@ -2004,7 +2149,7 @@ const layer = Layer.effect(
       }
     })
 
-    return Service.of({ list, getProvider, getModel, getLanguage, closest, getSmallModel, defaultModel })
+    return Service.of({ list, getProvider, getModel, getModelForUser, getProviderForUser, getLanguage, getLanguageForUser, closest, getSmallModel, defaultModel })
   }),
 )
 

@@ -87,7 +87,7 @@ type Rule = {
 
 export type AuthHook = {
   provider: string
-  loader?: (auth: () => Promise<Auth>, provider: Provider) => Promise<Record<string, any>>
+  loader?: (auth: () => Promise<Auth>, provider: Provider, ctx?: { userId?: string }) => Promise<Record<string, any>>
   methods: (
     | {
         type: "oauth"

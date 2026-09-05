@@ -5,6 +5,11 @@ import { NonNegativeInt } from "@opencode-ai/core/schema"
 import { Global } from "@opencode-ai/core/global"
 import { FSUtil } from "@opencode-ai/core/fs-util"
 import { Database } from "../storage/db"
+import { PUBLIC_USER_ID, normalizeUserId } from "./request-user"
+
+function userKey(userId: string, providerID: string) {
+  return `${userId}/${providerID}`
+}
 
 export const OAUTH_DUMMY_KEY = "opencode-oauth-dummy-key"
 
@@ -42,10 +47,10 @@ export class AuthError extends Schema.TaggedErrorClass<AuthError>()("AuthError",
 }) {}
 
 export interface Interface {
-  readonly get: (providerID: string) => Effect.Effect<Info | undefined, AuthError>
-  readonly all: () => Effect.Effect<Record<string, Info>, AuthError>
-  readonly set: (key: string, info: Info) => Effect.Effect<void, AuthError>
-  readonly remove: (key: string) => Effect.Effect<void, AuthError>
+  readonly get: (providerID: string, userId?: string) => Effect.Effect<Info | undefined, AuthError>
+  readonly all: (userId?: string) => Effect.Effect<Record<string, Info>, AuthError>
+  readonly set: (key: string, info: Info, userId?: string) => Effect.Effect<void, AuthError>
+  readonly remove: (key: string, userId?: string) => Effect.Effect<void, AuthError>
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/Auth") {}
@@ -56,37 +61,71 @@ const layer = Layer.effect(
     const fsys = yield* FSUtil.Service
     const decode = Schema.decodeUnknownOption(Info)
 
-    const all = Effect.fn("Auth.all")(function* () {
+    const readRaw = Effect.fn("Auth.readRaw")(function* () {
       if (process.env.OPENCODE_AUTH_CONTENT) {
         try {
           return JSON.parse(process.env.OPENCODE_AUTH_CONTENT)
         } catch (err) {}
       }
 
-      const data = (yield* fsys.readJson(file).pipe(Effect.orElseSucceed(() => ({})))) as Record<string, unknown>
-      return Record.filterMap(data, (value) => Result.fromOption(decode(value), () => undefined))
+      return (yield* fsys.readJson(file).pipe(Effect.orElseSucceed(() => ({})))) as Record<string, unknown>
     })
 
-    const get = Effect.fn("Auth.get")(function* (providerID: string) {
-      return (yield* all())[providerID]
+    const all = Effect.fn("Auth.all")(function* (userId?: string) {
+      const user = normalizeUserId(userId)
+      const data = yield* readRaw()
+      const decoded = Record.filterMap(data, (value) => Result.fromOption(decode(value), () => undefined))
+      if (!user) {
+        const pub: Record<string, Info> = {}
+        for (const [key, value] of Object.entries(decoded)) {
+          if (!key.includes("/")) pub[key] = value
+        }
+        return pub
+      }
+      const prefix = `${user}/`
+      const merged: Record<string, Info> = {}
+      for (const [key, value] of Object.entries(decoded)) {
+        if (key.startsWith(prefix)) merged[key.slice(prefix.length)] = value
+        if (!key.includes("/")) merged[key] ??= value
+      }
+      return merged
     })
 
-    const set = Effect.fn("Auth.set")(function* (key: string, info: Info) {
+    const get = Effect.fn("Auth.get")(function* (providerID: string, userId?: string) {
+      const user = normalizeUserId(userId)
+      if (!user) return (yield* all())[providerID]
+      const data = yield* all(user)
+      return data[providerID]
+    })
+
+    const set = Effect.fn("Auth.set")(function* (key: string, info: Info, userId?: string) {
+      const user = normalizeUserId(userId)
       const norm = key.replace(/\/+$/, "")
-      const data = yield* all()
-      if (norm !== key) delete data[key]
-      delete data[norm + "/"]
-      yield* fsys
-        .writeJson(file, { ...data, [norm]: info }, 0o600)
-        .pipe(Effect.mapError(fail("Failed to write auth data")))
+      const raw = yield* readRaw()
+      if (!user) {
+        if (norm !== key) delete raw[key]
+        delete raw[norm + "/"]
+        raw[norm] = info
+      } else {
+        const namespaced = userKey(user, norm)
+        if (namespaced !== key) delete raw[key]
+        raw[namespaced] = info
+      }
+      yield* fsys.writeJson(file, raw, 0o600).pipe(Effect.mapError(fail("Failed to write auth data")))
     })
 
-    const remove = Effect.fn("Auth.remove")(function* (key: string) {
+    const remove = Effect.fn("Auth.remove")(function* (key: string, userId?: string) {
+      const user = normalizeUserId(userId)
       const norm = key.replace(/\/+$/, "")
-      const data = yield* all()
-      delete data[key]
-      delete data[norm]
-      yield* fsys.writeJson(file, data, 0o600).pipe(Effect.mapError(fail("Failed to write auth data")))
+      const raw = yield* readRaw()
+      if (!user) {
+        delete raw[key]
+        delete raw[norm]
+      } else {
+        delete raw[key]
+        delete raw[userKey(user, norm)]
+      }
+      yield* fsys.writeJson(file, raw, 0o600).pipe(Effect.mapError(fail("Failed to write auth data")))
     })
 
     return Service.of({ get, all, set, remove })
@@ -99,41 +138,68 @@ export const pgLayer = Layer.effect(
     const pgClient = (Database.Client() as any).$client
     const decode = Schema.decodeUnknownOption(Info)
 
-    const all = Effect.fn("Auth.all")(function* () {
+    const readRows = Effect.fn("Auth.readRows")(function* (userId?: string) {
+      const user = normalizeUserId(userId)
       const rows: any[] = yield* Effect.tryPromise({
-        try: () => pgClient`SELECT * FROM auth` as Promise<any[]>,
+        try: () =>
+          (user
+            ? pgClient`SELECT * FROM auth WHERE user_id IN (${PUBLIC_USER_ID}, ${user})`
+            : pgClient`SELECT * FROM auth WHERE user_id = ${PUBLIC_USER_ID}`) as Promise<any[]>,
         catch: (e) => new AuthError({ message: "Failed to read auth from pg", cause: e }),
       }).pipe(Effect.orDie)
-      const result: Record<string, any> = {}
+      return rows
+    })
+
+    const stripPrefix = (user: string, providerID: string) =>
+      providerID.startsWith(`${user}/`) ? providerID.slice(user.length + 1) : undefined
+
+    const toRecord = (rows: any[], user: string) => {
+      const pub: Record<string, any> = {}
+      const personal: Record<string, any> = {}
       for (const row of rows) {
         const data = typeof row.data === "string" ? JSON.parse(row.data) : row.data
         const decoded = decode(data)
-        if (decoded._tag === "Some") result[row.provider_id] = decoded.value
+        if (decoded._tag !== "Some") continue
+        if (user && row.user_id === user) {
+          const id = stripPrefix(user, row.provider_id)
+          if (id) personal[id] = decoded.value
+        } else if (!row.user_id || row.user_id === PUBLIC_USER_ID) {
+          pub[row.provider_id] = decoded.value
+        }
       }
-      return result as Record<string, Info>
+      return { ...pub, ...personal } as Record<string, Info>
+    }
+
+    const all = Effect.fn("Auth.all")(function* (userId?: string) {
+      const user = normalizeUserId(userId)
+      return toRecord(yield* readRows(user), user)
     })
 
-    const get = Effect.fn("Auth.get")(function* (providerID: string) {
-      return (yield* all())[providerID]
+    const get = Effect.fn("Auth.get")(function* (providerID: string, userId?: string) {
+      return (yield* all(userId))[providerID]
     })
 
-    const set = Effect.fn("Auth.set")(function* (key: string, info: Info) {
+    const set = Effect.fn("Auth.set")(function* (key: string, info: Info, userId?: string) {
+      const user = normalizeUserId(userId)
       const norm = key.replace(/\/+$/, "")
+      const stored = user ? userKey(user, norm) : norm
       const now = Math.floor(Date.now() / 1000)
       yield* Effect.tryPromise({
         try: async () => {
-          await pgClient`INSERT INTO auth (provider_id, type, data, time_created, time_updated)
-            VALUES (${norm}, ${(info as any).type}, ${JSON.stringify(info)}, ${now}, ${now})
-            ON CONFLICT (provider_id) DO UPDATE SET type = ${(info as any).type}, data = ${JSON.stringify(info)}, time_updated = ${now}`
+          await pgClient`INSERT INTO auth (user_id, provider_id, type, data, time_created, time_updated)
+            VALUES (${user}, ${stored}, ${(info as any).type}, ${JSON.stringify(info)}, ${now}, ${now})
+            ON CONFLICT (provider_id) DO UPDATE SET user_id = ${user}, type = ${(info as any).type}, data = ${JSON.stringify(info)}, time_updated = ${now}`
         },
         catch: (e) => new AuthError({ message: "Failed to write auth to pg", cause: e }),
       }).pipe(Effect.orDie)
     })
 
-    const remove = Effect.fn("Auth.remove")(function* (key: string) {
+    const remove = Effect.fn("Auth.remove")(function* (key: string, userId?: string) {
+      const user = normalizeUserId(userId)
       const norm = key.replace(/\/+$/, "")
+      const stored = user ? userKey(user, norm) : norm
       yield* Effect.tryPromise({
-        try: () => pgClient`DELETE FROM auth WHERE provider_id = ${norm}`,
+        try: () => pgClient`DELETE FROM auth WHERE provider_id = ${stored}`,
         catch: (e) => new AuthError({ message: "Failed to delete auth from pg", cause: e }),
       }).pipe(Effect.orDie)
     })

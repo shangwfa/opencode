@@ -426,6 +426,67 @@ describe("plugin.codex", () => {
       { authorization: `Bearer ${refreshedAccess}`, accountId: "acc-123", residency: "eu" },
     ])
   })
+
+  test("writes token refresh back to the requesting user's auth row", async () => {
+    const refreshedAccess = createTestJwt({
+      "https://api.openai.com/auth": { chatgpt_compute_residency: "eu" },
+    })
+    const auth = {
+      type: "oauth" as const,
+      refresh: "refresh-old",
+      access: "",
+      expires: 0,
+    }
+    const authUpdates: Array<{ body: Record<string, unknown>; headers?: Record<string, string> }> = []
+    using server = Bun.serve({
+      port: 0,
+      async fetch(request) {
+        const url = new URL(request.url)
+        if (url.pathname === "/oauth/token") {
+          return Response.json({
+            id_token: createTestJwt({ chatgpt_account_id: "acc-123" }),
+            access_token: refreshedAccess,
+            refresh_token: "refresh-new",
+            expires_in: 3600,
+          })
+        }
+        return new Response("{}", { status: 200 })
+      },
+    })
+    const hooks = await CodexAuthPlugin(
+      {
+        client: {
+          auth: {
+            async set(input: { body: Record<string, unknown>; headers?: Record<string, string> }) {
+              authUpdates.push(input)
+            },
+          },
+        } as never,
+        project: {} as never,
+        directory: "",
+        worktree: "",
+        experimental_workspace: {
+          register() {},
+        },
+        serverUrl: new URL("https://example.com"),
+        $: {} as never,
+      },
+      {
+        issuer: server.url.origin,
+        codexApiEndpoint: new URL("/backend-api/codex/responses", server.url).toString(),
+      },
+    )
+
+    const personal = await hooks.auth!.loader!(async () => auth as never, {} as never, { userId: "u1" })
+    await personal.fetch!(new URL("/backend-api/codex/responses", server.url))
+    expect(authUpdates).toHaveLength(1)
+    expect(authUpdates[0]?.headers).toEqual({ "x-user-id": "u1" })
+
+    const pub = await hooks.auth!.loader!(async () => auth as never, {} as never)
+    await pub.fetch!(new URL("/backend-api/codex/responses", server.url))
+    expect(authUpdates).toHaveLength(2)
+    expect(authUpdates[1]?.headers).toBeUndefined()
+  })
 })
 
 async function waitFor(predicate: () => boolean) {

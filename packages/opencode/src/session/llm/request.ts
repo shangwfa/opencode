@@ -102,6 +102,7 @@ export const prepare = Effect.fn("LLMRequestPrep.prepare")(function* (input: Pre
         providerID: input.provider.id,
         provider: input.provider,
         auth: input.auth,
+        userId: (input.user as unknown as { userId?: string })?.userId,
       })
     : {}
   const options = mergeOptions(

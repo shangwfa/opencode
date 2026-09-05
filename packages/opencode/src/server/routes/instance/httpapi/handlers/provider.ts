@@ -3,6 +3,7 @@ import { Config } from "@/config/config"
 import { ModelsDev } from "@opencode-ai/core/models-dev"
 import { Provider } from "@/provider/provider"
 import { Auth } from "@/auth"
+import { getRequestUserId } from "@/auth/request-user"
 
 import { mapValues } from "remeda"
 import { Effect, Schema } from "effect"
@@ -48,12 +49,20 @@ export const providerHandlers = HttpApiBuilder.group(InstanceHttpApi, "provider"
       for (const [key, value] of Object.entries(all)) {
         if ((enabled ? enabled.has(key) : true) && !disabled.has(key)) filtered[key] = value
       }
+      const request = yield* HttpServerRequest.HttpServerRequest
+      const userId = getRequestUserId(request.headers)
       const connected = yield* provider.list()
-      const credentials = yield* authStore.all().pipe(Effect.orDie)
+      const credentials = yield* authStore.all(userId).pipe(Effect.orDie)
       const providers = Object.assign(
         mapValues(filtered, (item) => Provider.fromModelsDevProvider(item)),
         connected,
       )
+      for (const [id, cred] of Object.entries(credentials)) {
+        if (providers[id] || cred.type !== "api") continue
+        const catalogItem = filtered[id]
+        if (!catalogItem) continue
+        providers[id] = { ...Provider.fromModelsDevProvider(catalogItem), source: "api", key: cred.key }
+      }
       return {
         all: Object.values(providers).map(Provider.toPublicInfo),
         default: Provider.defaultModelIDs(providers),
@@ -68,12 +77,14 @@ export const providerHandlers = HttpApiBuilder.group(InstanceHttpApi, "provider"
     const authorize = Effect.fn("ProviderHttpApi.authorize")(function* (ctx: {
       params: { providerID: ProviderV2.ID }
       payload: ProviderAuth.AuthorizeInput
+      userId?: string
     }) {
       return yield* mapProviderAuthError(
         svc.authorize({
           providerID: ctx.params.providerID,
           method: ctx.payload.method,
           inputs: ctx.payload.inputs,
+          userId: ctx.userId,
         }),
       )
     })
@@ -89,7 +100,11 @@ export const providerHandlers = HttpApiBuilder.group(InstanceHttpApi, "provider"
       // Match legacy route behavior: when authorize() resolves without a
       // result (e.g. no further redirect), serialize as JSON `null` instead
       // of an empty body so clients can `.json()` parse the response.
-      const result = yield* authorize({ params: ctx.params, payload })
+      const result = yield* authorize({
+        params: ctx.params,
+        payload,
+        userId: getRequestUserId(ctx.request.headers),
+      })
       return HttpServerResponse.jsonUnsafe(result ?? null)
     })
 
@@ -97,11 +112,13 @@ export const providerHandlers = HttpApiBuilder.group(InstanceHttpApi, "provider"
       params: { providerID: ProviderV2.ID }
       payload: ProviderAuth.CallbackInput
     }) {
+      const request = yield* HttpServerRequest.HttpServerRequest
       yield* mapProviderAuthError(
         svc.callback({
           providerID: ctx.params.providerID,
           method: ctx.payload.method,
           code: ctx.payload.code,
+          userId: getRequestUserId(request.headers),
         }),
       )
       return true

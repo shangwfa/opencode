@@ -361,7 +361,12 @@ function createSandboxRuntime(
 export interface Runtime {
   readonly trigger: <Output>(name: string, input: unknown, output: Output) => Effect.Effect<Output>
   readonly event: (input: unknown, retry?: boolean) => Effect.Effect<void>
-  readonly auth: (input: { providerID: string; provider: unknown; auth: unknown }) => Effect.Effect<Record<string, unknown>>
+  readonly auth: (input: {
+    providerID: string
+    provider: unknown
+    auth: unknown
+    userId?: string
+  }) => Effect.Effect<Record<string, unknown>>
   readonly tools: () => Effect.Effect<Record<string, ToolDefinition>>
   readonly dispose: () => Effect.Effect<void>
 }
@@ -458,7 +463,10 @@ const layer = Layer.effect(
             const auth = item.hooks.auth
             if (!auth || auth.provider !== input.providerID || !auth.loader) continue
             const next = yield* Effect.tryPromise({
-              try: () => auth.loader!(() => Promise.resolve(input.auth as never), input.provider as never),
+              try: () =>
+                auth.loader!(() => Promise.resolve(input.auth as never), input.provider as never, {
+                  userId: input.userId,
+                }),
               catch: (error) => String(error),
             }).pipe(Effect.catch(() => Effect.succeed(undefined)))
             if (next && typeof next === "object") options = { ...options, ...next }

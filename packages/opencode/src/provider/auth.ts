@@ -5,8 +5,13 @@ import { Auth } from "@/auth"
 import { InstanceState } from "@/effect/instance-state"
 import { optional } from "@opencode-ai/core/schema"
 import { Plugin } from "../plugin"
+import { normalizeUserId } from "../auth/request-user"
 import { ProviderV2 } from "@opencode-ai/core/provider"
 import { Array as Arr, Effect, Layer, Record, Result, Context, Schema } from "effect"
+
+function pendingKey(userId: string, providerID: ProviderV2.ID) {
+  return `${userId}/${providerID}`
+}
 
 const When = Schema.Struct({
   key: Schema.String,
@@ -92,14 +97,17 @@ export interface Interface {
   readonly authorize: (
     input: {
       providerID: ProviderV2.ID
+      userId?: string
     } & AuthorizeInput,
   ) => Effect.Effect<Authorization | undefined, Error>
-  readonly callback: (input: { providerID: ProviderV2.ID } & CallbackInput) => Effect.Effect<void, Error>
+  readonly callback: (
+    input: { providerID: ProviderV2.ID; userId?: string } & CallbackInput,
+  ) => Effect.Effect<void, Error>
 }
 
 interface State {
   hooks: Record<ProviderV2.ID, Hook>
-  pending: Map<ProviderV2.ID, AuthOAuthResult>
+  pending: Map<string, AuthOAuthResult>
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/ProviderAuth") {}
@@ -161,7 +169,7 @@ const layer: Layer.Layer<Service, never, Auth.Service | Plugin.Service> = Layer.
     })
 
     const authorize = Effect.fn("ProviderAuth.authorize")(function* (
-      input: { providerID: ProviderV2.ID } & AuthorizeInput,
+      input: { providerID: ProviderV2.ID; userId?: string } & AuthorizeInput,
     ) {
       const { hooks, pending } = yield* InstanceState.get(state)
       const method = hooks[input.providerID].methods[input.method]
@@ -176,8 +184,9 @@ const layer: Layer.Layer<Service, never, Auth.Service | Plugin.Service> = Layer.
         }
       }
 
+      const user = normalizeUserId(input.userId)
       const result = yield* Effect.promise(() => method.authorize(input.inputs))
-      pending.set(input.providerID, result)
+      pending.set(pendingKey(user, input.providerID), result)
       return {
         url: result.url,
         method: result.method,
@@ -186,10 +195,12 @@ const layer: Layer.Layer<Service, never, Auth.Service | Plugin.Service> = Layer.
     })
 
     const callback = Effect.fn("ProviderAuth.callback")(function* (
-      input: { providerID: ProviderV2.ID } & CallbackInput,
+      input: { providerID: ProviderV2.ID; userId?: string } & CallbackInput,
     ) {
       const pending = (yield* InstanceState.get(state)).pending
-      const match = pending.get(input.providerID)
+      const user = normalizeUserId(input.userId)
+      const key = pendingKey(user, input.providerID)
+      const match = pending.get(key)
       if (!match) return yield* new OauthMissing({ providerID: input.providerID })
       if (match.method === "code" && !input.code) {
         return yield* new OauthCodeMissing({ providerID: input.providerID })
@@ -199,24 +210,33 @@ const layer: Layer.Layer<Service, never, Auth.Service | Plugin.Service> = Layer.
         match.method === "code" ? match.callback(input.code!) : match.callback(),
       )
       if (!result || result.type !== "success") return yield* new OauthCallbackFailed({})
+      pending.delete(key)
 
       if ("key" in result) {
-        yield* auth.set(input.providerID, {
-          type: "api",
-          key: result.key,
-          ...(result.metadata ? { metadata: result.metadata } : {}),
-        })
+        yield* auth.set(
+          input.providerID,
+          {
+            type: "api",
+            key: result.key,
+            ...(result.metadata ? { metadata: result.metadata } : {}),
+          },
+          user,
+        )
       }
 
       if ("refresh" in result) {
         const { type: _, provider: __, refresh, access, expires, ...extra } = result
-        yield* auth.set(input.providerID, {
-          type: "oauth",
-          access,
-          refresh,
-          expires,
-          ...extra,
-        })
+        yield* auth.set(
+          input.providerID,
+          {
+            type: "oauth",
+            access,
+            refresh,
+            expires,
+            ...extra,
+          },
+          user,
+        )
       }
     })
 

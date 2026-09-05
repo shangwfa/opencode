@@ -606,8 +606,9 @@ const layer = Layer.effect(
       providerID: ProviderV2.ID,
       modelID: ModelV2.ID,
       sessionID: SessionID,
+      userId?: string,
     ) {
-      const exit = yield* provider.getModel(providerID, modelID).pipe(Effect.exit)
+      const exit = yield* provider.getModelForUser(providerID, modelID, userId).pipe(Effect.exit)
       if (Exit.isSuccess(exit)) return exit.value
       const err = Cause.squash(exit.cause)
       if (Provider.ModelNotFoundError.isInstance(err)) {
@@ -659,7 +660,7 @@ const layer = Layer.effect(
       const full =
         !input.variant && ag.variant && same
           ? yield* provider
-              .getModel(model.providerID, model.modelID)
+              .getModelForUser(model.providerID, model.modelID, input.userId)
               .pipe(Effect.catchIf(Provider.ModelNotFoundError.isInstance, () => Effect.succeed(undefined)))
           : undefined
       const variant = input.variant ?? (ag.variant && full?.variants?.[ag.variant] ? ag.variant : undefined)
@@ -1250,7 +1251,12 @@ const layer = Layer.effect(
               history: msgs,
             }).pipe(Effect.ignore, Effect.forkIn(scope))
 
-          const model = yield* getModel(lastUser.model.providerID, lastUser.model.modelID, sessionID)
+          const model = yield* getModel(
+            lastUser.model.providerID,
+            lastUser.model.modelID,
+            sessionID,
+            (lastUser as unknown as { userId?: string })?.userId,
+          )
           const task = tasks.pop()
 
           if (task?.type === "subtask") {

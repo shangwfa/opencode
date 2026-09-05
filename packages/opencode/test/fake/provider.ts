@@ -65,6 +65,17 @@ export namespace ProviderTest {
           getLanguage: Effect.fn("TestProvider.getLanguage")(() =>
             Effect.die(new Error("ProviderTest.getLanguage not configured")),
           ),
+          getLanguageForUser: Effect.fn("TestProvider.getLanguageForUser")(() =>
+            Effect.die(new Error("ProviderTest.getLanguageForUser not configured")),
+          ),
+          getModelForUser: Effect.fn("TestProvider.getModelForUser")((providerID, modelID) => {
+            if (providerID === row.id && modelID === mdl.id) return Effect.succeed(mdl)
+            return Effect.die(new Error(`Unknown test model: ${providerID}/${modelID}`))
+          }),
+          getProviderForUser: Effect.fn("TestProvider.getProviderForUser")((providerID) => {
+            if (providerID === row.id) return Effect.succeed(row)
+            return Effect.die(new Error(`Unknown test provider: ${providerID}`))
+          }),
           closest: Effect.fn("TestProvider.closest")((providerID) =>
             Effect.succeed(providerID === row.id ? { providerID: row.id, modelID: mdl.id } : undefined),
           ),

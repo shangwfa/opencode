@@ -1,6 +1,7 @@
 import type { Hooks, PluginInput } from "@opencode-ai/plugin"
 import { InstallationVersion } from "@opencode-ai/core/installation/version"
 import { OAUTH_DUMMY_KEY } from "../../auth"
+import { USER_ID_HEADER } from "../../auth/request-user"
 import os from "os"
 import { setTimeout as sleep } from "node:timers/promises"
 import { createServer } from "http"
@@ -324,7 +325,8 @@ export async function CodexAuthPlugin(input: PluginInput, options: CodexAuthPlug
     },
     auth: {
       provider: "openai",
-      async loader(getAuth) {
+      async loader(getAuth, _provider, ctx) {
+        const refreshUserId = ctx?.userId
         const auth = await getAuth()
         const websocketFetch = options.experimentalWebSockets
           ? OpenAIWebSocketPool.createWebSocketFetch({ httpFetch: fetch })
@@ -377,6 +379,7 @@ export async function CodexAuthPlugin(input: PluginInput, options: CodexAuthPlug
                         expires: Date.now() + (tokens.expires_in ?? 3600) * 1000,
                         ...(accountId && { accountId }),
                       },
+                      ...(refreshUserId ? { headers: { [USER_ID_HEADER]: refreshUserId } } : {}),
                     })
                     return {
                       access: tokens.access_token,
