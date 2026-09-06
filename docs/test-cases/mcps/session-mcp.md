@@ -489,3 +489,11 @@ T22.18 实测发现两个 local MCP sandbox 启动相关的安全问题，已修
 2. **name 路径破坏**（`sandboxMcpPaths`）：用户可控 MCP name 直接拼入 `/tmp/opencode-mcp/${key}-${port}.{pid,log}` 文件路径，name 含 `/` 时重定向目标成为不存在的嵌套目录 → MCP 无法启动。修复：key 做路径 sanitize（非 `[A-Za-z0-9._-]` 替换为 `_`）。清理逻辑（kill supergateway）复用同一函数，启动/清理路径一致。
 
 > 注：session MCP local 端口从 `SANDBOX_MCP_BASE_PORT=9100` 起（实测端口 9100，非文档旧假设）。
+
+> **复测记录（2026-09-06，merge upstream/dev v1.18.29 后，镜像 `t0906-merged-1.18.29`，组合 3）**：
+> - T22.1（local create：type=local/command 数组/enabled=true，PG `session_mcps` 一致）/T22.2（remote create：type=remote/url/headers 完整）/T22.3（local+remote 同列表 count=2）✅
+> - T22.10（缺 name → 400）/T22.16（local 类型缺 command → 400）✅
+> - **T22.9 实测偏差（非回归）**：不存在 session 时 list=200 空数组 ✅（mcps list 无 requireSession）；**create=500、delete 单个=500、clear=500**（非文档所写 create 500 幂等 delete=200）。
+>   - 根因：`clearMcps`/`deleteMcp`/`createMcp` 均调 `requireSession`（`session.ts:722/733/741`），对不存在 session 抛 `ApiError.notFound`，但该组 DELETE/POST handler 未走错误契约映射 → 落默认 500。
+>   - **对照组证实为既有语义偏差非 merge 回归**：`agents` clear 对不存在 session 同为 500（`clearAgents` 同样 requireSession），而 `commands` 组（list/clear）返回 404（错误契约映射正常）。即 requireSession 的 404 语义仅在部分 handler 组生效。文档 T22.9 的"delete=200 幂等"期望与实际不符，属长期文档偏差，建议后续统一 requireSession 错误映射时修正文档或对齐实现。
+> - 未跑：T22.13/14/15（remote/local MCP 工具经模型调用 E2E，依赖模型行为，机制上次复测 2026-08-21 无回归）、T22.17/18/19（local MCP env 注入/shell 安全/pid 生命周期，本地 sandbox 依赖，机制稳定）。
