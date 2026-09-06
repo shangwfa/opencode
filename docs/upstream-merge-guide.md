@@ -34,6 +34,12 @@ docker build && docker run     # 回归测试
 
 ## 合并后必须检查
 
+### 0. upstream core 测试的类型偏差（2026-09-06 v1.18.29 合并记录）
+
+合并 v1.18.29 后 `bun typecheck`（packages/opencode）新增 ~249 个错误，**全部位于 upstream 的 core 测试文件**（`test/session-runner.test.ts`、`test/connector.test.ts`、`test/session-prompt.test.ts`、`test/session-create.test.ts`、`test/plugin/*` 等）。根因：SaaS 分支改了 core 的服务签名（`SessionV2.Service` requirements、错误类型结构、`Database` 层），upstream 后续按原签名编写的测试在 SaaS core 上类型不匹配（典型模式：`SessionV2.NotFoundError` vs `NotFoundError` 命名空间错位、R 通道 `Database.Service | SessionV2.Service` 未展开）。
+
+**判定标准：`grep -v "test/" ` 后的 src 错误数不得高于合并前基线**（本次合并 src 错误从 59 降到 2，基线反而更健康）。这些 core 测试属于「SaaS 场景不跑 core 单测」的已知偏差域（见根 AGENTS.md），用 HTTP 集成测试验证功能，不要为消 typecheck 去逐个适配 upstream 测试（工作量大且每次合并会重置）。
+
 ### 1. Database.use 异步兼容性
 
 SaaS 分支将 `Database.use` 从同步改为异步（返回 `Promise<T>`）。upstream 新代码如果使用 `Effect.sync(() => Database.use(...))` 模式，在 PG 模式下会产生运行时 bug（返回 Promise 对象而非查询结果）。
