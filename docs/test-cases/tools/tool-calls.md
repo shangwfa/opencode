@@ -630,3 +630,5 @@ ORDER BY p.time_created;
 **PG 结构验证**：父 session message role 分布为 `assistant=44`、`user=22`；`grep/glob` 空结果统计为 `glob total=1 empty_results=0`、`grep total=3 empty_results=0`；父 session 及其直接子会话在 `sandbox` 表中仅有 1 条记录，`session_id=ses_15d763272ffeVyMjgYRDGWX3bu`，测试后清理为 state=`destroyed`，确认子 agent 没有创建独立 sandbox。
 
 **实测注意**：本地 OpenSandbox Docker runtime 验证时，建议先启用 `keep-alive`，并通过配置放行 `external_directory`，否则跨 prompt 的 `/workspace` 文件可能因 idle destroy 或 permission ask 导致测试阻塞。此次回归还修复了 `grep` 对 OpenSandbox stdout chunks 使用 `join("")` 拼接导致 JSON 行粘连、误报 `No files found` 的问题。
+
+> 复测记录（2026-09-06，merge upstream/dev v1.18.29 后，镜像 `t0906-merged-1.18.29`）：工具域单测 `apply_patch`/`edit`（29/29，30s 超时）/`attachment`/`session-tool-load` 全过；write→read 闭环与 T-WEX.1 exists 语义见 ai-conversation 与 write-exists-semantics 复测记录。T18.9（bash 快速失败）因当日模型不调 bash 未执行——A/B 镜像对照已定性为 deepseek-v4-flash 行为波动，非 merge 回归（详见 session/ai-conversation.md 复测注记）。

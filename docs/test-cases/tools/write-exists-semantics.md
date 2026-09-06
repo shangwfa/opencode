@@ -96,3 +96,5 @@ summary
 | 2026-08-19 | `perf-rft`（组合 2：本地 PG + 远端沙箱，LSP 修复已撤销） | T-WEX.1 | ✅ PASS | 空文件覆盖 exists=true，1146ms |
 | 2026-08-19 | `perf-rft`（组合 2） | T-WEX.1b | ✅ PASS | 内容写入正确 |
 | 2026-08-19 | `perf-rft`（组合 2） | T-WEX.2 | ✅ PASS | new=false / existing=true |
+
+> 复测记录（2026-09-06，merge v1.18.29 后）：T-WEX.1 PASS（exec 预置空文件 → write part `completed|exists=true` → 回读内容一致）。

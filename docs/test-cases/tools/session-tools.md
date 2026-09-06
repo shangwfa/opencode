@@ -1233,3 +1233,5 @@ async function sendAndWait(sid, body, timeout = 90000) {
 - Service 层 CRUD + noopLayer 测试：`packages/opencode/test/tool/session-tool-crud.test.ts`（12 用例）
 - importToolCode 动态加载测试：`packages/opencode/test/tool/session-tool-load.test.ts`（6 用例）
 - PG 持久化测试：`packages/opencode/test/tool/session-tool-pg.test.ts`（5 用例）
+
+> 复测记录（2026-09-06，merge upstream/dev v1.18.29 后，镜像 `t0906-merged-1.18.29`，组合 3）：T32.1-T32.9 CRUD 抽验全过（创建 `stl_` 前缀/PG 落库/同名更新 count=1/删单个/清空/会话隔离/删 session 级联 404+PG=0/缺字段 400/不存在 session 404）。T32.10 LLM 调用受模型行为波动未触发（同日 bash A/B 定性，非 merge 回归），注册/合并链路由 `test/tool/session-tool-load.test.ts`（6/6）佐证。
