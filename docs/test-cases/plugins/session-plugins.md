@@ -974,3 +974,14 @@ curl -s --noproxy '*' -m 180 -X POST "$BASE/session/$SID/summarize" \
 | T35.32-62 | ⏸️ | 源码审计类（T35.32-51）依赖命令/npm fixture；npm 类（T35.52-61）依赖外部包与凭据，与文档标注一致未执行 |
 
 **关键结论**：本次全量执行确认 2026-08-23 的两个修复在真实链路生效；新增 T35.63/T35.64 用例防止回归。非 keepAlive 场景 agent 随沙箱回收属产品语义（已文档化），T35.63 明确要求 keepAlive。
+
+> **复测记录（2026-09-06，merge upstream/dev v1.18.29 后，镜像 `t0906-merged-1.18.29`，组合 3）**：
+> - **SaaS 单测 8/8 ✅**：`test/plugin/session-plugin-runtime.test.ts` + `test/server/session-plugin-payload.test.ts` 全过。
+> - **注意（非 SaaS 回归）**：`bun test test/plugin/` 全目录 315 测试中 33 fail，均为 upstream loader.shared/trigger/workspace 等测试，根因是 Effect v4.0.0-beta.83 版本不匹配（`TypeError: schema.ast` / `yield* Session.Service` undefined 于 Schema.js 加载）——污染 fixture 加载链，与 SaaS session-plugin 逻辑无关，判断为 baseline 环境问题。
+> - **集成**：
+>   - T35.1 create：PG `session_plugins.code` 列完整落库；**HTTP 响应不返回 code**（无 code 字段、spec=null）→ 与 T35.30 审计期望（响应不暴露源码）一致
+>   - T35.2/29 列表代码脱敏 ✅（无完整导出串，仅省略形态）；T35.6 缺 code → 400；T35.27 不存在 session create/list 均 404
+>   - **T35.15 ✅ messages.transform 注入端到端**：注入 "Reply with exactly: MSGHOOK77" 被下游 LLM 消费，模型回复 `MSGHOOK77`（证明 创建→PG→Runtime 加载→hook→transform→LLM 消费 全链路）
+>   - **T35.64 ✅ hook 抛异常降级**：chat.params throw → HTTP 200（异常隔离降级，不 500，08-23 修复语义保持）
+>   - **T35.12 ✅ chat.params**（temperature=0）hook 正常，消息完成
+> - 未跑：npm 包类（T35.52-62 真实功能）、T35.63（agent 启动完整性）——依赖 npm 安装/长对话，核心 loader 逻辑已由单测 + 集成 hook 链路覆盖。
