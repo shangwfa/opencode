@@ -1537,3 +1537,14 @@ for m in msgs[-2:]:
 | T27.22 重建自愈 | ✅ | kill-sandbox 后 `finish:stop`，LSP 自愈 |
 
 **结论**：mini 镜像下 LSP 核心功能无回归；路径 A 需 `LSP_WORKSPACE_ROOT` 覆盖工作区是已知约束。
+
+> 复测记录（2026-09-06，merge upstream/dev v1.18.29 后，镜像 `t0906-merged-1.18.29`）：
+> - **LSP 单测 61/61 ✅**（`test/lsp/` 6 文件：agent 状态机/client/index/launch/lifecycle/jdtls-root，12.6s）
+> - **路径 A daemon 直测 ✅**（宿主机 node 跑 bundle `docker/opt/opencode-lsp-daemon/index.js`，临时装 TS 7.1.0-dev）：
+>   - `/lsp/status`：tsconfig warmup → `{"servers":[{"id":"typescript","status":"running"}]}`
+>   - `/lsp/diagnostics`：test.ts 注入 `const x: string = 123` → 2 条 code 2322 severity 1 `Type 'number' is not assignable to type 'string'`（行 0/行 1）；结构为 `{diagnostics: {path: [...]}}`
+>   - `/lsp/hover`（x line0:6）→ `const x: string`；`/lsp/definition`（y→add line1:9）跳转正确；`/lsp/documentSymbol` x+add；`/lsp/implementation` add；`/lsp/workspaceSymbol` add 命中
+>   - `/lsp/references`（x 无引用→空 []，符合预期）；`/lsp/prepareCallHierarchy` add item
+>   - `/lsp/diagnostics` path=/etc/passwd → 400 `path outside workspace`（越界防护）；非法 JSON → 400 `invalid JSON`
+>   - `/lsp/shutdown` → 200 `{"ok":true}` 后 status 502（优雅关闭）
+> - 未跑：路径 B 端到端（sandbox 内模型触发 write 诊断链路）、PVC app 模式用例（T27.23-27）——依赖远端沙箱/模型，机制由路径 A + 单测覆盖。
