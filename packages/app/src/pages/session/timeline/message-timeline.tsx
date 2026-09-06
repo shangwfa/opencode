@@ -777,6 +777,7 @@ export function MessageTimeline(props: {
   }
 
   const saveTitleEditor = () => {
+    if (!title.editing) return
     const id = sessionID()
     if (!id) return
     if (titleMutation.isPending) return
@@ -1496,6 +1497,7 @@ export function MessageTimeline(props: {
                         onInput={(event) => setTitle("draft", event.currentTarget.value)}
                         onKeyDown={(event) => {
                           event.stopPropagation()
+                          if (event.isComposing || event.keyCode === 229) return
                           if (event.key === "Enter") {
                             event.preventDefault()
                             void saveTitleEditor()
@@ -1506,7 +1508,7 @@ export function MessageTimeline(props: {
                             closeTitleEditor()
                           }
                         }}
-                        onBlur={closeTitleEditor}
+                        onBlur={saveTitleEditor}
                       />
                     </Show>
                   </Show>

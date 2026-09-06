@@ -256,7 +256,7 @@ export const ApplyPatchTool = Tool.define(
         patch: change.diff,
         additions: change.additions,
         deletions: change.deletions,
-        movePath: change.movePath,
+        ...(change.movePath ? { movePath: change.movePath } : {}),
       }))
 
       const relativePaths = fileChanges.map((c) => path.relative(instance.directory, c.filePath).replaceAll("\\", "/"))
