@@ -32,6 +32,12 @@ import { transitionRunningTool } from "./mark-timed-out"
 
 const DOOM_LOOP_THRESHOLD = 3
 
+// Partial tool arguments stream to live listeners as message.part.delta (field
+// "raw"). The deltas are throttled batches of the LLM-generated argument JSON;
+// they are never persisted — the running-state part.update carries the parsed
+// input as the authoritative value.
+const TOOL_INPUT_FLUSH_MS = 200
+
 export function isWatchdogTimeout(part: SessionV1.ToolPart) {
   if (part.state.status !== "error") return false
   return isRecord(part.state.metadata) && part.state.metadata.timeout === true
@@ -77,6 +83,8 @@ type ToolCall = {
   messageID: SessionV1.ToolPart["messageID"]
   sessionID: SessionV1.ToolPart["sessionID"]
   done: Deferred.Deferred<void>
+  rawBuffer?: string
+  rawFlushedAt?: number
 }
 
 interface ProcessorContext extends Input {
@@ -282,6 +290,19 @@ const layer = Layer.effect(
         return { call: ctx.toolcalls[input.id], part }
       })
 
+      const flushToolInput = Effect.fnUntraced(function* (callID: string) {
+        const call = ctx.toolcalls[callID]
+        if (!call?.rawBuffer) return
+        ctx.toolcalls[callID] = { ...call, rawBuffer: "", rawFlushedAt: Date.now() }
+        yield* session.updatePartDelta({
+          sessionID: call.sessionID,
+          messageID: call.messageID,
+          partID: call.partID,
+          field: "raw",
+          delta: call.rawBuffer,
+        })
+      })
+
       const isFilePart = (value: unknown): value is SessionV1.FilePart => Schema.is(SessionV1.FilePart)(value)
 
       const toolResultOutput = (
@@ -349,12 +370,20 @@ const layer = Layer.effect(
             yield* ensureToolCall(value)
             return
 
-          case "tool-input-delta":
+          case "tool-input-delta": {
             yield* ensureToolCall(value)
+            const call = ctx.toolcalls[value.id]
+            if (!call) return
+            const buffered = (call.rawBuffer ?? "") + value.text
+            ctx.toolcalls[value.id] = { ...call, rawBuffer: buffered }
+            if (buffered && Date.now() - (call.rawFlushedAt ?? 0) < TOOL_INPUT_FLUSH_MS) return
+            yield* flushToolInput(value.id)
             return
+          }
 
           case "tool-input-end": {
             yield* ensureToolCall(value)
+            yield* flushToolInput(value.id)
             return
           }
 

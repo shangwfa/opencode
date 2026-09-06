@@ -599,8 +599,8 @@ DIR=$(curl -s "$BASE/session/$SID" | jexec "d['directory']")
 
 bun docs/test-cases/scripts/sse-dump.mjs "$BASE/event" 10 "$DIR" > /tmp/t924.log
 python3 -c "
-import json
-for line in open('/tmp/t924.log')[:3]:
+import json, itertools
+for line in itertools.islice(open('/tmp/t924.log'), 3):
     d = json.loads(line)
     print(d.get('id','?'), d.get('type','?'))
 "
@@ -618,6 +618,136 @@ for line in open('/tmp/t924.log')[:3]:
 curl -s -N --max-time 3 -D - "$BASE/event" | head -3
 ```
 **期望**：HTTP 200、`content-type: text/event-stream`、首行 `server.connected`（回退默认目录连接成功）。若未来行为改为 400 拒绝，则标准同步调整
+
+### T9.26 实例事件流：write 工具参数早期可用性（running 态预渲染）
+
+> 验证：web 端「HTML/PPT 生成边写边看」模式的数据基础 —— write tool part 在 `running` 态（参数生成完毕、工具刚要执行）即携带完整 `state.input.content`，前端可在 **completed 之前、整个回合（session.idle）之前** 渲染 HTML，无需等 `POST /message` 同步返回
+>
+> 背景：tool part 状态机为 `pending`（LLM 生成参数中，input 为空）→ `running`（参数完整，`input.filePath`/`input.content` 全量可用，**此时即可预渲染**）→ `completed`（文件已写盘，`state.output`/`metadata` 就位）。pending 阶段无参数增量事件（`tool-input-delta` 在 V1 链路被丢弃），仅能显示进度提示。
+>
+> **前提**（同 T9.11）：
+> 1. Sandbox TCP 转发已启动（`lsof -i :30040 | grep LISTEN`）
+> 2. write 权限配 `allow`（或依赖本用例的 permission.asked 自动回复）
+> 3. 写入路径在项目目录内（`/workspace/`）
+
+```bash
+SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
+DIR=$(curl -s "$BASE/session/$SID" | jexec "d['directory']")
+
+bun docs/test-cases/scripts/sse-dump.mjs "$BASE/event" 150 "$DIR" > /tmp/t926.log &
+SSE_PID=$!
+for i in $(seq 1 20); do grep -q server.connected /tmp/t926.log 2>/dev/null && break; sleep 0.5; done
+
+curl -s --max-time 140 -X POST "$BASE/session/$SID/message" \
+  -H 'Content-Type: application/json' \
+  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"use ONLY the write tool (not bash) to create /workspace/prerender-test.html containing a minimal HTML page with title 'sse prerender test' and one heading\"}],\"model\":$MODEL}" > /dev/null &
+
+# 权限自动回复（write 未配 allow 时）
+for i in $(seq 1 60); do
+  PLINE=$(grep -m1 '"type":"permission.asked"' /tmp/t926.log 2>/dev/null)
+  if [ -n "$PLINE" ]; then
+    curl -s -X POST "$BASE/session//permissions/" \
+      -H 'Content-Type: application/json' -d '{"response":"always"}' > /dev/null
+    break
+  fi
+  grep -q '"type":"session.idle"' /tmp/t926.log 2>/dev/null && break
+  sleep 2
+done
+wait $SSE_PID 2>/dev/null
+
+python3 -c "
+import json
+writes = []   # (行号, status, content长度, output非空)
+idle_line = None
+for n, line in enumerate(open('/tmp/t926.log')):
+    d = json.loads(line)
+    if d.get('type') == 'session.idle':
+        idle_line = n
+    if d.get('type') != 'message.part.updated': continue
+    part = d.get('properties', {}).get('part', {})
+    if part.get('type') != 'tool' or part.get('tool') != 'write': continue
+    state = part.get('state', {})
+    writes.append((
+        n,
+        state.get('status'),
+        len(state.get('input', {}).get('content') or ''),
+        bool(state.get('output')),
+    ))
+
+statuses = [w[1] for w in writes]
+print('write statuses:', statuses)
+running = next((w for w in writes if w[1] == 'running'), None)
+completed = next((w for w in writes if w[1] == 'completed'), None)
+
+assert 'pending' in statuses, '缺少 pending 事件'
+assert running, '缺少 running 事件'
+assert running[2] > 0 and '<html' in json.dumps(open('/tmp/t926.log').readlines()[running[0]]).lower(), 'running 态 input.content 应含完整 HTML'
+assert completed, '缺少 completed 事件'
+assert running[0] < completed[0], 'running 应早于 completed'
+assert completed[3], 'completed 应有 output'
+if idle_line: assert running[0] < idle_line, 'running 应早于 session.idle（回合未结束即可渲染）'
+print('✅ running 态 content=%d 字节，行号 running=%d < completed=%d%s' % (
+    running[2], running[0], completed[0], f' < idle={idle_line}' if idle_line is not None else ''))
+"
+```
+**期望**：write tool part 依次出现 `pending` → `running` → `completed`；`running` 态事件已携带完整 `input.content`（含 `<html`，字节数 > 0），且其出现顺序早于 `completed` 与 `session.idle` —— 即前端收到 running 事件即可 iframe 预渲染（srcdoc/blob），早于工具执行完成与整个回合结束
+
+### T9.27 实例事件流：工具参数流式增量（message.part.delta / field=raw）
+
+> 验证：方案 A —— LLM 生成工具参数期间（pending 阶段），processor 将参数 JSON 片段节流（200ms）推送为 `message.part.delta`（`field: "raw"`），前端可在参数生成过程中实时预览正在写的 HTML（PPT 场景"边写边看"）
+>
+> 背景：服务端在 `tool-input-delta` 分支累积参数文本并节流 flush（`processor.ts` 的 `flushToolInput`），经 `updatePartDelta` 发内存事件（不落库，刷新/回放不重放）；`running` 态 `part.updated` 仍为定稿值。本用例需镜像包含该改动（`opencode-saas-sandbox-test:tool-input-stream` 及之后）。
+
+```bash
+SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
+DIR=$(curl -s "$BASE/session/$SID" | jexec "d['directory']")
+
+bun docs/test-cases/scripts/sse-dump.mjs "$BASE/event" 150 "$DIR" > /tmp/t927.log &
+SSE_PID=$!
+for i in $(seq 1 20); do grep -q server.connected /tmp/t927.log 2>/dev/null && break; sleep 0.5; done
+
+curl -s --max-time 140 -X POST "$BASE/session/$SID/message" \
+  -H 'Content-Type: application/json' \
+  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"use ONLY the write tool (not bash) to create /workspace/stream-test.html containing an HTML page with title 'stream test' and three paragraphs\"}],\"model\":$MODEL}" > /dev/null &
+
+for i in $(seq 1 70); do
+  PLINE=$(grep -m1 '"type":"permission.asked"' /tmp/t927.log 2>/dev/null)
+  if [ -n "$PLINE" ]; then
+    curl -s -X POST "$BASE/session//permissions/" \
+      -H 'Content-Type: application/json' -d '{"response":"always"}' > /dev/null
+    break
+  fi
+  grep -q '"type":"session.idle"' /tmp/t927.log 2>/dev/null && break
+  sleep 2
+done
+wait $SSE_PID 2>/dev/null
+
+python3 -c "
+import json
+raw_deltas = []    # (行号, partID, delta)
+write_running = None
+for n, line in enumerate(open('/tmp/t927.log')):
+    d = json.loads(line)
+    if d.get('type') == 'message.part.delta':
+        p = d.get('properties', {})
+        if p.get('field') == 'raw': raw_deltas.append((n, p.get('partID'), p.get('delta') or ''))
+    if d.get('type') == 'message.part.updated':
+        part = d.get('properties', {}).get('part', {})
+        if part.get('type') == 'tool' and part.get('tool') == 'write' and part.get('state', {}).get('status') == 'running':
+            write_running = (n, part['id'], part['state']['input'])
+
+assert len(raw_deltas) >= 2, f'raw delta 应多条（节流推送），实际 {len(raw_deltas)}'
+assert write_running, '缺少 write running 事件'
+rid, rpart, rinput = write_running
+delta_parts = [x for x in raw_deltas if x[1] == rpart]
+assert delta_parts, 'raw delta 的 partID 应匹配 write tool part'
+assert max(x[0] for x in delta_parts) < rid, 'raw delta 应全部早于 running 定稿'
+raw = ''.join(x[2] for x in delta_parts)
+assert rinput.get('filePath') in raw and rinput.get('content', '')[:40] in raw.replace('\\\\n', chr(10)).replace('\\\\\"', '\"'), '拼接 raw 应覆盖完整参数'
+print('✅ %d 条 raw delta（partID 匹配），拼接 %d 字节，全部早于 running 定稿（行 %d）' % (len(delta_parts), len(raw), rid))
+"
+```
+**期望**：pending 期间收到 **≥2 条** `message.part.delta`（`field: "raw"`，partID 与 write tool part 一致，节流 200ms 批量）；拼接后包含完整参数（filePath + content）；全部早于 `running` 态 `message.part.updated`。前端消费模式：SSE 按 partID 累积 raw → 容错提取 `content` 字段尾部（部分 JSON，需处理 `\n`/`\"` 转义）→ 实时渲染；收到 running `part.updated` 后丢弃 raw 用 `state.input` 定稿
 
 ---
 
@@ -650,9 +780,18 @@ curl -s -N --max-time 3 -D - "$BASE/event" | head -3
 | T9.23 | ✅ | 全局事件 envelope 为 `{directory,project,payload}`（需原始 curl，sse-dump 会拍平） |
 | T9.24 | ✅ | 事件 id 为 `evt_*` 前缀 |
 | T9.25 | ✅ | 缺 x-opencode-directory 头时回退默认目录（OPENCODE_DEFAULT_DIRECTORY），仍返回 200 + server.connected，非拒绝 |
+| T9.26 | ✅ | write tool part pending→running→completed；running 态即含完整 input.content（155B HTML），顺序 running < completed < session.idle，web 端可在回合结束前预渲染 |
+| T9.27 | ✅ | pending 期间 5 条 message.part.delta（field=raw，partID 匹配，拼接 354B 完整参数），全部早于 running 定稿；镜像 tool-input-stream，改动后 T9.26 回归通过 |
 
 > 注：T9.16-T9.25 为覆盖补全用例，已在本轮验证（组合 1：远端 PG + 远端 Sandbox）。T9.21 的 `session.agent.switched`/`session.model.switched` 需 HTTP switch 端点就绪后验证；`todo.updated`/`mcp.tools.changed` 为按需补充项。
 
 > 注：2026-07-17 重构为标准三段式（sse-dump.mjs 后台订阅 + 业务动作 + 日志断言），原始内联 bun 脚本见 git 历史。
+
+> 复测记录（2026-09-06，组合 3：本地 PG + 本地 OpenSandbox，镜像 `opencode-saas-sandbox-test:t0906-tool-input-stream`）：**T9.1–T9.27 全部通过**（T9.21 为待端点项，PATCH model 静默忽略 0/0 符合记录）。本轮差异点：
+> - T9.7：write /workspace 沙箱写默认放行，`permission.asked`=0，走文档期望的另一分支（无弹窗、正常完成，`file.edited`/`session.diff`/`session.idle` 俱全）
+> - T9.12：`POST /global/dispose` 返回 200 并推送 `server.instance.disposed` + `global.disposed`；dispose 后 session API 仍 200（实例自愈），后续用例不受影响
+> - T9.15：首次用 "say hello" 短任务时 B 只收到 connected+heartbeat（2s 内 message 已结束，SSE 不回放历史——符合设计）；改用 150 词故事长任务后 B 收到 109 message 事件 + idle。**B 加入时机必须在执行中**，用例 prompt 不宜过短
+> - T9.24：文档原 python 命令 `open(...)[...]` 有文件对象切片 bug，实测用 `itertools.islice` 替代执行；建议修文档
+> - T9.26/T9.27：在新镜像复测通过，且 T9.26 日志中可直接看到 4 条 raw delta（方案 A 生效）
 
 ---
