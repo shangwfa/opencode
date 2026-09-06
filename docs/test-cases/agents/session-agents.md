@@ -1775,3 +1775,5 @@ print('✅ PASS' if finish else '❌ FAIL (session stuck)')
 | T-SUB-4 watchdog 不误杀 | ✅ | task 无 watchdog 超时错误 |
 | T-SUB-5 destroy 清理 keepAlive | ✅ | destroy 后 PG keep_alive 从 t→f |
 | T-SUB-6 失败后恢复 | ✅ | session finish=stop，不卡死 |
+
+> 复测记录（2026-09-06，merge v1.18.29 后，注入类用 Muse Spark 1.3）：T16.1 ✅ 创建（返回 agent 定义，name 即 id）/ T16.2 ✅ 列表全局+会话合并（agent-x 在列，非 native 区分）/ T16.3 ✅ upsert 同名唯一 / T16.4 ✅ 删除 / T16.9 ✅ 会话隔离（0 泄漏）/ T16.6 ✅ 自定义 primary agent 生效（message.agent=marker-agent，回复带 AGENT_TAG_START 前缀）。

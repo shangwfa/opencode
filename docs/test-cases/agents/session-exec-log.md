@@ -600,3 +600,4 @@ summary
 > ```bash
 > PGPASSWORD=8zuhlMLd4gaeUG5k psql -h 127.0.0.1 -p 15432 -U app -d opencode -c "SELECT source, COUNT(*) as cnt FROM exec_log WHERE session_id='$SID' GROUP BY source ORDER BY source"
 > ```
+> 复测记录（2026-09-06，merge upstream/dev v1.18.29 后，镜像 `t0906-merged-1.18.29`）：exec_log 审计全链路 ✅（session-create/patch/abort/share/unshare + agent-create/delete/clear + agentsmd-create/clear + command-create/delete/clear + skill-create 共 15 类 source 均产生记录，无模型依赖）。

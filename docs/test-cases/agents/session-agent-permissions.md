@@ -2115,3 +2115,5 @@ bun test test/tool/task.test.ts -t "resumable"
 **期望**：单测通过，覆盖 `task_id` 持久化与恢复链路。
 
 ---
+
+> 复测记录（2026-09-06，merge v1.18.29 后）：T26.21 ✅ 字符串简写转规则（edit:deny/bash:allow）；T26.25 ✅ allow/deny 快捷→`*` 规则；T26.22/24/28 ✅ 路径粒度/命令粒度/task 调度 deny 规范化有序。T26.27 ⚠️ 复现文档已记录行为：`tools` 字段被 session agent API 接受但忽略、不转 permission（转换仅 config 层）——既有行为非 merge 引入。
