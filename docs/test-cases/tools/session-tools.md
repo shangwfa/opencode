@@ -1235,3 +1235,5 @@ async function sendAndWait(sid, body, timeout = 90000) {
 - PG 持久化测试：`packages/opencode/test/tool/session-tool-pg.test.ts`（5 用例）
 
 > 复测记录（2026-09-06，merge upstream/dev v1.18.29 后，镜像 `t0906-merged-1.18.29`，组合 3）：T32.1-T32.9 CRUD 抽验全过（创建 `stl_` 前缀/PG 落库/同名更新 count=1/删单个/清空/会话隔离/删 session 级联 404+PG=0/缺字段 400/不存在 session 404）。T32.10 LLM 调用受模型行为波动未触发（同日 bash A/B 定性，非 merge 回归），注册/合并链路由 `test/tool/session-tool-load.test.ts`（6/6）佐证。
+
+> T32.10 补充排查（2026-09-06）：**非注册问题**。证据：① 创建后模型自报该会话工具清单含 `roll-dice`（`bash, ccr_retrieve, ..., roll-dice, ...`）→ 加载/合并/下发链路正常；② 强制指令（"MANDATORY: call the roll-dice tool now"）×2 与极简指令（"use roll-dice"）×1 均直接作答（极简指令直接编造骰子点数 "3"）。定性：deepseek-v4-flash 当日对工具调用消极（与 bash 同模式，A/B 镜像对照已排除 merge 回归），工具下发链路以自报清单为证。
