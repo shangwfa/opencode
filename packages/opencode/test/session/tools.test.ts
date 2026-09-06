@@ -9,6 +9,7 @@ import { Provider } from "@/provider/provider"
 import { Session } from "@/session/session"
 import { MessageID, PartID, SessionID } from "@/session/schema"
 import { SessionProcessor } from "@/session/processor"
+import { SessionPluginRuntime } from "@/plugin/session-plugin-runtime"
 import { SessionTools } from "@/session/tools"
 import { Tool } from "@/tool/tool"
 import { ToolRegistry } from "@/tool/registry"
@@ -39,6 +40,7 @@ function fakeMcp() {
   return MCP.Service.of({
     tools: () => Effect.succeed({}),
     clients: () => Effect.succeed({}),
+    toolsForSession: () => Effect.succeed({}),
   } as Partial<MCP.Interface> as MCP.Interface)
 }
 
@@ -61,11 +63,28 @@ const fakeTruncate = Truncate.Service.of({
   limits: () => Effect.succeed({ maxLines: 2000, maxBytes: 50 * 1024 }),
 } satisfies Truncate.Interface)
 
+// SaaS-only service: SessionTools.resolve triggers session plugins around tool
+// calls. The upstream timing test only exercises metadata updates, so a no-op
+// runtime is sufficient.
+const fakeSessionPluginRuntime = SessionPluginRuntime.Service.of({
+  acquire: () =>
+    Effect.succeed({
+      trigger: (_name, _input, output) => Effect.succeed(output),
+      event: () => Effect.void,
+      auth: () => Effect.succeed({}),
+      tools: () => Effect.succeed({}),
+      dispose: () => Effect.void,
+    } satisfies SessionPluginRuntime.Runtime),
+  invalidate: () => Effect.void,
+  dispose: () => Effect.void,
+} satisfies SessionPluginRuntime.Interface)
+
 const layer = Layer.mergeAll(
   Layer.succeed(Plugin.Service, fakePlugin),
   Layer.succeed(Permission.Service, fakePermission),
   Layer.succeed(MCP.Service, fakeMcp()),
   Layer.succeed(Truncate.Service, fakeTruncate),
+  Layer.succeed(SessionPluginRuntime.Service, fakeSessionPluginRuntime),
   RuntimeFlags.layer(),
   Layer.succeed(
     ToolRegistry.Service,
