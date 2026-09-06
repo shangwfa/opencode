@@ -771,3 +771,9 @@ SaaS E2E 通过后必须运行以下测试，不能用 E2E 中的模型回复替
 | 日期 | 环境 | 结果 |
 |---|---|---|
 | 2026-09-04 | 组合 1（远端 PG+远端沙箱），镜像 `:ccr`，all 模式（T50.27 用 mcp 模式），Yd-DeepSeek/deepseek-v4-flash | E2E 29/30 通过：T50.1–19 ✅（T50.8 重跑一次，T50.12 改缺参触发，T50.18 按语义判），T50.20 ⏭️（Kimi provider 500，网关问题），T50.21 ✅，T50.22 ⚠️（interrupted 语义与文档旧断言不一致，已修正断言），T50.23–26 ✅，T50.27 ✅（mcp 模式 0 新 part），T50.28–30 ✅（T50.30 实验设计修正为两轮对比，276 vs 1350）。自动化：code-mode catalog 8 ✅ / session-mcp 13 ✅ / lifecycle 21 ✅ / promise 35 ✅ |
+
+> 复测记录（2026-09-06，merge upstream/dev v1.18.29 后，镜像 `t0906-merged-1.18.29` + `OPENCODE_EXPERIMENTAL_CODE_MODE=all`，组合 3 本地沙箱，模型 Yd-DeepSeek）：
+> - 单测：`code-mode.test.ts`/`code-mode-integration.test.ts`/`code-mode-policy.test.ts`/`code-mode-tool-script-parity.test.ts` **89/89 ✅**（catalog/signature/sandbox 限制/权限可见性/截断——覆盖 T50.5 及错误处理、沙箱限制、权限过滤、大输出截断的代码逻辑面）
+> - 集成（execute 全链，deepseek 稳定触发，同 read 属"必须执行才能答"任务）：T50.4 ✅（echo `Echo: discovery-ok`，toolCalls 元数据精确匹配）、T50.6/7 ✅（`Echo: hello code-mode`）、T50.8/9 ✅（顺序依赖：step1 → `Echo: step1` 传递，PG 水位新增 2 execute）、T50.10/11 ✅（并发 3 条 toolCalls a/b/c 全 completed）
+> - ⚠️ 执行要点：模型可能幻觉"已调用 execute"或复用上一轮代码——**必须用 PG 水位**（记录调用前 execute part 数，只查新增）判定，勿用 HTTP 同步响应或"最后一条 execute"；措辞用「先调用 execute 跑精确代码，再原样报告 output」
+> - 图片类 T50.20（需 moonshot key）、内置工具编排长链用例未逐条跑（单测覆盖代码逻辑）
