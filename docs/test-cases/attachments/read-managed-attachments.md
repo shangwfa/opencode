@@ -714,3 +714,9 @@ rm -f /tmp/read-last-response.json \
 | T-READ-15~16 | 持久性              | Sandbox/SaaS 重建后附件仍可读取           |
 | T-READ-17    | 模型投影            | 内部 URL 不泄露，Office 不发送模型        |
 | T-FE-01~04   | 前端集成            | 图片渲染、PDF 内联、Office 下载、认证访问 |
+
+> 复测记录（2026-09-06，merge upstream/dev v1.18.29 后，镜像 `t0906-merged-1.18.29`，组合 3，模型 Yd-DeepSeek）：**T-READ-01~17 全部 PASS**。要点：
+> - read 工具由 deepseek 正常触发（"只调用 read 工具" prompt 稳定有效，本轮 17 次全部触发，未被模型消极行为影响——read 属"必须读文件才能答"任务）
+> - T-READ-10：文档 awk `BEGIN{IGNORECASE=1}` 为 gawk 特性，macOS BSD awk 取不到 ETag，实际用 `grep -i '^etag:'` 提取后 304 验证通过（建议修文档 awk）
+> - T-READ-12：需真实 ELF 文件触发 "Cannot read binary file"（随机字节会先命中 UTF-8 error）；fixture 用 `printf '\x7fELF...'` 构造
+> - T-READ-16：`docker restart` 后附件 URL 仍 200（Sandbox PVC 附件持久化验证通过）
