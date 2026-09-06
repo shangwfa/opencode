@@ -242,3 +242,5 @@ print('✅ T31.6 PASS' if has_findings else '❌ T31.6 FAIL')
 | T31.4 | ⏳ | |
 | T31.5 | ⏳ | |
 | T31.6 | ⏳ | |
+
+> 复测记录（2026-09-06，merge v1.18.29 后）：T31.1（git 环境 READY）+ T31.2（`/review` 经 `/command` 执行）✅——正确识别注入 bug.ts 的两个缺陷（`const x: string = 123` 类型不匹配 High；`as unknown as string` 类型安全漏洞 Medium）。命令只能经 `/command` 触发确认。

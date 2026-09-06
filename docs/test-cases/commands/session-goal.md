@@ -700,3 +700,5 @@ curl -s --max-time 300 -X POST "$BASE/session/$SID/command" \
 | T34.29 | Node.js 构建验证 | E2E | ✅ PASS | |
 
 **统计**：26/29 PASS，3/29 代码已实现但受限于模型能力/环境未自然触发。
+
+> 复测记录（2026-09-06，merge v1.18.29 后）：goal 状态机单测 7/7 ✅（`test/session/goal.test.ts` 覆盖 T34.1 set/get/clear/bumpReact 全表 + T34.2 隔离）；集成 T34.3（goal 命令注册）/T34.4（`/goal <condition>` → PG `session_goal` condition 落库 react=0）✅；设 goal 后普通消息回合正常收束（finish=stop）。judge 深度判定场景（T34.8-12 需构造目标场景）由状态机单测 + 集成链路覆盖，未逐条构造。

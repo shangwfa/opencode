@@ -676,3 +676,5 @@ console.log("⚠️ 方式二 记录限制: 单次提交不触发命令, 需多�
 - 多次 `/command` 调用依次返回 `STEP1_OK`、`STEP2_OK`（多命令串行编排可用）
 - 单次 message 提交 `/cmd1\n/cmd2` **不触发命令**（服务端 `/message` 不解析命令前缀；AI 当普通文本处理）
 - 多命令编排的正确方式是**多次调用 `/command`**，每次一个命令
+
+> 复测记录（2026-09-06，merge upstream/dev v1.18.29 后，镜像 `t0906-merged-1.18.29`，组合 3）：T33.1（创建+PG 落库）/T33.3（upsert count=1）/T33.4（删单个 200）/T33.5（清空后剩 instance 内置 native）/T33.6（会话隔离）/T33.7（删 session 级联 count=0）/T33.8（缺字段 400）/T33.9（不存在 session list+create 均 404）/T33.10（session `init` 覆盖 instance，count=1 不重复，template=SESSION OVERRIDE）/T33.11（删除覆盖后恢复 instance init「guided AGENTS.md setup」）/T33.14（命令执行模板替换：`greet`+arguments=张三 → AI 回「欢迎张三！」）✅ 全过。真实场景 T33.22-25 与 T33.14 同机制（模板+AI 执行），机制已验证。
