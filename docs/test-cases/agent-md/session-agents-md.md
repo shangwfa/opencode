@@ -444,3 +444,12 @@ psql "$PG_URL" -c "SELECT indexname FROM pg_indexes WHERE tablename='session_age
 - 并发 Upsert 不产生重复记录或未处理异常。
 - 真实 Vite React 场景中，Session AGENTS.md 约束、工具调用和最终构建结果全部通过。
 - 父子 Session、workspace 路由、输入边界、并发竞态、Prompt 快照、SQLite/PG migration 和性能回归均有明确结果。
+
+> 复测记录（2026-09-06，merge upstream/dev v1.18.29 后，镜像 `t0906-merged-1.18.29`，组合 3，模型 Muse Spark 1.3 用于注入类）：
+> - T36.1-7 API CRUD ✅（空状态 null/创建 `sam_` 前缀/读取/替换 upsert/缺 content 与非字符串 400/删除 200/会话隔离 SESSION_A_ONLY vs SESSION_B_ONLY）
+> - T36.10/12/13 PG 持久化 ✅（唯一性 count=1/删 session 级联 count=0/5 并发 upsert 后仍 count=1）
+> - T36.8 ✅ System instruction 注入（模型输出 `AGENT_MD_MARKER` 前缀）
+> - T36.14 ✅ 与 session agent 共存（agent 正常调用 finish=stop，无冲突）
+> - T36.16 ✅ fork 隔离：子 fork 后 agents-md=None（**不继承父**），子独立更新不反向修改父——隔离语义与文档一致
+> - T36.19 ✅ 空内容/超大 100KB 均 200 正常处理
+> - 未跑：T36.9（需多级 instruction 对比，深）、T36.15（真实长流程）、T36.17（需多 workspace）、T36.18/20-23（并发竞态/快照/迁移/错误注入，环境特化）——非 merge 影响面，按需补充。
