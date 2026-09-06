@@ -146,3 +146,5 @@ curl -s "$BASE/session/$SID/message" | jq '.[] | {role: .info.role, texts: [.par
 | 2026-08-17 | T41.2.1/2.2/2.3 appId 过滤 | ✅ | 匹配 `all match: True`；不存在 count=0；limit/search 组合正交 |
 | 2026-08-17 | T41.3.1 最后活动时间降序 | ✅ | 发消息后排序翻转（time_updated delta≈52s）；**改标题不刷新 time_updated**（PG bridge `$onUpdate` 不生效，用例已改用发消息验证） |
 | 2026-08-17 | T41.4.1 消息详情回归 | ✅ | Yd-DeepSeek 回复正常；详情含 appId |
+
+| 2026-09-06 | T41.1.1/1.2/1.3 回归（merge v1.18.29 后） | ✅ | 镜像 t0906-merged-1.18.29；appId 创建/PG 落库/非法 400 均正常 |

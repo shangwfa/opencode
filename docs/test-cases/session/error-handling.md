@@ -83,3 +83,5 @@ bun test test/session/retry.test.ts -t "network-error\|network_error\|at capacit
 
 ---
 
+
+> 复测记录（2026-09-06，merge upstream/dev v1.18.29 后，镜像 `t0906-merged-1.18.29`）：T7.1（500 UnknownError）/T7.2（404）/T7.3（400）/T7.4（500）/T7.5（超长 200 截断）全部符合期望 ✅。T7.6-T7.8（finish/retry 变体）由单测 `test/session/retry.test.ts`（60 用例 0 fail）覆盖。

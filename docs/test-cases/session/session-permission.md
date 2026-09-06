@@ -428,3 +428,4 @@ send_and_verify "$SID" "使用 codegraph_codegraph_explore 工具在 /workspace 
 | T5.10 `permission:"*"` 通配放行一切（含 MCP 工具） | — | — | MCP 工具免授权直接执行 | |
 
 ---
+> 复测记录（2026-09-06，merge upstream/dev v1.18.29 后，镜像 `t0906-merged-1.18.29`）：T4.1（默认空）/T4.2（创建传规则 + PG 落库一致）/T4.3+T4.4（PATCH 合并追加语义）/T4.7（跨会话隔离）/T4.8（400）/T4.9（404）✅。T5 系列工具级验证受模型调用波动影响未逐条复测，改由 `bun test test/permission/`（106 用例 0 fail）覆盖 ask/ruleset 链路（merge 触碰过 tools.ts 的 ask 区域，单测为证）。

@@ -180,3 +180,5 @@ psql "$PG_URL" -t -c "SELECT COUNT(*) FROM session WHERE id='$SID'"
 
 ---
 
+
+> 复测记录（2026-09-06，merge upstream/dev v1.18.29 后，镜像 `t0906-merged-1.18.29`）：T1.1/T1.2/T1.3（`GET /path` directory=/workspace）/T2.1-T2.6（创建/带 title/列表/单查/改 title/删除 404）全部 ✅。

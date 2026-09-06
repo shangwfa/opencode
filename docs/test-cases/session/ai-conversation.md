@@ -122,3 +122,7 @@ sleep 1 && curl -s -X POST "$BASE/session/$SID/abort"
 | T4.7 中断会话 | ✅ | abort 返回 `true`；中断发生在 assistant message 落库后（parts=`step-start`,`reasoning`，无 `step-finish`），`finish` 为空，parts 8s 内无增长，确认停止生成 |
 
 > ⚠️ 发现：`GET /session?is_busy=true` 的过滤参数**未生效**（与无参数请求同样返回全量 100 条，limit 截断），无法用于 busy 判定。T4.7 改用文档期望的替代判据（abort=true + 最后 assistant 消息 `finish` 为空 + parts 停止增长）。该接口问题与本次改动无关（既有行为），建议后续修复或改用其他状态查询端点。
+
+
+> 复测记录（2026-09-06，merge upstream/dev v1.18.29 后，镜像 `t0906-merged-1.18.29`，组合 3）：T4.1 ✅（finish=stop）/ T4.2 ✅（上下文记忆「蓝鲸47号」）/ T4.3+T4.4 ✅（write→read 闭环回读 `hello_merge_2026`）/ T4.6 ✅（async 204 + assistant 落库）。
+> ⚠️ T4.5 bash 本轮模型未真实调用（tools=0）：经 merge 前镜像（tool-input-stream）A/B 对照（各 3 次同 prompt，均 0/3 触发）+ 模型自报工具清单含 bash + config 无禁用，定性为 **deepseek-v4-flash 行为波动**，非 merge 回归；工具链路健康由 T4.3 write 闭环 + sse.md T9.6（早间真实触发 pending→running→completed）覆盖。T4.7 本轮未复测。

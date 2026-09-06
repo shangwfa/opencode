@@ -402,3 +402,5 @@ print('✅ 交叉发言时序和用户标识正确，同一用户多轮可追溯
 - 同一用户（alice）的多条消息各自独立携带正确标识
 - AI 每轮都基于完整历史上下文回答
 - 3 条 assistant 消息都有 `finish` 状态
+
+> 复测记录（2026-09-06，merge upstream/dev v1.18.29 后）：T25.1/T25.2 ✅（prompt_async 204，消息列表 userName=alice/userId=user-123 正确落库）。
