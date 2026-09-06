@@ -62,6 +62,10 @@ export namespace SandboxConfig {
   export const defaultLayer = layer
 }
 
+// local MCP（沙箱模式）连接是否经 OpenSandbox server 网关代理取 endpoint；缺省 false = 直连沙箱地址。
+// 在此导出避免 mcp/index.ts 同时 import core 与 opencode 两个同名 Flag namespace。
+export const MCP_ENDPOINT_SERVER_PROXY = Flag.OPENCODE_SANDBOX_MCP_SERVER_PROXY
+
 type Entry =
   | { state: "running"; sb: Sandbox; sandboxID: string; lastActive: number }
   | { state: "killed"; sandboxID: string; lastActive: number }
@@ -388,7 +392,11 @@ export namespace SandboxProvider {
     ) => Effect.Effect<CommandExecution, Error, never>
     readonly interrupt: (sessionID: SessionID) => Effect.Effect<void>
     readonly register: (sessionID: SessionID, sb: Sandbox) => Effect.Effect<void>
-    readonly getEndpoint: (sessionID: SessionID, port: number) => Effect.Effect<string>
+    readonly getEndpoint: (
+      sessionID: SessionID,
+      port: number,
+      opts?: { useServerProxy?: boolean },
+    ) => Effect.Effect<string>
   }
 
   export class Service extends Context.Service<Service, Interface>()("@opencode/SandboxProvider") {}
@@ -702,11 +710,17 @@ export namespace SandboxProvider {
           sandboxes.set(sessionID, sb)
         })
 
-      const getEndpoint: Interface["getEndpoint"] = (sessionID, port) =>
+      const getEndpoint: Interface["getEndpoint"] = (sessionID, port, opts) =>
         Effect.gen(function* () {
           const sb = yield* getOrCreate(sessionID)
           const url = yield* Effect.tryPromise({
-            try: () => sb.getEndpointUrl(port),
+            // useServerProxy=true 经 OpenSandbox server 网关代理（{endpoint-host}/sandboxes/{id}/port/{port}），缺省直连沙箱地址
+            try: () =>
+              opts?.useServerProxy
+                ? sb.sandboxes
+                    .getSandboxEndpoint(sb.id, port, true)
+                    .then((ep) => `${config.protocol}://${ep.endpoint}`)
+                : sb.getEndpointUrl(port),
             catch: (e) => new Error(`getEndpoint failed: ${String(e)}`),
           })
           log.info("sandbox endpoint resolved", { sessionID, port, url })
@@ -1845,11 +1859,17 @@ export namespace SandboxProvider {
           cacheSandbox(sessionID, sb)
         }))
 
-      const getEndpoint: Interface["getEndpoint"] = (sessionID, port) =>
+      const getEndpoint: Interface["getEndpoint"] = (sessionID, port, opts) =>
         Effect.gen(function* () {
           const sb = yield* getOrCreate(sessionID)
           const url = yield* Effect.tryPromise({
-            try: () => sb.getEndpointUrl(port),
+            // useServerProxy=true 经 OpenSandbox server 网关代理（{endpoint-host}/sandboxes/{id}/port/{port}），缺省直连沙箱地址
+            try: () =>
+              opts?.useServerProxy
+                ? sb.sandboxes
+                    .getSandboxEndpoint(sb.id, port, true)
+                    .then((ep) => `${config.protocol}://${ep.endpoint}`)
+                : sb.getEndpointUrl(port),
             catch: (e) => new Error(`getEndpoint failed: ${String(e)}`),
           })
           log.info("sandbox endpoint resolved", { sessionID, port, url })

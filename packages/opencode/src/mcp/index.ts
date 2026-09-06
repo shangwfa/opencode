@@ -37,7 +37,7 @@ import { McpCatalog } from "./catalog"
 import { McpEvent } from "@opencode-ai/schema/mcp-event"
 import { SessionID } from "@opencode-ai/schema/session-id"
 import { SessionMcp } from "./session-mcp"
-import { SandboxProvider } from "@/tool/sandbox-provider"
+import { SandboxProvider, MCP_ENDPOINT_SERVER_PROXY } from "@/tool/sandbox-provider"
 import { McpBrowser } from "./browser"
 
 const DEFAULT_TIMEOUT = 30_000
@@ -752,7 +752,11 @@ const layer = Layer.effect(
         ),
       )
 
-      const endpointUrl = yield* maybeSandboxProvider.getEndpoint(sessionID, port)
+      const endpointUrl = yield* maybeSandboxProvider.getEndpoint(
+        sessionID,
+        port,
+        MCP_ENDPOINT_SERVER_PROXY ? { useServerProxy: true } : undefined,
+      )
       const mcpUrl = new URL(endpointUrl.endsWith("/") ? endpointUrl + "mcp" : endpointUrl + "/mcp")
 
       // Connect via HTTP transport with retry (supergateway may still be starting)

@@ -184,6 +184,11 @@ curl -s --max-time 120 -X POST "$BASE/session/$SID/message" \
 
 > **2026-08-21 重跑记录**（容器 `opencode-saas-test:13b750953b`，本地 PG `opencode` + 本地 OpenSandbox `opencode-opensandbox:mini` 3.53G 默认淘宝源，模型 `opencode/muse-spark-1.2-contributor-free`）：T40.1 **PASS**（`antd|local|true`）；T40.2 CRUD/隔离 PASS；T40.3 **PASS**（列出 8 个 antd_ 工具，首次调用超时后 MCP 预热重试成功）；T40.4 **PASS**（`antd_list` completed 返回 74 组件）；T40.5 **PASS**（`antd_info` completed Button API）；T40.6 **PASS**（`antd_list×1 + antd_info×5 + antd_demo×8` 全 completed，`write` 生成 `/workspace/Dashboard.tsx` **524 行**，含 Card/Statistic/Table/Layout/useToken）。mini 镜像下 MCP 链路无回归。
 
+> **2026-09-06 双模式重跑记录**（本地 PG + 远端沙箱，镜像 `mcp-proxy-t0906` 含 local MCP endpoint 双模式改动，Yd-DeepSeek/deepseek-v4-flash，T40.1 + T40.4 核心链路，endpoint 模式定义见 [`local-mcp-endpoint-mode.md`](./local-mcp-endpoint-mode.md)）：
+> - **模式 A 纯直连**（`USE_SERVER_PROXY=false` + `MCP_SERVER_PROXY=false`）：T40.1 ✅（`antd|local|true`）；T40.4 ✅（execute `completed`，toolCalls `antd.antd_list|completed`，返回真实组件数据 Affix/Alert/Anchor…）；endpoint `url=http://10.12.10.193:9100`（沙箱直连 IP 形态）。
+> - **模式 B MCP 强制网关**（`USE_SERVER_PROXY=false` + `MCP_SERVER_PROXY=true`）：T40.1 ✅；T40.4 ✅（`completed`，toolCalls `antd.antd_list|completed`，返回 72 组件）；endpoint `url=http://host.docker.internal:30040/sandboxes/{id}/proxy/9100`（网关形态，同容器 exec 通道仍直连）。
+> - 结论：antd MCP（npx 拉起 + 首次下载预热）在两种 endpoint 模式下链路一致，无回归。
+
 **验证层级**：
 
 | 层级 | 标准 | 结果 |
