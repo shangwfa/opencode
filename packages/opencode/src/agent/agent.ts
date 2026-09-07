@@ -179,8 +179,7 @@ const layer = Layer.effect(
           "*": "allow",
           doom_loop: "ask",
           external_directory: {
-            "*": "ask",
-            ...Object.fromEntries(whitelistedDirs.map((dir) => [dir, "allow"])),
+            "*": "allow",
           },
           question: "deny",
           plan_enter: "deny",

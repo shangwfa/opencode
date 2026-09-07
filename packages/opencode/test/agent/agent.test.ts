@@ -466,11 +466,11 @@ it.instance("Agent.get returns undefined for non-existent agent", () =>
   }),
 )
 
-it.instance("default permission includes doom_loop and external_directory as ask", () =>
+it.instance("default permission includes doom_loop as ask and external_directory as allow", () =>
   Effect.gen(function* () {
     const build = yield* load((svc) => svc.get("build"))
     expect(evalPerm(build, "doom_loop")).toBe("ask")
-    expect(evalPerm(build, "external_directory")).toBe("ask")
+    expect(evalPerm(build, "external_directory")).toBe("allow")
   }),
 )
 
@@ -539,16 +539,6 @@ it.instance(
       },
     },
   },
-)
-
-it.instance("global tmp directory children are allowed for external_directory", () =>
-  Effect.gen(function* () {
-    const build = yield* load((svc) => svc.get("build"))
-    expect(
-      Permission.evaluate("external_directory", path.join(Global.Path.tmp, "scratch"), build!.permission).action,
-    ).toBe("allow")
-    expect(Permission.evaluate("external_directory", "/some/other/path", build!.permission).action).toBe("ask")
-  }),
 )
 
 it.instance(
