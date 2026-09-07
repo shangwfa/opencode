@@ -666,4 +666,7 @@ done
 
 **结论**：RBAC 已授权，T25.8 前置满足（可解除 BLOCKED）；多副本元数据不共享仍在，维持运维侧处理建议（二选一：controller/API 收敛单副本，或配置 `snapshot-registry`，推荐后者）。我方 fail-fast 降级语义持续工作正常（NOT_FOUND → markRestoreFailed → 镜像冷启动）。
 
+**补充：交替机制实锤（2026-09-07 对照实验）**：LB 按 **TCP 连接**分发（非按请求）——单进程 curl 复用连接 x6 → 6/6 粘滞同副本全 404；独立 curl 新连接 x6 → 严格 `200 404` 交替；SDK `Sandbox.create` x7 全过（marker 完整，真·快照恢复）纯属连接粘在好副本的运气（SDK createSandbox 单发无重试）。**生产含义**：opencode server 对远端为池化长连接，粘在坏副本期间所有快照恢复 100% 失败降级，直至连接重建。另观察到第二故障形态 `KUBERNETES::POD_READY_TIMEOUT`（命中好副本但恢复 Pod Ready 超时，疑似高频建删压力/节点资源）。
+**决议**：我方**不加重试兜底**——`Sandbox.create` 单发，成功即成功、失败即降级（fail-fast 语义维持）；根治依赖运维收敛单副本或上游支持共享快照存储（0.2.3 验尸确认 store 类型仍写死 `Literal["sqlite"]`，无共享后端选项）。
+
 复测命令（修复后验收仍可用 T25.3b 脚本与上方 8 次恢复验证脚本）。
