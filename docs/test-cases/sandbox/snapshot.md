@@ -100,6 +100,7 @@ curl -s -X POST $K/sandboxes/$R/proxy/44772/command -H "$AUTH" -H 'Content-Type:
 **期望**：stdout 含 `REAL-SNAP-MARKER` = 真·快照恢复；空/No such file = 实际是镜像冷启动。
 
 > **远端 K8s 实测**（2026-08-22，方式 B）：PASS — 恢复成功 5/5 个沙箱均 cat 出完整 marker，快照 rootfs 物化真实有效。注意多副本部署下恢复请求约 50% 报 `SNAPSHOT::NOT_FOUND`（控制面元数据副本本地化，见上方根因分析），需重试至命中持有副本。
+> **复测**（2026-09-07）：恢复循环 x10 仍 5 OK / 5 NOT_FOUND 完美交替——运维侧未修复，仍待根治（见文末复测记录）。
 > **本地实测**（2026-08-20，方式 A 思路）：T25.3 的 marker+pnpm store 断言即隐式覆盖此真伪检查。
 
 ### T25.4 快照失败降级（源容器已死）
@@ -241,7 +242,7 @@ curl -s -X POST "$BASE/session/$SID/snapshot"
 
 **期望**：远端 K8s 环境重复 T25.1-T25.6；关注 K8s CRD 实现的创建/恢复耗时基准（Docker 实测：创建 75s / 恢复 0.7s）。
 
-> **状态**：BLOCKED — 远端 RBAC 403（2026-08-19 实测）
+> **状态**：~~BLOCKED — 远端 RBAC 403（2026-08-19 实测）~~ **已解除**（2026-09-07 复测）：RBAC 已授权，K8s 快照创建全链路正常（见文末复测记录）；完整 T25.1-T25.6 K8s 全量用例待跑
 
 ---
 
@@ -651,3 +652,18 @@ done
 1. `session.ts` 的 `SNAPSHOT_ENABLED` guard 已移除，会话级 `persistMode=snapshot` 不再依赖全局开关。
 2. T25.10 远端 K8s 指定非默认镜像超时 — 非代码缺陷，环境限制。
 3. T25.17 二次恢复因 K8s 多副本快照 NOT_FOUND 降级冷启动 — 已知环境问题，单实例本地 OpenSandbox 可复现完整 stale 回退。
+
+---
+
+## 复测记录（2026-09-07，运维侧问题复测）
+
+环境：本地 PG + 远端 K8s 沙箱（30040 转发），纯 curl 直连 OpenSandbox（T25.3b 方式 B），镜像 mini v1.0.0。
+
+| 运维问题 | 结果 | 证据 |
+|---|---|---|
+| RBAC 403（T25.8 前置） | **已解决** | mini 源沙箱 → snapshot → **Ready ~35s**，message `Kubernetes snapshot image created successfully`；快照列表 20 条全部 `Ready\|snapshot_runtime_ready`，无 `Failed\|RegistryNotConfigured` 记录 |
+| K8s 多副本快照 NOT_FOUND | **未修复** | ① 同一 Ready 快照 GET 单查 x12 → 严格 `404 200` 交替；② 新快照（删源后）恢复循环 x10 → **5 OK / 5 `SNAPSHOT::NOT_FOUND`** 完美交替，恢复成功的 5 个沙箱 marker 全部完整（数据面仍无损）。与 08-22 根因（控制面元数据副本本地化）完全一致 |
+
+**结论**：RBAC 已授权，T25.8 前置满足（可解除 BLOCKED）；多副本元数据不共享仍在，维持运维侧处理建议（二选一：controller/API 收敛单副本，或配置 `snapshot-registry`，推荐后者）。我方 fail-fast 降级语义持续工作正常（NOT_FOUND → markRestoreFailed → 镜像冷启动）。
+
+复测命令（修复后验收仍可用 T25.3b 脚本与上方 8 次恢复验证脚本）。
