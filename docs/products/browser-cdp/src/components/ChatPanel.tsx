@@ -48,7 +48,7 @@ export function ChatPanel({ sessionId, ready }: ChatPanelProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           text,
-          model: { providerID: "opencode", modelID: "nemotron-3.5-lightning-free" },
+          model: { providerID: "Yd-DeepSeek", modelID: "deepseek-v4-flash" },
         }),
       })
       if (!response.ok) throw new Error(`请求失败（${response.status}）`)

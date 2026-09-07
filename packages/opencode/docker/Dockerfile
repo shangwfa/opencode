@@ -1,9 +1,11 @@
 # syntax=docker/dockerfile:1
-# OpenSandbox 沙箱镜像 —— 极简版（路线 1）
+# OpenSandbox 沙箱镜像 —— 极简版（路线 1）+ 常驻 CDP 浏览器
 #
 # 基于 ubuntu:24.04 + 单版本 Node 构建，剥离 code-interpreter 自带的多语言运行时
 # （Python/Go/JVM）与预装依赖缓存，rootfs 从 ~9.8G 压到 ~2.3G。
 # 快照（docker commit）耗时与 rootfs 体积近似线性：9.8G→86s，2.3G→~15s。
+# 另内置常驻 CDP 浏览器能力（headless Chromium + cdp-gateway 0.0.0.0:9222，
+# 含 /viewer 实时画面页），外部可直连控制（原 docker/browser-cdp 变体已并入本文件）。
 #
 # 依赖 OpenSandbox server 注入 bootstrap.sh（entrypoint 被其接管，见调研结论），
 # 镜像自身 ENTRYPOINT 不参与 execd 启动，仅提供运行环境（bash/node/pnpm/git 等）。
@@ -25,7 +27,11 @@ USER root
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates curl wget git unzip zip tar bash xz-utils ripgrep util-linux \
-    && rm -rf /var/lib/apt/lists/*
+    python3 python3-venv python3-pip \
+    && rm -rf /var/lib/apt/lists/* \
+    && pip install --break-system-packages --no-cache-dir uv \
+      -i https://pypi.tuna.tsinghua.edu.cn/simple
+ENV PYTHONUNBUFFERED=1
 
 # ── 2. Node.js 24（单版本）──
 ENV NODE_ROOT=/opt/node
@@ -68,7 +74,17 @@ RUN mkdir -p /opt/opencode-pty-agent \
     && bun add bun-pty@0.4.8
 COPY docker/opt/opencode-pty-agent.ts /opt/opencode-pty-agent/index.ts
 
-# ── 10. 瘦身清理（快照提速：commit 全量导出 rootfs）──
+# ── 10. 常驻 CDP 浏览器（外部控制 9222 + /viewer 实时画面）──
+# headless Chromium 常驻（共用第 5 步 Playwright 安装），CDP 经网关透出 0.0.0.0:9222，
+# 外部 Playwright/Puppeteer/前端可直连控制；网关内嵌 /viewer 实时画面页。
+# 浏览器/网关用 /opt/cdp-browser/cdp-browser.sh start 拉起（幂等），见 docker/README.md。
+COPY docker/opt/cdp-browser/cdp-gateway.mjs docker/opt/cdp-browser/viewer.html docker/opt/cdp-browser/cdp-browser.sh /opt/cdp-browser/
+RUN chmod +x /opt/cdp-browser/cdp-gateway.mjs /opt/cdp-browser/cdp-browser.sh
+ENV CDP_GATEWAY_PORT=9222 \
+    CDP_UPSTREAM_PORT=9221 \
+    CDP_WINDOW_SIZE=1440,900
+
+# ── 11. 瘦身清理（快照提速：commit 全量导出 rootfs）──
 # 保留 Chromium（功能必需）；清 npm/playwright 之外的可再生缓存。
 RUN rm -rf /root/.npm /root/.cache/pip \
     && rm -rf /usr/local/lib/node_modules/.cache

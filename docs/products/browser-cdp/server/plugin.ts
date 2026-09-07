@@ -9,8 +9,8 @@ import { listSessions, saveSession, updateSessionTitle } from "./db.ts"
 // browser-cdp 测试前端：vite 插件提供两类能力
 // 1. /api/*      —— 调 opencode SaaS API：创建会话(指定沙箱镜像)/boot/exec 拉起浏览器/endpoint 就绪探测
 // 2. /cdp/:sid/* —— 把 CDP 流量(HTTP + WS upgrade)代理到沙箱内 cdp-gateway(9222)
-//    upstream 优先沙箱 IP 直连（本地 OrbStack/K8s 内网均可达），失败降级 SaaS sandbox-proxy
-//    （本地实测 sandbox-proxy 的 WS 转发会挂起，直连绕过该问题）。前端全程同源访问。
+//    upstream 统一走 SaaS sandbox-proxy（/session/:sid/proxy/9222，HTTP + WS upgrade 均支持），
+//    不直连沙箱 IP（K8s pod-ip 跨环境不可达且绕过 OpenSandbox 代理）。前端全程同源访问。
 
 const JSON_HEADERS = { "Content-Type": "application/json" }
 const BROWSER_SKILL = "agent-browser"
@@ -78,48 +78,25 @@ async function cdpReady(config: ServerConfig, sessionId: string): Promise<boolea
   }
 }
 
-// ── upstream 解析：沙箱 IP 直连优先，SaaS proxy 兜底 ──
-
-async function probeBase(base: string): Promise<boolean> {
-  try {
-    const res = await fetch(`${base}/json/version`, { signal: AbortSignal.timeout(1500) })
-    return res.ok
-  } catch {
-    return false
-  }
-}
+// ── upstream 解析：统一走 SaaS proxy，env 可选覆盖 ──
 
 const baseCache = new Map<string, { base: string; expires: number }>()
 
-// 返回可直接访问沙箱 cdp-gateway 的 http base（含 SaaS proxy 兜底路径）。
-// 优先级：env 显式指定 → SaaS host-ip 接口（沙箱裸 IP:9222，WS 可直连）
-//       → endpoint directUrl（ingress 形态，仅 HTTP）→ SaaS proxy
+// 返回沙箱 cdp-gateway 的 http base。
+// 优先级：env directBase 显式指定（调试用）→ SaaS sandbox-proxy
+//（/session/:sid/proxy/9222，HTTP + WS upgrade 均经 OpenSandbox 代理转发）
 async function cdpBase(config: ServerConfig, sessionId: string): Promise<string> {
   const hit = baseCache.get(sessionId)
   if (hit && hit.expires > Date.now()) return hit.base
 
-  const candidates: string[] = []
-  if (config.directBase) candidates.push(config.directBase.replace("{sessionId}", sessionId))
-  try {
-    const info = await saas(config, `/session/${sessionId}/host-ip`)
-    for (const ip of (info.ips as string[] | undefined) ?? []) candidates.push(`http://${ip}:9222`)
-  } catch {}
-  try {
-    const ep = await saas(config, `/session/${sessionId}/endpoint/9222`)
-    const direct = ep.directUrl as string | undefined
-    if (direct) candidates.push(direct.replace(/\/$/, ""))
-  } catch {}
-
-  for (const candidate of candidates) {
-    if (await probeBase(candidate)) {
-      console.log(`[cdp] upstream: ${candidate}`)
-      baseCache.set(sessionId, { base: candidate, expires: Date.now() + 30_000 })
-      return candidate
-    }
+  let base: string
+  if (config.directBase) {
+    base = config.directBase.replace("{sessionId}", sessionId)
+  } else {
+    base = `${config.saasBaseUrl}/session/${sessionId}/proxy/9222`
   }
-  const fallback = `${config.saasBaseUrl}/session/${sessionId}/proxy/9222`
-  baseCache.set(sessionId, { base: fallback, expires: Date.now() + 10_000 })
-  return fallback
+  baseCache.set(sessionId, { base, expires: Date.now() + 30_000 })
+  return base
 }
 
 async function startBrowser(config: ServerConfig, sessionId: string) {

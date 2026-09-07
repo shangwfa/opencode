@@ -38,14 +38,18 @@ export function websocket(
 
       outbound.onmessage = (event) => {
         const data = event.data
-        if (data instanceof Blob) {
+          if (data instanceof Blob) {
           void data.arrayBuffer().then((value) => Effect.runFork(writeInbound(new Uint8Array(value))))
           return
         }
         Effect.runFork(writeInbound(typeof data === "string" ? data : new Uint8Array(data)))
       }
-      outbound.onclose = (event) => Effect.runFork(writeInbound(new Socket.CloseEvent(event.code, event.reason)))
-      outbound.onerror = () => Effect.runFork(writeInbound(new Socket.CloseEvent(1011, "proxy error")))
+      outbound.onclose = (event) => {
+          Effect.runFork(writeInbound(new Socket.CloseEvent(event.code, event.reason)))
+      }
+      outbound.onerror = () => {
+          Effect.runFork(writeInbound(new Socket.CloseEvent(1011, "proxy error")))
+      }
 
       yield* inbound
         .runRaw((message) => {
@@ -53,7 +57,9 @@ export function websocket(
             outbound.close(message.code, message.reason)
             return Effect.void
           }
-          if (outbound.readyState === WebSocket.OPEN) outbound.send(typeof message === "string" ? message : message.slice())
+          // Effect inbound 的 runRaw 把 WS 文本帧也以 Uint8Array 给出；直接 send(bytes) 会变成
+          // 二进制帧，文本协议（CDP/PTY）的下游直接断连。统一按 UTF-8 文本帧转发。
+          if (outbound.readyState === WebSocket.OPEN) outbound.send(typeof message === "string" ? message : new TextDecoder().decode(message))
           return Effect.void
         })
         .pipe(

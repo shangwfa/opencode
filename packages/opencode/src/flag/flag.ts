@@ -105,7 +105,7 @@ export namespace Flag {
   export const OPENCODE_SANDBOX_TIMEOUT = number("OPENCODE_SANDBOX_TIMEOUT") ?? 600
 
   export const OPENCODE_SANDBOX_API_KEY = process.env["OPENCODE_SANDBOX_API_KEY"] ?? ""
-  export const OPENCODE_SANDBOX_USE_SERVER_PROXY = truthy("OPENCODE_SANDBOX_USE_SERVER_PROXY")
+  export const OPENCODE_SANDBOX_USE_SERVER_PROXY = !falsy("OPENCODE_SANDBOX_USE_SERVER_PROXY")
   // local MCP（沙箱模式）连接是否经 OpenSandbox server 网关代理取 endpoint；缺省 false = 直连沙箱地址
   export const OPENCODE_SANDBOX_MCP_SERVER_PROXY = !falsy("OPENCODE_SANDBOX_MCP_SERVER_PROXY")
   export const OPENCODE_SANDBOX_VOLUME_TYPE = (process.env["OPENCODE_SANDBOX_VOLUME_TYPE"] ?? "pvc") as
