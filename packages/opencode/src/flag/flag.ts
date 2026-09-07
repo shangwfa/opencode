@@ -97,17 +97,17 @@ export namespace Flag {
   export const OPENCODE_SANDBOX_PUBLIC_DOMAIN = process.env["OPENCODE_SANDBOX_PUBLIC_DOMAIN"] ?? OPENCODE_SANDBOX_DOMAIN
   export const OPENCODE_SANDBOX_IMAGE =
     process.env["OPENCODE_SANDBOX_IMAGE"] ??
-    "crpi-hlpnu8kiweghie0r.cn-hangzhou.personal.cr.aliyuncs.com/shangwfa/opencode-sandbox:session-terminal"
+    "crpi-hlpnu8kiweghie0r.cn-hangzhou.personal.cr.aliyuncs.com/shangwfa/opencode-sandbox:browser-cdp"
   // snapshot 模式冷启动/降级用的精简镜像（rootfs 小、快照快）；默认（pvc）模式用 OPENCODE_SANDBOX_IMAGE
   export const OPENCODE_SANDBOX_SNAPSHOT_IMAGE =
     process.env["OPENCODE_SANDBOX_SNAPSHOT_IMAGE"] ??
-    "crpi-hlpnu8kiweghie0r.cn-hangzhou.personal.cr.aliyuncs.com/shangwfa/opencode-sandbox:v1.0.0"
+    "crpi-hlpnu8kiweghie0r.cn-hangzhou.personal.cr.aliyuncs.com/shangwfa/opencode-sandbox:browser-cdp"
   export const OPENCODE_SANDBOX_TIMEOUT = number("OPENCODE_SANDBOX_TIMEOUT") ?? 600
 
   export const OPENCODE_SANDBOX_API_KEY = process.env["OPENCODE_SANDBOX_API_KEY"] ?? ""
   export const OPENCODE_SANDBOX_USE_SERVER_PROXY = truthy("OPENCODE_SANDBOX_USE_SERVER_PROXY")
   // local MCP（沙箱模式）连接是否经 OpenSandbox server 网关代理取 endpoint；缺省 false = 直连沙箱地址
-  export const OPENCODE_SANDBOX_MCP_SERVER_PROXY = truthy("OPENCODE_SANDBOX_MCP_SERVER_PROXY")
+  export const OPENCODE_SANDBOX_MCP_SERVER_PROXY = !falsy("OPENCODE_SANDBOX_MCP_SERVER_PROXY")
   export const OPENCODE_SANDBOX_VOLUME_TYPE = (process.env["OPENCODE_SANDBOX_VOLUME_TYPE"] ?? "pvc") as
     | "none"
     | "pvc"

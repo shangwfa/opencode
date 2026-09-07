@@ -2,7 +2,7 @@
 
 > 验证 SaaS 下 local MCP（沙箱内 supergateway 桥接形态）取 endpoint 的两种模式：**直连**（默认，`host:port` 直连沙箱地址）与 **OpenSandbox server 网关代理**（`{gateway}/sandboxes/{id}/proxy/{port}`，经 OpenSandbox server 转发，不暴露沙箱直连地址）。
 >
-> 开关定义：`OPENCODE_SANDBOX_MCP_SERVER_PROXY`（`packages/opencode/src/flag/flag.ts`，缺省 `false`）；实现：`packages/opencode/src/tool/sandbox-provider.ts` `getEndpoint` 第三参 `opts.useServerProxy`。
+> 开关定义：`OPENCODE_SANDBOX_MCP_SERVER_PROXY`（`packages/opencode/src/flag/flag.ts`，**缺省 `true`**，2026-09-07 由 false 改为默认走网关，跨网段部署安全；显式 `=false` 回到直连）；实现：`packages/opencode/src/tool/sandbox-provider.ts` `getEndpoint` 第三参 `opts.useServerProxy`。
 
 ## 开关矩阵与语义
 
@@ -12,7 +12,7 @@
 | B MCP 强制网关 | `false` | `true` | `sb.sandboxes.getSandboxEndpoint(id, port, true)` → `http://<gateway>/sandboxes/{id}/proxy/{port}` | 直连 |
 | C 全网关 | `true` | 任意 | 均为网关路径（`MCP_SERVER_PROXY=false` 时经 SDK `connectionConfig.useServerProxy` 回落到网关） | 网关 |
 
-> ⚠️ 语义叠加：`MCP_SERVER_PROXY=false` **不强制直连**，回落到全局 `USE_SERVER_PROXY`（模式 C 下仍走网关）。要验证纯直连必须两个开关同时为 `false`。生产部署在跨网段（server 与沙箱 pod 不互通）时应使用 B 或 C；同网络（本地 OpenSandbox / 组合 2、3）三种均可用。
+> ⚠️ 语义叠加（缺省 true 后）：不设 `MCP_SERVER_PROXY` = true（网关）；要验证纯直连必须显式 `MCP_SERVER_PROXY=false` **且** 全局 `USE_SERVER_PROXY=false`（两个开关同时 false）。生产部署在跨网段（server 与沙箱 pod 不互通）时保持缺省即可；同网络（本地 OpenSandbox / 组合 2、3）三种均可用。
 
 ## 前置条件
 
@@ -80,11 +80,11 @@ bun test test/tool/sandbox-endpoint-proxy.test.ts
 
 **期望**：3 pass（缺省直连不触发网关查询 / `useServerProxy=true` 网关 URL 按 `config.protocol` 拼 scheme / 同会话混合调用沙箱复用且互不污染）。该文件使用进程级 `mock.module`，须与其他 mock SDK 的测试分进程运行。
 
-### T60.5 回退兼容：不设新开关的既有部署
+### T60.5 缺省值验证：不设开关
 
-镜像含改动但不设 `OPENCODE_SANDBOX_MCP_SERVER_PROXY`（缺省 false）。
+镜像含改动但不设 `OPENCODE_SANDBOX_MCP_SERVER_PROXY`（缺省 **true**，2026-09-07 变更）。
 
-**期望**：行为与改动前一致（endpoint 由全局 `USE_SERVER_PROXY` 决定）；5 处既有 `getEndpoint` 调用方（lsp/pty/plugin 等）不受影响。
+**期望**：不设开关 = 显式 true（endpoint 走网关）；5 处既有 `getEndpoint` 调用方（lsp/pty/plugin 等）不受影响。显式 `=false` 可回到直连（老部署兼容路径）。
 
 ## 测试矩阵
 
@@ -102,3 +102,4 @@ bun test test/tool/sandbox-endpoint-proxy.test.ts
 |---|---|---|
 | 2026-09-06 | 本地 PG + 远端沙箱，镜像 `mcp-proxy-t0906`，Yd-DeepSeek/deepseek-v4-flash | T60.1 ✅（`url=http://10.12.10.189:9100` 直连形态，`Echo: direct-verify-ok`）；T60.2 ✅（`url=http://host.docker.internal:30040/sandboxes/bc0270f6-…/proxy/9100` 网关形态 + 同容器全局直连下 exec 正常，`Echo: mixed-verify-ok`）；T60.3 ✅（`url=…/sandboxes/d3274fad-…/proxy/9100`，`Echo: proxy-verify-ok`）；T60.4 ✅ 3/3；T60.5 ✅（单测+typecheck+session-mcp 13/13 / lifecycle 21/21 无回归）。注：远端网关路径为 `/sandboxes/{id}/proxy/{port}`（与 SDK 类型注释的 `/port/` 前缀略有差异，属远端版本格式，不影响）；直连模式实测 `10.12.10.189`（K8s pod 网段）在本地容器可达——该网段当前内网互通，跨网段部署时直连模式预期不可达，应使用 B/C。 |
 | 2026-09-06 | 同上（echo 之外的第二个 server：`npx -y @ant-design/cli mcp`，见 [`antd-mcp.md`](./antd-mcp.md) 双模式记录） | 模式 A ✅（endpoint `10.12.10.193:9100` 直连，`antd.antd_list\|completed` 返回真实组件数据）；模式 B ✅（endpoint 网关 `/sandboxes/{id}/proxy/9100`，`antd.antd_list\|completed` 返回 72 组件）。npx 首次下载预热后两种模式链路一致，无回归。 |
+| 2026-09-07 | 本地 PG + 远端沙箱，镜像 `t0907-wsfix`（含 WS 文本帧修复），Yd-DeepSeek/deepseek-v4-flash | T60.1 ✅（`url=http://10.12.0.205:9100` 直连形态，`Echo: direct-verify-ok`）；T60.2 ✅（网关 `/sandboxes/e7153692-…/proxy/9100`，`Echo: mixed-verify-ok`，exec 通道正常）；T60.3 ✅（网关 `/sandboxes/028fbae2-…/proxy/9100`，`Echo: proxy-verify-ok`）；T60.4 ✅ 3/3；T60.5 ✅（true + 不设开关 → 网关 `/sandboxes/1660a30d-…/proxy/9100`，`Echo: compat-fallback-ok`）。**同日开关缺省值变更**：`MCP_SERVER_PROXY` 缺省 false → **true**（`flag.ts` `truthy` → `!falsy`，跨网段安全默认）；缺省验证 ✅（全局 false + 不设开关 → 仍网关 `/sandboxes/6a526a5f-…/proxy/9100`，`Echo: default-true-ok` completed）；mcp/ 18 fail 为 baseline（stash 对照一致），typecheck 59 无新增。直连（pod IP 10.12.x）当前内网互通仍可达，跨网段部署由缺省 true 兜底。 |
