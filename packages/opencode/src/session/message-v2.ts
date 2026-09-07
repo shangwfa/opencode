@@ -80,12 +80,22 @@ export const cursor = {
   },
 }
 
-const info = (row: typeof MessageTable.$inferSelect) =>
-  ({
-    ...row.data,
+const info = (row: typeof MessageTable.$inferSelect) => {
+  // OutputFormat is a Schema.Class union: encoding a response through it requires
+  // class instances, so plain JSON read back from storage must be re-decoded.
+  // Decode failures drop the optional format instead of failing the listing.
+  const { format: storedFormat, ...rest } = row.data as { format?: unknown }
+  const format =
+    storedFormat === undefined
+      ? undefined
+      : Option.getOrUndefined(Schema.decodeUnknownOption(SessionV1.Format)(storedFormat))
+  return {
+    ...rest,
+    ...(format !== undefined ? { format } : {}),
     id: row.id,
     sessionID: row.session_id,
-  }) as Info
+  } as Info
+}
 
 const part = (row: typeof PartTable.$inferSelect) =>
   ({

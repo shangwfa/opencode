@@ -1122,6 +1122,30 @@ const scenarios: Scenario[] = [
     }))
     .status(404),
   http.protected
+    .get("/session/{sessionID}/event", "session.event")
+    .seeded((ctx) => ctx.session({ title: "Event session" }))
+    .at((ctx) => ({
+      path: route("/session/{sessionID}/event", { sessionID: ctx.state.id }),
+      headers: ctx.headers(),
+    }))
+    .stream()
+    .status(
+      200,
+      (_ctx, result) =>
+        Effect.sync(() => {
+          check(result.contentType.includes("text/event-stream"), "session event should be an SSE stream")
+          check(result.text.includes("server.connected"), "session event should emit initial connection event")
+        }),
+      "status",
+    ),
+  http.protected
+    .get("/session/{sessionID}/event", "session.event.missing")
+    .at((ctx) => ({
+      path: route("/session/{sessionID}/event", { sessionID: "ses_httpapi_missing" }),
+      headers: ctx.headers(),
+    }))
+    .status(404),
+  http.protected
     .patch("/session/{sessionID}", "session.update")
     .mutating()
     .seeded((ctx) => ctx.session({ title: "Before rename" }))
@@ -1425,6 +1449,38 @@ const scenarios: Scenario[] = [
       Effect.gen(function* () {
         yield* ctx.llmWait(1)
       }),
+    ),
+  http.protected
+    .post("/session/{sessionID}/prompt_stream", "session.prompt_stream")
+    .preserveDatabase()
+    .withLlm()
+    .seeded((ctx) =>
+      Effect.gen(function* () {
+        const session = yield* ctx.session({ title: "Prompt stream session" })
+        yield* ctx.llmText("fake stream assistant")
+        yield* ctx.llmText("fake stream assistant")
+        return session
+      }),
+    )
+    .at((ctx) => ({
+      path: route("/session/{sessionID}/prompt_stream", { sessionID: ctx.state.id }),
+      headers: ctx.headers(),
+      body: {
+        agent: "build",
+        model: { providerID: "test", modelID: "test-model" },
+        parts: [{ type: "text", text: "hello stream" }],
+      },
+    }))
+    .stream()
+    .status(
+      200,
+      (ctx, result) =>
+        Effect.gen(function* () {
+          yield* ctx.llmWait(1)
+          check(result.contentType.includes("text/event-stream"), "prompt stream should be an SSE stream")
+          check(result.text.includes("server.connected"), "prompt stream should emit initial connection event")
+        }),
+      "status",
     ),
   http.protected
     .post("/session/{sessionID}/command", "session.command")

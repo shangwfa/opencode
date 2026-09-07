@@ -9,6 +9,7 @@
 **事件格式差异**：
 - 全局 SSE：`data: {"directory":"...","project":"...","payload":{"id":"...","type":"...","properties":{}}}\n\n`
 - 实例 SSE：`data: {"id":"...","type":"...","properties":{}}\n\n`
+- 会话 SSE（`GET /session/:id/event`，格式同实例 SSE）：仅推送 `properties.sessionID` 匹配该会话的事件，sessionID 在路径中自动路由、无需 `x-opencode-directory` 头
 
 **通用采集脚本**：所有 SSE 用例统一使用 [`scripts/sse-dump.mjs`](./scripts/sse-dump.mjs)（订阅 → 输出拍平后的事件 JSON 行，全局/实例格式已统一）：
 
@@ -751,6 +752,168 @@ print('✅ %d 条 raw delta（partID 匹配），拼接 %d 字节，全部早于
 
 ---
 
+### T9.28 会话事件流：订阅与初始连接事件（GET /session/:id/event）
+
+> 验证：按会话过滤的 SSE 端点（REST 风格子资源）。与实例级 `/event` 的区别：`sessionID` 在路径中，自动完成 workspace 路由，**无需 `x-opencode-directory` 头**
+>
+> **前提**：镜像需包含 session 事件流端点（`session.event`）。
+
+```bash
+SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
+
+curl -s -N --max-time 3 -D - -o /dev/null "$BASE/session/$SID/event" | grep -i "content-type\|cache-control"
+bun docs/test-cases/scripts/sse-dump.mjs "$BASE/session/$SID/event" 3 > /tmp/t928.log
+head -1 /tmp/t928.log | jexec "d.get('type')"
+```
+**期望**：`content-type` 含 `text/event-stream`、`cache-control` 为 `no-cache, no-transform`；首个事件 `type` 为 `server.connected`（事件格式与实例 `/event` 一致：`{"id","type","properties"}`）
+
+---
+
+### T9.29 会话事件流：只推该会话的事件（隔离性）
+
+> 验证：同一实例下两个 session，订阅 A 的会话流，B 的事件不得进入
+>
+> 设计：用 PATCH title 触发 `session.updated`（轻量、不依赖 LLM/sandbox）。两个 session 在订阅**前**创建完毕，避免 `session.created` 干扰断言。
+
+```bash
+SID_A=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
+SID_B=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
+sleep 1
+
+bun docs/test-cases/scripts/sse-dump.mjs "$BASE/session/$SID_A/event" 12 > /tmp/t929.log &
+SSE_PID=$!
+for i in $(seq 1 20); do grep -q server.connected /tmp/t929.log 2>/dev/null && break; sleep 0.5; done
+
+curl -s -X PATCH "$BASE/session/$SID_A" -H 'Content-Type: application/json' -d '{"title":"sse-a-updated"}' > /dev/null
+curl -s -X PATCH "$BASE/session/$SID_B" -H 'Content-Type: application/json' -d '{"title":"sse-b-updated"}' > /dev/null
+wait $SSE_PID
+
+echo "updated count: $(grep -c '"type":"session.updated"' /tmp/t929.log) (期望 1)"
+grep -m1 '"type":"session.updated"' /tmp/t929.log | jexec "d['properties']['sessionID']"
+echo "B leak: $(grep -c "$SID_B" /tmp/t929.log) (期望 0)"
+```
+**期望**：`session.updated` 恰好 1 条且 `properties.sessionID` 为 `SID_A`；整份日志中 `SID_B` 出现 0 次（B 的 `session.updated` 被 server 端过滤，而非客户端过滤）
+
+---
+
+### T9.30 会话事件流：负向测试（session 不存在）
+
+> 验证：不存在的 sessionID 返回 404（handler 内 `requireSession` 校验）
+
+```bash
+curl -s -o /dev/null -w "%{http_code}\n" -N --max-time 3 "$BASE/session/ses_httpapi_missing/event"
+```
+**期望**：`404`
+
+---
+
+### T9.31 会话事件流：发送异步消息并监听事件（POST /session/:id/prompt_stream）
+
+> 验证：「发送异步消息」+「监听会话事件」合并接口。一次请求：服务端发起异步 prompt 并返回 SSE 流，客户端直接消费该回合的事件，**回合结束（session.idle）后服务端主动关流**，无需客户端自己编排 prompt_async + event 两步
+>
+> **前提**：镜像需包含 `session.prompt_stream` 端点。
+
+```bash
+SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
+
+START=$(date +%s)
+curl -s -N --max-time 90 -D /tmp/t931-headers.txt "$BASE/session/$SID/prompt_stream" \
+  -H 'Content-Type: application/json' \
+  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"只回复两个字：收到\"}],\"model\":$MODEL}" > /tmp/t931.log
+CURL_EXIT=$?
+END=$(date +%s)
+echo "curl_exit=$CURL_EXIT elapsed=$((END-START))s"
+grep -i "content-type" /tmp/t931-headers.txt
+
+python3 -c "
+import re, json
+types = re.findall(r'\"type\":\"([a-z.\-]+)\"', open('/tmp/t931.log').read())
+print('total events:', len(types))
+print('has idle:', 'session.idle' in types)
+print('idle is last:', types[-1] == 'session.idle' if types else False)
+"
+```
+**期望**：`HTTP 200` + `content-type: text/event-stream`；流内含完整回合事件（`server.connected` → `message.*` / `session.status`(busy) → `session.status`(idle) → `session.idle`）；**`session.idle` 为最后一帧且 curl_exit=0**（服务端在回合结束后主动关流，而非 --max-time 截断）。prompt 发起失败时通过流内 `session.error` 事件体现（与 prompt_async 语义一致）
+
+---
+
+### T9.32 会话事件流：prompt_stream 错误路径（session.error + 关流）
+
+> 验证：非法模型发送 prompt_stream 时，`session.error` 事件通过流推送，且回合终止后流仍以 `session.idle` 正常关闭（错误不影响流生命周期管理）
+
+```bash
+SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
+
+START=$(date +%s)
+curl -s -N --max-time 60 "$BASE/session/$SID/prompt_stream" \
+  -H 'Content-Type: application/json' \
+  -d '{"parts":[{"type":"text","text":"hi"}],"model":{"providerID":"Yd-DeepSeek","modelID":"nonexistent-model-xyz"}}' > /tmp/t932.log
+CURL_EXIT=$?
+END=$(date +%s)
+echo "curl_exit=$CURL_EXIT elapsed=$((END-START))s"
+
+grep -o '"type":"session.error"' /tmp/t932.log | head -1
+grep -o '"name":"[^"]*"' /tmp/t932.log | head -1
+python3 -c "
+import re
+types = re.findall(r'\"type\":\"([a-z.\-]+)\"', open('/tmp/t932.log').read())
+print('idle-last:', types[-1] == 'session.idle' if types else False)
+"
+```
+**期望**：流内依次出现 `session.error`（`properties.error.name=UnknownError`，与 T9.19 一致）与 `session.idle`；**idle 为最后帧且 curl_exit=0**（错误回合同样触发服务端关流，客户端不会挂死）
+
+---
+
+### T9.33 会话事件流：prompt_stream 多会话并发隔离
+
+> 验证：两个 session 同时执行 prompt_stream，各自的流只包含本会话事件（`properties.sessionID` 无交叉），且各自独立关流
+>
+> **注意**：sessionID 含大写字母，正则字符类须用 `[A-Za-z0-9]`（实测踩坑：`[a-z0-9]` 会漏配得出"空集"的假象）
+
+```bash
+SID_A=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
+SID_B=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
+
+curl -s -N --max-time 60 "$BASE/session/$SID_A/prompt_stream" \
+  -H 'Content-Type: application/json' \
+  -d '{"parts":[{"type":"text","text":"只回复A"}],"model":$MODEL}' > /tmp/t933a.log &
+PA=$!
+sleep 0.3
+curl -s -N --max-time 60 "$BASE/session/$SID_B/prompt_stream" \
+  -H 'Content-Type: application/json' \
+  -d '{"parts":[{"type":"text","text":"只回复B"}],"model":$MODEL}' > /tmp/t933b.log &
+PB=$!
+wait $PA $PB
+
+python3 -c "
+import re
+for name, sid, f in [('A','$SID_A','/tmp/t933a.log'),('B','$SID_B','/tmp/t933b.log')]:
+    content = open(f).read()
+    sids = set(re.findall(r'\"sessionID\":\"(ses_[A-Za-z0-9]+)\"', content))
+    types = re.findall(r'\"type\":\"([a-z.\-]+)\"', content)
+    idle_last = types[-1] == 'session.idle' if types else False
+    leak = sids - {sid}
+    print(f'{name}: idle-last={idle_last}, cross-leak={leak or \"none\"}')
+"
+```
+**期望**：A/B 两条流各自 `sessionID` 集合只含本会话（cross-leak=none），均以 `session.idle` 结尾并独立关流（curl_exit=0）
+
+---
+
+### T9.34 会话事件流：prompt_stream 负向测试（session 不存在）
+
+> 验证：不存在的 sessionID 调用 prompt_stream 返回 404（`requireSession` 先于流建立）
+
+```bash
+curl -s -o /dev/null -w "%{http_code}\n" -N --max-time 3 \
+  -X POST "$BASE/session/ses_httpapi_missing/prompt_stream" \
+  -H 'Content-Type: application/json' \
+  -d '{"parts":[{"type":"text","text":"hi"}],"model":$MODEL}'
+```
+**期望**：`404`
+
+---
+
 ## 测试结果
 
 | 用例 | 结果 | 备注 |
@@ -782,6 +945,13 @@ print('✅ %d 条 raw delta（partID 匹配），拼接 %d 字节，全部早于
 | T9.25 | ✅ | 缺 x-opencode-directory 头时回退默认目录（OPENCODE_DEFAULT_DIRECTORY），仍返回 200 + server.connected，非拒绝 |
 | T9.26 | ✅ | write tool part pending→running→completed；running 态即含完整 input.content（155B HTML），顺序 running < completed < session.idle，web 端可在回合结束前预渲染 |
 | T9.27 | ✅ | pending 期间 5 条 message.part.delta（field=raw，partID 匹配，拼接 354B 完整参数），全部早于 running 定稿；镜像 tool-input-stream，改动后 T9.26 回归通过 |
+| T9.28 | ✅ | content-type=text/event-stream、cache-control=no-cache, no-transform、首事件 server.connected；无需 x-opencode-directory 头 |
+| T9.29 | ✅ | session.updated 恰好 1 条且属于 SID_A，SID_B 全日志 0 泄漏（server 端过滤生效） |
+| T9.30 | ✅ | 不存在 sessionID 返回 404 |
+| T9.31 | ✅ | prompt_stream 一次请求完成发送+监听：200 + text/event-stream，13 个事件（connected→message.*→status(busy)→status(idle)→session.idle），idle 为最后帧且服务端主动关流（curl_exit=0，7s） |
+| T9.32 | ✅ | 非法模型：session.error（error.name=UnknownError）照常推送，流仍以 session.idle 关流（curl_exit=0，<1s），客户端不挂死 |
+| T9.33 | ✅ | A/B 并发 prompt_stream 各自 sessionID 无交叉（cross-leak=none），均独立以 idle 关流；注意 sessionID 含大写字母，正则须 [A-Za-z0-9] |
+| T9.34 | ✅ | 不存在 sessionID 的 prompt_stream 返回 404 |
 
 > 注：T9.16-T9.25 为覆盖补全用例，已在本轮验证（组合 1：远端 PG + 远端 Sandbox）。T9.21 的 `session.agent.switched`/`session.model.switched` 需 HTTP switch 端点就绪后验证；`todo.updated`/`mcp.tools.changed` 为按需补充项。
 
@@ -793,5 +963,11 @@ print('✅ %d 条 raw delta（partID 匹配），拼接 %d 字节，全部早于
 > - T9.15：首次用 "say hello" 短任务时 B 只收到 connected+heartbeat（2s 内 message 已结束，SSE 不回放历史——符合设计）；改用 150 词故事长任务后 B 收到 109 message 事件 + idle。**B 加入时机必须在执行中**，用例 prompt 不宜过短
 > - T9.24：文档原 python 命令 `open(...)[...]` 有文件对象切片 bug，实测用 `itertools.islice` 替代执行；建议修文档
 > - T9.26/T9.27：在新镜像复测通过，且 T9.26 日志中可直接看到 4 条 raw delta（方案 A 生效）
+
+> 复测记录（2026-09-07，**本地新代码直跑**：`bun run ./src/index.ts serve --port 14098` + 本地 PG `127.0.0.1:15432`，未走镜像）：**T9.28–T9.30 全部通过**。隔离性（T9.29）用 PATCH title 触发 `session.updated`，实测 A 流恰好 1 条事件且 sessionID 为 A，SID_B 泄漏 0；T9.30 返回 404。注意 `/session/:id/event` 由 sessionID 路径参数完成 workspace 路由，`sse-dump.mjs` 第三个 directory 参数不传。
+
+> 复测记录（2026-09-07，同上环境，真实 LLM `Yd-DeepSeek/deepseek-v4-flash`）：**T9.31 通过**。`POST /session/:id/prompt_stream` 返回 200 + text/event-stream，流内 13 个事件完整覆盖回合生命周期，`session.idle` 为最后帧且服务端主动关流（curl_exit=0，耗时 7s）。
+
+> 复测记录（2026-09-07，同上环境）：**T9.32–T9.34 通过**。T9.32 错误回合实测事件序列 `...→session.status(busy)→session.error→session.status(idle)→session.idle`（error.name=UnknownError），idle 关流 curl_exit=0；T9.33 并发双流 sessionID 零交叉、独立关流；T9.34 返回 404。新增端点说明：`GET /session/:id/event` 见 T9.28–T9.30。
 
 ---

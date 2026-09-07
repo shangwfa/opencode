@@ -161,6 +161,7 @@ export const SessionPaths = {
   list: root,
   status: `${root}/status`,
   get: `${root}/:sessionID`,
+  event: `${root}/:sessionID/event`,
   children: `${root}/:sessionID/children`,
   todo: `${root}/:sessionID/todo`,
   diff: `${root}/:sessionID/diff`,
@@ -179,6 +180,7 @@ export const SessionPaths = {
   summarize: `${root}/:sessionID/summarize`,
   prompt: `${root}/:sessionID/message`,
   promptAsync: `${root}/:sessionID/prompt_async`,
+  promptStream: `${root}/:sessionID/prompt_stream`,
   command: `${root}/:sessionID/command`,
   shell: `${root}/:sessionID/shell`,
   revert: `${root}/:sessionID/revert`,
@@ -245,6 +247,19 @@ export const SessionApi = HttpApi.make("session")
             identifier: "session.get",
             summary: "Get session",
             description: "Retrieve detailed information about a specific OpenCode session.",
+          }),
+        ),
+        HttpApiEndpoint.get("event", SessionPaths.event, {
+          params: { sessionID: SessionID },
+          query: WorkspaceRoutingQuery,
+          success: Schema.String.pipe(HttpApiSchema.asText({ contentType: "text/event-stream" })),
+          error: [HttpApiError.BadRequest, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.event",
+            summary: "Subscribe to session events",
+            description:
+              "Server-sent event stream containing only the events that belong to the specified session.",
           }),
         ),
         HttpApiEndpoint.get("children", SessionPaths.children, {
@@ -506,6 +521,20 @@ export const SessionApi = HttpApi.make("session")
             summary: "Send async message",
             description:
               "Create and send a new message to a session asynchronously, starting the session if needed and returning immediately.",
+          }),
+        ),
+        HttpApiEndpoint.post("promptStream", SessionPaths.promptStream, {
+          params: { sessionID: SessionID },
+          query: WorkspaceRoutingQuery,
+          payload: PromptPayload,
+          success: Schema.String.pipe(HttpApiSchema.asText({ contentType: "text/event-stream" })),
+          error: [HttpApiError.BadRequest, HttpApiError.ServiceUnavailable, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.prompt_stream",
+            summary: "Send async message with event stream",
+            description:
+              "Send a new message asynchronously and return a server-sent event stream of the session events. The stream closes once the session goes idle.",
           }),
         ),
         HttpApiEndpoint.post("command", SessionPaths.command, {

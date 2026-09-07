@@ -22,7 +22,14 @@ function eventID() {
   return EventV2.ID.create()
 }
 
-function eventResponse(events: EventV2.Interface) {
+export interface EventResponseOptions {
+  filter?: (event: EventV2.Payload) => boolean
+  /** Terminate the stream (inclusive) after an event matching this predicate, e.g. session.idle for a prompt run. */
+  endOn?: (event: { id: string; type: string; properties: unknown }) => boolean
+}
+
+export function eventResponse(events: EventV2.Interface, options?: EventResponseOptions) {
+  const filter = options?.filter
   return Effect.gen(function* () {
     const instance = yield* InstanceState.context
     const workspaceID = yield* InstanceState.workspaceID
@@ -34,6 +41,7 @@ function eventResponse(events: EventV2.Interface) {
     const stream = Stream.fromQueue(queue).pipe(
       Stream.filter(
         (event) =>
+          (filter?.(event) ?? true) &&
           event.location?.directory === instance.directory &&
           (event.location.workspaceID === undefined || event.location.workspaceID === workspaceID),
       ),
@@ -56,9 +64,12 @@ function eventResponse(events: EventV2.Interface) {
         () => Effect.sync(() => GlobalBus.off("event", listener)),
       )
     })
+    const endOn = options?.endOn
     const output = stream.pipe(
       Stream.merge(disposed, { haltStrategy: "left" }),
-      Stream.takeUntil((event) => event.type === "server.instance.disposed"),
+      Stream.takeUntil(
+        (event) => event.type === "server.instance.disposed" || (endOn?.(event) ?? false),
+      ),
     )
     const heartbeat = Stream.tick("10 seconds").pipe(
       Stream.drop(1),

@@ -10,6 +10,7 @@ import { SessionPlugin } from "@/plugin/session-plugin"
 import { SessionPluginRuntime } from "@/plugin/session-plugin-runtime"
 import { SessionAgentsMd } from "@/session/agents-md"
 import { SessionV1 } from "@opencode-ai/core/v1/session"
+import { EventV2 } from "@opencode-ai/core/event"
 import { EventV2Bridge } from "@/event-v2-bridge"
 import { Command } from "@/command"
 import { InstanceRef } from "@/effect/instance-ref"
@@ -36,6 +37,7 @@ import { InstanceState } from "@/effect/instance-state"
 import { HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
 import { HttpApiBuilder, HttpApiError, HttpApiSchema } from "effect/unstable/httpapi"
 import { InstanceHttpApi } from "../api"
+import { eventResponse } from "./event"
 import {
   CommandPayload,
   DiffQuery,
@@ -67,6 +69,11 @@ const tryParseJson = (text: string) =>
     try: () => JSON.parse(text) as unknown,
     catch: () => new HttpApiError.BadRequest({}),
   })
+
+export const sessionEventFilter = (sessionID: SessionID) => (event: EventV2.Payload) => {
+  const data = event.data as { sessionID?: unknown } | undefined
+  return data?.sessionID === sessionID
+}
 
 export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", (handlers) =>
   Effect.gen(function* () {
@@ -115,6 +122,58 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
 
     const requireSession = Effect.fn("SessionHttpApi.requireSession")(function* (sessionID: SessionID) {
       return yield* SessionError.mapStorageNotFound(session.get(sessionID))
+    })
+
+    const subscribeEvents = Effect.fn("SessionHttpApi.event")(function* (ctx: {
+      params: { sessionID: SessionID }
+    }) {
+      yield* requireSession(ctx.params.sessionID)
+      return yield* eventResponse(events, { filter: sessionEventFilter(ctx.params.sessionID) })
+    })
+
+    const forkPrompt = (sessionID: SessionID, payload: typeof PromptPayload.Type) =>
+      withSessionLock(
+        sessionID,
+        promptSvc.prompt({ ...payload, sessionID }),
+      ).pipe(
+        Effect.catchCause((cause) =>
+          Effect.gen(function* () {
+            yield* Effect.logError("prompt_async failed", { sessionID, cause })
+            yield* events.publish(Session.Event.Error, {
+              sessionID,
+              error: new NamedError.Unknown({ message: Cause.pretty(cause) }).toObject(),
+            })
+          }),
+        ),
+        Effect.forkIn(scope, { startImmediately: true }),
+      )
+
+    const promptAsync = Effect.fn("SessionHttpApi.promptAsync")(function* (ctx: {
+      params: { sessionID: SessionID }
+      payload: typeof PromptPayload.Type
+    }) {
+      yield* requireSession(ctx.params.sessionID)
+      yield* waitForSessionLock(ctx.params.sessionID)
+      yield* forkPrompt(ctx.params.sessionID, ctx.payload)
+      yield* logAction(ctx.params.sessionID, "session-prompt-async", ctx.payload)
+      return HttpApiSchema.NoContent.make()
+    })
+
+    const promptStream = Effect.fn("SessionHttpApi.promptStream")(function* (ctx: {
+      params: { sessionID: SessionID }
+      payload: typeof PromptPayload.Type
+    }) {
+      yield* requireSession(ctx.params.sessionID)
+      yield* waitForSessionLock(ctx.params.sessionID)
+      // Subscribe before forking the prompt so no events of the run can be lost.
+      // The stream closes once the run goes idle (session.idle passes through takeUntil).
+      const response = yield* eventResponse(events, {
+        filter: sessionEventFilter(ctx.params.sessionID),
+        endOn: (event) => event.type === "session.idle",
+      })
+      yield* forkPrompt(ctx.params.sessionID, ctx.payload)
+      yield* logAction(ctx.params.sessionID, "session-prompt-stream", ctx.payload)
+      return response
     })
 
     const logAction = (sessionID: SessionID, source: ExecLogSource, command: unknown) =>
@@ -475,31 +534,6 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       return HttpServerResponse.stream(Stream.make(JSON.stringify(message)).pipe(Stream.encodeText), {
         contentType: "application/json",
       })
-    })
-
-    const promptAsync = Effect.fn("SessionHttpApi.promptAsync")(function* (ctx: {
-      params: { sessionID: SessionID }
-      payload: typeof PromptPayload.Type
-    }) {
-      yield* requireSession(ctx.params.sessionID)
-      yield* waitForSessionLock(ctx.params.sessionID)
-      yield* withSessionLock(
-        ctx.params.sessionID,
-        promptSvc.prompt({ ...ctx.payload, sessionID: ctx.params.sessionID }),
-      ).pipe(
-        Effect.catchCause((cause) =>
-          Effect.gen(function* () {
-            yield* Effect.logError("prompt_async failed", { sessionID: ctx.params.sessionID, cause })
-            yield* events.publish(Session.Event.Error, {
-              sessionID: ctx.params.sessionID,
-              error: new NamedError.Unknown({ message: Cause.pretty(cause) }).toObject(),
-            })
-          }),
-        ),
-        Effect.forkIn(scope, { startImmediately: true }),
-      )
-      yield* logAction(ctx.params.sessionID, "session-prompt-async", ctx.payload)
-      return HttpApiSchema.NoContent.make()
     })
 
     const command = Effect.fn("SessionHttpApi.command")(function* (ctx: {
@@ -917,6 +951,7 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       .handle("summarize", summarize)
       .handle("prompt", prompt)
       .handle("promptAsync", promptAsync)
+      .handle("promptStream", promptStream)
       .handle("command", command)
       .handle("shell", shell)
       .handle("revert", revert)
@@ -953,6 +988,7 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       .handle("pluginsCreate", createPlugin)
       .handle("pluginsDelete", deletePlugin)
       .handle("pluginsClear", clearPlugins)
+      .handleRaw("event", subscribeEvents)
   }),
 )
 

@@ -27,6 +27,7 @@ export type ExecLogSource =
   | "session-summarize"
   | "session-prompt"
   | "session-prompt-async"
+  | "session-prompt-stream"
   | "session-command"
   | "session-shell"
   | "session-revert"
