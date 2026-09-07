@@ -970,4 +970,6 @@ curl -s -o /dev/null -w "%{http_code}\n" -N --max-time 3 \
 
 > 复测记录（2026-09-07，同上环境）：**T9.32–T9.34 通过**。T9.32 错误回合实测事件序列 `...→session.status(busy)→session.error→session.status(idle)→session.idle`（error.name=UnknownError），idle 关流 curl_exit=0；T9.33 并发双流 sessionID 零交叉、独立关流；T9.34 返回 404。新增端点说明：`GET /session/:id/event` 见 T9.28–T9.30。
 
+> 复测记录（2026-09-07，本地 PG + 远端沙箱，镜像含 NUL guard 修复（`db.pg.ts` 剥离 jsonb 参数 `\u0000`，详见 structured-output.md 复测记录））：**T9.28–T9.34 回归全部通过**（含 T9.31/32/33 的完整 LLM 回合、错误路径关流与并发隔离）。
+
 ---

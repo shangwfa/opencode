@@ -63,6 +63,64 @@ const OID_INT8 = 20 // bigint
 const OID_JSON = 114
 const OID_JSONB = 3802
 
+// PG rejects NUL (\u0000) inside json/jsonb values ("unsupported Unicode escape
+// sequence") even though the JSON spec allows it. Upstream text such as Vite's
+// virtual module names ("\0virtual:...") regularly carries NUL and would break
+// every durable write (part/event rows). Strip it before serializing.
+function stripNul(value: unknown): unknown {
+  if (typeof value === "string") return value.includes("\0") ? value.replace(/\0/g, "") : value
+  if (Array.isArray(value)) return value.map(stripNul)
+  if (typeof value === "object" && value !== null) {
+    const out: Record<string, unknown> = {}
+    for (const [k, v] of Object.entries(value)) out[k.includes("\0") ? k.replace(/\0/g, "") : k] = stripNul(v)
+    return out
+  }
+  return value
+}
+
+function serializeJson(x: any) {
+  if (typeof x !== "string") return JSON.stringify(stripNul(x))
+  return x.includes("\0") ? x.replace(/\0/g, "") : x
+}
+
+// Drizzle sends every parameterized query through client.unsafe() with values
+// already JSON.stringify-ed as plain text params, so the json/jsonb type
+// serializers above never see jsonb columns. Wrapping unsafe() is the one
+// choke point where every bound parameter can be sanitized before PG parses
+// it and rejects NUL inside jsonb values. Transactions must be wrapped too:
+// postgres.js hands drizzle a fresh client object inside begin().
+function stripNulParam(value: unknown): unknown {
+  // JSON.stringify turns a real NUL into the six-character escape text \u0000,
+  // so string params never contain the raw byte — strip the escaped form (PG
+  // jsonb rejects it) plus any raw NUL for safety.
+  if (typeof value === "string") return /\\u0000|\0/.test(value) ? value.replace(/\\u0000/g, "").replace(/\0/g, "") : value
+  return value
+}
+
+const NUL_GUARD = Symbol("nul-guard")
+
+function installNulGuard(client: any): any {
+  if (!client || client[NUL_GUARD]) return client
+  try {
+    Object.defineProperty(client, NUL_GUARD, { value: true })
+  } catch {
+    return client
+  }
+  const originalUnsafe = client.unsafe.bind(client)
+  client.unsafe = ((query: string, params: any, options?: any) => {
+    if (Array.isArray(params) && params.some((p: any) => typeof p === "string" && /\\u0000|\0/.test(p))) {
+      params = params.map(stripNulParam)
+    }
+    return originalUnsafe(query, params, options)
+  }) as any
+  const originalBegin = client.begin?.bind(client)
+  if (originalBegin) {
+    client.begin = ((callback: any, ...rest: any[]) =>
+      originalBegin((tx: any) => callback(installNulGuard(tx)), ...rest)) as any
+  }
+  return client
+}
+
 export function init(url: string) {
   // Configure postgres.js to return raw values for jsonb, json and bigint
   // so that Drizzle column decoders (which were written for SQLite semantics)
@@ -92,17 +150,18 @@ export function init(url: string) {
       json: {
         to: OID_JSON,
         from: [OID_JSON],
-        serialize: (x: any) => (typeof x === "string" ? x : JSON.stringify(x)),
+        serialize: serializeJson,
         parse: (x: string) => x,
       },
       jsonb: {
         to: OID_JSONB,
         from: [OID_JSONB],
-        serialize: (x: any) => (typeof x === "string" ? x : JSON.stringify(x)),
+        serialize: serializeJson,
         parse: (x: string) => x,
       },
     } as any,
   })
   const db = drizzle({ client: client as any })
+  installNulGuard(client)
   return { db, client }
 }

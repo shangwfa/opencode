@@ -126,3 +126,16 @@ sleep 1 && curl -s -X POST "$BASE/session/$SID/abort"
 
 > 复测记录（2026-09-06，merge upstream/dev v1.18.29 后，镜像 `t0906-merged-1.18.29`，组合 3）：T4.1 ✅（finish=stop）/ T4.2 ✅（上下文记忆「蓝鲸47号」）/ T4.3+T4.4 ✅（write→read 闭环回读 `hello_merge_2026`）/ T4.6 ✅（async 204 + assistant 落库）。
 > ⚠️ T4.5 bash 本轮模型未真实调用（tools=0）：经 merge 前镜像（tool-input-stream）A/B 对照（各 3 次同 prompt，均 0/3 触发）+ 模型自报工具清单含 bash + config 无禁用，定性为 **deepseek-v4-flash 行为波动**，非 merge 回归；工具链路健康由 T4.3 write 闭环 + sse.md T9.6（早间真实触发 pending→running→completed）覆盖。T4.7 本轮未复测。
+
+> 复测记录（2026-09-07，镜像 `opencode-saas-sandbox-test:so-test`（含 NUL guard / format 读回修复 / session event + prompt_stream 新端点），本地 PG + 远端沙箱（K8s 30040 转发），真实 LLM `Yd-DeepSeek/deepseek-v4-flash`）：**T4.1–T4.7 全部通过**。
+> | 用例 | 结果 | 备注 |
+> |---|---|---|
+> | T4.1 | ✅ | 回复 `2` |
+> | T4.2 | ✅ | 第二轮回复「张三」 |
+> | T4.3 | ✅ | `write(completed)`，回复确认创建 |
+> | T4.4 | ✅ | `read(completed)`，回复含 `hello` |
+> | T4.5 | ✅ | `bash(completed)`，`ls /workspace` 列出 `t4-3.txt` |
+> | T4.6 | ✅ | HTTP 204，异步五言绝句落库（finish=stop） |
+> | T4.7 | ✅ | abort=true，8s parts 无增长（3→3），确认停止生成 |
+>
+> ⚠️ **prompt 措辞踩坑（本轮实测）**：T4.3 若在原文后附加「只回复：已创建」这类限定语，模型会跳过工具直接文字作答（tools=NONE，文件不落盘），进而连带 T4.4 无文件可读（模型凭上下文直答 hello 的假象）、T4.5 `ls` 如实报空目录。复测务必使用文档原文 prompt。
