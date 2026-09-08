@@ -1,6 +1,7 @@
 import { FileSystem } from "@opencode-ai/core/filesystem"
 import { NonNegativeInt } from "@opencode-ai/core/schema"
 import { LSP } from "@/lsp/lsp"
+import { SessionID } from "@/session/schema"
 import { Schema } from "effect"
 import { HttpApi, HttpApiEndpoint, HttpApiError, HttpApiGroup, OpenApi } from "effect/unstable/httpapi"
 import { Authorization } from "../middleware/authorization"
@@ -37,6 +38,54 @@ export const FindFileQuery = Schema.Struct({
 export const FindSymbolQuery = Schema.Struct({
   ...WorkspaceRoutingQueryFields,
   query: Schema.String,
+})
+
+export const WorkspaceSearchPayload = Schema.Struct({
+  query: Schema.String.check(Schema.isMinLength(1)),
+  isCaseSensitive: Schema.optional(Schema.Boolean),
+  isRegExp: Schema.optional(Schema.Boolean),
+  isWholeWord: Schema.optional(Schema.Boolean),
+  include: Schema.optional(Schema.Array(Schema.String)),
+  exclude: Schema.optional(Schema.Array(Schema.String)),
+  contextLines: Schema.optional(
+    Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(10)),
+  ),
+  maxResults: Schema.optional(
+    Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(1), Schema.isLessThanOrEqualTo(1000)),
+  ),
+})
+
+export const SearchRange = Schema.Struct({
+  start: NonNegativeInt,
+  end: NonNegativeInt,
+})
+
+export const SearchContextLine = Schema.Struct({
+  line_number: NonNegativeInt,
+  text: Schema.String,
+})
+
+export const SearchMatch = Schema.Struct({
+  line_number: NonNegativeInt,
+  text: Schema.String,
+  ranges: Schema.Array(SearchRange),
+  before: Schema.Array(SearchContextLine),
+  after: Schema.Array(SearchContextLine),
+})
+
+export const SearchFileResult = Schema.Struct({
+  path: Schema.String,
+  matches: Schema.Array(SearchMatch),
+})
+
+export const WorkspaceSearchResult = Schema.Struct({
+  files: Schema.Array(SearchFileResult),
+  truncated: Schema.Boolean,
+  stats: Schema.Struct({
+    files_with_matches: NonNegativeInt,
+    matches: NonNegativeInt,
+    duration_ms: NonNegativeInt,
+  }),
 })
 
 export const LegacyMatch = Schema.Struct({
@@ -98,6 +147,7 @@ export const FilePaths = {
   findText: "/find",
   findFile: "/find/file",
   findSymbol: "/find/symbol",
+  search: "/find/session/:sessionID",
   list: "/file",
   content: "/file/content",
   status: "/file/status",
@@ -137,6 +187,20 @@ export const FileApi = HttpApi.make("file")
             identifier: "find.symbols",
             summary: "Find symbols",
             description: "Search for workspace symbols like functions, classes, and variables using LSP.",
+          }),
+        ),
+        HttpApiEndpoint.post("search", FilePaths.search, {
+          params: { sessionID: SessionID },
+          query: WorkspaceRoutingQuery,
+          payload: WorkspaceSearchPayload,
+          success: described(WorkspaceSearchResult, "Search results"),
+          error: [HttpApiError.BadRequest],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "find.workspace",
+            summary: "Workspace search",
+            description:
+              "VSCode-style full-text search in the session sandbox workspace via ripgrep. Supports case-sensitive, regex and whole-word toggles, include/exclude globs, and returns matches grouped by file with context lines and highlight ranges.",
           }),
         ),
         HttpApiEndpoint.get("list", FilePaths.list, {

@@ -13,6 +13,7 @@ import ignore from "ignore"
 import path from "path"
 import { HttpApiBuilder, HttpApiError } from "effect/unstable/httpapi"
 import { InstanceHttpApi } from "../api"
+import { WorkspaceSearchPayload, WorkspaceSearchResult } from "../groups/file"
 import type { SessionID } from "@/session/schema"
 
 export const fileHandlers = HttpApiBuilder.group(InstanceHttpApi, "file", (handlers) =>
@@ -103,6 +104,55 @@ export const fileHandlers = HttpApiBuilder.group(InstanceHttpApi, "file", (handl
 
     const findSymbol = Effect.fn("FileHttpApi.findSymbol")(function* () {
       return []
+    })
+
+    const searchWorkspace = Effect.fn("FileHttpApi.searchWorkspace")(function* (ctx: {
+      params: { sessionID: SessionID }
+      payload: typeof WorkspaceSearchPayload.Type
+    }) {
+      const started = performance.now()
+      const sessionID = ctx.params.sessionID
+      const sp = yield* Effect.serviceOption(SandboxProvider.Service)
+      if (sp._tag === "None") return yield* Effect.die(new Error("SandboxProvider not available"))
+
+      const isCaseSensitive = ctx.payload.isCaseSensitive ?? false
+      const isRegExp = ctx.payload.isRegExp ?? false
+      const isWholeWord = ctx.payload.isWholeWord ?? false
+      const contextLines = ctx.payload.contextLines ?? 2
+      const maxResults = ctx.payload.maxResults ?? 200
+
+      const args = ["rg", "--json", "--hidden", "-g", shellQuote("!.git/*"), "--max-filesize", "10M", isCaseSensitive ? "-s" : "-i"]
+      if (!isRegExp) args.push("-F")
+      if (isWholeWord) args.push("-w")
+      if (contextLines > 0) args.push("-C", String(contextLines))
+      args.push("-m", String(maxResults))
+      for (const glob of ctx.payload.include ?? []) args.push("-g", shellQuote(glob))
+      for (const glob of ctx.payload.exclude ?? []) args.push("-g", shellQuote(glob.startsWith("!") ? glob : "!" + glob))
+      args.push("--", shellQuote(ctx.payload.query), "/workspace")
+
+      const result = yield* sp.value
+        .runInSession(sessionID, args.join(" ") + " | head -c 16777216", { timeoutSeconds: 60 })
+        .pipe(Effect.orDie)
+      const stdout = result.logs.stdout.map((line: any) => (typeof line === "string" ? line : line.text)).join("\n")
+      const parsed = parseRipgrepOutput(stdout, maxResults)
+      const durationMs = Math.round(performance.now() - started)
+      yield* Effect.logInfo("workspace search (sandbox)", {
+        query: ctx.payload.query,
+        sessionID,
+        isRegExp,
+        isCaseSensitive,
+        isWholeWord,
+        maxResults,
+        files: parsed.files.length,
+        matches: parsed.matches,
+        truncated: parsed.truncated,
+        duration: durationMs,
+      })
+      return {
+        files: parsed.files,
+        truncated: parsed.truncated,
+        stats: { files_with_matches: parsed.files.length, matches: parsed.matches, duration_ms: durationMs },
+      } as typeof WorkspaceSearchResult.Type
     })
 
     const list = Effect.fn("FileHttpApi.list")(function* (ctx: { query: { path: string; sessionID?: string } }) {
@@ -232,8 +282,85 @@ export const fileHandlers = HttpApiBuilder.group(InstanceHttpApi, "file", (handl
       .handle("findText", findText)
       .handle("findFile", findFile)
       .handle("findSymbol", findSymbol)
+      .handle("search", searchWorkspace)
       .handle("list", list)
       .handle("content", content)
       .handle("status", status)
   }),
 ).pipe(Layer.provide(locationServiceMapLayer))
+
+const shellQuote = (s: string) => "'" + s.replace(/'/g, "'\\''") + "'"
+
+type SearchContextLineOut = { line_number: number; text: string }
+type SearchMatchOut = {
+  line_number: number
+  text: string
+  ranges: Array<{ start: number; end: number }>
+  before: SearchContextLineOut[]
+  after: SearchContextLineOut[]
+}
+type SearchFileOut = { path: string; matches: SearchMatchOut[] }
+
+const rgString = (v: unknown) => (typeof v === "string" ? v : undefined)
+const rgNumber = (v: unknown) => (typeof v === "number" ? v : undefined)
+
+// Parses `rg --json` NDJSON: match events carry submatches (highlight ranges);
+// context events between matches are attributed to before/after by line number.
+const parseRipgrepOutput = (stdout: string, maxResults: number) => {
+  const files: SearchFileOut[] = []
+  let current: SearchFileOut | undefined
+  let pendingBefore: SearchContextLineOut[] = []
+  let lastMatchLine = 0
+  let total = 0
+  let truncated = false
+  for (const raw of stdout.split("\n")) {
+    const line = raw.trim()
+    if (!line.startsWith("{")) continue
+    const ev = Option.getOrUndefined(Option.liftThrowable((s: string) => JSON.parse(s) as unknown)(line))
+    if (typeof ev !== "object" || ev === null) continue
+    const type = rgString((ev as { type?: unknown }).type)
+    const data = (ev as { data?: unknown }).data
+    if (type === undefined || typeof data !== "object" || data === null) continue
+    if (type === "begin") {
+      const p = rgString((data as { path?: unknown }).path && ((data as { path: { text?: unknown } }).path.text))
+      if (p === undefined) continue
+      current = { path: p.replace(/^\/workspace\//, ""), matches: [] }
+      files.push(current)
+      pendingBefore = []
+      lastMatchLine = 0
+    } else if (type === "match" && current) {
+      if (total >= maxResults) {
+        truncated = true
+        continue
+      }
+      const text = rgString((data as { lines?: unknown }).lines && (data as { lines: { text?: unknown } }).lines.text)
+      const lineNumber = rgNumber((data as { line_number?: unknown }).line_number) ?? 0
+      const submatches = Array.isArray((data as { submatches?: unknown }).submatches) ? (data as { submatches: unknown[] }).submatches : []
+      current.matches.push({
+        line_number: lineNumber,
+        text: (text ?? "").replace(/\r?\n$/, ""),
+        ranges: submatches.flatMap((s: unknown) => {
+          if (typeof s !== "object" || s === null) return []
+          const start = rgNumber((s as { start?: unknown }).start)
+          const end = rgNumber((s as { end?: unknown }).end)
+          if (start === undefined || end === undefined) return []
+          return [{ start, end }]
+        }),
+        before: pendingBefore,
+        after: [],
+      })
+      pendingBefore = []
+      lastMatchLine = lineNumber
+      total++
+    } else if (type === "context" && current) {
+      const text = rgString((data as { lines?: unknown }).lines && (data as { lines: { text?: unknown } }).lines.text)
+      const ctxLine = {
+        line_number: rgNumber((data as { line_number?: unknown }).line_number) ?? 0,
+        text: (text ?? "").replace(/\r?\n$/, ""),
+      }
+      if (ctxLine.line_number > lastMatchLine && current.matches.length > 0) current.matches[current.matches.length - 1].after.push(ctxLine)
+      else pendingBefore.push(ctxLine)
+    }
+  }
+  return { files: files.filter((f) => f.matches.length > 0), matches: total, truncated }
+}
