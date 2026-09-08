@@ -219,6 +219,8 @@ type ExecSseEvent =
 type ExecState = {
   status: "running" | "completed" | "failed" | "killed" | "timed_out"
   exitCode: number | null
+  signal?: string
+  oomSuspected?: boolean
   stdout: string
   stderr: string
   startedAt: number
@@ -230,6 +232,63 @@ type ExecState = {
   command: string
   fiber: Fiber.Fiber<void, unknown> | null
   queuedOutputSize: number
+}
+
+// exitCode >= 128 表示进程被信号杀死（128 + signum）；沙箱里最常见的 137（SIGKILL）
+// 几乎总是 cgroup 内存 OOM——内核直接杀进程，不留任何 stdout/stderr，调用方只能
+// 看到模糊的连接失败，所以在这里解码并在接口层显式透出。
+export const signalName = (sig: number) =>
+  sig === 9 ? "SIGKILL" : sig === 15 ? "SIGTERM" : sig === 13 ? "SIGPIPE" : sig === 6 ? "SIGABRT" : sig === 1 ? "SIGHUP" : `SIG${sig}`
+
+export const exitSignal = (exitCode: number | null | undefined) =>
+  typeof exitCode === "number" && exitCode >= 128 ? signalName(exitCode - 128) : undefined
+
+// ── proxy 502 端口诊断 ─────────────────────────────────────────
+// 上游（dev server 进程）不在了时，进沙箱收集「端口是否监听 + cgroup OOM 证据」，
+// 把模糊的 "connection refused" 变成带原因的错误体。结果缓存 5s（页面刷新连发多个
+// 请求）；任何失败静默降级——诊断增强绝不能让 502 路径更慢或更糟。
+type PortDiagnostics = {
+  portListening: boolean
+  oomKillCount: number | null
+  lastKilled: string | null
+}
+
+const DIAG_CACHE_MS = 5_000
+const diagCache = new Map<string, { at: number; data: PortDiagnostics }>()
+
+const diagCommand = (port: number) => `printf 'PORT='; curl -s -o /dev/null -w '%{http_code}' --max-time 2 http://127.0.0.1:${port}/ 2>/dev/null || printf '000'; printf '\\n'
+printf 'OOM='; awk '$1=="oom_kill"{print $2}' /sys/fs/cgroup/memory.events /sys/fs/cgroup/memory/memory.oom_control 2>/dev/null | head -1; printf '\\n'
+printf 'KILLED='; dmesg 2>/dev/null | grep -i 'killed process' | tail -1 | cut -c1-200`
+
+export function parseDiag(out: string): PortDiagnostics {
+  const line = (key: string) => out.split("\n").find((l) => l.startsWith(key + "="))?.slice(key.length + 1) ?? ""
+  const port = line("PORT").trim()
+  const oom = line("OOM").trim()
+  return {
+    portListening: port !== "" && !port.startsWith("000"),
+    oomKillCount: /^\d+$/.test(oom) ? Number(oom) : null,
+    lastKilled: line("KILLED").trim() || null,
+  }
+}
+
+export const diagnosePort = (sandbox: SandboxProvider.Interface, sessionID: SessionID, port: number) =>
+  Effect.gen(function* () {
+    const key = `${sessionID}:${port}`
+    const cached = diagCache.get(key)
+    if (cached && Date.now() - cached.at < DIAG_CACHE_MS) return cached.data
+    const result = yield* sandbox
+      .runInSession(sessionID, diagCommand(port), { workingDirectory: "/workspace", timeoutSeconds: 8 })
+      .pipe(Effect.catch(() => Effect.succeed(undefined)))
+    if (!result) return undefined
+    const data = parseDiag(result.logs.stdout.map((m) => m.text).join(""))
+    diagCache.set(key, { at: Date.now(), data })
+    return data
+  })
+
+export function diagHint(d: PortDiagnostics, port: number): string {
+  if ((d.oomKillCount != null && d.oomKillCount > 0) || d.lastKilled)
+    return `port ${port} has no listener; sandbox memory OOM detected${d.oomKillCount ? ` (cgroup oom_kill=${d.oomKillCount})` : ""}. Increase the session sandbox memory limit or restart the process.`
+  return `port ${port} has no listener; no process is serving it. Start the dev server (e.g. POST /session/:id/exec/async) and check its output.`
 }
 const execStore = new Map<string, ExecState>()
 const sessionExecIndex = new Map<string, Set<string>>()
@@ -393,6 +452,8 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
         return HttpServerResponse.jsonUnsafe({
           id: execId,
           exitCode: result.exitCode,
+          signal: exitSignal(result.exitCode),
+          oomSuspected: result.exitCode === 137 || undefined,
           stdout,
           stderr,
           error: result.error ? { name: result.error.name, value: result.error.value, traceback: result.error.traceback } : undefined,
@@ -500,6 +561,8 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
             fullStdout = result.logs.stdout.map((m: any) => m.text).join("\n")
             fullStderr = result.logs.stderr.map((m: any) => m.text).join("\n")
             state.exitCode = result.exitCode
+            state.signal = exitSignal(result.exitCode)
+            state.oomSuspected = result.exitCode === 137 || undefined
             state.stdout = truncateOutput(fullStdout) ?? ""
             state.stderr = truncateOutput(fullStderr) ?? ""
             if (result.error) state.error = { name: result.error.name, value: result.error.value, traceback: result.error.traceback }
@@ -519,7 +582,11 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
             exit_code: state.exitCode,
             stdout: truncateOutput(state.stdout),
             stderr: truncateOutput(state.stderr),
-            error: state.error ? JSON.stringify({ name: state.error.name, value: state.error.value }) : null,
+            error: state.error
+              ? JSON.stringify({ name: state.error.name, value: state.error.value })
+              : state.oomSuspected
+                ? JSON.stringify({ name: "OOMSuspected", value: `process killed by SIGKILL (exit 137) — likely sandbox memory OOM` })
+                : null,
             time_finished: state.finishedAt,
           })).pipe(Effect.catch(() => Effect.void))
           if (state.status !== "completed" && body.repairOnFailure === true) {
@@ -1132,7 +1199,7 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
           return yield* websocket(request, endpoint + subPath + targetQuery)
         }
 
-        return yield* proxyHttp(request, params.sessionID, port, prefix, subPath, endpoint)
+        return yield* proxyHttp(request, sandbox, params.sessionID, port, prefix, subPath, endpoint)
       }).pipe(Effect.catch(() => Effect.succeed(HttpServerResponse.empty({ status: 502 })))),
     )
   }),
@@ -1148,7 +1215,8 @@ function rejectWs(request: HttpServerRequest.HttpServerRequest, code: number, re
 
 function proxyHttp(
   request: HttpServerRequest.HttpServerRequest,
-  sessionID: string,
+  sandbox: SandboxProvider.Interface,
+  sessionID: SessionID,
   port: number,
   prefix: string,
   subPath: string,
@@ -1177,8 +1245,11 @@ function proxyHttp(
     }).pipe(Effect.catch(() => Effect.succeed(null)))
 
     if (!res || res instanceof Error) {
+      const diag = yield* diagnosePort(sandbox, sessionID, port)
       return HttpServerResponse.jsonUnsafe({
-        error: "sandbox unreachable",
+        error: "sandbox process unreachable",
+        port,
+        diagnostics: diag ? { ...diag, hint: diagHint(diag, port) } : undefined,
         detail: res instanceof Error ? res.message : undefined,
       }, { status: 502 })
     }
@@ -1204,6 +1275,26 @@ function proxyHttp(
     }
 
     const contentType = resHeaders.get("content-type") ?? ""
+
+    // 上游 server proxy 连不上沙箱内进程时只回模糊的 5xx JSON
+    // （"Could not connect to the backend sandbox endpoint"）。这里拦截并附加端口级
+    // 诊断（OOM 证据等），让调用方能直接看到进程死亡的真正原因。
+    if (res.status >= 500 && contentType.includes("json")) {
+      const text = yield* Effect.tryPromise(() => res.text()).pipe(Effect.catch(() => Effect.succeed("")))
+      if (text.includes("Could not connect to the backend sandbox")) {
+        const diag = yield* diagnosePort(sandbox, sessionID, port)
+        return HttpServerResponse.jsonUnsafe({
+          error: "sandbox process unreachable",
+          port,
+          diagnostics: diag ? { ...diag, hint: diagHint(diag, port) } : undefined,
+          originalError: text.slice(0, 500) || undefined,
+        }, { status: 502 })
+      }
+      return HttpServerResponse.text(text, {
+        status: res.status, statusText: res.statusText || undefined,
+        headers: headersToRecord(resHeaders),
+      })
+    }
 
     if (contentType.includes("text/html")) {
       const text = yield* Effect.tryPromise(() => res.text())

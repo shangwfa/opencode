@@ -372,6 +372,61 @@ bun test test/session/sandbox-resource.test.ts --test-name-pattern "Session.Info
 
 ---
 
+## 五、内存不足（OOM）场景 — 可观测性与恢复
+
+> 背景（2026-09-08 线上事故）：会话沙箱 `memory=1Gi` 跑中型前端项目（vite + antd），依赖预构建内存峰值超 cgroup 限额被内核 SIGKILL——**不留任何 stdout/stderr**，外部只看到 proxy 502 / dev server "悄悄死"。排查实锤见 dmesg `oom-kill`。修复后 exec 响应透出 `signal/oomSuspected`、exec_log 记录 `OOMSuspected`、服务端日志打 WARN。
+
+### T29.14 内存不足 OOM → 进程被 SIGKILL → 信号/诊断透出
+
+```bash
+# 1. 创建 512Mi 小内存会话并 boot 沙箱
+SID=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' \
+  -d '{"sandbox":{"cpu":"1","memory":"512Mi"}}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+curl -s -X POST $BASE/session/$SID/keep-alive -H 'Content-Type: application/json' -d '{"enabled":true,"boot":true}' > /dev/null
+sleep 8
+
+# 2. 拉起内存饥饿命令（tail /dev/zero 持续吞内存，确定性触发 cgroup OOM kill；
+#    注意不要追加 `; echo ...`——会覆盖 shell 退出码，signal 解码就失效了）
+cat > /tmp/oom-cmd.json <<'EOF'
+{"command":"tail /dev/zero","timeoutSeconds":25}
+EOF
+curl -s --max-time 60 -X POST $BASE/session/$SID/exec -H 'Content-Type: application/json' -d @/tmp/oom-cmd.json \
+  | python3 -c "import json,sys;d=json.load(sys.stdin);print({k:d.get(k) for k in ['exitCode','signal','oomSuspected']});print('stdout:',repr(d.get('stdout',''))[:80])"
+
+# 3. 服务端日志应有明确 WARN（docker logs 不覆盖 LLM 路径，但 sandbox-provider 的 WARN 可见）
+docker logs opencode-saas-test 2>&1 | grep "likely sandbox memory OOM" | tail -1
+```
+**期望**：
+- 步骤 2：`exitCode=137, signal="SIGKILL", oomSuspected=true`，stdout 仅剩 bash 的 `Killed` 提示（内核直接杀进程，无遗言）
+- 步骤 3：日志含 `command killed by SIGKILL — likely sandbox memory OOM`
+- exec/async 路径：完成后 `GET /exec/:execId` 带 `signal/oomSuspected`，PG exec_log `error` 字段为 `{"name":"OOMSuspected",...}`
+
+> 踩坑记录（2026-09-08 实测）：
+> - `node` 用 `new Array` 吃内存先撞 **V8 堆限制**（SIGABRT/Abort，exitCode 被 shell 掩盖）而非 cgroup；`Buffer.alloc` 在限额边缘挣扎不触发 kill；`dd /dev/shm` 受独立 tmpfs size（64MB）限制，ENOSPC 退出碰不到 cgroup
+> - **`tail /dev/zero` 是确定性触发器**：匿名内存持续暴涨，cgroup v1/v2 下都会被内核 SIGKILL
+
+### T29.15 调整资源 + 重建沙箱 → 恢复
+
+> session.sandbox 创建时固化，调整需 UPDATE + kill-sandbox 重建（PVC 数据保留）。
+
+```bash
+# 1. 上调资源（T29.14 的 SID）
+psql "$PG_URL" -c "UPDATE session SET sandbox='{\"cpu\":\"2\",\"memory\":\"4Gi\",\"persistMode\":\"pvc\"}'::jsonb WHERE id='$SID';"
+curl -s -X POST $BASE/session/$SID/kill-sandbox -H 'Content-Type: application/json' -d '{}'
+
+# 2. 重建 + 受控内存分配（约 1.6GB 堆外，旧 512Mi 限额下必被 OOM 杀、4Gi 应正常完成）
+curl -s -X POST $BASE/session/$SID/keep-alive -H 'Content-Type: application/json' -d '{"enabled":true,"boot":true}' > /dev/null
+sleep 8
+cat > /tmp/mem-ok.json <<'EOF'
+{"command":"node -e \"const a=[]; for(i=0;i<200;i++) a.push(Buffer.alloc(8*1024*1024).fill(i)); console.log('mem-allocated-ok')\"","timeoutSeconds":30}
+EOF
+curl -s --max-time 60 -X POST $BASE/session/$SID/exec -H 'Content-Type: application/json' -d @/tmp/mem-ok.json \
+  | python3 -c "import json,sys;d=json.load(sys.stdin);print('exit:',d.get('exitCode'),'signal:',d.get('signal'),'stdout:',d.get('stdout','').strip())"
+```
+**期望**：`exit=0, signal=None, stdout=mem-allocated-ok`；可选验证 cgroup：`cat /sys/fs/cgroup/memory/memory.limit_in_bytes`（v1）或 `memory.max`（v2）= 4294967296
+
+---
+
 ## 结果汇总
 
 | 用例 | 状态 | 说明 |
@@ -389,6 +444,8 @@ bun test test/session/sandbox-resource.test.ts --test-name-pattern "Session.Info
 | T29.11 | ✅ | Schema 编解码单元测试 |
 | T29.12 | ✅ | 格式校验单元测试（38 用例） |
 | T29.13 | ✅ | Info/CreateInput/toRow 单元测试 |
+| T29.14 | ✅ | 2026-09-08 组合 1（镜像 `oom-diag-v2`）实测：session `ses_f7edeca9affeTOE39fEL0yizqA`（512Mi），`tail /dev/zero` → `{exitCode:137, signal:SIGKILL, oomSuspected:true}` + 本次 WARN 日志。注意：node Array 撞 V8 堆、dd 撞 tmpfs size 都触发不了 cgroup OOM，`tail /dev/zero` 是确定性触发器 |
+| T29.15 | ✅ | 2026-09-08 同环境实测：UPDATE 4Gi + kill-sandbox 重建后 cgroup=4294967296，Buffer 1.6GB 分配 `exit=0 mem-allocated-ok`（旧 512Mi 必死） |
 
 ---
 

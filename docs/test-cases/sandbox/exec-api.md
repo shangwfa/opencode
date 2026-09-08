@@ -677,6 +677,111 @@ console.log("API stdout 长度:", r.stdout?.length)
 
 ---
 
+### T19.22 exec/async 常驻进程不被清理（runDetached 修复）
+
+> 背景：`runDetached` 的 finally 曾无条件 `deleteSession`，execd 删 session 会终止 session 内全部进程——dev server / 守护进程刚拉起就被杀（历史 exit 137）。修复后 detached session 保留（由 interrupt/destroyAll/沙箱销毁兜底）。参见 `lsp/agent.ts` 的 nohup 注释与 `sandbox-provider.ts` runDetached。
+
+```bash
+# 1. async 拉起常驻命令（45s sleep），timeoutSeconds:0 = 不超时
+EXEC=$(curl -s -X POST $BASE/session/$SID/exec/async -H 'Content-Type: application/json' \
+  -d '{"command":"sleep 45; echo LONG-DONE","timeoutSeconds":0,"workingDirectory":"/workspace"}' \
+  | python3 -c "import json,sys;print(json.load(sys.stdin)['execId'])")
+
+# 2. 期间同步 exec 别的命令（模拟正常使用）
+curl -s -X POST $BASE/session/$SID/exec -H 'Content-Type: application/json' \
+  -d '{"command":"echo still-alive"}' > /dev/null
+
+# 3. 等待超过原「启动即杀」窗口，确认常驻命令完整跑完
+sleep 50
+curl -s "$BASE/session/$SID/exec/$EXEC" | python3 -c "import json,sys;d=json.load(sys.stdin);print('status:',d['status'],'exit:',d['exitCode'],'stdout:',d.get('stdout','').strip())"
+```
+**期望**：`status=completed, exitCode=0, stdout=LONG-DONE`（修复前进程在启动后即被杀，永远等不到完成）。
+
+### T19.23 exec 响应信号解码（exit ≥128 → signal / oomSuspected）
+
+> 内核 OOM kill（SIGKILL）不留任何 stdout/stderr，调用方只能看到裸 exitCode 137。本用例验证信号被解码并在响应/exec_log 中显式透出。
+
+```bash
+# 1. 同步 exec：自杀命令 exit 137
+curl -s -X POST $BASE/session/$SID/exec -H 'Content-Type: application/json' \
+  -d '{"command":"sh -c 'kill -9 $$'","timeoutSeconds":10}' \
+  | python3 -c "import json,sys;d=json.load(sys.stdin);print({k:d.get(k) for k in ['exitCode','signal','oomSuspected']})"
+
+# 2. 服务端日志应有明确 warn
+docker logs opencode-saas-test 2>&1 | grep "killed by SIGKILL" | tail -1
+```
+**期望**：
+- 响应含 `signal: "SIGKILL"`、`oomSuspected: true`
+- 容器日志含 `command killed by SIGKILL — likely sandbox memory OOM`
+- async 完成后 `GET /exec/:execId` 同样带 `signal`/`oomSuspected`；exec_log `error` 字段写入 `OOMSuspected` JSON
+
+### T19.24 proxy 502 端口诊断增强
+
+> dev server 死后 proxy 只回模糊的 `Could not connect to the backend sandbox endpoint`（来自 OpenSandbox server proxy）。增强后 opencode 层拦截失败并附沙箱内诊断（端口监听 + cgroup OOM 证据 + hint）。
+
+```bash
+# 1. 起一个 dev server 并确认 proxy 200（正常路径不回归）
+curl -s -X POST $BASE/session/$SID/exec/async -H 'Content-Type: application/json' \
+  -d '{"command":"cd /workspace && pnpm run dev --host -- --port 5174 --strictPort","timeoutSeconds":0,"workingDirectory":"/workspace"}' > /dev/null
+sleep 15 && curl -s -o /dev/null -w "running=%{http_code}\n" $BASE/session/$SID/proxy/5174/
+
+# 2. 杀掉 dev，访问 proxy 应返回带诊断的 502
+curl -s -X POST $BASE/session/$SID/exec -H 'Content-Type: application/json' \
+  -d '{"command":"pkill -f vite || true","timeoutSeconds":15}' > /dev/null
+sleep 2
+curl -s -w "\nHTTP=%{http_code}\n" $BASE/session/$SID/proxy/5174/ | python3 -c "
+import json,sys
+raw=sys.stdin.read()
+body=raw.rsplit('HTTP=',1)[0]
+print('HTTP='+raw.rsplit('HTTP=',1)[1].strip())
+d=json.loads(body)
+print('error:',d.get('error'))
+diag=d.get('diagnostics',{})
+print('portListening:',diag.get('portListening'))
+print('hint:',diag.get('hint','')[:100])
+print('originalError kept:','Could not connect' in (d.get('originalError') or ''))
+"
+```
+**期望**：
+- 步骤 1：`running=200`（正常路径回归）
+- 步骤 2：HTTP 502，`error="sandbox process unreachable"`，`diagnostics.portListening=false`，`hint` 给出明确指引；若为 OOM 死亡则 `oomKillCount`/`lastKilled` 有值且 hint 提示内存不足；`originalError` 保留上游原始错误
+
+### T19.25 exec/async 常驻进程存活 — 本地 OpenSandbox（组合 2/3）复测
+
+> runDetached 的 deleteSession 杀进程 bug 在 **local layer（内存态实现）与 pgLayer 各有一份**，两处已同步修复（正常完成保活、超时才 interrupt）。组合 1（远端 K8s 沙箱）由 T19.22 覆盖，本用例验证组合 2/3（本地 OpenSandbox Docker runtime）下的 local layer。
+
+```bash
+# 前置：按 docs/local-test-env.md 组合 2/3 启动（本地 OpenSandbox server :8080 + 对应镜像）
+# 1. async 拉起常驻命令
+EXEC=$(curl -s -X POST $BASE/session/$SID/exec/async -H 'Content-Type: application/json' \
+  -d '{"command":"sleep 60; echo LOCAL-LAYER-DONE","timeoutSeconds":0,"workingDirectory":"/workspace"}' \
+  | python3 -c "import json,sys;print(json.load(sys.stdin)['execId'])")
+
+# 2. 中途回查（仍在 running，进程未被 deleteSession 清理）
+sleep 20 && curl -s $BASE/session/$SID/exec/$EXEC | python3 -c "import json,sys;d=json.load(sys.stdin);print('mid status:',d['status'])"
+
+# 3. 等待完整跑完
+sleep 45 && curl -s $BASE/session/$SID/exec/$EXEC | python3 -c "import json,sys;d=json.load(sys.stdin);print('final:',d['status'],d['exitCode'],d.get('stdout','').strip())"
+```
+**期望**：`mid status=running`；`final: completed 0 LOCAL-LAYER-DONE`
+
+### 单测（bun test，非 HTTP 集成）
+
+```bash
+cd packages/opencode
+
+# 诊断与信号解码纯逻辑（17 用例，无外部依赖）
+bun test test/server/sandbox-diag.test.ts
+
+# runDetached 行为断言（3 用例：完成不删 session / exit 137 不抛错 / 超时 interrupt）
+# 需本地 PG opencode_test 库（migration-pg 已应用）；lifecycle mock 内嵌于测试文件
+OPENCODE_DATABASE_URL=postgresql://local@127.0.0.1:5432/opencode_test \
+  bun test test/tool/sandbox-detached-keepalive.test.ts
+```
+**期望**：17/17、3/3 全 pass。T1 断言 `sessionDeletes == []` 是本次修复的行为锚点——编辑事故（修复未落盘）正是被它暴露的。
+
+---
+
 > API 参考（请求/响应字段、错误码）已迁至 [`guides/exec-api-reference.md`](./guides/exec-api-reference.md)。
 
 ## 结果汇总
@@ -704,6 +809,10 @@ console.log("API stdout 长度:", r.stdout?.length)
 | T19.19 | ✅ | kill 后 exec_log 状态更新为 killed |
 | T19.20 | ⏳ | exec_log 字段覆盖（working_directory/exit_code/stderr 合并行为）——用例已定义，待执行 |
 | T19.21 | ⏳ | exec_log stdout 64KB 截断 + `...[truncated]` 标记——用例已定义，待执行 |
+| T19.22 | ✅ | 2026-09-08 本地组合 1（远端 PG+远端沙箱，镜像 `oom-diag`）实测：session `ses_f810f46acffe2Ft0hJH4F7EnNp`，sleep 45 完整跑完 `completed exit=0 stdout=LONG-DONE` 同类验证；修复前同路径进程启动即被杀（exec-837 VITE ready→Killed 137） |
+| T19.23 | ✅ | 2026-09-08 同环境实测：`sh -c 'kill -9 $$'` → `{exitCode:137, signal:"SIGKILL", oomSuspected:true}`；容器日志出现 `command killed by SIGKILL — likely sandbox memory OOM` |
+| T19.24 | ✅ | 2026-09-08 同环境实测：dev 运行时 proxy 200（正常路径回归通过）；pkill 后 502 响应含 `diagnostics.portListening=false` + hint + `originalError`（保留上游错误）。OOM 场景 `lastKilled` 来自 dmesg、`oomKillCount` 来自 cgroup（v2 memory.events / v1 memory.oom_control，缺失时为 null） |
+| T19.25 | ⏳ | local layer（组合 2/3）复测——用例已定义，待本地 OpenSandbox 环境执行；单测侧 `test/tool/sandbox-detached-keepalive.test.ts` 已覆盖两处 runDetached 修复的行为断言（3/3 pass） |
 
 **本轮全量回归环境**：宿主机 opencode server `127.0.0.1:14097`，PG auth，OpenSandbox Docker runtime `127.0.0.1:8080`，sandbox image `opencode-opensandbox:local`，`OPENCODE_SANDBOX_USE_SERVER_PROXY=false`。
 
