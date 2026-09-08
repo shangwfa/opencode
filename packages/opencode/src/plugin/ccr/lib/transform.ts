@@ -21,8 +21,10 @@ interface MessageLike {
 }
 
 export interface CcrTransformStats {
-  compressed: number
-  tokensSaved: number
+  created: number
+  reused: number
+  originalTokens: number
+  compressedTokens: number
   imagesResized?: number
 }
 
@@ -45,21 +47,13 @@ function extractQuery(messages: MessageLike[]): string | undefined {
 
 export function createMessageTransform(store: CcrStore, config: CcrConfig) {
   return async (_input: unknown, output: { messages: MessageLike[] }) => {
+    const startedAt = Date.now()
     const messages = output.messages
-    console.log(
-      `[ccr] transform: messages=${Array.isArray(messages) ? messages.length : "invalid"} completedTools=${Array.isArray(messages) ? messages.flatMap((m) => (Array.isArray(m.parts) ? m.parts : [])).filter((p) => (p as ToolPartLike).type === "tool" && (p as ToolPartLike).state?.status === "completed").length : 0}`,
-    )
     if (!Array.isArray(messages) || messages.length === 0) return
 
-    const stats: CcrTransformStats = { compressed: 0, tokensSaved: 0 }
+    const stats: CcrTransformStats = { created: 0, reused: 0, originalTokens: 0, compressedTokens: 0 }
     const lastCompressibleIndex = messages.length - 1 - config.protectRecent
     const query = extractQuery(messages)
-    console.log(
-      `[ccr] window: last=${lastCompressibleIndex} ids=${messages
-        .slice(0, lastCompressibleIndex + 1)
-        .map((m) => m?.info?.id?.slice(4, 16))
-        .join(",")}`,
-    )
 
     for (let i = 0; i <= lastCompressibleIndex; i++) {
       const msg = messages[i]
@@ -86,32 +80,39 @@ export function createMessageTransform(store: CcrStore, config: CcrConfig) {
         if (toolPart.state?.status !== "completed") continue
         const outputText = toolPart.state.output
         if (typeof outputText !== "string") continue
-        if (estimateTokens(outputText) < config.minTokens) continue
-        const replacement = await store.replace({
+        const originalTokens = estimateTokens(outputText)
+        if (originalTokens < config.minTokens) continue
+        const result = await store.replace({
           sessionID: msg.info.sessionID,
           messageID: msg.info.id,
           tool: toolPart.tool,
           output: outputText,
           query,
         })
-        if (replacement === undefined) {
+        if (result === undefined) {
           console.log(
             `[ccr] skip: idx=${i} id=${msg.info.id.slice(4, 20)} tool=${toolPart.tool} len=${outputText.length}`,
           )
           continue
         }
 
-        stats.compressed++
-        stats.tokensSaved += estimateTokens(outputText) - estimateTokens(replacement)
-        toolPart.state.output = replacement
+        stats[result.origin]++
+        const compressedTokens = estimateTokens(result.replacement)
+        stats.originalTokens += originalTokens
+        stats.compressedTokens += compressedTokens
+        toolPart.state.output = result.replacement
       }
     }
 
-    if (stats.compressed > 0) {
-      console.log(`[ccr] compressed ${stats.compressed} tool output(s), ~${stats.tokensSaved} tokens saved`)
-    }
-    if (stats.imagesResized) {
-      console.log(`[ccr] images: ${stats.imagesResized} history screenshot(s) resized to fit 512`)
-    }
+    // One structured line per turn: savings trend down when the compressors
+    // drift, and a reused count collapsing toward zero means marker bytes
+    // stopped matching (prefix cache is being invalidated every request).
+    const total = stats.created + stats.reused
+    const savedPct =
+      stats.originalTokens > 0 ? ((1 - stats.compressedTokens / stats.originalTokens) * 100).toFixed(1) : "0.0"
+    const images = stats.imagesResized ? ` images=${stats.imagesResized}` : ""
+    console.log(
+      `[ccr] turn: messages=${messages.length} window=${lastCompressibleIndex + 1} created=${stats.created} reused=${stats.reused} compressed=${total} orig=${stats.originalTokens} comp=${stats.compressedTokens} saved=${savedPct}%${images} took=${Date.now() - startedAt}ms`,
+    )
   }
 }

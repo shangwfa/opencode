@@ -29,14 +29,15 @@ describe("CcrStore.replace", () => {
     const { entries, backend } = makeBackend()
     const store = new CcrStore(backend, baseConfig)
 
-    const replacement = await store.replace({
+    const result = await store.replace({
       sessionID: "ses_1",
       messageID: "msg_1",
       tool: "read",
       output: bigJson,
     })
 
-    expect(replacement).toBeDefined()
+    expect(result?.origin).toBe("created")
+    const replacement = result?.replacement
     expect(replacement).toContain("[ccr:")
     expect(replacement).toContain("Retrieve original: hash=")
     expect(replacement).toContain("500 items compressed to")
@@ -56,13 +57,13 @@ describe("CcrStore.replace", () => {
   test("renders an expiry notice when ttlSeconds is set", async () => {
     const { backend } = makeBackend()
     const store = new CcrStore(backend, { ...baseConfig, ttlSeconds: 1800 })
-    const replacement = await store.replace({
+    const result = await store.replace({
       sessionID: "s",
       messageID: "m",
       tool: "read",
       output: bigJson,
     })
-    expect(replacement).toContain("Expires in 30m.")
+    expect(result?.replacement).toContain("Expires in 30m.")
   })
 
   test("is idempotent across all marker shapes (Headroom #2694 guard)", async () => {
@@ -83,7 +84,8 @@ describe("CcrStore.replace", () => {
     const first = await store.replace({ sessionID: "s", messageID: "m1", tool: "read", output: bigJson })
     const writesAfterFirst = entries.size
     const second = await store.replace({ sessionID: "s", messageID: "m2", tool: "read", output: bigJson })
-    expect(second).toBe(first)
+    expect(second?.replacement).toBe(first?.replacement)
+    expect(second?.origin).toBe("reused")
     expect(entries.size).toBe(writesAfterFirst)
   })
 
@@ -91,9 +93,9 @@ describe("CcrStore.replace", () => {
     const { entries, backend } = makeBackend()
     const store = new CcrStore(backend, baseConfig)
     await store.replace({ sessionID: "ses_a", messageID: "m1", tool: "read", output: bigJson })
-    const replacement = await store.replace({ sessionID: "ses_b", messageID: "m2", tool: "read", output: bigJson })
+    const result = await store.replace({ sessionID: "ses_b", messageID: "m2", tool: "read", output: bigJson })
 
-    expect(replacement).toContain("[ccr:")
+    expect(result?.replacement).toContain("[ccr:")
     expect(entries.has(["plugin", "ccr", "ses_b", contentHash(bigJson)].join("/"))).toBe(true)
     expect((await store.retrieve("ses_b", contentHash(bigJson))).status).toBe("available")
   })
@@ -119,7 +121,8 @@ describe("CcrStore.replace", () => {
       query: "beta",
     })
 
-    expect(second).toBe(first)
+    expect(second?.replacement).toBe(first?.replacement)
+    expect(second?.origin).toBe("reused")
   })
 
   test("evicts the oldest cached replacement beyond 1000 entries (LRU)", async () => {
@@ -150,13 +153,17 @@ describe("CcrStore.replace", () => {
     }
     const store = new CcrStore(failingBackend, baseConfig)
     expect(await store.replace({ sessionID: "s", messageID: "m", tool: "read", output: bigJson })).toBeUndefined()
-    expect(await store.replace({ sessionID: "s", messageID: "m", tool: "read", output: bigJson })).toContain("[ccr:")
+    expect(
+      (await store.replace({ sessionID: "s", messageID: "m", tool: "read", output: bigJson }))?.replacement,
+    ).toContain("[ccr:")
     expect(writes).toBe(2)
   })
 
   test("keeps entries retrievable when no backend is configured", async () => {
     const store = new CcrStore(undefined, baseConfig)
-    expect(await store.replace({ sessionID: "s", messageID: "m", tool: "read", output: bigJson })).toContain("[ccr:")
+    expect(
+      (await store.replace({ sessionID: "s", messageID: "m", tool: "read", output: bigJson }))?.replacement,
+    ).toContain("[ccr:")
     expect((await store.retrieve("s", contentHash(bigJson))).status).toBe("available")
   })
 })

@@ -32,6 +32,8 @@ export type CcrRetrieveResult =
   | { status: "expired"; ttlSeconds: number }
   | { status: "not_found" }
 
+export type CcrReplaceResult = { replacement: string; origin: "created" | "reused" }
+
 export function ccrKey(sessionID: string, hash: string): string[] {
   return ["plugin", "ccr", sessionID, hash]
 }
@@ -75,14 +77,17 @@ export class CcrStore {
    *  output is not worth compressing. Results are content-addressed: the same
    *  bytes always produce the same marker, keeping the request prefix stable.
    *  `query` influences item selection only on the first successful persistence;
-   *  later processes reuse the stored replacement by session and content hash. */
+   *  later processes reuse the stored replacement by session and content hash.
+   *  `origin` distinguishes a freshly compressed entry from one reused via the
+   *  in-memory cache or the backend — a reused-dominant turn distribution is
+   *  the observable signal that marker bytes stayed stable across requests. */
   async replace(input: {
     sessionID: string
     messageID: string
     tool: string
     output: string
     query?: string
-  }): Promise<string | undefined> {
+  }): Promise<CcrReplaceResult | undefined> {
     if (CCR_MARKER_PATTERNS.some((pattern) => input.output.includes(pattern))) return undefined
 
     const hash = contentHash(input.output)
@@ -91,7 +96,7 @@ export class CcrStore {
     if (cached && !isExpired(cached.entry, Date.now())) {
       this.replacements.delete(cacheID)
       this.replacements.set(cacheID, cached)
-      return cached.replacement
+      return { replacement: cached.replacement, origin: "reused" }
     }
     if (cached) this.replacements.delete(cacheID)
 
@@ -105,7 +110,7 @@ export class CcrStore {
     }
     if (existing?.replacement && !isExpired(existing, Date.now())) {
       this.remember(cacheID, existing.replacement, existing)
-      return existing.replacement
+      return { replacement: existing.replacement, origin: "reused" }
     }
 
     const compressed = compressOutput(input.output, this.config, input.query)
@@ -140,7 +145,7 @@ export class CcrStore {
       }
     }
     this.remember(cacheID, replacement, entry)
-    return replacement
+    return { replacement, origin: "created" }
   }
 
   async retrieve(sessionID: string, hash: string): Promise<CcrRetrieveResult> {

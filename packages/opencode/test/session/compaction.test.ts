@@ -452,46 +452,36 @@ describe("session.compaction.isOverflow", () => {
     ),
   )
 
-  // ─── Bug reproduction tests ───────────────────────────────────────────
-  // These tests demonstrate that when limit.input is set, isOverflow()
-  // does not subtract any headroom for the next model response. This means
-  // compaction only triggers AFTER we've already consumed the full input
-  // budget, leaving zero room for the next API call's output tokens.
-  //
-  // Compare: without limit.input, usable = context - output (reserves space).
-  // With limit.input, usable = limit.input (reserves nothing).
-  //
-  // Related issues: #10634, #8089, #11086, #12621
-  // Open PRs: #6875, #12924
+  // ─── Output-headroom regression guards ────────────────────────────────
+  // usable() must reserve room for the next model response on BOTH branches:
+  //   with limit.input:    usable = limit.input - min(COMPACTION_BUFFER, maxOutput)
+  //   without limit.input: usable = context - maxOutput
+  // Historical bug: the limit.input branch reserved nothing, so compaction
+  // only fired after the full input budget was consumed (upstream issues
+  // #10634, #8089, #11086, #12621; PRs #6875, #12924). Fixed upstream —
+  // these tests pin the fixed behavior.
 
   it.live(
-    "BUG: no headroom when limit.input is set — compaction should trigger near boundary but does not",
+    "reserves output headroom when limit.input is set — compaction triggers near boundary",
     provideTmpdirInstance(() =>
       Effect.gen(function* () {
         const compact = yield* SessionCompaction.Service
         // Simulate Claude with prompt caching: input limit = 200K, output limit = 32K
         const model = createModel({ context: 200_000, input: 200_000, output: 32_000 })
 
-        // We've used 198K tokens total. Only 2K under the input limit.
-        // On the next turn, the full conversation (198K) becomes input,
-        // plus the model needs room to generate output — this WILL overflow.
+        // 198K tokens total, only 2K under the input limit. The next turn's
+        // response has nowhere to go unless compaction fires here.
         const tokens = { input: 180_000, output: 15_000, reasoning: 0, cache: { read: 3_000, write: 0 } }
         // count = 180K + 3K + 15K = 198K
-        // usable = limit.input = 200K (no output subtracted!)
-        // 198K > 200K = false → no compaction triggered
-
-        // WITHOUT limit.input: usable = 200K - 32K = 168K, and 198K > 168K = true ✓
-        // WITH limit.input: usable = 200K, and 198K > 200K = false ✗
-
-        // With 198K used and only 2K headroom, the next turn will overflow.
-        // Compaction MUST trigger here.
+        // usable = 200K - min(20K, 32K) = 180K
+        // 198K > 180K = true → compaction triggered
         expect(yield* compact.isOverflow({ tokens, model })).toBe(true)
       }),
     ),
   )
 
   it.live(
-    "BUG: without limit.input, same token count correctly triggers compaction",
+    "without limit.input, same token count triggers compaction",
     provideTmpdirInstance(() =>
       Effect.gen(function* () {
         const compact = yield* SessionCompaction.Service
@@ -511,7 +501,7 @@ describe("session.compaction.isOverflow", () => {
   )
 
   it.live(
-    "BUG: asymmetry — limit.input model allows 30K more usage before compaction than equivalent model without it",
+    "limit.input and context-only models agree on compaction at equivalent capacity",
     provideTmpdirInstance(() =>
       Effect.gen(function* () {
         const compact = yield* SessionCompaction.Service
@@ -519,15 +509,15 @@ describe("session.compaction.isOverflow", () => {
         const withInputLimit = createModel({ context: 200_000, input: 200_000, output: 32_000 })
         const withoutInputLimit = createModel({ context: 200_000, output: 32_000 })
 
-        // 170K total tokens — well above context-output (168K) but below input limit (200K)
+        // 181K total tokens — above both usable budgets (180K / 168K)
         const tokens = { input: 166_000, output: 10_000, reasoning: 0, cache: { read: 5_000, write: 0 } }
 
         const withLimit = yield* compact.isOverflow({ tokens, model: withInputLimit })
         const withoutLimit = yield* compact.isOverflow({ tokens, model: withoutInputLimit })
 
         // Both models have identical real capacity — they should agree:
-        expect(withLimit).toBe(true) // should compact (170K leaves no room for 32K output)
-        expect(withoutLimit).toBe(true) // correctly compacts (170K > 168K)
+        expect(withLimit).toBe(true) // 181K > 200K - 20K reserved
+        expect(withoutLimit).toBe(true) // 181K > 200K - 32K output
       }),
     ),
   )
