@@ -62,6 +62,7 @@ import { eq } from "drizzle-orm"
 import { SessionTable } from "@opencode-ai/core/session/sql"
 import { SessionReminders } from "./reminders"
 import { SessionTools } from "./tools"
+import { AntiLoop } from "./anti-loop"
 import { LLMEvent } from "@opencode-ai/llm"
 
 // @ts-ignore
@@ -1113,6 +1114,9 @@ const layer = Layer.effect(
         let structured: unknown
         let step = 0
         const session = yield* sessions.get(sessionID).pipe(Effect.orDie)
+        // Per-run doom-loop detector: state resets on every user prompt so a task
+        // legitimately repeated later in the session is never a false positive.
+        const antiLoop = AntiLoop.make()
 
         const goalGate = Effect.fn("SessionPrompt.goalGate")(function* (lastUser: SessionV1.User) {
           const active = yield* goal.get(sessionID)
@@ -1343,6 +1347,7 @@ const layer = Layer.effect(
               bypassAgentCheck,
               messages: msgs,
               promptOps,
+              antiLoop,
             }).pipe(
               Effect.provideService(Plugin.Service, plugin),
               Effect.provideService(Permission.Service, permission),

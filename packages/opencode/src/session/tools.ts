@@ -15,6 +15,7 @@ import { SessionPluginRuntime } from "@/plugin/session-plugin-runtime"
 import type { TaskPromptOps } from "@/tool/task"
 import { type Tool as AITool, tool, jsonSchema, type ToolExecutionOptions, asSchema } from "ai"
 import { Effect, Option } from "effect"
+import { AntiLoop } from "./anti-loop"
 import { MessageV2 } from "./message-v2"
 import { Session } from "./session"
 import { SessionProcessor } from "./processor"
@@ -57,6 +58,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
   bypassAgentCheck: boolean
   messages: SessionV1.WithParts[]
   promptOps: TaskPromptOps
+  antiLoop?: AntiLoop.AntiLoop
 }) {
   const tools: Record<string, AITool> = {}
   const run = yield* EffectBridge.make()
@@ -140,6 +142,27 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
       ? ToolExecution.register(input.session.id, options.toolCallId, controller)
       : () => {}
     try {
+      if (input.antiLoop) {
+        const verdict = input.antiLoop.check(item.id, args)
+        if (verdict.action === "block") {
+          yield* Effect.logWarning("anti-loop block", {
+            "session.id": input.session.id,
+            "tool.name": verdict.tool,
+            signal: verdict.signal,
+            count: verdict.count,
+            threshold: verdict.threshold,
+            fatal: verdict.fatal,
+          })
+          if (verdict.fatal) yield* new AntiLoop.LoopAbortedError({ reason: verdict.reason })
+          return {
+            title: `Blocked repeated ${item.id} call`,
+            metadata: {
+              antiLoop: { signal: verdict.signal, count: verdict.count, threshold: verdict.threshold },
+            },
+            output: verdict.reason,
+          }
+        }
+      }
       const before = yield* plugin.trigger(
         "tool.execute.before",
         { tool: item.id, sessionID: input.session.id, callID: options.toolCallId },
@@ -181,7 +204,13 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
       const result = yield* ToolExecution.raceAbort(
         executionOptions.abortSignal,
         execution,
+      ).pipe(
+        Effect.tapError(() => {
+          input.antiLoop?.record(item.id, args, false)
+          return Effect.void
+        }),
       )
+      input.antiLoop?.record(item.id, args, true)
       if (parent) {
         const global = yield* plugin.trigger(
           "tool.execute.after",

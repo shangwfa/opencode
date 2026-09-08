@@ -4,11 +4,10 @@ import { Image } from "@/image/image"
 import { SessionV1 } from "@opencode-ai/core/v1/session"
 import { Cause, Deferred, Effect, Exit, Layer, Context, Scope, Schema } from "effect"
 import * as Stream from "effect/Stream"
-import { Agent } from "@/agent/agent"
 import { Config } from "@/config/config"
-import { Permission } from "@/permission"
 import { Plugin } from "@/plugin"
 import { Snapshot } from "@/snapshot"
+import { AntiLoop } from "./anti-loop"
 import { Session } from "./session"
 import { LLM } from "./llm"
 import { MessageV2 } from "./message-v2"
@@ -29,8 +28,6 @@ import { SessionPluginRuntime } from "@/plugin/session-plugin-runtime"
 import { Tool } from "@/tool/tool"
 import { ToolAttachment } from "@/tool/attachment"
 import { transitionRunningTool } from "./mark-timed-out"
-
-const DOOM_LOOP_THRESHOLD = 3
 
 // Partial tool arguments stream to live listeners as message.part.delta (field
 // "raw"). The deltas are throttled batches of the LLM-generated argument JSON;
@@ -107,9 +104,7 @@ const layer = Layer.effect(
     const session = yield* Session.Service
     const config = yield* Config.Service
     const snapshot = yield* Snapshot.Service
-    const agents = yield* Agent.Service
     const llm = yield* LLM.Service
-    const permission = yield* Permission.Service
     const plugin = yield* Plugin.Service
     const summary = yield* SessionSummary.Service
     const scope = yield* Scope.Scope
@@ -235,8 +230,16 @@ const layer = Layer.effect(
         const transitioned = yield* transitionRunningTool(part, match.part.state.time.start)
         if (!transitioned) return false
         yield* session.updatePart(part)
+        // Upstream semantics: a plain permission/question rejection stops the run
+        // unless `continue_loop_on_deny` opts out. CorrectedError (deny with feedback)
+        // intentionally keeps the run alive so the model can act on the feedback.
         if (error instanceof PermissionV1.RejectedError || error instanceof Question.RejectedError) {
           ctx.blocked = ctx.shouldBreak
+        }
+        // Anti-loop aborts stop the run unconditionally — `continue_loop_on_deny`
+        // is a permission-deny affordance and must not downgrade a doom-loop kill.
+        if (error instanceof AntiLoop.LoopAbortedError) {
+          ctx.blocked = true
         }
         yield* settleToolCall(toolCallID)
         return true
@@ -408,34 +411,6 @@ const layer = Layer.effect(
                 ? { ...value.providerMetadata, providerExecuted: true }
                 : value.providerMetadata,
             }))
-
-            const parts = yield* MessageV2.parts(ctx.assistantMessage.id).pipe(
-              Effect.provideService(Database.Service, database),
-            )
-            const recentParts = parts.slice(-DOOM_LOOP_THRESHOLD)
-
-            if (
-              recentParts.length !== DOOM_LOOP_THRESHOLD ||
-              !recentParts.every(
-                (part: any) =>
-                  part.type === "tool" &&
-                  part.tool === value.name &&
-                  part.state.status !== "pending" &&
-                  JSON.stringify(part.state.input) === JSON.stringify(input),
-              )
-            ) {
-              return
-            }
-
-            const agent = yield* agents.get(ctx.assistantMessage.agent)
-            yield* permission.ask({
-              permission: "doom_loop",
-              patterns: [value.name],
-              sessionID: ctx.assistantMessage.sessionID,
-              metadata: { tool: value.name, input },
-              always: [value.name],
-              ruleset: agent.permission,
-            })
             return
           }
 
@@ -788,9 +763,7 @@ export const node = LayerNode.make({
     Session.node,
     Config.node,
     Snapshot.node,
-    Agent.node,
     LLM.node,
-    Permission.node,
     Plugin.node,
     SessionSummary.node,
     SessionStatus.node,
