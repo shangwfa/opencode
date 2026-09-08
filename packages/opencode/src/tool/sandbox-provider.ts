@@ -672,17 +672,22 @@ export namespace SandboxProvider {
             try: () => sb.commands.createSession({ workingDirectory: options?.workingDirectory ?? "/workspace" }),
             catch: (e) => new Error(`Failed to create detached session: ${String(e)}`),
           })
-          try {
-            return yield* withExecTimeout(
-              Effect.tryPromise({
-                try: () => runCommandEarlyExit(sb, detachedSessionId, command, options, handlers, signal),
-                catch: (e) => new Error(`runDetached failed: ${String(e)}`),
-              }),
-              options?.timeoutSeconds,
-            )
-          } finally {
-            yield* Effect.tryPromise(() => sb.commands.deleteSession(detachedSessionId)).pipe(Effect.ignore)
+          // Detached commands are frequently long-lived (dev servers, LSP
+          // daemons): the SDK returns as soon as the command is launched, so
+          // "returned" does not mean "finished". execd's deleteSession kills
+          // every process in the session, which would terminate commands
+          // that are supposed to keep running (mirrors the pgLayer fix).
+          const result = yield* withExecTimeout(
+            Effect.tryPromise({
+              try: () => runCommandEarlyExit(sb, detachedSessionId, command, options, handlers, signal),
+              catch: (e) => new Error(`runDetached failed: ${String(e)}`),
+            }),
+            options?.timeoutSeconds,
+          )
+          if (result.error?.name === "TimeoutError") {
+            yield* Effect.tryPromise(() => sb.commands.interrupt(detachedSessionId)).pipe(Effect.ignore)
           }
+          return result
         }).pipe(Effect.withSpan("SandboxProvider.runDetached"))
 
       const interrupt: Interface["interrupt"] = (sessionID) =>
@@ -1743,6 +1748,13 @@ export namespace SandboxProvider {
                 log.warn("empty execution stream; command session likely stale", { sessionID, cmdSessionID })
                 return Effect.fail(new Error(`runInSession failed: command session ${cmdSessionID} not found (empty execution stream)`))
               }),
+              // exit 137（SIGKILL）在沙箱里几乎总是 cgroup 内存 OOM：内核直接杀进程，
+              // 不留 stdout/stderr，调用方只能看到模糊的连接失败——至少在服务端日志留下线索
+              Effect.tap((result) => {
+                if (result.exitCode !== 137) return Effect.void
+                log.warn("command killed by SIGKILL — likely sandbox memory OOM", { sessionID, sandboxID: sb.id, command: command.slice(0, 80) })
+                return Effect.void
+              }),
             )),
             options?.timeoutSeconds,
             // 外层预算覆盖排队等待 + 执行；执行超时走 TimeoutError 结果路径，此处 fail 多为纯排队超时
@@ -1794,17 +1806,19 @@ export namespace SandboxProvider {
             if (result.error?.name === "TimeoutError") {
               yield* Effect.tryPromise(() => sb.commands.interrupt(detachedSessionId)).pipe(Effect.ignore)
             }
+            if (result.exitCode === 137)
+              log.warn("detached command killed by SIGKILL — likely sandbox memory OOM", { sessionID, sandboxID: sb.id, command: command.slice(0, 80) })
             completed = true
             return result
           } finally {
             if (!completed) yield* Effect.tryPromise(() => sb.commands.interrupt(detachedSessionId)).pipe(Effect.ignore)
-            yield* withCommandOperationTimeout(
-              Effect.tryPromise(() => sb.commands.deleteSession(detachedSessionId)),
-              COMMAND_CLEANUP_TIMEOUT_SECONDS,
-              "delete detached command session",
-            ).pipe(Effect.ignore)
-            detached.delete(detachedSessionId)
-            if (detached.size === 0) detachedCommandSessions.delete(sessionID)
+            // Detached commands are frequently long-lived (dev servers, LSP
+            // daemons): the SDK returns as soon as the command is launched, so
+            // "returned" does not mean "finished". execd's deleteSession kills
+            // every process in the session, which would terminate commands
+            // that are supposed to keep running. Keep the session tracked in
+            // detachedCommandSessions; interrupt(), destroyAll and sandbox
+            // teardown reclaim it.
           }
         }).pipe(Effect.withSpan("SandboxProvider.runDetached")),
         )
