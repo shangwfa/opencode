@@ -383,6 +383,48 @@ curl -s -X POST "$BASE/session/$SID/exec/$NODE_EXEC_ID/kill" > /dev/null
 - Endpoint 直连访问返回正确 JSON
 - 证明 proxy 不限于前端 dev server，普通 Node.js API 服务同样可代理
 
+### T11.36 CSS 背景图（JS 内 url() 引用静态资源）
+
+> 模拟真实业务场景：组件内 `import BgPic from './assets/bg.png'` 后拼进 `style={{ backgroundImage: \`url(${BgPic})\` }}`。
+>
+> 坑：CSS 背景图的加载**不走 window.fetch patch**（浏览器资源加载），必须靠 rewriteJs 重写。Vite 将静态资源 import 编译为 `export default "/src/assets/bg.png"` 字符串，若未重写，运行时拼出无 prefix 路径，请求打到 SaaS 根路径——catch-all 返回 **200 + text/html**，图片解码失败背景空白（无 404，症状隐蔽）。
+
+```bash
+# 沙箱内准备：1x1 PNG + App.tsx 含 backgroundImage
+# PNG_B64 为 1x1 红色 PNG
+# App.tsx 关键行：
+#   import BgPic from './assets/bg.png'
+#   <div style={{ backgroundImage: `url(${BgPic})` }} />
+
+# 验证 1：bg.png?import 响应中 export default 已带 prefix
+curl -s "$BASE/session/$SID/proxy/5173/src/assets/bg.png?import" | head -1
+# 验证 2：重写后路径可取到真实 PNG
+BGURL=$(curl -s "$BASE/session/$SID/proxy/5173/src/assets/bg.png?import" | head -1 \
+  | python3 -c "import sys,re;print(re.search(r'\"([^\"]+)\"',sys.stdin.read()).group(1))")
+curl -s "$BASE$BGURL" | file - | grep -q PNG && echo "PNG OK"
+```
+
+**期望**：`export default "/session/{sid}/proxy/5173/src/assets/bg.png"`（带 prefix）；`$BASE$BGURL` 返回 200 + image/png 且为有效 PNG
+
+### T11.37 动态 import（含裸模块依赖）
+
+> 模拟真实业务场景：`await import('./lazy')` 与 `await import('lodash-es')`。
+>
+> 坑：Vite 将动态 import 编译为 `import("/src/lazy.ts")`——`import` 后是括号而非引号，rewriteJs 原有的 `(?:import|from)\s*(?:["'])` 正则匹配不到，路径不被重写。运行时模块请求打到 SaaS 根路径，catch-all 返回 200 + text/html，动态 import 因 MIME 不匹配抛 `Failed to fetch dynamically imported module`（同样无 404）。
+
+```bash
+# 沙箱内准备：src/lazy.ts 导出 lazyHello()，App.tsx 内两处动态 import
+# 验证 1：App.tsx 编译产物中 import("...") 路径带 prefix
+curl -s "$BASE/session/$SID/proxy/5173/src/App.tsx" | grep -o 'import("[^"]*")'
+# 验证 2：重写后路径可取到模块内容
+LAZYURL=$(curl -s "$BASE/session/$SID/proxy/5173/src/App.tsx" \
+  | grep -o 'import("[^"]*lazy[^"]*")' | head -1 \
+  | python3 -c "import sys,re;print(re.search(r'import\(\"([^\"]+)\"\)',sys.stdin.read()).group(1))")
+curl -s "$BASE$LAZYURL" | grep lazy-module-ok
+```
+
+**期望**：`import("/session/{sid}/proxy/5173/src/lazy.ts")`、`import("/session/{sid}/proxy/5173/node_modules/.vite/deps/lodash-es.js?v=…")` 均带 prefix；`$BASE$LAZYURL` 返回 200 + text/javascript 且内容正确
+
 ---
 
 ## 二、Endpoint 直连 API（T17.1–T17.6）
@@ -516,6 +558,8 @@ print('after kill:', d.get('error') or d.get('url'))
 | T11.33 | ✅ | 不存在端口 502 |
 | T11.34 | ✅ | 多端口均返回 direct URL |
 | T11.35 | ✅ | Node.js HTTP 服务 proxy/direct 均正确，JSON 不注入 patch |
+| T11.36 | ✅ | export default 资源路径重写，bg.png 200 + image/png |
+| T11.37 | ✅ | 动态 import 重写（本地模块 + 裸模块依赖均 200 + JS） |
 
 ### Endpoint 直连
 
@@ -529,6 +573,19 @@ print('after kill:', d.get('error') or d.get('url'))
 | T17.6 | ✅ | 销毁后 sandbox unreachable |
 
 > **验证环境**：组合 1（远端 PG + 远端 K8s Sandbox），2026-08-07 实测全量通过。T11.6 需先 `pnpm add react-router-dom`。T11.11 的 /about /contact 404 是 create-next-app 默认无此路由，非 proxy 问题（首页 200 已验证 Next.js 代理）。T17.5 直连注入检查中 `prefix=True` 表示"无注入"为 True（逻辑正确）。
+
+### 复测记录（2026-09-08，本地 PG + 远端 K8s Sandbox，T11.36/T11.37 修复验证）
+
+> 用户反馈业务项目经 proxy 访问时背景图与动态 import 加载失败（无 404，症状为解码/MIME 错误）。根因：`rewriteJs` 缺两类重写——`import("…")` 括号形式（静态 import 正则 `import\s*["']` 匹配不到括号）与 `export default "/…"` 资源字符串。修复于 `sandbox-proxy.ts` rewriteJs（含 `(?!prefix)` 防二次重写守卫），镜像 `proxy-rewrite2`。
+
+| 用例 | 修复前 | 修复后 |
+|------|--------|--------|
+| T11.36 bg.png?import 的 export default | `"/src/assets/bg.png"` 无 prefix；请求 200 + text/html（catch-all），图片解码失败、背景空白 | `"/session/{sid}/proxy/5173/src/assets/bg.png"`；200 + image/png，有效 PNG ✅ |
+| T11.37 `import("/src/lazy.ts")` | 无 prefix；200 + text/html，`Failed to fetch dynamically imported module` | 带 prefix；200 + text/javascript，模块内容正确 ✅ |
+| T11.37 `import("…/deps/lodash-es.js?v=…")` | 同上 | 带 prefix；200 + text/javascript ✅ |
+| 回归 | — | HTML 注入、静态 import 重写、@vite/client cache-bust、HMR 均正常 ✅ |
+
+> 另：本次复测期间在「远端 PG」配置下观察到 sandbox-proxy 部分路由（exec/proxy/endpoint）间歇性返回前端 SPA HTML 的现象，切换本地 PG 后未复现，疑似与远端 PG 连接质量相关，待后续单独排查。
 
 ### 复测记录（2026-08-31，组合 1：远端 PG + 远端 K8s Sandbox）
 

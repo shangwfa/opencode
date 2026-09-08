@@ -94,7 +94,7 @@ function __ocReport(errs){var img=new Image();img.src=P+"/__error_report?e="+enc
 
 const VITE_CLIENT_BUST = `oc=${Date.now().toString(36)}`
 
-function rewriteHtml(prefix: string, text: string) {
+export function rewriteHtml(prefix: string, text: string) {
   const htmlSrcHref = new RegExp("((?:src|href)\\s*=\\s*[\"'])/(?!/)", "g")
   let rewritten = text.replace(htmlSrcHref, `$1${prefix}/`)
   rewritten = rewritten.replace(`${prefix}/@vite/client`, `${prefix}/@vite/client?${VITE_CLIENT_BUST}`)
@@ -114,8 +114,14 @@ function rewriteHtml(prefix: string, text: string) {
   return rewritten
 }
 
-function rewriteJs(prefix: string, text: string, isViteClient = false) {
-  let rewritten = text.replace(new RegExp(`((?:import|from)\\s*(?:["']))/(?!/)`, "g"), `$1${prefix}/`)
+export function rewriteJs(prefix: string, text: string, isViteClient = false) {
+  const escapedPrefix = prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+  let rewritten = text.replace(new RegExp(`((?:import|from)\\s*(?:["']))/(?!/)(?!${escapedPrefix.slice(1)})`, "g"), `$1${prefix}/`)
+  // 动态 import("/x")：import 后是括号而非引号，静态 import 正则匹配不到
+  rewritten = rewritten.replace(new RegExp(`(import\\s*\\(\\s*(["']))/(?!/)(?!${escapedPrefix.slice(1)})`, "g"), `$1${prefix}/`)
+  // Vite 静态资源 import 编译产物：export default "/src/assets/x.png"（运行时拼进 style/src，
+  // 浏览器资源加载不走 fetch patch，必须在这里重写）
+  rewritten = rewritten.replace(new RegExp(`(export\\s+default\\s*(["']))/(?!/)(?!${escapedPrefix.slice(1)})`, "g"), `$1${prefix}/`)
   rewritten = rewritten.replace(/__webpack_require__\.p\s*=\s*"\/(?!\/)/g, `__webpack_require__.p="${prefix}/`)
   rewritten = rewritten.replace(/__HMR_BASE__/g, JSON.stringify(prefix + "/"))
   rewritten = rewritten.replace(/__BASE__/g, JSON.stringify(prefix + "/"))
@@ -136,7 +142,6 @@ function rewriteJs(prefix: string, text: string, isViteClient = false) {
   // （见 INJECT_SCRIPT）作为 BrowserRouter basename 适配代理前缀
   // 模块 import 的 /@vite/client 与 HTML script 引用统一 cache-bust，
   // 避免浏览器用旧缓存 client（base 无代理前缀）处理 HMR 消息
-  const escapedPrefix = prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
   rewritten = rewritten.replace(
     new RegExp(`(${escapedPrefix}/@vite/client)(?!\\?)`, "g"),
     `$1?${VITE_CLIENT_BUST}`,
@@ -144,7 +149,7 @@ function rewriteJs(prefix: string, text: string, isViteClient = false) {
   return rewritten
 }
 
-function rewriteCss(prefix: string, text: string) {
+export function rewriteCss(prefix: string, text: string) {
   return text.replace(/(url\s*\(\s*["']?)\//g, `$1${prefix}/`)
 }
 
