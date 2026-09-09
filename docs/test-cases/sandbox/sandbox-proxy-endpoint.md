@@ -512,6 +512,58 @@ print('after kill:', d.get('error') or d.get('url'))
 
 ---
 
+## 二A、预览异常可观测性（T11.38–T11.39）
+
+> 预览不可访问（沙箱被 idle-reap 回收 / dev 进程死亡 / OOM）时，接口层不再静默：
+> - **endpoint 502**：服务端 WARN 日志 + **写入 exec_log**（`source="preview"`，command=`preview-down port=N <原因>`，error 带 `PreviewUnreachable` JSON）；同一 session:port **60s 节流**（重复调用不刷表）
+> - **proxy 502**：服务端 WARN 日志；**不写 exec_log**（proxy 是热路径，每个资源请求都可能 502，落库会灌爆）；直连失败/上游 5xx 时响应体带 `diagnostics`（端口监听 / cgroup oom_kill / dmesg / hint），proxyHttp 经 `onDown` 回调上报的逻辑已收敛至 endpoint 单点
+
+### T11.38 预览不可访问 → endpoint 落库 exec_log + 节流 + proxy 静默
+
+```bash
+# 1. 创建无沙箱会话（不 boot —— 沙箱不存在即 502 场景）
+NEWSID=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -d '{}' \
+  | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+
+# 2. endpoint 502 → exec_log 落 1 条
+curl -s -o /dev/null "$BASE/session/$NEWSID/endpoint/5174"
+sleep 2
+PGSQL_1=$(psql "$PG_URL" -t -A -c "SELECT count(*) FROM exec_log WHERE session_id='$NEWSID' AND source='preview';")
+
+# 3. proxy 502 ×2 → 不落库（热路径），仅服务端 WARN
+curl -s -o /dev/null "$BASE/session/$NEWSID/proxy/5174/"
+curl -s -o /dev/null "$BASE/session/$NEWSID/proxy/5174/"
+sleep 2
+PGSQL_2=$(psql "$PG_URL" -t -A -c "SELECT count(*) FROM exec_log WHERE session_id='$NEWSID' AND source='preview';")
+
+echo "endpoint 落库: $PGSQL_1 (期望 1)"
+echo "proxy 后仍在: $PGSQL_2 (期望仍 1)"
+docker logs opencode-saas-test 2>&1 | grep -E "sandbox-proxy.*(endpoint|proxy): sandbox unreachable" | tail -2
+
+# 4. 记录内容检查
+psql "$PG_URL" -c "SELECT id, source, status, command, error FROM exec_log WHERE session_id='$NEWSID' AND source='preview';"
+```
+**期望**：
+- 步骤 2/3：`endpoint 落库: 1`，`proxy 后仍在: 1`（60s 节流内重复调用不增加；proxy 不落库）
+- `docker logs` 有 `service=sandbox-proxy ... endpoint: sandbox unreachable (recycled, starting, or gone)` 与 `proxy: sandbox unreachable ...` WARN
+- 记录字段：`source=preview`、`status=failed`、`command="preview-down port=5174 sandbox unreachable..."`、`error={"name":"PreviewUnreachable","port":5174,...}`
+
+### T11.39 沙箱存活时 endpoint/proxy 正常 — 无落库无误报
+
+```bash
+# boot 沙箱后重复 T11.38 的 endpoint/proxy 访问
+curl -s -X POST "$BASE/session/$NEWSID/keep-alive" -H 'Content-Type: application/json' -d '{"enabled":true,"boot":true}' > /dev/null
+sleep 8
+curl -s -o /dev/null -w "endpoint=%{http_code}\n" "$BASE/session/$NEWSID/endpoint/5174"
+curl -s -o /dev/null -w "proxy=%{http_code}\n" "$BASE/session/$NEWSID/proxy/5174/"
+sleep 2
+PGSQL_3=$(psql "$PG_URL" -t -A -c "SELECT count(*) FROM exec_log WHERE session_id='$NEWSID' AND source='preview';")
+echo "存活时落库: $PGSQL_3 (期望仍 1, 无新增)"
+```
+**期望**：endpoint/proxy 均 200；exec_log 计数不变（存活时不产生 preview-down 记录，无误报）
+
+---
+
 ## 三、Dev Server 生命周期最佳实践
 
 > 详见 [`exec-api.md`](./exec-api.md) T19.x。此处仅列出 proxy/endpoint 相关的关键约束。
@@ -571,6 +623,13 @@ print('after kill:', d.get('error') or d.get('url'))
 | T17.4 | ✅ | 直连 200, 无 proxy 注入 |
 | T17.5 | ✅ | Proxy 3699 字节 + 注入; Direct 621 字节 + 无注入 |
 | T17.6 | ✅ | 销毁后 sandbox unreachable |
+
+### 预览异常可观测性
+
+| 用例 | 结果 | 说明 |
+|------|------|------|
+| T11.38 | ✅ | 2026-09-09 组合 1（镜像 `preview-diag4`）实测：无沙箱 session `ses_f7b4e28c4ffeECVIHpfmpyYJMc`，endpoint 502 → exec_log 落 1 条（source=preview，error=PreviewUnreachable JSON）；proxy 502×2 不落库；docker logs 出现 endpoint/proxy 两条 WARN |
+| T11.39 | ⏳ | 沙箱存活时无误报——用例已定义，待执行（同环境 boot 沙箱后 endpoint/proxy 均 200，exec_log 计数不变） |
 
 > **验证环境**：组合 1（远端 PG + 远端 K8s Sandbox），2026-08-07 实测全量通过。T11.6 需先 `pnpm add react-router-dom`。T11.11 的 /about /contact 404 是 create-next-app 默认无此路由，非 proxy 问题（首页 200 已验证 Next.js 代理）。T17.5 直连注入检查中 `prefix=True` 表示"无注入"为 True（逻辑正确）。
 
