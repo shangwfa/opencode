@@ -1221,9 +1221,27 @@ export namespace SandboxProvider {
               Effect.catchCause(() => Effect.void),
             )
           }
-          yield* Effect.tryPromise(() => sb.commands.run("git config --global core.fsmonitor true && git config --global core.untrackedcache true")).pipe(
-            Effect.catchCause(() => Effect.void),
-          )
+          // pnpm 在 HOME 与 /workspace 跨文件系统时会把 store 落进 /workspace/.pnpm-store（硬链接需同盘），
+          // 业务 .gitignore 普遍缺该条目 → untracked 爆炸 → vcs diff 502。
+          // 修复（与 docs/shared-package-cache-design.md 对齐）：全局 npmrc 把 store 指到共享
+          // package-cache 挂载（PVC 模式 subPath=shared/package-cache，跨 session 共享下载缓存；
+          // none/snapshot 模式下为 rootfs 目录，不共享但同样不落 git 树）——install 命令
+          // 不再依赖调用方手动拼 --store-dir。旧 store 残留只做后台 rm（跨 NFS 挂载 mv 是
+          // 全量 copy，会阻塞 boot）。excludesfile 为第二道防线，不侵入业务 .gitignore。
+          // 幂等：grep 防重追加、printf 覆盖写、rm 条件执行，沙箱每次重建可安全重跑
+          yield* Effect.tryPromise(() =>
+            sb.commands.run(
+              [
+                "mkdir -p /home/sandbox",
+                "git config --global core.fsmonitor true",
+                "git config --global core.untrackedcache true",
+                "git config --global core.excludesfile /home/sandbox/.gitignore-global",
+                "printf '.pnpm-store/\\n' > /home/sandbox/.gitignore-global",
+                `grep -q '^store-dir=' /root/.npmrc 2>/dev/null || echo 'store-dir=${config.packageCacheMount}' >> /root/.npmrc`,
+                "[ -d /workspace/.pnpm-store ] && setsid nohup rm -rf /workspace/.pnpm-store >/dev/null 2>&1 </dev/null &",
+              ].join("; "),
+            ),
+          ).pipe(Effect.catchCause(() => Effect.void))
           const timeFinished = Date.now()
           yield* Effect.tryPromise({
             try: () =>

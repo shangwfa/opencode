@@ -746,6 +746,33 @@ print('originalError kept:','Could not connect' in (d.get('originalError') or ''
 - 步骤 1：`running=200`（正常路径回归）
 - 步骤 2：HTTP 502，`error="sandbox process unreachable"`，`diagnostics.portListening=false`，`hint` 给出明确指引；若为 OOM 死亡则 `oomKillCount`/`lastKilled` 有值且 hint 提示内存不足；`originalError` 保留上游原始错误
 
+### T19.25 沙箱 boot 初始化：pnpm store 迁出 git 树 + 全局 exclude 兜底
+
+> 背景：pnpm 在 HOME 与 /workspace 跨文件系统时把 store 落进 `/workspace/.pnpm-store`（硬链接需同盘），业务 .gitignore 普遍缺该条目 → untracked 爆炸 → vcs diff 502（ses_f810f46a、ses_f7a07a06 两次踩坑，靠 AI/平台事后补 .gitignore，还被 Harness Bot 提交进业务 git 历史）。
+> 修复（对齐 `docs/shared-package-cache-design.md`）：createSandbox 初始化命令把全局 npmrc 的 store-dir 指到共享 package-cache 挂载（`OPENCODE_SANDBOX_PACKAGE_CACHE_MOUNT`，默认 `/opt/pnpm-store`），并配全局 excludesfile 兜底；install 命令不再依赖调用方手动拼 `--store-dir`。
+
+```bash
+# 1. 新建会话（触发 createSandbox），验证初始化配置就位
+SID=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' \
+  -d "{\"directory\":\"/workspace\",\"title\":\"boot-init\"}" | python3 -c "import json,sys; print(json.load(sys.stdin)['id'])")
+curl -s -X POST $BASE/session/$SID/exec -H 'Content-Type: application/json' \
+  -d '{"command":"cat /root/.npmrc; echo ---; cat /home/sandbox/.gitignore-global; echo ---; git config --global core.excludesfile","timeoutSeconds":30}' | python3 -c "import json,sys; print(json.load(sys.stdin)['stdout'])"
+
+# 2. 跑一次 pnpm install，验证 store 不落 workspace
+# 注意：不吞 stderr、显式看 exit code——install 失败时"无 .pnpm-store"是假阳性（初版验证踩过此坑）
+curl -s --max-time 120 -X POST $BASE/session/$SID/exec -H 'Content-Type: application/json' \
+  -d '{"command":"cd /workspace && printf \"{\\\"name\\\":\\\"t\\\",\\\"version\\\":\\\"1.0.0\\\"}\\n\" > package.json && pnpm add is-even 2>&1 | tail -3; ls -d /workspace/.pnpm-store 2>/dev/null && echo BAD_STORE_IN_WORKSPACE || echo STORE_NOT_IN_WORKSPACE; pnpm store path","timeoutSeconds":110}' | python3 -c "import json,sys; print(json.load(sys.stdin)['stdout'])"
+
+# 3. vcs/diff 不受 untracked 拖累（秒回）
+time curl -s -o /dev/null -w "diff=%{http_code}\n" "$BASE/session/$SID/vcs/status?directory=%2Fworkspace"
+```
+**期望**：
+- 步骤 1：`/root/.npmrc` 含 `store-dir=/opt/pnpm-store`；`.gitignore-global` 含 `.pnpm-store/`；`core.excludesfile=/home/sandbox/.gitignore-global`
+- 步骤 2：pnpm 输出 `Done in ...`（install 真实成功）；`STORE_NOT_IN_WORKSPACE`；`pnpm store path` 指向共享挂载
+- 步骤 3：diff/status 快速返回（无 502/超时）
+
+> 实测备注：store（共享 NFS 挂载）与 /workspace 跨挂载点，硬链接 EXDEV（实测 `ln` 报 Invalid cross-device link），pnpm 自动降级 copy 模式（node_modules 文件 `stat %h` = 1）——跨会话共享下载缓存的既有代价，非本次引入。
+
 ### 单测（bun test，非 HTTP 集成）
 
 ```bash
@@ -758,8 +785,13 @@ bun test test/server/sandbox-diag.test.ts
 # 需本地 PG opencode_test 库（migration-pg 已应用）；lifecycle mock 内嵌于测试文件
 OPENCODE_DATABASE_URL=postgresql://local@127.0.0.1:5432/opencode_test \
   bun test test/tool/sandbox-detached-keepalive.test.ts
+
+# boot 初始化命令断言（2 用例：store 迁共享挂载 + excludesfile 全量配置 / 配置段 "; " 连接不短路）
+# 同上需本地 PG opencode_test 库；lifecycle mock 捕获 POST /command 下发的命令
+OPENCODE_DATABASE_URL=postgresql://local@127.0.0.1:5432/opencode_test \
+  bun test test/tool/sandbox-boot-init.test.ts
 ```
-**期望**：17/17、3/3 全 pass。T1 断言 `sessionDeletes == []` 是本次修复的行为锚点——编辑事故（修复未落盘）正是被它暴露的。
+**期望**：17/17、3/3、2/2 全 pass。keepalive T1 断言 `sessionDeletes == []` 是该修复的行为锚点——编辑事故（修复未落盘）正是被它暴露的。
 
 ---
 
@@ -793,6 +825,7 @@ OPENCODE_DATABASE_URL=postgresql://local@127.0.0.1:5432/opencode_test \
 | T19.22 | ✅ | 2026-09-08 本地组合 1（远端 PG+远端沙箱，镜像 `oom-diag`）实测：session `ses_f810f46acffe2Ft0hJH4F7EnNp`，sleep 45 完整跑完 `completed exit=0 stdout=LONG-DONE` 同类验证；修复前同路径进程启动即被杀（exec-837 VITE ready→Killed 137） |
 | T19.23 | ✅ | 2026-09-08 同环境实测：`sh -c 'kill -9 $$'` → `{exitCode:137, signal:"SIGKILL", oomSuspected:true}`；容器日志出现 `command killed by SIGKILL — likely sandbox memory OOM` |
 | T19.24 | ✅ | 2026-09-08/09 组合 1 实测（v2/v4 镜像各一轮）：dev 运行时 proxy 200（正常路径回归）；pkill 后 502 响应含 `diagnostics.portListening=false` + hint + `originalError`（保留上游错误）。OOM 场景 `lastKilled` 来自 dmesg、`oomKillCount` 来自 cgroup（v2 memory.events / v1 memory.oom_control，缺失时为 null） |
+| T19.25 | ✅ | 2026-09-09 组合 1 实测（镜像 `boot-init`）：新会话 `ses_f798519a9ffeYGzul0XZ96NNy3` boot 后 `/root/.npmrc` 含 `store-dir=/opt/pnpm-store`、`pnpm store path`=`/opt/pnpm-store/v10`、excludesfile 就位；`pnpm add is-even` 真实成功（Done in 1s）后 `STORE_NOT_IN_WORKSPACE`，`git status` 21ms、vcs/diff 200（0.49s）。初版验证曾假阳性（坏 package.json + 吞 stderr 导致 install 失败被误判通过），已修正用例命令并复测。旧会话 `ses_f7a07a06` kill-sandbox 重建后新配置生效，1.2GB 旧 store 由 setsid 后台 rm 渐进清理（实测进程存活） |
 
 **本轮全量回归环境**：宿主机 opencode server `127.0.0.1:14097`，PG auth，OpenSandbox Docker runtime `127.0.0.1:8080`，sandbox image `opencode-opensandbox:local`，`OPENCODE_SANDBOX_USE_SERVER_PROXY=false`。
 
