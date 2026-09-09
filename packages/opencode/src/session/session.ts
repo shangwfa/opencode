@@ -483,6 +483,8 @@ export interface Interface {
   readonly setDirectory: (input: { sessionID: SessionID; directory: string }) => Effect.Effect<void>
   readonly setArchived: (input: { sessionID: SessionID; time?: number }) => Effect.Effect<void>
   readonly setMetadata: (input: typeof SetMetadataInput.Type) => Effect.Effect<void>
+  /** 更新会话沙箱资源（下次创建沙箱生效）；传 null 清除配置回退默认值 */
+  readonly setSandboxResource: (input: { sessionID: SessionID; sandbox: Info["sandbox"] | null }) => Effect.Effect<void>
   readonly setAgentModel: (input: {
     sessionID: SessionID
     agent: string
@@ -895,6 +897,13 @@ export const layer: Layer.Layer<
       yield* patch(input.sessionID, { metadata: input.metadata, time: { updated: Date.now() } }).pipe(Effect.orDie)
     })
 
+    const setSandboxResource = Effect.fn("Session.setSandboxResource")(function* (input: {
+      sessionID: SessionID
+      sandbox: Info["sandbox"] | null
+    }) {
+      yield* patch(input.sessionID, { sandbox: input.sandbox ?? undefined, time: { updated: Date.now() } }).pipe(Effect.orDie)
+    })
+
     const setAgentModel = Effect.fn("Session.setAgentModel")(function* (input: {
       sessionID: SessionID
       agent: string
@@ -1055,6 +1064,7 @@ export const layer: Layer.Layer<
       setDirectory,
       setArchived,
       setMetadata,
+      setSandboxResource,
       setAgentModel,
       setPermission,
       setRevert,

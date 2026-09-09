@@ -403,6 +403,14 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       if (ctx.payload.time?.archived !== undefined) {
         yield* session.setArchived({ sessionID: ctx.params.sessionID, time: ctx.payload.time.archived })
       }
+      if (ctx.payload.sandbox !== undefined) {
+        yield* session.setSandboxResource({ sessionID: ctx.params.sessionID, sandbox: ctx.payload.sandbox })
+        // recreate=true：销毁当前沙箱，下次访问按新资源重建（PVC 数据保留，进程丢失）
+        if (ctx.payload.recreate === true) {
+          const sandboxProvider = Option.getOrUndefined(yield* Effect.serviceOption(SandboxProvider.Service))
+          if (sandboxProvider) yield* sandboxProvider.destroy(ctx.params.sessionID)
+        }
+      }
       yield* logAction(ctx.params.sessionID, "patch", ctx.payload)
       return yield* requireSession(ctx.params.sessionID)
     })

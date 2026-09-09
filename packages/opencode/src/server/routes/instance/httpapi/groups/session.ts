@@ -65,6 +65,10 @@ export const UpdatePayload = Schema.Struct({
   directory: Schema.optional(Schema.String),
   metadata: Schema.optional(Session.Metadata),
   permission: Schema.optional(PermissionV1.Ruleset),
+  /** 更新沙箱资源配置（下次创建沙箱生效）；配合 recreate=true 可销毁重建立即生效 */
+  sandbox: Schema.optional(Session.SandboxResource),
+  /** 更新 sandbox 时是否同时销毁当前沙箱（重建后按新资源创建，PVC 数据保留） */
+  recreate: Schema.optional(Schema.Boolean),
   time: Schema.optional(
     Schema.Struct({
       archived: Schema.optional(Session.ArchivedTimestamp),

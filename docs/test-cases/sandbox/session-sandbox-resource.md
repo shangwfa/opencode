@@ -427,6 +427,63 @@ curl -s --max-time 60 -X POST $BASE/session/$SID/exec -H 'Content-Type: applicat
 
 ---
 
+## 六、修改存量会话资源 — PATCH /session/:id
+
+> T29.14/T29.15 的资源调整此前依赖 PG 直改（`UPDATE session SET sandbox=...`）——不可规模化且绕过 API。现提供正式接口：`PATCH /session/:id` 的 payload 新增 `sandbox`（复用创建时的 SandboxResource schema）与 `recreate` 字段。
+>
+> - `sandbox` 单独使用：仅更新配置，**下次创建沙箱时生效**（不动当前实例）
+> - `sandbox` + `recreate: true`：更新配置并立即销毁当前沙箱，下次访问按新资源重建（PVC 数据保留，进程丢失）
+
+### T29.16 PATCH 修改存量会话资源 + recreate 重建验证
+
+```bash
+# 1. 创建 512Mi 会话并 boot
+SID=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' \
+  -d '{"sandbox":{"cpu":"1","memory":"512Mi"}}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+curl -s -X POST $BASE/session/$SID/keep-alive -H 'Content-Type: application/json' -d '{"enabled":true,"boot":true}' > /dev/null
+sleep 8
+curl -s --max-time 15 -X POST $BASE/session/$SID/exec -H 'Content-Type: application/json' \
+  -d '{"command":"cat /sys/fs/cgroup/memory/memory.limit_in_bytes","timeoutSeconds":10}' \
+  | python3 -c "import json,sys;print('before:',round(int(json.load(sys.stdin)['stdout'].strip())/1048576),'MB')"
+
+# 2. PATCH 升级资源 + recreate（销毁当前沙箱）
+curl -s -X PATCH "$BASE/session/$SID" -H 'Content-Type: application/json' \
+  -d '{"sandbox":{"cpu":"2","memory":"4Gi","persistMode":"pvc"},"recreate":true}' \
+  | python3 -c "import json,sys;d=json.load(sys.stdin);print('API sandbox:',json.dumps(d.get('sandbox')))"
+
+# 3. 重建后 cgroup 验证（exec 会自动按新配置 getOrCreate）
+sleep 3
+curl -s -X POST $BASE/session/$SID/keep-alive -H 'Content-Type: application/json' -d '{"enabled":true,"boot":true}' > /dev/null
+sleep 8
+curl -s --max-time 15 -X POST $BASE/session/$SID/exec -H 'Content-Type: application/json' \
+  -d '{"command":"cat /sys/fs/cgroup/memory/memory.limit_in_bytes","timeoutSeconds":10}' \
+  | python3 -c "import json,sys;print('after:',round(int(json.load(sys.stdin)['stdout'].strip())/1048576),'MB')"
+
+# 4. 审计：patch 动作已入 exec_log（source="patch"）
+psql "$PG_URL" -c "SELECT left(command,80) FROM exec_log WHERE session_id='$SID' AND source='patch' ORDER BY time_created DESC LIMIT 1;"
+```
+**期望**：
+- 步骤 1：`before: 512MB`
+- 步骤 2：响应 `sandbox={"cpu":"2","memory":"4Gi","persistMode":"pvc"}`（持久化 ✅），旧沙箱 destroyed
+- 步骤 3：`after: 4096 MB`（新资源生效）
+- 步骤 4：exec_log 有 `{"sandbox":...,"recreate":true}` 审计记录
+
+### T29.17 仅更新配置（不带 recreate）— 当前沙箱不受影响
+
+```bash
+# 当前沙箱（4Gi）运行中，仅改配置为 2Gi → 当前实例不变，下次创建按 2Gi
+curl -s -X PATCH "$BASE/session/$SID" -H 'Content-Type: application/json' \
+  -d '{"sandbox":{"cpu":"1","memory":"2Gi"}}' > /dev/null
+sleep 1
+curl -s --max-time 15 -X POST $BASE/session/$SID/exec -H 'Content-Type: application/json' \
+  -d '{"command":"cat /sys/fs/cgroup/memory/memory.limit_in_bytes","timeoutSeconds":10}' \
+  | python3 -c "import json,sys;print('current cgroup:',round(int(json.load(sys.stdin)['stdout'].strip())/1048576),'MB (应仍为 4096)')"
+psql "$PG_URL" -t -c "SELECT sandbox::text FROM session WHERE id='$SID';"
+```
+**期望**：当前沙箱 cgroup 仍为 4096MB（不受影响）；PG session.sandbox 已更新为 2Gi（下次创建生效）
+
+---
+
 ## 结果汇总
 
 | 用例 | 状态 | 说明 |
@@ -446,6 +503,8 @@ curl -s --max-time 60 -X POST $BASE/session/$SID/exec -H 'Content-Type: applicat
 | T29.13 | ✅ | Info/CreateInput/toRow 单元测试 |
 | T29.14 | ✅ | 2026-09-08 组合 1（镜像 `oom-diag-v2`）实测：session `ses_f7edeca9affeTOE39fEL0yizqA`（512Mi），`tail /dev/zero` → `{exitCode:137, signal:SIGKILL, oomSuspected:true}` + 本次 WARN 日志。注意：node Array 撞 V8 堆、dd 撞 tmpfs size 都触发不了 cgroup OOM，`tail /dev/zero` 是确定性触发器 |
 | T29.15 | ✅ | 2026-09-08 同环境实测：UPDATE 4Gi + kill-sandbox 重建后 cgroup=4294967296，Buffer 1.6GB 分配 `exit=0 mem-allocated-ok`（旧 512Mi 必死） |
+| T29.16 | ✅ | 2026-09-09 组合 1（镜像 `preview-diag3`）实测：session `ses_f7edeca9affeTOE39fEL0yizqA`，PATCH `{sandbox:2cpu/4Gi, recreate:true}` → PG 持久化 ✅ → 旧沙箱销毁 → 重建后 cgroup=4096MB ✅ → exec_log 审计记录 ✅ |
+| T29.17 | ⏳ | 仅更新配置不带 recreate（当前实例不受影响）——用例已定义，待执行 |
 
 ---
 
