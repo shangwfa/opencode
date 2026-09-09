@@ -118,8 +118,10 @@ export function rewriteHtml(prefix: string, text: string) {
 export function rewriteJs(prefix: string, text: string, isViteClient = false) {
   const escapedPrefix = prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
   let rewritten = text.replace(new RegExp(`((?:import|from)\\s*(?:["']))/(?!/)(?!${escapedPrefix.slice(1)})`, "g"), `$1${prefix}/`)
-  // 动态 import("/x")：import 后是括号而非引号，静态 import 正则匹配不到
-  rewritten = rewritten.replace(new RegExp(`(import\\s*\\(\\s*(["']))/(?!/)(?!${escapedPrefix.slice(1)})`, "g"), `$1${prefix}/`)
+  // 动态 import("/x")：import 后是括号而非引号，静态 import 正则匹配不到。
+  // 括号内可能出现 /* @vite-ignore */ 块注释（react-refresh 异步加载 react-dom 的产物），
+  // 需允许"空白/注释"混合后再接引号。
+  rewritten = rewritten.replace(new RegExp(`(import\\s*\\(\\s*(?:/\\*[\\s\\S]*?\\*/\\s*)*(["']))/(?!/)(?!${escapedPrefix.slice(1)})`, "g"), `$1${prefix}/`)
   // Vite 静态资源 import 编译产物：export default "/src/assets/x.png"（运行时拼进 style/src，
   // 浏览器资源加载不走 fetch patch，必须在这里重写）
   rewritten = rewritten.replace(new RegExp(`(export\\s+default\\s*(["']))/(?!/)(?!${escapedPrefix.slice(1)})`, "g"), `$1${prefix}/`)
@@ -177,7 +179,6 @@ function headersToRecord(headers: Headers): Record<string, string> {
   return obj
 }
 
-const MAX_BODY = 5 * 1024 * 1024
 const PathParams = Schema.Struct({ sessionID: SessionID, port: Schema.String })
 const SessionParams = Schema.Struct({ sessionID: SessionID })
 const SandboxParams = Schema.Struct({ sandboxID: Schema.String })
@@ -1289,6 +1290,10 @@ function proxyHttp(
       }
     }
     outHeaders.set("Accept-Encoding", "identity")
+    // 开发态预览零缓存：剥掉浏览器协商头，强制上游返回 200 全量内容——
+    // 304 会让浏览器沿用磁盘缓存的旧模块（引用已消失的 deps chunk → MIME 拒执行 → 空白）
+    outHeaders.delete("if-none-match")
+    outHeaders.delete("if-modified-since")
 
     const sourceBody = request.source instanceof Request ? request.source.body : null
     const reqBody = ["GET", "HEAD"].includes(request.method) ? undefined : sourceBody
@@ -1315,6 +1320,13 @@ function proxyHttp(
     for (const h of ["transfer-encoding", "connection", "keep-alive", "proxy-connection", "upgrade", "te", "trailer", "date", "server", "content-encoding"]) {
       resHeaders.delete(h)
     }
+    // 开发态预览零缓存（响应侧）：vite 对 deps 发 max-age=31536000,immutable，
+    // 配合 304 协商会让浏览器沿用旧编译产物引用已删除的 chunk（MIME 拒执行、
+    // 页面空白且 immutable 一年无法自愈）。统一 no-store + 削掉全部协商凭据。
+    resHeaders.set("cache-control", "no-cache, no-store, must-revalidate")
+    resHeaders.delete("etag")
+    resHeaders.delete("last-modified")
+    resHeaders.delete("expires")
     // 预览页面常被平台前端跨域 iframe 嵌入：显式放行跨域资源与嵌入
     // （允许嵌入的正确方式是不发送 X-Frame-Options，ALLOWALL 等值非标准且部分浏览器按 DENY 处理）
     for (const h of ["x-frame-options", "cross-origin-resource-policy", "cross-origin-embedder-policy"]) {
@@ -1354,7 +1366,8 @@ function proxyHttp(
 
     if (contentType.includes("text/html")) {
       const text = yield* Effect.tryPromise(() => res.text())
-      const rewritten = text.length > MAX_BODY ? text : rewriteHtml(prefix, text)
+      // 超大 HTML 跳过注入可能丢 baseroute/prefix 变量，阈值放宽到 20MB 保证常规页面全覆盖
+      const rewritten = text.length > 20 * 1024 * 1024 ? text : rewriteHtml(prefix, text)
       if (res.status >= 400) {
         push(sessionID, port, [{
           type: "network", message: `HTTP ${res.status} ${res.statusText} for ${subPath}`,
@@ -1372,8 +1385,10 @@ function proxyHttp(
     if (isJs) {
       const text = yield* Effect.tryPromise(() => res.text())
       const isViteClient = subPath === "/@vite/client" || target.pathname.endsWith("/@vite/client")
-      if (isViteClient) resHeaders.set("cache-control", "no-cache")
-      const rewritten = text.length > MAX_BODY ? text : rewriteJs(prefix, text, isViteClient)
+      // JS 模块必须无条件重写：import 引用重写是正确性问题（漏重写 → 根路径请求 →
+      // SPA HTML → Strict MIME 拒执行 → 页面空白）。vite 预构建巨型 chunk 可达数 MB
+      // （本项目实测 7.6MB tiptap chunk），绝不能因体积跳过；正则只扫 import 语句，开销可忽略。
+      const rewritten = rewriteJs(prefix, text, isViteClient)
       return HttpServerResponse.text(rewritten, {
         status: res.status, statusText: res.statusText || undefined,
         headers: headersToRecord(resHeaders),
@@ -1383,7 +1398,7 @@ function proxyHttp(
     const isCss = contentType.includes("text/css") || /\.css(?:\?|$)/.test(target.pathname)
     if (isCss) {
       const text = yield* Effect.tryPromise(() => res.text())
-      const rewritten = text.length > MAX_BODY ? text : rewriteCss(prefix, text)
+      const rewritten = text.length > 20 * 1024 * 1024 ? text : rewriteCss(prefix, text)
       return HttpServerResponse.text(rewritten, {
         status: res.status, statusText: res.statusText || undefined,
         headers: headersToRecord(resHeaders),
