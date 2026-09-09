@@ -746,25 +746,6 @@ print('originalError kept:','Could not connect' in (d.get('originalError') or ''
 - 步骤 1：`running=200`（正常路径回归）
 - 步骤 2：HTTP 502，`error="sandbox process unreachable"`，`diagnostics.portListening=false`，`hint` 给出明确指引；若为 OOM 死亡则 `oomKillCount`/`lastKilled` 有值且 hint 提示内存不足；`originalError` 保留上游原始错误
 
-### T19.25 exec/async 常驻进程存活 — 本地 OpenSandbox（组合 2/3）复测
-
-> runDetached 的 deleteSession 杀进程 bug 在 **local layer（内存态实现）与 pgLayer 各有一份**，两处已同步修复（正常完成保活、超时才 interrupt）。组合 1（远端 K8s 沙箱）由 T19.22 覆盖，本用例验证组合 2/3（本地 OpenSandbox Docker runtime）下的 local layer。
-
-```bash
-# 前置：按 docs/local-test-env.md 组合 2/3 启动（本地 OpenSandbox server :8080 + 对应镜像）
-# 1. async 拉起常驻命令
-EXEC=$(curl -s -X POST $BASE/session/$SID/exec/async -H 'Content-Type: application/json' \
-  -d '{"command":"sleep 60; echo LOCAL-LAYER-DONE","timeoutSeconds":0,"workingDirectory":"/workspace"}' \
-  | python3 -c "import json,sys;print(json.load(sys.stdin)['execId'])")
-
-# 2. 中途回查（仍在 running，进程未被 deleteSession 清理）
-sleep 20 && curl -s $BASE/session/$SID/exec/$EXEC | python3 -c "import json,sys;d=json.load(sys.stdin);print('mid status:',d['status'])"
-
-# 3. 等待完整跑完
-sleep 45 && curl -s $BASE/session/$SID/exec/$EXEC | python3 -c "import json,sys;d=json.load(sys.stdin);print('final:',d['status'],d['exitCode'],d.get('stdout','').strip())"
-```
-**期望**：`mid status=running`；`final: completed 0 LOCAL-LAYER-DONE`
-
 ### 单测（bun test，非 HTTP 集成）
 
 ```bash
@@ -811,8 +792,7 @@ OPENCODE_DATABASE_URL=postgresql://local@127.0.0.1:5432/opencode_test \
 | T19.21 | ⏳ | exec_log stdout 64KB 截断 + `...[truncated]` 标记——用例已定义，待执行 |
 | T19.22 | ✅ | 2026-09-08 本地组合 1（远端 PG+远端沙箱，镜像 `oom-diag`）实测：session `ses_f810f46acffe2Ft0hJH4F7EnNp`，sleep 45 完整跑完 `completed exit=0 stdout=LONG-DONE` 同类验证；修复前同路径进程启动即被杀（exec-837 VITE ready→Killed 137） |
 | T19.23 | ✅ | 2026-09-08 同环境实测：`sh -c 'kill -9 $$'` → `{exitCode:137, signal:"SIGKILL", oomSuspected:true}`；容器日志出现 `command killed by SIGKILL — likely sandbox memory OOM` |
-| T19.24 | ✅ | 2026-09-08 同环境实测：dev 运行时 proxy 200（正常路径回归通过）；pkill 后 502 响应含 `diagnostics.portListening=false` + hint + `originalError`（保留上游错误）。OOM 场景 `lastKilled` 来自 dmesg、`oomKillCount` 来自 cgroup（v2 memory.events / v1 memory.oom_control，缺失时为 null） |
-| T19.25 | ⏳ | local layer（组合 2/3）复测——用例已定义，待本地 OpenSandbox 环境执行；单测侧 `test/tool/sandbox-detached-keepalive.test.ts` 已覆盖两处 runDetached 修复的行为断言（3/3 pass） |
+| T19.24 | ✅ | 2026-09-08/09 组合 1 实测（v2/v4 镜像各一轮）：dev 运行时 proxy 200（正常路径回归）；pkill 后 502 响应含 `diagnostics.portListening=false` + hint + `originalError`（保留上游错误）。OOM 场景 `lastKilled` 来自 dmesg、`oomKillCount` 来自 cgroup（v2 memory.events / v1 memory.oom_control，缺失时为 null） |
 
 **本轮全量回归环境**：宿主机 opencode server `127.0.0.1:14097`，PG auth，OpenSandbox Docker runtime `127.0.0.1:8080`，sandbox image `opencode-opensandbox:local`，`OPENCODE_SANDBOX_USE_SERVER_PROXY=false`。
 

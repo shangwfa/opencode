@@ -11,6 +11,7 @@ const log = Log.create({ service: "exec-log" })
 export type ExecLogSource =
   | "exec"
   | "exec-async"
+  | "preview"
   | "keep-alive"
   | "kill-sandbox"
   | "patch"

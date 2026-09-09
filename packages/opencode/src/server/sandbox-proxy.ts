@@ -14,6 +14,7 @@ import { eq } from "drizzle-orm"
 import { websocket } from "./routes/instance/httpapi/middleware/proxy"
 import { resolveSandboxOpts } from "@/session/sandbox-opts"
 import { insertExecLog, updateExecLog, queryExecLogsBySession, queryExecLog, type ExecLog } from "@/session/exec-log"
+import * as Log from "@opencode-ai/core/util/log"
 import { ExecFailed } from "@/sandbox/exec-failed"
 import { toSandboxCwd, toSandboxPath } from "@/tool/sandbox-path"
 import path from "path"
@@ -301,6 +302,8 @@ function truncateOutput(s: string | undefined): string | undefined {
   return s.length > MAX_OUTPUT ? s.slice(0, MAX_OUTPUT) + "\n...[truncated]" : s
 }
 
+const proxyLog = Log.create({ service: "sandbox-proxy" })
+
 export const sandboxProxyRoute = HttpRouter.use((router) =>
   Effect.gen(function* () {
     const sandbox = yield* SandboxProvider.Service
@@ -319,6 +322,37 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
 
     const resolveRootSessionID = (sessionID: SessionID) =>
       Effect.promise(() => resolveSandboxOpts(sessionID)).pipe(Effect.map((root) => root.id))
+
+    // ── 预览不可访问 → exec_log（source="preview"）──────────────────
+    // 排查规范是查 PG exec_log 而非 docker logs，预览 502 必须落库。
+    // 同一 session:port 60s 节流：故障期间前端轮询/刷新不刷爆表。
+    const PREVIEW_LOG_THROTTLE_MS = 60_000
+    const previewLogAt = new Map<string, number>()
+
+    const logPreviewDown = (sessionID: SessionID, port: number, hint: string) => {
+      const key = `${sessionID}:${port}`
+      const now = Date.now()
+      if (now - (previewLogAt.get(key) ?? 0) < PREVIEW_LOG_THROTTLE_MS) return
+      previewLogAt.set(key, now)
+      const execId = `preview-${now}`
+      void insertExecLog({
+        id: execId,
+        session_id: sessionID,
+        command: `preview-down port=${port} ${hint}`.slice(0, 500),
+        working_directory: null,
+        status: "failed",
+        exit_code: null,
+        stdout: "",
+        stderr: "",
+        error: JSON.stringify({ name: "PreviewUnreachable", port, hint: hint.slice(0, 300) }),
+        source: "preview",
+        time_started: now,
+        time_finished: now,
+      }).catch(() => {})
+      if (previewLogAt.size > 1000) {
+        for (const [key, at] of previewLogAt) if (now - at > PREVIEW_LOG_THROTTLE_MS) previewLogAt.delete(key)
+      }
+    }
 
     // Retry worktree creation — newly created sandboxes may need a few
     // seconds for execd to become ready (especially under QEMU). The old
@@ -352,7 +386,13 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
         if (!port) return HttpServerResponse.jsonUnsafe({ error: "invalid port" }, { status: 400 })
 
         const sb = yield* sandbox.get(params.sessionID).pipe(Effect.catch(() => Effect.succeed(undefined)))
-        if (!sb) return HttpServerResponse.jsonUnsafe({ error: "sandbox unreachable" }, { status: 502 })
+        if (!sb) {
+          // 预览地址获取失败的第一大场景：沙箱被 idle-reap 回收/重建中。此前完全静默，
+          // 调用方只拿到一句 sandbox unreachable，无任何日志可查。
+          proxyLog.warn("endpoint: sandbox unreachable (recycled, starting, or gone)", { sessionID: params.sessionID, port })
+          logPreviewDown(params.sessionID, port, "sandbox unreachable (recycled, starting, or gone)")
+          return HttpServerResponse.jsonUnsafe({ error: "sandbox unreachable" }, { status: 502 })
+        }
 
         const protocol = (process.env.OPENCODE_SANDBOX_PROTOCOL as "http" | "https") ?? "http"
 
@@ -361,7 +401,10 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
             const ep = await (sb as any).sandboxes.getSandboxEndpoint(sb.id, port, false)
             return `${protocol}://${ep.endpoint}` as string | undefined
           },
-          catch: () => undefined as string | undefined,
+          catch: (error) => {
+            proxyLog.warn("endpoint: direct endpoint resolve failed", { sessionID: params.sessionID, port, error: String(error) })
+            return undefined as string | undefined
+          },
         })
 
         const proxyUrl = yield* Effect.tryPromise({
@@ -369,7 +412,10 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
             const ep = await (sb as any).sandboxes.getSandboxEndpoint(sb.id, port, true)
             return `${protocol}://${ep.endpoint}`
           },
-          catch: () => undefined as string | undefined,
+          catch: (error) => {
+            proxyLog.warn("endpoint: server-proxy endpoint resolve failed", { sessionID: params.sessionID, port, error: String(error) })
+            return undefined as string | undefined
+          },
         })
 
         const req = yield* HttpServerRequest.HttpServerRequest
@@ -378,6 +424,9 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
         const fallback = `/session/${params.sessionID}/proxy/${port}/`
         const mode = reqMode === "proxy" ? "proxy" : reqMode === "direct" ? "direct" : directUrl ? "direct" : "proxy"
         const url = mode === "proxy" ? (proxyUrl ?? fallback) : (directUrl ?? proxyUrl ?? fallback)
+        // 双解析都失败时 url 静默降级为 proxy fallback 路径——显式标记，让调用方能区分
+        const degraded = !directUrl && !proxyUrl
+        if (degraded) proxyLog.warn("endpoint: both endpoint resolves failed; degrading to proxy fallback", { sessionID: params.sessionID, port, requestedMode: reqMode })
 
         // 完整的外部可访问代理地址（基于浏览器可达的 public domain），预览前端拿到即可直接访问
         const previewUrl = proxyUrl
@@ -393,6 +442,7 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
           port,
           sandboxId: sb.id,
           fallback,
+          ...(degraded ? { degraded, error: "endpoint resolve failed for both direct and server-proxy modes" } : {}),
         })
       }),
     )
@@ -1178,6 +1228,7 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
 
         const sb = yield* sandbox.get(params.sessionID).pipe(Effect.catch(() => Effect.succeed(undefined)))
         if (!sb) {
+          proxyLog.warn("proxy: sandbox unreachable (recycled, starting, or gone)", { sessionID: params.sessionID, port, isWs })
           if (isWs) { yield* rejectWs(request, 1011, "sandbox unreachable"); return HttpServerResponse.empty() }
           return HttpServerResponse.jsonUnsafe({ error: "sandbox unreachable" }, { status: 502 })
         }
@@ -1187,7 +1238,10 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
             const ep = await (sb as any).sandboxes.getSandboxEndpoint(sb.id, port, Flag.OPENCODE_SANDBOX_USE_SERVER_PROXY)
             return `http://${ep.endpoint}`
           },
-          catch: () => undefined,
+          catch: (error) => {
+            proxyLog.warn("proxy: sandbox endpoint resolve failed", { sessionID: params.sessionID, port, error: String(error) })
+            return undefined
+          },
         })
         if (!endpoint) {
           if (isWs) { yield* rejectWs(request, 1011, "sandbox unreachable"); return HttpServerResponse.empty() }
@@ -1246,10 +1300,11 @@ function proxyHttp(
 
     if (!res || res instanceof Error) {
       const diag = yield* diagnosePort(sandbox, sessionID, port)
+      const hint = diag ? diagHint(diag, port) : "port has no listener"
       return HttpServerResponse.jsonUnsafe({
         error: "sandbox process unreachable",
         port,
-        diagnostics: diag ? { ...diag, hint: diagHint(diag, port) } : undefined,
+        diagnostics: diag ? { ...diag, hint } : undefined,
         detail: res instanceof Error ? res.message : undefined,
       }, { status: 502 })
     }
@@ -1283,10 +1338,11 @@ function proxyHttp(
       const text = yield* Effect.tryPromise(() => res.text()).pipe(Effect.catch(() => Effect.succeed("")))
       if (text.includes("Could not connect to the backend sandbox")) {
         const diag = yield* diagnosePort(sandbox, sessionID, port)
+        const hint = diag ? diagHint(diag, port) : "port has no listener"
         return HttpServerResponse.jsonUnsafe({
           error: "sandbox process unreachable",
           port,
-          diagnostics: diag ? { ...diag, hint: diagHint(diag, port) } : undefined,
+          diagnostics: diag ? { ...diag, hint } : undefined,
           originalError: text.slice(0, 500) || undefined,
         }, { status: 502 })
       }
