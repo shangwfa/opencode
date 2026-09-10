@@ -444,6 +444,60 @@ curl -s -X POST "$BASE/session/$SID/snapshot" -d '{}' -H 'Content-Type: applicat
 > - 顺带：降级冷启动后 `restoreFrom` 日志不再打无效 id（T25.19 瑕疵）；GC reconcile 对远端 404 的 creating 记录标 failed 终止重试（T25.20 坑）
 > **复测结果**：场景 1 全链路 PASS（/workspace overlay ✓、显式快照 creating→ready ✓、kill 后恢复 FIX_MARKER + restoreFrom 日志 + stale|restored ✓）；全局 snapshot 部署回归冒烟 PASS（exec/快照/恢复正常）；typecheck 无新增错误（39 < 基线 43）。
 
+### T25.24 无变更复用快照（kill/idle 回收跳过重复快照）
+
+场景：沙箱自上次快照 Ready 后 workspace 无任何写入（如恢复后仅读操作、或纯闲置）时，销毁路径（kill-sandbox / idle 回收 / destroyById）不再重复发起快照，直接复用已有 ready/stale 快照并立即销毁——省 20~80s 快照创建与远端存储。
+
+机制：快照 Ready 前在源沙箱 rootfs 写入 marker（`/var/tmp/.opencode-snapshot-marker`）和内容清单（`/var/tmp/.opencode-snapshot-manifest`，均随快照持久化）；销毁前用临时 command session 执行 mtime 快速筛查和 mode、size、SHA-256 清单比对。两者均无变化才复用；marker/清单缺失、有新写入、RPC/命令失败或超时均保守走原快照路径。显式 `POST /snapshot` 不复用（业务要求「现在」时点）。
+
+```bash
+# 场景 1：复用主路径（无写入 → 不新建快照）
+curl -s -X POST "$BASE/session/$SID/exec" -d '{"command":"echo data > /workspace/a.txt"}'   # 写入
+curl -s -X POST "$BASE/session/$SID/snapshot"; <等 ready>                                   # 快照 S1
+curl -s -X POST "$BASE/session/$SID/kill-sandbox"                                           # S1 后无写入
+# 期望：日志 snapshot reused (workspace unchanged)；快照表无新 creating/ready 记录（仍只有 S1）；
+#       远端 POST /sandboxes/<id>/snapshots 未发生；销毁秒级完成（无 20~80s 快照等待）
+#       GET /session/$SID/sandbox → sandboxId 立即 null
+#       ★ 再 exec 恢复：cat /workspace/a.txt == "data"（复用快照数据完整，非空/非镜像冷启动）
+
+# 场景 2：dirty 路径（有写入 → 正常新快照）
+curl -s -X POST "$BASE/session/$SID/exec" -d '{"command":"echo more > /workspace/b.txt"}'   # S1 后写入
+curl -s -X POST "$BASE/session/$SID/kill-sandbox"
+# 期望：新快照 S2 creating→ready；S1 superseded；行为与改动前完全一致
+
+# 场景 3：回退安全（命令通道异常 → 保守快照）
+# execd 不可达/命令失败时（注入方式：mock 或环境故障），kill 仍走「先快照 Ready 再销毁」原路径
+
+# 场景 4：idle 回收复用（自动快照主战场，前置 OPENCODE_SANDBOX_IDLE_REAP_SEC=60）
+# 建快照会话 → 写 marker → 等 idle 自动快照 S1 ready（沙箱 destroyed）→ exec 恢复（S1 转 stale）
+# → 无写入 → 等下一轮 idle 回收
+# 期望：日志 snapshot reused；快照表无新快照（仍只有 stale S1）；sandbox 行 destroyed
+#       （此前每次 idle 都会重新快照，现在无变更直接复用）
+
+# 场景 5：显式 POST /snapshot 不复用（反向语义）
+# S1 ready 后无任何写入 → 显式 POST /session/$SID/snapshot
+# 期望：仍产生新快照 S2 creating→ready（不复用 S1）；S1 superseded
+#       （业务显式要「现在」时点，必须新快照，防止实现误伤）
+
+# 场景 6：连续复用（stale 快照）
+# S1 ready → kill（复用，S1 转 stale）→ exec 恢复 → 无写入 → 再次 kill
+# 期望：再次复用 stale S1；快照表无新记录；数据仍完整
+
+# 场景 7：升级兼容（旧快照无 manifest）
+# 用升级前镜像创建的快照 S0（无 /var/tmp/.opencode-snapshot-manifest）→ 恢复 → 无写入 → kill
+# 期望：首次 kill 判 dirty（多一次快照补 manifest，S0 superseded）；第二次无写入 kill 才复用
+```
+
+**期望**：单测 `test/tool/sandbox-snapshot-reuse.test.ts`（判定脚本六态 / Effect 映射 / findRestorable / destroy 三路径）全过；集成场景 1~7 行为如上（1/2/4 为核心，5 反向，7 升级兼容）；T25.4b 安全承诺不变（复用失败不影响「快照未成功不销毁」）。
+
+> **实现记录**（2026-09-10）：
+> - 代码：`sandbox-provider.ts` 模块级新增 `SNAPSHOT_MARKER_PATH` / `snapshotDirtyCheckCommand` / `workspaceUnchangedSinceSnapshot` / `touchSnapshotMarker`；`cleanupSandbox` 快照分支 startSnapshot 前插「无变更 → 复用 `findRestorable` 最新快照直接销毁」；快照 Ready 后 touch marker（cleanupSandbox 与显式 `createSnapshot` 两路径）。`session-snapshot.ts` 暴露 `findRestorable`。
+> - 判定语义：**两级判定**——① `find /workspace -newermm <marker> -print -quit` mtime 快速路径；② mode、size、SHA-256 内容清单全量比对，覆盖 mtime 回填、粗粒度时间分辨率与同尺寸内容改写。快照恢复会重建文件 ctime，不能将 ctime 用作快照间判定。清单缺失/扫描超时/不一致/命令失败一律保守 dirty 走原快照路径。**T25.4b 安全承诺不变**。
+> - 执行路径：判定使用一次性 `commands.createSession` / `runInSession` / `deleteSession`，避免恢复沙箱的无会话 `/command` SSE 流可能不结束；SDK 和沙箱内命令均有超时，超时直接保守快照。
+> - 已知边界：① 仅对比 /workspace（npm cache 等更新不触发新快照，属预期收益）；② marker 写在快照开始前，随 rootfs 保存；③ find 与清单扫描瞬间的并发写入存在理论竞态窗口，丢失量级为 dev server 临时文件；④ 删除/重命名由父目录 mtime 覆盖。
+> - 单测：`test/tool/sandbox-snapshot-reuse.test.ts` 16/16 pass；回归 `sandbox-provider-destroy-by-id.test.ts` 9/9 pass；typecheck 59 个既有错误，无新增。
+> - **集成复测待办**：场景 3/4/7 及其余全量快照用例仍需按专项环境执行。
+
 ---
 
 ## 复测记录（2026-08-21，commit 13b750953b，镜像重建后全量回归 + 缺口用例补充）
@@ -698,3 +752,35 @@ python3 docs/test-cases/sandbox/scripts/snapshot_notfound_check.py --probe-snap 
 | 数据面完整性 | 无损 | 恢复成功的 5 个沙箱 `cat /workspace/mark.txt` 全部输出完整 marker |
 
 **结论**：与 08-22 根因分析、09-07 复测完全一致，运维侧（收敛单副本或配置 snapshot-registry）仍未处理。我方 fail-fast 降级语义（NOT_FOUND → markRestoreFailed → 镜像冷启动）维持不变。
+
+---
+
+## 复测记录（2026-09-10 第二轮，运维修复后验收）
+
+环境：同上，直连远端 K8s OpenSandbox。验证期间集群资源紧张（用户侧要求少量测试）。
+
+| 验证项 | 结果 | 证据 |
+|---|---|---|
+| GET 单查 x8（独立连接） | **已修复** | 全 200，无 404（此前严格 `404 200` 交替） |
+| 粘滞连接 GET x6 | 全 200 | 单一副本视角（对照成立） |
+| 恢复循环 x8+x2（独立连接） | **已修复** | 8/10 OK + 2/2 OK；`SNAPSHOT::NOT_FOUND` **零出现**（此前 ~50%） |
+| 失败形态变化 | 新现象 | 2 次失败均为 `KUBERNETES::POD_READY_TIMEOUT`（Pod Pending 60s，集群资源不足所致，与快照元数据无关；沙箱资源紧张期可复现） |
+
+**结论**：多副本快照元数据不共享问题**已由运维修复**——GET 与恢复路径均无 NOT_FOUND。恢复失败的新原因是集群资源不足（POD_READY_TIMEOUT），属容量问题另案跟进。验证产物已即时清理（恢复出的沙箱全部 DELETE）。
+
+> 复测命令：`python3 docs/test-cases/sandbox/scripts/snapshot_notfound_check.py`（资源紧张期建议 `--rounds 3` 并配合 `--probe-snap` 减少建沙箱）。
+
+---
+
+## 复测记录（2026-09-11，T25.24 连续复用修复）
+
+环境：组合 1（本地 Docker，远端 PG + 远端 K8s Sandbox），默认 snapshot image。
+
+| 验证项 | 结果 | 证据 |
+|---|---|---|
+| S1 后首次 kill | PASS | `snapshot reused (workspace unchanged)`，源 sandbox 销毁完成 |
+| S1 恢复数据 | PASS | `cat /workspace/data.txt` 输出 `hello` |
+| 恢复后无写入再次 kill（场景 6） | PASS | 同一 stale S1 再次 `snapshot reused`，快照数 `1 -> 1` |
+| 快照状态 | PASS | S1 为 `stale|restored`，未创建 superseding snapshot |
+
+会话 `ses_f7330077effeXMXs0OcHKhvGcj`，S1 `76a992da-1e23-463f-9303-7b40680bb9f1`。根因是恢复会重建 workspace 文件 ctime，原 ctime 快速筛查将未写入的恢复沙箱误判为 dirty；改为 mtime + 内容清单后通过。

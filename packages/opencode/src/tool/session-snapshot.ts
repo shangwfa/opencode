@@ -337,7 +337,7 @@ export namespace SessionSnapshot {
     }
 
     return {
-      resolveForCreate, markRestoreFailed, markConsumed,
+      resolveForCreate, markRestoreFailed, markConsumed, findRestorable,
       startSnapshot, awaitSnapshot, getLatest, gc, deleteAllForSession,
     }
   }

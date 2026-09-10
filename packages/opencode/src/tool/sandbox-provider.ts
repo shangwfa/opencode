@@ -153,6 +153,72 @@ function requirePackageCacheMount(mountPath: string, reservedPaths: string[]) {
   return normalized
 }
 
+// ── 快照无变更复用（T25.24）───────────────────────────────────────────
+// marker 随快照进 rootfs（恢复出的沙箱自带，时间即该快照数据时点）；
+// /var/tmp 而非 /tmp：规避个别基础镜像把 /tmp 挂 tmpfs（不随快照持久化）。
+export const SNAPSHOT_MARKER_PATH = "/var/tmp/.opencode-snapshot-marker"
+export const SNAPSHOT_MANIFEST_PATH = "/var/tmp/.opencode-snapshot-manifest"
+
+/** 生成内容清单（快照开始前调用）：mode、size、SHA-256，LC_ALL=C 保证排序稳定。 */
+export function snapshotManifestCommand(workspace = "/workspace", manifest = SNAPSHOT_MANIFEST_PATH) {
+  return `{ find ${workspace} -type f -printf '%m %s %p\\n'; find ${workspace} -type f -exec sha256sum {} \\; ; } 2>/dev/null | LC_ALL=C sort > ${manifest}`
+}
+
+/** 判定脚本：marker 之后 workspace 无新写入则 stdout 输出 CLEAN，否则 DIRTY。
+ * 结果走 stdout 标记而非退出码：部分 execd 不返回可靠 exitCode（execution_complete 缺失 → null），
+ * 但 stdout 事件始终可靠。
+ * 两级判定：
+ * 1. 快速路径仅比较 mtime：快照恢复会重建所有文件 ctime，不能以 ctime 判定；有变更或超时立即
+ *    判 DIRTY，不做全量扫描。
+ * 2. 内容清单兜底：快速路径判 clean 后，与快照时生成的 mode、size、SHA-256 清单比对——捕获
+ *    mtime 被回填或分辨率粗于写入间隔的变更。清单缺失 / 扫描超时 / 不一致一律 DIRTY。
+ * timeoutSec>0 时由沙箱内 timeout 兜底（超时/命令失败均 DIRTY）。 */
+export function snapshotDirtyCheckCommand(
+  marker = SNAPSHOT_MARKER_PATH,
+  manifest = SNAPSHOT_MANIFEST_PATH,
+  workspace = "/workspace",
+  timeoutSec = 10,
+) {
+  const quick = `find ${workspace} -newermm ${marker} -print -quit 2>/dev/null`
+  const guardedQuick = timeoutSec > 0 ? `timeout ${timeoutSec} ${quick}` : quick
+  const scan = `{ find ${workspace} -type f -printf '%m %s %p\\n'; find ${workspace} -type f -exec sha256sum {} \\; ; } 2>/dev/null | LC_ALL=C sort`
+  const guardedScan = timeoutSec > 0 ? `timeout $((timeoutSec + 5)) ${scan}` : scan
+  return [
+    `out=$(${guardedQuick}); rc=$?; if [ "$rc" -ne 0 ] || [ -n "$out" ]; then echo DIRTY; exit 0; fi`,
+    `[ -f ${manifest} ] || { echo DIRTY; exit 0; }`,
+    `now=$(${guardedScan}); nrc=$?; [ "$nrc" -eq 0 ] || { echo DIRTY; exit 0; }`,
+    `if [ "$now" = "$(cat ${manifest})" ]; then echo CLEAN; else echo DIRTY; fi`,
+  ].join("; ")
+}
+
+/** 沙箱自上次快照后 workspace 是否无变更（stdout 无 CLEAN 标记 / 命令失败 / 超时一律视为有变更，走保守快照）。 */
+export function workspaceUnchangedSinceSnapshot(sb: Sandbox): Effect.Effect<boolean> {
+  return Effect.tryPromise(async () => {
+    // 恢复的沙箱上无会话 /command 流可能永不结束；临时 bash session 与前台 exec 使用同一可靠路径。
+    const sessionID = await sb.commands.createSession({ workingDirectory: "/workspace" })
+    try {
+      return await sb.commands.runInSession(sessionID, snapshotDirtyCheckCommand(), {
+        workingDirectory: "/workspace",
+        timeoutSeconds: 15,
+      })
+    } finally {
+      await sb.commands.deleteSession(sessionID).catch(() => undefined)
+    }
+  }).pipe(
+    Effect.map((result) => result.logs.stdout.some((line) => line.text.includes("CLEAN"))),
+    Effect.timeoutOrElse({ duration: Duration.seconds(20), orElse: () => Effect.succeed(false) }),
+    Effect.catchCause(() => Effect.succeed(false)),
+  )
+}
+
+/** 快照 Ready 后打 marker + 生成 size 清单（失败静默：过旧只会导致下次多一次快照，无害）。 */
+export function touchSnapshotMarker(sb: Sandbox): Effect.Effect<void> {
+  const cmd = `touch ${SNAPSHOT_MARKER_PATH} && ${snapshotManifestCommand()}`
+  return Effect.tryPromise(() => sb.commands.run(cmd)).pipe(
+    Effect.catchCause(() => Effect.void),
+  )
+}
+
 export function withExecTimeout(
   effect: Effect.Effect<CommandExecution, Error>,
   timeoutSeconds: number | undefined,
@@ -765,6 +831,14 @@ export namespace SandboxProvider {
       const commandSemaphores = new Map<string, Semaphore.Semaphore>()
       const detachedCommandSessions = new Map<string, Set<string>>()
       const createRef = yield* Ref.make(new Map<string, Deferred.Deferred<Sandbox, Error>>())
+      // 快照清理互斥：同一 session 只允许一个 cleanup 在跑。T25.24 复用分支绕过了
+      // startSnapshot 的 advisory lock，并发 cleanup（destroy 与 getOrCreate 的 killed 重试）
+      // 会一个复用、一个判 dirty 产生多余快照；用 in-flight 集合串行化规避。
+      const cleanupRef = yield* Ref.make(new Set<string>())
+      const claimCleanup = (sessionID: string) =>
+        Ref.modify(cleanupRef, (s) => s.has(sessionID) ? [false, s] as const : [true, new Set(s).add(sessionID)] as const)
+      const releaseCleanup = (sessionID: string) =>
+        Ref.update(cleanupRef, (s) => { s.delete(sessionID); return s })
       // Sandbox creations outlive the caller that triggered them: when a
       // waiter times out, the creation fiber keeps running here until the
       // layer is disposed.
@@ -1334,26 +1408,46 @@ export namespace SandboxProvider {
           const sb = yield* reconnectIfPresent(row)
           if (sb) {
             if (opts?.snapshot && snapshots) {
-              // 快照+销毁异步化：锁内仅发起，后台 fiber 等快照 Ready 后才 kill 源沙箱。
-              // 代码安全承诺：快照未成功不销毁——失败/超时保留沙箱（行保持 killed，300s 后
-              // idle reap 重试快照）；沙箱由 TTL 兜底最终回收，重试期间不阻塞会话恢复。
-              yield* Effect.gen(function* () {
-                const snapshotId = yield* Effect.promise(() => snapshots.startSnapshot(sb, row.session_id))
-                if (!snapshotId) {
-                  log.warn("snapshot start failed; keeping sandbox for retry", { sessionID: row.session_id, sandboxID: sb.id })
-                  yield* Effect.tryPromise(() => sb.close()).pipe(Effect.catchCause(() => Effect.void))
+            // 快照+销毁异步化：锁内仅发起，后台 fiber 等快照 Ready 后才 kill 源沙箱。
+            // 代码安全承诺：快照未成功不销毁——失败/超时保留沙箱（行保持 killed，300s 后
+            // idle reap 重试快照）；沙箱由 TTL 兜底最终回收，重试期间不阻塞会话恢复。
+            const claimed = yield* claimCleanup(row.session_id)
+            if (!claimed) return
+            yield* Effect.gen(function* () {
+              // 无变更复用（T25.24）：marker 之后 workspace 无写入 → 复用最新 ready/stale 快照，
+              // 跳过重复快照直接销毁；判定失败/无可复用快照保守走原快照路径。
+              if (yield* workspaceUnchangedSinceSnapshot(sb)) {
+                const reusable = yield* Effect.promise(() => snapshots.findRestorable(row.session_id)).pipe(
+                  Effect.catch(() => Effect.succeed(null)),
+                )
+                if (reusable) {
+                  log.info("snapshot reused (workspace unchanged)", { sessionID: row.session_id, sandboxID: sb.id, snapshotId: reusable.id })
+                  yield* destroySandbox(sb, row.session_id).pipe(Effect.catchCause(() => Effect.void))
                   return
                 }
-                const result = yield* Effect.promise(() => snapshots.awaitSnapshot(row.session_id, snapshotId))
-                if (result !== "ready") {
-                  log.warn("snapshot not ready; keeping sandbox for retry", { sessionID: row.session_id, sandboxID: sb.id, snapshotId })
-                  yield* Effect.tryPromise(() => sb.close()).pipe(Effect.catchCause(() => Effect.void))
-                  return
-                }
-                yield* destroySandbox(sb, row.session_id).pipe(Effect.catchCause(() => Effect.void))
-              }).pipe(Effect.forkIn(creationScope))
-              return
-            }
+              }
+              // marker/manifest 必须在 startSnapshot 之前写入，才能随快照 rootfs 持久化
+              // （快照 commit 之后 touch 的话 marker 不进快照，恢复后缺失 → 永远判 dirty）。
+              yield* touchSnapshotMarker(sb)
+              const snapshotId = yield* Effect.promise(() => snapshots.startSnapshot(sb, row.session_id))
+              if (!snapshotId) {
+                log.warn("snapshot start failed; keeping sandbox for retry", { sessionID: row.session_id, sandboxID: sb.id })
+                yield* Effect.tryPromise(() => sb.close()).pipe(Effect.catchCause(() => Effect.void))
+                return
+              }
+              const result = yield* Effect.promise(() => snapshots.awaitSnapshot(row.session_id, snapshotId))
+              if (result !== "ready") {
+                log.warn("snapshot not ready; keeping sandbox for retry", { sessionID: row.session_id, sandboxID: sb.id, snapshotId })
+                yield* Effect.tryPromise(() => sb.close()).pipe(Effect.catchCause(() => Effect.void))
+                return
+              }
+              yield* destroySandbox(sb, row.session_id).pipe(Effect.catchCause(() => Effect.void))
+            }).pipe(
+              Effect.ensuring(releaseCleanup(row.session_id)),
+              Effect.forkIn(creationScope),
+            )
+            return
+          }
             return yield* destroySandbox(sb, row.session_id)
           }
           yield* killByID(row.id, row.session_id)
@@ -2078,6 +2172,8 @@ export namespace SandboxProvider {
               yield* dbMarkDestroyed(sessionID, row.id)
               return null
             }
+            // marker/manifest 在 startSnapshot 之前写入，随快照 rootfs 持久化（见 cleanupSandbox 同款注释）
+            yield* touchSnapshotMarker(sb)
             const id = yield* Effect.promise(() => snapshots.startSnapshot(sb, sessionID))
             if (!id) {
               log.warn("snapshot request failed; startSnapshot error", { sessionID, sandboxID: row.id })
