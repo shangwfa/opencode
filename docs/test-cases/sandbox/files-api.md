@@ -1,6 +1,6 @@
-# 沙箱文件管理 API：创建目录 / 创建文件 / 下载 / 上传 / 删除 / 搜索
+# 沙箱文件管理 API：创建目录 / 创建文件 / 下载 / 上传 / 删除 / 搜索 / 文件树
 
-> 仅适用于 opencode SaaS。验证 `POST /session/:id/files/mkdir`、`POST /session/:id/files/create`、`GET /session/:id/files/download`、`POST /session/:id/files/upload`、`POST /session/:id/files/remove` 五个 sandbox-proxy 接口，以及 `GET /find/file` 文件搜索接口（实现于 `packages/opencode/src/server/sandbox-proxy.ts` 和 `packages/opencode/src/server/routes/instance/httpapi/handlers/file.ts`）。
+> 仅适用于 opencode SaaS。验证 `POST /session/:id/files/mkdir`、`POST /session/:id/files/create`、`GET /session/:id/files/download`、`POST /session/:id/files/upload`、`POST /session/:id/files/remove` 五个 sandbox-proxy 接口，以及 `GET /find/file` 文件搜索、`GET /file` 文件树列目录接口（实现于 `packages/opencode/src/server/sandbox-proxy.ts` 和 `packages/opencode/src/server/routes/instance/httpapi/handlers/file.ts`）。
 > 环境变量 `$BASE $PG_URL $MODEL` 由 `test-env.sh` 提供；本组用例不依赖 `$MODEL`（不经 AI 消息）。
 
 ```bash
@@ -471,6 +471,107 @@ psql "$PG_URL" -t -A -c "
 
 ---
 
+## 七、文件树列目录 `GET /file`
+
+> 实现于 `packages/opencode/src/server/routes/instance/httpapi/handlers/file.ts`（HttpApi 路由，Web UI 文件树数据源）。沙箱分支走 `runDetached`（独立 command session，与 `exec/async` 同通道）执行 `ls -1ap`，**不经过** `runInSession` 的 per-session `commandSemaphore` 串行队列——前台长命令（`pnpm install` 等）独占队列时文件树不被阻塞；沙箱命令失败映射为 503 `ServiceUnavailableError`（含具体原因），不再是无信息 500（缺陷修复回归见 T-FILE-72）。
+
+### T-FILE-70 根目录列表（沙箱分支）
+
+**验证点**：带 `sessionID` 走沙箱分支，返回结构化 LegacyEntry。
+
+```bash
+SID=$(new_sid -k)
+curl -s --noproxy '*' -X POST "$BASE/session/$SID/exec" -H 'Content-Type: application/json' \
+  -d '{"command":"mkdir -p /workspace/tree/src && echo hi > /workspace/tree/readme.md","timeoutSeconds":30}' >/dev/null
+
+curl -s --noproxy '*' -m 30 "$BASE/file?sessionID=$SID&directory=/workspace&path=tree" | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+assert sorted(e['name'] for e in d) == ['readme.md','src'], d
+by={e['name']:e for e in d}
+assert by['src']['type']=='directory' and by['readme.md']['type']=='file', d
+assert by['readme.md']['path']=='tree/readme.md', d
+assert all(set(e)>={'name','path','absolute','type','ignored'} for e in d), d
+print('tree root ok')
+"
+```
+
+**期望**：200 + 条目含 `name/path/absolute/type/ignored` 五字段；目录 `type=directory`，相对 `path` 带查询前缀（`tree/readme.md`）。
+
+### T-FILE-71 子目录与空目录
+
+```bash
+# 子目录
+curl -s --noproxy '*' -m 30 "$BASE/file?sessionID=$SID&directory=/workspace&path=tree/src" \
+  | python3 -c "import json,sys; assert json.load(sys.stdin)==[], 'expect empty'; print('empty sub ok')"
+
+# path 为空 → 列 /workspace 根（Web UI 文件树首屏请求形态）
+curl -s --noproxy '*' -m 30 "$BASE/file?sessionID=$SID&directory=/workspace&path=" \
+  | python3 -c "import json,sys; d=json.load(sys.stdin); assert any(e['name']=='tree' and e['type']=='directory' for e in d), d; print('root empty-path ok')"
+```
+
+**期望**：空目录返回 `[]`；`path=`（空）列 `/workspace` 根。
+
+### T-FILE-72 前台长命令独占命令队列时文件树不被阻塞（缺陷修复回归）
+
+**背景**：修复前列目录走 `runInSession`（per-session `commandSemaphore` 串行），`pnpm install` 等前台长命令独占队列期间（实测 install 100~470s），文件树排队 `timeoutSeconds+5s` 后超时——`Effect.orDie` 把超时变无信息 500（生产案例：ses_f75913982，install 100s 期间 `GET /file` 500）。修复后走 `runDetached` 独立 session，与队列无关。
+
+```bash
+# 预热 command session（排除 createSession 首建干扰）
+curl -s --noproxy '*' -m 30 -X POST "$BASE/session/$SID/exec" -H 'Content-Type: application/json' \
+  -d '{"command":"echo warm"}' >/dev/null
+
+# 后台占住主命令通道 45s（同步 exec = runInSession 串行通道）
+curl -s --noproxy '*' -m 60 -X POST "$BASE/session/$SID/exec" -H 'Content-Type: application/json' \
+  -d '{"command":"sleep 45","timeoutSeconds":50}' >/dev/null 2>&1 &
+
+sleep 3   # 等 sleep 进入执行态（持有 semaphore）
+
+T0=$(date +%s)
+CODE=$(curl -s --noproxy '*' -m 30 -o /tmp/file-tree.json -w '%{http_code}' \
+  "$BASE/file?sessionID=$SID&directory=/workspace&path=tree")
+T1=$(date +%s)
+
+test "$CODE" = 200
+test $((T1-T0)) -lt 5
+python3 -c "import json; d=json.load(open('/tmp/file-tree.json')); assert any(e['name']=='src' for e in d), d"
+
+# 对照：主队列本身仍正常排队（非破坏性验证，可选）。
+# 注意排队预算 = timeoutSeconds+5s，需大于 sleep 剩余时间（实测 sleep 45 发出后约剩 41s，
+# timeoutSeconds=30 会因排队超时失败——这本身即「队列确实被占用」的佐证）
+curl -s --noproxy '*' -m 120 -X POST "$BASE/session/$SID/exec" -H 'Content-Type: application/json' \
+  -d '{"command":"echo queued-ok","timeoutSeconds":60}' \
+  | python3 -c "import json,sys; assert 'queued-ok' in json.load(sys.stdin,strict=False)['stdout']; print('queue intact')"
+```
+
+**期望**：`sleep 45` 独占命令队列期间，`GET /file` **5 秒内**返回 200 且条目正确（修复前 15s 后 500）；主队列语义不受影响（排队命令仍能执行）。
+
+### T-FILE-73 沙箱回收后文件树自动恢复
+
+```bash
+curl -s --noproxy '*' -X POST "$BASE/session/$SID/kill-sandbox" >/dev/null
+
+test "$(curl -s --noproxy '*' -m 180 -o /tmp/file-rebuild.json -w '%{http_code}' \
+  "$BASE/file?sessionID=$SID&directory=/workspace&path=tree")" = 200
+python3 -c "import json; d=json.load(open('/tmp/file-rebuild.json')); assert any(e['name']=='src' for e in d), d"
+```
+
+**期望**：沙箱销毁后列目录触发自动重建（PVC 数据在），最终 200；全程不出现无信息 500（沙箱暂时不可达时为 503 `ServiceUnavailableError` + 具体原因，错误映射已由单测 `test/server/httpapi-file-sandbox.test.ts` 覆盖）。
+
+### T-FILE-74 本地分支兼容（无 sessionID）
+
+> 注意：`directory` 是 opencode **服务进程视角**的路径——容器部署形态下为容器内路径（不是测试脚本所在的宿主机路径）。
+
+```bash
+# 不带 sessionID → 走服务进程本地 filesystem 分支（非沙箱），列服务容器根目录
+curl -s --noproxy '*' -m 15 "$BASE/file?directory=/&path=." \
+  | python3 -c "import json,sys; d=json.load(sys.stdin); assert any(e['type']=='directory' for e in d), d; print('local branch ok')"
+```
+
+**期望**：无 `sessionID` 时回退本地分支，能列服务进程本地目录（保持原行为不回归；单测 `httpapi-file.test.ts` 另以 tmpdir 覆盖）。
+
+---
+
 ## 八、文件搜索 `GET /find/file`
 
 > 实现于 `packages/opencode/src/server/routes/instance/httpapi/handlers/file.ts`（HttpApi 路由，与 sandbox-proxy 同端口）。沙箱内搜索走 `rg --files --hidden | grep -iF` + `find -type d | grep -iF`，返回结构化条目。
@@ -548,7 +649,8 @@ curl -s --noproxy '*' -X DELETE "$BASE/session/$SID" >/dev/null
 rm -f /tmp/files-dl.headers /tmp/files-dl.txt /tmp/files-ct.headers /tmp/files-zip.headers /tmp/files-archive.zip \
   /tmp/files-up.txt /tmp/files-up.bin /tmp/files-create.bin /tmp/files-loop.bin /tmp/files-loop2.bin /tmp/files-empty.zip \
   /tmp/files-special.headers /tmp/files-special.txt /tmp/files-fallback.headers /tmp/files-pdf.headers \
-  /tmp/files-ow.txt /tmp/files-root.txt /tmp/files-app.txt /tmp/files-app2.txt /tmp/files-sp.txt /tmp/files-sp2.txt
+  /tmp/files-ow.txt /tmp/files-root.txt /tmp/files-app.txt /tmp/files-app2.txt /tmp/files-sp.txt /tmp/files-sp2.txt \
+  /tmp/file-tree.json /tmp/file-rebuild.json
 summary
 ```
 
@@ -565,6 +667,7 @@ summary
 | T-FILE-40~44 | 横切 | exec_log 审计、临时文件清理、PVC 持久、host 路径兼容、app 模式共享卷 |
 | T-FILE-50~55 | 删除 | 文件删除、目录递归删除、不存在返回 404、参数校验、session 不存在 404、exec_log 审计 |
 | T-FILE-60~64 | 文件搜索 | 文件名搜索、隐藏文件搜索、目录搜索、无匹配空数组、LegacyEntry 结构化响应 |
+| T-FILE-70~74 | 文件树列目录 | 根/子目录列表结构化、空目录 `[]`、长命令独占队列时不阻塞（≤5s，缺陷修复回归）、沙箱回收自动恢复、本地分支兼容 |
 
 ## 复测记录
 
@@ -572,3 +675,4 @@ summary
 |---|---|---|---|
 | 2026-08-19 | 本地 PG + 远程沙箱（组合 1 沙箱 + 组合 3 PG） | PASS | T-FILE-01~44 全过（24 个用例 PASS / 0 FAIL）；含 T-FILE-05/34/35 边界用例、Content-Length 一致性断言、`filename=.`/`..` 400 校验 |
 | 2026-08-27 | 组合 1（远端 PG + 远端 K8s 沙箱，镜像 `opencode-saas-sandbox-test:8714a81`，feat/opencode-1.18.21 迁移后） | PASS | 全量回归 T-FILE-01~55 + 60~64 共 39 断言全过：mkdir/create/download/upload 段、横切段（审计/PVC 重建/host 路径）、删除段、搜索段；特殊字符路径需 URL 编码后请求（脚本直传原始字符会 curl 本地错误，非产品问题） |
+| 2026-09-10 | 组合 1（远端 PG + 远端 K8s 沙箱，镜像 `opencode-saas-sandbox-test:filefix`，file.list `runDetached` 修复后） | PASS | 新增 T-FILE-70~74 全过（9 断言）：T-FILE-72 `sleep 45` 独占命令队列期间 `GET /file` **1s** 返回 200 且条目正确（修复前 15s 排队超时后无信息 500）；T-FILE-73 kill-sandbox 后 5s 重建 200 且 PVC 数据完整；T-FILE-74 修正为容器内路径（`directory=/`，服务进程视角）。附带实证：对照命令 `timeoutSeconds=30`（排队预算 35s < sleep 剩余 41s）自身排队超时，反向佐证队列确实被占而文件树未被阻塞 |

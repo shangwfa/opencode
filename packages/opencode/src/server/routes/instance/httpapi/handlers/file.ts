@@ -14,6 +14,7 @@ import path from "path"
 import { HttpApiBuilder, HttpApiError } from "effect/unstable/httpapi"
 import { InstanceHttpApi } from "../api"
 import { WorkspaceSearchPayload, WorkspaceSearchResult } from "../groups/file"
+import { ServiceUnavailableError } from "../errors"
 import type { SessionID } from "@/session/schema"
 
 export const fileHandlers = HttpApiBuilder.group(InstanceHttpApi, "file", (handlers) =>
@@ -161,14 +162,25 @@ export const fileHandlers = HttpApiBuilder.group(InstanceHttpApi, "file", (handl
         const instance = yield* InstanceState.context
         const sp = yield* Effect.serviceOption(SandboxProvider.Service)
         if (sp._tag === "Some") {
-          const sb = yield* sp.value.getOrCreate(sessionID).pipe(Effect.orDie)
           const sandboxPath = toSandboxPath(
             path.isAbsolute(ctx.query.path) ? ctx.query.path : path.join(instance.directory, ctx.query.path),
             instance.directory,
           )
+          // 列目录走 runDetached（独立 command session，exec/async 同通道）而非
+          // runInSession：前台 pnpm install 等长命令独占 commandSemaphore 时，
+          // runInSession 的 ls 会排队超时，文件树被 install 阻塞数十秒到几分钟。
+          // 远端 execd 无 /directories/list 路由（实测 404），files API 替代不了
+          // 列目录，故用独立 session 的 ls 绕开命令队列。
           const result = yield* sp.value
-            .runInSession(sessionID, `ls -1ap "${sandboxPath}" 2>/dev/null`, { timeoutSeconds: 10 })
-            .pipe(Effect.orDie)
+            .runDetached(sessionID, `ls -1ap "${sandboxPath}" 2>/dev/null`, { timeoutSeconds: 10 })
+            .pipe(
+              Effect.mapError((error) =>
+                new ServiceUnavailableError({
+                  message: error instanceof Error ? error.message : String(error),
+                  service: "sandbox",
+                }),
+              ),
+            )
           const items = result.logs.stdout
             .map((l: any) => (typeof l === "string" ? l : l.text ?? ""))
             .join("\n")

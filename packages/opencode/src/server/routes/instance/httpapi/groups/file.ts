@@ -11,6 +11,7 @@ import {
   WorkspaceRoutingQuery,
   WorkspaceRoutingQueryFields,
 } from "../middleware/workspace-routing"
+import { ServiceUnavailableError } from "../errors"
 import { described } from "./metadata"
 
 export const FileQuery = Schema.Struct({
@@ -206,6 +207,7 @@ export const FileApi = HttpApi.make("file")
         HttpApiEndpoint.get("list", FilePaths.list, {
           query: FileQuery,
           success: described(Schema.Array(LegacyEntry), "Files and directories"),
+          error: [ServiceUnavailableError],
         }).annotateMerge(
           OpenApi.annotations({
             identifier: "file.list",
