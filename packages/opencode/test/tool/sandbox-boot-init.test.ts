@@ -135,7 +135,7 @@ describe.skipIf(!enabled)("createSandbox - boot 初始化命令（pnpm store 迁
     lifecycle.stop(true)
   })
 
-  test("T1: 初始化命令包含 pnpm store 迁移 + 全局 exclude 全部配置", async () => {
+  test("T1: 初始化命令只含 git 性能与 excludesfile 兜底，不配置 pnpm store", async () => {
     runCommands.length = 0
     // SandboxTable 无记录 → ensure 走 createSandbox 全流程
     const result: any = await Effect.runPromise(
@@ -146,16 +146,16 @@ describe.skipIf(!enabled)("createSandbox - boot 初始化命令（pnpm store 迁
     const initCmd = runCommands.find((c) => c.includes("core.excludesfile"))
     expect(initCmd).toBeDefined()
 
-    // store 指向共享 package-cache 挂载（对齐 shared-package-cache-design.md）
-    expect(initCmd).toContain("store-dir=/cache")
-    // 全局 npmrc 追加需幂等（grep 防重）
-    expect(initCmd).toContain("grep -q '^store-dir=' /root/.npmrc")
+    // 不写 store-dir：pnpm 跨 FS fallback 让 store 落 /workspace/.pnpm-store（同盘硬链接最快）；
+    // 指到共享挂载会 EXDEV 退化 copy 模式（比下载慢）且存量元数据不匹配触发 NO_TTY purge 中止
+    expect(initCmd).not.toContain("store-dir=")
+    expect(initCmd).not.toContain("/root/.npmrc")
+    // 不做 node_modules 迁移/清理（store 位置未变，存量元数据天然一致）
+    expect(initCmd).not.toContain("node_modules")
+    expect(initCmd).not.toContain("rm -rf /workspace/.pnpm-store")
     // excludesfile 兜底（不侵入业务 .gitignore）
     expect(initCmd).toContain("git config --global core.excludesfile /home/sandbox/.gitignore-global")
     expect(initCmd).toContain("printf '.pnpm-store/\\n' > /home/sandbox/.gitignore-global")
-    // 旧 store 残留仅后台 rm（跨 NFS 挂载 mv 是全量 copy，禁止）
-    expect(initCmd).not.toContain("mv /workspace/.pnpm-store")
-    expect(initCmd).toContain("setsid nohup rm -rf /workspace/.pnpm-store")
     // 原有 git 性能配置保留
     expect(initCmd).toContain("git config --global core.fsmonitor true")
     expect(initCmd).toContain("git config --global core.untrackedcache true")
@@ -168,10 +168,10 @@ describe.skipIf(!enabled)("createSandbox - boot 初始化命令（pnpm store 迁
     )
     const initCmd = runCommands.find((c) => c.includes("core.excludesfile"))
     expect(initCmd).toBeDefined()
-    // 7 个配置段全部以 "; " 连接（前段失败不得中断后续配置）
-    expect(initCmd!.split("; ")).toHaveLength(7)
-    // 配置段之间不得用 "&&" 短路（唯一的 && 只允许出现在后台 rm 条件段内部）
-    expect(initCmd).not.toContain("&& git config")
+    // 5 个配置段全部以 "; " 连接（前段失败不得中断后续配置）
+    expect(initCmd!.split("; ")).toHaveLength(5)
+    // 配置段之间不得用 "&&" 短路
+    expect(initCmd).not.toContain("&&")
     expect(initCmd).toContain("; git config --global core.excludesfile")
   }, 30_000)
 })

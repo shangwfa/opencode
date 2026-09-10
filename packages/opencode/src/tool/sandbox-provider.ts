@@ -1221,14 +1221,14 @@ export namespace SandboxProvider {
               Effect.catchCause(() => Effect.void),
             )
           }
-          // pnpm 在 HOME 与 /workspace 跨文件系统时会把 store 落进 /workspace/.pnpm-store（硬链接需同盘），
-          // 业务 .gitignore 普遍缺该条目 → untracked 爆炸 → vcs diff 502。
-          // 修复（与 docs/shared-package-cache-design.md 对齐）：全局 npmrc 把 store 指到共享
-          // package-cache 挂载（PVC 模式 subPath=shared/package-cache，跨 session 共享下载缓存；
-          // none/snapshot 模式下为 rootfs 目录，不共享但同样不落 git 树）——install 命令
-          // 不再依赖调用方手动拼 --store-dir。旧 store 残留只做后台 rm（跨 NFS 挂载 mv 是
-          // 全量 copy，会阻塞 boot）。excludesfile 为第二道防线，不侵入业务 .gitignore。
-          // 幂等：grep 防重追加、printf 覆盖写、rm 条件执行，沙箱每次重建可安全重跑
+          // pnpm 在 HOME(/root, overlay) 与 /workspace(NFS) 跨文件系统时自动把 store fallback
+          // 到 /workspace/.pnpm-store（同盘 → install 走硬链接，秒级）。git 污染由 excludesfile
+          // 全局兜底（不依赖业务 .gitignore，vcs diff 不受 .pnpm-store 影响）。
+          // 注意：不要再把 store 指到共享挂载（/opt/pnpm-store）——store 与 workspace 跨挂载点
+          // 导致 EXDEV，pnpm 退化为 copy 模式（全量 copy 3-5 分钟，比内网 registry 下载 1-2 分钟
+          // 还慢，共享缓存净价值为负），且存量 node_modules 元数据 storeDir 不匹配会触发 purge
+          // 重建确认，无 TTY 的 exec 环境下直接中止（ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY）。
+          // 幂等：git config 重复执行无害，printf 覆盖写，沙箱每次重建可安全重跑
           yield* Effect.tryPromise(() =>
             sb.commands.run(
               [
@@ -1237,8 +1237,6 @@ export namespace SandboxProvider {
                 "git config --global core.untrackedcache true",
                 "git config --global core.excludesfile /home/sandbox/.gitignore-global",
                 "printf '.pnpm-store/\\n' > /home/sandbox/.gitignore-global",
-                `grep -q '^store-dir=' /root/.npmrc 2>/dev/null || echo 'store-dir=${config.packageCacheMount}' >> /root/.npmrc`,
-                "[ -d /workspace/.pnpm-store ] && setsid nohup rm -rf /workspace/.pnpm-store >/dev/null 2>&1 </dev/null &",
               ].join("; "),
             ),
           ).pipe(Effect.catchCause(() => Effect.void))
