@@ -120,6 +120,18 @@ describe("rewriteJs - export default 资源字符串（本次修复）", () => {
     const out = rewriteJs(PREFIX, `export default { path: "/api/users", name: "x" }`)
     expect(out).toBe(`export default { path: "/api/users", name: "x" }`)
   })
+
+  test("export default API 路径常量不误伤（无资源扩展名，本次修复）", () => {
+    const out = rewriteJs(PREFIX, `export default "/api/users"`)
+    expect(out).toBe(`export default "/api/users"`)
+  })
+
+  test("export default 常见资源扩展名重写不受影响", () => {
+    for (const p of ["/src/assets/bg.png", "/src/assets/logo.svg?t=raw", "/src/style.css", "/src/fonts/x.woff2", "/src/media/v.mp4"]) {
+      const out = rewriteJs(PREFIX, `export default "${p}"`)
+      expect(out).toContain(PREFIX)
+    }
+  })
 })
 
 describe("rewriteJs - 防御性守卫", () => {
@@ -158,6 +170,27 @@ describe("rewriteJs - 防御性守卫", () => {
     const trickyPrefix = "/session/ses(a)[b]/proxy/5173"
     const out = rewriteJs(trickyPrefix, `import x from "/src/a.ts";`)
     expect(out).toBe(`import x from "${trickyPrefix}/src/a.ts";`)
+  })
+
+  test("字符串文案里的单词 from 不误伤（语句锚定，本次修复）", () => {
+    const out = rewriteJs(PREFIX, `var tip = 'Learn from "/docs" page';var s2 = "data from /old";`)
+    expect(out).toBe(`var tip = 'Learn from "/docs" page';var s2 = "data from /old";`)
+  })
+
+  test("minified 语句形态的 from 重写不受影响", () => {
+    const out = rewriteJs(PREFIX, `;import{useState}from"/node_modules/.vite/deps/react.js?v=x";export{helper}from"/src/helper.ts";`)
+    expect(out).toContain(`from"${PREFIX}/node_modules/.vite/deps/react.js?v=x"`)
+    expect(out).toContain(`from"${PREFIX}/src/helper.ts"`)
+  })
+
+  test("import * as ns from 重写（语句锚定）", () => {
+    const out = rewriteJs(PREFIX, `import * as ns from "/src/ns.ts";`)
+    expect(out).toBe(`import * as ns from "${PREFIX}/src/ns.ts";`)
+  })
+
+  test("import \"/x\" 无 from 形态重写保留（import 关键字直接跟引号）", () => {
+    const out = rewriteJs(PREFIX, `import "/src/styles.css";`)
+    expect(out).toBe(`import "${PREFIX}/src/styles.css";`)
   })
 })
 
@@ -219,6 +252,10 @@ describe("rewriteHtml - 与 rewriteJs 的路径重写一致性（回归）", () 
     expect(out).toContain(`window.__OC_PROXY_PREFIX__`)
     expect(out).toContain(`window.fetch=function`)
     expect(out).toContain(`window.WebSocket=function`)
+    // 运行时硬跳转兜底 patch：pushState/replaceState 第三参、window.open 首参走 f() 加前缀
+    expect(out).toContain(`history.pushState=function`)
+    expect(out).toContain(`history.replaceState=function`)
+    expect(out).toContain(`window.open=function`)
   })
 
   test("内联 script 中动态 import 兜底重写（HTML 兜底正则，与 JS 文件修复语义一致）", () => {
@@ -234,6 +271,91 @@ describe("rewriteHtml - 与 rewriteJs 的路径重写一致性（回归）", () 
     expect(countPrefix(out)).toBe(3)
     // 关键：无重复拼接特征
     expect(out).not.toContain(`${PREFIX}/session/`)
+  })
+
+  test("内联 script 中 export default 资源字符串重写（与 rewriteJs 语义一致）", () => {
+    const html = `<html><head></head><body><script type="module">export default "/src/assets/inline.png";</script></body></html>`
+    const out = rewriteHtml(PREFIX, html)
+    expect(out).toContain(`export default "${PREFIX}/src/assets/inline.png"`)
+  })
+})
+
+describe("rewriteHtml - 正则字面量防误伤（本次修复）", () => {
+  test("minified 正则字面量 /'/g、/\"/g、/>/g 不被注入 prefix（code-inspector preact 产物实测样本）", () => {
+    const html = `<html><head></head><body><script>var Yt=/>/g,Wt=/'/g,Ft=/"/g,z=RegExp(">|[^x]","g");</script></body></html>`
+    const out = rewriteHtml(PREFIX, html)
+    expect(out).toContain(`Wt=/'/g`)
+    expect(out).toContain(`Ft=/"/g`)
+    expect(out).toContain(`Yt=/>/g`)
+    // 注入特征：prefix 出现在正则定界符内（/g 前粘上 prefix）
+    expect(out).not.toMatch(new RegExp(`/${PREFIX.slice(1).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/g`))
+  })
+
+  test("内联 script 中普通字符串路径不重写（运行时由 INJECT_SCRIPT patch 兜底）", () => {
+    const html = `<html><head></head><body><script>fetch("/api/data");</script></body></html>`
+    const out = rewriteHtml(PREFIX, html)
+    expect(out).toContain(`fetch("/api/data")`)
+  })
+
+  test("常见业务正则字面量形态不被注入（URL 协议、字符类、flags 组合）", () => {
+    const html = `<html><head></head><body><script>var r1=/^https?:\\/\\//;var r2=/[a-z]+/gi;var r3=/\\d{2,4}/;var r4=/[\\/]/;</script></body></html>`
+    const out = rewriteHtml(PREFIX, html)
+    expect(out).toContain(`r1=/^https?:\\/\\//`)
+    expect(out).toContain(`r2=/[a-z]+/gi`)
+    expect(out).toContain(`r3=/\\d{2,4}/`)
+    expect(out).toContain(`r4=/[\\/]/`)
+  })
+
+  test("除法与正则混合的 minified 表达式保持原样", () => {
+    const html = `<html><head></head><body><script>var pct=a/b/g;var esc=c.replace(/"/g,"&quot;");</script></body></html>`
+    const out = rewriteHtml(PREFIX, html)
+    expect(out).toContain(`a/b/g`)
+    expect(out).toContain(`c.replace(/"/g,"&quot;")`)
+  })
+})
+
+describe("rewriteHtml - 内联 script 静态 import（补全）", () => {
+  test("内联 script 静态 import from 重写", () => {
+    const html = `<html><head></head><body><script type="module">import x from "/src/inline-mod.ts";</script></body></html>`
+    const out = rewriteHtml(PREFIX, html)
+    expect(out).toContain(`import x from "${PREFIX}/src/inline-mod.ts"`)
+  })
+
+  test("vite react-refresh preamble 形态重写（内联 script 首行、/@react-refresh）", () => {
+    const html = `<html><head></head><body><script type="module">import RefreshRuntime from "/@react-refresh";
+import { useState } from "/node_modules/.vite/deps/react.js?v=abc";
+RefreshRuntime.injectIntoGlobalHook(window);
+window.$RefreshReg$ = () => {};
+window.$RefreshSig$ = () => (type) => type;</script></body></html>`
+    const out = rewriteHtml(PREFIX, html)
+    expect(out).toContain(`from "${PREFIX}/@react-refresh"`)
+    expect(out).toContain(`from "${PREFIX}/node_modules/.vite/deps/react.js?v=abc"`)
+  })
+
+  test("硬跳转路径已带 prefix 不双写", () => {
+    const html = `<html><head></head><body><script>location.href = "${PREFIX}/login";</script></body></html>`
+    const out = rewriteHtml(PREFIX, html)
+    expect(out).toContain(`location.href = "${PREFIX}/login"`)
+    expect(out).not.toContain(`${PREFIX}/session/`)
+  })
+
+  test("内联 script 动态 import 带 /* @vite-ignore */ 注释形态重写", () => {
+    const html = `<html><head></head><body><script type="module">const m = await import(/* @vite-ignore */ "/src/lazy.ts");</script></body></html>`
+    const out = rewriteHtml(PREFIX, html)
+    expect(out).toContain(`import(/* @vite-ignore */ "${PREFIX}/src/lazy.ts")`)
+  })
+
+  test("内联 script 单引号 import 重写", () => {
+    const html = `<html><head></head><body><script type="module">import '/src/style.css';</script></body></html>`
+    const out = rewriteHtml(PREFIX, html)
+    expect(out).toContain(`import '${PREFIX}/src/style.css'`)
+  })
+
+  test("内联 script 协议相对与完整 URL 不重写", () => {
+    const html = `<html><head></head><body><script type="module">import a from "//cdn.example.com/lib.js";import b from "https://esm.sh/x";</script></body></html>`
+    const out = rewriteHtml(PREFIX, html)
+    expect(out).toContain(`import a from "//cdn.example.com/lib.js"`)
+    expect(out).toContain(`import b from "https://esm.sh/x"`)
   })
 })
 
@@ -251,5 +373,87 @@ describe("rewriteCss - url() 重写（回归）", () => {
   test("相对路径与 data: URI 不误伤", () => {
     const src = `.a { background: url(./x.png) } .b { background: url(data:image/png;base64,AAA) }`
     expect(rewriteCss(PREFIX, src)).toBe(src)
+  })
+
+  test("协议相对 url(//cdn) 不破坏（本次修复）", () => {
+    const out = rewriteCss(PREFIX, `.a { background: url(//cdn.example.com/x.png); } .b { background: url('//cdn.example.com/y.png'); }`)
+    expect(out).toContain(`url(//cdn.example.com/x.png)`)
+    expect(out).toContain(`url('//cdn.example.com/y.png')`)
+  })
+
+  test("已带 prefix 的 url() 不双写（本次修复）", () => {
+    const src = `.a { background: url(${PREFIX}/assets/bg.png); }`
+    expect(rewriteCss(PREFIX, src)).toBe(src)
+  })
+})
+
+describe("rewriteHtml - 硬跳转路径重写（Location 无法运行时 patch，静态精准锚定）", () => {
+  test("内联 script location.href 赋值重写", () => {
+    const html = `<html><head></head><body><script>function logout(){location.href = "/login";}</script></body></html>`
+    const out = rewriteHtml(PREFIX, html)
+    expect(out).toContain(`location.href = "${PREFIX}/login"`)
+  })
+
+  test("minified 紧凑形态 location.href=\"/x\" 重写", () => {
+    const html = `<html><head></head><body><script>location.href="/login?next=/home";</script></body></html>`
+    const out = rewriteHtml(PREFIX, html)
+    expect(out).toContain(`location.href="${PREFIX}/login?next=/home"`)
+  })
+
+  test("window.location 对象赋值与 pathname 赋值重写", () => {
+    const html = `<html><head></head><body><script>window.location = "/home";location.pathname = "/profile";</script></body></html>`
+    const out = rewriteHtml(PREFIX, html)
+    expect(out).toContain(`window.location = "${PREFIX}/home"`)
+    expect(out).toContain(`location.pathname = "${PREFIX}/profile"`)
+  })
+
+  test("location.assign / location.replace 字面量重写", () => {
+    const html = `<html><head></head><body><script>location.assign("/a");location.replace("/b");</script></body></html>`
+    const out = rewriteHtml(PREFIX, html)
+    expect(out).toContain(`location.assign("${PREFIX}/a")`)
+    expect(out).toContain(`location.replace("${PREFIX}/b")`)
+  })
+
+  test("协议相对与完整 URL 的硬跳转不重写", () => {
+    const html = `<html><head></head><body><script>location.href = "https://sso.example.com/login";location.href = "//cdn.example.com/x";</script></body></html>`
+    const out = rewriteHtml(PREFIX, html)
+    expect(out).toContain(`location.href = "https://sso.example.com/login"`)
+    expect(out).toContain(`location.href = "//cdn.example.com/x"`)
+  })
+})
+
+describe("rewriteJs - 硬跳转路径重写（与 rewriteHtml 一致）", () => {
+  test("JS 模块内 location.href 赋值重写", () => {
+    const out = rewriteJs(PREFIX, `export function go(){ location.href = "/login"; }`)
+    expect(out).toContain(`location.href = "${PREFIX}/login"`)
+  })
+
+  test("JS 模块内 location.assign/replace 重写", () => {
+    const out = rewriteJs(PREFIX, `location.assign("/a");location.replace("/b");`)
+    expect(out).toContain(`location.assign("${PREFIX}/a")`)
+    expect(out).toContain(`location.replace("${PREFIX}/b")`)
+  })
+
+  test("变量赋值形态不误伤（运行时由 pushState/open patch 兜底）", () => {
+    const src = `var target = "/login"; location.href = target;`
+    expect(rewriteJs(PREFIX, src)).toBe(src)
+  })
+})
+
+describe("rewriteHtml - 属性重写防御（本次修复）", () => {
+  test("已带 prefix 的 src/href 不双写", () => {
+    const html = `<html><head></head><body><script type="module" src="${PREFIX}/src/main.tsx"></script><link rel="stylesheet" href="${PREFIX}/src/a.css"></body></html>`
+    const out = rewriteHtml(PREFIX, html)
+    expect(out).toContain(`src="${PREFIX}/src/main.tsx"`)
+    expect(out).toContain(`href="${PREFIX}/src/a.css"`)
+    expect(out).not.toContain(`${PREFIX}/session/`)
+  })
+
+  test("含正则特殊字符的 prefix 不抛错且属性重写正确", () => {
+    const trickyPrefix = "/session/ses(a)[b]/proxy/5173"
+    const html = `<html><head></head><body><script type="module" src="/src/main.tsx"></script></body></html>`
+    const out = rewriteHtml(trickyPrefix, html)
+    expect(out).toContain(`src="${trickyPrefix}/src/main.tsx"`)
+    expect(out).not.toContain(`${trickyPrefix}/session/`)
   })
 })

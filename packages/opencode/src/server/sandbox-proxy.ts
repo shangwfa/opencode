@@ -81,30 +81,49 @@ window.EventSource.prototype=_es.prototype;
 window.EventSource.CONNECTING=_es.CONNECTING;window.EventSource.OPEN=_es.OPEN;window.EventSource.CLOSED=_es.CLOSED;
 var _xo=XMLHttpRequest.prototype.open;
 XMLHttpRequest.prototype.open=function(m,u){if(typeof u==="string")arguments[1]=f(u);return _xo.apply(this,arguments)};
+var _ps=history.pushState,_rs=history.replaceState;
+history.pushState=function(s,t,u){if(arguments.length>2&&typeof u==="string")arguments[2]=f(u);return _ps.apply(history,arguments)};
+history.replaceState=function(s,t,u){if(arguments.length>2&&typeof u==="string")arguments[2]=f(u);return _rs.apply(history,arguments)};
+var _open=window.open;
+window.open=function(u){if(typeof u==="string")arguments[0]=f(u);return _open.apply(window,arguments)};
 function _patchSetter(proto,prop){var d=Object.getOwnPropertyDescriptor(proto,prop);if(!d||!d.set)return;Object.defineProperty(proto,prop,{set:function(u){return d.set.call(this,typeof u==="string"?f(u):u)},get:d.get,configurable:true})}
 _patchSetter(HTMLScriptElement.prototype,"src");
 _patchSetter(HTMLLinkElement.prototype,"href");
 _patchSetter(HTMLImageElement.prototype,"src");
 _patchSetter(HTMLMediaElement.prototype,"src");
-var _err=console.error;
-console.error=function(){_err.apply(console,arguments);try{__ocReport([{type:"runtime",message:Array.from(arguments).map(function(a){return typeof a==="string"?a:typeof a==="object"&&a&&a.message?a.message:String(a)}).join(" "),timestamp:Date.now()}])}catch(e){}};
-window.addEventListener("error",function(e){try{__ocReport([{type:"runtime",message:e.message,url:e.filename,line:e.lineno,col:e.colno,stack:e.error&&e.error.stack||"",timestamp:Date.now()}])}catch(ex){}});
-window.addEventListener("unhandledrejection",function(e){try{__ocReport([{type:"runtime",message:"UnhandledPromise: "+(e.reason&&e.reason.message||String(e.reason)),stack:e.reason&&e.reason.stack||"",timestamp:Date.now()}])}catch(ex){}});
-function __ocReport(errs){var img=new Image();img.src=P+"/__error_report?e="+encodeURIComponent(JSON.stringify(errs))}
 })();</script>`
 
 const VITE_CLIENT_BUST = `oc=${Date.now().toString(36)}`
 
 export function rewriteHtml(prefix: string, text: string) {
-  const htmlSrcHref = new RegExp("((?:src|href)\\s*=\\s*[\"'])/(?!/)", "g")
+  // prefix 进正则需转义（sessionID 现为 base62，防御未来字符集变化与 rewriteJs 保持一致）
+  const escapedPrefix = prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+  // 属性重写需防双重前缀：dev server 配置 base 为 proxy 前缀等场景下 HTML 可能已带 prefix
+  const htmlSrcHref = new RegExp(`((?:src|href)\\s*=\\s*[\"'])/(?!/)(?!${escapedPrefix.slice(1)})`, "g")
   let rewritten = text.replace(htmlSrcHref, `$1${prefix}/`)
   rewritten = rewritten.replace(`${prefix}/@vite/client`, `${prefix}/@vite/client?${VITE_CLIENT_BUST}`)
   rewritten = rewritten.replace(
     /(<script[^>]*>)([\s\S]*?)(<\/script>)/gi,
     (_, open, code, close) => {
       if (/\ssrc\s*=/i.test(open)) return open + code + close
-      let r = code.replace(new RegExp(`((?:import|from)\\s*(?:["']))/(?!/)`, "g"), `$1${prefix}/`)
-      r = r.replace(new RegExp(`(["'])/(?!/)(?!${prefix.slice(1)})`, "g"), `$1${prefix}/`)
+      let r = code.replace(new RegExp(`(import\\s*(["']))/(?!/)(?!${escapedPrefix.slice(1)})`, "g"), `$1${prefix}/`)
+      // from 语句锚定：要求分号/行首/{ 后接 import|export 关键字再到 from，避免误伤
+      // 字符串文案里的普通英文单词 from（如 'Learn from "/docs"'）
+      r = r.replace(new RegExp(`((?:^|[;{}\\n])\\s*(?:import|export)[^;"'()]*?\\s*from\\s*(["']))/(?!/)(?!${escapedPrefix.slice(1)})`, "gm"), `$1${prefix}/`)
+      // 内联 script 只做与 rewriteJs 一致的精准锚定重写（动态 import / export default）。
+      // 严禁泛匹配「引号+斜杠」：minified 产物里的正则字面量 /'/g、/"/g（如 code-inspector
+      // 注入的 preact escapeHtml 正则）会被误注入 prefix，产生非法 regex flags 导致整段
+      // 内联脚本 SyntaxError 白屏。运行时路径字符串由 INJECT_SCRIPT 的 fetch/XHR/src patch 兜底。
+      r = r.replace(new RegExp(`(import\\s*\\(\\s*(?:/\\*[\\s\\S]*?\\*/\\s*)*(["']))/(?!/)(?!${escapedPrefix.slice(1)})`, "g"), `$1${prefix}/`)
+      // export default 仅重写带资源扩展名的路径（vite 静态资源导出必有扩展名），
+      // 避免误改 API 路径常量（export default "/api/users"）
+      r = r.replace(new RegExp(`(export\\s+default\\s*(["']))/(?!/)(?!${escapedPrefix.slice(1)})(?=[^"']*\\.[A-Za-z0-9]+(?=\\?|["']))`, "g"), `$1${prefix}/`)
+      // 硬跳转字面量（location 是 Unforgeable 属性无法运行时 patch，必须静态锚定；
+      // 仅匹配字面量字符串，变量形态由 INJECT_SCRIPT 的 pushState/open patch 兜底）
+      r = r.replace(new RegExp(`(location\\.(?:href|pathname)\\s*=\\s*(["']))/(?!/)(?!${escapedPrefix.slice(1)})`, "g"), `$1${prefix}/`)
+      r = r.replace(new RegExp(`((?:window\\.)?location\\s*=\\s*(["']))/(?!/)(?!${escapedPrefix.slice(1)})`, "g"), `$1${prefix}/`)
+      r = r.replace(new RegExp(`(location\\.(?:assign|replace)\\s*\\(\\s*(["']))/(?!/)(?!${escapedPrefix.slice(1)})`, "g"), `$1${prefix}/`)
+      r = r.replace(new RegExp(`(window\\.open\\s*\\(\\s*(["']))/(?!/)(?!${escapedPrefix.slice(1)})`, "g"), `$1${prefix}/`)
       return open + r + close
     },
   )
@@ -117,14 +136,24 @@ export function rewriteHtml(prefix: string, text: string) {
 
 export function rewriteJs(prefix: string, text: string, isViteClient = false) {
   const escapedPrefix = prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-  let rewritten = text.replace(new RegExp(`((?:import|from)\\s*(?:["']))/(?!/)(?!${escapedPrefix.slice(1)})`, "g"), `$1${prefix}/`)
+  let rewritten = text.replace(new RegExp(`(import\\s*(["']))/(?!/)(?!${escapedPrefix.slice(1)})`, "g"), `$1${prefix}/`)
+  // from 语句锚定：要求语句头（^|;|{|} 或换行）后接 import|export 关键字再到 from，
+  // 避免误伤字符串文案里的普通英文单词 from（'Learn from "/docs"'）
+  rewritten = rewritten.replace(new RegExp(`((?:^|[;{}\\n])\\s*(?:import|export)[^;"'()]*?\\s*from\\s*(["']))/(?!/)(?!${escapedPrefix.slice(1)})`, "gm"), `$1${prefix}/`)
   // 动态 import("/x")：import 后是括号而非引号，静态 import 正则匹配不到。
   // 括号内可能出现 /* @vite-ignore */ 块注释（react-refresh 异步加载 react-dom 的产物），
   // 需允许"空白/注释"混合后再接引号。
   rewritten = rewritten.replace(new RegExp(`(import\\s*\\(\\s*(?:/\\*[\\s\\S]*?\\*/\\s*)*(["']))/(?!/)(?!${escapedPrefix.slice(1)})`, "g"), `$1${prefix}/`)
   // Vite 静态资源 import 编译产物：export default "/src/assets/x.png"（运行时拼进 style/src，
-  // 浏览器资源加载不走 fetch patch，必须在这里重写）
-  rewritten = rewritten.replace(new RegExp(`(export\\s+default\\s*(["']))/(?!/)(?!${escapedPrefix.slice(1)})`, "g"), `$1${prefix}/`)
+  // 浏览器资源加载不走 fetch patch，必须在这里重写）。仅重写带资源扩展名的路径，
+  // 避免误改 API 路径常量（export default "/api/users"）
+  rewritten = rewritten.replace(new RegExp(`(export\\s+default\\s*(["']))/(?!/)(?!${escapedPrefix.slice(1)})(?=[^"']*\\.[A-Za-z0-9]+(?=\\?|["']))`, "g"), `$1${prefix}/`)
+  // 硬跳转字面量：Location 属性（href/pathname/对象赋值/assign/replace）是 Unforgeable
+  // 无法运行时 patch，只能静态精准锚定；变量形态的 URL 由 pushState/open patch 或不处理
+  rewritten = rewritten.replace(new RegExp(`(location\\.(?:href|pathname)\\s*=\\s*(["']))/(?!/)(?!${escapedPrefix.slice(1)})`, "g"), `$1${prefix}/`)
+  rewritten = rewritten.replace(new RegExp(`((?:window\\.)?location\\s*=\\s*(["']))/(?!/)(?!${escapedPrefix.slice(1)})`, "g"), `$1${prefix}/`)
+  rewritten = rewritten.replace(new RegExp(`(location\\.(?:assign|replace)\\s*\\(\\s*(["']))/(?!/)(?!${escapedPrefix.slice(1)})`, "g"), `$1${prefix}/`)
+  rewritten = rewritten.replace(new RegExp(`(window\\.open\\s*\\(\\s*(["']))/(?!/)(?!${escapedPrefix.slice(1)})`, "g"), `$1${prefix}/`)
   rewritten = rewritten.replace(/__webpack_require__\.p\s*=\s*"\/(?!\/)/g, `__webpack_require__.p="${prefix}/`)
   rewritten = rewritten.replace(/__HMR_BASE__/g, JSON.stringify(prefix + "/"))
   rewritten = rewritten.replace(/__BASE__/g, JSON.stringify(prefix + "/"))
@@ -153,7 +182,9 @@ export function rewriteJs(prefix: string, text: string, isViteClient = false) {
 }
 
 export function rewriteCss(prefix: string, text: string) {
-  return text.replace(/(url\s*\(\s*["']?)\//g, `$1${prefix}/`)
+  // (?!/) 排除协议相对 url(//cdn.example.com/x)；(?!prefix) 防已带前缀的资源双写
+  const escapedPrefix = prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+  return text.replace(new RegExp(`(url\\s*\\(\\s*["']?)/(?!/)(?!${escapedPrefix.slice(1)})`, "g"), `$1${prefix}/`)
 }
 
 function parsePort(raw: string) {
