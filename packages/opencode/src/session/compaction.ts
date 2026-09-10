@@ -7,6 +7,7 @@ import { Provider } from "@/provider/provider"
 import { MessageV2 } from "./message-v2"
 import { Token } from "@/util/token"
 import { SessionProcessor } from "./processor"
+import { SessionStatus } from "./status"
 import { Agent } from "@/agent/agent"
 import { Plugin } from "@/plugin"
 import { Config } from "@/config/config"
@@ -194,6 +195,10 @@ export interface Interface {
     auto: boolean
     overflow?: boolean
   }) => Effect.Effect<void>
+  readonly deriveSummary: (input: {
+    sourceSessionID: SessionID
+    targetSessionID: SessionID
+  }) => Effect.Effect<void>
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/SessionCompaction") {}
@@ -208,6 +213,7 @@ const layer = Layer.effect(
     const agents = yield* Agent.Service
     const plugin = yield* Plugin.Service
     const processors = yield* SessionProcessor.Service
+    const status = yield* SessionStatus.Service
     const provider = yield* Provider.Service
     const events = yield* EventV2Bridge.Service
     const flags = yield* RuntimeFlags.Service
@@ -650,11 +656,94 @@ const layer = Layer.effect(
       })
     })
 
+    // 在目标会话里异步生成一份源会话的最新摘要（走 processor 流式事件，不写源会话）。
+    const deriveSummary = Effect.fn("SessionCompaction.deriveSummary")(function* (input: {
+      sourceSessionID: SessionID
+      targetSessionID: SessionID
+    }) {
+      const sourceMessages = yield* session.messages({ sessionID: input.sourceSessionID }).pipe(Effect.orDie)
+      if (!sourceMessages.length) return
+
+      const lastUserMessage = sourceMessages.findLast((m) => m.info.role === "user")
+      if (!lastUserMessage || lastUserMessage.info.role !== "user") return
+      const lastUser = lastUserMessage.info
+
+      const previous = completedCompactions(sourceMessages).at(-1)
+      const recentMessages = previous ? sourceMessages.slice(previous.assistantIndex + 1) : sourceMessages
+      const conversation = recentMessages
+        .filter((m) => !m.parts.some((p) => p.type === "compaction"))
+        .map((m) => serialize(m))
+        .filter(Boolean)
+        .join("\n\n")
+      if (!conversation && !previous?.summary) return
+
+      const agent = yield* agents.get("compaction")
+      const model = agent.model
+        ? yield* provider.getModel(agent.model.providerID, agent.model.modelID).pipe(Effect.orDie)
+        : yield* provider.getModel(lastUser.model.providerID, lastUser.model.modelID).pipe(Effect.orDie)
+
+      const prompt = buildPrompt({ previousSummary: previous?.summary, context: [conversation] })
+      const ctx = yield* InstanceState.context
+
+      const userMsg = yield* session.updateMessage({
+        id: MessageID.ascending(),
+        role: "user",
+        sessionID: input.targetSessionID,
+        agent: lastUser.agent,
+        model: { providerID: model.providerID, modelID: model.id },
+        time: { created: Date.now() },
+      })
+      yield* session.updatePart({
+        id: PartID.ascending(),
+        messageID: userMsg.id,
+        sessionID: input.targetSessionID,
+        type: "compaction",
+        auto: false,
+      })
+
+      const assistantMsg: SessionV1.Assistant = {
+        id: MessageID.ascending(),
+        role: "assistant",
+        parentID: userMsg.id,
+        sessionID: input.targetSessionID,
+        mode: "compaction",
+        agent: "compaction",
+        variant: lastUser.model.variant,
+        summary: true,
+        path: { cwd: ctx.directory, root: ctx.worktree },
+        cost: 0,
+        tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+        modelID: model.id,
+        providerID: model.providerID,
+        time: { created: Date.now() },
+      }
+      yield* session.updateMessage(assistantMsg)
+
+      const processor = yield* processors.create({
+        assistantMessage: assistantMsg,
+        sessionID: input.targetSessionID,
+        model,
+      })
+      yield* processor
+        .process({
+          user: userMsg,
+          agent,
+          sessionID: input.targetSessionID,
+          tools: {},
+          system: [],
+          messages: [{ role: "user", content: [{ type: "text", text: prompt }] }],
+          model,
+        })
+        // processor 只负责置 busy；不走 prompt loop 时须自行恢复 idle（完成信号）
+        .pipe(Effect.ensuring(status.set(input.targetSessionID, { type: "idle" })))
+    })
+
     return Service.of({
       isOverflow,
       prune,
       process: processCompaction,
       create,
+      deriveSummary,
     })
   }),
 )
@@ -668,6 +757,7 @@ export const node = LayerNode.make({
     Agent.node,
     Plugin.node,
     SessionProcessor.node,
+    SessionStatus.node,
     Provider.node,
     EventV2Bridge.node,
     RuntimeFlags.node,

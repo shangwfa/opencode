@@ -310,6 +310,8 @@ export const CreateInput = Schema.optional(
     pvcMode: Schema.optional(PvcMode),
     appId: Schema.optional(Schema.String),
     sandbox: Schema.optional(SandboxResource),
+    /** 创建会话后，异步从该会话生成一份最新摘要注入到新会话（摘要走消息事件流） */
+    summaryFrom: Schema.optional(SessionID),
   }),
 )
 export type CreateInput = Types.DeepMutable<Schema.Schema.Type<typeof CreateInput>>

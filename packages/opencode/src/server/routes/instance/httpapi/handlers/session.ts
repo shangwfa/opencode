@@ -148,6 +148,17 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
         Effect.forkIn(scope, { startImmediately: true }),
       )
 
+    const forkDeriveSummary = (targetSessionID: SessionID, sourceSessionID: SessionID) =>
+      withSessionLock(
+        targetSessionID,
+        compactSvc.deriveSummary({ sourceSessionID, targetSessionID }),
+      ).pipe(
+          Effect.catchCause((cause) =>
+            Effect.logError("derive_summary failed", { sourceSessionID, targetSessionID, cause }),
+          ),
+          Effect.forkIn(scope, { startImmediately: true }),
+        )
+
     const promptAsync = Effect.fn("SessionHttpApi.promptAsync")(function* (ctx: {
       params: { sessionID: SessionID }
       payload: typeof PromptPayload.Type
@@ -324,6 +335,9 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       const result = yield* shareSvc
         .create(ctx.payload)
         .pipe(Effect.catchTag("SessionInvalidPvcConfigError", () => Effect.fail(new HttpApiError.BadRequest({}))))
+      if (result?.id && ctx.payload?.summaryFrom) {
+        yield* forkDeriveSummary(result.id as SessionID, ctx.payload.summaryFrom)
+      }
       if (result?.id) yield* logAction(result.id as SessionID, "session-create", ctx.payload ?? {})
       return result
     })

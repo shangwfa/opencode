@@ -1652,6 +1652,130 @@ describe("session.compaction.process", () => {
   )
 })
 
+describe("session.compaction.deriveSummary", () => {
+  it.instance(
+    "writes a compaction user message and summary assistant message into the target session",
+    Effect.gen(function* () {
+      const ssn = yield* SessionNs.Service
+      const source = yield* ssn.create({})
+      const target = yield* ssn.create({})
+      yield* createUserMessage(source.id, "hello world")
+
+      yield* SessionCompaction.use.deriveSummary({ sourceSessionID: source.id, targetSessionID: target.id })
+
+      const targetMsgs = yield* ssn.messages({ sessionID: target.id })
+      expect(targetMsgs).toHaveLength(2)
+      expect(targetMsgs[0].info.role).toBe("user")
+      expect(targetMsgs[0].info.agent).toBe("build")
+      expect(targetMsgs[0].parts[0]).toMatchObject({ type: "compaction", auto: false })
+      expect(targetMsgs[1].info.role).toBe("assistant")
+      if (targetMsgs[1].info.role === "assistant") {
+        expect(targetMsgs[1].info.summary).toBe(true)
+        expect(targetMsgs[1].info.parentID).toBe(targetMsgs[0].info.id)
+      }
+    }),
+  )
+
+  it.instance(
+    "does not modify the source session",
+    Effect.gen(function* () {
+      const ssn = yield* SessionNs.Service
+      const source = yield* ssn.create({})
+      const target = yield* ssn.create({})
+      yield* createUserMessage(source.id, "hello world")
+
+      yield* SessionCompaction.use.deriveSummary({ sourceSessionID: source.id, targetSessionID: target.id })
+
+      const sourceMsgs = yield* ssn.messages({ sessionID: source.id })
+      expect(sourceMsgs).toHaveLength(1)
+      expect(sourceMsgs[0].info.role).toBe("user")
+    }),
+  )
+
+  it.instance(
+    "does nothing when the source session is empty",
+    Effect.gen(function* () {
+      const ssn = yield* SessionNs.Service
+      const source = yield* ssn.create({})
+      const target = yield* ssn.create({})
+
+      yield* SessionCompaction.use.deriveSummary({ sourceSessionID: source.id, targetSessionID: target.id })
+
+      const targetMsgs = yield* ssn.messages({ sessionID: target.id })
+      expect(targetMsgs).toHaveLength(0)
+    }),
+  )
+
+  itCompaction.instance(
+    "summarizes the full source when there is no previous summary",
+    () => {
+      const stub = llm()
+      let captured = ""
+      stub.push(reply("derived summary", (input) => (captured = JSON.stringify(input.messages))))
+      return Effect.gen(function* () {
+        const ssn = yield* SessionNs.Service
+        const source = yield* ssn.create({})
+        const target = yield* ssn.create({})
+        yield* createUserMessage(source.id, "first turn")
+        yield* createUserMessage(source.id, "second turn")
+
+        yield* SessionCompaction.use.deriveSummary({ sourceSessionID: source.id, targetSessionID: target.id })
+
+        expect(captured).toContain("[User]: first turn")
+        expect(captured).toContain("[User]: second turn")
+        expect(captured).not.toContain("<prior-summary>")
+
+        const targetMsgs = yield* ssn.messages({ sessionID: target.id })
+        const summary = targetMsgs.find((m) => m.info.role === "assistant" && m.info.summary)
+        expect(summary?.parts.some((p) => p.type === "text" && p.text === "derived summary")).toBe(true)
+      }).pipe(withCompaction({ llm: stub.llmLayer }))
+    },
+    { git: true },
+  )
+
+  itCompaction.instance(
+    "anchors the previous summary and only summarizes recent turns",
+    () => {
+      const stub = llm()
+      let captured = ""
+      stub.push(reply("derived summary", (input) => (captured = JSON.stringify(input.messages))))
+      return Effect.gen(function* () {
+        const ssn = yield* SessionNs.Service
+        const test = yield* TestInstance
+        const source = yield* ssn.create({})
+        const target = yield* ssn.create({})
+
+        yield* createUserMessage(source.id, "old context")
+        const marker = yield* ssn.updateMessage({
+          id: MessageID.ascending(),
+          role: "user",
+          model: ref,
+          sessionID: source.id,
+          agent: "build",
+          time: { created: Date.now() },
+        })
+        yield* ssn.updatePart({
+          id: PartID.ascending(),
+          messageID: marker.id,
+          sessionID: source.id,
+          type: "compaction",
+          auto: false,
+        })
+        yield* createSummaryAssistantMessage(source.id, marker.id, test.directory, "summary one")
+        yield* createUserMessage(source.id, "recent turn")
+
+        yield* SessionCompaction.use.deriveSummary({ sourceSessionID: source.id, targetSessionID: target.id })
+
+        expect(captured).toContain("<prior-summary>")
+        expect(captured).toContain("summary one")
+        expect(captured).toContain("[User]: recent turn")
+        expect(captured).not.toContain("old context")
+      }).pipe(withCompaction({ llm: stub.llmLayer }))
+    },
+    { git: true },
+  )
+})
+
 describe("util.token.estimate", () => {
   test("estimates tokens from text (4 chars per token)", () => {
     const text = "x".repeat(4000)
