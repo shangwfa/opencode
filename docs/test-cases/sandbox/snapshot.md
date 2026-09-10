@@ -101,6 +101,7 @@ curl -s -X POST $K/sandboxes/$R/proxy/44772/command -H "$AUTH" -H 'Content-Type:
 
 > **远端 K8s 实测**（2026-08-22，方式 B）：PASS — 恢复成功 5/5 个沙箱均 cat 出完整 marker，快照 rootfs 物化真实有效。注意多副本部署下恢复请求约 50% 报 `SNAPSHOT::NOT_FOUND`（控制面元数据副本本地化，见上方根因分析），需重试至命中持有副本。
 > **复测**（2026-09-07）：恢复循环 x10 仍 5 OK / 5 NOT_FOUND 完美交替——运维侧未修复，仍待根治（见文末复测记录）。
+> **复测**（2026-09-10）：未修复——GET x12 独立连接严格 `404 200` 交替、新快照恢复 x10 仍 5 OK / 5 NOT_FOUND（marker 5/5 完整）。已沉淀自动化脚本 [`scripts/snapshot_notfound_check.py`](scripts/snapshot_notfound_check.py)（每请求独立 TCP 连接防 LB 粘滞误判，附粘滞对照组），见文末复测记录。
 > **本地实测**（2026-08-20，方式 A 思路）：T25.3 的 marker+pnpm store 断言即隐式覆盖此真伪检查。
 
 ### T25.4 快照失败降级（源容器已死）
@@ -670,3 +671,30 @@ done
 **决议**：我方**不加重试兜底**——`Sandbox.create` 单发，成功即成功、失败即降级（fail-fast 语义维持）；根治依赖运维收敛单副本或上游支持共享快照存储（0.2.3 验尸确认 store 类型仍写死 `Literal["sqlite"]`，无共享后端选项）。
 
 复测命令（修复后验收仍可用 T25.3b 脚本与上方 8 次恢复验证脚本）。
+
+---
+
+## 复测记录（2026-09-10，运维侧问题复测 + 脚本沉淀）
+
+环境：本地直连远端 K8s OpenSandbox（172.18.32.15:30040），mini v1.0.0 镜像。
+
+**新增自动化脚本**：[`scripts/snapshot_notfound_check.py`](scripts/snapshot_notfound_check.py)——完整链路（建源沙箱 → 写 marker → 快照 Ready → 删源 → GET 探测 + 恢复循环 + marker 校验 + 清理），退出码 0=FIXED / 1=BROKEN。
+
+```bash
+# 完整链路（base/key 已内置默认值，直接跑）
+python3 docs/test-cases/sandbox/scripts/snapshot_notfound_check.py
+# 快速探测（仅对已有快照 GET，不建资源）
+python3 docs/test-cases/sandbox/scripts/snapshot_notfound_check.py --probe-snap <snapshotId>
+```
+
+> **连接粘性是探测的关键坑**：LB 按 TCP 连接分发——复用连接的客户端（`requests.Session`、SDK 连接池、`curl 多URL`）会粘滞单副本，得到「全 200」（误判已修复）或「全 404」（误判快照丢失）。脚本主判定每请求**独立新建 TCP 连接**，并附粘滞连接对照组佐证 LB 行为。
+
+| 验证项 | 结果 | 证据 |
+|---|---|---|
+| 快照列表健康度 | 无 Failed | 20 条全部 `Ready\|Kubernetes snapshot image created successfully`，无 `Failed\|RegistryNotConfigured` |
+| GET 单查 x12（独立连接） | **未修复** | 严格 `404 200` 交替（6/6），多副本元数据不共享典型特征 |
+| 粘滞连接 GET x6 | 佐证 LB 行为 | 同一 TCP 连接全 404（粘在坏副本）；复用连接的探测结果不可信 |
+| 新快照恢复 x10（独立连接） | **未修复** | 5 OK / 5 `SNAPSHOT::NOT_FOUND` 完美交替（快照 0a20a455，Ready ~30s） |
+| 数据面完整性 | 无损 | 恢复成功的 5 个沙箱 `cat /workspace/mark.txt` 全部输出完整 marker |
+
+**结论**：与 08-22 根因分析、09-07 复测完全一致，运维侧（收敛单副本或配置 snapshot-registry）仍未处理。我方 fail-fast 降级语义（NOT_FOUND → markRestoreFailed → 镜像冷启动）维持不变。
