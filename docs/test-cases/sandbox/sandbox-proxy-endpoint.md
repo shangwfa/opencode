@@ -562,6 +562,41 @@ echo "存活时落库: $PGSQL_3 (期望仍 1, 无新增)"
 ```
 **期望**：endpoint/proxy 均 200；exec_log 计数不变（存活时不产生 preview-down 记录，无误报）
 
+### T11.40 JSDoc 注释与 import 挤同一行 → 语句锚定漏改写 → Strict MIME 拒执行
+
+> **故障背景（2026-09-11 实测）**：用户源码 TSX 顶部带 JSDoc 注释（`/** 客户健康度看板首页 … */`），esbuild 转换时保留注释并与 import 挤同一行，产物为 `…;\n/**\n * 中文说明\n */ import __vite__cjsImport3_react from "/node_modules/.vite/deps/react.js?v=…"`.
+>
+> 坑：rewriteJs/rewriteHtml 的 `from` 重写采用语句头锚定 `(?:^|[;{}\n])`，`*/`（注释结尾）不在锚定集合 → 该 import 漏改写 → 浏览器请求 `/node_modules/.vite/deps/react.js` 打到 SaaS 根路径 → catch-all 返回 **200 + text/html** → `Failed to load module script: Expected a JavaScript module script but the server responded with a MIME type of "text/html"`，页面白屏。前一天 940cb61d64 收紧锚定（修文案误伤）挤掉了此形态的覆盖，属于收紧引入的回归。
+>
+> 修复：锚定序列扩展为 `(?:\s|/\*…\*/|\*+/?)*`（允许空白/完整块注释/注释结尾）。
+
+```bash
+# 真实会话验证路径（vite dev server 5174，健康度看板项目）：
+SID=ses_f756d9823ffe7ncGnDO5uGF3Xv
+
+# 验证 1：入口 HTML 可达且已注入 prefix patch
+curl -s -o /dev/null -w "%{http_code} %{content_type}\n" "$BASE/session/$SID/proxy/5174/"
+# 验证 2：带 JSDoc 的页面模块编译产物中，注释后的 import 已带 prefix
+curl -s "$BASE/session/$SID/proxy/5174/src/pages/index.tsx" | grep -oE '\*/ import __vite__cjsImport[0-9]_react from "[^"]*"'
+# 验证 3：全链路无残留——递归抓取 import 链所有模块，断言无根路径引用、无 text/html 响应
+#（脚本：extract 所有 import/from/src 引用 → 递归 fetch → 汇总残留；见下方单行版）
+curl -s "$BASE/session/$SID/proxy/5174/src/pages/index.tsx" | grep -cE 'from "/node_modules' | grep -q '^0$' && echo "无残留 OK"
+# 验证 4：重写后的依赖模块真实可达（JS 而非 HTML）
+curl -s -o /dev/null -w "%{http_code} %{content_type}\n" \
+  "$BASE/session/$SID/proxy/5174/node_modules/.vite/deps/react.js"
+```
+**期望**：
+- 验证 1：`200 text/html`（入口 HTML，已注入 INJECT_SCRIPT）
+- 验证 2：`*/ import __vite__cjsImport3_react from "/session/{sid}/proxy/5174/node_modules/.vite/deps/react.js?v=…"`（`*/` 后的 import 带 prefix）
+- 验证 3：`无残留 OK`（94 个链路模块 0 残留、0 HTML-MIME）
+- 验证 4：`200 text/javascript`
+
+**复测记录**：
+
+| 日期 | 镜像/分支 | 结果 |
+|---|---|---|
+| 2026-09-11 | `opencode-saas-sandbox-test:mime-fix`（工作区含锚定修复，组合 1：远端 PG + 远端沙箱） | ✅ 通过：验证 2 带 prefix、验证 3 94 模块 0 残留 0 HTML-MIME、验证 4 200 JS；单测 `sandbox-proxy-rewrite.test.ts` 81/81 |
+
 ---
 
 ## 三、Dev Server 生命周期最佳实践

@@ -109,7 +109,10 @@ export function rewriteHtml(prefix: string, text: string) {
       let r = code.replace(new RegExp(`(import\\s*(["']))/(?!/)(?!${escapedPrefix.slice(1)})`, "g"), `$1${prefix}/`)
       // from 语句锚定：要求分号/行首/{ 后接 import|export 关键字再到 from，避免误伤
       // 字符串文案里的普通英文单词 from（如 'Learn from "/docs"'）
-      r = r.replace(new RegExp(`((?:^|[;{}\\n])\\s*(?:import|export)[^;"'()]*?\\s*from\\s*(["']))/(?!/)(?!${escapedPrefix.slice(1)})`, "gm"), `$1${prefix}/`)
+      // 锚定含注释：esbuild 保留源码 JSDoc 并与 import 挤同一行（"/** x */ import ..."），
+      // 纯标点锚定会漏改写 → 根路径请求 → SPA HTML → Strict MIME 拒执行。
+      // 序列允许 空白 | 完整块注释 | 注释结尾 */（多行 JSDoc 的 */ 独立成行形态）
+      r = r.replace(new RegExp(`((?:^|[;{}\\n])(?:\\s|/\\*(?:[^*]|\\*(?!/))*\\*/|\\*+/?)*(?:import|export)[^;"'()]*?\\s*from\\s*(["']))/(?!/)(?!${escapedPrefix.slice(1)})`, "gm"), `$1${prefix}/`)
       // 内联 script 只做与 rewriteJs 一致的精准锚定重写（动态 import / export default）。
       // 严禁泛匹配「引号+斜杠」：minified 产物里的正则字面量 /'/g、/"/g（如 code-inspector
       // 注入的 preact escapeHtml 正则）会被误注入 prefix，产生非法 regex flags 导致整段
@@ -138,8 +141,11 @@ export function rewriteJs(prefix: string, text: string, isViteClient = false) {
   const escapedPrefix = prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
   let rewritten = text.replace(new RegExp(`(import\\s*(["']))/(?!/)(?!${escapedPrefix.slice(1)})`, "g"), `$1${prefix}/`)
   // from 语句锚定：要求语句头（^|;|{|} 或换行）后接 import|export 关键字再到 from，
-  // 避免误伤字符串文案里的普通英文单词 from（'Learn from "/docs"'）
-  rewritten = rewritten.replace(new RegExp(`((?:^|[;{}\\n])\\s*(?:import|export)[^;"'()]*?\\s*from\\s*(["']))/(?!/)(?!${escapedPrefix.slice(1)})`, "gm"), `$1${prefix}/`)
+  // 避免误伤字符串文案里的普通英文单词 from（'Learn from "/docs"'）。
+  // 头部序列允许 空白 | 完整块注释 | 注释结尾 */：esbuild 会保留源码 JSDoc 并与
+  // import 挤同一行（"...\n/** 中文说明\n */ import x from ..."），不锚定注释则漏改写
+  // → 根路径请求打到 server → SPA fallback HTML → Strict MIME 拒执行（白屏）
+  rewritten = rewritten.replace(new RegExp(`((?:^|[;{}\\n])(?:\\s|/\\*(?:[^*]|\\*(?!/))*\\*/|\\*+/?)*(?:import|export)[^;"'()]*?\\s*from\\s*(["']))/(?!/)(?!${escapedPrefix.slice(1)})`, "gm"), `$1${prefix}/`)
   // 动态 import("/x")：import 后是括号而非引号，静态 import 正则匹配不到。
   // 括号内可能出现 /* @vite-ignore */ 块注释（react-refresh 异步加载 react-dom 的产物），
   // 需允许"空白/注释"混合后再接引号。

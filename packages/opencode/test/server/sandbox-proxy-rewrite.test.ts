@@ -188,6 +188,61 @@ describe("rewriteJs - 防御性守卫", () => {
     expect(out).toBe(`import * as ns from "${PREFIX}/src/ns.ts";`)
   })
 
+  test("JSDoc 块注释与 import 挤同一行重写（esbuild 保留源码注释的真实产物，T11.40）", () => {
+    // esbuild 转换 TSX 时保留顶部 JSDoc，产物为 "...;\n/**\n * 中文说明\n */ import x from ..."：
+    // */ 不在标点锚定集合里 → 漏改写 → 根路径请求 → SPA HTML → Strict MIME 拒执行
+    const src = `var _s = $RefreshSig$();\n/**\n * 客户健康度看板首页 — 支持在线数据刷新\n */ import __vite__cjsImport3_react from "/node_modules/.vite/deps/react.js?v=be51c6fe"; const React = 1;`
+    const out = rewriteJs(PREFIX, src)
+    expect(out).toContain(`from "${PREFIX}/node_modules/.vite/deps/react.js?v=be51c6fe"`)
+    expect(out).not.toContain(`from "/node_modules/`)
+  })
+
+  test("单行块注释 + import 同行重写", () => {
+    const out = rewriteJs(PREFIX, `;/* 说明 */import x from "/src/a.ts";`)
+    expect(out).toBe(`;/* 说明 */import x from "${PREFIX}/src/a.ts";`)
+  })
+
+  test("行注释 + 换行 import 重写", () => {
+    const out = rewriteJs(PREFIX, `;// note\nimport x from "/src/a.ts";`)
+    expect(out).toBe(`;// note\nimport x from "${PREFIX}/src/a.ts";`)
+  })
+
+  test("注释夹在 import 与 from 之间重写（vite esbuild 转换罕见形态，固化行为）", () => {
+    const out = rewriteJs(PREFIX, `import/*interop*/y from "/src/a.ts";`)
+    expect(out).toBe(`import/*interop*/y from "${PREFIX}/src/a.ts";`)
+  })
+
+  test("多星注释结尾 **/import 重写（锚定 \\*+/? 分支）", () => {
+    const out = rewriteJs(PREFIX, `;/*x**/import x from "/src/a.ts";`)
+    expect(out).toBe(`;/*x**/import x from "${PREFIX}/src/a.ts";`)
+  })
+
+  test("注释掉的 import 块内路径被改写（无害：注释不执行；换行锚定独立生效且回溯有界）", () => {
+    const out = rewriteJs(PREFIX, `;/* unclosed\nimport x from "/src/a.ts";`)
+    expect(out).toBe(`;/* unclosed\nimport x from "${PREFIX}/src/a.ts";`)
+  })
+
+  test("同一行未闭合块注释吞掉的 import 不重写（无锚定可达，性能有界）", () => {
+    const src = `;/* x import y from "/src/a.ts"`
+    expect(rewriteJs(PREFIX, src)).toBe(src)
+  })
+
+  test("字符串内嵌「语句头+注释+import from」形态会被改写（已知边界：正则无法区分字符串与代码）", () => {
+    // 实际影响仅在字符串被当作模块路径 eval/import 时产生，与收紧前泛匹配版本的取舍一致
+    const out = rewriteJs(PREFIX, `var doc = ';\n/** note */ import y from "/src/x.ts"';`)
+    expect(out).toContain(`from "${PREFIX}/src/x.ts"`)
+  })
+
+  test("JSDoc 注释 + export from 重写", () => {
+    const out = rewriteJs(PREFIX, `/** helpers */export { helper } from "/src/helper.ts";`)
+    expect(out).toContain(`from "${PREFIX}/src/helper.ts"`)
+  })
+
+  test("注释中间行不构成锚定：仅跨越空白与 */，文本不误伤", () => {
+    const src = `var tip = "Learn from /docs";`
+    expect(rewriteJs(PREFIX, src)).toBe(src)
+  })
+
   test("import \"/x\" 无 from 形态重写保留（import 关键字直接跟引号）", () => {
     const out = rewriteJs(PREFIX, `import "/src/styles.css";`)
     expect(out).toBe(`import "${PREFIX}/src/styles.css";`)
@@ -317,6 +372,18 @@ describe("rewriteHtml - 正则字面量防误伤（本次修复）", () => {
 describe("rewriteHtml - 内联 script 静态 import（补全）", () => {
   test("内联 script 静态 import from 重写", () => {
     const html = `<html><head></head><body><script type="module">import x from "/src/inline-mod.ts";</script></body></html>`
+    const out = rewriteHtml(PREFIX, html)
+    expect(out).toContain(`import x from "${PREFIX}/src/inline-mod.ts"`)
+  })
+
+  test("内联 script JSDoc 块注释与 import 挤同一行重写（与 rewriteJs 一致）", () => {
+    const html = `<html><head></head><body><script type="module">/** 说明 */import x from "/src/inline-mod.ts";</script></body></html>`
+    const out = rewriteHtml(PREFIX, html)
+    expect(out).toContain(`import x from "${PREFIX}/src/inline-mod.ts"`)
+  })
+
+  test("内联 script 多行 JSDoc 与 import 挤同一行重写（真实 esbuild 产物形态）", () => {
+    const html = `<html><head></head><body><script type="module">var s = 1;\n/**\n * 页面说明\n */ import x from "/src/inline-mod.ts";</script></body></html>`
     const out = rewriteHtml(PREFIX, html)
     expect(out).toContain(`import x from "${PREFIX}/src/inline-mod.ts"`)
   })
