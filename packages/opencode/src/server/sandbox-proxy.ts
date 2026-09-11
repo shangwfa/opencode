@@ -34,6 +34,37 @@ const MAX_ERRORS = 100
 const MAX_SESSIONS = 500
 const reportTs = new Map<string, number>()
 const REPORT_INTERVAL = 1000
+// A preview page fans out into many assets; avoid resolving its sandbox endpoint for each one.
+// The short TTL still rechecks lifecycle state and refreshes the sandbox activity timestamp.
+const proxyTargets = new Map<string, { endpoint: string; expiresAt: number }>()
+const PROXY_TARGET_TTL_MS = 10_000
+const MAX_PROXY_TARGETS = 2_000
+
+function proxyTargetKey(sessionID: string, port: number) {
+  return `${sessionID}:${port}`
+}
+
+function getProxyTarget(sessionID: string, port: number) {
+  const key = proxyTargetKey(sessionID, port)
+  const target = proxyTargets.get(key)
+  if (!target) return undefined
+  if (target.expiresAt > Date.now()) return target
+  proxyTargets.delete(key)
+  return undefined
+}
+
+function setProxyTarget(sessionID: string, port: number, target: { endpoint: string }) {
+  const key = proxyTargetKey(sessionID, port)
+  if (!proxyTargets.has(key) && proxyTargets.size >= MAX_PROXY_TARGETS) {
+    const oldest = proxyTargets.keys().next().value
+    if (oldest) proxyTargets.delete(oldest)
+  }
+  proxyTargets.set(key, { ...target, expiresAt: Date.now() + PROXY_TARGET_TTL_MS })
+}
+
+function clearProxyTarget(sessionID: string, port: number) {
+  proxyTargets.delete(proxyTargetKey(sessionID, port))
+}
 
 function push(sessionID: string, port: number, items: ProxyError[]) {
   const key = `${sessionID}:${port}`
@@ -57,6 +88,9 @@ export function clearProxyErrors(sessionID: string) {
   }
   for (const key of reportTs.keys()) {
     if (key.startsWith(sessionID + ":")) reportTs.delete(key)
+  }
+  for (const key of proxyTargets.keys()) {
+    if (key.startsWith(sessionID + ":")) proxyTargets.delete(key)
   }
 }
 
@@ -908,6 +942,15 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
       }),
     )
 
+    yield* router.add("GET", "/snapshot/stats",
+      Effect.gen(function* () {
+        const getStats = sandbox.getSnapshotStats
+        const stats = getStats ? yield* getStats() : null
+        if (!stats) return HttpServerResponse.jsonUnsafe({ error: "snapshot stats unavailable" }, { status: 503 })
+        return HttpServerResponse.jsonUnsafe(stats)
+      }),
+    )
+
     // ── files API: 创建目录 / 创建文件 / 下载 / 上传 ──────────────
     // 解析 root session 的 sandbox（app 模式 PVC subPath 需要 root）
     const resolveSandbox = (sessionID: SessionID) =>
@@ -1264,34 +1307,37 @@ export const sandboxProxyRoute = HttpRouter.use((router) =>
         const prefix = `/session/${params.sessionID}/proxy/${port}`
         const subPath = extractSubPath(request.url ?? "", prefix)
 
-        const sb = yield* sandbox.get(params.sessionID).pipe(Effect.catch(() => Effect.succeed(undefined)))
-        if (!sb) {
+        const cached = getProxyTarget(params.sessionID, port)
+        const proxyTarget = cached ?? (yield* Effect.gen(function* () {
+          const sandboxTarget = yield* sandbox.get(params.sessionID).pipe(Effect.catch(() => Effect.succeed(undefined)))
+          if (!sandboxTarget) return undefined
+          const endpoint = yield* Effect.tryPromise({
+            try: async () => {
+              const ep = await (sandboxTarget as any).sandboxes.getSandboxEndpoint(sandboxTarget.id, port, Flag.OPENCODE_SANDBOX_USE_SERVER_PROXY)
+              return `http://${ep.endpoint}`
+            },
+            catch: (error) => {
+              proxyLog.warn("proxy: sandbox endpoint resolve failed", { sessionID: params.sessionID, port, error: String(error) })
+              return undefined
+            },
+          })
+          if (!endpoint) return undefined
+          const target = { endpoint }
+          setProxyTarget(params.sessionID, port, target)
+          return target
+        }))
+        if (!proxyTarget) {
           proxyLog.warn("proxy: sandbox unreachable (recycled, starting, or gone)", { sessionID: params.sessionID, port, isWs })
-          if (isWs) { yield* rejectWs(request, 1011, "sandbox unreachable"); return HttpServerResponse.empty() }
-          return HttpServerResponse.jsonUnsafe({ error: "sandbox unreachable" }, { status: 502 })
-        }
-
-        const endpoint = yield* Effect.tryPromise({
-          try: async () => {
-            const ep = await (sb as any).sandboxes.getSandboxEndpoint(sb.id, port, Flag.OPENCODE_SANDBOX_USE_SERVER_PROXY)
-            return `http://${ep.endpoint}`
-          },
-          catch: (error) => {
-            proxyLog.warn("proxy: sandbox endpoint resolve failed", { sessionID: params.sessionID, port, error: String(error) })
-            return undefined
-          },
-        })
-        if (!endpoint) {
           if (isWs) { yield* rejectWs(request, 1011, "sandbox unreachable"); return HttpServerResponse.empty() }
           return HttpServerResponse.jsonUnsafe({ error: "sandbox unreachable" }, { status: 502 })
         }
 
         if (isWs) {
           const targetQuery = request.url ? (() => { try { return new URL(request.url, "http://localhost").search } catch { return "" } })() : ""
-          return yield* websocket(request, endpoint + subPath + targetQuery)
+          return yield* websocket(request, proxyTarget.endpoint + subPath + targetQuery)
         }
 
-        return yield* proxyHttp(request, sandbox, params.sessionID, port, prefix, subPath, endpoint)
+        return yield* proxyHttp(request, sandbox, params.sessionID, port, prefix, subPath, proxyTarget.endpoint)
       }).pipe(Effect.catch(() => Effect.succeed(HttpServerResponse.empty({ status: 502 })))),
     )
   }),
@@ -1341,6 +1387,7 @@ function proxyHttp(
     }).pipe(Effect.catch(() => Effect.succeed(null)))
 
     if (!res || res instanceof Error) {
+      clearProxyTarget(sessionID, port)
       const diag = yield* diagnosePort(sandbox, sessionID, port)
       const hint = diag ? diagHint(diag, port) : "port has no listener"
       return HttpServerResponse.jsonUnsafe({
@@ -1386,6 +1433,7 @@ function proxyHttp(
     if (res.status >= 500 && contentType.includes("json")) {
       const text = yield* Effect.tryPromise(() => res.text()).pipe(Effect.catch(() => Effect.succeed("")))
       if (text.includes("Could not connect to the backend sandbox")) {
+        clearProxyTarget(sessionID, port)
         const diag = yield* diagnosePort(sandbox, sessionID, port)
         const hint = diag ? diagHint(diag, port) : "port has no listener"
         return HttpServerResponse.jsonUnsafe({
@@ -1442,11 +1490,25 @@ function proxyHttp(
       })
     }
 
-    const body = yield* Effect.tryPromise(() => res.arrayBuffer())
-    return HttpServerResponse.uint8Array(new Uint8Array(body), {
-      status: res.status, statusText: res.statusText || undefined,
-      headers: headersToRecord(resHeaders),
-    })
+    const body = res.body
+    if (!body) {
+      return HttpServerResponse.empty({
+        status: res.status,
+        statusText: res.statusText || undefined,
+        headers: headersToRecord(resHeaders),
+      })
+    }
+    return HttpServerResponse.stream(
+      Stream.fromReadableStream({
+        evaluate: () => body,
+        onError: () => undefined,
+      }).pipe(Stream.catchCause(() => Stream.empty)),
+      {
+        status: res.status,
+        statusText: res.statusText || undefined,
+        headers: headersToRecord(resHeaders),
+      },
+    )
   })
 }
 
