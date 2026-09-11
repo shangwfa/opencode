@@ -498,6 +498,128 @@ curl -s -X POST "$BASE/session/$SID/kill-sandbox"
 > - 单测：`test/tool/sandbox-snapshot-reuse.test.ts` 16/16 pass；回归 `sandbox-provider-destroy-by-id.test.ts` 9/9 pass；typecheck 59 个既有错误，无新增。
 > - **集成复测待办**：场景 3/4/7 及其余全量快照用例仍需按专项环境执行。
 
+### T25.25 快照操作队列持久化 + 跨实例租约接管
+
+场景：kill/idle 回收触发的快照销毁不再只依赖进程内 fiber，而是先写 `snapshot_operation`（durable job），再由 worker 凭租约领取执行；实例崩溃后另一实例凭租约过期接管。
+
+```bash
+PSQL="psql $PG_URL -Atc"
+# 造一条 pending 操作（模拟崩溃遗留），任意 kill 触发 drain
+$PSQL "INSERT INTO snapshot_operation (id,session_id,sandbox_id,kind,state,attempts,fencing_token,time_created,time_updated)
+  VALUES ('op_t2525','$SID','ghost-2525','snapshot_destroy','pending',0,0,extract(epoch from now())*1000,extract(epoch from now())*1000)
+  ON CONFLICT DO NOTHING"
+curl -s -X POST "$BASE/session/$SID/kill-sandbox"
+# 期望：op → done|attempts=1|fencing=1（幂等执行体，reconnect 404 后 killByID 忽略 404 → dbMarkDestroyed）
+$PSQL "SELECT state||'|attempts='||attempts||'|fencing='||fencing_token FROM snapshot_operation WHERE id='op_t2525'"
+```
+
+**期望**：操作 `done|attempts=1|fencing=1`；正常 kill 的 op 同样落库并 `done`。多实例同时 drain 时靠 `FOR UPDATE SKIP LOCKED` 不重复领取。
+
+### T25.26 fencing：租约过期接管后旧执行者不覆盖状态
+
+场景：执行体运行期间续租；租约过期被接管后，旧执行者的 `complete`/`fail`/`heartbeat` 全部失效。
+
+```bash
+PSQL="psql $PG_URL -Atc"
+NOW=$(date +%s000)
+# 造 running 且租约未过期（owner=dead-instance）
+$PSQL "INSERT INTO snapshot_operation (id,session_id,sandbox_id,kind,state,attempts,fencing_token,lease_owner,lease_until,time_created,time_updated)
+  VALUES ('op_t2526','$SID','ghost-2526','snapshot_destroy','running',1,7,'dead-instance',$((NOW+300000)),$NOW,$NOW) ON CONFLICT DO NOTHING"
+curl -s -X POST "$BASE/session/$SID/kill-sandbox"; sleep 6
+# 期望①：租约未过期，另一实例不领取 → 仍 running|fencing=7
+$PSQL "SELECT state||'|fencing='||fencing_token FROM snapshot_operation WHERE id='op_t2526'"
+$PSQL "UPDATE snapshot_operation SET lease_until=$((NOW-1000)) WHERE id='op_t2526'"
+curl -s -X POST "$BASE/session/$SID/kill-sandbox"
+# 期望②：租约过期后被接管 → done|fencing=8|attempts=2（fencing 单调递增）
+$PSQL "SELECT state||'|fencing='||fencing_token||'|attempts='||attempts FROM snapshot_operation WHERE id='op_t2526'"
+```
+
+**期望**：未过期不领取；过期后 `done|fencing=8|attempts=2`。单测 `snapshot-operation.test.ts` 覆盖「旧 token complete 被拒」「心跳失租返回 false」。
+
+### T25.27 幂等唯一索引：并发 enqueue 收敛为一条
+
+场景：同 `session_id + sandbox_id + kind` 的活跃操作至多一条；并发 enqueue 由部分唯一索引 + `ON CONFLICT DO NOTHING` 收敛。
+
+```bash
+PSQL="psql $PG_URL -Atc"
+# 并发插入（应用层 enqueue 等价）
+for i in $(seq 1 6); do
+  $PSQL "INSERT INTO snapshot_operation (id,session_id,sandbox_id,kind,state,attempts,fencing_token,time_created,time_updated)
+    VALUES ('op_t2527_$i','$SID','sb-2527','snapshot_destroy','pending',0,0,extract(epoch from now())*1000,extract(epoch from now())*1000)
+    ON CONFLICT DO NOTHING" &
+done; wait
+# 期望：活跃操作仅 1 条
+$PSQL "SELECT count(*) FROM snapshot_operation WHERE session_id='$SID' AND sandbox_id='sb-2527' AND state IN ('pending','running')"
+```
+
+**期望**：结果为 `1`；索引定义 `snapshot_operation_active_uniq ON (session_id, sandbox_id, kind) WHERE state IN ('pending','running')`。
+
+### T25.28 快照兼容性元数据 + schema 不兼容阻断
+
+场景：快照记录 `image` / `arch` / `schema_version` / `runtime_version`；恢复前校验 `schema_version`，不兼容则标记 failed 并冷启动。
+
+```bash
+PSQL="psql $PG_URL -Atc"
+# 建快照后查元数据
+$PSQL "SELECT 'schema='||coalesce(schema_version::text,'-')||' runtime='||coalesce(runtime_version,'-')||' arch='||coalesce(arch,'-') FROM session_snapshot WHERE session_id='$SID' ORDER BY time_created DESC LIMIT 1"
+# 人为置不兼容版本 → kill → 恢复
+$PSQL "UPDATE session_snapshot SET schema_version=999 WHERE session_id='$SID'"
+curl -s -X POST "$BASE/session/$SID/kill-sandbox"; <等 destroyed>
+curl -s -X POST "$BASE/session/$SID/exec" -d '{"command":"cat /workspace/a.txt 2>&1"}'
+# 期望：冷启动（a.txt 不存在），快照 failed|incompatible
+$PSQL "SELECT state||'|'||coalesce(reason,'-') FROM session_snapshot WHERE session_id='$SID' ORDER BY time_created DESC LIMIT 1"
+```
+
+**期望**：元数据落库（`schema=1`、`runtime_version`、`image`）；置 `999` 后恢复冷启动、快照 `failed|incompatible: schema 999 != 1`；`schema_version=1` 的正常快照不受影响（T25.17/T25.24 回归）。`arch` 取自远端 `SandboxInfo.platform.arch`，该远端实现可能不返回（为空时跳过 arch 检查）。
+
+### T25.29 快照聚合统计接口
+
+场景：`GET /snapshot/stats` 从 `session_snapshot` + `exec_log` 聚合，供观测。
+
+```bash
+curl -s "$BASE/snapshot/stats" | python3 -m json.tool
+# 期望字段：snapshots（状态分布）、operations（各 source 的 count/p50Ms/p95Ms）、
+#          gc（creating/deleting backlog）、derived（reuseHitRate/fallbackRate）
+```
+
+**期望**：返回 `snapshot-create` / `snapshot-restore` / `snapshot-reuse` / `snapshot-fallback` 的计数与 P50/P95；`reuseHitRate = reuse/(reuse+create)`、`fallbackRate = fallback/(restore+fallback)`。历史 `snapshot-reuse` 记录兼容旧 `checkMs` 字段。
+
+### T25.30 快照 prune 与体积观测
+
+场景：`OPENCODE_SANDBOX_SNAPSHOT_PRUNE=1` 时快照前清理可重建产物；`snapshot-create` 记录 `workspaceKb` / `pruned`。
+
+```bash
+# 容器需带 OPENCODE_SANDBOX_SNAPSHOT_PRUNE=1
+# 写入后 kill → 查 exec_log
+psql "$PG_URL" -Atc "SELECT command FROM exec_log WHERE session_id='$SID' AND source='snapshot-create' ORDER BY time_started DESC LIMIT 1"
+# 期望：command 含 "workspaceKb":<n>,"pruned":true
+```
+
+**期望**：`pruned=true` 且 `workspaceKb` 有值；默认（未设 flag）`pruned=false` 且不执行清理。清理白名单：`/root/.cache`、`/home/sandbox/.cache`、`/workspace/.cache`（不含 `/tmp` 与 pnpm store）。
+
+### T25.31 快照失败原因落库
+
+场景：远端 `SnapshotStatus.reason`/`message` 落库到 `session_snapshot.reason`，排障可见根因。
+
+```bash
+PSQL="psql $PG_URL -Atc"
+# 快照 Failed（远端因 RegistryNotConfigured / POD_READY_TIMEOUT 等失败）后
+$PSQL "SELECT state||'|'||coalesce(reason,'-') FROM session_snapshot WHERE session_id='$SID' ORDER BY time_created DESC LIMIT 1"
+# 期望：failed|server Failed: <reason>: <message>
+# 超时：creating|wait timeout: <最后观察到的 reason>
+# GC 对账失败：failed|reconcile: Failed: <reason>
+```
+
+**期望**：`reason` 含远端根因字符串；单测 `session-snapshot-pg.test.ts` 用 mock 覆盖「Failed + reason → 落库」。
+
+### T25.32 远端 API 能力边界（调研，非用例）
+
+场景：评估快照分层/差量/内存快照的可行性。
+
+- **支持**：整机 rootfs 快照（`POST /sandboxes/{id}/snapshots`，body 仅 `{name?}`）；从快照创建沙箱（`CreateSandboxRequest.snapshotId`，与 `image` 互斥，可同时带 `platform`/`volumes`/`networkPolicy`/`resourceLimits`/`entrypoint`）；快照 `Creating/Ready/Failed/Deleting` + `reason/message/lastTransitionAt`。
+- **不支持**：directory snapshot（无 path 参数）、差量/增量快照、memory snapshot 控制、mount/unmount 快照到运行中沙箱、快照大小/digest 等元数据。
+- **结论**：workspace/依赖/系统层分层（原建议第 6 项）在当前远端 API 下**无法实现**，需远端新增 directory snapshot + mount 能力。当下可用替代：`snapshotId + volumes` 组合（快照 + 独立卷）、`status.reason` 排障（已用于 T25.31）。
+
 ---
 
 ## 复测记录（2026-08-21，commit 13b750953b，镜像重建后全量回归 + 缺口用例补充）
@@ -660,7 +782,7 @@ done
 | T25.23 混合部署 | PASS | 全局 pvc + 会话级 snapshot 并存互不影响 |
 | T25.21 creating 期间路径 | PASS | creating 期间 exec 被拒/挂起，ready 后沙箱 running |
 | T25.6 删除清理 | PASS | 删会话 PG 快照级联清零；远端快照不可查询（404） |
-| T25.18 TTL GC | 未跑 | TTL 7 天，需专项环境缩短验证 |
+| T25.18 TTL GC | PASS(部分) | GC 删除链路 ✓（deleted\|ttl expired）；发现过期 ready 快照漏删 2 条（立档待查）；TTL 默认调整为 14 天 |
 
 ### 遗留与观察
 
@@ -784,3 +906,84 @@ python3 docs/test-cases/sandbox/scripts/snapshot_notfound_check.py --probe-snap 
 | 快照状态 | PASS | S1 为 `stale|restored`，未创建 superseding snapshot |
 
 会话 `ses_f7330077effeXMXs0OcHKhvGcj`，S1 `76a992da-1e23-463f-9303-7b40680bb9f1`。根因是恢复会重建 workspace 文件 ctime，原 ctime 快速筛查将未写入的恢复沙箱误判为 dirty；改为 mtime + 内容清单后通过。
+
+---
+
+## 复测记录（2026-09-11 第二轮，快照编排持久化 + 兼容性观测 + 分层准备）
+
+环境：组合 2（本地 Docker，**本地 PG** + 远端 K8s Sandbox），默认 snapshot image，`OPENCODE_SANDBOX_SNAPSHOT_PRUNE=1`。
+
+**改造内容**
+
+1. **持久化操作队列（durable job）**：新增 `snapshot_operation` 表 + `src/tool/snapshot-operation.ts`。kill/idle 回收不再只依赖进程内 fiber，而是先 `enqueue` 落库，再由 worker 通过 `FOR UPDATE SKIP LOCKED` + 租约（5min）领取执行；失败指数退避（30s 起，上限 10min，5 次后转 `failed`），进程崩溃后其他实例可凭租约过期接管。执行体 `runSnapshotDestroy` 幂等，仍保持「快照 Ready 才销毁源沙箱」。
+   - **fencing token**：`claim` 时单调递增，`complete`/`fail`/`heartbeat` 均带 token 校验；租约过期被接管后，旧执行者的写操作全部失效，不会覆盖新执行者状态。
+   - **租约心跳**：执行体运行期间每 `LEASE_MS/3` 续租，续租失败即 `Effect.race` 中断执行体，避免旧执行者继续做销毁/快照副作用（快照最坏等 900s，超过 5min 租约）。
+   - **幂等唯一索引**：`(session_id, COALESCE(sandbox_id,''), kind) WHERE state IN ('pending','running')` 部分唯一索引 + `ON CONFLICT DO NOTHING` + 回读，并发 enqueue 收敛为一条。
+2. **兼容性元数据与观测**：`session_snapshot` 新增 `image` / `source_sandbox_id` / `restored_count` / `last_restored_at`；恢复前比对创建镜像与会话当前镜像，漂移记 warn 仍恢复。新增 `exec_log` 来源 `snapshot-create` / `snapshot-reuse` / `snapshot-restore` / `snapshot-fallback`，含 `durationMs` / `workspaceKb` / `pruned`。
+3. **分层准备**：新增 `OPENCODE_SANDBOX_SNAPSHOT_PRUNE`（默认关），开启后快照前清理 `/root/.cache`、`/home/sandbox/.cache`、`/workspace/.cache` 等可重建产物（不删 `/tmp` 与 pnpm store）。完整 workspace/依赖分层仍受限于远端仅提供整机快照 API，记为后续项。
+4. **兼容性元数据与阻断**：`session_snapshot` 新增 `arch` / `schema_version` / `runtime_version`。`SNAPSHOT_SCHEMA_VERSION` 标识快照内容布局版本，恢复前校验：`schema_version` 存在且不等于当前 → 标记 `failed|incompatible` 并冷启动；`arch` / `image` 漂移只记 warn 仍尝试恢复（远端失败会自动降级）。`arch` 取自 `SandboxInfo.platform.arch`，该远端实现可能不返回（当前记录为 null，仅跳过 arch 检查）。
+5. **聚合统计接口**：新增 `GET /snapshot/stats`，从 `session_snapshot` + `exec_log` 聚合状态分布、各操作耗时 P50/P95、GC backlog（creating/deleting）、派生比率（复用命中率、fallback 比例）。**canary restore 评估后不做**：远端多副本快照元数据读不一致会误判 404，自动 canary 可能误杀可用快照，宜作为手动/运维工具。
+
+**关键缺陷修复**：判定脚本原写法 `timeout N { find …; find …; }` 是非法 shell 语法（timeout 会把 `{` 当命令名）；execd 又把含命令源码的错误回显混入 stdout，其中的 `echo CLEAN` 字面量被 `includes("CLEAN")` 误判 → **写入后仍复用旧快照，导致数据丢失**。修复为子 shell 包裹两个 timeout，并将判定改为整行精确匹配 `CLEAN`。
+
+| 验证项 | 结果 | 证据 |
+|---|---|---|
+| 迁移 | PASS | 26 条迁移应用；`snapshot_operation` 表与 `session_snapshot` 四个新列存在 |
+| 复用主路径 | PASS | `snapshot-reuse` exec_log（`checkMs=142`）；`snapshot_operation` = `snapshot_destroy\|done\|attempts=1` |
+| 恢复 | PASS | `snapshot-restore` exec_log 记录 image；`session_snapshot.restored_count=1`、`last_restored_at` 非空 |
+| 写入后新快照 | PASS | `snapshot-create` exec_log（`durationMs=16558`、`workspaceKb=12`、`pruned=true`）；旧快照 superseded |
+| 数据完整性 | PASS | 恢复后 `cat data.txt b.txt` = `hello\nmore`（修复前该场景会丢 b.txt） |
+| 崩溃遗留接管 | PASS | 手动插入 pending 操作后，任意 kill 触发的 drain 将其领为 `done\|attempts=1\|fencing=1` |
+| fencing/心跳/幂等 | PASS | 单测覆盖：旧 token complete 被拒、心跳失去租约返回 false、并发 enqueue 收敛为 1 条 |
+| 多实例 SKIP LOCKED | PASS | A/B 双实例同时 drain 5 条 pending：全 `done\|attempts=1\|fencing=1`，无重复领取 |
+| 租约保护 + 过期接管 | PASS | 租约未过期时另一实例不领取（仍 `running\|fencing=7`）；改过期后接管为 `done\|fencing=8\|attempts=2` |
+| 跨实例并发创建 | PASS | 同一会话 A/B 并发 exec 均成功，仅创建 1 个沙箱（advisory xact lock 生效） |
+| 兼容性元数据 | PASS | 快照记录 `schema_version=1`、`runtime_version`、`image`；`arch` 因远端未返回 platform 而为空 |
+| schema 不兼容阻断 | PASS | 手动置 `schema_version=999` → 恢复时 `failed\|incompatible: schema 999 != 1`，冷启动（`a.txt` 不存在） |
+| 正常路径不误阻断 | PASS | `schema_version=1` 快照正常复用 + 恢复（`cat k.txt` = `keep`） |
+| 聚合统计接口 | PASS | `GET /snapshot/stats`：create p50=16.3s / restore p50=4.2s / reuse p50=114ms，`reuseHitRate=0.61` |
+| 失败原因落库 | PASS | 远端 `status.reason` 写入 `session_snapshot.reason`（Failed/超时/GC 对账三路径） |
+| 对应用例 | T25.25（操作队列+租约接管）、T25.26（fencing）、T25.27（幂等唯一索引）、T25.28（兼容性阻断）、T25.29（stats）、T25.30（prune）、T25.31（失败原因） |
+| 单测 | PASS | `snapshot-operation`(10) / `sandbox-snapshot-reuse`(25) / `destroy-by-id`(9) / `session-snapshot-pg`(8) 共 52 pass |
+| 类型检查 | PASS | 无本次文件新增错误 |
+
+会话 `ses_f730d44e6ffeJsQ6yohH27pHkp`：S1 `dc6ea870…`（复用）→ 恢复 `7713763d…` → 写入后 S2 `08362a07…`（`ready`）。
+
+---
+
+## 复测记录（2026-09-11 第三轮，新增用例 T25.25~T25.31 执行）
+
+环境：组合 2（本地 PG + 远端 K8s Sandbox），镜像 `snapshot-reuse`，`OPENCODE_SANDBOX_SNAPSHOT_PRUNE=1`。
+
+| 用例 | 结果 | 证据 |
+|---|---|---|
+| T25.25 操作队列 + 接管 | PASS | 遗留 pending op → kill 触发 drain → `done\|attempts=1\|fencing=1` |
+| T25.26 fencing | PASS | 租约未过期 `running\|fencing=7`；改过期后接管 `done\|fencing=8\|attempts=2` |
+| T25.27 幂等唯一索引 | PASS | 并发 6 条同 `sandbox_id` → active=1（唯一索引收敛） |
+| T25.28 兼容性元数据 + 阻断 | PASS | `schema=1` 落库；置 `999` → `failed\|incompatible: schema 999 != 1` + 冷启动（`a.txt` 不存在） |
+| T25.29 聚合统计接口 | PASS | `keys=[derived,gc,operations,snapshots]`，`operations` 含 create/restore/reuse，`reuseHitRate=0.375` |
+| T25.30 prune + workspaceKb | PASS | `snapshot-create` command 含 `workspaceKb=12,pruned=true` |
+| T25.31 失败原因落库 | PASS（单测） | mock 远端 `Failed+reason` → `reason` 含 `RegistryNotConfigured`；集成制造 Failed 需故障注入，暂以单测覆盖 |
+
+**结论**：新增用例 T25.25~T25.30 集成全部 PASS，T25.31 由单测覆盖。测试产物（`op_t25*`）已清理。
+
+---
+
+## 复测记录（2026-09-11 第四轮，评审缺口修复）
+
+环境：组合 2（本地 PG + 远端 K8s Sandbox）。对评审指出的缺口逐项「验证存在 → 修复 → 验证通过」：
+
+| 缺口 | 验证存在 | 修复 | 验证通过 |
+|---|---|---|---|
+| 恢复后无内容校验 | 恢复成功但内容损坏不可见 | 恢复后抽查 marker（`restoredMarkerCheckCommand`），`markerPresent` 落 `exec_log`，缺失记 warn 不阻断 | 恢复后 `markerPresent=true`，数据 `v1` 完整 |
+| 显式快照无审计 | `POST /snapshot` 无任何 exec_log | `createSnapshot` 落 `snapshot-create` 且 `explicit=true`（自动快照 `explicit=false`） | 两条路径审计均落库 |
+| stats 无健康评估 | 接口无告警信号 | 新增 `snapshotHealth` 纯函数（fallback 率>20%、creating>10、deleting>20 → degraded），`/snapshot/stats` 返回 `health` | `health={'status':'healthy','reasons':[]}`；单测 5 例覆盖各分支 |
+| `arch` 形同虚设 | `session_snapshot.arch` 全 NULL（远端不返回 `platform`） | 改为快照前沙箱内 `uname -m`（`touchSnapshotMarker` 返回 `arch`，x86_64/aarch64 归一 amd64/arm64），并移除多余的 `getInfo` RPC | `arch=amd64` 落库 |
+| 死代码 | `retired` 状态、`snapshot_delete` kind、`payload` 列均无使用 | 类型/写入点同步删除；迁移拆为「原版 `20260820000000` 不动 + 新增 `20260911000000`（ADD COLUMN + snapshot_operation 建表）」，保证已应用旧版迁移的共享 PG（远端 test）升级时 `CREATE TABLE IF NOT EXISTS` 跳过也不会缺列 | 双路径迁移验证：全新库顺序执行 ✓；模拟远端旧库（已应用原版 0808）升级补列 ✓ |
+| RPO 语义未显式化 | — | 文档补充（见下） | — |
+
+**RPO 说明**：快照模式的数据安全边界是「上次快照 Ready 时点」。运行中沙箱若被远端强制回收（节点故障/OOM），上次快照之后的写入会丢失——TTL/idle reap（默认 120s）内的崩溃最多丢一个回收窗口内的工作。业务对数据的要求超出此边界时，应在关键写入后显式 `POST /snapshot`。
+
+**额外修复**：`runEphemeralCommand` 的 stdout 事件分片间不含换行符（SDK 实测 `["4","x86_64"]`），`join("")` 会把相邻行粘连成 `4x86_64` 导致清单解析失败——已改为 `join("\n")`，并为 `parseMarkerOutput` 补事件边界回归单测。
+
+**单测**：60 pass（`snapshot-operation` 10 / `sandbox-snapshot-reuse` 33 / `destroy-by-id` 9 / `session-snapshot-pg` 8）；typecheck 59 既有错误无新增。

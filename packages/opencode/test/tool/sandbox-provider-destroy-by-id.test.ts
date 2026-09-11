@@ -86,6 +86,7 @@ const config = SandboxConfig.Service.of({
   idleReapIntervalMs: 3_600_000,
   maxTtlSeconds: 3600,
   packageCacheMount: "/cache",
+  snapshotPrune: false,
   cleanupOnScopeExit: false,
 })
 const configLayer = Layer.succeed(SandboxConfig.Service, config)

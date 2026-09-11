@@ -28,6 +28,11 @@ import {
   snapshotDirtyCheckCommand,
   snapshotManifestCommand,
   workspaceUnchangedSinceSnapshot,
+  touchSnapshotMarker,
+  snapshotSchemaMismatch,
+  expectedSandboxArch,
+  parseMarkerOutput,
+  restoredMarkerCheckCommand,
 } from "../../src/tool/sandbox-provider"
 import type { SessionID } from "../../src/session/schema"
 import type { ProjectV2 } from "@opencode-ai/core/project"
@@ -182,8 +187,138 @@ describe("workspaceUnchangedSinceSnapshot", () => {
     expect(await Effect.runPromise(workspaceUnchangedSinceSnapshot(stubSandbox({ stdout: "" })))).toBe(false)
   })
 
+  test("stdout 回显源码含 CLEAN 字面量但无独立 CLEAN 行 → false（防 execd 错误回显误判）", async () => {
+    const echoed = "out=$(...); then echo DIRTY; else echo CLEAN; fi\nbash: line 27: syntax error near unexpected token `}'"
+    expect(await Effect.runPromise(workspaceUnchangedSinceSnapshot(stubSandbox({ stdout: echoed })))).toBe(false)
+  })
+
   test("命令通道异常 → false（保守 dirty）", async () => {
     expect(await Effect.runPromise(workspaceUnchangedSinceSnapshot(stubSandbox({ reject: new Error("execd down") })))).toBe(false)
+  })
+
+  test("timeoutSec>0 的判定脚本语法合法（禁止 timeout N { ... } 非法写法）", async () => {
+    const cmd = snapshotDirtyCheckCommand("/tmp/m", "/tmp/mf", "/tmp/ws", 10)
+    const proc = Bun.spawn(["bash", "-n", "-c", cmd], { stdout: "pipe", stderr: "pipe" })
+    const code = await proc.exited
+    expect(code).toBe(0)
+  })
+})
+
+// ── touchSnapshotMarker：marker/manifest 写入 + workspace 大小 + 可选 prune ──
+
+const stubMarkerSandbox = (behavior: { stdout?: string; reject?: Error; onCommand?: (cmd: string) => void }) =>
+  ({
+    commands: {
+      createSession: async () => {
+        if (behavior.reject) throw behavior.reject
+        return "marker-check"
+      },
+      runInSession: async (_sessionId: string, cmd: string) => {
+        behavior.onCommand?.(cmd)
+        if (behavior.reject) throw behavior.reject
+        return { logs: { stdout: [{ text: behavior.stdout ?? "", timestamp: 0 }], stderr: [] }, result: [] }
+      },
+      deleteSession: async () => undefined,
+    },
+  }) as unknown as Sandbox
+
+describe("touchSnapshotMarker", () => {
+  test("写入 marker/manifest 并解析 du 输出为 workspaceKb", async () => {
+    let seen = ""
+    const out = await Effect.runPromise(
+      touchSnapshotMarker(stubMarkerSandbox({ stdout: "manifest-line\n12345\n", onCommand: (c) => (seen = c) })),
+    )
+    expect(out.workspaceKb).toBe(12345)
+    expect(seen).toContain(SNAPSHOT_MARKER_PATH)
+    expect(seen).toContain("du -sk /workspace")
+    expect(seen).not.toContain("rm -rf")
+  })
+
+  test("prune=true 时命令包含可重建产物清理", async () => {
+    let seen = ""
+    const out = await Effect.runPromise(
+      touchSnapshotMarker(stubMarkerSandbox({ stdout: "100\n", onCommand: (c) => (seen = c) }), { prune: true }),
+    )
+    expect(out.workspaceKb).toBe(100)
+    expect(seen).toContain("rm -rf")
+  })
+
+  test("du 无输出 → workspaceKb null（不阻塞快照）", async () => {
+    const out = await Effect.runPromise(touchSnapshotMarker(stubMarkerSandbox({ stdout: "" })))
+    expect(out.workspaceKb).toBeNull()
+  })
+
+  test("命令通道异常 → workspaceKb null（失败静默）", async () => {
+    const out = await Effect.runPromise(touchSnapshotMarker(stubMarkerSandbox({ reject: new Error("execd down") })))
+    expect(out.workspaceKb).toBeNull()
+  })
+})
+
+// ── 快照兼容性判定（恢复前校验）─────────────────────────────────────
+
+describe("snapshot 兼容性判定", () => {
+  test("snapshotSchemaMismatch：同版本兼容、不同版本不兼容、旧快照兼容", () => {
+    expect(snapshotSchemaMismatch(1, 1)).toBe(false)
+    expect(snapshotSchemaMismatch(999, 1)).toBe(true)
+    expect(snapshotSchemaMismatch(null, 1)).toBe(false)
+    expect(snapshotSchemaMismatch(undefined, 1)).toBe(false)
+  })
+
+  test("expectedSandboxArch：x64→amd64、arm64 保持", () => {
+    expect(expectedSandboxArch("x64")).toBe("amd64")
+    expect(expectedSandboxArch("arm64")).toBe("arm64")
+  })
+})
+
+// ── 恢复完整性 / marker 输出解析 ────────────────────────────────────
+
+describe("恢复完整性抽查", () => {
+  test("restoredMarkerCheckCommand 输出 PRESENT/MISSING 标记", async () => {
+    const dir = await mkdtemp()
+    const marker = `${dir}/.marker`
+    expect((await runScript(restoredMarkerCheckCommand(marker)))).toContain("MISSING")
+    await fs.writeFile(marker, "")
+    expect((await runScript(restoredMarkerCheckCommand(marker)))).toContain("PRESENT")
+    await rmrf(dir)
+  })
+
+  test("parseMarkerOutput：du 行取 KB、uname 行归一 arch、异常输入容忍", () => {
+    expect(parseMarkerOutput("manifest-line\n12345\nx86_64\n")).toEqual({ workspaceKb: 12345, arch: "amd64" })
+    expect(parseMarkerOutput("aarch64\n")).toEqual({ workspaceKb: null, arch: "arm64" })
+    expect(parseMarkerOutput("42\n")).toEqual({ workspaceKb: 42, arch: null })
+    expect(parseMarkerOutput("")).toEqual({ workspaceKb: null, arch: null })
+    expect(parseMarkerOutput("not-a-number\nweird\n")).toEqual({ workspaceKb: null, arch: null })
+  })
+
+  test("touchSnapshotMarker 解析 uname 架构", async () => {
+    const out = await Effect.runPromise(touchSnapshotMarker(stubMarkerSandbox({ stdout: "8192\naarch64\n" })))
+    expect(out).toEqual({ workspaceKb: 8192, arch: "arm64" })
+  })
+})
+
+// ── 快照系统健康评估 ────────────────────────────────────────────────
+
+describe("snapshotHealth", () => {
+  const ops = (counts: Partial<Record<"snapshot-create" | "snapshot-restore" | "snapshot-reuse" | "snapshot-fallback", number>>) =>
+    Object.fromEntries(Object.entries(counts).map(([k, v]) => [k, { count: v! }]))
+
+  test("无数据 → healthy", () => {
+    expect(SessionSnapshot.snapshotHealth({}, { creating: 0, deleting: 0 })).toEqual({ status: "healthy", reasons: [] })
+  })
+
+  test("fallback 率 ≤20% → healthy", () => {
+    expect(SessionSnapshot.snapshotHealth(ops({ "snapshot-restore": 9, "snapshot-fallback": 1 }), { creating: 0, deleting: 0 }).status).toBe("healthy")
+  })
+
+  test("fallback 率 >20% → degraded", () => {
+    const h = SessionSnapshot.snapshotHealth(ops({ "snapshot-restore": 5, "snapshot-fallback": 3 }), { creating: 0, deleting: 0 })
+    expect(h.status).toBe("degraded")
+    expect(h.reasons.join(" ")).toContain("fallback")
+  })
+
+  test("creating/deleting 积压 → degraded", () => {
+    expect(SessionSnapshot.snapshotHealth({}, { creating: 11, deleting: 0 }).reasons.join(" ")).toContain("creating")
+    expect(SessionSnapshot.snapshotHealth({}, { creating: 0, deleting: 21 }).reasons.join(" ")).toContain("deleting")
   })
 })
 
@@ -218,7 +353,7 @@ describe.skipIf(!enabled)("findRestorable", () => {
     })
     const row = await snapshots.findRestorable(SID)
     expect(row?.id).toBe("snap_reuse_ready_new")
-    expect(await snapshots.resolveForCreate(SID)).toBe("snap_reuse_ready_new")
+    expect((await snapshots.resolveForCreate(SID))?.id).toBe("snap_reuse_ready_new")
   })
 
   test("无可恢复快照 → null", async () => {
@@ -249,6 +384,28 @@ describe.skipIf(!enabled)("findRestorable", () => {
       waitMs: 10_000,
     })
     expect((await snapshots.findRestorable(SID))?.id).toBe("snap_reuse_stale_only")  })
+
+  test("markIncompatible 标记 failed 后不再可恢复", async () => {
+    await db.delete(SessionSnapshotTable).where(like(SessionSnapshotTable.session_id, SID)).run()
+    await db.insert(SessionSnapshotTable).values({
+      id: "snap_reuse_incompat",
+      session_id: SID,
+      scope: "session",
+      state: "ready",
+      schema_version: 999,
+      time_created: Date.now(),
+      time_updated: Date.now(),
+    }).run()
+    const snapshots = SessionSnapshot.create({
+      pgDb: db,
+      connectionConfig: fakeConnectionConfig(),
+      ttlMs: 86_400_000,
+      waitMs: 10_000,
+    })
+    expect((await snapshots.resolveForCreate(SID))?.id).toBe("snap_reuse_incompat")
+    await snapshots.markIncompatible(SID, "snap_reuse_incompat", "schema 999 != 1")
+    expect(await snapshots.resolveForCreate(SID)).toBeNull()
+  })
 })
 
 import { ConnectionConfig } from "@alibaba-group/opensandbox"
@@ -313,6 +470,7 @@ const config = SandboxConfig.Service.of({
   idleReapIntervalMs: 3_600_000,
   maxTtlSeconds: 3600,
   packageCacheMount: "/cache",
+  snapshotPrune: false,
   cleanupOnScopeExit: false,
 })
 const configLayer = Layer.succeed(SandboxConfig.Service, config)
@@ -451,4 +609,12 @@ describe.skipIf(!enabled)("快照复用（destroy 路径）", () => {
     expect(snapIdx).toBeGreaterThanOrEqual(0)
     expect(snapIdx).toBeLessThan(indexOfRequest("DELETE", `/v1/sandboxes/sb_${name}`))
   }, 40_000)
+})
+
+describe("runEphemeralCommand 事件分片", () => {
+  test("stdout 事件无换行时仍按行解析（touch 场景回归）", async () => {
+    const out = await Effect.runPromise(touchSnapshotMarker(stubMarkerSandbox({ stdout: "4" })))
+    // 单事件数字行
+    expect(out.workspaceKb).toBe(4)
+  })
 })

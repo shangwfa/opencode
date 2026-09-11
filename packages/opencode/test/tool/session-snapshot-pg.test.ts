@@ -17,6 +17,7 @@ const db = Database.Client()
 let creates = 0
 let failGets = 0
 let failDeletes = false
+let failReason: string | undefined
 const states = new Map<string, "Creating" | "Ready" | "Failed">()
 
 const server = Bun.serve({
@@ -38,7 +39,7 @@ const server = Bun.serve({
       const id = path.split("/").at(-1)!
       const state = states.get(id)
       if (!state) return Response.json({ code: "NOT_FOUND", message: "missing" }, { status: 404 })
-      return Response.json({ id, createdAt: new Date().toISOString(), status: { state } })
+      return Response.json({ id, createdAt: new Date().toISOString(), status: { state, ...(failReason ? { reason: failReason } : {}) } })
     }
     if (request.method === "DELETE" && path.includes("/snapshots/")) {
       if (failDeletes) return Response.json({ code: "TEMPORARY", message: "temporary failure" }, { status: 500 })
@@ -58,6 +59,7 @@ async function cleanup() {
   creates = 0
   failGets = 0
   failDeletes = false
+  failReason = undefined
   states.clear()
 }
 
@@ -113,5 +115,87 @@ describe.skipIf(!enabled)("SessionSnapshot PG state machine", () => {
     await snapshots.gc()
     const deleted = await db.select().from(SessionSnapshotTable).where(eq(SessionSnapshotTable.id, id!)).all()
     expect(deleted[0]?.state).toBe("deleted")
+  })
+
+  test("startSnapshot 持久化兼容性元数据", async () => {
+    const sessionID = "ses_snapshot_test_meta"
+    const id = await make().startSnapshot(sandbox, sessionID, {
+      image: "img:v1",
+      sourceSandboxId: "sb-meta",
+      arch: "arm64",
+      schemaVersion: 7,
+      runtimeVersion: "1.2.3",
+    })
+    const row = (await db.select().from(SessionSnapshotTable).where(eq(SessionSnapshotTable.id, id!)).all())[0]
+    expect(row.image).toBe("img:v1")
+    expect(row.source_sandbox_id).toBe("sb-meta")
+    expect(row.arch).toBe("arm64")
+    expect(row.schema_version).toBe(7)
+    expect(row.runtime_version).toBe("1.2.3")
+    expect(row.restored_count).toBe(0)
+    expect(row.last_restored_at).toBeNull()
+  })
+
+  test("markConsumed 递增 restored_count 并记录 last_restored_at", async () => {
+    const sessionID = "ses_snapshot_test_consumed"
+    const snapshots = make()
+    const id = await snapshots.startSnapshot(sandbox, sessionID)
+    states.set(id!, "Ready")
+    expect(await snapshots.awaitSnapshot(sessionID, id!)).toBe("ready")
+
+    await snapshots.markConsumed(id!)
+    await snapshots.markConsumed(id!)
+    const row = (await db.select().from(SessionSnapshotTable).where(eq(SessionSnapshotTable.id, id!)).all())[0]
+    expect(row.state).toBe("stale")
+    expect(row.restored_count).toBe(2)
+    expect(Number(row.last_restored_at)).toBeGreaterThan(0)
+  })
+
+  test("awaitSnapshot 失败时落库远端 reason（排障）", async () => {
+    const sessionID = "ses_snapshot_test_fail_reason"
+    const snapshots = make()
+    const id = await snapshots.startSnapshot(sandbox, sessionID)
+    states.set(id!, "Failed")
+    failReason = "RegistryNotConfigured"
+    expect(await snapshots.awaitSnapshot(sessionID, id!)).toBe("failed")
+    const row = (await db.select().from(SessionSnapshotTable).where(eq(SessionSnapshotTable.id, id!)).all())[0]
+    expect(row.state).toBe("failed")
+    expect(row.reason).toContain("RegistryNotConfigured")
+    failReason = undefined
+  })
+
+  test("markIncompatible 标记 failed 并从可恢复集合移除", async () => {
+    const sessionID = "ses_snapshot_test_incompat"
+    const snapshots = make()
+    const id = await snapshots.startSnapshot(sandbox, sessionID)
+    states.set(id!, "Ready")
+    await snapshots.awaitSnapshot(sessionID, id!)
+    expect((await snapshots.resolveForCreate(sessionID))?.id).toBe(id!)
+
+    await snapshots.markIncompatible(sessionID, id!, "schema 999 != 1")
+    expect(await snapshots.resolveForCreate(sessionID)).toBeNull()
+    const row = (await db.select().from(SessionSnapshotTable).where(eq(SessionSnapshotTable.id, id!)).all())[0]
+    expect(row.state).toBe("failed")
+    expect(row.reason).toContain("incompatible")
+  })
+
+  test("stats 聚合快照状态分布与 GC backlog", async () => {
+    const SID = "ses_snapshot_test_stats"
+    await db.delete(SessionSnapshotTable).where(like(SessionSnapshotTable.session_id, SID)).run()
+    const now = Date.now()
+    await db.insert(SessionSnapshotTable).values([
+      { id: "stat_ready_1", session_id: SID, scope: "session", state: "ready", time_created: now, time_updated: now },
+      { id: "stat_ready_2", session_id: SID, scope: "session", state: "ready", time_created: now, time_updated: now },
+      { id: "stat_stale", session_id: SID, scope: "session", state: "stale", time_created: now, time_updated: now },
+      { id: "stat_creating", session_id: SID, scope: "session", state: "creating", time_created: now, time_updated: now },
+    ]).run()
+
+    const s = await make().stats()
+    expect(s.snapshots.ready).toBeGreaterThanOrEqual(2)
+    expect(s.snapshots.stale).toBeGreaterThanOrEqual(1)
+    expect(s.gc.creating).toBeGreaterThanOrEqual(1)
+    expect(s.derived).toHaveProperty("reuseHitRate")
+    expect(s.derived).toHaveProperty("fallbackRate")
+    await db.delete(SessionSnapshotTable).where(like(SessionSnapshotTable.session_id, SID)).run()
   })
 })

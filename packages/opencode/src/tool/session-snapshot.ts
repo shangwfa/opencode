@@ -21,6 +21,26 @@ export namespace SessionSnapshot {
   const log = Log.create({ service: "session-snapshot" })
   const POLL_INTERVAL_MS = 5_000
 
+  /** 拼接远端 SnapshotStatus 的 reason/message 作为失败原因（落库排障，如 RegistryNotConfigured / POD_READY_TIMEOUT）。 */
+  function snapshotFailureDetail(status: { reason?: string; message?: string }): string {
+    return [status.reason, status.message].filter((s): s is string => !!s).join(": ")
+  }
+
+  /** 快照系统健康评估（拉模式观测；degraded 不影响功能，仅供告警/巡检）。 */
+  export function snapshotHealth(
+    operations: Record<string, { count: number }>,
+    gc: { creating: number; deleting: number },
+  ): { status: "healthy" | "degraded"; reasons: string[] } {
+    const reasons: string[] = []
+    const create = operations["snapshot-create"]?.count ?? 0
+    const restore = operations["snapshot-restore"]?.count ?? 0
+    const fallback = operations["snapshot-fallback"]?.count ?? 0
+    if (restore + fallback > 0 && fallback / (restore + fallback) > 0.2) reasons.push("high restore fallback rate")
+    if (gc.creating > 10) reasons.push("creating snapshots backlog")
+    if (gc.deleting > 20) reasons.push("deleting snapshots backlog")
+    return { status: reasons.length > 0 ? "degraded" : "healthy", reasons }
+  }
+
   export function create(deps: SnapshotDeps) {
     const manager = SandboxManager.create({ connectionConfig: deps.connectionConfig })
 
@@ -57,10 +77,14 @@ export namespace SessionSnapshot {
       return rows.length > 0
     }
 
-    /** createSandbox 前调用：返回可恢复快照 id（无则 null，走镜像冷启动）。 */
-    async function resolveForCreate(sessionID: string): Promise<string | null> {
+    /** createSandbox 前调用：返回可恢复快照（含创建镜像与兼容性元数据，供调用方校验）；无则 null，走镜像冷启动。 */
+    async function resolveForCreate(
+      sessionID: string,
+    ): Promise<{ id: string; image: string | null; arch: string | null; schemaVersion: number | null } | null> {
       try {
-        return (await findRestorable(sessionID))?.id ?? null
+        const row = await findRestorable(sessionID)
+        if (!row) return null
+        return { id: row.id, image: row.image, arch: row.arch, schemaVersion: row.schema_version }
       } catch (e) {
         log.warn("findRestorable failed; cold start", { sessionID, error: String(e) })
         return null
@@ -85,10 +109,34 @@ export namespace SessionSnapshot {
       }
     }
 
-    /** 恢复成功：标记 stale（已消费）。stale 仍可恢复（运行中沙箱异常退出的回退），直到被新快照替代。 */
+    /** 兼容性校验失败：标记 failed，下次走镜像冷启动（不再尝试恢复）。 */
+    async function markIncompatible(sessionID: string, snapshotId: string, reason: string) {
+      try {
+        await setState(snapshotId, "failed", `incompatible: ${reason}`, ["ready", "stale"])
+        log.warn("snapshot incompatible; cold start", { sessionID, snapshotId, reason })
+      } catch (e) {
+        log.warn("markIncompatible db update failed", { snapshotId, error: String(e) })
+      }
+    }
+
+    /** 恢复成功：标记 stale（已消费）并累计恢复次数/时间。stale 仍可恢复（运行中沙箱异常退出的回退），直到被新快照替代。 */
     async function markConsumed(snapshotId: string) {
       try {
-        await setState(snapshotId, "stale", "restored", ["ready", "stale"])
+        const now = Date.now()
+        await deps.pgDb
+          .update(SessionSnapshotTable)
+          .set({
+            state: "stale",
+            reason: "restored",
+            restored_count: sql`${SessionSnapshotTable.restored_count} + 1`,
+            last_restored_at: now,
+            time_updated: now,
+          })
+          .where(and(
+            eq(SessionSnapshotTable.id, snapshotId),
+            inArray(SessionSnapshotTable.state, ["ready", "stale"]),
+          ))
+          .run()
       } catch (e) {
         log.warn("markConsumed db update failed", { snapshotId, error: String(e) })
       }
@@ -131,7 +179,11 @@ export namespace SessionSnapshot {
      * 去重：已有 creating 快照时直接返回其 id（并发 fiber 等同一个快照，避免重复 commit；
      * 卡死的 creating 由 gc 对账修正为 failed，下轮重试可正常发起新快照）。
      */
-    async function startSnapshot(sb: Sandbox, sessionID: string): Promise<string | null> {
+    async function startSnapshot(
+      sb: Sandbox,
+      sessionID: string,
+      opts?: { image?: string | null; sourceSandboxId?: string; arch?: string | null; schemaVersion?: number | null; runtimeVersion?: string | null },
+    ): Promise<string | null> {
       let createdId: string | null = null
       try {
         return await deps.pgDb.transaction(async (tx: any) => {
@@ -158,6 +210,11 @@ export namespace SessionSnapshot {
               session_id: sessionID,
               scope: "session",
               state: "creating",
+              image: opts?.image ?? null,
+              source_sandbox_id: opts?.sourceSandboxId ?? sb.id,
+              arch: opts?.arch ?? null,
+              schema_version: opts?.schemaVersion ?? null,
+              runtime_version: opts?.runtimeVersion ?? null,
               time_created: Date.now(),
               time_updated: Date.now(),
             })
@@ -178,15 +235,18 @@ export namespace SessionSnapshot {
     async function awaitSnapshot(sessionID: string, snapshotId: string): Promise<"ready" | "failed"> {
       const startedAt = Date.now()
       const deadline = startedAt + deps.waitMs
+      let lastStatus: { reason?: string; message?: string } | null = null
       while (Date.now() < deadline) {
-        let state: string
+        let status: { state: string; reason?: string; message?: string }
         try {
-          state = (await manager.getSnapshot(snapshotId)).status.state
+          status = (await manager.getSnapshot(snapshotId)).status
         } catch (e) {
           log.warn("getSnapshot failed; retrying", { sessionID, snapshotId, error: String(e) })
           await new Promise((res) => setTimeout(res, POLL_INTERVAL_MS))
           continue
         }
+        const state = status.state
+        lastStatus = status
         if (state === "Ready") {
           const persisted = await setState(snapshotId, "ready", null, ["creating"]).catch(() => false)
           if (!persisted) {
@@ -203,15 +263,18 @@ export namespace SessionSnapshot {
           return "ready"
         }
         if (state === "Failed") {
-          await setState(snapshotId, "failed", "server reported Failed", ["creating"]).catch(() => undefined)
-          log.warn("snapshot failed", { sessionID, snapshotId })
+          // 远端 SnapshotStatus.reason/message 携带失败根因（如 RegistryNotConfigured、POD_READY_TIMEOUT），落库排障
+          const detail = snapshotFailureDetail(status)
+          await setState(snapshotId, "failed", `server Failed${detail ? `: ${detail}` : ""}`, ["creating"]).catch(() => undefined)
+          log.warn("snapshot failed", { sessionID, snapshotId, reason: status.reason, message: status.message })
           return "failed"
         }
         await new Promise((res) => setTimeout(res, POLL_INTERVAL_MS))
       }
-      // 超时不代表远端失败，保持 creating，由下轮重试或 GC 继续对账。
-      await setState(snapshotId, "creating", "wait timeout", ["creating"]).catch(() => undefined)
-      log.warn("snapshot wait timeout", { sessionID, snapshotId, waitMs: deps.waitMs })
+      // 超时不代表远端失败，保持 creating，由下轮重试或 GC 继续对账；附最后观察到的原因供排障。
+      const detail = lastStatus ? snapshotFailureDetail(lastStatus) : ""
+      await setState(snapshotId, "creating", detail ? `wait timeout: ${detail}` : "wait timeout", ["creating"]).catch(() => undefined)
+      log.warn("snapshot wait timeout", { sessionID, snapshotId, waitMs: deps.waitMs, reason: lastStatus?.reason, message: lastStatus?.message })
       return "failed"
     }
 
@@ -247,7 +310,7 @@ export namespace SessionSnapshot {
 
     async function deleteSnapshot(row: SnapshotRow, reason: string) {
       if (row.state !== "deleting") {
-        const claimed = await setState(row.id, "deleting", reason, ["creating", "ready", "stale", "failed", "retired"])
+        const claimed = await setState(row.id, "deleting", reason, ["creating", "ready", "stale", "failed"])
         if (!claimed) return
       }
       try {
@@ -295,9 +358,9 @@ export namespace SessionSnapshot {
         .limit(20)
         .all()
       for (const row of stuck) {
-        let state: string | null = null
+        let status: { state: string; reason?: string; message?: string } | null = null
         try {
-          state = (await manager.getSnapshot(row.id)).status.state
+          status = (await manager.getSnapshot(row.id)).status
         } catch (error) {
           if (error instanceof SandboxApiException && error.statusCode === 404) {
             // 远端已不存在（被 sibling 清理/TTL/人工删除）——不可能再 Ready，标 failed 终止重试
@@ -308,6 +371,7 @@ export namespace SessionSnapshot {
           log.warn("snapshot reconcile query failed; keeping creating", { snapshotId: row.id, sessionID: row.session_id, error: String(error) })
           continue
         }
+        const state = status.state
         if (state === "Ready") {
           const persisted = await setState(row.id, "ready", "reconciled", ["creating"]).catch(() => false)
           if (!persisted) continue
@@ -316,9 +380,48 @@ export namespace SessionSnapshot {
             await backfillMetadata(row.session_id, row.id)
           }
         } else if (state === "Failed") {
-          await setState(row.id, "failed", "reconcile: Failed", ["creating"]).catch(() => undefined)
+          const detail = snapshotFailureDetail(status)
+          await setState(row.id, "failed", `reconcile: Failed${detail ? `: ${detail}` : ""}`, ["creating"]).catch(() => undefined)
         }
         log.info("snapshot reconcile", { snapshotId: row.id, sessionID: row.session_id, state })
+      }
+    }
+
+    /** 聚合统计（GET /snapshot/stats）：快照状态分布、各操作耗时 P50/P95、GC backlog、派生比率。 */
+    async function stats() {
+      const byState: Array<{ state: string; n: number | string }> = await deps.pgDb.execute(sql`
+        SELECT state, count(*)::int AS n FROM session_snapshot GROUP BY state
+      `)
+      const ops: Array<{ source: string; n: number | string; p50: number | string | null; p95: number | string | null }> =
+        await deps.pgDb.execute(sql`
+          SELECT source, count(*)::int AS n,
+            percentile_cont(0.5) WITHIN GROUP (ORDER BY COALESCE(command::json->>'durationMs', command::json->>'checkMs')::numeric) AS p50,
+            percentile_cont(0.95) WITHIN GROUP (ORDER BY COALESCE(command::json->>'durationMs', command::json->>'checkMs')::numeric) AS p95
+          FROM exec_log
+          WHERE source IN ('snapshot-create','snapshot-restore','snapshot-reuse','snapshot-fallback')
+            AND (command ~ 'durationMs' OR command ~ 'checkMs')
+          GROUP BY source
+        `)
+      const gcRow: Array<{ creating: number | string; deleting: number | string }> = await deps.pgDb.execute(sql`
+        SELECT count(*) FILTER (WHERE state='creating')::int AS creating,
+               count(*) FILTER (WHERE state='deleting')::int AS deleting
+        FROM session_snapshot
+      `)
+      const num = (v: number | string | null | undefined) => (v == null ? null : Number(v))
+      const operations = Object.fromEntries(
+        ops.map((r) => [r.source, { count: Number(r.n), p50Ms: num(r.p50), p95Ms: num(r.p95) }]),
+      ) as Record<string, { count: number; p50Ms: number | null; p95Ms: number | null }>
+      const create = operations["snapshot-create"]?.count ?? 0
+      const reuse = operations["snapshot-reuse"]?.count ?? 0
+      const restore = operations["snapshot-restore"]?.count ?? 0
+      const fallback = operations["snapshot-fallback"]?.count ?? 0
+      const rate = (a: number, b: number) => (a + b === 0 ? null : Number((a / (a + b)).toFixed(4)))
+      return {
+        snapshots: Object.fromEntries(byState.map((r) => [r.state, Number(r.n)])),
+        operations,
+        gc: { creating: Number(gcRow[0]?.creating ?? 0), deleting: Number(gcRow[0]?.deleting ?? 0) },
+        derived: { reuseHitRate: rate(reuse, create), fallbackRate: rate(fallback, restore) },
+        health: snapshotHealth(operations, { creating: Number(gcRow[0]?.creating ?? 0), deleting: Number(gcRow[0]?.deleting ?? 0) }),
       }
     }
 
@@ -337,8 +440,8 @@ export namespace SessionSnapshot {
     }
 
     return {
-      resolveForCreate, markRestoreFailed, markConsumed, findRestorable,
-      startSnapshot, awaitSnapshot, getLatest, gc, deleteAllForSession,
+      resolveForCreate, markRestoreFailed, markConsumed, markIncompatible, findRestorable,
+      startSnapshot, awaitSnapshot, getLatest, gc, deleteAllForSession, stats,
     }
   }
 

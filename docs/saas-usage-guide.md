@@ -172,6 +172,7 @@ curl -s https://test-opencode.shadow-rpa.net/provider/auth | jq '.["openai"]'
 | POST | `/session/:sessionID/share` | 生成分享链接 |
 | POST | `/session/:sessionID/snapshot` | 沙箱快照（快照模式下，异步创建） |
 | GET | `/session/:sessionID/snapshot` | 最新快照状态查询 |
+| GET | `/snapshot/stats` | 快照系统聚合统计（状态分布/操作耗时 P50·P95/GC 积压/复用命中率/健康评估）|
 
 **创建参数（body 可选字段）**：`parentID` / `title` / `agent` / `model` / `metadata` / `permission` / `workspaceID` / `pvcMode` / `appId` / `sandbox`
 
@@ -834,7 +835,9 @@ curl -X POST $BASE/session -d '{"sandbox":{"cpu":"1","memory":"2Gi","persistMode
 - workspace 在沙箱本地盘（rootfs），不再挂 NFS PVC——小文件/元数据性能大幅提升
 - 空闲回收前**自动快照**：**快照 Ready 才销毁沙箱**（失败保留沙箱重试，代码不丢），下次发消息**从快照秒级恢复**（数据 + 依赖缓存完整）
 - 快照 Ready 后快照 id 自动写入 `metadata.sandboxSnapshot`（`GET /session` 可见）
-- 会话删除自动清理全部快照（含用户数据不留存）；同会话只保留最新快照（TTL 默认 7 天）
+- 会话删除自动清理全部快照（含用户数据不留存）；同会话只保留最新快照（TTL 默认 14 天，`OPENCODE_SANDBOX_SNAPSHOT_TTL_SEC` 可调）
+- **数据保留边界（RPO）**：快照保存的是「上次快照完成时点」的数据；两次快照之间的写入不落盘。销毁时若 workspace 与上次快照一致则自动复用（秒级），有变更则自动新建快照后再销毁——正常 kill/回收**不会丢数据**；仅沙箱被平台强制回收且超出 TTL 时才可能丢失
+- 显式 `POST /snapshot` 始终创建新快照（不复用），可在关键节点主动保数据
 
 **业务侧用法**：
 

@@ -120,7 +120,9 @@ docker run -d \
 
 | 变量 | 必填 | 默认值 | 说明 |
 |------|------|--------|------|
-| `OPENCODE_SANDBOX_VOLUME_TYPE` | 否 | `none` | 存储类型：`none`（无持久化）/ `pvc`（K8s PVC）/ `host`（主机挂载） |
+| `OPENCODE_SANDBOX_VOLUME_TYPE` | 否 | `none` | 存储类型：`none`（无持久化）/ `pvc`（K8s PVC）/ `host`（主机挂载）/ `snapshot`（会话快照，rootfs 持久化） |
+| `OPENCODE_SANDBOX_SNAPSHOT_TTL_SEC` | 否 | `1209600`（14 天） | 快照保留时长，过期由 GC 自动删除远端快照与记录 |
+| `OPENCODE_SANDBOX_SNAPSHOT_PRUNE` | 否 | 关闭 | 开启后快照前清理可重建缓存（`/root/.cache` 等），减小快照体积 |
 | `OPENCODE_SANDBOX_PVC_CLAIM` | 否 | `sandbox-test` | PVC claim 名称（`VOLUME_TYPE=pvc` 时有效） |
 | `OPENCODE_SANDBOX_IDLE_KILL_SEC` | 否 | `3600` | sandbox 空闲多久后销毁（秒），PVC 数据保留；测试可调小如 `60` |
 | `OPENCODE_SANDBOX_MAX_TTL_SEC` | 否 | `3600` | sandbox 最大存活时间（秒），兜底强制销毁 |

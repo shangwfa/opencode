@@ -5,12 +5,14 @@ import { and, asc, eq, lt, or, sql } from "drizzle-orm"
 import * as Log from "@opencode-ai/core/util/log"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { Flag } from "@/flag/flag"
+import { InstallationVersion } from "@opencode-ai/core/installation/version"
 import type { SessionID } from "../session/schema"
 import { parseSandboxColumn, resolveSandboxOpts } from "../session/sandbox-opts"
 import { SessionTable } from "../session/session.pg"
 import { Database } from "../storage/db"
 import { SandboxTable } from "./sandbox.pg"
 import { SessionSnapshot } from "./session-snapshot"
+import { SnapshotOperation, LEASE_MS, type SnapshotOperationRow } from "./snapshot-operation"
 import { ExecLogTable } from "../session/exec-log"
 
 export namespace SandboxConfig {
@@ -32,6 +34,7 @@ export namespace SandboxConfig {
     readonly idleReapIntervalMs: number
     readonly maxTtlSeconds: number
     readonly packageCacheMount: string
+    readonly snapshotPrune: boolean
     readonly cleanupOnScopeExit?: boolean
   }
 
@@ -55,6 +58,7 @@ export namespace SandboxConfig {
     idleReapIntervalMs: 300_000,
     maxTtlSeconds: Flag.OPENCODE_SANDBOX_MAX_TTL_SEC,
     packageCacheMount: Flag.OPENCODE_SANDBOX_PACKAGE_CACHE_MOUNT,
+    snapshotPrune: Flag.OPENCODE_SANDBOX_SNAPSHOT_PRUNE,
     cleanupOnScopeExit: true,
   }
 
@@ -158,6 +162,25 @@ function requirePackageCacheMount(mountPath: string, reservedPaths: string[]) {
 // /var/tmp 而非 /tmp：规避个别基础镜像把 /tmp 挂 tmpfs（不随快照持久化）。
 export const SNAPSHOT_MARKER_PATH = "/var/tmp/.opencode-snapshot-marker"
 export const SNAPSHOT_MANIFEST_PATH = "/var/tmp/.opencode-snapshot-manifest"
+/** 快照内容布局版本：marker/manifest 语义或 workspace 约定发生破坏性变更时递增，
+ * 恢复前据此阻断不兼容旧快照（null = 迁移前的旧快照，视为兼容，避免误伤）。 */
+export const SNAPSHOT_SCHEMA_VERSION = 1
+
+/** 快照内容布局版本是否与当前不兼容（null/undefined = 旧快照，兼容）。 */
+export function snapshotSchemaMismatch(snapshotVersion: number | null | undefined, currentVersion: number): boolean {
+  return snapshotVersion != null && snapshotVersion !== currentVersion
+}
+
+/** 快照 platform.arch（amd64/arm64）对应的服务端架构（仅用于漂移观测，不阻断）。 */
+export function expectedSandboxArch(processArch: string): string {
+  return processArch === "x64" ? "amd64" : processArch
+}
+
+/** 恢复完整性抽查：marker 随 rootfs 持久化，其缺失说明快照来自旧格式（无 marker）或内容可疑。
+ * 仅观测不阻断——缺失时复用判定会自然判 dirty，多一次快照兜底。 */
+export function restoredMarkerCheckCommand(marker = SNAPSHOT_MARKER_PATH): string {
+  return `if [ -f ${marker} ]; then echo PRESENT; else echo MISSING; fi`
+}
 
 /** 生成内容清单（快照开始前调用）：mode、size、SHA-256，LC_ALL=C 保证排序稳定。 */
 export function snapshotManifestCommand(workspace = "/workspace", manifest = SNAPSHOT_MANIFEST_PATH) {
@@ -181,8 +204,12 @@ export function snapshotDirtyCheckCommand(
 ) {
   const quick = `find ${workspace} -newermm ${marker} -print -quit 2>/dev/null`
   const guardedQuick = timeoutSec > 0 ? `timeout ${timeoutSec} ${quick}` : quick
+  // 注意：不能写 `timeout N { ...; }`——timeout 会把 `{` 当命令名导致 shell 语法错误，
+  // 而 execd 会把含命令源码的错误回显进 stdout（其中的字面量会污染标记匹配）。故用子 shell 包两个 timeout。
   const scan = `{ find ${workspace} -type f -printf '%m %s %p\\n'; find ${workspace} -type f -exec sha256sum {} \\; ; } 2>/dev/null | LC_ALL=C sort`
-  const guardedScan = timeoutSec > 0 ? `timeout $((timeoutSec + 5)) ${scan}` : scan
+  const guardedScan = timeoutSec > 0
+    ? `( timeout ${timeoutSec + 5} find ${workspace} -type f -printf '%m %s %p\\n' 2>/dev/null; timeout ${timeoutSec + 5} find ${workspace} -type f -exec sha256sum {} \\; 2>/dev/null ) | LC_ALL=C sort`
+    : scan
   return [
     `out=$(${guardedQuick}); rc=$?; if [ "$rc" -ne 0 ] || [ -n "$out" ]; then echo DIRTY; exit 0; fi`,
     `[ -f ${manifest} ] || { echo DIRTY; exit 0; }`,
@@ -191,32 +218,75 @@ export function snapshotDirtyCheckCommand(
   ].join("; ")
 }
 
-/** 沙箱自上次快照后 workspace 是否无变更（stdout 无 CLEAN 标记 / 命令失败 / 超时一律视为有变更，走保守快照）。 */
-export function workspaceUnchangedSinceSnapshot(sb: Sandbox): Effect.Effect<boolean> {
+/** 在沙箱上执行一次性命令并返回 stdout。走临时 command session（runInSession）而非无会话 /command：
+ * 后者在部分 execd 上不产出 stdout 事件（曾导致 marker 的 workspaceKb/arch 全部为空）。
+ * 超时/异常一律返回空串，由调用方按「不可知→保守」处理。 */
+const snapshotCmdLog = Log.create({ service: "snapshot-cmd" })
+function runEphemeralCommand(sb: Sandbox, command: string, timeoutSeconds = 15): Effect.Effect<string> {
   return Effect.tryPromise(async () => {
-    // 恢复的沙箱上无会话 /command 流可能永不结束；临时 bash session 与前台 exec 使用同一可靠路径。
     const sessionID = await sb.commands.createSession({ workingDirectory: "/workspace" })
     try {
-      return await sb.commands.runInSession(sessionID, snapshotDirtyCheckCommand(), {
-        workingDirectory: "/workspace",
-        timeoutSeconds: 15,
-      })
+      const result = await sb.commands.runInSession(sessionID, command, { workingDirectory: "/workspace", timeoutSeconds })
+      // 事件边界以 \n 连接：OutputMessage 分片间不含换行符（实测 ["4","x86_64"]），join("") 会把相邻行粘连
+      const out = result.logs.stdout.map((l) => l.text).join("\n")
+      if (!out) {
+        snapshotCmdLog.warn("ephemeral command returned empty stdout", {
+          sandboxID: sb.id,
+          cmd: command.slice(0, 120),
+          exitCode: result.exitCode,
+          complete: !!result.complete,
+          hasError: result.error != null,
+          errorValue: result.error?.value ?? null,
+        })
+      }
+      return out
     } finally {
       await sb.commands.deleteSession(sessionID).catch(() => undefined)
     }
   }).pipe(
-    Effect.map((result) => result.logs.stdout.some((line) => line.text.includes("CLEAN"))),
-    Effect.timeoutOrElse({ duration: Duration.seconds(20), orElse: () => Effect.succeed(false) }),
-    Effect.catchCause(() => Effect.succeed(false)),
+    Effect.tap(() => Effect.void),
+    Effect.catchCause((cause) => {
+      snapshotCmdLog.warn("ephemeral command failed", { sandboxID: sb.id, cmd: command.slice(0, 120), cause: Cause.pretty(cause) })
+      return Effect.succeed("")
+    }),
+    Effect.timeoutOrElse({ duration: Duration.seconds(timeoutSeconds + 5), orElse: () => Effect.succeed("") }),
+    Effect.catchCause(() => Effect.succeed("")),
   )
 }
 
-/** 快照 Ready 后打 marker + 生成 size 清单（失败静默：过旧只会导致下次多一次快照，无害）。 */
-export function touchSnapshotMarker(sb: Sandbox): Effect.Effect<void> {
-  const cmd = `touch ${SNAPSHOT_MARKER_PATH} && ${snapshotManifestCommand()}`
-  return Effect.tryPromise(() => sb.commands.run(cmd)).pipe(
-    Effect.catchCause(() => Effect.void),
+/** 沙箱自上次快照后 workspace 是否无变更（stdout 无 CLEAN 标记 / 命令失败 / 超时一律视为有变更，走保守快照）。 */
+export function workspaceUnchangedSinceSnapshot(sb: Sandbox): Effect.Effect<boolean> {
+  return runEphemeralCommand(sb, snapshotDirtyCheckCommand()).pipe(
+    // 精确整行匹配：execd 在语法/运行错误时会把含命令源码的回显混入 stdout，substring 匹配会被
+    // 源码里的 "CLEAN" 字面量误判（曾导致写入后仍复用旧快照）。
+    Effect.map((out) => out.split("\n").some((s) => s.trim() === "CLEAN")),
   )
+}
+
+/** 快照前可清理的可重建产物白名单（不删 /tmp 与 pnpm store：前者含 execd 运行时文件，后者是 node_modules 硬链接来源）。 */
+const SNAPSHOT_PRUNE_COMMAND = "rm -rf /root/.cache /home/sandbox/.cache /workspace/.cache 2>/dev/null; true"
+
+/** 解析 touchSnapshotMarker 的输出：数字行 = workspace KB；uname 行（x86_64/aarch64/…）归一为 amd64/arm64。 */
+export function parseMarkerOutput(stdout: string): { workspaceKb: number | null; arch: string | null } {
+  let workspaceKb: number | null = null
+  let arch: string | null = null
+  for (const line of stdout.split("\n").map((s) => s.trim()).filter(Boolean)) {
+    if (/^(x86_64|aarch64|amd64|arm64)$/i.test(line)) {
+      const lower = line.toLowerCase()
+      arch = lower === "x86_64" ? "amd64" : lower === "aarch64" ? "arm64" : lower
+    } else if (/^\d+$/.test(line)) {
+      workspaceKb = Number(line)
+    }
+  }
+  return { workspaceKb, arch }
+}
+
+/** 快照开始前打 marker + 生成内容清单，回读 workspace 大小（KB）与沙箱架构（uname -m）。
+ * prune=true 时先清理可重建产物；失败静默：marker 缺失只会导致下次多一次快照，无害。 */
+export function touchSnapshotMarker(sb: Sandbox, opts?: { prune?: boolean }): Effect.Effect<{ workspaceKb: number | null; arch: string | null }> {
+  const prune = opts?.prune ? `${SNAPSHOT_PRUNE_COMMAND}; ` : ""
+  const cmd = `${prune}touch ${SNAPSHOT_MARKER_PATH} && ${snapshotManifestCommand()} && du -sk /workspace 2>/dev/null | cut -f1; uname -m 2>/dev/null`
+  return runEphemeralCommand(sb, cmd).pipe(Effect.map(parseMarkerOutput))
 }
 
 export function withExecTimeout(
@@ -420,6 +490,8 @@ export namespace SandboxProvider {
     readonly createSnapshot?: (sessionID: SessionID) => Effect.Effect<string | null>
     /** 会话最新快照状态（无则 null） */
     readonly getLatestSnapshot?: (sessionID: SessionID) => Effect.Effect<{ id: string; state: string; reason: string | null } | null>
+    /** 快照聚合统计（状态分布 / 操作耗时 P50-P95 / GC backlog / 派生比率） */
+    readonly getSnapshotStats?: () => Effect.Effect<unknown>
     readonly keepAlive: (sessionID: SessionID) => Effect.Effect<void>
     readonly touch: (sessionID: SessionID) => Effect.Effect<void>
     readonly release: (sessionID: SessionID) => Effect.Effect<void>
@@ -814,6 +886,7 @@ export namespace SandboxProvider {
         runInSession, runDetached, interrupt, register, getEndpoint,
         cleanupSessionVolume: (sessionID) => cleanupSessionVolume(sessionID, config, connectionConfig),
         purgeSnapshots: () => Effect.void,
+        getSnapshotStats: () => Effect.succeed(null),
       })
     }),
   )
@@ -889,6 +962,8 @@ export namespace SandboxProvider {
         ttlMs: config.snapshotTtlMs,
         waitMs: config.snapshotWaitMs,
       })
+      // 快照编排操作队列：kill/回收先把操作落库，再由 worker 凭租约领取执行（进程崩溃可被接管）
+      const snapshotOps = SnapshotOperation.create(pgDb)
 
       type Row = {
         id: string
@@ -1244,9 +1319,27 @@ export namespace SandboxProvider {
           const explicitSnapshotId = resolved.sandbox?.snapshotId?.trim() || null
 
           // 快照恢复优先：显式 snapshotId > 会话快照表最新 ready|stale；恢复失败在 catch 分支降级镜像
-          const snapshotId = snapshots && persistMode === "snapshot"
-            ? (explicitSnapshotId ?? (yield* Effect.promise(() => snapshots.resolveForCreate(sessionID))))
-            : explicitSnapshotId
+          const explicitTarget = { id: explicitSnapshotId ?? "", image: null as string | null, arch: null as string | null, schemaVersion: null as number | null }
+          let resolvedSnapshot = snapshots && persistMode === "snapshot"
+            ? (explicitSnapshotId ? explicitTarget : (yield* Effect.promise(() => snapshots.resolveForCreate(sessionID))))
+            : (explicitSnapshotId ? explicitTarget : null)
+          // 兼容性阻断：快照内容布局版本与当前不兼容 → 标记 failed 并冷启动
+          // （远端可能"恢复成功"但内容不可用；null = 迁移前旧快照，视为兼容避免误伤）
+          if (resolvedSnapshot && snapshotSchemaMismatch(resolvedSnapshot.schemaVersion, SNAPSHOT_SCHEMA_VERSION)) {
+            const incompatible = resolvedSnapshot
+            log.warn("snapshot schema incompatible; cold start", { sessionID, snapshotId: incompatible.id, snapshotSchema: incompatible.schemaVersion, current: SNAPSHOT_SCHEMA_VERSION })
+            yield* Effect.promise(() => snapshots!.markIncompatible(sessionID, incompatible.id, `schema ${incompatible.schemaVersion} != ${SNAPSHOT_SCHEMA_VERSION}`)).pipe(Effect.catchCause(() => Effect.void))
+            resolvedSnapshot = null
+          }
+          const snapshotId = resolvedSnapshot?.id ?? null
+          // 兼容性观测：镜像/架构漂移记录，仍尝试恢复（远端失败会自动降级冷启动），便于排障与 fallback 归因
+          if (resolvedSnapshot?.image && resolvedSnapshot.image !== sessionImage) {
+            log.warn("snapshot image drift; restoring anyway", { sessionID, snapshotId, snapshotImage: resolvedSnapshot.image, sessionImage })
+          }
+          const expectedArch = expectedSandboxArch(process.arch)
+          if (resolvedSnapshot?.arch && resolvedSnapshot.arch !== expectedArch) {
+            log.warn("snapshot arch drift; restoring anyway", { sessionID, snapshotId, snapshotArch: resolvedSnapshot.arch, serverArch: process.arch })
+          }
           const createFromSnapshot = (id: string) =>
             Effect.tryPromise({
               try: () =>
@@ -1273,6 +1366,7 @@ export namespace SandboxProvider {
             })
           // 快照恢复优先：有快照则从快照拉起（秒级）；恢复失败（快照被 GC/层损坏）
           // 标记 failed 并降级镜像冷启动，不阻塞会话创建
+          const restoreStarted = Date.now()
           const created = yield* (snapshotId
             ? createFromSnapshot(snapshotId).pipe(
                 Effect.map((sb) => ({ sb, restoredFromSnapshot: true })),
@@ -1283,8 +1377,13 @@ export namespace SandboxProvider {
                       snapshots
                         ? Effect.promise(() => snapshots.markRestoreFailed(sessionID, snapshotId!, err.message))
                         : Effect.void,
-                      createFromImage().pipe(Effect.map((sb) => ({ sb, restoredFromSnapshot: false }))),
-                    ),
+                      logSnapshotAction({
+                        sessionID,
+                        source: "snapshot-fallback",
+                        detail: { snapshotId, durationMs: Date.now() - restoreStarted, error: err.message },
+                        timeStarted: restoreStarted,
+                      }),
+                    ).pipe(Effect.andThen(createFromImage().pipe(Effect.map((sb) => ({ sb, restoredFromSnapshot: false }))))),
                 ),
               )
             : createFromImage().pipe(Effect.map((sb) => ({ sb, restoredFromSnapshot: false }))))
@@ -1314,6 +1413,16 @@ export namespace SandboxProvider {
               ].join("; "),
             ),
           ).pipe(Effect.catchCause(() => Effect.void))
+          // 恢复完整性抽查：marker 缺失说明快照来自旧格式或内容可疑（只观测不阻断，见 restoredMarkerCheckCommand）
+          let markerPresent: boolean | null = null
+          if (created.restoredFromSnapshot) {
+            const out = yield* runEphemeralCommand(sb, restoredMarkerCheckCommand(), 5)
+            if (out.includes("PRESENT")) markerPresent = true
+            else if (out.includes("MISSING")) {
+              markerPresent = false
+              log.warn("restored snapshot missing integrity marker; legacy snapshot or corrupted content", { sessionID, snapshotId })
+            }
+          }
           const timeFinished = Date.now()
           yield* Effect.tryPromise({
             try: () =>
@@ -1322,9 +1431,16 @@ export namespace SandboxProvider {
                 .values({
                   id: `sandbox-create-${timeStarted}`,
                   session_id: sessionID,
-                  command: JSON.stringify({ sandboxID: sb.id, image: sessionImage, restoredFromSnapshot: created.restoredFromSnapshot, durationMs: timeFinished - timeStarted }),
+                  command: JSON.stringify({
+                    sandboxID: sb.id,
+                    image: sessionImage,
+                    restoredFromSnapshot: created.restoredFromSnapshot,
+                    restoredSnapshotId: created.restoredFromSnapshot ? snapshotId : null,
+                    markerPresent,
+                    durationMs: timeFinished - timeStarted,
+                  }),
                   status: "completed",
-                  source: "sandbox-create",
+                  source: created.restoredFromSnapshot ? "snapshot-restore" : "sandbox-create",
                   time_started: timeStarted,
                   time_finished: timeFinished,
                 })
@@ -1402,54 +1518,153 @@ export namespace SandboxProvider {
         }).pipe(Effect.withSpan("SandboxProvider.destroySandbox"))
       }
 
+      function logSnapshotAction(input: { sessionID: string; source: "snapshot-create" | "snapshot-reuse" | "snapshot-delete" | "snapshot-fallback"; detail: unknown; timeStarted: number }) {
+        const now = Date.now()
+        return Effect.tryPromise(() =>
+          pgDb.insert(ExecLogTable).values({
+            id: `action-${input.source}-${now}`,
+            session_id: input.sessionID,
+            command: JSON.stringify(input.detail),
+            status: "completed",
+            source: input.source,
+            time_started: input.timeStarted,
+            time_finished: now,
+          }).run(),
+        ).pipe(Effect.catchCause(() => Effect.void))
+      }
+
+      /** 快照销毁执行体（worker 与直接路径共用，须幂等）：
+       * 无变更复用已有快照，否则先快照 Ready 再销毁源沙箱——快照未成功不销毁。 */
+      function runSnapshotDestroy(row: Row) {
+        return Effect.gen(function* () {
+          invalidateCachedSandbox(row.session_id)
+          // 同 pod 互斥：kill 与 killed 重试并发时只允许一个执行体进入（跨 pod 由操作租约保证）
+          const claimed = yield* claimCleanup(row.session_id)
+          if (!claimed) return
+          yield* Effect.gen(function* () {
+            const sb = yield* reconnectIfPresent(row)
+            if (!sb) {
+              yield* killByID(row.id, row.session_id)
+              yield* dbMarkDestroyed(row.session_id, row.id)
+              log.info("sandbox destroyed by id", { sessionID: row.session_id, sandboxID: row.id })
+              return
+            }
+            // 无变更复用（T25.24）：marker 之后 workspace 无写入 → 复用最新 ready/stale 快照，
+            // 跳过重复快照直接销毁；判定失败/无可复用快照保守走原快照路径。
+            const checkStarted = Date.now()
+            if (yield* workspaceUnchangedSinceSnapshot(sb)) {
+              const reusable = yield* Effect.promise(() => snapshots!.findRestorable(row.session_id)).pipe(
+                Effect.catch(() => Effect.succeed(null)),
+              )
+              if (reusable) {
+                log.info("snapshot reused (workspace unchanged)", { sessionID: row.session_id, sandboxID: sb.id, snapshotId: reusable.id })
+              yield* logSnapshotAction({
+                sessionID: row.session_id,
+                source: "snapshot-reuse",
+                detail: { snapshotId: reusable.id, sandboxID: sb.id, explicit: false, durationMs: Date.now() - checkStarted },
+                timeStarted: checkStarted,
+              })
+                yield* destroySandbox(sb, row.session_id).pipe(Effect.catchCause(() => Effect.void))
+                return
+              }
+            }
+            // marker/manifest 必须在 startSnapshot 之前写入，才能随快照 rootfs 持久化
+            // （快照 commit 之后 touch 的话 marker 不进快照，恢复后缺失 → 永远判 dirty）。
+            const snapStarted = Date.now()
+            const marker = yield* touchSnapshotMarker(sb, { prune: config.snapshotPrune })
+            const snapshotId = yield* Effect.promise(() => snapshots!.startSnapshot(sb, row.session_id, {
+              sourceSandboxId: sb.id,
+              arch: marker.arch,
+              schemaVersion: SNAPSHOT_SCHEMA_VERSION,
+              runtimeVersion: InstallationVersion,
+            }))
+            if (!snapshotId) {
+              log.warn("snapshot start failed; keeping sandbox for retry", { sessionID: row.session_id, sandboxID: sb.id })
+              yield* Effect.tryPromise(() => sb.close()).pipe(Effect.catchCause(() => Effect.void))
+              return
+            }
+            const result = yield* Effect.promise(() => snapshots!.awaitSnapshot(row.session_id, snapshotId))
+            if (result !== "ready") {
+              log.warn("snapshot not ready; keeping sandbox for retry", { sessionID: row.session_id, sandboxID: sb.id, snapshotId })
+              yield* Effect.tryPromise(() => sb.close()).pipe(Effect.catchCause(() => Effect.void))
+              return
+            }
+            yield* logSnapshotAction({
+              sessionID: row.session_id,
+              source: "snapshot-create",
+              detail: { snapshotId, sandboxID: sb.id, explicit: false, durationMs: Date.now() - snapStarted, workspaceKb: marker.workspaceKb, pruned: config.snapshotPrune },
+              timeStarted: snapStarted,
+            })
+            yield* destroySandbox(sb, row.session_id).pipe(Effect.catchCause(() => Effect.void))
+          }).pipe(Effect.ensuring(releaseCleanup(row.session_id)))
+        })
+      }
+
+      /** 执行期间持续续租；一旦续租失败（租约过期被接管），以失败结束 race 并中断执行体，
+       * 避免旧执行者继续做销毁/快照等副作用。 */
+      function withLeaseHeartbeat<A, E>(op: SnapshotOperationRow, effect: Effect.Effect<A, E>) {
+        const intervalMs = Math.max(10_000, Math.floor(LEASE_MS / 3))
+        const beat = Effect.forever(
+          Effect.gen(function* () {
+            yield* Effect.sleep(Duration.millis(intervalMs))
+            const ok = yield* Effect.promise(() => snapshotOps.heartbeat(op.id, op.fencing_token))
+            if (!ok) yield* Effect.fail(new Error(`snapshot operation lease lost: ${op.id}`))
+          }),
+        )
+        return Effect.race(beat, effect)
+      }
+
+      /** 领取并执行队列中的快照操作（租约+fencing 保证跨实例不重复；执行体幂等，失败退避重试）。 */
+      function drainSnapshotOperations() {
+        return Effect.gen(function* () {
+          let op = yield* Effect.promise(() => snapshotOps.claim())
+          while (op) {
+            const current = op
+            const row: Row = {
+              id: current.sandbox_id ?? "",
+              session_id: current.session_id,
+              host: `http://${config.domain}`,
+              state: "killed",
+              keep_alive: false,
+              command_session_id: null,
+              time_created: 0,
+              time_updated: 0,
+            }
+            yield* withLeaseHeartbeat(current, runSnapshotDestroy(row)).pipe(
+              Effect.tap(() => Effect.promise(() => snapshotOps.complete(current.id, current.fencing_token))),
+              Effect.catchCause((cause) =>
+                Effect.promise(() => snapshotOps.fail(current.id, current.fencing_token, Cause.pretty(cause))).pipe(Effect.catchCause(() => Effect.void)),
+              ),
+            )
+            op = yield* Effect.promise(() => snapshotOps.claim())
+          }
+        }).pipe(Effect.catchCause((cause) => {
+          log.error("snapshot operation drain failed", { cause: Cause.pretty(cause) })
+          return Effect.void
+        }))
+      }
+
+      /** 触发一次后台 drain。不单飞：claim 用 SKIP LOCKED 保证不重复领取，无操作时立即返回，
+       * 这样 kill 入队后新 fork 的 drain 必然能领到刚入队的操作（单飞会因窗口期漏领）。 */
+      function nudgeSnapshotDrain() {
+        return drainSnapshotOperations().pipe(Effect.forkIn(creationScope), Effect.asVoid)
+      }
+
       function cleanupSandbox(row: Row, opts?: { snapshot?: boolean }) {
         return Effect.gen(function* () {
           invalidateCachedSandbox(row.session_id)
-          const sb = yield* reconnectIfPresent(row)
-          if (sb) {
-            if (opts?.snapshot && snapshots) {
-            // 快照+销毁异步化：锁内仅发起，后台 fiber 等快照 Ready 后才 kill 源沙箱。
-            // 代码安全承诺：快照未成功不销毁——失败/超时保留沙箱（行保持 killed，300s 后
-            // idle reap 重试快照）；沙箱由 TTL 兜底最终回收，重试期间不阻塞会话恢复。
-            const claimed = yield* claimCleanup(row.session_id)
-            if (!claimed) return
-            yield* Effect.gen(function* () {
-              // 无变更复用（T25.24）：marker 之后 workspace 无写入 → 复用最新 ready/stale 快照，
-              // 跳过重复快照直接销毁；判定失败/无可复用快照保守走原快照路径。
-              if (yield* workspaceUnchangedSinceSnapshot(sb)) {
-                const reusable = yield* Effect.promise(() => snapshots.findRestorable(row.session_id)).pipe(
-                  Effect.catch(() => Effect.succeed(null)),
-                )
-                if (reusable) {
-                  log.info("snapshot reused (workspace unchanged)", { sessionID: row.session_id, sandboxID: sb.id, snapshotId: reusable.id })
-                  yield* destroySandbox(sb, row.session_id).pipe(Effect.catchCause(() => Effect.void))
-                  return
-                }
-              }
-              // marker/manifest 必须在 startSnapshot 之前写入，才能随快照 rootfs 持久化
-              // （快照 commit 之后 touch 的话 marker 不进快照，恢复后缺失 → 永远判 dirty）。
-              yield* touchSnapshotMarker(sb)
-              const snapshotId = yield* Effect.promise(() => snapshots.startSnapshot(sb, row.session_id))
-              if (!snapshotId) {
-                log.warn("snapshot start failed; keeping sandbox for retry", { sessionID: row.session_id, sandboxID: sb.id })
-                yield* Effect.tryPromise(() => sb.close()).pipe(Effect.catchCause(() => Effect.void))
-                return
-              }
-              const result = yield* Effect.promise(() => snapshots.awaitSnapshot(row.session_id, snapshotId))
-              if (result !== "ready") {
-                log.warn("snapshot not ready; keeping sandbox for retry", { sessionID: row.session_id, sandboxID: sb.id, snapshotId })
-                yield* Effect.tryPromise(() => sb.close()).pipe(Effect.catchCause(() => Effect.void))
-                return
-              }
-              yield* destroySandbox(sb, row.session_id).pipe(Effect.catchCause(() => Effect.void))
-            }).pipe(
-              Effect.ensuring(releaseCleanup(row.session_id)),
-              Effect.forkIn(creationScope),
+          // 快照销毁异步化：先把操作落库（durable），再由后台 worker 等快照 Ready 后 kill 源沙箱。
+          // 代码安全承诺：快照未成功不销毁——失败/超时保留沙箱（行保持 killed，后续 idle reap
+          // 重试）；沙箱由 TTL 兜底最终回收，重试期间不阻塞会话恢复。进程崩溃后操作可被其他实例接管。
+          if (opts?.snapshot && snapshots) {
+            yield* Effect.promise(() => snapshotOps.enqueue({ sessionID: row.session_id, sandboxID: row.id, kind: "snapshot_destroy" })).pipe(
+              Effect.catchCause(() => Effect.void),
             )
+            yield* nudgeSnapshotDrain()
             return
           }
-            return yield* destroySandbox(sb, row.session_id)
-          }
+          const sb = yield* reconnectIfPresent(row)
+          if (sb) return yield* destroySandbox(sb, row.session_id)
           yield* killByID(row.id, row.session_id)
           yield* dbMarkDestroyed(row.session_id, row.id)
           log.info("sandbox destroyed by id", { sessionID: row.session_id, sandboxID: row.id })
@@ -2105,6 +2320,8 @@ export namespace SandboxProvider {
 
             // 顺带执行快照 GC + 对账（吞错；独立于本轮是否有 idle 沙箱）
             if (snapshots) yield* Effect.promise(() => snapshots.gc()).pipe(Effect.catchCause(() => Effect.void))
+            // 接管遗留快照操作（本实例或其他实例崩溃后租约过期的 pending/running 操作）
+            if (snapshots) yield* nudgeSnapshotDrain()
 
             if (rows.length === 0) return
             log.info("idle sandbox reap scan", { count: rows.length })
@@ -2173,14 +2390,30 @@ export namespace SandboxProvider {
               return null
             }
             // marker/manifest 在 startSnapshot 之前写入，随快照 rootfs 持久化（见 cleanupSandbox 同款注释）
-            yield* touchSnapshotMarker(sb)
-            const id = yield* Effect.promise(() => snapshots.startSnapshot(sb, sessionID))
+            const snapStarted = Date.now()
+            const marker = yield* touchSnapshotMarker(sb)
+            const snapOpts = yield* Effect.promise(() => resolveSandboxOpts(sessionID))
+            const snapImage = snapOpts.sandbox?.image?.trim() || config.snapshotImage
+            const id = yield* Effect.promise(() => snapshots.startSnapshot(sb, sessionID, {
+              image: snapImage,
+              sourceSandboxId: sb.id,
+              arch: marker.arch,
+              schemaVersion: SNAPSHOT_SCHEMA_VERSION,
+              runtimeVersion: InstallationVersion,
+            }))
             if (!id) {
               log.warn("snapshot request failed; startSnapshot error", { sessionID, sandboxID: row.id })
               yield* dbTransitionState(sessionID, row.id, "snapshotting", "running")
               yield* Effect.tryPromise(() => sb.close()).pipe(Effect.catchCause(() => Effect.void))
               return null
             }
+            // 显式快照审计（业务要「现在」时点，与自动快照以 explicit 区分）
+            yield* logSnapshotAction({
+              sessionID,
+              source: "snapshot-create",
+              detail: { snapshotId: id, sandboxID: sb.id, explicit: true, image: snapImage, durationMs: Date.now() - snapStarted, workspaceKb: marker.workspaceKb },
+              timeStarted: snapStarted,
+            })
             yield* Effect.promise(() => snapshots.awaitSnapshot(sessionID, id)).pipe(
               Effect.ensuring(Effect.gen(function* () {
                 yield* dbTransitionState(sessionID, row.id, "snapshotting", "running").pipe(Effect.catchCause(() => Effect.void))
@@ -2200,6 +2433,8 @@ export namespace SandboxProvider {
                 Effect.catchCause(() => Effect.succeed(null)),
               )
             : Effect.succeed(null),
+        getSnapshotStats: () =>
+          Effect.promise(() => snapshots.stats()).pipe(Effect.catchCause(() => Effect.succeed(null))),
       })
     }),
   )

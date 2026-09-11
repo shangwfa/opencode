@@ -114,7 +114,7 @@ export namespace Flag {
     | "host"
     | "snapshot"
   export const OPENCODE_SANDBOX_PVC_CLAIM = process.env["OPENCODE_SANDBOX_PVC_CLAIM"] ?? "sandbox-test"
-  export const OPENCODE_SANDBOX_SNAPSHOT_TTL_SEC = number("OPENCODE_SANDBOX_SNAPSHOT_TTL_SEC") ?? 7 * 86400
+  export const OPENCODE_SANDBOX_SNAPSHOT_TTL_SEC = number("OPENCODE_SANDBOX_SNAPSHOT_TTL_SEC") ?? 14 * 86400
   export const OPENCODE_SANDBOX_SNAPSHOT_WAIT_SEC = number("OPENCODE_SANDBOX_SNAPSHOT_WAIT_SEC") ?? 900
   export const OPENCODE_SANDBOX_IDLE_KILL_SEC = number("OPENCODE_SANDBOX_IDLE_KILL_SEC") ?? 3600
   export const OPENCODE_SANDBOX_IDLE_REAP_SEC = number("OPENCODE_SANDBOX_IDLE_REAP_SEC") ?? 3600
@@ -126,6 +126,8 @@ export namespace Flag {
   export const OPENCODE_PG_STATEMENT_TIMEOUT_MS = number("OPENCODE_PG_STATEMENT_TIMEOUT_MS") ?? 30000
   export const OPENCODE_SANDBOX_PACKAGE_CACHE_MOUNT =
     process.env["OPENCODE_SANDBOX_PACKAGE_CACHE_MOUNT"] ?? "/opt/pnpm-store"
+  // 快照前清理可重建产物（/tmp、各类 cache），减小快照体积；默认关，避免牺牲恢复后 node_modules 即用性
+  export const OPENCODE_SANDBOX_SNAPSHOT_PRUNE = truthy("OPENCODE_SANDBOX_SNAPSHOT_PRUNE")
 
   function number(key: string) {
     const value = process.env[key]
