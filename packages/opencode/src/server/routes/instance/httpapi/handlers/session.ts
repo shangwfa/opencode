@@ -58,6 +58,7 @@ import {
   CommandCreatePayload,
   SummarizePayload,
   UpdatePayload,
+  SessionEventQuery,
 } from "../groups/session"
 import { ApiNotFoundError, PermissionNotFoundError, notFound } from "../errors"
 import { SkillCreateError } from "../groups/session"
@@ -126,9 +127,23 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
 
     const subscribeEvents = Effect.fn("SessionHttpApi.event")(function* (ctx: {
       params: { sessionID: SessionID }
+      query: typeof SessionEventQuery.Type
     }) {
       yield* requireSession(ctx.params.sessionID)
-      return yield* eventResponse(events, { filter: sessionEventFilter(ctx.params.sessionID) })
+      const filter = sessionEventFilter(ctx.params.sessionID)
+      const after = ctx.query.after
+      if (after === undefined) {
+        return yield* eventResponse(events, { filter })
+      }
+      // Catch-up replay: durable events with seq > after are streamed from the
+      // store before the live stream. `target` marks the store's frontier at
+      // connection time; the live stream drops durable events at or below it
+      // because the replay already delivered them.
+      const target = yield* events.latestSequence(ctx.params.sessionID)
+      const prepend = events.durable({ aggregateID: ctx.params.sessionID, after }).pipe(
+        Stream.takeWhile((event) => (event.durable?.seq ?? -1) <= target),
+      )
+      return yield* eventResponse(events, { filter, prepend, liveAfterSeq: target })
     })
 
     const forkPrompt = (sessionID: SessionID, payload: typeof PromptPayload.Type) =>

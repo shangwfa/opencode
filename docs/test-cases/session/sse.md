@@ -914,6 +914,108 @@ curl -s -o /dev/null -w "%{http_code}\n" -N --max-time 3 \
 
 ---
 
+### T9.35 会话事件流：断连续传（GET /session/:id/event?after=\<seq\>）
+
+> 验证：SSE 断连窗口内错过的 durable 事件可通过 `?after=` 补发 —— 「快照-002 卡死」问题（前端断连后 UI 停在"思考中"，刷新才恢复）的服务端修复。durable 事件（`session.created/updated/deleted`、`message.updated/removed`、`message.part.updated/removed`，aggregate=sessionID）持久化在 `event` 表；非 durable 事件（`message.part.delta`/`session.diff`/`session.error`）不补发，由客户端重连后 refetch 对齐。
+>
+> **修复内容**（`handlers/session.ts` subscribeEvents + `handlers/event.ts` eventResponse）：
+> 1. `?after=<seq>`：连接时先从 `event` 表补发 `seq > after` 的 durable 事件（不经过 location 过滤），再接实时流；实时侧丢弃 `seq <= liveAfterSeq` 的事件防重复（补发/实时衔接窗口零重复）
+> 2. SSE 事件新增顶层 `seq` 字段（durable 事件为自增序号，非 durable/连接级事件无此字段）——客户端记录收到的最大 seq 作为重连游标
+> 3. location 过滤容错：无 `location` 的事件（全局/replay 路径发布）不再被静默丢弃（`eventVisible`）
+>
+> **前提**：镜像/本地代码含 `SessionEventQuery`（session.event 端点 query 加 `after`）。
+
+```bash
+SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
+
+# 客户端 A：连接后立即断开（模拟断连）
+bun docs/test-cases/scripts/sse-dump.mjs "$BASE/session/$SID/event" 3 > /tmp/t935a.log
+grep -c server.connected /tmp/t935a.log
+
+# 断连窗口内产生 durable 事件（session.updated）
+curl -s -X PATCH "$BASE/session/$SID" -H 'Content-Type: application/json' -d '{"title":"t935-gap"}' > /dev/null
+
+# 场景1：不带 after 重连 → 不回放（原行为回归）
+bun docs/test-cases/scripts/sse-dump.mjs "$BASE/session/$SID/event" 3 > /tmp/t935b.log
+echo "no-after updated count (期望 0): $(grep -c session.updated /tmp/t935b.log)"
+
+# 场景2：带 after=-1 全量补发
+bun docs/test-cases/scripts/sse-dump.mjs "$BASE/session/$SID/event?after=-1" 3 > /tmp/t935c.log
+python3 -c "
+import json
+types = [json.loads(l)['type'] for l in open('/tmp/t935c.log')]
+print('types:', types)
+assert types[0] == 'server.connected'
+assert types.count('session.created') == 1 and types.count('session.updated') == 1, '补发恰好各一次'
+"
+
+# 场景3：after=0 部分补发（跳过 seq=0 的 created）
+bun docs/test-cases/scripts/sse-dump.mjs "$BASE/session/$SID/event?after=0" 3 > /tmp/t935d.log
+echo "after=0: created=$(grep -c session.created /tmp/t935d.log) (期望 0), updated=$(grep -c session.updated /tmp/t935d.log) (期望 1)"
+
+# 场景4：负向参数
+curl -s -o /dev/null -w "after=-5: %{http_code}\n" --max-time 3 "$BASE/session/$SID/event?after=-5"
+curl -s -o /dev/null -w "after=abc: %{http_code}\n" --max-time 3 "$BASE/session/$SID/event?after=abc"
+```
+**期望**：
+- 场景1：无 after 时 0 条 `session.updated`（不回放，保持原行为）
+- 场景2：`server.connected → session.created → session.updated`，各恰好一次
+- 场景3：`created=0, updated=1`（部分续传只补 after 之后的事件）
+- 场景4：非法 after（<-1 / 非数字）返回 `400`
+- 补发事件带顶层 `seq` 字段（durable 事件），客户端可用作下次重连游标
+
+---
+
+### T9.36 会话事件流：断连续传并发窗口（补发/实时衔接不丢不重）
+
+> 验证：`?after=` 补发进行时新事件持续产生（listener 已注册、store 边界 target 已定）——补发与实时流衔接窗口事件**零丢失、零重复**。
+
+```bash
+SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
+curl -s -X PATCH "$BASE/session/$SID" -H 'Content-Type: application/json' -d '{"title":"t936-1"}' > /dev/null
+curl -s -X PATCH "$BASE/session/$SID" -H 'Content-Type: application/json' -d '{"title":"t936-2"}' > /dev/null
+
+# 连接（after=-1 全量补发）后立刻并发 PATCH 3 次
+bun docs/test-cases/scripts/sse-dump.mjs "$BASE/session/$SID/event?after=-1" 12 > /tmp/t936.log &
+SSE_PID=$!
+for i in $(seq 1 20); do grep -q server.connected /tmp/t936.log 2>/dev/null && break; sleep 0.5; done
+for i in 1 2 3; do curl -s -X PATCH "$BASE/session/$SID" -H 'Content-Type: application/json' -d "{\"title\":\"t936-c$i\"}" > /dev/null; done
+wait $SSE_PID
+
+python3 -c "
+import json
+updates = []
+for l in open('/tmp/t936.log'):
+    d = json.loads(l)
+    if d['type'] == 'session.updated': updates.append(d.get('seq'))
+updates.sort()
+print('seqs:', updates)
+assert updates == [1,2,3,4,5], f'补发(1,2)+并发(3,4,5) 应恰好各一次, 实际 {updates}'
+print('✅ 衔接窗口零丢失零重复')
+"
+```
+**期望**：`session.updated` 的 seq 序列恰好为 `[1,2,3,4,5]`（补发 1,2 + 实时 3,4,5，各一次）
+
+---
+
+### T9.37 实例事件流：无 location 事件不再被静默丢弃（eventVisible 容错）
+
+> 验证：`eventResponse` 的 location 过滤语义修正 —— 无 `location` 的事件（replay 路径/全局服务发布）此前被 `event.location?.directory === instance.directory` 无条件丢弃（心跳照发、连接看似健康，最难排查）。修复后无 location 事件放行，有 location 且不匹配的仍被隔离。
+>
+> 单测覆盖（`packages/opencode/test/server/httpapi-event.test.ts` 的 `eventVisible` describe，5 个用例）：
+> 1. 有 location + directory 不匹配 → 拒绝（隔离语义保留）
+> 2. 有 location + directory 匹配 → 放行
+> 3. **无 location → 放行**（修复点）
+> 4. workspaceID 匹配/不匹配 → 对应放行/拒绝
+> 5. 调用方 filter（如 sessionEventFilter）叠加生效
+>
+> ```bash
+> cd packages/opencode && bun test test/server/httpapi-event.test.ts
+> ```
+> **期望**：`eventVisible` describe 下 5 个用例全部通过（`delivers instance events` 的 fail 为 SQLite fixture 既有基线问题，与本项无关）
+
+---
+
 ## 测试结果
 
 | 用例 | 结果 | 备注 |
@@ -952,6 +1054,9 @@ curl -s -o /dev/null -w "%{http_code}\n" -N --max-time 3 \
 | T9.32 | ✅ | 非法模型：session.error（error.name=UnknownError）照常推送，流仍以 session.idle 关流（curl_exit=0，<1s），客户端不挂死 |
 | T9.33 | ✅ | A/B 并发 prompt_stream 各自 sessionID 无交叉（cross-leak=none），均独立以 idle 关流；注意 sessionID 含大写字母，正则须 [A-Za-z0-9] |
 | T9.34 | ✅ | 不存在 sessionID 的 prompt_stream 返回 404 |
+| T9.35 | ✅ | after 续传：无 after 0 回放（原行为）、after=-1 全量补发各一次、after=0 部分补发（created=0/updated=1）、非法 after 400；补发事件带顶层 seq 游标 |
+| T9.36 | ✅ | 并发衔接窗口 seqs=[1,2,3,4,5]，补发(1,2)+实时(3,4,5) 零丢失零重复 |
+| T9.37 | ✅ | eventVisible 5 个单测通过（无 location 放行 / 有 location 隔离保留 / workspace 过滤 / 调用方 filter 叠加） |
 
 > 注：T9.16-T9.25 为覆盖补全用例，已在本轮验证（组合 1：远端 PG + 远端 Sandbox）。T9.21 的 `session.agent.switched`/`session.model.switched` 需 HTTP switch 端点就绪后验证；`todo.updated`/`mcp.tools.changed` 为按需补充项。
 
@@ -971,5 +1076,12 @@ curl -s -o /dev/null -w "%{http_code}\n" -N --max-time 3 \
 > 复测记录（2026-09-07，同上环境）：**T9.32–T9.34 通过**。T9.32 错误回合实测事件序列 `...→session.status(busy)→session.error→session.status(idle)→session.idle`（error.name=UnknownError），idle 关流 curl_exit=0；T9.33 并发双流 sessionID 零交叉、独立关流；T9.34 返回 404。新增端点说明：`GET /session/:id/event` 见 T9.28–T9.30。
 
 > 复测记录（2026-09-07，本地 PG + 远端沙箱，镜像含 NUL guard 修复（`db.pg.ts` 剥离 jsonb 参数 `\u0000`，详见 structured-output.md 复测记录））：**T9.28–T9.34 回归全部通过**（含 T9.31/32/33 的完整 LLM 回合、错误路径关流与并发隔离）。
+
+> 复测记录（2026-09-12，**本地新代码直跑**：`bun run ./src/index.ts serve --port 14098` + 远端 PG 转发 `127.0.0.1:15432`）：**T9.35–T9.37 全部通过**，origin 为「快照-002」会话卡死排查（前端断连后 UI 停在"思考中" 1103s，刷新才恢复；服务端事件完整入库）。本轮变更：
+> - `GET /session/:id/event` 新增 `?after=<seq>` 断连续传：durable 事件（session/message/part 的 created/updated/removed）从 `event` 表补发后接实时流，衔接窗口经 `liveAfterSeq` 去重（T9.36 seqs=[1,2,3,4,5] 验证零丢失零重复）
+> - SSE 事件新增顶层 `seq` 字段（客户端重连游标）；非 durable 事件（`message.part.delta` 等）不补发，由客户端 refetch 对齐
+> - `eventVisible` 提取 + 无 `location` 事件放行（此前被静默丢弃）
+> - 回归：T9.1/T9.3/T9.4/T9.5/T9.30 及 T9.29 隔离性（恰好 1 条 updated、零泄漏）均通过；`eventVisible` 单测 5/5（`httpapi-event.test.ts`，`delivers instance events` 的 fail 为 SQLite fixture 既有基线，与本轮无关）
+> - 前端配套（待前端侧落地）：断连重连时对活跃会话带 `?after=<lastSeq>`；配合心跳看门狗（>25~30s 无字节即重建连接）
 
 ---

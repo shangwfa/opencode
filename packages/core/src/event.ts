@@ -132,6 +132,8 @@ export interface Interface {
   readonly subscribe: <D extends Definition>(definition: D) => Stream.Stream<Payload<D>>
   readonly all: () => Stream.Stream<Payload>
   readonly durable: (input: { readonly aggregateID: string; readonly after?: number }) => Stream.Stream<Payload>
+  /** Highest committed sequence for the aggregate, or -1 when nothing was committed yet. */
+  readonly latestSequence: (aggregateID: string) => Effect.Effect<number>
   /** @deprecated Use `all()` and consume the returned stream. */
   readonly listen: (listener: Subscriber) => Effect.Effect<Unsubscribe>
   readonly project: <D extends Definition>(definition: D, projector: Subscriber<D>) => Effect.Effect<void>
@@ -613,6 +615,8 @@ export const layerWith = (options?: LayerOptions) =>
           })
         })
 
+      const latestSequenceFor = (aggregateID: string) => latestSequence(db, aggregateID)
+
       const project = <D extends Definition>(definition: D, projector: Subscriber<D>): Effect.Effect<void> =>
         Effect.sync(() => {
           const list = projectors.get(definition.type) ?? []
@@ -625,6 +629,7 @@ export const layerWith = (options?: LayerOptions) =>
         subscribe,
         all: streamAll,
         durable,
+        latestSequence: latestSequenceFor,
         listen,
         project,
         replay,

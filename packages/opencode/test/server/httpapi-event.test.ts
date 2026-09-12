@@ -1,6 +1,7 @@
-import { afterEach, describe, expect } from "bun:test"
+import { afterEach, describe, expect, test } from "bun:test"
 import { Effect, Layer, Queue, Schema, Stream } from "effect"
 import { EventPaths } from "../../src/server/routes/instance/httpapi/groups/event"
+import { eventVisible } from "../../src/server/routes/instance/httpapi/handlers/event"
 import { resetDatabase } from "../fixture/db"
 import { disposeAllInstances, TestInstance } from "../fixture/fixture"
 import { testEffect } from "../lib/effect"
@@ -91,4 +92,50 @@ describe("event HttpApi", () => {
       }),
     { git: true, config: { formatter: false, lsp: false } },
   )
+
+  // End-to-end ?after=<seq> catch-up is covered by docs/test-cases/session/sse.md
+  // T9.35 (integration, PG): the in-memory SQLite fixture cannot create sessions
+  // (known core migration baseline drift, see AGENTS.md).
+})
+
+describe("eventVisible", () => {
+  const instance = { directory: "/workspace", workspaceID: undefined }
+  const payload = (event: { id: string; type: string; location?: { directory: string; workspaceID?: string }; data: {} }) =>
+    event as unknown as import("@opencode-ai/core/event").EventV2.Payload
+
+  test("drops located events from another directory", () => {
+    expect(
+      eventVisible(instance)(payload({ id: "evt_1", type: "session.updated", location: { directory: "/other" }, data: {} })),
+    ).toBe(false)
+  })
+
+  test("passes located events matching the instance directory", () => {
+    expect(
+      eventVisible(instance)(payload({ id: "evt_1", type: "session.updated", location: { directory: "/workspace" }, data: {} })),
+    ).toBe(true)
+  })
+
+  test("passes events without a location (global or replayed)", () => {
+    expect(eventVisible(instance)(payload({ id: "evt_1", type: "session.updated", data: {} }))).toBe(true)
+  })
+
+  test("filters located events by workspace when set", () => {
+    const workspace = { directory: "/workspace", workspaceID: "ws_1" }
+    expect(
+      eventVisible(workspace)(
+        payload({ id: "evt_1", type: "session.updated", location: { directory: "/workspace", workspaceID: "ws_1" }, data: {} }),
+      ),
+    ).toBe(true)
+    expect(
+      eventVisible(workspace)(
+        payload({ id: "evt_1", type: "session.updated", location: { directory: "/workspace", workspaceID: "ws_2" }, data: {} }),
+      ),
+    ).toBe(false)
+  })
+
+  test("applies the caller filter in addition to visibility", () => {
+    const visible = eventVisible(instance, (event) => event.type === "session.updated")
+    expect(visible(payload({ id: "evt_1", type: "session.updated", data: {} }))).toBe(true)
+    expect(visible(payload({ id: "evt_1", type: "session.error", data: {} }))).toBe(false)
+  })
 })

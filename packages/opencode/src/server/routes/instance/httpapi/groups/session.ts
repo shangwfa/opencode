@@ -59,6 +59,11 @@ export const MessagesQuery = Schema.Struct({
   limit: Schema.optional(Schema.NumberFromString.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0))),
   before: Schema.optional(Schema.String),
 })
+export const SessionEventQuery = Schema.Struct({
+  ...WorkspaceRoutingQueryFields,
+  /** Replay durable events with seq greater than this value before the live stream. */
+  after: Schema.optional(Schema.NumberFromString.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(-1))),
+})
 export const StatusMap = Schema.Record(Schema.String, SessionStatus.Info)
 export const UpdatePayload = Schema.Struct({
   title: Schema.optional(Schema.String),
@@ -255,7 +260,7 @@ export const SessionApi = HttpApi.make("session")
         ),
         HttpApiEndpoint.get("event", SessionPaths.event, {
           params: { sessionID: SessionID },
-          query: WorkspaceRoutingQuery,
+          query: SessionEventQuery,
           success: Schema.String.pipe(HttpApiSchema.asText({ contentType: "text/event-stream" })),
           error: [HttpApiError.BadRequest, ApiNotFoundError],
         }).annotateMerge(
@@ -263,7 +268,7 @@ export const SessionApi = HttpApi.make("session")
             identifier: "session.event",
             summary: "Subscribe to session events",
             description:
-              "Server-sent event stream containing only the events that belong to the specified session.",
+              "Server-sent event stream containing only the events that belong to the specified session. Pass ?after=<seq> to replay durable events missed by a previous connection before the live stream.",
           }),
         ),
         HttpApiEndpoint.get("children", SessionPaths.children, {
