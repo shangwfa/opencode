@@ -25,6 +25,7 @@ import { RuntimeFlags } from "@/effect/runtime-flags"
 import { ProviderV2 } from "@opencode-ai/core/provider"
 import { ModelV2 } from "@opencode-ai/core/model"
 import { SessionProjector } from "@opencode-ai/core/session/projector"
+import { LocationServiceMap, locationServiceMapLayer } from "@opencode-ai/core/location-services"
 import { LLMEvent } from "@opencode-ai/llm"
 
 const summary = Layer.succeed(
@@ -176,6 +177,7 @@ const root = LayerNode.group([
   CrossSpawnSpawner.node,
 ])
 const replacements = [
+  [LocationServiceMap.node, locationServiceMapLayer],
   [SessionSummary.node, summary],
   [RuntimeFlags.node, RuntimeFlags.layer({ experimentalEventSystem: true })],
 ] as const

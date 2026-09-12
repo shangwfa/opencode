@@ -205,6 +205,7 @@ ORDER BY p.time_created;
 | sandbox 反复创建销毁 | sandbox 表多条记录 | 健康检查失败 / keep_alive 未设置 | 检查 sandbox 服务端配置 |
 | LLM 循环重试同一搜索 | 同一 title 出现 5+ 次 | 工具结果不可靠导致 LLM 不信任 | 修复工具本身的正确性 |
 | 工具超时 | metadata exit=null | sandbox 命令执行超时 | 增大 timeout 或优化命令 |
+| 工具永久 pending + input 为空 | part `status=pending`、`state.input={}`;exec_log 无执行记录、permission 无审批记录 | LLM 流 tool-call 参数流(input_json_delta)未送达,工具从未执行,run 永久等待(见 `session-stuck-analysis-20260911.md`) | 已修复:exec_log `tool-call` 记录(`running` 无 `time_finished` 即挂死签名)+ 流结束兜底置 error;历史数据仍需按此排查 |
 
 ## 7. 分析流程
 

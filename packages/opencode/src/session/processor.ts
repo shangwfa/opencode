@@ -637,6 +637,24 @@ const layer = Layer.effect(
           const part = match.part
           const end = Date.now()
           const metadata = "metadata" in part.state && isRecord(part.state.metadata) ? part.state.metadata : {}
+          // A pending call never received its arguments — the provider stream
+          // dropped the call after tool-input-start. It can never execute, so
+          // settle it as an error or the transcript keeps a permanently
+          // pending part and the run appears stuck (see the ses_f70e676f1ffe
+          // incident in docs/guides/session-stuck-analysis-20260911.md).
+          if (part.state.status === "pending") {
+            yield* session.updatePart({
+              ...part,
+              state: {
+                status: "error",
+                input: part.state.input,
+                error: "Tool call interrupted before arguments were received",
+                metadata: { ...metadata, interrupted: true },
+                time: { start: end, end },
+              },
+            } satisfies SessionV1.ToolPart)
+            continue
+          }
           if (part.state.status !== "running") continue
           const next = {
             ...part,

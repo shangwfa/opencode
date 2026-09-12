@@ -68,6 +68,8 @@ export type ExecLogSource =
   | "file-download"
   | "file-upload"
   | "file-remove"
+  | "permission-deny"
+  | "tool-call"
 
 export const ExecLogTable = pgTable(
   "exec_log",
@@ -79,11 +81,14 @@ export const ExecLogTable = pgTable(
       .references(() => SessionTable.id, { onDelete: "cascade" }),
     command: text().notNull(),
     working_directory: text(),
-    status: text().$type<"running" | "completed" | "failed" | "killed" | "timed_out">().notNull(),
+    status: text()
+      .$type<"running" | "completed" | "failed" | "killed" | "timed_out" | "denied">()
+      .notNull(),
     exit_code: integer(),
     stdout: text(),
     stderr: text(),
     error: text(),
+    rule: text(),
     source: text().$type<ExecLogSource>().notNull(),
     time_started: bigint({ mode: "number" }).notNull(),
     time_finished: bigint({ mode: "number" }),

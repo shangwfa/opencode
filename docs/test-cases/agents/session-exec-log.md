@@ -4,7 +4,7 @@
 >
 > **前置条件**：SaaS 服务已启动（`docs/local-test-env.md`），组合 1/2（远端 PG）下生效。
 >
-> **通用清单映射**：T17.1-T17.24 覆盖所有会话操作接口的 exec_log 记录。
+> **通用清单映射**：T17.1-T17.24 覆盖所有会话操作接口的 exec_log 记录；T17.25-T17.27 沙箱创建耗时与 permission-deny 审计；T17.28-T17.30 工具调用全链路记录与卡死修复回归（见 `docs/guides/session-stuck-analysis-20260911.md`）。
 
 ## 十七、Session Exec Log（会话操作审计日志）
 
@@ -583,6 +583,206 @@ ORDER BY bucket;
 
 ---
 
+### T17.27 permission deny 动作落审计（status="denied" + 命中规则）
+
+> 验证策略拒绝的动作有审计记录：permission 规则 deny 触发时写入 `exec_log`，`source='permission-deny'`、`status='denied'`、`rule` 记录命中的 `permission: pattern`。对应单测 `test/server/exec-log-integration.test.ts` 的 "permission rule deny is logged with hit rule"。
+
+```bash
+SID=$(new_sid)
+echo "SID: $SID"
+
+bun -e '
+const BASE = process.env.BASE || "http://localhost:14096"
+const MODEL = { providerID: "Yd-DeepSeek", modelID: "deepseek-v4-flash" }
+const sid = process.argv[2]
+
+async function sendAndWait(sid, body, timeout = 120000) {
+  return new Promise(async (resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("timeout")), timeout)
+    const eventRes = await fetch(BASE + "/event?sessionID=" + sid)
+    const reader = eventRes.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ""
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split("\n")
+      buffer = lines.pop() || ""
+      for (const line of lines) {
+        if (!line.startsWith("data: ")) continue
+        try {
+          const e = JSON.parse(line.slice(6))
+          if (e.type === "session.idle") { clearTimeout(timer); resolve(); return }
+        } catch {}
+      }
+    }
+    clearTimeout(timer)
+    reject(new Error("stream ended before idle"))
+  })
+}
+
+// 创建 bash 全 deny 的 agent 并以该 agent 身份发消息，诱导其尝试执行命令
+await fetch(`${BASE}/session/${sid}/agents/create`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    name: "deny-audit",
+    description: "deny audit",
+    mode: "primary",
+    prompt: "你必须在收到消息后立即执行一次 bash 命令 ls -la，不要询问。",
+    permission: { bash: "deny" },
+  }),
+})
+
+const promptPromise = fetch(`${BASE}/session/${sid}/message`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    parts: [{ type: "text", text: "运行 ls -la 并告诉我结果" }],
+    model: MODEL,
+    agent: "deny-audit",
+  }),
+}).then((r) => r.json())
+
+await sendAndWait(sid)
+await promptPromise.catch(() => {})
+' "$SID"
+
+# PG 验证：deny 记录存在且带命中规则
+psql "$PG_URL" -c "SELECT id, status, rule, source FROM exec_log WHERE session_id='$SID' AND source='permission-deny' ORDER BY time_created DESC LIMIT 3"
+```
+
+**期望**：
+- `exec_log` 出现 `source='permission-deny'` 记录，`status='denied'`
+- `rule` 形如 `bash: *`（`permission: pattern`，即 agent 权限里 `bash: "deny"` 展开的命中规则）
+- `command` 字段为 JSON（含 `permission`/`patterns`/`metadata`）
+- 消息回合最终正常结束（LLM 收到 denied 反馈并自行向用户说明），服务不因拒绝而失败
+
+> **注意**：`ask` 动作（等待人工批准）不属于 denied；人工 reject 已由 `source='permission-respond'` 记录，二者不重复。
+
+---
+
+### T17.28 工具调用全链路记录（source="tool-call"，含挂死签名）
+
+> 验证 LLM 工具调用（read/write/edit/grep 等，区别于 bash/proxy 的 `exec` 记录）在 `exec_log` 有全生命周期记录：`tool.input.started` 插入 `status=running` 行，`called` 补全 input，`success`/`failed` 收敛终态。
+>
+> **挂死签名**：provider 流在 tool-call 参数传输中断（如 `ses_f70e676f1ffe` 卡死事故，write 参数 delta 丢失、工具从未执行）时，记录停在 `running` 且 `time_finished IS NULL`——排查用例见下方 SQL。实现：`packages/opencode/src/session/tool-exec-log.ts`；单测 `test/session/tool-exec-log.test.ts`。
+
+```bash
+SID=$(new_sid)
+echo "SID: $SID"
+
+# 发消息诱导工具调用（read + write）
+curl -s --noproxy '*' --max-time 120 -X POST "$BASE/session/$SID/message" \
+  -H 'Content-Type: application/json' \
+  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"读取 /workspace/package.json 然后在 /workspace/t17-28.txt 写入 ok\"}],\"model\":$MODEL}" > /dev/null
+
+# 等待会话空闲后验证
+psql "$PG_URL" -c "
+SELECT id, substring(command,1,50) as cmd, status, time_finished IS NOT NULL AS finished
+FROM exec_log WHERE session_id='$SID' AND source='tool-call' ORDER BY time_created;
+"
+```
+
+**期望**：
+- 出现 `source='tool-call'` 记录，写文件成功后对应行 `status='completed'` 且 `finished=t`
+- 行 `id` 为 `tool-<partID>`（part 唯一，callID 跨会话可复用，不可作键）；`command`（JSON）含 `tool`/`callID`/`partID`/`assistantMessageID`，called 后含 `input`（对象形式，8KB 截断降级为 `truncated` 字符串）
+- 落库为有界队列异步写（容量 1024），刚发完消息立即查询可能滞后数毫秒，重查一次即可
+- 与 `source='exec'`（bash/proxy 路径）互不重复覆盖；迟到/重放终态事件不回改已 settle 行（`session_id + status=running` 守卫）
+
+**挂死排查 SQL**（流中断后未执行的调用，`running` 无终态）：
+
+```sql
+SELECT * FROM exec_log
+WHERE source = 'tool-call' AND status = 'running' AND time_finished IS NULL
+ORDER BY time_started DESC;
+```
+
+---
+
+### T17.29 正常工具回合收敛：无残留 pending/running part 与 exec_log
+
+> 回归监测 `ses_f70e676f1ffe` 卡死修复（`packages/core/src/session/runner/publish-llm-event.ts`：流结束时未 settle 的工具调用一律置 error）。正常回合完成后，所有 tool part 必须到达终态（completed/error），exec_log 的 `tool-call` 记录不得停留 `running`。
+
+```bash
+SID=$(new_sid -kb)
+echo "SID: $SID"
+
+# 触发一次普通工具回合（read + 文本回复）
+curl -s --noproxy '*' --max-time 120 -X POST "$BASE/session/$SID/message" \
+  -H 'Content-Type: application/json' \
+  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"读取 /workspace/package.json，告诉我 name 字段\"}],\"model\":$MODEL}" > /dev/null
+
+# 轮询等待回合结束（tool part 全部终态且存在已完成回合，最多 90s）
+for i in $(seq 1 45); do
+  UNSETTLED=$(pgval "SELECT count(*) FROM part WHERE session_id='$SID' AND data->>'type'='tool' AND data->'state'->>'status' IN ('pending','running')")
+  [ "$UNSETTLED" = "0" ] && pgval "SELECT count(*) FROM part WHERE session_id='$SID' AND data->>'type'='tool' AND data->'state'->>'status'='completed'" | grep -q '^[1-9]' && break
+  sleep 2
+done
+
+echo "unsettled parts: $UNSETTLED"
+[ "$UNSETTLED" = "0" ] && pass "T17.29-part" || fail "T17.29-part" "residual pending/running tool parts"
+
+# exec_log tool-call 记录全部收敛终态
+STUCK=$(pgval "SELECT count(*) FROM exec_log WHERE session_id='$SID' AND source='tool-call' AND status='running'")
+DONE=$(pgval "SELECT count(*) FROM exec_log WHERE session_id='$SID' AND source='tool-call' AND status IN ('completed','failed')")
+echo "tool-call exec_log: stuck=$STUCK done=$DONE"
+[ "$STUCK" = "0" ] && [ "$DONE" -ge 1 ] && pass "T17.29-execlog" || fail "T17.29-execlog" "tool-call rows stuck in running (stuck=$STUCK done=$DONE)"
+```
+
+**期望**：
+- part 层：无 `pending`/`running` 残留，至少 1 条 `completed`
+- exec_log 层：`tool-call` 无 `running` 残留，至少 1 条 `completed`
+
+---
+
+### T17.30 abort 会话兜底：执行中/未完成工具全部收敛终态
+
+> 验证 `failUnsettledTools` 兜底在真实链路生效：用户 abort 会话时（`POST /session/:id/abort`），正在执行与尚未开始的工具一律收到 `Tool.Failed`（"Tool execution interrupted"），part 置 error、exec_log 置 failed——不残留任何 `pending`/`running`。这是对卡死事故中「run 干等永不开执行的调用」路径的主动验证。
+
+```bash
+SID=$(new_sid -kb)
+echo "SID: $SID"
+
+# 让模型跑长命令，制造「工具执行中」窗口
+curl -s --noproxy '*' --max-time 5 -X POST "$BASE/session/$SID/message" \
+  -H 'Content-Type: application/json' \
+  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"用 bash 执行 sleep 90，完成后告诉我 ok。不要做别的。\"}],\"model\":$MODEL}" > /dev/null &
+
+# 轮询等待 bash 工具开始执行（exec_log 出现 tool-call running，最多 90s）
+STARTED=""
+for i in $(seq 1 45); do
+  STARTED=$(pgval "SELECT count(*) FROM exec_log WHERE session_id='$SID' AND source='tool-call' AND status='running'")
+  [ "$STARTED" -ge 1 ] && break
+  sleep 2
+done
+echo "tool-call started: $STARTED"
+[ "$STARTED" -ge 1 ] || fail "T17.30-setup" "no tool-call row appeared in 90s"
+
+# abort 会话
+curl -s --noproxy '*' -X POST "$BASE/session/$SID/abort" > /dev/null
+sleep 5
+
+# part 层：所有 tool part 到达终态
+UNSETTLED=$(pgval "SELECT count(*) FROM part WHERE session_id='$SID' AND data->>'type'='tool' AND data->'state'->>'status' IN ('pending','running')")
+echo "unsettled parts after abort: $UNSETTLED"
+[ "$UNSETTLED" = "0" ] && pass "T17.30-part" || fail "T17.30-part" "abort left pending/running tool parts ($UNSETTLED)"
+
+# exec_log 层：tool-call 无 running 残留
+STUCK=$(pgval "SELECT count(*) FROM exec_log WHERE session_id='$SID' AND source='tool-call' AND status='running'")
+ABORTED=$(pgval "SELECT count(*) FROM exec_log e WHERE e.session_id='$SID' AND e.source='tool-call' AND e.status='failed' AND (e.error LIKE '%aborted%' OR e.error LIKE '%nterrupted%')")
+echo "exec_log after abort: stuck=$STUCK aborted=$ABORTED"
+[ "$STUCK" = "0" ] && pass "T17.30-execlog" || fail "T17.30-execlog" "tool-call rows stuck in running after abort"
+```
+
+**期望**：
+- setup：90s 内出现 `tool-call` `running` 记录（模型已开始调 bash）
+- abort 后 5s：part 无 `pending`/`running`；exec_log `tool-call` 无 `running`（被中断工具转 `failed`，error 为 `Tool execution aborted`；参数流丢失的调用为 `Tool call interrupted before arguments were received`）
+- 会话可继续接受新消息（abort 是收敛不是挂死）
+
+---
+
 ### 运行与验证
 
 ```bash
@@ -601,3 +801,7 @@ summary
 > PGPASSWORD=8zuhlMLd4gaeUG5k psql -h 127.0.0.1 -p 15432 -U app -d opencode -c "SELECT source, COUNT(*) as cnt FROM exec_log WHERE session_id='$SID' GROUP BY source ORDER BY source"
 > ```
 > 复测记录（2026-09-06，merge upstream/dev v1.18.29 后，镜像 `t0906-merged-1.18.29`）：exec_log 审计全链路 ✅（session-create/patch/abort/share/unshare + agent-create/delete/clear + agentsmd-create/clear + command-create/delete/clear + skill-create 共 15 类 source 均产生记录，无模型依赖）。
+>
+> 复测记录（2026-09-12，分支 `feat/opencode-1.18.30`，镜像 `t0912-toolexeclog`，本地 PG + 远程沙箱）：T17.28 ✅（read=failed/write=completed 均有 `tool-call` 记录，command 含 tool/callID/input）、T17.29 ✅（part 无残留 + exec_log 全终态）、T17.30 ✅（abort 后 part/exec_log 双层收敛，error=`Tool execution aborted`）。单测全绿（`packages/core/test/session-runner-fail-unsettled.test.ts` 7 用例、`packages/opencode/test/session/tool-exec-log.test.ts` 8 用例）。
+>
+> 实现说明：SaaS 生产链路为 V1 事件体系（`session/processor.ts` → `message.part.updated`），工具调用记录监听 V1 PartUpdated 事件；`processor.ts` cleanup 兜底参数流丢失的 pending 工具（置 error `Tool call interrupted before arguments were received`）；core V2 runner（`publish-llm-event.ts`）同构缺陷同步修复，供上游架构切换后生效。

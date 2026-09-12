@@ -7,6 +7,7 @@ import os from "os"
 import { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import { EventV2Bridge } from "@/event-v2-bridge"
 import { SessionPluginRuntime } from "@/plugin/session-plugin-runtime"
+import { insertExecLog } from "@/session/exec-log"
 
 export const Event = PermissionV1.Event
 
@@ -39,6 +40,28 @@ export function evaluate(permission: string, pattern: string, ...rulesets: Permi
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/Permission") {}
+
+function recordDenial(request: Omit<PermissionV1.AskInput, "ruleset">, rule: string) {
+  return Effect.promise(() =>
+    insertExecLog({
+      // Date.now() alone collides when multiple asks are denied in the same
+      // millisecond; the random suffix keeps concurrent denials distinct.
+      id: `deny-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`,
+      session_id: request.sessionID,
+      command: JSON.stringify({
+        permission: request.permission,
+        patterns: request.patterns,
+        tool: request.tool,
+        metadata: request.metadata,
+      }),
+      status: "denied",
+      rule,
+      source: "permission-deny",
+      time_started: Date.now(),
+      time_finished: Date.now(),
+    }),
+  ).pipe(Effect.catch(() => Effect.void))
+}
 
 const layer = Layer.effect(
   Service,
@@ -75,6 +98,7 @@ const layer = Layer.effect(
         const rule = evaluate(request.permission, pattern, ruleset, approved)
         yield* Effect.logInfo("evaluated", { permission: request.permission, pattern, action: rule })
         if (rule.action === "deny") {
+          yield* recordDenial(request, `${request.permission}: ${rule.pattern}`)
           return yield* new PermissionV1.DeniedError({
             ruleset: ruleset.filter((rule) => Wildcard.match(request.permission, rule.permission)),
           })
@@ -90,6 +114,7 @@ const layer = Layer.effect(
       } as { status: "ask" | "deny" | "allow" })
       if (decision.status === "allow") return
       if (decision.status === "deny") {
+        yield* recordDenial(request, `${request.permission}: plugin`)
         return yield* new PermissionV1.DeniedError({
           ruleset: ruleset.filter((rule) => Wildcard.match(request.permission, rule.permission)),
         })

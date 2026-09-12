@@ -6,7 +6,7 @@ import { EventV2 } from "@opencode-ai/core/event"
 import { expect, beforeAll, afterAll } from "bun:test"
 import { tool } from "ai"
 import postgres from "postgres"
-import { Effect, Fiber, Layer, Stream } from "effect"
+import { Effect, Exit, Fiber, Layer, Stream } from "effect"
 import path from "path"
 import z from "zod"
 import type { Agent } from "../../src/agent/agent"
@@ -273,6 +273,26 @@ const providerToolEnv = LayerNode.compile(root, [
 const itProviderTool = testEffect(providerToolEnv)
 const liveProviderTool = pgEnabled ? itProviderTool.live : itProviderTool.live.skip
 
+// ses_f70e676f1ffe signature: the provider stream opened a tool call
+// (tool-input-start + argument deltas) and then ended the step normally
+// without ever completing the arguments — no tool-call, no tool-error.
+const droppedToolLLM = Layer.succeed(
+  LLM.Service,
+  LLM.Service.of({
+    stream: () =>
+      Stream.make(
+        LLMEvent.stepStart({ index: 0 }),
+        LLMEvent.toolInputStart({ id: "call-1", name: "lookup" }),
+        LLMEvent.toolInputDelta({ id: "call-1", name: "lookup", text: '{"qu' }),
+        LLMEvent.stepFinish({ index: 0, reason: "stop" }),
+        LLMEvent.finish({ reason: "stop" }),
+      ),
+  }),
+)
+const droppedToolEnv = LayerNode.compile(root, [...replacements, [LLM.node, droppedToolLLM]])
+const itDroppedTool = testEffect(droppedToolEnv)
+const liveDroppedTool = pgEnabled ? itDroppedTool.live : itDroppedTool.live.skip
+
 /** Collects live raw PartDelta events (field=raw) plus the arrival index of the running-state tool part update. */
 function trackToolInput(events: EventV2.Interface) {
   const deltas: RawDelta[] = []
@@ -534,6 +554,60 @@ liveProviderTool("tool input stream emits no raw deltas without input fragments"
         expect(tracker.deltas).toEqual([])
         expect(call?.state.status).toBe("completed")
         if (call?.state.status === "completed") expect(call.state.output).toBe("provider did it")
+      }),
+    { config: cfg },
+  ),
+)
+
+// ses_f70e676f1ffe regression: a tool call whose argument stream was dropped
+// after tool-input-start must settle as an error, not stay pending forever and
+// hang the run waiting for arguments that will never arrive.
+liveDroppedTool("dropped tool argument stream settles the never-called part as error", () =>
+  provideTmpdirInstance(
+    (dir) =>
+      Effect.gen(function* () {
+        const { processors, session, provider } = yield* boot()
+
+        const chat = yield* session.create({})
+        cleanup.push(chat.id)
+        const parent = yield* user(chat.id, "dropped args")
+        const msg = yield* assistant(chat.id, parent.id, path.resolve(dir))
+        const mdl = yield* provider.getModel(ref.providerID, ref.modelID)
+        const handle = yield* processors.create({ assistantMessage: msg, sessionID: chat.id, model: mdl })
+
+        const exit = yield* handle
+          .process({
+            user: {
+              id: parent.id,
+              sessionID: chat.id,
+              role: "user",
+              time: parent.time,
+              agent: parent.agent,
+              model: { providerID: ref.providerID, modelID: ref.modelID },
+            } satisfies SessionV1.User,
+            sessionID: chat.id,
+            model: mdl,
+            agent: agent(),
+            system: [],
+            messages: [{ role: "user", content: "dropped args" }],
+            tools: { lookup: lookupTool },
+          })
+          .pipe(Effect.exit)
+
+        // The run must terminate on its own (no abort, no hang).
+        expect(Exit.isSuccess(exit)).toBe(true)
+
+        const parts = yield* MessageV2.parts(msg.id)
+        const call = parts.find((part): part is SessionV1.ToolPart => part.type === "tool")
+
+        expect(call).toBeDefined()
+        expect(call?.state.status).toBe("error")
+        if (call?.state.status === "error") {
+          expect(call.state.error).toBe("Tool call interrupted before arguments were received")
+          expect((call.state.metadata as Record<string, unknown> | undefined)?.interrupted).toBe(true)
+          expect(call.state.time.end).toBeDefined()
+        }
+        expect(JSON.stringify(parts)).not.toContain('"status":"pending"')
       }),
     { config: cfg },
   ),

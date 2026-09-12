@@ -1,39 +1,40 @@
 import { afterEach, beforeAll, describe, expect, test } from "bun:test"
+import { Effect, Exit } from "effect"
 import { Database, eq } from "../../src/storage/db"
 import { provideTestInstance, disposeAllInstances, tmpdir } from "../fixture/fixture"
 import { Server } from "../../src/server/server"
 import { Log } from "@opencode-ai/core/util/log"
 import { ExecLogTable, queryExecLogsBySession } from "../../src/session/exec-log"
 import { SessionTable } from "../../src/session/session.pg"
+import { AppRuntime } from "../../src/effect/app-runtime"
+import { InstanceRef } from "../../src/effect/instance-ref"
+import { Permission } from "../../src/permission"
 
 Log.init({ print: false })
 
 const DB_URL = process.env.OPENCODE_DATABASE_URL
-if (!DB_URL) {
-  console.log("skip: OPENCODE_DATABASE_URL not set")
-  process.exit(0)
-}
+const enabled = !!DB_URL
 
-const db = Database.Client()
+const db = DB_URL ? Database.Client() : undefined
 
 async function queryLogs(sid: string) {
   return queryExecLogsBySession(sid)
 }
 
 async function cleanupSession(sid: string) {
+  if (!db) return
   await db.delete(ExecLogTable).where(eq(ExecLogTable.session_id, sid as any)).run().catch(() => {})
   await db.delete(SessionTable).where(eq(SessionTable.id, sid as any)).run().catch(() => {})
 }
 
-beforeAll(async () => {
-  await Database.initialize()
-})
+describe.skipIf(!enabled)("session exec_log integration (PG)", () => {
+  beforeAll(async () => {
+    await Database.initialize()
+  })
 
-afterEach(async () => {
-  await disposeAllInstances()
-})
-
-describe("session exec_log integration (PG)", () => {
+  afterEach(async () => {
+    await disposeAllInstances()
+  })
   test("agent create/delete/clear are logged", async () => {
     await using tmp = await tmpdir({ git: true })
     await provideTestInstance({
@@ -186,6 +187,85 @@ describe("session exec_log integration (PG)", () => {
 
         const logs = await queryLogs(sid)
         expect(logs.some((l) => l.source === "permission-respond")).toBe(false)
+
+        await cleanupSession(sid)
+      },
+    })
+  })
+
+  test("permission rule deny is logged with hit rule", async () => {
+    await using tmp = await tmpdir({ git: true })
+    await provideTestInstance({
+      directory: tmp.path,
+      fn: async (ctx) => {
+        const app = Server.Default().app
+        const sid = ((await (await app.request("/session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title: "exec-log-perm-deny" }),
+        })).json()) as { id: string }).id
+
+        const exit = await AppRuntime.runPromiseExit(
+          Effect.gen(function* () {
+            const permission = yield* Permission.Service
+            yield* permission.ask({
+              sessionID: sid as any,
+              permission: "bash",
+              patterns: ["rm -rf *"],
+              metadata: { input: { command: "rm -rf /tmp/secret" } },
+              always: [],
+              ruleset: [{ permission: "bash", pattern: "rm -rf *", action: "deny" }],
+            })
+          }).pipe(Effect.provideService(InstanceRef, ctx)),
+        )
+        expect(Exit.isFailure(exit)).toBe(true)
+
+        const logs = await queryLogs(sid)
+        const denied = logs.find((l) => l.source === "permission-deny")
+        expect(denied).toBeDefined()
+        expect(denied!.status).toBe("denied")
+        expect(denied!.rule).toBe("bash: rm -rf *")
+        expect(denied!.command).toContain("rm -rf /tmp/secret")
+
+        await cleanupSession(sid)
+      },
+    })
+  })
+
+  test("concurrent permission denies in the same millisecond all get distinct rows", async () => {
+    await using tmp = await tmpdir({ git: true })
+    await provideTestInstance({
+      directory: tmp.path,
+      fn: async (ctx) => {
+        const app = Server.Default().app
+        const sid = ((await (await app.request("/session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title: "exec-log-perm-deny-race" }),
+        })).json()) as { id: string }).id
+
+        const deny = () =>
+          Effect.gen(function* () {
+            const permission = yield* Permission.Service
+            yield* permission.ask({
+              sessionID: sid as any,
+              permission: "bash",
+              patterns: ["rm -rf *"],
+              metadata: { input: { command: `rm -rf /tmp/secret-${Math.random().toString(36).slice(2)}` } },
+              always: [],
+              ruleset: [{ permission: "bash", pattern: "rm -rf *", action: "deny" }],
+            })
+          }).pipe(Effect.exit, Effect.provideService(InstanceRef, ctx))
+
+        const outcomes = await AppRuntime.runPromise(
+          Effect.all([deny(), deny(), deny()], { concurrency: "unbounded" }),
+        )
+        expect(outcomes.every((outcome) => Exit.isFailure(outcome))).toBe(true)
+
+        const logs = await queryLogs(sid)
+        const denied = logs.filter((l) => l.source === "permission-deny")
+        expect(denied).toHaveLength(3)
+        expect(new Set(denied.map((l) => l.id)).size).toBe(3)
 
         await cleanupSession(sid)
       },

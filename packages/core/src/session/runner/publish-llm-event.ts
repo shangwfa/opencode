@@ -215,7 +215,13 @@ export const createLLMEventPublisher = (events: EventV2.Interface, input: Input)
     hostedOnly = false,
   ) {
     for (const [callID, tool] of tools) {
-      if (tool.settled || (hostedOnly && !tool.providerExecuted)) continue
+      if (tool.settled) continue
+      // hostedOnly targets provider-executed calls left without a result when
+      // the stream ends. A call that never completed — e.g. the provider stream
+      // dropped the argument deltas after tool-input-start — can never execute,
+      // so it must fail in every mode or the transcript keeps a permanently
+      // pending tool part and the run stalls waiting on it.
+      if (hostedOnly && tool.called && !tool.providerExecuted) continue
       tool.settled = true
       yield* events.publish(SessionEvent.Tool.Failed, {
         sessionID: input.sessionID,

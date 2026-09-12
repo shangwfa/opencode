@@ -49,6 +49,7 @@ import { Session } from "@/session/session"
 import { SessionCompaction } from "@/session/compaction"
 import { LLM } from "@/session/llm"
 import { SessionPrompt } from "@/session/prompt"
+import { ToolExecLog } from "@/session/tool-exec-log"
 import { SessionRevert } from "@/session/revert"
 import { SessionRunState } from "@/session/run-state"
 import { SessionStatus } from "@/session/status"
@@ -280,6 +281,7 @@ const app = LayerNode.group([
   BackgroundJob.node,
   RuntimeFlags.node,
   EventV2Bridge.node,
+  ToolExecLog.node,
   SessionRunState.node,
   SessionProcessor.node,
   SessionCompaction.node,
