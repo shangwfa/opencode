@@ -330,7 +330,7 @@ const DIAG_CACHE_MS = 5_000
 const diagCache = new Map<string, { at: number; data: PortDiagnostics }>()
 
 const diagCommand = (port: number) => `printf 'PORT='; curl -s -o /dev/null -w '%{http_code}' --max-time 2 http://127.0.0.1:${port}/ 2>/dev/null || printf '000'; printf '\\n'
-printf 'OOM='; awk '$1=="oom_kill"{print $2}' /sys/fs/cgroup/memory.events /sys/fs/cgroup/memory/memory.oom_control 2>/dev/null | head -1; printf '\\n'
+printf 'OOM='; { awk '$1=="oom_kill"{print $2}' /sys/fs/cgroup/memory.events 2>/dev/null || awk '$1=="oom_kill"{print $2}' /sys/fs/cgroup/memory/memory.oom_control 2>/dev/null; } | head -1; printf '\\n'
 printf 'KILLED='; dmesg 2>/dev/null | grep -i 'killed process' | tail -1 | cut -c1-200`
 
 export function parseDiag(out: string): PortDiagnostics {

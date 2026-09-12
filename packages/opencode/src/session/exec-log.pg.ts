@@ -57,6 +57,7 @@ export type ExecLogSource =
   | "plugin-clear"
   | "dotopencode-load"
   | "sandbox-create"
+  | "sandbox-oom"
   | "snapshot-create"
   | "snapshot-reuse"
   | "snapshot-restore"

@@ -1,7 +1,7 @@
 import { Effect, Context, Layer, Cause, Deferred, Ref, Semaphore, Schedule, Duration, Scope, Exit, Option } from "effect"
 import { Sandbox, ConnectionConfig, SandboxApiException, SandboxManager } from "@alibaba-group/opensandbox"
 import type { CommandExecution, Volume } from "@alibaba-group/opensandbox"
-import { and, asc, eq, lt, or, sql } from "drizzle-orm"
+import { and, asc, desc, eq, lt, or, sql } from "drizzle-orm"
 import * as Log from "@opencode-ai/core/util/log"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { Flag } from "@/flag/flag"
@@ -261,6 +261,82 @@ export function workspaceUnchangedSinceSnapshot(sb: Sandbox): Effect.Effect<bool
     // 源码里的 "CLEAN" 字面量误判（曾导致写入后仍复用旧快照）。
     Effect.map((out) => out.split("\n").some((s) => s.trim() === "CLEAN")),
   )
+}
+
+// ── OOM 采样 ──────────────────────────────────────────────────────────
+// dev server 等后台进程被 OOM kill 时容器仍 running（"invisible OOM kill"），接口层完全
+// 不可见。周期进沙箱读 cgroup oom_kill 累计计数，相邻两次差值 >0 即该周期内发生了 OOM。
+// cgroup v2（memory.events）与 v1（memory.oom_control）双兼容。注意不能用 awk 多文件参数：
+// busybox awk（沙箱实测）遇到第一个文件不存在会直接退出、不处理后续文件，2>/dev/null 还会
+// 把报错吞掉——v1 沙箱上将永远返回空。故用 `||` 链：v1 缺 v2 文件时 awk 非零退出自动落到 v1。
+export const OOM_SAMPLE_COMMAND = [
+  `printf 'OOM='; { awk '$1=="oom_kill"{print $2}' /sys/fs/cgroup/memory.events 2>/dev/null || awk '$1=="oom_kill"{print $2}' /sys/fs/cgroup/memory/memory.oom_control 2>/dev/null; } | head -1`,
+  "printf 'USAGE='; cat /sys/fs/cgroup/memory/memory.current /sys/fs/cgroup/memory/memory.usage_in_bytes 2>/dev/null | head -1",
+  "printf 'LIMIT='; cat /sys/fs/cgroup/memory/memory.max /sys/fs/cgroup/memory/memory.limit_in_bytes 2>/dev/null | head -1",
+].join("; ")
+
+export type OomSample = {
+  oomKill: number | null
+  usageBytes: number | null
+  limitBytes: number | null
+}
+
+export function parseOomSample(out: string): OomSample {
+  const line = (key: string) => out.split("\n").find((l) => l.startsWith(key + "="))?.slice(key.length + 1).trim() ?? ""
+  const num = (value: string) => (/^\d+$/.test(value) ? Number(value) : null)
+  return {
+    oomKill: num(line("OOM")),
+    usageBytes: num(line("USAGE")),
+    // v2 无限制时 memory.max 内容为 "max"（非数字→null）；v1 无限制是接近 2^63 的巨大数字，由调用方按阈值判无限制
+    limitBytes: num(line("LIMIT")),
+  }
+}
+
+// v1 cgroup 无限制时 limit_in_bytes 接近 2^63，超过此值视为未设限不预警
+const OOM_UNLIMITED_LIMIT_BYTES = 1e15
+const OOM_PRESSURE_RATIO = 0.85
+const OOM_PRESSURE_WINDOW_MS = 5 * 60_000
+
+/** 采样判定结果：kind=oom/pressure 时 id/exec_log 字段已就绪（主键幂等，冲突即去重）。 */
+export type OomAction =
+  | { kind: "oom"; id: string; delta: number; oomKillTotal: number; command: string; error: string }
+  | { kind: "pressure"; id: string; pct: number; command: string; error: string }
+  | { kind: "none" }
+
+/** 纯判定：相邻采样差值 >0 → OOM 归因；否则水位 ≥85% → 预警（5 分钟窗口一条）。
+ * prev=undefined（首轮）只立基准不告警；delta<0（沙箱重建计数器归零）按新基准静默重置，仍走水位检查。 */
+export function classifyOomSample(input: { sessionID: string; sandboxID: string; prev: number | undefined; sample: OomSample; now: number }): OomAction {
+  const { sessionID, sandboxID, prev, sample, now } = input
+  const delta = prev == null || sample.oomKill == null ? 0 : sample.oomKill - prev
+  if (sample.oomKill != null && delta > 0) {
+    return {
+      kind: "oom",
+      id: `oom-${sessionID}-${sandboxID}-${sample.oomKill}`,
+      delta,
+      oomKillTotal: sample.oomKill,
+      command: `sandbox-oom-scan oom_kill_total=${sample.oomKill} delta=${delta}`,
+      error: JSON.stringify({
+        name: "SandboxOOM",
+        oomKillDelta: delta,
+        oomKillTotal: sample.oomKill,
+        usageBytes: sample.usageBytes,
+        limitBytes: sample.limitBytes,
+      }),
+    }
+  }
+  const limit = sample.limitBytes
+  const usage = sample.usageBytes
+  if (limit == null || usage == null || limit <= 0 || limit > OOM_UNLIMITED_LIMIT_BYTES) return { kind: "none" }
+  const pct = usage / limit
+  if (pct < OOM_PRESSURE_RATIO) return { kind: "none" }
+  const pctRounded = Math.round(pct * 100)
+  return {
+    kind: "pressure",
+    id: `oom-pressure-${sessionID}-${sandboxID}-${Math.floor(now / OOM_PRESSURE_WINDOW_MS)}`,
+    pct: pctRounded,
+    command: `memory-pressure pct=${pctRounded}%`,
+    error: JSON.stringify({ name: "MemoryPressure", usageBytes: usage, limitBytes: limit, pct: pctRounded / 100 }),
+  }
 }
 
 /** 快照前可清理的可重建产物白名单（不删 /tmp 与 pnpm store：前者含 execd 运行时文件，后者是 node_modules 硬链接来源）。 */
@@ -1486,8 +1562,13 @@ export namespace SandboxProvider {
         )
       }
 
+      // OOM 采样基准（session → 上次 oom_kill 读数）。沙箱销毁即失效：
+      // 重建/快照恢复是全新 cgroup，残留旧基准会与新沙箱读数撞出假 delta=0 漏检。
+      const oomSampleBaseline = new Map<string, number>()
+
       function destroySandbox(sb: Sandbox, sessionID: string) {
         return Effect.gen(function* () {
+          oomSampleBaseline.delete(sessionID)
           invalidateCachedSandbox(sessionID)
           log.info("destroying sandbox", { sessionID, sandboxID: sb.id })
           const row = yield* dbGet(sessionID).pipe(Effect.orElseSucceed(() => null))
@@ -2281,6 +2362,105 @@ export namespace SandboxProvider {
           Effect.interruptible,
         )
       })
+
+      // ── OOM 采样与内存水位预警 ────────────────────────────────────────
+      // 周期扫描 state=running 的沙箱，读 cgroup oom_kill 计数与内存水位，判定见
+      // classifyOomSample（差值>0 归因 OOM / 水位≥85% 预警，落 exec_log source="sandbox-oom"）。
+      // 必须走 runEphemeralCommand 临时 session：runInSession 会 touch 沙箱心跳，
+      // 让常驻沙箱永远不过 idle-reap 阈值。OPENCODE_SANDBOX_OOM_SCAN_ENABLED=0 禁用。
+      // （OPENCODE_SANDBOX_OOM_SCAN_INTERVAL_SEC 的 number() 解析不接受 0，不能作开关）
+      const oomScanIntervalMs = Flag.OPENCODE_SANDBOX_OOM_SCAN_INTERVAL_SEC * 1000
+      if (Flag.OPENCODE_SANDBOX_OOM_SCAN_ENABLED && oomScanIntervalMs > 0) {
+        const OOM_SCAN_BATCH = 50
+        const lastOomKill = oomSampleBaseline
+        log.info("oom scan task started", { intervalMs: oomScanIntervalMs, batch: OOM_SCAN_BATCH })
+        yield* Effect.gen(function* () {
+          yield* Effect.repeat(
+            Effect.gen(function* () {
+              const t0 = Date.now()
+              const rows = yield* Effect.tryPromise({
+                try: () => pgDb
+                  .select({ id: SandboxTable.id, session_id: SandboxTable.session_id, host: SandboxTable.host })
+                  .from(SandboxTable)
+                  .where(eq(SandboxTable.state, "running"))
+                  // 活跃沙箱优先覆盖：批量截断时牺牲最久未用的（其 OOM 风险最低）
+                  .orderBy(desc(SandboxTable.time_updated))
+                  .limit(OOM_SCAN_BATCH)
+                  .all() as Promise<{ id: string; session_id: string; host: string }[]>,
+                catch: (error) => new Error(`oom scan query failed: ${String(error)}`),
+              }).pipe(Effect.catchCause((cause) => {
+                log.error("oom scan query failed", { cause: Cause.pretty(cause) })
+                return Effect.succeed([] as { id: string; session_id: string; host: string }[])
+              }))
+              if (rows.length === 0) return
+              yield* Effect.forEach(rows, (row) =>
+                Effect.gen(function* () {
+                  const sb = yield* reconnect(row).pipe(Effect.orElseSucceed(() => null))
+                  if (!sb) {
+                    lastOomKill.delete(row.session_id)
+                    log.warn("oom scan reconnect failed", { sessionID: row.session_id, sandboxID: row.id })
+                    return
+                  }
+                  const out = yield* runEphemeralCommand(sb, OOM_SAMPLE_COMMAND, 8)
+                  yield* Effect.tryPromise(() => sb.close()).pipe(Effect.catchCause(() => Effect.void))
+                  const sample = parseOomSample(out)
+                  const prev = lastOomKill.get(row.session_id)
+                  if (sample.oomKill != null) lastOomKill.set(row.session_id, sample.oomKill)
+                  const now = Date.now()
+                  const action = classifyOomSample({ sessionID: row.session_id, sandboxID: row.id, prev, sample, now })
+                  if (action.kind === "none") return
+                  yield* Effect.tryPromise(() =>
+                    pgDb.insert(ExecLogTable).values({
+                      id: action.id,
+                      session_id: row.session_id as SessionID,
+                      command: action.command,
+                      status: action.kind === "oom" ? "failed" : "completed",
+                      error: action.error,
+                      source: "sandbox-oom",
+                      time_started: now,
+                      time_finished: now,
+                    }).run(),
+                  ).pipe(Effect.catchCause((cause) => {
+                    // 主键冲突（多实例/多轮去重）属预期静默；其余失败（如表结构漂移）必须留痕
+                    const msg = Cause.pretty(cause)
+                    if (!/duplicate key|unique constraint|23505/i.test(msg)) {
+                      log.error("oom scan exec_log insert failed", {
+                        id: action.id,
+                        sessionID: row.session_id,
+                        cause: msg,
+                      })
+                    }
+                    return Effect.void
+                  }))
+                  if (action.kind === "oom") {
+                    log.warn("sandbox OOM detected", {
+                      sessionID: row.session_id,
+                      sandboxID: row.id,
+                      delta: action.delta,
+                      oomKillTotal: action.oomKillTotal,
+                    })
+                  } else {
+                    log.warn("sandbox memory pressure", {
+                      sessionID: row.session_id,
+                      sandboxID: row.id,
+                      pct: `${action.pct}%`,
+                    })
+                  }
+                }).pipe(Effect.catchCause((cause) => {
+                  log.error("oom scan candidate failed", { sessionID: row.session_id, cause: Cause.pretty(cause) })
+                  return Effect.void
+                })),
+                { concurrency: 4, discard: true },
+              )
+              log.info("oom scan completed", { scanned: rows.length, durationMs: Date.now() - t0 })
+            }),
+            { schedule: Schedule.spaced(Duration.millis(oomScanIntervalMs)) },
+          ).pipe(
+            Effect.forkScoped,
+            Effect.interruptible,
+          )
+        })
+      }
 
       // 周期性回收空闲 sandbox（含 keep_alive=true，idleReapMs 阈值）
       // 判定：state=running 且 time_updated 超过 idleReapMs 未更新
