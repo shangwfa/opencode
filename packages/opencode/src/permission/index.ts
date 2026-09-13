@@ -2,12 +2,18 @@ import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { ConfigPermissionV1 } from "@opencode-ai/core/v1/config/permission"
 import { InstanceState } from "@/effect/instance-state"
 import { Wildcard } from "@opencode-ai/core/util/wildcard"
-import { Deferred, Effect, Layer, Context } from "effect"
+import { Deferred, Effect, Layer, Context, Schedule } from "effect"
 import os from "os"
 import { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import { EventV2Bridge } from "@/event-v2-bridge"
 import { SessionPluginRuntime } from "@/plugin/session-plugin-runtime"
 import { insertExecLog } from "@/session/exec-log"
+import { HitlStore } from "@/hitl/store"
+
+// Per-process instance identifier for hitl_request.owner_id.
+const hitlOwnerID = crypto.randomUUID()
+const HITL_POLL_INTERVAL_MS = 1_000
+const HITL_RENEW_EVERY_TICKS = 30
 
 export const Event = PermissionV1.Event
 
@@ -110,6 +116,44 @@ const layer = Layer.effect(
       }),
     )
 
+    // HITL polling: check PG for cross-instance replies; every N ticks renew lease.
+    const startHitlPolling = Effect.fn("Permission.hitlPoll")(function* () {
+      if (!HitlStore.enabled()) return
+      let tick = 0
+      yield* Effect.gen(function* () {
+        const pending = (yield* InstanceState.get(state)).pending
+        const ids = Array.from(pending.keys(), (id) => id as string)
+
+        const changed = yield* Effect.tryPromise({
+          try: () => HitlStore.changed(ids),
+          catch: (error) => new Error(`hitl poll failed: ${String(error)}`),
+        }).pipe(Effect.catchCause(() => Effect.succeed([] as HitlStore.Row[])))
+
+        for (const row of changed) {
+          const entry = pending.get(row.id as PermissionV1.ID)
+          if (entry === undefined) continue
+          pending.delete(row.id as PermissionV1.ID)
+          if (row.status === "replied") {
+            yield* Deferred.succeed(entry.deferred, undefined)
+          } else {
+            yield* Deferred.fail(entry.deferred, new PermissionV1.RejectedError())
+          }
+        }
+
+        tick += 1
+        if (tick % HITL_RENEW_EVERY_TICKS === 0 && ids.length > 0) {
+          yield* Effect.tryPromise({
+            try: () => HitlStore.renewLease(ids, Date.now() + HitlStore.LEASE_TTL_MS),
+            catch: () => new Error("lease renew failed"),
+          }).pipe(Effect.catchCause(() => Effect.void))
+        }
+      }).pipe(
+        Effect.repeat(Schedule.spaced(HITL_POLL_INTERVAL_MS)),
+        Effect.catchCause(() => Effect.void),
+        Effect.forkScoped,
+      )
+    })
+
     const ask = Effect.fn("Permission.ask")(function* (input: PermissionV1.AskInput) {
       const { approved, pending } = yield* InstanceState.get(state)
       const { ruleset, ...request } = input
@@ -153,13 +197,41 @@ const layer = Layer.effect(
       }
       yield* Effect.logInfo("asking", { id, permission: info.permission, patterns: info.patterns })
 
+      // HITL: PG insert (fail fast — PG unavailable means the tool errors rather than producing an invisible pending).
+      if (HitlStore.enabled()) {
+        const directory = yield* InstanceState.directory
+        yield* Effect.tryPromise({
+          try: () =>
+            HitlStore.insertPending({
+              id: id as string,
+              kind: "permission",
+              directory,
+              sessionID: request.sessionID as string,
+              ownerID: hitlOwnerID,
+              payload: info as unknown as Record<string, unknown>,
+              leaseUntil: Date.now() + HitlStore.LEASE_TTL_MS,
+            }),
+          catch: (error) => new Error(`hitl insert failed: ${String(error)}`),
+        }).pipe(Effect.orDie)
+      }
+
       const deferred = yield* Deferred.make<void, PermissionV1.RejectedError | PermissionV1.CorrectedError>()
       pending.set(id, { info, deferred })
       yield* events.publish(Event.Asked, info)
       return yield* Effect.ensuring(
         Deferred.await(deferred),
-        Effect.sync(() => {
+        Effect.gen(function* () {
           pending.delete(id)
+          if (HitlStore.enabled()) {
+            yield* Effect.tryPromise({
+              try: () =>
+                HitlStore.casTransition(id as string, "permission", {
+                  status: "closed",
+                  closeReason: "answered-delivered",
+                }),
+              catch: () => new Error("hitl defensive close failed"),
+            }).pipe(Effect.catchCause(() => Effect.void))
+          }
         }),
       )
     })
@@ -167,6 +239,44 @@ const layer = Layer.effect(
     const reply = Effect.fn("Permission.reply")(function* (input: PermissionV1.ReplyInput) {
       const { approved, pending } = yield* InstanceState.get(state)
       const existing = pending.get(input.requestID)
+
+      // HITL: CAS the PG row first; cross-instance replies succeed here and
+      // the owning instance's polling fiber resolves the deferred.
+      if (HitlStore.enabled()) {
+        const transition: HitlStore.Transition =
+          input.reply === "reject"
+            ? { status: "rejected" as const }
+            : { status: "replied" as const, result: { reply: input.reply } }
+        const outcome = yield* Effect.tryPromise({
+          try: () => HitlStore.casTransition(input.requestID as string, "permission", transition),
+          catch: (error) => new Error(`hitl reply cas failed: ${String(error)}`),
+        }).pipe(Effect.orDie)
+        if (outcome.updated !== undefined || outcome.current !== undefined) {
+          if (existing !== undefined) {
+            pending.delete(input.requestID)
+            yield* events.publish(Event.Replied, {
+              sessionID: existing.info.sessionID,
+              requestID: existing.info.id,
+              reply: input.reply,
+            })
+            if (input.reply === "reject") {
+              yield* Deferred.fail(
+                existing.deferred,
+                input.message
+                  ? new PermissionV1.CorrectedError({ feedback: input.message })
+                  : new PermissionV1.RejectedError(),
+              )
+            } else {
+              yield* Deferred.succeed(existing.deferred, undefined)
+            }
+          }
+          return
+        }
+        if (existing === undefined) {
+          return yield* new PermissionV1.NotFoundError({ requestID: input.requestID })
+        }
+      }
+
       if (!existing) return yield* new PermissionV1.NotFoundError({ requestID: input.requestID })
 
       pending.delete(input.requestID)
@@ -225,9 +335,20 @@ const layer = Layer.effect(
     })
 
     const list = Effect.fn("Permission.list")(function* () {
+      if (HitlStore.enabled()) {
+        const directory = yield* InstanceState.directory
+        const rows = yield* Effect.tryPromise({
+          try: () => HitlStore.listPending("permission", directory),
+          catch: (error) => new Error(`hitl list failed: ${String(error)}`),
+        }).pipe(Effect.catchCause(() => Effect.succeed([] as HitlStore.Row[])))
+        return rows.map((row) => row.payload as unknown as PermissionV1.Request)
+      }
       const pending = (yield* InstanceState.get(state)).pending
       return Array.from(pending.values(), (item) => item.info)
     })
+
+    // Start HITL polling within the instance scope.
+    yield* startHitlPolling()
 
     return Service.of({ ask, reply, list })
   }),
