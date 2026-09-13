@@ -8,7 +8,7 @@ import { HitlRequestTable } from "./request.pg"
 
 export type Kind = "question" | "permission"
 export type Status = "pending" | "replied" | "rejected" | "closed"
-export type CloseReason = "instance-restart" | "shutdown" | "answered-delivered"
+export type CloseReason = "instance-restart" | "shutdown" | "answered-delivered" | "decision-delivered"
 
 export const enabled = () => Database.dialect === "pg"
 
@@ -40,7 +40,6 @@ export interface NewPending {
   sessionID: string
   ownerID: string
   payload: Record<string, unknown>
-  leaseUntil: number
 }
 
 export interface Transition {
@@ -54,138 +53,283 @@ export interface TransitionOutcome {
   current?: Row
 }
 
-const now = () => Date.now()
+const databaseNow = () => sql<number>`(extract(epoch from clock_timestamp()) * 1000)::bigint`
 
 const rowify = (item: typeof HitlRequestTable.$inferSelect): Row => item as Row
 
 export const insertPending = (input: NewPending) =>
-  Database.Client()
-    .insert(HitlRequestTable)
-    .values({
-      id: input.id,
-      kind: input.kind,
-      directory: input.directory,
-      session_id: input.sessionID,
-      owner_id: input.ownerID,
-      status: "pending",
-      payload: input.payload,
-      lease_until: input.leaseUntil,
-      time_created: now(),
-      time_updated: now(),
-    })
-    .run()
+  Database.use((db) =>
+    db
+      .insert(HitlRequestTable)
+      .values({
+        id: input.id,
+        kind: input.kind,
+        directory: input.directory,
+        session_id: input.sessionID,
+        owner_id: input.ownerID,
+        status: "pending",
+        payload: input.payload,
+        lease_until: sql`${databaseNow()} + ${LEASE_TTL_MS}`,
+        time_created: databaseNow(),
+        time_updated: databaseNow(),
+      })
+      .run(),
+  )
 
-export async function casTransition(id: string, kind: Kind, set: Transition): Promise<TransitionOutcome> {
-  const db = Database.Client()
-  const updated = await db
-    .update(HitlRequestTable)
-    .set({
-      status: set.status,
-      ...(set.result === undefined ? {} : { result: set.result }),
-      ...(set.closeReason === undefined ? {} : { close_reason: set.closeReason }),
-      time_updated: now(),
-    })
-    .where(and(eq(HitlRequestTable.id, id), eq(HitlRequestTable.kind, kind), eq(HitlRequestTable.status, "pending")))
-    .returning()
-    .all()
-  if (updated[0] !== undefined) return { updated: rowify(updated[0]) }
-  const current = await db.select().from(HitlRequestTable).where(eq(HitlRequestTable.id, id)).limit(1).all()
-  return current[0] === undefined ? {} : { current: rowify(current[0]) }
-}
+export const insertPendingLimited = (input: NewPending, limit: number) =>
+  Database.transaction(async (db) => {
+    await db.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`hitl:${input.directory}:${input.sessionID}`}))`)
+    const row = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(HitlRequestTable)
+      .where(
+        and(
+          eq(HitlRequestTable.directory, input.directory),
+          eq(HitlRequestTable.session_id, input.sessionID),
+          eq(HitlRequestTable.status, "pending"),
+        ),
+      )
+      .get()
+    if ((row?.count ?? 0) >= limit) return false
+    await insertPending(input)
+    return true
+  })
 
-export function renewLease(ids: string[], until: number) {
-  if (ids.length === 0) return Promise.resolve()
-  return Database.Client()
-    .update(HitlRequestTable)
-    .set({ lease_until: until, time_updated: now() })
-    .where(and(inArray(HitlRequestTable.id, ids), eq(HitlRequestTable.status, "pending")))
-    .run()
-}
-
-export async function changed(ids: string[]): Promise<Row[]> {
-  if (ids.length === 0) return []
-  return (
-    await Database.Client()
+export async function casTransition(
+  id: string,
+  kind: Kind,
+  directory: string,
+  set: Transition,
+): Promise<TransitionOutcome> {
+  return Database.use(async (db) => {
+    const updated = await db
+      .update(HitlRequestTable)
+      .set({
+        status: set.status,
+        ...(set.result === undefined ? {} : { result: set.result }),
+        ...(set.closeReason === undefined ? {} : { close_reason: set.closeReason }),
+        time_updated: databaseNow(),
+      })
+      .where(
+        and(
+          eq(HitlRequestTable.id, id),
+          eq(HitlRequestTable.kind, kind),
+          eq(HitlRequestTable.directory, directory),
+          eq(HitlRequestTable.status, "pending"),
+        ),
+      )
+      .returning()
+      .all()
+    if (updated[0] !== undefined) return { updated: rowify(updated[0]) }
+    const current = await db
       .select()
       .from(HitlRequestTable)
-      .where(and(inArray(HitlRequestTable.id, ids), ne(HitlRequestTable.status, "pending")))
+      .where(
+        and(eq(HitlRequestTable.id, id), eq(HitlRequestTable.kind, kind), eq(HitlRequestTable.directory, directory)),
+      )
+      .limit(1)
       .all()
+    return current[0] === undefined ? {} : { current: rowify(current[0]) }
+  })
+}
+
+export function renewLease(ids: string[], ownerID: string, directory: string) {
+  if (ids.length === 0) return Promise.resolve()
+  return Database.use((db) =>
+    db
+      .update(HitlRequestTable)
+      .set({ lease_until: sql`${databaseNow()} + ${LEASE_TTL_MS}`, time_updated: databaseNow() })
+      .where(
+        and(
+          inArray(HitlRequestTable.id, ids),
+          eq(HitlRequestTable.owner_id, ownerID),
+          eq(HitlRequestTable.directory, directory),
+          eq(HitlRequestTable.status, "pending"),
+        ),
+      )
+      .run(),
+  )
+}
+
+export async function changed(ids: string[], ownerID: string, directory: string): Promise<Row[]> {
+  if (ids.length === 0) return []
+  return (
+    await Database.use((db) =>
+      db
+        .select()
+        .from(HitlRequestTable)
+        .where(
+          and(
+            inArray(HitlRequestTable.id, ids),
+            eq(HitlRequestTable.owner_id, ownerID),
+            eq(HitlRequestTable.directory, directory),
+            ne(HitlRequestTable.status, "pending"),
+          ),
+        )
+        .all(),
+    )
   ).map(rowify)
 }
 
 export async function listPending(kind: Kind, directory: string): Promise<Row[]> {
   return (
-    await Database.Client()
-      .select()
-      .from(HitlRequestTable)
-      .where(
-        and(eq(HitlRequestTable.kind, kind), eq(HitlRequestTable.directory, directory), eq(HitlRequestTable.status, "pending")),
-      )
-      .all()
+    await Database.use((db) =>
+      db
+        .select()
+        .from(HitlRequestTable)
+        .where(
+          and(
+            eq(HitlRequestTable.kind, kind),
+            eq(HitlRequestTable.directory, directory),
+            eq(HitlRequestTable.status, "pending"),
+          ),
+        )
+        .all(),
+    )
   ).map(rowify)
 }
 
-export async function countPending(kind: Kind, sessionID: string): Promise<number> {
-  const row = await Database.Client()
-    .select({ count: sql<number>`count(*)::int` })
-    .from(HitlRequestTable)
-    .where(and(eq(HitlRequestTable.kind, kind), eq(HitlRequestTable.session_id, sessionID), eq(HitlRequestTable.status, "pending")))
-    .get()
-  return row?.count ?? 0
-}
-
-// 死实例的挂起行：同 directory 内租约已断的 pending。
-export async function deadPending(kind: Kind, directory: string, before: number): Promise<Row[]> {
-  return (
-    await Database.Client()
-      .select()
+export async function countPending(kind: Kind, directory: string, sessionID: string): Promise<number> {
+  const row = await Database.use((db) =>
+    db
+      .select({ count: sql<number>`count(*)::int` })
       .from(HitlRequestTable)
       .where(
         and(
           eq(HitlRequestTable.kind, kind),
           eq(HitlRequestTable.directory, directory),
+          eq(HitlRequestTable.session_id, sessionID),
           eq(HitlRequestTable.status, "pending"),
-          lt(HitlRequestTable.lease_until, before),
         ),
       )
-      .all()
+      .get(),
+  )
+  return row?.count ?? 0
+}
+
+export async function listSessionPending(kind: Kind, directory: string, sessionID: string): Promise<Row[]> {
+  return (
+    await Database.use((db) =>
+      db
+        .select()
+        .from(HitlRequestTable)
+        .where(
+          and(
+            eq(HitlRequestTable.kind, kind),
+            eq(HitlRequestTable.directory, directory),
+            eq(HitlRequestTable.session_id, sessionID),
+            eq(HitlRequestTable.status, "pending"),
+          ),
+        )
+        .all(),
+    )
+  ).map(rowify)
+}
+
+// 死实例的挂起行：同 directory 内租约已断的 pending。
+export async function deadPending(kind: Kind, directory: string): Promise<Row[]> {
+  return (
+    await Database.use((db) =>
+      db
+        .select()
+        .from(HitlRequestTable)
+        .where(
+          and(
+            eq(HitlRequestTable.kind, kind),
+            eq(HitlRequestTable.directory, directory),
+            eq(HitlRequestTable.status, "pending"),
+            lt(HitlRequestTable.lease_until, sql`${databaseNow()} - ${SWEEP_GRACE_MS}`),
+          ),
+        )
+        .all(),
+    )
   ).map(rowify)
 }
 
 // 死实例的已决未消费行：replied/rejected 不再续约，租约断即视为原持有实例死亡
 // （正常路径下 run 会很快写 part 终态，salvage 的 part CAS 不命中，仅做行归档）。
-export async function deadFinal(kind: Kind, directory: string, before: number): Promise<Row[]> {
+export async function deadFinal(kind: Kind, directory: string): Promise<Row[]> {
   return (
-    await Database.Client()
-      .select()
-      .from(HitlRequestTable)
-      .where(
-        and(
-          eq(HitlRequestTable.kind, kind),
-          eq(HitlRequestTable.directory, directory),
-          ne(HitlRequestTable.status, "pending"),
-          ne(HitlRequestTable.status, "closed"),
-          lt(HitlRequestTable.lease_until, before),
-        ),
-      )
-      .all()
+    await Database.use((db) =>
+      db
+        .select()
+        .from(HitlRequestTable)
+        .where(
+          and(
+            eq(HitlRequestTable.kind, kind),
+            eq(HitlRequestTable.directory, directory),
+            ne(HitlRequestTable.status, "pending"),
+            ne(HitlRequestTable.status, "closed"),
+            lt(HitlRequestTable.lease_until, sql`${databaseNow()} - ${SWEEP_GRACE_MS}`),
+          ),
+        )
+        .all(),
+    )
   ).map(rowify)
 }
 
-export function casCloseReplied(id: string, reason: CloseReason) {
-  return Database.Client()
-    .update(HitlRequestTable)
-    .set({ status: "closed", close_reason: reason, time_updated: now() })
-    .where(and(eq(HitlRequestTable.id, id), eq(HitlRequestTable.status, "replied")))
-    .returning({ id: HitlRequestTable.id })
-    .all()
+export function claimExpiredPending(id: string, kind: Kind, directory: string) {
+  return Database.use((db) =>
+    db
+      .update(HitlRequestTable)
+      .set({ status: "closed", close_reason: "instance-restart", time_updated: databaseNow() })
+      .where(
+        and(
+          eq(HitlRequestTable.id, id),
+          eq(HitlRequestTable.kind, kind),
+          eq(HitlRequestTable.directory, directory),
+          eq(HitlRequestTable.status, "pending"),
+          lt(HitlRequestTable.lease_until, sql`${databaseNow()} - ${SWEEP_GRACE_MS}`),
+        ),
+      )
+      .returning()
+      .all(),
+  ).then((rows) => (rows[0] === undefined ? undefined : rowify(rows[0])))
 }
 
-export function retention(before: number) {
-  return Database.Client()
-    .delete(HitlRequestTable)
-    .where(and(ne(HitlRequestTable.status, "pending"), lt(HitlRequestTable.time_updated, before)))
-    .run()
+export function casCloseFinal(
+  id: string,
+  kind: Kind,
+  directory: string,
+  status: "replied" | "rejected",
+  reason: CloseReason,
+) {
+  return Database.use((db) =>
+    db
+      .update(HitlRequestTable)
+      .set({ status: "closed", close_reason: reason, time_updated: databaseNow() })
+      .where(
+        and(
+          eq(HitlRequestTable.id, id),
+          eq(HitlRequestTable.kind, kind),
+          eq(HitlRequestTable.directory, directory),
+          eq(HitlRequestTable.status, status),
+        ),
+      )
+      .returning({ id: HitlRequestTable.id })
+      .all(),
+  )
+}
+
+export function retention(directory: string) {
+  return Database.use((db) =>
+    db
+      .delete(HitlRequestTable)
+      .where(
+        and(
+          eq(HitlRequestTable.directory, directory),
+          ne(HitlRequestTable.status, "pending"),
+          lt(HitlRequestTable.time_updated, sql`${databaseNow()} - ${RETENTION_MS}`),
+        ),
+      )
+      .run(),
+  )
+}
+
+export function sameTransition(row: Row, transition: Transition) {
+  if (row.status !== transition.status) return false
+  if ((row.close_reason ?? undefined) !== transition.closeReason) return false
+  return JSON.stringify(row.result ?? undefined) === JSON.stringify(transition.result)
 }
 
 export * as HitlStore from "./store"

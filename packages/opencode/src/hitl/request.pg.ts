@@ -1,5 +1,7 @@
-import { pgTable, text, bigint, jsonb, index } from "drizzle-orm/pg-core"
+import { sql } from "drizzle-orm"
+import { pgTable, text, bigint, jsonb, index, check } from "drizzle-orm/pg-core"
 import { Timestamps } from "@/storage/schema.pg"
+import { SessionTable } from "@/session/session.pg"
 
 // HITL（human-in-the-loop）挂起请求状态表：question 与 permission 共用。
 // 生命周期 pending → replied/rejected/closed，全部经 CAS 迁移（见 hitl/store.ts）。
@@ -10,17 +12,26 @@ export const HitlRequestTable = pgTable(
     id: text().primaryKey(),
     kind: text().$type<"question" | "permission">().notNull(),
     directory: text().notNull(),
-    session_id: text().notNull(),
+    session_id: text()
+      .notNull()
+      .references(() => SessionTable.id, { onDelete: "cascade" }),
     owner_id: text().notNull(),
     status: text().$type<"pending" | "replied" | "rejected" | "closed">().notNull(),
     payload: jsonb().$type<Record<string, unknown>>().notNull(),
     result: jsonb().$type<Record<string, unknown>>(),
-    close_reason: text().$type<"instance-restart" | "shutdown" | "answered-delivered">(),
-    lease_until: bigint({ mode: "number" }),
+    close_reason: text().$type<"instance-restart" | "shutdown" | "answered-delivered" | "decision-delivered">(),
+    lease_until: bigint({ mode: "number" }).notNull(),
     ...Timestamps,
   },
   (table) => [
-    index("hitl_pending_idx").on(table.status, table.lease_until),
-    index("hitl_session_idx").on(table.session_id),
+    index("hitl_pending_idx").on(table.directory, table.kind, table.status, table.lease_until),
+    index("hitl_session_idx").on(table.directory, table.session_id, table.status),
+    index("hitl_retention_idx").on(table.status, table.time_updated),
+    check("hitl_kind_check", sql`${table.kind} IN ('question', 'permission')`),
+    check("hitl_status_check", sql`${table.status} IN ('pending', 'replied', 'rejected', 'closed')`),
+    check(
+      "hitl_close_reason_check",
+      sql`${table.close_reason} IS NULL OR ${table.close_reason} IN ('instance-restart', 'shutdown', 'answered-delivered', 'decision-delivered')`,
+    ),
   ],
 )

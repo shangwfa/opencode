@@ -1,5 +1,5 @@
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
-import { Deferred, Effect, Layer, Schema, Context, Schedule } from "effect"
+import { Cause, Deferred, Effect, Layer, Schema, Context, Schedule } from "effect"
 import { InstanceState } from "@/effect/instance-state"
 import { SessionID } from "@/session/schema"
 import { QuestionID } from "./schema"
@@ -7,6 +7,7 @@ import { EventV2Bridge } from "@/event-v2-bridge"
 import { QuestionV1 } from "@opencode-ai/schema/question-v1"
 import { HitlStore } from "@/hitl/store"
 import { Flag } from "@/flag/flag"
+import { HitlSalvage } from "@/hitl/salvage"
 
 export const Option = QuestionV1.Option
 export type Option = typeof Option.Type
@@ -36,6 +37,12 @@ export class NotFoundError extends Schema.TaggedErrorClass<NotFoundError>()("Que
   requestID: QuestionID,
 }) {}
 
+export class ConflictError extends Schema.TaggedErrorClass<ConflictError>()("Question.ConflictError", {
+  requestID: QuestionID,
+  status: Schema.String,
+  closeReason: Schema.optional(Schema.String),
+}) {}
+
 // Per-process instance identifier; rows owned by this process carry it in owner_id.
 const ownerID = crypto.randomUUID()
 
@@ -60,8 +67,8 @@ export interface Interface {
   readonly reply: (input: {
     requestID: QuestionID
     answers: ReadonlyArray<Answer>
-  }) => Effect.Effect<void, NotFoundError>
-  readonly reject: (requestID: QuestionID) => Effect.Effect<void, NotFoundError>
+  }) => Effect.Effect<void, NotFoundError | ConflictError>
+  readonly reject: (requestID: QuestionID) => Effect.Effect<void, NotFoundError | ConflictError>
   readonly list: () => Effect.Effect<ReadonlyArray<Request>>
 }
 
@@ -72,65 +79,63 @@ const layer = Layer.effect(
   Effect.gen(function* () {
     const events = yield* EventV2Bridge.Service
     const state = yield* InstanceState.make<State>(
-      Effect.fn("Question.state")(function* () {
-        const state = {
+      Effect.fn("Question.state")(function* (ctx) {
+        const value = {
           pending: new Map<QuestionID, PendingEntry>(),
         }
 
         yield* Effect.addFinalizer(() =>
           Effect.gen(function* () {
-            for (const item of state.pending.values()) {
+            for (const item of value.pending.values()) {
               yield* Deferred.fail(item.deferred, new RejectedError())
             }
-            state.pending.clear()
+            value.pending.clear()
           }),
         )
 
-        return state
+        if (HitlStore.enabled()) {
+          let tick = 0
+          const poll = Effect.gen(function* () {
+            const ids = Array.from(value.pending.keys(), (id) => id as string)
+            const changed = yield* Effect.tryPromise({
+              try: () => HitlStore.changed(ids, ownerID, ctx.directory),
+              catch: (error) => new Error(`hitl poll failed: ${String(error)}`),
+            })
+
+            for (const row of changed) {
+              const entry = value.pending.get(row.id as QuestionID)
+              if (entry === undefined) continue
+              value.pending.delete(row.id as QuestionID)
+              if (row.status === "replied") {
+                const answers = Array.isArray(row.result?.["answers"])
+                  ? (row.result["answers"] as unknown as ReadonlyArray<Answer>)
+                  : []
+                yield* Deferred.succeed(entry.deferred, answers)
+                continue
+              }
+              yield* Deferred.fail(entry.deferred, new RejectedError())
+            }
+
+            tick += 1
+            if (tick % RENEW_EVERY_TICKS !== 0) return
+            yield* Effect.tryPromise({
+              try: () => HitlStore.renewLease(ids, ownerID, ctx.directory),
+              catch: (error) => new Error(`hitl lease renewal failed: ${String(error)}`),
+            })
+            yield* HitlSalvage.sweepKind(events, "question", ctx.directory)
+          }).pipe(
+            Effect.catchCauseIf(
+              (cause) => !Cause.hasInterrupts(cause),
+              (cause) =>
+                Effect.logError("question HITL polling failed", { directory: ctx.directory, cause: String(cause) }),
+            ),
+          )
+          yield* poll.pipe(Effect.repeat(Schedule.spaced(POLL_INTERVAL_MS)), Effect.forkScoped)
+        }
+
+        return value
       }),
     )
-
-    // Poll PG for status changes on local pending IDs; every N ticks renew lease + sweep dead instances.
-    // Only active in PG mode; scoped to the InstanceState lifetime.
-    const startPolling = Effect.fn("Question.hitlPoll")(function* () {
-      if (!HitlStore.enabled()) return
-      let tick = 0
-      yield* Effect.gen(function* () {
-        const pending = (yield* InstanceState.get(state)).pending
-        const ids = Array.from(pending.keys(), (id) => id as string)
-
-        const changed = yield* Effect.tryPromise({
-          try: () => HitlStore.changed(ids),
-          catch: (error) => new Error(`hitl poll failed: ${String(error)}`),
-        }).pipe(Effect.catchCause(() => Effect.succeed([] as HitlStore.Row[])))
-
-        for (const row of changed) {
-          const entry = pending.get(row.id as QuestionID)
-          if (entry === undefined) continue
-          pending.delete(row.id as QuestionID)
-          if (row.status === "replied") {
-            const answers = Array.isArray(row.result?.["answers"])
-              ? (row.result["answers"] as unknown as ReadonlyArray<Answer>)
-              : []
-            yield* Deferred.succeed(entry.deferred, answers)
-          } else {
-            yield* Deferred.fail(entry.deferred, new RejectedError())
-          }
-        }
-
-        tick += 1
-        if (tick % RENEW_EVERY_TICKS === 0 && ids.length > 0) {
-          yield* Effect.tryPromise({
-            try: () => HitlStore.renewLease(ids, Date.now() + HitlStore.LEASE_TTL_MS),
-            catch: () => new Error("lease renew failed"),
-          }).pipe(Effect.catchCause(() => Effect.void))
-        }
-      }).pipe(
-        Effect.repeat(Schedule.spaced(POLL_INTERVAL_MS)),
-        Effect.catchCause(() => Effect.void),
-        Effect.forkScoped,
-      )
-    })
 
     const ask = Effect.fn("Question.ask")(function* (input: {
       sessionID: SessionID
@@ -149,7 +154,9 @@ const layer = Layer.effect(
       }
 
       // Pending limit: memory count covers both modes (single-process view).
-      const sessionPending = Array.from(pending.values(), (x) => x.info.sessionID).filter((sid) => sid === input.sessionID).length
+      const sessionPending = Array.from(pending.values(), (x) => x.info.sessionID).filter(
+        (sid) => sid === input.sessionID,
+      ).length
       if (sessionPending >= Flag.OPENCODE_HITL_MAX_PENDING_PER_SESSION) {
         return yield* Effect.die(
           new Error(`Too many pending questions (${sessionPending}) for session ${input.sessionID}`),
@@ -159,42 +166,37 @@ const layer = Layer.effect(
       // HITL: PG insert (fail fast).
       if (HitlStore.enabled()) {
         const directory = yield* InstanceState.directory
-        yield* Effect.tryPromise({
+        const inserted = yield* Effect.tryPromise({
           try: () =>
-            HitlStore.insertPending({
-              id: id as string,
-              kind: "question",
-              directory,
-              sessionID: input.sessionID as string,
-              ownerID,
-              payload: info as unknown as Record<string, unknown>,
-              leaseUntil: Date.now() + HitlStore.LEASE_TTL_MS,
-            }),
+            HitlStore.insertPendingLimited(
+              {
+                id: id as string,
+                kind: "question",
+                directory,
+                sessionID: input.sessionID as string,
+                ownerID,
+                payload: info as unknown as Record<string, unknown>,
+              },
+              Flag.OPENCODE_HITL_MAX_PENDING_PER_SESSION,
+            ),
           catch: (error) => new Error(`hitl insert failed: ${String(error)}`),
         }).pipe(Effect.orDie)
+        if (!inserted) {
+          return yield* Effect.die(new Error(`Too many pending questions for session ${input.sessionID}`))
+        }
       }
 
       const deferred = yield* Deferred.make<ReadonlyArray<Answer>, RejectedError>()
       pending.set(id, { info, deferred })
-      yield* events.publish(Event.Asked, info)
-
-      return yield* Effect.ensuring(
-        Deferred.await(deferred),
-        Effect.gen(function* () {
-          pending.delete(id)
-          // Defensive close: if the PG row is still pending after the deferred
-          // resolved through an in-process path, archive it now.
-          if (HitlStore.enabled()) {
-            yield* Effect.tryPromise({
-              try: () =>
-                HitlStore.casTransition(id as string, "question", {
-                  status: "closed",
-                  closeReason: "answered-delivered",
-                }),
-              catch: () => new Error("hitl defensive close failed"),
-            }).pipe(Effect.catchCause(() => Effect.void))
-          }
-        }),
+      return yield* Effect.gen(function* () {
+        yield* events.publish(Event.Asked, info)
+        return yield* Deferred.await(deferred)
+      }).pipe(
+        Effect.ensuring(
+          Effect.sync(() => {
+            pending.delete(id)
+          }),
+        ),
       )
     })
 
@@ -206,31 +208,39 @@ const layer = Layer.effect(
       const existing = pending.get(input.requestID)
 
       if (HitlStore.enabled()) {
+        const directory = yield* InstanceState.directory
+        const transition = {
+          status: "replied" as const,
+          result: { answers: input.answers as unknown as unknown[] },
+        }
         const outcome = yield* Effect.tryPromise({
-          try: () =>
-            HitlStore.casTransition(input.requestID as string, "question", {
-              status: "replied",
-              result: { answers: input.answers as unknown as unknown[] },
-            }),
+          try: () => HitlStore.casTransition(input.requestID as string, "question", directory, transition),
           catch: (error) => new Error(`hitl reply cas failed: ${String(error)}`),
         }).pipe(Effect.orDie)
-        // CAS succeeded (or idempotent repeat): consume locally if we own the deferred.
-        if (outcome.updated !== undefined || outcome.current !== undefined) {
-          if (existing !== undefined) {
-            pending.delete(input.requestID)
-            yield* events.publish(Event.Replied, {
-              sessionID: existing.info.sessionID,
-              requestID: existing.info.id,
-              answers: input.answers.map((a) => [...a]),
-            })
-            yield* Deferred.succeed(existing.deferred, input.answers)
-          }
-          return
+        const row = outcome.updated ?? outcome.current
+        if (row === undefined) return yield* new NotFoundError({ requestID: input.requestID })
+        if (outcome.current !== undefined && !HitlStore.sameTransition(outcome.current, transition)) {
+          return yield* new ConflictError({
+            requestID: input.requestID,
+            status: outcome.current.status,
+            closeReason: outcome.current.close_reason ?? undefined,
+          })
         }
-        // Row doesn't exist in PG either → genuine 404.
-        if (existing === undefined) {
-          return yield* new NotFoundError({ requestID: input.requestID })
+        const answers = Array.isArray(row.result?.["answers"])
+          ? (row.result["answers"] as unknown as ReadonlyArray<Answer>)
+          : []
+        if (outcome.updated !== undefined) {
+          const request = row.payload as unknown as Request
+          yield* events.publish(Event.Replied, {
+            sessionID: request.sessionID,
+            requestID: request.id,
+            answers: answers.map((answer) => [...answer]),
+          })
         }
+        if (existing === undefined) return
+        pending.delete(input.requestID)
+        yield* Deferred.succeed(existing.deferred, answers)
+        return
       }
 
       // SQLite fallback (original behavior).
@@ -253,21 +263,29 @@ const layer = Layer.effect(
       const existing = pending.get(requestID)
 
       if (HitlStore.enabled()) {
+        const directory = yield* InstanceState.directory
+        const transition = { status: "rejected" as const }
         const outcome = yield* Effect.tryPromise({
-          try: () => HitlStore.casTransition(requestID as string, "question", { status: "rejected" }),
+          try: () => HitlStore.casTransition(requestID as string, "question", directory, transition),
           catch: (error) => new Error(`hitl reject cas failed: ${String(error)}`),
         }).pipe(Effect.orDie)
-        if (outcome.updated !== undefined || outcome.current !== undefined) {
-          if (existing !== undefined) {
-            pending.delete(requestID)
-            yield* events.publish(Event.Rejected, { sessionID: existing.info.sessionID, requestID: existing.info.id })
-            yield* Deferred.fail(existing.deferred, new RejectedError())
-          }
-          return
+        const row = outcome.updated ?? outcome.current
+        if (row === undefined) return yield* new NotFoundError({ requestID })
+        if (outcome.current !== undefined && !HitlStore.sameTransition(outcome.current, transition)) {
+          return yield* new ConflictError({
+            requestID,
+            status: outcome.current.status,
+            closeReason: outcome.current.close_reason ?? undefined,
+          })
         }
-        if (existing === undefined) {
-          return yield* new NotFoundError({ requestID })
+        if (outcome.updated !== undefined) {
+          const request = row.payload as unknown as Request
+          yield* events.publish(Event.Rejected, { sessionID: request.sessionID, requestID: request.id })
         }
+        if (existing === undefined) return
+        pending.delete(requestID)
+        yield* Deferred.fail(existing.deferred, new RejectedError())
+        return
       }
 
       if (!existing) {
@@ -286,15 +304,15 @@ const layer = Layer.effect(
         const rows = yield* Effect.tryPromise({
           try: () => HitlStore.listPending("question", directory),
           catch: (error) => new Error(`hitl list failed: ${String(error)}`),
-        }).pipe(Effect.catchCause(() => Effect.succeed([] as HitlStore.Row[])))
+        }).pipe(
+          Effect.tapError((error) => Effect.logError("question HITL list failed", { directory, error: String(error) })),
+          Effect.orDie,
+        )
         return rows.map((row) => row.payload as unknown as Request)
       }
       const pending = (yield* InstanceState.get(state)).pending
       return Array.from(pending.values(), (x) => x.info)
     })
-
-    // Start polling within the instance scope.
-    yield* startPolling()
 
     return Service.of({ ask, reply, reject, list })
   }),

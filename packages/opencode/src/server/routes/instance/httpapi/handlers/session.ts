@@ -60,7 +60,7 @@ import {
   UpdatePayload,
   SessionEventQuery,
 } from "../groups/session"
-import { ApiNotFoundError, PermissionNotFoundError, notFound } from "../errors"
+import { ApiNotFoundError, ConflictError, PermissionNotFoundError, notFound } from "../errors"
 import { SkillCreateError } from "../groups/session"
 import * as SessionError from "./session-errors"
 import { withSessionLock, waitForSessionLock } from "./session-lock"
@@ -140,17 +140,14 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       // connection time; the live stream drops durable events at or below it
       // because the replay already delivered them.
       const target = yield* events.latestSequence(ctx.params.sessionID)
-      const prepend = events.durable({ aggregateID: ctx.params.sessionID, after }).pipe(
-        Stream.takeWhile((event) => (event.durable?.seq ?? -1) <= target),
-      )
+      const prepend = events
+        .durable({ aggregateID: ctx.params.sessionID, after })
+        .pipe(Stream.takeWhile((event) => (event.durable?.seq ?? -1) <= target))
       return yield* eventResponse(events, { filter, prepend, liveAfterSeq: target })
     })
 
     const forkPrompt = (sessionID: SessionID, payload: typeof PromptPayload.Type) =>
-      withSessionLock(
-        sessionID,
-        promptSvc.prompt({ ...payload, sessionID }),
-      ).pipe(
+      withSessionLock(sessionID, promptSvc.prompt({ ...payload, sessionID })).pipe(
         Effect.catchCause((cause) =>
           Effect.gen(function* () {
             yield* Effect.logError("prompt_async failed", { sessionID, cause })
@@ -164,15 +161,12 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       )
 
     const forkDeriveSummary = (targetSessionID: SessionID, sourceSessionID: SessionID) =>
-      withSessionLock(
-        targetSessionID,
-        compactSvc.deriveSummary({ sourceSessionID, targetSessionID }),
-      ).pipe(
-          Effect.catchCause((cause) =>
-            Effect.logError("derive_summary failed", { sourceSessionID, targetSessionID, cause }),
-          ),
-          Effect.forkIn(scope, { startImmediately: true }),
-        )
+      withSessionLock(targetSessionID, compactSvc.deriveSummary({ sourceSessionID, targetSessionID })).pipe(
+        Effect.catchCause((cause) =>
+          Effect.logError("derive_summary failed", { sourceSessionID, targetSessionID, cause }),
+        ),
+        Effect.forkIn(scope, { startImmediately: true }),
+      )
 
     const promptAsync = Effect.fn("SessionHttpApi.promptAsync")(function* (ctx: {
       params: { sessionID: SessionID }
@@ -625,6 +619,14 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
             new PermissionNotFoundError({
               requestID: String(error.requestID),
               message: `Permission request not found: ${error.requestID}`,
+            }),
+          ),
+        ),
+        Effect.catchTag("Permission.ConflictError", (error) =>
+          Effect.fail(
+            new ConflictError({
+              resource: String(error.requestID),
+              message: `Permission request is already ${error.status}${error.closeReason ? ` (${error.closeReason})` : ""}`,
             }),
           ),
         ),

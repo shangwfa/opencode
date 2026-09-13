@@ -3,7 +3,7 @@ import { Permission } from "@/permission"
 import { Effect } from "effect"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
 import { InstanceHttpApi } from "../api"
-import { PermissionNotFoundError } from "../errors"
+import { ConflictError, PermissionNotFoundError } from "../errors"
 
 export const permissionHandlers = HttpApiBuilder.group(InstanceHttpApi, "permission", (handlers) =>
   Effect.gen(function* () {
@@ -29,6 +29,14 @@ export const permissionHandlers = HttpApiBuilder.group(InstanceHttpApi, "permiss
               new PermissionNotFoundError({
                 requestID: String(error.requestID),
                 message: `Permission request not found: ${error.requestID}`,
+              }),
+            ),
+          ),
+          Effect.catchTag("Permission.ConflictError", (error) =>
+            Effect.fail(
+              new ConflictError({
+                resource: String(error.requestID),
+                message: `Permission request is already ${error.status}${error.closeReason ? ` (${error.closeReason})` : ""}`,
               }),
             ),
           ),

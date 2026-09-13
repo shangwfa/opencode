@@ -2,13 +2,18 @@ import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { ConfigPermissionV1 } from "@opencode-ai/core/v1/config/permission"
 import { InstanceState } from "@/effect/instance-state"
 import { Wildcard } from "@opencode-ai/core/util/wildcard"
-import { Deferred, Effect, Layer, Context, Schedule } from "effect"
+import { Cause, Deferred, Effect, Layer, Context, Schedule, Schema } from "effect"
 import os from "os"
 import { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import { EventV2Bridge } from "@/event-v2-bridge"
 import { SessionPluginRuntime } from "@/plugin/session-plugin-runtime"
 import { insertExecLog } from "@/session/exec-log"
 import { HitlStore } from "@/hitl/store"
+import { HitlSalvage } from "@/hitl/salvage"
+import { Flag } from "@/flag/flag"
+import { Database } from "@/storage/db"
+import { SessionTable } from "@/session/session.pg"
+import { eq, sql } from "drizzle-orm"
 
 // Per-process instance identifier for hitl_request.owner_id.
 const hitlOwnerID = crypto.randomUUID()
@@ -19,7 +24,7 @@ export const Event = PermissionV1.Event
 
 export interface Interface {
   readonly ask: (input: PermissionV1.AskInput) => Effect.Effect<void, PermissionV1.Error>
-  readonly reply: (input: PermissionV1.ReplyInput) => Effect.Effect<void, PermissionV1.NotFoundError>
+  readonly reply: (input: PermissionV1.ReplyInput) => Effect.Effect<void, PermissionV1.NotFoundError | ConflictError>
   readonly list: () => Effect.Effect<ReadonlyArray<PermissionV1.Request>>
 }
 
@@ -47,6 +52,12 @@ export function evaluate(permission: string, pattern: string, ...rulesets: Permi
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/Permission") {}
 
+export class ConflictError extends Schema.TaggedErrorClass<ConflictError>()("Permission.ConflictError", {
+  requestID: PermissionV1.ID,
+  status: Schema.String,
+  closeReason: Schema.optional(Schema.String),
+}) {}
+
 // Metadata is arbitrary tool input and may contain circular references or
 // bigints, either of which makes JSON.stringify throw. Preserve the
 // identifying fields and degrade only the unserializable parts.
@@ -67,24 +78,25 @@ function safeStringify(value: unknown): string {
 }
 
 function recordDenial(request: Omit<PermissionV1.AskInput, "ruleset">, rule: string) {
-  return Effect.promise(() =>
-    insertExecLog({
-      // Date.now() alone collides when multiple asks are denied in the same
-      // millisecond; the random suffix keeps concurrent denials distinct.
-      id: `deny-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`,
-      session_id: request.sessionID,
-      command: safeStringify({
-        permission: request.permission,
-        patterns: request.patterns,
-        tool: request.tool,
-        metadata: request.metadata,
+  return Effect.promise(
+    () =>
+      insertExecLog({
+        // Date.now() alone collides when multiple asks are denied in the same
+        // millisecond; the random suffix keeps concurrent denials distinct.
+        id: `deny-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`,
+        session_id: request.sessionID,
+        command: safeStringify({
+          permission: request.permission,
+          patterns: request.patterns,
+          tool: request.tool,
+          metadata: request.metadata,
+        }),
+        status: "denied",
+        rule,
+        source: "permission-deny",
+        time_started: Date.now(),
+        time_finished: Date.now(),
       }),
-      status: "denied",
-      rule,
-      source: "permission-deny",
-      time_started: Date.now(),
-      time_finished: Date.now(),
-    }),
     // Audit must never break the deny path. `Effect.catch` would miss a defect
     // (e.g. a synchronous throw while building the row), so catch the whole cause.
   ).pipe(Effect.catchCause(() => Effect.void))
@@ -97,62 +109,76 @@ const layer = Layer.effect(
     const sessionPlugins = yield* SessionPluginRuntime.Service
     const state = yield* InstanceState.make<State>(
       Effect.fn("Permission.state")(function* (ctx) {
-        void ctx
-        const state = {
+        const value = {
           pending: new Map<PermissionV1.ID, PendingEntry>(),
-          approved: [],
+          approved: [] as PermissionV1.Rule[],
         }
 
         yield* Effect.addFinalizer(() =>
           Effect.gen(function* () {
-            for (const item of state.pending.values()) {
+            for (const item of value.pending.values()) {
               yield* Deferred.fail(item.deferred, new PermissionV1.RejectedError())
             }
-            state.pending.clear()
+            value.pending.clear()
           }),
         )
 
-        return state
+        if (HitlStore.enabled()) {
+          let tick = 0
+          const poll = Effect.gen(function* () {
+            const ids = Array.from(value.pending.keys(), (id) => id as string)
+            const changed = yield* Effect.tryPromise({
+              try: () => HitlStore.changed(ids, hitlOwnerID, ctx.directory),
+              catch: (error) => new Error(`hitl poll failed: ${String(error)}`),
+            })
+
+            for (const row of changed) {
+              const entry = value.pending.get(row.id as PermissionV1.ID)
+              if (entry === undefined) continue
+              value.pending.delete(row.id as PermissionV1.ID)
+              const reply = row.result?.["reply"]
+              if (row.status === "replied" && (reply === "once" || reply === "always")) {
+                if (reply === "always") {
+                  value.approved.push(
+                    ...entry.info.always.map((pattern) => ({
+                      permission: entry.info.permission,
+                      pattern,
+                      action: "allow" as const,
+                    })),
+                  )
+                }
+                yield* Deferred.succeed(entry.deferred, undefined)
+                continue
+              }
+              const message = row.result?.["message"]
+              yield* Deferred.fail(
+                entry.deferred,
+                typeof message === "string"
+                  ? new PermissionV1.CorrectedError({ feedback: message })
+                  : new PermissionV1.RejectedError(),
+              )
+            }
+
+            tick += 1
+            if (tick % HITL_RENEW_EVERY_TICKS !== 0) return
+            yield* Effect.tryPromise({
+              try: () => HitlStore.renewLease(ids, hitlOwnerID, ctx.directory),
+              catch: (error) => new Error(`hitl lease renewal failed: ${String(error)}`),
+            })
+            yield* HitlSalvage.sweepKind(events, "permission", ctx.directory)
+          }).pipe(
+            Effect.catchCauseIf(
+              (cause) => !Cause.hasInterrupts(cause),
+              (cause) =>
+                Effect.logError("permission HITL polling failed", { directory: ctx.directory, cause: String(cause) }),
+            ),
+          )
+          yield* poll.pipe(Effect.repeat(Schedule.spaced(HITL_POLL_INTERVAL_MS)), Effect.forkScoped)
+        }
+
+        return value
       }),
     )
-
-    // HITL polling: check PG for cross-instance replies; every N ticks renew lease.
-    const startHitlPolling = Effect.fn("Permission.hitlPoll")(function* () {
-      if (!HitlStore.enabled()) return
-      let tick = 0
-      yield* Effect.gen(function* () {
-        const pending = (yield* InstanceState.get(state)).pending
-        const ids = Array.from(pending.keys(), (id) => id as string)
-
-        const changed = yield* Effect.tryPromise({
-          try: () => HitlStore.changed(ids),
-          catch: (error) => new Error(`hitl poll failed: ${String(error)}`),
-        }).pipe(Effect.catchCause(() => Effect.succeed([] as HitlStore.Row[])))
-
-        for (const row of changed) {
-          const entry = pending.get(row.id as PermissionV1.ID)
-          if (entry === undefined) continue
-          pending.delete(row.id as PermissionV1.ID)
-          if (row.status === "replied") {
-            yield* Deferred.succeed(entry.deferred, undefined)
-          } else {
-            yield* Deferred.fail(entry.deferred, new PermissionV1.RejectedError())
-          }
-        }
-
-        tick += 1
-        if (tick % HITL_RENEW_EVERY_TICKS === 0 && ids.length > 0) {
-          yield* Effect.tryPromise({
-            try: () => HitlStore.renewLease(ids, Date.now() + HitlStore.LEASE_TTL_MS),
-            catch: () => new Error("lease renew failed"),
-          }).pipe(Effect.catchCause(() => Effect.void))
-        }
-      }).pipe(
-        Effect.repeat(Schedule.spaced(HITL_POLL_INTERVAL_MS)),
-        Effect.catchCause(() => Effect.void),
-        Effect.forkScoped,
-      )
-    })
 
     const ask = Effect.fn("Permission.ask")(function* (input: PermissionV1.AskInput) {
       const { approved, pending } = yield* InstanceState.get(state)
@@ -197,42 +223,47 @@ const layer = Layer.effect(
       }
       yield* Effect.logInfo("asking", { id, permission: info.permission, patterns: info.patterns })
 
+      const sessionPending = Array.from(pending.values(), (item) => item.info.sessionID).filter(
+        (sessionID) => sessionID === request.sessionID,
+      ).length
+      if (sessionPending >= Flag.OPENCODE_HITL_MAX_PENDING_PER_SESSION) {
+        return yield* Effect.die(new Error(`Too many pending HITL requests for session ${request.sessionID}`))
+      }
+
       // HITL: PG insert (fail fast — PG unavailable means the tool errors rather than producing an invisible pending).
       if (HitlStore.enabled()) {
         const directory = yield* InstanceState.directory
-        yield* Effect.tryPromise({
+        const inserted = yield* Effect.tryPromise({
           try: () =>
-            HitlStore.insertPending({
-              id: id as string,
-              kind: "permission",
-              directory,
-              sessionID: request.sessionID as string,
-              ownerID: hitlOwnerID,
-              payload: info as unknown as Record<string, unknown>,
-              leaseUntil: Date.now() + HitlStore.LEASE_TTL_MS,
-            }),
+            HitlStore.insertPendingLimited(
+              {
+                id: id as string,
+                kind: "permission",
+                directory,
+                sessionID: request.sessionID as string,
+                ownerID: hitlOwnerID,
+                payload: info as unknown as Record<string, unknown>,
+              },
+              Flag.OPENCODE_HITL_MAX_PENDING_PER_SESSION,
+            ),
           catch: (error) => new Error(`hitl insert failed: ${String(error)}`),
         }).pipe(Effect.orDie)
+        if (!inserted) {
+          return yield* Effect.die(new Error(`Too many pending permission requests for session ${request.sessionID}`))
+        }
       }
 
       const deferred = yield* Deferred.make<void, PermissionV1.RejectedError | PermissionV1.CorrectedError>()
       pending.set(id, { info, deferred })
-      yield* events.publish(Event.Asked, info)
-      return yield* Effect.ensuring(
-        Deferred.await(deferred),
-        Effect.gen(function* () {
-          pending.delete(id)
-          if (HitlStore.enabled()) {
-            yield* Effect.tryPromise({
-              try: () =>
-                HitlStore.casTransition(id as string, "permission", {
-                  status: "closed",
-                  closeReason: "answered-delivered",
-                }),
-              catch: () => new Error("hitl defensive close failed"),
-            }).pipe(Effect.catchCause(() => Effect.void))
-          }
-        }),
+      return yield* Effect.gen(function* () {
+        yield* events.publish(Event.Asked, info)
+        return yield* Deferred.await(deferred)
+      }).pipe(
+        Effect.ensuring(
+          Effect.sync(() => {
+            pending.delete(id)
+          }),
+        ),
       )
     })
 
@@ -243,38 +274,120 @@ const layer = Layer.effect(
       // HITL: CAS the PG row first; cross-instance replies succeed here and
       // the owning instance's polling fiber resolves the deferred.
       if (HitlStore.enabled()) {
+        const directory = yield* InstanceState.directory
         const transition: HitlStore.Transition =
           input.reply === "reject"
-            ? { status: "rejected" as const }
+            ? {
+                status: "rejected" as const,
+                result: { reply: "reject", ...(input.message === undefined ? {} : { message: input.message }) },
+              }
             : { status: "replied" as const, result: { reply: input.reply } }
-        const outcome = yield* Effect.tryPromise({
-          try: () => HitlStore.casTransition(input.requestID as string, "permission", transition),
+        const result = yield* Effect.tryPromise({
+          try: () =>
+            Database.transaction(async (db) => {
+              const outcome = await HitlStore.casTransition(
+                input.requestID as string,
+                "permission",
+                directory,
+                transition,
+              )
+              if (outcome.updated === undefined) return { outcome, cascaded: [] as HitlStore.Row[] }
+
+              const request = outcome.updated.payload as unknown as PermissionV1.Request
+              await db.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`hitl:${directory}:${request.sessionID}`}))`)
+              const cascade: HitlStore.Row[] = []
+              if (input.reply === "always") {
+                const additions = request.always.map((pattern) => ({
+                  permission: request.permission,
+                  pattern,
+                  action: "allow" as const,
+                }))
+                const session = await db
+                  .select({ permission: SessionTable.permission })
+                  .from(SessionTable)
+                  .where(eq(SessionTable.id, request.sessionID))
+                  .limit(1)
+                  .get()
+                const rules = [...(session?.permission ?? []), ...additions]
+                await db
+                  .update(SessionTable)
+                  .set({ permission: rules, time_updated: Date.now() })
+                  .where(eq(SessionTable.id, request.sessionID))
+                  .run()
+                for (const row of await HitlStore.listSessionPending("permission", directory, request.sessionID)) {
+                  const item = row.payload as unknown as PermissionV1.Request
+                  const allowed = item.patterns.every(
+                    (pattern) => evaluate(item.permission, pattern, rules).action === "allow",
+                  )
+                  if (!allowed) continue
+                  const next = await HitlStore.casTransition(row.id, "permission", directory, {
+                    status: "replied",
+                    result: { reply: "always", causedBy: input.requestID },
+                  })
+                  if (next.updated !== undefined) cascade.push(next.updated)
+                }
+              }
+              if (input.reply === "reject") {
+                for (const row of await HitlStore.listSessionPending("permission", directory, request.sessionID)) {
+                  const next = await HitlStore.casTransition(row.id, "permission", directory, {
+                    status: "rejected",
+                    result: { reply: "reject", causedBy: input.requestID },
+                  })
+                  if (next.updated !== undefined) cascade.push(next.updated)
+                }
+              }
+              return { outcome, cascaded: cascade }
+            }),
           catch: (error) => new Error(`hitl reply cas failed: ${String(error)}`),
         }).pipe(Effect.orDie)
-        if (outcome.updated !== undefined || outcome.current !== undefined) {
-          if (existing !== undefined) {
-            pending.delete(input.requestID)
-            yield* events.publish(Event.Replied, {
-              sessionID: existing.info.sessionID,
-              requestID: existing.info.id,
-              reply: input.reply,
-            })
-            if (input.reply === "reject") {
-              yield* Deferred.fail(
-                existing.deferred,
-                input.message
-                  ? new PermissionV1.CorrectedError({ feedback: input.message })
-                  : new PermissionV1.RejectedError(),
-              )
-            } else {
-              yield* Deferred.succeed(existing.deferred, undefined)
-            }
+        const row = result.outcome.updated ?? result.outcome.current
+        if (row === undefined) return yield* new PermissionV1.NotFoundError({ requestID: input.requestID })
+        if (result.outcome.current !== undefined && !HitlStore.sameTransition(result.outcome.current, transition)) {
+          return yield* new ConflictError({
+            requestID: input.requestID,
+            status: result.outcome.current.status,
+            closeReason: result.outcome.current.close_reason ?? undefined,
+          })
+        }
+
+        const changed = result.outcome.updated === undefined ? [] : [row, ...result.cascaded]
+        for (const item of changed) {
+          const request = item.payload as unknown as PermissionV1.Request
+          const reply = item.result?.["reply"]
+          yield* events.publish(Event.Replied, {
+            sessionID: request.sessionID,
+            requestID: request.id,
+            reply: reply === "once" ? "once" : reply === "always" ? "always" : "reject",
+          })
+        }
+
+        for (const item of result.outcome.updated === undefined ? [row] : [row, ...result.cascaded]) {
+          const local = pending.get(item.id as PermissionV1.ID)
+          if (local === undefined) continue
+          pending.delete(item.id as PermissionV1.ID)
+          const reply = item.result?.["reply"]
+          if (reply === "reject" || item.status === "rejected") {
+            const message = item.result?.["message"]
+            yield* Deferred.fail(
+              local.deferred,
+              typeof message === "string"
+                ? new PermissionV1.CorrectedError({ feedback: message })
+                : new PermissionV1.RejectedError(),
+            )
+            continue
           }
-          return
+          if (item.id === row.id && reply === "always") {
+            approved.push(
+              ...local.info.always.map((pattern) => ({
+                permission: local.info.permission,
+                pattern,
+                action: "allow" as const,
+              })),
+            )
+          }
+          yield* Deferred.succeed(local.deferred, undefined)
         }
-        if (existing === undefined) {
-          return yield* new PermissionV1.NotFoundError({ requestID: input.requestID })
-        }
+        return
       }
 
       if (!existing) return yield* new PermissionV1.NotFoundError({ requestID: input.requestID })
@@ -340,15 +453,17 @@ const layer = Layer.effect(
         const rows = yield* Effect.tryPromise({
           try: () => HitlStore.listPending("permission", directory),
           catch: (error) => new Error(`hitl list failed: ${String(error)}`),
-        }).pipe(Effect.catchCause(() => Effect.succeed([] as HitlStore.Row[])))
+        }).pipe(
+          Effect.tapError((error) =>
+            Effect.logError("permission HITL list failed", { directory, error: String(error) }),
+          ),
+          Effect.orDie,
+        )
         return rows.map((row) => row.payload as unknown as PermissionV1.Request)
       }
       const pending = (yield* InstanceState.get(state)).pending
       return Array.from(pending.values(), (item) => item.info)
     })
-
-    // Start HITL polling within the instance scope.
-    yield* startHitlPolling()
 
     return Service.of({ ask, reply, list })
   }),

@@ -52,21 +52,24 @@
 ```sql
 CREATE TABLE hitl_request (
   id            text PRIMARY KEY,      -- que_* / prm_*（沿用现有 ID 生成）
-  kind          text NOT NULL,         -- 'question' | 'permission'
+  kind          text NOT NULL,         -- 'question' | 'permission'（CHECK 约束）
   directory     text NOT NULL,         -- 实例目录隔离（对齐 session 表惯例）
-  session_id    text NOT NULL,
+  session_id    text NOT NULL REFERENCES session(id) ON DELETE CASCADE,
   owner_id      text NOT NULL,         -- 持有 Deferred 的实例 ID（每次启动生成 UUID）
-  status        text NOT NULL,         -- 'pending' | 'replied' | 'rejected' | 'closed'
+  status        text NOT NULL,         -- 'pending' | 'replied' | 'rejected' | 'closed'（CHECK 约束）
   payload       jsonb NOT NULL,        -- QuestionV1.Request / PermissionV1.Request 全文（含 tool 定位）
-  result        jsonb,                 -- answers / { reply, message }
-  close_reason  text,                  -- 'instance-restart' | 'shutdown' | 'answered-delivered'
-  lease_until   bigint,                -- 行级租约：持有实例每 30s 续约
+  result        jsonb,                 -- answers / { reply, message?, causedBy? }
+  close_reason  text,                  -- 'instance-restart' | 'shutdown' | 'answered-delivered' | 'decision-delivered'（CHECK 约束）
+  lease_until   bigint NOT NULL,       -- 行级租约：持有实例每 30s 续约（以 PG clock_timestamp 为准）
   time_created  bigint NOT NULL,
   time_updated  bigint NOT NULL
 );
-CREATE INDEX idx_hitl_pending  ON hitl_request (status, lease_until);
-CREATE INDEX idx_hitl_session  ON hitl_request (session_id);
+CREATE INDEX idx_hitl_pending  ON hitl_request (directory, kind, status, lease_until);
+CREATE INDEX idx_hitl_session  ON hitl_request (directory, session_id, status);
+CREATE INDEX idx_hitl_retention ON hitl_request (status, time_updated);
 ```
+
+硬化要点（相对初版）：`lease_until NOT NULL`（NULL pending 永不被 dead 查询命中）、`session_id` FK 级联删除（session 删后无孤儿）、kind/status/close_reason CHECK（非法状态进不了库）、复合索引对齐主要查询（清扫/级联/限流计数/retention 均索引前缀命中）。`directory` 参与所有 CAS 与读路径（跨目录 ID 不可操作）。
 
 配套：`packages/opencode/src/hitl/request.pg.ts`（drizzle 定义）+ `migration-pg/<时间戳>_hitl_request/migration.sql`。
 
@@ -93,17 +96,17 @@ CREATE INDEX idx_hitl_session  ON hitl_request (session_id);
 1. `INSERT INTO hitl_request (status='pending', owner_id=me, lease_until=now+60s)` — 失败则 fail fast 不挂起（PG 不可用时宁可工具报错，不产生不可见 pending）
 2. 内存 `Map` 照旧存 `{info, deferred}`（本实例消费索引 + `list()` 缓存）
 3. `events.publish(Asked)`（SSE 照旧）
-4. `Deferred.await` + `ensuring`：清内存；防御性检查——Deferred 结束时若 PG 行仍 pending（如实例内异常路径），补写终态
+4. `Deferred.await` + `ensuring`：只清内存。**中断/取消不写终态**（旧行为把取消写成 closed(answered-delivered) 会伪造已交付并逃逸清扫）；PG 行保持 pending，由租约断链走统一清扫路径
 
 **`reply()` / `reject()`（任意实例）**：
 
-1. CAS：`UPDATE ... SET status='replied', result=..., time_updated=now WHERE id=? AND status='pending' RETURNING *`
-   - 返回 1 行 → 成功，publish 事件
-   - 返回 0 行 → 读当前行：
-     - `replied` 且 result 相同 → **幂等 200**（重复提交）
-     - `rejected` / `closed` → 200 + 当前状态体（迟到提交），错误信息注明状态与原因
-     - 行不存在 → 404（唯一保留 404 的场景）
-2. 本实例内存有该 ID → 直接 resolve/fail Deferred；没有（跨实例）→ 到此为止，持有实例轮询发现
+1. CAS：`UPDATE ... SET status='replied', result=..., time_updated=now WHERE id=? AND kind=? AND directory=? AND status='pending' RETURNING *`（directory 绑定防跨目录 IDOR）
+   - 返回 1 行 → 成功（权威结果 = PG result）；publish 事件；本实例有 Deferred 按 **PG result**（非 HTTP 输入）resolve
+   - 返回 0 行 → 读当前行（同样绑定 kind+directory）：
+      - 终态且 status/result/close_reason 与本次提交完全相同 → **幂等 200**
+      - 终态但决策不同 → **409 Conflict**（绝不按迟到提交的内容消费本地 Deferred）
+      - 行不存在 → 404（唯一保留 404 的场景）
+2. 本实例内存有该 ID → 按 PG 权威结果 resolve/fail；没有（跨实例）→ 到此为止，持有实例轮询发现
 
 **`list()`**：改为查 PG（`status='pending' AND directory=me`）——`GET /question`、`GET /permission` 立即跨实例可见。
 
@@ -200,11 +203,14 @@ sequenceDiagram
 
 ### 4.4 跨实例消费：持有实例轮询
 
-Question / Permission service 各起一个 scoped fiber（随 `InstanceState` scope 生命周期）：
+Question / Permission service 在**每个 directory 的 `InstanceState.make` 初始化闭包内**各起一个 scoped fiber（fiber 闭包捕获该实例的 state 与 ctx.directory，随 ScopedCache 条目销毁中断）：
 
-- 每 **1s**：`SELECT id, status, result FROM hitl_request WHERE id IN (本地 pending IDs) AND status <> 'pending'`
-- 发现状态变化 → resolve（replied → `Deferred.succeed(answers)`；rejected → fail；closed → fail 带 close_reason 语义错误）
-- 同一 fiber 顺带做**租约续约**：每 30s `UPDATE ... SET lease_until=now+60s WHERE id IN (本地 pending IDs) AND status='pending'`
+- 每 **1s**：`SELECT ... WHERE id IN (本地 pending IDs) AND owner_id=me AND directory=me AND status <> 'pending'`
+- 发现状态变化 → 按 **PG result** resolve（replied → `Deferred.succeed`，question 取 `result.answers`、permission 取 `result.reply` 且 `reject+message` 重建 `CorrectedError`；rejected → fail）
+- 同一 fiber 顺带做**租约续约**：每 30s `UPDATE ... SET lease_until=clock_timestamp()+60s WHERE id IN (本地) AND owner_id=me AND status='pending'`
+- 每 30s 附带执行一次 §4.5 清扫（同 directory）
+- 单次迭代内捕获非中断错误（log 后下一轮继续）；`Effect.repeat` 只在成功后继续，错误必须在 iteration 内恢复而不是在 repeat 外 catch
+- **所有时间戳取 PG `clock_timestamp()`**（`lease_until`、`time_updated`、清扫判定），消除 Pod 本地时钟漂移导致的误清/漏清
 
 **为什么轮询而不是 PG LISTEN/NOTIFY**：人机交互场景 1s 延迟无感；无连接/通道管理复杂度；与 watchdog 轮询风格一致；PG bridge 层无需新增能力。
 
@@ -238,20 +244,20 @@ sequenceDiagram
 
 1. **清死实例的 pending**：
    ```sql
-   UPDATE hitl_request SET status='closed', close_reason='instance-restart', time_updated=now
-   WHERE status='pending' AND directory=me AND lease_until < now - 30s
+   UPDATE hitl_request SET status='closed', close_reason='instance-restart', time_updated=clock_timestamp()
+   WHERE status='pending' AND directory=me AND lease_until < clock_timestamp() - 30s
    RETURNING *
    ```
    graceful shutdown **不单独处理**（实现从简）：finalizer 只 fail 内存 Deferred（现状行为），PG 行保持 pending、租约自然断，与硬杀统一走同一条清扫路径——单一代码路径换取最多 ~120s 的额外检测延迟。
-2. **善后悬空 tool part（三分支，核心是答案不丢）**：对每个刚终态化且 `payload.tool` 存在的行（question 必有；permission 的 `Request.tool` 亦携带 messageID/callID），复用 `markTimedOut` 的 CAS 写法，按行的终态把对应 running tool part 改写为：
+2. **善后悬空 tool part（三分支，核心是答案不丢）**：对每个刚终态化且 `payload.tool` 存在的行（question 必有；permission 的 `Request.tool` 亦携带 messageID/callID），按行的终态把对应 running tool part 改写为：
    - `replied` 未消费（answered-lost）→ **completed 终态，output = 用户答案回填**（question：`"User answered: 继续"`；permission：`"User approved (once)"`）。下一次任何 prompt 触发新 run 时，LLM 读消息树看到完整 tool call/result 对，**答案自然续上**——等效 pi-ask 的持久化恢复，无需重建 run
    - `closed`（pending 未答）→ error 终态：`Question closed: the opencode instance restarted before the user answered. Ask again if still needed.`
    - `rejected` 未消费 → error 终态：`The user rejected this request.`
 
-   run 层面无需动作：原 run 的 fiber 已随死实例消亡；下次 `ensureRunning` 接管后 LLM 读到该 part 终态，按内容决定续用答案、重问或放弃。
-3. **answered-lost 检测**：`status='replied' AND owner 租约已死` 的行同样进入善后（answer 已落 `result`，只差 part 回填），回填后置 `closed(close_reason='answered-delivered')` 归档语义。
+   **claim-first 事务**：每行的善后在**单个 PG 事务**内完成——先 CAS 请求行到终态（阻断并发 reply），再在同事务内 CAS 更新 running part（`WHERE data->'state'->>'status'='running' AND start 匹配`，run 正常写完则不命中）；part 定位失败或 CAS 失败则整个事务回滚，行保持原状等待下轮重试（**绝不把未回填答案的行标记为已交付**）。`PartUpdated` 事件在事务提交后发布，避免读到未提交状态。
+3. **answered-lost 检测**：`status='replied' AND owner 租约已死` 的行同样进入善后（answer 已落 `result`，只差 part 回填），回填后置 `closed(close_reason='answered-delivered')` 归档语义；`rejected` 未消费行善后后置 `closed(close_reason='decision-delivered')`。
 
-**多实例安全**：行级租约保证不清活实例的行；清扫动作本身是 CAS，两实例并发清扫无竞争伤害。
+**多实例安全**：行级租约保证不清活实例的行；清扫动作本身是 CAS + 事务，两实例并发清扫无竞争伤害（后到者 claim 不命中，安全跳过）。
 
 **时序图 5：实例死亡清扫（三分支善后 + retention）**
 
@@ -299,8 +305,8 @@ reply = `always` 成功时，将 `{permission, pattern, action:'allow'}` 规则 
 
 ### 4.8 数据保留与背压上限
 
-- **retention**：`hitl_request` 是状态表（非事件日志，event 表另论），终态行由轮询 fiber 顺带清理：`status <> 'pending' AND time_updated < now - 30d` 删除。挂起中的行永不清理。
-- **pending 上限**：单 session 挂起请求数上限（`OPENCODE_HITL_MAX_PENDING_PER_SESSION`，默认 10）。`ask()` 时同 session 已有 ≥ 上限个 pending → 不挂起，直接以明确错误返回（防失控 agent 无限 ask 打爆表与 UI）。
+- **retention**：`hitl_request` 是状态表（非事件日志，event 表另论），终态行由轮询 fiber 顺带清理：`status <> 'pending' AND directory=me AND time_updated < clock_timestamp() - 30d` 删除。挂起中的行永不清理。
+- **pending 上限**：单 session 挂起请求数上限（`OPENCODE_HITL_MAX_PENDING_PER_SESSION`，默认 10），question 与 permission 各自计数、共用同一 flag。PG 模式下在 session 级 advisory lock 事务内**原子「计数 + INSERT」**（多实例/并发 ask 不可突破）；SQLite 模式退化为内存计数（单进程视图）。超限的 `ask()` 不挂起，直接以明确错误返回（防失控 agent 无限 ask 打爆表与 UI）。
 
 ### 4.9 可观测性
 
@@ -315,12 +321,19 @@ reply = `always` 成功时，将 `{permission, pattern, action:'allow'}` 规则 
 | 场景 | 现行为 | 新行为 |
 |---|---|---|
 | reply 挂起中的请求 | 200 | 200（不变） |
-| reply 已 replied（重复点） | — | 200 + 当前状态（幂等） |
-| reply 已 closed/rejected | 404 | 200 + 状态体 + 原因 |
+| reply 已 replied 且决策相同（重复点） | — | 200（幂等，布尔语义不变） |
+| reply 已 closed/rejected 或决策不同（迟到/冲突提交） | 404 | **409 Conflict**（message 注明当前状态与原因） |
 | reply 不存在的 ID | 404 | 404（不变） |
-| `GET /question` / `GET /permission` | 仅本实例 pending | 全实例 pending（directory 内） |
+| `GET /question` / `GET /permission` | 仅本实例 pending | 全实例 pending（directory 内）；PG 故障时 5xx（不伪装为空列表） |
 
-纯放宽，无破坏性；原依赖 404 判错的接入方行为不变。
+成功仍返回布尔 `true`（SDK 兼容）；冲突是明确的新错误通道（`ConflictError`），不与成功复用同一响应体。
+
+### 4.11 权威结果与级联（permission）
+
+- reply 落 PG 后**以 PG result 为准**消费本地 Deferred（含跨实例轮询路径），reject 的 `message` 持久化在 `result.message`，持有实例据此重建 `CorrectedError(feedback)`
+- `always`：单事务内完成目标行 CAS → `session.permission` 规则合并写入 → 同 session 其余 pending 依新规则级联 CAS 放行（`result.causedBy` 记录来源）→ 提交后统一 publish；持有实例轮询发现 always 级联行后同步追加内存 approved 规则
+- `reject`：目标行带 `result.message` 落库后，同 session 其余 pending 级联 CAS reject（不带 message，与 V1 语义一致）
+- session 级 advisory lock（`pg_advisory_xact_lock(hashtext('hitl:<directory>:<sessionID>'))`）序列化同 session 的 reply 级联与 ask 限流插入，防并发 ask 漏过级联判定
 
 ## 5. 关键决策记录
 

@@ -32,7 +32,7 @@ afterEach(async () => {
   await disposeAllInstances()
 })
 
-/** 钉住 docs/hitl-persistence-design.md §4.8：单 session 挂起上限（SQLite 内存路径，PG 路径同逻辑走 countPending）。 */
+/** 钉住 docs/hitl-persistence-design.md §4.8：单 session 挂起上限（SQLite 内存路径；PG 路径在 advisory lock 事务内原子计数+插入，见 HitlStore.insertPendingLimited）。 */
 lifecycle.live("question ask enforces per-session pending limit and recovers after reply", () =>
   Effect.gen(function* () {
     const dir = yield* tmpdirScoped({ git: true })
