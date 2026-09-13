@@ -1,5 +1,5 @@
 import { afterEach, beforeAll, describe, expect, test } from "bun:test"
-import { Effect, Exit } from "effect"
+import { Cause, Effect, Exit } from "effect"
 import { Database, eq } from "../../src/storage/db"
 import { provideTestInstance, disposeAllInstances, tmpdir } from "../fixture/fixture"
 import { Server } from "../../src/server/server"
@@ -226,6 +226,66 @@ describe.skipIf(!enabled)("session exec_log integration (PG)", () => {
         expect(denied!.status).toBe("denied")
         expect(denied!.rule).toBe("bash: rm -rf *")
         expect(denied!.command).toContain("rm -rf /tmp/secret")
+
+        await cleanupSession(sid)
+      },
+    })
+  })
+
+  test("permission deny survives circular metadata and keeps identifying audit fields", async () => {
+    await using tmp = await tmpdir({ git: true })
+    await provideTestInstance({
+      directory: tmp.path,
+      fn: async (ctx) => {
+        const app = Server.Default().app
+        const sid = ((await (await app.request("/session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title: "exec-log-perm-deny-circular" }),
+        })).json()) as { id: string }).id
+
+        const circular: Record<string, unknown> = { command: "rm -rf /tmp/secret" }
+        circular.self = circular
+
+        const exit = await AppRuntime.runPromiseExit(
+          Effect.gen(function* () {
+            const permission = yield* Permission.Service
+            yield* permission.ask({
+              sessionID: sid as any,
+              permission: "bash",
+              patterns: ["rm -rf *"],
+              metadata: circular,
+              always: [],
+              ruleset: [{ permission: "bash", pattern: "rm -rf *", action: "deny" }],
+            })
+          }).pipe(Effect.provideService(InstanceRef, ctx)),
+        )
+
+        expect(Exit.isFailure(exit)).toBe(true)
+        if (!Exit.isFailure(exit)) return
+
+        // A circular metadata object must not turn the rejection into a defect:
+        // the ask path has to fail with a typed DeniedError, not die.
+        expect(exit.cause.reasons.some(Cause.isDieReason)).toBe(false)
+        expect(exit.cause.reasons.some(Cause.isFailReason)).toBe(true)
+
+        const logs = await queryLogs(sid)
+        const denied = logs.find((l) => l.source === "permission-deny")
+        expect(denied).toBeDefined()
+        expect(denied!.status).toBe("denied")
+        expect(denied!.rule).toBe("bash: rm -rf *")
+
+        // Audit must stay valid JSON and preserve the identifying fields even
+        // when metadata cannot be serialized as-is.
+        const command = JSON.parse(denied!.command) as {
+          permission?: string
+          patterns?: string[]
+          metadata?: { command?: string; self?: string }
+        }
+        expect(command.permission).toBe("bash")
+        expect(command.patterns).toEqual(["rm -rf *"])
+        expect(command.metadata?.command).toBe("rm -rf /tmp/secret")
+        expect(command.metadata?.self).toBe("[Circular]")
 
         await cleanupSession(sid)
       },

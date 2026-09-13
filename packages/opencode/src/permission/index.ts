@@ -41,6 +41,25 @@ export function evaluate(permission: string, pattern: string, ...rulesets: Permi
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/Permission") {}
 
+// Metadata is arbitrary tool input and may contain circular references or
+// bigints, either of which makes JSON.stringify throw. Preserve the
+// identifying fields and degrade only the unserializable parts.
+function safeStringify(value: unknown): string {
+  const seen = new WeakSet<object>()
+  try {
+    return JSON.stringify(value, (_key, item) => {
+      if (typeof item === "bigint") return item.toString()
+      if (typeof item === "object" && item !== null) {
+        if (seen.has(item)) return "[Circular]"
+        seen.add(item)
+      }
+      return item
+    })
+  } catch {
+    return "{}"
+  }
+}
+
 function recordDenial(request: Omit<PermissionV1.AskInput, "ruleset">, rule: string) {
   return Effect.promise(() =>
     insertExecLog({
@@ -48,7 +67,7 @@ function recordDenial(request: Omit<PermissionV1.AskInput, "ruleset">, rule: str
       // millisecond; the random suffix keeps concurrent denials distinct.
       id: `deny-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`,
       session_id: request.sessionID,
-      command: JSON.stringify({
+      command: safeStringify({
         permission: request.permission,
         patterns: request.patterns,
         tool: request.tool,
@@ -60,7 +79,9 @@ function recordDenial(request: Omit<PermissionV1.AskInput, "ruleset">, rule: str
       time_started: Date.now(),
       time_finished: Date.now(),
     }),
-  ).pipe(Effect.catch(() => Effect.void))
+    // Audit must never break the deny path. `Effect.catch` would miss a defect
+    // (e.g. a synchronous throw while building the row), so catch the whole cause.
+  ).pipe(Effect.catchCause(() => Effect.void))
 }
 
 const layer = Layer.effect(

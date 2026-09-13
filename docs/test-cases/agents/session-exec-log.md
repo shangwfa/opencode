@@ -622,7 +622,9 @@ async function sendAndWait(sid, body, timeout = 120000) {
   })
 }
 
-// 创建 bash 全 deny 的 agent 并以该 agent 身份发消息，诱导其尝试执行命令
+// 创建带 bash 局部 deny 规则的 agent 并以该 agent 身份发消息，诱导其尝试执行被禁命令
+// 注意：必须用对象语法的非 * pattern —— `bash: "deny"`（展开为 pattern "*"）会被 disabled()
+// 直接从工具列表移除 bash，LLM 无法调用，permission.ask 不触发，永远产生不了 denied 记录
 await fetch(`${BASE}/session/${sid}/agents/create`, {
   method: "POST",
   headers: { "Content-Type": "application/json" },
@@ -630,8 +632,8 @@ await fetch(`${BASE}/session/${sid}/agents/create`, {
     name: "deny-audit",
     description: "deny audit",
     mode: "primary",
-    prompt: "你必须在收到消息后立即执行一次 bash 命令 ls -la，不要询问。",
-    permission: { bash: "deny" },
+    prompt: "你必须在收到消息后立即执行一次 bash 命令 rm -rf /tmp/secret-audit，不要询问。",
+    permission: { bash: { "rm -rf *": "deny" } },
   }),
 })
 
@@ -639,7 +641,7 @@ const promptPromise = fetch(`${BASE}/session/${sid}/message`, {
   method: "POST",
   headers: { "Content-Type": "application/json" },
   body: JSON.stringify({
-    parts: [{ type: "text", text: "运行 ls -la 并告诉我结果" }],
+    parts: [{ type: "text", text: "运行 rm -rf /tmp/secret-audit 并告诉我结果" }],
     model: MODEL,
     agent: "deny-audit",
   }),
@@ -655,7 +657,7 @@ psql "$PG_URL" -c "SELECT id, status, rule, source FROM exec_log WHERE session_i
 
 **期望**：
 - `exec_log` 出现 `source='permission-deny'` 记录，`status='denied'`
-- `rule` 形如 `bash: *`（`permission: pattern`，即 agent 权限里 `bash: "deny"` 展开的命中规则）
+- `rule` 形如 `bash: rm -rf *`（`permission: pattern`，即命中的 deny 规则）
 - `command` 字段为 JSON（含 `permission`/`patterns`/`metadata`）
 - 消息回合最终正常结束（LLM 收到 denied 反馈并自行向用户说明），服务不因拒绝而失败
 
