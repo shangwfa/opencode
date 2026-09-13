@@ -126,7 +126,7 @@ export function pendingToolCall(input: {
 }): ToolCall {
   return {
     toolCallId: input.toolCallId,
-    title: input.state.title || input.toolName,
+    title: toolTitle(input.toolName, input.state.input, input.state.title),
     kind: toToolKind(input.toolName),
     status: "pending",
     locations: toLocations(input.toolName, input.state.input),
@@ -156,7 +156,7 @@ export function runningToolUpdate(input: {
     toolCallId: input.toolCallId,
     status: "in_progress",
     kind: toToolKind(input.toolName),
-    title: input.state.title ?? input.toolName,
+    title: toolTitle(input.toolName, input.state.input, input.state.title),
     locations: toLocations(input.toolName, input.state.input),
     rawInput: input.state.input,
     ...(content ? { content } : {}),
@@ -172,7 +172,7 @@ export function duplicateRunningToolUpdate(input: {
     toolCallId: input.toolCallId,
     status: "in_progress",
     kind: toToolKind(input.toolName),
-    title: input.state.title ?? input.toolName,
+    title: toolTitle(input.toolName, input.state.input, input.state.title),
     locations: toLocations(input.toolName, input.state.input),
     rawInput: input.state.input,
   }

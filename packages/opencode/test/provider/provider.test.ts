@@ -23,6 +23,8 @@ import { InstanceStore } from "@/project/instance-store"
 import { testEffect } from "../lib/effect"
 import { ProviderV2 } from "@opencode-ai/core/provider"
 import { ModelV2 } from "@opencode-ai/core/model"
+import { LocationServiceMap } from "@opencode-ai/core/location-service-map"
+import { locationServiceMapLayer } from "@opencode-ai/core/location-services"
 
 const originalEnv = new Map<string, string | undefined>()
 
@@ -60,7 +62,7 @@ afterEach(async () => {
 })
 
 const providerLayer = (flags: Partial<RuntimeFlags.Info> = {}) =>
-  LayerNode.compile(
+  AppNodeBuilder.build(
     LayerNode.group([
       Provider.node,
       FSUtil.node,
@@ -84,7 +86,7 @@ const paid = (providers: Record<string, { models: Record<string, { cost: { input
 
 const languageBaseURL = (language: unknown) => (language as { config: { baseURL: string } }).config.baseURL
 
-const it = testEffect(LayerNode.compile(LayerNode.group([Provider.node, Env.node, Plugin.node])))
+const it = testEffect(AppNodeBuilder.build(LayerNode.group([Provider.node, Env.node, Plugin.node])))
 const experimentalModels = testEffect(providerLayer({ enableExperimentalModels: true }))
 
 const alphaProviderConfig = {
@@ -1968,8 +1970,9 @@ it.instance(
 // Tests that need plugin file setup or multi-instance flows fall back to a
 // scoped tmpdir + provideInstance pattern via it.effect.
 
-const instanceStoreLayer = LayerNode.compile(InstanceStore.node, [
+const instanceStoreLayer = AppNodeBuilder.build(InstanceStore.node, [
   [InstanceStore.bootstrapNode, InstanceBootstrap.node],
+  [LocationServiceMap.node, locationServiceMapLayer],
 ])
 const provideMultiInstance = <A, E, R>(eff: Effect.Effect<A, E, R>) =>
   eff.pipe(Effect.provide(instanceStoreLayer), Effect.provide(AppNodeBuilder.build(CrossSpawnSpawner.node)))
