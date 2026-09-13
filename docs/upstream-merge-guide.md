@@ -14,7 +14,24 @@ bun typecheck                  # packages/opencode 目录下
 docker build && docker run     # 回归测试
 ```
 
+### 合并记录
+
+| 日期 | upstream 版本 | 提交数 | 冲突 | 备注 |
+|------|--------------|--------|------|------|
+| 2026-09-13 | 95daf90670 | 36 | package.json ×2 + bun.lock | gitlab-ai-provider 6.13→6.15；checkout --theirs 又丢了 opensandbox+postgres（325e9f37c2 修复） |
+| 2026-08-23 | — | — | package.json | 同样丢了 opensandbox+postgres（2eefbf039f 修复） |
+
 ## 冲突解决
+
+### ⚠️ package.json 禁用 checkout --theirs（重复踩坑，已两次）
+
+`packages/opencode/package.json` 含 SaaS 独有依赖（`@alibaba-group/opensandbox`、`postgres`）。upstream 不认识它们，`checkout --theirs` 会**静默丢弃**——症状是 fresh `docker build` 报 `ENOENT opensandbox`（本地 `node_modules` 有缓存所以 typecheck 不报错，只有 Docker 才暴露）。**必须手动合并**：取 upstream 的版本变更，同时保留 SaaS 依赖行。
+
+| 文件 | 解决方式 |
+|------|----------|
+| `packages/opencode/package.json` | **手动合并**（取 upstream 变更 + 保留 `@alibaba-group/opensandbox` 和 `postgres`） |
+| `packages/core/package.json` | 手动合并（保留 `@opentelemetry/sdk-metrics`、`@opentelemetry/exporter-metrics-otlp-http`） |
+| `bun.lock` | 删掉冲突标记，重新 `bun install` |
 
 ### 常规冲突（每次都会有）
 
