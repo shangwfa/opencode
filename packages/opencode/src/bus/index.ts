@@ -6,14 +6,11 @@ import { InstanceState } from "@/effect/instance-state"
 import { makeRuntime } from "@/effect/run-service"
 import { serviceUse } from "@opencode-ai/core/effect/service-use"
 import { Identifier } from "@/id/id"
+import * as Log from "@opencode-ai/core/util/log"
 import type { InstanceContext } from "@/project/instance-context"
 import { InstanceRef } from "@/effect/instance-ref"
 
-const log = {
-  info(msg: string, data?: Record<string, unknown>) { console.info(`[bus] ${msg}`, data ?? "") },
-  warn(msg: string, data?: Record<string, unknown>) { console.warn(`[bus] ${msg}`, data ?? "") },
-  error(msg: string, data?: Record<string, unknown>) { console.error(`[bus] ${msg}`, data ?? "") },
-}
+const log = Log.create({ service: "bus" })
 
 type BusProperties<D extends BusEvent.Definition<string, Schema.Top>> = Schema.Schema.Type<D["properties"]>
 

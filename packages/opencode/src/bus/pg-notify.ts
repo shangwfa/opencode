@@ -1,10 +1,7 @@
 import { Flag } from "@opencode-ai/core/flag/flag"
+import * as Log from "@opencode-ai/core/util/log"
 
-const log = {
-  info(msg: string, data?: Record<string, unknown>) { console.info(`[pg-notify] ${msg}`, data ?? "") },
-  warn(msg: string, data?: Record<string, unknown>) { console.warn(`[pg-notify] ${msg}`, data ?? "") },
-  error(msg: string, data?: Record<string, unknown>) { console.error(`[pg-notify] ${msg}`, data ?? "") },
-}
+const log = Log.create({ service: "pg-notify" })
 
 const CHANNEL = "opencode_event"
 

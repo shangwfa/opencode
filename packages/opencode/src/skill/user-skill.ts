@@ -2,14 +2,13 @@ import z from "zod"
 import { Effect, Context, Layer } from "effect"
 import { Database, eq, and } from "../storage/db"
 import { UserSkillTable } from "./skill.sql"
+import * as Log from "@opencode-ai/core/util/log"
 
 
 import { randomBytes } from "crypto"
 
 export namespace UserSkill {
-  const log = {
-    info(msg: string, data?: Record<string, unknown>) { console.info(`[user-skill] ${msg}`, data ?? "") },
-  }
+  const log = Log.create({ service: "user-skill" })
 
   export const Info = z.object({
     id: z.string(),

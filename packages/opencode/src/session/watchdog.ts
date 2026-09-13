@@ -149,7 +149,7 @@ const scan = Effect.fn("SessionWatchdog.scan")(function* (config: Config) {
   span.attribute("watchdog.duration_ms", durationMs)
 
   if (stuck.length > 0) log.warn("watchdog stuck tools detected", { count: stuck.length, marked })
-  log.info("watchdog scan completed", {
+  log.debug("watchdog scan completed", {
     scanned: rows.length,
     stuck: stuck.length,
     orphaned: stuck.filter((item) => !item.local).length,

@@ -1,5 +1,6 @@
 import { Hono } from "hono"
 import type { UpgradeWebSocket } from "hono/ws"
+import * as Log from "@opencode-ai/core/util/log"
 
 
 
@@ -100,12 +101,10 @@ const app = (upgrade: UpgradeWebSocket) =>
   )
 
 export namespace ServerProxy {
-  const log = {
-    info(msg: string, data?: Record<string, unknown>) { console.info(`[server-proxy] ${msg}`, data ?? "") },
-  }
+  const log = Log.create({ service: "server-proxy" })
 
   export function http(url: string | URL, extra: HeadersInit | undefined, req: Request) {
-    console.log("proxy http request", {
+    log.info("proxy http request", {
       method: req.method,
       request: req.url,
       url: String(url),
@@ -123,7 +122,7 @@ export namespace ServerProxy {
       next.delete("content-encoding")
       next.delete("content-length")
 
-      console.log("proxy http response", {
+      log.info("proxy http response", {
         method: req.method,
         request: req.url,
         url: String(url),

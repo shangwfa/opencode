@@ -1,6 +1,9 @@
 import { estimateTokens, type CcrConfig } from "./config"
 import { resizeImageDataUrl } from "./image-resize"
 import type { CcrStore } from "./store"
+import * as Log from "@opencode-ai/core/util/log"
+
+const log = Log.create({ service: "ccr" })
 
 const EXCLUDED_TOOLS = new Set(["edit", "write", "question"])
 
@@ -90,9 +93,7 @@ export function createMessageTransform(store: CcrStore, config: CcrConfig) {
           query,
         })
         if (result === undefined) {
-          console.log(
-            `[ccr] skip: idx=${i} id=${msg.info.id.slice(4, 20)} tool=${toolPart.tool} len=${outputText.length}`,
-          )
+          log.info("skip", { idx: i, id: msg.info.id.slice(4, 20), tool: toolPart.tool, len: outputText.length })
           continue
         }
 
@@ -110,9 +111,17 @@ export function createMessageTransform(store: CcrStore, config: CcrConfig) {
     const total = stats.created + stats.reused
     const savedPct =
       stats.originalTokens > 0 ? ((1 - stats.compressedTokens / stats.originalTokens) * 100).toFixed(1) : "0.0"
-    const images = stats.imagesResized ? ` images=${stats.imagesResized}` : ""
-    console.log(
-      `[ccr] turn: messages=${messages.length} window=${lastCompressibleIndex + 1} created=${stats.created} reused=${stats.reused} compressed=${total} orig=${stats.originalTokens} comp=${stats.compressedTokens} saved=${savedPct}%${images} took=${Date.now() - startedAt}ms`,
-    )
+    log.info("turn", {
+      messages: messages.length,
+      window: lastCompressibleIndex + 1,
+      created: stats.created,
+      reused: stats.reused,
+      compressed: total,
+      orig: stats.originalTokens,
+      comp: stats.compressedTokens,
+      savedPct,
+      images: stats.imagesResized,
+      tookMs: Date.now() - startedAt,
+    })
   }
 }

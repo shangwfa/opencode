@@ -1,3 +1,4 @@
+import * as Log from "@opencode-ai/core/util/log"
 import { NotFoundError } from "@/storage/storage"
 import { eq } from "drizzle-orm"
 import { and } from "drizzle-orm"
@@ -70,7 +71,7 @@ function toSyncDefinition<D extends EventV2.Definition>(def: D): SyncEvent.Defin
   }
 }
 
-const log = { warn: (...args: unknown[]) => console.warn("[session.projector]", ...args) }
+const log = Log.create({ service: "session.projector" })
 
 function foreign(err: unknown) {
   if (typeof err !== "object" || err === null) return false

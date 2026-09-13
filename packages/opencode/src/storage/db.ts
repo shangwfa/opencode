@@ -1,3 +1,4 @@
+import * as Log from "@opencode-ai/core/util/log"
 import { type SQLiteBunDatabase } from "drizzle-orm/bun-sqlite"
 import { migrate } from "drizzle-orm/bun-sqlite/migrator"
 import { type SQLiteTransaction } from "drizzle-orm/sqlite-core"
@@ -23,11 +24,7 @@ export const NotFoundError = NamedError.create("NotFoundError", {
   message: Schema.String,
 })
 
-const log = {
-  info(message: string, extra?: Record<string, unknown>) {
-    console.log(`[db] ${message}`, extra ?? "")
-  },
-}
+const log = Log.create({ service: "db" })
 
 export type Dialect = "sqlite" | "pg"
 

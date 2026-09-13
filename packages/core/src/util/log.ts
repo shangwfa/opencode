@@ -3,6 +3,7 @@ export * as Log from "./log"
 import path from "path"
 import fs from "fs/promises"
 import { createWriteStream } from "fs"
+import { trace } from "@opentelemetry/api"
 import * as Global from "../global"
 import { Schema } from "effect"
 import { Glob } from "./glob"
@@ -103,41 +104,37 @@ async function cleanup(dir: string) {
 }
 
 function formatError(error: Error, depth = 0): string {
-  const result = error.message
+  // Keep the stack on a single line so one log entry stays one line.
+  const result = (error.stack ?? error.message).replaceAll("\n", "\\n")
   return error.cause instanceof Error && depth < 10
     ? result + " Caused by: " + formatError(error.cause, depth + 1)
     : result
 }
 
-let last = Date.now()
 export function create(tags?: Record<string, any>) {
   tags = tags || {}
 
-  const service = tags["service"]
-  if (service && typeof service === "string") {
-    const cached = loggers.get(service)
-    if (cached) {
-      return cached
-    }
+  const cacheKey = JSON.stringify(tags)
+  const cached = loggers.get(cacheKey)
+  if (cached) {
+    return cached
   }
 
   function build(message: any, extra?: Record<string, any>) {
-    const prefix = Object.entries({
-      ...tags,
-      ...extra,
-    })
+    const fields: Record<string, any> = { ...tags, ...extra }
+    const traceId = trace.getActiveSpan()?.spanContext().traceId
+    if (traceId) fields["trace_id"] = traceId
+    const prefix = Object.entries(fields)
       .filter(([_, value]) => value !== undefined && value !== null)
       .map(([key, value]) => {
         const prefix = `${key}=`
         if (value instanceof Error) return prefix + formatError(value)
         if (typeof value === "object") return prefix + JSON.stringify(value)
+        if (typeof value === "string") return prefix + (/^[^\s="]+$/.test(value) ? value : JSON.stringify(value))
         return prefix + value
       })
       .join(" ")
-    const next = new Date()
-    const diff = next.getTime() - last
-    last = next.getTime()
-    return [next.toISOString().split(".")[0], "+" + diff + "ms", prefix, message].filter(Boolean).join(" ") + "\n"
+    return [new Date().toISOString(), prefix, message].filter(Boolean).join(" ") + "\n"
   }
   const result: Logger = {
     debug(message?: any, extra?: Record<string, any>) {
@@ -161,8 +158,7 @@ export function create(tags?: Record<string, any>) {
       }
     },
     tag(key: string, value: string) {
-      if (tags) tags[key] = value
-      return result
+      return create({ ...tags, [key]: value })
     },
     clone() {
       return create({ ...tags })
@@ -186,9 +182,7 @@ export function create(tags?: Record<string, any>) {
     },
   }
 
-  if (service && typeof service === "string") {
-    loggers.set(service, result)
-  }
+  loggers.set(cacheKey, result)
 
   return result
 }
