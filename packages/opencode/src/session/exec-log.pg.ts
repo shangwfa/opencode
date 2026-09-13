@@ -4,6 +4,7 @@ import { SessionTable } from "./session.pg"
 import type { SessionID } from "./schema"
 import * as Database from "../storage/db"
 import { Log } from "@opencode-ai/core/util/log"
+import { trace } from "@opentelemetry/api"
 import { eq, desc } from "drizzle-orm"
 
 const log = Log.create({ service: "exec-log" })
@@ -89,6 +90,7 @@ export const ExecLogTable = pgTable(
     stderr: text(),
     error: text(),
     rule: text(),
+    trace_id: text(),
     source: text().$type<ExecLogSource>().notNull(),
     time_started: bigint({ mode: "number" }).notNull(),
     time_finished: bigint({ mode: "number" }),
@@ -102,7 +104,9 @@ export type NewExecLog = typeof ExecLogTable.$inferInsert
 
 export async function insertExecLog(row: NewExecLog) {
   try {
-    await Database.use((db) => db.insert(ExecLogTable).values(row))
+    await Database.use((db) =>
+      db.insert(ExecLogTable).values({ ...row, trace_id: row.trace_id ?? currentTraceId() }),
+    )
   } catch (error) {
     log.error("failed to insert exec log", {
       id: row.id,
@@ -111,6 +115,12 @@ export async function insertExecLog(row: NewExecLog) {
       error,
     })
   }
+}
+
+// Correlates an audit row with the distributed trace it happened in. Empty when
+// no OTLP exporter is configured or the write is outside a traced span.
+export function currentTraceId() {
+  return trace.getActiveSpan()?.spanContext().traceId
 }
 
 export async function updateExecLog(id: string, patch: Partial<NewExecLog>) {

@@ -14,6 +14,7 @@ import { SandboxTable } from "./sandbox.pg"
 import { SessionSnapshot } from "./session-snapshot"
 import { SnapshotOperation, LEASE_MS, type SnapshotOperationRow } from "./snapshot-operation"
 import { ExecLogTable } from "../session/exec-log"
+import { Metrics } from "@/observability/metrics"
 
 export namespace SandboxConfig {
   export interface Interface {
@@ -1523,6 +1524,7 @@ export namespace SandboxProvider {
                 .run(),
             catch: () => null,
           }).pipe(Effect.catchCause(() => Effect.void))
+          yield* Metrics.recordSandboxEvent(created.restoredFromSnapshot ? "restore" : "create")
           const host = `http://${config.domain}`
           // 远程创建期间 keepAlive 可能已并发设置（async 场景），upsert 前重新读取
           // latest 的 keep_alive，避免用创建前的快照覆盖掉刚设置的 keepAlive。
@@ -1594,6 +1596,7 @@ export namespace SandboxProvider {
               ),
             ),
           )
+          yield* Metrics.recordSandboxEvent("kill")
           yield* dbMarkDestroyed(sessionID, sb.id)
           log.info("sandbox destroyed", { sessionID })
         }).pipe(Effect.withSpan("SandboxProvider.destroySandbox"))
@@ -2433,6 +2436,7 @@ export namespace SandboxProvider {
                     return Effect.void
                   }))
                   if (action.kind === "oom") {
+                    yield* Metrics.recordSandboxEvent("oom")
                     log.warn("sandbox OOM detected", {
                       sessionID: row.session_id,
                       sandboxID: row.id,

@@ -5,7 +5,7 @@ import fs from "fs/promises"
 import os from "os"
 import path from "path"
 import { fileLogger } from "../../src/observability/logging"
-import { resource } from "../../src/observability/otlp"
+import { resource, observabilityLayer, loggers } from "../../src/observability/otlp"
 
 const otelResourceAttributes = process.env.OTEL_RESOURCE_ATTRIBUTES
 const opencodeClient = process.env.OPENCODE_CLIENT
@@ -18,8 +18,7 @@ afterEach(() => {
   else process.env.OPENCODE_CLIENT = opencodeClient
 })
 
-describe("resource", () => {
-  test("parses and decodes OTEL resource attributes", () => {
+describe("resource", () => {  test("parses and decodes OTEL resource attributes", () => {
     process.env.OTEL_RESOURCE_ATTRIBUTES =
       "service.namespace=anomalyco,team=platform%2Cobservability,label=hello%3Dworld,key%2Fname=value%20here"
 
@@ -106,4 +105,28 @@ test("file logger flattens nested objects", async () => {
   expect(line).toContain('tags="[\\\"api\\\",\\\"test\\\"]"')
   expect(line).toContain("session.id=session-1")
   expect(line).not.toContain("request={")
+})
+
+const otlpEndpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT
+
+describe.skipIf(!!otlpEndpoint)("otlp export disabled without endpoint", () => {
+  test("observabilityLayer is a no-op layer", async () => {
+    expect(await observabilityLayer()).toBe(Layer.empty)
+  })
+
+  test("no otlp loggers are registered", () => {
+    expect(loggers()).toEqual([])
+  })
+})
+
+test("observabilityLayer assembles tracer and metrics when an endpoint is provided", async () => {
+  const layer = await observabilityLayer({ endpoint: "http://127.0.0.1:4318", headers: {} })
+  expect(layer).not.toBe(Layer.empty)
+  // Build and immediately release: nothing is exported within this window, but
+  // assembling the tracer provider + metric reader must not throw.
+  await Effect.runPromise(Effect.scoped(Layer.build(layer)))
+})
+
+test("loggers honor an explicit endpoint", () => {
+  expect(loggers({ endpoint: "http://127.0.0.1:4318", headers: {} })).toHaveLength(1)
 })

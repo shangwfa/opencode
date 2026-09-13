@@ -6,16 +6,19 @@ import { runID } from "./shared"
 
 const endpoint = Flag.OTEL_EXPORTER_OTLP_ENDPOINT
 
-const headers = Flag.OTEL_EXPORTER_OTLP_HEADERS
-  ? Flag.OTEL_EXPORTER_OTLP_HEADERS.split(",").reduce(
-      (acc, entry) => {
-        const [key, ...value] = entry.split("=")
-        acc[key] = value.join("=")
-        return acc
-      },
-      {} as Record<string, string>,
-    )
-  : undefined
+function parseHeaders(value: string | undefined): Record<string, string> | undefined {
+  if (!value) return undefined
+  return value.split(",").reduce(
+    (acc, entry) => {
+      const [key, ...rest] = entry.split("=")
+      acc[key] = rest.join("=")
+      return acc
+    },
+    {} as Record<string, string>,
+  )
+}
+
+const headers = parseHeaders(Flag.OTEL_EXPORTER_OTLP_HEADERS)
 
 function resourceAttributes() {
   const value = process.env.OTEL_RESOURCE_ATTRIBUTES
@@ -47,16 +50,25 @@ export function resource(): { serviceName: string; serviceVersion: string; attri
   }
 }
 
-export function loggers() {
-  if (!endpoint) return []
-  return [OtlpLogger.make({ url: `${endpoint}/v1/logs`, resource: resource(), headers })]
+export function loggers(options?: { endpoint?: string; headers?: Record<string, string> }) {
+  const url = options?.endpoint ?? endpoint
+  if (!url) return []
+  return [OtlpLogger.make({ url: `${url}/v1/logs`, resource: resource(), headers: options?.headers ?? headers })]
 }
 
-export async function tracingLayer() {
-  if (!endpoint) return Layer.empty
+export async function observabilityLayer(options?: {
+  endpoint?: string
+  headers?: Record<string, string>
+  metricExportIntervalMillis?: number
+}) {
+  const url = options?.endpoint ?? endpoint
+  if (!url) return Layer.empty
+  const exporterHeaders = options?.headers ?? headers
   const NodeSdk = await import("@effect/opentelemetry/NodeSdk")
   const OTLP = await import("@opentelemetry/exporter-trace-otlp-http")
+  const OtlpMetrics = await import("@opentelemetry/exporter-metrics-otlp-http")
   const SdkBase = await import("@opentelemetry/sdk-trace-base")
+  const SdkMetrics = await import("@opentelemetry/sdk-metrics")
   const { AsyncLocalStorageContextManager } = await import("@opentelemetry/context-async-hooks")
   const { context } = await import("@opentelemetry/api")
 
@@ -65,14 +77,33 @@ export async function tracingLayer() {
   manager.enable()
   context.setGlobalContextManager(manager)
 
+  // Opt-in head sampling: `OTEL_TRACES_SAMPLER_ARG` as a ratio in [0, 1).
+  // Defaults to unsampled (always-on) via the SDK default when unset.
+  const sampleRatio = Number(process.env.OTEL_TRACES_SAMPLER_ARG)
+  const sampled = Number.isFinite(sampleRatio) && sampleRatio >= 0 && sampleRatio < 1
+
   return NodeSdk.layer(() => ({
     resource: resource(),
     spanProcessor: new SdkBase.BatchSpanProcessor(
       new OTLP.OTLPTraceExporter({
-        url: `${endpoint}/v1/traces`,
-        headers,
+        url: `${url}/v1/traces`,
+        headers: exporterHeaders,
       }),
     ),
+    ...(sampled
+      ? {
+          tracerConfig: {
+            sampler: new SdkBase.ParentBasedSampler({ root: new SdkBase.TraceIdRatioBasedSampler(sampleRatio) }),
+          },
+        }
+      : {}),
+    metricReader: new SdkMetrics.PeriodicExportingMetricReader({
+      exporter: new OtlpMetrics.OTLPMetricExporter({
+        url: `${url}/v1/metrics`,
+        headers: exporterHeaders,
+      }),
+      exportIntervalMillis: options?.metricExportIntervalMillis ?? 15_000,
+    }),
   }))
 }
 

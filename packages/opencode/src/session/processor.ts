@@ -28,6 +28,7 @@ import { SessionPluginRuntime } from "@/plugin/session-plugin-runtime"
 import { Tool } from "@/tool/tool"
 import { ToolAttachment } from "@/tool/attachment"
 import { transitionRunningTool } from "./mark-timed-out"
+import { Metrics } from "@/observability/metrics"
 
 // Partial tool arguments stream to live listeners as message.part.delta (field
 // "raw"). The deltas are throttled batches of the LLM-generated argument JSON;
@@ -488,6 +489,7 @@ const layer = Layer.effect(
               usage: value.usage ?? new Usage({}),
               metadata: value.providerMetadata,
             })
+            yield* Metrics.recordTokenUsage(usage.tokens, { provider: ctx.model.providerID, model: ctx.model.id })
             ctx.assistantMessage.finish = value.reason
             ctx.assistantMessage.cost += usage.cost
             ctx.assistantMessage.tokens = usage.tokens

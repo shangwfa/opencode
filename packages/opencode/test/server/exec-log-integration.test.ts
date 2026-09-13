@@ -1,10 +1,12 @@
 import { afterEach, beforeAll, describe, expect, test } from "bun:test"
 import { Cause, Effect, Exit } from "effect"
+import { context, trace, TraceFlags } from "@opentelemetry/api"
+import { AsyncLocalStorageContextManager } from "@opentelemetry/context-async-hooks"
 import { Database, eq } from "../../src/storage/db"
 import { provideTestInstance, disposeAllInstances, tmpdir } from "../fixture/fixture"
 import { Server } from "../../src/server/server"
 import { Log } from "@opencode-ai/core/util/log"
-import { ExecLogTable, queryExecLogsBySession } from "../../src/session/exec-log"
+import { ExecLogTable, currentTraceId, insertExecLog, queryExecLogsBySession } from "../../src/session/exec-log"
 import { SessionTable } from "../../src/session/session.pg"
 import { AppRuntime } from "../../src/effect/app-runtime"
 import { InstanceRef } from "../../src/effect/instance-ref"
@@ -292,6 +294,112 @@ describe.skipIf(!enabled)("session exec_log integration (PG)", () => {
     })
   })
 
+  test("insertExecLog persists the active trace id and defaults to null", async () => {
+    await using tmp = await tmpdir({ git: true })
+    await provideTestInstance({
+      directory: tmp.path,
+      fn: async () => {
+        const app = Server.Default().app
+        const sid = ((await (await app.request("/session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title: "exec-log-trace" }),
+        })).json()) as { id: string }).id
+
+        const spanContext = {
+          traceId: "0af7651916cd43dd8448eb211c80319c",
+          spanId: "b7ad6b7169203331",
+          traceFlags: TraceFlags.SAMPLED,
+        }
+        const span = trace.wrapSpanContext(spanContext)
+        const tracedId = `trace-test-${Date.now()}`
+        const untracedId = `trace-none-${Date.now()}`
+
+        context.setGlobalContextManager(new AsyncLocalStorageContextManager())
+        try {
+          await context.with(trace.setSpan(context.active(), span), () =>
+            insertExecLog({
+              id: tracedId,
+              session_id: sid as any,
+              command: "{}",
+              status: "completed",
+              source: "exec",
+              time_started: Date.now(),
+              time_finished: Date.now(),
+            }),
+          )
+        } finally {
+          context.disable()
+        }
+        await insertExecLog({
+          id: untracedId,
+          session_id: sid as any,
+          command: "{}",
+          status: "completed",
+          source: "exec",
+          time_started: Date.now(),
+          time_finished: Date.now(),
+        })
+
+        const logs = await queryLogs(sid)
+        expect(logs.find((l) => l.id === tracedId)?.trace_id).toBe(spanContext.traceId)
+        expect(logs.find((l) => l.id === untracedId)?.trace_id ?? null).toBeNull()
+
+        await cleanupSession(sid)
+      },
+    })
+  })
+
+  test("permission deny audit carries the active trace id", async () => {
+    await using tmp = await tmpdir({ git: true })
+    await provideTestInstance({
+      directory: tmp.path,
+      fn: async (ctx) => {
+        const app = Server.Default().app
+        const sid = ((await (await app.request("/session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title: "exec-log-perm-trace" }),
+        })).json()) as { id: string }).id
+
+        const spanContext = {
+          traceId: "0af7651916cd43dd8448eb211c80319c",
+          spanId: "b7ad6b7169203331",
+          traceFlags: TraceFlags.SAMPLED,
+        }
+        const span = trace.wrapSpanContext(spanContext)
+
+        context.setGlobalContextManager(new AsyncLocalStorageContextManager())
+        try {
+          const exit = await context.with(trace.setSpan(context.active(), span), () =>
+            AppRuntime.runPromiseExit(
+              Effect.gen(function* () {
+                const permission = yield* Permission.Service
+                yield* permission.ask({
+                  sessionID: sid as any,
+                  permission: "bash",
+                  patterns: ["rm -rf *"],
+                  metadata: { input: { command: "rm -rf /tmp/x" } },
+                  always: [],
+                  ruleset: [{ permission: "bash", pattern: "rm -rf *", action: "deny" }],
+                })
+              }).pipe(Effect.provideService(InstanceRef, ctx)),
+            ),
+          )
+          expect(Exit.isFailure(exit)).toBe(true)
+        } finally {
+          context.disable()
+        }
+
+        const logs = await queryLogs(sid)
+        const denied = logs.find((l) => l.source === "permission-deny")
+        expect(denied?.trace_id).toBe(spanContext.traceId)
+
+        await cleanupSession(sid)
+      },
+    })
+  })
+
   test("concurrent permission denies in the same millisecond all get distinct rows", async () => {
     await using tmp = await tmpdir({ git: true })
     await provideTestInstance({
@@ -558,4 +666,22 @@ describe.skipIf(!enabled)("session exec_log integration (PG)", () => {
       },
     })
   })
+})
+
+test("currentTraceId reads the active OpenTelemetry span", () => {
+  // Trace propagation only works once a global context manager is installed,
+  // which production does when an OTLP endpoint is configured.
+  context.setGlobalContextManager(new AsyncLocalStorageContextManager())
+  try {
+    const spanContext = {
+      traceId: "0af7651916cd43dd8448eb211c80319c",
+      spanId: "b7ad6b7169203331",
+      traceFlags: TraceFlags.SAMPLED,
+    }
+    const span = trace.wrapSpanContext(spanContext)
+    const id = context.with(trace.setSpan(context.active(), span), () => currentTraceId())
+    expect(id).toBe(spanContext.traceId)
+  } finally {
+    context.disable()
+  }
 })

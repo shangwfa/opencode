@@ -3,12 +3,13 @@ import "./init-projectors"
 import { NodeHttpServer } from "@effect/platform-node"
 import { AppNodeBuilder } from "@opencode-ai/core/effect/app-node-builder"
 import { ConfigProvider, Context, Effect, Exit, Layer, Scope } from "effect"
-import { HttpRouter, HttpServer } from "effect/unstable/http"
+import { HttpMiddleware, HttpRouter, HttpServer } from "effect/unstable/http"
 import { OpenApi } from "effect/unstable/httpapi"
 import { createServer } from "node:http"
 import { MDNS } from "./mdns"
 import { HttpApiApp } from "./routes/instance/httpapi/server"
 import { disposeMiddleware } from "./routes/instance/httpapi/lifecycle"
+import { httpMetricsMiddleware } from "./http-metrics"
 import { WebSocketTracker } from "./routes/instance/httpapi/websocket-tracker"
 import { PublicApi } from "./routes/instance/httpapi/public"
 import type { CorsOptions } from "./cors"
@@ -100,7 +101,7 @@ const listenEffect: (opts: ListenOptions) => Effect.Effect<EffectListener, unkno
 
 function listenerLayer(opts: ListenOptions, port: number) {
   return HttpRouter.serve(HttpApiApp.createRoutes(opts), {
-    middleware: disposeMiddleware,
+    middleware: HttpMiddleware.make((effect) => httpMetricsMiddleware(disposeMiddleware(effect))),
     disableLogger: true,
     disableListenLog: true,
   }).pipe(
