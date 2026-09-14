@@ -29,6 +29,8 @@ export namespace SandboxConfig {
     readonly pvcClaimName: string
     readonly snapshotTtlMs: number
     readonly snapshotWaitMs: number
+    /** 远端快照物理删除开关，缺省关闭（TTL GC / superseded / 会话删除联动均不删）。 */
+    readonly snapshotDeleteEnabled?: boolean
     readonly idleKillMs: number
     readonly idleReapMs: number
     readonly idleReapIntervalMs: number
@@ -53,6 +55,7 @@ export namespace SandboxConfig {
     pvcClaimName: Flag.OPENCODE_SANDBOX_PVC_CLAIM,
     snapshotTtlMs: Flag.OPENCODE_SANDBOX_SNAPSHOT_TTL_SEC * 1000,
     snapshotWaitMs: Flag.OPENCODE_SANDBOX_SNAPSHOT_WAIT_SEC * 1000,
+    snapshotDeleteEnabled: Flag.OPENCODE_SANDBOX_SNAPSHOT_DELETE_ENABLED,
     idleKillMs: Flag.OPENCODE_SANDBOX_IDLE_KILL_SEC * 1000,
     idleReapMs: Flag.OPENCODE_SANDBOX_IDLE_REAP_SEC * 1000,
     idleReapIntervalMs: 300_000,
@@ -1037,6 +1040,7 @@ export namespace SandboxProvider {
         connectionConfig,
         ttlMs: config.snapshotTtlMs,
         waitMs: config.snapshotWaitMs,
+        deleteEnabled: config.snapshotDeleteEnabled,
       })
       // 快照编排操作队列：kill/回收先把操作落库，再由 worker 凭租约领取执行（进程崩溃可被接管）
       const snapshotOps = SnapshotOperation.create(pgDb)

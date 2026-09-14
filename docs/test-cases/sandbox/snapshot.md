@@ -11,6 +11,9 @@
 #   OPENCODE_SANDBOX_VOLUME_TYPE=snapshot        workspace 走 rootfs，仅挂 shared package-cache
 #   OPENCODE_SANDBOX_SNAPSHOT_ENABLED=true       启用快照（idle 回收前快照、创建时恢复）
 #   OPENCODE_SANDBOX_SNAPSHOT_WAIT_SEC=300       快照 Ready 等待上限
+#   OPENCODE_SANDBOX_SNAPSHOT_DELETE_ENABLED=1   远端快照物理删除开关（默认关闭！）：
+#                                                T25.5/T25.6/T25.18 等删除类用例必须显式开启，
+#                                                关闭时 TTL GC/superseded/会话删除联动均不删（防共享 PG 误删）
 #   OPENCODE_SANDBOX_IDLE_REAP_SEC=60            （测试用）缩短 idle 回收阈值
 #   OPENCODE_SANDBOX_SNAPSHOT_IMAGE=<ref>        快照模式冷启动/降级镜像（默认 mini v1.0.0；
 #                                                默认 pvc 模式仍用 OPENCODE_SANDBOX_IMAGE 原镜像）

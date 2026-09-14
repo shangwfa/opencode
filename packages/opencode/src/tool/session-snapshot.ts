@@ -9,6 +9,8 @@ export type SnapshotDeps = {
   readonly connectionConfig: ConnectionConfig
   readonly ttlMs: number
   readonly waitMs: number
+  /** 远端快照物理删除开关（默认关闭）：关闭时 TTL GC / superseded / 会话删除联动只保留不删除，由远端 TTL 兜底回收。 */
+  readonly deleteEnabled?: boolean
 }
 
 export type SnapshotRow = typeof SessionSnapshotTable.$inferSelect
@@ -222,7 +224,7 @@ export namespace SessionSnapshot {
           return info.id
         })
       } catch (e) {
-        if (createdId) await manager.deleteSnapshot(createdId).catch(() => undefined)
+        if (createdId && deps.deleteEnabled) await manager.deleteSnapshot(createdId).catch(() => undefined)
         log.warn("createSnapshot failed", { sessionID, error: String(e) })
         return null
       }
@@ -309,6 +311,10 @@ export namespace SessionSnapshot {
     }
 
     async function deleteSnapshot(row: SnapshotRow, reason: string) {
+      if (!deps.deleteEnabled) {
+        log.debug("snapshot delete skipped (disabled)", { snapshotId: row.id, sessionID: row.session_id, reason })
+        return
+      }
       if (row.state !== "deleting") {
         const claimed = await setState(row.id, "deleting", reason, ["creating", "ready", "stale", "failed"])
         if (!claimed) return
@@ -331,18 +337,21 @@ export namespace SessionSnapshot {
      */
     async function gc(): Promise<void> {
       const now = Date.now()
-      const expired: SnapshotRow[] = await deps.pgDb
-        .select()
-        .from(SessionSnapshotTable)
-        .where(or(
-          eq(SessionSnapshotTable.state, "deleting"),
-          and(
-            inArray(SessionSnapshotTable.state, ["ready", "stale", "failed"]),
-            lt(SessionSnapshotTable.time_created, now - deps.ttlMs),
-          ),
-        ))
-        .limit(50)
-        .all()
+      // 删除开关关闭时跳过 TTL/deleting 删除扫描（防共享 PG 误删）；creating 对账保留（只修正状态，不删远端）
+      const expired: SnapshotRow[] = deps.deleteEnabled
+        ? await deps.pgDb
+            .select()
+            .from(SessionSnapshotTable)
+            .where(or(
+              eq(SessionSnapshotTable.state, "deleting"),
+              and(
+                inArray(SessionSnapshotTable.state, ["ready", "stale", "failed"]),
+                lt(SessionSnapshotTable.time_created, now - deps.ttlMs),
+              ),
+            ))
+            .limit(50)
+            .all()
+        : []
       for (const row of expired) {
         await deleteSnapshot(row, row.state === "deleting" ? row.reason ?? "delete retry" : "ttl expired")
         log.info("snapshot gc", { snapshotId: row.id, sessionID: row.session_id })
@@ -425,8 +434,18 @@ export namespace SessionSnapshot {
       }
     }
 
-    /** 会话删除联动：清理该会话全部快照记录与远端快照。 */
+    /** 会话删除联动：清理该会话全部快照记录与远端快照。删除开关关闭时仅提示保留，不物理删除。 */
     async function deleteAllForSession(sessionID: string): Promise<void> {
+      if (!deps.deleteEnabled) {
+        const rows: SnapshotRow[] = await deps.pgDb
+          .select()
+          .from(SessionSnapshotTable)
+          .where(eq(SessionSnapshotTable.session_id, sessionID))
+          .all()
+        const kept = rows.filter((row) => row.state !== "deleted").length
+        if (kept > 0) log.info("snapshot delete skipped (disabled); snapshots kept for deleted session", { sessionID, kept })
+        return
+      }
       const rows: SnapshotRow[] = await deps.pgDb
         .select()
         .from(SessionSnapshotTable)
