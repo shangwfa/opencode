@@ -136,6 +136,7 @@ const layer = Layer.effect(
               const entry = value.pending.get(row.id as PermissionV1.ID)
               if (entry === undefined) continue
               value.pending.delete(row.id as PermissionV1.ID)
+              ;(yield* Effect.currentSpan).attribute("hitl.remote_consumed", 1)
               const reply = row.result?.["reply"]
               if (row.status === "replied" && (reply === "once" || reply === "always")) {
                 if (reply === "always") {

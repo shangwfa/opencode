@@ -136,8 +136,11 @@ export interface SweepStats {
 }
 
 // 单个 kind 的完整清扫：死实例 pending → closed；已决未消费 → part 善后 + 归档；顺带 retention。
+// span attributes 对齐 watchdog 风格（hitl.swept_pending/answered_backfilled/archived_final/duration_ms）。
 export const sweepKind = (events: EventV2Bridge.Service["Service"], kind: HitlStore.Kind, directory: string) =>
   Effect.gen(function* () {
+    const t0 = Date.now()
+    const span = yield* Effect.currentSpan
     let sweptPending = 0
     let answeredBackfilled = 0
     let archivedFinal = 0
@@ -226,6 +229,12 @@ export const sweepKind = (events: EventV2Bridge.Service["Service"], kind: HitlSt
       try: () => HitlStore.retention(directory),
       catch: (error) => new Error(`hitl retention failed: ${String(error)}`),
     }).pipe(Effect.catchCause((cause) => Effect.logError("hitl retention failed", { cause: String(cause) })))
+
+    span.attribute("hitl.kind", kind)
+    span.attribute("hitl.swept_pending", sweptPending)
+    span.attribute("hitl.answered_backfilled", answeredBackfilled)
+    span.attribute("hitl.archived_final", archivedFinal)
+    span.attribute("hitl.duration_ms", Date.now() - t0)
 
     return { sweptPending, answeredBackfilled, archivedFinal } satisfies SweepStats
   })

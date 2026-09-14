@@ -106,6 +106,7 @@ const layer = Layer.effect(
               const entry = value.pending.get(row.id as QuestionID)
               if (entry === undefined) continue
               value.pending.delete(row.id as QuestionID)
+              ;(yield* Effect.currentSpan).attribute("hitl.remote_consumed", 1)
               if (row.status === "replied") {
                 const answers = Array.isArray(row.result?.["answers"])
                   ? (row.result["answers"] as unknown as ReadonlyArray<Answer>)

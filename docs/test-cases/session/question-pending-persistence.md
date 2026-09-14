@@ -282,18 +282,27 @@ curl -s -o /dev/null -w "%{http_code}\n" -X POST "$BASE2/question/$QID/reply" \
 
 | 用例 | 触发动作 | 修复后验收标准 | 当前状态（缺陷） |
 |------|---------|--------------|----------------|
-| T1.1 异步触发 question | prompt_async + 轮询 | pending=1，sessionID 正确 | —（基线，应 PASS） |
-| T1.2 pending 内容 | GET /question | id/session/questions 完整 | —（基线，应 PASS） |
-| T1.3 正常 reply 链路 | reply + 轮询 run | run 完成，答案回填，pending 归零 | —（基线，应 PASS） |
-| T2.1 重启后清空 | docker restart | pending 保留可恢复 | FAIL：清空 |
-| T2.2 reply 404 | reply/reject 旧 ID | 200 或明确状态语义 | FAIL：404 |
-| T2.3 PG 无载体 | information_schema / event | 有持久化载体 | FAIL：状态表与事件均不落 PG |
-| T2.4 run 悬死 | 消息树 + run 状态 | 明确语义收场 | FAIL：等 stale 接管 30min |
-| T2.5 answered-lost 回填 | reply + restart + 补发消息 | 答案回填 part，LLM 可复述 | FAIL：答案丢失 |
-| T3.1 permission ask | bash ask 规则 + rm | pending=1 | —（基线，应 PASS） |
-| T3.2 重启后 404/always 丢 | restart + reply | 可达 / always 持久化 | FAIL：404 + always 丢 |
-| T4.1 多实例 reply（可选） | 双容器共享 PG | 跨实例路由成功 | FAIL：404 |
+| T1.1 异步触发 question | prompt_async + 轮询 | pending=1，sessionID 正确 | ✅ PASS（2026-09-14 复测） |
+| T1.2 pending 内容 | GET /question | id/session/questions 完整 | ✅ PASS（2026-09-14 复测） |
+| T1.3 正常 reply 链路 | reply + 轮询 run | run 完成，答案回填，pending 归零 | ✅ PASS（链路由 T4.1 完整覆盖：reply → 回填 → run 完成） |
+| T2.1 重启后清空 | docker restart | pending 保留可恢复 | ✅ PASS：重启后 pending=1 且 ID 一致 |
+| T2.2 reply 404 | reply/reject 旧 ID | 200 或明确状态语义 | ✅ PASS：reply 200（PG 落 replied）；随后 reject 返回 **409 冲突**（胜者结果不被覆盖，见 §4.10） |
+| T2.3 PG 无载体 | information_schema / event | 有持久化载体 | ✅ PASS：`hitl_request` 表，pending 行含 kind/status/directory/payload |
+| T2.4 run 悬死 | 消息树 + run 状态 | 明确语义收场 | ✅ PASS：重启后 part 悬空（running），由**租约清扫**自动收场（~2min），不再等 stale-run 30min |
+| T2.5 answered-lost 回填 | reply + restart + 补发消息 | 答案回填 part，LLM 可复述 | ✅ PASS：part → completed `output="User answered: 继续"`；补发消息 LLM 复述「继续」 |
+| T3.1 permission ask | bash ask 规则 + rm | pending=1 | ✅ PASS（permission=bash、pattern 命中、sessionID 正确） |
+| T3.2 重启后 404/always 丢 | restart + reply | 可达 / always 持久化 | ✅ PASS：重启后 pending 保留、reply 200；`always` 落 `session.permission`（`rm *→allow`），重启后同 pattern 触发 **0 次新 ask** |
+| T4.1 多实例 reply（可选） | 双容器共享 PG | 跨实例路由成功 | ✅ PASS：实例 B reply 实例 A 的 question → 200，A 轮询消费（pending 清零）→ run 恢复，答案回填，assistant 正常回复 |
 
 ---
 
-> 复测记录：待首测。本文档为缺陷钉住型用例——T2/T3/T4 系列在修复前**预期 FAIL**，FAIL 即缺陷复现成功；修复后按「修复后验收标准」列复测并回填。
+> **复测记录（2026-09-14，全部 PASS，P1 验收关闭）**
+>
+> 环境：组合 3 变体——本地 PG（`postgresql://local@host.docker.internal:15432/opencode`）+ 远端 K8s 沙箱（`host.docker.internal:30040`）；镜像 `opencode-saas-sandbox-test:hitl-d83a45a4dd`（commit `d83a45a4dd`）；双容器 14096（实例 A）/ 14097（实例 B）共享同一 PG；模型 `Yd-DeepSeek/deepseek-v4-flash`。
+>
+> 修复提交：`05da6cf815`（P1 初版）→ `4787c2e021`（跨实例一致性/清扫顺序/隔离硬化）→ `6af42b6c08`（jsonb 字符串/幂等键序/ask 竞态修复 + PG 单测 35 例）。
+>
+> 补充语义（与原用例书的差异，均为设计文档 §4.10 的放宽/收紧）：
+> - 已 replied 后的**不同决策**提交（如先 reply 再 reject）返回 **409 Conflict**（`ConflictError`，message 注明当前状态），而非 200——防止迟到提交覆盖胜者结果
+> - T2.4 的收场方从「等待 stale-run 接管」提前为「存活实例的租约清扫」（~120s 内：租约 60s + grace 30s + 扫描周期 30s）
+> - answered-lost 的答案回填文案为 `User answered: <答案>`（question）/ `User approved (once|always)`（permission）
