@@ -51,7 +51,8 @@ const server = Bun.serve({
 })
 
 const connectionConfig = new ConnectionConfig({ domain: server.url.host, protocol: "http" })
-const make = () => SessionSnapshot.create({ pgDb: db, connectionConfig, ttlMs: 1, waitMs: 12_000 })
+const make = (overrides?: { deleteEnabled?: boolean }) =>
+  SessionSnapshot.create({ pgDb: db, connectionConfig, ttlMs: 1, waitMs: 12_000, deleteEnabled: overrides?.deleteEnabled ?? true })
 const sandbox = { id: "sb-snapshot-test" } as Sandbox
 
 async function cleanup() {
@@ -177,6 +178,32 @@ describe.skipIf(!enabled)("SessionSnapshot PG state machine", () => {
     const row = (await db.select().from(SessionSnapshotTable).where(eq(SessionSnapshotTable.id, id!)).all())[0]
     expect(row.state).toBe("failed")
     expect(row.reason).toContain("incompatible")
+  })
+
+  test("delete disabled keeps snapshots (gc + session delete no-op)", async () => {
+    const sessionID = "ses_snapshot_test_disabled"
+    const enabled = make()
+    const id = await enabled.startSnapshot(sandbox, sessionID)
+    expect(id).toBeTruthy()
+    states.set(id!, "Ready")
+    expect(await enabled.awaitSnapshot(sessionID, id!)).toBe("ready")
+
+    const disabled = make({ deleteEnabled: false })
+    // TTL 已过期（ttlMs=1）也不删
+    await disabled.gc()
+    let row = (await db.select().from(SessionSnapshotTable).where(eq(SessionSnapshotTable.id, id!)).all())[0]
+    expect(row.state).toBe("ready")
+
+    // 会话删除联动不删，状态保持
+    await disabled.deleteAllForSession(sessionID)
+    row = (await db.select().from(SessionSnapshotTable).where(eq(SessionSnapshotTable.id, id!)).all())[0]
+    expect(row.state).toBe("ready")
+    expect((await disabled.getLatest(sessionID))?.id).toBe(id!)
+
+    // 开关开启后同一轮 gc 收敛删除
+    await enabled.gc()
+    row = (await db.select().from(SessionSnapshotTable).where(eq(SessionSnapshotTable.id, id!)).all())[0]
+    expect(row.state).toBe("deleted")
   })
 
   test("stats 聚合快照状态分布与 GC backlog", async () => {
