@@ -55,7 +55,33 @@ export interface TransitionOutcome {
 
 const databaseNow = () => sql<number>`(extract(epoch from clock_timestamp()) * 1000)::bigint`
 
-const rowify = (item: typeof HitlRequestTable.$inferSelect): Row => item as Row
+// The PG bridge returns json/jsonb columns as raw strings (postgres.js jsonb
+// parse is identity so SQLite text-json decoders can do the parsing), but
+// drizzle's pg jsonb columns have no string decoder — so decode here.
+const parseJson = <T>(value: unknown, fallback: T): T => {
+  if (typeof value !== "string") return (value === null || value === undefined ? fallback : value) as T
+  try {
+    return JSON.parse(value) as T
+  } catch {
+    return fallback
+  }
+}
+
+const rowify = (item: typeof HitlRequestTable.$inferSelect): Row => ({
+  ...item,
+  payload: parseJson<Record<string, unknown>>(item.payload, {}),
+  result: parseJson<Record<string, unknown> | null>(item.result, null),
+})
+
+// jsonb normalizes object key order on storage, so comparison must not rely on
+// JSON.stringify of the raw objects.
+const stableStringify = (value: unknown): string => {
+  if (value === null || value === undefined) return "null"
+  if (typeof value !== "object") return JSON.stringify(value) ?? "null"
+  if (Array.isArray(value)) return `[${value.map(stableStringify).join(",")}]`
+  const keys = Object.keys(value).sort()
+  return `{${keys.map((key) => `${JSON.stringify(key)}:${stableStringify((value as Record<string, unknown>)[key])}`).join(",")}}`
+}
 
 export const insertPending = (input: NewPending) =>
   Database.use((db) =>
@@ -329,7 +355,7 @@ export function retention(directory: string) {
 export function sameTransition(row: Row, transition: Transition) {
   if (row.status !== transition.status) return false
   if ((row.close_reason ?? undefined) !== transition.closeReason) return false
-  return JSON.stringify(row.result ?? undefined) === JSON.stringify(transition.result)
+  return stableStringify(row.result ?? undefined) === stableStringify(transition.result)
 }
 
 export * as HitlStore from "./store"

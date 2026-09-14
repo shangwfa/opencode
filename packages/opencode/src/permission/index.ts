@@ -230,32 +230,33 @@ const layer = Layer.effect(
         return yield* Effect.die(new Error(`Too many pending HITL requests for session ${request.sessionID}`))
       }
 
-      // HITL: PG insert (fail fast — PG unavailable means the tool errors rather than producing an invisible pending).
-      if (HitlStore.enabled()) {
-        const directory = yield* InstanceState.directory
-        const inserted = yield* Effect.tryPromise({
-          try: () =>
-            HitlStore.insertPendingLimited(
-              {
-                id: id as string,
-                kind: "permission",
-                directory,
-                sessionID: request.sessionID as string,
-                ownerID: hitlOwnerID,
-                payload: info as unknown as Record<string, unknown>,
-              },
-              Flag.OPENCODE_HITL_MAX_PENDING_PER_SESSION,
-            ),
-          catch: (error) => new Error(`hitl insert failed: ${String(error)}`),
-        }).pipe(Effect.orDie)
-        if (!inserted) {
-          return yield* Effect.die(new Error(`Too many pending permission requests for session ${request.sessionID}`))
-        }
-      }
-
       const deferred = yield* Deferred.make<void, PermissionV1.RejectedError | PermissionV1.CorrectedError>()
-      pending.set(id, { info, deferred })
       return yield* Effect.gen(function* () {
+        // Register locally BEFORE the PG row becomes visible: replies and
+        // same-session cascades resolve deferreds through this map, so a PG
+        // row must never be observable before its local entry exists.
+        pending.set(id, { info, deferred })
+        if (HitlStore.enabled()) {
+          const directory = yield* InstanceState.directory
+          const inserted = yield* Effect.tryPromise({
+            try: () =>
+              HitlStore.insertPendingLimited(
+                {
+                  id: id as string,
+                  kind: "permission",
+                  directory,
+                  sessionID: request.sessionID as string,
+                  ownerID: hitlOwnerID,
+                  payload: info as unknown as Record<string, unknown>,
+                },
+                Flag.OPENCODE_HITL_MAX_PENDING_PER_SESSION,
+              ),
+            catch: (error) => new Error(`hitl insert failed: ${String(error)}`),
+          }).pipe(Effect.orDie)
+          if (!inserted) {
+            return yield* Effect.die(new Error(`Too many pending permission requests for session ${request.sessionID}`))
+          }
+        }
         yield* events.publish(Event.Asked, info)
         return yield* Deferred.await(deferred)
       }).pipe(
@@ -308,7 +309,18 @@ const layer = Layer.effect(
                   .where(eq(SessionTable.id, request.sessionID))
                   .limit(1)
                   .get()
-                const rules = [...(session?.permission ?? []), ...additions]
+                // PG bridge returns jsonb as a raw string; decode before use.
+                const stored =
+                  typeof session?.permission === "string"
+                    ? (() => {
+                        try {
+                          return JSON.parse(session.permission) as PermissionV1.Rule[]
+                        } catch {
+                          return undefined
+                        }
+                      })()
+                    : session?.permission
+                const rules = [...(stored ?? []), ...additions]
                 await db
                   .update(SessionTable)
                   .set({ permission: rules, time_updated: Date.now() })

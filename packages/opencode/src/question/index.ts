@@ -163,32 +163,31 @@ const layer = Layer.effect(
         )
       }
 
-      // HITL: PG insert (fail fast).
-      if (HitlStore.enabled()) {
-        const directory = yield* InstanceState.directory
-        const inserted = yield* Effect.tryPromise({
-          try: () =>
-            HitlStore.insertPendingLimited(
-              {
-                id: id as string,
-                kind: "question",
-                directory,
-                sessionID: input.sessionID as string,
-                ownerID,
-                payload: info as unknown as Record<string, unknown>,
-              },
-              Flag.OPENCODE_HITL_MAX_PENDING_PER_SESSION,
-            ),
-          catch: (error) => new Error(`hitl insert failed: ${String(error)}`),
-        }).pipe(Effect.orDie)
-        if (!inserted) {
-          return yield* Effect.die(new Error(`Too many pending questions for session ${input.sessionID}`))
-        }
-      }
-
       const deferred = yield* Deferred.make<ReadonlyArray<Answer>, RejectedError>()
-      pending.set(id, { info, deferred })
       return yield* Effect.gen(function* () {
+        // Register locally BEFORE the PG row becomes visible (see permission ask).
+        pending.set(id, { info, deferred })
+        if (HitlStore.enabled()) {
+          const directory = yield* InstanceState.directory
+          const inserted = yield* Effect.tryPromise({
+            try: () =>
+              HitlStore.insertPendingLimited(
+                {
+                  id: id as string,
+                  kind: "question",
+                  directory,
+                  sessionID: input.sessionID as string,
+                  ownerID,
+                  payload: info as unknown as Record<string, unknown>,
+                },
+                Flag.OPENCODE_HITL_MAX_PENDING_PER_SESSION,
+              ),
+            catch: (error) => new Error(`hitl insert failed: ${String(error)}`),
+          }).pipe(Effect.orDie)
+          if (!inserted) {
+            return yield* Effect.die(new Error(`Too many pending questions for session ${input.sessionID}`))
+          }
+        }
         yield* events.publish(Event.Asked, info)
         return yield* Deferred.await(deferred)
       }).pipe(

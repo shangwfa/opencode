@@ -79,7 +79,8 @@ async function salvageRow(db: SalvageDb, row: HitlStore.Row): Promise<SalvageRes
     .all()
   const target = partRows[0]
   if (target === undefined) return { complete: false }
-  const part = target.data as unknown as ToolPart
+  // PG bridge returns jsonb as a raw string; decode before use.
+  const part = (typeof target.data === "string" ? JSON.parse(target.data) : target.data) as unknown as ToolPart
   if (part.state.status !== "running") return { complete: true }
   const running = part.state
   const start = running.time.start
