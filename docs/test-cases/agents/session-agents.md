@@ -1777,3 +1777,23 @@ print('✅ PASS' if finish else '❌ FAIL (session stuck)')
 | T-SUB-6 失败后恢复 | ✅ | session finish=stop，不卡死 |
 
 > 复测记录（2026-09-06，merge v1.18.29 后，注入类用 Muse Spark 1.3）：T16.1 ✅ 创建（返回 agent 定义，name 即 id）/ T16.2 ✅ 列表全局+会话合并（agent-x 在列，非 native 区分）/ T16.3 ✅ upsert 同名唯一 / T16.4 ✅ 删除 / T16.9 ✅ 会话隔离（0 泄漏）/ T16.6 ✅ 自定义 primary agent 生效（message.agent=marker-agent，回复带 AGENT_TAG_START 前缀）。
+
+> **复测记录（2026-09-14，镜像 `hitl-cbf2276a-wip2`（含 pgJsonb/LEASE_TOOLS/偏离修复），本地 PG + 远端沙箱，`Yd-DeepSeek/deepseek-v4-flash`）**：
+>
+> | 用例 | 结果 | 实测 |
+> |---|---|---|
+> | T16.1–T16.5 | ✅ | 创建（name/mode/temperature）/ 列表全局+会话合并 / upsert 同名唯一 / 删除单个 / 清空（全局保留） |
+> | T16.3a | ✅ | 全字段更新（description/temperature/color/permission 对象 ≥2 条/model）API+PG 生效 |
+> | T16.6 | ✅ | 自定义 primary agent：`info.agent=analyst`，回复含 JSON |
+> | T16.7 | ⚠️ NOTE | 只读 agent（deny write/edit）**被 bash 绕过**：模型用 `printf > file` 写文件成功——permission 未 deny bash，限制不绝对（设计事实，非缺陷；需要硬隔离应连 bash 一起约束） |
+> | T16.8 | ⚠️ NOTE | `@translator` 诱导：模型直接翻译（未派发 task），译文正确——subagent 派发依赖模型行为；机制由 T-SUB-1 ✅ 覆盖 |
+> | T16.9/T16.10 | ✅ | 会话隔离（A/B 同 name 不同 desc）；删 session 级联清理 |
+> | T16.12 | ✅ 行为升级 | 缺 session 创建 agent 实测 **404**（文档原期望 500/FK）——handler 先校验 session，是更正确的行为 |
+> | T16.13–T16.17 | ✅ | 缺 session 列出 404 / 非法 mode 400 / 缺 name 400 / 保留名拒绝 |
+> | T16.19 | ✅ | 自定义 model + temperature 字段持久化 |
+> | T16.20 | ✅ | 无自定义 agent 时回退全局（7 个全局 agent 含 build/explore），`agent:build` 发消息正常 |
+> | T-SUB-1 | ✅ | task 工具调用 translator 子代理，`task=completed` |
+> | T-SUB-2 | ✅ | children=1、child 消息=2、PG `parent_id` 正确、子 session `agent=translator` |
+> | T-SUB-4 | ⚠️ NOTE（LE 语义正确） | 长时 task（同批另一 task 390s 完成，观察中 376s 仍 running）**未被 watchdog 误杀**（无 `(watchdog)` 错误）——LEASE_TOOLS 下 task 为孤儿语义（无超时杀），符合设计；子代理耗时可达 6min+ |
+> | T-SUB-5 | ⚠️ 用例期望过时（已修正验证） | 文档期望「kill-sandbox 后 keep_alive=f」与架构不符（`local-test-env.md:689`：销毁沙箱**不撤销** keepAlive 意愿）。实测 `destroyed|t`；改用 `enabled:false` 后 t→f ✅ |
+> | 未跑 | — | T16.3b（更新后实际生效）、T16.11（完整工作流）、T16.16（多 agent 协作）、T16.18（task subagent_type 派发）、T16.29/30（沙箱共享/VCS diff 重建）、T-SUB-3（并行双 subagent）、T-SUB-6（task 失败恢复）——均为长时编排，建议按需单独跑 |

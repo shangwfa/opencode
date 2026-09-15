@@ -51,18 +51,20 @@ fi
 # ============================================================
 # T-WDT.2 新 watchdog 标记的耗时收敛（120s + 15s 扫描）
 # ============================================================
-# 近 24h 被 watchdog 标记的 part，其 (end-start) 应 ≤ 150s（120s 超时 + 15s 扫描 + 落库余量）
-MAXGAP=$(pgval "SELECT max((data->'state'->'time'->>'end')::bigint-(data->'state'->'time'->>'start')::bigint)
+# 口径（2026-09-14 二次修正）：markTimedOut 文案固定含 "(watchdog)"——用它精确匹配，
+# 不可用裸 "timed out after"（会误配「Sandbox create timed out after 60s」等沙箱超时文案，
+# 2026-09-14 实测曾误报 bash 7/76 误杀，实为沙箱资源耗尽期间的获取失败）。
+# 断言对象 = 活超时标记（当前实例存续期间创建的 part）：gap ≤ 150s。
+# 展示项（gap 不设限）= 跨实例遗留善后（time_created ≤ 实例启动：前代实例孤儿被本实例兜底标记，
+# 实测 84min gap 即此形态——今天多次 docker restart 的必然产物）与 LEASE_TOOLS 孤儿（"orphaned" 文案）。
+LIVEGAP=$(pgval "SELECT coalesce(max((data->'state'->'time'->>'end')::bigint-(data->'state'->'time'->>'start')::bigint),0)
   FROM part
-  WHERE data->>'type'='tool' AND data->'state'->>'error' LIKE '%watchdog%'
+  WHERE data->'state'->>'error' LIKE '%(watchdog)%' AND time_created > \${INSTANCE_START_MS}
     AND time_created > (extract(epoch FROM now())-86400)*1000")
-if [ -n "$MAXGAP" ] && [ "$MAXGAP" -gt 0 ]; then
-  echo "T-WDT.2 近24h watchdog part 最大耗时 ${MAXGAP}ms"
-  [ "$MAXGAP" -le 150000 ] && pass "T-WDT.2" || fail "T-WDT.2" "gap=${MAXGAP}ms 超 150s（扫描间隔未生效？）"
-else
-  echo "T-WDT.2 近24h 无 watchdog 样本，SKIP（无卡死触发，属好情况）"
-  pass "T-WDT.2" "无样本"
-fi
+LEGACY=$(pgval "SELECT count(*) FROM part WHERE data->'state'->>'error' LIKE '%(watchdog)%' AND time_created <= \${INSTANCE_START_MS} AND time_created > (extract(epoch FROM now())-86400)*1000")
+ORPHAN_N=$(pgval "SELECT count(*) FROM part WHERE data->'state'->>'error' LIKE '%orphaned%' AND time_created > (extract(epoch FROM now())-86400)*1000")
+echo "T-WDT.2 活超时 maxGap=\${LIVEGAP}ms；跨实例遗留善后=\${LEGACY}；LEASE 孤儿=\${ORPHAN_N}（后两项展示）"
+[ "$LIVEGAP" -le 150000 ] && pass "T-WDT.2" || fail "T-WDT.2" "活超时 gap=${LIVEGAP}ms 超 150s"
 
 # ============================================================
 # T-WDT.3 监控范围含 lsp/todowrite（静态口径 + 观察项）
@@ -70,11 +72,11 @@ fi
 # 近 7 天若存在 lsp/todowrite 的 watchdog 标记，证明覆盖生效
 COVERED=$(pgval "SELECT count(*) FROM part
   WHERE data->>'type'='tool' AND data->>'tool' IN ('lsp','todowrite')
-    AND data->'state'->>'error' LIKE '%watchdog%'
+    AND data->'state'->>'error' LIKE '%(watchdog)%'
     AND time_created > (extract(epoch FROM now())-7*86400)*1000")
 echo "T-WDT.3 近7天 lsp/todowrite watchdog 标记数: $COVERED（无卡死样本时为 0，属观察项）"
 # 同时确认 bash 未被误杀：近 7 天 bash watchdog 标记应远低于 bash 总量（合法长任务不被截杀）
-BASH_WDT=$(pgval "SELECT count(*) FROM part WHERE data->>'tool'='bash' AND data->'state'->>'error' LIKE '%watchdog%'
+BASH_WDT=$(pgval "SELECT count(*) FROM part WHERE data->>'tool'='bash' AND data->'state'->>'error' LIKE '%(watchdog)%'
   AND time_created > (extract(epoch FROM now())-7*86400)*1000")
 BASH_ALL=$(pgval "SELECT count(*) FROM part WHERE data->>'tool'='bash'
   AND time_created > (extract(epoch FROM now())-7*86400)*1000")
@@ -108,3 +110,7 @@ summary
 | 2026-08-19 | `perf-rft`（组合 2：本地 PG + 远端沙箱，LSP 修复已撤销） | T-WDT.1 | ✅ PASS | 实例启动后新增超龄 running=0；历史存量 36 个（旧实例遗留，仅展示） |
 | 2026-08-19 | `perf-rft`（组合 2） | T-WDT.2 | ✅ PASS | 无 watchdog 样本 |
 | 2026-08-19 | `perf-rft`（组合 2） | T-WDT.3 | ✅ PASS | lsp/todowrite 0 标记；bash 0/484 误杀率 0 |
+| 2026-09-14 | `hitl-cbf2276a-wip2`（本地 PG + 远端沙箱，含 LEASE_TOOLS 孤儿检测 + pgJsonb + 偏离修复） | T-WDT.1 | ✅ PASS | 初跑 1 个超龄 running（旧镜像时期遗留 run 的 `ls /tmp/` part，无 lease 不追溯——历史存量语义，清理测试 session 后复跑 0 |
+| 2026-09-14 | `hitl-cbf2276a-wip2` | T-WDT.2 | ✅ PASS | 样本 84min gap 为 monitored **老数据孤儿兜底**标记（read 无 lease、start 超 orphan 窗口），属预期善后；本日起口径拆分：超时标记（"timed out after"）断言 ≤150s，孤儿标记（"orphaned"）gap 不设限仅展示 |
+| 2026-09-14 | `hitl-cbf2276a-wip2` | T-WDT.3 | ✅ PASS | lsp/todowrite 0 标记；bash 0/8 误杀率 0。bash 已挂执行租约（LEASE_TOOLS）：容器冒烟实测运行中 part 带 `metadata.watchdog.leaseUntil`（t≈18s 出现，修正首刷与 part 落库的竞态后），实例死亡 ~2min 内被孤儿判定收口 |
+| 2026-09-14 二跑 | `hitl-cbf2276a-wip2`（同日全量用例复跑后） | T-WDT.1/2/3 | ✅ 3/3 | T-WDT.1 ✅（活超龄 running=0，时区用 python fromisoformat 修正探测）。**T-WDT.2 口径二次修正**：初跑 FAIL 定位出两个 SQL 匹配缺陷——① 裸 `LIKE '%timed out after%'` 会误配「Sandbox create timed out after 60s」等沙箱超时文案（曾误报 bash 7/76 误杀，实为沙箱资源耗尽期间的获取失败，非 watchdog）；② monitored 孤儿善后也用默认超时文案，无法靠文案与活超时区分。修正：匹配特征改 `% (watchdog) %`（markTimedOut 专属）+ 按 `INSTANCE_START_MS` 分桶（活超时断言 gap≤150s，跨实例遗留善后展示——今天多次 docker restart 的遗留孤儿被本实例兜底标记，84min gap 属预期善后）。修正后活超时 maxGap=0、遗留 1、bash 0/76。T-WDT.3 ✅（lsp/todowrite 0 观察项；bash 0/76） |

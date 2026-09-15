@@ -92,7 +92,11 @@ describe.skipIf(!enabled)("snapshot operation queue", () => {
     await ops.enqueue({ sessionID: SID, sandboxID: "sb-fence", kind: "snapshot_destroy" })
     const first = (await ops.claim())!
     // 模拟租约过期后被另一实例接管（fencing 递增）
-    await db.update(SnapshotOperationTable).set({ lease_until: Date.now() - 1_000 }).where(eq(SnapshotOperationTable.id, first.id)).run()
+    await db
+      .update(SnapshotOperationTable)
+      .set({ lease_until: Date.now() - 1_000 })
+      .where(eq(SnapshotOperationTable.id, first.id))
+      .run()
     const second = (await ops.claim())!
     expect(Number(second.fencing_token)).toBe(2)
     // 旧执行者的 complete 应被 fencing 拒绝
@@ -119,7 +123,11 @@ describe.skipIf(!enabled)("snapshot operation queue", () => {
     await cleanup()
     await ops.enqueue({ sessionID: SID, sandboxID: "sb5", kind: "snapshot_destroy" })
     const first = (await ops.claim())!
-    await db.update(SnapshotOperationTable).set({ lease_until: Date.now() - 1_000 }).where(eq(SnapshotOperationTable.id, first.id)).run()
+    await db
+      .update(SnapshotOperationTable)
+      .set({ lease_until: Date.now() - 1_000 })
+      .where(eq(SnapshotOperationTable.id, first.id))
+      .run()
     const reclaimed = await ops.claim()
     expect(reclaimed?.id).toBe(first.id)
     expect(reclaimed?.attempts).toBe(2)
@@ -131,5 +139,67 @@ describe.skipIf(!enabled)("snapshot operation queue", () => {
     const claimed = (await ops.claim())!
     await ops.fail(claimed.id, claimed.fencing_token, "transient")
     expect(await ops.claim()).toBeNull()
+  })
+
+  test("retention 只删超期终态行，保留活跃与未超期行", async () => {
+    await cleanup()
+    const now = Date.now()
+    // 超期 done / failed（应删）
+    for (const [sandbox, state] of [
+      ["sb_r1", "done"],
+      ["sb_r2", "failed"],
+    ] as const) {
+      await db
+        .insert(SnapshotOperationTable)
+        .values({
+          id: `op_ret_${sandbox}`,
+          session_id: `${SID}_${sandbox}`,
+          sandbox_id: sandbox,
+          kind: "snapshot_destroy",
+          state,
+          attempts: 1,
+          fencing_token: 1,
+          time_created: now - 8 * 24 * 60 * 60 * 1000,
+          time_updated: now - 8 * 24 * 60 * 60 * 1000,
+        })
+        .run()
+    }
+    // 未超期 done（应留：7 天内）
+    await db
+      .insert(SnapshotOperationTable)
+      .values({
+        id: "op_ret_fresh",
+        session_id: `${SID}_fresh`,
+        sandbox_id: "sb_r3",
+        kind: "snapshot_destroy",
+        state: "done",
+        attempts: 1,
+        fencing_token: 1,
+        time_created: now - 24 * 60 * 60 * 1000,
+        time_updated: now - 24 * 60 * 60 * 1000,
+      })
+      .run()
+    // 活跃行（应留：pending/running 永不清理，即便时间戳很老）
+    await db
+      .insert(SnapshotOperationTable)
+      .values({
+        id: "op_ret_pending",
+        session_id: `${SID}_pending`,
+        sandbox_id: "sb_r4",
+        kind: "snapshot_destroy",
+        state: "pending",
+        attempts: 0,
+        fencing_token: 0,
+        time_created: now - 30 * 24 * 60 * 60 * 1000,
+        time_updated: now - 30 * 24 * 60 * 60 * 1000,
+      })
+      .run()
+
+    const removed = await ops.retention()
+    expect(removed).toBe(2)
+    expect(await row("op_ret_sb_r1")).toBeUndefined()
+    expect(await row("op_ret_sb_r2")).toBeUndefined()
+    expect((await row("op_ret_fresh"))?.state).toBe("done")
+    expect((await row("op_ret_pending"))?.state).toBe("pending")
   })
 })

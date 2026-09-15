@@ -428,4 +428,12 @@ send_and_verify "$SID" "使用 codegraph_codegraph_explore 工具在 /workspace 
 | T5.10 `permission:"*"` 通配放行一切（含 MCP 工具） | — | — | MCP 工具免授权直接执行 | |
 
 ---
-> 复测记录（2026-09-06，merge upstream/dev v1.18.29 后，镜像 `t0906-merged-1.18.29`）：T4.1（默认空）/T4.2（创建传规则 + PG 落库一致）/T4.3+T4.4（PATCH 合并追加语义）/T4.7（跨会话隔离）/T4.8（400）/T4.9（404）✅。T5 系列工具级验证受模型调用波动影响未逐条复测，改由 `bun test test/permission/`（106 用例 0 fail）覆盖 ask/ruleset 链路（merge 触碰过 tools.ts 的 ask 区域，单测为证）。
+> **复测记录（2026-09-06，merge upstream/dev v1.18.29 后，镜像 `t0906-merged-1.18.29`）**：T4.1（默认空）/T4.2（创建传规则 + PG 落库一致）/T4.3+T4.4（PATCH 合并追加语义）/T4.7（跨会话隔离）/T4.8（400）/T4.9（404）✅。T5 系列工具级验证受模型调用波动影响未逐条复测，改由 `bun test test/permission/`（106 用例 0 fail）覆盖 ask/ruleset 链路（merge 触碰过 tools.ts 的 ask 区域，单测为证）。
+>
+> **复测记录（2026-09-14，镜像 `hitl-cbf2276a-wip2`（含 pgJsonb/LEASE_TOOLS/偏离修复），本地 PG + 远端沙箱，全 21 例实测）**：
+> - **T4.1–T4.11 全 PASS**（CRUD/合并追加/隔离/400/404/优先级存储/通配存储；`jsonb` 读写经 pgJsonb customType 解码无恙）。
+> - **T5.1–T5.10 全 PASS**，其中三处按实现语义修正了用例命令/期望（均为上游既有语义，非代码缺陷）：
+>   1. **T5.1/T5.4 命令选型**：`ls` 不在 shell 工具 external_directory 扫描的 `FILES` 集合（`shell.ts:33`，只含 cat/rm/cp/mv 等文件操作命令）——`ls /tmp/` 不触发 external 询问。改用 `cat` 验证：deny `/tmp/*` 下 `cat /tmp/x` 被规则拒绝、`cat /etc/hostname` 放行 ✅；allow 生效由 T5.3 强证（默认 ask 语义下 `cat /etc/hostname` 零弹窗 completed）。
+>   2. **T5.5 期望段落过时**：PATCH 是合并语义，`"permission":[]` **不清除**已有规则（T4.6 注释已说明；实测 PATCH [] 后规则数=1、行为仍 allow）。如需真清除应逐条追加反向规则或删 session 重建。
+>   3. **T5.7 pattern 语义**：read 工具的 ask pattern 是**相对实例目录的路径**（`read.ts:303` `path.relative(instance.directory, filepath)`）——`/etc/hostname` → `../etc/hostname`，用例书的 `/etc/*` 不匹配。改配 `{"permission":"read","pattern":"../etc/*","action":"deny"}` 后 read 被规则拒绝 ✅（bash 不受影响）。
+> - T5.8 ✅ `bash:curl* deny` 拒 curl、echo 不受影响；T5.9 ✅ 具体 allow 胜出（`cat /tmp/allow-this/t.txt` completed）+ 通配 deny 拒其他 /tmp 路径；T5.10 通配放行语义 ✅（`permission:"*"` 落库 + `cat /etc` 零弹窗），**MCP 部分环境无已注册 MCP 服务，SKIP**（待有 codegraph 或任意 MCP 的环境补测对照组）。

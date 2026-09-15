@@ -188,3 +188,16 @@ touch -t "$(date -v-8d +%Y%m%d%H%M)" "$TOOL_OUTPUT/tool_history_stale.md"
 | 基础兼容接口           | ✅   | `/session/status`、`/agent`、`/skill`、`/command` 均返回 `200`                          |
 
 本次运行保持 SaaS 约束：只使用 PostgreSQL，历史正文只写远程沙箱，不再写本地文件回退。
+
+> **复测记录（2026-09-15，镜像 `hitl-cbf2276a-wip2`（含 pgJsonb/LEASE_TOOLS/偏离修复），本地 PG + 远端沙箱，Yd-DeepSeek）**：
+> | 用例 | 结果 | 实测 |
+> |---|---|---|
+> | T-CX.1 core 单测 | ✅ **27/27** | `session-compaction.test.ts`(26) + `session-runner-message.test.ts` 全过 + `compaction-history.test.ts`(1) |
+> | T-CX.2 历史文件落盘 | ✅ | 沙箱 `/workspace/.opencode/tool-output/tool_history_msg_0a2cd939...md` 生成，内容含完整对话（violet-owl-42 细节可见） |
+> | T-CX.3 historyPath 持久化 | ✅ | **`historyPath` 在 `type=compaction` 的 part data 中**（非 message data）：`{"auto":false,"type":"compaction","historyPath":"/workspace/.opencode/tool-output/tool_history_msg_...md"}` |
+> | T-CX.4 检索效果 | ✅ | summarize 后问「秘密代码是什么」→ AI 回答 `violet-owl-42` 正确 |
+> | T-CX.5 优雅降级 | ✅（单测覆盖） | compaction.test.ts 含落盘失败降级用例 |
+> | T-CX.6 清理 | ✅（代码确认） | `compaction.ts` 落盘时附带 `find ... -mtime +7 -delete`；直接单测仍待补 |
+> | T-CX.7 两次 compaction 链式检索 | ⏭️ 未跑 | 需要两次 overflow compaction（长流程） |
+>
+> ⚠️ 注意：**T-CX.3 的 `historyPath` 在 part data 而非 message data**——文档 SQL `SELECT data->>'historyPath' FROM session_message WHERE type='compaction'` 查不到（message 无 type 列，正确查法：`SELECT data->>'historyPath' FROM part WHERE data->>'type'='compaction'`）

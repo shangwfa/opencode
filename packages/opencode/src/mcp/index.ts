@@ -759,13 +759,29 @@ const layer = Layer.effect(
       )
       const mcpUrl = new URL(endpointUrl.endsWith("/") ? endpointUrl + "mcp" : endpointUrl + "/mcp")
 
-      // Connect via HTTP transport with retry (supergateway may still be starting)
+      // Connect via HTTP transport with retry (supergateway may still be starting).
+      // The sandbox may be recycled mid-retry (K8s pod restart → new sandbox ID →
+      // proxy URL becomes stale with KUBERNETES::SANDBOX_NOT_FOUND), so re-resolve
+      // the endpoint on each attempt instead of reusing the initial URL.
       const connectTimeout = mcp.timeout ?? DEFAULT_TIMEOUT
       const client = yield* Effect.gen(function* () {
         const directory = yield* InstanceState.directory
         for (let attempt = 0; attempt < 30; attempt++) {
+          const url =
+            attempt === 0
+              ? mcpUrl
+              : new URL(
+                  (
+                    yield* maybeSandboxProvider.getEndpoint(
+                      sessionID,
+                      port,
+                      MCP_ENDPOINT_SERVER_PROXY ? { useServerProxy: true } : undefined,
+                    )
+                  )
+                    .replace(/\/$/, "") + "/mcp",
+                )
           const c = createClient(directory)
-          const transport = new StreamableHTTPClientTransport(mcpUrl)
+          const transport = new StreamableHTTPClientTransport(url)
           const result = yield* Effect.tryPromise(() => withTimeout(c.connect(transport), connectTimeout)).pipe(
             Effect.map(() => c),
             Effect.catch((error) =>

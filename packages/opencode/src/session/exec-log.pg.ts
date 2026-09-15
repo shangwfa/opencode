@@ -5,7 +5,7 @@ import type { SessionID } from "./schema"
 import * as Database from "../storage/db"
 import { Log } from "@opencode-ai/core/util/log"
 import { trace } from "@opentelemetry/api"
-import { eq, desc } from "drizzle-orm"
+import { and, eq, desc, lt } from "drizzle-orm"
 
 const log = Log.create({ service: "exec-log" })
 
@@ -82,9 +82,7 @@ export const ExecLogTable = pgTable(
       .references(() => SessionTable.id, { onDelete: "cascade" }),
     command: text().notNull(),
     working_directory: text(),
-    status: text()
-      .$type<"running" | "completed" | "failed" | "killed" | "timed_out" | "denied">()
-      .notNull(),
+    status: text().$type<"running" | "completed" | "failed" | "killed" | "timed_out" | "denied">().notNull(),
     exit_code: integer(),
     stdout: text(),
     stderr: text(),
@@ -104,9 +102,7 @@ export type NewExecLog = typeof ExecLogTable.$inferInsert
 
 export async function insertExecLog(row: NewExecLog) {
   try {
-    await Database.use((db) =>
-      db.insert(ExecLogTable).values({ ...row, trace_id: row.trace_id ?? currentTraceId() }),
-    )
+    await Database.use((db) => db.insert(ExecLogTable).values({ ...row, trace_id: row.trace_id ?? currentTraceId() }))
   } catch (error) {
     log.error("failed to insert exec log", {
       id: row.id,
@@ -133,11 +129,44 @@ export async function updateExecLog(id: string, patch: Partial<NewExecLog>) {
 
 export async function queryExecLogsBySession(sessionID: string) {
   return Database.use((db) =>
-    db.select().from(ExecLogTable).where(eq(ExecLogTable.session_id, sessionID as any)).orderBy(desc(ExecLogTable.time_started))
+    db
+      .select()
+      .from(ExecLogTable)
+      .where(eq(ExecLogTable.session_id, sessionID as any))
+      .orderBy(desc(ExecLogTable.time_started)),
   ) as Promise<ExecLog[]>
 }
 
 export async function queryExecLog(id: string) {
   const rows = await Database.use((db) => db.select().from(ExecLogTable).where(eq(ExecLogTable.id, id)).limit(1))
   return rows[0] ?? null
+}
+
+/** 24h：实例死亡后悬空的 running 行最迟收口阈值。
+ * 沙箱命令最长 ~10h（keepAlive 10x maxTtl），24h 仍 running 必然是执行实例已死。 */
+export const STALE_RUNNING_MS = 24 * 60 * 60 * 1000
+
+/** 把超期仍 running 的 exec_log 行终态化（实例死亡后无人写终态的兜底清扫）。
+ * 挂在 sandbox idle reap 周期调用；返回清理行数。 */
+export async function reapStaleRunning(now = Date.now()) {
+  try {
+    const rows = await Database.use((db) =>
+      db
+        .update(ExecLogTable)
+        .set({
+          status: "failed",
+          rule: "instance lost (stale running exec)",
+          time_finished: now,
+          time_updated: now,
+        })
+        .where(and(eq(ExecLogTable.status, "running"), lt(ExecLogTable.time_started, now - STALE_RUNNING_MS)))
+        .returning({ id: ExecLogTable.id }),
+    )
+    const count = rows.length
+    if (count > 0) log.warn("reaped stale running exec logs", { count })
+    return count
+  } catch (error) {
+    log.error("failed to reap stale running exec logs", { error: String(error) })
+    return 0
+  }
 }

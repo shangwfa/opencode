@@ -306,3 +306,22 @@ curl -s -o /dev/null -w "%{http_code}\n" -X POST "$BASE2/question/$QID/reply" \
 > - 已 replied 后的**不同决策**提交（如先 reply 再 reject）返回 **409 Conflict**（`ConflictError`，message 注明当前状态），而非 200——防止迟到提交覆盖胜者结果
 > - T2.4 的收场方从「等待 stale-run 接管」提前为「存活实例的租约清扫」（~120s 内：租约 60s + grace 30s + 扫描周期 30s）
 > - answered-lost 的答案回填文案为 `User answered: <答案>`（question）/ `User approved (once|always)`（permission）
+>
+> **复测记录（2026-09-14 二次，镜像 `hitl-cbf2276a-wip2`（含 pgJsonb/LEASE_TOOLS/四偏离修复 + maintain 首刷 delay），同环境，全部 11 例重跑）**：
+>
+> | 用例 | 结果 | 实测 |
+> |---|---|---|
+> | T1.1/T1.2 | ✅ | pending=1（按 sessionID 精确过滤）；questions 完整含「继续」选项 |
+> | T1.3 | ✅ | reply 200；part `completed` + 答案回填「测试流程是否继续？」=「继续」；pending 归零 |
+> | T2.1 | ✅ | docker restart 后旧 QID 仍在 pending 列表 |
+> | T2.2 | ✅ | reply 旧 ID 200；随后 reject **409**（冲突保护） |
+> | T2.3 | ✅ | PG 行 status=pending（重启前）/ replied（reply 后） |
+> | T2.4 | ✅ | 重启前 part running（悬空）→ 租约清扫自动收场：行 `closed/answered-delivered`、part `completed`「User answered: 继续」 |
+> | T2.5 | ✅ | 补发消息 LLM 复述「继续」 |
+> | T3.1/T3.2 | ✅ | permission ask=1；重启后 pending 保留 + reply always 200 + `session.permission` 落 `rm *→allow`；**重启后同 pattern 0 次新 ask**、rm 命令直接 completed |
+> | T4.1 | ✅ | 实例 B（14097）reply 实例 A 的 question 200 → A 轮询消费 pending 清零 → part completed 答案回填 |
+>
+> 补充语义（与原用例书的差异，均为设计文档 §4.10 的放宽/收紧）：
+> - 已 replied 后的**不同决策**提交（如先 reply 再 reject）返回 **409 Conflict**（`ConflictError`，message 注明当前状态），而非 200——防止迟到提交覆盖胜者结果
+> - T2.4 的收场方从「等待 stale-run 接管」提前为「存活实例的租约清扫」（~120s 内：租约 60s + grace 30s + 扫描周期 30s）
+> - answered-lost 的答案回填文案为 `User answered: <答案>`（question）/ `User approved (once|always)`（permission）

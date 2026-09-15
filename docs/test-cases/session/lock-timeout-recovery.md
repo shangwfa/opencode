@@ -1,6 +1,6 @@
-# 会话锁超时 + PG 语句超时 + 客户端查询超时修复验证
+# 会话锁超时 + PG 语句超时 + 客户端查询超时 + 废弃事务超时修复验证
 
-> 验证防挂死修复：`waitForSessionLock` 超时返回 503 + PG `statement_timeout` 兜底 + 客户端查询超时（半开连接兜底）。
+> 验证防挂死修复：`waitForSessionLock` 超时返回 503 + PG `statement_timeout` 兜底 + 客户端查询超时（半开连接兜底）+ `idle_in_transaction_session_timeout`（废弃事务兜底，2026-09-14 补）。
 >
 > **背景**（2026-08-21 线上事故 `ses_fdde248abffeCC7VIONSebVhdg`）：容器 → 远端 PG 瞬时网络抖动 → `edit` 工具写回状态报 `write CONNECT_TIMEOUT 172.18.32.14:5432`（挂 ~10s）→ Runner 下一轮 PG 写入挂死 → run 永不结束 → `withSessionLock` 计数永不归零 → 后续 `prompt`/`prompt_async`/`command` 全部卡在 `waitForSessionLock` 的无限 50ms 轮询（`session-lock.ts`，无超时无日志）→ 请求无限 padding、user 消息无法落库。pod 重启能临时恢复，但根因未除。
 >
@@ -301,7 +301,19 @@ grep -n "withQueryTimeout" packages/opencode/src/storage/db-core-bridge.ts
 
 | 日期 | 用例 | 结果 | 备注 |
 |---|---|---|---|
-| 2026-08-21 | 单测（session-lock 13 + db-pg-config 3 + flag-timeouts 2） | ✅ 18 pass / 0 fail | `bun test test/server/session-lock.test.ts test/storage/db-pg-config.test.ts test/flag/flag-timeouts.test.ts` |
+| 2026-09-14 | **全量复测**（镜像 `hitl-cbf2276a-wip2`（含 pgJsonb/LEASE_TOOLS/偏离修复），本地 PG + 远端沙箱） | ✅ 全部通过 | 单测 20/20 + 集成 11 例全过，分项如下 |
+| 2026-09-14 | 单测（session-lock 13 + db-pg-config 3 + flag-timeouts 2 + db-core-bridge-timeout 2） | ✅ 20 pass / 0 fail | |
+| 2026-09-14 | T41.2.1 + T41.2.2 GUC 生效 + 超限 cancel | ✅ | `PG_STATEMENT_TIMEOUT_MS=1000` 下 `SHOW` 均 `1s`；`pg_sleep(5)` **1064ms** 被 `canceling statement due to statement timeout` |
+| 2026-09-14 | T41.2.3 默认阈值业务回归 | ✅ | 正常消息 200 + statement timeout 错误 part=0 |
+| 2026-09-14 | T41.1.1 + T41.1.3 三入口 503 | ✅ | stall-mock 挂死 provider 制造幽灵 run（user 落库 + 零 part=LLM 流挂住形态），并发 message/prompt_async/command 三请求：**60.160s / 60.190s / 60.195s** 精确 503 `{"_tag":"ServiceUnavailable"}`。⚠️ 踩坑：长 bash（sleep 300）制不成幽灵——模型把命令后台化后自己 ls/ps 检查提前收尾，run 快速结束；**stall provider 是唯一可靠制造方式** |
+| 2026-09-14 | T41.1.2 正常串行 | ✅ | 单条消息 2s 正常回复，无 503 无额外延迟 |
+| 2026-09-14 | T41.3.1 事故对照 + 恢复 | ✅ | 503 已证（同上）；abort 幽灵 run 后同会话消息 **2s** 恢复 `ok`；event 流有 message/session.updated 收尾非戛然而止 |
+| 2026-09-14 | T41.4.1 半开盲区（fake PG） | ✅ | 裸 postgres.js（仅服务端 statement_timeout）8.002s 永久挂起——盲区证实。执行注意：本机 bun tempdir 权限异常时改用 `node -e` 跑同脚本 |
+| 2026-09-14 | T41.4.2 客户端超时单测 | ✅ | 含在单测 20/20 内 |
+| 2026-09-14 | T41.4.3 容器内超限联动 | ✅ | 容器 `PG_STATEMENT_TIMEOUT_MS=3000` 下 `pg_sleep(60)` **3160ms** 被 cancel |
+| 2026-09-14 | T41.4.4 事务不误伤（审查） | ✅ | `withQueryTimeout` 仅 3 处：定义 + `wrap()` terminal 拦截（:47）+ raw SQL（:108）；`wrapTransaction` 保持 uninterruptible（:81）未被包裹 |
+| 2026-08-21 | 单测（session-lock 13 + db-pg-config 3 + flag-timeouts 2） | ✅ 18 pass / 0 fail | 历史记录 |
+| 2026-08-21 | T41.2.1+T41.2.2 GUC 生效 + 语句超限 cancel（真实 PG 172.18.32.14） | ✅ | `pg_sleep(5)` 1027ms 被 cancel；对照组普通连接 `SHOW` 为 `0` |
 | 2026-08-21 | typecheck | ✅ | 基线 39 个既有错误，无新增；新增测试文件无类型错误 |
 | 2026-08-21 | T41.2.1+T41.2.2 GUC 生效 + 语句超限 cancel（真实 PG 172.18.32.14） | ✅ | `OPENCODE_PG_STATEMENT_TIMEOUT_MS=1000` 下 `SHOW statement_timeout`=`1s`、`lock_timeout`=`1s`；`pg_sleep(5)` 1027ms 被 cancel（`canceling statement due to statement timeout`）。对照组普通连接 `SHOW` 为 `0` |
 | 2026-08-21 | httpapi 相关测试回归 | ✅ | `httpapi-session` / `httpapi-promptasync-context` / `session-actions` 失败名单与改动前基线一致（19 个既有环境性失败，无新增） |
@@ -328,16 +340,22 @@ grep -n "withQueryTimeout" packages/opencode/src/storage/db-core-bridge.ts
 
 ## 分层防线（与 llm-stall-recovery.md 的分层发现对应）
 
-「发消息不回」现在有四道防线，按触发先后：
+「发消息不回」现在有五道防线，按触发先后：
 
 ```
-HTTP handler: waitForSessionLock（本次修复：加超时，超时 503 + 日志）  ← 第一层，先卡这里
-    └── SessionPrompt.prompt → Runner.ensureRunning（stall 断流 + 陈旧 run 接管）  ← 第二层
-PG 服务端: statement_timeout（本次修复：请求到达服务端后超限即 cancel）  ← 第三层
-PG 客户端: withQueryTimeout（本次修复：请求到不了服务端的半开连接挂死兜底）  ← 第四层，根除挂死源头
+HTTP handler: waitForSessionLock（2026-08-21 修复：加超时，超时 503 + 日志）  ← 第一层，先卡这里
+    └── SessionPrompt.prompt → Runner.ensureRunning（stall 移除后为陈旧 run 接管）  ← 第二层
+PG 服务端: statement_timeout（2026-08-21 修复：请求到达服务端后超限即 cancel）  ← 第三层
+PG 客户端: withQueryTimeout（2026-08-22 修复：请求到不了服务端的半开连接挂死兜底）  ← 第四层
+PG 服务端: idle_in_transaction_session_timeout（2026-09-14 补：废弃事务自动终止释放锁）  ← 第五层
 ```
 
-- **第一层（本次修复）**：等待方不再无限轮询，幽灵持锁 60s 后收到 503，请求可结束、错误可见。
-- **第二层（2026-08-17 修复）**：stall 流 300s 断流、陈旧 run 1800s 接管，兜住 LLM/工具层挂死。
-- **第三层（本次修复）**：请求已到达服务端但语句执行超限（如慢查询/锁等待）由 PG `statement_timeout` cancel——run 快速失败释放锁。
-- **第四层（本次修复，2026-08-22 审查补充）**：连接握手完成但 socket 半开（数据不通）时，请求根本到不了服务端，`statement_timeout` 失效——由客户端 `withQueryTimeout` 在阈值内 fail，run 失败释放锁。这是本次事故根因（网络抖动 → PG 写挂死 → run 挂死占锁）的最深层兜底，配合 `max_lifetime` 自愈半开连接。
+- **第一层（2026-08-21 修复）**：等待方不再无限轮询，幽灵持锁 60s 后收到 503，请求可结束、错误可见。
+- **第二层（2026-08-17 修复，stall 部分已移除）**：陈旧 run 1800s 接管；stall 断流已于 `add48efde0` 移除（见 llm-stall-recovery.md）。
+- **第三层（2026-08-21 修复）**：请求已到达服务端但语句执行超限（如慢查询/锁等待）由 PG `statement_timeout` cancel——run 快速失败释放锁。
+- **第四层（2026-08-22 修复）**：连接握手完成但 socket 半开（数据不通）时，请求根本到不了服务端，`statement_timeout` 失效——由客户端 `withQueryTimeout` 在阈值内 fail，run 失败释放锁。
+- **第五层（2026-09-14 补，`OPENCODE_PG_IDLE_TX_TIMEOUT_MS` 默认 60s）**：废弃事务卡在 `idle in transaction`（容器重启/进程挂死，事务既不 COMMIT 也不 ROLLBACK）会**永久持有 advisory/行锁**——`statement_timeout` 只管单语句、`lock_timeout` 只让等待方失败、`idle_timeout` 不回收开放事务中的连接，三者都挡不住。PG 按 `idle_in_transaction_session_timeout` 自动终止该会话、释放锁。**实测缺陷（2026-09-14）**：watchdog 持续 `stuck=N marked=0`（检测到卡死工具却标记失败，`markTimedOut` 的 `pg_advisory_xact_lock(hashtext(message_id))` 被废弃事务阻塞），废弃事务终止后立即正常标记。
+
+> **复测记录（2026-09-14，第五道防线）**：`SHOW idle_in_transaction_session_timeout` = `1min`（startup 参数生效）；实测连接 A `BEGIN` + `pg_advisory_xact_lock` 后空转（`IDLE_TX_TIMEOUT_MS=3000`），连接 B 尝试同锁 → **3088ms 获得**（A 被自动终止释放锁）。单测 `db-pg-config.test.ts`（+1 例 GUC 注入）/ `flag-timeouts.test.ts`（+1 例默认值）通过，typecheck 基线 58。
+
+> **审核记录（2026-09-14，修复后全面审计）**：全仓 12 个 `Database.transaction` 调用点逐一核验事务内空闲间隙（GUC 只计语句间空闲，语句执行/等锁不计）——permission 级联 `evaluate()`、hitl sweep、sync projector、markTimedOut 全部为毫秒级 SQL 间隙；`sync/index.ts` 的 bus publish 经 `Database.effect`（ALS effects 数组）**在事务提交后执行**，不在事务内；嵌套事务（process 复用外层 tx）effects 注册到最外层。三道超时解耦无互扰（statement/lock 管语句级 30s，idle-txn 管事务级 60s，触发条件不相交）。**生产建议**：`OPENCODE_PG_IDLE_TX_TIMEOUT_MS` 可设 300000（5min，为合法手工长事务留窗口）；代码默认 60s 对应用侧足够。

@@ -102,11 +102,12 @@ const layer = Layer.effect(
               catch: (error) => new Error(`hitl poll failed: ${String(error)}`),
             })
 
+            let consumed = 0
             for (const row of changed) {
               const entry = value.pending.get(row.id as QuestionID)
               if (entry === undefined) continue
               value.pending.delete(row.id as QuestionID)
-              ;(yield* Effect.currentSpan).attribute("hitl.remote_consumed", 1)
+              consumed += 1
               if (row.status === "replied") {
                 const answers = Array.isArray(row.result?.["answers"])
                   ? (row.result["answers"] as unknown as ReadonlyArray<Answer>)
@@ -116,6 +117,7 @@ const layer = Layer.effect(
               }
               yield* Deferred.fail(entry.deferred, new RejectedError())
             }
+            if (consumed > 0) (yield* Effect.currentSpan).attribute("hitl.remote_consumed", consumed)
 
             tick += 1
             if (tick % RENEW_EVERY_TICKS !== 0) return
@@ -125,6 +127,7 @@ const layer = Layer.effect(
             })
             yield* HitlSalvage.sweepKind(events, "question", ctx.directory)
           }).pipe(
+            Effect.withSpan("question.hitlPoll", { attributes: { directory: ctx.directory } }),
             Effect.catchCauseIf(
               (cause) => !Cause.hasInterrupts(cause),
               (cause) =>

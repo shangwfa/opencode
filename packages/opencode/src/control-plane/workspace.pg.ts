@@ -1,4 +1,5 @@
-import { pgTable, text, jsonb, bigint } from "drizzle-orm/pg-core"
+import { pgJsonb } from "@/storage/schema.pg"
+import { pgTable, text, bigint } from "drizzle-orm/pg-core"
 import { ProjectTable } from "../project/project.pg"
 import type { ProjectV2 } from "@opencode-ai/core/project"
 import type { WorkspaceV2 } from "@opencode-ai/core/workspace"
@@ -9,7 +10,7 @@ export const WorkspaceTable = pgTable("workspace", {
   name: text().notNull().default(""),
   branch: text(),
   directory: text(),
-  extra: jsonb(),
+  extra: pgJsonb(),
   project_id: text()
     .$type<ProjectV2.ID>()
     .notNull()

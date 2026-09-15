@@ -41,6 +41,9 @@ export interface Interface {
     expectedStart: number
     timeoutMs: number
     now?: number
+    /** Custom terminal error text (defaults to the timeout wording). Used by the
+     * lease-orphan path where the criterion is a broken lease, not elapsed time. */
+    error?: string
   }) => Effect.Effect<boolean>
 }
 
@@ -63,19 +66,20 @@ export const layer = Layer.effect(
               if (Database.dialect === "pg") {
                 await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${initial.message_id}))`)
               }
-              const row = Database.dialect === "pg"
-                ? await tx.select().from(PartTable).where(eq(PartTable.id, input.partID)).get()
-                : initial
+              const row =
+                Database.dialect === "pg"
+                  ? await tx.select().from(PartTable).where(eq(PartTable.id, input.partID)).get()
+                  : initial
               const part = parseToolPart(row?.data)
               if (!row || !part) return undefined
               if (part.state.time.start !== input.expectedStart) return undefined
-              if (now - part.state.time.start <= input.timeoutMs) return undefined
-              const attempts = (await tx
-                .select()
-                .from(PartTable)
-                .where(eq(PartTable.message_id, row.message_id))
-                .all())
-                .filter((item) => isWatchdogTimeout(item.data)).length + 1
+              // Custom-error callers (lease orphans) bypass the elapsed-time
+              // recheck: a broken lease is the criterion, not runtime.
+              if (input.error === undefined && now - part.state.time.start <= input.timeoutMs) return undefined
+              const attempts =
+                (await tx.select().from(PartTable).where(eq(PartTable.message_id, row.message_id)).all()).filter(
+                  (item) => isWatchdogTimeout(item.data),
+                ).length + 1
               const eligible = attempts <= MAX_AGENT_RETRY_ATTEMPTS
               const requiresVerification = RETRY_WITH_VERIFICATION.has(part.tool)
 
@@ -85,7 +89,7 @@ export const layer = Layer.effect(
                   status: "error",
                   input: part.state.input,
                   error: [
-                    `Tool execution timed out after ${Math.round(input.timeoutMs / 1000)}s (watchdog).`,
+                    input.error ?? `Tool execution timed out after ${Math.round(input.timeoutMs / 1000)}s (watchdog).`,
                     "The operation may have partially completed.",
                     eligible
                       ? requiresVerification
@@ -206,7 +210,9 @@ export function transitionRunningTool(part: ToolPart, expectedStart: number) {
       ),
     catch: (error) => new Error(`tool transition failed for ${part.id}: ${String(error)}`),
   }).pipe(
-    Effect.tapError((error) => Effect.sync(() => log.error("tool transition failed", { partID: part.id, error: String(error) }))),
+    Effect.tapError((error) =>
+      Effect.sync(() => log.error("tool transition failed", { partID: part.id, error: String(error) })),
+    ),
     Effect.orDie,
   )
 }

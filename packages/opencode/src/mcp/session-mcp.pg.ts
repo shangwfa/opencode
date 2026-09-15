@@ -1,5 +1,5 @@
-import { pgTable, text, jsonb, index, uniqueIndex } from "drizzle-orm/pg-core"
-import { Timestamps } from "../storage/schema.pg"
+import { pgTable, text, index, uniqueIndex } from "drizzle-orm/pg-core"
+import { pgJsonb, Timestamps } from "../storage/schema.pg"
 import { SessionTable } from "../session/session.pg"
 
 export const SessionMcpTable = pgTable(
@@ -11,11 +11,11 @@ export const SessionMcpTable = pgTable(
       .references(() => SessionTable.id, { onDelete: "cascade" }),
     name: text().notNull(),
     type: text().notNull(),
-    command: jsonb().$type<string[]>(),
+    command: pgJsonb<string[]>(),
     url: text(),
-    environment: jsonb().notNull().$type<Record<string, string>>().default({}),
-    headers: jsonb().notNull().$type<Record<string, string>>().default({}),
-    enabled: jsonb().notNull().$type<boolean>().default(true),
+    environment: pgJsonb<Record<string, string>>().notNull().default({}),
+    headers: pgJsonb<Record<string, string>>().notNull().default({}),
+    enabled: pgJsonb<boolean>().notNull().default(true),
     time_created: Timestamps.time_created,
     time_updated: Timestamps.time_updated,
   },

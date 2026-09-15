@@ -139,3 +139,14 @@ sleep 1 && curl -s -X POST "$BASE/session/$SID/abort"
 > | T4.7 | ✅ | abort=true，8s parts 无增长（3→3），确认停止生成 |
 >
 > ⚠️ **prompt 措辞踩坑（本轮实测）**：T4.3 若在原文后附加「只回复：已创建」这类限定语，模型会跳过工具直接文字作答（tools=NONE，文件不落盘），进而连带 T4.4 无文件可读（模型凭上下文直答 hello 的假象）、T4.5 `ls` 如实报空目录。复测务必使用文档原文 prompt。
+
+> **复测记录（2026-09-14，镜像 `hitl-cbf2276a-wip2`（含 pgJsonb/LEASE_TOOLS/四偏离修复 + maintain 首刷 delay），本地 PG + 远端沙箱，真实 LLM `Yd-DeepSeek/deepseek-v4-flash`，文档原文 prompt）：T4.1–T4.7 全部通过。**
+> | 用例 | 结果 | 备注 |
+> |---|---|---|
+> | T4.1 | ✅ | 回复 `2` |
+> | T4.2 | ✅ | 第二轮回复「张三。」 |
+> | T4.3 | ✅ | `write(completed)` |
+> | T4.4 | ✅ | `read(completed)`，回复含 `hello` |
+> | T4.5 | ✅ | bash `ls /workspace`，回复含 `t4-3.txt` |
+> | T4.6 | ✅ | HTTP 204；异步五言绝句落库（春晨/朝露润青芽…）。判定脚本注意：消息 JSON 无顶层 `role` 字段（PG data 结构），用「末条消息含非空 text part」而非 `role=='assistant'` 判完成，否则误报 |
+> | T4.7 | ✅ | abort=true；parts 52→52（8s 零增长）确认停止生成 |

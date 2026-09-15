@@ -1,9 +1,9 @@
-import { pgTable, text, jsonb } from "drizzle-orm/pg-core"
-import { Timestamps } from "../storage/schema.pg"
+import { pgTable, text } from "drizzle-orm/pg-core"
+import { pgJsonb, Timestamps } from "../storage/schema.pg"
 
 export const AuthTable = pgTable("auth", {
   provider_id: text().primaryKey(),
   type: text().notNull(),
-  data: jsonb().notNull().$type<Record<string, unknown>>(),
+  data: pgJsonb<Record<string, unknown>>().notNull(),
   ...Timestamps,
 })

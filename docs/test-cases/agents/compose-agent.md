@@ -265,3 +265,8 @@ curl -s "$BASE/session/$SID/skills" | python3 -c "import json,sys;d=json.load(sy
 | T42.3 | 子 agent 并行分发 | PG task 调用 + exec 验证 | |
 | T42.4 | 编排技能 session 隔离 | PG + API | |
 | T42.5 | 重启后持久化恢复 | PG + docker restart + API | |
+
+> **复测记录（2026-09-14，镜像 `hitl-cbf2276a-wip2`，本地 PG + 远端沙箱，`Yd-DeepSeek/deepseek-v4-flash`）**：
+> - T42.1 ✅ fixture 创建：PG `session_agents` = `compose/primary`；`session_skill` = `compose-plan,compose-execute,compose-review`（skill 名连字符约束已遵循）
+> - T42.2 ✅ 编排执行：单轮任务触发 **3 次 skill 调用（全部 completed）**，覆盖 compose-plan/execute/review 三技能；task 工具未使用（本任务单 agent 内完成，符合简化版语义）
+> - T42.3/T42.4/T42.5 ⏸️ 未跑（并行分发 / 会话隔离 / 重启持久化——长时编排，建议按需单独跑）

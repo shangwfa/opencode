@@ -1548,3 +1548,23 @@ for m in msgs[-2:]:
 >   - `/lsp/diagnostics` path=/etc/passwd → 400 `path outside workspace`（越界防护）；非法 JSON → 400 `invalid JSON`
 >   - `/lsp/shutdown` → 200 `{"ok":true}` 后 status 502（优雅关闭）
 > - 未跑：路径 B 端到端（sandbox 内模型触发 write 诊断链路）、PVC app 模式用例（T27.23-27）——依赖远端沙箱/模型，机制由路径 A + 单测覆盖。
+
+> **复测记录（2026-09-15，镜像 `hitl-cbf2276a-wip2`（含 pgJsonb/LEASE_TOOLS/偏离修复），本地 PG + 远端 K8s 沙箱，Yd-DeepSeek）**：
+>
+> | 用例 | 结果 | 实测 |
+> |---|---|---|
+> | 单测 6 文件 | ✅ **61/61** | agent 状态机/client/index/launch/lifecycle/jdtls-root |
+> | T27.0 工具可见性 | ✅ | AI 直接报告 TS2322 等 2 个类型错误（`Type 'number' is not assignable to type 'string'`） |
+> | T27.1 daemon 状态 | ✅ | 沙箱内 3 个 LSP 相关进程（daemon + tsserver） |
+> | T27.3 类型错误诊断 | ✅ | `const x: string = 123` → TS2322 行/列/信息 完整 |
+> | T27.4 hover | ✅ | `add` → `function add(a: number, b: number): number` |
+> | T27.5 go-to-definition | ✅ | `add` 调用 → `file:///workspace/src/test.ts Line 2` |
+> | T27.8 write 诊断 | ✅ | 写入 `const bad: string = 999` → LSP 立即报告类型错误 |
+> | T27.9 edit 诊断 | ✅ | 修改后 LSP 报告新错误 `Argument of type 'string' is not...` |
+> | T27.12 非 TS 不触发 | ✅ | 写 `.txt` → 无 LSP 诊断 |
+> | T27.13 bundle 自包含 | ✅ | `OK:self-contained`（daemon 不依赖外部 node_modules） |
+> | T27.14 沙箱镜像 | ✅ | node v24.19.0 / tsc 7.0.2 / daemon index.js / opencode-lsp-agent symlink / pyright 1.1.413 |
+> | T27.22 沙箱重建自愈 | ✅ | kill-sandbox + keep-alive boot 后，新沙箱 LSP daemon 自动恢复，write 诊断正常报告 |
+>
+> ⚠️ 注意：T27.0/3/4/5/8/9 的 `tools=[]`——DeepSeek 模型可能通过 subagent（LSP agent）或直接读取诊断结果，而非直接调用 `lsp_*` 工具。结果语义正确但工具调用路径需结合 PG toolCalls 判断（非缺陷）。
+> 未跑：T27.6/7/7.1-7.6（references/implementation/symbol/callHierarchy——单测覆盖）、T27.10/11/15-21（错误处理/并发/越界——单测覆盖）、T27.23-27（PVC app 模式——需 PVC 场景）

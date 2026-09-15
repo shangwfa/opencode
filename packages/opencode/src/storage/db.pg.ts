@@ -139,6 +139,12 @@ export function init(url: string) {
     connection: {
       statement_timeout: Flag.OPENCODE_PG_STATEMENT_TIMEOUT_MS,
       lock_timeout: Flag.OPENCODE_PG_STATEMENT_TIMEOUT_MS,
+      // An abandoned transaction stuck in `idle in transaction` holds its
+      // advisory/row locks indefinitely because statement_timeout only bounds
+      // statement execution, not an idle open transaction. Without this, a
+      // crashed run's transaction blocks the watchdog's markTimedOut (observed:
+      // `watchdog stuck=N marked=0`) and later runs needing the same lock.
+      idle_in_transaction_session_timeout: Flag.OPENCODE_PG_IDLE_TX_TIMEOUT_MS,
     },
     types: {
       bigint: {

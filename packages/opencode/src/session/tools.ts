@@ -32,7 +32,7 @@ import type { Extension as CodeModeExtension } from "@/tool/code-mode"
 import { CodeModePolicy } from "@/tool/code-mode-policy"
 import { ToolExecution } from "./tool-execution"
 import { ToolExecutionLease } from "./tool-execution-lease"
-import { MONITORED_TOOLS } from "./watchdog-sql"
+import { LEASE_TOOLS, MONITORED_TOOLS } from "./watchdog-sql"
 
 const MCP_RESOURCE_TOOLS = {
   list: "list_mcp_resources",
@@ -138,9 +138,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
     parent?: Tool.Context,
   ) {
     const controller = parent ? undefined : new AbortController()
-    const unregister = controller
-      ? ToolExecution.register(input.session.id, options.toolCallId, controller)
-      : () => {}
+    const unregister = controller ? ToolExecution.register(input.session.id, options.toolCallId, controller) : () => {}
     try {
       if (input.antiLoop) {
         const verdict = input.antiLoop.check(item.id, args)
@@ -179,7 +177,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
           ? options.abortSignal
             ? AbortSignal.any([options.abortSignal, controller.signal])
             : controller.signal
-          : options.abortSignal ?? parent!.abort,
+          : (options.abortSignal ?? parent!.abort),
       }
       const base = parent
         ? Object.assign(Object.create(parent) as Tool.Context, {
@@ -188,10 +186,15 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
             metadata: () => Effect.void,
           })
         : context(transformed.args, executionOptions)
-      const ctx = !parent && item.id === "execute"
-        ? Object.assign(Object.create(base) as Tool.Context, { orchestration: { extensions: codeModeExtensions } })
-        : base
-      const execution = MONITORED_TOOLS.some((tool) => tool === item.id)
+      const ctx =
+        !parent && item.id === "execute"
+          ? Object.assign(Object.create(base) as Tool.Context, { orchestration: { extensions: codeModeExtensions } })
+          : base
+      // Lease maintenance covers monitored tools (timeout semantics) plus
+      // LEASE_TOOLS (orphan-only semantics: live instances renew forever, a
+      // broken lease means the owning instance died).
+      const leased = [...MONITORED_TOOLS, ...LEASE_TOOLS].some((tool) => tool === item.id)
+      const execution = leased
         ? Effect.raceFirst(
             item.execute(transformed.args, ctx),
             ToolExecutionLease.maintain({
@@ -201,10 +204,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
             }),
           )
         : item.execute(transformed.args, ctx)
-      const result = yield* ToolExecution.raceAbort(
-        executionOptions.abortSignal,
-        execution,
-      ).pipe(
+      const result = yield* ToolExecution.raceAbort(executionOptions.abortSignal, execution).pipe(
         Effect.tapError(() => {
           input.antiLoop?.record(item.id, args, false)
           return Effect.void

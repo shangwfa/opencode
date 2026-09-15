@@ -132,11 +132,12 @@ const layer = Layer.effect(
               catch: (error) => new Error(`hitl poll failed: ${String(error)}`),
             })
 
+            let consumed = 0
             for (const row of changed) {
               const entry = value.pending.get(row.id as PermissionV1.ID)
               if (entry === undefined) continue
               value.pending.delete(row.id as PermissionV1.ID)
-              ;(yield* Effect.currentSpan).attribute("hitl.remote_consumed", 1)
+              consumed += 1
               const reply = row.result?.["reply"]
               if (row.status === "replied" && (reply === "once" || reply === "always")) {
                 if (reply === "always") {
@@ -159,6 +160,7 @@ const layer = Layer.effect(
                   : new PermissionV1.RejectedError(),
               )
             }
+            if (consumed > 0) (yield* Effect.currentSpan).attribute("hitl.remote_consumed", consumed)
 
             tick += 1
             if (tick % HITL_RENEW_EVERY_TICKS !== 0) return
@@ -168,6 +170,7 @@ const layer = Layer.effect(
             })
             yield* HitlSalvage.sweepKind(events, "permission", ctx.directory)
           }).pipe(
+            Effect.withSpan("permission.hitlPoll", { attributes: { directory: ctx.directory } }),
             Effect.catchCauseIf(
               (cause) => !Cause.hasInterrupts(cause),
               (cause) =>
@@ -310,18 +313,7 @@ const layer = Layer.effect(
                   .where(eq(SessionTable.id, request.sessionID))
                   .limit(1)
                   .get()
-                // PG bridge returns jsonb as a raw string; decode before use.
-                const stored =
-                  typeof session?.permission === "string"
-                    ? (() => {
-                        try {
-                          return JSON.parse(session.permission) as PermissionV1.Rule[]
-                        } catch {
-                          return undefined
-                        }
-                      })()
-                    : session?.permission
-                const rules = [...(stored ?? []), ...additions]
+                const rules = [...(session?.permission ?? []), ...additions]
                 await db
                   .update(SessionTable)
                   .set({ permission: rules, time_updated: Date.now() })

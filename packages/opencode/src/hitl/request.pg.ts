@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm"
-import { pgTable, text, bigint, jsonb, index, check } from "drizzle-orm/pg-core"
-import { Timestamps } from "@/storage/schema.pg"
+import { pgTable, text, bigint, index, check } from "drizzle-orm/pg-core"
+import { pgJsonb, Timestamps } from "@/storage/schema.pg"
 import { SessionTable } from "@/session/session.pg"
 
 // HITL（human-in-the-loop）挂起请求状态表：question 与 permission 共用。
@@ -17,8 +17,8 @@ export const HitlRequestTable = pgTable(
       .references(() => SessionTable.id, { onDelete: "cascade" }),
     owner_id: text().notNull(),
     status: text().$type<"pending" | "replied" | "rejected" | "closed">().notNull(),
-    payload: jsonb().$type<Record<string, unknown>>().notNull(),
-    result: jsonb().$type<Record<string, unknown>>(),
+    payload: pgJsonb<Record<string, unknown>>().notNull(),
+    result: pgJsonb<Record<string, unknown>>(),
     close_reason: text().$type<"instance-restart" | "shutdown" | "answered-delivered" | "decision-delivered">(),
     lease_until: bigint({ mode: "number" }).notNull(),
     ...Timestamps,

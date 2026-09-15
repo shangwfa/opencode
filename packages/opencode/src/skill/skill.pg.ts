@@ -1,5 +1,5 @@
-import { pgTable, text, index, uniqueIndex, jsonb } from "drizzle-orm/pg-core"
-import { Timestamps } from "../storage/schema.pg"
+import { pgTable, text, index, uniqueIndex } from "drizzle-orm/pg-core"
+import { pgJsonb, Timestamps } from "../storage/schema.pg"
 import { SessionTable } from "../session/session.pg"
 import type { SkillResource } from "./resource"
 
@@ -30,7 +30,7 @@ export const SessionSkillTable = pgTable(
     name: text().notNull(),
     description: text().notNull(),
     content: text().notNull(),
-    resources: jsonb().notNull().$type<SkillResource.Stored[]>().default([]),
+    resources: pgJsonb<SkillResource.Stored[]>().notNull().default([]),
     time_created: Timestamps.time_created,
     time_updated: Timestamps.time_updated,
   },

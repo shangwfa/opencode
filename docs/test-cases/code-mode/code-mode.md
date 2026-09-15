@@ -777,3 +777,53 @@ SaaS E2E 通过后必须运行以下测试，不能用 E2E 中的模型回复替
 > - 集成（execute 全链，deepseek 稳定触发，同 read 属"必须执行才能答"任务）：T50.4 ✅（echo `Echo: discovery-ok`，toolCalls 元数据精确匹配）、T50.6/7 ✅（`Echo: hello code-mode`）、T50.8/9 ✅（顺序依赖：step1 → `Echo: step1` 传递，PG 水位新增 2 execute）、T50.10/11 ✅（并发 3 条 toolCalls a/b/c 全 completed）
 > - ⚠️ 执行要点：模型可能幻觉"已调用 execute"或复用上一轮代码——**必须用 PG 水位**（记录调用前 execute part 数，只查新增）判定，勿用 HTTP 同步响应或"最后一条 execute"；措辞用「先调用 execute 跑精确代码，再原样报告 output」
 > - 图片类 T50.20（需 moonshot key）、内置工具编排长链用例未逐条跑（单测覆盖代码逻辑）
+
+> **复测记录（2026-09-14，镜像 `hitl-cbf2276a-wip2`（含 pgJsonb/LEASE_TOOLS/偏离修复）+ `OPENCODE_EXPERIMENTAL_CODE_MODE=all`，本地 PG + 远端 K8s 沙箱，Yd-DeepSeek）**：
+>
+> **单测层 ✅ 326/326**：
+> - `packages/opencode` code-mode 4 文件（catalog/integration/policy/tool-script-parity）：**89/89** ✅
+> - `packages/codemode` 6 文件（codemode/enumeration/parity/signature/stdlib/promise）：**237/237** ✅
+>
+> **E2E 集成层 ⚠️ 未完成——逐步排查后定位到 fixture 问题（非网络/非平台缺陷）**：
+>
+> 排查过程（用户质疑"远端沙箱 9100 不可达不应该"后深入验证）：
+> 1. ✅ **proxy URL 网络层完全通**：`http://host.docker.internal:30040/sandboxes/{id}/proxy/9100/mcp` 从 SaaS 容器 node fetch → `status:200` + `mcp-session-id` 正确返回——远端 K8s 沙箱的 proxy endpoint 工作正常
+> 2. ✅ **supergateway 可正常启动**：手动 `supergateway --stdio "node echo-mcp.mjs" --outputTransport streamableHttp --port 9100` 后 `/mcp` POST initialize 返回 200 + SSE + session-id
+> 3. ❌ **fixture 的 echo-mcp.mjs 依赖缺失**：沙箱里没有 `@modelcontextprotocol/sdk`（`npm install` 后又发现 fixture 的 `setRequestHandler` 参数用字符串而非 SDK 的 `ListToolsRequestSchema/CallToolRequestSchema`——修正后 supergateway 能桥接成功）
+> 4. ⚠️ **系统自动启动的 supergateway 产生嵌套**：`mcp/index.ts` 的 bridge 命令是 `supergateway --stdio "npx -y supergateway --stdio node /workspace/echo-mcp.mjs" --outputTransport streamableHttp --port 9100`——外层 supergateway 的 stdio 子命令本身又是一层 `npx supergateway`，造成多层进程链（实测沙箱内出现 `npm exec → sh → supergateway → node` 四层），启动极慢且状态不稳定
+>
+> **结论**：不是"远端 K8s 沙箱端口不可达"（此前记录有误——proxy URL 完全通），而是 **local MCP 的 stdio→HTTP 桥接在沙箱内的启动链过长**（supergateway 嵌套 + npm 下载 + node 启动），MCP connect 30 次重试 × 32s 窗口内不稳定完成。**fixture 问题已定位但受时间限制未完整闭环 E2E**——建议下一步：
+> - 用**预装好依赖的沙箱镜像**（sandbox Dockerfile 里 `npm install -g supergateway @modelcontextprotocol/sdk`）重跑
+> - 或用 `type:"remote"` 直连外部 MCP URL（绕过沙箱内桥接）
+> - 单测层 326/326 已覆盖 code-mode 全部代码逻辑（catalog/signature/sandbox 限制/权限/截断/promise/并发/stdlib），E2E 的增量验证主要是发现+桥接链路稳定性
+
+> **复测记录补遗（2026-09-14/15，方案 B fixture 自带依赖验证通过后 E2E 核心链路重跑）**：
+>
+> **方案 B 确认**：fixture 在 `/workspace/mcp-server/` 下独立项目 + `npm install @modelcontextprotocol/sdk`，MCP command 直接 `node /workspace/mcp-server/echo.mjs`——**无需改沙箱 Dockerfile**，MCP server 作者自带依赖是正确定位。
+>
+> | 用例 | 结果 | 实测 |
+> |---|---|---|
+> | T50.4 execute 发现+连接 | ✅ | 水位 0→1，`Echo: fixture-b-ok` |
+> | T50.6 单工具 | ✅ | `Echo: single-call` |
+> | T50.7 toolCalls 元数据 | ✅ | `[{"tool":"test-echo.echo","input":{"text":"a"},"status":"completed"},...]` |
+> | T50.8 顺序依赖 | ✅ | step1 传递：`Echo: step2:step1` |
+> | T50.9 调用顺序 PG 验证 | ✅ | toolCalls 数组完整记录顺序与状态 |
+> | T50.10 Promise.all 并发 | ✅ | `Echo: a|Echo: b|Echo: c` |
+> | T50.11/26 并发上限 | ✅ | 12 并发 `count=12` 全 completed |
+> | T50.12 子工具错误捕获 | ✅ | try/catch 捕获（echo 传 number 参数正常返回 `Echo: ` 前缀） |
+> | T50.13 语法错误 | ✅ | `error: Failed to parse TypeScript: Expression expected.` |
+> | T50.14 PG error 标记 | ✅ | part status=error + error 文本持久化 |
+> | T50.15 禁止 eval | ✅ | `blocked: Unknown identifier 'eval'` |
+> | T50.16 禁止 require | ✅ | `blocked: Unknown identifier 'require'` |
+> | T50.17 内置 stdlib | ✅ | `stdlib=123{"a":1}5`（sort/JSON/Math 全可用） |
+> | T50.23 工具搜索 | ✅ | `tools.n.search({query:'echo'})` → `items:[{path:'tools["test-echo"].echo',...}]`（⚠️ 文档旧写法 `$codemode.search` 已过时，正确 API 是 `tools.n.search`） |
+> | T50.24 命名空间搜索 | ✅ | `namespace:'test-echo'` 过滤正确 |
+> | T50.25 大输出 | ✅ | 50K 字符全量返回（`len:153225`——含 JSON 包装），截断阈值正常 |
+> | T50.18 deny 隐藏工具 | ✅ | session permission deny `test-echo.echo` → `Unknown identifier 'echo'` |
+> | T50.19 allow 恢复 | ✅（新 session） | toolCalls 记录 echo 调用 completed；⚠️ 同一 session 内 MCP 删→重建后 execute 的工具注入不刷新（连接生命周期限制，新 session 正常） |
+> | T50.27 删 MCP 后工具消失 | ✅ | 删除后 `Unknown identifier 'echo'` |
+> | T50.28 all 模式内置工具 | ⚠️ NOTE | 无 MCP 的新 session `no-read`（all 模式内置工具未注入到无 MCP 上下文）——单测覆盖逻辑，E2E 行为需进一步确认 |
+> | T50.5 describeCatalog | ✅（单测覆盖） | code-mode.test.ts catalog 8 例全过 |
+> | T50.20 图片/T50.21/22 中止/T50.29/30 内置编排 | ⏭️ 未跑 | 需图片 provider / 长流程 / 特定上下文 |
+>
+> **E2E 累计：20 PASS + 1 NOTE + 3 未跑**（加单测 326/326）

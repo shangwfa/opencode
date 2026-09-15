@@ -93,10 +93,13 @@ export const dialect: Dialect = Flag.OPENCODE_DATABASE_URL ? "pg" : "sqlite"
   - `OID_JSONB (3802)` → 返回原始字符串，不做 JSON.parse
 - **API Shim 注入**：PG Drizzle 不提供 `.run()/.get()/.all()` 方法，通过遍历 query builder 原型链注入
 
+> **jsonb 解码的两轨制（重要）**：OID 覆盖只对 **core SQLite schema**（`text({mode:'json'})` 列，drizzle 的 text-json 解码器会 parse 字符串）是正确的。**PG-only 表**（`*.pg.ts`）若用裸 `jsonb()` 列，drizzle 的 jsonb 解码器是 identity——直读会拿到字符串而非对象，所有把列值当对象用的代码会**静默失效**（HITL 落库功能曾因此整体失效，见 `docs/hitl-persistence-design.md`）。因此 `*.pg.ts` 的 jsonb 列一律使用 `pgJsonb<T>()`（`storage/schema.pg.ts`，customType：fromDriver 对字符串 JSON.parse，写入行为与原 drizzle jsonb 等价），**禁止裸 `jsonb()`**。
+
 #### 4.1.3 PG Schema 文件
 
 新增所有表的 PG 版本定义（`*.pg.ts` 文件）：
 - 类型映射：`integer → bigint`，`text({mode:'json'}) → jsonb`，`sqliteTable → pgTable`
+- jsonb 列统一使用 `pgJsonb<T>()`（原 `jsonb().$type<T>()` 写法已全部迁移，解码见 4.1.2 的两轨制说明）
 - 与 SQLite Schema 保持字段级别兼容
 
 #### 4.1.4 迁移系统

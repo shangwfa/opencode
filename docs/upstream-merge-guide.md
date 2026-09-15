@@ -194,6 +194,7 @@ curl -X POST http://localhost:14096/session -H 'Content-Type: application/json' 
 |------|------|
 | `Database.use` 改为 async | PG drizzle 的 `.all()/.get()/.run()` shim 返回 Promise，调用者必须 await |
 | `TxOrDb = any` | 避免耦合 pg-core 和 sqlite-core 类型系统 |
+| `*.pg.ts` jsonb 列用 `pgJsonb<T>()`（storage/schema.pg.ts，customType） | 驱动层 jsonb 返回 raw string 是为 core `text({mode:"json"})` 解码器设计的；drizzle 裸 jsonb 列解码器是 identity，直读拿到字符串、下游取值静默 undefined（HITL 曾整体失效）。合并上游新增 `*.pg.ts` 表时同样必须用 `pgJsonb`，勿照抄上游 `jsonb()` |
 | SessionAgent 用 raw SQL（postgres tagged template） | drizzle PG 的 `.all()` shim 返回 Promise，无法在同步上下文链式调用 `.map()` |
 | SessionSkill 用 `Database.use`（drizzle） | 通过 `parseRow()` 处理 jsonb/bigint 类型转换 |
 | Auth 用 raw SQL（postgres tagged template） | 独立于 drizzle 的轻量实现 |

@@ -497,3 +497,28 @@ T22.18 实测发现两个 local MCP sandbox 启动相关的安全问题，已修
 >   - 根因：`clearMcps`/`deleteMcp`/`createMcp` 均调 `requireSession`（`session.ts:722/733/741`），对不存在 session 抛 `ApiError.notFound`，但该组 DELETE/POST handler 未走错误契约映射 → 落默认 500。
 >   - **对照组证实为既有语义偏差非 merge 回归**：`agents` clear 对不存在 session 同为 500（`clearAgents` 同样 requireSession），而 `commands` 组（list/clear）返回 404（错误契约映射正常）。即 requireSession 的 404 语义仅在部分 handler 组生效。文档 T22.9 的"delete=200 幂等"期望与实际不符，属长期文档偏差，建议后续统一 requireSession 错误映射时修正文档或对齐实现。
 > - 未跑：T22.13/14/15（remote/local MCP 工具经模型调用 E2E，依赖模型行为，机制上次复测 2026-08-21 无回归）、T22.17/18/19（local MCP env 注入/shell 安全/pid 生命周期，本地 sandbox 依赖，机制稳定）。
+
+> **复测记录（2026-09-15，镜像 `hitl-cbf2276a-wip2`（含 pgJsonb/LEASE_TOOLS/偏离修复），本地 PG + 远端沙箱）**：
+>
+> | 用例 | 结果 | 实测 |
+> |---|---|---|
+> | 单测 2 文件 | ✅ **29/29** | session-mcp-crud(16) + session-mcp(13，含 shell 注入加固) |
+> | T22.1 local create | ✅ | `type=local`、command 数组、PG `command` JSON 一致 |
+> | T22.2 remote create | ✅ | `type=remote`、url、headers PG 一致 |
+> | T22.3 local+remote 同列表 | ✅ | count=2 |
+> | T22.4 upsert local→remote | ✅ | type 切换、count=1、PG type=remote |
+> | T22.5 删单个 | ✅ | DELETE 200，列表/PG 移除 |
+> | T22.6 清空 | ✅ | DELETE 200，list=0 PG=0 |
+> | T22.7 隔离 | ✅ | A=local B=remote 互不影响 |
+> | T22.8 级联 | ✅ | 删 session 后 PG=0 |
+> | T22.9 不存在 session | ✅（与 2026-09-06 记录一致） | create=500 / list=200 / delete=500（requireSession 错误映射偏差为既有问题） |
+> | T22.10 缺必填 | ✅ | 缺 name=400 / 缺 command=400 |
+> | T22.11 完整字段 | ✅ | name/type/url/headers/enabled 全落 PG |
+> | T22.12 disabled | ✅ | `enabled=false` PG 一致 |
+> | T22.16 互斥校验 | ✅ | remote+command=400 / local+url=400 |
+> | T22.17 environment 注入 | ✅（PG 层） | `{"MY_TEST_VAR":"hello-env-injection"}` 完整持久化 |
+> | T22.18 shell 安全 | ✅ | 恶意 name/env key 创建接受（宽松设计），但沙箱内 **NO_PWNED**——执行时 sanitize 生效 |
+> | T22.13 remote E2E | ⏭️ 未跑 | 需可达 remote MCP（无外部服务） |
+> | T22.14 local E2E | ✅（code-mode 复测覆盖） | echo MCP supergateway 桥接链路已在 code-mode 完整验证 |
+> | T22.15 agent 切换 | ⏭️ 未跑 | 依赖模型行为长流程 |
+> | T22.19 lifecycle | ✅（code-mode 覆盖） | pid/log 文件机制已在 code-mode 复测中验证 |

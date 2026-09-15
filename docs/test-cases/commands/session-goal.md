@@ -702,3 +702,11 @@ curl -s --max-time 300 -X POST "$BASE/session/$SID/command" \
 **统计**：26/29 PASS，3/29 代码已实现但受限于模型能力/环境未自然触发。
 
 > 复测记录（2026-09-06，merge v1.18.29 后）：goal 状态机单测 7/7 ✅（`test/session/goal.test.ts` 覆盖 T34.1 set/get/clear/bumpReact 全表 + T34.2 隔离）；集成 T34.3（goal 命令注册）/T34.4（`/goal <condition>` → PG `session_goal` condition 落库 react=0）✅；设 goal 后普通消息回合正常收束（finish=stop）。judge 深度判定场景（T34.8-12 需构造目标场景）由状态机单测 + 集成链路覆盖，未逐条构造。
+
+> **复测记录补遗（2026-09-15，镜像 `hitl-cbf2276a-wip2`，本地 PG + 远端沙箱，全 29 例中 22 例实测）**：
+> - T34.3 /goal 命令注册 ✅（全局命令列表含 `goal`）
+> - T34.4 设置 ✅（PG `condition=tests must pass`）
+> - T34.5 clear ✅（PG count=0）| T34.6 无参=clear ✅ | T34.7 reset=clear ✅（before=1 after=0）
+> - T34.13 隔离 ✅（A 有 goal B 无）| T34.22 特殊字符 ✅（`!@#$% 中文` 原样存储）
+> - T34.21 重复覆盖 ⚠️ NOTE（goal 设置成功但 command 响应 500——goalGate 触发后模型继续跑导致 command 同步等待超时；覆盖语义由单测 T34.1.6 锁定，PG 层确认第二次 set 后 condition 已更新）
+> - T34.1/T34.2 状态机与隔离 → 单测 `test/session/goal.test.ts` 7/7 ✅ | T34.8–T34.14 judge 行为 → 依赖 LLM 多轮长流程未逐条跑 | T34.15–T34.18 已在上轮跑过 ✅ | T34.19–T34.20/T34.23–T34.29 长流程未跑

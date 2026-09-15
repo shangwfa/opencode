@@ -7,6 +7,8 @@ const log = Log.create({ service: "snapshot-operation" })
 
 /** 租约时长；执行体应每 LEASE_MS/3 续租一次，续租失败说明已被接管，须立即停止副作用。 */
 export const LEASE_MS = 5 * 60 * 1000
+/** done/failed 终态行的保留期：操作记录只服务于近期排查，超期即删（否则只进不出无限增长）。 */
+export const RETENTION_MS = 7 * 24 * 60 * 60 * 1000
 const MAX_ATTEMPTS = 5
 const BASE_BACKOFF_MS = 30_000
 const MAX_BACKOFF_MS = 10 * 60 * 1000
@@ -23,12 +25,14 @@ export function create(pgDb: any) {
     const rows: SnapshotOperationRow[] = await pgDb
       .select()
       .from(SnapshotOperationTable)
-      .where(and(
-        eq(SnapshotOperationTable.session_id, sessionID),
-        eq(SnapshotOperationTable.sandbox_id, sandboxID),
-        eq(SnapshotOperationTable.kind, kind),
-        inArray(SnapshotOperationTable.state, ["pending", "running"]),
-      ))
+      .where(
+        and(
+          eq(SnapshotOperationTable.session_id, sessionID),
+          eq(SnapshotOperationTable.sandbox_id, sandboxID),
+          eq(SnapshotOperationTable.kind, kind),
+          inArray(SnapshotOperationTable.state, ["pending", "running"]),
+        ),
+      )
       .orderBy(SnapshotOperationTable.time_created)
       .limit(1)
       .all()
@@ -117,7 +121,19 @@ export function create(pgDb: any) {
     log.warn("snapshot operation failed", { id, error })
   }
 
-  return { enqueue, claim, heartbeat, complete, fail }
+  /** 清理超期终态行（挂在 idle reap 扫描周期）。 */
+  async function retention(now = Date.now()) {
+    const rows = await pgDb.execute(sql`
+      DELETE FROM snapshot_operation
+      WHERE state IN ('done', 'failed') AND time_updated < ${now - RETENTION_MS}
+      RETURNING id
+    `)
+    const count = (rows as unknown[]).length
+    if (count > 0) log.info("snapshot operation retention", { count })
+    return count
+  }
+
+  return { enqueue, claim, heartbeat, complete, fail, retention }
 }
 
 export type SnapshotOperations = ReturnType<typeof create>

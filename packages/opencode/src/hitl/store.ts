@@ -55,23 +55,8 @@ export interface TransitionOutcome {
 
 const databaseNow = () => sql<number>`(extract(epoch from clock_timestamp()) * 1000)::bigint`
 
-// The PG bridge returns json/jsonb columns as raw strings (postgres.js jsonb
-// parse is identity so SQLite text-json decoders can do the parsing), but
-// drizzle's pg jsonb columns have no string decoder — so decode here.
-const parseJson = <T>(value: unknown, fallback: T): T => {
-  if (typeof value !== "string") return (value === null || value === undefined ? fallback : value) as T
-  try {
-    return JSON.parse(value) as T
-  } catch {
-    return fallback
-  }
-}
-
-const rowify = (item: typeof HitlRequestTable.$inferSelect): Row => ({
-  ...item,
-  payload: parseJson<Record<string, unknown>>(item.payload, {}),
-  result: parseJson<Record<string, unknown> | null>(item.result, null),
-})
+// jsonb columns decode through pgJsonb (schema.pg.ts); rows arrive parsed.
+const rowify = (item: typeof HitlRequestTable.$inferSelect): Row => item as Row
 
 // jsonb normalizes object key order on storage, so comparison must not rely on
 // JSON.stringify of the raw objects.

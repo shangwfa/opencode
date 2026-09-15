@@ -13,6 +13,11 @@ describe("db.pg connection GUC injection", () => {
     expect(client.options.connection.lock_timeout).toBe(Flag.OPENCODE_PG_STATEMENT_TIMEOUT_MS)
   })
 
+  test("injects idle_in_transaction_session_timeout into connection startup params", () => {
+    const { client } = init("postgres://user:pass@localhost:5432/db")
+    expect(client.options.connection.idle_in_transaction_session_timeout).toBe(Flag.OPENCODE_PG_IDLE_TX_TIMEOUT_MS)
+  })
+
   test("preserves existing pool tuning options", () => {
     const { client } = init("postgres://user:pass@localhost:5432/db")
     expect(client.options.max).toBe(20)

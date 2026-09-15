@@ -15,10 +15,11 @@ export function refresh(input: { sessionID: SessionID; messageID: MessageID; cal
   if (Database.dialect !== "pg") return Effect.succeed(false)
   const now = input.now ?? Date.now()
   return Effect.tryPromise({
-    try: () => Database.Client()
-      .update(PartTable)
-      .set({
-        data: sql`jsonb_set(
+    try: () =>
+      Database.Client()
+        .update(PartTable)
+        .set({
+          data: sql`jsonb_set(
           ${PartTable.data},
           '{state,metadata}',
           COALESCE(${PartTable.data}->'state'->'metadata', '{}'::jsonb) || jsonb_build_object(
@@ -26,17 +27,19 @@ export function refresh(input: { sessionID: SessionID; messageID: MessageID; cal
             jsonb_build_object('owner', ${ownerID}::text, 'leaseUntil', ${now + leaseDurationMs}::bigint)
           )
         )`,
-        time_updated: now,
-      })
-      .where(and(
-        eq(PartTable.session_id, input.sessionID),
-        eq(PartTable.message_id, input.messageID),
-        sql`${PartTable.data}->>'type' = 'tool'`,
-        sql`${PartTable.data}->>'callID' = ${input.callID}`,
-        sql`${PartTable.data}->'state'->>'status' = 'running'`,
-      ))
-      .returning({ id: PartTable.id })
-      .then((rows: Array<{ id: string }>) => rows.length > 0),
+          time_updated: now,
+        })
+        .where(
+          and(
+            eq(PartTable.session_id, input.sessionID),
+            eq(PartTable.message_id, input.messageID),
+            sql`${PartTable.data}->>'type' = 'tool'`,
+            sql`${PartTable.data}->>'callID' = ${input.callID}`,
+            sql`${PartTable.data}->'state'->>'status' = 'running'`,
+          ),
+        )
+        .returning({ id: PartTable.id })
+        .then((rows: Array<{ id: string }>) => rows.length > 0),
     catch: (error) => new Error(`tool execution lease refresh failed: ${String(error)}`),
   })
 }
@@ -48,6 +51,11 @@ export function maintain(input: { sessionID: SessionID; messageID: MessageID; ca
       log.error("tool execution lease refresh failed", { callID: input.callID, cause: String(cause) })
       return Effect.succeed(false)
     }),
+    // The part row is written around tool-start; delay the first heartbeat so
+    // it reliably finds a running row (a miss here would leave the execution
+    // unleased until the next 30s tick, breaking orphan detection for tools
+    // that die within that window).
+    Effect.delay("1 second"),
     Effect.repeat(Schedule.spaced(heartbeatInterval)),
     Effect.andThen(Effect.never),
   )

@@ -1,4 +1,17 @@
-import { Effect, Context, Layer, Cause, Deferred, Ref, Semaphore, Schedule, Duration, Scope, Exit, Option } from "effect"
+import {
+  Effect,
+  Context,
+  Layer,
+  Cause,
+  Deferred,
+  Ref,
+  Semaphore,
+  Schedule,
+  Duration,
+  Scope,
+  Exit,
+  Option,
+} from "effect"
 import { Sandbox, ConnectionConfig, SandboxApiException, SandboxManager } from "@alibaba-group/opensandbox"
 import type { CommandExecution, Volume } from "@alibaba-group/opensandbox"
 import { and, asc, desc, eq, lt, or, sql } from "drizzle-orm"
@@ -13,7 +26,7 @@ import { Database } from "../storage/db"
 import { SandboxTable } from "./sandbox.pg"
 import { SessionSnapshot } from "./session-snapshot"
 import { SnapshotOperation, LEASE_MS, type SnapshotOperationRow } from "./snapshot-operation"
-import { ExecLogTable } from "../session/exec-log"
+import { ExecLogTable, reapStaleRunning as reapStaleExecRunning } from "../session/exec-log"
 import { Metrics } from "@/observability/metrics"
 
 export namespace SandboxConfig {
@@ -131,7 +144,10 @@ export function buildVolumes(scope: VolumeScope, config: SandboxConfig.Interface
   })
 
   if (mode === "pvc") {
-    const packageCacheMount = requirePackageCacheMount(config.packageCacheMount, mounts.map((m) => m.mountPath))
+    const packageCacheMount = requirePackageCacheMount(
+      config.packageCacheMount,
+      mounts.map((m) => m.mountPath),
+    )
     result.push({
       name: "package-cache",
       mountPath: packageCacheMount,
@@ -153,7 +169,8 @@ function requirePackageCacheMount(mountPath: string, reservedPaths: string[]) {
     throw new Error("OPENCODE_SANDBOX_PACKAGE_CACHE_MOUNT cannot be /")
   }
   const conflict = reservedPaths.find(
-    (reserved) => normalized === reserved || normalized.startsWith(`${reserved}/`) || reserved.startsWith(`${normalized}/`),
+    (reserved) =>
+      normalized === reserved || normalized.startsWith(`${reserved}/`) || reserved.startsWith(`${normalized}/`),
   )
   if (conflict) {
     throw new Error(`OPENCODE_SANDBOX_PACKAGE_CACHE_MOUNT conflicts with reserved mount path ${conflict}`)
@@ -211,9 +228,10 @@ export function snapshotDirtyCheckCommand(
   // 注意：不能写 `timeout N { ...; }`——timeout 会把 `{` 当命令名导致 shell 语法错误，
   // 而 execd 会把含命令源码的错误回显进 stdout（其中的字面量会污染标记匹配）。故用子 shell 包两个 timeout。
   const scan = `{ find ${workspace} -type f -printf '%m %s %p\\n'; find ${workspace} -type f -exec sha256sum {} \\; ; } 2>/dev/null | LC_ALL=C sort`
-  const guardedScan = timeoutSec > 0
-    ? `( timeout ${timeoutSec + 5} find ${workspace} -type f -printf '%m %s %p\\n' 2>/dev/null; timeout ${timeoutSec + 5} find ${workspace} -type f -exec sha256sum {} \\; 2>/dev/null ) | LC_ALL=C sort`
-    : scan
+  const guardedScan =
+    timeoutSec > 0
+      ? `( timeout ${timeoutSec + 5} find ${workspace} -type f -printf '%m %s %p\\n' 2>/dev/null; timeout ${timeoutSec + 5} find ${workspace} -type f -exec sha256sum {} \\; 2>/dev/null ) | LC_ALL=C sort`
+      : scan
   return [
     `out=$(${guardedQuick}); rc=$?; if [ "$rc" -ne 0 ] || [ -n "$out" ]; then echo DIRTY; exit 0; fi`,
     `[ -f ${manifest} ] || { echo DIRTY; exit 0; }`,
@@ -230,7 +248,10 @@ function runEphemeralCommand(sb: Sandbox, command: string, timeoutSeconds = 15):
   return Effect.tryPromise(async () => {
     const sessionID = await sb.commands.createSession({ workingDirectory: "/workspace" })
     try {
-      const result = await sb.commands.runInSession(sessionID, command, { workingDirectory: "/workspace", timeoutSeconds })
+      const result = await sb.commands.runInSession(sessionID, command, {
+        workingDirectory: "/workspace",
+        timeoutSeconds,
+      })
       // 事件边界以 \n 连接：OutputMessage 分片间不含换行符（实测 ["4","x86_64"]），join("") 会把相邻行粘连
       const out = result.logs.stdout.map((l) => l.text).join("\n")
       if (!out) {
@@ -250,7 +271,11 @@ function runEphemeralCommand(sb: Sandbox, command: string, timeoutSeconds = 15):
   }).pipe(
     Effect.tap(() => Effect.void),
     Effect.catchCause((cause) => {
-      snapshotCmdLog.warn("ephemeral command failed", { sandboxID: sb.id, cmd: command.slice(0, 120), cause: Cause.pretty(cause) })
+      snapshotCmdLog.warn("ephemeral command failed", {
+        sandboxID: sb.id,
+        cmd: command.slice(0, 120),
+        cause: Cause.pretty(cause),
+      })
       return Effect.succeed("")
     }),
     Effect.timeoutOrElse({ duration: Duration.seconds(timeoutSeconds + 5), orElse: () => Effect.succeed("") }),
@@ -286,7 +311,12 @@ export type OomSample = {
 }
 
 export function parseOomSample(out: string): OomSample {
-  const line = (key: string) => out.split("\n").find((l) => l.startsWith(key + "="))?.slice(key.length + 1).trim() ?? ""
+  const line = (key: string) =>
+    out
+      .split("\n")
+      .find((l) => l.startsWith(key + "="))
+      ?.slice(key.length + 1)
+      .trim() ?? ""
   const num = (value: string) => (/^\d+$/.test(value) ? Number(value) : null)
   return {
     oomKill: num(line("OOM")),
@@ -309,7 +339,13 @@ export type OomAction =
 
 /** 纯判定：相邻采样差值 >0 → OOM 归因；否则水位 ≥85% → 预警（5 分钟窗口一条）。
  * prev=undefined（首轮）只立基准不告警；delta<0（沙箱重建计数器归零）按新基准静默重置，仍走水位检查。 */
-export function classifyOomSample(input: { sessionID: string; sandboxID: string; prev: number | undefined; sample: OomSample; now: number }): OomAction {
+export function classifyOomSample(input: {
+  sessionID: string
+  sandboxID: string
+  prev: number | undefined
+  sample: OomSample
+  now: number
+}): OomAction {
   const { sessionID, sandboxID, prev, sample, now } = input
   const delta = prev == null || sample.oomKill == null ? 0 : sample.oomKill - prev
   if (sample.oomKill != null && delta > 0) {
@@ -350,7 +386,10 @@ const SNAPSHOT_PRUNE_COMMAND = "rm -rf /root/.cache /home/sandbox/.cache /worksp
 export function parseMarkerOutput(stdout: string): { workspaceKb: number | null; arch: string | null } {
   let workspaceKb: number | null = null
   let arch: string | null = null
-  for (const line of stdout.split("\n").map((s) => s.trim()).filter(Boolean)) {
+  for (const line of stdout
+    .split("\n")
+    .map((s) => s.trim())
+    .filter(Boolean)) {
     if (/^(x86_64|aarch64|amd64|arm64)$/i.test(line)) {
       const lower = line.toLowerCase()
       arch = lower === "x86_64" ? "amd64" : lower === "aarch64" ? "arm64" : lower
@@ -363,7 +402,10 @@ export function parseMarkerOutput(stdout: string): { workspaceKb: number | null;
 
 /** 快照开始前打 marker + 生成内容清单，回读 workspace 大小（KB）与沙箱架构（uname -m）。
  * prune=true 时先清理可重建产物；失败静默：marker 缺失只会导致下次多一次快照，无害。 */
-export function touchSnapshotMarker(sb: Sandbox, opts?: { prune?: boolean }): Effect.Effect<{ workspaceKb: number | null; arch: string | null }> {
+export function touchSnapshotMarker(
+  sb: Sandbox,
+  opts?: { prune?: boolean },
+): Effect.Effect<{ workspaceKb: number | null; arch: string | null }> {
   const prune = opts?.prune ? `${SNAPSHOT_PRUNE_COMMAND}; ` : ""
   const cmd = `${prune}touch ${SNAPSHOT_MARKER_PATH} && ${snapshotManifestCommand()} && du -sk /workspace 2>/dev/null | cut -f1; uname -m 2>/dev/null`
   return runEphemeralCommand(sb, cmd).pipe(Effect.map(parseMarkerOutput))
@@ -377,17 +419,18 @@ export function withExecTimeout(
   return effect.pipe(
     Effect.timeoutOrElse({
       duration: Duration.seconds(timeoutSeconds),
-      orElse: () => Effect.succeed({
-        logs: { stdout: [], stderr: [] },
-        result: [],
-        exitCode: null,
-        error: {
-          name: "TimeoutError",
-          value: `Command timed out after ${timeoutSeconds}s`,
-          timestamp: Date.now(),
-          traceback: [],
-        },
-      } as CommandExecution),
+      orElse: () =>
+        Effect.succeed({
+          logs: { stdout: [], stderr: [] },
+          result: [],
+          exitCode: null,
+          error: {
+            name: "TimeoutError",
+            value: `Command timed out after ${timeoutSeconds}s`,
+            timestamp: Date.now(),
+            traceback: [],
+          },
+        } as CommandExecution),
     }),
   )
 }
@@ -417,8 +460,10 @@ const queueLog = Log.create({ service: "sandbox-provider" })
 export function isSandboxGone(error: unknown): boolean {
   const msg = error instanceof Error ? error.message : String(error)
   if (msg.includes("Sandbox is no longer running")) return true
-  return /^runInSession failed:|^runDetached failed:|^Failed to create (command|detached) session:/i.test(msg) &&
+  return (
+    /^runInSession failed:|^runDetached failed:|^Failed to create (command|detached) session:/i.test(msg) &&
     /not found|\b404\b/i.test(msg)
+  )
 }
 
 export function withCommandSemaphoreTimeout<A>(
@@ -430,19 +475,21 @@ export function withCommandSemaphoreTimeout<A>(
   if (!timeoutSeconds) return semaphore.withPermit(effect)
   const t0 = Date.now()
   return withCommandOperationTimeout(
-    semaphore.withPermitsIfAvailable(1)(effect).pipe(
-      Effect.flatMap((result) => {
-        if (Option.isSome(result)) {
-          queueLog.info("command permit acquired", { operation, waitedMs: Date.now() - t0 })
-          return Effect.succeed(result.value)
-        }
-        return Effect.fail(COMMAND_PERMIT_UNAVAILABLE)
-      }),
-      Effect.retry({
-        while: (error) => error === COMMAND_PERMIT_UNAVAILABLE,
-        schedule: Schedule.spaced(Duration.millis(10)),
-      }),
-    ),
+    semaphore
+      .withPermitsIfAvailable(1)(effect)
+      .pipe(
+        Effect.flatMap((result) => {
+          if (Option.isSome(result)) {
+            queueLog.info("command permit acquired", { operation, waitedMs: Date.now() - t0 })
+            return Effect.succeed(result.value)
+          }
+          return Effect.fail(COMMAND_PERMIT_UNAVAILABLE)
+        }),
+        Effect.retry({
+          while: (error) => error === COMMAND_PERMIT_UNAVAILABLE,
+          schedule: Schedule.spaced(Duration.millis(10)),
+        }),
+      ),
     timeoutSeconds + COMMAND_QUEUE_GRACE_SECONDS,
     operation,
   )
@@ -525,7 +572,9 @@ async function runCommandEarlyExit(
         execution.complete = { executionTimeMs: ev.execution_time ?? 0, timestamp: Date.now() }
         await handlers?.onExecutionComplete?.(execution.complete)
         execution.exitCode = execution.error
-          ? errorValue && /^-?\d+$/.test(errorValue.trim()) ? Number(errorValue.trim()) : null
+          ? errorValue && /^-?\d+$/.test(errorValue.trim())
+            ? Number(errorValue.trim())
+            : null
           : 0
         return execution
       }
@@ -558,7 +607,11 @@ export namespace SandboxProvider {
   export interface Interface {
     readonly getOrCreate: (
       sessionID: SessionID,
-      opts?: { pvcMode?: "session" | "app"; appId?: string; sandbox?: { cpu: string; memory: string; image?: string; snapshotId?: string } },
+      opts?: {
+        pvcMode?: "session" | "app"
+        appId?: string
+        sandbox?: { cpu: string; memory: string; image?: string; snapshotId?: string }
+      },
     ) => Effect.Effect<Sandbox>
     readonly get: (sessionID: SessionID) => Effect.Effect<Sandbox | null>
     readonly destroy: (sessionID: SessionID) => Effect.Effect<void>
@@ -569,7 +622,9 @@ export namespace SandboxProvider {
     /** 显式快照：对会话当前沙箱发起快照（异步，不等 Ready），返回快照 id；无沙箱/失败返回 null */
     readonly createSnapshot?: (sessionID: SessionID) => Effect.Effect<string | null>
     /** 会话最新快照状态（无则 null） */
-    readonly getLatestSnapshot?: (sessionID: SessionID) => Effect.Effect<{ id: string; state: string; reason: string | null } | null>
+    readonly getLatestSnapshot?: (
+      sessionID: SessionID,
+    ) => Effect.Effect<{ id: string; state: string; reason: string | null } | null>
     /** 快照聚合统计（状态分布 / 操作耗时 P50-P95 / GC backlog / 派生比率） */
     readonly getSnapshotStats?: () => Effect.Effect<unknown>
     readonly keepAlive: (sessionID: SessionID) => Effect.Effect<void>
@@ -655,10 +710,21 @@ export namespace SandboxProvider {
       }
 
       function removeEntry(sessionID: string) {
-        return Ref.modify(entries, (m) => { m.delete(sessionID); return [undefined, m] as const })
+        return Ref.modify(entries, (m) => {
+          m.delete(sessionID)
+          return [undefined, m] as const
+        })
       }
 
-      function createSandbox(sessionID: SessionID, opts?: { pvcMode?: "session" | "app"; appId?: string; persistMode?: "pvc" | "snapshot"; sandbox?: { cpu: string; memory: string; image?: string; snapshotId?: string } }) {
+      function createSandbox(
+        sessionID: SessionID,
+        opts?: {
+          pvcMode?: "session" | "app"
+          appId?: string
+          persistMode?: "pvc" | "snapshot"
+          sandbox?: { cpu: string; memory: string; image?: string; snapshotId?: string }
+        },
+      ) {
         return Effect.gen(function* () {
           const resolved = opts ?? (yield* Effect.promise(() => resolveSandboxOpts(sessionID)))
           const timeoutSeconds = hasVolume ? config.maxTtlSeconds : config.timeoutSeconds
@@ -667,11 +733,20 @@ export namespace SandboxProvider {
           const resource = resolved.sandbox
             ? { cpu: resolved.sandbox.cpu, memory: resolved.sandbox.memory }
             : config.resourceLimits
-          log.info("creating sandbox", { sessionID, volumeType: config.volumeType, timeoutSeconds, pvcMode: resolved.pvcMode, resource })
-          const volumes = buildVolumes({ sessionID, pvcMode: resolved.pvcMode, appId: resolved.appId, persistMode: resolved.persistMode }, config)
+          log.info("creating sandbox", {
+            sessionID,
+            volumeType: config.volumeType,
+            timeoutSeconds,
+            pvcMode: resolved.pvcMode,
+            resource,
+          })
+          const volumes = buildVolumes(
+            { sessionID, pvcMode: resolved.pvcMode, appId: resolved.appId, persistMode: resolved.persistMode },
+            config,
+          )
           const persistMode = resolved.persistMode ?? (config.volumeType === "snapshot" ? "snapshot" : "pvc")
-          const sessionImage = resolved.sandbox?.image?.trim()
-            || (persistMode === "snapshot" ? config.snapshotImage : config.image)
+          const sessionImage =
+            resolved.sandbox?.image?.trim() || (persistMode === "snapshot" ? config.snapshotImage : config.image)
           const sb = yield* Effect.tryPromise({
             try: () =>
               Sandbox.create({
@@ -693,7 +768,8 @@ export namespace SandboxProvider {
         }).pipe(
           Effect.timeoutOrElse({
             duration: Duration.seconds(CREATE_TIMEOUT_SECONDS),
-            orElse: () => Effect.fail(new Error(`Sandbox create timed out after ${CREATE_TIMEOUT_SECONDS}s: ${sessionID}`)),
+            orElse: () =>
+              Effect.fail(new Error(`Sandbox create timed out after ${CREATE_TIMEOUT_SECONDS}s: ${sessionID}`)),
           }),
           Effect.orDie,
           Effect.withSpan("SandboxProvider.createSandbox"),
@@ -711,16 +787,26 @@ export namespace SandboxProvider {
           }
           commandSessions.delete(sessionID)
           yield* Effect.tryPromise(() => sb.kill()).pipe(
-            Effect.catchCause(() => { log.error("sandbox kill failed", { sessionID }); return Effect.void }),
+            Effect.catchCause(() => {
+              log.error("sandbox kill failed", { sessionID })
+              return Effect.void
+            }),
           )
           yield* Effect.tryPromise(() => sb.close()).pipe(
-            Effect.catchCause(() => { log.error("sandbox close failed", { sessionID }); return Effect.void }),
+            Effect.catchCause(() => {
+              log.error("sandbox close failed", { sessionID })
+              return Effect.void
+            }),
           )
           log.info("sandbox destroyed", { sessionID })
         }).pipe(Effect.withSpan("SandboxProvider.destroySandbox"))
       }
 
-      function claim<D, E>(ref: Ref.Ref<Map<string, Deferred.Deferred<D, E>>>, key: string, token: Deferred.Deferred<D, E>) {
+      function claim<D, E>(
+        ref: Ref.Ref<Map<string, Deferred.Deferred<D, E>>>,
+        key: string,
+        token: Deferred.Deferred<D, E>,
+      ) {
         return Ref.modify(ref, (map) => {
           const existing = map.get(key)
           if (existing) return [existing, map] as const
@@ -754,8 +840,13 @@ export namespace SandboxProvider {
           }).pipe(
             Effect.catchCause((cause) =>
               Effect.gen(function* () {
-                yield* Ref.modify(createRef, (m) => { m.delete(sessionID); return [undefined, m] as const })
-                yield* Deferred.fail(myToken, new Error("Sandbox creation failed")).pipe(Effect.catchCause(() => Effect.void))
+                yield* Ref.modify(createRef, (m) => {
+                  m.delete(sessionID)
+                  return [undefined, m] as const
+                })
+                yield* Deferred.fail(myToken, new Error("Sandbox creation failed")).pipe(
+                  Effect.catchCause(() => Effect.void),
+                )
                 return yield* Effect.failCause(cause)
               }),
             ),
@@ -766,7 +857,10 @@ export namespace SandboxProvider {
             yield* destroySandbox(sb, sessionID).pipe(Effect.catchCause(() => Effect.void))
             return yield* Effect.fail(new Error(`Sandbox creation cancelled: ${sessionID}`))
           }
-          yield* Ref.modify(createRef, (m) => { m.delete(sessionID); return [undefined, m] as const })
+          yield* Ref.modify(createRef, (m) => {
+            m.delete(sessionID)
+            return [undefined, m] as const
+          })
           sandboxes.set(sessionID, sb)
           yield* setEntry(sessionID, { state: "running", sb, sandboxID: sb.id, lastActive: Date.now() })
           yield* Deferred.succeed(myToken, sb)
@@ -791,7 +885,8 @@ export namespace SandboxProvider {
             if (d) m.delete(sessionID)
             return [d, m] as const
           })
-          if (inFlightSession) yield* Deferred.fail(inFlightSession, new Error(`Command session destroyed while creating: ${sessionID}`))
+          if (inFlightSession)
+            yield* Deferred.fail(inFlightSession, new Error(`Command session destroyed while creating: ${sessionID}`))
           if (sb) yield* destroySandbox(sb, sessionID)
         }).pipe(Effect.withSpan("SandboxProvider.destroy"))
 
@@ -809,28 +904,48 @@ export namespace SandboxProvider {
       const destroyAll: Interface["destroyAll"] = () =>
         Effect.gen(function* () {
           log.info("destroying all sandboxes", { count: sandboxes.size })
-          const inFlightCreates = yield* Ref.modify(createRef, (m) => { const e = Array.from(m.entries()); m.clear(); return [e, m] as const })
+          const inFlightCreates = yield* Ref.modify(createRef, (m) => {
+            const e = Array.from(m.entries())
+            m.clear()
+            return [e, m] as const
+          })
           for (const [, d] of inFlightCreates) yield* Deferred.fail(d, new Error("Sandbox destroyed during shutdown"))
-          const inFlightSessions = yield* Ref.modify(sessionRef, (m) => { const e = Array.from(m.entries()); m.clear(); return [e, m] as const })
-          for (const [, d] of inFlightSessions) yield* Deferred.fail(d, new Error("Command session destroyed during shutdown"))
-          const all = yield* Ref.modify(entries, (m) => { const e = Array.from(m.entries()); m.clear(); return [e, m] as const })
+          const inFlightSessions = yield* Ref.modify(sessionRef, (m) => {
+            const e = Array.from(m.entries())
+            m.clear()
+            return [e, m] as const
+          })
+          for (const [, d] of inFlightSessions)
+            yield* Deferred.fail(d, new Error("Command session destroyed during shutdown"))
+          const all = yield* Ref.modify(entries, (m) => {
+            const e = Array.from(m.entries())
+            m.clear()
+            return [e, m] as const
+          })
           for (const [sid, entry] of all) {
             if (entry.state === "running") {
               sandboxes.delete(sid)
               yield* destroySandbox(entry.sb, sid).pipe(
-                Effect.catchCause((cause) => { log.error("failed to destroy sandbox during shutdown", { sid, cause: Cause.pretty(cause) }); return Effect.void }),
+                Effect.catchCause((cause) => {
+                  log.error("failed to destroy sandbox during shutdown", { sid, cause: Cause.pretty(cause) })
+                  return Effect.void
+                }),
               )
             }
           }
         }).pipe(Effect.withSpan("SandboxProvider.destroyAll"))
 
       const keepAlive: Interface["keepAlive"] = (sessionID) =>
-        Effect.sync(() => { log.info("sandbox keep alive enabled", { sessionID }) })
+        Effect.sync(() => {
+          log.info("sandbox keep alive enabled", { sessionID })
+        })
 
       const touch: Interface["touch"] = touchLastActive
 
       const release: Interface["release"] = (sessionID) =>
-        Effect.sync(() => { log.info("sandbox keep alive released", { sessionID }) })
+        Effect.sync(() => {
+          log.info("sandbox keep alive released", { sessionID })
+        })
 
       const isKeepAlive: Interface["isKeepAlive"] = (sessionID) => Effect.sync(() => false)
 
@@ -871,7 +986,10 @@ export namespace SandboxProvider {
             }
           }
           let sem = commandSemaphores.get(sessionID)
-          if (!sem) { sem = Effect.runSync(Semaphore.make(1)); commandSemaphores.set(sessionID, sem) }
+          if (!sem) {
+            sem = Effect.runSync(Semaphore.make(1))
+            commandSemaphores.set(sessionID, sem)
+          }
           return yield* sem.withPermit(
             withExecTimeout(
               Effect.tryPromise({
@@ -920,9 +1038,11 @@ export namespace SandboxProvider {
           })
           log.info("sandbox command interrupted", { sessionID })
         }).pipe(
-          Effect.ensuring(Effect.sync(() => {
-            commandSessions.delete(sessionID)
-          })),
+          Effect.ensuring(
+            Effect.sync(() => {
+              commandSessions.delete(sessionID)
+            }),
+          ),
           Effect.catch(() => Effect.void),
           Effect.withSpan("SandboxProvider.interrupt"),
         )
@@ -940,9 +1060,7 @@ export namespace SandboxProvider {
             // useServerProxy=true 经 OpenSandbox server 网关代理（{endpoint-host}/sandboxes/{id}/port/{port}），缺省直连沙箱地址
             try: () =>
               opts?.useServerProxy
-                ? sb.sandboxes
-                    .getSandboxEndpoint(sb.id, port, true)
-                    .then((ep) => `${config.protocol}://${ep.endpoint}`)
+                ? sb.sandboxes.getSandboxEndpoint(sb.id, port, true).then((ep) => `${config.protocol}://${ep.endpoint}`)
                 : sb.getEndpointUrl(port),
             catch: (e) => new Error(`getEndpoint failed: ${String(e)}`),
           })
@@ -962,8 +1080,21 @@ export namespace SandboxProvider {
       }
 
       return Service.of({
-        getOrCreate, get, destroy, destroyById, destroyAll, keepAlive, touch, release, isKeepAlive, isSnapshotSession,
-        runInSession, runDetached, interrupt, register, getEndpoint,
+        getOrCreate,
+        get,
+        destroy,
+        destroyById,
+        destroyAll,
+        keepAlive,
+        touch,
+        release,
+        isKeepAlive,
+        isSnapshotSession,
+        runInSession,
+        runDetached,
+        interrupt,
+        register,
+        getEndpoint,
         cleanupSessionVolume: (sessionID) => cleanupSessionVolume(sessionID, config, connectionConfig),
         purgeSnapshots: () => Effect.void,
         getSnapshotStats: () => Effect.succeed(null),
@@ -978,7 +1109,7 @@ export namespace SandboxProvider {
       const config = yield* SandboxConfig.Service
       yield* Effect.try({
         try: () => validateSnapshotConfig(config),
-        catch: (error) => error instanceof Error ? error : new Error(String(error)),
+        catch: (error) => (error instanceof Error ? error : new Error(String(error))),
       }).pipe(Effect.orDie)
       const runPromise = Effect.runPromiseWith(yield* Effect.context())
       const commandSemaphores = new Map<string, Semaphore.Semaphore>()
@@ -989,9 +1120,14 @@ export namespace SandboxProvider {
       // 会一个复用、一个判 dirty 产生多余快照；用 in-flight 集合串行化规避。
       const cleanupRef = yield* Ref.make(new Set<string>())
       const claimCleanup = (sessionID: string) =>
-        Ref.modify(cleanupRef, (s) => s.has(sessionID) ? [false, s] as const : [true, new Set(s).add(sessionID)] as const)
+        Ref.modify(cleanupRef, (s) =>
+          s.has(sessionID) ? ([false, s] as const) : ([true, new Set(s).add(sessionID)] as const),
+        )
       const releaseCleanup = (sessionID: string) =>
-        Ref.update(cleanupRef, (s) => { s.delete(sessionID); return s })
+        Ref.update(cleanupRef, (s) => {
+          s.delete(sessionID)
+          return s
+        })
       // Sandbox creations outlive the caller that triggered them: when a
       // waiter times out, the creation fiber keeps running here until the
       // layer is disposed.
@@ -1059,71 +1195,76 @@ export namespace SandboxProvider {
 
       function dbGet(sessionID: string) {
         return Effect.tryPromise({
-          try: () => pgDb
-            .select()
-            .from(SandboxTable)
-            .where(eq(SandboxTable.session_id, sessionID))
-            .limit(1)
-            .then((rows: Row[]) => rows[0] ?? null) as Promise<Row | null>,
+          try: () =>
+            pgDb
+              .select()
+              .from(SandboxTable)
+              .where(eq(SandboxTable.session_id, sessionID))
+              .limit(1)
+              .then((rows: Row[]) => rows[0] ?? null) as Promise<Row | null>,
           catch: (e) => new Error(`db.get failed: ${String(e)}`),
         }).pipe(Effect.orDie)
       }
 
       function dbGetSessionDirectory(sessionID: string) {
         return Effect.tryPromise({
-          try: () => pgDb
-            .select({ directory: SessionTable.directory })
-            .from(SessionTable)
-            .where(eq(SessionTable.id, sessionID as SessionID))
-            .limit(1)
-            .then((rows: { directory: string }[]) => rows[0]?.directory ?? null) as Promise<string | null>,
+          try: () =>
+            pgDb
+              .select({ directory: SessionTable.directory })
+              .from(SessionTable)
+              .where(eq(SessionTable.id, sessionID as SessionID))
+              .limit(1)
+              .then((rows: { directory: string }[]) => rows[0]?.directory ?? null) as Promise<string | null>,
           catch: () => null as null,
         }).pipe(Effect.orElseSucceed(() => null))
       }
 
       // 会话级持久化方式（固化在 sandbox JSON 的 persistMode；未固化旧行回退全局 volumeType）
       function dbResolvePersistMode(sessionID: string) {
-        const fallback = config.volumeType === "snapshot" ? "snapshot" as const : "pvc" as const
+        const fallback = config.volumeType === "snapshot" ? ("snapshot" as const) : ("pvc" as const)
         return Effect.tryPromise({
-          try: () => pgDb
-            .select({ sandbox: SessionTable.sandbox })
-            .from(SessionTable)
-            .where(eq(SessionTable.id, sessionID as SessionID))
-            .limit(1)
-            .then((rows: { sandbox: unknown }[]) => parseSandboxColumn(rows[0]?.sandbox)?.persistMode ?? fallback),
+          try: () =>
+            pgDb
+              .select({ sandbox: SessionTable.sandbox })
+              .from(SessionTable)
+              .where(eq(SessionTable.id, sessionID as SessionID))
+              .limit(1)
+              .then((rows: { sandbox: unknown }[]) => parseSandboxColumn(rows[0]?.sandbox)?.persistMode ?? fallback),
           catch: () => fallback,
         }).pipe(Effect.orElseSucceed(() => fallback))
       }
 
       function dbGetById(id: string) {
         return Effect.tryPromise({
-          try: () => pgDb
-            .select()
-            .from(SandboxTable)
-            .where(eq(SandboxTable.id, id))
-            .limit(1)
-            .then((rows: Row[]) => rows[0] ?? null) as Promise<Row | null>,
+          try: () =>
+            pgDb
+              .select()
+              .from(SandboxTable)
+              .where(eq(SandboxTable.id, id))
+              .limit(1)
+              .then((rows: Row[]) => rows[0] ?? null) as Promise<Row | null>,
           catch: (e) => new Error(`db.getById failed: ${String(e)}`),
         }).pipe(Effect.orDie)
       }
 
       function dbUpsert(row: typeof SandboxTable.$inferInsert) {
         return Effect.tryPromise({
-          try: () => pgDb
-            .insert(SandboxTable)
-            .values(row)
-            .onConflictDoUpdate({
-              target: SandboxTable.session_id,
-              set: {
-                id: row.id,
-                host: row.host,
-                state: row.state,
-                keep_alive: row.keep_alive,
-                command_session_id: row.command_session_id,
-                time_updated: Date.now(),
-              },
-            })
-            .run(),
+          try: () =>
+            pgDb
+              .insert(SandboxTable)
+              .values(row)
+              .onConflictDoUpdate({
+                target: SandboxTable.session_id,
+                set: {
+                  id: row.id,
+                  host: row.host,
+                  state: row.state,
+                  keep_alive: row.keep_alive,
+                  command_session_id: row.command_session_id,
+                  time_updated: Date.now(),
+                },
+              })
+              .run(),
           catch: (e) => new Error(`db.upsert failed: ${String(e)}`),
         }).pipe(Effect.orDie)
       }
@@ -1158,22 +1299,24 @@ export namespace SandboxProvider {
 
       function dbSetState(sessionID: string, state: "running" | "killed") {
         return Effect.tryPromise({
-          try: () => pgDb
-            .update(SandboxTable)
-            .set({ state, time_updated: Date.now() })
-            .where(eq(SandboxTable.session_id, sessionID))
-            .run(),
+          try: () =>
+            pgDb
+              .update(SandboxTable)
+              .set({ state, time_updated: Date.now() })
+              .where(eq(SandboxTable.session_id, sessionID))
+              .run(),
           catch: (e) => new Error(`db.setState failed: ${String(e)}`),
         }).pipe(Effect.orDie)
       }
 
       function dbSetStateFor(sessionID: string, id: string, state: "running" | "killed") {
         return Effect.tryPromise({
-          try: () => pgDb
-            .update(SandboxTable)
-            .set({ state, time_updated: Date.now() })
-            .where(and(eq(SandboxTable.session_id, sessionID), eq(SandboxTable.id, id)))
-            .run(),
+          try: () =>
+            pgDb
+              .update(SandboxTable)
+              .set({ state, time_updated: Date.now() })
+              .where(and(eq(SandboxTable.session_id, sessionID), eq(SandboxTable.id, id)))
+              .run(),
           catch: (e) => new Error(`db.setStateFor failed: ${String(e)}`),
         }).pipe(Effect.orDie)
       }
@@ -1185,54 +1328,52 @@ export namespace SandboxProvider {
         to: "running" | "snapshotting" | "killed",
       ) {
         return Effect.tryPromise({
-          try: () => pgDb
-            .update(SandboxTable)
-            .set({ state: to, time_updated: Date.now() })
-            .where(and(
-              eq(SandboxTable.session_id, sessionID),
-              eq(SandboxTable.id, id),
-              eq(SandboxTable.state, from),
-            ))
-            .returning({ id: SandboxTable.id })
-            .then((rows: Array<{ id: string }>) => rows.length > 0),
+          try: () =>
+            pgDb
+              .update(SandboxTable)
+              .set({ state: to, time_updated: Date.now() })
+              .where(and(eq(SandboxTable.session_id, sessionID), eq(SandboxTable.id, id), eq(SandboxTable.state, from)))
+              .returning({ id: SandboxTable.id })
+              .then((rows: Array<{ id: string }>) => rows.length > 0),
           catch: (e) => new Error(`db.transitionState failed: ${String(e)}`),
         }).pipe(Effect.orDie)
       }
 
       function dbSetKeepAlive(sessionID: string, val: boolean) {
         return Effect.tryPromise({
-          try: () => pgDb
-            .update(SandboxTable)
-            .set({ keep_alive: val, time_updated: Date.now() })
-            .where(eq(SandboxTable.session_id, sessionID))
-            .run(),
+          try: () =>
+            pgDb
+              .update(SandboxTable)
+              .set({ keep_alive: val, time_updated: Date.now() })
+              .where(eq(SandboxTable.session_id, sessionID))
+              .run(),
           catch: (e) => new Error(`db.setKeepAlive failed: ${String(e)}`),
         }).pipe(Effect.orDie)
       }
 
       function dbSetCommandSession(sessionID: string, id: string, cmdSessionID: string | null) {
         return Effect.tryPromise({
-          try: () => pgDb
-            .update(SandboxTable)
-            .set({ command_session_id: cmdSessionID, time_updated: Date.now() })
-            .where(and(eq(SandboxTable.session_id, sessionID), eq(SandboxTable.id, id)))
-            .run(),
+          try: () =>
+            pgDb
+              .update(SandboxTable)
+              .set({ command_session_id: cmdSessionID, time_updated: Date.now() })
+              .where(and(eq(SandboxTable.session_id, sessionID), eq(SandboxTable.id, id)))
+              .run(),
           catch: (e) => new Error(`db.setCommandSession failed: ${String(e)}`),
         }).pipe(Effect.orDie)
       }
 
       function dbTouchSandbox(sessionID: string, id: string) {
         return Effect.tryPromise({
-          try: () => pgDb
-            .update(SandboxTable)
-            .set({ time_updated: Date.now() })
-            .where(and(
-              eq(SandboxTable.session_id, sessionID),
-              eq(SandboxTable.id, id),
-              eq(SandboxTable.state, "running"),
-            ))
-            .returning({ id: SandboxTable.id })
-            .then((rows: Array<{ id: string }>) => rows.length > 0),
+          try: () =>
+            pgDb
+              .update(SandboxTable)
+              .set({ time_updated: Date.now() })
+              .where(
+                and(eq(SandboxTable.session_id, sessionID), eq(SandboxTable.id, id), eq(SandboxTable.state, "running")),
+              )
+              .returning({ id: SandboxTable.id })
+              .then((rows: Array<{ id: string }>) => rows.length > 0),
           catch: (e) => new Error(`db.touchSandbox failed: ${String(e)}`),
         }).pipe(Effect.orDie)
       }
@@ -1241,72 +1382,64 @@ export namespace SandboxProvider {
         const retryBefore = Date.now() - CLEANUP_RETRY_MS
         const snapshottingBefore = Date.now() - config.snapshotWaitMs - 60_000
         return Effect.tryPromise({
-          try: () => pgDb
-            .update(SandboxTable)
-            .set({ state: "killed", time_updated: Date.now() })
-            .where(and(
-              eq(SandboxTable.session_id, sessionID),
-              eq(SandboxTable.id, id),
-              or(
+          try: () =>
+            pgDb
+              .update(SandboxTable)
+              .set({ state: "killed", time_updated: Date.now() })
+              .where(
                 and(
-                  eq(SandboxTable.state, "running"),
-                  lt(SandboxTable.time_updated, threshold),
-                  keepAlive === undefined ? undefined : eq(SandboxTable.keep_alive, keepAlive),
+                  eq(SandboxTable.session_id, sessionID),
+                  eq(SandboxTable.id, id),
+                  or(
+                    and(
+                      eq(SandboxTable.state, "running"),
+                      lt(SandboxTable.time_updated, threshold),
+                      keepAlive === undefined ? undefined : eq(SandboxTable.keep_alive, keepAlive),
+                    ),
+                    and(eq(SandboxTable.state, "killed"), lt(SandboxTable.time_updated, retryBefore)),
+                    and(eq(SandboxTable.state, "snapshotting"), lt(SandboxTable.time_updated, snapshottingBefore)),
+                  ),
                 ),
-                and(
-                  eq(SandboxTable.state, "killed"),
-                  lt(SandboxTable.time_updated, retryBefore),
-                ),
-                and(
-                  eq(SandboxTable.state, "snapshotting"),
-                  lt(SandboxTable.time_updated, snapshottingBefore),
-                ),
-              ),
-            ))
-            .returning({ id: SandboxTable.id })
-            .then((rows: Array<{ id: string }>) => rows.length > 0),
+              )
+              .returning({ id: SandboxTable.id })
+              .then((rows: Array<{ id: string }>) => rows.length > 0),
           catch: (e) => new Error(`db.claimIdleSandbox failed: ${String(e)}`),
         }).pipe(Effect.orDie)
       }
 
       function dbDelete(sessionID: string) {
         return Effect.tryPromise({
-          try: () => pgDb
-            .delete(SandboxTable)
-            .where(eq(SandboxTable.session_id, sessionID))
-            .run(),
+          try: () => pgDb.delete(SandboxTable).where(eq(SandboxTable.session_id, sessionID)).run(),
           catch: (e) => new Error(`db.delete failed: ${String(e)}`),
         }).pipe(Effect.orDie)
       }
 
       function dbDeleteFor(sessionID: string, id: string) {
         return Effect.tryPromise({
-          try: () => pgDb
-            .delete(SandboxTable)
-            .where(and(eq(SandboxTable.session_id, sessionID), eq(SandboxTable.id, id)))
-            .run(),
+          try: () =>
+            pgDb
+              .delete(SandboxTable)
+              .where(and(eq(SandboxTable.session_id, sessionID), eq(SandboxTable.id, id)))
+              .run(),
           catch: (e) => new Error(`db.deleteFor failed: ${String(e)}`),
         }).pipe(Effect.orDie)
       }
 
       function dbMarkDestroyed(sessionID: string, id: string) {
         return Effect.tryPromise({
-          try: () => pgDb
-            .update(SandboxTable)
-            .set({ state: "destroyed", command_session_id: null, time_updated: Date.now() })
-            .where(and(eq(SandboxTable.session_id, sessionID), eq(SandboxTable.id, id)))
-            .run(),
+          try: () =>
+            pgDb
+              .update(SandboxTable)
+              .set({ state: "destroyed", command_session_id: null, time_updated: Date.now() })
+              .where(and(eq(SandboxTable.session_id, sessionID), eq(SandboxTable.id, id)))
+              .run(),
           catch: (e) => new Error(`db.markDestroyed failed: ${String(e)}`),
         }).pipe(Effect.orDie)
       }
 
       function dbAll() {
         return Effect.tryPromise({
-          try: () => pgDb
-            .select()
-            .from(SandboxTable)
-            .where(eq(SandboxTable.state, "running"))
-            .all() as Promise<Row[]>,
+          try: () => pgDb.select().from(SandboxTable).where(eq(SandboxTable.state, "running")).all() as Promise<Row[]>,
           catch: (e) => new Error(`db.all failed: ${String(e)}`),
         }).pipe(Effect.orDie)
       }
@@ -1340,7 +1473,7 @@ export namespace SandboxProvider {
       function reconnect(row: { id: string; host: string }) {
         return Effect.tryPromise({
           try: () => Sandbox.connect({ connectionConfig, sandboxId: row.id }),
-          catch: (error) => error instanceof Error ? error : new Error(`Sandbox.connect failed: ${String(error)}`),
+          catch: (error) => (error instanceof Error ? error : new Error(`Sandbox.connect failed: ${String(error)}`)),
         })
       }
 
@@ -1377,7 +1510,15 @@ export namespace SandboxProvider {
         })
       }
 
-      function createSandbox(sessionID: SessionID, opts?: { pvcMode?: "session" | "app"; appId?: string; persistMode?: "pvc" | "snapshot"; sandbox?: { cpu: string; memory: string; image?: string; snapshotId?: string } }) {
+      function createSandbox(
+        sessionID: SessionID,
+        opts?: {
+          pvcMode?: "session" | "app"
+          appId?: string
+          persistMode?: "pvc" | "snapshot"
+          sandbox?: { cpu: string; memory: string; image?: string; snapshotId?: string }
+        },
+      ) {
         return Effect.gen(function* () {
           const existingRow = yield* dbGet(sessionID).pipe(Effect.orElseSucceed(() => null))
           const isKept = existingRow?.keep_alive === true
@@ -1392,34 +1533,68 @@ export namespace SandboxProvider {
             ? { cpu: resolved.sandbox.cpu, memory: resolved.sandbox.memory }
             : config.resourceLimits
           const timeStarted = Date.now()
-          const volumes = buildVolumes({ sessionID, pvcMode: resolved.pvcMode, appId: resolved.appId, persistMode }, config)
+          const volumes = buildVolumes(
+            { sessionID, pvcMode: resolved.pvcMode, appId: resolved.appId, persistMode },
+            config,
+          )
           // 会话级沙箱参数（SandboxResource）：镜像覆盖 + 显式恢复源；
           // snapshot 模式冷启动/恢复失败降级用精简镜像（rootfs 小、快照快），默认（pvc）用原镜像
-          const sessionImage = resolved.sandbox?.image?.trim()
-            || (persistMode === "snapshot" ? config.snapshotImage : config.image)
+          const sessionImage =
+            resolved.sandbox?.image?.trim() || (persistMode === "snapshot" ? config.snapshotImage : config.image)
           const explicitSnapshotId = resolved.sandbox?.snapshotId?.trim() || null
 
           // 快照恢复优先：显式 snapshotId > 会话快照表最新 ready|stale；恢复失败在 catch 分支降级镜像
-          const explicitTarget = { id: explicitSnapshotId ?? "", image: null as string | null, arch: null as string | null, schemaVersion: null as number | null }
-          let resolvedSnapshot = snapshots && persistMode === "snapshot"
-            ? (explicitSnapshotId ? explicitTarget : (yield* Effect.promise(() => snapshots.resolveForCreate(sessionID))))
-            : (explicitSnapshotId ? explicitTarget : null)
+          const explicitTarget = {
+            id: explicitSnapshotId ?? "",
+            image: null as string | null,
+            arch: null as string | null,
+            schemaVersion: null as number | null,
+          }
+          let resolvedSnapshot =
+            snapshots && persistMode === "snapshot"
+              ? explicitSnapshotId
+                ? explicitTarget
+                : yield* Effect.promise(() => snapshots.resolveForCreate(sessionID))
+              : explicitSnapshotId
+                ? explicitTarget
+                : null
           // 兼容性阻断：快照内容布局版本与当前不兼容 → 标记 failed 并冷启动
           // （远端可能"恢复成功"但内容不可用；null = 迁移前旧快照，视为兼容避免误伤）
           if (resolvedSnapshot && snapshotSchemaMismatch(resolvedSnapshot.schemaVersion, SNAPSHOT_SCHEMA_VERSION)) {
             const incompatible = resolvedSnapshot
-            log.warn("snapshot schema incompatible; cold start", { sessionID, snapshotId: incompatible.id, snapshotSchema: incompatible.schemaVersion, current: SNAPSHOT_SCHEMA_VERSION })
-            yield* Effect.promise(() => snapshots!.markIncompatible(sessionID, incompatible.id, `schema ${incompatible.schemaVersion} != ${SNAPSHOT_SCHEMA_VERSION}`)).pipe(Effect.catchCause(() => Effect.void))
+            log.warn("snapshot schema incompatible; cold start", {
+              sessionID,
+              snapshotId: incompatible.id,
+              snapshotSchema: incompatible.schemaVersion,
+              current: SNAPSHOT_SCHEMA_VERSION,
+            })
+            yield* Effect.promise(() =>
+              snapshots!.markIncompatible(
+                sessionID,
+                incompatible.id,
+                `schema ${incompatible.schemaVersion} != ${SNAPSHOT_SCHEMA_VERSION}`,
+              ),
+            ).pipe(Effect.catchCause(() => Effect.void))
             resolvedSnapshot = null
           }
           const snapshotId = resolvedSnapshot?.id ?? null
           // 兼容性观测：镜像/架构漂移记录，仍尝试恢复（远端失败会自动降级冷启动），便于排障与 fallback 归因
           if (resolvedSnapshot?.image && resolvedSnapshot.image !== sessionImage) {
-            log.warn("snapshot image drift; restoring anyway", { sessionID, snapshotId, snapshotImage: resolvedSnapshot.image, sessionImage })
+            log.warn("snapshot image drift; restoring anyway", {
+              sessionID,
+              snapshotId,
+              snapshotImage: resolvedSnapshot.image,
+              sessionImage,
+            })
           }
           const expectedArch = expectedSandboxArch(process.arch)
           if (resolvedSnapshot?.arch && resolvedSnapshot.arch !== expectedArch) {
-            log.warn("snapshot arch drift; restoring anyway", { sessionID, snapshotId, snapshotArch: resolvedSnapshot.arch, serverArch: process.arch })
+            log.warn("snapshot arch drift; restoring anyway", {
+              sessionID,
+              snapshotId,
+              snapshotArch: resolvedSnapshot.arch,
+              serverArch: process.arch,
+            })
           }
           const createFromSnapshot = (id: string) =>
             Effect.tryPromise({
@@ -1448,7 +1623,7 @@ export namespace SandboxProvider {
           // 快照恢复优先：有快照则从快照拉起（秒级）；恢复失败（快照被 GC/层损坏）
           // 标记 failed 并降级镜像冷启动，不阻塞会话创建
           const restoreStarted = Date.now()
-          const created = yield* (snapshotId
+          const created = yield* snapshotId
             ? createFromSnapshot(snapshotId).pipe(
                 Effect.map((sb) => ({ sb, restoredFromSnapshot: true })),
                 Effect.catchIf(
@@ -1464,10 +1639,12 @@ export namespace SandboxProvider {
                         detail: { snapshotId, durationMs: Date.now() - restoreStarted, error: err.message },
                         timeStarted: restoreStarted,
                       }),
-                    ).pipe(Effect.andThen(createFromImage().pipe(Effect.map((sb) => ({ sb, restoredFromSnapshot: false }))))),
+                    ).pipe(
+                      Effect.andThen(createFromImage().pipe(Effect.map((sb) => ({ sb, restoredFromSnapshot: false })))),
+                    ),
                 ),
               )
-            : createFromImage().pipe(Effect.map((sb) => ({ sb, restoredFromSnapshot: false }))))
+            : createFromImage().pipe(Effect.map((sb) => ({ sb, restoredFromSnapshot: false })))
           const sb = created.sb
           // snapshot 模式冷启动（无快照可恢复）时 /workspace 在 rootfs 上，需手动创建
           if (!hasVolume || (persistMode === "snapshot" && !created.restoredFromSnapshot)) {
@@ -1501,7 +1678,10 @@ export namespace SandboxProvider {
             if (out.includes("PRESENT")) markerPresent = true
             else if (out.includes("MISSING")) {
               markerPresent = false
-              log.warn("restored snapshot missing integrity marker; legacy snapshot or corrupted content", { sessionID, snapshotId })
+              log.warn("restored snapshot missing integrity marker; legacy snapshot or corrupted content", {
+                sessionID,
+                snapshotId,
+              })
             }
           }
           const timeFinished = Date.now()
@@ -1556,12 +1736,17 @@ export namespace SandboxProvider {
           if (created.restoredFromSnapshot && snapshotId && snapshots && !explicitSnapshotId) {
             yield* Effect.promise(() => snapshots!.markConsumed(snapshotId)).pipe(Effect.catchCause(() => Effect.void))
           }
-          log.info("sandbox created", { sessionID, sandboxID: sb.id, restoreFrom: created.restoredFromSnapshot ? snapshotId : null })
+          log.info("sandbox created", {
+            sessionID,
+            sandboxID: sb.id,
+            restoreFrom: created.restoredFromSnapshot ? snapshotId : null,
+          })
           return sb
         }).pipe(
           Effect.timeoutOrElse({
             duration: Duration.seconds(CREATE_TIMEOUT_SECONDS),
-            orElse: () => Effect.fail(new Error(`Sandbox create timed out after ${CREATE_TIMEOUT_SECONDS}s: ${sessionID}`)),
+            orElse: () =>
+              Effect.fail(new Error(`Sandbox create timed out after ${CREATE_TIMEOUT_SECONDS}s: ${sessionID}`)),
           }),
           Effect.orDie,
           Effect.withSpan("SandboxProvider.createSandbox"),
@@ -1591,12 +1776,21 @@ export namespace SandboxProvider {
               Effect.gen(function* () {
                 const info = yield* Effect.tryPromise(() => sb.getInfo()).pipe(Effect.orElseSucceed(() => null))
                 if (!info?.status) return
-                log.warn("sandbox status on kill failure", { sessionID, sandboxID: sb.id, state: info.status.state, reason: info.status.reason, message: info.status.message })
+                log.warn("sandbox status on kill failure", {
+                  sessionID,
+                  sandboxID: sb.id,
+                  state: info.status.state,
+                  reason: info.status.reason,
+                  message: info.status.message,
+                })
               }),
             ),
             Effect.ensuring(
               Effect.tryPromise(() => sb.close()).pipe(
-                Effect.catchCause(() => { log.error("sandbox close failed", { sessionID }); return Effect.void }),
+                Effect.catchCause(() => {
+                  log.error("sandbox close failed", { sessionID })
+                  return Effect.void
+                }),
               ),
             ),
           )
@@ -1606,18 +1800,26 @@ export namespace SandboxProvider {
         }).pipe(Effect.withSpan("SandboxProvider.destroySandbox"))
       }
 
-      function logSnapshotAction(input: { sessionID: string; source: "snapshot-create" | "snapshot-reuse" | "snapshot-delete" | "snapshot-fallback"; detail: unknown; timeStarted: number }) {
+      function logSnapshotAction(input: {
+        sessionID: string
+        source: "snapshot-create" | "snapshot-reuse" | "snapshot-delete" | "snapshot-fallback"
+        detail: unknown
+        timeStarted: number
+      }) {
         const now = Date.now()
         return Effect.tryPromise(() =>
-          pgDb.insert(ExecLogTable).values({
-            id: `action-${input.source}-${now}`,
-            session_id: input.sessionID,
-            command: JSON.stringify(input.detail),
-            status: "completed",
-            source: input.source,
-            time_started: input.timeStarted,
-            time_finished: now,
-          }).run(),
+          pgDb
+            .insert(ExecLogTable)
+            .values({
+              id: `action-${input.source}-${now}`,
+              session_id: input.sessionID,
+              command: JSON.stringify(input.detail),
+              status: "completed",
+              source: input.source,
+              time_started: input.timeStarted,
+              time_finished: now,
+            })
+            .run(),
         ).pipe(Effect.catchCause(() => Effect.void))
       }
 
@@ -1645,13 +1847,22 @@ export namespace SandboxProvider {
                 Effect.catch(() => Effect.succeed(null)),
               )
               if (reusable) {
-                log.info("snapshot reused (workspace unchanged)", { sessionID: row.session_id, sandboxID: sb.id, snapshotId: reusable.id })
-              yield* logSnapshotAction({
-                sessionID: row.session_id,
-                source: "snapshot-reuse",
-                detail: { snapshotId: reusable.id, sandboxID: sb.id, explicit: false, durationMs: Date.now() - checkStarted },
-                timeStarted: checkStarted,
-              })
+                log.info("snapshot reused (workspace unchanged)", {
+                  sessionID: row.session_id,
+                  sandboxID: sb.id,
+                  snapshotId: reusable.id,
+                })
+                yield* logSnapshotAction({
+                  sessionID: row.session_id,
+                  source: "snapshot-reuse",
+                  detail: {
+                    snapshotId: reusable.id,
+                    sandboxID: sb.id,
+                    explicit: false,
+                    durationMs: Date.now() - checkStarted,
+                  },
+                  timeStarted: checkStarted,
+                })
                 yield* destroySandbox(sb, row.session_id).pipe(Effect.catchCause(() => Effect.void))
                 return
               }
@@ -1660,27 +1871,43 @@ export namespace SandboxProvider {
             // （快照 commit 之后 touch 的话 marker 不进快照，恢复后缺失 → 永远判 dirty）。
             const snapStarted = Date.now()
             const marker = yield* touchSnapshotMarker(sb, { prune: config.snapshotPrune })
-            const snapshotId = yield* Effect.promise(() => snapshots!.startSnapshot(sb, row.session_id, {
-              sourceSandboxId: sb.id,
-              arch: marker.arch,
-              schemaVersion: SNAPSHOT_SCHEMA_VERSION,
-              runtimeVersion: InstallationVersion,
-            }))
+            const snapshotId = yield* Effect.promise(() =>
+              snapshots!.startSnapshot(sb, row.session_id, {
+                sourceSandboxId: sb.id,
+                arch: marker.arch,
+                schemaVersion: SNAPSHOT_SCHEMA_VERSION,
+                runtimeVersion: InstallationVersion,
+              }),
+            )
             if (!snapshotId) {
-              log.warn("snapshot start failed; keeping sandbox for retry", { sessionID: row.session_id, sandboxID: sb.id })
+              log.warn("snapshot start failed; keeping sandbox for retry", {
+                sessionID: row.session_id,
+                sandboxID: sb.id,
+              })
               yield* Effect.tryPromise(() => sb.close()).pipe(Effect.catchCause(() => Effect.void))
               return
             }
             const result = yield* Effect.promise(() => snapshots!.awaitSnapshot(row.session_id, snapshotId))
             if (result !== "ready") {
-              log.warn("snapshot not ready; keeping sandbox for retry", { sessionID: row.session_id, sandboxID: sb.id, snapshotId })
+              log.warn("snapshot not ready; keeping sandbox for retry", {
+                sessionID: row.session_id,
+                sandboxID: sb.id,
+                snapshotId,
+              })
               yield* Effect.tryPromise(() => sb.close()).pipe(Effect.catchCause(() => Effect.void))
               return
             }
             yield* logSnapshotAction({
               sessionID: row.session_id,
               source: "snapshot-create",
-              detail: { snapshotId, sandboxID: sb.id, explicit: false, durationMs: Date.now() - snapStarted, workspaceKb: marker.workspaceKb, pruned: config.snapshotPrune },
+              detail: {
+                snapshotId,
+                sandboxID: sb.id,
+                explicit: false,
+                durationMs: Date.now() - snapStarted,
+                workspaceKb: marker.workspaceKb,
+                pruned: config.snapshotPrune,
+              },
               timeStarted: snapStarted,
             })
             yield* destroySandbox(sb, row.session_id).pipe(Effect.catchCause(() => Effect.void))
@@ -1721,15 +1948,19 @@ export namespace SandboxProvider {
             yield* withLeaseHeartbeat(current, runSnapshotDestroy(row)).pipe(
               Effect.tap(() => Effect.promise(() => snapshotOps.complete(current.id, current.fencing_token))),
               Effect.catchCause((cause) =>
-                Effect.promise(() => snapshotOps.fail(current.id, current.fencing_token, Cause.pretty(cause))).pipe(Effect.catchCause(() => Effect.void)),
+                Effect.promise(() => snapshotOps.fail(current.id, current.fencing_token, Cause.pretty(cause))).pipe(
+                  Effect.catchCause(() => Effect.void),
+                ),
               ),
             )
             op = yield* Effect.promise(() => snapshotOps.claim())
           }
-        }).pipe(Effect.catchCause((cause) => {
-          log.error("snapshot operation drain failed", { cause: Cause.pretty(cause) })
-          return Effect.void
-        }))
+        }).pipe(
+          Effect.catchCause((cause) => {
+            log.error("snapshot operation drain failed", { cause: Cause.pretty(cause) })
+            return Effect.void
+          }),
+        )
       }
 
       /** 触发一次后台 drain。不单飞：claim 用 SKIP LOCKED 保证不重复领取，无操作时立即返回，
@@ -1745,9 +1976,9 @@ export namespace SandboxProvider {
           // 代码安全承诺：快照未成功不销毁——失败/超时保留沙箱（行保持 killed，后续 idle reap
           // 重试）；沙箱由 TTL 兜底最终回收，重试期间不阻塞会话恢复。进程崩溃后操作可被其他实例接管。
           if (opts?.snapshot && snapshots) {
-            yield* Effect.promise(() => snapshotOps.enqueue({ sessionID: row.session_id, sandboxID: row.id, kind: "snapshot_destroy" })).pipe(
-              Effect.catchCause(() => Effect.void),
-            )
+            yield* Effect.promise(() =>
+              snapshotOps.enqueue({ sessionID: row.session_id, sandboxID: row.id, kind: "snapshot_destroy" }),
+            ).pipe(Effect.catchCause(() => Effect.void))
             yield* nudgeSnapshotDrain()
             return
           }
@@ -1784,7 +2015,11 @@ export namespace SandboxProvider {
         )
       }
 
-      function claim<D, E>(ref: Ref.Ref<Map<string, Deferred.Deferred<D, E>>>, key: string, token: Deferred.Deferred<D, E>) {
+      function claim<D, E>(
+        ref: Ref.Ref<Map<string, Deferred.Deferred<D, E>>>,
+        key: string,
+        token: Deferred.Deferred<D, E>,
+      ) {
         return Ref.modify(ref, (map) => {
           const existing = map.get(key)
           if (existing) return [existing, map] as const
@@ -1794,7 +2029,14 @@ export namespace SandboxProvider {
 
       // ── Interface 实装 ────────────────────────────────────────────────
 
-      function getOrCreateUnlocked(sessionID: SessionID, opts?: { pvcMode?: "session" | "app"; appId?: string; sandbox?: { cpu: string; memory: string; image?: string; snapshotId?: string } }) {
+      function getOrCreateUnlocked(
+        sessionID: SessionID,
+        opts?: {
+          pvcMode?: "session" | "app"
+          appId?: string
+          sandbox?: { cpu: string; memory: string; image?: string; snapshotId?: string }
+        },
+      ) {
         return Effect.gen(function* () {
           const cached = getCachedSandbox(sessionID)
           if (cached) {
@@ -1889,26 +2131,29 @@ export namespace SandboxProvider {
               // P0-3: cross-pod mutex — transaction-level locks are released with
               // the same pooled connection that acquired them.
               const tCreate = Date.now()
-              const result = yield* Effect.promise(() =>
-                pgDb.transaction(async (tx: any) => {
-                  await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${sessionID}))`)
-                  const current = await runPromise(dbGet(sessionID).pipe(Effect.orElseSucceed(() => null)))
-                  if (current?.state === "running") {
-                    const existing = await runPromise(reconnectIfPresent(current))
-                    if (existing) {
-                      const healthy = await existing.isHealthy().catch(() => false)
-                      if (healthy) {
-                        const touched = await runPromise(dbTouchSandbox(sessionID, current.id).pipe(Effect.orElseSucceed(() => false)))
-                        if (!touched) {
-                          await existing.close().catch(() => undefined)
-                          throw new Error(`Sandbox lifecycle changed: ${sessionID}/${current.id}`)
+              const result = yield* Effect.promise(
+                () =>
+                  pgDb.transaction(async (tx: any) => {
+                    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${sessionID}))`)
+                    const current = await runPromise(dbGet(sessionID).pipe(Effect.orElseSucceed(() => null)))
+                    if (current?.state === "running") {
+                      const existing = await runPromise(reconnectIfPresent(current))
+                      if (existing) {
+                        const healthy = await existing.isHealthy().catch(() => false)
+                        if (healthy) {
+                          const touched = await runPromise(
+                            dbTouchSandbox(sessionID, current.id).pipe(Effect.orElseSucceed(() => false)),
+                          )
+                          if (!touched) {
+                            await existing.close().catch(() => undefined)
+                            throw new Error(`Sandbox lifecycle changed: ${sessionID}/${current.id}`)
+                          }
+                          return existing
                         }
-                        return existing
                       }
                     }
-                  }
-                  return runPromise(createSandbox(sessionID, opts))
-                }) as Promise<Sandbox>,
+                    return runPromise(createSandbox(sessionID, opts))
+                  }) as Promise<Sandbox>,
               )
               log.info("createSandbox done", {
                 sessionID,
@@ -1934,7 +2179,10 @@ export namespace SandboxProvider {
               yield* destroySandbox(sb, sessionID).pipe(Effect.catchCause(() => Effect.void))
               return yield* Effect.fail(new Error(`Sandbox creation cancelled: ${sessionID}`))
             }
-            yield* Ref.modify(createRef, (m) => { m.delete(sessionID); return [undefined, m] as const })
+            yield* Ref.modify(createRef, (m) => {
+              m.delete(sessionID)
+              return [undefined, m] as const
+            })
             yield* Deferred.succeed(myToken, sb)
             cacheSandbox(sessionID, sb)
             log.info("getOrCreate done", { sessionID, sandboxID: sb.id, totalMs: Date.now() - t0 })
@@ -1946,7 +2194,10 @@ export namespace SandboxProvider {
                   m.delete(sessionID)
                   return [true, m] as const
                 })
-                if (removed) yield* Deferred.fail(myToken, new Error(`Sandbox creation interrupted: ${sessionID}`)).pipe(Effect.catchCause(() => Effect.void))
+                if (removed)
+                  yield* Deferred.fail(myToken, new Error(`Sandbox creation interrupted: ${sessionID}`)).pipe(
+                    Effect.catchCause(() => Effect.void),
+                  )
               }),
             ),
             Effect.forkIn(creationScope),
@@ -1957,13 +2208,15 @@ export namespace SandboxProvider {
       }
 
       const getOrCreate: Interface["getOrCreate"] = (sessionID, opts) =>
-        lock(sessionID, getOrCreateUnlocked(sessionID, opts)).pipe(
-          Effect.timeoutOrElse({
-            duration: Duration.seconds(90),
-            orElse: () => Effect.fail(new Error(`Sandbox getOrCreate timeout after 90s: ${sessionID}`)),
-          }),
-          Effect.orDie,
-        ).pipe(Effect.withSpan("SandboxProvider.getOrCreate"))
+        lock(sessionID, getOrCreateUnlocked(sessionID, opts))
+          .pipe(
+            Effect.timeoutOrElse({
+              duration: Duration.seconds(90),
+              orElse: () => Effect.fail(new Error(`Sandbox getOrCreate timeout after 90s: ${sessionID}`)),
+            }),
+            Effect.orDie,
+          )
+          .pipe(Effect.withSpan("SandboxProvider.getOrCreate"))
 
       const get: Interface["get"] = (sessionID) =>
         Effect.gen(function* () {
@@ -1980,25 +2233,28 @@ export namespace SandboxProvider {
         }).pipe(Effect.withSpan("SandboxProvider.get"))
 
       const destroy: Interface["destroy"] = (sessionID) =>
-        lock(sessionID, Effect.gen(function* () {
-          invalidateCachedSandbox(sessionID)
-          // keepAlive 是 session 维度的持久偏好：destroy 只销毁 sandbox，不改变 keepAlive。
-          // 清除 keepAlive 必须显式调用 release()；destroy 后重建仍继承 keepAlive。
-          const inFlight = yield* Ref.modify(createRef, (m) => {
-            const d = m.get(sessionID)
-            if (d) m.delete(sessionID)
-            return [d, m] as const
-          })
-          if (inFlight) yield* Deferred.fail(inFlight, new Error(`Sandbox destroyed while creating: ${sessionID}`))
-          const row = yield* dbGet(sessionID).pipe(Effect.orElseSucceed(() => null))
-          if (row?.state === "running" || row?.state === "snapshotting" || row?.state === "killed") {
-            if (row.state !== "killed") yield* dbSetStateFor(sessionID, row.id, "killed")
-            const snapshotSession = !!snapshots && (yield* dbResolvePersistMode(sessionID)) === "snapshot"
-            // 快照会话必须经 cleanupSandbox 的快照安全路径：快照 Ready 后才 kill 源沙箱，
-            // 失败/超时保留沙箱待重试；pvc 会话在该路径下等价于直接销毁。
-            yield* cleanupSandbox({ ...row, state: "killed" }, snapshotSession ? { snapshot: true } : undefined)
-          }
-        })).pipe(Effect.withSpan("SandboxProvider.destroy"))
+        lock(
+          sessionID,
+          Effect.gen(function* () {
+            invalidateCachedSandbox(sessionID)
+            // keepAlive 是 session 维度的持久偏好：destroy 只销毁 sandbox，不改变 keepAlive。
+            // 清除 keepAlive 必须显式调用 release()；destroy 后重建仍继承 keepAlive。
+            const inFlight = yield* Ref.modify(createRef, (m) => {
+              const d = m.get(sessionID)
+              if (d) m.delete(sessionID)
+              return [d, m] as const
+            })
+            if (inFlight) yield* Deferred.fail(inFlight, new Error(`Sandbox destroyed while creating: ${sessionID}`))
+            const row = yield* dbGet(sessionID).pipe(Effect.orElseSucceed(() => null))
+            if (row?.state === "running" || row?.state === "snapshotting" || row?.state === "killed") {
+              if (row.state !== "killed") yield* dbSetStateFor(sessionID, row.id, "killed")
+              const snapshotSession = !!snapshots && (yield* dbResolvePersistMode(sessionID)) === "snapshot"
+              // 快照会话必须经 cleanupSandbox 的快照安全路径：快照 Ready 后才 kill 源沙箱，
+              // 失败/超时保留沙箱待重试；pvc 会话在该路径下等价于直接销毁。
+              yield* cleanupSandbox({ ...row, state: "killed" }, snapshotSession ? { snapshot: true } : undefined)
+            }
+          }),
+        ).pipe(Effect.withSpan("SandboxProvider.destroy"))
 
       const destroyById: Interface["destroyById"] = (sandboxID) =>
         Effect.gen(function* () {
@@ -2006,36 +2262,52 @@ export namespace SandboxProvider {
           if (!row || (row.state !== "running" && row.state !== "snapshotting")) return null
           invalidateCachedSandbox(row.session_id)
           const snapshotSession = !!snapshots && (yield* dbResolvePersistMode(row.session_id)) === "snapshot"
-          yield* lock(row.session_id, Effect.gen(function* () {
-            invalidateCachedSandbox(row.session_id)
-            const current = yield* dbGetById(sandboxID).pipe(Effect.orElseSucceed(() => null))
-            if (!current || current.id !== sandboxID || (current.state !== "running" && current.state !== "snapshotting")) return
-            yield* dbSetStateFor(current.session_id, current.id, "killed")
-            const inFlight = yield* Ref.modify(createRef, (m) => {
-              const d = m.get(current.session_id)
-              if (d) m.delete(current.session_id)
-              return [d, m] as const
-            })
-            if (inFlight) yield* Deferred.fail(inFlight, new Error(`Sandbox destroyed while creating: ${current.session_id}`))
-            yield* cleanupSandbox({ ...current, state: "killed" }, snapshotSession ? { snapshot: true } : undefined)
-          }))
+          yield* lock(
+            row.session_id,
+            Effect.gen(function* () {
+              invalidateCachedSandbox(row.session_id)
+              const current = yield* dbGetById(sandboxID).pipe(Effect.orElseSucceed(() => null))
+              if (
+                !current ||
+                current.id !== sandboxID ||
+                (current.state !== "running" && current.state !== "snapshotting")
+              )
+                return
+              yield* dbSetStateFor(current.session_id, current.id, "killed")
+              const inFlight = yield* Ref.modify(createRef, (m) => {
+                const d = m.get(current.session_id)
+                if (d) m.delete(current.session_id)
+                return [d, m] as const
+              })
+              if (inFlight)
+                yield* Deferred.fail(inFlight, new Error(`Sandbox destroyed while creating: ${current.session_id}`))
+              yield* cleanupSandbox({ ...current, state: "killed" }, snapshotSession ? { snapshot: true } : undefined)
+            }),
+          )
           return row.session_id as SessionID
         }).pipe(Effect.withSpan("SandboxProvider.destroyById"))
 
       const destroyAll: Interface["destroyAll"] = () =>
         Effect.gen(function* () {
           sbCache.clear()
-          const inFlightCreates = yield* Ref.modify(createRef, (m) => { const e = Array.from(m.entries()); m.clear(); return [e, m] as const })
+          const inFlightCreates = yield* Ref.modify(createRef, (m) => {
+            const e = Array.from(m.entries())
+            m.clear()
+            return [e, m] as const
+          })
           for (const [, d] of inFlightCreates) yield* Deferred.fail(d, new Error("Sandbox destroyed during shutdown"))
           const rows = yield* dbAll().pipe(Effect.orElseSucceed(() => [] as any[]))
           log.info("destroying all sandboxes", { count: rows.length })
           for (const row of rows) {
-            yield* lock(row.session_id, Effect.gen(function* () {
-              const current = yield* dbGet(row.session_id).pipe(Effect.orElseSucceed(() => null))
-              if (!current || current.id !== row.id || current.state !== "running") return
-              yield* dbSetStateFor(row.session_id, row.id, "killed")
-              yield* cleanupSandbox({ ...row, state: "killed" })
-            }))
+            yield* lock(
+              row.session_id,
+              Effect.gen(function* () {
+                const current = yield* dbGet(row.session_id).pipe(Effect.orElseSucceed(() => null))
+                if (!current || current.id !== row.id || current.state !== "running") return
+                yield* dbSetStateFor(row.session_id, row.id, "killed")
+                yield* cleanupSandbox({ ...row, state: "killed" })
+              }),
+            )
           }
           commandSemaphores.clear()
           detachedCommandSessions.clear()
@@ -2087,153 +2359,211 @@ export namespace SandboxProvider {
 
       const runInSession: Interface["runInSession"] = (sessionID, command, options, handlers, signal) =>
         withRecreateRetry(sessionID, () =>
-        Effect.gen(function* () {
-          const operationTimeoutSeconds = options?.timeoutSeconds
-            ? Math.min(options.timeoutSeconds, GET_OR_CREATE_TIMEOUT_SECONDS)
-            : GET_OR_CREATE_TIMEOUT_SECONDS
-          const sb = yield* lockWithTimeout(sessionID, getOrCreateUnlocked(sessionID), operationTimeoutSeconds)
-          yield* dbTouchSandbox(sessionID, sb.id).pipe(Effect.catchCause(() => Effect.void))
-          const workingDirectory = options?.workingDirectory ?? (yield* dbGetSessionDirectory(sessionID)) ?? "/workspace"
+          Effect.gen(function* () {
+            const operationTimeoutSeconds = options?.timeoutSeconds
+              ? Math.min(options.timeoutSeconds, GET_OR_CREATE_TIMEOUT_SECONDS)
+              : GET_OR_CREATE_TIMEOUT_SECONDS
+            const sb = yield* lockWithTimeout(sessionID, getOrCreateUnlocked(sessionID), operationTimeoutSeconds)
+            yield* dbTouchSandbox(sessionID, sb.id).pipe(Effect.catchCause(() => Effect.void))
+            const workingDirectory =
+              options?.workingDirectory ?? (yield* dbGetSessionDirectory(sessionID)) ?? "/workspace"
 
-          const row = yield* dbGet(sessionID).pipe(Effect.orElseSucceed(() => null))
-          let cmdSessionID = (row?.id === sb.id ? row?.command_session_id : null) ?? null
+            const row = yield* dbGet(sessionID).pipe(Effect.orElseSucceed(() => null))
+            let cmdSessionID = (row?.id === sb.id ? row?.command_session_id : null) ?? null
 
-          let sem = commandSemaphores.get(sessionID)
-          if (!sem) { sem = Effect.runSync(Semaphore.make(1)); commandSemaphores.set(sessionID, sem) }
+            let sem = commandSemaphores.get(sessionID)
+            if (!sem) {
+              sem = Effect.runSync(Semaphore.make(1))
+              commandSemaphores.set(sessionID, sem)
+            }
 
-          if (!cmdSessionID) {
-            cmdSessionID = yield* withCommandSemaphoreTimeout(
+            if (!cmdSessionID) {
+              cmdSessionID = yield* withCommandSemaphoreTimeout(
+                sem,
+                Effect.gen(function* () {
+                  const row2 = yield* dbGet(sessionID).pipe(Effect.orElseSucceed(() => null))
+                  const existing = (row2?.id === sb.id ? row2?.command_session_id : null) ?? null
+                  if (existing) return existing
+
+                  const newSession = yield* withCommandOperationTimeout(
+                    Effect.tryPromise({
+                      try: () => sb.commands.createSession({ workingDirectory }),
+                      catch: (e) => new Error(`Failed to create command session: ${String(e)}`),
+                    }),
+                    options?.timeoutSeconds,
+                    "create command session",
+                  )
+                  yield* dbSetCommandSession(sessionID, sb.id, newSession).pipe(Effect.catchCause(() => Effect.void))
+                  return newSession
+                }),
+                options?.timeoutSeconds,
+                "prepare command session",
+              )
+            }
+
+            return yield* withCommandSemaphoreTimeout(
               sem,
-              Effect.gen(function* () {
-                const row2 = yield* dbGet(sessionID).pipe(Effect.orElseSucceed(() => null))
-                const existing = (row2?.id === sb.id ? row2?.command_session_id : null) ?? null
-                if (existing) return existing
-
-                const newSession = yield* withCommandOperationTimeout(Effect.tryPromise({
-                  try: () => sb.commands.createSession({ workingDirectory }),
-                  catch: (e) => new Error(`Failed to create command session: ${String(e)}`),
-                }), options?.timeoutSeconds, "create command session")
-                yield* dbSetCommandSession(sessionID, sb.id, newSession).pipe(Effect.catchCause(() => Effect.void))
-                return newSession
-              }),
-              options?.timeoutSeconds,
-              "prepare command session",
-            )
-          }
-
-          return yield* withCommandSemaphoreTimeout(
-            sem,
-            withCommandHeartbeat(sessionID, sb.id, withExecTimeout(
-              Effect.tryPromise({
-                try: () => runCommandEarlyExit(sb, cmdSessionID!, command, { ...options, workingDirectory }, handlers, signal),
-                catch: (e) => new Error(`runInSession failed: ${String(e)}`),
-              }).pipe(
-                Effect.tapError((err) =>
-                  String(err).includes("not found")
-                    ? Effect.sync(() => { invalidateCachedSandbox(sessionID); log.warn("sandbox invalidated after command failure", { sessionID }) })
-                    : Effect.void,
+              withCommandHeartbeat(
+                sessionID,
+                sb.id,
+                withExecTimeout(
+                  Effect.tryPromise({
+                    try: () =>
+                      runCommandEarlyExit(
+                        sb,
+                        cmdSessionID!,
+                        command,
+                        { ...options, workingDirectory },
+                        handlers,
+                        signal,
+                      ),
+                    catch: (e) => new Error(`runInSession failed: ${String(e)}`),
+                  }).pipe(
+                    Effect.tapError((err) =>
+                      String(err).includes("not found")
+                        ? Effect.sync(() => {
+                            invalidateCachedSandbox(sessionID)
+                            log.warn("sandbox invalidated after command failure", { sessionID })
+                          })
+                        : Effect.void,
+                    ),
+                  ),
+                  options?.timeoutSeconds,
+                  // 超时后旧命令仍在沙箱执行，且 SDK interrupt 会让持久 session 进入
+                  // 立即 EOF 的报废状态：改为销毁 command session 并清 PG 记录，
+                  // 下条命令自动重建干净 session（同时隔离旧进程输出交叉）
+                ).pipe(
+                  Effect.tap((result) => {
+                    if (result.error?.name !== "TimeoutError") return Effect.void
+                    log.warn("foreground command timed out; recycling command session", { sessionID, sandboxID: sb.id })
+                    return withCommandOperationTimeout(
+                      Effect.tryPromise({
+                        try: () => sb.commands.deleteSession(cmdSessionID!),
+                        catch: (e) => new Error(`delete timed-out session failed: ${String(e)}`),
+                      }),
+                      COMMAND_CLEANUP_TIMEOUT_SECONDS,
+                      "recycle timed-out command session",
+                    ).pipe(
+                      Effect.catchCause(() => Effect.void),
+                      Effect.andThen(
+                        dbSetCommandSession(sessionID, sb.id, null).pipe(Effect.catchCause(() => Effect.void)),
+                      ),
+                    )
+                  }),
+                  // SDK 对失效的 command session 不报错而是静默返回空流（无 complete/error/exitCode），
+                  // 转成 isSandboxGone 可识别的失败，交由外层重建重试
+                  Effect.tap((result) => {
+                    if (result.complete || result.error || result.exitCode != null) return Effect.void
+                    log.warn("empty execution stream; command session likely stale", { sessionID, cmdSessionID })
+                    return Effect.fail(
+                      new Error(
+                        `runInSession failed: command session ${cmdSessionID} not found (empty execution stream)`,
+                      ),
+                    )
+                  }),
+                  // exit 137（SIGKILL）在沙箱里几乎总是 cgroup 内存 OOM：内核直接杀进程，
+                  // 不留 stdout/stderr，调用方只能看到模糊的连接失败——至少在服务端日志留下线索
+                  Effect.tap((result) => {
+                    if (result.exitCode !== 137) return Effect.void
+                    log.warn("command killed by SIGKILL — likely sandbox memory OOM", {
+                      sessionID,
+                      sandboxID: sb.id,
+                      command: command.slice(0, 80),
+                    })
+                    return Effect.void
+                  }),
                 ),
               ),
               options?.timeoutSeconds,
-            // 超时后旧命令仍在沙箱执行，且 SDK interrupt 会让持久 session 进入
-            // 立即 EOF 的报废状态：改为销毁 command session 并清 PG 记录，
-            // 下条命令自动重建干净 session（同时隔离旧进程输出交叉）
-            ).pipe(
-              Effect.tap((result) => {
-                if (result.error?.name !== "TimeoutError") return Effect.void
-                log.warn("foreground command timed out; recycling command session", { sessionID, sandboxID: sb.id })
-                return withCommandOperationTimeout(
-                  Effect.tryPromise({
-                    try: () => sb.commands.deleteSession(cmdSessionID!),
-                    catch: (e) => new Error(`delete timed-out session failed: ${String(e)}`),
-                  }),
-                  COMMAND_CLEANUP_TIMEOUT_SECONDS,
-                  "recycle timed-out command session",
-                ).pipe(
-                  Effect.catchCause(() => Effect.void),
-                  Effect.andThen(dbSetCommandSession(sessionID, sb.id, null).pipe(Effect.catchCause(() => Effect.void))),
-                )
-              }),
-              // SDK 对失效的 command session 不报错而是静默返回空流（无 complete/error/exitCode），
-              // 转成 isSandboxGone 可识别的失败，交由外层重建重试
-              Effect.tap((result) => {
-                if (result.complete || result.error || result.exitCode != null) return Effect.void
-                log.warn("empty execution stream; command session likely stale", { sessionID, cmdSessionID })
-                return Effect.fail(new Error(`runInSession failed: command session ${cmdSessionID} not found (empty execution stream)`))
-              }),
-              // exit 137（SIGKILL）在沙箱里几乎总是 cgroup 内存 OOM：内核直接杀进程，
-              // 不留 stdout/stderr，调用方只能看到模糊的连接失败——至少在服务端日志留下线索
-              Effect.tap((result) => {
-                if (result.exitCode !== 137) return Effect.void
-                log.warn("command killed by SIGKILL — likely sandbox memory OOM", { sessionID, sandboxID: sb.id, command: command.slice(0, 80) })
-                return Effect.void
-              }),
-            )),
-            options?.timeoutSeconds,
-            // 外层预算覆盖排队等待 + 执行；执行超时走 TimeoutError 结果路径，此处 fail 多为纯排队超时
-            "command queue wait",
-          )
-        }).pipe(Effect.withSpan("SandboxProvider.runInSession")),
+              // 外层预算覆盖排队等待 + 执行；执行超时走 TimeoutError 结果路径，此处 fail 多为纯排队超时
+              "command queue wait",
+            )
+          }).pipe(Effect.withSpan("SandboxProvider.runInSession")),
         )
 
       const runDetached: Interface["runDetached"] = (sessionID, command, options, handlers, signal) =>
         withRecreateRetry(sessionID, () =>
-        Effect.gen(function* () {
-          const operationTimeoutSeconds = options?.timeoutSeconds
-            ? Math.min(options.timeoutSeconds, GET_OR_CREATE_TIMEOUT_SECONDS)
-            : GET_OR_CREATE_TIMEOUT_SECONDS
-          const sb = yield* lockWithTimeout(sessionID, getOrCreateUnlocked(sessionID), operationTimeoutSeconds)
-          yield* dbTouchSandbox(sessionID, sb.id).pipe(Effect.catchCause(() => Effect.void))
-          const workingDirectory = options?.workingDirectory ?? (yield* dbGetSessionDirectory(sessionID)) ?? "/workspace"
-          const detachedSessionId = yield* withCommandOperationTimeout(Effect.tryPromise({
-            try: () => sb.commands.createSession({ workingDirectory }),
-            catch: (e) => new Error(`Failed to create detached session: ${String(e)}`),
-          }), options?.timeoutSeconds, "create detached command session")
-          const detached = detachedCommandSessions.get(sessionID) ?? new Set<string>()
-          detached.add(detachedSessionId)
-          detachedCommandSessions.set(sessionID, detached)
-          let completed = false
-          try {
-          // async/detached 命令不维持心跳：后台命令不应阻止 idle-reap 回收无人使用的会话沙箱。
-          // 防误杀只保留给前台命令（runInSession，AI 正在同步等待）。
-          const result = yield* withExecTimeout(
+          Effect.gen(function* () {
+            const operationTimeoutSeconds = options?.timeoutSeconds
+              ? Math.min(options.timeoutSeconds, GET_OR_CREATE_TIMEOUT_SECONDS)
+              : GET_OR_CREATE_TIMEOUT_SECONDS
+            const sb = yield* lockWithTimeout(sessionID, getOrCreateUnlocked(sessionID), operationTimeoutSeconds)
+            yield* dbTouchSandbox(sessionID, sb.id).pipe(Effect.catchCause(() => Effect.void))
+            const workingDirectory =
+              options?.workingDirectory ?? (yield* dbGetSessionDirectory(sessionID)) ?? "/workspace"
+            const detachedSessionId = yield* withCommandOperationTimeout(
               Effect.tryPromise({
-                try: () => runCommandEarlyExit(sb, detachedSessionId, command, { ...options, workingDirectory }, handlers, signal),
-                catch: (e) => new Error(`runDetached failed: ${String(e)}`),
-              }).pipe(
-                Effect.tapError((err) =>
-                  String(err).includes("not found")
-                    ? Effect.sync(() => { invalidateCachedSandbox(sessionID); log.warn("sandbox invalidated after detached failure", { sessionID }) })
-                    : Effect.void,
-                ),
-              ),
-              options?.timeoutSeconds,
-            // detached 同样可能命中失效 session 的静默空流，转成可重试失败
-            ).pipe(
-              Effect.tap((result) => {
-                if (result.complete || result.error || result.exitCode != null) return Effect.void
-                log.warn("empty detached execution stream; session likely stale", { sessionID, detachedSessionId })
-                return Effect.fail(new Error(`runDetached failed: command session ${detachedSessionId} not found (empty execution stream)`))
+                try: () => sb.commands.createSession({ workingDirectory }),
+                catch: (e) => new Error(`Failed to create detached session: ${String(e)}`),
               }),
+              options?.timeoutSeconds,
+              "create detached command session",
             )
-            if (result.error?.name === "TimeoutError") {
-              yield* Effect.tryPromise(() => sb.commands.interrupt(detachedSessionId)).pipe(Effect.ignore)
+            const detached = detachedCommandSessions.get(sessionID) ?? new Set<string>()
+            detached.add(detachedSessionId)
+            detachedCommandSessions.set(sessionID, detached)
+            let completed = false
+            try {
+              // async/detached 命令不维持心跳：后台命令不应阻止 idle-reap 回收无人使用的会话沙箱。
+              // 防误杀只保留给前台命令（runInSession，AI 正在同步等待）。
+              const result = yield* withExecTimeout(
+                Effect.tryPromise({
+                  try: () =>
+                    runCommandEarlyExit(
+                      sb,
+                      detachedSessionId,
+                      command,
+                      { ...options, workingDirectory },
+                      handlers,
+                      signal,
+                    ),
+                  catch: (e) => new Error(`runDetached failed: ${String(e)}`),
+                }).pipe(
+                  Effect.tapError((err) =>
+                    String(err).includes("not found")
+                      ? Effect.sync(() => {
+                          invalidateCachedSandbox(sessionID)
+                          log.warn("sandbox invalidated after detached failure", { sessionID })
+                        })
+                      : Effect.void,
+                  ),
+                ),
+                options?.timeoutSeconds,
+                // detached 同样可能命中失效 session 的静默空流，转成可重试失败
+              ).pipe(
+                Effect.tap((result) => {
+                  if (result.complete || result.error || result.exitCode != null) return Effect.void
+                  log.warn("empty detached execution stream; session likely stale", { sessionID, detachedSessionId })
+                  return Effect.fail(
+                    new Error(
+                      `runDetached failed: command session ${detachedSessionId} not found (empty execution stream)`,
+                    ),
+                  )
+                }),
+              )
+              if (result.error?.name === "TimeoutError") {
+                yield* Effect.tryPromise(() => sb.commands.interrupt(detachedSessionId)).pipe(Effect.ignore)
+              }
+              if (result.exitCode === 137)
+                log.warn("detached command killed by SIGKILL — likely sandbox memory OOM", {
+                  sessionID,
+                  sandboxID: sb.id,
+                  command: command.slice(0, 80),
+                })
+              completed = true
+              return result
+            } finally {
+              if (!completed)
+                yield* Effect.tryPromise(() => sb.commands.interrupt(detachedSessionId)).pipe(Effect.ignore)
+              // Detached commands are frequently long-lived (dev servers, LSP
+              // daemons): the SDK returns as soon as the command is launched, so
+              // "returned" does not mean "finished". execd's deleteSession kills
+              // every process in the session, which would terminate commands
+              // that are supposed to keep running. Keep the session tracked in
+              // detachedCommandSessions; interrupt(), destroyAll and sandbox
+              // teardown reclaim it.
             }
-            if (result.exitCode === 137)
-              log.warn("detached command killed by SIGKILL — likely sandbox memory OOM", { sessionID, sandboxID: sb.id, command: command.slice(0, 80) })
-            completed = true
-            return result
-          } finally {
-            if (!completed) yield* Effect.tryPromise(() => sb.commands.interrupt(detachedSessionId)).pipe(Effect.ignore)
-            // Detached commands are frequently long-lived (dev servers, LSP
-            // daemons): the SDK returns as soon as the command is launched, so
-            // "returned" does not mean "finished". execd's deleteSession kills
-            // every process in the session, which would terminate commands
-            // that are supposed to keep running. Keep the session tracked in
-            // detachedCommandSessions; interrupt(), destroyAll and sandbox
-            // teardown reclaim it.
-          }
-        }).pipe(Effect.withSpan("SandboxProvider.runDetached")),
+          }).pipe(Effect.withSpan("SandboxProvider.runDetached")),
         )
 
       const interrupt: Interface["interrupt"] = (sessionID) =>
@@ -2257,34 +2587,40 @@ export namespace SandboxProvider {
           )
           log.info("sandbox command interrupted", { sessionID })
         }).pipe(
-          Effect.ensuring(Effect.gen(function* () {
-          yield* Effect.tryPromise({
-              try: () => pgDb
-                .update(SandboxTable)
-                .set({ command_session_id: null, time_updated: Date.now() })
-                .where(eq(SandboxTable.session_id, sessionID))
-                .run(),
-              catch: () => {},
-            }).pipe(Effect.catch(() => Effect.void))
-          })),
+          Effect.ensuring(
+            Effect.gen(function* () {
+              yield* Effect.tryPromise({
+                try: () =>
+                  pgDb
+                    .update(SandboxTable)
+                    .set({ command_session_id: null, time_updated: Date.now() })
+                    .where(eq(SandboxTable.session_id, sessionID))
+                    .run(),
+                catch: () => {},
+              }).pipe(Effect.catch(() => Effect.void))
+            }),
+          ),
           Effect.withSpan("SandboxProvider.interrupt"),
         )
 
       const register: Interface["register"] = (sessionID, sb) =>
-        lock(sessionID, Effect.gen(function* () {
-          const existing = yield* dbGet(sessionID).pipe(Effect.orElseSucceed(() => null))
-          yield* dbUpsert({
-            id: sb.id,
-            session_id: sessionID,
-            host: `http://${config.domain}`,
-            state: "running",
-            keep_alive: existing?.keep_alive ?? false,
-            command_session_id: null,
-            time_created: Date.now(),
-            time_updated: Date.now(),
-          })
-          cacheSandbox(sessionID, sb)
-        }))
+        lock(
+          sessionID,
+          Effect.gen(function* () {
+            const existing = yield* dbGet(sessionID).pipe(Effect.orElseSucceed(() => null))
+            yield* dbUpsert({
+              id: sb.id,
+              session_id: sessionID,
+              host: `http://${config.domain}`,
+              state: "running",
+              keep_alive: existing?.keep_alive ?? false,
+              command_session_id: null,
+              time_created: Date.now(),
+              time_updated: Date.now(),
+            })
+            cacheSandbox(sessionID, sb)
+          }),
+        )
 
       const getEndpoint: Interface["getEndpoint"] = (sessionID, port, opts) =>
         Effect.gen(function* () {
@@ -2293,9 +2629,7 @@ export namespace SandboxProvider {
             // useServerProxy=true 经 OpenSandbox server 网关代理（{endpoint-host}/sandboxes/{id}/port/{port}），缺省直连沙箱地址
             try: () =>
               opts?.useServerProxy
-                ? sb.sandboxes
-                    .getSandboxEndpoint(sb.id, port, true)
-                    .then((ep) => `${config.protocol}://${ep.endpoint}`)
+                ? sb.sandboxes.getSandboxEndpoint(sb.id, port, true).then((ep) => `${config.protocol}://${ep.endpoint}`)
                 : sb.getEndpointUrl(port),
             catch: (e) => new Error(`getEndpoint failed: ${String(e)}`),
           })
@@ -2311,63 +2645,80 @@ export namespace SandboxProvider {
           Effect.gen(function* () {
             const threshold = Date.now() - zombieThresholdMs
             const rows = yield* Effect.tryPromise({
-              try: () => pgDb
-                .select()
-                .from(SandboxTable)
-                .where(and(
-                  eq(SandboxTable.state, "running"),
-                  eq(SandboxTable.keep_alive, false),
-                  lt(SandboxTable.time_updated, threshold),
-                ))
-                .orderBy(asc(SandboxTable.time_updated))
-                .limit(CLEANUP_BATCH_SIZE)
-                .all() as Promise<Row[]>,
+              try: () =>
+                pgDb
+                  .select()
+                  .from(SandboxTable)
+                  .where(
+                    and(
+                      eq(SandboxTable.state, "running"),
+                      eq(SandboxTable.keep_alive, false),
+                      lt(SandboxTable.time_updated, threshold),
+                    ),
+                  )
+                  .orderBy(asc(SandboxTable.time_updated))
+                  .limit(CLEANUP_BATCH_SIZE)
+                  .all() as Promise<Row[]>,
               catch: (error) => new Error(`zombie sandbox query failed: ${String(error)}`),
-            }).pipe(Effect.catchCause((cause) => {
-              log.error("zombie sandbox query failed", { cause: Cause.pretty(cause) })
-              return Effect.succeed([] as Row[])
-            }))
+            }).pipe(
+              Effect.catchCause((cause) => {
+                log.error("zombie sandbox query failed", { cause: Cause.pretty(cause) })
+                return Effect.succeed([] as Row[])
+              }),
+            )
 
             if (rows.length === 0) return
             log.info("zombie sandbox cleanup", { count: rows.length })
-            yield* Effect.forEach(rows, (row) =>
-              lock(row.session_id, Effect.gen(function* () {
-                const claimed = yield* dbClaimIdleSandbox(row.session_id, row.id, threshold, false)
-                if (!claimed) return
-                const snapshotSession = !!snapshots && (yield* dbResolvePersistMode(row.session_id)) === "snapshot"
-                const sb = yield* reconnect(row).pipe(Effect.orElseSucceed(() => null))
-                if (sb) {
-                  // reconcile：用 getInfo 验证 sandbox 实际状态，已终止的跳过 kill 直接回收 DB
-                  const info = yield* Effect.tryPromise(() => sb.getInfo()).pipe(Effect.orElseSucceed(() => null))
-                  const state = info?.status?.state
-                  if (state && state !== "Running" && state !== "Creating" && state !== "Resuming") {
-                    log.info("zombie sandbox already terminated", { sessionID: row.session_id, sandboxID: row.id, state, reason: info?.status?.reason })
-                    yield* Effect.tryPromise(() => sb.close()).pipe(Effect.catchCause(() => Effect.void))
-                    yield* dbMarkDestroyed(row.session_id, row.id).pipe(Effect.catchCause(() => Effect.void))
-                    return
-                  }
-                  if (!snapshotSession) {
-                    yield* destroySandbox(sb, row.session_id).pipe(Effect.catchCause(() => Effect.void))
-                    return
-                  }
-                  // zombie 判定只基于 time_updated 超时，沙箱可能实际存活（与 idle 场景重叠）。
-                  // 快照会话与 idle reap 同一语义：快照 Ready 才 kill，失败保留沙箱重试。
-                  // 关闭本次探测连接，cleanupSandbox 内部会重新 connect。
-                  yield* Effect.tryPromise(() => sb.close()).pipe(Effect.catchCause(() => Effect.void))
-                }
-                yield* cleanupSandbox({ ...row, state: "killed" }, snapshotSession ? { snapshot: true } : undefined)
-              })).pipe(Effect.catchCause((cause) => {
-                log.error("zombie sandbox candidate failed", { sessionID: row.session_id, cause: Cause.pretty(cause) })
-                return Effect.void
-              })),
+            yield* Effect.forEach(
+              rows,
+              (row) =>
+                lock(
+                  row.session_id,
+                  Effect.gen(function* () {
+                    const claimed = yield* dbClaimIdleSandbox(row.session_id, row.id, threshold, false)
+                    if (!claimed) return
+                    const snapshotSession = !!snapshots && (yield* dbResolvePersistMode(row.session_id)) === "snapshot"
+                    const sb = yield* reconnect(row).pipe(Effect.orElseSucceed(() => null))
+                    if (sb) {
+                      // reconcile：用 getInfo 验证 sandbox 实际状态，已终止的跳过 kill 直接回收 DB
+                      const info = yield* Effect.tryPromise(() => sb.getInfo()).pipe(Effect.orElseSucceed(() => null))
+                      const state = info?.status?.state
+                      if (state && state !== "Running" && state !== "Creating" && state !== "Resuming") {
+                        log.info("zombie sandbox already terminated", {
+                          sessionID: row.session_id,
+                          sandboxID: row.id,
+                          state,
+                          reason: info?.status?.reason,
+                        })
+                        yield* Effect.tryPromise(() => sb.close()).pipe(Effect.catchCause(() => Effect.void))
+                        yield* dbMarkDestroyed(row.session_id, row.id).pipe(Effect.catchCause(() => Effect.void))
+                        return
+                      }
+                      if (!snapshotSession) {
+                        yield* destroySandbox(sb, row.session_id).pipe(Effect.catchCause(() => Effect.void))
+                        return
+                      }
+                      // zombie 判定只基于 time_updated 超时，沙箱可能实际存活（与 idle 场景重叠）。
+                      // 快照会话与 idle reap 同一语义：快照 Ready 才 kill，失败保留沙箱重试。
+                      // 关闭本次探测连接，cleanupSandbox 内部会重新 connect。
+                      yield* Effect.tryPromise(() => sb.close()).pipe(Effect.catchCause(() => Effect.void))
+                    }
+                    yield* cleanupSandbox({ ...row, state: "killed" }, snapshotSession ? { snapshot: true } : undefined)
+                  }),
+                ).pipe(
+                  Effect.catchCause((cause) => {
+                    log.error("zombie sandbox candidate failed", {
+                      sessionID: row.session_id,
+                      cause: Cause.pretty(cause),
+                    })
+                    return Effect.void
+                  }),
+                ),
               { concurrency: 4, discard: true },
             )
           }),
           { schedule: Schedule.spaced(config.idleKillMs) },
-        ).pipe(
-          Effect.forkScoped,
-          Effect.interruptible,
-        )
+        ).pipe(Effect.forkScoped, Effect.interruptible)
       })
 
       // ── OOM 采样与内存水位预警 ────────────────────────────────────────
@@ -2386,87 +2737,102 @@ export namespace SandboxProvider {
             Effect.gen(function* () {
               const t0 = Date.now()
               const rows = yield* Effect.tryPromise({
-                try: () => pgDb
-                  .select({ id: SandboxTable.id, session_id: SandboxTable.session_id, host: SandboxTable.host })
-                  .from(SandboxTable)
-                  .where(eq(SandboxTable.state, "running"))
-                  // 活跃沙箱优先覆盖：批量截断时牺牲最久未用的（其 OOM 风险最低）
-                  .orderBy(desc(SandboxTable.time_updated))
-                  .limit(OOM_SCAN_BATCH)
-                  .all() as Promise<{ id: string; session_id: string; host: string }[]>,
+                try: () =>
+                  pgDb
+                    .select({ id: SandboxTable.id, session_id: SandboxTable.session_id, host: SandboxTable.host })
+                    .from(SandboxTable)
+                    .where(eq(SandboxTable.state, "running"))
+                    // 活跃沙箱优先覆盖：批量截断时牺牲最久未用的（其 OOM 风险最低）
+                    .orderBy(desc(SandboxTable.time_updated))
+                    .limit(OOM_SCAN_BATCH)
+                    .all() as Promise<{ id: string; session_id: string; host: string }[]>,
                 catch: (error) => new Error(`oom scan query failed: ${String(error)}`),
-              }).pipe(Effect.catchCause((cause) => {
-                log.error("oom scan query failed", { cause: Cause.pretty(cause) })
-                return Effect.succeed([] as { id: string; session_id: string; host: string }[])
-              }))
+              }).pipe(
+                Effect.catchCause((cause) => {
+                  log.error("oom scan query failed", { cause: Cause.pretty(cause) })
+                  return Effect.succeed([] as { id: string; session_id: string; host: string }[])
+                }),
+              )
               if (rows.length === 0) return
-              yield* Effect.forEach(rows, (row) =>
-                Effect.gen(function* () {
-                  const sb = yield* reconnect(row).pipe(Effect.orElseSucceed(() => null))
-                  if (!sb) {
-                    lastOomKill.delete(row.session_id)
-                    log.warn("oom scan reconnect failed", { sessionID: row.session_id, sandboxID: row.id })
-                    return
-                  }
-                  const out = yield* runEphemeralCommand(sb, OOM_SAMPLE_COMMAND, 8)
-                  yield* Effect.tryPromise(() => sb.close()).pipe(Effect.catchCause(() => Effect.void))
-                  const sample = parseOomSample(out)
-                  const prev = lastOomKill.get(row.session_id)
-                  if (sample.oomKill != null) lastOomKill.set(row.session_id, sample.oomKill)
-                  const now = Date.now()
-                  const action = classifyOomSample({ sessionID: row.session_id, sandboxID: row.id, prev, sample, now })
-                  if (action.kind === "none") return
-                  yield* Effect.tryPromise(() =>
-                    pgDb.insert(ExecLogTable).values({
-                      id: action.id,
-                      session_id: row.session_id as SessionID,
-                      command: action.command,
-                      status: action.kind === "oom" ? "failed" : "completed",
-                      error: action.error,
-                      source: "sandbox-oom",
-                      time_started: now,
-                      time_finished: now,
-                    }).run(),
-                  ).pipe(Effect.catchCause((cause) => {
-                    // 主键冲突（多实例/多轮去重）属预期静默；其余失败（如表结构漂移）必须留痕
-                    const msg = Cause.pretty(cause)
-                    if (!/duplicate key|unique constraint|23505/i.test(msg)) {
-                      log.error("oom scan exec_log insert failed", {
-                        id: action.id,
+              yield* Effect.forEach(
+                rows,
+                (row) =>
+                  Effect.gen(function* () {
+                    const sb = yield* reconnect(row).pipe(Effect.orElseSucceed(() => null))
+                    if (!sb) {
+                      lastOomKill.delete(row.session_id)
+                      log.warn("oom scan reconnect failed", { sessionID: row.session_id, sandboxID: row.id })
+                      return
+                    }
+                    const out = yield* runEphemeralCommand(sb, OOM_SAMPLE_COMMAND, 8)
+                    yield* Effect.tryPromise(() => sb.close()).pipe(Effect.catchCause(() => Effect.void))
+                    const sample = parseOomSample(out)
+                    const prev = lastOomKill.get(row.session_id)
+                    if (sample.oomKill != null) lastOomKill.set(row.session_id, sample.oomKill)
+                    const now = Date.now()
+                    const action = classifyOomSample({
+                      sessionID: row.session_id,
+                      sandboxID: row.id,
+                      prev,
+                      sample,
+                      now,
+                    })
+                    if (action.kind === "none") return
+                    yield* Effect.tryPromise(() =>
+                      pgDb
+                        .insert(ExecLogTable)
+                        .values({
+                          id: action.id,
+                          session_id: row.session_id as SessionID,
+                          command: action.command,
+                          status: action.kind === "oom" ? "failed" : "completed",
+                          error: action.error,
+                          source: "sandbox-oom",
+                          time_started: now,
+                          time_finished: now,
+                        })
+                        .run(),
+                    ).pipe(
+                      Effect.catchCause((cause) => {
+                        // 主键冲突（多实例/多轮去重）属预期静默；其余失败（如表结构漂移）必须留痕
+                        const msg = Cause.pretty(cause)
+                        if (!/duplicate key|unique constraint|23505/i.test(msg)) {
+                          log.error("oom scan exec_log insert failed", {
+                            id: action.id,
+                            sessionID: row.session_id,
+                            cause: msg,
+                          })
+                        }
+                        return Effect.void
+                      }),
+                    )
+                    if (action.kind === "oom") {
+                      yield* Metrics.recordSandboxEvent("oom")
+                      log.warn("sandbox OOM detected", {
                         sessionID: row.session_id,
-                        cause: msg,
+                        sandboxID: row.id,
+                        delta: action.delta,
+                        oomKillTotal: action.oomKillTotal,
+                      })
+                    } else {
+                      log.warn("sandbox memory pressure", {
+                        sessionID: row.session_id,
+                        sandboxID: row.id,
+                        pct: `${action.pct}%`,
                       })
                     }
-                    return Effect.void
-                  }))
-                  if (action.kind === "oom") {
-                    yield* Metrics.recordSandboxEvent("oom")
-                    log.warn("sandbox OOM detected", {
-                      sessionID: row.session_id,
-                      sandboxID: row.id,
-                      delta: action.delta,
-                      oomKillTotal: action.oomKillTotal,
-                    })
-                  } else {
-                    log.warn("sandbox memory pressure", {
-                      sessionID: row.session_id,
-                      sandboxID: row.id,
-                      pct: `${action.pct}%`,
-                    })
-                  }
-                }).pipe(Effect.catchCause((cause) => {
-                  log.error("oom scan candidate failed", { sessionID: row.session_id, cause: Cause.pretty(cause) })
-                  return Effect.void
-                })),
+                  }).pipe(
+                    Effect.catchCause((cause) => {
+                      log.error("oom scan candidate failed", { sessionID: row.session_id, cause: Cause.pretty(cause) })
+                      return Effect.void
+                    }),
+                  ),
                 { concurrency: 4, discard: true },
               )
               log.info("oom scan completed", { scanned: rows.length, durationMs: Date.now() - t0 })
             }),
             { schedule: Schedule.spaced(Duration.millis(oomScanIntervalMs)) },
-          ).pipe(
-            Effect.forkScoped,
-            Effect.interruptible,
-          )
+          ).pipe(Effect.forkScoped, Effect.interruptible)
         })
       }
 
@@ -2480,66 +2846,86 @@ export namespace SandboxProvider {
             const retryBefore = Date.now() - CLEANUP_RETRY_MS
             const snapshottingBefore = Date.now() - config.snapshotWaitMs - 60_000
             const rows = yield* Effect.tryPromise({
-              try: () => pgDb
-                .select()
-                .from(SandboxTable)
-                .where(or(
-                  and(
-                    eq(SandboxTable.state, "running"),
-                    lt(SandboxTable.time_updated, threshold),
-                  ),
-                  and(
-                    eq(SandboxTable.state, "killed"),
-                    lt(SandboxTable.time_updated, retryBefore),
-                  ),
-                  and(
-                    eq(SandboxTable.state, "snapshotting"),
-                    lt(SandboxTable.time_updated, snapshottingBefore),
-                  ),
-                ))
-                .orderBy(asc(SandboxTable.time_updated))
-                .limit(CLEANUP_BATCH_SIZE)
-                .all() as Promise<Row[]>,
+              try: () =>
+                pgDb
+                  .select()
+                  .from(SandboxTable)
+                  .where(
+                    or(
+                      and(eq(SandboxTable.state, "running"), lt(SandboxTable.time_updated, threshold)),
+                      and(eq(SandboxTable.state, "killed"), lt(SandboxTable.time_updated, retryBefore)),
+                      and(eq(SandboxTable.state, "snapshotting"), lt(SandboxTable.time_updated, snapshottingBefore)),
+                    ),
+                  )
+                  .orderBy(asc(SandboxTable.time_updated))
+                  .limit(CLEANUP_BATCH_SIZE)
+                  .all() as Promise<Row[]>,
               catch: (error) => new Error(`idle sandbox reap query failed: ${String(error)}`),
-            }).pipe(Effect.catchCause((cause) => {
-              log.error("idle sandbox reap query failed", { cause: Cause.pretty(cause) })
-              return Effect.succeed([] as Row[])
-            }))
+            }).pipe(
+              Effect.catchCause((cause) => {
+                log.error("idle sandbox reap query failed", { cause: Cause.pretty(cause) })
+                return Effect.succeed([] as Row[])
+              }),
+            )
 
             // 顺带执行快照 GC + 对账（吞错；独立于本轮是否有 idle 沙箱）
             if (snapshots) yield* Effect.promise(() => snapshots.gc()).pipe(Effect.catchCause(() => Effect.void))
             // 接管遗留快照操作（本实例或其他实例崩溃后租约过期的 pending/running 操作）
             if (snapshots) yield* nudgeSnapshotDrain()
+            // 清理超期的 done/failed 操作行（否则只进不出无限增长）
+            yield* Effect.promise(() => snapshotOps.retention()).pipe(Effect.catchCause(() => Effect.void))
+            // 实例死亡后悬空的 running exec_log 行终态化（无人写终态的兜底）
+            yield* Effect.promise(() => reapStaleExecRunning()).pipe(Effect.catchCause(() => Effect.void))
 
             if (rows.length === 0) return
             log.info("idle sandbox reap scan", { count: rows.length })
-            yield* Effect.forEach(rows, (row) =>
-              lock(row.session_id, Effect.gen(function* () {
-                const claimed = yield* dbClaimIdleSandbox(row.session_id, row.id, threshold)
-                if (!claimed) return
-                const snapshotSession = !!snapshots && (yield* dbResolvePersistMode(row.session_id)) === "snapshot"
-                yield* cleanupSandbox({ ...row, state: "killed" }, snapshotSession ? { snapshot: true } : undefined)
-              })).pipe(Effect.catchCause((cause) => {
-                log.error("idle sandbox candidate failed", { sessionID: row.session_id, cause: Cause.pretty(cause) })
-                return Effect.void
-              })),
+            yield* Effect.forEach(
+              rows,
+              (row) =>
+                lock(
+                  row.session_id,
+                  Effect.gen(function* () {
+                    const claimed = yield* dbClaimIdleSandbox(row.session_id, row.id, threshold)
+                    if (!claimed) return
+                    const snapshotSession = !!snapshots && (yield* dbResolvePersistMode(row.session_id)) === "snapshot"
+                    yield* cleanupSandbox({ ...row, state: "killed" }, snapshotSession ? { snapshot: true } : undefined)
+                  }),
+                ).pipe(
+                  Effect.catchCause((cause) => {
+                    log.error("idle sandbox candidate failed", {
+                      sessionID: row.session_id,
+                      cause: Cause.pretty(cause),
+                    })
+                    return Effect.void
+                  }),
+                ),
               { concurrency: 4, discard: true },
             )
           }),
           { schedule: Schedule.spaced(Duration.millis(config.idleReapIntervalMs)) },
-        ).pipe(
-          Effect.forkScoped,
-          Effect.interruptible,
-        )
+        ).pipe(Effect.forkScoped, Effect.interruptible)
       })
 
       // PG sandboxes are shared across server instances. Process shutdown must
       // not destroy resources owned by other instances; idle cleanup handles them.
 
       return Service.of({
-        getOrCreate, get, destroy, destroyById, destroyAll, keepAlive, touch, release, isKeepAlive,
-        isSnapshotSession: (sessionID) => dbResolvePersistMode(sessionID).pipe(Effect.map((mode) => mode === "snapshot")),
-        runInSession, runDetached, interrupt, register, getEndpoint,
+        getOrCreate,
+        get,
+        destroy,
+        destroyById,
+        destroyAll,
+        keepAlive,
+        touch,
+        release,
+        isKeepAlive,
+        isSnapshotSession: (sessionID) =>
+          dbResolvePersistMode(sessionID).pipe(Effect.map((mode) => mode === "snapshot")),
+        runInSession,
+        runDetached,
+        interrupt,
+        register,
+        getEndpoint,
         cleanupSessionVolume: (sessionID) => cleanupSessionVolume(sessionID, config, connectionConfig),
         // 会话删除联动：清理该会话全部快照记录与远端快照（含用户数据，不留存）
         purgeSnapshots: (sessionID) =>
@@ -2548,76 +2934,97 @@ export namespace SandboxProvider {
             : Effect.void,
         // 显式快照：先 fence sandbox，阻止新写入；终态后恢复 running，源沙箱不销毁。
         createSnapshot: (sessionID) =>
-          lock(sessionID, Effect.gen(function* () {
-            if (!snapshots) {
-              log.info("snapshot request rejected", { sessionID, reason: "snapshot disabled" })
-              return null
-            }
-            // 仅快照会话支持显式快照（pvc 会话 workspace 在共享卷，快照无意义）
-            const mode = yield* dbResolvePersistMode(sessionID)
-            if (mode !== "snapshot") {
-              log.info("snapshot request rejected", { sessionID, reason: `persistMode=${mode}` })
-              return null
-            }
-            const row = yield* dbGet(sessionID).pipe(Effect.orElseSucceed(() => null))
-            if (!row || row.state !== "running") {
-              log.info("snapshot request rejected", { sessionID, reason: `sandbox state=${row?.state ?? "none"}` })
-              return null
-            }
-            const claimed = yield* dbTransitionState(sessionID, row.id, "running", "snapshotting")
-            if (!claimed) {
-              log.info("snapshot request rejected", { sessionID, reason: "state transition running->snapshotting lost race" })
-              return null
-            }
-            const sb = yield* reconnectIfPresent(row).pipe(
-              Effect.tapError(() => dbTransitionState(sessionID, row.id, "snapshotting", "running")),
-            )
-            if (!sb) {
-              log.warn("snapshot request failed; sandbox gone on server", { sessionID, sandboxID: row.id })
-              yield* dbMarkDestroyed(sessionID, row.id)
-              return null
-            }
-            // marker/manifest 在 startSnapshot 之前写入，随快照 rootfs 持久化（见 cleanupSandbox 同款注释）
-            const snapStarted = Date.now()
-            const marker = yield* touchSnapshotMarker(sb)
-            const snapOpts = yield* Effect.promise(() => resolveSandboxOpts(sessionID))
-            const snapImage = snapOpts.sandbox?.image?.trim() || config.snapshotImage
-            const id = yield* Effect.promise(() => snapshots.startSnapshot(sb, sessionID, {
-              image: snapImage,
-              sourceSandboxId: sb.id,
-              arch: marker.arch,
-              schemaVersion: SNAPSHOT_SCHEMA_VERSION,
-              runtimeVersion: InstallationVersion,
-            }))
-            if (!id) {
-              log.warn("snapshot request failed; startSnapshot error", { sessionID, sandboxID: row.id })
-              yield* dbTransitionState(sessionID, row.id, "snapshotting", "running")
-              yield* Effect.tryPromise(() => sb.close()).pipe(Effect.catchCause(() => Effect.void))
-              return null
-            }
-            // 显式快照审计（业务要「现在」时点，与自动快照以 explicit 区分）
-            yield* logSnapshotAction({
-              sessionID,
-              source: "snapshot-create",
-              detail: { snapshotId: id, sandboxID: sb.id, explicit: true, image: snapImage, durationMs: Date.now() - snapStarted, workspaceKb: marker.workspaceKb },
-              timeStarted: snapStarted,
-            })
-            yield* Effect.promise(() => snapshots.awaitSnapshot(sessionID, id)).pipe(
-              Effect.ensuring(Effect.gen(function* () {
-                yield* dbTransitionState(sessionID, row.id, "snapshotting", "running").pipe(Effect.catchCause(() => Effect.void))
+          lock(
+            sessionID,
+            Effect.gen(function* () {
+              if (!snapshots) {
+                log.info("snapshot request rejected", { sessionID, reason: "snapshot disabled" })
+                return null
+              }
+              // 仅快照会话支持显式快照（pvc 会话 workspace 在共享卷，快照无意义）
+              const mode = yield* dbResolvePersistMode(sessionID)
+              if (mode !== "snapshot") {
+                log.info("snapshot request rejected", { sessionID, reason: `persistMode=${mode}` })
+                return null
+              }
+              const row = yield* dbGet(sessionID).pipe(Effect.orElseSucceed(() => null))
+              if (!row || row.state !== "running") {
+                log.info("snapshot request rejected", { sessionID, reason: `sandbox state=${row?.state ?? "none"}` })
+                return null
+              }
+              const claimed = yield* dbTransitionState(sessionID, row.id, "running", "snapshotting")
+              if (!claimed) {
+                log.info("snapshot request rejected", {
+                  sessionID,
+                  reason: "state transition running->snapshotting lost race",
+                })
+                return null
+              }
+              const sb = yield* reconnectIfPresent(row).pipe(
+                Effect.tapError(() => dbTransitionState(sessionID, row.id, "snapshotting", "running")),
+              )
+              if (!sb) {
+                log.warn("snapshot request failed; sandbox gone on server", { sessionID, sandboxID: row.id })
+                yield* dbMarkDestroyed(sessionID, row.id)
+                return null
+              }
+              // marker/manifest 在 startSnapshot 之前写入，随快照 rootfs 持久化（见 cleanupSandbox 同款注释）
+              const snapStarted = Date.now()
+              const marker = yield* touchSnapshotMarker(sb)
+              const snapOpts = yield* Effect.promise(() => resolveSandboxOpts(sessionID))
+              const snapImage = snapOpts.sandbox?.image?.trim() || config.snapshotImage
+              const id = yield* Effect.promise(() =>
+                snapshots.startSnapshot(sb, sessionID, {
+                  image: snapImage,
+                  sourceSandboxId: sb.id,
+                  arch: marker.arch,
+                  schemaVersion: SNAPSHOT_SCHEMA_VERSION,
+                  runtimeVersion: InstallationVersion,
+                }),
+              )
+              if (!id) {
+                log.warn("snapshot request failed; startSnapshot error", { sessionID, sandboxID: row.id })
+                yield* dbTransitionState(sessionID, row.id, "snapshotting", "running")
                 yield* Effect.tryPromise(() => sb.close()).pipe(Effect.catchCause(() => Effect.void))
-              })),
-              Effect.forkIn(creationScope),
-            )
-            return id
-          })).pipe(Effect.catchCause((cause) => {
-            log.error("createSnapshot failed", { sessionID, cause: Cause.pretty(cause) })
-            return Effect.succeed(null)
-          })),
+                return null
+              }
+              // 显式快照审计（业务要「现在」时点，与自动快照以 explicit 区分）
+              yield* logSnapshotAction({
+                sessionID,
+                source: "snapshot-create",
+                detail: {
+                  snapshotId: id,
+                  sandboxID: sb.id,
+                  explicit: true,
+                  image: snapImage,
+                  durationMs: Date.now() - snapStarted,
+                  workspaceKb: marker.workspaceKb,
+                },
+                timeStarted: snapStarted,
+              })
+              yield* Effect.promise(() => snapshots.awaitSnapshot(sessionID, id)).pipe(
+                Effect.ensuring(
+                  Effect.gen(function* () {
+                    yield* dbTransitionState(sessionID, row.id, "snapshotting", "running").pipe(
+                      Effect.catchCause(() => Effect.void),
+                    )
+                    yield* Effect.tryPromise(() => sb.close()).pipe(Effect.catchCause(() => Effect.void))
+                  }),
+                ),
+                Effect.forkIn(creationScope),
+              )
+              return id
+            }),
+          ).pipe(
+            Effect.catchCause((cause) => {
+              log.error("createSnapshot failed", { sessionID, cause: Cause.pretty(cause) })
+              return Effect.succeed(null)
+            }),
+          ),
         getLatestSnapshot: (sessionID) =>
           snapshots
             ? Effect.promise(() => snapshots.getLatest(sessionID)).pipe(
-                Effect.map((row) => row ? { id: row.id, state: row.state, reason: row.reason } : null),
+                Effect.map((row) => (row ? { id: row.id, state: row.state, reason: row.reason } : null)),
                 Effect.catchCause(() => Effect.succeed(null)),
               )
             : Effect.succeed(null),

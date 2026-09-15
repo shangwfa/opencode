@@ -13,4 +13,10 @@ describe("timeout flags added for lock/pg hang protection", () => {
       expect(Flag.OPENCODE_PG_STATEMENT_TIMEOUT_MS).toBe(30000)
     }
   })
+
+  test("OPENCODE_PG_IDLE_TX_TIMEOUT_MS defaults to 60000", () => {
+    if (process.env["OPENCODE_PG_IDLE_TX_TIMEOUT_MS"] === undefined) {
+      expect(Flag.OPENCODE_PG_IDLE_TX_TIMEOUT_MS).toBe(60000)
+    }
+  })
 })

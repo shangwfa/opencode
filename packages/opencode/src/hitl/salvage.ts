@@ -5,7 +5,7 @@
 //   replied 未消费   → part 写 completed（用户答案回填），行 closed(answered-delivered)
 //   rejected 未消费  → part 写 error（用户拒绝文案），行保持 rejected
 import { and, eq, sql } from "drizzle-orm"
-import { Effect } from "effect"
+import { Effect, Option } from "effect"
 import * as Log from "@opencode-ai/core/util/log"
 import type { ToolPart } from "@opencode-ai/core/v1/session"
 import { SessionV1 } from "@opencode-ai/core/v1/session"
@@ -79,8 +79,7 @@ async function salvageRow(db: SalvageDb, row: HitlStore.Row): Promise<SalvageRes
     .all()
   const target = partRows[0]
   if (target === undefined) return { complete: false }
-  // PG bridge returns jsonb as a raw string; decode before use.
-  const part = (typeof target.data === "string" ? JSON.parse(target.data) : target.data) as unknown as ToolPart
+  const part = target.data as unknown as ToolPart
   if (part.state.status !== "running") return { complete: true }
   const running = part.state
   const start = running.time.start
@@ -140,7 +139,12 @@ export interface SweepStats {
 export const sweepKind = (events: EventV2Bridge.Service["Service"], kind: HitlStore.Kind, directory: string) =>
   Effect.gen(function* () {
     const t0 = Date.now()
-    const span = yield* Effect.currentSpan
+    // Spans only exist under a tracing parent (the poll fiber's Effect.fn);
+    // degrade to a no-op when swept directly (tests, scripts).
+    const span = yield* Effect.option(Effect.currentSpan)
+    const attribute = (key: string, value: string | number | boolean) => {
+      if (Option.isSome(span)) span.value.attribute(key, value)
+    }
     let sweptPending = 0
     let answeredBackfilled = 0
     let archivedFinal = 0
@@ -230,11 +234,11 @@ export const sweepKind = (events: EventV2Bridge.Service["Service"], kind: HitlSt
       catch: (error) => new Error(`hitl retention failed: ${String(error)}`),
     }).pipe(Effect.catchCause((cause) => Effect.logError("hitl retention failed", { cause: String(cause) })))
 
-    span.attribute("hitl.kind", kind)
-    span.attribute("hitl.swept_pending", sweptPending)
-    span.attribute("hitl.answered_backfilled", answeredBackfilled)
-    span.attribute("hitl.archived_final", archivedFinal)
-    span.attribute("hitl.duration_ms", Date.now() - t0)
+    attribute("hitl.kind", kind)
+    attribute("hitl.swept_pending", sweptPending)
+    attribute("hitl.answered_backfilled", answeredBackfilled)
+    attribute("hitl.archived_final", archivedFinal)
+    attribute("hitl.duration_ms", Date.now() - t0)
 
     return { sweptPending, answeredBackfilled, archivedFinal } satisfies SweepStats
   })

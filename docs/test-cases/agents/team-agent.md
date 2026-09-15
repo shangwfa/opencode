@@ -320,3 +320,8 @@ BASE=$BASE MODEL=$MODEL python3 team-agent-dynamic.py "实现 Python 的 calc �
 | T52.10 动态团队 | ✅ | 任务→规划 JSON(Designer/Implementer/Reviewer)→动态创建→依赖链执行→[APPROVED]→汇总；交付代码 import 实测全对（除零 ValueError/均值/标准差） |
 
 > 复测记录（2026-09-06，merge upstream/dev v1.18.29 后，镜像 `t0906-merged-1.18.29`，组合 3，模型 `opencode/muse-spark-1.3-contributor-free`）：**T52 全部用例实测通过**。本套用例验证：openCode SaaS 原生能力（session agents + HTTP 指定 agent 发消息）可稳定编排「captain→多角色成员→依赖任务链→质量门→汇总归档→成员复用」的完整团队流程，作为 dsh-agent-teams 重型能力的轻量替代。要点：① primary 与 subagent 均可被 HTTP `agent` 参数直接唤醒（subagent 无需依赖模型自主调 task）；② 下游角色消息携带上游产出即实现「依赖感知」；③ 编排完全由控制面驱动，不依赖模型主动调度，规避了 deepseek/spark 工具调用消极的问题。
+
+> **复测记录（2026-09-14，镜像 `hitl-cbf2276a-wip2`，本地 PG + 远端沙箱，`Yd-DeepSeek/deepseek-v4-flash`）**：
+> - T52.1 ✅ 团队组建：4 agent 落库 `analyst:primary, coder:subagent, lead:primary, reviewer:subagent`
+> - T52.2 ✅ 工单规划：`agent=lead`，回复含团队工单（成员分工 + 依赖顺序）
+> - T52.3–T52.10 ⏸️ 未跑（依赖任务链 / 质量门 / 汇总归档 / 动态团队——长时编排，建议按需单独跑）

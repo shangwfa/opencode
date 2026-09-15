@@ -1,5 +1,5 @@
-import { pgTable, text, boolean, jsonb, index, uniqueIndex } from "drizzle-orm/pg-core"
-import { Timestamps } from "../storage/schema.pg"
+import { pgTable, text, boolean, index, uniqueIndex } from "drizzle-orm/pg-core"
+import { pgJsonb, Timestamps } from "../storage/schema.pg"
 import { SessionTable } from "../session/session.pg"
 
 export const SessionCommandTable = pgTable(
@@ -15,7 +15,7 @@ export const SessionCommandTable = pgTable(
     agent: text(),
     model: text(),
     subtask: boolean(),
-    hints: jsonb().notNull().$type<string[]>().default([]),
+    hints: pgJsonb<string[]>().notNull().default([]),
     time_created: Timestamps.time_created,
     time_updated: Timestamps.time_updated,
   },

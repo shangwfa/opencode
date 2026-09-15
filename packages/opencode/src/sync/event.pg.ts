@@ -1,4 +1,5 @@
-import { pgTable, text, integer, jsonb } from "drizzle-orm/pg-core"
+import { pgJsonb } from "@/storage/schema.pg"
+import { pgTable, text, integer } from "drizzle-orm/pg-core"
 
 export const EventSequenceTable = pgTable("event_sequence", {
   aggregate_id: text().notNull().primaryKey(),
@@ -13,5 +14,5 @@ export const EventTable = pgTable("event", {
     .references(() => EventSequenceTable.aggregate_id, { onDelete: "cascade" }),
   seq: integer().notNull(),
   type: text().notNull(),
-  data: jsonb().$type<Record<string, unknown>>().notNull(),
+  data: pgJsonb<Record<string, unknown>>().notNull(),
 })

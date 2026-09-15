@@ -1,12 +1,12 @@
 import { Context, Duration, Effect, Layer, Schedule } from "effect"
-import { and, asc } from "drizzle-orm"
+import { and, asc, or } from "drizzle-orm"
 import * as Log from "@opencode-ai/core/util/log"
 import { Flag } from "@/flag/flag"
 import { Database } from "../storage/db"
 import { PartTable } from "./session.pg"
 import type { PartID } from "./schema"
 import { SessionTools } from "./mark-timed-out"
-import { watchdogToolCondition } from "./watchdog-sql"
+import { LEASE_TOOLS, leaseOrphanCondition, watchdogToolCondition } from "./watchdog-sql"
 import { ToolExecution } from "./tool-execution"
 
 const log = Log.create({ service: "watchdog" })
@@ -63,13 +63,16 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null
 }
 
-function runningExecution(data: unknown): { start: number; callID: string; leaseUntil?: number } | undefined {
+function runningExecution(
+  data: unknown,
+): { start: number; callID: string; tool: string; leaseUntil?: number } | undefined {
   const value = parsePartData(data)
   if (!isRecord(value)) return
   if (value.type !== "tool") return
   if (!isRecord(value.state)) return
   if (value.state.status !== "running") return
   if (typeof value.callID !== "string") return
+  if (typeof value.tool !== "string") return
   if (!isRecord(value.state.time)) return
   if (typeof value.state.time.start !== "number") return
   const metadata = isRecord(value.state.metadata) ? value.state.metadata : undefined
@@ -77,6 +80,7 @@ function runningExecution(data: unknown): { start: number; callID: string; lease
   return {
     start: value.state.time.start,
     callID: value.callID,
+    tool: value.tool,
     ...(typeof watchdog?.leaseUntil === "number" ? { leaseUntil: watchdog.leaseUntil } : {}),
   }
 }
@@ -99,7 +103,14 @@ const scan = Effect.fn("SessionWatchdog.scan")(function* (config: Config) {
           data: PartTable.data,
         })
         .from(PartTable)
-        .where(watchdogToolCondition({ startBefore, orphanBefore, now: t0, dialect: Database.dialect, callIDs }))
+        .where(
+          or(
+            watchdogToolCondition({ startBefore, orphanBefore, now: t0, dialect: Database.dialect, callIDs }),
+            // LEASE_TOOLS orphans: broken lease only, no elapsed-time ceiling —
+            // live instances keep renewing, so a broken lease means the owner died.
+            Database.dialect === "pg" ? leaseOrphanCondition(t0) : undefined,
+          ),
+        )
         .orderBy(asc(PartTable.time_created))
         .limit(100)
         .all(),
@@ -115,15 +126,21 @@ const scan = Effect.fn("SessionWatchdog.scan")(function* (config: Config) {
     .map((row) => {
       const execution = runningExecution(row.data)
       if (!execution) return
+      const leaseOnly = (LEASE_TOOLS as readonly string[]).includes(execution.tool)
+      if (leaseOnly) {
+        // Lease candidates come from leaseOrphanCondition: broken lease already
+        // verified in SQL. Live executions are local — never mark those.
+        if (ToolExecution.has(row.session_id, execution.callID)) return
+        return { row, start: execution.start, local: false, leaseOnly: true }
+      }
       const local = ToolExecution.has(row.session_id, execution.callID)
-      const orphaned = execution.leaseUntil === undefined
-        ? execution.start < orphanBefore
-        : execution.leaseUntil <= t0
+      const orphaned = execution.leaseUntil === undefined ? execution.start < orphanBefore : execution.leaseUntil <= t0
       if (!local && !orphaned) return
       return {
         row,
         start: execution.start,
         local,
+        leaseOnly: false,
       }
     })
     .filter((item) => item !== undefined)
@@ -132,11 +149,24 @@ const scan = Effect.fn("SessionWatchdog.scan")(function* (config: Config) {
     stuck,
     (item) =>
       tools
-        .markTimedOut({ partID: item.row.id, expectedStart: item.start, timeoutMs: config.timeoutMs })
-        .pipe(Effect.catchCause((cause) => {
-          log.error("watchdog candidate failed", { partID: item.row.id, cause: String(cause) })
-          return Effect.succeed(false)
-        })),
+        .markTimedOut({
+          partID: item.row.id,
+          expectedStart: item.start,
+          timeoutMs: config.timeoutMs,
+          ...(item.leaseOnly
+            ? {
+                error: "Tool execution was orphaned: the instance that started it is no longer alive (lease expired).",
+                // Lease orphans bypass the elapsed-time recheck via the custom error.
+                timeoutMs: 0,
+              }
+            : {}),
+        })
+        .pipe(
+          Effect.catchCause((cause) => {
+            log.error("watchdog candidate failed", { partID: item.row.id, cause: String(cause) })
+            return Effect.succeed(false)
+          }),
+        ),
     { concurrency: 4 },
   )
   const marked = results.filter(Boolean).length

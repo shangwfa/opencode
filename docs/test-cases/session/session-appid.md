@@ -148,3 +148,4 @@ curl -s "$BASE/session/$SID/message" | jq '.[] | {role: .info.role, texts: [.par
 | 2026-08-17 | T41.4.1 消息详情回归 | ✅ | Yd-DeepSeek 回复正常；详情含 appId |
 
 | 2026-09-06 | T41.1.1/1.2/1.3 回归（merge v1.18.29 后） | ✅ | 镜像 t0906-merged-1.18.29；appId 创建/PG 落库/非法 400 均正常 |
+| 2026-09-14 | **全量复测**（镜像 `hitl-cbf2276a-wip2`（含 pgJsonb/LEASE_TOOLS/偏离修复），本地 PG + 远端沙箱） | ✅ 10/10 | T41.1.1 ✅（resp+PG 落库一致）/ T41.1.2 ✅（null）/ T41.1.3 ✅（400）/ T41.2.1 ✅（count=2 全匹配，不含他 appId）/ T41.2.2 ✅（0）/ T41.2.3 ✅（appId×limit 正交）/ T41.3.1 ✅（发消息后排序翻转 newer→older，`time_updated` delta=3534ms 已刷新）/ T41.4.1 ✅（回复 `2`、消息链 user→assistant、详情 appId=verify-app） |

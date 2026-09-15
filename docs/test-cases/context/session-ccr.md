@@ -164,3 +164,12 @@ bun test test/plugin/ccr-transform.test.ts test/plugin/ccr-compressors.test.ts \
 | 双实例同 session | object     | lines    |          10719 |              5432 |              1 |
 | 跨 session A     | object     | json     |          60391 |              1123 |              0 |
 | 跨 session B     | object     | json     |          60391 |              1123 |              1 |
+
+> **复测记录（2026-09-15，镜像 `hitl-cbf2276a-wip2`（含 pgJsonb/LEASE_TOOLS/偏离修复），本地 PG + 远端沙箱）**：
+> - **L0 单测 ✅ 97/97**（5 套件：transform/compressors/image/retrieve/store，与 2026-09-04 基线一致）
+> - **L1 加载 ✅**：容器 `OPENCODE_CCR_ENABLED=true`（Dockerfile 内置）
+> - **L2/L5 压缩+持久化 ✅**：PG seed 34KB JSON tool output（300 items）→ 发 5 条消息推入压缩窗口 → **PG `storage_data` 产生 entry**（key=`plugin/ccr/<sid>/<hash>`、`strategy=json`、`originalTokens=8548`）
+> - **L6 PG 原文不动 ✅**：seed part 的 `state.output` 长度 34191 字符原封未动
+> - **L7 验证数据完整**：entry 含 `strategy=json`、`originalTokens`、`tool`、`retrievalCount` 元数据
+> - ⚠️ 注意事项：**seed 的 message/part 需要完整字段**——`data` 必须包含 `time.created`（message）和 `tokens.total`（message）否则 `isAfter`/`isOverflow` 崩（500）；CCR 的 `protect_recent=4` 意味着 seed part 需要至少 4 条后续消息才能进入压缩窗口
+> - L3（模型 retrieve 取回原文）、L4（多轮幂等）、L8–L14：已有历史复测记录全 PASS，本轮未重跑（依赖 LLM 多轮长流程，L0+L2+L5 已覆盖核心链路）

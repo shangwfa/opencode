@@ -1,5 +1,5 @@
-import { pgTable, text, bigint, jsonb } from "drizzle-orm/pg-core"
-import { Timestamps } from "../storage/schema.pg"
+import { pgTable, text, bigint } from "drizzle-orm/pg-core"
+import { pgJsonb, Timestamps } from "../storage/schema.pg"
 import type { ProjectV2 } from "@opencode-ai/core/project"
 
 export const ProjectTable = pgTable("project", {
@@ -12,6 +12,6 @@ export const ProjectTable = pgTable("project", {
   icon_color: text(),
   ...Timestamps,
   time_initialized: bigint({ mode: "number" }),
-  sandboxes: jsonb().notNull().$type<string[]>(),
-  commands: jsonb().$type<{ start?: string }>(),
+  sandboxes: pgJsonb<string[]>().notNull(),
+  commands: pgJsonb<{ start?: string }>(),
 })

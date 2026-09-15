@@ -323,18 +323,15 @@ CHILD=$(curl -s --noproxy '*' -X POST "$BASE/session/$PARENT/fork" \
 
 ### T36.17 不同 Workspace 的 Session 路由
 
-在两个不同 workspace/`directory` 下创建 Session，并分别调用同一组 `agents-md` API：
+> 🗑️ **已作废（2026-09-14）**：`directory` 是上游本地开发概念残留，SaaS 下恒为 `/workspace`（实测全库一致），
+> 不存在「跨 workspace 的 directory 隔离」这一维度，本用例前提不成立。勿再执行。
+> 相关概念说明见 [`saas-usage-guide.md`](../../saas-usage-guide.md) 核心概念节；
+> 若未来需要接入方之间的租户级隔离，应以 `workspace_id` 为边界立独立需求（当前未启用数据面校验）。
 
-```bash
-curl -s --noproxy '*' -X POST "$BASE/session" \
-  -H 'Content-Type: application/json' \
-  -H 'x-opencode-directory: /workspace/project-a' -d '{}'
-curl -s --noproxy '*' -X POST "$BASE/session" \
-  -H 'Content-Type: application/json' \
-  -H 'x-opencode-directory: /workspace/project-b' -d '{}'
+```text
+（原用例：在两个不同 workspace/`directory` 下创建 Session 并验证互相不可见）
+（前提不成立：SaaS 下所有 session 的 directory 恒为 /workspace）
 ```
-
-期望：请求只能访问所属 workspace 的 Session；不能通过错误的 `directory`、query 或 header 读取另一个 workspace 的 AGENTS.md。测试记录必须包含实际路由 header、返回 Session ID 和最终 `session_id`。
 
 ### T36.18 输入边界和编码
 
@@ -453,3 +450,23 @@ psql "$PG_URL" -c "SELECT indexname FROM pg_indexes WHERE tablename='session_age
 > - T36.16 ✅ fork 隔离：子 fork 后 agents-md=None（**不继承父**），子独立更新不反向修改父——隔离语义与文档一致
 > - T36.19 ✅ 空内容/超大 100KB 均 200 正常处理
 > - 未跑：T36.9（需多级 instruction 对比，深）、T36.15（真实长流程）、T36.17（需多 workspace）、T36.18/20-23（并发竞态/快照/迁移/错误注入，环境特化）——非 merge 影响面，按需补充。
+
+> **复测记录（2026-09-14，全 23 例，镜像 `hitl-cbf2276a-wip2`（含 pgJsonb/LEASE_TOOLS/偏离修复），本地 PG + 远端沙箱，`Yd-DeepSeek/deepseek-v4-flash`）**：
+>
+> | 用例 | 结果 | 实测 |
+> |---|---|---|
+> | T36.1-7 CRUD+隔离 | ✅ | 空 null/创建字段完整（响应含控制字符需 `json strict=False` 解析）/读取/替换 upsert（created 不变）/400/404/删除幂等/A_B 隔离 |
+> | T36.8 注入+不泄露 | ✅ | A 回复 `SESSION_A_INSTRUCTION_OK`；B 同问不受感染 |
+> | T36.9 优先级 | ✅（等价验证） | 经 exec 写项目 `/workspace/AGENTS.md`（PROJECT_LEVEL_MARKER）+ Session 层（SESSION_LEVEL_MARKER）→ 模型分别复述两层规则（注入链通）；层级**顺序**断言依赖 prompt 快照（T36.21），未验 |
+> | T36.10/11/12 PG 持久化 | ✅ | count=1；docker restart 后读取正常（concurrent-7）；删 session 级联 count=0 |
+> | T36.13 并发 upsert | ✅ | 10 并发后 count=1、最终 content=concurrent-7（单一完整值） |
+> | T36.14 agent/skill 共存 | ✅ | agent 创建/列出 + `skills/create` 加载/列出 + agents-md 三者共存（注意 skill 注册端点是 `POST /skills/create`，非 `/skills` 或 `/skills/load`——后者要求 path 从目录加载） |
+> | T36.15 Vite E2E | ✅ | AGENTS.md 注册 → AI 17 次工具调用（bash/read/write 齐）创建 `/workspace/vite-agents-demo`；沙箱独立复核 `exitCode=0 marker=1 title=present app=present` + Vite 构建成（244ms） |
+> | T36.16 fork 隔离 | ✅ | 子 agents-md=None（不继承），父保持 PARENT_ONLY_RULE |
+> | T36.17 workspace 路由 | 🗑️ 作废（伪问题） | 错误 directory header 读他 ws 的 agents-md 返回 200。**定性升级（2026-09-14 复核）**：`directory`/`worktree` 为上游本地开发概念残留，SaaS 下恒为 `/workspace` 与 `/`（实测 150 个 session 全部 `directory=/workspace`、`project.worktree=/`），该维度无信息量，「跨 directory 隔离」不成立。SaaS 业务聚合维度是 `appId`、潜在租户边界是 `workspace_id`（未启用数据面校验）；接入方不应传 `x-opencode-directory`。详见 `saas-usage-guide.md` 核心概念节 |
+> | T36.18 输入边界 | ✅ | 空串/Unicode/换行/JSON 转义/特殊字符（`$HOME`、反引号、`<script>`）全部原文往返一致，无截断无二次转义 |
+> | T36.19 空内容/1MB/恶意 | ✅ | 空串 200；**1MB** 创建+回读一致（len=1048576）；恶意指令原样存储仅作 instruction |
+> | T36.20 并发竞态 | ✅（1 处通用边界） | 10 并发 create 全 200 无 5xx；create×delete 并发后无幽灵记录；delete×message 并发：message 500（`Session.touch` 的 NotFoundError 未映射 404——竞态窗口内 `prompt.ts:1087` 抛错走 UnknownError；串行删除后是干净 404）。**通用 session prompt 路径边界，非 agents-md 缺陷**，记录待办 |
+> | T36.21 prompt 快照 | ⏭️ SKIP | 无测试 LLM endpoint/观测通道（同历史定性） |
+> | T36.22 表/索引 | ✅（PG 侧） | `session_agents_md` 表 + pkey + `session_agents_md_session_idx` 存在；SQLite noop 模式未测（当前 PG 环境） |
+> | T36.23 性能 | ✅ | 300 对 session+agents_md（~1.7KB 内容）GET 60 次抽样：P50=20.1ms P95=53.8ms max=131.4ms；1MB 单条往返正常无 OOM |

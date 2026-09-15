@@ -985,3 +985,33 @@ curl -s --noproxy '*' -m 180 -X POST "$BASE/session/$SID/summarize" \
 >   - **T35.64 ✅ hook 抛异常降级**：chat.params throw → HTTP 200（异常隔离降级，不 500，08-23 修复语义保持）
 >   - **T35.12 ✅ chat.params**（temperature=0）hook 正常，消息完成
 > - 未跑：npm 包类（T35.52-62 真实功能）、T35.63（agent 启动完整性）——依赖 npm 安装/长对话，核心 loader 逻辑已由单测 + 集成 hook 链路覆盖。
+
+### 复测记录（2026-09-15，本地 PG + 远程 K8s 沙箱）
+
+**环境**：本地 PG（`local@127.0.0.1:5432` 经 15432 转发）+ 远程沙箱（172.18.32.15:30040），`http://localhost:14096`，模型 `Yd-DeepSeek/deepseek-v4-flash`（网关恢复正常，替代上轮 hy3-free）。
+
+| 用例 | 结果 | 备注 |
+|---|---|---|
+| T35.1-6 CRUD | ✅ | 创建脱敏/upsert 收敛 1 条/删除/清空/缺 code 400 |
+| T35.7-8 PG 持久化 | ✅ | 记录落库 enabled=true；upsert 后 time_created 不变、time_updated 前进 |
+| T35.9 级联删除 | ✅ | 删会话后 session_plugins 行清零 |
+| T35.10 多 Session 隔离 | ✅ | B session 插件数 0 |
+| T35.11-14 hook 基础 | ✅ | 空 runtime/chat.params/headers/system.transform 均 200 |
+| T35.15 MSGHOOK77 | ✅ | 模型实际回复 `MSGHOOK77`（messages.transform 下游消费） |
+| T35.16 tool.execute | ✅ | before 改写 `args.command` 进入实际执行输出；after metadata 进入消息（state.input 保留模型原始参数为已知语义） |
+| T35.17 / T35.28 command hook | ⏸️ | 无确定性 command fixture（文档已标注） |
+| T35.18-19 enabled 切换 | ✅ | disabled hook throw 不执行 / 启用后 200 |
+| T35.20-21 失效 | ✅ | upsert V1MARK→V2MARK 只执行 v2；删除后 DELMARK 消失 |
+| T35.22-23 语法错误 | ✅ | 坏插件跳过 / 修正后重载 200 |
+| T35.24 抛错隔离 | ✅ | 200 且 assistant 无 error（fail-soft 降级语义保持） |
+| T35.25 顺序 | ✅ | 3 插件 transform 依次追加，模型复述尾部 `abc`（顺序正确） |
+| T35.26 Hook 层隔离 | ✅ | AMARK / BMARK 各自独立 |
+| T35.27 不存在 Session | ✅ | 404，无孤立 PG 记录 |
+| T35.29-30 脱敏 | ✅ | 创建响应与列表均无源码 |
+| T35.31 非法导出 | ✅ | 工厂抛错/无 default/非函数/undefined/未知 hook 均 200 |
+| T35.62 新 Hook 下游 | ✅ | 历史含 CHAT_MESSAGE_MARKER + 最终文本 `TEXT_COMPLETE_MARKER` |
+| T35.63 agent 启动完整性 | ✅ | deepseek-v4-flash 快模型 3 次 message 200；exec 确认 `loaded: persist (1 hooks)` + `listening on :9200`、进程存活 |
+| T35.64 hook 异常降级 | ✅ | compacting 抛错 message 200 + summarize 200(true)，无 500 |
+| T35.32-61 | ⏸️ | 与文档标注一致：源码审计类 / npm 外部包与凭据，未执行 |
+
+**结论**：26/26 可执行用例全部通过（较 2026-08-23 全量重跑无回归；08-23 两个修复——agent 启动完整性、hook 异常降级——在本轮继续有效）。T35.25 本轮改为「transform 追加 + 模型复述尾部词」的顺序观测法，可区分 abc/acb 等排列，比早期「仅验证都执行」更强。

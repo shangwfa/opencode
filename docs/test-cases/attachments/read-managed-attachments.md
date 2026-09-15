@@ -720,3 +720,20 @@ rm -f /tmp/read-last-response.json \
 > - T-READ-10：文档 awk `BEGIN{IGNORECASE=1}` 为 gawk 特性，macOS BSD awk 取不到 ETag，实际用 `grep -i '^etag:'` 提取后 304 验证通过（建议修文档 awk）
 > - T-READ-12：需真实 ELF 文件触发 "Cannot read binary file"（随机字节会先命中 UTF-8 error）；fixture 用 `printf '\x7fELF...'` 构造
 > - T-READ-16：`docker restart` 后附件 URL 仍 200（Sandbox PVC 附件持久化验证通过）
+
+> **复测记录（2026-09-14，全部 17 例，镜像 `hitl-cbf2276a-wip2`（含 pgJsonb/LEASE_TOOLS/偏离修复/idle-txn 超时），本地 PG + 远端 K8s 沙箱，`Yd-DeepSeek/deepseek-v4-flash`）**：**T-READ-01~17 全部 PASS**。
+> | 组 | 结果 | 实测 |
+> |---|---|---|
+> | T-READ-01~04 文本 | ✅ | 分页 alpha/beta ✓、空文件 `total 0 lines` ✓、SVG kind=svg mime=image/svg+xml attachments=0 ✓、非法 UTF-8 error 含 "UTF-8" ✓ |
+> | T-READ-05 PNG | ✅ | kind=image mime=image/png、URL `/session/{sid}/attachment/att_...`、PNG signature `89504e470d0a1a0a` ✓ |
+> | T-READ-06 PDF | ✅ | kind=pdf mime=application/pdf、下载前缀 `%PDF-` ✓ |
+> | T-READ-07 Office | ✅ | kind=office textExtracted=False、Content-Disposition: attachment ✓ |
+> | T-READ-08~11 下载协议 | ✅ | 206 + accept-ranges + content-range `bytes 0-7/69` + 8 字节签名、非法 Range 416、ETag sha256 + If-None-Match 304、SHA-256 源/下载一致 ✓ |
+> | T-READ-12 二进制 | ✅ | ELF fixture → error "Cannot read binary file"、attachments=0 ✓ |
+> | T-READ-13 超限 | ✅ | 真实 PNG 签名 + 21MB 随机填充 → error "Media exceeds 20971520 byte ingestion limit"、attachments=0。⚠️ 首跑用 `/dev/urandom` 造超限文件先命中二进制拒绝（无 PNG 签名）——fixture 必须以真实 PNG 开头 |
+> | T-READ-14 PG/API 安全 | ✅ | part 表 0 条含 data:image/base64/\\u0000；API 响应无 Base64/Data URL；3 个附件 URL 全部 `/session/{sid}/attachment/att_` 受管格式 |
+> | T-READ-15 Sandbox 重建 | ✅ | kill-sandbox + keep-alive boot=true 后，附件 URL 字节 SHA-256 不变 ✓（远端 K8s 沙箱，PVC 附件跨沙箱生命周期持久） |
+> | T-READ-16 SaaS 重启 | ✅ | docker restart 后附件 URL 仍 200、SHA-256 一致 ✓ |
+> | T-READ-17 单测 | ✅ | `attachment.test.ts` + `message-v2.test.ts` **67 pass / 0 fail**（文档基线 ≥50） |
+>
+> 环境备注：远端 K8s 沙箱（组合 2/3 变体）而非文档前置的本地 OpenSandbox——T-READ-15/16 的 PVC 持久化语义在远端沙箱同样验证通过（附件存 PVC，跨沙箱重建与 SaaS 重启持久）。

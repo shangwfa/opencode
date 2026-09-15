@@ -1,4 +1,4 @@
-import { pgTable, text, bigint, jsonb, integer, real, index, primaryKey } from "drizzle-orm/pg-core"
+import { pgTable, text, bigint, integer, real, index, primaryKey } from "drizzle-orm/pg-core"
 import { ProjectTable } from "../project/project.pg"
 import type { SessionV1 } from "@opencode-ai/core/v1/session"
 import type { Snapshot } from "../snapshot"
@@ -6,7 +6,7 @@ import type { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import type { ProjectV2 } from "@opencode-ai/core/project"
 import type { SessionID, MessageID, PartID } from "./schema"
 import type { WorkspaceV2 } from "@opencode-ai/core/workspace"
-import { Timestamps } from "../storage/schema.pg"
+import { pgJsonb, Timestamps } from "../storage/schema.pg"
 
 type PartData = Omit<SessionV1.Part, "id" | "sessionID" | "messageID">
 type InfoData = Omit<SessionV1.Info, "id" | "sessionID">
@@ -30,18 +30,18 @@ export const SessionTable = pgTable(
     summary_additions: integer(),
     summary_deletions: integer(),
     summary_files: integer(),
-    summary_diffs: jsonb().$type<Snapshot.FileDiff[]>(),
-    metadata: jsonb().$type<Record<string, unknown>>(),
+    summary_diffs: pgJsonb<Snapshot.FileDiff[]>(),
+    metadata: pgJsonb<Record<string, unknown>>(),
     cost: real().notNull().default(0),
     tokens_input: integer().notNull().default(0),
     tokens_output: integer().notNull().default(0),
     tokens_reasoning: integer().notNull().default(0),
     tokens_cache_read: integer().notNull().default(0),
     tokens_cache_write: integer().notNull().default(0),
-    revert: jsonb().$type<{ messageID: MessageID; partID?: PartID; snapshot?: string; diff?: string }>(),
-    permission: jsonb().$type<PermissionV1.Ruleset>(),
+    revert: pgJsonb<{ messageID: MessageID; partID?: PartID; snapshot?: string; diff?: string }>(),
+    permission: pgJsonb<PermissionV1.Ruleset>(),
     agent: text(),
-    model: jsonb().$type<{
+    model: pgJsonb<{
       id: string
       providerID: string
       variant?: string
@@ -51,7 +51,7 @@ export const SessionTable = pgTable(
     time_archived: bigint({ mode: "number" }),
     pvc_mode: text().$type<"session" | "app">(),
     app_id: text(),
-    sandbox: jsonb().$type<{ cpu: string; memory: string; persistMode?: "pvc" | "snapshot" }>(),
+    sandbox: pgJsonb<{ cpu: string; memory: string; persistMode?: "pvc" | "snapshot" }>(),
   },
   (table) => [
     index("session_project_idx").on(table.project_id),
@@ -69,7 +69,7 @@ export const MessageTable = pgTable(
       .notNull()
       .references(() => SessionTable.id, { onDelete: "cascade" }),
     ...Timestamps,
-    data: jsonb().notNull().$type<InfoData>(),
+    data: pgJsonb<InfoData>().notNull(),
   },
   (table) => [index("message_session_time_created_id_idx").on(table.session_id, table.time_created, table.id)],
 )
@@ -84,7 +84,7 @@ export const PartTable = pgTable(
       .references(() => MessageTable.id, { onDelete: "cascade" }),
     session_id: text().$type<SessionID>().notNull(),
     ...Timestamps,
-    data: jsonb().notNull().$type<PartData>(),
+    data: pgJsonb<PartData>().notNull(),
   },
   (table) => [
     index("part_message_id_id_idx").on(table.message_id, table.id),
@@ -121,7 +121,7 @@ export const SessionEntryTable = pgTable(
       .references(() => SessionTable.id, { onDelete: "cascade" }),
     type: text().notNull(),
     ...Timestamps,
-    data: jsonb().notNull(),
+    data: pgJsonb().notNull(),
   },
   (table) => [
     index("session_entry_session_idx").on(table.session_id),
@@ -135,5 +135,5 @@ export const PermissionTable = pgTable("permission", {
     .primaryKey()
     .references(() => ProjectTable.id, { onDelete: "cascade" }),
   ...Timestamps,
-  data: jsonb().notNull().$type<PermissionV1.Ruleset>(),
+  data: pgJsonb<PermissionV1.Ruleset>().notNull(),
 })

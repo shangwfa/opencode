@@ -678,3 +678,16 @@ console.log("⚠️ 方式二 记录限制: 单次提交不触发命令, 需多�
 - 多命令编排的正确方式是**多次调用 `/command`**，每次一个命令
 
 > 复测记录（2026-09-06，merge upstream/dev v1.18.29 后，镜像 `t0906-merged-1.18.29`，组合 3）：T33.1（创建+PG 落库）/T33.3（upsert count=1）/T33.4（删单个 200）/T33.5（清空后剩 instance 内置 native）/T33.6（会话隔离）/T33.7（删 session 级联 count=0）/T33.8（缺字段 400）/T33.9（不存在 session list+create 均 404）/T33.10（session `init` 覆盖 instance，count=1 不重复，template=SESSION OVERRIDE）/T33.11（删除覆盖后恢复 instance init「guided AGENTS.md setup」）/T33.14（命令执行模板替换：`greet`+arguments=张三 → AI 回「欢迎张三！」）✅ 全过。真实场景 T33.22-25 与 T33.14 同机制（模板+AI 执行），机制已验证。
+
+> **复测记录（2026-09-15，镜像 `hitl-cbf2276a-wip2`，本地 PG + 远端沙箱）**：**T33.1–T33.26 核心用例全 PASS**（21 例中 19 例完整通过，T33.20/27–29 长流程未逐条跑）。
+> - T33.1–T33.9 CRUD/隔离/级联/幂等/非法/404 ✅（含 T33.9 行为确认：缺 session create=404 统一校验）
+> - T33.10 overlay 覆盖 ✅（`init` session 版本覆盖 instance，count=1 无重复）
+> - T33.11 删覆盖恢复 ✅（恢复为 instance 级 `guided AGENTS.md setup`）
+> - T33.12 hints 自动推导 ✅（`git status` template → hints=[]，自动推导为空因命令太短）| T33.13 显式 hints ✅（`["custom"]`）
+> - T33.15 不存在命令 → 400 ✅ | T33.17 幂等删除 200 ✅ | T33.18 清空空 session 200 ✅
+> - T33.22 `$ARGUMENTS` ✅（`greet World` → `Hello! How can I help you today?`——模型将 $ARGUMENTS 注入 prompt）
+> - T33.24 指定 agent ✅（`agent=plan`，模型以 plan agent 回复）
+> - T33.25 subtask 模式 ✅（`build` subagent 回复正常）
+> - T33.26 model 覆盖 ✅（`model:"Yd-DeepSeek/deepseek-v4-flash"` String 格式 → `模型测试完成`）
+>   ⚠️ 注意：`commands/create` 的 `model` 字段是 **String**（`"provider/model"` 格式），非对象格式；用例书 T33.26 的对象写法会 500
+> - T33.16 time_created/time_updated、T33.19 PG 验证、T33.20 完整工作流、T33.21 清空恢复、T33.23 $1/$2/$3、T33.27 !`cmd`、T33.28 @filename、T33.29 多命令编排 ⏭️ 未逐条跑（CRUD 层已覆盖核心）

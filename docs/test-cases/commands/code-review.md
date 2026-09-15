@@ -244,3 +244,9 @@ print('✅ T31.6 PASS' if has_findings else '❌ T31.6 FAIL')
 | T31.6 | ⏳ | |
 
 > 复测记录（2026-09-06，merge v1.18.29 后）：T31.1（git 环境 READY）+ T31.2（`/review` 经 `/command` 执行）✅——正确识别注入 bug.ts 的两个缺陷（`const x: string = 123` 类型不匹配 High；`as unknown as string` 类型安全漏洞 Medium）。命令只能经 `/command` 触发确认。
+
+> **复测记录（2026-09-15，镜像 `hitl-cbf2276a-wip2`，本地 PG + 远端沙箱，Yd-DeepSeek）**：
+> - T31.1 fixture ✅（git init + 2 commits 建立成功）
+> - T31.2 /review ✅（HTTP 200，模型返回审查回复——但审查范围在 `/workspace` 根目录，子目录 fixture 未被扫描）
+> - T31.3 /codex-review ✅（HTTP 200，模型执行审查流程——发现无 staged/unstaged diff 时正确报告"nothing to review"并提示用户）
+> - ⚠️ 环境限制：`/review` 和 `/codex-review` 审查范围基于当前 workspace 的 git diff（staged/unstaged），**不自动扫描 commit history**——fixture 需要 uncommitted changes 才能触发实际审查内容。T31.4–T31.6 未跑（需仔细构造 diff/commit 场景）

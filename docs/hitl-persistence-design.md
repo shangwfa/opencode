@@ -345,14 +345,14 @@ reply = `always` 成功时，将 `{permission, pattern, action:'allow'}` 规则 
 | D4 | 悬空善后按「owner 死亡」判定，不按时间超时 | question 合法无限期等待，按时间杀会复发 stall 误杀事故（见 llm-stall-recovery） | 加入 MONITORED_TOOLS（否决，同上） |
 | D5 | 死亡实例的 pending 一律 `closed`，不做 run 级恢复；**已答未消费的答案回填进消息树** | run 恢复依赖消息树重放 + 悬空 part 上下文重建，复杂度高；而答案回填 part 后下一轮 prompt 天然续上（消息树架构的轻量等效），用户已提交的答案不丢 | 接手实例重建 run 回填答案并自动续跑（列为 P3；与 Temporal 式自动恢复的差距已在非目标明示） |
 | D6 | `always` 写 `session.permission` 列 | 列本来就是规则评估源、机器可写、UI 透明 | 新建 approved 规则表（多一张表且 GET /session 不可见）；只落 hitl_request.result 重建（历史累积无界） |
-| D7 | `hitl_request` 定位为 **projection（状态投影）**，非事件溯源本体 | P1 直写状态表最小化触碰 core event 体系；P2 事件 durable 化后，`question.asked/replied/rejected` 可改为经 sync projector 维护同一张表（写路径收敛），两期不撞车 | 直接走事件溯源（projector + event 表）一步到位（触碰 durable manifest 聚合设计，P1 周期内风险过高） |
+| D7 | `hitl_request` 定位为 **projection（状态投影）**，非事件溯源本体 | P1 直写状态表最小化触碰 core event 体系 | 直接走事件溯源一步到位（触碰 durable manifest 聚合设计，P1 周期内风险过高）。**修正（2026-09-14）**：原「P2 经 sync projector 维护同一张表」的收敛路径**对 SaaS 不成立**——`server.ts → init-projectors → server/projectors.ts` 是空实现（`initProjectors() {}`），`SyncEvent.init` 全库无调用点，projector 体系（`src/sync/` + `session/projectors.ts`）是上游「本地多设备同步」机制的死代码路径；SaaS 里连 `session` 表都是服务直写（`session.ts` 直插直查 `SessionTable`），HITL 的「状态表直写 + 事件桥」与全库同构，非债。P2 范围相应收窄为仅「事件 durable 化」 |
 
 ## 6. 分期
 
 | 期 | 内容 | 验收 |
 |---|---|---|
 | **P1（止血，本周期）** | `hitl_request` 表 + migration；question/permission service 双写 PG + CAS reply + 轮询消费 + 租约；启动/周期清扫 + 悬空 part 三分支善后（含答案回填）；HTTP 幂等语义；pending 上限 + 终态 retention；可观测性 | 用例文档 T2.1–T2.4、T3.2、T4.1 全部转 PASS（按「修复后验收标准」列）；answered-lost 场景新用例：重启后补发消息，LLM 能引用已提交答案 |
-| **P2** | `always` → session.permission；事件 durable 化（`hitl_request` 转由 projector 维护）；SSE catch-up；bash-ask 悬空 part 覆盖确认 | T3.2 always 分支；新增事件回放用例 |
+| **P2（已收窄，2026-09-14）** | ~~`hitl_request` 转由 projector 维护~~（对 SaaS 不成立，见 D7 修正）；保留：`always` → session.permission（**P1 已提前完成**，事务内合并写入 + 重启恢复，见 T3.2 复测）；`question.asked/replied/rejected`、`permission.asked/replied` 标 **durable** 落 event 表（core EventV2 能力，不经过 SyncEvent/projector——收益：审计留痕 + SSE 断线 catch-up，即 `durable(aggregateID, after)` 重放补发）；bash-ask 悬空 part 覆盖确认 | 新增：event 表可查到 HITL 事件历史；SSE 断线重连后 pending 状态变化可补发 |
 | **P3（对齐 pi-ask）** | 自动续跑（answered-lost 后无需用户再发消息）；steer 非阻塞注入 | 新特性独立用例 |
 
 ## 7. 涉及文件

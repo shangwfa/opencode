@@ -131,6 +131,11 @@ export namespace Flag {
   export const OPENCODE_SESSION_LOCK_TIMEOUT_SEC = number("OPENCODE_SESSION_LOCK_TIMEOUT_SEC") ?? 60
   export const OPENCODE_HITL_MAX_PENDING_PER_SESSION = number("OPENCODE_HITL_MAX_PENDING_PER_SESSION") ?? 10
   export const OPENCODE_PG_STATEMENT_TIMEOUT_MS = number("OPENCODE_PG_STATEMENT_TIMEOUT_MS") ?? 30000
+  // Abandoned transactions stuck in `idle in transaction` (crashed/hung run) keep
+  // their advisory/row locks forever, blocking the watchdog's markTimedOut and any
+  // later run needing the same advisory key. PG auto-terminates such sessions after
+  // this duration, releasing the locks.
+  export const OPENCODE_PG_IDLE_TX_TIMEOUT_MS = number("OPENCODE_PG_IDLE_TX_TIMEOUT_MS") ?? 60000
   export const OPENCODE_SANDBOX_PACKAGE_CACHE_MOUNT =
     process.env["OPENCODE_SANDBOX_PACKAGE_CACHE_MOUNT"] ?? "/opt/pnpm-store"
   // 快照前清理可重建产物（/tmp、各类 cache），减小快照体积；默认关，避免牺牲恢复后 node_modules 即用性

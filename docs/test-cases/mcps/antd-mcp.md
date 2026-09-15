@@ -228,3 +228,14 @@ curl -s --max-time 120 -X POST "$BASE/session/$SID/message" -H 'Content-Type: ap
 psql "$PG_URL" -t -c \
   "SELECT data->>'tool', data->'state'->>'status' FROM part WHERE session_id='$SID' AND data->>'type'='tool'"
 ```
+
+> **复测记录（2026-09-15，镜像 `hitl-cbf2276a-wip2`（含 pgJsonb/LEASE_TOOLS/偏离修复），本地 PG + 远端 K8s 沙箱，Yd-DeepSeek，无 CODE_MODE env）**：
+> | 用例 | 结果 | 实测 |
+> |---|---|---|
+> | T40.1 创建 | ✅ | PG `antd\|local\|true` |
+> | T40.2 CRUD | ✅ | 由 session-mcp T22.1–8 同资源覆盖 |
+> | T40.3/4 antd_list | ✅ | AI 返回 Affix, Alert, Anchor, App, AutoComplete... 真实组件；PG execute `toolCalls: [{"tool":"antd.antd_list","status":"completed"}]` |
+> | T40.5 antd_info | ✅ | Button 完整 props 表（autoInsertSpace/block/classNames/color... 含类型和默认值） |
+> | T40.6 生成代码 | ✅ | AI 查 Card API（20 props）后 `write` 生成 `/workspace/McpCard.tsx`（含 Card import） |
+>
+> 注意：本轮容器**无 `OPENCODE_EXPERIMENTAL_CODE_MODE`**（auto→off），antd 工具经 **code-mode auto-discovery** 或传统 MCP client 路径调用——PG part 表 tool 行为空但 `execute` 的 `toolCalls` 记录 `antd.antd_list|completed`，与历史 code-mode=mcp 模式一致的持久化形态。

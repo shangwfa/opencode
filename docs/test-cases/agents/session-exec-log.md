@@ -807,3 +807,12 @@ summary
 > 复测记录（2026-09-12，分支 `feat/opencode-1.18.30`，镜像 `t0912-toolexeclog`，本地 PG + 远程沙箱）：T17.28 ✅（read=failed/write=completed 均有 `tool-call` 记录，command 含 tool/callID/input）、T17.29 ✅（part 无残留 + exec_log 全终态）、T17.30 ✅（abort 后 part/exec_log 双层收敛，error=`Tool execution aborted`）。单测全绿（`packages/core/test/session-runner-fail-unsettled.test.ts` 7 用例、`packages/opencode/test/session/tool-exec-log.test.ts` 8 用例）。
 >
 > 实现说明：SaaS 生产链路为 V1 事件体系（`session/processor.ts` → `message.part.updated`），工具调用记录监听 V1 PartUpdated 事件；`processor.ts` cleanup 兜底参数流丢失的 pending 工具（置 error `Tool call interrupted before arguments were received`）；core V2 runner（`publish-llm-event.ts`）同构缺陷同步修复，供上游架构切换后生效。
+
+> **复测记录（2026-09-14，全 30 例，镜像 `hitl-cbf2276a-wip2`（含 pgJsonb/LEASE_TOOLS/偏离修复），本地 PG + 远端沙箱）**：T17.1–T17.30 **全部 PASS**。
+> - T17.1–T17.24 审计矩阵 ✅（15 类 source：session-create/patch/delete 级联/abort/share/unshare + agent-create/delete/clear + command-create/delete/clear + agentsmd-create/clear + plugin-create/delete/clear；payload 捕获；跨 session 隔离；保留名拒绝；permission 对象解析 ≥6 条；model/color/temperature 持久化；空 name 400；缺 session 404；失败 permission-respond 不记录；混合操作完整性）
+>   - ⚠️ T17.5 首跑 share=0/unshare=1：`logAction` 异步落库的毫秒级时序竞态，加 sleep 1 后 share=1/unshare=1（非缺陷）
+> - T17.25/26 沙箱审计 ✅（`sandbox-create` status=completed、duration=4293ms、command 含 sandboxID/image/durationMs；全库 67 次 avg=8199ms max=58560ms 均在合理范围）
+> - T17.27 permission deny ✅（`status=denied` + `rule=bash: rm*`）
+> - T17.28 tool-call 全链路 ✅（read=failed/write=completed 均有记录，command 含 tool/callID/partID/assistantMessageID）
+> - T17.29 正常回合收敛 ✅（part unsettled=0；exec_log stuck=0 done=2）
+> - T17.30 abort 收敛 ✅（setup running=1 → abort → part unsettled=0、exec_log stuck=0）

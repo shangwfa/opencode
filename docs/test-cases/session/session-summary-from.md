@@ -280,3 +280,5 @@ curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{"title"
 
 > 执行环境：镜像 `opencode-saas-sandbox-test:sumfrom-fix2`（本地 PG `local` 用户 + 远程沙箱，容器 `opencode-saas-test`）。
 > 本轮执行暴露并修复 2 个实现缺陷：① `deriveSummary` 缺 idle 恢复（SSE 无完成信号、状态永停 busy）→ `Effect.ensuring(status.set(idle))`；② `forkDeriveSummary` 缺会话锁 → 摘要流式期间发消息触发空 compaction 竞态 → 包 `withSessionLock`（`handlers/session.ts`）。`wait_derived` 判据同步加强为「等 summary assistant 的 finish 落库」。
+
+| 2026-09-14 | **全量复测**（镜像 `hitl-cbf2276a-wip2`（含 pgJsonb/LEASE_TOOLS/偏离修复），本地 PG + 远端沙箱） | ✅ 15/15 | T43.1.1 ✅（user compaction part + assistant summary=true + 摘要含「凤凰」）/ T43.1.2 ✅（**行为演进**：user 行 `summary={"diffs":[]}` 而非 09-10 时的 null——compaction 元数据随消息落库，结构断言核心不变：compaction part=1 + assistant summary=true）/ T43.1.3 ✅（exec_log 审计含 summaryFrom、title 未继承源标题）/ T43.2.1 ✅（delta×47 + part.updated×6 + `session.idle`）/ T43.3.1 ✅（before=after=2 零污染）/ T43.4.1 ✅（回复「凤凰」）/ T43.5.1 ✅（西瓜开门硬校验 ×2 + 芝麻开门软校验 ×2，真实合并）/ T43.6.1/6.2/6.3 ✅（空源 0 消息 / 不存在源正常创建 / 400）/ T43.7.1 ✅（phoenix 命中 ×4）/ T43.8.1 ✅（pvcMode=app + appId + 摘要照常）/ T43.9.1 ✅（并发两 ID 各自生成）/ T43.10.1 ✅（排队回复 ok、消息数 4）/ T43.11.1 ✅ |

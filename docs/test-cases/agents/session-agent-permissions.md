@@ -2117,3 +2117,29 @@ bun test test/tool/task.test.ts -t "resumable"
 ---
 
 > 复测记录（2026-09-06，merge v1.18.29 后）：T26.21 ✅ 字符串简写转规则（edit:deny/bash:allow）；T26.25 ✅ allow/deny 快捷→`*` 规则；T26.22/24/28 ✅ 路径粒度/命令粒度/task 调度 deny 规范化有序。T26.27 ⚠️ 复现文档已记录行为：`tools` 字段被 session agent API 接受但忽略、不转 permission（转换仅 config 层）——既有行为非 merge 引入。
+
+> **复测记录（2026-09-14，重点矩阵，镜像 `hitl-cbf2276a-wip2`，本地 PG + 远端沙箱，`Yd-DeepSeek/deepseek-v4-flash`）**：
+> - T26.21 ✅ 字符串简写：permission count=6、bash 工具 `completed`、模型无法调用 edit/write（`disabled()` 移除生效）
+> - T26.22 ✅ 粒度路径：`edit` 规则=2（`*:deny` + `src/*.ts:allow`）
+> - T26.24 ✅ bash 粒度命令：3 条规则（`*:ask` + `git *:allow` + `rm *:deny`）
+> - T26.26 ✅ 覆盖顺序 last-wins：`[(*,deny),(docs/*.md,allow)]`，allow 在后生效
+> - T26.26b ✅ 对象 key 顺序：`*` 在 `src/*.ts` 之前，白名单可覆盖
+> - T26.27 ⚠️ `tools` 字段被 session agent API 接受但忽略、不转 permission（与 2026-09-06 记录的既有行为一致，非回归）
+> - T26.28 ✅ task 调度限制：`task` 规则 `[(*,ask),(dangerous-agent,deny),(safe-agent,allow)]` 规范化有序
+> - T26.36 ✅ subagent 权限派生：子 session `permission` = `[(todowrite,*,deny),(task,*,deny)]`（`deriveSubagentSessionPermission` 运行时补齐）
+> - 其余 28 例（T26.23/25/29–T26.55）⏸️ 未跑（含 ask 模式交互、MCP 工具、并发等长时场景）
+
+> **复测记录（2026-09-14 续，配置层 + 切换批）**：
+> - T26.25 ✅ 全局快捷：`permission:"allow"` → `[(*,*,allow)]`、`"deny"` → `[(*,*,deny)]`
+> - T26.31 ✅ 对象语法白名单：edit 3 条规则（`*:deny` + 两个具体 allow）
+> - T26.33 ✅ `...` 字面点原样持久化（`a/.../b/*.md`）
+> - T26.37 ✅ `external_directory:"deny"` → `[(external_directory,*,deny)]`
+> - T26.40 ✅ `~`/`$HOME` 展开为 `/home/opencode/...` 绝对路径
+> - T26.52 ✅ bash 命令级白名单 4 条（`*:deny` + 3 条具体 allow，顺序正确）
+> - T26.55 ✅ 全局 deny 在前、agent allow 在后（findLast 取 allow）
+> - T26.56 ✅ 即时 agent 切换：`prompt_async agent=dyn-build` → PG `session.agent` 切换 + `session.updated` 事件
+> - T26.58 ✅ 不存在 agent → 500 + `session.agent` 不变
+> - T26.60 ⚠️ NOTE：严格→宽松切换验证被环境干扰（模型改用 bash 且其沙箱被回收挂起）——机制由 T26.56 + 权限配置层断言覆盖
+> - T26.53/T26.38/T26.39 ⏸️ 受远端沙箱不稳定影响未获稳定断言（模型改走 bash 且 bash 因沙箱回收挂起）
+>
+> **⚠️ 本次挖出的基础设施缺口（重要）**：跑用例期间 watchdog 持续 `stuck=1/2 marked=0`——**检测到挂起工具但标记失败**。根因定位：挂死 run 遗留的 PG 连接处于 `idle in transaction` 状态、持有 `pg_advisory_xact_lock(hashtext(message_id))`，阻塞 `markTimedOut` 的加锁（直接调用同参数可成功标记，证明标记逻辑正常）。`pg_terminate_backend` 终止该废弃事务后 running 归 0。**`db.pg.ts` 未设置 `idle_in_transaction_session_timeout`**（仅有 statement/lock_timeout）——建议补上（如 60s），防止废弃事务长期持锁阻塞 watchdog 与后续同 message 的 run。

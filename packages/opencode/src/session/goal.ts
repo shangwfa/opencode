@@ -14,7 +14,7 @@ import { MessageV2 } from "./message-v2"
 import { SessionV1 } from "@opencode-ai/core/v1/session"
 import { Database, dialect } from "../storage/db"
 import { SessionGoalTable } from "./goal.pg"
-import { eq } from "drizzle-orm"
+import { and, eq } from "drizzle-orm"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 
 const log = Log.create({ service: "session.goal" })
@@ -87,7 +87,34 @@ const mirrorDelete = (sessionID: SessionID) =>
   dialect !== "pg"
     ? Effect.void
     : dbQuery((d: any) =>
-        d.delete(SessionGoalTable as any).where(eq(SessionGoalTable.session_id as any, sessionID as string)).run(),
+        d
+          .delete(SessionGoalTable as any)
+          .where(eq(SessionGoalTable.session_id as any, sessionID as string))
+          .run(),
+      )
+
+// Recover the goal from PG when the in-memory map misses (instance restart or
+// route switch to another replica). PG is the source of truth; the map is a
+// per-instance cache.
+const mirrorRead = (sessionID: SessionID): Effect.Effect<Goal | undefined> =>
+  dialect !== "pg"
+    ? Effect.succeed(undefined)
+    : dbQuery((d: any) =>
+        d
+          .select()
+          .from(SessionGoalTable as any)
+          .where(
+            and(
+              eq(SessionGoalTable.session_id as any, sessionID as string),
+              eq(SessionGoalTable.status as any, "active"),
+            ),
+          )
+          .limit(1)
+          .all()
+          .then((rows: Array<{ condition: string; react: number }>) => {
+            const row = rows?.[0]
+            return row === undefined ? undefined : ({ condition: row.condition, react: row.react } satisfies Goal)
+          }),
       )
 
 export const layer = Layer.effect(
@@ -112,7 +139,13 @@ export const layer = Layer.effect(
 
     const get = Effect.fn("SessionGoal.get")(function* (sessionID: SessionID) {
       const data = yield* InstanceState.get(state)
-      return data.goals.get(sessionID)
+      const cached = data.goals.get(sessionID)
+      if (cached !== undefined) return cached
+      const restored = yield* mirrorRead(sessionID).pipe(Effect.catchCause(() => Effect.succeed(undefined)))
+      if (restored === undefined) return undefined
+      data.goals.set(sessionID, restored)
+      log.info("goal restored from PG", { sessionID, condition: restored.condition })
+      return restored
     })
 
     const clear = Effect.fn("SessionGoal.clear")(function* (sessionID: SessionID) {
@@ -123,8 +156,7 @@ export const layer = Layer.effect(
     })
 
     const bumpReact = Effect.fn("SessionGoal.bumpReact")(function* (sessionID: SessionID) {
-      const data = yield* InstanceState.get(state)
-      const goal = data.goals.get(sessionID)
+      const goal = yield* get(sessionID)
       if (!goal) return 0
       goal.react += 1
       yield* mirrorUpsert(sessionID, goal).pipe(Effect.catchCause(() => Effect.void))
