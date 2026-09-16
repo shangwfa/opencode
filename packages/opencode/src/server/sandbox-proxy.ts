@@ -1378,8 +1378,11 @@ function proxyHttp(
     outHeaders.delete("if-none-match")
     outHeaders.delete("if-modified-since")
 
-    const sourceBody = request.source instanceof Request ? request.source.body : null
-    const reqBody = ["GET", "HEAD"].includes(request.method) ? undefined : sourceBody
+    // body 必须整体读出后再转发：request.source.body 流已被 server 层消费，
+    // 直接透传会得到空流（上游报 "Required request body is missing" → 400）
+    const reqBody = ["GET", "HEAD"].includes(request.method)
+      ? undefined
+      : yield* Effect.orDie(request.arrayBuffer)
 
     const res = yield* Effect.tryPromise({
       try: () => fetch(target.toString(), { method: request.method, headers: outHeaders, body: reqBody, redirect: "manual" }),
