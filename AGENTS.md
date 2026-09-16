@@ -47,12 +47,13 @@
 
 ## 测试与验证
 
-- **集成用例（SaaS 功能首选）**：`docs/test-cases/`，按域分目录（session 17 篇 / sandbox 10 篇 / skills 8 篇 / mcps / agents / pvc / lsp / tools 等）。
+- **集成用例（SaaS 功能首选）**：`docs/test-cases/`，按域分目录（session 18 篇 / sandbox 10 篇 / skills 8 篇 / mcps / agents / pvc / lsp / tools 等）。
   ```bash
   source docs/test-cases/test-env.sh [1|2|3]   # 加载 $BASE $PG_URL $MODEL
-  source docs/test-cases/test-lib.sh           # pass/fail/summary/jexec/new_sid 等函数库
+  source docs/test-cases/test-lib.sh           # pass/fail/summary/jexec/new_sid/stream_prompt 等函数库
   ```
   用例执行后**更新文档内复测记录表**；新用例沿用现有格式（场景 + 命令 + 期望，编号 Txx.x.x）。
+  观察 AI 执行过程用 `stream_prompt <SID> "<消息>" [超时秒]`：走 `prompt_stream` SSE 实时渲染为可读流水（正文增量、`[tool]` 状态流转、bash 命令与输出、error）；事件过滤按 `field` 区分（`text`=正文增量，`raw`=tool 参数碎片，后者直接丢弃）。需要结果做断言时仍在结束后用 `/session/:id/message` 拉终态。
 - 单测：`bun test test/<域>/...`，**必须从 `packages/opencode` 目录跑**（根目录有 guard）。
 - 类型检查：`bun typecheck`（包目录内，勿直接 `tsc`）。基线存在既有错误，**以「不新增」为准**（前后对比 error 数）。
 - 验证新代码需重建镜像：`docker build -t opencode-saas-sandbox-test:<tag> -f Dockerfile .` 后按 local-test-env.md 重启容器。
@@ -177,4 +178,4 @@ const table = pgTable("session", {
 - 尽量避免 mock，除非别无选择才用 globalThis.\*
 - 测试真实实现，不要在测试里复制逻辑
 - 测试不能从仓库根目录跑（guard：`do-not-run-tests-from-root`）；从包目录（如 `packages/opencode`）跑
-- SaaS 功能（PG 专属列/行为）优先写 `docs/test-cases/` 集成用例而非 core 单测；集成用例用 `test-lib.sh` 的 `new_sid`/`jexec`/`pass`/`fail` 函数
+- SaaS 功能（PG 专属列/行为）优先写 `docs/test-cases/` 集成用例而非 core 单测；集成用例用 `test-lib.sh` 的 `new_sid`/`jexec`/`pass`/`fail` 函数；需要观察 AI 执行过程时用 `stream_prompt`
