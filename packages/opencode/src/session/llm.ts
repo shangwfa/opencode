@@ -95,12 +95,13 @@ const live: Layer.Layer<
         mode: input.agent.mode,
       })
 
+      const requestUserId = (input.user as unknown as { userId?: string })?.userId
       const [language, cfg, item, info] = yield* Effect.all(
         [
-          provider.getLanguage(input.model),
+          provider.getLanguageForUser(input.model, requestUserId),
           config.get(),
-          provider.getProvider(input.model.providerID),
-          auth.get(input.model.providerID),
+          provider.getProviderForUser(input.model.providerID, requestUserId),
+          auth.get(input.model.providerID, requestUserId),
         ],
         { concurrency: "unbounded" },
       )

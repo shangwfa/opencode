@@ -1,7 +1,9 @@
 import { Auth } from "@/auth"
+import { getRequestUserId } from "@/auth/request-user"
 
 import { Effect } from "effect"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
+import { HttpServerRequest } from "effect/unstable/http"
 import { RootHttpApi } from "../api"
 import { LogInput } from "../groups/control"
 import { ProviderV2 } from "@opencode-ai/core/provider"
@@ -14,14 +16,18 @@ export const controlHandlers = HttpApiBuilder.group(RootHttpApi, "control", (han
       params: { providerID: ProviderV2.ID }
       payload: Auth.Info
     }) {
-      yield* auth.set(ctx.params.providerID, ctx.payload).pipe(Effect.orDie)
+      const request = yield* HttpServerRequest.HttpServerRequest
+      const userId = getRequestUserId(request.headers)
+      yield* auth.set(ctx.params.providerID, ctx.payload, userId).pipe(Effect.orDie)
       return true
     })
 
     const authRemove = Effect.fn("ControlHttpApi.authRemove")(function* (ctx: {
       params: { providerID: ProviderV2.ID }
     }) {
-      yield* auth.remove(ctx.params.providerID).pipe(Effect.orDie)
+      const request = yield* HttpServerRequest.HttpServerRequest
+      const userId = getRequestUserId(request.headers)
+      yield* auth.remove(ctx.params.providerID, userId).pipe(Effect.orDie)
       return true
     })
 

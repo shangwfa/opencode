@@ -31,6 +31,7 @@ import { Storage } from "@/storage/storage"
 import { Todo } from "@/session/todo"
 import { MessageID, PartID, SessionID } from "@/session/schema"
 import { Skill } from "@/skill"
+import { getRequestUserId } from "@/auth/request-user"
 import { NamedError } from "@opencode-ai/core/util/error"
 import { Cause, Effect, Option, Schema, Scope } from "effect"
 import * as Stream from "effect/Stream"
@@ -197,7 +198,9 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
     }) {
       yield* requireSession(ctx.params.sessionID)
       yield* waitForSessionLock(ctx.params.sessionID)
-      yield* forkPrompt(ctx.params.sessionID, ctx.payload)
+      const headerUserId = getRequestUserId((yield* HttpServerRequest.HttpServerRequest).headers)
+      const input = { ...ctx.payload, userId: headerUserId || undefined }
+      yield* forkPrompt(ctx.params.sessionID, input)
       yield* logAction(ctx.params.sessionID, "session-prompt-async", ctx.payload)
       return HttpApiSchema.NoContent.make()
     })
@@ -214,7 +217,9 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
         filter: sessionEventFilter(ctx.params.sessionID),
         endOn: (event) => event.type === "session.idle",
       })
-      yield* forkPrompt(ctx.params.sessionID, ctx.payload)
+      const headerUserId = getRequestUserId((yield* HttpServerRequest.HttpServerRequest).headers)
+      const input = { ...ctx.payload, userId: headerUserId || undefined }
+      yield* forkPrompt(ctx.params.sessionID, input)
       yield* logAction(ctx.params.sessionID, "session-prompt-stream", ctx.payload)
       return response
     })
@@ -580,10 +585,12 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
     }) {
       yield* requireSession(ctx.params.sessionID)
       yield* waitForSessionLock(ctx.params.sessionID)
+      const headerUserId = getRequestUserId((yield* HttpServerRequest.HttpServerRequest).headers)
+      const input = { ...ctx.payload, userId: headerUserId || undefined }
       const message = yield* withSessionLock(
         ctx.params.sessionID,
         promptSvc.prompt({
-          ...ctx.payload,
+          ...input,
           sessionID: ctx.params.sessionID,
         }),
       ).pipe(Effect.mapError(() => new HttpApiError.BadRequest({})))

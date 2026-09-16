@@ -5,7 +5,11 @@ import { Schema } from "effect"
 import { HttpApi, HttpApiEndpoint, HttpApiGroup, OpenApi } from "effect/unstable/httpapi"
 import { Authorization } from "../middleware/authorization"
 import { InstanceContextMiddleware } from "../middleware/instance-context"
-import { WorkspaceRoutingMiddleware, WorkspaceRoutingQuery } from "../middleware/workspace-routing"
+import {
+  WorkspaceRoutingMiddleware,
+  WorkspaceRoutingQuery,
+  WorkspaceRoutingQueryFields,
+} from "../middleware/workspace-routing"
 import { described } from "./metadata"
 import { ProviderV2 } from "@opencode-ai/core/provider"
 
@@ -36,13 +40,21 @@ export const ProviderApi = HttpApi.make("provider")
     HttpApiGroup.make("provider")
       .add(
         HttpApiEndpoint.get("list", root, {
-          query: WorkspaceRoutingQuery,
+          query: Schema.Struct({
+            ...WorkspaceRoutingQueryFields,
+            // "visible" (default): only providers the requesting identity can
+            // use right now (public runtime + own credentials) — for model
+            // pickers. "connect": full enabled catalog with `connected` flags —
+            // for the provider-connect wizard. Never includes credentials.
+            scope: Schema.optional(Schema.Literals(["visible", "connect"])),
+          }),
           success: described(Provider.ListResult, "List of providers"),
         }).annotateMerge(
           OpenApi.annotations({
             identifier: "provider.list",
             summary: "List providers",
-            description: "Get a list of all available AI providers, including both available and connected ones.",
+            description:
+              "Get providers and models configured publicly or for the requesting x-user-id. scope=connect returns the full enabled catalog with connected flags for the connect wizard.",
           }),
         ),
         HttpApiEndpoint.get("auth", `${root}/auth`, {
