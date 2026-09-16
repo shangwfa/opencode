@@ -14,6 +14,7 @@ import { EventV2 } from "@opencode-ai/core/event"
 import { EventV2Bridge } from "@/event-v2-bridge"
 import { Command } from "@/command"
 import { InstanceRef } from "@/effect/instance-ref"
+import { Flag } from "@/flag/flag"
 import { Permission } from "@/permission"
 import { InstanceStore } from "@/project/instance-store"
 import { SessionShare } from "@/share/session"
@@ -165,6 +166,28 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
         Effect.catchCause((cause) =>
           Effect.logError("derive_summary failed", { sourceSessionID, targetSessionID, cause }),
         ),
+        Effect.forkIn(scope, { startImmediately: true }),
+      )
+
+    // 默认保活：root 会话创建即启用 keepalive 并 boot 沙箱（等价 keep-alive API
+    // {"enabled":true,"boot":true}），接入方无需显式调用。编排子会话不自动保活，
+    // 避免沙箱数量随编排规模失控。OPENCODE_SESSION_AUTO_KEEPALIVE=0 可关闭。
+    const forkAutoKeepAlive = (sessionID: SessionID) =>
+      Effect.gen(function* () {
+        if (!sandboxProvider || !Flag.OPENCODE_SESSION_AUTO_KEEPALIVE) return
+        // 必须先写 keep_alive 标志再 boot：createSandbox 按该标志决定 10x TTL
+        yield* sandboxProvider.keepAlive(sessionID)
+        const sb = yield* sandboxProvider.getOrCreate(sessionID).pipe(
+          Effect.catchCause((cause) =>
+            Effect.gen(function* () {
+              yield* Effect.logError("auto keep-alive boot failed", { sessionID, cause: Cause.pretty(cause) })
+              return null
+            }),
+          ),
+        )
+        yield* logAction(sessionID, "keep-alive", { auto: true, enabled: true, boot: true, sandboxId: sb?.id ?? null })
+      }).pipe(
+        Effect.catchCause((cause) => Effect.logError("auto keep-alive failed", { sessionID, cause })),
         Effect.forkIn(scope, { startImmediately: true }),
       )
 
@@ -347,7 +370,10 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       if (result?.id && ctx.payload?.summaryFrom) {
         yield* forkDeriveSummary(result.id as SessionID, ctx.payload.summaryFrom)
       }
-      if (result?.id) yield* logAction(result.id as SessionID, "session-create", ctx.payload ?? {})
+      if (result?.id) {
+        yield* logAction(result.id as SessionID, "session-create", ctx.payload ?? {})
+        if (!result.parentID) yield* forkAutoKeepAlive(result.id as SessionID)
+      }
       return result
     })
 

@@ -118,6 +118,9 @@ export namespace Flag {
   export const OPENCODE_SANDBOX_SNAPSHOT_WAIT_SEC = number("OPENCODE_SANDBOX_SNAPSHOT_WAIT_SEC") ?? 900
   // 远端快照删除默认关闭（GC TTL / superseded / 会话删除联动均不物理删除），防共享 PG 场景误删
   export const OPENCODE_SANDBOX_SNAPSHOT_DELETE_ENABLED = truthy("OPENCODE_SANDBOX_SNAPSHOT_DELETE_ENABLED")
+  // 会话创建即默认保活：root 会话创建后自动 keepalive + boot 沙箱（等价 keep-alive API
+  // {"enabled":true,"boot":true}）。设 0/false 关闭（如批量集成测试防沙箱资源暴涨）。
+  export const OPENCODE_SESSION_AUTO_KEEPALIVE = !falsy("OPENCODE_SESSION_AUTO_KEEPALIVE")
   export const OPENCODE_SANDBOX_IDLE_KILL_SEC = number("OPENCODE_SANDBOX_IDLE_KILL_SEC") ?? 3600
   export const OPENCODE_SANDBOX_IDLE_REAP_SEC = number("OPENCODE_SANDBOX_IDLE_REAP_SEC") ?? 3600
   export const OPENCODE_SANDBOX_MAX_TTL_SEC = number("OPENCODE_SANDBOX_MAX_TTL_SEC") ?? 3600
