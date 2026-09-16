@@ -2876,6 +2876,11 @@ export namespace SandboxProvider {
             yield* Effect.promise(() => snapshotOps.retention()).pipe(Effect.catchCause(() => Effect.void))
             // 实例死亡后悬空的 running exec_log 行终态化（无人写终态的兜底）
             yield* Effect.promise(() => reapStaleExecRunning()).pipe(Effect.catchCause(() => Effect.void))
+            // RPA runner 是 detached fiber；实例死亡后由共享 PG 的任一存活实例终态化悬空任务。
+            yield* Effect.promise(async () => {
+              const { reapStaleRpaRuns } = await import("@/rpa/rpa.pg")
+              await reapStaleRpaRuns()
+            }).pipe(Effect.catchCause(() => Effect.void))
 
             if (rows.length === 0) return
             log.info("idle sandbox reap scan", { count: rows.length })
