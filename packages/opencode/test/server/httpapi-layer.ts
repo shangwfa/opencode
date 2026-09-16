@@ -26,6 +26,16 @@ export function request(path: string, init?: RequestInit) {
   )
 }
 
+// fromWeb + setUrl duplicates query params on the outgoing request (the web
+// Request source keeps its own search string), which breaks single-value query
+// schemas like `scope=...`. Build the request directly instead.
+export function requestDirect(path: string, init: { headers?: Record<string, string> } = {}) {
+  return HttpClientRequest.get(path).pipe(
+    HttpClientRequest.setHeaders(init.headers ?? {}),
+    HttpClient.execute,
+  )
+}
+
 export function requestInDirectory(path: string, directory: string, init: RequestInit = {}) {
   const headers = new Headers(init.headers)
   headers.set("x-opencode-directory", directory)

@@ -33,6 +33,10 @@ const sid = (s: string) => s as SessionID
 
 // ── lifecycle mock：OpenSandbox API + command session SSE ─────────────
 const sessionDeletes: string[] = []
+// OOM 采样扫描（0ab2de0ebc）启动即对 running 沙箱跑 ephemeral 命令（runEphemeralCommand
+// 的 finally 会 deleteSession 自己的临时 session——设计行为）。按命令特征把这些
+// session 标记出来，delete 不计入 sessionDeletes，避免后台任务污染断言。
+const ephemeralSessions = new Set<string>()
 const interrupts: string[] = []
 const activeControllers: ReadableStreamDefaultController<Uint8Array>[] = []
 let runBehavior: "complete" | "hang" | "exit137" = "complete"
@@ -54,6 +58,8 @@ const lifecycle = Bun.serve({
     }
     if (request.method === "POST" && /^\/session\/[^/]+\/run$/.test(path)) {
       const sessionId = path.split("/")[2]
+      const body = (await request.json().catch(() => ({}))) as { command?: string }
+      if (body.command?.includes("printf 'OOM='")) ephemeralSessions.add(sessionId)
       return new Response(
         new ReadableStream<Uint8Array>({
           start(controller) {
@@ -81,7 +87,8 @@ const lifecycle = Bun.serve({
       return new Response(null, { status: 200 })
     }
     if (request.method === "DELETE" && /^\/session\/[^/]+$/.test(path)) {
-      sessionDeletes.push(path.split("/")[2])
+      const id = path.split("/")[2]
+      if (!ephemeralSessions.has(id)) sessionDeletes.push(id)
       return new Response(null, { status: 200 })
     }
     return Response.json({ code: "NOT_FOUND", message: "not found" }, { status: 404 })

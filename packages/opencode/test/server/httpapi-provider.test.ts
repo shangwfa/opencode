@@ -7,7 +7,7 @@ import { resetDatabase } from "../fixture/db"
 import { TestInstance } from "../fixture/fixture"
 import { markPluginDependenciesReady } from "../fixture/plugin"
 import { testEffect } from "../lib/effect"
-import { httpApiLayer, request } from "./httpapi-layer"
+import { httpApiLayer, request, requestDirect } from "./httpapi-layer"
 
 const testStateLayer = Layer.effectDiscard(
   Effect.acquireRelease(
@@ -277,6 +277,91 @@ describe("provider HttpApi", () => {
       })
     }),
     projectOptions,
+    30000,
+  )
+
+  it.instance(
+    "returns only public and requesting-user provider models",
+    Effect.gen(function* () {
+      const directory = (yield* TestInstance).directory
+      yield* setEnvScoped(
+        "OPENCODE_AUTH_CONTENT",
+        JSON.stringify({
+          "user-a/openai": { type: "api", key: "personal-openai-key" },
+        }),
+      )
+
+      const userA = yield* request("/provider", {
+        headers: { "x-opencode-directory": directory, "x-user-id": "user-a" },
+      })
+      const userB = yield* request("/provider", {
+        headers: { "x-opencode-directory": directory, "x-user-id": "user-b" },
+      })
+      const anonymous = yield* request("/provider", {
+        headers: { "x-opencode-directory": directory },
+      })
+
+      const userABody = yield* userA.json
+      const userBBody = yield* userB.json
+      const anonymousBody = yield* anonymous.json
+      expect(providerByID(userABody, "all", "openai")).toBeDefined()
+      expect(isRecord(userABody) && Array.isArray(userABody.connected) && userABody.connected).toContain("openai")
+      expect(providerByID(userBBody, "all", "openai")).toBeUndefined()
+      expect(isRecord(userBBody) && Array.isArray(userBBody.connected) && userBBody.connected).not.toContain("openai")
+      expect(providerByID(anonymousBody, "all", "openai")).toBeUndefined()
+      expect(isRecord(anonymousBody) && Array.isArray(anonymousBody.connected) && anonymousBody.connected).not.toContain(
+        "openai",
+      )
+    }),
+    projectOptions,
+    30000,
+  )
+
+  it.instance(
+    "scope=connect returns the full catalog with connected flags per identity",
+    Effect.gen(function* () {
+      const directory = (yield* TestInstance).directory
+      yield* setEnvScoped(
+        "OPENCODE_AUTH_CONTENT",
+        JSON.stringify({
+          "user-a/openai": { type: "api", key: "personal-openai-key" },
+        }),
+      )
+      const headers = { "x-opencode-directory": directory }
+
+      const visible = yield* (yield* request("/provider", { headers })).json
+      const connectUserA = yield* (yield* requestDirect("/provider?scope=connect", {
+        headers: { ...headers, "x-user-id": "user-a" },
+      })).json
+      const connectUserB = yield* (yield* requestDirect("/provider?scope=connect", {
+        headers: { ...headers, "x-user-id": "user-b" },
+      })).json
+
+      // The connect view exposes unconfigured catalog providers...
+      const visibleIDs = providerList(visible, "all").map((provider) => (isRecord(provider) ? provider.id : ""))
+      const catalogIDs = providerList(connectUserA, "all").map((provider) => (isRecord(provider) ? provider.id : ""))
+      expect(catalogIDs.length).toBeGreaterThan(visibleIDs.length)
+      const catalogOnly = catalogIDs.filter((id) => !visibleIDs.includes(id))
+      expect(catalogOnly.length).toBeGreaterThan(0)
+
+      // ...while connected marks only what each identity can actually use.
+      const userAConnected = (isRecord(connectUserA) && connectUserA.connected) || []
+      const userBConnected = (isRecord(connectUserB) && connectUserB.connected) || []
+      expect(userAConnected).toContain("openai")
+      expect(userBConnected).not.toContain("openai")
+
+      // The connect view is redacted like the visible view.
+      const raw = JSON.stringify(connectUserA)
+      expect(raw).not.toContain("personal-openai-key")
+      const leaked = providerList(connectUserA, "all").some((provider) => {
+        if (!isRecord(provider)) return false
+        if ("key" in provider) return true
+        return isRecord(provider.options) && "apiKey" in provider.options
+      })
+      expect(leaked).toBe(false)
+    }),
+    projectOptions,
+    30000,
   )
 
   it.instance(
@@ -382,6 +467,12 @@ describe("provider HttpApi", () => {
     "keeps provider.models hook input mutations out of provider state",
     Effect.gen(function* () {
       const directory = (yield* TestInstance).directory
+      yield* setEnvScoped(
+        "OPENCODE_AUTH_CONTENT",
+        JSON.stringify({
+          google: { type: "oauth", refresh: "dummy", access: "dummy", expires: 9999999999999 },
+        }),
+      )
 
       const headers = { "x-opencode-directory": directory }
       const providerResponse = yield* request("/provider", { headers })
