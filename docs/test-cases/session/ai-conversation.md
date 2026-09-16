@@ -150,3 +150,16 @@ sleep 1 && curl -s -X POST "$BASE/session/$SID/abort"
 > | T4.5 | ✅ | bash `ls /workspace`，回复含 `t4-3.txt` |
 > | T4.6 | ✅ | HTTP 204；异步五言绝句落库（春晨/朝露润青芽…）。判定脚本注意：消息 JSON 无顶层 `role` 字段（PG data 结构），用「末条消息含非空 text part」而非 `role=='assistant'` 判完成，否则误报 |
 > | T4.7 | ✅ | abort=true；parts 52→52（8s 零增长）确认停止生成 |
+
+> **复测记录（2026-09-16，镜像 `person-model`（feat/opencode-1.18.31 工作区：个人模型 x-user-id 隔离 + 公共优先 + provider 脱敏 + autokeepalive），本地 PG + 远端 K8s 沙箱，真实 LLM `Yd-DeepSeek/deepseek-v4-flash`，文档原文 prompt，session `ses_f55f0191fffeI2pvfWamUzwU8E`）：T4.1–T4.7 全部通过。**
+> | 用例 | 结果 | 备注 |
+> |---|---|---|
+> | T4.1 | ✅ | 回复含 `2` |
+> | T4.2 | ✅ | 第二轮回复含「张三」 |
+> | T4.3 | ✅ | `write(completed)` |
+> | T4.4 | ✅ | `read(completed)`，回复 `hello` |
+> | T4.5 | ✅ | `bash(completed)`，回复含 `t4-3.txt`（本轮 bash 真实触发，无 09-06 的行为波动） |
+> | T4.6 | ✅ | HTTP 204；异步五言绝句落库（「寒窗映雪光，孤影对残墙」）；用「末条消息含非空 text part」判完成 |
+> | T4.7 | ✅ | abort=true；parts 零增长（8s）确认停止生成 |
+>
+> 附注：本轮起 session 创建默认自动 keepalive + boot 沙箱（autokeepalive），全程工具调用无沙箱冷启动等待/502。

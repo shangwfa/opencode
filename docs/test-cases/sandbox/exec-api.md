@@ -837,6 +837,25 @@ OPENCODE_DATABASE_URL=postgresql://local@127.0.0.1:5432/opencode_test \
 
 **T19.12 流式日志验证**：SSE 事件序列为 `stdout(async-line-1)`、`stdout(async-line-2)`、`stdout(async-line-3)`、`stdout(async-done)`、`done(status=completed, exitCode=0)`；`GET /exec/:execId` 返回 `stdout` 包含完整输出。该用例只使用 exec API，不产生 message/part 记录；PG `sandbox` 表记录 `session_id=ses_15bbdc427ffekQUGtCGGPnKzFZ`，host=`http://127.0.0.1:8080`，测试后 state=`destroyed`。
 
+> **复测记录（2026-09-16，镜像 `person-model-connect`（feat/opencode-1.18.31 工作区：个人模型隔离 + 公共优先 + provider 脱敏 + autokeepalive），本地 PG + 远端 K8s 沙箱，真实 LLM）**：T19.1–T19.25 全部通过（含两处历史 ⏳ 用例 T19.20/T19.21 补测）。要点：
+>
+> | 用例 | 结果 | 备注 |
+> |---|---|---|
+> | T19.1–T19.6、T19.11 | ✅ | 基础 exec（echo/多行/工作目录/exit 42/400/404/环境信息）；**autokeepalive 下无需 AI 消息预创建沙箱，T19.1 直接 exec 即可**（文档原「先 AI 消息」步骤已非必要） |
+> | T19.8/T19.9 | ✅ | keepAlive 语义不变（idle 存活/释放后纯 exec 不触发 runner 回收为已知行为） |
+> | T19.10a–f | ✅ | 超时全链路：b 1s 返回 TimeoutError、f async 13s 终态 exitCode=null；T19.10e 单测 7/7 |
+> | T19.12 | ✅ | stream 顺序 `async-line-1..3 + async-done` + done(completed)，终态兜底 200 |
+> | T19.13/T19.14 | ✅ | boot:true 返回 sandboxId + exec 可用；不传 boot **响应** sandboxId=null（契约不变）。⚠️ autokeepalive 语义注记：session 创建后沙箱会在后台自动启动，T19.14「GET sandbox=null」在立即查询时序下仍成立（沙箱尚在创建中），但「不传 boot=完全不启动沙箱」的旧语义已升级 |
+> | T19.15–T19.21 | ✅ | exec_log 全系（持久化/状态流转/历史/容错/kill→killed/字段覆盖/**64KB 截断实测 PG=65551B + truncated 标记**，两处历史 ⏳ 补测） |
+> | T19.22/T19.23 | ✅ | detached sleep 45 完整跑完（LONG-DONE）；exit 137 → signal=SIGKILL + oomSuspected + 容器日志 warn |
+> | T19.24 | ✅ | python http.server 替代 pnpm dev（/workspace 无项目，语义等价）：监听时 proxy 200；杀掉后 502 + `portListening=false` + hint + originalError |
+> | T19.25 | ⚠️ 环境差异 | 远端 K8s 沙箱无 `/opt/pnpm-store` 共享挂载：`/root/.npmrc` 仅 registry（无 store-dir），但 `.gitignore-global` 兜底在位；实测 `pnpm add` 真实成功（Done in 1s）且 **store 落 HOME**（`/root/.local/share/pnpm/store/v10`，非 workspace）——无污染问题；vcs/status 200。文档期望的 store-dir 共享挂载行为属本地 OpenSandbox 镜像（组合 2/3），远端组合不适用 |
+> | 单测 | ⚠️ 1/4 | diag **37/37**（文档记 17，实际已扩到 37）、boot-init 2/2、exec-timeout 7/7 通过；**detached-keepalive T1 失败根因已定位**（详见下方「detached T1 根因分析」），设 `OPENCODE_SANDBOX_OOM_SCAN_ENABLED=0` 后 3/3 通过 |
+>
+> 执行注记：文档中嵌套引号的 bun -e 用例在 shell 直跑易挂（建议改独立脚本文件 + curl --max-time）；T19.25b 的 `?directory=%2Fworkspace` URL 形式 curl 需注意转义（简化为无 query 的 `$BASE/vcs/status` 等价验证）。
+
+> **detached T1 根因分析（2026-09-16 定位）**：`sandbox-detached-keepalive.test.ts` T1（`sessionDeletes == []`）自 **`0ab2de0ebc`（2026-09-12，periodic cgroup OOM sampling）** 起失败，非 runDetached 修复失效。机制：① OOM 扫描任务 `Effect.repeat` **首轮立即执行**，对 PG 中 `state=running` 的沙箱跑 `runEphemeralCommand`（读 cgroup oom 计数）；② `runEphemeralCommand` 的 finally **无条件 `deleteSession`**（snapshot 临时命令的既有语义，2754d80614 的 detached 修复不覆盖它——设计如此）；③ 测试 T1 `insertRunningSandbox` 插入 running 行后，OOM 扫描首轮恰好对该沙箱 ephemeral 一次（createSession+run+deleteSession），污染共享 mock 的 `sessionDeletes`（库有遗留 running 行时污染 N 条，实测 3 条 = 遗留 2 + 本身 1）。**验证**：清库后仍复现（单条污染）；设 `OPENCODE_SANDBOX_OOM_SCAN_ENABLED=0` 后 **3/3 全过**；集成 T19.22（真实链路 detached sleep 45 完整跑完）证明修复行为本身完好。**修复建议**：跑该测试时设 `OPENCODE_SANDBOX_OOM_SCAN_ENABLED=0`（Flag 在模块加载时读 env，须进程级设置），或 mock 按命令特征区分 ephemeral 调用不计入 `sessionDeletes`。
+
 ### 已知问题
 
 - **T19.9 idle 销毁机制**：sandbox 的 idle 回收由 session runner 的 `onIdle` 回调触发（见 `run-state.ts`），纯 exec API 调用不经过 session runner，因此释放 keepAlive 后不会仅凭 exec 探测触发销毁。需通过 `kill-sandbox` 或 `instance/dispose` 显式销毁。

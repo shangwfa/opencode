@@ -1084,4 +1084,13 @@ print('✅ 衔接窗口零丢失零重复')
 > - 回归：T9.1/T9.3/T9.4/T9.5/T9.30 及 T9.29 隔离性（恰好 1 条 updated、零泄漏）均通过；`eventVisible` 单测 5/5（`httpapi-event.test.ts`，`delivers instance events` 的 fail 为 SQLite fixture 既有基线，与本轮无关）
 > - 前端配套（待前端侧落地）：断连重连时对活跃会话带 `?after=<lastSeq>`；配合心跳看门狗（>25~30s 无字节即重建连接）
 
+> **复测记录（2026-09-16，镜像 `person-model-connect`（feat/opencode-1.18.31 工作区：个人模型隔离 + 公共优先 + provider 脱敏 + autokeepalive），本地 PG + 远端 K8s 沙箱，真实 LLM `Yd-DeepSeek/deepseek-v4-flash`）：T9.1–T9.37 全部通过**（T9.21 为待端点项，PATCH model 静默忽略 0/0 符合记录）。要点：
+> - T9.5 消息事件 34 条、T9.8 双会话 A=45/B=48 无交叉、T9.14 三客户端均收全事件、T9.15 中途加入 B 收 120 条 message 事件 + idle
+> - T9.7 走「write 默认放行」分支（无 permission.asked，正常完成，文档允许）
+> - T9.26 write running 态 155B HTML（running=31 < completed=34 < idle=65 行号序）；T9.27 5 条 raw delta 拼接 354B 全部早于 running 定稿
+> - T9.31 prompt_stream 45 事件 idle 末帧 curl=0（3s）；T9.32 错误回合 err+idle 正常关流；T9.33 双流零交叉
+> - T9.35 四场景（无 after 不回放 / after=-1 全量各一次 / after=0 部分补发 / 非法 400×2）；T9.36 seqs=[1,2,3,4,5]
+> - T9.37 `eventVisible` 5/5；`delivers instance events`/`keeps the event stream open` 2 个 fail 为 SQLite fixture 既有基线（stash 基线对比同样 2 fail，非本轮引入）
+> - 执行提示：整批脚本易因 SSE 窗口叠加超时，建议按 5-8 个用例分批执行；T9.25 断言勿用 `head -3` 截断头（content-type 在第 4 行）
+
 ---

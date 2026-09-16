@@ -191,3 +191,14 @@ curl -s --max-time 60 -X POST "$BASE/session/$SID/message" \
 | T10.3 | ✅ | SSE 监听 79 个事件、14 种类型，含 file.edited 完整时间线 |
 | T10.4 | ✅ | Round 1 设定 42，Round 2 正确回忆 42 |
 
+> **复测记录（2026-09-16，镜像 `person-model-connect`（feat/opencode-1.18.31 工作区：个人模型隔离 + 公共优先 + provider 脱敏 + autokeepalive），本地 PG + 远端 K8s 沙箱，真实 LLM `Yd-DeepSeek/deepseek-v4-flash`）**：T10.1–T10.4 全部通过。**本轮 AI 消息统一改走流式接口**（`POST /session/:id/prompt_stream`，即 `test-lib.sh` 的 `stream_prompt`，实时渲染正文增量 + `[tool]` 状态流转），断言仍以 exec API / 消息终态为准：
+>
+> | 用例 | 结果 | 备注 |
+> |---|---|---|
+> | T10.1 | ✅ | 流式观察 write×4 → exec 验证 4 个 .py → 运行输出 `hello` |
+> | T10.2 | ✅ | 流式 write → 流式 edit（subtract）→ exec 输出 `5`/`3` |
+> | T10.3 | ✅ | `/event` SSE 监听 59 个事件、11 种类型，含 `file.edited` → `session.idle` 完整时间线（该用例本体即流式，保持原同步触发） |
+> | T10.4 | ✅ | 两轮流式对话，Round 2 终态回复 `42` |
+>
+> 附注：autokeepalive 下 session 创建即启动沙箱，T10.1/T10.2 的首次工具调用无沙箱冷启动等待。
+

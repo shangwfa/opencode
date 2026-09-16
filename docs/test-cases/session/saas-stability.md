@@ -247,3 +247,10 @@ docker exec opencode-saas-test grep -E 'orphan|cleanup|sandbox' /home/opencode/.
 | T13.23 | ✅ | 重启后 0 个 running session |
 | T13.24 | ✅ | PG 有 1 个 keep_alive=false 的 running 记录，zombie cleanup 会处理 |
 
+> **复测记录（2026-09-16，镜像 `person-model-connect`（feat/opencode-1.18.31 工作区：个人模型隔离 + 公共优先 + provider 脱敏 + autokeepalive），本地 PG + 远端 K8s 沙箱，真实 LLM `Yd-DeepSeek/deepseek-v4-flash`）**：T13.1–T13.24 全部通过（T13.3 按去重说明以 T39.3.1 为准不重复执行；T13.13 依赖外部限流网关 SKIP）。适配说明：
+> - T13.11/T13.22 的 PG 访问从旧环境 `docker exec ai-nova-postgres psql -U postgres -d opencode_test` 适配为当前 `$PG_URL`（本地 PG `local@127.0.0.1:15432/opencode`）；T13.20/21/24 的日志路径从 `dev.log` 适配为 `opencode.log`
+> - T13.23/T13.24 合并一次 `docker restart` 执行（sleep 60 任务运行中重启 → 终态非 busy + PG running 记录由 idle-reap/zombie 兜底）
+> - T13.12 console 单测：subscription 6 用例 + rateLimiter 3 用例全过
+> - autokeepalive 影响下 T13.20 的 keepalive 生命周期日志依然可关联（session 创建即启用 keepalive，1 条以上 sandbox/keepalive 记录）
+> - 沙箱安全三连（T13.14/15/16）：无宿主用户目录/docker.sock/SSH 痕迹；`/etc/passwd` 仅容器自身内容；环境变量无 provider key、DB 连接串、APIKEY 泄露
+

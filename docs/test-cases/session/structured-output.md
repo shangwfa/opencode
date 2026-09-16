@@ -199,6 +199,8 @@ print([(m['info']['role'], m['info'].get('format')) for m in msgs])
 >
 > 复测记录（2026-09-14，镜像 `hitl-cbf2276a-wip2`（含 pgJsonb/LEASE_TOOLS/偏离修复），本地 PG + 远端沙箱）：**TSO.1–TSO.7 全部通过**——TSO.1 ✅（`{"answer": true, "city": "Beijing"}`，结构符合 required）/ TSO.2 ✅（列表+单条 GET 均 200，format/structured 完整回读）/ TSO.3 ✅（204 + 轮询 `{"color": "蓝色"}`）/ TSO.4 ✅（stream 内 `{"days": 7}`，idle 为最后帧，curl_exit=0）/ TSO.5 ✅（bad type=xml → 400 BadRequest；schema=42 → 400）/ TSO.6 ✅（structured=None + 文本回复）/ TSO.7 ✅（PG 直写非法 format 后 GET 200，user.format 丢弃为 None——pgJsonb 列解码下容错分支依然健在）。
 >
+> **复测记录（2026-09-16，镜像 `person-model-connect`（feat/opencode-1.18.31 工作区：个人模型隔离 + 公共优先 + provider 脱敏 + autokeepalive），本地 PG + 远端 K8s 沙箱，真实 LLM `Yd-DeepSeek/deepseek-v4-flash`）：TSO.1–TSO.7 全部通过**——TSO.1 ✅（`{"answer": true, "city": "北京"}`）/ TSO.2 ✅（列表+单条 GET 200，format/structured 完整回读）/ TSO.3 ✅（204 + 轮询 structured）/ TSO.4 ✅（stream 内 structured，idle 末帧 curl=0）/ TSO.5 ✅（xml/42 → 400×2）/ TSO.6 ✅（text 格式 structured=null 正常文本）/ TSO.7 ✅（脏 format 容错 200）。附注：TSO.1 首跑 FAIL 为断言脚本把 jexec 的 Python repr 当 JSON 解析（`{'a': True}` 单引号），修正判定后通过，非功能问题。
+>
 > - 修复说明：TSO.2/TSO.7 覆盖本轮修复——`OutputFormat` 是 Schema.Class union，HTTP 响应 encode 仅接受类实例；PG bridge 的 `message-v2.ts info()` 原样透传普通 JSON 对象导致 encode 失败。修复为读取时对 format 字段 re-decode（decode 失败丢弃该可选字段，不炸列表）。
 > - 接口范围：`command` / `shell` 端点的输入 schema 无 format 字段，不支持结构化输出（代码确认 `ShellInput`/`CommandInput` 定义）。
 > - 已知限制：模型拒绝/未产出结构化输出时走 `StructuredOutputError`（`info.error`），触发条件依赖模型行为，未做稳定复现用例；`retryCount`（默认 2）重试机制当前未实现（失败路径 retries 硬编码 0），列为后续增强。

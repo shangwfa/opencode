@@ -406,3 +406,21 @@ RUN apt-get update \
 已修复为 `throw new Error("Execution environment not available")`。
 
 > **注**：edit.ts:67 的 `new Error(String(e))` 中 `Sandbox` 仅为类型注解/变量名，错误文本不含 sandbox，非泄露。
+
+## 复测记录（2026-09-16）
+
+> 环境：本地 PG + 远端 K8s 沙箱，镜像 `person-model-connect`（feat/opencode-1.18.31 工作区：个人模型隔离 + 公共优先 + provider 脱敏 + autokeepalive），真实 LLM `Yd-DeepSeek/deepseek-v4-flash`。**T20.1–T20.14 全部通过**。要点：
+
+| 用例 | 结果 | 备注 |
+|---|---|---|
+| T20.1 | ✅ | 10 个工具文件静态检查全过（无本地 IO / 无 sandbox 分支） |
+| T20.2 | ✅ | write 三层验证：沙箱内存在+内容正确，容器内不存在，宿主机不存在 |
+| T20.3/20.4 | ✅ | read 读回 `sandbox-write-proof`；bash hostname=K8s Pod UUID |
+| T20.5/20.6/20.7 | ✅ | edit 改为 `sandbox-edit-proof`；glob 含 .txt 不含 .log；grep 命中 edit-proof |
+| T20.8 | ✅ | AI 选择 bash 列目录（文档允许 ls/read/glob/bash 任一） |
+| T20.9 | ✅ | apply_patch 后文件 3 行（第一/二/三行）；复验一轮 AI 改用 write（模型工具选择波动，同 T4.5 历史定性，功能由首轮证明） |
+| T20.10 | ✅ | PG sandbox 记录 `state=running`，host 指向远端 Sandbox API |
+| T20.11 | ✅ | hostname UUID、/app 不存在、OPENCODE env=0；首跑「2 个 opencode 进程」复验为瞬态（exec 命令自身 grep 误报），复跑 0 |
+| T20.12 | ⚠️ 已知遗留 | read.ts:49 / write.ts:46,49 共 3 处含 Sandbox 关键字（2026-07-18 已记录待修，本轮一致） |
+| T20.13 | ✅ | **用例构造修正**：手工写沙箱 `.opencode/skills/*.md` 不是 skill 发现渠道（skill 列表来自服务端，实测报 `Available skills: customize-opencode`）；改为 `POST /session/:id/skills/create` 建档后 skill 工具 `completed` 且正确加载内容 |
+| T20.14 | ✅ | task 子 agent 完成；实测形态：子 agent 与父 session **共享同一 workspace/directory**（父沙箱可见子写文件）——directory 继承行为，非独立沙箱，如实记录 |

@@ -114,3 +114,16 @@ curl -s "$BASE/command" | python3 -m json.tool | head -80
 | T14.9 | ✅ | sandbox 模式 vcs info 返回 400（方案 A 修复），vcs/diff 需 git/branch mode，vcs/status 返回空 |
 | T14.10 | ✅ | agent 1 项、skill 多项、command 多项，均返回数组 |
 
+> **复测记录（2026-09-16，镜像 `person-model-connect`（feat/opencode-1.18.31 工作区：个人模型 x-user-id 隔离 + 公共优先 + provider 脱敏 + autokeepalive），本地 PG + 远端 K8s 沙箱，真实 LLM `Yd-DeepSeek/deepseek-v4-flash`）：T14.1–T14.10 全部通过**（首跑 T14.3/5/6 三例 FAIL 为执行脚本 python `strict` 参数误置于 `open()` 导致 messageID 取空，修正断言后复跑全 PASS）。与旧记录的行为差异：
+>
+> | 用例 | 旧记录 | 本次实测 |
+> |---|---|---|
+> | T14.3 | children 空（fork 不建 parent-child） | fork 后 `children` 返回 **1**（上游 v1.18.29+ 已建立关联，行为改善） |
+> | T14.5 | `POST /share` 返回 `{url}` | 返回 **session 对象**（url 在 `share.url` 字段），unshare 后移除 |
+> | T14.7 | file 列表空（sandbox 未运行） | 沙箱随 session 自动启动（autokeepalive），列表=list、content 正常读出 `diff-test` |
+> | T14.8 | find 400（方案 A） | `find/file`=400（带 directory query）、`find?pattern`=**200**（沙箱常驻后 ripgrep 可用）、symbol=0 项 |
+> | T14.9 | vcs info 400 | 返回 `{branch:null, default_branch:null}`（沙箱常驻、workspace 无 git repo） |
+> | T14.10 | agent 1 项 | agent=7、skill=1、command 正常（v1.18.30 会话级 agent 上线后数量增加） |
+>
+> 结论：基础 API 兼容性完好，无 SaaS 改造回归；行为差异均源于上游版本演进与 autokeepalive（沙箱常驻），属改善而非破坏。
+
