@@ -847,7 +847,7 @@ curl -X POST $BASE/session -d '{"sandbox":{"cpu":"1","memory":"2Gi","persistMode
 - 空闲回收前**自动快照**：**快照 Ready 才销毁沙箱**（失败保留沙箱重试，代码不丢），下次发消息**从快照秒级恢复**（数据 + 依赖缓存完整）
 - 快照 Ready 后快照 id 自动写入 `metadata.sandboxSnapshot`（`GET /session` 可见）
 - 同会话只保留最新快照（TTL 默认 14 天，`OPENCODE_SANDBOX_SNAPSHOT_TTL_SEC` 可调）；远端快照物理删除默认关闭（`OPENCODE_SANDBOX_SNAPSHOT_DELETE_ENABLED` 开启后，会话删除联动清理 / TTL 过期 GC 才会实际删除远端快照）
-- **数据保留边界（RPO）**：快照保存的是「上次快照完成时点」的数据；两次快照之间的写入不落盘。销毁时若 workspace 与上次快照一致则自动复用（秒级），有变更则自动新建快照后再销毁——正常 kill/回收**不会丢数据**；仅沙箱被平台强制回收且超出 TTL 时才可能丢失
+- **数据保留边界（RPO）**：快照保存的是「上次快照完成时点」的数据；两次快照之间的写入不落盘。正常 kill/空闲回收会等待新快照 Ready 后再销毁；平台强制回收、节点故障或 OOM 只能恢复到最近 Ready 快照。系统会为空闲会话周期补检查点，但持续活跃、后台写入、扫描排队和失败重试意味着该间隔不是严格 RPO 上限
 - 显式 `POST /snapshot` 始终创建新快照（不复用），可在关键节点主动保数据
 
 **业务侧用法**：

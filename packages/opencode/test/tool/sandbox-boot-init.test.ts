@@ -109,6 +109,7 @@ const configLayer = Layer.succeed(
     idleKillMs: 3_600_000,
     idleReapMs: 3_600_000,
     idleReapIntervalMs: 60_000,
+    snapshotIntervalMs: 0,
     maxTtlSeconds: 3600,
     packageCacheMount: "/cache",
     snapshotPrune: false,

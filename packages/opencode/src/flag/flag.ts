@@ -143,6 +143,10 @@ export namespace Flag {
     process.env["OPENCODE_SANDBOX_PACKAGE_CACHE_MOUNT"] ?? "/opt/pnpm-store"
   // 快照前清理可重建产物（/tmp、各类 cache），减小快照体积；默认关，避免牺牲恢复后 node_modules 即用性
   export const OPENCODE_SANDBOX_SNAPSHOT_PRUNE = truthy("OPENCODE_SANDBOX_SNAPSHOT_PRUNE")
+  // 周期性快照保鲜：快照模式会话空闲超过间隔即刷新快照（不销毁源沙箱）。平台 TTL 硬回收
+  // 绕过 SaaS 销毁路径时无法做临终快照，该间隔即数据丢失窗口上限（RPO）。设 0/false 关闭。
+  export const OPENCODE_SANDBOX_SNAPSHOT_PERIODIC_ENABLED = !falsy("OPENCODE_SANDBOX_SNAPSHOT_PERIODIC_ENABLED")
+  export const OPENCODE_SANDBOX_SNAPSHOT_INTERVAL_SEC = number("OPENCODE_SANDBOX_SNAPSHOT_INTERVAL_SEC") ?? 1800
 
   function number(key: string) {
     const value = process.env[key]

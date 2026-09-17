@@ -234,9 +234,9 @@ export namespace SessionSnapshot {
      * 等待快照到终态并收尾（Ready：标 ready + 清旧 + 回填；Failed/超时：标 failed）。
      * caller 须在快照 Ready 后才销毁源沙箱（Creating 中 kill 会使快照 Failed，实测坑）。
      */
-    async function awaitSnapshot(sessionID: string, snapshotId: string): Promise<"ready" | "failed"> {
+    async function awaitSnapshot(sessionID: string, snapshotId: string, waitMs?: number): Promise<"ready" | "failed"> {
       const startedAt = Date.now()
-      const deadline = startedAt + deps.waitMs
+      const deadline = startedAt + (waitMs ?? deps.waitMs)
       let lastStatus: { reason?: string; message?: string } | null = null
       while (Date.now() < deadline) {
         let status: { state: string; reason?: string; message?: string }
@@ -407,7 +407,7 @@ export namespace SessionSnapshot {
             percentile_cont(0.5) WITHIN GROUP (ORDER BY COALESCE(command::json->>'durationMs', command::json->>'checkMs')::numeric) AS p50,
             percentile_cont(0.95) WITHIN GROUP (ORDER BY COALESCE(command::json->>'durationMs', command::json->>'checkMs')::numeric) AS p95
           FROM exec_log
-          WHERE source IN ('snapshot-create','snapshot-restore','snapshot-reuse','snapshot-fallback')
+          WHERE source IN ('snapshot-create','snapshot-restore','snapshot-reuse','snapshot-fallback','snapshot-refresh')
             AND (command ~ 'durationMs' OR command ~ 'checkMs')
           GROUP BY source
         `)
@@ -416,6 +416,16 @@ export namespace SessionSnapshot {
                count(*) FILTER (WHERE state='deleting')::int AS deleting
         FROM session_snapshot
       `)
+      // durable 操作队列积压（destroy / refresh 双队列）：pending/running 堆积说明 worker 消费异常
+      const queueRows: Array<{ queue: string; state: string; n: number | string }> = await deps.pgDb.execute(sql`
+        SELECT 'destroy' AS queue, state, count(*)::int AS n FROM snapshot_operation WHERE state IN ('pending','running','failed') GROUP BY state
+        UNION ALL
+        SELECT 'refresh', state, count(*)::int AS n FROM snapshot_refresh_operation WHERE state IN ('pending','running','failed') GROUP BY state
+      `)
+      const queues: Record<string, Record<string, number>> = {}
+      for (const row of queueRows) {
+        queues[row.queue] = { ...queues[row.queue], [row.state]: Number(row.n) }
+      }
       const num = (v: number | string | null | undefined) => (v == null ? null : Number(v))
       const operations = Object.fromEntries(
         ops.map((r) => [r.source, { count: Number(r.n), p50Ms: num(r.p50), p95Ms: num(r.p95) }]),
@@ -429,6 +439,7 @@ export namespace SessionSnapshot {
         snapshots: Object.fromEntries(byState.map((r) => [r.state, Number(r.n)])),
         operations,
         gc: { creating: Number(gcRow[0]?.creating ?? 0), deleting: Number(gcRow[0]?.deleting ?? 0) },
+        queues,
         derived: { reuseHitRate: rate(reuse, create), fallbackRate: rate(fallback, restore) },
         health: snapshotHealth(operations, { creating: Number(gcRow[0]?.creating ?? 0), deleting: Number(gcRow[0]?.deleting ?? 0) }),
       }

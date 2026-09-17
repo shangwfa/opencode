@@ -48,6 +48,8 @@ export namespace SandboxConfig {
     readonly idleKillMs: number
     readonly idleReapMs: number
     readonly idleReapIntervalMs: number
+    /** 周期性快照保鲜间隔；0 = 关闭（见 Flag.OPENCODE_SANDBOX_SNAPSHOT_PERIODIC_ENABLED）。 */
+    readonly snapshotIntervalMs: number
     readonly maxTtlSeconds: number
     readonly packageCacheMount: string
     readonly snapshotPrune: boolean
@@ -73,6 +75,9 @@ export namespace SandboxConfig {
     idleKillMs: Flag.OPENCODE_SANDBOX_IDLE_KILL_SEC * 1000,
     idleReapMs: Flag.OPENCODE_SANDBOX_IDLE_REAP_SEC * 1000,
     idleReapIntervalMs: 300_000,
+    snapshotIntervalMs: Flag.OPENCODE_SANDBOX_SNAPSHOT_PERIODIC_ENABLED
+      ? Flag.OPENCODE_SANDBOX_SNAPSHOT_INTERVAL_SEC * 1000
+      : 0,
     maxTtlSeconds: Flag.OPENCODE_SANDBOX_MAX_TTL_SEC,
     packageCacheMount: Flag.OPENCODE_SANDBOX_PACKAGE_CACHE_MOUNT,
     snapshotPrune: Flag.OPENCODE_SANDBOX_SNAPSHOT_PRUNE,
@@ -603,6 +608,8 @@ export namespace SandboxProvider {
   const CREATE_TIMEOUT_SECONDS = 60
   const GET_OR_CREATE_TIMEOUT_SECONDS = 90
   const COMMAND_CLEANUP_TIMEOUT_SECONDS = 10
+  /** 保鲜快照单次 fence 的等待上限：短于业务快照等待（900s），为用户返回留出 fence 间隙。 */
+  const REFRESH_SNAPSHOT_WAIT_MS = 120_000
 
   export interface Interface {
     readonly getOrCreate: (
@@ -1181,6 +1188,9 @@ export namespace SandboxProvider {
       })
       // 快照编排操作队列：kill/回收先把操作落库，再由 worker 凭租约领取执行（进程崩溃可被接管）
       const snapshotOps = SnapshotOperation.create(pgDb)
+      const refreshOps = SnapshotOperation.create(pgDb, "refresh")
+      // 仅复用本进程确认 Ready 后对应的 marker；重启/恢复后保守重新快照。
+      const confirmedSnapshots = new Map<string, string>()
 
       type Row = {
         id: string
@@ -1802,7 +1812,7 @@ export namespace SandboxProvider {
 
       function logSnapshotAction(input: {
         sessionID: string
-        source: "snapshot-create" | "snapshot-reuse" | "snapshot-delete" | "snapshot-fallback"
+        source: "snapshot-create" | "snapshot-reuse" | "snapshot-delete" | "snapshot-fallback" | "snapshot-refresh" | "snapshot-lag-warning"
         detail: unknown
         timeStarted: number
       }) {
@@ -1811,7 +1821,7 @@ export namespace SandboxProvider {
           pgDb
             .insert(ExecLogTable)
             .values({
-              id: `action-${input.source}-${now}`,
+              id: `action-${input.source}-${now}-${Math.random().toString(36).slice(2, 8)}`,
               session_id: input.sessionID,
               command: JSON.stringify(input.detail),
               status: "completed",
@@ -1823,10 +1833,153 @@ export namespace SandboxProvider {
         ).pipe(Effect.catchCause(() => Effect.void))
       }
 
+      /** 沙箱已消失且快照明显落后时的丢失风险告警（exec_log + 日志）。平台 TTL 硬回收
+       * 绕过 SaaS 销毁路径、无法做临终快照，这里是该无保护窗口的唯一可观测点。
+       * 落后判定：无快照，或最新快照 age 超过 2 倍保鲜间隔（正常应 ≤ 1 倍）。 */
+      function warnSnapshotLag(sessionID: string, sandboxID: string, cause: string) {
+        return Effect.gen(function* () {
+          const row = yield* dbGet(sessionID)
+          if (!row || row.id !== sandboxID) return
+          const latest = yield* Effect.promise(() => snapshots!.findRestorable(sessionID))
+          const lagThresholdMs = Math.max(2 * config.snapshotIntervalMs, config.idleReapMs)
+          const snapshotAgeMs = latest ? Date.now() - latest.time_created : null
+          if (snapshotAgeMs !== null && snapshotAgeMs < lagThresholdMs) return
+          log.warn("snapshot lag: sandbox gone with unsnapshotted writes", {
+            sessionID,
+            sandboxID,
+            cause,
+            snapshotAgeMs,
+            latestSnapshotId: latest?.id ?? null,
+          })
+          yield* Metrics.recordSandboxEvent("snapshot-lag")
+          yield* logSnapshotAction({
+            sessionID,
+            source: "snapshot-lag-warning",
+            detail: { sandboxID, cause, snapshotAgeMs, latestSnapshotId: latest?.id ?? null },
+            timeStarted: Date.now(),
+          })
+        })
+      }
+
+      /** 周期快照执行体（worker 路径，须幂等）：为空闲快照会话刷新快照但保留源沙箱运行。
+       * marker 之后无写入时复用现有快照跳过重复 commit；沙箱已死则落丢失风险告警。 */
+      function runSnapshotRefresh(row: Row) {
+        return Effect.gen(function* () {
+          const current = yield* dbGet(row.session_id)
+          if (!current || current.id !== row.id) return
+          if (current.state === "snapshotting") return yield* Effect.fail(new Error("Sandbox snapshot pending"))
+          if (current.state !== "running") return
+          // fence 前的即时空闲校验：等待重试期间用户可能已恢复活跃（touch 刷新 time_updated），
+          // 此时必须放弃 fence——保鲜是后台动作，不得把活跃用户的请求卡在 snapshotting 上。
+          const idleBefore = Date.now() - config.snapshotIntervalMs
+          const started = Date.now()
+          const claimed = yield* Effect.promise(() => pgDb.update(SandboxTable)
+            .set({ state: "snapshotting", time_updated: started })
+            .where(and(eq(SandboxTable.session_id, current.session_id), eq(SandboxTable.id, current.id),
+              eq(SandboxTable.state, "running"), eq(SandboxTable.time_updated, current.time_updated),
+              lt(SandboxTable.time_updated, idleBefore)))
+            .returning({ id: SandboxTable.id })
+            .then((rows: Array<{ id: string }>) => rows.length > 0))
+          if (!claimed) return yield* Effect.fail(new Error("sandbox active or lifecycle changed before periodic snapshot"))
+          // fence 归因：用户请求被 snapshotting 拒绝时可区分「显式快照」与「后台保鲜」
+          log.info("periodic snapshot fence acquired", { sessionID: current.session_id, sandboxID: current.id })
+          invalidateCachedSandbox(current.session_id)
+          yield* refreshSnapshot(current).pipe(Effect.ensuring(Effect.gen(function* () {
+            yield* Effect.promise(() => pgDb.update(SandboxTable)
+              .set({ state: "running", time_updated: sql`CASE WHEN ${SandboxTable.time_updated} = ${started} THEN ${current.time_updated} ELSE ${SandboxTable.time_updated} END` })
+              .where(and(eq(SandboxTable.session_id, current.session_id), eq(SandboxTable.id, current.id), eq(SandboxTable.state, "snapshotting")))
+              .run())
+          })))
+        })
+      }
+
+      function refreshSnapshot(row: Row) {
+        return Effect.gen(function* () {
+          const sb = yield* reconnectIfPresent(row)
+          if (!sb) {
+            yield* warnSnapshotLag(row.session_id, row.id, "sandbox gone before periodic snapshot")
+            // 对账收敛：平台侧已确认沙箱消失（connect 404），行保持 running 会让保鲜轮
+            // 反复入队重试——直接终态化，与 runSnapshotDestroy 的死亡分支同一语义。
+            yield* killByID(row.id, row.session_id)
+            yield* dbMarkDestroyed(row.session_id, row.id)
+            log.info("sandbox destroyed by id (periodic refresh reconcile)", { sessionID: row.session_id, sandboxID: row.id })
+            return
+          }
+          yield* Effect.gen(function* () {
+            const checkStarted = Date.now()
+            const reusable = yield* Effect.promise(() => snapshots!.findRestorable(row.session_id))
+            if (reusable && confirmedSnapshots.get(row.id) === reusable.id && (yield* workspaceUnchangedSinceSnapshot(sb))) {
+              // 与 destroy 路径的 snapshot-reuse 对齐：保鲜复用同样落审计（periodic 区分来源）
+              log.info("snapshot reused (periodic refresh, workspace unchanged)", {
+                sessionID: row.session_id,
+                sandboxID: sb.id,
+                snapshotId: reusable.id,
+              })
+              yield* logSnapshotAction({
+                sessionID: row.session_id,
+                source: "snapshot-reuse",
+                detail: {
+                  snapshotId: reusable.id,
+                  sandboxID: sb.id,
+                  explicit: false,
+                  periodic: true,
+                  durationMs: Date.now() - checkStarted,
+                },
+                timeStarted: checkStarted,
+              })
+              return
+            }
+            const snapStarted = Date.now()
+            confirmedSnapshots.delete(row.id)
+            const marker = yield* touchSnapshotMarker(sb, { prune: config.snapshotPrune })
+            const snapshotId = yield* Effect.promise(() =>
+              snapshots!.startSnapshot(sb, row.session_id, {
+                sourceSandboxId: sb.id,
+                arch: marker.arch,
+                schemaVersion: SNAPSHOT_SCHEMA_VERSION,
+                runtimeVersion: InstallationVersion,
+              }),
+            )
+            if (!snapshotId) {
+              log.warn("periodic snapshot start failed", { sessionID: row.session_id, sandboxID: row.id })
+              return yield* Effect.fail(new Error(`periodic snapshot start failed: ${row.session_id}/${row.id}`))
+            }
+            const result = yield* Effect.promise(() =>
+              // 保鲜 fence 只持有短窗口：超时即释放 fence、操作退避重试时重新 CAS。
+              // 若全程等待 deps.waitMs（默认 900s），用户恰在此间返回会被 snapshotting 卡满全程；
+              // 短超时制造间隙，用户 touch 后重试的空闲校验会自然放弃后续 refresh。
+              snapshots!.awaitSnapshot(row.session_id, snapshotId, Math.min(REFRESH_SNAPSHOT_WAIT_MS, config.snapshotWaitMs)),
+            )
+            if (result !== "ready") {
+              return yield* Effect.fail(new Error(`periodic snapshot not ready: ${row.session_id}/${snapshotId}`))
+            }
+            confirmedSnapshots.set(row.id, snapshotId)
+            yield* logSnapshotAction({
+              sessionID: row.session_id,
+              source: "snapshot-refresh",
+              detail: {
+                snapshotId,
+                sandboxID: sb.id,
+                durationMs: Date.now() - snapStarted,
+                workspaceKb: marker.workspaceKb,
+                pruned: config.snapshotPrune,
+              },
+              timeStarted: snapStarted,
+            })
+          }).pipe(Effect.ensuring(Effect.tryPromise(() => sb.close()).pipe(Effect.ignore)))
+        })
+      }
+
       /** 快照销毁执行体（worker 与直接路径共用，须幂等）：
        * 无变更复用已有快照，否则先快照 Ready 再销毁源沙箱——快照未成功不销毁。 */
       function runSnapshotDestroy(row: Row) {
         return Effect.gen(function* () {
+          const current = yield* dbGet(row.session_id)
+          if (!current || current.id !== row.id || current.state === "destroyed") return
+          if (current.state === "snapshotting") return yield* Effect.fail(new Error("Sandbox snapshot pending before destroy"))
+          if (current.state === "running" && !(yield* dbTransitionState(row.session_id, row.id, "running", "killed"))) {
+            return yield* Effect.fail(new Error("Sandbox lifecycle changed before destroy"))
+          }
           invalidateCachedSandbox(row.session_id)
           // 同 pod 互斥：kill 与 killed 重试并发时只允许一个执行体进入（跨 pod 由操作租约保证）
           const claimed = yield* claimCleanup(row.session_id)
@@ -1834,6 +1987,7 @@ export namespace SandboxProvider {
           yield* Effect.gen(function* () {
             const sb = yield* reconnectIfPresent(row)
             if (!sb) {
+              yield* warnSnapshotLag(row.session_id, row.id, "sandbox gone before snapshot")
               yield* killByID(row.id, row.session_id)
               yield* dbMarkDestroyed(row.session_id, row.id)
               log.info("sandbox destroyed by id", { sessionID: row.session_id, sandboxID: row.id })
@@ -1842,11 +1996,11 @@ export namespace SandboxProvider {
             // 无变更复用（T25.24）：marker 之后 workspace 无写入 → 复用最新 ready/stale 快照，
             // 跳过重复快照直接销毁；判定失败/无可复用快照保守走原快照路径。
             const checkStarted = Date.now()
-            if (yield* workspaceUnchangedSinceSnapshot(sb)) {
+            if (confirmedSnapshots.has(row.id) && (yield* workspaceUnchangedSinceSnapshot(sb))) {
               const reusable = yield* Effect.promise(() => snapshots!.findRestorable(row.session_id)).pipe(
                 Effect.catch(() => Effect.succeed(null)),
               )
-              if (reusable) {
+              if (reusable && confirmedSnapshots.get(row.id) === reusable.id) {
                 log.info("snapshot reused (workspace unchanged)", {
                   sessionID: row.session_id,
                   sandboxID: sb.id,
@@ -1870,6 +2024,7 @@ export namespace SandboxProvider {
             // marker/manifest 必须在 startSnapshot 之前写入，才能随快照 rootfs 持久化
             // （快照 commit 之后 touch 的话 marker 不进快照，恢复后缺失 → 永远判 dirty）。
             const snapStarted = Date.now()
+            confirmedSnapshots.delete(row.id)
             const marker = yield* touchSnapshotMarker(sb, { prune: config.snapshotPrune })
             const snapshotId = yield* Effect.promise(() =>
               snapshots!.startSnapshot(sb, row.session_id, {
@@ -1915,24 +2070,27 @@ export namespace SandboxProvider {
         })
       }
 
-      /** 执行期间持续续租；一旦续租失败（租约过期被接管），以失败结束 race 并中断执行体，
-       * 避免旧执行者继续做销毁/快照等副作用。 */
-      function withLeaseHeartbeat<A, E>(op: SnapshotOperationRow, effect: Effect.Effect<A, E>) {
+      /** 执行期间持续续租；一旦续租失败（租约过期被接管），以失败结束竞争并中断执行体，
+       * 避免旧执行者继续做销毁/快照等副作用。
+       * 必须用 raceFirst（第一个「完成」者，含失败）：race 是第一个「成功」者——执行体
+       * fail 后会继续等待永不成功的心跳循环，操作卡 running 直到租约过期（实测坑：
+       * 快照 start 失败的操作永远不落 pending，重试链路断裂）。 */
+      function withLeaseHeartbeat<A, E>(op: SnapshotOperationRow, effect: Effect.Effect<A, E>, queue = snapshotOps) {
         const intervalMs = Math.max(10_000, Math.floor(LEASE_MS / 3))
         const beat = Effect.forever(
           Effect.gen(function* () {
             yield* Effect.sleep(Duration.millis(intervalMs))
-            const ok = yield* Effect.promise(() => snapshotOps.heartbeat(op.id, op.fencing_token))
+            const ok = yield* Effect.promise(() => queue.heartbeat(op.id, op.fencing_token))
             if (!ok) yield* Effect.fail(new Error(`snapshot operation lease lost: ${op.id}`))
           }),
         )
-        return Effect.race(beat, effect)
+        return Effect.raceFirst(beat, effect)
       }
 
       /** 领取并执行队列中的快照操作（租约+fencing 保证跨实例不重复；执行体幂等，失败退避重试）。 */
-      function drainSnapshotOperations() {
+      function drainSnapshotOperations(queue = snapshotOps) {
         return Effect.gen(function* () {
-          let op = yield* Effect.promise(() => snapshotOps.claim())
+          let op = yield* Effect.promise(() => queue.claim())
           while (op) {
             const current = op
             const row: Row = {
@@ -1945,15 +2103,16 @@ export namespace SandboxProvider {
               time_created: 0,
               time_updated: 0,
             }
-            yield* withLeaseHeartbeat(current, runSnapshotDestroy(row)).pipe(
-              Effect.tap(() => Effect.promise(() => snapshotOps.complete(current.id, current.fencing_token))),
+            const exec = current.kind === "snapshot_refresh" ? runSnapshotRefresh(row) : runSnapshotDestroy(row)
+            yield* withLeaseHeartbeat(current, exec, queue).pipe(
+              Effect.tap(() => Effect.promise(() => queue.complete(current.id, current.fencing_token))),
               Effect.catchCause((cause) =>
-                Effect.promise(() => snapshotOps.fail(current.id, current.fencing_token, Cause.pretty(cause))).pipe(
+                Effect.promise(() => queue.fail(current.id, current.fencing_token, Cause.pretty(cause))).pipe(
                   Effect.catchCause(() => Effect.void),
                 ),
               ),
             )
-            op = yield* Effect.promise(() => snapshotOps.claim())
+            op = yield* Effect.promise(() => queue.claim())
           }
         }).pipe(
           Effect.catchCause((cause) => {
@@ -1965,8 +2124,8 @@ export namespace SandboxProvider {
 
       /** 触发一次后台 drain。不单飞：claim 用 SKIP LOCKED 保证不重复领取，无操作时立即返回，
        * 这样 kill 入队后新 fork 的 drain 必然能领到刚入队的操作（单飞会因窗口期漏领）。 */
-      function nudgeSnapshotDrain() {
-        return drainSnapshotOperations().pipe(Effect.forkIn(creationScope), Effect.asVoid)
+      function nudgeSnapshotDrain(queue = snapshotOps) {
+        return drainSnapshotOperations(queue).pipe(Effect.forkIn(creationScope), Effect.asVoid)
       }
 
       function cleanupSandbox(row: Row, opts?: { snapshot?: boolean }) {
@@ -2246,8 +2405,13 @@ export namespace SandboxProvider {
             })
             if (inFlight) yield* Deferred.fail(inFlight, new Error(`Sandbox destroyed while creating: ${sessionID}`))
             const row = yield* dbGet(sessionID).pipe(Effect.orElseSucceed(() => null))
-            if (row?.state === "running" || row?.state === "snapshotting" || row?.state === "killed") {
-              if (row.state !== "killed") yield* dbSetStateFor(sessionID, row.id, "killed")
+            if (row?.state === "snapshotting") {
+              yield* Effect.promise(() => snapshotOps.enqueue({ sessionID, sandboxID: row.id, kind: "snapshot_destroy" }))
+              yield* nudgeSnapshotDrain()
+              return
+            }
+            if (row?.state === "running" || row?.state === "killed") {
+              if (row.state === "running" && !(yield* dbTransitionState(sessionID, row.id, "running", "killed"))) return
               const snapshotSession = !!snapshots && (yield* dbResolvePersistMode(sessionID)) === "snapshot"
               // 快照会话必须经 cleanupSandbox 的快照安全路径：快照 Ready 后才 kill 源沙箱，
               // 失败/超时保留沙箱待重试；pvc 会话在该路径下等价于直接销毁。
@@ -2273,7 +2437,12 @@ export namespace SandboxProvider {
                 (current.state !== "running" && current.state !== "snapshotting")
               )
                 return
-              yield* dbSetStateFor(current.session_id, current.id, "killed")
+              if (current.state === "snapshotting") {
+                yield* Effect.promise(() => snapshotOps.enqueue({ sessionID: current.session_id, sandboxID, kind: "snapshot_destroy" }))
+                yield* nudgeSnapshotDrain()
+                return
+              }
+              if (!(yield* dbTransitionState(current.session_id, current.id, "running", "killed"))) return
               const inFlight = yield* Ref.modify(createRef, (m) => {
                 const d = m.get(current.session_id)
                 if (d) m.delete(current.session_id)
@@ -2872,10 +3041,74 @@ export namespace SandboxProvider {
             if (snapshots) yield* Effect.promise(() => snapshots.gc()).pipe(Effect.catchCause(() => Effect.void))
             // 接管遗留快照操作（本实例或其他实例崩溃后租约过期的 pending/running 操作）
             if (snapshots) yield* nudgeSnapshotDrain()
+            if (snapshots) yield* nudgeSnapshotDrain(refreshOps)
             // 清理超期的 done/failed 操作行（否则只进不出无限增长）
             yield* Effect.promise(() => snapshotOps.retention()).pipe(Effect.catchCause(() => Effect.void))
+            yield* Effect.promise(() => refreshOps.retention()).pipe(Effect.catchCause(() => Effect.void))
             // 实例死亡后悬空的 running exec_log 行终态化（无人写终态的兜底）
             yield* Effect.promise(() => reapStaleExecRunning()).pipe(Effect.catchCause(() => Effect.void))
+
+            // 空闲检查点不是固定 RPO：持续活跃、后台写入、扫描排队及快照失败均可扩大恢复窗口。
+            if (snapshots && config.snapshotIntervalMs > 0) {
+              const refreshThreshold = Date.now() - config.snapshotIntervalMs
+              const staleRows = yield* Effect.tryPromise({
+                try: () =>
+                  pgDb
+                    .select()
+                    .from(SandboxTable)
+                    .where(and(eq(SandboxTable.state, "running"), lt(SandboxTable.time_updated, refreshThreshold),
+                      sql`EXISTS (SELECT 1 FROM session s WHERE s.id = ${SandboxTable.session_id}
+                        AND COALESCE(s.sandbox->>'persistMode', ${config.volumeType === "snapshot" ? "snapshot" : "pvc"}) = 'snapshot')`,
+                      sql`NOT EXISTS (SELECT 1 FROM session_snapshot snap WHERE snap.session_id = ${SandboxTable.session_id}
+                        AND snap.scope = 'session' AND (snap.state = 'creating' OR
+                          (snap.state IN ('ready', 'stale') AND snap.time_created >= ${SandboxTable.time_updated})))`,
+                      sql`NOT EXISTS (SELECT 1 FROM snapshot_refresh_operation op WHERE op.session_id = ${SandboxTable.session_id}
+                        AND op.sandbox_id = ${SandboxTable.id} AND
+                        (op.state IN ('pending', 'running') OR op.time_updated > ${refreshThreshold}))`,
+                    ))
+                    .orderBy(asc(SandboxTable.time_updated))
+                    .limit(CLEANUP_BATCH_SIZE)
+                    .all() as Promise<Row[]>,
+                catch: (error) => new Error(`periodic snapshot scan query failed: ${String(error)}`),
+              }).pipe(
+                Effect.catchCause((cause) => {
+                  log.error("periodic snapshot scan query failed", { cause: Cause.pretty(cause) })
+                  return Effect.succeed([] as Row[])
+                }),
+              )
+              // 扫描可见性：候选数与实际入队数（候选被 lock 内二次校验跳过是正常收敛）
+              let enqueued = 0
+              for (const row of staleRows) {
+                yield* lock(
+                  row.session_id,
+                  Effect.gen(function* () {
+                    const current = yield* dbGet(row.session_id)
+                    if (!current || current.id !== row.id || current.state !== "running") return
+                    if (current.time_updated > refreshThreshold) return
+                    if ((yield* dbResolvePersistMode(row.session_id)) !== "snapshot") return
+                    // failed 不能充当恢复点；creating 由队列或 GC 收尾。
+                    const pending = yield* Effect.promise(() => snapshots!.getLatest(row.session_id))
+                    if (pending?.state === "creating") return
+                    const latest = yield* Effect.promise(() => snapshots!.findRestorable(row.session_id))
+                    if (latest && latest.time_created >= current.time_updated) return
+                    yield* Effect.promise(() =>
+                      refreshOps.enqueue({ sessionID: row.session_id, sandboxID: row.id, kind: "snapshot_refresh" }),
+                    )
+                    enqueued += 1
+                    yield* nudgeSnapshotDrain(refreshOps)
+                  }),
+                ).pipe(
+                  Effect.catchCause((cause) => {
+                    log.error("periodic snapshot candidate failed", {
+                      sessionID: row.session_id,
+                      cause: Cause.pretty(cause),
+                    })
+                    return Effect.void
+                  }),
+                )
+              }
+              if (staleRows.length > 0) log.info("periodic snapshot scan", { candidates: staleRows.length, enqueued })
+            }
 
             if (rows.length === 0) return
             log.info("idle sandbox reap scan", { count: rows.length })
@@ -2970,7 +3203,8 @@ export namespace SandboxProvider {
               }
               // marker/manifest 在 startSnapshot 之前写入，随快照 rootfs 持久化（见 cleanupSandbox 同款注释）
               const snapStarted = Date.now()
-              const marker = yield* touchSnapshotMarker(sb)
+              confirmedSnapshots.delete(row.id)
+              const marker = yield* touchSnapshotMarker(sb, { prune: config.snapshotPrune })
               const snapOpts = yield* Effect.promise(() => resolveSandboxOpts(sessionID))
               const snapImage = snapOpts.sandbox?.image?.trim() || config.snapshotImage
               const id = yield* Effect.promise(() =>
@@ -2999,10 +3233,14 @@ export namespace SandboxProvider {
                   image: snapImage,
                   durationMs: Date.now() - snapStarted,
                   workspaceKb: marker.workspaceKb,
+                  pruned: config.snapshotPrune,
                 },
                 timeStarted: snapStarted,
               })
               yield* Effect.promise(() => snapshots.awaitSnapshot(sessionID, id)).pipe(
+                Effect.tap((result) => Effect.sync(() => {
+                  if (result === "ready") confirmedSnapshots.set(row.id, id)
+                })),
                 Effect.ensuring(
                   Effect.gen(function* () {
                     yield* dbTransitionState(sessionID, row.id, "snapshotting", "running").pipe(

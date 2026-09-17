@@ -468,6 +468,7 @@ const config = SandboxConfig.Service.of({
   idleKillMs: 3_600_000,
   idleReapMs: 3_600_000,
   idleReapIntervalMs: 3_600_000,
+  snapshotIntervalMs: 0,
   maxTtlSeconds: 3600,
   packageCacheMount: "/cache",
   snapshotPrune: false,
@@ -557,7 +558,7 @@ describe.skipIf(!enabled)("快照复用（destroy 路径）", () => {
     lifecycle.stop(true)
   })
 
-  test("复用主路径：workspace 无变更且有 ready 快照 → 跳过 startSnapshot 直接销毁，快照表无新记录", async () => {
+  test("未经当前 worker 确认的 ready 快照不因 CLEAN 直接复用", async () => {
     const name = "reuse"
     const sessionID = await insertSnapshotSession(name, { readySnapshot: true })
     commandClean = true
@@ -567,14 +568,35 @@ describe.skipIf(!enabled)("快照复用（destroy 路径）", () => {
 
     const deleted = await waitFor(async () => (await getSandboxState(sessionID))?.state === "destroyed")
     expect(deleted).toBe(true)
-    // 复用路径：不发 POST /v1/sandboxes/<id>/snapshots
+    // PG 中存在 ready 不代表当前 marker 来自它，必须保守重拍。
+    expect(indexOfRequest("POST", `/v1/sandboxes/sb_${name}/snapshots`)).toBeGreaterThanOrEqual(0)
+    expect(indexOfRequest("DELETE", `/v1/sandboxes/sb_${name}`)).toBeGreaterThanOrEqual(0)
+    // 新快照 Ready 后旧快照会被清理或转 stale。
+    const snaps = (await db.select().from(SessionSnapshotTable).where(eq(SessionSnapshotTable.session_id, sessionID)).all()) as Array<
+      { id: string; state: string }
+    >
+    expect(snaps.some((snap) => snap.id !== `snap_${name}_ready` && snap.state === "ready")).toBe(true)
+    commandClean = false
+  }, 40_000)
+
+  test("当前 worker 确认 Ready 且 workspace 无变更时安全复用", async () => {
+    const name = "confirmed_reuse"
+    const sessionID = await insertSnapshotSession(name)
+    commandClean = true
+
+    const snapshotID = await Effect.runPromise(svc().createSnapshot!(sessionID))
+    expect(snapshotID).toBeTruthy()
+    expect(await waitFor(async () => {
+      const rows = await db.select().from(SessionSnapshotTable).where(eq(SessionSnapshotTable.id, snapshotID!)).limit(1)
+      return rows[0]?.state === "ready"
+    })).toBe(true)
+    requests.length = 0
+
+    await Effect.runPromise(svc().destroy(sessionID))
+
+    expect(await waitFor(async () => (await getSandboxState(sessionID))?.state === "destroyed")).toBe(true)
     expect(indexOfRequest("POST", `/v1/sandboxes/sb_${name}/snapshots`)).toBe(-1)
     expect(indexOfRequest("DELETE", `/v1/sandboxes/sb_${name}`)).toBeGreaterThanOrEqual(0)
-    // 快照表仍只有原 ready 记录，无新增 creating/ready
-    const snaps = await db.select().from(SessionSnapshotTable).where(eq(SessionSnapshotTable.session_id, sessionID)).all()
-    expect(snaps.length).toBe(1)
-    expect(snaps[0]?.id).toBe(`snap_${name}_ready`)
-    expect(snaps[0]?.state).toBe("ready")
     commandClean = false
   }, 40_000)
 

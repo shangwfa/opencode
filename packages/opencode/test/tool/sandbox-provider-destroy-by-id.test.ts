@@ -84,6 +84,7 @@ const config = SandboxConfig.Service.of({
   idleKillMs: 3_600_000,
   idleReapMs: 3_600_000,
   idleReapIntervalMs: 3_600_000,
+  snapshotIntervalMs: 0,
   maxTtlSeconds: 3600,
   packageCacheMount: "/cache",
   snapshotPrune: false,

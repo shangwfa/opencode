@@ -75,7 +75,8 @@ curl -s -X POST "$BASE/session/$SID/snapshot"; sleep 40   # 等 ready
 psql "$PG_URL" -tAc "DELETE FROM sandbox WHERE session_id='$SID'"  # 或直接杀远端
 # 2) 触发重建，取三重证据
 curl -s -X POST "$BASE/session/$SID/exec" -d '{"command":"cat /workspace/origin.txt"}'   # 数据面
-psql "$PG_URL" -tAc "SELECT command FROM exec_log WHERE session_id='$SID' AND source='sandbox-create' ORDER BY time_created DESC LIMIT 1"
+# 注意 source：恢复成功记 snapshot-restore（冷启动才是 sandbox-create）——查错 source 会拿到旧冷启动记录误判「假恢复」
+psql "$PG_URL" -tAc "SELECT command FROM exec_log WHERE session_id='$SID' AND source='snapshot-restore' ORDER BY time_created DESC LIMIT 1"
 ```
 
 **期望**（快照恢复路径）：① exec 输出含 `SNAPSHOT-EVIDENCE-*`（数据随快照回来）；② exec_log `"restoredFromSnapshot":true`；③ 创建耗时显著低于该镜像冷启动基线（mini ≈5s，快照恢复应秒级）。
@@ -93,7 +94,7 @@ curl -s -X POST $K/sandboxes/$S/proxy/44772/command -H "$AUTH" -H 'Content-Type:
 SNAP=$(curl -s -X POST $K/sandboxes/$S/snapshots -H "$AUTH" -H 'Content-Type: application/json' -d '{"name":"restore-origin-check"}' | jq -r .id)
 sleep 40   # 等 Ready（GET /snapshots/$SNAP 轮询 status.state）
 curl -s -X DELETE $K/sandboxes/$S -H "$AUTH"   # 删源沙箱
-# 反复恢复（多副本部署下有 NOT_FOUND 交替问题，见下方复测记录）→ 对成功的沙箱验证内容
+# 反复恢复验证（NOT_FOUND 交替问题已于 2026-09-17 前修复，见下方复测记录）→ 对成功的沙箱验证内容
 R=$(curl -s -X POST $K/sandboxes -H "$AUTH" -H 'Content-Type: application/json' \
   -d "{\"snapshotId\":\"$SNAP\",\"timeoutSeconds\":3600,\"resourceLimits\":{\"cpu\":\"1\",\"memory\":\"2Gi\"}}" | jq -r '.id // empty')
 curl -s -X POST $K/sandboxes/$R/proxy/44772/command -H "$AUTH" -H 'Content-Type: application/json' \
@@ -105,6 +106,7 @@ curl -s -X POST $K/sandboxes/$R/proxy/44772/command -H "$AUTH" -H 'Content-Type:
 > **远端 K8s 实测**（2026-08-22，方式 B）：PASS — 恢复成功 5/5 个沙箱均 cat 出完整 marker，快照 rootfs 物化真实有效。注意多副本部署下恢复请求约 50% 报 `SNAPSHOT::NOT_FOUND`（控制面元数据副本本地化，见上方根因分析），需重试至命中持有副本。
 > **复测**（2026-09-07）：恢复循环 x10 仍 5 OK / 5 NOT_FOUND 完美交替——运维侧未修复，仍待根治（见文末复测记录）。
 > **复测**（2026-09-10）：未修复——GET x12 独立连接严格 `404 200` 交替、新快照恢复 x10 仍 5 OK / 5 NOT_FOUND（marker 5/5 完整）。已沉淀自动化脚本 [`scripts/snapshot_notfound_check.py`](scripts/snapshot_notfound_check.py)（每请求独立 TCP 连接防 LB 粘滞误判，附粘滞对照组），见文末复测记录。
+> **复测**（2026-09-17）：**已修复**（运维侧确认）——本轮快照全量回归中所有恢复请求（idle 恢复 / stale 回退 / 硬回收后 T25.36 检查点恢复 / 混合部署恢复等 ≥5 次，跨多个快照与副本调度）**零 NOT_FOUND**，与历史 50% 失败率形成对照。
 > **本地实测**（2026-08-20，方式 A 思路）：T25.3 的 marker+pnpm store 断言即隐式覆盖此真伪检查。
 
 ### T25.4 快照失败降级（源容器已死）
@@ -719,7 +721,7 @@ execd_image = "opensandbox/execd:v1.0.21"   # 以本地 docker images 实际版�
 
 实测（exec_log `sandbox-create` 记录，现记录实际镜像 + restoredFromSnapshot 标志）：pvc → session-terminal ✓；snapshot 冷启动 → v1.0.0 ✓（5.3s）。
 
-### 远端 K8s 快照恢复 NOT_FOUND（根因已定位：多副本快照元数据不共享，待运维侧修复）
+### 远端 K8s 快照恢复 NOT_FOUND（~~根因已定位：多副本快照元数据不共享，待运维侧修复~~ 已于 2026-09-17 复测确认修复）
 
 - 现象：快照 Ready（GET `/snapshots/{id}` 200，"Kubernetes snapshot image created successfully"）→ POST `/sandboxes` `{snapshotId}` 返回 `SNAPSHOT::NOT_FOUND`。
 - **根因实锤**（2026-08-22 受控实验）：远端 OpenSandbox 为**双副本部署且快照元数据副本本地化、不共享**。同一请求连续重放呈完美 50% 交替：
@@ -990,3 +992,232 @@ python3 docs/test-cases/sandbox/scripts/snapshot_notfound_check.py --probe-snap 
 **额外修复**：`runEphemeralCommand` 的 stdout 事件分片间不含换行符（SDK 实测 `["4","x86_64"]`），`join("")` 会把相邻行粘连成 `4x86_64` 导致清单解析失败——已改为 `join("\n")`，并为 `parseMarkerOutput` 补事件边界回归单测。
 
 **单测**：60 pass（`snapshot-operation` 10 / `sandbox-snapshot-reuse` 33 / `destroy-by-id` 9 / `session-snapshot-pg` 8）；typecheck 59 既有错误无新增。
+
+---
+
+## 三十三、周期性快照保鲜（T25.33~T25.36，2026-09-17 新增）
+
+> **背景**（生产事故 `ses_f567bb456ffeOACH9Yt1gRABxS`，2026-09-16）：keepAlive 快照会话夜间静默后，
+> SaaS idle reap 未触发（疑似旧版 OOM 扫描 touch 失明），沙箱活到平台 TTL（10x maxTtl ≈ 10h）被硬回收，
+> 无法做临终快照 → 次日重建回滚到 19 小时前的旧快照，中间写入全部丢失。
+> **修复**：idle reap 扫描周期新增「快照保鲜」轮——空闲超过 `OPENCODE_SANDBOX_SNAPSHOT_INTERVAL_SEC`
+> （默认 1800s）的快照会话入队 `snapshot_refresh`（durable，走独立的 `snapshot_refresh_operation` 租约/fencing），
+> worker 快照 Ready 后**保留源沙箱继续运行**；沙箱已死且快照落后（age > 2× 间隔）时落
+> `snapshot-lag-warning` exec_log 告警。该机制缩短空闲会话的风险窗口，但不承诺固定 RPO：持续活跃、
+> 后台写入、扫描排队、快照耗时和失败重试均可能扩大窗口。
+>
+> ```bash
+> # 新增开关（均挂在服务启动环境变量）：
+> #   OPENCODE_SANDBOX_SNAPSHOT_PERIODIC_ENABLED=1   总开关（默认开；0/false 关闭）
+> #   OPENCODE_SANDBOX_SNAPSHOT_INTERVAL_SEC=60      测试用：缩短保鲜间隔
+> ```
+
+### T25.33 周期快照触发：空闲超间隔 → 快照刷新、沙箱保留
+
+```bash
+SID=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' \
+  -d '{"sandbox":{"persistMode":"snapshot","cpu":"1","memory":"2Gi"}}' \
+  | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+# keepAlive + 写入数据 + 保持空闲（不触发 idle reap 销毁——间隔 < idleReap 阈值）
+curl -s -X POST "$BASE/session/$SID/keep-alive" -H 'Content-Type: application/json' -d '{"enabled":true,"boot":true}'
+curl -s -X POST "$BASE/session/$SID/exec" -H 'Content-Type: application/json' \
+  -d '{"command":"echo v1 > /workspace/rpo.txt && cat /workspace/rpo.txt"}'
+sleep $((INTERVAL + SCAN + SLACK))   # 间隔 + idleReap 扫描周期 + 快照 Ready 余量
+psql $PG_URL -tAc "SELECT state FROM session_snapshot WHERE session_id='$SID' ORDER BY time_created DESC LIMIT 1"
+psql $PG_URL -tAc "SELECT state FROM sandbox WHERE session_id='$SID'"
+psql $PG_URL -tAc "SELECT source, command FROM exec_log WHERE session_id='$SID' AND source IN ('snapshot-refresh') ORDER BY time_created DESC LIMIT 1"
+```
+
+**期望**：新快照 `creating → ready`；`sandbox` 行仍 `running`（保鲜不销毁）；`snapshot-refresh` exec_log 含 `snapshotId`/`durationMs`/`workspaceKb`。
+
+### T25.34 已覆盖跳过：Ready 快照晚于最后活动 → 不重复入队
+
+```bash
+# 承接 T25.33：不再写入，再等一个保鲜间隔
+sleep $((INTERVAL + SCAN + SLACK))
+psql $PG_URL -tAc "SELECT count(*) FROM session_snapshot WHERE session_id='$SID'"
+```
+
+**期望**：快照总数不变（扫描阶段确认 Ready 快照已覆盖 `sandbox.time_updated`，不重复入队）。worker 仅在本进程确认 marker 对应的快照已经 Ready 时才允许 CLEAN 复用；失败快照留下的 marker 不得跳过重拍。
+
+### T25.35 平台硬回收 + 快照落后 → snapshot-lag-warning 告警
+
+```bash
+# 模拟平台 TTL 硬回收（SaaS 不知情的死亡）：直连 OpenSandbox 删沙箱，且把快照 age 拉到 2× 间隔外
+OS=$(psql $PG_URL -tAc "SELECT id FROM sandbox WHERE session_id='$SID'")
+curl -s -X DELETE "$OPENSANDBOX/sandboxes/$OS" -H "OPEN-SANDBOX-API-KEY: $KEY"
+psql $PG_URL -tAc "UPDATE session_snapshot SET time_created = time_created - $((3*INTERVAL*1000)) WHERE session_id='$SID'"
+# 触发一次对该会话的快照操作（等 idle reap 把 killed 行交 drain，或 kill-sandbox）
+curl -s -X POST "$BASE/session/$SID/kill-sandbox"
+sleep 30
+psql $PG_URL -tAc "SELECT source, command FROM exec_log WHERE session_id='$SID' AND source='snapshot-lag-warning' ORDER BY time_created DESC LIMIT 1"
+```
+
+**期望**：`snapshot-lag-warning` exec_log 落库，`command` 含 `cause`/`snapshotAgeMs`/`latestSnapshotId`；服务日志 `snapshot lag: sandbox gone with unsnapshotted writes`。快照够新（age < 2× 间隔）时不告警（负向对照）。
+
+### T25.36 检查点恢复：硬回收后恢复到最新 Ready 快照
+
+```bash
+# 承接 T25.33 场景：保鲜间隔内写入 v2 → 平台硬回收沙箱 → 重建恢复
+curl -s -X POST "$BASE/session/$SID/exec" -H 'Content-Type: application/json' \
+  -d '{"command":"echo v2 > /workspace/rpo.txt"}'
+sleep $((INTERVAL + SCAN + SLACK))                                    # 保鲜快照捕获 v2
+curl -s -X DELETE "$OPENSANDBOX/sandboxes/$(psql $PG_URL -tAc "SELECT id FROM sandbox WHERE session_id='$SID'")" -H "OPEN-SANDBOX-API-KEY: $KEY"
+curl -s -X POST "$BASE/session/$SID/exec" -H 'Content-Type: application/json' \
+  -d '{"command":"cat /workspace/rpo.txt"}'
+```
+
+**期望**：确认 v2 快照已 Ready 后，重建的 `rpo.txt` = `v2`（修复前该场景回滚到 v1 甚至空文件）；`sandbox-create` exec_log `restoredFromSnapshot=true`。该用例证明已完成检查点可恢复，不证明任意时刻硬回收的丢失窗口严格小于配置间隔。
+
+### 单测覆盖（`packages/opencode/test/tool/sandbox-snapshot-periodic.test.ts`）
+
+集成链路之外，以下分支由单测覆盖（mock OpenSandbox lifecycle server + 本地 `opencode_test` PG）：
+
+```bash
+cd packages/opencode
+OPENCODE_DATABASE_URL=postgresql://local@127.0.0.1:5432/opencode_test \
+  bun test test/tool/sandbox-snapshot-periodic.test.ts
+```
+
+| # | 单测用例 | 对应集成/内部逻辑 |
+|---|---|---|
+| 1 | flag 默认值（默认开、间隔 1800s） | `OPENCODE_SANDBOX_SNAPSHOT_PERIODIC_ENABLED` / `_INTERVAL_SEC` |
+| 2 | 空闲超间隔 → 入队 refresh、快照 ready、**源沙箱保留**（不发 DELETE） | T25.33；drain 按 kind 分派不销毁 |
+| 3 | 快照已覆盖空闲期（快照时间 ≥ 最后活动）→ 不入队不重复快照 | 保鲜轮覆盖判定 |
+| 4 | pvc 会话 → 不入队 | 保鲜轮 persistMode 过滤 |
+| 5 | 未超间隔的活跃沙箱 → 不入队 | 保鲜轮空闲阈值 |
+| 6 | 只有旧快照时即使 marker 返回 CLEAN 也保守重拍 | 失败 marker 不得误复用 |
+| 7 | 平台回收 + 快照落后 → `snapshot-lag-warning` 告警 + 行对账收敛 destroyed | T25.35（refresh 分支）；死沙箱收敛防反复入队 |
+| 8 | 平台回收但快照够新 → 收敛不告警 | lag 阈值（max(2× 间隔, idleReapMs)）负向 |
+| 9 | destroy 路径死亡分支 → 告警 cause=`sandbox gone before snapshot` | T25.35（kill-sandbox 触发路径） |
+| 10 | refresh 进行中 destroy → 最终销毁、快照先于 DELETE | 双 kind 共存与顺序语义 |
+| 11 | CAS：扫描窗口内 time_updated 被持续刷新 → 不入队 | 保鲜轮 lock 内二次校验（防误触发） |
+| 12 | 行状态非 running（killed）→ worker 直接跳过不动行 | runSnapshotRefresh 的 dbGet 前置校验 |
+| 13 | creating 中快照视为已覆盖 → 不重复入队 | 覆盖判定含 creating（startSnapshot 去重兜底） |
+| 14 | 从未快照 + 平台回收 → 也落 lag 告警（latestSnapshotId=null） | 「数据全丢」极端场景的可观测性 |
+| 15 | createSnapshot 失败并留下 marker → 恢复后仍重拍成功 | durable 队列失败路径（attempts 累加 ≥2） |
+| 16 | 最新记录为 failed → 仍创建新 Ready 快照 | failed 不参与覆盖判定与恢复点选择 |
+| 17 | 快照卡 Creating → refresh 短超时释放 fence，恢复后重试复用同一快照成功 | fence 间隙设计（`REFRESH_SNAPSHOT_WAIT_MS`） |
+| 18 | 等待重试期间用户恢复活跃 → 重试的空闲校验拒绝再次 fence | fence 不卡活跃用户（CAS `time_updated < now-interval`） |
+| 19 | 保鲜成功后无实质写入的 touch（如 reconnect touch）→ 确认式 CLEAN 复用，不重拍 | refresh 路径的确认式复用（与 destroy 路径独立实现） |
+
+> `snapshotIntervalMs=0`（关闭保鲜）由 4 个既有测试文件（reuse/destroy-by-id/boot-init/detached-keepalive）的 config 显式设置且断言不受 refresh 干扰，属隐式回归覆盖。
+
+---
+
+## 复测记录（2026-09-17 周期性快照保鲜单测）
+
+环境：本地 PG（`opencode_test`）+ mock OpenSandbox lifecycle server；config `snapshotIntervalMs=2s`、`idleReapIntervalMs=400ms`、`idleReapMs=1h`（禁用销毁轮，保鲜轮独立受测）。
+
+**审查后安全加固（2026-09-17 第二轮）**：
+
+1. **refresh 独立队列**：`snapshot_refresh` 改落新表 `snapshot_refresh_operation`（迁移 `20260917000000_snapshot_refresh_queue`）。旧版本 worker 会把 `snapshot_operation` 的所有行按销毁语义领取执行——滚动升级期间 refresh 任务可能被旧实例**销毁本应保留的沙箱**。`SnapshotOperation.create(pgDb, queue)` 按 kind 拒绝跨队列入队；
+2. **确认式复用**：CLEAN 复用仅在「本进程 `confirmedSnapshots` Map 确认该快照 ID 已 Ready」时允许。此前 marker 在 `startSnapshot` 前写入——快照失败后 marker 残留，重试会把失败时留下的 marker 当成功依据复用**更旧的快照**；PG 中存在 ready 记录同样不能证明它来自当前 marker。代价是进程重启后首次销毁多拍一次快照（保守正确）；
+3. **refresh 生命周期 fence（含间隙设计）**：refresh 执行前 CAS `running→snapshotting`（带 `time_updated` 二次校验 + 即时空闲校验），结束回 `running`；期间 `destroy`/`destroyById` 不再破坏 fence，改为入队 destroy 操作交 worker 在 fence 释放后执行。fence 的等待上限为 `min(120s, snapshotWaitMs)`（`REFRESH_SNAPSHOT_WAIT_MS`）——**不是业务快照的 900s**：保鲜是后台动作，超时即释放 fence、操作退避重试时重新 CAS；重试的空闲校验（`time_updated < now-interval`）在用户恢复活跃后自然放弃后续 refresh，不会把返回用户的请求长时间卡在 `snapshotting`。最坏卡顿 = 单次 fence 窗口（默认 120s）；
+4. **扫描收敛到 SQL**：候选查询在 SQL 内完成 persistMode 过滤、快照覆盖判定（仅 `ready`/`stale`/`creating` 算覆盖，**failed 不算**）与活跃 refresh 操作去重，消除「先取最老 100 行再过滤」的候选饥饿；
+5. **审计 ID 去冲突**：`action-<source>-<ts>` 追加随机后缀，消除周期性批量操作同毫秒主键冲突丢审计。
+
+**可观测性补强（2026-09-17 第四轮，全量回归中发现的日志缺口）**：
+
+1. 保鲜扫描轮日志：`periodic snapshot scan {candidates, enqueued}`（候选 >0 时输出；enqueue 失败由静默吞错改为记 error）；
+2. 保鲜 fence 归因：CAS 成功打 `periodic snapshot fence acquired`——用户被 `snapshotting` 拒绝时可区分「显式快照」与「后台保鲜」；
+3. refresh CLEAN 复用对齐 destroy 路径：落 `snapshot-reuse` 审计（detail 带 `periodic:true`）+ `snapshot reused (periodic refresh, ...)` 日志（此前该分支零痕迹，只能间接推断）；
+4. `GET /snapshot/stats` 补全：operations 增加 `snapshot-refresh` 聚合；新增 `queues`（destroy/refresh 双队列的 pending/running/failed 积压，堆积即 worker 消费异常信号）；
+5. 显式快照审计补 `pruned` 字段，且 `touchSnapshotMarker` 传 `{prune}` 与 destroy/refresh 路径对齐（此前显式路径漏 prune 行为不一致）；
+6. lag 告警接 `Metrics.recordSandboxEvent("snapshot-lag")`（与 kill/oom 同级，告警平台可见）。
+
+**可观测性补强回测（2026-09-17 第四轮）**：
+
+环境：同第三轮（本地 PG + 远端 K8s 沙箱），镜像 `snapshot-obs4`（`INTERVAL=60 + REAP=600 + PRUNE=1`）。
+
+| 项 | 结果 | 证据 |
+|---|---|---|
+| #1 扫描日志 | PASS | `periodic snapshot scan {candidates:5→1, enqueued}` 多轮可见；启动后首轮还接管了全量回归遗留的空闲会话（candidates=5） |
+| #2 fence 归因 | PASS | `periodic snapshot fence acquired {sessionID, sandboxID}` |
+| #3 refresh 复用审计 | PASS | touch（无写入）后下一轮：`snapshot-reuse` 审计 `periodic:true, durationMs:131` + `snapshot reused (periodic refresh, workspace unchanged)` 日志 + 快照数不变（2→2，未重拍） |
+| #4 stats 扩展 | PASS | `operations.snapshot-refresh: {count:10, p50Ms:15.6s}`；`queues: {destroy:{failed:1}, refresh:{pending:1}}`（注入积压行验证，done 不计入——无积压时为空对象） |
+| #5 显式快照 pruned | PASS | PRUNE=1 下显式 POST /snapshot 审计 `pruned:true, explicit:true, workspaceKb:8` |
+| #6 lag metrics | 代码级 | `recordSandboxEvent("snapshot-lag")` 在 warnSnapshotLag 内部（refresh/destroy 双路径共用）；无导出端点，集成不可见 |
+| 单测 | PASS | 7 文件合跑连续 3 次 88 pass / 0 fail（顺带修复 retry 用例 waitFor 时序：操作 done 与快照 ready 需同时满足） |
+| 类型检查 | PASS | 58 基线，0 新增 |
+
+| 用例 | 结果 | 证据 |
+|---|---|---|
+| 保鲜主路径（#2） | PASS | 快照 ready（`POST /v1/sandboxes/<id>/snapshots` ≥1 次）；sandbox 行 `running` 且 `DELETE /v1/sandboxes/<id>` = 0 次；`snapshot-refresh` exec_log；`snapshot_refresh_operation` 行 `done`，旧 `snapshot_operation` 无 refresh 行 |
+| 入队过滤（#3/#4/#5/#11/#13） | PASS | 覆盖/creating/pvc/未超间隔/CAS 刷新五类均 0 条 refresh 操作、0 次快照创建 |
+| marker 安全（#6/#15） | PASS | 未经本进程确认的旧快照不因 CLEAN 跳过；首次创建失败后第二次仍 POST snapshots 并得到新 Ready 快照 |
+| killed 行 skip（#12） | PASS | 手动入队 refresh → 操作 `done`、行保持 `killed`、无快照创建 |
+| lag 告警（#7/#9/#14） | PASS | exec_log `snapshot-lag-warning`：refresh 分支 cause=`sandbox gone before periodic snapshot`；destroy 分支 cause=`sandbox gone before snapshot`；无快照场景 `latestSnapshotId=null`；行收敛 `destroyed` |
+| 告警负向（#8） | PASS | 快照 age < 阈值 → 收敛 destroyed、0 条告警 |
+| kind 共存（#10） | PASS | refresh 入队后 destroy → 最终 `destroyed`，POST snapshots（若有）先于 DELETE |
+| 失败重试（#15/#16） | PASS | POST snapshots 500 → 操作 `pending\|attempts=1`；恢复 + 提前退避 → 新快照 ready、操作 `done\|attempts≥2`；较新的 failed 记录不阻止补拍 |
+| 队列隔离（snapshot-operation） | PASS | destroy 队列入 refresh kind 抛错（双向）；refresh 行落在 `snapshot_refresh_operation`，`ops.claim()` 对其不可见 |
+| fence 间隙（#17/#18） | PASS | 卡 Creating → `waitMs=3000 timeout` 后行回 `running`、操作退避 pending，恢复后重试 ready；用户 touch 后重试被 `sandbox active or lifecycle changed` 拒绝、0 次 POST、行保持 `running` |
+| refresh 确认式复用（#19） | PASS | 保鲜成功 + touch（无写入）→ 第二次操作 `done`、0 次 POST snapshots、快照表仍 1 条、无新 `snapshot-refresh` 审计 |
+| 确认式复用（sandbox-snapshot-reuse） | PASS | PG 直插 ready + CLEAN → 保守重拍；`createSnapshot` 确认 Ready + CLEAN → `snapshot reused (workspace unchanged)`，0 次 POST |
+| flag（#1） | PASS | 默认开 / 1800s |
+| 回归 | PASS | 快照相关 6 文件 79 pass（periodic 19 / operation 12 / reuse 34 / destroy-by-id 9 / boot-init + detached-keepalive）；`sandbox-idle-reap` 2 例失败为**既有 flake**（git stash 基线对照复现，与本次无关） |
+| 类型检查 | PASS | 58 既有错误，0 新增 |
+
+---
+
+## 复测记录（2026-09-17 第三轮，快照用例全量回归）
+
+环境：**本地 PG（docker，经 15432 转发）+ 远端 K8s 沙箱（30040 转发）**，镜像 `opencode-saas-sandbox-test:snapshot-fulltest`（含周期保鲜全部修复 + `snapshot_refresh_operation` 迁移，37 条迁移）。
+分组配置：主组 `VOLUME_TYPE=snapshot + SNAPSHOT_ENABLED=1 + DELETE_ENABLED=1 + INTERVAL_SEC=60 + IDLE_REAP_SEC=600`（保鲜间隔 < idleReap，避免回收抢先）；T25.18/30 组 `TTL_SEC=60 + PRUNE=1`；T25.23/7 组 `VOLUME_TYPE=pvc`。
+
+### 集成用例结果
+
+| 用例 | 结果 | 证据 |
+|---|---|---|
+| T25.1 冷启动 | PASS | /workspace overlay、marker 写入、快照表 0 记录 |
+| T25.2 idle 自动快照 | PASS | reap 扫描 → 快照 20s ready → destroyed（Ready 前不 kill） |
+| T25.3/3b 恢复+真伪 | PASS | `snapshot-restore` exec_log `restoredFromSnapshot:true + markerPresent:true`；数据/依赖缓存完整；恢复+exec 6s |
+| T25.5 多快照 | PASS | S1 `deleted\|superseded`、S2 ready |
+| T25.6 删除清理 | PASS | `deleted\|session deleted`、远端 /v1/snapshots 0 残留 |
+| T25.7 pvc 回归 | PASS | 默认会话挂 NFS PVC；单测基线（4 fail 为既有） |
+| T25.8 K8s | PASS | 本轮即远端 K8s 全链路（快照/恢复/supersede/GC） |
+| T25.9 显式快照 | PASS | creating→ready 40s；期间 exec `Sandbox snapshot pending`；ready 后沙箱 running |
+| T25.10 镜像指定 | PASS | registry URL 镜像创建 + exec_log image 记录 |
+| T25.12 fork 继承 | PASS | cpu/memory/image/persistMode 整块继承 |
+| T25.13 metadata | PASS | `sandboxSnapshot` 与最新 ready 快照一致 |
+| T25.14 keepAlive 共存 | PASS | 无 idle 回收干扰（REAP=600）、显式快照正常 |
+| T25.15 端到端 | PASS | clone→wip→idle 快照→恢复 6s（git 历史完整）→step2 续写连续 |
+| T25.16 恢复失败降级 | PASS | 远端删快照→kill→exec 冷启动；`failed\|restore failed: Snapshot … not found` |
+| T25.17 stale 回退 | **语义变更** | kill 现在走「先快照 Ready 再销毁」（durable destroy 队列）——恢复后写入**不再丢失**，旧「kill 丢写入」语义已过时 |
+| T25.18 TTL GC | PASS | TTL=60 → 270s `deleted\|ttl expired` |
+| T25.19 坏 snapshotId | PASS | 降级冷启动（workspace 空）、无脏快照记录 |
+| T25.20 creating 对账 | PASS | 远端 Ready 的超期 creating → 收敛 ready（备注：本轮观测到一条空 reason 的 ready，后经代码核实 reconcile 分支确写 `reconciled`（session-snapshot.ts:385），系快照多条时观测对象错位，非代码回退） |
+| T25.21 快照期间消息 | PASS | exec 变体：`Sandbox snapshot pending: <sid>/<sandboxid>` 文案正确 |
+| T25.22 重启接管 | PASS | `docker restart` 后同 sandboxID、153ms reconnect、RESTART_BASELINE 完整 |
+| T25.23 混合部署 | PASS | 全局 pvc + 会话 snapshot → /workspace overlay（parseSandboxColumn 有效）、快照 creating→ready、kill 后恢复 MIX23 + `stale\|restored` |
+| T25.24 复用 | 场景 1/2/4 PASS；**场景 6 语义变更** | 场景 1：`snapshot reused` + 快照表无新增 + 秒级销毁。场景 6（恢复后再 kill）：**确认式复用**只信任本进程同沙箱确认——恢复产生新沙箱 id 后首次销毁保守重拍（S1 superseded、S2 ready），数据安全优先 |
+| T25.25 队列接管 | PASS | 崩溃遗留 pending → `done\|attempts=1\|fencing=1` |
+| T25.26 fencing | PASS | 租约未过期不领取（`running\|fencing=7`）；过期后 `done\|fencing=8\|attempts=2` |
+| T25.27 幂等索引 | PASS | 6 并发 INSERT 收敛 1 条活跃 |
+| T25.28 兼容性 | PASS | 元数据 `schema=1/runtime/arch` 落库；置 999 → 恢复冷启动 + `failed\|incompatible: schema 999 != 1` |
+| T25.29 stats | PASS | create p50=7.8s / restore p50=5.7s / reuse p50=104ms、`reuseHitRate=0.33`、gc backlog 0 |
+| T25.30 prune | PASS | dirty kill 路径 `pruned:true + workspaceKb:4`（CLEAN 复用路径不新拍故无该审计，符合预期） |
+| T25.31 失败原因 | PASS | 由 T25.16 证据覆盖（`failed\|restore failed: … not found`） |
+| T25.33 周期保鲜 | PASS | 空闲超 60s+扫描 → 快照 ready、**沙箱保持 running**、`snapshot-refresh` 审计（snapshotId/durationMs=10.3s/workspaceKb/pruned）、refresh 操作 `done\|attempts=1` |
+| T25.34 覆盖跳过 | PASS | 一个间隔后 0 新操作、0 新快照 |
+| T25.35 lag 告警 | PASS | 硬回收 + 快照拉老 700s（>阈值 600s）→ `snapshot-lag-warning`（cause/snapshotAgeMs/latestSnapshotId）+ 行收敛 destroyed |
+| T25.36 检查点恢复 | **PASS（事故场景闭环）** | 写 v2 → 保鲜捕获（快照数 2）→ 远端硬回收 204 → 恢复 exec `rpo.txt=v2`（8s，双标志 true）。**修复前该场景回滚旧快照** |
+
+### 单测结果（本地 `opencode_test`）
+
+9 文件 146 pass / 6 fail：`sandbox-idle-reap` 2 例 + `sandbox-pvc` 4 例均为既有基线（git stash 对照复现过），与本次改动无关。
+
+### 观测差异与语义变更汇总（本轮实测确认）
+
+1. **恢复审计的 source 是 `snapshot-restore`**（非 `sandbox-create`）——T25.3b 示例 SQL 已同步修正（查错 source 会拿到旧冷启动记录，误判「假恢复」，本轮实测踩过此坑）；
+2. **T25.17/T25.24 场景 6 语义变更**：kill 恒走「先快照再销毁」+ 确认式复用只信任本进程同沙箱确认——恢复后的新沙箱首次销毁会保守重拍一次（安全优先，效率代价一轮快照）；
+3. 快照 arch drift（amd64 快照 / arm64 server）仅 warn 不阻断，远端环境混布已知；
+4. 测试配置陷阱：保鲜用例必须 `INTERVAL < IDLE_REAP`（相等时 idle 回收抢先销毁，保鲜轮变陪跑——第一轮 T25.33 即因此误判）；
+5. **远端快照恢复 NOT_FOUND 交替问题已修复**（运维侧确认 + 本轮实证）：全量回归 ≥5 次恢复请求零失败（历史 50% 失败率），详见 T25.3b 复测记录。
+
+**过程发现并修复**：
+1. refresh 死亡分支补对账收敛（`killByID + dbMarkDestroyed`），否则保鲜轮对死沙箱反复入队；
+2. **`withLeaseHeartbeat` 的 race 语义 bug（既有，`26ff3c807c` 引入）**：`Effect.race` 是「第一个**成功**者」——执行体 fail 后继续等永不成功的心跳循环，快照操作卡 `running` 直到 5 分钟租约过期被接管再重试再卡，失败重试链路实际断裂。改 `Effect.raceFirst`（第一个完成者，含失败）后操作即时落 `pending` 退避重试，测试总时长 59s→14s；
+3. `ExecLogSource` 类型补 `snapshot-refresh`/`snapshot-lag-warning` 枚举；
+4. 测试 mock 需保证同沙箱多次 createSnapshot 返回不同 ID（真实远端语义）。

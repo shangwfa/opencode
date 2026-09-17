@@ -64,6 +64,8 @@ export type ExecLogSource =
   | "snapshot-restore"
   | "snapshot-fallback"
   | "snapshot-delete"
+  | "snapshot-refresh"
+  | "snapshot-lag-warning"
   | "file-mkdir"
   | "file-create"
   | "file-download"

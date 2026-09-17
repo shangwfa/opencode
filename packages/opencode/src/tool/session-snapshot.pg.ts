@@ -33,7 +33,7 @@ export const SnapshotOperationTable = pgTable(
     id: text().primaryKey(),
     session_id: text().notNull(),
     sandbox_id: text(),
-    kind: text().$type<"snapshot_destroy">().notNull(),
+    kind: text().$type<"snapshot_destroy" | "snapshot_refresh">().notNull(),
     state: text().$type<"pending" | "running" | "done" | "failed">().notNull(),
     attempts: integer().notNull().default(0),
     next_retry_at: bigint({ mode: "number" }),
@@ -49,6 +49,32 @@ export const SnapshotOperationTable = pgTable(
     index("snapshot_operation_session_idx").on(t.session_id, t.time_created),
     // 同 session+sandbox+kind 至多一条活跃操作；sandbox_id 为 NULL 时不去重（Postgres NULL distinct），destroy 路径恒非空
     uniqueIndex("snapshot_operation_active_uniq")
+      .on(t.session_id, t.sandbox_id, t.kind)
+      .where(sql`${t.state} in ('pending', 'running')`),
+  ],
+)
+
+// 独立队列：旧 worker 会把 snapshot_operation 的所有 kind 当作销毁任务领取。
+export const SnapshotRefreshOperationTable = pgTable(
+  "snapshot_refresh_operation",
+  {
+    id: text().primaryKey(),
+    session_id: text().notNull(),
+    sandbox_id: text(),
+    kind: text().$type<"snapshot_destroy" | "snapshot_refresh">().notNull(),
+    state: text().$type<"pending" | "running" | "done" | "failed">().notNull(),
+    attempts: integer().notNull().default(0),
+    next_retry_at: bigint({ mode: "number" }),
+    lease_owner: text(),
+    lease_until: bigint({ mode: "number" }),
+    fencing_token: bigint({ mode: "number" }).notNull().default(0),
+    error: text(),
+    ...Timestamps,
+  },
+  (t) => [
+    index("snapshot_refresh_operation_claim_idx").on(t.state, t.next_retry_at),
+    index("snapshot_refresh_operation_session_idx").on(t.session_id, t.time_created),
+    uniqueIndex("snapshot_refresh_operation_active_uniq")
       .on(t.session_id, t.sandbox_id, t.kind)
       .where(sql`${t.state} in ('pending', 'running')`),
   ],

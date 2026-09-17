@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import { eq, like } from "drizzle-orm"
 import { Database } from "../../src/storage/db"
 import { SnapshotOperation } from "../../src/tool/snapshot-operation"
-import { SnapshotOperationTable } from "../../src/tool/session-snapshot.pg"
+import { SnapshotOperationTable, SnapshotRefreshOperationTable } from "../../src/tool/session-snapshot.pg"
 
 const DB_URL = process.env.OPENCODE_DATABASE_URL
 const enabled = (() => {
@@ -32,6 +32,7 @@ describe.skipIf(!enabled)("snapshot operation queue", () => {
 
   afterAll(async () => {
     await cleanup()
+    await db.delete(SnapshotRefreshOperationTable).where(like(SnapshotRefreshOperationTable.session_id, "ses_snapop_%")).run()
   })
 
   test("enqueue 去重：同 session+sandbox+kind 复用同一条 pending", async () => {
@@ -69,6 +70,22 @@ describe.skipIf(!enabled)("snapshot operation queue", () => {
   test("无待执行操作时 claim 返回 null", async () => {
     await cleanup()
     expect(await ops.claim()).toBeNull()
+  })
+
+  test("refresh 队列与 destroy 队列隔离：kind 不匹配即拒绝且互不可领取", async () => {
+    await cleanup()
+    const refreshOps = SnapshotOperation.create(db, "refresh")
+    // 旧 worker 会把 snapshot_operation 所有行按销毁语义执行——refresh 必须落在独立表
+    await expect(ops.enqueue({ sessionID: SID, sandboxID: "sb-q", kind: "snapshot_refresh" })).rejects.toThrow()
+    await expect(refreshOps.enqueue({ sessionID: SID, sandboxID: "sb-q", kind: "snapshot_destroy" })).rejects.toThrow()
+    const id = await refreshOps.enqueue({ sessionID: SID, sandboxID: "sb-q", kind: "snapshot_refresh" })
+    expect(await ops.claim()).toBeNull()
+    const claimed = await refreshOps.claim()
+    expect(claimed?.id).toBe(id)
+    expect(claimed?.state).toBe("running")
+    await refreshOps.complete(claimed!.id, claimed!.fencing_token)
+    const rows = await db.select().from(SnapshotRefreshOperationTable).where(eq(SnapshotRefreshOperationTable.id, id)).all()
+    expect(rows[0]?.state).toBe("done")
   })
 
   test("heartbeat 持租约成功、失去租约失败", async () => {

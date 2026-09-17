@@ -236,8 +236,12 @@ idle reap / zombie 回收 / killed 重试（带快照）:
 | `OPENCODE_SANDBOX_SNAPSHOT_TTL_SEC` | `7d` | 快照保留期（对应 Modal 30d/7d，我们更短：快照含用户数据，跟会话保留策略对齐） |
 | `OPENCODE_SANDBOX_SNAPSHOT_WAIT_SEC` | `900` | 等待 Ready 上限；超时保持 creating，等待下轮/GC 对账 |
 | `OPENCODE_SANDBOX_VOLUME_TYPE` | `pvc` | 全局默认 persistMode；取值 `pvc` / `snapshot`（`host`/`none` 为本地开发形态，不支持会话级覆盖到 snapshot 之外的组合） |
+| `OPENCODE_SANDBOX_SNAPSHOT_PERIODIC_ENABLED` | 开 | 周期快照保鲜总开关（idle reap 扫描周期内的 refresh 轮） |
+| `OPENCODE_SANDBOX_SNAPSHOT_INTERVAL_SEC` | `1800` | 空闲检查点间隔：快照会话空闲超过该时长即尝试刷新快照（不销毁源沙箱）。它降低平台硬回收时的损失窗口，但不是严格 RPO 上限 |
 
 全局默认为 `snapshot` 时必须开 `SNAPSHOT_ENABLED`（否则所有缺省会话创建即失败，服务拒绝启动）；`pvc` 默认 + 能力开关开启 = 会话按需选快照，合法组合。
+
+周期检查点仅覆盖 `state=running` 且持续空闲的沙箱。持续活跃、沙箱内脱离 API 的后台写入、扫描排队、快照耗时及失败重试都会扩大「最新 Ready 快照」之后的数据窗口；关键业务节点仍应显式调用 `POST /session/:id/snapshot` 并等待 Ready。refresh 使用独立的 `snapshot_refresh_operation` 表，避免滚动升级期间旧 worker 把新任务按销毁语义执行。
 
 ### 6.5 SDK 兼容
 
