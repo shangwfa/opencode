@@ -1,0 +1,561 @@
+# Session Sandbox Resource（会话级沙箱资源配置）
+
+> 创建会话时通过 `sandbox: { cpu, memory }` 参数指定沙箱资源。创建沙箱时从会话信息中读取 resource 配置，传入 OpenSandbox SDK 创建对应规格的沙箱。
+>
+> 前置条件：SaaS 服务已启动（`docs/local-test-env.md`），本地 PG + 远端 Sandbox API 可用。
+
+---
+
+## 测试环境
+
+```bash
+# 本地 PG + 远端 Sandbox（参考 docs/local-test-env.md 组合变体）
+# PG 转发 15432 → 127.0.0.1:5432（本地 PG）
+# Sandbox 转发 30040 → 172.18.32.15:30040（远端 K8s Sandbox API）
+BASE=http://localhost:14096
+PG_URL=postgresql://local@127.0.0.1:5432/opencode
+SB_DOMAIN=127.0.0.1:30040
+SB_API_KEY=H68idVYzjadx
+SB_IMAGE=crpi-hlpnu8kiweghie0r.cn-hangzhou.personal.cr.aliyuncs.com/shangwfa/opencode-sandbox:session-lsp-v3
+```
+
+---
+
+## 一、会话创建 — sandbox resource 写入验证
+
+### T29.1 创建带 sandbox resource 的会话 — API + PG 双重验证
+
+```bash
+bun -e '
+const BASE = "http://localhost:14096"
+const PG_URL = "postgresql://local@127.0.0.1:5432/opencode"
+
+// 1. 创建会话，设置 sandbox resource
+const sid = await (await fetch(BASE + "/session", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ sandbox: { cpu: "2", memory: "4Gi" } }),
+})).json()
+console.log("API session.sandbox:", JSON.stringify(sid.sandbox))
+
+// 2. 查 PG 确认持久化
+const { Client } = require("pg")
+const client = new Client({ connectionString: PG_URL })
+await client.connect()
+const { rows } = await client.query("SELECT sandbox FROM session WHERE id = $1", [sid.id])
+await client.end()
+console.log("PG  session.sandbox:", JSON.stringify(rows[0]?.sandbox))
+
+const pass = JSON.stringify(sid.sandbox) === "{\"cpu\":\"2\",\"memory\":\"4Gi\"}"
+  && JSON.stringify(rows[0]?.sandbox) === "{\"cpu\":\"2\",\"memory\":\"4Gi\"}"
+console.log(pass ? "✅ T29.1 PASS" : "❌ T29.1 FAIL")
+'
+```
+**期望**：API 返回和 PG 存储均为 `{"cpu":"2","memory":"4Gi"}`
+
+---
+
+### T29.2 不传 sandbox → null（创建沙箱时使用默认值）
+
+```bash
+bun -e '
+const BASE = "http://localhost:14096"
+const sid = await (await fetch(BASE + "/session", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: "{}",
+})).json()
+console.log("session.sandbox:", sid.sandbox)
+console.log(sid.sandbox === undefined ? "✅ T29.2 PASS — null, 创建沙箱时走默认 {cpu:1,memory:2Gi}" : "❌ T29.2 FAIL")
+'
+```
+**期望**：`sandbox=undefined`
+
+---
+
+### T29.3 无效 cpu → 400
+
+```bash
+curl -s -o /dev/null -w "%{http_code}" -X POST http://localhost:14096/session \
+  -H 'Content-Type: application/json' \
+  -d '{"sandbox":{"cpu":"abc","memory":"4Gi"}}'
+echo ""
+```
+**期望**：HTTP `400`
+
+---
+
+### T29.4 无效 memory → 400
+
+```bash
+curl -s -o /dev/null -w "%{http_code}" -X POST http://localhost:14096/session \
+  -H 'Content-Type: application/json' \
+  -d '{"sandbox":{"cpu":"2","memory":"8gb"}}'
+echo ""
+```
+**期望**：HTTP `400`（`gb` 小写后缀不合法）
+
+---
+
+### T29.5 多资源格式组合
+
+```bash
+bun -e '
+const BASE = "http://localhost:14096"
+const cases = [
+  { cpu: "1",    memory: "2Gi"    },
+  { cpu: "0.5",  memory: "1Gi"    },
+  { cpu: "500m", memory: "512Mi"  },
+  { cpu: "0.25", memory: "256Mi"  },
+  { cpu: "100m", memory: "128Mi"  },
+  { cpu: "4",    memory: "16Gi"   },
+]
+for (const r of cases) {
+  const sid = await (await fetch(BASE + "/session", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ sandbox: r }),
+  })).json()
+  const ok = sid.sandbox?.cpu === r.cpu && sid.sandbox?.memory === r.memory
+  console.log(`${ok ? "✅" : "❌"} cpu=${r.cpu.padEnd(5)} memory=${r.memory.padEnd(8)} → ${JSON.stringify(sid.sandbox)}`)
+}
+'
+```
+**期望**：全部 ✅
+
+---
+
+## 二、从会话读取 resource 创建沙箱 — SDK cgroup 验证
+
+> **核心链路**：创建会话（写入 sandbox 配置）→ `resolveSandboxOpts` 从会话读取 resource → `Sandbox.create({ resource })` → SDK 验证 cgroup 实际限制
+
+### T29.6 从会话读取 resource → 创建沙箱 → SDK 验证
+
+```bash
+bun -e '
+import { ConnectionConfig, Sandbox } from "@alibaba-group/opensandbox"
+import { resolveSandboxOpts } from "../../src/session/sandbox-opts"
+import { Database } from "@opencode-ai/core/database/database"
+
+const BASE = "http://localhost:14096"
+const PG_URL = "postgresql://local@127.0.0.1:5432/opencode"
+const SB_DOMAIN = "127.0.0.1:30040"
+const SB_API_KEY = "H68idVYzjadx"
+const SB_IMAGE = "crpi-hlpnu8kiweghie0r.cn-hangzhou.personal.cr.aliyuncs.com/shangwfa/opencode-sandbox:session-lsp-v3"
+
+// 1. 用户创建会话，设置沙箱资源
+console.log("=== 1. 创建会话 sandbox:{cpu:2,memory:4Gi} ===")
+const sid = await (await fetch(BASE + "/session", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ sandbox: { cpu: "2", memory: "4Gi" } }),
+})).json()
+console.log("sessionID:", sid.id)
+
+// 2. 从会话中读取 sandbox resource（resolveSandboxOpts 代码路径）
+console.log("\n=== 2. resolveSandboxOpts 从会话读取 resource ===")
+Database.setClient(PG_URL) // 初始化 PG 连接
+const opts = await resolveSandboxOpts(sid.id)
+const resource = opts.sandbox ?? { cpu: "1", memory: "2Gi" }
+console.log("resolved resource:", JSON.stringify(resource))
+console.log("from session:", opts.sandbox ? "✅ 使用会话配置" : "⚠️ 会话无配置, 走默认值")
+
+// 3. 用从会话读取的 resource 创建沙箱
+console.log("\n=== 3. 创建沙箱（resource 来自会话）===")
+const cfg = new ConnectionConfig({ domain: SB_DOMAIN, protocol: "http", apiKey: SB_API_KEY, useServerProxy: true })
+const sb = await Sandbox.create({ connectionConfig: cfg, image: SB_IMAGE, timeoutSeconds: 120, resource, readyTimeoutSeconds: 90 })
+console.log("sandboxID:", sb.id)
+
+// 4. SDK 验证沙箱 cgroup 实际限制
+console.log("\n=== 4. SDK 验证 cgroup ===")
+const result = await sb.commands.run(
+  "cat /sys/fs/cgroup/cpu/cpu.cfs_quota_us; cat /sys/fs/cgroup/memory/memory.limit_in_bytes"
+)
+const [cpuQuota, memLimit] = result.logs.stdout.map(m => m.text.trim()).filter(Boolean).map(Number)
+console.log("cpu.cfs_quota_us:", cpuQuota, `(期望 ${Number(resource.cpu) * 100000})`)
+console.log("memory.limit_in_bytes:", memLimit, `(期望 ${Number(resource.memory.replace(/[^0-9]/g, "")) * 1024 ** 3})`)
+
+const cpuOK = cpuQuota === Number(resource.cpu) * 100000
+const memOK = memLimit === Number(resource.memory.replace(/[^0-9]/g, "")) * 1024 ** 3
+console.log("cpu 生效:", cpuOK ? "✅" : "❌")
+console.log("memory 生效:", memOK ? "✅" : "❌")
+
+// 5. 关闭沙箱
+console.log("\n=== 5. 关闭沙箱 ===")
+await sb.kill().catch(() => {})
+await sb.close().catch(() => {})
+console.log(cpuOK && memOK ? "\n✅ T29.6 PASS — 从会话读取 resource, 沙箱 cgroup 精确匹配" : "\n❌ T29.6 FAIL")
+'
+```
+**期望**：
+- `resolveSandboxOpts` 返回会话中存储的 `sandbox`
+- 沙箱 `cpu.cfs_quota_us=200000`、`memory.limit_in_bytes=4294967296`
+- cpu ✅ memory ✅
+
+---
+
+### T29.7 不传 sandbox → 默认 resource → SDK 验证
+
+```bash
+bun -e '
+import { ConnectionConfig, Sandbox } from "@alibaba-group/opensandbox"
+import { resolveSandboxOpts } from "../../src/session/sandbox-opts"
+import { Database } from "@opencode-ai/core/database/database"
+
+const BASE = "http://localhost:14096"
+const PG_URL = "postgresql://local@127.0.0.1:5432/opencode"
+const SB_DOMAIN = "127.0.0.1:30040"
+const SB_API_KEY = "H68idVYzjadx"
+const SB_IMAGE = "crpi-hlpnu8kiweghie0r.cn-hangzhou.personal.cr.aliyuncs.com/shangwfa/opencode-sandbox:session-lsp-v3"
+
+// 创建不带 sandbox 的会话
+const sid = await (await fetch(BASE + "/session", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: "{}",
+})).json()
+
+// resolveSandboxOpts 读不到 sandbox → 走默认值
+Database.setClient(PG_URL)
+const opts = await resolveSandboxOpts(sid.id)
+const resource = opts.sandbox ?? { cpu: "1", memory: "2Gi" }
+console.log("会话无 sandbox 配置 → 默认 resource:", JSON.stringify(resource))
+
+const cfg = new ConnectionConfig({ domain: SB_DOMAIN, protocol: "http", apiKey: SB_API_KEY, useServerProxy: true })
+const sb = await Sandbox.create({ connectionConfig: cfg, image: SB_IMAGE, timeoutSeconds: 120, resource, readyTimeoutSeconds: 90 })
+const result = await sb.commands.run(
+  "cat /sys/fs/cgroup/cpu/cpu.cfs_quota_us; cat /sys/fs/cgroup/memory/memory.limit_in_bytes"
+)
+const [cpuQuota, memLimit] = result.logs.stdout.map(m => m.text.trim()).filter(Boolean).map(Number)
+console.log("cgroup cpu:", cpuQuota, "memory:", memLimit)
+await sb.kill().catch(() => {})
+await sb.close().catch(() => {})
+
+const pass = cpuQuota === 100000 && memLimit === 2147483648
+console.log(pass ? "✅ T29.7 PASS — 默认 {cpu:1,memory:2Gi} 生效" : "❌ T29.7 FAIL")
+'
+```
+**期望**：`cpu.cfs_quota_us=100000`、`memory.limit_in_bytes=2147483648`（默认 1 cpu / 2Gi）
+
+---
+
+### T29.8 多资源组合 → SDK cgroup 精确验证
+
+```bash
+bun -e '
+import { ConnectionConfig, Sandbox } from "@alibaba-group/opensandbox"
+import { resolveSandboxOpts } from "../../src/session/sandbox-opts"
+import { Database } from "@opencode-ai/core/database/database"
+
+const BASE = "http://localhost:14096"
+const PG_URL = "postgresql://local@127.0.0.1:5432/opencode"
+const SB_DOMAIN = "127.0.0.1:30040"
+const SB_API_KEY = "H68idVYzjadx"
+const SB_IMAGE = "crpi-hlpnu8kiweghie0r.cn-hangzhou.personal.cr.aliyuncs.com/shangwfa/opencode-sandbox:session-lsp-v3"
+Database.setClient(PG_URL)
+const cfg = new ConnectionConfig({ domain: SB_DOMAIN, protocol: "http", apiKey: SB_API_KEY, useServerProxy: true })
+
+const cases = [
+  { cpu: "0.5",  memory: "1Gi"    },
+  { cpu: "500m", memory: "512Mi"  },
+  { cpu: "0.25", memory: "256Mi"  },
+  { cpu: "2",    memory: "4Gi"    },
+]
+
+for (const want of cases) {
+  // 1. 创建会话
+  const sid = await (await fetch(BASE + "/session", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ sandbox: want }),
+  })).json()
+
+  // 2. 从会话读取 resource
+  const opts = await resolveSandboxOpts(sid.id)
+  const resource = opts.sandbox
+
+  // 3. 创建沙箱
+  const sb = await Sandbox.create({ connectionConfig: cfg, image: SB_IMAGE, timeoutSeconds: 120, resource, readyTimeoutSeconds: 90 })
+
+  // 4. SDK 验证 cgroup
+  const result = await sb.commands.run(
+    "cat /sys/fs/cgroup/cpu/cpu.cfs_quota_us; cat /sys/fs/cgroup/memory/memory.limit_in_bytes"
+  )
+  const [cpuQuota, memLimit] = result.logs.stdout.map(m => m.text.trim()).filter(Boolean).map(Number)
+
+  const cpuExpected = want.cpu.endsWith("m") ? Number(want.cpu.replace("m", "")) * 100 : Number(want.cpu) * 100000
+  const memUnit = want.memory.replace(/[0-9]/g, "")
+  const memNum = Number(want.memory.replace(/[^0-9]/g, ""))
+  const memMul = { Ki: 1024, Mi: 1024**2, Gi: 1024**3, Ti: 1024**4, K: 1e3, M: 1e6, G: 1e9, T: 1e12 }[memUnit]
+  const memExpected = memNum * memMul
+
+  const ok = cpuQuota === cpuExpected && memLimit === memExpected
+  console.log(`${ok ? "✅" : "❌"} cpu=${want.cpu.padEnd(5)} mem=${want.memory.padEnd(8)} → quota=${cpuQuota}/${cpuExpected} mem=${memLimit}/${memExpected}`)
+
+  await sb.kill().catch(() => {})
+  await sb.close().catch(() => {})
+}
+'
+```
+**期望**：全部 ✅，cgroup 限制精确匹配会话配置
+
+---
+
+## 三、子会话 / fork 继承
+
+### T29.9 子会话自动继承父会话 sandbox resource
+
+```bash
+bun -e '
+const BASE = "http://localhost:14096"
+const parent = await (await fetch(BASE + "/session", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ sandbox: { cpu: "2", memory: "4Gi" } }),
+})).json()
+const child = await (await fetch(BASE + "/session", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ parentID: parent.id }),
+})).json()
+console.log("parent:", JSON.stringify(parent.sandbox))
+console.log("child: ", JSON.stringify(child.sandbox))
+console.log(JSON.stringify(child.sandbox) === "{\"cpu\":\"2\",\"memory\":\"4Gi\"}" ? "✅ T29.9 PASS" : "❌ T29.9 FAIL")
+'
+```
+**期望**：子会话 sandbox 继承父会话配置
+
+---
+
+### T29.10 fork 继承
+
+```bash
+bun -e '
+const BASE = "http://localhost:14096"
+const orig = await (await fetch(BASE + "/session", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ sandbox: { cpu: "2", memory: "4Gi" } }),
+})).json()
+const fork = await (await fetch(`${BASE}/session/${orig.id}/fork`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: "{}",
+})).json()
+console.log("fork:", JSON.stringify(fork.sandbox))
+console.log(JSON.stringify(fork.sandbox) === "{\"cpu\":\"2\",\"memory\":\"4Gi\"}" ? "✅ T29.10 PASS" : "❌ T29.10 FAIL")
+'
+```
+**期望**：fork 继承原会话 sandbox
+
+---
+
+## 四、单元测试
+
+### T29.11 SandboxResource Schema 编解码
+
+```bash
+bun test test/session/sandbox-resource.test.ts --test-name-pattern "SandboxResource schema" 2>&1 | tail -5
+```
+
+### T29.12 cpu/memory 格式校验
+
+```bash
+bun test test/session/sandbox-resource.test.ts --test-name-pattern "format validation" 2>&1 | tail -5
+```
+
+### T29.13 Info / CreateInput / toRow / resource selection
+
+```bash
+bun test test/session/sandbox-resource.test.ts --test-name-pattern "Session.Info|CreateInput|toRow|resource selection" 2>&1 | tail -5
+```
+
+---
+
+## 五、内存不足（OOM）场景 — 可观测性与恢复
+
+> 背景（2026-09-08 线上事故）：会话沙箱 `memory=1Gi` 跑中型前端项目（vite + antd），依赖预构建内存峰值超 cgroup 限额被内核 SIGKILL——**不留任何 stdout/stderr**，外部只看到 proxy 502 / dev server "悄悄死"。排查实锤见 dmesg `oom-kill`。修复后 exec 响应透出 `signal/oomSuspected`、exec_log 记录 `OOMSuspected`、服务端日志打 WARN。
+
+### T29.14 内存不足 OOM → 进程被 SIGKILL → 信号/诊断透出
+
+```bash
+# 1. 创建 512Mi 小内存会话并 boot 沙箱
+SID=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' \
+  -d '{"sandbox":{"cpu":"1","memory":"512Mi"}}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+curl -s -X POST $BASE/session/$SID/keep-alive -H 'Content-Type: application/json' -d '{"enabled":true,"boot":true}' > /dev/null
+sleep 8
+
+# 2. 拉起内存饥饿命令（tail /dev/zero 持续吞内存，确定性触发 cgroup OOM kill；
+#    注意不要追加 `; echo ...`——会覆盖 shell 退出码，signal 解码就失效了）
+cat > /tmp/oom-cmd.json <<'EOF'
+{"command":"tail /dev/zero","timeoutSeconds":25}
+EOF
+curl -s --max-time 60 -X POST $BASE/session/$SID/exec -H 'Content-Type: application/json' -d @/tmp/oom-cmd.json \
+  | python3 -c "import json,sys;d=json.load(sys.stdin);print({k:d.get(k) for k in ['exitCode','signal','oomSuspected']});print('stdout:',repr(d.get('stdout',''))[:80])"
+
+# 3. 服务端日志应有明确 WARN（docker logs 不覆盖 LLM 路径，但 sandbox-provider 的 WARN 可见）
+docker logs opencode-saas-test 2>&1 | grep "likely sandbox memory OOM" | tail -1
+```
+**期望**：
+- 步骤 2：`exitCode=137, signal="SIGKILL", oomSuspected=true`，stdout 仅剩 bash 的 `Killed` 提示（内核直接杀进程，无遗言）
+- 步骤 3：日志含 `command killed by SIGKILL — likely sandbox memory OOM`
+- exec/async 路径：完成后 `GET /exec/:execId` 带 `signal/oomSuspected`，PG exec_log `error` 字段为 `{"name":"OOMSuspected",...}`
+
+> 踩坑记录（2026-09-08 实测）：
+> - `node` 用 `new Array` 吃内存先撞 **V8 堆限制**（SIGABRT/Abort，exitCode 被 shell 掩盖）而非 cgroup；`Buffer.alloc` 在限额边缘挣扎不触发 kill；`dd /dev/shm` 受独立 tmpfs size（64MB）限制，ENOSPC 退出碰不到 cgroup
+> - **`tail /dev/zero` 是确定性触发器**：匿名内存持续暴涨，cgroup v1/v2 下都会被内核 SIGKILL
+
+### T29.15 调整资源 + 重建沙箱 → 恢复
+
+> session.sandbox 创建时固化，调整需 UPDATE + kill-sandbox 重建（PVC 数据保留）。
+
+```bash
+# 1. 上调资源（T29.14 的 SID）
+psql "$PG_URL" -c "UPDATE session SET sandbox='{\"cpu\":\"2\",\"memory\":\"4Gi\",\"persistMode\":\"pvc\"}'::jsonb WHERE id='$SID';"
+curl -s -X POST $BASE/session/$SID/kill-sandbox -H 'Content-Type: application/json' -d '{}'
+
+# 2. 重建 + 受控内存分配（约 1.6GB 堆外，旧 512Mi 限额下必被 OOM 杀、4Gi 应正常完成）
+curl -s -X POST $BASE/session/$SID/keep-alive -H 'Content-Type: application/json' -d '{"enabled":true,"boot":true}' > /dev/null
+sleep 8
+cat > /tmp/mem-ok.json <<'EOF'
+{"command":"node -e \"const a=[]; for(i=0;i<200;i++) a.push(Buffer.alloc(8*1024*1024).fill(i)); console.log('mem-allocated-ok')\"","timeoutSeconds":30}
+EOF
+curl -s --max-time 60 -X POST $BASE/session/$SID/exec -H 'Content-Type: application/json' -d @/tmp/mem-ok.json \
+  | python3 -c "import json,sys;d=json.load(sys.stdin);print('exit:',d.get('exitCode'),'signal:',d.get('signal'),'stdout:',d.get('stdout','').strip())"
+```
+**期望**：`exit=0, signal=None, stdout=mem-allocated-ok`；可选验证 cgroup：`cat /sys/fs/cgroup/memory/memory.limit_in_bytes`（v1）或 `memory.max`（v2）= 4294967296
+
+---
+
+## 六、修改存量会话资源 — PATCH /session/:id
+
+> T29.14/T29.15 的资源调整此前依赖 PG 直改（`UPDATE session SET sandbox=...`）——不可规模化且绕过 API。现提供正式接口：`PATCH /session/:id` 的 payload 新增 `sandbox`（复用创建时的 SandboxResource schema）与 `recreate` 字段。
+>
+> - `sandbox` 单独使用：仅更新配置，**下次创建沙箱时生效**（不动当前实例）
+> - `sandbox` + `recreate: true`：更新配置并立即销毁当前沙箱，下次访问按新资源重建（PVC 数据保留，进程丢失）
+
+### T29.16 PATCH 修改存量会话资源 + recreate 重建验证
+
+```bash
+# 1. 创建 512Mi 会话并 boot
+SID=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' \
+  -d '{"sandbox":{"cpu":"1","memory":"512Mi"}}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+curl -s -X POST $BASE/session/$SID/keep-alive -H 'Content-Type: application/json' -d '{"enabled":true,"boot":true}' > /dev/null
+sleep 8
+curl -s --max-time 15 -X POST $BASE/session/$SID/exec -H 'Content-Type: application/json' \
+  -d '{"command":"cat /sys/fs/cgroup/memory/memory.limit_in_bytes","timeoutSeconds":10}' \
+  | python3 -c "import json,sys;print('before:',round(int(json.load(sys.stdin)['stdout'].strip())/1048576),'MB')"
+
+# 2. PATCH 升级资源 + recreate（销毁当前沙箱）
+curl -s -X PATCH "$BASE/session/$SID" -H 'Content-Type: application/json' \
+  -d '{"sandbox":{"cpu":"2","memory":"4Gi","persistMode":"pvc"},"recreate":true}' \
+  | python3 -c "import json,sys;d=json.load(sys.stdin);print('API sandbox:',json.dumps(d.get('sandbox')))"
+
+# 3. 重建后 cgroup 验证（exec 会自动按新配置 getOrCreate）
+sleep 3
+curl -s -X POST $BASE/session/$SID/keep-alive -H 'Content-Type: application/json' -d '{"enabled":true,"boot":true}' > /dev/null
+sleep 8
+curl -s --max-time 15 -X POST $BASE/session/$SID/exec -H 'Content-Type: application/json' \
+  -d '{"command":"cat /sys/fs/cgroup/memory/memory.limit_in_bytes","timeoutSeconds":10}' \
+  | python3 -c "import json,sys;print('after:',round(int(json.load(sys.stdin)['stdout'].strip())/1048576),'MB')"
+
+# 4. 审计：patch 动作已入 exec_log（source="patch"）
+psql "$PG_URL" -c "SELECT left(command,80) FROM exec_log WHERE session_id='$SID' AND source='patch' ORDER BY time_created DESC LIMIT 1;"
+```
+**期望**：
+- 步骤 1：`before: 512MB`
+- 步骤 2：响应 `sandbox={"cpu":"2","memory":"4Gi","persistMode":"pvc"}`（持久化 ✅），旧沙箱 destroyed
+- 步骤 3：`after: 4096 MB`（新资源生效）
+- 步骤 4：exec_log 有 `{"sandbox":...,"recreate":true}` 审计记录
+
+### T29.17 仅更新配置（不带 recreate）— 当前沙箱不受影响
+
+```bash
+# 当前沙箱（4Gi）运行中，仅改配置为 2Gi → 当前实例不变，下次创建按 2Gi
+curl -s -X PATCH "$BASE/session/$SID" -H 'Content-Type: application/json' \
+  -d '{"sandbox":{"cpu":"1","memory":"2Gi"}}' > /dev/null
+sleep 1
+curl -s --max-time 15 -X POST $BASE/session/$SID/exec -H 'Content-Type: application/json' \
+  -d '{"command":"cat /sys/fs/cgroup/memory/memory.limit_in_bytes","timeoutSeconds":10}' \
+  | python3 -c "import json,sys;print('current cgroup:',round(int(json.load(sys.stdin)['stdout'].strip())/1048576),'MB (应仍为 4096)')"
+psql "$PG_URL" -t -c "SELECT sandbox::text FROM session WHERE id='$SID';"
+```
+**期望**：当前沙箱 cgroup 仍为 4096MB（不受影响）；PG session.sandbox 已更新为 2Gi（下次创建生效）
+
+---
+
+## 结果汇总
+
+| 用例 | 状态 | 说明 |
+|------|------|------|
+| T29.1 | ✅ | 创建带 sandbox 的会话 — API + PG 双重验证 |
+| T29.2 | ✅ | 不传 sandbox → null（走默认值） |
+| T29.3 | ✅ | 无效 cpu → 400 |
+| T29.4 | ✅ | 无效 memory → 400 |
+| T29.5 | ✅ | 多资源格式组合均通过 |
+| T29.6 | ✅ | 从会话读取 resource 创建沙箱 — SDK cgroup 精确匹配 |
+| T29.7 | ✅ | 无配置走默认 {cpu:1,memory:2Gi} — SDK 验证 |
+| T29.8 | ✅ | 多资源组合 SDK cgroup 精确验证（0.5cpu/500m/0.25cpu/2cpu） |
+| T29.9 | ✅ | 子会话自动继承父会话 sandbox |
+| T29.10 | ✅ | fork 继承 |
+| T29.11 | ✅ | Schema 编解码单元测试 |
+| T29.12 | ✅ | 格式校验单元测试（38 用例） |
+| T29.13 | ✅ | Info/CreateInput/toRow 单元测试 |
+| T29.14 | ✅ | 2026-09-08 组合 1（镜像 `oom-diag-v2`）实测：session `ses_f7edeca9affeTOE39fEL0yizqA`（512Mi），`tail /dev/zero` → `{exitCode:137, signal:SIGKILL, oomSuspected:true}` + 本次 WARN 日志。注意：node Array 撞 V8 堆、dd 撞 tmpfs size 都触发不了 cgroup OOM，`tail /dev/zero` 是确定性触发器 |
+| T29.15 | ✅ | 2026-09-08 同环境实测：UPDATE 4Gi + kill-sandbox 重建后 cgroup=4294967296，Buffer 1.6GB 分配 `exit=0 mem-allocated-ok`（旧 512Mi 必死） |
+| T29.16 | ✅ | 2026-09-09 组合 1（镜像 `preview-diag3`）实测：session `ses_f7edeca9affeTOE39fEL0yizqA`，PATCH `{sandbox:2cpu/4Gi, recreate:true}` → PG 持久化 ✅ → 旧沙箱销毁 → 重建后 cgroup=4096MB ✅ → exec_log 审计记录 ✅ |
+| T29.17 | ⏳ | 仅更新配置不带 recreate（当前实例不受影响）——用例已定义，待执行 |
+
+---
+
+## 格式校验规则
+
+| 字段 | 正则 | 合法示例 | 非法示例 |
+|------|------|---------|---------|
+| cpu | `/^\d+(\.\d+)?m?$/` | `1`, `0.5`, `500m`, `0.25` | `abc`, `-1`, `1.5.5`, `.5`, `5.` |
+| memory | `/^\d+(Ki\|Mi\|Gi\|Ti\|K\|M\|G\|T)$/` | `2Gi`, `512Mi`, `1G`, `128Mi` | `8gb`, `1024`, `-1Gi`, `1.5Gi`, `2 G` |
+
+---
+
+## 数据流
+
+```
+用户 POST /session { sandbox: { cpu: "2", memory: "4Gi" } }
+  ↓ Schema 校验 + Session.create → projector 写 PG sandbox 列
+  ↓
+创建沙箱时:
+  resolveSandboxOpts(sessionID)
+    → 沿 parent_id 链找到 root session
+    → 从会话中读取 sandbox = {"cpu":"2","memory":"4Gi"}
+  ↓
+  createSandbox(sessionID)
+    → resource = resolved.sandbox ?? {cpu:"1", memory:"2Gi"}
+    → Sandbox.create({ resource })   ← resource 来自会话
+  ↓
+SDK 验证: cpu.cfs_quota_us=200000 (2 cores), memory.limit_in_bytes=4294967296 (4Gi)
+```
+
+### 继承逻辑
+
+- **子会话**：不传 sandbox 时自动继承父会话配置（沿 parent_id 链 resolve）
+- **fork**：继承原会话 sandbox 配置
+- **默认值**：会话无 sandbox 配置时，使用 `{cpu:"1", memory:"2Gi"}`
+
+---
+
+## 改动文件清单
+
+```
+packages/schema/src/v1/session.ts                        # SessionInfo schema 加 sandbox（事件序列化）
+packages/core/src/session/sql.ts                         # SQLite schema 加 sandbox JSON 列
+packages/core/src/session/projector.ts                   # sessionRow 写入 sandbox
+packages/core/src/database/migration/20260710...ts       # 新 migration: ALTER TABLE session ADD sandbox
+packages/core/src/database/migration.gen.ts              # 注册新 migration
+packages/opencode/src/session/session.pg.ts              # PG schema 加 sandbox JSON 列
+packages/opencode/src/session/session.ts                 # SandboxResource Schema + Info/CreateInput + create/fork
+packages/opencode/src/session/sandbox-opts.ts            # resolveSandboxOpts 返回 sandbox
+packages/opencode/src/session/projectors.ts              # toPartialRow 写入 sandbox
+packages/opencode/src/tool/sandbox-provider.ts           # createSandbox 使用 resolved.sandbox + 默认值
+packages/opencode/src/server/sandbox-proxy.ts            # exec/exec-async 透传 root.sandbox
+packages/opencode/test/session/sandbox-resource.test.ts  # 单元测试（52 个）
+```

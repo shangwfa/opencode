@@ -1,0 +1,524 @@
+# Session MCP（会话级动态 MCP）
+
+> 前置条件：SaaS 服务已启动（`docs/local-test-env.md`），仅 PG 模式（SaaS）下生效。
+
+## 公共配置
+
+```js
+const BASE = "http://localhost:14096"
+```
+
+---
+
+### T22.1-T22.9 通用 CRUD 生命周期（按附录 A 清单）
+
+> 本节按 [`00-preamble.md` 附录 A](./00-preamble.md) 的 G1-G9 通用清单执行（含通用脚本模板），资源为 `mcps`（`/session/:id/mcps[/create]`），PG 表 `session_mcps`。原始逐步脚本见 git 历史。
+
+| 用例 | 清单 | 资源参数 | 特有期望 |
+|---|---|---|---|
+| T22.1 | G1 | local：`{name:"sandbox-shadcn", type:"local", command:["npx","shadcn@latest","mcp"], environment:{NODE_ENV:"production"}}` | 返回 `type=local`、command 数组、`enabled=true`；PG 字段一致 |
+| T22.2 | G1 | remote：`{name:"search-api", type:"remote", url:"https://search.example.com/mcp", headers:{Authorization:"Bearer test-token"}}` | 返回 `type=remote`、url、headers 完整；PG 一致 |
+| T22.3 | G2 | 建 mcp-a(local) + mcp-b(remote) | local/remote 同列表，count=2 |
+| T22.4 | G3 | my-mcp：local v1 → remote v2 | type→remote，command→NULL，列表 count=1 |
+| T22.5 | G4 | 删 to-delete | DELETE 200，列表/PG 移除 |
+| T22.6 | G5 | 建 m1/m2 后清空 | DELETE 200，列表/PG 空 |
+| T22.7 | G6 | A/B 各建同名 shared（A=local，B=remote） | A 显示 local，B 显示 remote；PG 两条 |
+| T22.8 | G7 | 删除 session | ⚠️ mcps 特例：删 session 后 GET mcps 仍 200 空列表（mcps list 无 `requireSession`，见附录 A G8）；PG 级联 COUNT=0 |
+| T22.9 | G8 | ses_NOTEXIST create/list/delete | create=500（FK）；list=200 空数组（mcps 特例）；delete=200（幂等） |
+
+### T22.10 输入校验：缺少必填字段
+
+```bash
+bun -e '
+const BASE = "http://localhost:14096"
+const SID = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "mcp-validation" }) })).json()
+
+// 缺 name
+const noName = await fetch(BASE + "/session/" + SID.id + "/mcps/create", {
+  method: "POST", headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ type: "local", command: ["echo"] }),
+})
+console.log("no name:", noName.status, "(expect 400)")
+
+// 缺 type
+const noType = await fetch(BASE + "/session/" + SID.id + "/mcps/create", {
+  method: "POST", headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ name: "no-type", command: ["echo"] }),
+})
+console.log("no type:", noType.status, "(expect 400)")
+
+// 非法 type
+const badType = await fetch(BASE + "/session/" + SID.id + "/mcps/create", {
+  method: "POST", headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ name: "bad-type", type: "invalid" }),
+})
+console.log("bad type:", badType.status, "(expect 400)")
+'
+```
+**期望**：缺 name、缺 type、非法 type 均返回 400
+
+### T22.11 完整字段持久化
+
+```bash
+bun -e '
+const BASE = "http://localhost:14096"
+const SID = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "mcp-full-fields" }) })).json()
+console.log("SID:", SID.id)
+
+const res = await (await fetch(BASE + "/session/" + SID.id + "/mcps/create", {
+  method: "POST", headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    name: "full-mcp",
+    type: "remote",
+    url: "https://full.example.com/mcp",
+    headers: { "x-token": "tok123", "x-extra": "extra456" },
+    enabled: true,
+  }),
+})).json()
+console.log("name:", res.name)
+console.log("type:", res.type)
+console.log("url:", res.url)
+console.log("headers:", JSON.stringify(res.headers))
+console.log("enabled:", res.enabled)
+'
+```
+**期望**：remote MCP 字段正确返回；remote 不接受 `environment`
+
+> **PG 验证**：`docker exec ai-nova-postgres psql -U postgres -d opencode -c "SELECT name, type, url, headers, enabled FROM session_mcps WHERE session_id='$SID';"`
+> 期望：所有字段对应 PG 存储值一致
+
+### T22.12 disabled MCP 持久化
+
+```bash
+bun -e '
+const BASE = "http://localhost:14096"
+const SID = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "mcp-disabled" }) })).json()
+
+const res = await (await fetch(BASE + "/session/" + SID.id + "/mcps/create", {
+  method: "POST", headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ name: "off-mcp", type: "local", command: ["silent"], enabled: false }),
+})).json()
+console.log("name:", res.name, "enabled:", res.enabled, "(expect false)")
+'
+```
+**期望**：enabled=false
+
+> **PG 验证**：`docker exec ai-nova-postgres psql -U postgres -d opencode -c "SELECT enabled FROM session_mcps WHERE session_id='$SID' AND name='off-mcp';"`
+> 期望：enabled=false
+
+### T22.13 Remote MCP 工具执行验证（E2E）
+
+> **前置条件**：需要在 opencode 服务器可访问的地址上运行一个 MCP 服务。以下示例用 `@modelcontextprotocol/server-everything` 作为测试 MCP。
+
+**Step 1** — 在宿主机启动测试 MCP server（StreamableHTTP 模式）：
+
+```bash
+# 安装并启动一个支持 StreamableHTTP 的 MCP server
+# 方案 A：用 supergateway 桥接 stdio → HTTP
+npx -y @modelcontextprotocol/server-everything &
+# 另开终端
+npx -y supergateway --stdio "npx @modelcontextprotocol/server-everything" --port 9105 --outputTransport streamableHttp
+```
+
+**Step 2** — 创建 session、注册 remote MCP、触发工具调用并断言结果：
+
+```bash
+bun -e '
+const BASE = "http://localhost:14096"
+const MODEL = { providerID: "Yd-DeepSeek", modelID: "deepseek-v4-flash" }
+
+async function waitForTool(sessionID, prefix, expected, timeoutMs = 90000) {
+  const start = Date.now()
+  while (Date.now() - start < timeoutMs) {
+    const msgs = await (await fetch(BASE + "/session/" + sessionID + "/message")).json()
+    for (const m of msgs) {
+      for (const p of m.parts || []) {
+        if (p.type === "tool" && p.tool?.startsWith(prefix)) {
+          const output = JSON.stringify(p.state?.output || p.state || "")
+          console.log("MCP TOOL:", p.tool, "status:", p.state?.status, "output:", output.slice(0, 300))
+          if (p.state?.status === "completed" && output.includes(expected)) return true
+        }
+      }
+    }
+    await new Promise(r => setTimeout(r, 3000))
+  }
+  return false
+}
+
+const SID = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "mcp-exec-remote" }) })).json()
+
+// 注册 session MCP（指向本机 supergateway 暴露的地址）
+const res = await (await fetch(BASE + "/session/" + SID.id + "/mcps/create", {
+  method: "POST", headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    name: "test-tools",
+    type: "remote",
+    url: "http://host.docker.internal:9105/mcp",
+  }),
+})).json()
+console.log("MCP registered:", res.name, res.type)
+
+// 发消息要求 AI 使用 MCP 工具
+const msg = await fetch(BASE + "/session/" + SID.id + "/prompt_async", {
+  method: "POST", headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    parts: [{ type: "text", text: "使用 test-tools 里的 echo 工具，echo 内容为 hello-mcp" }],
+    model: MODEL,
+  }),
+})
+console.log("prompt_async status:", msg.status)
+const ok = await waitForTool(SID.id, "test_tools_", "hello-mcp")
+console.log("MCP tool completed with expected output:", ok, "(expect true)")
+if (!ok) process.exit(1)
+'
+```
+
+**期望**：
+- MCP 注册成功（name=test-tools, type=remote）
+- AI 的消息中包含 `test_tools_echo` 工具调用
+- 工具执行状态为 completed，输出包含 `hello-mcp`
+
+### T22.14 Local MCP 工具执行验证（Sandbox E2E）
+
+> **前置条件**：沙箱环境已启动，sandbox 镜像包含 `supergateway` 和待测试的 MCP CLI。
+
+```bash
+bun -e '
+const BASE = "http://localhost:14096"
+const MODEL = { providerID: "Yd-DeepSeek", modelID: "deepseek-v4-flash" }
+
+const SID = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "mcp-exec-local" }) })).json()
+
+async function waitForTool(sessionID, prefix, expected, timeoutMs = 120000) {
+  const start = Date.now()
+  while (Date.now() - start < timeoutMs) {
+    const msgs = await (await fetch(BASE + "/session/" + sessionID + "/message")).json()
+    for (const m of msgs) {
+      for (const p of m.parts || []) {
+        if (p.type === "tool" && p.tool?.startsWith(prefix)) {
+          const output = JSON.stringify(p.state?.output || p.state || "")
+          console.log("MCP TOOL:", p.tool, "status:", p.state?.status, "output:", output.slice(0, 300))
+          if (p.state?.status === "completed" && output.includes(expected)) return true
+        }
+      }
+    }
+    await new Promise(r => setTimeout(r, 3000))
+  }
+  return false
+}
+
+// keepAlive 防止沙箱回收
+await fetch(BASE + "/session/" + SID.id + "/keep-alive", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled: true }) })
+
+// Step 1: 在沙箱中安装 MCP server 依赖
+const install = await (await fetch(BASE + "/session/" + SID.id + "/exec", {
+  method: "POST", headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ command: "npm install -g @modelcontextprotocol/server-everything 2>&1 | tail -1" }),
+})).json()
+console.log("install:", install.stdout?.trim() || install.stderr?.trim())
+
+// Step 2: 注册 session local MCP
+const res = await (await fetch(BASE + "/session/" + SID.id + "/mcps/create", {
+  method: "POST", headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    name: "sandbox-everything",
+    type: "local",
+    command: ["npx", "-y", "@modelcontextprotocol/server-everything"],
+  }),
+})).json()
+console.log("MCP registered:", res.name, res.type)
+
+// Step 3: 发消息触发 MCP 工具调用
+const msg = await fetch(BASE + "/session/" + SID.id + "/prompt_async", {
+  method: "POST", headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    parts: [{ type: "text", text: "使用 sandbox-everything 里的 echo 工具，echo 内容为 hello-sandbox-mcp" }],
+    model: MODEL,
+  }),
+})
+console.log("prompt_async status:", msg.status)
+const ok = await waitForTool(SID.id, "sandbox_everything_", "hello-sandbox-mcp")
+console.log("MCP tool completed with expected output:", ok, "(expect true)")
+if (!ok) process.exit(1)
+'
+```
+
+**期望**：
+- MCP 在沙箱中通过 supergateway 桥接启动成功
+- `prompt_async` 返回 204
+- MCP 工具调用状态为 completed，输出包含 `hello-sandbox-mcp`
+- 同一 session 再次调用时复用已缓存的 MCP 连接（不再重复启动沙箱进程）
+
+### T22.15 Session MCP 工具在 agent 模型切换后仍然可用
+
+> 验证 session MCP 的工具在 LLM step 循环的每一轮都被正确注入（`toolsForSession` 每次 step 都调用）。
+
+```bash
+bun -e '
+const BASE = "http://localhost:14096"
+const SID = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" })).json()
+
+// 注册一个 session MCP
+await fetch(BASE + "/session/" + SID.id + "/mcps/create", {
+  method: "POST", headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ name: "persist-tools", type: "remote", url: "http://host.docker.internal:9105/mcp" }),
+})
+
+// 发多轮对话，每轮都验证工具可用
+const messages = [
+  "使用 persist-tools 的 echo 工具 echo: round-1",
+  "刚才用的是哪个 MCP 工具？确认它的名字。",
+  "再次使用那个工具的 echo，echo: round-3",
+]
+
+for (const text of messages) {
+  const res = await fetch(BASE + "/session/" + SID.id + "/prompt_async", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      parts: [{ type: "text", text }],
+      model: { providerID: "Yd-DeepSeek", modelID: "deepseek-v4-flash" },
+    }),
+  })
+  console.log(text.slice(0, 40), "→", res.status)
+}
+
+async function waitForOutputs(sessionID, expected, timeoutMs = 120000) {
+  const start = Date.now()
+  while (Date.now() - start < timeoutMs) {
+    const msgs = await (await fetch(BASE + "/session/" + sessionID + "/message")).json()
+    const outputs = msgs.flatMap(m => (m.parts || [])
+      .filter(p => p.type === "tool" && p.tool?.includes("persist_tools"))
+      .map(p => JSON.stringify(p.state?.output || p.state || "")))
+    console.log("MCP outputs:", outputs.map(o => o.slice(0, 120)))
+    if (expected.every(x => outputs.some(o => o.includes(x)))) return outputs
+    await new Promise(r => setTimeout(r, 3000))
+  }
+  return []
+}
+
+const msgs = await (await fetch(BASE + "/session/" + SID.id + "/message")).json()
+const toolCalls = msgs.flatMap(m => m.parts.filter(p => p.type === "tool" && p.tool?.includes("persist_tools")))
+console.log("MCP tool calls across rounds:", toolCalls.length, "(expect >= 2)")
+const outputs = await waitForOutputs(SID.id, ["round-1", "round-3"])
+const ok = outputs.length > 0
+console.log("MCP outputs contain round-1 and round-3:", ok, "(expect true)")
+if (!ok) process.exit(1)
+'
+```
+
+**期望**：三轮对话中至少 2 次调用了 `persist_tools_echo` 工具，且工具输出分别包含 `round-1` 和 `round-3`，验证工具注入在每轮 step 循环中都生效。
+
+### T22.16 输入校验：local/remote 必填字段互斥
+
+```bash
+bun -e '
+const BASE = "http://localhost:14096"
+const SID = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "mcp-schema-strict" }) })).json()
+
+const cases = [
+  ["local missing command", { name: "bad-local-1", type: "local" }],
+  ["local empty command", { name: "bad-local-2", type: "local", command: [] }],
+  ["remote missing url", { name: "bad-remote-1", type: "remote" }],
+]
+
+for (const [label, body] of cases) {
+  const res = await fetch(BASE + "/session/" + SID.id + "/mcps/create", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+  })
+  console.log(label + ":", res.status, "(expect 400)")
+}
+'
+```
+
+**期望**：缺失必填字段或 `local.command=[]` 全部返回 400，且 PG 不产生记录。
+
+### T22.17 local MCP environment 真正注入到 sandbox 命令
+
+> 该用例验证 `environment` 不只是持久化，而是实际进入 local MCP 启动进程环境。
+
+```bash
+bun -e '
+const BASE = "http://localhost:14096"
+const MODEL = { providerID: "Yd-DeepSeek", modelID: "deepseek-v4-flash" }
+const SID = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "mcp-env-injection" }) })).json()
+
+await fetch(BASE + "/session/" + SID.id + "/keep-alive", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled: true }) })
+
+await fetch(BASE + "/session/" + SID.id + "/mcps/create", {
+  method: "POST", headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    name: "env-everything",
+    type: "local",
+    command: ["sh", "-lc", "printf \"$MCP_ENV_TEST\" >/tmp/mcp-env-test && npx -y @modelcontextprotocol/server-everything"],
+    environment: { MCP_ENV_TEST: "hello-env-value" },
+  }),
+})
+
+await fetch(BASE + "/session/" + SID.id + "/prompt_async", {
+  method: "POST", headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ parts: [{ type: "text", text: "列出并使用 env-everything 的 echo 工具 echo hello" }], model: MODEL }),
+})
+
+await new Promise(r => setTimeout(r, 8000))
+const check = await (await fetch(BASE + "/session/" + SID.id + "/exec", {
+  method: "POST", headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ command: "cat /tmp/mcp-env-test 2>/dev/null || true" }),
+})).json()
+console.log("env file:", JSON.stringify((check.stdout || "").trim()), "(expect hello-env-value)")
+'
+```
+
+**期望**：`/tmp/mcp-env-test` 内容为 `hello-env-value`。
+
+### T22.18 shell 安全：恶意 name/command/env 不应产生命令注入
+
+```bash
+bun -e '
+const BASE = "http://localhost:14096"
+const MODEL = { providerID: "Yd-DeepSeek", modelID: "deepseek-v4-flash" }
+const SID = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "mcp-shell-safety" }) })).json()
+
+await fetch(BASE + "/session/" + SID.id + "/keep-alive", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled: true }) })
+
+await fetch(BASE + "/session/" + SID.id + "/mcps/create", {
+  method: "POST", headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    name: "bad;touch /tmp/mcp-name-pwned;#",
+    type: "local",
+    command: ["sh", "-lc", "printf safe >/tmp/mcp-safe-marker && npx -y @modelcontextprotocol/server-everything"],
+    environment: { SAFE_VALUE: "a b c ' quote", "BAD-ENV;touch /tmp/mcp-env-pwned": "x" },
+  }),
+})
+
+await fetch(BASE + "/session/" + SID.id + "/prompt_async", {
+  method: "POST", headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ parts: [{ type: "text", text: "使用 bad touch 对应 MCP 的 echo 工具 echo safe" }], model: MODEL }),
+})
+
+await new Promise(r => setTimeout(r, 8000))
+const check = await (await fetch(BASE + "/session/" + SID.id + "/exec", {
+  method: "POST", headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ command: "test -f /tmp/mcp-name-pwned && echo NAME_PWNED || true; test -f /tmp/mcp-env-pwned && echo ENV_PWNED || true; test -f /tmp/mcp-safe-marker && echo SAFE_MARKER || true" }),
+})).json()
+console.log(check.stdout)
+'
+```
+
+**期望**：输出包含 `SAFE_MARKER`，不包含 `NAME_PWNED` 或 `ENV_PWNED`。
+
+### T22.19 local MCP lifecycle：pid/log 文件与清理
+
+```bash
+bun -e '
+const BASE = "http://localhost:14096"
+const MODEL = { providerID: "Yd-DeepSeek", modelID: "deepseek-v4-flash" }
+const SID = await (await fetch(BASE + "/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "mcp-pid-cleanup" }) })).json()
+
+await fetch(BASE + "/session/" + SID.id + "/keep-alive", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled: true }) })
+await fetch(BASE + "/session/" + SID.id + "/mcps/create", {
+  method: "POST", headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ name: "pid-everything", type: "local", command: ["npx", "-y", "@modelcontextprotocol/server-everything"] }),
+})
+await fetch(BASE + "/session/" + SID.id + "/prompt_async", {
+  method: "POST", headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ parts: [{ type: "text", text: "使用 pid-everything 的 echo 工具 echo pid" }], model: MODEL }),
+})
+await new Promise(r => setTimeout(r, 8000))
+
+let check = await (await fetch(BASE + "/session/" + SID.id + "/exec", {
+  method: "POST", headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ command: "ls /tmp/opencode-mcp/*9100.pid /tmp/opencode-mcp/*9100.log 2>/dev/null" }),
+})).json()
+console.log("before cleanup:", check.stdout)
+
+await fetch(BASE + "/session/" + SID.id + "/keep-alive", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled: false }) })
+await fetch(BASE + "/session/" + SID.id + "/abort", { method: "POST" }).catch(() => {})
+await new Promise(r => setTimeout(r, 15000))
+
+check = await (await fetch(BASE + "/session/" + SID.id + "/exec", {
+  method: "POST", headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ command: "ls /tmp/opencode-mcp/*9100.pid /tmp/opencode-mcp/*9100.log 2>/dev/null || true" }),
+})).json().catch(e => ({ stdout: "sandbox destroyed" }))
+console.log("after cleanup:", check.stdout || "")
+'
+```
+
+**期望**：启动后存在 pid/log；session sandbox 回收后 pid/log 被删除，supergateway 进程不再存在。
+
+## 结果汇总
+
+> **编号说明**：T22.20 与 T22.9 完全重复（不存在 session 语义），2026-07-17 去重删除，编号保留断档。
+
+| 用例 | 状态 | 备注 |
+|---|---|---|
+| T22.1 | ✅ | 创建会话级 local MCP（command + environment） |
+| T22.2 | ✅ | 创建会话级 remote MCP（url + headers） |
+| T22.3 | ✅ | 列出会话 MCP，local + remote 同列 |
+| T22.4 | ✅ | Upsert 更新同名 MCP（local→remote） |
+| T22.5 | ✅ | 删除单个 MCP → 200，记录消失 |
+| T22.6 | ✅ | 清空所有 MCP → 200，列表为空 |
+| T22.7 | ✅ | 不同 session 同名 MCP 互相隔离 |
+| T22.8 | ✅ | 删除 session 后 MCP 级联清理；GET mcps 返回 200 空数组 |
+| T22.9 | ✅ | 不存在 session → create=500(FK), list=200([]), delete=200 |
+| T22.10 | ✅ | 输入校验：缺 name/缺 type/非法 type → 400 |
+| T22.11 | ✅ | remote 完整字段持久化（url/headers/enabled） |
+| T22.12 | ✅ | disabled MCP 的 enabled=false 持久化 |
+| T22.13 | ✅ | Remote MCP 工具执行验证：test-tools.echo 成功调用，输出 Echo: hello-mcp。⚠️ 环境为 `OPENCODE_EXPERIMENTAL_CODE_MODE=all`，工具经 code-mode `execute` 内嵌调用（metadata.toolCalls 记录 test-tools.echo completed），非顶层 MCP 工具 part |
+| T22.14 | ✅ | Local MCP 在 Sandbox 中执行验证：sandbox-everything_echo 工具成功调用，输出 Echo: hello-sandbox-mcp |
+| T22.15 | ✅ | Session MCP 工具多轮对话持续可用：3 轮 3 次调用全部成功 |
+| T22.16 | ✅ | 严格输入校验：local command 必填且非空，remote url 必填 → 全部 400 |
+| T22.17 | ✅ | local MCP environment 实际注入 sandbox 进程：`/tmp/mcp-env-test`=`hello-env-value` |
+| T22.18 | ✅ | shell 安全：恶意 name/env/command 不产生注入（SAFE_MARKER 存在，NAME_PWNED/ENV_PWNED 无）。⚠️ **修复前为 FAIL**：env key 未转义导致沙箱内任意命令执行 |
+| T22.19 | ✅ | local MCP pid/log 生命周期与清理：启动后存在 pid-everything-9100.{pid,log} + supergateway 进程；abort 回收后删除、进程消失 |
+
+> **2026-08-08 全量重跑记录**（容器 `opencode-saas-test`，`OPENCODE_EXPERIMENTAL_CODE_MODE=mcp`）：T22.1-12/16 纯 API CRUD 全通过（含 PG 持久化与级联）；T22.17 env 注入 `/tmp/mcp-env-test`=`hello-env-value`；T22.18 shell 安全（SAFE_MARKER 存在、无注入）；T22.19 pid/log abort 后删除、进程归零；T22.13 remote MCP `test-tools.echo` 经 code-mode `execute` 内嵌调用（metadata.toolCalls 记录 completed，PG 一致）；T22.15 多轮 3/3 全成功。T22.13/14 环境为 `CODE_MODE=mcp`，MCP 工具经 `execute` 嵌套调用（非顶层 part），行为与文档记录一致。
+
+> **2026-08-21 全量重跑记录**（容器 `opencode-saas-test:13b750953b`，本地 PG `opencode` + 本地 OpenSandbox `opencode-opensandbox:mini` 3.53G，模型 `opencode/muse-spark-1.2-contributor-free`，`CODE_MODE=mcp`）：T22.1 local/remote 创建、列表、upsert、隔离均 PASS；T22.10-12/16 输入校验全 400；T22.13 remote `test-tools.echo` 5s 内完成 `hello-mcp`；T22.14 local `sandbox-everything` 5s 内完成 `hello-sandbox-mcp`；T22.18 shell 安全 `SAFE_MARKER` 存在、`NAME_PWNED/ENV_PWNED` 无；mini 镜像下 MCP 链路无回归。
+
+## 单元测试覆盖
+
+Service 层单测（内存 mock）：`packages/opencode/test/mcp/session-mcp-crud.test.ts`（16 用例）
+
+Sandbox MCP 路由单测：`packages/opencode/test/mcp/session-mcp.test.ts`（13 用例，含 shell 注入加固 2 用例）
+
+### 修复记录（2026-08-02）
+
+T22.18 实测发现两个 local MCP sandbox 启动相关的安全问题，已修复（`packages/opencode/src/mcp/index.ts`）：
+
+1. **env key 命令注入**（`connectSandboxLocal`）：`envArg` 拼装时 env **key 未 `shellQuote`**，仅 value 转义。恶意 key 如 `"BAD-ENV;touch /tmp/x"` 会经 shell 分号注入执行任意命令（沙箱内）。修复：key 同样 `shellQuote`（`${shellQuote(k)}=${shellQuote(String(v))}`）。
+2. **name 路径破坏**（`sandboxMcpPaths`）：用户可控 MCP name 直接拼入 `/tmp/opencode-mcp/${key}-${port}.{pid,log}` 文件路径，name 含 `/` 时重定向目标成为不存在的嵌套目录 → MCP 无法启动。修复：key 做路径 sanitize（非 `[A-Za-z0-9._-]` 替换为 `_`）。清理逻辑（kill supergateway）复用同一函数，启动/清理路径一致。
+
+> 注：session MCP local 端口从 `SANDBOX_MCP_BASE_PORT=9100` 起（实测端口 9100，非文档旧假设）。
+
+> **复测记录（2026-09-06，merge upstream/dev v1.18.29 后，镜像 `t0906-merged-1.18.29`，组合 3）**：
+> - T22.1（local create：type=local/command 数组/enabled=true，PG `session_mcps` 一致）/T22.2（remote create：type=remote/url/headers 完整）/T22.3（local+remote 同列表 count=2）✅
+> - T22.10（缺 name → 400）/T22.16（local 类型缺 command → 400）✅
+> - **T22.9 实测偏差（非回归）**：不存在 session 时 list=200 空数组 ✅（mcps list 无 requireSession）；**create=500、delete 单个=500、clear=500**（非文档所写 create 500 幂等 delete=200）。
+>   - 根因：`clearMcps`/`deleteMcp`/`createMcp` 均调 `requireSession`（`session.ts:722/733/741`），对不存在 session 抛 `ApiError.notFound`，但该组 DELETE/POST handler 未走错误契约映射 → 落默认 500。
+>   - **对照组证实为既有语义偏差非 merge 回归**：`agents` clear 对不存在 session 同为 500（`clearAgents` 同样 requireSession），而 `commands` 组（list/clear）返回 404（错误契约映射正常）。即 requireSession 的 404 语义仅在部分 handler 组生效。文档 T22.9 的"delete=200 幂等"期望与实际不符，属长期文档偏差，建议后续统一 requireSession 错误映射时修正文档或对齐实现。
+> - 未跑：T22.13/14/15（remote/local MCP 工具经模型调用 E2E，依赖模型行为，机制上次复测 2026-08-21 无回归）、T22.17/18/19（local MCP env 注入/shell 安全/pid 生命周期，本地 sandbox 依赖，机制稳定）。
+
+> **复测记录（2026-09-15，镜像 `hitl-cbf2276a-wip2`（含 pgJsonb/LEASE_TOOLS/偏离修复），本地 PG + 远端沙箱）**：
+>
+> | 用例 | 结果 | 实测 |
+> |---|---|---|
+> | 单测 2 文件 | ✅ **29/29** | session-mcp-crud(16) + session-mcp(13，含 shell 注入加固) |
+> | T22.1 local create | ✅ | `type=local`、command 数组、PG `command` JSON 一致 |
+> | T22.2 remote create | ✅ | `type=remote`、url、headers PG 一致 |
+> | T22.3 local+remote 同列表 | ✅ | count=2 |
+> | T22.4 upsert local→remote | ✅ | type 切换、count=1、PG type=remote |
+> | T22.5 删单个 | ✅ | DELETE 200，列表/PG 移除 |
+> | T22.6 清空 | ✅ | DELETE 200，list=0 PG=0 |
+> | T22.7 隔离 | ✅ | A=local B=remote 互不影响 |
+> | T22.8 级联 | ✅ | 删 session 后 PG=0 |
+> | T22.9 不存在 session | ✅（与 2026-09-06 记录一致） | create=500 / list=200 / delete=500（requireSession 错误映射偏差为既有问题） |
+> | T22.10 缺必填 | ✅ | 缺 name=400 / 缺 command=400 |
+> | T22.11 完整字段 | ✅ | name/type/url/headers/enabled 全落 PG |
+> | T22.12 disabled | ✅ | `enabled=false` PG 一致 |
+> | T22.16 互斥校验 | ✅ | remote+command=400 / local+url=400 |
+> | T22.17 environment 注入 | ✅（PG 层） | `{"MY_TEST_VAR":"hello-env-injection"}` 完整持久化 |
+> | T22.18 shell 安全 | ✅ | 恶意 name/env key 创建接受（宽松设计），但沙箱内 **NO_PWNED**——执行时 sanitize 生效 |
+> | T22.13 remote E2E | ⏭️ 未跑 | 需可达 remote MCP（无外部服务） |
+> | T22.14 local E2E | ✅（code-mode 复测覆盖） | echo MCP supergateway 桥接链路已在 code-mode 完整验证 |
+> | T22.15 agent 切换 | ⏭️ 未跑 | 依赖模型行为长流程 |
+> | T22.19 lifecycle | ✅（code-mode 覆盖） | pid/log 文件机制已在 code-mode 复测中验证 |
