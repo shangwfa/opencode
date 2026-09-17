@@ -62,14 +62,15 @@ export interface Interface {
   readonly ask: (input: {
     sessionID: SessionID
     questions: ReadonlyArray<Info>
+    userId?: string
     tool?: Tool
   }) => Effect.Effect<ReadonlyArray<Answer>, RejectedError>
-  readonly reply: (input: {
-    requestID: QuestionID
-    answers: ReadonlyArray<Answer>
-  }) => Effect.Effect<void, NotFoundError | ConflictError>
-  readonly reject: (requestID: QuestionID) => Effect.Effect<void, NotFoundError | ConflictError>
-  readonly list: () => Effect.Effect<ReadonlyArray<Request>>
+  readonly reply: (
+    input: { requestID: QuestionID; answers: ReadonlyArray<Answer> },
+    userID?: string,
+  ) => Effect.Effect<void, NotFoundError | ConflictError>
+  readonly reject: (requestID: QuestionID, userID?: string) => Effect.Effect<void, NotFoundError | ConflictError>
+  readonly list: (userID?: string) => Effect.Effect<ReadonlyArray<Request>>
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/Question") {}
@@ -144,6 +145,7 @@ const layer = Layer.effect(
     const ask = Effect.fn("Question.ask")(function* (input: {
       sessionID: SessionID
       questions: ReadonlyArray<Info>
+      userId?: string
       tool?: Tool
     }) {
       const pending = (yield* InstanceState.get(state)).pending
@@ -180,6 +182,7 @@ const layer = Layer.effect(
                   id: id as string,
                   kind: "question",
                   directory,
+                  userID: input.userId ?? "",
                   sessionID: input.sessionID as string,
                   ownerID,
                   payload: info as unknown as Record<string, unknown>,
@@ -203,10 +206,13 @@ const layer = Layer.effect(
       )
     })
 
-    const reply = Effect.fn("Question.reply")(function* (input: {
-      requestID: QuestionID
-      answers: ReadonlyArray<Answer>
-    }) {
+    const reply = Effect.fn("Question.reply")(function* (
+      input: {
+        requestID: QuestionID
+        answers: ReadonlyArray<Answer>
+      },
+      userID?: string,
+    ) {
       const pending = (yield* InstanceState.get(state)).pending
       const existing = pending.get(input.requestID)
 
@@ -217,7 +223,7 @@ const layer = Layer.effect(
           result: { answers: input.answers as unknown as unknown[] },
         }
         const outcome = yield* Effect.tryPromise({
-          try: () => HitlStore.casTransition(input.requestID as string, "question", directory, transition),
+          try: () => HitlStore.casTransition(input.requestID as string, "question", directory, transition, userID),
           catch: (error) => new Error(`hitl reply cas failed: ${String(error)}`),
         }).pipe(Effect.orDie)
         const row = outcome.updated ?? outcome.current
@@ -261,7 +267,7 @@ const layer = Layer.effect(
       yield* Deferred.succeed(existing.deferred, input.answers)
     })
 
-    const reject = Effect.fn("Question.reject")(function* (requestID: QuestionID) {
+    const reject = Effect.fn("Question.reject")(function* (requestID: QuestionID, userID?: string) {
       const pending = (yield* InstanceState.get(state)).pending
       const existing = pending.get(requestID)
 
@@ -269,7 +275,7 @@ const layer = Layer.effect(
         const directory = yield* InstanceState.directory
         const transition = { status: "rejected" as const }
         const outcome = yield* Effect.tryPromise({
-          try: () => HitlStore.casTransition(requestID as string, "question", directory, transition),
+          try: () => HitlStore.casTransition(requestID as string, "question", directory, transition, userID),
           catch: (error) => new Error(`hitl reject cas failed: ${String(error)}`),
         }).pipe(Effect.orDie)
         const row = outcome.updated ?? outcome.current
@@ -301,11 +307,11 @@ const layer = Layer.effect(
       yield* Deferred.fail(existing.deferred, new RejectedError())
     })
 
-    const list = Effect.fn("Question.list")(function* () {
+    const list = Effect.fn("Question.list")(function* (userID?: string) {
       if (HitlStore.enabled()) {
         const directory = yield* InstanceState.directory
         const rows = yield* Effect.tryPromise({
-          try: () => HitlStore.listPending("question", directory),
+          try: () => HitlStore.listPending("question", directory, userID ?? ""),
           catch: (error) => new Error(`hitl list failed: ${String(error)}`),
         }).pipe(
           Effect.tapError((error) => Effect.logError("question HITL list failed", { directory, error: String(error) })),

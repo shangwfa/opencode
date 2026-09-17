@@ -22,6 +22,7 @@ export interface Row {
   id: string
   kind: Kind
   directory: string
+  user_id: string
   session_id: string
   owner_id: string
   status: Status
@@ -37,6 +38,8 @@ export interface NewPending {
   id: string
   kind: Kind
   directory: string
+  /** 发起身份（'' = 公共/匿名）；列表与回复按此隔离租户 */
+  userID: string
   sessionID: string
   ownerID: string
   payload: Record<string, unknown>
@@ -76,6 +79,7 @@ export const insertPending = (input: NewPending) =>
         id: input.id,
         kind: input.kind,
         directory: input.directory,
+        user_id: input.userID,
         session_id: input.sessionID,
         owner_id: input.ownerID,
         status: "pending",
@@ -111,7 +115,11 @@ export async function casTransition(
   kind: Kind,
   directory: string,
   set: Transition,
+  userID?: string,
 ): Promise<TransitionOutcome> {
+  // userID 存在时限定归属：跨租户提交与不存在同为「查不到」（防枚举）。
+  // 内部善后（salvage/cascade）不传，保持跨用户清扫能力。
+  const ownerScope = userID === undefined ? [] : [eq(HitlRequestTable.user_id, userID)]
   return Database.use(async (db) => {
     const updated = await db
       .update(HitlRequestTable)
@@ -127,6 +135,7 @@ export async function casTransition(
           eq(HitlRequestTable.kind, kind),
           eq(HitlRequestTable.directory, directory),
           eq(HitlRequestTable.status, "pending"),
+          ...ownerScope,
         ),
       )
       .returning()
@@ -136,7 +145,12 @@ export async function casTransition(
       .select()
       .from(HitlRequestTable)
       .where(
-        and(eq(HitlRequestTable.id, id), eq(HitlRequestTable.kind, kind), eq(HitlRequestTable.directory, directory)),
+        and(
+          eq(HitlRequestTable.id, id),
+          eq(HitlRequestTable.kind, kind),
+          eq(HitlRequestTable.directory, directory),
+          ...ownerScope,
+        ),
       )
       .limit(1)
       .all()
@@ -182,7 +196,7 @@ export async function changed(ids: string[], ownerID: string, directory: string)
   ).map(rowify)
 }
 
-export async function listPending(kind: Kind, directory: string): Promise<Row[]> {
+export async function listPending(kind: Kind, directory: string, userID: string): Promise<Row[]> {
   return (
     await Database.use((db) =>
       db
@@ -192,6 +206,7 @@ export async function listPending(kind: Kind, directory: string): Promise<Row[]>
           and(
             eq(HitlRequestTable.kind, kind),
             eq(HitlRequestTable.directory, directory),
+            eq(HitlRequestTable.user_id, userID),
             eq(HitlRequestTable.status, "pending"),
           ),
         )

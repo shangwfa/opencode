@@ -805,6 +805,55 @@ it.instance(
 )
 
 it.instance(
+  "always approvals are shared across sessions of the same user but isolated between users",
+  () =>
+    Effect.gen(function* () {
+      // 同用户 u1：session_test 的 always 批准应覆盖其另一会话（既有便利特性）
+      const fiber = yield* ask({
+        id: PermissionV1.ID.make("per_user_a"),
+        sessionID: SessionID.make("session_u1_a"),
+        permission: "bash",
+        patterns: ["ls"],
+        metadata: {},
+        always: ["ls"],
+        ruleset: [],
+        userId: "u1",
+      }).pipe(Effect.forkScoped)
+      yield* waitForPending(1)
+      yield* reply({ requestID: PermissionV1.ID.make("per_user_a"), reply: "always" })
+      yield* Fiber.join(fiber)
+
+      const sameUser = yield* ask({
+        sessionID: SessionID.make("session_u1_b"),
+        permission: "bash",
+        patterns: ["ls"],
+        metadata: {},
+        always: [],
+        ruleset: [],
+        userId: "u1",
+      })
+      expect(sameUser).toBeUndefined()
+
+      // 跨用户 u2：不得继承 u1 的批准，须重新挂起
+      const otherUser = yield* ask({
+        id: PermissionV1.ID.make("per_user_b"),
+        sessionID: SessionID.make("session_u2_a"),
+        permission: "bash",
+        patterns: ["ls"],
+        metadata: {},
+        always: [],
+        ruleset: [],
+        userId: "u2",
+      }).pipe(Effect.forkScoped)
+      yield* waitForPending(1)
+      yield* reply({ requestID: PermissionV1.ID.make("per_user_b"), reply: "reject" })
+      const exit = yield* Fiber.await(otherUser)
+      expect(Exit.isFailure(exit)).toBe(true)
+    }),
+  { git: true },
+)
+
+it.instance(
   "reply - reject cancels all pending for same session",
   () =>
     Effect.gen(function* () {

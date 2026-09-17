@@ -24,18 +24,24 @@ export const Event = PermissionV1.Event
 
 export interface Interface {
   readonly ask: (input: PermissionV1.AskInput) => Effect.Effect<void, PermissionV1.Error>
-  readonly reply: (input: PermissionV1.ReplyInput) => Effect.Effect<void, PermissionV1.NotFoundError | ConflictError>
-  readonly list: () => Effect.Effect<ReadonlyArray<PermissionV1.Request>>
+  readonly reply: (
+    input: PermissionV1.ReplyInput,
+    userID?: string,
+  ) => Effect.Effect<void, PermissionV1.NotFoundError | ConflictError>
+  readonly list: (userID?: string) => Effect.Effect<ReadonlyArray<PermissionV1.Request>>
 }
 
 interface PendingEntry {
   info: PermissionV1.Request
+  /** 发起身份（'' = 公共/匿名）：always 批准按此分桶，同用户跨会话共享、跨用户隔离 */
+  userId: string
   deferred: Deferred.Deferred<void, PermissionV1.RejectedError | PermissionV1.CorrectedError>
 }
 
 interface State {
   pending: Map<PermissionV1.ID, PendingEntry>
-  approved: PermissionV1.Rule[]
+  /** always 批准，按 userId 分桶：同用户的多会话共享，跨用户隔离（SaaS 多租户） */
+  approved: Map<string, PermissionV1.Rule[]>
 }
 
 export function evaluate(permission: string, pattern: string, ...rulesets: PermissionV1.Ruleset[]): PermissionV1.Rule {
@@ -111,7 +117,7 @@ const layer = Layer.effect(
       Effect.fn("Permission.state")(function* (ctx) {
         const value = {
           pending: new Map<PermissionV1.ID, PendingEntry>(),
-          approved: [] as PermissionV1.Rule[],
+          approved: new Map<string, PermissionV1.Rule[]>(),
         }
 
         yield* Effect.addFinalizer(() =>
@@ -141,13 +147,15 @@ const layer = Layer.effect(
               const reply = row.result?.["reply"]
               if (row.status === "replied" && (reply === "once" || reply === "always")) {
                 if (reply === "always") {
-                  value.approved.push(
+                  const rules = value.approved.get(entry.userId) ?? []
+                  rules.push(
                     ...entry.info.always.map((pattern) => ({
                       permission: entry.info.permission,
                       pattern,
                       action: "allow" as const,
                     })),
                   )
+                  value.approved.set(entry.userId, rules)
                 }
                 yield* Deferred.succeed(entry.deferred, undefined)
                 continue
@@ -190,7 +198,7 @@ const layer = Layer.effect(
       let needsAsk = false
 
       for (const pattern of request.patterns) {
-        const rule = evaluate(request.permission, pattern, ruleset, approved)
+        const rule = evaluate(request.permission, pattern, ruleset, approved.get(request.userId ?? "") ?? [])
         yield* Effect.logInfo("evaluated", { permission: request.permission, pattern, action: rule })
         if (rule.action === "deny") {
           yield* recordDenial(request, `${request.permission}: ${rule.pattern}`)
@@ -239,7 +247,7 @@ const layer = Layer.effect(
         // Register locally BEFORE the PG row becomes visible: replies and
         // same-session cascades resolve deferreds through this map, so a PG
         // row must never be observable before its local entry exists.
-        pending.set(id, { info, deferred })
+        pending.set(id, { info, userId: request.userId ?? "", deferred })
         if (HitlStore.enabled()) {
           const directory = yield* InstanceState.directory
           const inserted = yield* Effect.tryPromise({
@@ -249,6 +257,7 @@ const layer = Layer.effect(
                   id: id as string,
                   kind: "permission",
                   directory,
+                  userID: request.userId ?? "",
                   sessionID: request.sessionID as string,
                   ownerID: hitlOwnerID,
                   payload: info as unknown as Record<string, unknown>,
@@ -272,7 +281,7 @@ const layer = Layer.effect(
       )
     })
 
-    const reply = Effect.fn("Permission.reply")(function* (input: PermissionV1.ReplyInput) {
+    const reply = Effect.fn("Permission.reply")(function* (input: PermissionV1.ReplyInput, userID?: string) {
       const { approved, pending } = yield* InstanceState.get(state)
       const existing = pending.get(input.requestID)
 
@@ -295,6 +304,7 @@ const layer = Layer.effect(
                 "permission",
                 directory,
                 transition,
+                userID,
               )
               if (outcome.updated === undefined) return { outcome, cascaded: [] as HitlStore.Row[] }
 
@@ -382,13 +392,15 @@ const layer = Layer.effect(
             continue
           }
           if (item.id === row.id && reply === "always") {
-            approved.push(
+            const rules = approved.get(local.userId) ?? []
+            rules.push(
               ...local.info.always.map((pattern) => ({
                 permission: local.info.permission,
                 pattern,
                 action: "allow" as const,
               })),
             )
+            approved.set(local.userId, rules)
           }
           yield* Deferred.succeed(local.deferred, undefined)
         }
@@ -428,18 +440,20 @@ const layer = Layer.effect(
       yield* Deferred.succeed(existing.deferred, undefined)
       if (input.reply === "once") return
 
+      const sessionApproved = approved.get(existing.userId) ?? []
       for (const pattern of existing.info.always) {
-        approved.push({
+        sessionApproved.push({
           permission: existing.info.permission,
           pattern,
           action: "allow",
         })
       }
+      approved.set(existing.userId, sessionApproved)
 
       for (const [id, item] of pending.entries()) {
         if (item.info.sessionID !== existing.info.sessionID) continue
         const ok = item.info.patterns.every(
-          (pattern) => evaluate(item.info.permission, pattern, approved).action === "allow",
+          (pattern) => evaluate(item.info.permission, pattern, approved.get(existing.userId) ?? []).action === "allow",
         )
         if (!ok) continue
         pending.delete(id)
@@ -452,11 +466,11 @@ const layer = Layer.effect(
       }
     })
 
-    const list = Effect.fn("Permission.list")(function* () {
+    const list = Effect.fn("Permission.list")(function* (userID?: string) {
       if (HitlStore.enabled()) {
         const directory = yield* InstanceState.directory
         const rows = yield* Effect.tryPromise({
-          try: () => HitlStore.listPending("permission", directory),
+          try: () => HitlStore.listPending("permission", directory, userID ?? ""),
           catch: (error) => new Error(`hitl list failed: ${String(error)}`),
         }).pipe(
           Effect.tapError((error) =>

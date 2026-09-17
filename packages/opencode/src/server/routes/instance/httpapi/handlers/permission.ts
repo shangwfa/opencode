@@ -1,7 +1,9 @@
 import { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import { Permission } from "@/permission"
+import { getRequestUserId } from "@/auth/request-user"
 import { Effect } from "effect"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
+import { HttpServerRequest } from "effect/unstable/http"
 import { InstanceHttpApi } from "../api"
 import { ConflictError, PermissionNotFoundError } from "../errors"
 
@@ -10,19 +12,24 @@ export const permissionHandlers = HttpApiBuilder.group(InstanceHttpApi, "permiss
     const svc = yield* Permission.Service
 
     const list = Effect.fn("PermissionHttpApi.list")(function* () {
-      return yield* svc.list()
+      const request = yield* HttpServerRequest.HttpServerRequest
+      return yield* svc.list(getRequestUserId(request.headers))
     })
 
     const reply = Effect.fn("PermissionHttpApi.reply")(function* (ctx: {
       params: { requestID: PermissionV1.ID }
       payload: PermissionV1.ReplyBody
     }) {
+      const request = yield* HttpServerRequest.HttpServerRequest
       yield* svc
-        .reply({
-          requestID: ctx.params.requestID,
-          reply: ctx.payload.reply,
-          message: ctx.payload.message,
-        })
+        .reply(
+          {
+            requestID: ctx.params.requestID,
+            reply: ctx.payload.reply,
+            message: ctx.payload.message,
+          },
+          getRequestUserId(request.headers),
+        )
         .pipe(
           Effect.catchTag("Permission.NotFoundError", (error) =>
             Effect.fail(

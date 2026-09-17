@@ -30,6 +30,7 @@ type FixtureRow = {
   id: string
   kind?: HitlStore.Kind
   directory?: string
+  userID?: string
   sessionID?: string
   ownerID?: string
   status?: HitlStore.Status
@@ -47,12 +48,13 @@ async function insertRow(row: FixtureRow) {
   // scalar instead of the object.
   await fixtureDb.unsafe(
     `INSERT INTO hitl_request (
-       id, kind, directory, session_id, owner_id, status, payload, result, close_reason, lease_until, time_created, time_updated
-     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+       id, kind, directory, user_id, session_id, owner_id, status, payload, result, close_reason, lease_until, time_created, time_updated
+     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
     [
       row.id,
       row.kind ?? "question",
       row.directory ?? DIRECTORY,
+      row.userID ?? "",
       row.sessionID ?? `ses_${row.id}`,
       row.ownerID ?? "owner-test",
       row.status ?? "pending",
@@ -91,6 +93,7 @@ describe("HitlStore.sameTransition", () => {
     id: "que_x",
     kind: "question",
     directory: DIRECTORY,
+    user_id: "",
     session_id: "ses_x",
     owner_id: "owner",
     status: "replied",
@@ -209,7 +212,7 @@ describe.skipIf(!enabled)("HitlStore PostgreSQL", () => {
       const rid = id("que_limit")
       rowIDs.push(rid)
       const ok = await HitlStore.insertPendingLimited(
-        { id: rid, kind: "question", directory: DIRECTORY, sessionID, ownerID: "owner-a", payload: {} },
+        { id: rid, kind: "question", directory: DIRECTORY, userID: "", sessionID, ownerID: "owner-a", payload: {} },
         3,
       )
       expect(ok).toBe(true)
@@ -217,7 +220,7 @@ describe.skipIf(!enabled)("HitlStore PostgreSQL", () => {
     const over = id("que_limit_over")
     rowIDs.push(over)
     const ok = await HitlStore.insertPendingLimited(
-      { id: over, kind: "question", directory: DIRECTORY, sessionID, ownerID: "owner-a", payload: {} },
+      { id: over, kind: "question", directory: DIRECTORY, userID: "", sessionID, ownerID: "owner-a", payload: {} },
       3,
     )
     expect(ok).toBe(false)
@@ -233,7 +236,7 @@ describe.skipIf(!enabled)("HitlStore PostgreSQL", () => {
     const results = await Promise.all(
       ids.map((rid) =>
         HitlStore.insertPendingLimited(
-          { id: rid, kind: "question", directory: DIRECTORY, sessionID, ownerID: "owner-a", payload: {} },
+          { id: rid, kind: "question", directory: DIRECTORY, userID: "", sessionID, ownerID: "owner-a", payload: {} },
           limit,
         ).catch(() => false),
       ),
@@ -248,7 +251,7 @@ describe.skipIf(!enabled)("HitlStore PostgreSQL", () => {
     rowIDs.push(ridA)
     expect(
       await HitlStore.insertPendingLimited(
-        { id: ridA, kind: "question", directory: DIRECTORY, sessionID: sessionA, ownerID: "owner-a", payload: {} },
+        { id: ridA, kind: "question", directory: DIRECTORY, userID: "", sessionID: sessionA, ownerID: "owner-a", payload: {} },
         1,
       ),
     ).toBe(true)
@@ -256,7 +259,7 @@ describe.skipIf(!enabled)("HitlStore PostgreSQL", () => {
     rowIDs.push(ridB)
     expect(
       await HitlStore.insertPendingLimited(
-        { id: ridB, kind: "question", directory: DIRECTORY, sessionID: sessionB, ownerID: "owner-a", payload: {} },
+        { id: ridB, kind: "question", directory: DIRECTORY, userID: "", sessionID: sessionB, ownerID: "owner-a", payload: {} },
         1,
       ),
     ).toBe(true)
@@ -423,5 +426,49 @@ describe.skipIf(!enabled)("HitlStore PostgreSQL", () => {
     expect(await fetchRow(oldTerminal)).toBeUndefined()
     expect((await fetchRow(freshTerminal))?.status).toBe("closed")
     expect((await fetchRow(oldPending))?.status).toBe("pending")
+  })
+test("listPending scopes rows by requesting user", async () => {
+    const sessionID = await createSession()
+    const mine = id("que_iso_mine")
+    const theirs = id("que_iso_theirs")
+    const anon = id("que_iso_anon")
+    rowIDs.push(mine, theirs, anon)
+    await insertRow({ id: mine, sessionID, userID: "user-a" })
+    await insertRow({ id: theirs, sessionID, userID: "user-b" })
+    await insertRow({ id: anon, sessionID, userID: "" })
+
+    const forA = await HitlStore.listPending("question", DIRECTORY, "user-a")
+    expect(forA.map((row) => row.id)).toEqual([mine])
+    const forB = await HitlStore.listPending("question", DIRECTORY, "user-b")
+    expect(forB.map((row) => row.id)).toEqual([theirs])
+    const forAnonymous = await HitlStore.listPending("question", DIRECTORY, "")
+    expect(forAnonymous.map((row) => row.id)).toEqual([anon])
+  })
+
+  test("casTransition rejects cross-user replies but keeps internal salvage unfiltered", async () => {
+    const sessionID = await createSession()
+    const theirs = id("que_iso_cas")
+    rowIDs.push(theirs)
+    await insertRow({ id: theirs, sessionID, userID: "user-b" })
+
+    // 跨用户回复：与不存在同语义（返回空 outcome，调用方映射 NotFound，防枚举）
+    const blocked = await HitlStore.casTransition(theirs, "question", DIRECTORY, { status: "replied" }, "user-a")
+    expect(blocked.updated).toBeUndefined()
+    expect(blocked.current).toBeUndefined()
+    expect((await fetchRow(theirs))?.status).toBe("pending")
+
+    // 内部善后（不传 userID）仍可处理任意归属的行
+    const salvaged = await HitlStore.casTransition(theirs, "question", DIRECTORY, {
+      status: "closed",
+      closeReason: "instance-restart",
+    })
+    expect(salvaged.updated?.status).toBe("closed")
+
+    // 归属校验不破坏同用户正常回复
+    const okRow = id("que_iso_ok")
+    rowIDs.push(okRow)
+    await insertRow({ id: okRow, sessionID, userID: "user-a" })
+    const done = await HitlStore.casTransition(okRow, "question", DIRECTORY, { status: "replied" }, "user-a")
+    expect(done.updated?.status).toBe("replied")
   })
 })

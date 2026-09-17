@@ -24,6 +24,9 @@ export const QuestionTool = Tool.define<typeof Parameters, Metadata, Question.Se
           const answers = yield* question.ask({
             sessionID: ctx.sessionID,
             questions: params.questions,
+            // 发起身份随 HITL 行落库（列表/回复按 x-user-id 隔离）
+            userId: (ctx.messages.findLast((message) => message.info.role === "user")?.info as { userId?: string })
+              ?.userId,
             tool: ctx.callID ? { messageID: ctx.messageID, callID: ctx.callID } : undefined,
           })
 

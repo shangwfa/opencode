@@ -646,7 +646,13 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       payload: typeof PermissionResponsePayload.Type
     }) {
       yield* requireSession(ctx.params.sessionID)
-      yield* permissionSvc.reply({ requestID: ctx.params.permissionID, reply: ctx.payload.response }).pipe(
+      const permRequest = yield* HttpServerRequest.HttpServerRequest
+      yield* permissionSvc
+        .reply(
+          { requestID: ctx.params.permissionID, reply: ctx.payload.response },
+          getRequestUserId(permRequest.headers),
+        )
+        .pipe(
         Effect.catchTag("Permission.NotFoundError", (error) =>
           Effect.fail(
             new PermissionNotFoundError({

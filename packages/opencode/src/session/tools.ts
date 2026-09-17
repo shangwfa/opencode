@@ -124,6 +124,10 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
           .ask({
             ...req,
             sessionID: input.session.id,
+            // 发起身份随 HITL 行落库：列表/回复按 x-user-id 隔离租户；
+            // 与 llm.ts 取最后一条 user 消息 userId 的口径一致。
+            userId: (input.messages.findLast((message) => message.info.role === "user")?.info as { userId?: string })
+              ?.userId,
             tool: { messageID: input.processor.message.id, callID: options.toolCallId },
             ruleset: Permission.merge(input.agent.permission, input.session.permission ?? []),
           })
