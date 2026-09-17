@@ -98,7 +98,7 @@ const AppMemoryTable = pgTable("app_memory", {
 
 - **topic 唯一 = 防膨胀与防矛盾的核心**：同一主题（如 `build.command`）同 app 只有一条，复验产出的新结论 `upsert` 覆盖旧条目，而不是追加（追加会产生自相矛盾的记忆对）。
 - **status 状态机**：`candidate`（提炼待验证）→ `verified`（沙箱复验通过，可进注入索引）；任一条目 `head` 落后项目当前 HEAD → 标 `stale`（读路径展示但降权，懒复验后恢复 `verified`）；被新条目覆盖时旧状态写 `superseded` 保留一版溯源。
-- **`verified_count` 语义（借鉴 hermes curator 对 use_count 的教训）**：count 只用于**排序与衰减**，不用于**准入**——准入唯一条件是复验通过（`status=verified`）。低频 app 的第一条经验可能长期等不到第二次触发，若设「count≥N 才注入」门槛会把它们永久埋没；同理，「count=0」也不是删除/降权的理由，stale 判定只看 HEAD 与复验时间。
+- **`verified_count` 语义（hermes use_count 教训 + ModularRSI 多任务投票）**：count 统计「**多少个独立 session 提供支持证据**」（evidence.session_id 去重计数），而非复验次数——多任务投票比重复计数更抗噪声。count 只用于**排序与衰减**，不用于**准入**：准入唯一条件是复验通过（`status=verified`）。低频 app 的第一条经验可能长期等不到第二次触发，若设「count≥N 才注入」门槛会把它们永久埋没；同理，「count=0」也不是删除/降权的理由，stale 判定只看 HEAD 与复验时间。
 - 表设计对齐代码风格：字段名 snake_case、列名不重复定义（AGENTS.md Drizzle 规则）、迁移走 `migration-pg/<ts>_app_memory/migration.sql`。
 
 ### 2. 写路径：三处触发点，全部复用现有机制
@@ -121,12 +121,23 @@ const AppMemoryTable = pgTable("app_memory", {
 
 某 appId 的首个 session（该 app_id 在 app_memory 表中无 `verified` 条目）结束且空闲时执行一次「环境普查」：探测构建/测试/lint 命令、目录结构、依赖特征，沉淀为 `fact.*` 条目——对应 RSIAgent 的 broad-then-deep 中的 broad；后续 session 的失败教训逐步沉淀深水区规律（deep）。
 
+**④ 同 appId 轨迹分组提炼（借鉴 ModularRSI 三组分类，V2）**
+
+idle 提炼扫描到多个同 appId session 时，按结果分组并采用差异化提炼策略——**对比提炼的质量高于单侧诊断**：
+
+- **Contrastive 组**（同类任务有成功有失败）：成功/失败轨迹成对对比，定位导致分野的具体行为差异——最高质量信号，优先提炼
+- **Negative 组**（全失败）：先查该 appId 历史成功轨迹（app_memory.evidence / exec_log）配对对比；无历史才做单侧诊断（重复循环/错误工具/过早终止）
+- **Positive 组**（全成功）：找**效率改进**机会（冗余动作、重复探索、不必要调用）——V1 完全没利用的信号面，成功轨迹里也有可沉淀的低效模式
+
+配合难度分布假说：**中等复杂度（有成功有失败）的会话组是提炼甜点**——全成功无对比信息、全失败无成功路径可借鉴，信号密度都低。
+
 ### 3. 提炼器：廉价模型 + 结构化输出
 
 - 提炼复用现有 LLM 调用链路（消息级系统已连接 Yd-DeepSeek），用配置的便宜模型生成结构化条目（category + topic slug + 正文 + 复验命令）。
 - **content 形态收紧（对照 RSIAgent "code as policy"）**：正文必须是「可执行步骤 + 具体命令/参数」级的过程知识（如"在 Y 目录用 X 命令跑 Z，注意 W 参数"），拒绝泛泛的行为建议——不可执行、不可复验的条目没有复用价值。RSIAgent 官网实例（T085）保留的教训即具体参数级（`RENDER_RESAMPLE 0 0 0`），后续 attempt 直接在构造程序里采用。
 - **入队硬门**：提炼器必须产出一条**只读可复验命令**，产出不了的条目直接丢弃（V1 管道只收可复验条目）。
 - **写入规范（借鉴 hermes-agent `_DO_NOT_CAPTURE_BLOCK`，与沙箱复验互补的 prompt 级防线）**：复验只能拦「跑不过的」，拦不住「跑得过但是毒的」。提炼 prompt 硬性约束三类不收：① 负面断言（"X 工具不行/不好用"）——能复验但会硬化为 agent 自拒；② 未解决的失败——严禁包装成"可靠工作流"；③ 环境依赖失败（缺依赖/未配置）——只沉淀修复动作（装什么/配什么），不沉淀"这环境有问题"。
+- **Diff Review 门（借鉴 ModularRSI 第二验证门）**：入库前对候选条目做一次泛化性自检——「该条目是否编码了 task-specific 的细节（具体任务参数、一次性上下文、个例文件路径）而无法泛化到同 app 的其他任务？」识别为过度特化的候选直接丢弃。与复验构成双门：复验管「真假」，Diff Review 管「可迁移性」。
 - 提炼器只产 `candidate`；**任何条目不经沙箱复验不得转为 `verified`**——这是全自动模式下替代人工审查的生死线（无人工兜底，自评条目严禁转正）。
 - 限流与去重：同 appId 串行（下方 §6），同 `(appId, topic)` 数据库唯一索引兜底并发，单 app 每日提炼预算与单条管道超时均可配置。
 
@@ -220,7 +231,7 @@ hermes 的 agent 直接 `skill_manage` patch 本地文件——**我们的 agent
 ## 分期
 
 - **V1（最短闭环）**：exec-repair 实时入队 + watchdog 式 idle 提炼 + 沙箱只读复验 + `(app_id, topic)` 聚合 upsert + skill discovery 挂 memory:// + preloaded_skills 自动索引注入 + **四层触发机制（SaaS 改造版）**（强硬触发指令 + appId 隔离 / fact 类全文注入 / PG 统计复杂度 nudge / 「agent 提议 → server 复验」两段式就地修复）。
-- **V2**：appId 首个 session 广度普查、git HEAD 变更触发懒复验/`stale` 衰减、candidate→verified 的复验重试机制、提炼池的成本观测面板（对齐 CCR 的 PG 聚合观测思路）、**curator 式 topic 整理**（借鉴 hermes `curator.py`：周期性 prefix/domain 聚类 → 相近 topic 合并为聚合条目 → 被合并条目写 `superseded` 归档而非删除；**dry-run 报告先行**，人工批准后才实跑；永不物理删除）。
+- **V2**：appId 首个 session 广度普查、git HEAD 变更触发懒复验/`stale` 衰减、candidate→verified 的复验重试机制、提炼池的成本观测面板（对齐 CCR 的 PG 聚合观测思路）、**同 appId 轨迹分组提炼**（写路径④：Contrastive 成对对比优先 / Negative 配历史 / Positive 挖效率）、**curator 式 topic 整理**（借鉴 hermes `curator.py`：周期性 prefix/domain 聚类 → 相近 topic 合并为聚合条目 → 被合并条目写 `superseded` 归档而非删除；**dry-run 报告先行**，人工批准后才实跑；永不物理删除；合并时携带条目变更史喂给提炼器防振荡——借鉴 ModularRSI Evolution History）。
 - **不做**：全局自主探索（curriculum agent 自决定学什么）——编码 agent 有任务目标驱动，探索方向天然由工作内容决定，自主探索循环对本场景收益偏低。
 
 ## 验证要点（集成）

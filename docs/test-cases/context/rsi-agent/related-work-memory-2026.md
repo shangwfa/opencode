@@ -102,7 +102,20 @@ Eric Ma 的体系是**同一问题的「人工运营」版本**——改进不�
 有**真实环境反馈闭环**的记忆进化，记忆是"验证过的环境规律"而非对话总结：
 
 - **RSIAgent**（[arXiv:2609.15364](https://arxiv.org/abs/2609.15364)，[官网](https://aetherlabsai.github.io/RSIAgent)、[GitHub](https://github.com/AetherLabsAI/RSIAgent)）：broad-then-deep 自主探索 + 真实环境 verifier + 冻结记忆复用，详见 [RSIAgent 官方实现分析](./app-memory-rsi.md)
+- **ModularRSI**（[arXiv:2609.14857](https://arxiv.org/abs/2609.14857)，[GitHub](https://github.com/IQuestLab/ModularRSI)，2026-09）：harness 自进化的 credit-assignment 框架，与 App Memory 机制同构度最高。三阶段：**对比轨迹分析**（同任务 K 次 rollout 按结果分 Contrastive/Negative/Positive 三组，各组不同提炼策略——Contrastive 成对对比最高质量，Negative 查 Trajectory Memory 配历史成功轨迹，Positive 找效率改进）→ **模块级修改**（五模块受限范围 + 多任务投票抑制个例噪声 + Evolution History 防振荡）→ **三道验证门**（静态检查 / Diff Review 泛化性审查「是否编码了 task-specific 解法」/ 抽样实跑）。库管理：Function Merge 去冗余 + Task-Aware Composition 按任务激活子集。**关键实验**：非模块化进化（46.44）和联合进化（44.19）均低于不动的基线（47.57）——乱改会倒退，修改范围受限是生死线；跨域/跨模型迁移成立；进化底模即 DeepSeek-V4-Flash（与我们生产同款）。benchmark-disjoint 协议：2000 个与评测不相交的演进任务
+- **Dream-RSI**（[arXiv:2609.14858](https://arxiv.org/abs/2609.14858)，[官网](https://dream-rsi.com)、[GitHub](https://github.com/zhengkid/Dream-RSI)，Google/DeepMind 2026-09）：元层 RSI——不进化任务记忆也不训权重，进化的是**探索策略**。核心洞察：**历史本身就是模拟器**——完成的发现过程记录成一棵 discovery tree（每节点 = 尝试 + 文件系统快照 + 评估诊断 + 分数），换一个策略"重放"这棵树 = 按不同 batch 序列遍历，所有节点结果已存储，评估**零执行成本**。数千候选策略在梦境中打分，只有赢家上线；候选集含现任 ⇒ 新策略单调不退步。关键数字：发现成本降 1.7×~162×。**反直觉发现**：把历史抽象成高层语义指导注入 prompt，一致地比不注入更差——语义先验过约束搜索空间
 - 各类 OS/computer-use 自进化 agent（OSWorld 系 benchmark 生态）
+
+### RSI 三足对比（进化对象不同，均不重训底模）
+
+| | RSIAgent | ModularRSI | SAGE | Dream-RSI |
+| ---- | ---- | ---- | ---- | ---- |
+| 进化对象 | 环境规律记忆（test-time 沉淀） | harness 执行机制（模块化修改） | 技能生成/使用能力（train-time RL） | 元层探索策略（离线 replay 进化） |
+| 验证机制 | 沙箱真实反馈 verifier | 三道验证门 + benchmark-disjoint 协议 | 任务成败作为 RL 奖励信号 | 历史树重放打分（零执行） |
+| 对 App Memory 的价值 | 直接原型 | 机制同构度最高：对比提炼 / 多任务投票 / 验证门 / 模块受限 | 印证 verified_count 门槛与可执行形态 | 历史数据的第二种读法 + 提炼策略 replay-first 评估 |
+
+对 App Memory 的四点具体借鉴（replay-first 评估提炼策略、触发点元层反馈、条目形态禁区、upsert 单调性）已落进 [app-memory-rsi.md](./app-memory-rsi.md)。注意其局限：重放模拟器适用于开放搜索型发现任务，编码是任务驱动场景，学其结论（语义抽象要谨慎、元层决策要吃反馈）而非套用其机制。仓库暂无代码（Full codebase 标注 "Being prepared"），实现细节取自论文 Method 节。
+
 
 ## 本方案的定位与差异化
 
