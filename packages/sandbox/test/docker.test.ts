@@ -6,7 +6,7 @@ import { Database } from "@opencode/core/database/database"
 import type { FilesImpl } from "@opencode/core/environment/files"
 import { Workspace } from "@opencode/core/workspace"
 import { WorkspaceDriver } from "@opencode/core/workspace/driver"
-import { WorkspaceDocker } from "@opencode/core/workspace/docker"
+import { SandboxDocker } from "@opencode/sandbox/docker"
 import { LayerNode } from "@opencode/util/effect/layer-node"
 import { Effect } from "effect"
 import { ChildProcess } from "effect/unstable/process"
@@ -32,7 +32,7 @@ describe.skipIf(!dockerAvailable)("workspace docker driver", () => {
       ]),
       [
         WorkspaceDriver.node.replace(
-          WorkspaceDocker.registryNode("docker", {
+          SandboxDocker.registryNode("docker", {
             image: "node:24-slim",
             installAgent: path.join(import.meta.dir, "../../containers/sandbox/fs-agent.mjs"),
           }),
@@ -49,6 +49,11 @@ describe.skipIf(!dockerAvailable)("workspace docker driver", () => {
         .map((line) => line.trim())
         .filter((line) => line.length > 0)
       for (const id of stale) execFileSync("docker", ["rm", "-f", "-v", id], { stdio: "ignore" })
+      const images = execFileSync("docker", ["images", "-q", "opencode-ws-snapshot"], { encoding: "utf8" })
+        .split("\n")
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0)
+      for (const id of images) execFileSync("docker", ["rmi", "-f", id], { stdio: "ignore" })
     } catch {
       // best-effort cleanup only
     }
@@ -62,6 +67,15 @@ describe.skipIf(!dockerAvailable)("workspace docker driver", () => {
   const containerOf = (id: Workspace.ID) => `opencode-ws-${id}`
   const containerState = (container: string) =>
     execFileSync("docker", ["inspect", "-f", "{{.State.Running}}", container], { encoding: "utf8" }).trim()
+  const snapshotTags = (id: Workspace.ID) =>
+    execFileSync(
+      "docker",
+      ["images", "--filter", `label=dev.opencode.workspace=${id}`, "--format", "{{.Repository}}:{{.Tag}}"],
+      { encoding: "utf8" },
+    )
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0)
 
   it.live(
     "creates, provisions, connects and destroys a workspace",

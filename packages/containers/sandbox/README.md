@@ -1,21 +1,20 @@
 # opencode sandbox image
 
-沙箱容器镜像 — 从 `feat/opencode-1.18.31`（v1 沙箱体系）迁移，作为 v2 docker
-WorkspaceDriver（`packages/core/src/workspace/docker.ts`）的执行目标。
+沙箱容器镜像 — 从 `feat/opencode-1.18.31`（v1 沙箱体系）迁移，作为 v2
+OpenSandbox WorkspaceDriver（`packages/sandbox/src/opensandbox.ts`）的执行镜像。
 
-## 构建
+## 构建与推送
+
+镜像构建后推送到 OpenSandbox 平台可引用的镜像仓库（默认指向团队阿里云 CR
+的 `opencode-sandbox:browser-cdp`）：
 
 ```bash
-docker build -t opencode-sandbox:latest .
+docker build -t crpi-hlpnu8kiweghie0r.cn-hangzhou.personal.cr.aliyuncs.com/shangwfa/opencode-sandbox:browser-cdp .
+docker push crpi-hlpnu8kiweghie0r.cn-hangzhou.personal.cr.aliyuncs.com/shangwfa/opencode-sandbox:browser-cdp
 ```
 
-## 与 driver 的契约
-
-- `node` 在 PATH 上（fs-agent 与包管理器都依赖）
-- `/workspace` 存在，是默认工作目录
-- `/opt/opencode-sandbox/fs-agent.mjs` 由镜像安装；driver 配置 `installAgent`
-  （宿主路径）时会在每次 connect 前 `docker cp` 引导安装，适合未内置 agent
-  的基础镜像（如 `node:24-slim`）的开发/测试场景
+本地开发也可以配合 `@opencode/sandbox/docker`（本地 docker provider）使用，
+driver 支持 `installAgent` 参数向未内置 agent 的基础镜像引导安装 fs-agent。
 
 ## fs-agent 协议
 
