@@ -7,3 +7,4 @@ process.chdir(fileURLToPath(new URL("..", import.meta.url)))
 
 await $`rm -rf dist`
 await $`bun tsc -p tsconfig.build.json`
+await $`bun build agent.ts --target=node --outfile=dist/agent.mjs`

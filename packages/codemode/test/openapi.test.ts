@@ -30,7 +30,7 @@ const toolAt = (tools: OpenAPI.Tools, name: string) =>
     .split(".")
     .reduce<
       Tool.Tool<HttpClient.HttpClient> | OpenAPI.Tools | undefined
-    >((current, segment) => (current !== undefined && !Tool.isTool(current) ? current[segment] : undefined), tools)
+    >((current, segment) => (current !== undefined && !Tool.isTool(current) ? (current as OpenAPI.Tools)[segment] : undefined), tools)
 
 const recordingClient = (respond: (request: HttpClientRequest.HttpClientRequest) => Response) => {
   const requests: Array<Recorded> = []

@@ -10,9 +10,10 @@ import type {
   Namespace as ToolNamespace,
   Result,
 } from "@opencode/schema/tool"
-import { Effect, Ref, Schema, Semaphore } from "effect"
+import { Effect, Option, Ref, Schema, Semaphore } from "effect"
 import { definition, normalizedName } from "../tool/runtime.js"
 import { CodeModeCatalog } from "./catalog.js"
+import { CodeModeSandbox } from "./sandbox.js"
 import { CodeModeWeb } from "./web.js"
 
 const ExecuteFile = Schema.Struct({
@@ -87,25 +88,25 @@ export const create = (
           lock.withPermit(
             Ref.updateAndGet(calls, update).pipe(Effect.tap((toolCalls) => context.progress({ toolCalls }))),
           )
-        const result = yield* runtime(
-          inventory,
-          (name, tool, input) =>
-            Effect.gen(function* () {
-              const index = yield* Ref.getAndUpdate(callIndex, (index) => index + 1)
-              const executed = yield* executeTool(name, tool, input, context)
-              const content =
-                typeof executed.content === "string"
-                  ? [{ type: "text" as const, text: executed.content }]
-                  : (executed.content ?? [])
-              const outputFileParts = outputFiles(content)
-              if (outputFileParts.length > 0)
-                yield* Ref.update(files, (items) => [...items, { index, files: outputFileParts }])
-              if (executed.output !== undefined) return executed.output
-              const text = content.flatMap((part) => (part.type === "text" ? [part.text] : [])).join("\n")
-              return text === "" ? null : text
-            }),
-          progressHooks(record),
-        ).execute(code)
+        const executeChild = (name: string, tool: Info, input: unknown) =>
+          Effect.gen(function* () {
+            const index = yield* Ref.getAndUpdate(callIndex, (index) => index + 1)
+            const executed = yield* executeTool(name, tool, input, context)
+            const content =
+              typeof executed.content === "string"
+                ? [{ type: "text" as const, text: executed.content }]
+                : (executed.content ?? [])
+            const outputFileParts = outputFiles(content)
+            if (outputFileParts.length > 0)
+              yield* Ref.update(files, (items) => [...items, { index, files: outputFileParts }])
+            if (executed.output !== undefined) return executed.output
+            const text = content.flatMap((part) => (part.type === "text" ? [part.text] : [])).join("\n")
+            return text === "" ? null : text
+          })
+        const sandbox = yield* Effect.serviceOption(CodeModeSandbox.Service)
+        const result = yield* (Option.isSome(sandbox)
+          ? runInSandbox(sandbox.value, inventory, code, executeChild, record).pipe(Effect.orDie)
+          : runtime(inventory, executeChild, progressHooks(record)).execute(code))
         const toolCalls = yield* Ref.get(calls)
         const collected = (yield* Ref.get(files))
           .toSorted((left, right) => left.index - right.index)
@@ -173,6 +174,48 @@ function progressHooks(record: (update: (items: Array<ExecuteCall>) => Array<Exe
     },
     "extension.after": settle,
   } satisfies CodeMode.Hooks
+}
+
+// The sandboxed program sees the same tool paths as the in-process runtime;
+// calls come back one at a time over the file bridge.
+function runInSandbox(
+  sandbox: CodeModeSandbox.Interface,
+  inventory: Inventory,
+  code: string,
+  executeChild: (name: string, tool: Info, input: unknown) => Effect.Effect<unknown, unknown>,
+  record: (update: (items: Array<ExecuteCall>) => Array<ExecuteCall>) => Effect.Effect<unknown>,
+) {
+  const byPath = new Map(
+    Array.from(inventory.tools).map(([name, registration]) => [qualifiedName(registration), { name, registration }]),
+  )
+  return sandbox.run({
+    code,
+    tools: Array.from(byPath, ([path, { registration }]) => ({
+      path,
+      description: definition(registration).description,
+    })),
+    bridge: {
+      onStart: (tool, input) => {
+        const shown = displayInput(input)
+        return record((items) => [...items, { tool, status: "running" as const, ...(shown ? { input: shown } : {}) }])
+      },
+      onEnd: (tool, ok) => record((items) => settleLastRunning(items, ok)),
+      call: (tool, input) => {
+        const found = byPath.get(tool)
+        if (found === undefined) return Effect.fail(toolError(`Unknown tool '${tool}'.`))
+        return executeChild(found.name, found.registration, input)
+      },
+    },
+  })
+}
+
+// The file bridge carries no call identity; rows settle in start order.
+function settleLastRunning(items: Array<ExecuteCall>, ok: boolean): Array<ExecuteCall> {
+  const index = items.findLastIndex((item) => item.status === "running")
+  if (index === -1) return items
+  const next = [...items]
+  next[index] = { ...items[index]!, status: ok ? "completed" : "error" }
+  return next
 }
 
 export const catalog = (inventory: Inventory) => {
