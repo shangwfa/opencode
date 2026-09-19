@@ -1,6 +1,14 @@
-FROM oven/bun:1.3.14-alpine AS base
-RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories \
-    && apk add --no-cache git ripgrep
+# v2 SaaS 服务镜像 —— 容器内跑 v2 server（serve 命令，暴露 /api/* 的 v2 REST API 与 web UI）。
+# 与 v1 镜像的差异：入口改为 packages/cli、PG 走 core 的 pg bridge
+# （OPENCODE_DATABASE_URL）、provider 配置沿用 opencode.jsonc、模型目录使用
+# packages/core 内置 snapshot（不再 COPY 根 models-dev.json）。
+# glibc 基础镜像：Bun 在 musl 上对 core 的 PG bridge（Proxy 密集访问）存在
+# 段错误（Bun 1.3.14 已知不稳），Debian 版更可靠。
+FROM oven/bun:1.3.14 AS base
+RUN sed -i 's|deb.debian.org|mirrors.aliyun.com|g' /etc/apt/sources.list.d/debian.sources 2>/dev/null || true
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends git ripgrep ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
 FROM base AS builder
 WORKDIR /app
@@ -8,8 +16,17 @@ WORKDIR /app
 COPY package.json bun.lock bunfig.toml ./
 COPY patches/ patches/
 COPY packages packages
-RUN rm -rf patches && sed -i '/"patchedDependencies"/,/^[[:space:]]*}/d' package.json
-RUN bun install --ignore-scripts
+COPY services services
+COPY sdks sdks
+# 本镜像只构建 v2 运行时：去掉 v1 家族 workspace 与构建期不需要的 patch 声明
+RUN rm -rf patches && sed -i '/"patchedDependencies"/,/^[[:space:]]*}/d' package.json \
+    && sed -i '/"packages\/v1\/\*",/d' package.json
+RUN for attempt in 1 2 3; do \
+      if bun install --ignore-scripts --network-concurrency=16; then exit 0; fi; \
+      echo "bun install attempt ${attempt} failed; retrying"; \
+      sleep 5; \
+    done; \
+    echo "bun install failed after 3 attempts"; exit 1
 
 RUN find /app -path "*/node-pty/prebuilds/*/spawn-helper" -exec chmod +x {} \;
 
@@ -18,38 +35,27 @@ WORKDIR /app
 
 COPY --from=builder /app/node_modules node_modules
 COPY --from=builder /app/packages packages
-COPY models-dev.json /app/models.json
+COPY --from=builder /app/services services
+COPY --from=builder /app/sdks sdks
 COPY --from=builder /app/package.json /app/bun.lock /app/bunfig.toml ./
 
-WORKDIR /app/packages/opencode
+WORKDIR /app/packages/cli
 
-RUN adduser -D opencode && mkdir -p /workspace && chown opencode:opencode /workspace
+RUN useradd -m -s /bin/bash opencode && mkdir -p /workspace && chown opencode:opencode /workspace
 
 COPY opencode.jsonc /home/opencode/.config/opencode/opencode.jsonc
 RUN chown -R opencode:opencode /home/opencode
 
-ENV OPENCODE_DEFAULT_DIRECTORY=/workspace
-ENV OPENCODE_SERVER_HOSTNAME=0.0.0.0
-ENV OPENCODE_SERVER_PORT=4096
-ENV OPENCODE_AUTH_PROVIDER=pg
-ENV OPENCODE_CCR_ENABLED=true
-ENV OPENCODE_SANDBOX_ENABLED=true
-ENV OPENCODE_SANDBOX_USE_SERVER_PROXY=true
-ENV OPENCODE_SANDBOX_VOLUME_TYPE=pvc
-ENV OPENCODE_SANDBOX_PVC_CLAIM=sandbox-test
-ENV OPENCODE_SANDBOX_MAX_TTL_SEC=3600
-ENV OPENCODE_SANDBOX_IDLE_KILL_SEC=30
-ENV OPENCODE_DISABLE_EMBEDDED_WEB_UI=1
 ENV OPENCODE_DISABLE_AUTOUPDATE=1
-ENV OPENCODE_DATABASE_URL=postgresql://app:8zuhlMLd4gaeUG5k@172.18.32.14:5432/opencode
-ENV OPENCODE_SANDBOX_DOMAIN=172.18.32.15:30040
-ENV OPENCODE_SANDBOX_API_KEY=H68idVYzjadx
-ENV OPENSANDBOX_INSECURE_SERVER=YES
+ENV OPENCODE_DEFAULT_DIRECTORY=/workspace
+# 部署必须注入（不写入镜像层）：
+#   OPENCODE_PASSWORD       服务访问口令，请求带 Basic auth（用户名 opencode）
+#   OPENCODE_DATABASE_URL   PG 连接串（core pg bridge；多实例共享同一库）
 
 EXPOSE 4096
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD wget -qO- http://0.0.0.0:${OPENCODE_SERVER_PORT:-4096}/global/health || exit 1
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+  CMD wget -qO- --header="Authorization: Basic $(printf 'opencode:%s' "$OPENCODE_PASSWORD" | base64)" http://127.0.0.1:${OPENCODE_SERVER_PORT:-4096}/api/info || exit 1
 
 USER opencode
 
