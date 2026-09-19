@@ -16,6 +16,10 @@ import { PersistentPty } from "@opencode/core/persistent-pty"
 import { Project } from "@opencode/core/project"
 import { Worktree } from "@opencode/core/worktree"
 import { Session } from "@opencode/core/session"
+import { SessionWatchdog } from "@opencode/core/session/watchdog"
+import { SessionExecAsync } from "@opencode/core/session/exec-async"
+import { SandboxOOM } from "@opencode/core/sandbox-oom"
+import { SessionExecution } from "@opencode/core/session/execution"
 import { Instance } from "@opencode/core/instance/service"
 import { SessionTransfer } from "@opencode/core/session/transfer"
 import { ShellSelect } from "@opencode/core/shell/select"
@@ -37,6 +41,8 @@ import { HttpApiBuilder } from "effect/unstable/httpapi"
 import { Context, Effect, Layer, Option } from "effect"
 import { Api } from "./api"
 import { ServerAuth } from "./auth"
+import { SandboxOpenSandbox } from "@opencode/sandbox/opensandbox"
+import { WorkspaceDriver } from "@opencode/core/workspace/driver"
 import { CorsConfig } from "./cors"
 import { handlers } from "./handlers"
 import { authorizationLayer } from "./middleware/authorization"
@@ -48,6 +54,18 @@ import { sessionLocationLayer } from "./middleware/session-location"
 import { ServerInfo } from "./server-info"
 import type { ServerOptions } from "./options"
 
+/**
+ * Sandbox wiring (SaaS): when a sandbox domain is configured, register the
+ * OpenSandbox workspace provider so sessions bound to a workspace execute all
+ * tools inside the sandbox. Without it the core registry stays empty and
+ * Location falls back to the local environment driver.
+ */
+const workspaceReplacements = ((): LayerNode.Replacements => {
+  const options = SandboxOpenSandbox.fromEnv()
+  if (options === undefined) return []
+  return [WorkspaceDriver.node.replace(SandboxOpenSandbox.registryNode(SandboxOpenSandbox.PROVIDER, options))]
+})()
+
 const applicationServiceNodes = [
   Global.node,
   Database.node,
@@ -58,6 +76,7 @@ const applicationServiceNodes = [
   Project.node,
   Worktree.node,
   Session.node,
+  SessionExecution.node,
   Instance.node,
   SessionTransfer.node,
   SdkPlugins.node,
@@ -71,6 +90,9 @@ const applicationServiceNodes = [
   LocationServiceMap.node,
   LocationActivity.node,
   SessionRestart.node,
+  SessionWatchdog.node,
+  SessionExecAsync.node,
+  SandboxOOM.node,
   Workspace.node,
 ] as const
 const applicationServices = LayerNode.group(applicationServiceNodes)
@@ -86,7 +108,7 @@ export function createRoutes(
       : ServerAuth.Config.layer,
     options,
     serviceURLs,
-    overrides,
+    [...workspaceReplacements, ...overrides],
   )
 }
 
@@ -163,6 +185,7 @@ function makeRoutes<AuthError, AuthServices>(
           Context.pick(
             Database.Service,
             Credential.Service,
+            LocationServiceMap.Service,
             PermissionSaved.Service,
             PluginUpdate.Service,
             Project.Service,

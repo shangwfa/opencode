@@ -219,7 +219,7 @@ async function run(input: {
   terminalDelay?: number
 }) {
   const sdk = OpenCode.make({ baseUrl: "https://opencode.test" })
-  const values: V2Event[] = [{ id: "evt_connected", type: "server.connected", data: {} }]
+  const values: V2Event[] = [{ id: "evt_connected", created: 0, type: "server.connected", data: {} }]
   let wake: (() => void) | undefined
   const wait = Promise.withResolvers<void>()
   const stream = (async function* (): AsyncGenerator<V2Event, void, unknown> {

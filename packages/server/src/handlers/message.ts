@@ -1,9 +1,9 @@
 import { SessionMessage } from "@opencode/core/session/message"
 import { Session } from "@opencode/core/session"
 import { Effect, Schema } from "effect"
-import { HttpApiBuilder } from "effect/unstable/httpapi"
+import { HttpApiBuilder, HttpApiSchema } from "effect/unstable/httpapi"
 import { Api } from "../api"
-import { InvalidCursorError } from "@opencode/protocol/errors"
+import { InvalidCursorError, MessageNotFoundError } from "@opencode/protocol/errors"
 import { failedMessageDecode, missingSession } from "./session-error"
 
 const DefaultMessagesLimit = 50
@@ -29,38 +29,59 @@ export const MessageHandler = HttpApiBuilder.group(Api, "server.message", (handl
   Effect.gen(function* () {
     const session = yield* Session.Service
 
-    return handlers.handle(
-      "session.messages",
-      Effect.fn(function* (ctx) {
-        if (ctx.query.cursor && ctx.query.order !== undefined)
-          return yield* new InvalidCursorError({ message: "Cursor cannot be combined with order" })
-        const decoded = yield* Effect.try({
-          try: () => (ctx.query.cursor ? cursor.decode(ctx.query.cursor) : undefined),
-          catch: () => new InvalidCursorError({ message: "Invalid cursor" }),
-        })
-        const order = decoded?.order ?? ctx.query.order ?? "desc"
-        const messages = yield* session
-          .messages({
-            sessionID: ctx.params.sessionID,
-            limit: ctx.query.limit ?? DefaultMessagesLimit,
-            order,
-            type: ctx.query.type,
-            cursor: decoded ? { id: decoded.id, direction: decoded.direction } : undefined,
+    return handlers
+      .handle(
+        "session.messages",
+        Effect.fn(function* (ctx) {
+          if (ctx.query.cursor && ctx.query.order !== undefined)
+            return yield* new InvalidCursorError({ message: "Cursor cannot be combined with order" })
+          const decoded = yield* Effect.try({
+            try: () => (ctx.query.cursor ? cursor.decode(ctx.query.cursor) : undefined),
+            catch: () => new InvalidCursorError({ message: "Invalid cursor" }),
           })
-          .pipe(
-            Effect.catchTag("Session.NotFoundError", missingSession),
-            Effect.catchTag("Session.MessageDecodeError", failedMessageDecode),
-          )
-        const first = messages[0]
-        const last = messages.at(-1)
-        return {
-          data: messages,
-          cursor: {
-            previous: first ? cursor.encode(first, order, "previous") : undefined,
-            next: last ? cursor.encode(last, order, "next") : undefined,
-          },
-        }
-      }),
-    )
+          const order = decoded?.order ?? ctx.query.order ?? "desc"
+          const messages = yield* session
+            .messages({
+              sessionID: ctx.params.sessionID,
+              limit: ctx.query.limit ?? DefaultMessagesLimit,
+              order,
+              type: ctx.query.type,
+              cursor: decoded ? { id: decoded.id, direction: decoded.direction } : undefined,
+            })
+            .pipe(
+              Effect.catchTag("Session.NotFoundError", missingSession),
+              Effect.catchTag("Session.MessageDecodeError", failedMessageDecode),
+            )
+          const first = messages[0]
+          const last = messages.at(-1)
+          return {
+            data: messages,
+            cursor: {
+              previous: first ? cursor.encode(first, order, "previous") : undefined,
+              next: last ? cursor.encode(last, order, "next") : undefined,
+            },
+          }
+        }),
+      )
+      .handle(
+        "session.message.remove",
+        Effect.fn(function* (ctx) {
+          yield* session
+            .removeMessage({ sessionID: ctx.params.sessionID, messageID: ctx.params.messageID })
+            .pipe(
+              Effect.catchTag("Session.NotFoundError", missingSession),
+              Effect.catchTag(
+                "Session.MessageNotFoundError",
+                (error) =>
+                  new MessageNotFoundError({
+                    sessionID: error.sessionID,
+                    messageID: error.messageID,
+                    message: `Message not found: ${error.messageID}`,
+                  }),
+              ),
+            )
+          return HttpApiSchema.NoContent.make()
+        }),
+      )
   }),
 )

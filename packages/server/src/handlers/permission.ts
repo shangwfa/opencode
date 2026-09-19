@@ -7,7 +7,8 @@ import { Effect } from "effect"
 import { HttpApiBuilder, HttpApiSchema } from "effect/unstable/httpapi"
 import { Api } from "../api"
 import { PermissionNotFoundError } from "@opencode/protocol/errors"
-import { response, sessionInfo } from "../location"
+import { response, requestUserID, sessionInfo } from "../location"
+import { HttpServerRequest } from "effect/unstable/http"
 import { missingSession } from "./session-error"
 
 function missingRequest(id: Permission.ID) {
@@ -33,7 +34,8 @@ export const PermissionHandler = HttpApiBuilder.group(Api, "server.permission", 
         "permission.request.list",
         Effect.fn(function* () {
           const permission = yield* Permission.Service
-          return yield* response(permission.list())
+          const request = yield* HttpServerRequest.HttpServerRequest
+          return yield* response(permission.list(requestUserID(request)))
         }),
       )
       .handle(
@@ -60,8 +62,9 @@ export const PermissionHandler = HttpApiBuilder.group(Api, "server.permission", 
         "session.permission.list",
         Effect.fn(function* (ctx) {
           const session = yield* sessionInfo(sessions, ctx.params.sessionID)
+          const request = yield* HttpServerRequest.HttpServerRequest
           const requests = yield* Permission.Service.use((permission) =>
-            permission.forSession(ctx.params.sessionID),
+            permission.forSession(ctx.params.sessionID, requestUserID(request)),
           ).pipe(instances.provide(session))
           return { data: requests }
         }),
@@ -77,8 +80,14 @@ export const PermissionHandler = HttpApiBuilder.group(Api, "server.permission", 
         "session.permission.reply",
         Effect.fn(function* (ctx) {
           const owned = yield* requireOwnedRequest(ctx.params.sessionID, ctx.params.requestID)
+          const request = yield* HttpServerRequest.HttpServerRequest
           yield* owned.permission
-            .reply({ requestID: ctx.params.requestID, reply: ctx.payload.decision, message: ctx.payload.message })
+            .reply({
+              requestID: ctx.params.requestID,
+              reply: ctx.payload.decision,
+              message: ctx.payload.message,
+              userID: requestUserID(request),
+            })
             .pipe(Effect.catchTag("Permission.NotFoundError", () => missingRequest(ctx.params.requestID)))
           return HttpApiSchema.NoContent.make()
         }),

@@ -1,13 +1,23 @@
 import { Session } from "@opencode/core/session"
+import { SessionExecution } from "@opencode/core/session/execution"
 import { SessionStats } from "@opencode/core/session/stats"
+import { SessionExecAsync } from "@opencode/core/session/exec-async"
 import { SessionTitle } from "@opencode/core/session/title"
 import { SessionTransfer } from "@opencode/core/session/transfer"
 import { InstructionEntry } from "@opencode/core/session/instruction-entry"
 import { Form } from "@opencode/core/form"
-import { DateTime, Effect, Stream } from "effect"
+import { Permission } from "@opencode/core/permission"
+import { Hitl } from "@opencode/core/hitl/index"
+import { DateTime, Effect, Exit, Queue, Stream } from "effect"
+import { Option } from "effect"
+import type { PlatformError } from "effect/PlatformError"
 import { HttpApiBuilder, HttpApiSchema } from "effect/unstable/httpapi"
 import { Api } from "../api"
+import { Bus } from "@opencode/core/bus"
+import { Event } from "@opencode/schema/event"
+import { Command } from "@opencode/schema/command"
 import { SessionsCursor } from "@opencode/protocol/groups/session"
+
 import {
   ConflictError,
   CommandExecutionError,
@@ -23,7 +33,14 @@ import {
   SkillNotFoundError,
 } from "@opencode/protocol/errors"
 import { AbsolutePath } from "@opencode/core/schema"
+import { SandboxOpenSandbox } from "@opencode/sandbox/opensandbox"
+import { SandboxResource } from "@opencode/schema/sandbox-resource"
+import { Workspace } from "@opencode/core/workspace"
+import { ChildProcess } from "effect/unstable/process"
+import { Location } from "@opencode/core/location"
 import { failedMessageDecode, failedSnapshot, missingMessage, missingSession } from "./session-error"
+import { requestUserID, requestUserName } from "../location"
+import { HttpServerRequest } from "effect/unstable/http"
 
 const DefaultSessionsLimit = 50
 
@@ -31,15 +48,40 @@ function missingForm(id: Form.ID) {
   return new FormNotFoundError({ id, message: `Form not found: ${id}` })
 }
 
+function eventSessionID(event: Event.Payload): string | undefined {
+  const data = event.data as { readonly sessionID?: unknown } | undefined
+  return typeof data?.sessionID === "string" ? data.sessionID : undefined
+}
+
+/** A turn settles at a terminal execution state (v2 streams no `session.idle` for a normal run). */
+function isTurnEnd(event: Event.Payload): boolean {
+  if (event.type === "session.idle") return true
+  if (event.type === "session.status") {
+    const status = (event.data as { readonly status?: { readonly type?: string } }).status
+    return status?.type === "idle"
+  }
+  return (
+    event.type === "session.execution.succeeded" ||
+    event.type === "session.execution.failed" ||
+    event.type === "session.execution.interrupted"
+  )
+}
+
 export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handlers) =>
   Effect.gen(function* () {
     const session = yield* Session.Service
     const transfer = yield* SessionTransfer.Service
+    const workspace = yield* Workspace.Service
+    const execution = yield* SessionExecution.Service
+    // Optional: the test fixture's minimal graph does not carry the async
+    // exec service; real deployments always do.
+    const execAsyncOption = yield* Effect.serviceOption(SessionExecAsync.Service)
+    const bus = yield* Bus.Service
     const requireOwnedForm = Effect.fnUntraced(function* (sessionID: Form.Info["sessionID"], formID: Form.ID) {
-      const form = yield* Form.Service
-      const info = yield* form.get(formID).pipe(Effect.catchTag("Form.NotFoundError", () => missingForm(formID)))
+      const forms = yield* Form.Service
+      const info = yield* forms.get(formID).pipe(Effect.catchTag("Form.NotFoundError", () => missingForm(formID)))
       if (info.sessionID !== sessionID) return yield* missingForm(formID)
-      return { form, info }
+      return { form: forms, info }
     })
     const busySession = (error: Session.BusyError) =>
       new SessionBusyError({
@@ -122,21 +164,244 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
         }),
       )
       .handle(
+        "session.status",
+        Effect.fn(function* () {
+          const active = yield* execution.active
+          return { data: { active: [...active] } }
+        }),
+      )
+      .handle(
+        "session.exec",
+        Effect.fn(function* (ctx) {
+          // v1 parity: run the command inside the session's sandbox workspace
+          // (provisioned on demand by workspace.connect). The workspaceID comes
+          // from the session's location.
+          const info = yield* session
+            .get(ctx.params.sessionID)
+            .pipe(Effect.catchTag("Session.NotFoundError", missingSession))
+          const workspaceID = info.location.workspaceID
+          if (workspaceID === undefined) {
+            return { exitCode: -1, stdout: "", stderr: "session has no sandbox workspace" }
+          }
+          const cwd = ctx.payload.workingDirectory ?? info.location.directory
+          // v1 falsy semantics: 0 (and undefined) mean "no timeout".
+          const timeoutMs = ctx.payload.timeoutSeconds ? ctx.payload.timeoutSeconds * 1000 : undefined
+          const runOnce = Effect.fn("session.exec.once")(function* () {
+            const driver = yield* workspace.connect(workspaceID)
+            // The payload is a full shell string (v1 parity): pipes,
+            // substitutions, quoting. Route it through sh -c so the argv
+            // quoting in the sandbox adapter preserves shell semantics.
+            const shell = yield* driver.spawner.spawn(ChildProcess.make("sh", ["-c", ctx.payload.command], { cwd }))
+            const collect = <E>(stream: Stream.Stream<Uint8Array, E>) =>
+              Stream.decodeText(stream).pipe(
+                Stream.runCollect,
+                Effect.map((chunks) => Array.from(chunks).join("")),
+                Effect.orDie,
+              )
+            const wait = Effect.all([shell.exitCode, collect(shell.stdout), collect(shell.stderr)] as const)
+            const settled: Option.Option<readonly [number, string, string]> =
+              timeoutMs === undefined
+                ? yield* Effect.map(wait, Option.some)
+                : yield* Effect.timeoutOption(wait, `${timeoutMs} millis`)
+            if (Option.isNone(settled)) {
+              yield* Effect.ignore(shell.kill())
+              return [-1, "", `exec timed out after ${ctx.payload.timeoutSeconds}s`] as const
+            }
+            return settled.value
+          })
+          let output = yield* Effect.scoped(runOnce()).pipe(Effect.orDie)
+          // Transport failure (-1 with no command output): the sandbox likely
+          // died underneath the cached connection. Drop it and retry once on a
+          // fresh connection (connect revives from snapshot or cold start).
+          if (Number(output[0]) === -1 && output[1] === "" && !String(output[2]).startsWith("exec timed out")) {
+            yield* workspace.invalidate(workspaceID)
+            output = yield* Effect.scoped(runOnce()).pipe(Effect.orDie)
+          }
+          // v1 parity: decode exit >= 128 to a signal name and flag likely OOM (SIGKILL).
+          const exitCode = Number(output[0])
+          const signal = SandboxResource.exitSignal(exitCode)
+          return {
+            exitCode,
+            stdout: output[1],
+            stderr: output[2],
+            ...(signal === undefined ? {} : { signal, oomSuspected: signal === "SIGKILL" }),
+          }
+        }),
+      )
+      .handle(
+        "session.snapshot",
+        Effect.fn(function* (ctx) {
+          const info = yield* session
+            .get(ctx.params.sessionID)
+            .pipe(Effect.catchTag("Session.NotFoundError", missingSession))
+          const workspaceID = info.location.workspaceID
+          if (workspaceID === undefined)
+            return yield* new ServiceUnavailableError({ message: "session has no sandbox workspace", service: "sandbox" })
+          const result = yield* workspace.snapshot(workspaceID).pipe(Effect.exit)
+          if (Exit.isSuccess(result)) return { snapshotId: result.value.snapshotId }
+          return yield* new ServiceUnavailableError({
+            message: "snapshot failed or not supported",
+            service: "sandbox",
+          })
+        }),
+      )
+      .handle(
+        "session.killSandbox",
+        Effect.fn(function* (ctx) {
+          const info = yield* session
+            .get(ctx.params.sessionID)
+            .pipe(Effect.catchTag("Session.NotFoundError", missingSession))
+          const workspaceID = info.location.workspaceID
+          if (workspaceID === undefined) return { workspaceID: undefined, destroyed: false }
+          // v1 parity for persistent sessions: snapshot first (Ready before the
+          // kill), keep the workspace row so the next use restores from the
+          // snapshot. Falls back to a plain destroy when nothing is bound.
+          const suspended = yield* workspace.suspend(workspaceID).pipe(Effect.exit)
+          if (Exit.isSuccess(suspended)) return { workspaceID, destroyed: true }
+          const result = yield* workspace.destroy(workspaceID).pipe(Effect.orDie)
+          if (result.destroyed) {
+            // kill the *container*, keep the logical record so the session's
+            // workspaceID stays valid; the next exec/tool provisions a fresh
+            // sandbox (destroy removes the row, so re-commit it).
+            yield* workspace.create({ id: workspaceID, provider: SandboxOpenSandbox.PROVIDER }).pipe(Effect.orDie)
+          }
+          return { workspaceID, destroyed: result.destroyed }
+        }),
+      )
+      .handle(
+        "session.execAsync",
+        Effect.fn(function* (ctx) {
+          if (Option.isNone(execAsyncOption))
+            return yield* new ServiceUnavailableError({ message: "exec async unavailable", service: "sandbox" })
+          const execAsync = execAsyncOption.value
+          const info = yield* session
+            .get(ctx.params.sessionID)
+            .pipe(Effect.catchTag("Session.NotFoundError", missingSession))
+          const workspaceID = info.location.workspaceID
+          if (workspaceID === undefined)
+            return yield* new ServiceUnavailableError({
+              message: "session has no sandbox workspace",
+              service: "sandbox",
+            })
+          const { execId } = yield* execAsync.start({
+            sessionID: ctx.params.sessionID,
+            workspaceID,
+            command: ctx.payload.command,
+            workingDirectory: ctx.payload.workingDirectory ?? info.location.directory,
+            timeoutMs: ctx.payload.timeoutSeconds ? ctx.payload.timeoutSeconds * 1000 : undefined,
+          })
+          return { execId, status: "running" as const }
+        }),
+      )
+      .handle(
+        "session.execs",
+        Effect.fn(function* (ctx) {
+          if (Option.isNone(execAsyncOption))
+            return yield* new ServiceUnavailableError({ message: "exec async unavailable", service: "sandbox" })
+          const execAsync = execAsyncOption.value
+          yield* session.get(ctx.params.sessionID).pipe(Effect.catchTag("Session.NotFoundError", missingSession))
+          return { execs: yield* execAsync.list(ctx.params.sessionID) }
+        }),
+      )
+      .handle(
+        "session.execStatus",
+        Effect.fn(function* (ctx) {
+          if (Option.isNone(execAsyncOption))
+            return yield* new ServiceUnavailableError({ message: "exec async unavailable", service: "sandbox" })
+          const execAsync = execAsyncOption.value
+          yield* session.get(ctx.params.sessionID).pipe(Effect.catchTag("Session.NotFoundError", missingSession))
+          const snapshot = execAsync.get(ctx.params.execID)
+          if (snapshot === undefined)
+            return yield* new InvalidRequestError({ message: `exec not found: ${ctx.params.execID}` })
+          return snapshot
+        }),
+      )
+      .handle(
+        "session.execKill",
+        Effect.fn(function* (ctx) {
+          if (Option.isNone(execAsyncOption))
+            return yield* new ServiceUnavailableError({ message: "exec async unavailable", service: "sandbox" })
+          const execAsync = execAsyncOption.value
+          yield* session.get(ctx.params.sessionID).pipe(Effect.catchTag("Session.NotFoundError", missingSession))
+          const killed = yield* execAsync.kill(ctx.params.execID)
+          return { killed }
+        }),
+      )
+      .handle(
+        "session.execStream",
+        Effect.fn(function* (ctx) {
+          if (Option.isNone(execAsyncOption))
+            return yield* new ServiceUnavailableError({ message: "exec async unavailable", service: "sandbox" })
+          const execAsync = execAsyncOption.value
+          yield* session.get(ctx.params.sessionID).pipe(Effect.catchTag("Session.NotFoundError", missingSession))
+          const events = execAsync.events(ctx.params.execID)
+          if (events === undefined)
+            return yield* new InvalidRequestError({ message: `exec not found: ${ctx.params.execID}` })
+          return events
+        }),
+      )
+      .handle(
+        "session.keepAlive",
+        Effect.fn(function* (ctx) {
+          const info = yield* session
+            .get(ctx.params.sessionID)
+            .pipe(Effect.catchTag("Session.NotFoundError", missingSession))
+          const workspaceID = info.location.workspaceID
+          if (ctx.payload.enabled && workspaceID === undefined)
+            return yield* new InvalidRequestError({ message: "session has no sandbox workspace" })
+          if (workspaceID === undefined) return { keepAlive: false }
+          yield* workspace.setKeepAlive(workspaceID, ctx.payload.enabled)
+          // connect is per-operation lazy; boot must provision eagerly so the
+          // binding (sandbox) exists when the response returns.
+          if (ctx.payload.boot) yield* workspace.provision(workspaceID).pipe(Effect.orDie)
+          return { keepAlive: ctx.payload.enabled, workspaceID }
+        }),
+      )
+      .handle(
+        "session.keepAliveGet",
+        Effect.fn(function* (ctx) {
+          const info = yield* session
+            .get(ctx.params.sessionID)
+            .pipe(Effect.catchTag("Session.NotFoundError", missingSession))
+          const workspaceID = info.location.workspaceID
+          return { keepAlive: workspaceID === undefined ? false : workspace.isKeepAlive(workspaceID) }
+        }),
+      )
+      .handle(
+        "session.sandbox",
+        Effect.fn(function* (ctx) {
+          const info = yield* session
+            .get(ctx.params.sessionID)
+            .pipe(Effect.catchTag("Session.NotFoundError", missingSession))
+          return { workspaceID: info.location.workspaceID }
+        }),
+      )
+      .handle(
         "session.create",
         Effect.fn(function* (ctx) {
-          return {
-            data: yield* session
-              .create({
-                id: ctx.payload.id,
-                title: ctx.payload.title,
-                agent: ctx.payload.agent,
-                model: ctx.payload.model,
-                metadata: ctx.payload.metadata,
-                permissions: ctx.payload.permissions,
-                location: ctx.payload.location ?? { directory: AbsolutePath.make(process.cwd()) },
+          const location = ctx.payload.location ?? { directory: AbsolutePath.make(process.cwd()) }
+          const created = yield* session
+            .create({
+              id: ctx.payload.id,
+              title: ctx.payload.title,
+              appId: ctx.payload.appId,
+              summaryFrom: ctx.payload.summaryFrom,
+              agent: ctx.payload.agent,
+              model: ctx.payload.model,
+              metadata: ctx.payload.metadata,
+              permissions: ctx.payload.permissions,
+              sandbox: ctx.payload.sandbox,
+                // Sandbox wiring (SaaS): bind every session to its own
+                // OpenSandbox workspace unless the caller pinned one. The
+                // workspace is only a logical commit here; the sandbox is
+                // provisioned lazily on first tool execution (v1 parity).
+                location: yield* bindSandboxWorkspace(location, workspace, ctx.payload.sandbox),
               })
-              .pipe(Effect.orDie),
-          }
+              .pipe(Effect.orDie)
+          // v1 parity: enrich the response with the stored sandbox resource.
+          const workspaceID = created.location.workspaceID
+          const resource = workspaceID === undefined ? null : yield* workspace.resource(workspaceID).pipe(Effect.orElseSucceed(() => null))
+          return { data: { ...created, sandbox: resource === null ? undefined : { cpu: resource.cpu, memory: resource.memory } } }
         }),
       )
       .handle(
@@ -187,10 +452,13 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
       .handle(
         "session.get",
         Effect.fn(function* (ctx) {
+          const info = yield* session
+            .get(ctx.params.sessionID)
+            .pipe(Effect.catchTag("Session.NotFoundError", missingSession))
+          const workspaceID = info.location.workspaceID
+          const resource = workspaceID === undefined ? null : yield* workspace.resource(workspaceID).pipe(Effect.orElseSucceed(() => null))
           return {
-            data: yield* session
-              .get(ctx.params.sessionID)
-              .pipe(Effect.catchTag("Session.NotFoundError", missingSession)),
+            data: { ...info, sandbox: resource === null ? undefined : { cpu: resource.cpu, memory: resource.memory } },
           }
         }),
       )
@@ -206,7 +474,34 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
       .handle(
         "session.remove",
         Effect.fn(function* (ctx) {
+          // SaaS: destroying the session also destroys its sandbox workspace
+          // (v1's remove -> cancel + destroy linkage). Capture the location
+          // first; remove invalidates the row.
+          const info = yield* session
+            .get(ctx.params.sessionID)
+            .pipe(Effect.catchTag("Session.NotFoundError", missingSession))
+          // SaaS: sweep pending HITL asks before the session row goes away —
+          // in-memory pendings are settled with a terminal decision and the
+          // hitl_request rows are deleted (v1's FK cascade semantics). Both
+          // services are Location-scoped, so they resolve per-request here.
+          const permission = yield* Permission.Service
+          const form = yield* Form.Service
+          yield* permission.cancelBySession(ctx.params.sessionID)
+          yield* form.cancelBySession(ctx.params.sessionID)
+          yield* Hitl.deleteBySession(ctx.params.sessionID)
           yield* session.remove(ctx.params.sessionID).pipe(Effect.catchTag("Session.NotFoundError", missingSession))
+          const workspaceID = info.location.workspaceID
+          if (workspaceID !== undefined) {
+            yield* workspace.destroy(workspaceID).pipe(
+              // A stale workspace row (already destroyed) must not fail the
+              // session removal.
+              Effect.catchIf(
+                (error) => error._tag === "WorkspaceDriver.Error",
+                () => Effect.void,
+              ),
+              Effect.orDie,
+            )
+          }
           return HttpApiSchema.NoContent.make()
         }),
       )
@@ -255,7 +550,9 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
       .handle(
         "session.update",
         Effect.fn(function* (ctx) {
-          yield* session.get(ctx.params.sessionID).pipe(Effect.catchTag("Session.NotFoundError", missingSession))
+          const info = yield* session
+            .get(ctx.params.sessionID)
+            .pipe(Effect.catchTag("Session.NotFoundError", missingSession))
           if (ctx.payload.title !== undefined) {
             if (ctx.payload.title) {
               yield* session
@@ -270,6 +567,27 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
             yield* session
               .setPermissions({ sessionID: ctx.params.sessionID, permissions: ctx.payload.permissions })
               .pipe(Effect.catchTag("Session.NotFoundError", missingSession))
+          // v1 parity: update the workspace sandbox resource; with recreate the
+          // current sandbox is killed so the next use provisions with the new spec.
+          const workspaceID = info.location.workspaceID
+          if (ctx.payload.sandbox !== undefined && workspaceID !== undefined) {
+            yield* workspace
+              .setResource(workspaceID, { cpu: ctx.payload.sandbox.cpu, memory: ctx.payload.sandbox.memory })
+              .pipe(Effect.catchTag("Workspace.NotFound", () => Effect.void), Effect.orDie)
+            if (ctx.payload.recreate === true) {
+              const suspended = yield* workspace.suspend(workspaceID).pipe(Effect.exit)
+              if (!Exit.isSuccess(suspended)) {
+                yield* workspace.destroy(workspaceID).pipe(Effect.orDie)
+                yield* workspace
+                  .create({
+                    id: workspaceID,
+                    provider: SandboxOpenSandbox.PROVIDER,
+                    resource: { cpu: ctx.payload.sandbox.cpu, memory: ctx.payload.sandbox.memory },
+                  })
+                  .pipe(Effect.orDie)
+              }
+            }
+          }
           return HttpApiSchema.NoContent.make()
         }),
       )
@@ -300,6 +618,16 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
       .handle(
         "session.prompt",
         Effect.fn(function* (ctx) {
+          // SaaS: stamp the acting user onto the admitted message so HITL asks
+          // raised by this turn record their owner (v1's x-user-id -> ask.userId);
+          // `x-user-name` mirrors v1's per-message userName on the user message.
+          const request = yield* HttpServerRequest.HttpServerRequest
+          const userID = requestUserID(request)
+          const userName = requestUserName(request)
+          const identity = {
+            ...(userID === "" ? {} : { userId: userID }),
+            ...(userName === "" ? {} : { userName }),
+          }
           return {
             data: yield* session
               .prompt({
@@ -309,7 +637,9 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
                 files: ctx.payload.files,
                 agents: ctx.payload.agents,
                 skills: ctx.payload.skills,
-                metadata: ctx.payload.metadata,
+                format: ctx.payload.format,
+                metadata:
+                  Object.keys(identity).length === 0 ? ctx.payload.metadata : { ...ctx.payload.metadata, ...identity },
                 delivery: ctx.payload.delivery,
                 resume: ctx.payload.resume,
               })
@@ -331,6 +661,69 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
                 ),
               ),
           }
+        }),
+      )
+      .handle(
+        "session.promptStream",
+        Effect.fn(function* (ctx) {
+          const request = yield* HttpServerRequest.HttpServerRequest
+          const userID = requestUserID(request)
+          const userName = requestUserName(request)
+          yield* session
+            .get(ctx.params.sessionID)
+            .pipe(Effect.catchTag("Session.NotFoundError", missingSession))
+          // Subscribe before admitting so no event of this turn can be missed;
+          // the stream closes once the turn settles.
+          const queue = yield* Queue.unbounded<Event.Payload>()
+          const unsubscribe = yield* bus.listen((event) =>
+            Effect.sync(() => {
+              Queue.offerUnsafe(queue, event)
+            }),
+          )
+          const identity = {
+            ...(userID === "" ? {} : { userId: userID }),
+            ...(userName === "" ? {} : { userName }),
+          }
+          yield* session
+            .prompt({
+              sessionID: ctx.params.sessionID,
+              text: ctx.payload.text,
+              files: ctx.payload.files,
+              agents: ctx.payload.agents,
+              skills: ctx.payload.skills,
+              format: ctx.payload.format,
+              metadata:
+                Object.keys(identity).length === 0 ? ctx.payload.metadata : { ...ctx.payload.metadata, ...identity },
+              delivery: ctx.payload.delivery,
+            })
+            .pipe(
+              Effect.catchTag("Session.NotFoundError", missingSession),
+              Effect.catchTag("Session.PromptConflictError", (error) =>
+                Effect.fail(
+                  new ConflictError({
+                    message: `Prompt message ID conflicts with an existing durable record: ${error.messageID}`,
+                    resource: error.messageID,
+                  }),
+                ),
+              ),
+              Effect.catchTag("Session.AttachmentError", (error) =>
+                Effect.fail(new InvalidRequestError({ message: error.message, field: "files" })),
+              ),
+              Effect.catchTag("Session.SkillNotFoundError", (error) =>
+                Effect.fail(new InvalidRequestError({ message: `Skill not found: ${error.skill}`, field: "skills" })),
+              ),
+            )
+          const connected = { id: Event.ID.create(), type: "server.connected", data: {} } as unknown
+          return Stream.make(connected).pipe(
+            Stream.concat(
+              Stream.fromQueue(queue).pipe(
+                Stream.filter((event) => eventSessionID(event) === ctx.params.sessionID),
+                Stream.takeUntil(isTurnEnd),
+                Stream.map((event) => event as unknown),
+              ),
+            ),
+            Stream.ensuring(unsubscribe),
+          )
         }),
       )
       .handle(
@@ -365,6 +758,12 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
                 ),
               ),
             )
+          // v1 parity: signal that a custom command ran (arguments is the invocation text).
+          yield* bus.publish(Command.Event.Executed, {
+            sessionID: ctx.params.sessionID,
+            name: ctx.payload.name,
+            arguments: ctx.payload.text,
+          })
           return HttpApiSchema.NoContent.make()
         }),
       )
@@ -606,7 +1005,17 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
       .handle(
         "session.interrupt",
         Effect.fn(function* (ctx) {
-          return { interrupted: yield* session.interrupt(ctx.params.sessionID, { resume: ctx.query.resume }) }
+          const interrupted = yield* session.interrupt(ctx.params.sessionID, { resume: ctx.query.resume })
+          // SaaS: an interrupted run no longer waits on its HITL asks, so the
+          // pending list clears and the rows close as instance-restart (v1's
+          // abort sweep). Idle no-ops leave other owners' asks untouched.
+          if (interrupted) {
+            const permission = yield* Permission.Service
+            const form = yield* Form.Service
+            yield* permission.cancelBySession(ctx.params.sessionID, "instance-restart")
+            yield* form.cancelBySession(ctx.params.sessionID, "instance-restart")
+          }
+          return { interrupted }
         }),
       )
       .handle(
@@ -672,7 +1081,12 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
         "session.form.reply",
         Effect.fn(function* (ctx) {
           const owned = yield* requireOwnedForm(ctx.params.sessionID, ctx.params.formID)
-          yield* owned.form.reply({ id: ctx.params.formID, answer: ctx.payload.answer }).pipe(
+          const request = yield* HttpServerRequest.HttpServerRequest
+          yield* owned.form.reply({
+            id: ctx.params.formID,
+            answer: ctx.payload.answer,
+            userID: requestUserID(request),
+          }).pipe(
             Effect.catchTags({
               "Form.AlreadySettledError": (error) =>
                 new FormAlreadySettledError({ id: error.id, message: error.message }),
@@ -700,3 +1114,37 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
       )
   }),
 )
+
+/**
+ * Sandbox wiring (SaaS): when a sandbox provider is configured, allocate a
+ * logical workspace for this session so Location routes tool execution into
+ * the sandbox. Provisioning stays lazy (first tool execution), matching v1's
+ * getOrCreate semantics. Configured alongside the workspace driver in
+ * routes.ts; without a configured domain this is a no-op.
+ */
+const bindSandboxWorkspace = (
+  location: Location.Ref,
+  workspace: Workspace.Interface,
+  sandbox?: { readonly cpu: string; readonly memory: string },
+): Effect.Effect<Location.Ref> =>
+  Effect.gen(function* () {
+    if (location.workspaceID !== undefined) return location
+    if (SandboxOpenSandbox.fromEnv() === undefined) return location
+    const workspaceID = yield* workspace
+      .create({
+        provider: SandboxOpenSandbox.PROVIDER,
+        resource: sandbox === undefined ? undefined : { cpu: sandbox.cpu, memory: sandbox.memory },
+      })
+      .pipe(
+        Effect.catchTag("Workspace.CreateConflict", (conflict) => Effect.succeed(conflict.workspaceID)),
+        Effect.catchTag("WorkspaceDriver.ProviderNotFound", () => Effect.succeed(undefined)),
+      )
+    if (workspaceID === undefined) return location
+    // The sandbox has its own filesystem: Location must point at the
+    // in-sandbox working directory, not the host cwd (v1's toSandboxCwd
+    // semantics). Host-path -> sandbox-path mapping per directory comes later.
+    return Location.Ref.make({
+      directory: AbsolutePath.make(process.env["OPENCODE_SANDBOX_WORKDIR"] ?? "/workspace"),
+      workspaceID,
+    })
+  })

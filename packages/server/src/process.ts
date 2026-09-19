@@ -2,6 +2,8 @@ export * as ServerProcess from "./process"
 
 import { NodeHttpServer } from "@effect/platform-node"
 import { Bus } from "@opencode/core/bus"
+import { Session as SessionCore } from "@opencode/core/session"
+import { Workspace as WorkspaceCore } from "@opencode/core/workspace"
 import { SessionRestart } from "@opencode/core/session/execution/restart"
 import { InstallationEvent } from "@opencode/schema/installation-event"
 import { hasPtyConnectTicketURL } from "@opencode/protocol/groups/pty"
@@ -21,7 +23,10 @@ import { ServerAuth } from "./auth"
 import { isAllowedCorsOrigin } from "./cors"
 import { authorizedRequest } from "./middleware/authorization"
 import { withoutParentSpan } from "./request-tracing"
+import { Database } from "@opencode/core/database/database"
 import { createRoutes } from "./routes"
+import { SandboxFiles } from "./sandbox-files"
+import { SandboxProxy } from "./sandbox-proxy"
 import { ServerInfo } from "./server-info"
 import { Status } from "./service-status"
 import type { ServerOptions } from "./options"
@@ -116,7 +121,25 @@ export const start = Effect.fn("ServerProcess.start")(function* <E, R>(
         HttpMiddleware.compression(),
         Effect.provideService(HttpPlatform.HttpPlatform, Context.get(context, HttpPlatform.HttpPlatform)),
       )
-    yield* Ref.set(application, Option.some(transform ? transform(app) : app))
+    // Session-scoped file management endpoints are served from the
+    // RouteNotFound fallback, ahead of any caller-provided transform.
+    const sandboxProxyFallback = SandboxProxy.handler({
+      sessions: Context.get(context, SessionCore.Service),
+      workspace: Context.get(context, WorkspaceCore.Service),
+    })
+    const sandboxFilesFallback = SandboxFiles.handler({
+      sessions: Context.get(context, SessionCore.Service),
+      database: Context.get(context, Database.Service),
+      workspace: Context.get(context, WorkspaceCore.Service),
+    })
+    yield* Ref.set(
+      application,
+      Option.some(
+        transform
+          ? transform(sandboxFilesFallback(sandboxProxyFallback(app)))
+          : sandboxFilesFallback(sandboxProxyFallback(app)),
+      ),
+    )
     yield* status.ready
     const bus = Context.get(context, Bus.Service)
     return {

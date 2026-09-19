@@ -113,6 +113,9 @@ const processEffect = Effect.fnUntraced(function* (options: Options) {
           windows: {
             gitbash: process.env.OPENCODE_GIT_BASH_PATH,
           },
+          events: {
+            persist: truthy(process.env.OPENCODE_EVENT_PERSIST),
+          },
           fs: {
             filewatcher: !truthy(process.env.OPENCODE_FILEWATCHER_DISABLE ?? process.env.OPENCODE_DISABLE_FILEWATCHER),
             fff:
