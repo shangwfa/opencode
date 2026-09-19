@@ -6,6 +6,7 @@ import { HttpApiClient } from "effect/unstable/httpapi"
 import { ClientApi } from "../../contract"
 import type {
   ServerInfoOutput,
+  ServerDisposeOutput,
   LocationGetInput,
   LocationGetOutput,
   LocationReloadOutput,
@@ -23,6 +24,29 @@ import type {
   SessionListOutput,
   SessionStatsInput,
   SessionStatsOutput,
+  SessionStatusOutput,
+  SessionExecInput,
+  SessionExecOutput,
+  SessionExecAsyncInput,
+  SessionExecAsyncOutput,
+  SessionExecStatusInput,
+  SessionExecStatusOutput,
+  SessionExecListInput,
+  SessionExecListOutput,
+  SessionExecKillInput,
+  SessionExecKillOutput,
+  SessionExecStreamInput,
+  SessionExecStreamOutput,
+  SessionKeepAliveSetInput,
+  SessionKeepAliveSetOutput,
+  SessionKeepAliveGetInput,
+  SessionKeepAliveGetOutput,
+  SessionSandboxGetInput,
+  SessionSandboxGetOutput,
+  SessionSnapshotInput,
+  SessionSnapshotOutput,
+  SessionKillSandboxInput,
+  SessionKillSandboxOutput,
   SessionCreateInput,
   SessionCreateOutput,
   SessionImportInput,
@@ -46,6 +70,8 @@ import type {
   SessionMoveOutput,
   SessionPromptInput,
   SessionPromptOutput,
+  SessionPromptStreamInput,
+  SessionPromptStreamOutput,
   SessionCommandInput,
   SessionCommandOutput,
   SessionSkillInput,
@@ -106,6 +132,8 @@ import type {
   SessionViewOutput,
   MessageListInput,
   MessageListOutput,
+  MessageRemoveInput,
+  MessageRemoveOutput,
   ModelListInput,
   ModelListOutput,
   ModelDefaultInput,
@@ -281,7 +309,13 @@ const preserveStream =
 const EndpointServerInfo = (raw: RawClient["server.server"]) => () =>
   preserveEffect<ServerInfoOutput>()(raw["server.info"]({}).pipe(Effect.mapError(mapClientError)))
 
-const adaptGroupServer = (raw: RawClient["server.server"]) => ({ info: EndpointServerInfo(raw) })
+const EndpointServerDispose = (raw: RawClient["server.server"]) => () =>
+  preserveEffect<ServerDisposeOutput>()(raw["server.dispose"]({}).pipe(Effect.mapError(mapClientError)))
+
+const adaptGroupServer = (raw: RawClient["server.server"]) => ({
+  info: EndpointServerInfo(raw),
+  dispose: EndpointServerDispose(raw),
+})
 
 const EndpointLocationGet = (raw: RawClient["server.location"]) => (input?: LocationGetInput) =>
   preserveEffect<LocationGetOutput>()(
@@ -342,6 +376,7 @@ const EndpointSessionList = (raw: RawClient["server.session"]) => (input?: Sessi
   preserveEffect<SessionListOutput>()(
     raw["session.list"]({
       query: {
+        appId: input?.["appId"],
         limit: input?.["limit"],
         order: input?.["order"],
         search: input?.["search"],
@@ -370,17 +405,109 @@ const EndpointSessionStats = (raw: RawClient["server.session"]) => (input?: Sess
     ),
   )
 
+const EndpointSessionStatus = (raw: RawClient["server.session"]) => () =>
+  preserveEffect<SessionStatusOutput>()(
+    raw["session.status"]({}).pipe(
+      Effect.mapError(mapClientError),
+      Effect.map((value) => value.data),
+    ),
+  )
+
+const EndpointSessionExec = (raw: RawClient["server.session"]) => (input: SessionExecInput) =>
+  preserveEffect<SessionExecOutput>()(
+    raw["session.exec"]({
+      params: { sessionID: input["sessionID"] },
+      payload: {
+        command: input["command"],
+        workingDirectory: input["workingDirectory"],
+        timeoutSeconds: input["timeoutSeconds"],
+      },
+    }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const EndpointSessionExecAsync = (raw: RawClient["server.session"]) => (input: SessionExecAsyncInput) =>
+  preserveEffect<SessionExecAsyncOutput>()(
+    raw["session.execAsync"]({
+      params: { sessionID: input["sessionID"] },
+      payload: {
+        command: input["command"],
+        workingDirectory: input["workingDirectory"],
+        timeoutSeconds: input["timeoutSeconds"],
+      },
+    }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const EndpointSessionExecStatus = (raw: RawClient["server.session"]) => (input: SessionExecStatusInput) =>
+  preserveEffect<SessionExecStatusOutput>()(
+    raw["session.execStatus"]({ params: { sessionID: input["sessionID"], execID: input["execID"] } }).pipe(
+      Effect.mapError(mapClientError),
+    ),
+  )
+
+const EndpointSessionExecList = (raw: RawClient["server.session"]) => (input: SessionExecListInput) =>
+  preserveEffect<SessionExecListOutput>()(
+    raw["session.execs"]({ params: { sessionID: input["sessionID"] } }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const EndpointSessionExecKill = (raw: RawClient["server.session"]) => (input: SessionExecKillInput) =>
+  preserveEffect<SessionExecKillOutput>()(
+    raw["session.execKill"]({ params: { sessionID: input["sessionID"], execID: input["execID"] } }).pipe(
+      Effect.mapError(mapClientError),
+    ),
+  )
+
+const EndpointSessionExecStream = (raw: RawClient["server.session"]) => (input: SessionExecStreamInput) =>
+  preserveStream<SessionExecStreamOutput>()(
+    Stream.unwrap(
+      raw["session.execStream"]({ params: { sessionID: input["sessionID"], execID: input["execID"] } }).pipe(
+        Effect.mapError(mapClientError),
+        Effect.map((stream) => stream.pipe(Stream.mapError(mapClientError))),
+      ),
+    ),
+  )
+
+const EndpointSessionKeepAliveSet = (raw: RawClient["server.session"]) => (input: SessionKeepAliveSetInput) =>
+  preserveEffect<SessionKeepAliveSetOutput>()(
+    raw["session.keepAlive"]({
+      params: { sessionID: input["sessionID"] },
+      payload: { enabled: input["enabled"], boot: input["boot"] },
+    }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const EndpointSessionKeepAliveGet = (raw: RawClient["server.session"]) => (input: SessionKeepAliveGetInput) =>
+  preserveEffect<SessionKeepAliveGetOutput>()(
+    raw["session.keepAliveGet"]({ params: { sessionID: input["sessionID"] } }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const EndpointSessionSandboxGet = (raw: RawClient["server.session"]) => (input: SessionSandboxGetInput) =>
+  preserveEffect<SessionSandboxGetOutput>()(
+    raw["session.sandbox"]({ params: { sessionID: input["sessionID"] } }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const EndpointSessionSnapshot = (raw: RawClient["server.session"]) => (input: SessionSnapshotInput) =>
+  preserveEffect<SessionSnapshotOutput>()(
+    raw["session.snapshot"]({ params: { sessionID: input["sessionID"] } }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const EndpointSessionKillSandbox = (raw: RawClient["server.session"]) => (input: SessionKillSandboxInput) =>
+  preserveEffect<SessionKillSandboxOutput>()(
+    raw["session.killSandbox"]({ params: { sessionID: input["sessionID"] } }).pipe(Effect.mapError(mapClientError)),
+  )
+
 const EndpointSessionCreate = (raw: RawClient["server.session"]) => (input?: SessionCreateInput) =>
   preserveEffect<SessionCreateOutput>()(
     raw["session.create"]({
       payload: {
         id: input?.["id"],
         title: input?.["title"],
+        appId: input?.["appId"],
+        summaryFrom: input?.["summaryFrom"],
         agent: input?.["agent"],
         model: input?.["model"],
         location: input?.["location"],
         metadata: input?.["metadata"],
         permissions: input?.["permissions"],
+        sandbox: input?.["sandbox"],
       },
     }).pipe(
       Effect.mapError(mapClientError),
@@ -453,7 +580,12 @@ const EndpointSessionUpdate = (raw: RawClient["server.session"]) => (input: Sess
   preserveEffect<SessionUpdateOutput>()(
     raw["session.update"]({
       params: { sessionID: input["sessionID"] },
-      payload: { title: input["title"], permissions: input["permissions"] },
+      payload: {
+        title: input["title"],
+        permissions: input["permissions"],
+        sandbox: input["sandbox"],
+        recreate: input["recreate"],
+      },
     }).pipe(Effect.mapError(mapClientError)),
   )
 
@@ -475,6 +607,7 @@ const EndpointSessionPrompt = (raw: RawClient["server.session"]) => (input: Sess
         files: input["files"],
         agents: input["agents"],
         skills: input["skills"],
+        format: input["format"],
         metadata: input["metadata"],
         delivery: input["delivery"],
         resume: input["resume"],
@@ -482,6 +615,27 @@ const EndpointSessionPrompt = (raw: RawClient["server.session"]) => (input: Sess
     }).pipe(
       Effect.mapError(mapClientError),
       Effect.map((value) => value.data),
+    ),
+  )
+
+const EndpointSessionPromptStream = (raw: RawClient["server.session"]) => (input: SessionPromptStreamInput) =>
+  preserveStream<SessionPromptStreamOutput>()(
+    Stream.unwrap(
+      raw["session.promptStream"]({
+        params: { sessionID: input["sessionID"] },
+        payload: {
+          text: input["text"],
+          files: input["files"],
+          agents: input["agents"],
+          skills: input["skills"],
+          format: input["format"],
+          metadata: input["metadata"],
+          delivery: input["delivery"],
+        },
+      }).pipe(
+        Effect.mapError(mapClientError),
+        Effect.map((stream) => stream.pipe(Stream.mapError(mapClientError))),
+      ),
     ),
   )
 
@@ -495,6 +649,7 @@ const EndpointSessionCommand = (raw: RawClient["server.session"]) => (input: Ses
         files: input["files"],
         agents: input["agents"],
         skills: input["skills"],
+        format: input["format"],
         delivery: input["delivery"],
       },
     }).pipe(Effect.mapError(mapClientError)),
@@ -740,6 +895,17 @@ const EndpointSessionView = (raw: RawClient["server.session"]) => (input: Sessio
 const adaptGroupSession = (raw: RawClient["server.session"]) => ({
   list: EndpointSessionList(raw),
   stats: EndpointSessionStats(raw),
+  status: EndpointSessionStatus(raw),
+  exec: EndpointSessionExec(raw),
+  execAsync: EndpointSessionExecAsync(raw),
+  execStatus: EndpointSessionExecStatus(raw),
+  execList: EndpointSessionExecList(raw),
+  execKill: EndpointSessionExecKill(raw),
+  execStream: EndpointSessionExecStream(raw),
+  keepAlive: { set: EndpointSessionKeepAliveSet(raw), get: EndpointSessionKeepAliveGet(raw) },
+  sandbox: { get: EndpointSessionSandboxGet(raw) },
+  snapshot: EndpointSessionSnapshot(raw),
+  killSandbox: EndpointSessionKillSandbox(raw),
   create: EndpointSessionCreate(raw),
   import: EndpointSessionImport(raw),
   export: EndpointSessionExport(raw),
@@ -752,6 +918,7 @@ const adaptGroupSession = (raw: RawClient["server.session"]) => ({
   update: EndpointSessionUpdate(raw),
   move: EndpointSessionMove(raw),
   prompt: EndpointSessionPrompt(raw),
+  prompt_stream: EndpointSessionPromptStream(raw),
   command: EndpointSessionCommand(raw),
   skill: EndpointSessionSkill(raw),
   synthetic: EndpointSessionSynthetic(raw),
@@ -801,7 +968,17 @@ const EndpointMessageList = (raw: RawClient["server.message"]) => (input: Messag
     }).pipe(Effect.mapError(mapClientError)),
   )
 
-const adaptGroupMessage = (raw: RawClient["server.message"]) => ({ list: EndpointMessageList(raw) })
+const EndpointMessageRemove = (raw: RawClient["server.message"]) => (input: MessageRemoveInput) =>
+  preserveEffect<MessageRemoveOutput>()(
+    raw["session.message.remove"]({ params: { sessionID: input["sessionID"], messageID: input["messageID"] } }).pipe(
+      Effect.mapError(mapClientError),
+    ),
+  )
+
+const adaptGroupMessage = (raw: RawClient["server.message"]) => ({
+  list: EndpointMessageList(raw),
+  remove: EndpointMessageRemove(raw),
+})
 
 const EndpointModelList = (raw: RawClient["server.model"]) => (input?: ModelListInput) =>
   preserveEffect<ModelListOutput>()(

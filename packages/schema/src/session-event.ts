@@ -48,6 +48,8 @@ const options = {
     version: 1,
   },
 } as const
+const AppID = Schema.String.check(Schema.isPattern(/^[\w\-.]{1,128}$/)).annotate({ identifier: "Session.AppID" })
+
 export const Created = Event.durable({
   type: "session.created",
   ...options,
@@ -64,6 +66,8 @@ export const Created = Event.durable({
     /** Host-supplied annotations resolved at creation, including any inherited from a parent. */
     metadata: SessionMetadata.pipe(optional),
     permissions: Permission.Ruleset.pipe(optional),
+    /** Business-side application identifier for aggregating sessions (v1's appId). */
+    appId: AppID.pipe(optional),
     version: Schema.String,
   },
 })
@@ -144,6 +148,16 @@ export const MessageContentUpdated = Event.durable({
   },
 })
 export type MessageContentUpdated = typeof MessageContentUpdated.Type
+
+export const MessageRemoved = Event.durable({
+  type: "session.message.removed",
+  ...options,
+  schema: {
+    ...Base,
+    messageID: SessionMessage.ID,
+  },
+})
+export type MessageRemoved = typeof MessageRemoved.Type
 
 export const UsageRecorded = Event.durable({
   type: "session.usage.recorded",
@@ -328,6 +342,8 @@ export namespace Step {
       agent: Agent.ID,
       model: Model.Ref,
       snapshot: Snapshot.ID.pipe(optional),
+      /** Marks the step as a session-derived summary (v1's summaryFrom parity). */
+      summary: Schema.Boolean.pipe(optional),
     },
   })
   export type Started = typeof Started.Type
@@ -603,6 +619,8 @@ export namespace Compaction {
       providerContext: SessionMessage.CompactionCompleted.fields.providerContext,
       text: Schema.String,
       recent: Schema.String,
+      /** Sandbox/local path of the full untruncated compacted history written on compaction. */
+      historyPath: SessionMessage.CompactionCompleted.fields.historyPath,
       // Repeats the internal `session.usage.recorded` figures: that event never reaches clients, and it
       // stays the accounting source for session totals and stats.
       cost: SessionMessage.CompactionCompleted.fields.cost,
@@ -648,6 +666,7 @@ export const Definitions = Event.inventory(
   Renamed,
   Permissions,
   Viewed,
+  MessageRemoved,
   UsageUpdated,
   Deleted,
   Forked,

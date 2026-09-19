@@ -37,10 +37,12 @@ import { Skill } from "@opencode/schema/skill"
 import { Model } from "@opencode/schema/model"
 import { Permission } from "@opencode/schema/permission"
 import { Location } from "@opencode/schema/location"
+import { Workspace } from "@opencode/schema/workspace"
 import { SessionEvent } from "@opencode/schema/session-event"
 import { EventLog } from "@opencode/schema/event-log"
 import { FileDiff } from "@opencode/schema/file-diff"
 import { Form } from "@opencode/schema/form"
+import { SandboxResource } from "@opencode/schema/sandbox-resource"
 import { PublicSessionMessage } from "./message.js"
 
 const ParentIDFilter = Schema.Union([
@@ -56,6 +58,9 @@ const ParentIDFilter = Schema.Union([
 })
 
 const SessionsQueryFields = {
+  appId: Schema.String.pipe(Schema.optional).annotate({
+    description: "Only return sessions created with this business application id.",
+  }),
   limit: Schema.NumberFromString.pipe(Schema.decodeTo(PositiveInt), Schema.optional).annotate({
     description: "Maximum number of sessions to return. Defaults to the newest 50 sessions.",
   }),
@@ -119,7 +124,9 @@ const SessionActive = Schema.Struct({
 
 const PublicSessionInfo = Schema.Struct({
   ...Struct.omit(Session.Info.fields, ["location"]),
-  location: Location.PublicRef,
+  // SaaS: expose the bound workspace so clients can address sandbox files via
+  // the fs endpoints (x-opencode-workspace). Upstream's PublicRef omits it.
+  location: Location.Ref,
 }).annotate({ identifier: "Session.Info" })
 
 const PublicSessionTransfer = Schema.Struct({
@@ -175,7 +182,13 @@ export const makeSessionGroup = <
   S,
   FormI extends HttpApiMiddleware.AnyId,
   FormS,
->(sessionLocationMiddleware: Context.Key<I, S>, formLocationMiddleware: Context.Key<FormI, FormS>) =>
+  LI extends HttpApiMiddleware.AnyId,
+  LS,
+>(
+  sessionLocationMiddleware: Context.Key<I, S>,
+  formLocationMiddleware: Context.Key<FormI, FormS>,
+  locationMiddleware: Context.Key<LI, LS>,
+) =>
   HttpApiGroup.make("server.session")
     .add(
       HttpApiEndpoint.get("session.list", "/api/session", {
@@ -217,21 +230,269 @@ export const makeSessionGroup = <
       ),
     )
     .add(
+      HttpApiEndpoint.get("session.status", "/api/session/status", {
+        success: Schema.Struct({
+          data: Schema.Struct({
+            active: Schema.Array(Session.ID),
+          }).annotate({ identifier: "SessionStatusResponse" }),
+        }).annotate({ identifier: "SessionActiveStatus" }),
+      }).annotateMerge(
+        OpenApi.annotations({
+          identifier: "session.status",
+          summary: "Get session status",
+          description:
+            "Snapshot the sessions whose execution this process currently owns (the busy set; everything else is idle).",
+        }),
+      ),
+    )
+    .add(
+      HttpApiEndpoint.post("session.exec", "/api/session/:sessionID/exec", {
+        params: { sessionID: Session.ID },
+        payload: Schema.Struct({
+          command: Schema.String,
+          workingDirectory: Schema.String.pipe(Schema.optional),
+          timeoutSeconds: Schema.Number.pipe(Schema.optional),
+        }),
+        success: Schema.Struct({
+          exitCode: Schema.Number,
+          stdout: Schema.String,
+          stderr: Schema.String,
+          signal: Schema.String.pipe(Schema.optional),
+          oomSuspected: Schema.Boolean.pipe(Schema.optional),
+        }).annotate({ identifier: "SessionExecResult" }),
+        error: [SessionNotFoundError],
+      })
+        .middleware(sessionLocationMiddleware)
+        .annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.exec",
+            summary: "Run a command in the session sandbox",
+            description:
+              "Executes a shell command inside the session's sandbox workspace (created on demand). Synchronous: waits for exit.",
+          }),
+        ),
+    )
+    .add(
+      HttpApiEndpoint.post("session.execAsync", "/api/session/:sessionID/exec/async", {
+        params: { sessionID: Session.ID },
+        payload: Schema.Struct({
+          command: Schema.String,
+          workingDirectory: Schema.String.pipe(Schema.optional),
+          timeoutSeconds: Schema.Number.pipe(Schema.optional),
+        }),
+        success: Schema.Struct({
+          execId: Schema.String,
+          status: Schema.Literals(["running"]),
+        }).annotate({ identifier: "SessionExecAsyncStarted" }),
+        error: [ServiceUnavailableError, SessionNotFoundError],
+      })
+        .middleware(sessionLocationMiddleware)
+        .annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.execAsync",
+            summary: "Start a detached sandbox command",
+            description:
+              "Starts a shell command inside the session's sandbox and returns immediately. Stream logs via /exec/:execID/stream or poll /exec/:execID.",
+          }),
+        ),
+    )
+    .add(
+      HttpApiEndpoint.get("session.execStatus", "/api/session/:sessionID/exec/:execID", {
+        params: { sessionID: Session.ID, execID: Schema.String },
+        success: Schema.Struct({
+          id: Schema.String,
+          command: Schema.String,
+          status: Schema.Literals(["running", "completed", "failed", "killed", "timed_out"]),
+          exitCode: Schema.Number.pipe(Schema.optional),
+          stdout: Schema.String.pipe(Schema.optional),
+          stderr: Schema.String.pipe(Schema.optional),
+          workingDirectory: Schema.String.pipe(Schema.optional),
+          startedAt: Schema.Number,
+          finishedAt: Schema.Number.pipe(Schema.optional),
+        }).annotate({ identifier: "SessionExecStatus" }),
+        error: [ServiceUnavailableError, SessionNotFoundError],
+      })
+        .middleware(sessionLocationMiddleware)
+        .annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.execStatus",
+            summary: "Query a detached command",
+          }),
+        ),
+    )
+    .add(
+      HttpApiEndpoint.get("session.execs", "/api/session/:sessionID/execs", {
+        params: { sessionID: Session.ID },
+        success: Schema.Struct({
+          execs: Schema.Array(
+            Schema.Struct({
+              id: Schema.String,
+              command: Schema.String,
+              status: Schema.Literals(["running", "completed", "failed", "killed", "timed_out"]),
+              exitCode: Schema.Number.pipe(Schema.optional),
+              startedAt: Schema.Number,
+              finishedAt: Schema.Number.pipe(Schema.optional),
+            }),
+          ),
+        }).annotate({ identifier: "SessionExecList" }),
+        error: [ServiceUnavailableError, SessionNotFoundError],
+      })
+        .middleware(sessionLocationMiddleware)
+        .annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.execList",
+            summary: "List detached commands",
+          }),
+        ),
+    )
+    .add(
+      HttpApiEndpoint.post("session.execKill", "/api/session/:sessionID/exec/:execID/kill", {
+        params: { sessionID: Session.ID, execID: Schema.String },
+        success: Schema.Struct({ killed: Schema.Boolean }).annotate({ identifier: "SessionExecKillResult" }),
+        error: [ServiceUnavailableError, SessionNotFoundError],
+      })
+        .middleware(sessionLocationMiddleware)
+        .annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.execKill",
+            summary: "Kill a detached command",
+          }),
+        ),
+    )
+    .add(
+      HttpApiEndpoint.get("session.execStream", "/api/session/:sessionID/exec/:execID/stream", {
+        params: { sessionID: Session.ID, execID: Schema.String },
+        success: HttpApiSchema.StreamSse({
+          data: Schema.Struct({
+            event: Schema.Literals(["stdout", "stderr", "done"]),
+            text: Schema.String.pipe(Schema.optional),
+            status: Schema.String.pipe(Schema.optional),
+            exitCode: Schema.Number.pipe(Schema.optional),
+          }),
+        }),
+        error: [ServiceUnavailableError, SessionNotFoundError],
+      })
+        .middleware(sessionLocationMiddleware)
+        .annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.execStream",
+            summary: "Stream a detached command's output",
+          }),
+        ),
+    )
+    .add(
+      HttpApiEndpoint.post("session.keepAlive", "/api/session/:sessionID/keep-alive", {
+        params: { sessionID: Session.ID },
+        payload: Schema.Struct({
+          enabled: Schema.Boolean,
+          boot: Schema.Boolean.pipe(Schema.optional),
+        }),
+        success: Schema.Struct({
+          keepAlive: Schema.Boolean,
+          workspaceID: Workspace.ID.pipe(Schema.optional),
+        }).annotate({ identifier: "SessionKeepAliveResult" }),
+        error: [SessionNotFoundError],
+      })
+        .middleware(sessionLocationMiddleware)
+        .annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.keepAlive.set",
+            summary: "Keep the session sandbox alive (v1 parity)",
+            description:
+              "Marks the session's sandbox as exempt from idle suspension. With boot=true the sandbox is provisioned immediately.",
+          }),
+        ),
+    )
+    .add(
+      HttpApiEndpoint.get("session.keepAliveGet", "/api/session/:sessionID/keep-alive", {
+        params: { sessionID: Session.ID },
+        success: Schema.Struct({ keepAlive: Schema.Boolean }).annotate({ identifier: "SessionKeepAliveStatus" }),
+        error: [SessionNotFoundError],
+      })
+        .middleware(sessionLocationMiddleware)
+        .annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.keepAlive.get",
+            summary: "Query the keep-alive flag",
+          }),
+        ),
+    )
+    .add(
+      HttpApiEndpoint.get("session.sandbox", "/api/session/:sessionID/sandbox", {
+        params: { sessionID: Session.ID },
+        success: Schema.Struct({
+          workspaceID: Workspace.ID.pipe(Schema.optional),
+        }).annotate({ identifier: "SessionSandboxStatus" }),
+        error: [SessionNotFoundError],
+      })
+        .middleware(sessionLocationMiddleware)
+        .annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.sandbox.get",
+            summary: "Query the session sandbox",
+          }),
+        ),
+    )
+    .add(
+      HttpApiEndpoint.post("session.snapshot", "/api/session/:sessionID/snapshot", {
+        params: { sessionID: Session.ID },
+        success: Schema.Struct({
+          snapshotId: Schema.String,
+        }).annotate({ identifier: "SessionSnapshotResult" }),
+        error: [ServiceUnavailableError, SessionNotFoundError],
+      })
+        .middleware(sessionLocationMiddleware)
+        .annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.snapshot",
+            summary: "Snapshot the session sandbox",
+            description:
+              "Creates a snapshot of the sandbox's current state without killing it. The sandbox stays running; the binding records the snapshot for later restore.",
+          }),
+        ),
+    )
+    .add(
+      HttpApiEndpoint.post("session.killSandbox", "/api/session/:sessionID/kill-sandbox", {
+        params: { sessionID: Session.ID },
+        success: Schema.Struct({
+          workspaceID: Workspace.ID.pipe(Schema.optional),
+          destroyed: Schema.Boolean,
+        }).annotate({ identifier: "SessionKillSandboxResult" }),
+        error: [SessionNotFoundError],
+      })
+        .middleware(sessionLocationMiddleware)
+        .annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.killSandbox",
+            summary: "Destroy the session sandbox",
+            description:
+              "Destroys the session's sandbox workspace. The next tool execution or exec provisions a fresh sandbox (v1 kill-sandbox parity).",
+          }),
+        ),
+    )
+    .add(
       HttpApiEndpoint.post("session.create", "/api/session", {
         payload: Schema.Struct({
           id: Session.ID.pipe(Schema.optional),
           title: Schema.String.pipe(Schema.optional),
+          /** Business-side application identifier; 1-128 chars of [a-zA-Z0-9_-.]. */
+          appId: Schema.String.check(Schema.isPattern(/^[\w\-.]{1,128}$/)).pipe(Schema.optional),
+          /** Derives a fresh summary of this source session into the new session (v1 summaryFrom). */
+          summaryFrom: Session.ID.pipe(Schema.optional),
           agent: Agent.ID.pipe(Schema.optional),
           model: Model.Ref.pipe(Schema.optional),
           location: Location.PublicRef.pipe(Schema.optional),
           metadata: Session.Metadata.pipe(Schema.optional),
           permissions: Permission.Ruleset.pipe(Schema.optional),
+          sandbox: SandboxResource.Resource.pipe(Schema.optional),
         }),
         success: Schema.Struct({ data: PublicSessionInfo }),
-      }).annotateMerge(
-        OpenApi.annotations({
-          identifier: "session.create",
-          summary: "Create session",
+      })
+        .middleware(locationMiddleware)
+        .annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.create",
+            summary: "Create session",
           description: "Create a session at the requested location.",
         }),
       ),
@@ -297,7 +558,9 @@ export const makeSessionGroup = <
         params: { sessionID: Session.ID },
         success: HttpApiSchema.NoContent,
         error: SessionNotFoundError,
-      }).annotateMerge(
+      })
+        .middleware(sessionLocationMiddleware)
+        .annotateMerge(
         OpenApi.annotations({
           identifier: "session.remove",
           summary: "Delete session",
@@ -360,6 +623,8 @@ export const makeSessionGroup = <
         payload: Schema.Struct({
           title: Schema.String.pipe(Schema.optional),
           permissions: Permission.Ruleset.pipe(Schema.optional),
+          sandbox: SandboxResource.Resource.pipe(Schema.optional),
+          recreate: Schema.Boolean.pipe(Schema.optional),
         }),
         success: HttpApiSchema.NoContent,
         error: SessionNotFoundError,
@@ -406,6 +671,27 @@ export const makeSessionGroup = <
             identifier: "session.prompt",
             summary: "Send message",
             description: "Durably admit one session input and schedule agent-loop execution unless resume is false.",
+          }),
+        ),
+    )
+    .add(
+      HttpApiEndpoint.post("session.promptStream", "/api/session/:sessionID/prompt_stream", {
+        params: { sessionID: Session.ID },
+        payload: Schema.Struct({
+          ...PromptInput.Prompt.fields,
+          metadata: SessionInbox.UserPayload.fields.metadata,
+          delivery: SessionInbox.Delivery.pipe(Schema.optional),
+        }),
+        success: HttpApiSchema.StreamSse({ data: Schema.Unknown }),
+        error: [ConflictError, InvalidRequestError, SessionNotFoundError],
+      })
+        .middleware(sessionLocationMiddleware)
+        .annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.prompt_stream",
+            summary: "Send message and stream the turn",
+            description:
+              "Admit one session input and stream that session's events until the turn settles (execution succeeded/failed/interrupted), then close the stream.",
           }),
         ),
     )

@@ -12,6 +12,7 @@ import { Provider } from "../src/provider.js"
 import { Pty } from "../src/pty.js"
 import { Session } from "../src/session.js"
 import { SessionMessage } from "../src/session-message.js"
+import { SessionEvent } from "../src/session-event.js"
 import { SessionInbox } from "../src/session-inbox.js"
 import { FileDiff } from "../src/file-diff.js"
 import { Money } from "../src/money.js"
@@ -331,5 +332,44 @@ describe("contract hygiene", () => {
       snapshot: "tree",
       files: [{ file: "src/index.ts", status: "modified", additions: 1, deletions: 0, patch: "@@" }],
     })
+  })
+
+  test("keeps the compaction history path optional across event and message contracts", () => {
+    const base = {
+      id: SessionMessage.ID.make("msg_history"),
+      type: "compaction" as const,
+      status: "completed" as const,
+      reason: "auto" as const,
+      summary: "summary",
+      recent: "recent",
+      time: { created: DateTime.makeUnsafe(0) },
+    }
+    // Absent historyPath stays absent: older durable events replay unchanged.
+    expect(SessionMessage.CompactionCompleted.make(base)).not.toHaveProperty("historyPath")
+    const path = "/workspace/.opencode/tool-output/tool_history_msg_history.md"
+    expect(
+      Schema.decodeUnknownSync(SessionMessage.CompactionCompleted)({
+        ...base,
+        time: { created: 0 },
+        historyPath: path,
+      }),
+    ).toMatchObject({ historyPath: path })
+
+    const ended = {
+      sessionID: Session.ID.make("ses_contract"),
+      reason: "auto" as const,
+      text: "summary",
+      recent: "recent",
+      historyPath: path,
+    }
+    expect(Schema.encodeSync(SessionEvent.Compaction.Ended.data)(ended)).toMatchObject({ historyPath: path })
+    expect(
+      Schema.decodeUnknownSync(SessionEvent.Compaction.Ended.data)({
+        sessionID: Session.ID.make("ses_contract"),
+        reason: "auto",
+        text: "summary",
+        recent: "recent",
+      }),
+    ).not.toHaveProperty("historyPath")
   })
 })

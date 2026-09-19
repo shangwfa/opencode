@@ -13,6 +13,7 @@ import { Money } from "./money.js"
 import { Permission } from "./permission.js"
 import { TokenUsage } from "./token-usage.js"
 import { Revert } from "./session-revert.js"
+import { SandboxResource } from "./sandbox-resource.js"
 import { SessionFork } from "./session-fork.js"
 
 export const ID = SessionID
@@ -50,11 +51,15 @@ export const Info = Schema.Struct({
     archived: DateTimeUtcFromMillis.pipe(optional),
   }),
   title: Schema.String.pipe(optional),
+  /** Business-side application identifier; aggregate sessions by it (v1 appId). */
+  appId: Schema.String.pipe(optional),
   location: Location.Ref,
   subpath: RelativePath.pipe(optional),
   metadata: Metadata.pipe(optional),
   /** Evaluated after the agent's rules; the last matching rule wins. */
   permissions: Permission.Ruleset.pipe(optional),
+  /** Session-level sandbox resource spec (cpu/memory); applied when the sandbox is provisioned. */
+  sandbox: SandboxResource.Resource.pipe(optional),
   revert: Revert.pipe(optional),
 }).annotate({ identifier: "Session.Info" })
 

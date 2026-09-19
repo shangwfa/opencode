@@ -58,8 +58,19 @@ type SessionGroups<
   SessionLocationService,
   FormLocationId extends HttpApiMiddleware.AnyId,
   FormLocationService,
+  LocationId extends HttpApiMiddleware.AnyId,
+  LocationService,
 > =
-  | ReturnType<typeof makeSessionGroup<SessionLocationId, SessionLocationService, FormLocationId, FormLocationService>>
+  | ReturnType<
+      typeof makeSessionGroup<
+        SessionLocationId,
+        SessionLocationService,
+        FormLocationId,
+        FormLocationService,
+        LocationId,
+        LocationService
+      >
+    >
   | typeof MessageGroup
 
 type FormGroups<LocationId extends HttpApiMiddleware.AnyId, LocationService> = ReturnType<
@@ -96,7 +107,7 @@ type ApiGroups<
   | LocationGroups<LocationId>
   | LocationGroup<LocationId, LocationService>
   | FormGroups<LocationId, LocationService>
-  | SessionGroups<SessionLocationId, SessionLocationService, FormLocationId, FormLocationService>
+  | SessionGroups<SessionLocationId, SessionLocationService, FormLocationId, FormLocationService, LocationId, LocationService>
   | MixedMiddlewareGroups<LocationId, LocationService, SessionLocationId, SessionLocationService>
   | Event
 
@@ -157,7 +168,7 @@ const makeApiFromGroup = <
     .add(makeLocationGroup(locationMiddleware))
     .add(AgentGroup.middleware(locationMiddleware))
     .add(PluginGroup.middleware(locationMiddleware))
-    .add(makeSessionGroup(sessionLocationMiddleware, formLocationMiddleware))
+    .add(makeSessionGroup(sessionLocationMiddleware, formLocationMiddleware, locationMiddleware))
     .add(MessageGroup)
     .add(ModelGroup.middleware(locationMiddleware))
     .add(GenerateGroup)

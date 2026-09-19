@@ -77,6 +77,7 @@ export const User = Schema.Struct({
   files: Prompt.fields.files,
   agents: Prompt.fields.agents,
   skills: Prompt.fields.skills,
+  format: Prompt.fields.format,
   type: Schema.tag("user"),
 }).annotate({ identifier: "Session.Message.User" })
 
@@ -214,6 +215,10 @@ export const Assistant = Schema.Struct({
   type: Schema.tag("assistant"),
   agent: Agent.ID,
   model: Model.Ref,
+  /** Marks a session-derived summary message (v1's summaryFrom parity). */
+  summary: Schema.Boolean.pipe(optional),
+  /** Captured `StructuredOutput` tool arguments when the prompt requested a JSON Schema format. */
+  structured: Schema.Record(Schema.String, Schema.Unknown).pipe(optional),
   content: AssistantContent.pipe(Schema.Array),
   snapshot: Schema.Struct({
     start: Snapshot.ID.pipe(optional),
@@ -261,6 +266,8 @@ export const CompactionCompleted = Schema.Struct({
   providerState: ProviderState.pipe(optional),
   summary: Schema.String,
   recent: Schema.String,
+  /** Path of the full compacted-history file (sandbox `/workspace/.opencode/tool-output` or local data dir). */
+  historyPath: Schema.String.pipe(optional),
   providerContext: SessionProviderContext.Info.pipe(optional),
   ...CompactionUsage,
 }).annotate({ identifier: "Session.Message.Compaction.Completed" })

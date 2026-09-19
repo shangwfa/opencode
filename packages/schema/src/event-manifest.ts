@@ -12,7 +12,6 @@ import { FileSystemV1 } from "./filesystem-v1.js"
 import { Form } from "./form.js"
 import { InstallationEvent } from "./installation-event.js"
 import { Integration } from "./integration.js"
-import { LegacyEventV1 } from "./legacy-event.js"
 import { LspEvent } from "./lsp-event.js"
 import { LocationEvent } from "./location-event.js"
 import { McpEvent } from "./mcp-event.js"
@@ -76,6 +75,7 @@ export const ServerDefinitions = Event.inventory(
   ...TuiEvent.Definitions,
   ...InstallationEvent.Definitions,
   ...VcsEvent.Definitions,
+  ...ServerEvent.Definitions,
   McpEvent.StatusChanged,
   McpEvent.ResourcesChanged,
 )
@@ -90,7 +90,8 @@ export const Definitions = Event.inventory(
   ...LspEvent.Definitions,
   ...TuiEvent.Definitions,
   ...McpEvent.Definitions,
-  ...LegacyEventV1.Definitions,
+  // v2 owns `command.executed` (emitted by the session.command route); the V1
+  // legacy shape stays exported from v1/legacy-event.ts for SDK compatibility.
   ...FileSystemV1.Event.Definitions,
   ...SessionStatusEvent.Definitions,
   ...SessionCompactionEvent.Definitions,

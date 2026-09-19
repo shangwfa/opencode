@@ -47,8 +47,12 @@ export type ServerInfoOutput = {
 }
 export type ServerInfoOperation<E = never> = () => Effect.Effect<ServerInfoOutput, E>
 
+export type ServerDisposeOutput = { readonly disposed: boolean }
+export type ServerDisposeOperation<E = never> = () => Effect.Effect<ServerDisposeOutput, E>
+
 export interface ServerApi<E = never> {
   readonly info: ServerInfoOperation<E>
+  readonly dispose: ServerDisposeOperation<E>
 }
 
 export type LocationGetInput = { readonly location?: { readonly directory?: string | undefined } | undefined }
@@ -104,6 +108,7 @@ export interface PluginApi<E = never> {
 }
 
 export type SessionListInput = {
+  readonly appId?: string | undefined
   readonly limit?: number | undefined
   readonly order?: "asc" | "desc" | undefined
   readonly search?: string | undefined
@@ -187,14 +192,134 @@ export type SessionStatsOutput = {
 }
 export type SessionStatsOperation<E = never> = (input?: SessionStatsInput) => Effect.Effect<SessionStatsOutput, E>
 
+export type SessionStatusOutput = { readonly active: ReadonlyArray<Session.ID> }
+export type SessionStatusOperation<E = never> = () => Effect.Effect<SessionStatusOutput, E>
+
+export type SessionExecInput = {
+  readonly sessionID: Session.ID
+  readonly command: string
+  readonly workingDirectory?: string | undefined
+  readonly timeoutSeconds?: number | undefined
+}
+export type SessionExecOutput = {
+  readonly exitCode: number
+  readonly stdout: string
+  readonly stderr: string
+  readonly signal?: string | undefined
+  readonly oomSuspected?: boolean | undefined
+}
+export type SessionExecOperation<E = never> = (input: SessionExecInput) => Effect.Effect<SessionExecOutput, E>
+
+export type SessionExecAsyncInput = {
+  readonly sessionID: Session.ID
+  readonly command: string
+  readonly workingDirectory?: string | undefined
+  readonly timeoutSeconds?: number | undefined
+}
+export type SessionExecAsyncOutput = { readonly execId: string; readonly status: "running" }
+export type SessionExecAsyncOperation<E = never> = (
+  input: SessionExecAsyncInput,
+) => Effect.Effect<SessionExecAsyncOutput, E>
+
+export type SessionExecStatusInput = { readonly sessionID: Session.ID; readonly execID: string }
+export type SessionExecStatusOutput = {
+  readonly id: string
+  readonly command: string
+  readonly status: "running" | "completed" | "failed" | "killed" | "timed_out"
+  readonly exitCode?: number | undefined
+  readonly stdout?: string | undefined
+  readonly stderr?: string | undefined
+  readonly workingDirectory?: string | undefined
+  readonly startedAt: number
+  readonly finishedAt?: number | undefined
+}
+export type SessionExecStatusOperation<E = never> = (
+  input: SessionExecStatusInput,
+) => Effect.Effect<SessionExecStatusOutput, E>
+
+export type SessionExecListInput = { readonly sessionID: Session.ID }
+export type SessionExecListOutput = {
+  readonly execs: ReadonlyArray<{
+    readonly id: string
+    readonly command: string
+    readonly status: "running" | "completed" | "failed" | "killed" | "timed_out"
+    readonly exitCode?: number | undefined
+    readonly startedAt: number
+    readonly finishedAt?: number | undefined
+  }>
+}
+export type SessionExecListOperation<E = never> = (
+  input: SessionExecListInput,
+) => Effect.Effect<SessionExecListOutput, E>
+
+export type SessionExecKillInput = { readonly sessionID: Session.ID; readonly execID: string }
+export type SessionExecKillOutput = { readonly killed: boolean }
+export type SessionExecKillOperation<E = never> = (
+  input: SessionExecKillInput,
+) => Effect.Effect<SessionExecKillOutput, E>
+
+export type SessionExecStreamInput = { readonly sessionID: Session.ID; readonly execID: string }
+export type SessionExecStreamOutput = {
+  readonly event: "stdout" | "stderr" | "done"
+  readonly text?: string | undefined
+  readonly status?: string | undefined
+  readonly exitCode?: number | undefined
+}
+export type SessionExecStreamOperation<E = never> = (
+  input: SessionExecStreamInput,
+) => Stream.Stream<SessionExecStreamOutput, E>
+
+export type SessionKeepAliveSetInput = {
+  readonly sessionID: Session.ID
+  readonly enabled: boolean
+  readonly boot?: boolean | undefined
+}
+export type SessionKeepAliveSetOutput = {
+  readonly keepAlive: boolean
+  readonly workspaceID?: (string & Brand.Brand<"Workspace.ID">) | undefined
+}
+export type SessionKeepAliveSetOperation<E = never> = (
+  input: SessionKeepAliveSetInput,
+) => Effect.Effect<SessionKeepAliveSetOutput, E>
+
+export type SessionKeepAliveGetInput = { readonly sessionID: Session.ID }
+export type SessionKeepAliveGetOutput = { readonly keepAlive: boolean }
+export type SessionKeepAliveGetOperation<E = never> = (
+  input: SessionKeepAliveGetInput,
+) => Effect.Effect<SessionKeepAliveGetOutput, E>
+
+export type SessionSandboxGetInput = { readonly sessionID: Session.ID }
+export type SessionSandboxGetOutput = { readonly workspaceID?: (string & Brand.Brand<"Workspace.ID">) | undefined }
+export type SessionSandboxGetOperation<E = never> = (
+  input: SessionSandboxGetInput,
+) => Effect.Effect<SessionSandboxGetOutput, E>
+
+export type SessionSnapshotInput = { readonly sessionID: Session.ID }
+export type SessionSnapshotOutput = { readonly snapshotId: string }
+export type SessionSnapshotOperation<E = never> = (
+  input: SessionSnapshotInput,
+) => Effect.Effect<SessionSnapshotOutput, E>
+
+export type SessionKillSandboxInput = { readonly sessionID: Session.ID }
+export type SessionKillSandboxOutput = {
+  readonly workspaceID?: (string & Brand.Brand<"Workspace.ID">) | undefined
+  readonly destroyed: boolean
+}
+export type SessionKillSandboxOperation<E = never> = (
+  input: SessionKillSandboxInput,
+) => Effect.Effect<SessionKillSandboxOutput, E>
+
 export type SessionCreateInput = {
   readonly id?: Session.ID | undefined
   readonly title?: string | undefined
+  readonly appId?: string | undefined
+  readonly summaryFrom?: Session.ID | undefined
   readonly agent?: Agent.ID | undefined
   readonly model?: Model.Ref | undefined
   readonly location?: Location.PublicRef | undefined
   readonly metadata?: Session.Metadata | undefined
   readonly permissions?: Permission.Ruleset | undefined
+  readonly sandbox?: { readonly cpu: string; readonly memory: string } | undefined
 }
 export type SessionCreateOutput = Session.Info
 export type SessionCreateOperation<E = never> = (input?: SessionCreateInput) => Effect.Effect<SessionCreateOutput, E>
@@ -242,6 +367,8 @@ export type SessionUpdateInput = {
   readonly sessionID: Session.ID
   readonly title?: string | undefined
   readonly permissions?: Permission.Ruleset | undefined
+  readonly sandbox?: { readonly cpu: string; readonly memory: string } | undefined
+  readonly recreate?: boolean | undefined
 }
 export type SessionUpdateOutput = void
 export type SessionUpdateOperation<E = never> = (input: SessionUpdateInput) => Effect.Effect<SessionUpdateOutput, E>
@@ -261,12 +388,46 @@ export type SessionPromptInput = {
   readonly files?: ReadonlyArray<PromptInput.FileAttachment> | undefined
   readonly agents?: ReadonlyArray<AgentAttachment> | undefined
   readonly skills?: ReadonlyArray<PromptInput.SkillAttachment> | undefined
+  readonly format?:
+    | (
+        | { readonly type: "text" }
+        | {
+            readonly type: "json_schema"
+            readonly schema: { readonly [x: string]: unknown }
+            readonly retryCount?: number | undefined
+          }
+      )
+    | undefined
   readonly metadata?: { readonly [x: string]: unknown } | undefined
   readonly delivery?: SessionInbox.Delivery | undefined
   readonly resume?: boolean | undefined
 }
 export type SessionPromptOutput = SessionInbox.User
 export type SessionPromptOperation<E = never> = (input: SessionPromptInput) => Effect.Effect<SessionPromptOutput, E>
+
+export type SessionPromptStreamInput = {
+  readonly sessionID: Session.ID
+  readonly text: string
+  readonly files?: ReadonlyArray<PromptInput.FileAttachment> | undefined
+  readonly agents?: ReadonlyArray<AgentAttachment> | undefined
+  readonly skills?: ReadonlyArray<PromptInput.SkillAttachment> | undefined
+  readonly format?:
+    | (
+        | { readonly type: "text" }
+        | {
+            readonly type: "json_schema"
+            readonly schema: { readonly [x: string]: unknown }
+            readonly retryCount?: number | undefined
+          }
+      )
+    | undefined
+  readonly metadata?: { readonly [x: string]: unknown } | undefined
+  readonly delivery?: SessionInbox.Delivery | undefined
+}
+export type SessionPromptStreamOutput = unknown
+export type SessionPromptStreamOperation<E = never> = (
+  input: SessionPromptStreamInput,
+) => Stream.Stream<SessionPromptStreamOutput, E>
 
 export type SessionCommandInput = {
   readonly sessionID: Session.ID
@@ -275,6 +436,16 @@ export type SessionCommandInput = {
   readonly files?: ReadonlyArray<PromptInput.FileAttachment> | undefined
   readonly agents?: ReadonlyArray<AgentAttachment> | undefined
   readonly skills?: ReadonlyArray<PromptInput.SkillAttachment> | undefined
+  readonly format?:
+    | (
+        | { readonly type: "text" }
+        | {
+            readonly type: "json_schema"
+            readonly schema: { readonly [x: string]: unknown }
+            readonly retryCount?: number | undefined
+          }
+      )
+    | undefined
   readonly delivery?: SessionInbox.Delivery | undefined
 }
 export type SessionCommandOutput = void
@@ -441,6 +612,7 @@ export type SessionLogOutput =
             readonly model?: Model.Ref | undefined
             readonly metadata?: Session.Metadata | undefined
             readonly permissions?: Permission.Ruleset | undefined
+            readonly appId?: string | undefined
             readonly version: string
           }
         }
@@ -543,6 +715,20 @@ export type SessionLogOutput =
               }
             | undefined
           readonly data: { readonly sessionID: Session.ID; readonly idle: number }
+        }
+      | {
+          readonly id: Event.ID
+          readonly created: number
+          readonly metadata?: { readonly [x: string]: unknown } | undefined
+          readonly type: "session.message.removed"
+          readonly durable: { readonly aggregateID: string; readonly seq: Event.Seq; readonly version: Event.Version }
+          readonly location?:
+            | {
+                readonly directory: AbsolutePath
+                readonly workspaceID?: (string & Brand.Brand<"Workspace.ID">) | undefined
+              }
+            | undefined
+          readonly data: { readonly sessionID: Session.ID; readonly messageID: SessionMessage.ID }
         }
       | {
           readonly id: Event.ID
@@ -817,6 +1003,7 @@ export type SessionLogOutput =
             readonly agent: Agent.ID
             readonly model: Model.Ref
             readonly snapshot?: (string & Brand.Brand<"Snapshot.ID">) | undefined
+            readonly summary?: boolean | undefined
           }
         }
       | {
@@ -1187,6 +1374,7 @@ export type SessionLogOutput =
               | undefined
             readonly text: string
             readonly recent: string
+            readonly historyPath?: string | undefined
             readonly cost?: (number & Brand.Brand<"Money.USD">) | undefined
             readonly tokens?:
               | {
@@ -1386,6 +1574,17 @@ export type SessionViewOperation<E = never> = (input: SessionViewInput) => Effec
 export interface SessionApi<E = never> {
   readonly list: SessionListOperation<E>
   readonly stats: SessionStatsOperation<E>
+  readonly status: SessionStatusOperation<E>
+  readonly exec: SessionExecOperation<E>
+  readonly execAsync: SessionExecAsyncOperation<E>
+  readonly execStatus: SessionExecStatusOperation<E>
+  readonly execList: SessionExecListOperation<E>
+  readonly execKill: SessionExecKillOperation<E>
+  readonly execStream: SessionExecStreamOperation<E>
+  readonly keepAlive: { readonly set: SessionKeepAliveSetOperation<E>; readonly get: SessionKeepAliveGetOperation<E> }
+  readonly sandbox: { readonly get: SessionSandboxGetOperation<E> }
+  readonly snapshot: SessionSnapshotOperation<E>
+  readonly killSandbox: SessionKillSandboxOperation<E>
   readonly create: SessionCreateOperation<E>
   readonly import: SessionImportOperation<E>
   readonly export: SessionExportOperation<E>
@@ -1398,6 +1597,7 @@ export interface SessionApi<E = never> {
   readonly update: SessionUpdateOperation<E>
   readonly move: SessionMoveOperation<E>
   readonly prompt: SessionPromptOperation<E>
+  readonly prompt_stream: SessionPromptStreamOperation<E>
   readonly command: SessionCommandOperation<E>
   readonly skill: SessionSkillOperation<E>
   readonly synthetic: SessionSyntheticOperation<E>
@@ -1463,8 +1663,13 @@ export type MessageListOutput = {
 }
 export type MessageListOperation<E = never> = (input: MessageListInput) => Effect.Effect<MessageListOutput, E>
 
+export type MessageRemoveInput = { readonly sessionID: Session.ID; readonly messageID: SessionMessage.ID }
+export type MessageRemoveOutput = void
+export type MessageRemoveOperation<E = never> = (input: MessageRemoveInput) => Effect.Effect<MessageRemoveOutput, E>
+
 export interface MessageApi<E = never> {
   readonly list: MessageListOperation<E>
+  readonly remove: MessageRemoveOperation<E>
 }
 
 export type ModelListInput = { readonly location?: { readonly directory?: string | undefined } | undefined }

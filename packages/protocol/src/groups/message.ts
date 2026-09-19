@@ -2,8 +2,8 @@ import { Session } from "@opencode/schema/session"
 import { SessionMessage } from "@opencode/schema/session-message"
 import { Location } from "@opencode/schema/location"
 import { Schema, Struct } from "effect"
-import { HttpApiEndpoint, HttpApiGroup, OpenApi } from "effect/unstable/httpapi"
-import { InvalidCursorError, SessionNotFoundError, UnknownError } from "../errors.js"
+import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema, OpenApi } from "effect/unstable/httpapi"
+import { InvalidCursorError, MessageNotFoundError, SessionNotFoundError, UnknownError } from "../errors.js"
 
 export const SessionMessagesQuery = Schema.Struct({
   limit: Schema.optional(
@@ -82,6 +82,20 @@ export const MessageGroup = HttpApiGroup.make("server.message")
         summary: "Get session messages",
         description:
           "Retrieve projected messages for a session, optionally filtered by type. Items keep the requested order across pages; use cursor.next or cursor.previous to move through the ordered timeline, passing the same type filter on each page.",
+      }),
+    ),
+  )
+  .add(
+    HttpApiEndpoint.delete("session.message.remove", "/api/session/:sessionID/message/:messageID", {
+      params: { sessionID: Session.ID, messageID: SessionMessage.ID },
+      success: HttpApiSchema.NoContent,
+      error: [MessageNotFoundError, SessionNotFoundError],
+    }).annotateMerge(
+      OpenApi.annotations({
+        identifier: "session.message.remove",
+        summary: "Delete a message",
+        description:
+          "Durably remove one message from the session. The projection deletes the row and subscribers observe `session.message.removed`.",
       }),
     ),
   )

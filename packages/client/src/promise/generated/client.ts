@@ -1,5 +1,6 @@
 import type {
   ServerInfoOutput,
+  ServerDisposeOutput,
   LocationGetInput,
   LocationGetOutput,
   LocationReloadOutput,
@@ -17,6 +18,29 @@ import type {
   SessionListOutput,
   SessionStatsInput,
   SessionStatsOutput,
+  SessionStatusOutput,
+  SessionExecInput,
+  SessionExecOutput,
+  SessionExecAsyncInput,
+  SessionExecAsyncOutput,
+  SessionExecStatusInput,
+  SessionExecStatusOutput,
+  SessionExecListInput,
+  SessionExecListOutput,
+  SessionExecKillInput,
+  SessionExecKillOutput,
+  SessionExecStreamInput,
+  SessionExecStreamOutput,
+  SessionKeepAliveSetInput,
+  SessionKeepAliveSetOutput,
+  SessionKeepAliveGetInput,
+  SessionKeepAliveGetOutput,
+  SessionSandboxGetInput,
+  SessionSandboxGetOutput,
+  SessionSnapshotInput,
+  SessionSnapshotOutput,
+  SessionKillSandboxInput,
+  SessionKillSandboxOutput,
   SessionCreateInput,
   SessionCreateOutput,
   SessionImportInput,
@@ -40,6 +64,8 @@ import type {
   SessionMoveOutput,
   SessionPromptInput,
   SessionPromptOutput,
+  SessionPromptStreamInput,
+  SessionPromptStreamOutput,
   SessionCommandInput,
   SessionCommandOutput,
   SessionSkillInput,
@@ -100,6 +126,8 @@ import type {
   SessionViewOutput,
   MessageListInput,
   MessageListOutput,
+  MessageRemoveInput,
+  MessageRemoveOutput,
   ModelListInput,
   ModelListOutput,
   ModelDefaultInput,
@@ -403,6 +431,17 @@ export function make(options: ClientOptions) {
           { method: "GET", path: `/api/info`, successStatus: 200, declaredStatuses: [400, 401], empty: false },
           requestOptions,
         ),
+      dispose: (requestOptions?: RequestOptions) =>
+        request<ServerDisposeOutput>(
+          {
+            method: "POST",
+            path: `/api/global/dispose`,
+            successStatus: 200,
+            declaredStatuses: [400, 401, 503],
+            empty: false,
+          },
+          requestOptions,
+        ),
     },
     location: {
       get: (input?: LocationGetInput, requestOptions?: RequestOptions) =>
@@ -502,6 +541,7 @@ export function make(options: ClientOptions) {
             method: "GET",
             path: `/api/session`,
             query: {
+              appId: input?.["appId"],
               limit: input?.["limit"],
               order: input?.["order"],
               search: input?.["search"],
@@ -535,6 +575,156 @@ export function make(options: ClientOptions) {
           },
           requestOptions,
         ).then((value) => value.data),
+      status: (requestOptions?: RequestOptions) =>
+        request<{ readonly data: SessionStatusOutput }>(
+          {
+            method: "GET",
+            path: `/api/session/status`,
+            successStatus: 200,
+            declaredStatuses: [400, 401],
+            empty: false,
+          },
+          requestOptions,
+        ).then((value) => value.data),
+      exec: (input: SessionExecInput, requestOptions?: RequestOptions) =>
+        request<SessionExecOutput>(
+          {
+            method: "POST",
+            path: `/api/session/${encodeURIComponent(input.sessionID)}/exec`,
+            body: {
+              command: input["command"],
+              workingDirectory: input["workingDirectory"],
+              timeoutSeconds: input["timeoutSeconds"],
+            },
+            successStatus: 200,
+            declaredStatuses: [400, 401, 404],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      execAsync: (input: SessionExecAsyncInput, requestOptions?: RequestOptions) =>
+        request<SessionExecAsyncOutput>(
+          {
+            method: "POST",
+            path: `/api/session/${encodeURIComponent(input.sessionID)}/exec/async`,
+            body: {
+              command: input["command"],
+              workingDirectory: input["workingDirectory"],
+              timeoutSeconds: input["timeoutSeconds"],
+            },
+            successStatus: 200,
+            declaredStatuses: [400, 401, 404, 503],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      execStatus: (input: SessionExecStatusInput, requestOptions?: RequestOptions) =>
+        request<SessionExecStatusOutput>(
+          {
+            method: "GET",
+            path: `/api/session/${encodeURIComponent(input.sessionID)}/exec/${encodeURIComponent(input.execID)}`,
+            successStatus: 200,
+            declaredStatuses: [400, 401, 404, 503],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      execList: (input: SessionExecListInput, requestOptions?: RequestOptions) =>
+        request<SessionExecListOutput>(
+          {
+            method: "GET",
+            path: `/api/session/${encodeURIComponent(input.sessionID)}/execs`,
+            successStatus: 200,
+            declaredStatuses: [400, 401, 404, 503],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      execKill: (input: SessionExecKillInput, requestOptions?: RequestOptions) =>
+        request<SessionExecKillOutput>(
+          {
+            method: "POST",
+            path: `/api/session/${encodeURIComponent(input.sessionID)}/exec/${encodeURIComponent(input.execID)}/kill`,
+            successStatus: 200,
+            declaredStatuses: [400, 401, 404, 503],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      execStream: (
+        input: SessionExecStreamInput,
+        requestOptions?: RequestOptions,
+      ): AsyncIterable<SessionExecStreamOutput> =>
+        sse<SessionExecStreamOutput>(
+          {
+            method: "GET",
+            path: `/api/session/${encodeURIComponent(input.sessionID)}/exec/${encodeURIComponent(input.execID)}/stream`,
+            successStatus: 200,
+            declaredStatuses: [400, 401, 404, 503],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      keepAlive: {
+        set: (input: SessionKeepAliveSetInput, requestOptions?: RequestOptions) =>
+          request<SessionKeepAliveSetOutput>(
+            {
+              method: "POST",
+              path: `/api/session/${encodeURIComponent(input.sessionID)}/keep-alive`,
+              body: { enabled: input["enabled"], boot: input["boot"] },
+              successStatus: 200,
+              declaredStatuses: [400, 401, 404],
+              empty: false,
+            },
+            requestOptions,
+          ),
+        get: (input: SessionKeepAliveGetInput, requestOptions?: RequestOptions) =>
+          request<SessionKeepAliveGetOutput>(
+            {
+              method: "GET",
+              path: `/api/session/${encodeURIComponent(input.sessionID)}/keep-alive`,
+              successStatus: 200,
+              declaredStatuses: [400, 401, 404],
+              empty: false,
+            },
+            requestOptions,
+          ),
+      },
+      sandbox: {
+        get: (input: SessionSandboxGetInput, requestOptions?: RequestOptions) =>
+          request<SessionSandboxGetOutput>(
+            {
+              method: "GET",
+              path: `/api/session/${encodeURIComponent(input.sessionID)}/sandbox`,
+              successStatus: 200,
+              declaredStatuses: [400, 401, 404],
+              empty: false,
+            },
+            requestOptions,
+          ),
+      },
+      snapshot: (input: SessionSnapshotInput, requestOptions?: RequestOptions) =>
+        request<SessionSnapshotOutput>(
+          {
+            method: "POST",
+            path: `/api/session/${encodeURIComponent(input.sessionID)}/snapshot`,
+            successStatus: 200,
+            declaredStatuses: [400, 401, 404, 503],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      killSandbox: (input: SessionKillSandboxInput, requestOptions?: RequestOptions) =>
+        request<SessionKillSandboxOutput>(
+          {
+            method: "POST",
+            path: `/api/session/${encodeURIComponent(input.sessionID)}/kill-sandbox`,
+            successStatus: 200,
+            declaredStatuses: [400, 401, 404],
+            empty: false,
+          },
+          requestOptions,
+        ),
       create: (input?: SessionCreateInput, requestOptions?: RequestOptions) =>
         request<{ readonly data: SessionCreateOutput }>(
           {
@@ -543,11 +733,14 @@ export function make(options: ClientOptions) {
             body: {
               id: input?.["id"],
               title: input?.["title"],
+              appId: input?.["appId"],
+              summaryFrom: input?.["summaryFrom"],
               agent: input?.["agent"],
               model: input?.["model"],
               location: input?.["location"],
               metadata: input?.["metadata"],
               permissions: input?.["permissions"],
+              sandbox: input?.["sandbox"],
             },
             successStatus: 200,
             declaredStatuses: [400, 401],
@@ -653,7 +846,12 @@ export function make(options: ClientOptions) {
           {
             method: "PATCH",
             path: `/api/session/${encodeURIComponent(input.sessionID)}`,
-            body: { title: input["title"], permissions: input["permissions"] },
+            body: {
+              title: input["title"],
+              permissions: input["permissions"],
+              sandbox: input["sandbox"],
+              recreate: input["recreate"],
+            },
             successStatus: 204,
             declaredStatuses: [400, 401, 404],
             empty: true,
@@ -683,6 +881,7 @@ export function make(options: ClientOptions) {
               files: input["files"],
               agents: input["agents"],
               skills: input["skills"],
+              format: input["format"],
               metadata: input["metadata"],
               delivery: input["delivery"],
               resume: input["resume"],
@@ -693,6 +892,29 @@ export function make(options: ClientOptions) {
           },
           requestOptions,
         ).then((value) => value.data),
+      prompt_stream: (
+        input: SessionPromptStreamInput,
+        requestOptions?: RequestOptions,
+      ): AsyncIterable<SessionPromptStreamOutput> =>
+        sse<SessionPromptStreamOutput>(
+          {
+            method: "POST",
+            path: `/api/session/${encodeURIComponent(input.sessionID)}/prompt_stream`,
+            body: {
+              text: input["text"],
+              files: input["files"],
+              agents: input["agents"],
+              skills: input["skills"],
+              format: input["format"],
+              metadata: input["metadata"],
+              delivery: input["delivery"],
+            },
+            successStatus: 200,
+            declaredStatuses: [400, 401, 404, 409],
+            empty: false,
+          },
+          requestOptions,
+        ),
       command: (input: SessionCommandInput, requestOptions?: RequestOptions) =>
         request<SessionCommandOutput>(
           {
@@ -704,6 +926,7 @@ export function make(options: ClientOptions) {
               files: input["files"],
               agents: input["agents"],
               skills: input["skills"],
+              format: input["format"],
               delivery: input["delivery"],
             },
             successStatus: 204,
@@ -1065,6 +1288,17 @@ export function make(options: ClientOptions) {
             successStatus: 200,
             declaredStatuses: [400, 401, 404, 500],
             empty: false,
+          },
+          requestOptions,
+        ),
+      remove: (input: MessageRemoveInput, requestOptions?: RequestOptions) =>
+        request<MessageRemoveOutput>(
+          {
+            method: "DELETE",
+            path: `/api/session/${encodeURIComponent(input.sessionID)}/message/${encodeURIComponent(input.messageID)}`,
+            successStatus: 204,
+            declaredStatuses: [400, 401, 404],
+            empty: true,
           },
           requestOptions,
         ),
