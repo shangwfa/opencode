@@ -1,0 +1,495 @@
+import { afterAll, afterEach, beforeAll, describe, expect, test } from "bun:test"
+import { Duration, Effect, Layer } from "effect"
+import { EventV2 } from "@opencode-ai/core/event"
+import postgres from "postgres"
+import { eq } from "drizzle-orm"
+import { Database } from "../../src/storage/db"
+import { EventV2Bridge } from "../../src/event-v2-bridge"
+import { SessionTools, transitionRunningTool } from "../../src/session/mark-timed-out"
+import { MessageTable, PartTable, SessionTable } from "../../src/session/session.pg"
+import { MessageID, PartID, SessionID } from "../../src/session/schema"
+import { ToolExecution } from "../../src/session/tool-execution"
+import { ToolExecutionLease } from "../../src/session/tool-execution-lease"
+import { SessionWatchdog } from "../../src/session/watchdog"
+
+const DB_URL = process.env.OPENCODE_DATABASE_URL
+const enabled = (() => {
+  if (!DB_URL) return false
+  const url = new URL(DB_URL)
+  return ["127.0.0.1", "localhost"].includes(url.hostname) && url.pathname === "/opencode_test"
+})()
+const db = Database.Client()
+const fixtureDb = DB_URL ? postgres(DB_URL) : undefined
+const sessions: SessionID[] = []
+const PROJECT_ID = "watchdog-test-project"
+let sequence = 0
+type StoredToolData = {
+  type: "tool"
+  callID: string
+  tool: string
+  state: {
+    status: string
+    error?: string
+    metadata?: {
+      timeout?: boolean
+      retry?: {
+        strategy: string
+        eligible: boolean
+        attempt: number
+        maxAttempts: number
+        requiresVerification: boolean
+      }
+      watchdog?: {
+        owner: string
+        leaseUntil: number
+      }
+    }
+    time?: { start: number; end?: number }
+  }
+}
+
+function id(prefix: string) {
+  sequence++
+  return `${prefix}_${Date.now()}_${sequence}`
+}
+
+async function createSession() {
+  const sessionID = SessionID.make(id("ses_watchdog"))
+  const messageID = MessageID.make(id("msg_watchdog"))
+  const now = Date.now()
+  if (!fixtureDb) throw new Error("local PostgreSQL is required")
+  await fixtureDb.unsafe(
+    `INSERT INTO session (
+      id, project_id, directory, slug, title, version, time_created, time_updated,
+      cost, tokens_input, tokens_output, tokens_reasoning
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 0, 0, 0, 0)`,
+    [sessionID, PROJECT_ID, "/tmp/watchdog-test", "watchdog-test", "Watchdog test", "test", now, now],
+  )
+  await fixtureDb.unsafe(
+    "INSERT INTO message (id, session_id, time_created, time_updated, data) VALUES ($1, $2, $3, $4, jsonb_build_object('role', 'assistant'))",
+    [messageID, sessionID, now, now],
+  )
+  sessions.push(sessionID)
+  return { sessionID, messageID }
+}
+
+async function insertRunning(input: {
+  sessionID: SessionID
+  messageID: MessageID
+  callID: string
+  tool: string
+  start: number
+}) {
+  const partID = PartID.make(id("prt_watchdog"))
+  if (!fixtureDb) throw new Error("local PostgreSQL is required")
+  const inserted = await fixtureDb.unsafe(
+    `INSERT INTO part (id, message_id, session_id, time_created, time_updated, data)
+     VALUES (
+       $1, $2, $3, $4, $5,
+       jsonb_build_object(
+         'type', 'tool', 'callID', $6::text, 'tool', $7::text,
+         'state', jsonb_build_object(
+           'status', 'running', 'input', '{}'::jsonb,
+           'time', jsonb_build_object('start', $8::bigint)
+         )
+       )
+     ) RETURNING id`,
+    [partID, input.messageID, input.sessionID, input.start, input.start, input.callID, input.tool, input.start],
+  )
+  if (inserted[0]?.id !== partID) throw new Error(`part fixture insert failed: ${partID}`)
+  return partID
+}
+
+async function partData(partID: PartID) {
+  if (!fixtureDb) throw new Error("local PostgreSQL is required")
+  const rows = await fixtureDb<{ data_text: string }[]>`SELECT data::text AS data_text FROM part WHERE id = ${partID}`
+  if (!rows[0]) throw new Error(`part fixture not found: ${partID}`)
+  const data = rows[0]?.data_text
+  if (typeof data !== "string") throw new Error(`unexpected fixture row: ${JSON.stringify(rows[0])}`)
+  return typeof data === "string" ? (JSON.parse(data) as StoredToolData) : undefined
+}
+
+async function setLease(partID: PartID, leaseUntil: number) {
+  if (!fixtureDb) throw new Error("local PostgreSQL is required")
+  await fixtureDb.unsafe(
+    `UPDATE part
+     SET data = jsonb_set(
+       data,
+       '{state,metadata}',
+       COALESCE(data->'state'->'metadata', '{}'::jsonb) || jsonb_build_object(
+         'watchdog', jsonb_build_object('owner', 'remote', 'leaseUntil', $2::bigint)
+       )
+     )
+     WHERE id = $1`,
+    [partID, leaseUntil],
+  )
+}
+
+describe.skipIf(!enabled)("SessionWatchdog PostgreSQL", () => {
+  beforeAll(async () => {
+    await Database.initialize()
+    if (!fixtureDb) return
+    const now = Date.now()
+    await fixtureDb.unsafe(
+      `INSERT INTO project (id, worktree, time_created, time_updated, sandboxes)
+       VALUES ($1, $2, $3, $4, $5::jsonb)
+       ON CONFLICT (id) DO NOTHING`,
+      [PROJECT_ID, "/tmp/watchdog-test", now, now, "[]"],
+    )
+  })
+
+  afterAll(async () => {
+    if (!fixtureDb) return
+    await fixtureDb.unsafe("DELETE FROM project WHERE id = $1", [PROJECT_ID])
+    await fixtureDb.end()
+  })
+
+  afterEach(async () => {
+    for (const sessionID of sessions) await db.delete(SessionTable).where(eq(SessionTable.id, sessionID)).run()
+    sessions.length = 0
+  })
+
+  test("markTimedOut applies CAS, publishes an event, aborts execution, and enforces retry budget", async () => {
+    const chat = await createSession()
+    const events: unknown[] = []
+    const publish: EventV2.Interface["publish"] = (definition, data) =>
+      Effect.sync(() => {
+        events.push(data)
+        return { id: EventV2.ID.create(), type: definition.type, data } as EventV2.Payload<typeof definition>
+      })
+    const layer = SessionTools.layer.pipe(
+      Layer.provide(
+        Layer.mock(EventV2Bridge.Service, {
+          publish,
+        }),
+      ),
+    )
+    const tools = ["read", "write", "edit"]
+
+    for (const [index, tool] of tools.entries()) {
+      const start = Date.now() - 10_000
+      const callID = `call_retry_${index}`
+      const partID = await insertRunning({ ...chat, callID, tool, start })
+      const controller = new AbortController()
+      const unregister = ToolExecution.register(chat.sessionID, callID, controller)
+      const before = await partData(partID)
+      if (before?.type !== "tool") throw new Error(`unexpected part data: ${JSON.stringify(before)}`)
+      expect(before.state.status).toBe("running")
+      expect(before.state.time?.start).toBe(start)
+      const marked = await Effect.runPromise(
+        Effect.gen(function* () {
+          const service = yield* SessionTools.Service
+          return yield* service.markTimedOut({ partID, expectedStart: start, timeoutMs: 5_000 })
+        }).pipe(Effect.provide(layer)),
+      )
+      unregister()
+
+      expect(marked).toBe(true)
+      expect(controller.signal.aborted).toBe(true)
+      const data = await partData(partID)
+      expect(data?.type).toBe("tool")
+      if (data?.type !== "tool" || data.state.status !== "error") throw new Error("expected timed out tool part")
+      expect(data.state.metadata?.timeout).toBe(true)
+      expect(data.state.metadata?.retry).toEqual({
+        strategy: "agent",
+        eligible: index < 2,
+        attempt: index + 1,
+        maxAttempts: 2,
+        requiresVerification: tool !== "read",
+      })
+    }
+
+    expect(events).toHaveLength(3)
+  }, 20_000)
+
+  test("terminal transition is first-writer-wins", async () => {
+    const chat = await createSession()
+    const start = Date.now() - 1_000
+    const partID = await insertRunning({ ...chat, callID: "call_transition", tool: "read", start })
+    const completed = {
+      id: partID,
+      messageID: chat.messageID,
+      sessionID: chat.sessionID,
+      type: "tool" as const,
+      callID: "call_transition",
+      tool: "read",
+      state: {
+        status: "completed" as const,
+        input: {},
+        output: "ok",
+        title: "read",
+        metadata: {},
+        time: { start, end: Date.now() },
+      },
+    }
+    const failed = {
+      ...completed,
+      state: {
+        status: "error" as const,
+        input: {},
+        error: "late error",
+        metadata: {},
+        time: { start, end: Date.now() },
+      },
+    }
+
+    const before = await partData(partID)
+    if (before?.type !== "tool") throw new Error(`unexpected part data: ${JSON.stringify(before)}`)
+    expect(before.state.status).toBe("running")
+    expect(before.state.time?.start).toBe(start)
+    expect(await Effect.runPromise(transitionRunningTool(completed, start))).toBe(true)
+    expect(await Effect.runPromise(transitionRunningTool(failed, start))).toBe(false)
+    const data = await partData(partID)
+    expect(data?.type === "tool" && data.state.status).toBe("completed")
+  })
+
+  test("concurrent timeouts allocate unique retry attempts", async () => {
+    const chat = await createSession()
+    const starts = [0, 1, 2].map(() => Date.now() - 10_000)
+    const partIDs = await Promise.all(
+      starts.map((start, index) => insertRunning({ ...chat, callID: `call_concurrent_${index}`, tool: "read", start })),
+    )
+    const layer = SessionTools.layer.pipe(
+      Layer.provide(
+        Layer.mock(EventV2Bridge.Service, {
+          publish: (definition, data) =>
+            Effect.succeed({
+              id: EventV2.ID.create(),
+              type: definition.type,
+              data,
+            } as EventV2.Payload<typeof definition>),
+        }),
+      ),
+    )
+
+    const marked = await Promise.all(
+      partIDs.map((partID, index) =>
+        Effect.runPromise(
+          Effect.gen(function* () {
+            const service = yield* SessionTools.Service
+            return yield* service.markTimedOut({ partID, expectedStart: starts[index]!, timeoutMs: 5_000 })
+          }).pipe(Effect.provide(layer)),
+        ),
+      ),
+    )
+
+    expect(marked).toEqual([true, true, true])
+    const attempts = await Promise.all(
+      partIDs.map(async (partID) => {
+        const data = await partData(partID)
+        return data?.state.metadata?.retry?.attempt
+      }),
+    )
+    expect(attempts.sort()).toEqual([1, 2, 3])
+  })
+
+  test("event publish failure rolls back the timeout transition", async () => {
+    const chat = await createSession()
+    const start = Date.now() - 10_000
+    const partID = await insertRunning({ ...chat, callID: "call_publish_failure", tool: "read", start })
+    const layer = SessionTools.layer.pipe(
+      Layer.provide(
+        Layer.mock(EventV2Bridge.Service, {
+          publish: () => Effect.die(new Error("simulated publish failure")),
+        }),
+      ),
+    )
+
+    const marked = await Effect.runPromise(
+      Effect.gen(function* () {
+        const service = yield* SessionTools.Service
+        return yield* service.markTimedOut({ partID, expectedStart: start, timeoutMs: 5_000 })
+      }).pipe(Effect.provide(layer)),
+    )
+
+    expect(marked).toBe(false)
+    expect((await partData(partID))?.state.status).toBe("running")
+  })
+
+  test("execution lease refresh persists owner and deadline", async () => {
+    const chat = await createSession()
+    const start = Date.now() - 1_000
+    const partID = await insertRunning({ ...chat, callID: "call_lease", tool: "read", start })
+    const now = Date.now()
+
+    expect(
+      await Effect.runPromise(
+        ToolExecutionLease.refresh({
+          ...chat,
+          callID: "call_lease",
+          now,
+        }),
+      ),
+    ).toBe(true)
+
+    const lease = (await partData(partID))?.state.metadata?.watchdog
+    expect(lease?.owner).toBeString()
+    expect(lease?.leaseUntil).toBe(now + ToolExecutionLease.leaseDurationMs)
+  })
+
+  test("markTimedOut custom error bypasses the elapsed-time recheck", async () => {
+    // Lease-orphan criterion: a broken lease, not runtime. A freshly-started
+    // execution (well under timeoutMs) must still be markable when the caller
+    // supplies a custom error; without one the recheck must refuse it.
+    const chat = await createSession()
+    const start = Date.now() - 1_000
+    const partID = await insertRunning({ ...chat, callID: "call_orphan_fresh", tool: "bash", start })
+    const layer = SessionTools.layer.pipe(
+      Layer.provide(
+        Layer.mock(EventV2Bridge.Service, {
+          publish: (definition, data) =>
+            Effect.succeed({ id: EventV2.ID.create(), type: definition.type, data } as EventV2.Payload<
+              typeof definition
+            >),
+        }),
+      ),
+    )
+    const call = (error?: string) =>
+      Effect.runPromise(
+        Effect.gen(function* () {
+          const service = yield* SessionTools.Service
+          return yield* service.markTimedOut({
+            partID,
+            expectedStart: start,
+            timeoutMs: 5 * 60_000, // far above the 1s-old part
+            ...(error === undefined ? {} : { error }),
+          })
+        }).pipe(Effect.provide(layer)),
+      )
+
+    // Without a custom error the recheck refuses the fresh row.
+    expect(await call()).toBe(false)
+    expect((await partData(partID))?.state.status).toBe("running")
+
+    // With the orphan error the mark succeeds and carries the custom text.
+    expect(await call("orphaned: lease expired")).toBe(true)
+    const data = await partData(partID)
+    expect(data?.state.status).toBe("error")
+    expect(data?.state.error).toContain("orphaned: lease expired")
+    expect(data?.state.error).not.toContain("timed out after")
+  })
+
+  test("scanOnce recovers expired leases without touching live remote executions", async () => {
+    const expired = await createSession()
+    const live = await createSession()
+    const start = Date.now() - 10_000
+    const expiredPart = await insertRunning({ ...expired, callID: "call_expired", tool: "read", start })
+    await setLease(expiredPart, Date.now() - 1)
+    const livePart = await insertRunning({ ...live, callID: "call_live", tool: "read", start })
+    await setLease(livePart, Date.now() + 60_000)
+    const marked: PartID[] = []
+    const layer = SessionWatchdog.layerWithConfig({
+      scanInterval: Duration.hours(1),
+      initialDelay: Duration.hours(1),
+      timeoutMs: 5_000,
+      orphanTimeoutMs: 60_000,
+    }).pipe(
+      Layer.provide(
+        Layer.mock(SessionTools.Service, {
+          markTimedOut: (input) =>
+            Effect.sync(() => {
+              marked.push(input.partID)
+              return true
+            }),
+        }),
+      ),
+    )
+
+    await Effect.runPromise(
+      Effect.gen(function* () {
+        const watchdog = yield* SessionWatchdog.Service
+        yield* watchdog.scanOnce
+      }).pipe(Effect.scoped, Effect.provide(layer)),
+    )
+
+    expect(marked).toEqual([expiredPart])
+  })
+
+  test("scanOnce only marks executions owned by this process and session", async () => {
+    const local = await createSession()
+    const remote = await createSession()
+    const start = Date.now() - 10_000
+    const localPart = await insertRunning({ ...local, callID: "shared_call", tool: "read", start })
+    await insertRunning({ ...remote, callID: "shared_call", tool: "read", start })
+    const marked: PartID[] = []
+    const unregister = ToolExecution.register(local.sessionID, "shared_call", new AbortController())
+    const layer = SessionWatchdog.layerWithConfig({
+      scanInterval: Duration.hours(1),
+      initialDelay: Duration.hours(1),
+      timeoutMs: 5_000,
+      orphanTimeoutMs: 15_000,
+    }).pipe(
+      Layer.provide(
+        Layer.mock(SessionTools.Service, {
+          markTimedOut: (input) =>
+            Effect.sync(() => {
+              marked.push(input.partID)
+              return true
+            }),
+        }),
+      ),
+    )
+
+    await Effect.runPromise(
+      Effect.gen(function* () {
+        const watchdog = yield* SessionWatchdog.Service
+        yield* watchdog.scanOnce
+      }).pipe(Effect.scoped, Effect.provide(layer)),
+    )
+    unregister()
+
+    expect(marked).toEqual([localPart])
+  })
+
+  test("scanOnce orphans broken-lease LEASE_TOOLS without elapsed-time ceiling", async () => {
+    const dead = await createSession()
+    const live = await createSession()
+    const noLease = await createSession()
+    const start = Date.now() - 1_000 // fresh: far below any timeout window
+    // Dead instance: lease written once, now broken.
+    const deadPart = await insertRunning({ ...dead, callID: "call_bash_dead", tool: "bash", start })
+    await setLease(deadPart, Date.now() - 1)
+    // Live remote instance: lease still renewable.
+    const livePart = await insertRunning({ ...live, callID: "call_bash_live", tool: "bash", start })
+    await setLease(livePart, Date.now() + 60_000)
+    // Legacy row without any lease: must never be marked (no liveness evidence).
+    const noLeasePart = await insertRunning({
+      ...noLease,
+      callID: "call_bash_legacy",
+      tool: "bash",
+      start: Date.now() - 3600_000,
+    })
+    const marked: PartID[] = []
+    const errors: string[] = []
+    const layer = SessionWatchdog.layerWithConfig({
+      scanInterval: Duration.hours(1),
+      initialDelay: Duration.hours(1),
+      timeoutMs: 5_000,
+      orphanTimeoutMs: 60_000,
+    }).pipe(
+      Layer.provide(
+        Layer.mock(SessionTools.Service, {
+          markTimedOut: (input) =>
+            Effect.sync(() => {
+              marked.push(input.partID)
+              if (input.error) errors.push(input.error)
+              return true
+            }),
+        }),
+      ),
+    )
+
+    await Effect.runPromise(
+      Effect.gen(function* () {
+        const watchdog = yield* SessionWatchdog.Service
+        yield* watchdog.scanOnce
+      }).pipe(Effect.scoped, Effect.provide(layer)),
+    )
+
+    expect(marked).toEqual([deadPart])
+    expect(errors[0]).toContain("orphaned")
+    expect(errors).toHaveLength(1)
+    void livePart
+    void noLeasePart
+  })
+})

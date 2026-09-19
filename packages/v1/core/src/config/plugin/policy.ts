@@ -1,0 +1,27 @@
+export * as ConfigPolicyPlugin from "./policy.js"
+
+import { define } from "@ocv1/plugin/effect/plugin"
+import { Document } from "@ocv1/schema/config"
+import { Effect } from "effect"
+import { Config } from "../../config.js"
+import { Wildcard } from "../../util/wildcard.js"
+import { ConfigEntryObserver } from "./entry-observer.js"
+
+export const Plugin = define({
+  id: "opencode.config.policy",
+  effect: Effect.fn(function* (ctx) {
+    const config = yield* Config.Service
+    const loaded = yield* ConfigEntryObserver.observe(config, ctx.event, ctx.provider.reload())
+    yield* ctx.provider.transform((providers) => {
+      // User-global policy takes priority over policy authored by a repository.
+      const policies = loaded.entries
+        .filter((entry): entry is Document => entry.type === "document")
+        .toReversed()
+        .flatMap((entry) => entry.info.experimental?.policies ?? [])
+      for (const record of providers.list()) {
+        const policy = policies.findLast((policy) => Wildcard.match(record.provider.id, policy.resource))
+        if (policy?.effect === "deny") providers.remove(record.provider.id)
+      }
+    })
+  }),
+})

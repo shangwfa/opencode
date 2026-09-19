@@ -1,0 +1,716 @@
+import { Duration, Effect, Option, Schema, Scope, Stream } from "effect"
+import { PositiveInt } from "@opencode-ai/core/schema"
+import * as path from "path"
+import * as Tool from "./tool"
+import { FSUtil } from "@opencode-ai/core/fs-util"
+import { LSP } from "@/lsp/lsp"
+import DESCRIPTION from "./read.txt"
+import { InstanceState } from "@/effect/instance-state"
+import { assertExternalDirectoryEffect } from "./external-directory"
+import { Instruction } from "../session/instruction"
+import { isPdfAttachment, sniffAttachmentMime } from "@/util/media"
+import { toSandboxPath } from "./sandbox-path"
+import { SandboxProvider } from "./sandbox-provider"
+import { ToolAttachment } from "./attachment"
+import { SandboxApiException, type FileInfo, type Sandbox } from "@alibaba-group/opensandbox"
+
+const DEFAULT_READ_LIMIT = 2000
+const MAX_LINE_LENGTH = 2000
+const MAX_LINE_SUFFIX = `... (line truncated to ${MAX_LINE_LENGTH} chars)`
+const MAX_BYTES = 50 * 1024
+const MAX_BYTES_LABEL = `${MAX_BYTES / 1024} KB`
+const SAMPLE_BYTES = 4096
+const SUPPORTED_IMAGE_MIMES = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"])
+const MAX_READ_BYTES = 50 * 1024
+// files API calls can hang indefinitely (half-open connection, sandbox being
+// torn down). Fail fast and retry once instead of waiting for the 120s
+// session watchdog to kill the call.
+const FAST_FILE_OP_TIMEOUT = Duration.seconds(15)
+const FILE_OP_RETRY = { times: 1 as const }
+const INVALID_UTF8_RATIO = 0.3
+
+function hasExcessiveInvalidUtf8(bytes: Uint8Array): boolean {
+  if (bytes.length === 0) return false
+  const decoder = new TextDecoder("utf-8", { fatal: false })
+  const text = decoder.decode(bytes)
+  let invalid = 0
+  for (let i = 0; i < text.length; i++) if (text.charCodeAt(i) === 0xfffd) invalid++
+  return invalid / Math.max(text.length, 1) > INVALID_UTF8_RATIO
+}
+
+class ReadStop extends Schema.TaggedErrorClass<ReadStop>()("ReadStop", {}) {}
+class SandboxReadTimeout extends Schema.TaggedErrorClass<SandboxReadTimeout>()("SandboxReadTimeout", {}) {}
+
+// `offset` and `limit` were originally `z.coerce.number()` — the runtime
+// coercion was useful when the tool was called from a shell but serves no
+// purpose in the LLM tool-call path (the model emits typed JSON). The JSON
+// Schema output is identical (`type: "number"`), so the LLM view is
+// unchanged; purely CLI-facing uses must now send numbers rather than strings.
+export const Parameters = Schema.Struct({
+  filePath: Schema.String.annotate({ description: "The absolute path to the file or directory to read" }),
+  offset: Schema.optional(PositiveInt).annotate({
+    description: "The line number to start reading from (1-indexed)",
+  }),
+  limit: Schema.optional(PositiveInt).annotate({
+    description: "The maximum number of lines to read (defaults to 2000)",
+  }),
+})
+
+type Display =
+  | {
+      type: "directory"
+      path: string
+      entries: string[]
+      offset: number
+      totalEntries: number
+      truncated: boolean
+    }
+  | {
+      type: "file"
+      path: string
+      text: string
+      lineStart: number
+      lineEnd: number
+      totalLines: number
+      truncated: boolean
+    }
+
+type Metadata = {
+  preview: string
+  truncated: boolean
+  loaded: string[]
+  display?: Display
+}
+
+export const ReadTool = Tool.define<
+  typeof Parameters,
+  Metadata,
+  FSUtil.Service | Instruction.Service | Scope.Scope
+>(
+  "read",
+  Effect.gen(function* () {
+    const fs = yield* FSUtil.Service
+    const instruction = yield* Instruction.Service
+    const lsp = Option.getOrUndefined(yield* Effect.serviceOption(LSP.Service))
+    const scope = yield* Scope.Scope
+    const sandboxProvider = Option.getOrUndefined(yield* Effect.serviceOption(SandboxProvider.Service))
+
+    const miss = Effect.fn("ReadTool.miss")(function* (filepath: string) {
+      const dir = path.dirname(filepath)
+      const base = path.basename(filepath)
+      const items = yield* fs.readDirectory(dir).pipe(
+        Effect.map((items) =>
+          items
+            .filter(
+              (item) =>
+                item.toLowerCase().includes(base.toLowerCase()) || base.toLowerCase().includes(item.toLowerCase()),
+            )
+            .map((item) => path.join(dir, item))
+            .slice(0, 3),
+        ),
+        Effect.catch(() => Effect.succeed([] as string[])),
+      )
+
+      if (items.length > 0) {
+        return yield* Effect.fail(
+          new Error(`File not found: ${filepath}\n\nDid you mean one of these?\n${items.join("\n")}`),
+        )
+      }
+
+      return yield* Effect.fail(new Error(`File not found: ${filepath}`))
+    })
+
+    const list = Effect.fn("ReadTool.list")(function* (filepath: string) {
+      const items = yield* fs.readDirectoryEntries(filepath)
+      return yield* Effect.forEach(
+        items,
+        Effect.fnUntraced(function* (item) {
+          if (item.type === "directory") return item.name + "/"
+          if (item.type !== "symlink") return item.name
+
+          const target = yield* fs.stat(path.join(filepath, item.name)).pipe(Effect.catch(() => Effect.void))
+          if (target?.type === "Directory") return item.name + "/"
+          return item.name
+        }),
+        { concurrency: "unbounded" },
+      ).pipe(Effect.map((items: string[]) => items.sort((a, b) => a.localeCompare(b))))
+    })
+
+    const warm = Effect.fn("ReadTool.warm")(function* (filepath: string) {
+      // LSP warm-up is optional; do not let a background defect fail an otherwise successful read.
+      if (!lsp) return
+      yield* lsp.touchFile(filepath).pipe(Effect.ignoreCause, Effect.forkIn(scope))
+    })
+
+    const readSample = Effect.fn("ReadTool.readSample")(function* (
+      filepath: string,
+      fileSize: number,
+      sampleSize: number,
+    ) {
+      if (fileSize === 0) return new Uint8Array()
+
+      return yield* Effect.scoped(
+        Effect.gen(function* () {
+          const file = yield* fs.open(filepath, { flag: "r" })
+          return Option.getOrElse(yield* file.readAlloc(Math.min(sampleSize, fileSize)), () => new Uint8Array())
+        }),
+      )
+    })
+
+    const lines = Effect.fn("ReadTool.lines")(function* (filepath: string, opts: { limit: number; offset: number }) {
+      const start = opts.offset - 1
+      const raw: string[] = []
+      const flags = { bytes: 0, count: 0, cut: false, more: false, done: false }
+
+      // Note: prefer manual TextDecoder over Stream.decodeText — when the source stream
+      // ends without flushing, decodeText drops the final unterminated line. We also
+      // avoid Stream.runForEachWhile (it currently swallows the final unterminated
+      // line of the upstream splitLines pipeline) and use a tagged error to stop the
+      // upstream file stream as soon as the byte cap is reached.
+  const decoder = new TextDecoder("utf-8", { fatal: false })
+      yield* fs.stream(filepath).pipe(
+        Stream.map((bytes) => decoder.decode(bytes, { stream: true })),
+        Stream.splitLines,
+        Stream.runForEach((text) =>
+          Effect.gen(function* () {
+            if (flags.done) return yield* new ReadStop()
+            flags.count += 1
+            if (flags.count <= start) return
+
+            if (raw.length >= opts.limit) {
+              flags.more = true
+              return
+            }
+
+            const line = text.length > MAX_LINE_LENGTH ? text.substring(0, MAX_LINE_LENGTH) + MAX_LINE_SUFFIX : text
+            const size = Buffer.byteLength(line, "utf-8") + (raw.length > 0 ? 1 : 0)
+            if (flags.bytes + size <= MAX_BYTES) {
+              raw.push(line)
+              flags.bytes += size
+              return
+            }
+
+            flags.cut = true
+            flags.more = true
+            flags.done = true
+            return yield* new ReadStop()
+          }),
+        ),
+        Effect.catchTag("ReadStop", () => Effect.void),
+      )
+
+      return { raw, count: flags.count, cut: flags.cut, more: flags.more, offset: opts.offset }
+    })
+
+    const isBinaryFile = (filepath: string, bytes: Uint8Array) => {
+      const ext = path.extname(filepath).toLowerCase()
+      switch (ext) {
+        case ".zip":
+        case ".tar":
+        case ".gz":
+        case ".exe":
+        case ".dll":
+        case ".so":
+        case ".class":
+        case ".jar":
+        case ".war":
+        case ".7z":
+        case ".doc":
+        case ".docx":
+        case ".xls":
+        case ".xlsx":
+        case ".ppt":
+        case ".pptx":
+        case ".odt":
+        case ".ods":
+        case ".odp":
+        case ".bin":
+        case ".dat":
+        case ".obj":
+        case ".o":
+        case ".a":
+        case ".lib":
+        case ".wasm":
+        case ".pyc":
+        case ".pyo":
+          return true
+      }
+
+      if (bytes.length === 0) return false
+
+      let nonPrintableCount = 0
+      for (let i = 0; i < bytes.length; i++) {
+        if (bytes[i] === 0) return true
+        if (bytes[i] < 9 || (bytes[i] > 13 && bytes[i] < 32)) {
+          nonPrintableCount++
+        }
+      }
+
+      return nonPrintableCount / bytes.length > 0.3
+    }
+
+    const runSandbox = Effect.fn("ReadTool.runSandbox")(function* (
+      sb: Sandbox,
+      provider: SandboxProvider.Interface,
+      filepath: string,
+      title: string,
+      params: Schema.Schema.Type<typeof Parameters>,
+      ctx: Tool.Context<Metadata>,
+    ) {
+      const instance = yield* InstanceState.context
+      const sandboxPath = toSandboxPath(filepath, instance.directory)
+
+      // Distinguish "file does not exist" from "files API failed". A 404 (or a
+      // missing result entry) means the file is simply absent → undefined.
+      // Network/transport errors propagate; timeouts become a tagged error so
+      // only they are retried and (on exhaustion) trigger sandbox teardown.
+      const info = yield* Effect.tryPromise({
+        try: async () => {
+          const result = await sb.files.getFileInfo([sandboxPath]).catch((cause) => {
+            if (cause instanceof SandboxApiException && cause.statusCode === 404) return {} as Record<string, FileInfo>
+            throw cause
+          })
+          return result[sandboxPath] ?? undefined
+        },
+        catch: (cause) =>
+          new Error(`getFileInfo failed: ${sandboxPath}: ${cause instanceof Error ? cause.message : String(cause)}`),
+      }).pipe(
+        Effect.timeoutOrElse({
+          duration: FAST_FILE_OP_TIMEOUT,
+          orElse: () => Effect.fail(new SandboxReadTimeout()),
+        }),
+        Effect.retry({ ...FILE_OP_RETRY, while: (error) => error instanceof SandboxReadTimeout }),
+        Effect.catchTag("SandboxReadTimeout", () =>
+          provider
+            .destroy(ctx.sandboxSessionID ?? ctx.sessionID)
+            .pipe(Effect.catchCause(() => Effect.void), Effect.andThen(Effect.fail(new Error(`Read timed out: ${sandboxPath}`)))),
+        ),
+      )
+
+      const isDirectory = typeof info?.mode === "number" && (info.mode & 0o170000) === 0o040000
+
+      yield* assertExternalDirectoryEffect(ctx, filepath, {
+        bypass: Boolean(ctx.extra?.["bypassCwdCheck"]),
+        kind: isDirectory ? "directory" : "file",
+        managed: true,
+      })
+
+      yield* ctx.ask({
+        permission: "read",
+        patterns: [path.relative(instance.directory, filepath)],
+        always: ["*"],
+        metadata: {},
+      })
+
+      if (!info) {
+        const dir = path.posix.dirname(sandboxPath)
+        const base = path.posix.basename(sandboxPath).toLowerCase()
+        const lsResult = yield* provider
+          .runInSession(ctx.sandboxSessionID ?? ctx.sessionID, `ls -1 ${shellQuote(dir)} 2>/dev/null`, {
+            timeoutSeconds: 5,
+          })
+          .pipe(
+            Effect.catchCause(() =>
+              Effect.succeed({ logs: { stdout: [] as { text: string }[] }, exitCode: 1 }),
+            ),
+          )
+        const matches = lsResult.logs.stdout
+          .map((line) => line.text)
+          .filter((name) => name.toLowerCase().includes(base) || base.includes(name.toLowerCase()))
+          .slice(0, 3)
+        if (matches.length > 0) {
+          return yield* Effect.fail(
+            new Error(`File not found: ${sandboxPath}\n\nDid you mean one of these?\n${matches.join("\n")}`),
+          )
+        }
+        return yield* Effect.fail(new Error(`File not found: ${sandboxPath}`))
+      }
+
+      if (isDirectory) {
+        const quoted = shellQuote(sandboxPath)
+        const lsResult = yield* provider.runInSession(
+          ctx.sandboxSessionID ?? ctx.sessionID,
+          `if [ -d ${quoted} ]; then for entry in ${quoted}/* ${quoted}/.[!.]* ${quoted}/..?*; do [ -e "$entry" ] || continue; name="\${entry##*/}"; if [ -d "$entry" ]; then printf '%s/\\n' "$name"; else printf '%s\\n' "$name"; fi; done; else exit 2; fi`,
+          { timeoutSeconds: 10 },
+        )
+        if (lsResult.exitCode === 2) return yield* Effect.fail(new Error(`Cannot read file: ${sandboxPath}`))
+        if (lsResult.exitCode !== 0)
+          return yield* Effect.fail(new Error(`Failed to list directory ${sandboxPath} (exit ${lsResult.exitCode})`))
+        const allItems = (
+          lsResult.logs.stdout
+            .map((line) => line.text)
+            .join("\n")
+            .trim() || ""
+        )
+          .split("\n")
+          .filter((s: string) => s.length > 0)
+          .sort((a: string, b: string) => a.localeCompare(b))
+
+        const dirOffset = params.offset ?? 1
+        const dirLimit = params.limit ?? DEFAULT_READ_LIMIT
+        const dirStart = dirOffset - 1
+        const sliced = allItems.slice(dirStart, dirStart + dirLimit)
+        const dirTruncated = dirStart + sliced.length < allItems.length
+
+        let output = [`<path>${sandboxPath}</path>`, `<type>directory</type>`, "<contents>"].join("\n")
+        output += "\n" + sliced.map((item: string) => `- ${item}`).join("\n")
+        if (dirTruncated)
+          output += `\n\n(Showing ${sliced.length} of ${allItems.length} entries. Use offset=${dirOffset + sliced.length} to continue.)`
+        else output += `\n\n(${allItems.length} entries)`
+        output += "\n</contents>"
+
+        return {
+          title,
+          output,
+          metadata: {
+            count: allItems.length,
+            preview: sliced.slice(0, 20).join("\n"),
+            truncated: dirTruncated,
+            loaded: [],
+          },
+        }
+      }
+
+      const header = yield* Effect.tryPromise({
+        try: () => sb.files.readBytes(sandboxPath, { range: "bytes=0-65535" }),
+        catch: () => undefined,
+      }).pipe(
+        Effect.catchCause(() => Effect.succeed(undefined)),
+        Effect.timeoutOrElse({
+          duration: FAST_FILE_OP_TIMEOUT,
+          orElse: () => Effect.fail(new SandboxReadTimeout()),
+        }),
+        Effect.retry({ ...FILE_OP_RETRY, while: (error) => error instanceof SandboxReadTimeout }),
+        Effect.catchTag("SandboxReadTimeout", () =>
+          provider
+            .destroy(ctx.sandboxSessionID ?? ctx.sessionID)
+            .pipe(Effect.catchCause(() => Effect.void), Effect.andThen(Effect.fail(new Error(`Read timed out: ${sandboxPath}`)))),
+        ),
+      )
+
+      if (header) {
+        const kind = ToolAttachment.classify(sandboxPath, header)
+        if (kind.type === "binary") return yield* Effect.fail(new Error(`Cannot read binary file: ${sandboxPath}`))
+        if (kind.type === "image" || kind.type === "pdf" || kind.type === "office") {
+          const attachment = yield* ToolAttachment.store({
+            sandbox: sb,
+            sessionID: ctx.sessionID,
+            sourcePath: sandboxPath,
+            filename: path.posix.basename(sandboxPath),
+            mime: kind.mime,
+            size: info?.size,
+            audience: kind.type === "office" ? "display-only" : "model-and-display",
+          })
+          const label = kind.type === "image" ? "Image" : kind.type === "pdf" ? "PDF" : "Document"
+          return {
+            title,
+            output:
+              kind.type === "office"
+                ? "Document read successfully. Text extraction is not available for this format."
+                : `${label} read successfully`,
+            metadata: {
+              kind: kind.type,
+              mime: kind.mime,
+              size: attachment.metadata.size,
+              truncated: false,
+              ...(kind.type === "office" ? { textExtracted: false } : {}),
+            },
+            attachments: [
+              {
+                type: "file" as const,
+                mime: kind.mime,
+                filename: attachment.metadata.filename,
+                url: attachment.url,
+              },
+            ],
+          }
+        }
+
+        const start = (params.offset ?? 1) - 1
+        const limit = params.limit ?? DEFAULT_READ_LIMIT
+        if (hasExcessiveInvalidUtf8(header)) {
+          return yield* Effect.fail(new Error(`File is not valid UTF-8: ${sandboxPath}`))
+        }
+        const page = yield* Effect.tryPromise({
+          try: () =>
+            readTextPage(
+              typeof info?.size === "number" && info.size <= header.length
+                ? streamBytes(header)
+                : sb.files.readBytesStream(sandboxPath),
+              start + 1,
+              limit,
+            ),
+          catch: (cause) => {
+            if (cause instanceof BinaryContentError) return new Error(`Cannot read binary file: ${sandboxPath}`)
+            if (cause instanceof TypeError) return new Error(`File is not valid UTF-8: ${sandboxPath}`)
+            return new Error(cause instanceof Error ? cause.message : String(cause))
+          },
+        }).pipe(
+          Effect.timeoutOrElse({
+            duration: FAST_FILE_OP_TIMEOUT,
+            orElse: () => Effect.fail(new SandboxReadTimeout()),
+          }),
+          Effect.retry({ ...FILE_OP_RETRY, while: (error) => error instanceof SandboxReadTimeout }),
+          Effect.catchTag("SandboxReadTimeout", () =>
+            provider
+              .destroy(ctx.sandboxSessionID ?? ctx.sessionID)
+              .pipe(Effect.catchCause(() => Effect.void), Effect.andThen(Effect.fail(new Error(`Read timed out: ${sandboxPath}`)))),
+          ),
+        )
+        const loaded = yield* instruction.resolve(ctx.messages, filepath, ctx.messageID)
+
+        let output = [`<path>${sandboxPath}</path>`, `<type>file</type>`, "<content>\n"].join("\n")
+        output += page.lines.map((line, i) => `${i + start + 1}: ${line}`).join("\n")
+        const next = page.next
+        if (page.byteCapped)
+          output += `\n\n(Output capped at ${MAX_BYTES_LABEL}. Showing lines ${start + 1}-${start + page.lines.length}. Use offset=${next} to continue.)`
+        else if (next)
+          output += `\n\n(Showing lines ${start + 1}-${start + page.lines.length} of ${page.total}. Use offset=${next} to continue.)`
+        else output += `\n\n(End of file - total ${page.total} lines)`
+        output += "\n</content>"
+
+        if (loaded.length > 0) {
+          output += `\n\n<system-reminder>\n${loaded.map((item) => item.content).join("\n\n")}\n</system-reminder>`
+        }
+
+        return {
+          title,
+          output,
+          metadata: {
+            kind: kind.type,
+            mime: kind.mime,
+            size: info?.size ?? page.sourceBytes,
+            preview: page.lines.slice(0, 20).join("\n"),
+            truncated: page.byteCapped || page.next !== undefined,
+            loaded: loaded.map((item) => item.filepath),
+          },
+        }
+      }
+
+      return yield* Effect.fail(new Error(`Cannot read file: ${sandboxPath}`))
+    })
+
+    const run = Effect.fn("ReadTool.execute")(function* (
+      params: Schema.Schema.Type<typeof Parameters>,
+      ctx: Tool.Context<Metadata>,
+    ) {
+      const instance = yield* InstanceState.context
+      let filepath = params.filePath
+      if (!path.isAbsolute(filepath)) {
+        filepath = path.resolve(instance.directory, filepath)
+      }
+      if (process.platform === "win32") {
+        filepath = FSUtil.normalizePath(filepath)
+      }
+      const title = path.relative(instance.worktree, filepath)
+
+      const maybeSandbox = ctx.sandbox ? ((yield* Effect.promise(() => ctx.sandbox!)) as Sandbox | null) : null
+      if (maybeSandbox && sandboxProvider) {
+        return yield* runSandbox(maybeSandbox, sandboxProvider, filepath, title, params, ctx)
+      }
+
+      const stat = yield* fs.stat(filepath).pipe(
+        Effect.catchIf(
+          (err) => "reason" in err && err.reason._tag === "NotFound",
+          () => Effect.succeed(undefined),
+        ),
+      )
+
+      yield* assertExternalDirectoryEffect(ctx, filepath, {
+        bypass: Boolean(ctx.extra?.["bypassCwdCheck"]),
+        kind: stat?.type === "Directory" ? "directory" : "file",
+      })
+
+      yield* ctx.ask({
+        permission: "read",
+        patterns: [path.relative(instance.worktree, filepath)],
+        always: ["*"],
+        metadata: {},
+      })
+
+      if (!stat) return yield* miss(filepath)
+
+      if (stat.type === "Directory") {
+        const items = yield* list(filepath)
+        const limit = params.limit ?? DEFAULT_READ_LIMIT
+        const offset = params.offset || 1
+        const start = offset - 1
+        const sliced = items.slice(start, start + limit)
+        const truncated = start + sliced.length < items.length
+
+        return {
+          title,
+          output: [
+            `<path>${filepath}</path>`,
+            `<type>directory</type>`,
+            `<entries>`,
+            sliced.join("\n"),
+            truncated
+              ? `\n(Showing ${sliced.length} of ${items.length} entries. Use 'offset' parameter to read beyond entry ${offset + sliced.length})`
+              : `\n(${items.length} entries)`,
+            `</entries>`,
+          ].join("\n"),
+          metadata: {
+            preview: sliced.slice(0, 20).join("\n"),
+            truncated,
+            loaded: [] as string[],
+            display: {
+              type: "directory" as const,
+              path: filepath,
+              entries: sliced,
+              offset,
+              totalEntries: items.length,
+              truncated,
+            },
+          },
+        }
+      }
+
+      const loaded = yield* instruction.resolve(ctx.messages, filepath, ctx.messageID)
+      const sample = yield* readSample(filepath, Number(stat.size), SAMPLE_BYTES)
+
+      const mime = sniffAttachmentMime(sample, FSUtil.mimeType(filepath))
+      const isImage = SUPPORTED_IMAGE_MIMES.has(mime)
+
+      if (isImage || isPdfAttachment(mime)) {
+        const bytes = yield* fs.readFile(filepath)
+        const msg = isPdfAttachment(mime) ? "PDF read successfully" : "Image read successfully"
+        return {
+          title,
+          output: msg,
+          metadata: {
+            preview: msg,
+            truncated: false,
+            loaded: loaded.map((item) => item.filepath),
+          },
+          attachments: [
+            {
+              type: "file" as const,
+              mime,
+              url: `data:${mime};base64,${Buffer.from(bytes).toString("base64")}`,
+            },
+          ],
+        }
+      }
+
+      if (isBinaryFile(filepath, sample)) {
+        return yield* Effect.fail(new Error(`Cannot read binary file: ${filepath}`))
+      }
+
+      if (hasExcessiveInvalidUtf8(sample)) {
+        return yield* Effect.fail(new Error(`File is not valid UTF-8: ${filepath}`))
+      }
+
+      const file = yield* lines(filepath, { limit: params.limit ?? DEFAULT_READ_LIMIT, offset: params.offset || 1 })
+      if (file.count < file.offset && !(file.count === 0 && file.offset === 1)) {
+        return yield* Effect.fail(
+          new Error(`Offset ${file.offset} is out of range for this file (${file.count} lines)`),
+        )
+      }
+
+      let output = [`<path>${filepath}</path>`, `<type>file</type>`, "<content>\n"].join("\n")
+      output += file.raw.map((line, i) => `${i + file.offset}: ${line}`).join("\n")
+
+      const last = file.offset + file.raw.length - 1
+      const next = last + 1
+      const truncated = file.more || file.cut
+      if (file.cut) {
+        output += `\n\n(Output capped at ${MAX_BYTES_LABEL}. Showing lines ${file.offset}-${last}. Use offset=${next} to continue.)`
+      } else if (file.more) {
+        output += `\n\n(Showing lines ${file.offset}-${last} of ${file.count}. Use offset=${next} to continue.)`
+      } else {
+        output += `\n\n(End of file - total ${file.count} lines)`
+      }
+      output += "\n</content>"
+
+      yield* warm(filepath)
+
+      if (loaded.length > 0) {
+        output += `\n\n<system-reminder>\n${loaded.map((item) => item.content).join("\n\n")}\n</system-reminder>`
+      }
+
+      return {
+        title,
+        output,
+        metadata: {
+          preview: file.raw.slice(0, 20).join("\n"),
+          truncated,
+          loaded: loaded.map((item) => item.filepath),
+          display: {
+            type: "file" as const,
+            path: filepath,
+            text: file.raw.join("\n"),
+            lineStart: file.offset,
+            lineEnd: last,
+            totalLines: file.count,
+            truncated,
+          },
+        },
+      }
+    })
+
+    return {
+      description: DESCRIPTION,
+      parameters: Parameters,
+      execute: (params: Schema.Schema.Type<typeof Parameters>, ctx: Tool.Context<Metadata>) =>
+        run(params, ctx).pipe(Effect.orDie),
+    }
+  }),
+)
+
+async function readTextPage(stream: AsyncIterable<Uint8Array>, offset: number, limit: number) {
+  const decoder = new TextDecoder("utf-8", { fatal: false })
+  const lines: string[] = []
+  let pending = ""
+  let total = 0
+  let outputBytes = 0
+  let sourceBytes = 0
+  let byteLimitReached = false
+
+  const append = (line: string) => {
+    total++
+    if (total < offset || lines.length >= limit || byteLimitReached) return
+    const text = line.length > MAX_LINE_LENGTH ? line.slice(0, MAX_LINE_LENGTH) + MAX_LINE_SUFFIX : line
+    const size = Buffer.byteLength(text, "utf-8") + (lines.length > 0 ? 1 : 0)
+    if (outputBytes + size > MAX_READ_BYTES) {
+      byteLimitReached = true
+      return
+    }
+    lines.push(text)
+    outputBytes += size
+  }
+  const consume = (text: string) => {
+    pending += text
+    while (true) {
+      const newline = pending.indexOf("\n")
+      if (newline === -1) return
+      const line = pending.slice(0, newline)
+      pending = pending.slice(newline + 1)
+      append(line.endsWith("\r") ? line.slice(0, -1) : line)
+      if (byteLimitReached) return
+    }
+  }
+
+  for await (const chunk of stream) {
+    sourceBytes += chunk.length
+    if (chunk.includes(0)) throw new BinaryContentError()
+    consume(decoder.decode(chunk, { stream: true }))
+    if (byteLimitReached) break
+  }
+  if (!byteLimitReached) consume(decoder.decode())
+  if (pending && !byteLimitReached) append(pending.endsWith("\r") ? pending.slice(0, -1) : pending)
+  if (offset > Math.max(total, 1)) throw new Error(`Offset ${offset} is out of range for this file (${total} lines)`)
+  const hasMore = byteLimitReached || total > offset - 1 + lines.length
+  const next = hasMore ? offset + lines.length : undefined
+  return { lines, total, sourceBytes, next, byteCapped: byteLimitReached }
+}
+
+class BinaryContentError extends Error {}
+
+async function* streamBytes(bytes: Uint8Array) {
+  yield bytes
+}
+
+function shellQuote(value: string) {
+  return `'${value.replaceAll("'", `'"'"'`)}'`
+}

@@ -1,0 +1,186 @@
+import { LayerNode } from "@opencode-ai/core/effect/layer-node"
+import { InstanceState } from "@/effect/instance-state"
+import { SessionV1 } from "@opencode-ai/core/v1/session"
+import { Runner } from "@/effect/runner"
+import { BackgroundJob } from "@/background/job"
+import { Effect, Latch, Layer, Scope, Context, Cause } from "effect"
+import * as Log from "@opencode-ai/core/util/log"
+import { Session } from "./session"
+import { SessionID } from "./schema"
+import { SessionStatus } from "./status"
+import { SandboxProvider, SandboxConfig } from "@/tool/sandbox-provider"
+import { MCP } from "@/mcp"
+import { Agent as LspAgent } from "@/lsp/agent"
+
+const log = Log.create({ service: "run-state" })
+
+export interface Interface {
+  readonly assertNotBusy: (sessionID: SessionID) => Effect.Effect<void, Session.BusyError>
+  readonly cancel: (sessionID: SessionID) => Effect.Effect<void>
+  readonly ensureRunning: (
+    sessionID: SessionID,
+    onInterrupt: Effect.Effect<SessionV1.WithParts>,
+    work: Effect.Effect<SessionV1.WithParts>,
+  ) => Effect.Effect<SessionV1.WithParts>
+  readonly startShell: (
+    sessionID: SessionID,
+    onInterrupt: Effect.Effect<SessionV1.WithParts>,
+    work: Effect.Effect<SessionV1.WithParts>,
+    ready?: Latch.Latch,
+  ) => Effect.Effect<SessionV1.WithParts, Session.BusyError>
+}
+
+export class Service extends Context.Service<Service, Interface>()("@opencode/SessionRunState") {}
+
+const layer = Layer.effect(
+  Service,
+  Effect.gen(function* () {
+    const background = yield* BackgroundJob.Service
+    const status = yield* SessionStatus.Service
+
+    const state = yield* InstanceState.make(
+      Effect.fn("SessionRunState.state")(function* () {
+        const scope = yield* Scope.Scope
+        const runners = new Map<SessionID, Runner.Runner<SessionV1.WithParts>>()
+        yield* Effect.addFinalizer(
+          Effect.fnUntraced(function* () {
+            yield* Effect.forEach(runners.values(), (runner) => runner.cancel, {
+              concurrency: "unbounded",
+              discard: true,
+            })
+            runners.clear()
+          }),
+        )
+        return { runners, scope }
+      }),
+    )
+
+    const runner = Effect.fn("SessionRunState.runner")(function* (
+      sessionID: SessionID,
+      onInterrupt: Effect.Effect<SessionV1.WithParts>,
+    ) {
+      const data = yield* InstanceState.get(state)
+      const existing = data.runners.get(sessionID)
+      if (existing) return existing
+      const next = Runner.make<SessionV1.WithParts>(data.scope, {
+        onIdle: Effect.gen(function* () {
+          data.runners.delete(sessionID)
+          yield* status.set(sessionID, { type: "idle" })
+          const sandbox = yield* Effect.serviceOption(SandboxProvider.Service)
+          let destroyed = false
+          if (sandbox._tag === "Some") {
+            const keep = yield* sandbox.value.isKeepAlive(sessionID).pipe(Effect.orDie)
+            // 快照会话：workspace 在沙箱 rootfs，onIdle 立即销毁会丢数据且每轮交互都触发一次
+            // docker commit（~70s）——改用 idle reap（超时真空闲）统一快照+回收，onIdle 保留沙箱。
+            const snapshotMode = yield* sandbox.value.isSnapshotSession(sessionID).pipe(Effect.orDie)
+            if (!keep && !snapshotMode) {
+              const agent = yield* Effect.serviceOption(LspAgent.Service)
+              if (agent._tag === "Some") {
+                yield* agent.value.shutdown(sessionID).pipe(Effect.catchCause(() => Effect.void))
+              }
+              yield* sandbox.value.destroy(sessionID).pipe(
+                Effect.catchCause((cause) => {
+                  log.error("sandbox destroy failed on idle", { sessionID, cause: Cause.pretty(cause) })
+                  return Effect.void
+                }),
+              )
+              destroyed = true
+            }
+          }
+          // Only clear MCP cache when sandbox is destroyed
+          if (destroyed) {
+            const mcp = yield* Effect.serviceOption(MCP.Service)
+            if (mcp._tag === "Some") {
+              yield* mcp.value.clearSessionCache(sessionID).pipe(Effect.catchCause(() => Effect.void))
+            }
+          }
+          // TODO: Effect error type inference issue
+        }) as any,
+        onBusy: status.set(sessionID, { type: "busy" }),
+        onInterrupt,
+      })
+      data.runners.set(sessionID, next)
+      return next
+    })
+
+    const assertNotBusy = Effect.fn("SessionRunState.assertNotBusy")(function* (sessionID: SessionID) {
+      const data = yield* InstanceState.get(state)
+      const existing = data.runners.get(sessionID)
+      if (existing?.busy) yield* busyError(sessionID)
+    })
+
+    const cancel = Effect.fn("SessionRunState.cancel")(function* (sessionID: SessionID) {
+      yield* cancelBackgroundJobs(background, sessionID)
+      const data = yield* InstanceState.get(state)
+      const existing = data.runners.get(sessionID)
+      if (!existing) {
+        yield* status.set(sessionID, { type: "idle" })
+        return
+      }
+      yield* existing.cancel
+    })
+
+    const ensureRunning = Effect.fn("SessionRunState.ensureRunning")(function* (
+      sessionID: SessionID,
+      onInterrupt: Effect.Effect<SessionV1.WithParts>,
+      work: Effect.Effect<SessionV1.WithParts>,
+    ) {
+      return yield* (yield* runner(sessionID, onInterrupt)).ensureRunning(work)
+    })
+
+    const startShell = Effect.fn("SessionRunState.startShell")(function* (
+      sessionID: SessionID,
+      onInterrupt: Effect.Effect<SessionV1.WithParts>,
+      work: Effect.Effect<SessionV1.WithParts>,
+      ready?: Latch.Latch,
+    ) {
+      return yield* (yield* runner(sessionID, onInterrupt))
+        .startShell(work, ready)
+        .pipe(Effect.catchTag("RunnerBusy", () => Effect.fail(busyError(sessionID))))
+    })
+
+    return Service.of({ assertNotBusy, cancel, ensureRunning, startShell })
+  }),
+)
+
+const cancelBackgroundJobs = Effect.fn("SessionRunState.cancelBackgroundJobs")(function* (
+  background: BackgroundJob.Interface,
+  sessionID: SessionID,
+) {
+  const jobs = yield* background.list()
+  const pending = new Set<string>([sessionID])
+  const cancelled = new Set<string>()
+  const matches = (job: BackgroundJob.Info) => {
+    if (job.status !== "running") return false
+    if (cancelled.has(job.id)) return false
+    if (pending.has(job.id)) return true
+    if (typeof job.metadata?.sessionId === "string" && pending.has(job.metadata.sessionId)) return true
+    return typeof job.metadata?.parentSessionId === "string" && pending.has(job.metadata.parentSessionId)
+  }
+  let batch = jobs.filter(matches)
+  while (batch.length > 0) {
+    yield* Effect.forEach(
+      batch,
+      (job) =>
+        background.cancel(job.id).pipe(
+          Effect.tap(() =>
+            Effect.sync(() => {
+              cancelled.add(job.id)
+              pending.add(job.id)
+              if (typeof job.metadata?.sessionId === "string") pending.add(job.metadata.sessionId)
+            }),
+          ),
+        ),
+      { concurrency: "unbounded", discard: true },
+    )
+    batch = jobs.filter(matches)
+  }
+})
+
+function busyError(sessionID: SessionID) {
+  return new Session.BusyError({ sessionID })
+}
+
+export const node = LayerNode.make({ service: Service, layer: layer, deps: [BackgroundJob.node, SessionStatus.node] })
+
+export * as SessionRunState from "./run-state"

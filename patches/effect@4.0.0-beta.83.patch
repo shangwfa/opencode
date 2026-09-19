@@ -1,0 +1,135 @@
+diff --git a/dist/unstable/httpapi/HttpApiSchema.js b/dist/unstable/httpapi/HttpApiSchema.js
+--- a/dist/unstable/httpapi/HttpApiSchema.js
++++ b/dist/unstable/httpapi/HttpApiSchema.js
+@@ -151,7 +151,7 @@ export const StreamSse = options => {
+   const events = options.events ?? (options.data === undefined ? undefined : Schema.Struct({
+     id: Schema.UndefinedOr(Schema.String),
+     event: Schema.String,
+-    data: Schema.fromJsonString(options.data)
++    data: sseDataJsonSchema(options.data)
+   }));
+   if (events === undefined) {
+     throw new Error("StreamSse requires either an events schema or a data schema");
+@@ -166,6 +166,14 @@ export const StreamSse = options => {
+     error: options.error ?? Schema.Never
+   });
+ };
++const sseDataJsonSchema = data => {
++  const identifier = SchemaAST.resolveIdentifier(data.ast);
++  return identifier === undefined ? Schema.fromJsonString(data) : Schema.fromJsonString(data).annotate({
++    // The SSE transport field is a JSON string. Give that wrapper its own
++    // OpenAPI identifier so it does not claim the decoded data schema's name.
++    identifier: `${identifier}Stream`
++  });
++};
+ /**
+  * Creates a streaming `Uint8Array` success response schema.
+  *
+diff --git a/src/unstable/httpapi/HttpApiSchema.ts b/src/unstable/httpapi/HttpApiSchema.ts
+--- a/src/unstable/httpapi/HttpApiSchema.ts
++++ b/src/unstable/httpapi/HttpApiSchema.ts
+@@ -433,7 +433,7 @@ export const StreamSse: {
+   const events = options.events ?? (options.data === undefined ? undefined : Schema.Struct({
+     id: Schema.UndefinedOr(Schema.String),
+     event: Schema.String,
+-    data: Schema.fromJsonString(options.data)
++    data: sseDataJsonSchema(options.data)
+   }))
+   if (events === undefined) {
+     throw new Error("StreamSse requires either an events schema or a data schema")
+@@ -449,6 +449,15 @@ export const StreamSse: {
+   })
+ }
+
++const sseDataJsonSchema = (data: Schema.Constraint) => {
++  const identifier = SchemaAST.resolveIdentifier(data.ast)
++  return identifier === undefined ? Schema.fromJsonString(data) : Schema.fromJsonString(data).annotate({
++    // The SSE transport field is a JSON string. Give that wrapper its own
++    // OpenAPI identifier so it does not claim the decoded data schema's name.
++    identifier: `${identifier}Stream`
++  })
++}
++
+ /**
+  * Creates a streaming `Uint8Array` success response schema.
+  *
+diff --git a/dist/unstable/socket/Socket.d.ts b/dist/unstable/socket/Socket.d.ts
+--- a/dist/unstable/socket/Socket.d.ts
++++ b/dist/unstable/socket/Socket.d.ts
+@@ -63,6 +63,7 @@ export interface Socket {
+         readonly onOpen?: Effect.Effect<void> | undefined;
+     }) => Effect.Effect<void, SocketError | E, R>;
+     readonly writer: Effect.Effect<(chunk: Uint8Array | string | CloseEvent) => Effect.Effect<void, SocketError>, never, Scope.Scope>;
++    readonly bufferedAmount: Effect.Effect<number>;
+ }
+ /**
+  * Constructs a `Socket` from a raw read loop and scoped writer, deriving binary
+@@ -82,6 +83,7 @@ export declare const make: (options: {
+         readonly onOpen?: Effect.Effect<void> | undefined;
+     }) => Effect.Effect<void, SocketError | E, R>;
+     readonly writer: Effect.Effect<(chunk: Uint8Array | string | CloseEvent) => Effect.Effect<void, SocketError>, never, Scope.Scope>;
++    readonly bufferedAmount?: Effect.Effect<number> | undefined;
+ }) => Socket;
+ declare const CloseEventTypeId = "~effect/socket/Socket/CloseEvent";
+ /**
+diff --git a/dist/unstable/socket/Socket.js b/dist/unstable/socket/Socket.js
+--- a/dist/unstable/socket/Socket.js
++++ b/dist/unstable/socket/Socket.js
+@@ -51,7 +51,8 @@ export const make = options => Socket.of({
+   runRaw: options.runRaw,
+   run: options.run ?? ((handler, opts) => options.runRaw(data => typeof data === "string" ? handler(encoder.encode(data)) : data instanceof Uint8Array ? handler(data) : handler(new Uint8Array(data)), opts)),
+   runString: options.runString ?? (options.run ? (handler, opts) => options.run(data => handler(decoder.decode(data)), opts) : (handler, opts) => options.runRaw(data => typeof data === "string" ? handler(data) : data instanceof Uint8Array ? handler(decoder.decode(data)) : handler(decoder.decode(new Uint8Array(data))), opts)),
+-  writer: options.writer
++  writer: options.writer,
++  bufferedAmount: options.bufferedAmount ?? Effect.succeed(0)
+ });
+ const encoder = /*#__PURE__*/new TextEncoder();
+ const decoder = /*#__PURE__*/new TextDecoder();
+@@ -445,7 +446,8 @@ export const fromWebSocket = (acquire, options) => Effect.withFiber(fiber => {
+   const writer = Effect.succeed(write);
+   return Effect.succeed(make({
+     runRaw,
+-    writer
++    writer,
++    bufferedAmount: Effect.sync(() => currentWS?.bufferedAmount ?? 0)
+   }));
+ });
+ /**
+diff --git a/src/unstable/socket/Socket.ts b/src/unstable/socket/Socket.ts
+--- a/src/unstable/socket/Socket.ts
++++ b/src/unstable/socket/Socket.ts
+@@ -86,6 +86,7 @@ export interface Socket {
+     never,
+     Scope.Scope
+   >
++  readonly bufferedAmount: Effect.Effect<number>
+ }
+
+ /**
+@@ -119,6 +120,7 @@ export const make = (options: {
+     never,
+     Scope.Scope
+   >
++  readonly bufferedAmount?: Effect.Effect<number> | undefined
+ }): Socket =>
+   Socket.of({
+     [TypeId]: TypeId,
+@@ -142,7 +144,8 @@ export const make = (options: {
+               : data instanceof Uint8Array
+               ? handler(decoder.decode(data))
+               : handler(decoder.decode(new Uint8Array(data))), opts)),
+-    writer: options.writer
++    writer: options.writer,
++    bufferedAmount: options.bufferedAmount ?? Effect.succeed(0)
+   })
+
+ const encoder = new TextEncoder()
+@@ -746,6 +749,7 @@ export const fromWebSocket = <RO>(
+
+     return Effect.succeed(make({
+       runRaw,
+-      writer
++      writer,
++      bufferedAmount: Effect.sync(() => currentWS?.bufferedAmount ?? 0)
+     }))
+   })
