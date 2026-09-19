@@ -516,6 +516,11 @@ function updateProgress(progress: Progress) {
 export function run(options: Options = {}): Effect.Effect<RunResult, never, Database.Service | Global.Service> {
   return lock.withPermit(
     Effect.gen(function* () {
+      // The v1 import lifts a v1 *sqlite* database into v2. In PG mode there is
+      // no such source (the v1 fleet itself ran on PG), and its statements
+      // (`sqlite_master`, `INSERT OR IGNORE`, `rowid`, `changes()`) are
+      // sqlite-only. Skip entirely.
+      if ((process.env["OPENCODE_DATABASE_URL"] ?? "").length > 0) return { status: "completed" as const }
       const db = (yield* Database.Service).db
       const global = yield* Global.Service
       const state = yield* readState(db)

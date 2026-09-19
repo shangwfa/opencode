@@ -5,6 +5,7 @@ import path from "path"
 import { Context, Effect, Layer, Schema } from "effect"
 import { FSUtil } from "@opencode/util/fs-util"
 import { Location } from "./location.js"
+import { EnvironmentService } from "./environment/environment.js"
 import { PositiveInt, RelativePath } from "./schema.js"
 import { FileSystemSearch } from "./filesystem/search.js"
 import { Entry, FileSystem, FindInput } from "@opencode/schema/filesystem"
@@ -72,6 +73,20 @@ const baseLayer = Layer.effect(
     const fs = yield* FSUtil.Service
     const location = yield* Location.Service
     const search = yield* FileSystemSearch.Service
+    // Workspace-placed locations execute in the sandbox: route file operations
+    // through the Location environment (Environment.files) instead of the host
+    // node fs (upstream #44568). Local placements keep the host fs.
+    const environment = yield* EnvironmentService.Service
+    const files = environment.files
+
+    const listFromEnvironment = (directory: string) =>
+      files.list(directory).pipe(
+        Effect.map((entries) =>
+          entries.flatMap((entry) =>
+            entry.type === "file" || entry.type === "directory" ? [{ name: entry.name, type: entry.type }] : [],
+          ),
+        ),
+      )
     // Workspace-placed directories exist only inside the workspace, so a host
     // realpath probe at boot consults the wrong filesystem and would block
     // construction on servers without a matching local directory. Treat the
@@ -83,6 +98,8 @@ const baseLayer = Layer.effect(
       const absolute = path.resolve(location.directory, input ?? ".")
       if (!FSUtil.contains(location.directory, absolute))
         return yield* Effect.die(new Error("Path escapes the location"))
+      // Sandbox filesystems have no host realpath; the absolute path is canonical.
+      if (location.workspaceID) return { absolute, real: absolute, directory: location.directory }
       const real = yield* fs.realPath(absolute)
       if (!FSUtil.contains(root, real)) return yield* Effect.die(new Error("Path escapes the location"))
       return { absolute, real, directory: location.directory }
@@ -90,6 +107,20 @@ const baseLayer = Layer.effect(
     return Service.of({
       find: search.find,
       read: Effect.fn("FileSystem.read")(function* (input) {
+        if (location.workspaceID) {
+          // Sandbox placement: Environment.files routes to the workspace.
+          const absolute = path.resolve(location.directory, input.path ?? ".")
+          const result = yield* files.read(absolute).pipe(
+            Effect.mapError((error) =>
+              error._tag === "Environment.NotFound"
+                ? new NotFoundError({ path: input.path })
+                : new NotFoundError({ path: input.path }),
+
+            ),
+          )
+          if (result.info.type !== "file") return yield* Effect.die(new Error("Path is not a file"))
+          return { content: result.bytes, mime: FSUtil.mimeType(absolute) }
+        }
         const target = yield* resolve(input.path).pipe(
           Effect.catchReason(
             "PlatformError",
@@ -107,21 +138,29 @@ const baseLayer = Layer.effect(
           ),
         )
         if (info.type !== "File") return yield* Effect.die(new Error("Path is not a file"))
-        return {
-          content: yield* fs.readFile(target.real).pipe(
-            Effect.catchReason(
-              "PlatformError",
-              "NotFound",
-              () => Effect.fail(new NotFoundError({ path: input.path })),
-              (_, error) => Effect.die(error),
-            ),
+        const content = yield* fs.readFile(target.real).pipe(
+          Effect.catchReason(
+            "PlatformError",
+            "NotFound",
+            () => Effect.fail(new NotFoundError({ path: input.path })),
+            (_, error) => Effect.die(error),
           ),
+        )
+        return {
+          content: new Uint8Array(content),
           mime: FSUtil.mimeType(target.real),
         }
       }),
       list: Effect.fn("FileSystem.list")(function* (input = {}) {
         // Navigation can leave the cwd without activating another Location.
         const directory = path.resolve(location.directory, input.path ?? ".")
+        if (location.workspaceID) {
+          return yield* listFromEnvironment(directory).pipe(
+            Effect.map((items) => entryList(items, location.directory, directory)),
+            Effect.mapError((error) => new Error(`Sandbox list failed: ${String(error)}`)),
+            Effect.orDie,
+          )
+        }
         const info = yield* fs.stat(directory).pipe(Effect.orDie)
         if (info.type !== "Directory") return yield* Effect.die(new Error("Path is not a directory"))
         return yield* fs.readDirectoryEntries(directory).pipe(
@@ -150,5 +189,24 @@ const baseLayer = Layer.effect(
 export const node = makeLocationNode({
   service: Service,
   layer: baseLayer,
-  deps: [FSUtil.node, Location.node, FileSystemSearch.node],
+  deps: [FSUtil.node, Location.node, FileSystemSearch.node, EnvironmentService.node],
 })
+/** Shared entry shaping for both host and environment listings. */
+function entryList(
+  items: ReadonlyArray<{ name: string; type: "file" | "directory" }>,
+  rootDirectory: string,
+  directory: string,
+): Array<ReturnType<typeof Entry.make>> {
+  return items
+    .flatMap((item) => {
+      const absolute = path.join(directory, item.name)
+      const relative = path.relative(rootDirectory, absolute) || "."
+      return [
+        Entry.make({
+          path: RelativePath.make(relative + (item.type === "directory" ? path.sep : "")),
+          type: item.type,
+        }),
+      ]
+    })
+    .sort((a, b) => (a.type === b.type ? a.path.localeCompare(b.path) : a.type === "directory" ? -1 : 1))
+}

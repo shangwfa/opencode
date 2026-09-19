@@ -69,6 +69,45 @@ const schema: Omit<DatabaseMigration.Migration, "id"> = {
         );
       `)
       yield* tx.run(`
+        CREATE TABLE \`exec_log\` (
+          \`id\` text PRIMARY KEY,
+          \`session_id\` text NOT NULL,
+          \`command\` text NOT NULL,
+          \`working_directory\` text,
+          \`status\` text NOT NULL,
+          \`exit_code\` integer,
+          \`stdout\` text,
+          \`stderr\` text,
+          \`error\` text,
+          \`rule\` text,
+          \`trace_id\` text,
+          \`source\` text NOT NULL,
+          \`time_started\` integer NOT NULL,
+          \`time_finished\` integer,
+          \`time_created\` integer NOT NULL,
+          \`time_updated\` integer NOT NULL,
+          CONSTRAINT \`fk_exec_log_session_id_session_v2_id_fk\` FOREIGN KEY (\`session_id\`) REFERENCES \`session_v2\`(\`id\`) ON DELETE CASCADE
+        );
+      `)
+      yield* tx.run(`
+        CREATE TABLE \`hitl_request\` (
+          \`id\` text PRIMARY KEY,
+          \`kind\` text NOT NULL,
+          \`directory\` text NOT NULL,
+          \`user_id\` text DEFAULT '' NOT NULL,
+          \`session_id\` text NOT NULL,
+          \`owner_id\` text NOT NULL,
+          \`status\` text NOT NULL,
+          \`payload\` text NOT NULL,
+          \`result\` text,
+          \`close_reason\` text,
+          \`lease_until\` integer NOT NULL,
+          \`time_created\` integer NOT NULL,
+          \`time_updated\` integer NOT NULL,
+          CONSTRAINT \`fk_hitl_request_session_id_session_v2_id_fk\` FOREIGN KEY (\`session_id\`) REFERENCES \`session_v2\`(\`id\`) ON DELETE CASCADE
+        );
+      `)
+      yield* tx.run(`
         CREATE TABLE \`kv\` (
           \`key\` text PRIMARY KEY,
           \`value\` text NOT NULL,
@@ -190,6 +229,7 @@ const schema: Omit<DatabaseMigration.Migration, "id"> = {
           \`directory\` text NOT NULL,
           \`path\` text,
           \`title\` text,
+          \`app_id\` text,
           \`version\` text NOT NULL,
           \`share_url\` text,
           \`summary_additions\` integer,
@@ -224,6 +264,7 @@ const schema: Omit<DatabaseMigration.Migration, "id"> = {
           \`id\` text PRIMARY KEY,
           \`provider\` text NOT NULL,
           \`binding\` text,
+          \`resource\` text,
           \`created_at\` integer NOT NULL,
           \`last_used_at\` integer NOT NULL
         );
@@ -240,6 +281,12 @@ const schema: Omit<DatabaseMigration.Migration, "id"> = {
       `)
       yield* tx.run(`CREATE UNIQUE INDEX \`event_aggregate_seq_idx\` ON \`event\` (\`aggregate_id\`,\`seq\`);`)
       yield* tx.run(`CREATE INDEX \`event_aggregate_type_seq_idx\` ON \`event\` (\`aggregate_id\`,\`type\`,\`seq\`);`)
+      yield* tx.run(`CREATE INDEX \`exec_log_session_idx\` ON \`exec_log\` (\`session_id\`);`)
+      yield* tx.run(
+        `CREATE INDEX \`hitl_pending_idx\` ON \`hitl_request\` (\`directory\`,\`user_id\`,\`kind\`,\`status\`,\`lease_until\`);`,
+      )
+      yield* tx.run(`CREATE INDEX \`hitl_session_idx\` ON \`hitl_request\` (\`directory\`,\`session_id\`,\`status\`);`)
+      yield* tx.run(`CREATE INDEX \`hitl_retention_idx\` ON \`hitl_request\` (\`status\`,\`time_updated\`);`)
       yield* tx.run(
         `CREATE UNIQUE INDEX \`permission_project_action_resource_idx\` ON \`permission\` (\`project_id\`,\`action\`,\`resource\`);`,
       )

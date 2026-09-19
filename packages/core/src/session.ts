@@ -8,6 +8,7 @@ import { and, desc, eq } from "drizzle-orm"
 import { Project } from "./project.js"
 import { Model } from "@opencode/schema/model"
 import { Location } from "./location.js"
+// WIP(codemode-sandbox, unfinied): import { CodeModeSandbox } from "./codemode/sandbox.js"
 import { SessionMessage } from "./session/message.js"
 import { PromptInput } from "@opencode/schema/prompt-input"
 import { Bus } from "./bus.js"
@@ -24,6 +25,7 @@ import { Slug } from "./util/slug.js"
 import path from "path"
 import { SessionRunner } from "./session/runner/index.js"
 import { SessionStore } from "./session/store.js"
+import { SessionDerive } from "./session/derive.js"
 import { SessionExecution } from "./session/execution.js"
 import {
   AttachmentError,
@@ -82,10 +84,15 @@ export type ListInput = SessionStore.ListInput
 type CreateBaseInput = {
   id?: SessionSchema.ID
   title?: string
+  /** Business-side application identifier; validated by the create schema. */
+  appId?: string
+  /** Derives a fresh summary of this source session into the new one (v1 summaryFrom). */
+  summaryFrom?: SessionSchema.ID
   agent?: Agent.ID
   model?: Model.Ref
   metadata?: SessionSchema.Metadata
   permissions?: Permission.Ruleset
+  sandbox?: import("@opencode/schema/sandbox-resource").SandboxResource.Resource
 }
 type CreateInput = CreateBaseInput &
   ({ location: Location.Ref; parentID?: never } | { parentID: SessionSchema.ID; location?: never })
@@ -136,6 +143,10 @@ export interface Interface {
     sessionID: SessionSchema.ID
     messageID: SessionMessage.ID
   }) => Effect.Effect<SessionMessage.Info | undefined>
+  readonly removeMessage: (input: {
+    sessionID: SessionSchema.ID
+    messageID: SessionMessage.ID
+  }) => Effect.Effect<void, NotFoundError | MessageNotFoundError>
   readonly context: (
     sessionID: SessionSchema.ID,
   ) => Effect.Effect<SessionMessage.Info[], NotFoundError | MessageDecodeError>
@@ -265,6 +276,7 @@ const layer = Layer.effect(
               location,
               subpath: RelativePath.make(path.relative(project.directory, location.directory).replaceAll("\\", "/")),
               title: input.title,
+              appId: input.appId,
               agent: input.agent,
               // Children inherit metadata and permissions the way they inherit
               // location, so host policies that read them treat the family uniformly.
@@ -298,7 +310,29 @@ const layer = Layer.effect(
           )
         if (projected.type === "existing") return projected.session
         // TODO: Restore recorded sessions onto replacement synchronized workspaces in a future API slice.
-        return yield* result.get(sessionID).pipe(Effect.orDie)
+        const created = yield* result.get(sessionID).pipe(Effect.orDie)
+        // SaaS: summaryFrom derives a fresh summary of the source session into
+        // the new one (v1 parity, plan C: regenerate from message events, the
+        // source's own compaction only anchors the input). The transcript is
+        // admitted as a synthetic input and then compacted, so the derivation
+        // rides the regular inbox -> run pipeline: queued behind other work,
+        // durable across restarts, streamed over SSE, and settled to idle by
+        // the runner itself. Failures never surface in the create response.
+        if (input.summaryFrom !== undefined) {
+          const text = yield* SessionDerive.transcript(store, input.summaryFrom)
+          if (text !== undefined) {
+            yield* result
+              .synthetic({ sessionID, text, metadata: { summaryFrom: input.summaryFrom } })
+              .pipe(Effect.catchTag("Session.SyntheticConflictError", () => Effect.void))
+            // Queued (not steered): the synthetic transcript must deliver
+            // into history first, otherwise compaction runs against an empty
+            // session and fails with "Nothing to compact yet".
+            yield* result
+              .compact({ sessionID, delivery: "queue" })
+              .pipe(Effect.catchTag("Session.CompactionConflictError", () => Effect.void))
+          }
+        }
+        return created
       }),
       fork: Effect.fn("Session.fork")(function* (input) {
         const parent = yield* result.get(input.sessionID)
@@ -367,6 +401,16 @@ const layer = Layer.effect(
         return yield* store.messages(input)
       }),
       message: (input) => sessions.forSession(input.sessionID).message(input.messageID),
+      removeMessage: Effect.fn("Session.removeMessage")(function* (input) {
+        yield* result.get(input.sessionID)
+        const existing = yield* sessions.forSession(input.sessionID).message(input.messageID)
+        if (existing === undefined)
+          return yield* new MessageNotFoundError({ sessionID: input.sessionID, messageID: input.messageID })
+        yield* bus.publish(SessionEvent.MessageRemoved, {
+          sessionID: input.sessionID,
+          messageID: input.messageID,
+        })
+      }),
       context: Effect.fn("Session.context")(function* (sessionID) {
         yield* result.get(sessionID)
         return yield* store.context(sessionID)
@@ -460,6 +504,7 @@ export const node: LayerNode.Provider<Service, never, typeof Node.tags.values.gl
   deps: [
     Job.node,
     SessionEnvironment.node,
+    // WIP(codemode-sandbox, unfinished): CodeModeSandbox.node,
     Database.node,
     Bus.node,
     Project.node,

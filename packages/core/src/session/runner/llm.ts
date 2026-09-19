@@ -1,6 +1,6 @@
 export * as SessionRunnerLLM from "./llm.js"
 
-import { Message } from "@opencode/ai"
+import { Message, SystemPart, ToolDefinition } from "@opencode/ai"
 import { and, desc, eq, sql } from "drizzle-orm"
 import { Cause, Effect, Exit, FiberMap, Layer } from "effect"
 import { Database } from "../../database/database.js"
@@ -30,9 +30,75 @@ import { SessionStep } from "./step.js"
 import { ToolOutput } from "../../tool-output.js"
 import { Plugin } from "../../plugin.js"
 import { MAX_STEPS_PROMPT } from "./max-steps.js"
+import { Tool } from "../../tool.js"
+import { AntiLoop } from "../anti-loop.js"
+import { JsonSchema } from "effect"
+
 
 const CONTINUE_AFTER_INCOMPLETE_STREAM =
   "The previous response was interrupted. Continue from where you left off without repeating completed content."
+
+const STRUCTURED_OUTPUT_TOOL = "StructuredOutput"
+const STRUCTURED_OUTPUT_DESCRIPTION =
+  "Use this tool to return your final response in the requested structured format. Do not respond with plain text."
+const STRUCTURED_OUTPUT_SYSTEM =
+  "IMPORTANT: The user has requested structured output. You MUST use the StructuredOutput tool to provide your final response. Do NOT respond with plain text - you MUST call the StructuredOutput tool with your answer formatted according to the schema."
+
+/** The latest user message of the current turn decides the reply format. */
+const structuredFormat = (messages: ReadonlyArray<SessionMessage.Info>) => {
+  for (let index = messages.length - 1; index >= 0; index--) {
+    const message = messages[index]
+    if (message.type !== "user") continue
+    return message.format?.type === "json_schema" ? message.format : undefined
+  }
+  return undefined
+}
+
+/** Per-run anti-loop state shared across every step of one prompt. */
+const makeLoopGuard = () => {
+  const antiLoop = AntiLoop.make()
+  let aborted = false
+  return {
+    antiLoop,
+    abort() {
+      aborted = true
+    },
+    aborted() {
+      return aborted
+    },
+  }
+}
+
+/**
+ * Advertises one forced tool whose input schema is the requested JSON Schema;
+ * its call arguments become the assistant message's `structured` value.
+ */
+const structuredTools = (
+  snapshot: Tool.Snapshot,
+  schema: Record<string, unknown>,
+  onCapture: () => void,
+): Tool.Snapshot => ({
+  ...snapshot,
+  definitions: [
+    ...snapshot.definitions,
+    new ToolDefinition({
+      name: STRUCTURED_OUTPUT_TOOL,
+      description: STRUCTURED_OUTPUT_DESCRIPTION,
+      inputSchema: schema as JsonSchema.JsonSchema,
+    }),
+  ],
+  execute: (input) =>
+    input.call.name === STRUCTURED_OUTPUT_TOOL
+      ? Effect.suspend(() => {
+          onCapture()
+          return Effect.succeed({
+            output: "Structured output captured successfully.",
+            content: [{ type: "text", text: "Structured output captured successfully." }],
+            metadata: { valid: true },
+          } satisfies Tool.NormalizedResult)
+        })
+      : snapshot.execute(input),
+})
 
 const layer = Layer.effect(
   Service,
@@ -67,6 +133,9 @@ const layer = Layer.effect(
       yield* settleStaleCompactions(sessionID)
       yield* settleStaleToolCalls(sessionID)
 
+      // One doom-loop detector per run (v1 anti-loop parity): identical-call
+      // window + consecutive failures, reset when a new prompt is promoted.
+      let loopGuard = makeLoopGuard()
       const advanceToStep = Effect.fn("SessionRunner.advanceToStep")(() =>
         Effect.uninterruptibleMask((restore) =>
           Effect.gen(function* () {
@@ -174,7 +243,10 @@ const layer = Layer.effect(
                     yield* FiberMap.run(titles, sessionID, title.generate(sessionID), {
                       onlyIfMissing: true,
                     })
-                  if (promoted > 0) step = 1
+                  if (promoted > 0) {
+                    step = 1
+                    loopGuard = makeLoopGuard()
+                  }
                   return { _tag: "Ready" as const, context: yield* context.load(selected) }
                 }),
               )
@@ -187,7 +259,7 @@ const layer = Layer.effect(
       while (true) {
         const next = yield* advanceToStep()
         if (next._tag !== "Ready") return next
-        continuing = yield* runStep(next.context, step)
+        continuing = yield* runStep(next.context, step, loopGuard)
         step++
         force = false
         entering = false
@@ -202,13 +274,19 @@ const layer = Layer.effect(
     })
 
     /** Owns logical Step policy; each attempt owns its streaming, tools, and durable settlement. */
-    const runStep = Effect.fn("SessionRunner.runStep")(function* (first: SessionContext.Loaded, step: number) {
+    const runStep = Effect.fn("SessionRunner.runStep")(function* (
+      first: SessionContext.Loaded,
+      step: number,
+      loop: { readonly antiLoop: AntiLoop.Detector; abort(): void; aborted(): boolean },
+    ) {
       const sessionID = first.session.id
       let assistantMessageID = SessionMessage.ID.create()
       const retry = yield* SessionRunnerRetry.make(bus, sessionID)
       let initial: SessionContext.Loaded | undefined = first
       let recoverOverflow = true
       let recoverContinuation = true
+      // Set by the forced StructuredOutput call; the turn ends once the reply is in hand.
+      let structuredCaptured = false
       while (true) {
         // Reuse boundary preparation once; retries refresh context without delivering more input.
         const loaded = initial ?? (yield* prepareContext(sessionID).pipe(Effect.flatMap(context.load)))
@@ -225,10 +303,17 @@ const layer = Layer.effect(
           continue
         }
         const stepLimitReached = loaded.agent.info.steps !== undefined && step >= loaded.agent.info.steps
+        const structured = structuredFormat(loaded.messages)
+        const tools =
+          structured === undefined
+            ? loaded.tools
+            : structuredTools(loaded.tools, structured.schema, () => {
+                structuredCaptured = true
+              })
         const transcript = SessionModelRequest.baseTranscript({
           agent: loaded.agent.info,
           model: loaded.model,
-          tools: loaded.tools,
+          tools,
           initial: loaded.initial,
           messages: loaded.messages,
         })
@@ -236,22 +321,66 @@ const layer = Layer.effect(
           session: loaded.session,
           agent: loaded.agent.id,
           model: loaded.model,
-          tools: loaded.tools,
-          system: transcript.system,
+          tools,
+          system: structured === undefined ? transcript.system : [...transcript.system, SystemPart.make(STRUCTURED_OUTPUT_SYSTEM)],
           messages: stepLimitReached
             ? [...transcript.messages, Message.assistant(MAX_STEPS_PROMPT)]
             : transcript.messages,
           // Keep tool definitions on the final Step to preserve the provider's cached prefix.
-          toolChoice: stepLimitReached ? "none" : undefined,
+          toolChoice: stepLimitReached ? "none" : structured === undefined ? undefined : "required",
           webSocket: "session",
         })
+        const antiLoop = loop.antiLoop
+        const guarded = {
+          ...prepared,
+          executeTool: (input: Parameters<typeof prepared.executeTool>[0]) =>
+            Effect.gen(function* () {
+              yield* Effect.logInfo("anti-loop guard hit", { tool: input.call.name })
+              const args = (input.call.input ?? {}) as Record<string, unknown>
+              const verdict = antiLoop.check(input.call.name, args)
+              if (verdict.action === "block") {
+                yield* Effect.logWarning("anti-loop block", {
+                  sessionID,
+                  tool: verdict.tool,
+                  signal: verdict.signal,
+                  count: verdict.count,
+                  threshold: verdict.threshold,
+                  fatal: verdict.fatal,
+                })
+                if (verdict.fatal) {
+                  loop.abort()
+                  return yield* new Tool.Error({ message: verdict.reason })
+                }
+                // Blocked calls never execute and never enter the window.
+                return {
+                  output: verdict.reason,
+                  content: [{ type: "text", text: verdict.reason }],
+                  metadata: AntiLoop.blockedMetadata(verdict),
+                } satisfies Tool.NormalizedResult
+              }
+              return yield* prepared.executeTool(input).pipe(
+                Effect.tapError((error) =>
+                  Effect.logInfo("anti-loop record", { tool: input.call.name, ok: false, error: error.message }).pipe(
+                    Effect.asVoid,
+                    Effect.andThen(Effect.sync(() => antiLoop.record(input.call.name, args, false))),
+                  ),
+                ),
+                Effect.tap(() =>
+                  Effect.logInfo("anti-loop record", { tool: input.call.name, ok: true }).pipe(
+                    Effect.asVoid,
+                    Effect.andThen(Effect.sync(() => antiLoop.record(input.call.name, args, true))),
+                  ),
+                ),
+              )
+            }),
+        }
         const outcome = yield* steps.attempt({
           isLocationClosed: lifecycle.isClosed,
           sessionID,
           assistantMessageID,
           agent: loaded.agent.id,
           model: loaded.model,
-          prepared,
+          prepared: guarded,
           retry: (cause, error, proposed) =>
             retry.decide({
               cause,
@@ -271,7 +400,7 @@ const layer = Layer.effect(
           ),
         })
         const completed = yield* SessionStep.Outcome.$match(outcome, {
-          Completed: (outcome) => Effect.succeed(outcome.needsContinuation),
+          Completed: (outcome) => Effect.succeed(outcome.needsContinuation && !structuredCaptured && !loop.aborted()),
           Retry: (outcome) =>
             retry.wait({
               decision: outcome.decision,

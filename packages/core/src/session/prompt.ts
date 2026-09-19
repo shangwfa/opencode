@@ -22,6 +22,7 @@ export type Input = {
   files?: PromptInput.Prompt["files"]
   agents?: PromptInput.Prompt["agents"]
   skills?: PromptInput.Prompt["skills"]
+  format?: PromptInput.Prompt["format"]
   metadata?: Record<string, unknown>
   delivery?: SessionInbox.Delivery
 }
@@ -82,6 +83,8 @@ export const prepare = Effect.fn("SessionPrompt.prepare")(function* (request: {
           agents: input.agents,
           files,
           skills: selected?.length ? selected : undefined,
+          // Structured-output control stays outside the plugin prompt hook.
+          format: request.input.format,
         }),
         metadata: event.metadata,
       }),

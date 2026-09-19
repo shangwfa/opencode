@@ -65,6 +65,14 @@ function lockFor(filename: string) {
 export function layer(options: Options = { path: ":memory:" }) {
   return Layer.unwrap(
     Effect.gen(function* () {
+      // SaaS PG mode: swap the whole storage layer for the PG bridge (v1
+      // app-runtime parity). Core sqlite migrations never run in this mode.
+      const pgUrl = process.env["OPENCODE_DATABASE_URL"]
+      if (pgUrl !== undefined && pgUrl.length > 0) {
+        const { DatabasePg } = yield* Effect.promise(() => import("./pg.js"))
+        // Pass our own Effect instance so bridged values carry the consumer's prototype.
+        return DatabasePg.layer(pgUrl, Effect)
+      }
       const provide = (filename: string) =>
         databaseLayer(filename === ":memory:" ? Semaphore.make(1) : Effect.succeed(lockFor(filename))).pipe(
           Layer.provide(sqliteLayer({ filename })),

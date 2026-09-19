@@ -13,15 +13,19 @@ import {
 } from "@opencode/ai"
 import type { SessionCompactionResult } from "@opencode/plugin/effect/session"
 import { SessionError } from "@opencode/schema/session-error"
-import { Context, Effect, Layer, Stream } from "effect"
+import { Event } from "@opencode/schema/event"
+import { Global } from "@opencode/util/global"
+import { DateTime } from "effect"
+import { Context, Effect, Exit, Layer, Stream } from "effect"
 import { Bus } from "../bus.js"
 import { Database } from "../database/database.js"
+import { Workspace } from "../workspace.js"
 import { makeLocationNode } from "@opencode/util/effect/app-node"
 import { llmClient } from "../effect/app-node-platform.js"
 import { SessionEvent } from "./event.js"
 import type { SessionContext } from "./context.js"
 import { SessionHistory } from "./history.js"
-import type { SessionMessage } from "./message.js"
+import { SessionMessage } from "./message.js"
 import { SessionModelRequest } from "./model-request.js"
 import { SessionProviderContext } from "./provider-context.js"
 import type { SessionRunnerModel } from "./runner/model.js"
@@ -34,6 +38,8 @@ import { State } from "../state.js"
 import { toLLMMessages } from "./runner/to-llm-message.js"
 import type { AgentNotFoundError } from "./error.js"
 import type { Instructions } from "../instructions/index.js"
+import fs from "fs"
+import path from "path"
 
 const DEFAULT_BUFFER = 20_000
 const DEFAULT_KEEP_TOKENS = 15_000
@@ -257,7 +263,8 @@ export const serializeToolContent = (content: SessionMessage.ToolStateCompleted[
     )
     .join("\n")
 
-const serializeRecentMessage = (message: SessionMessage.Info) => {
+const serializeRecentMessage = (message: SessionMessage.Info, full = false) => {
+  const toolOutput = (value: string) => (full ? value : truncateToolOutput(value))
   // Checkpoints and instruction updates are handled outside the serialized tail.
   if (message.type === "compaction" || message.type === "system") return ""
   if (message.type === "user") {
@@ -283,7 +290,7 @@ const serializeRecentMessage = (message: SessionMessage.Info) => {
         if (part.state.status === "completed")
           return [
             `[Assistant tool call]: ${part.name}(${input})`,
-            `[Tool result]: ${truncateToolOutput(serializeToolContent(part.state.content))}`,
+            `[Tool result]: ${toolOutput(serializeToolContent(part.state.content))}`,
           ]
         if (part.state.status === "error")
           return [`[Assistant tool call]: ${part.name}(${input})`, `[Tool error]: ${part.state.error.message}`]
@@ -296,8 +303,27 @@ const serializeRecentMessage = (message: SessionMessage.Info) => {
   if (message.type === "shell")
     return message.metadata?.background === true
       ? ""
-      : `[Shell]: ${message.command}\n${truncateToolOutput(message.output?.output ?? "")}`
+      : `[Shell]: ${message.command}\n${toolOutput(message.output?.output ?? "")}`
   return ""
+}
+
+/**
+ * Serializes the compacted head into `## <id> | <type> | <ISO time>` Markdown
+ * sections with full, untruncated tool output. When an earlier compaction's
+ * history file exists, it is referenced first so retrieval can follow the
+ * chain across successive compactions.
+ */
+export const serializeHistory = (messages: readonly SessionMessage.Info[], previousPath?: string) => {
+  const sections = messages.flatMap((message) => {
+    const body = serializeRecentMessage(message, true)
+    return body
+      ? [
+          `## ${message.id} | ${message.type} | ${new Date(DateTime.toEpochMillis(message.time.created)).toISOString()}\n\n${body}`,
+        ]
+      : []
+  })
+  const header = previousPath ? [`> Earlier compacted history: ${previousPath}`] : []
+  return `${[...header, ...sections].join("\n\n")}\n`
 }
 
 const splitHistory = (messages: readonly SessionMessage.Info[], keepTokens: number) => {
@@ -305,7 +331,7 @@ const splitHistory = (messages: readonly SessionMessage.Info[], keepTokens: numb
   if (tailStart === undefined) return
   return {
     messages: messages.slice(0, tailStart),
-    recent: messages.slice(tailStart).map(serializeRecentMessage).filter(Boolean).join("\n\n"),
+    recent: messages.slice(tailStart).map((message) => serializeRecentMessage(message)).filter(Boolean).join("\n\n"),
   }
 }
 
@@ -379,6 +405,75 @@ export const layer = Layer.effect(
     const bus = yield* Bus.Service
     const llm = yield* LLMClient.Service
     const db = (yield* Database.Service).db
+    const workspace = yield* Workspace.Service
+
+    const TOOL_OUTPUT_RETENTION_DAYS = 7
+    const sandboxToolOutputDir = "/workspace/.opencode/tool-output"
+
+    /**
+     * Writes the compacted head as a full-history file the next agent can
+     * Grep/Read. Remote sessions write into their sandbox so tools can reach
+     * the file; local sessions write under the data directory. Any failure
+     * only skips `historyPath` — the compaction summary is unaffected.
+     */
+    const writeHistory = Effect.fnUntraced(function* (
+      input: ExecuteInput,
+      history: { readonly messages: readonly SessionMessage.Info[] },
+      messageID: SessionMessage.ID,
+    ): Effect.fn.Return<string | undefined> {
+      const previous = history.messages.findLast(
+        (message): message is SessionMessage.CompactionCompleted =>
+          message.type === "compaction" && message.status === "completed" && message.historyPath !== undefined,
+      )
+      const content = serializeHistory(history.messages, previous?.historyPath)
+      const bytes = new TextEncoder().encode(content)
+      const workspaceID = input.context.session.location.workspaceID
+      if (workspaceID === undefined) {
+        const dir = path.join(Global.Path.data, "tool-output")
+        const file = path.join(dir, `tool_history_${messageID}.md`)
+        const outcome = yield* Effect.try({
+          try: () => {
+            fs.mkdirSync(dir, { recursive: true })
+            fs.writeFileSync(file, bytes)
+            const cutoff = Date.now() - TOOL_OUTPUT_RETENTION_DAYS * 86_400_000
+            for (const entry of fs.readdirSync(dir)) {
+              if (!entry.startsWith("tool_")) continue
+              const stale = path.join(dir, entry)
+              if (fs.statSync(stale).mtimeMs < cutoff) fs.rmSync(stale, { force: true })
+            }
+            return file
+          },
+          catch: (cause) => cause,
+        }).pipe(Effect.exit)
+        if (Exit.isFailure(outcome)) {
+          yield* Effect.logWarning("failed to write compaction history", {
+            cause: String(outcome.cause),
+          })
+          return undefined
+        }
+        return outcome.value
+      }
+      const sandboxWorkspace = workspaceID
+      const file = `${sandboxToolOutputDir}/tool_history_${messageID}.md`
+      const written = yield* workspace.writeFile(sandboxWorkspace, file, bytes).pipe(
+        Effect.as(true),
+        Effect.catchCause((cause) =>
+          Effect.logWarning("failed to write compaction history", { workspaceID: sandboxWorkspace, cause: String(cause) }).pipe(
+            Effect.as(false),
+          ),
+        ),
+      )
+      if (!written) return undefined
+      // Retention sweep piggybacks on the write; failures are best effort.
+      yield* workspace
+        .sample(
+          sandboxWorkspace,
+          `find ${sandboxToolOutputDir} -name 'tool_*' -mtime +${TOOL_OUTPUT_RETENTION_DAYS} -delete 2>/dev/null; true`,
+          10_000,
+        )
+        .pipe(Effect.ignore)
+      return file
+    })
 
     const state = State.create<Settings, Editor>({
       name: "session-compaction",
@@ -395,15 +490,19 @@ export const layer = Layer.effect(
       yield* bus.publish(SessionEvent.Compaction.Failed, input)
       return { status: "failed" as const, error: input.error }
     })
-    const started = (input: ExecuteInput, recent: string) =>
+    const started = (input: ExecuteInput, recent: string, eventID?: Event.ID) =>
       input.started
         ? Effect.void
-        : bus.publish(SessionEvent.Compaction.Started, {
-            sessionID: input.context.session.id,
-            reason: input.reason,
-            recent,
-            inputID: input.inputID,
-          })
+        : bus.publish(
+            SessionEvent.Compaction.Started,
+            {
+              sessionID: input.context.session.id,
+              reason: input.reason,
+              recent,
+              inputID: input.inputID,
+            },
+            eventID === undefined ? undefined : { id: eventID },
+          )
     const supplied = Effect.fn("SessionCompaction.supplied")(function* (
       input: ExecuteInput,
       result: SessionCompactionResult,
@@ -581,7 +680,12 @@ export const layer = Layer.effect(
           error: { type: "compaction.unavailable", message: "Nothing to compact yet" },
           inputID: input.inputID,
         })
-      yield* started(input, history.recent)
+      // A pre-generated Started event id keeps the projected compaction
+      // message id identical to the history file name (tool_history_<id>.md).
+      // When Started already ran (overflow recovery) the file name still holds
+      // a fresh id; the path stays retrievable even if the ids diverge.
+      const startEventID = Event.ID.create()
+      yield* started(input, history.recent, startEventID)
 
       const chunks: string[] = []
       let failure: SessionError.Error | undefined
@@ -701,6 +805,11 @@ export const layer = Layer.effect(
           ...usage,
         })
       }
+      const historyPath = yield* writeHistory(
+        input,
+        history,
+        input.inputID ?? SessionMessage.ID.fromEvent(startEventID),
+      )
       yield* bus.publish(SessionEvent.Compaction.Ended, {
         sessionID: context.session.id,
         reason: input.reason,
@@ -708,6 +817,7 @@ export const layer = Layer.effect(
         providerState,
         text: summary,
         recent: history.recent,
+        historyPath,
         ...usage,
       })
       return { status: "completed" as const }
@@ -790,5 +900,5 @@ export const layer = Layer.effect(
 export const node = makeLocationNode({
   service: Service,
   layer,
-  deps: [Bus.node, Database.node, llmClient],
+  deps: [Bus.node, Database.node, llmClient, Workspace.node],
 })

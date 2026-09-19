@@ -36,12 +36,20 @@ export interface Interface {
    */
   readonly create: (input: {
     readonly workspaceID: Workspace.ID
+    /** Session-level sandbox resource spec (cpu/memory); provider-agnostic. */
+    readonly resource?: Record<string, string>
   }) => Effect.Effect<{ readonly binding: Binding }, Error>
   readonly connect: (input: {
     readonly workspaceID: Workspace.ID
     readonly binding: Binding
     readonly saveBinding: (binding: Binding) => Effect.Effect<void>
   }) => Effect.Effect<EnvironmentDriver.Driver, Error, Scope.Scope>
+  /** Creates a snapshot of the sandbox's current state without killing it (v1 explicit snapshot API). Optional: local/test drivers may not support it. */
+  readonly snapshot?: (input: {
+    readonly workspaceID: Workspace.ID
+    readonly binding: Binding
+    readonly saveBinding: (binding: Binding) => Effect.Effect<void>
+  }) => Effect.Effect<{ readonly snapshotId: string }, Error>
   readonly suspendForIdle: (input: {
     readonly workspaceID: Workspace.ID
     readonly binding: Binding

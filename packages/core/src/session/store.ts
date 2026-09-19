@@ -16,6 +16,7 @@ import { fromRow } from "./info.js"
 
 const ListInputBase = {
   workspaceID: Workspace.ID.pipe(Schema.optional),
+  appId: Schema.String.pipe(Schema.optional),
   search: Schema.String.pipe(Schema.optional),
   limit: PositiveInt.pipe(Schema.optional),
   order: Schema.Literals(["asc", "desc"]).pipe(Schema.optional),
@@ -106,6 +107,7 @@ const layer = Layer.effect(
         if (input.workspaceID) conditions.push(eq(SessionTable.workspace_id, input.workspaceID))
         if ("project" in input) conditions.push(eq(SessionTable.project_id, input.project))
         if ("project" in input && input.subpath !== undefined) conditions.push(eq(SessionTable.path, input.subpath))
+        if (input.appId) conditions.push(eq(SessionTable.app_id, input.appId))
         if (input.search) conditions.push(like(SessionTable.title, `%${input.search}%`))
         if (input.parentID !== undefined)
           conditions.push(

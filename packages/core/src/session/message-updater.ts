@@ -80,6 +80,7 @@ export function update(adapter: Adapter, event: SessionEvent.DurableEvent) {
     Match.discriminatorsExhaustive("type")({
       "session.created": () => Effect.void,
       "session.viewed": () => Effect.void,
+      "session.message.removed": () => Effect.void,
       "session.message.content.updated": (event) =>
         updateOwnedAssistant(event.data.messageID, (draft) => {
           draft.content = castDraft(
@@ -245,6 +246,7 @@ export function update(adapter: Adapter, event: SessionEvent.DurableEvent) {
               type: "assistant",
               agent: event.data.agent,
               model: event.data.model,
+              ...(event.data.summary === undefined ? {} : { summary: event.data.summary }),
               metadata: event.metadata,
               time: { created },
               content: [],
@@ -352,6 +354,9 @@ export function update(adapter: Adapter, event: SessionEvent.DurableEvent) {
                 ...(event.data.metadata === undefined ? {} : { metadata: event.data.metadata }),
               }),
             )
+            // The forced StructuredOutput call's arguments are the reply the
+            // prompt asked for; surface them as the message's `structured`.
+            if (match.name === "StructuredOutput") draft.structured = castDraft(match.state.input)
           }
         })
       },
@@ -434,6 +439,7 @@ export function update(adapter: Adapter, event: SessionEvent.DurableEvent) {
               summary: event.data.text,
               providerContext: event.data.providerContext,
               recent: event.data.recent,
+              historyPath: event.data.historyPath,
               cost: event.data.cost,
               tokens: event.data.tokens,
             })
@@ -451,6 +457,7 @@ export function update(adapter: Adapter, event: SessionEvent.DurableEvent) {
               summary: event.data.text,
               providerContext: event.data.providerContext,
               recent: event.data.recent,
+              historyPath: event.data.historyPath,
               cost: event.data.cost,
               tokens: event.data.tokens,
               time: { created },

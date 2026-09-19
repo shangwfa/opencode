@@ -8,6 +8,8 @@ import { Bom } from "@opencode/util/bom"
 import { Environment } from "./environment/index.js"
 import type { Files } from "./environment/index.js"
 import type { FileAccess } from "./file-access.js"
+import { Bus } from "./bus.js"
+import { FileSystem as FileSystemEvent } from "@opencode/schema/filesystem"
 
 export type Target = Pick<FileAccess.Target, "absolute" | "resource">
 
@@ -67,7 +69,18 @@ const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
     const environment = yield* Environment.Service
+    const bus = yield* Bus.Service
     const locks = KeyedMutex.makeUnsafe<string>()
+
+    // Tool-driven edits run inside the session's sandbox, so the host watcher
+    // never sees them; the mutation layer itself publishes the change, keeping
+    // the event on the same filesystem the session wrote to.
+    const publishChanged = (target: Target, existed: boolean) =>
+      bus.publish(FileSystemEvent.Event.Changed, {
+        file: target.absolute,
+        event: existed ? "change" : "add",
+      })
+
     const withLock: Interface["withLock"] = (targets) => (effect) =>
       [...new Set(targets.map(FSUtil.resolve))]
         .sort()
@@ -95,6 +108,7 @@ const layer = Layer.effect(
             input.target.absolute,
             typeof input.content === "string" ? new TextEncoder().encode(input.content) : input.content,
           )
+          yield* publishChanged(input.target, existed)
           return writeResult(input.target, existed)
         }),
       ),
@@ -112,6 +126,7 @@ const layer = Layer.effect(
             input.target.absolute,
             new TextEncoder().encode(Bom.join(next.text, Boolean(current && Bom.has(current)) || next.bom)),
           )
+          yield* publishChanged(input.target, current !== undefined)
           return writeResult(input.target, current !== undefined)
         }),
       ),
@@ -121,7 +136,7 @@ const layer = Layer.effect(
   }),
 )
 
-export const node = makeLocationNode({ service: Service, layer, deps: [Environment.node] })
+export const node = makeLocationNode({ service: Service, layer, deps: [Environment.node, Bus.node] })
 
 /**
  * Deferred until the corresponding integrations exist.

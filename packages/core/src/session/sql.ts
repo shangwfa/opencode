@@ -35,6 +35,7 @@ export const SessionTable = sqliteTable(
     directory: directoryColumn().notNull(),
     path: pathColumn(),
     title: text(),
+    app_id: text(),
     version: text().notNull(),
     share_url: text(),
     summary_additions: integer(),

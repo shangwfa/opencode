@@ -34,6 +34,7 @@ import { Worktree } from "../worktree.js"
 import { WorktreeStrategies } from "../worktree/strategies.js"
 import { Bus } from "../bus.js"
 import { Environment } from "../environment/index.js"
+import { CodeModeSandbox } from "../codemode/sandbox.js"
 import { FileAccess } from "../file-access.js"
 import { FileMutation } from "../file-mutation.js"
 import { Formatter } from "../formatter.js"
@@ -158,6 +159,7 @@ export const requirements = LayerNode.group([
   Credential.node,
   Bus.node,
   Environment.node,
+  CodeModeSandbox.node,
   FileAccess.node,
   FileMutation.node,
   Formatter.node,

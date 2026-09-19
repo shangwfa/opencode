@@ -305,6 +305,10 @@ function toLLMMessage(message: SessionMessage.Info, model: Model.Ref, providerMe
       // History selection only keeps native windows the target model can replay.
       if (SessionProviderContext.isCheckpoint(message))
         return [...SessionProviderContext.decode(message.providerContext)]
+      const retrieval =
+        message.historyPath === undefined
+          ? ""
+          : `\n\nThe full record of the compacted conversation is available at ${message.historyPath}. If the summary is missing a detail you need, search that file with Grep or Read (offset/limit) instead of reading it whole.\n`
       return [
         Message.make({
           id: message.id,
@@ -318,7 +322,7 @@ ${message.summary}
 
 <recent-context>
 ${message.recent}
-</recent-context>
+</recent-context>${retrieval}
 </conversation-checkpoint>`,
           metadata: message.metadata,
         }),

@@ -77,8 +77,12 @@ export const make = Effect.fn("Session.make")(function* () {
     sessionID: SessionSchema.ID,
     input: { permissions: Permission.Ruleset },
   ) {
-    yield* get(sessionID)
-    yield* bus.publish(SessionEvent.Permissions, { sessionID, permissions: input.permissions })
+    const session = yield* get(sessionID)
+    // v1's PATCH semantics merge by appending: evaluate() is findLast, so a
+    // later rule (e.g. a deny for the same pattern) overrides earlier ones and
+    // an empty array clears nothing.
+    const permissions = [...(session.permissions ?? []), ...input.permissions]
+    yield* bus.publish(SessionEvent.Permissions, { sessionID, permissions })
   })
   const switchAgent = Effect.fn("Session.switchAgent")(function* (
     sessionID: SessionSchema.ID,

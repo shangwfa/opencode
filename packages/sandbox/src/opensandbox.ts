@@ -1,12 +1,12 @@
 export * as SandboxOpenSandbox from "./opensandbox.js"
 
-import { ConnectionConfig, Sandbox, SandboxManager } from "@alibaba-group/opensandbox"
-import type { ConnectionConfigOptions, FileInfo as SandboxFileInfo, SandboxFiles, SnapshotInfo } from "@alibaba-group/opensandbox"
+import { createDefaultAdapterFactory, ConnectionConfig, Sandbox, SandboxManager } from "@alibaba-group/opensandbox"
+import type { ConnectionConfigOptions, RunCommandOpts, SnapshotInfo } from "@alibaba-group/opensandbox"
 import { Workspace } from "@opencode/schema/workspace"
 import { makeGlobalNode } from "@opencode/util/effect/app-node"
-import { Effect, Layer, Schedule, Scope } from "effect"
-import { systemError } from "effect/PlatformError"
-import { make } from "effect/unstable/process/ChildProcessSpawner"
+import { ChildProcess } from "effect/unstable/process"
+import { Cause, Deferred, Effect, Layer, Queue, Ref, Schedule, Scope, Sink, Stream } from "effect"
+import { make, makeHandle, ExitCode, ProcessId } from "effect/unstable/process/ChildProcessSpawner"
 import type { DirEntry, FileInfo, FilesImpl } from "@opencode/core/environment/files"
 import { Failed, NotFound, WrongKind } from "@opencode/core/environment/files"
 import { WorkspaceDriver } from "@opencode/core/workspace/driver"
@@ -48,6 +48,30 @@ export interface Options {
   readonly resource?: Record<string, string>
   /** Environment baked into new sandboxes. */
   readonly env?: Record<string, string>
+}
+
+/**
+ * Provider name registered with the WorkspaceDriver registry in sandbox mode.
+ */
+export const PROVIDER = "opensandbox"
+
+/**
+ * Builds driver options from the environment (v1 flag parity). Returns
+ * undefined when no sandbox domain is configured, letting callers fall back to
+ * the local environment driver.
+ */
+export const fromEnv = (env: Record<string, string | undefined> = process.env): Options | undefined => {
+  const domain = env["OPENCODE_SANDBOX_DOMAIN"]
+  if (domain === undefined || domain.length === 0) return undefined
+  return {
+    domain,
+    protocol: (env["OPENCODE_SANDBOX_PROTOCOL"] as "https" | "http" | undefined) ?? "http",
+    ...(env["OPENCODE_SANDBOX_API_KEY"] === undefined || env["OPENCODE_SANDBOX_API_KEY"].length === 0
+      ? {}
+      : { apiKey: env["OPENCODE_SANDBOX_API_KEY"] }),
+    ...(env["OPENCODE_SANDBOX_IMAGE"] === undefined ? {} : { image: env["OPENCODE_SANDBOX_IMAGE"] }),
+    useServerProxy: env["OPENCODE_SANDBOX_USE_SERVER_PROXY"] !== "false",
+  }
 }
 
 const LABEL = "dev.opencode.workspace"
@@ -93,14 +117,18 @@ export const driver = (options: Options): WorkspaceDriver.Interface => {
   const connectionConfig = makeConnectionConfig(options)
   const manager = SandboxManager.create({ connectionConfig })
 
-  const createSandbox = (workspaceID: Workspace.ID, from: { readonly image: string } | { readonly snapshotId: string }) =>
+  const createSandbox = (
+    workspaceID: Workspace.ID,
+    from: { readonly image: string } | { readonly snapshotId: string },
+    resourceOverride?: Record<string, string>,
+  ) =>
     tryPromise(
       () =>
         Sandbox.create({
           connectionConfig,
           ...("snapshotId" in from ? { snapshotId: from.snapshotId } : { image: from.image }),
           timeoutSeconds: options.timeoutSeconds ?? 600,
-          ...(options.resource === undefined ? {} : { resource: options.resource }),
+          ...(resourceOverride ?? options.resource) === undefined ? {} : { resource: resourceOverride ?? options.resource },
           ...(options.env === undefined ? {} : { env: options.env }),
           metadata: { [LABEL]: workspaceID },
         }),
@@ -126,7 +154,7 @@ export const driver = (options: Options): WorkspaceDriver.Interface => {
     return result.items.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
   })
 
-  const create: WorkspaceDriver.Interface["create"] = ({ workspaceID }) =>
+  const create: WorkspaceDriver.Interface["create"] = ({ workspaceID, resource }) =>
     Effect.gen(function* () {
       const bind = (
         sandboxId: string,
@@ -151,7 +179,7 @@ export const driver = (options: Options): WorkspaceDriver.Interface => {
         }
       }
       // Recovery tier 3: nothing to adopt or restore — cold start from the base image.
-      const sb = yield* createSandbox(workspaceID, { image })
+      const sb = yield* createSandbox(workspaceID, { image }, resource)
       return { binding: bind(sb.id) }
     })
 
@@ -198,7 +226,22 @@ export const driver = (options: Options): WorkspaceDriver.Interface => {
       // Release client-side HTTP resources when the connection scope closes;
       // the sandbox itself stays alive (Workspace owns its lifecycle).
       yield* Scope.addFinalizer(scope, Effect.promise(() => sb.close().catch(() => undefined)))
-      return sandboxEnvironment(sb.files)
+      return sandboxEnvironment(sb)
+    })
+
+  const snapshot: WorkspaceDriver.Interface["snapshot"] = ({ workspaceID, binding, saveBinding }) =>
+    Effect.gen(function* () {
+      const parsed = yield* parseBinding(binding)
+      // Same Ready-before-commit semantics as suspend, but the source sandbox stays alive.
+      const snapshotId = yield* snapshotUntilReady(parsed.sandboxId, workspaceID)
+      yield* retireSuperseded(workspaceID, snapshotId)
+      yield* saveBinding({
+        sandboxId: parsed.sandboxId,
+        image: parsed.image,
+        snapshotId,
+        snapshotAt: Date.now(),
+      })
+      return { snapshotId }
     })
 
   const suspendForIdle: WorkspaceDriver.Interface["suspendForIdle"] = ({ workspaceID, binding, saveBinding }) =>
@@ -286,7 +329,7 @@ export const driver = (options: Options): WorkspaceDriver.Interface => {
     return info.id
   })
 
-  return WorkspaceDriver.make({ create, connect, suspendForIdle, destroy })
+  return WorkspaceDriver.make({ create, connect, snapshot, suspendForIdle, destroy })
 }
 
 const SNAPSHOT_WAIT_MS_DEFAULT = 900_000
@@ -339,92 +382,246 @@ export const collectGarbage = Effect.fn("SandboxOpenSandbox.collectGarbage")(fun
   }
 })
 
-const sandboxEnvironment = (files: SandboxFiles) => {
-  // The spawner adapter (ExecdCommands bash-session semantics mapped onto the
-  // ChildProcessSpawner shape) lands in the next migration batch.
-  const spawner = make(() =>
-    Effect.fail(
-      systemError({
-        _tag: "Unknown",
-        module: "SandboxOpenSandbox",
-        method: "spawn",
-        description: "opensandbox spawner adapter is not implemented yet",
-      }),
-    ),
-  )
+/** POSIX single-quote escaping for argv -> shell script translation. */
+const quote = (word: string) => `'${word.replaceAll("'", "'\\''")}'`
 
-  const fileInfo = (info: SandboxFileInfo): FileInfo => ({
-    type: (info.type ?? "other") as FileInfo["type"],
-    size: info.size ?? 0,
-    mtimeMs: info.modifiedAt?.getTime() ?? 0,
+/**
+ * Translates a Command into a shell script plus exec options. argv is quoted so
+ * the remote bash runs the same process; pipes become shell pipes. `extendEnv`
+ * is dropped: the sandbox must not inherit the host environment.
+ */
+const toShell = (command: ChildProcess.Command): { script: string; options: RunCommandOpts } => {
+  if (command._tag === "PipedCommand") {
+    const left = toShell(command.left)
+    const right = toShell(command.right)
+    return {
+      script: `${left.script} | ${right.script}`,
+      options: {
+        ...right.options,
+        ...(left.options.workingDirectory !== undefined ? { workingDirectory: left.options.workingDirectory } : {}),
+      },
+    }
+  }
+  const envs = Object.fromEntries(
+    Object.entries(command.options.env ?? {}).filter((entry): entry is [string, string] => entry[1] !== undefined),
+  )
+  return {
+    script: [command.command, ...command.args].map(quote).join(" "),
+    options: {
+      ...(command.options.cwd === undefined ? {} : { workingDirectory: command.options.cwd }),
+      ...(Object.keys(envs).length === 0 ? {} : { envs }),
+    },
+  }
+}
+
+/**
+ * Spawns a command inside the sandbox by streaming execd SSE events and
+ * mapping them onto a ChildProcessHandle: init carries the command id used for
+ * interruption, stdout/stderr feed queues, and completion/error settle the
+ * exit code (mirrors the SDK's foreground exit-code inference).
+ */
+const spawnInSandbox = (sb: Sandbox, command: ChildProcess.Command) =>
+  Effect.gen(function* () {
+    const { script, options } = toShell(command)
+    yield* Effect.logInfo("[spawn-probe] spawn start", { script, options })
+    const out = yield* Queue.unbounded<Uint8Array, Cause.Done>()
+    const err = yield* Queue.unbounded<Uint8Array, Cause.Done>()
+    const exit = yield* Deferred.make<ExitCode>()
+    const commandID = yield* Ref.make<string | undefined>(undefined)
+    const failure = yield* Ref.make<string | undefined>(undefined)
+    const sawExit = yield* Ref.make(false)
+    const abort = new AbortController()
+    const encoder = new TextEncoder()
+
+    yield* Stream.fromAsyncIterable(
+      sb.commands.runStream(script, options, abort.signal),
+      (cause) => new Error(`sandbox command stream failed: ${String(cause)}`),
+    ).pipe(
+      Stream.runForEach((event) =>
+        Effect.gen(function* () {
+          yield* Effect.logInfo("[spawn-probe] event", { type: event.type, text: typeof event.text === "string" ? event.text.slice(0, 80) : undefined })
+          if (event.type === "init") {
+            if (typeof event.text === "string" && event.text.length > 0) yield* Ref.set(commandID, event.text)
+            return
+          }
+          // execd events carry line payloads without the trailing newline
+          // (the SDK's own collector joins with "\n"); append it back so
+          // multi-line command output keeps its shape.
+          if (event.type === "stdout") return yield* Queue.offer(out, encoder.encode((event.text ?? "") + "\n"))
+          if (event.type === "execution_complete") yield* Ref.set(sawExit, true)
+          if (event.type === "stderr") return yield* Queue.offer(err, encoder.encode((event.text ?? "") + "\n"))
+          if (event.type === "error") {
+            const detail = event.error as { evalue?: unknown; value?: unknown } | undefined
+            const value = detail?.evalue ?? detail?.value
+            if (value !== undefined) yield* Ref.set(failure, String(value))
+          }
+        }),
+      ),
+      Effect.ensuring(Effect.all([Queue.end(out), Queue.end(err)])),
+      Effect.ensuring(
+        Effect.gen(function* () {
+          yield* Effect.logInfo("[spawn-probe] stream done")
+          const failed = yield* Ref.get(failure)
+          const trimmed = failed?.trim() ?? ""
+          const parsed = /^-?\d+$/.test(trimmed) ? Number(trimmed) : undefined
+          const sawCompletion = yield* Ref.get(sawExit)
+          // A stream that ends without a completion event means the execd
+          // connection died (e.g. the sandbox was reclaimed externally);
+          // report a transport failure instead of a fake success.
+          const code = parsed ?? (failed === undefined ? (sawCompletion ? 0 : -1) : 1)
+          yield* Deferred.succeed(exit, ExitCode(code))
+        }),
+      ),
+      Effect.catchCause((cause) =>
+        Effect.gen(function* () {
+          yield* Effect.logWarning("sandbox command stream ended abnormally", cause)
+          yield* Ref.set(sawExit, false)
+        }),
+      ),
+      Effect.forkScoped,
+    )
+
+    return makeHandle({
+      // The execd has no host pid; expose a stable non-zero placeholder.
+      pid: ProcessId(0),
+      // execd has no stdin channel for foreground commands.
+      stdin: Sink.drain,
+      stdout: Stream.fromQueue(out),
+      stderr: Stream.fromQueue(err),
+      all: Stream.merge(Stream.fromQueue(out), Stream.fromQueue(err)),
+      getInputFd: () => Sink.drain,
+      getOutputFd: () => Stream.empty,
+      isRunning: Deferred.isDone(exit).pipe(Effect.map((done) => !done)),
+      exitCode: Deferred.await(exit),
+      kill: () =>
+        Effect.gen(function* () {
+          abort.abort()
+          const id = yield* Ref.get(commandID)
+          if (id !== undefined) {
+            yield* Effect.promise(() => sb.commands.interrupt(id)).pipe(
+              Effect.catchCause((cause) => Effect.logWarning("sandbox interrupt failed", cause)),
+            )
+          }
+        }),
+      unref: Effect.succeed(Effect.void),
+    })
+  })
+
+const sandboxEnvironment = (sb: Sandbox) => {
+  const files = sb.files
+  const spawner = make((command) => spawnInSandbox(sb, command))
+
+  // The execd's files API (`getFileInfo`/`readBytes`) serves a stale view that
+  // never sees `writeFiles` output, while commands inside the sandbox see it
+  // immediately — so stat/read resolve through exec scripts instead. write and
+  // mkdir stay on the files API: exec has no stdin channel to feed bytes in.
+  const shQuote = (value: string) => `'` + value.replace(/'/g, `'\\''`) + `'`
+  const runScript = (script: string) =>
+    Effect.promise(() =>
+      (async () => {
+        const lines: string[] = []
+        for await (const event of sb.commands.runStream(script)) {
+          if (event.type === "stdout") lines.push(event.text ?? "")
+        }
+        return lines
+      })(),
+    )
+
+  const fileFacts = Effect.fn("SandboxOpenSandbox.fileFacts")(function* (
+    path: string,
+    range?: { readonly offset: number; readonly length: number },
+  ) {
+    const p = shQuote(path)
+    const body = range ? `tail -c +$(( ${range.offset} + 1 )) ${p} | head -c ${range.length} | base64` : `base64 ${p}`
+    const script = [
+      `if [ -d ${p} ]; then printf '__DIR__\\n'; exit 0; fi`,
+      `if [ ! -f ${p} ]; then printf '__MISSING__\\n'; exit 0; fi`,
+      `printf '__SIZE__%s\\n' "$(wc -c < ${p})"`,
+      `printf '__MTIME__%s\\n' "$(stat -c %Y ${p} 2>/dev/null || printf 0)"`,
+      `printf '__B64__\\n'`,
+      body,
+    ].join("\n")
+    const lines = yield* runScript(script).pipe(
+      Effect.mapError(() => new Failed({ path, cause: new Error("sandbox exec stream failed") })),
+    )
+    if (lines[0] === "__DIR__") return yield* new WrongKind({ path, actual: "directory" })
+    if (lines[0] === "__MISSING__") return yield* new NotFound({ path })
+    const marker = lines.indexOf("__B64__")
+    const size = Number(lines.find((line) => line.startsWith("__SIZE__"))?.slice("__SIZE__".length) ?? NaN)
+    const mtime = Number(lines.find((line) => line.startsWith("__MTIME__"))?.slice("__MTIME__".length) ?? 0)
+    if (marker < 0 || Number.isNaN(size))
+      return yield* new Failed({ path, cause: new Error("sandbox read produced no payload") })
+    const bytes = Buffer.from(lines.slice(marker + 1).join(""), "base64")
+    return { info: { type: "file" as const, size, mtimeMs: mtime * 1000 }, bytes }
   })
 
   const stat = Effect.fn("SandboxOpenSandbox.stat")(function* (path: string) {
-    const map = yield* agent(() => files.getFileInfo([path]), path)
-    const info = map[path]
-    if (info === undefined) return yield* new NotFound({ path })
-    return fileInfo(info)
+    return (yield* fileFacts(path)).info
   })
 
-  const overrides: FilesImpl = {
-    read: (path, range) =>
-      Effect.gen(function* () {
-        const info = yield* stat(path)
-        if (info.type !== "file") return yield* new WrongKind({ path, actual: info.type })
-        const bytes = yield* agent(
-          () => files.readBytes(path, range === undefined ? undefined : { offset: range.offset, limit: range.length }),
-          path,
-        )
-        return { info, bytes }
-      }),
-    stat: (path) => stat(path),
-    list: (path) =>
-      Effect.gen(function* () {
-        const info = yield* stat(path)
-        if (info.type !== "directory" && info.type !== "symlink") {
-          return yield* new WrongKind({ path, actual: info.type })
-        }
-        const entries = yield* agent(() => files.listDirectory({ path }), path)
-        return entries.map((entry) => ({
-          name: entry.path.split("/").filter(Boolean).pop() ?? entry.path,
-          type: (entry.type ?? "other") as FileInfo["type"],
-        })) satisfies Array<DirEntry>
-      }),
-    write: (path, bytes) => agentVoid(() => files.writeFiles([{ path, data: bytes }]), path),
-    remove: (path) =>
-      Effect.gen(function* () {
-        const info = yield* stat(path).pipe(Effect.catchTag("Environment.NotFound", () => Effect.succeed(null)))
-        // rm -rf semantics: removing a missing path succeeds.
-        if (info === null) return
-        if (info.type === "directory") return yield* agentVoid(() => files.deleteDirectories([path]), path)
-        return yield* agentVoid(() => files.deleteFiles([path]), path)
-      }),
-    move: (from, to) =>
-      Effect.gen(function* () {
-        const info = yield* stat(from)
-        if (info.type === "file") {
-          const target = yield* stat(to).pipe(
-            Effect.map((dest) => (dest.type === "directory" ? `${to}/${from.split("/").pop()}` : to)),
-            Effect.catchTag("Environment.NotFound", () => Effect.succeed(to)),
-          )
-          return yield* agentVoid(() => files.moveFiles([{ src: from, dest: target }]), from)
-        }
-        return yield* agentVoid(() => files.moveFiles([{ src: from, dest: to }]), from)
-      }),
-    mkdir: (path) => agentVoid(() => files.createDirectories([{ path }]), path),
+  const overrides: Partial<FilesImpl> = {
+    read: (path, range) => fileFacts(path, range),
+    write: (path, bytes) =>
+      agentVoid(() => files.writeFiles([{ path, data: bytes }]), path).pipe(
+        Effect.mapError(() => new Failed({ path, cause: new Error("sandbox write failed") })),
+      ),
+    mkdir: (path) =>
+      agentVoid(() => files.createDirectories([{ path }]), path).pipe(
+        Effect.mapError(() => new Failed({ path, cause: new Error("sandbox mkdir failed") })),
+      ),
   }
 
   return { spawner, overrides }
 }
 
 /** OpenSandbox request failures collapse into Failed file operations. */
+// execd reports missing paths through SandboxApiException with a 404-ish
+// status or "not found" message; callers (e.g. write's BOM-preserving read of
+// the existing file) rely on NotFound specifically and treat generic Failed
+// as fatal.
+const isNotFound = (cause: unknown) => {
+  // "Download failed" is the execd's fixed wording when readBytes targets a
+  // missing path (verified against the fleet's execd build).
+  const text = String((cause as { message?: string })?.message ?? cause)
+  return /not found|no such file|404|download failed/i.test(text)
+}
+
 const agent = <A>(run: () => Promise<A>, path: string) =>
   tryPromise(run, "sandbox files request failed").pipe(
-    Effect.mapError(() => new Failed({ path, cause: new Error("sandbox files request failed") })),
+    Effect.mapError((error) =>
+      isNotFound((error as { cause?: unknown })?.cause ?? error)
+        ? new NotFound({ path })
+        : new Failed({ path, cause: new Error("sandbox files request failed") },
+      ),
+    ),
   )
 
 const agentVoid = (run: () => Promise<void>, path: string) =>
   agent(run, path).pipe(Effect.asVoid)
+
+/**
+ * Resolves the externally reachable address (host:port) for one sandbox
+ * service port; used by the server's proxy/endpoint routes.
+ */
+export const resolveEndpoint = Effect.fn("SandboxOpenSandbox.resolveEndpoint")((sandboxId: string, port: number) =>
+  Effect.tryPromise({
+    try: async () => {
+      const connectionConfig = makeConnectionConfig(fromEnv() as Options)
+      const factory = createDefaultAdapterFactory()
+      const stack = factory.createLifecycleStack({
+        connectionConfig,
+        lifecycleBaseUrl: connectionConfig.getBaseUrl(),
+      })
+      const endpoint = await stack.sandboxes.getSandboxEndpoint(
+        sandboxId as never,
+        port,
+        connectionConfig.useServerProxy,
+      )
+      return endpoint.endpoint
+    },
+    catch: (cause) => new Error(`resolveEndpoint failed: ${String(cause)}`),
+  }),
+)
 
 /** Registry node wiring the opensandbox driver under its provider name. */
 export const registryNode = (provider = "opensandbox", options: Options) =>

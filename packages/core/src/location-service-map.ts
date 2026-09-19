@@ -17,6 +17,21 @@ export class Service extends Context.Service<
 
 export const node = LayerNode.unbound(Service, Node.tags.values.global)
 
+/**
+ * Release every live location instance without booting replacements; the next
+ * request rebuilds its location lazily. Unlike `reload`, disposal never fails
+ * on a stale placement (e.g. a raced workspace destroy).
+ */
+export const dispose = Effect.fn("LocationServiceMap.dispose")(function* () {
+  const locations = yield* Service
+  const refs = Array.from(yield* RcMap.keys(locations.rcMap))
+  yield* Effect.forEach(refs, (ref) => locations.invalidate(ref), {
+    discard: true,
+    concurrency: "unbounded",
+  })
+  yield* Effect.logInfo("location services disposed", { count: refs.length })
+})
+
 export const reload = Effect.fn("LocationServiceMap.reload")(function* () {
   const locations = yield* Service
   const refs = Array.from(yield* RcMap.keys(locations.rcMap))

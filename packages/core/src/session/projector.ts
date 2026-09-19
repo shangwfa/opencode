@@ -421,7 +421,7 @@ function projectIdle(
       .update(SessionTable)
       .set({
         // Unread uses a strict timestamp comparison, so every terminal must advance even within one millisecond.
-        time_idle: sql`max(${time}, coalesce(${SessionTable.time_idle} + 1, ${time}))`,
+        time_idle: sql`CASE WHEN ${time} > coalesce(${SessionTable.time_idle} + 1, ${time}) THEN ${time} ELSE coalesce(${SessionTable.time_idle} + 1, ${time}) END`,
         idle_outcome: outcome,
         time_updated: sql`${SessionTable.time_updated}`,
       })
@@ -448,6 +448,7 @@ const layer = Layer.effectDiscard(
             directory: event.data.location.directory,
             path: event.data.subpath,
             title: event.data.title,
+            app_id: event.data.appId,
             agent: event.data.agent,
             model: event.data.model,
             metadata: event.data.metadata,
@@ -588,7 +589,7 @@ const layer = Layer.effectDiscard(
         .set({
           // Monotone watermark: a duplicate or stale view never regresses, and a terminal event
           // committing after the viewer's observation keeps the newer idle transition unread.
-          time_viewed: sql`max(${idle}, coalesce(${SessionTable.time_viewed}, ${idle}))`,
+          time_viewed: sql`CASE WHEN ${idle} > coalesce(${SessionTable.time_viewed}, ${idle}) THEN ${idle} ELSE coalesce(${SessionTable.time_viewed}, ${idle}) END`,
           time_updated: sql`${SessionTable.time_updated}`,
         })
         .where(eq(SessionTable.id, event.data.sessionID))
@@ -596,6 +597,15 @@ const layer = Layer.effectDiscard(
         .pipe(Effect.orDie)
     })
     yield* bus.project(SessionEvent.MessageContentUpdated, (event) => run(db, event))
+    yield* bus.project(SessionEvent.MessageRemoved, (event) =>
+      db
+        .delete(SessionMessageTable)
+        .where(
+          and(eq(SessionMessageTable.session_id, event.data.sessionID), eq(SessionMessageTable.id, event.data.messageID)),
+        )
+        .run()
+        .pipe(Effect.orDie),
+    )
     yield* bus.project(SessionEvent.UsageRecorded, (event) => applyUsage(db, event.data.sessionID, event.data))
     yield* bus.project(SessionEvent.Forked, (event) => projectFork(db, event))
     yield* bus.project(SessionEvent.InboxDelivered, (event) =>
@@ -617,6 +627,7 @@ const layer = Layer.effectDiscard(
                 files: input.payload.files,
                 agents: input.payload.agents,
                 skills: input.payload.skills,
+                format: input.payload.format,
                 time: { created: DateTime.makeUnsafe(event.created) },
               }
             : {

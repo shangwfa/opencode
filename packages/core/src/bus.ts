@@ -41,7 +41,11 @@ export const reserveSequence = Effect.fn("Bus.reserveSequence")(function* (
     .values([{ aggregate_id: aggregateID, seq }])
     .onConflictDoUpdate({
       target: EventSequenceTable.aggregate_id,
-      set: { seq: sql`max(${EventSequenceTable.seq}, ${seq})` },
+      // CASE WHEN keeps this dialect-neutral: sqlite's two-arg max() is a scalar,
+      // while PG's max() is an aggregate and rejects two arguments.
+      set: {
+        seq: sql`CASE WHEN ${EventSequenceTable.seq} > ${seq} THEN ${EventSequenceTable.seq} ELSE ${seq} END`,
+      },
     })
     .run()
     .pipe(Effect.orDie)
@@ -407,7 +411,7 @@ export function configured(options?: Options) {
                           .onConflictDoUpdate({
                             target: EventSequenceTable.aggregate_id,
                             set: {
-                              seq: sql`max(${EventSequenceTable.seq}, ${seq})`,
+                              seq: sql`CASE WHEN ${EventSequenceTable.seq} > ${seq} THEN ${EventSequenceTable.seq} ELSE ${seq} END`,
                               ...(input?.ownerID && row?.ownerID == null ? { owner_id: input.ownerID } : {}),
                             },
                           })

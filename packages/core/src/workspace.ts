@@ -3,9 +3,12 @@ export * as Workspace from "./workspace.js"
 import { Workspace } from "@opencode/schema/workspace"
 import { makeGlobalNode } from "@opencode/util/effect/app-node"
 import { eq } from "drizzle-orm"
-import { Clock, Context, Deferred, Duration, Effect, Exit, FiberSet, Layer, Ref, Schedule, Schema, Scope } from "effect"
+import { ChildProcess } from "effect/unstable/process"
+import { Clock, Context, Deferred, Duration, Effect, Exit, FiberSet, Layer, Option, Ref, Schedule, Schema, Scope, Stream } from "effect"
 import { systemError } from "effect/PlatformError"
 import { make } from "effect/unstable/process/ChildProcessSpawner"
+import { execDefaults } from "./environment/exec-defaults.js"
+import type { Files } from "./environment/files.js"
 import type { EnvironmentDriver } from "./environment/driver.js"
 import { Database } from "./database/database.js"
 import { KeyedMutex } from "./effect/keyed-mutex.js"
@@ -36,6 +39,7 @@ export interface Interface {
   readonly create: (input: {
     readonly id?: ID
     readonly provider: string
+    readonly resource?: Record<string, string>
   }) => Effect.Effect<ID, CreateConflict | WorkspaceDriver.ProviderNotFound>
   /** Starts or joins the shared attempt that makes the backing resource real, then returns it. */
   readonly provision: (
@@ -48,6 +52,44 @@ export interface Interface {
   readonly destroy: (
     workspaceID: ID,
   ) => Effect.Effect<Workspace.DestroyResult, WorkspaceDriver.Error | WorkspaceDriver.ProviderNotFound>
+  /** Marks the sandbox exempt from idle suspension (v1 keep-alive parity). */
+  readonly setKeepAlive: (workspaceID: ID, enabled: boolean) => Effect.Effect<void>
+  readonly isKeepAlive: (workspaceID: ID) => boolean
+  /**
+   * Snapshot-then-stop one workspace's sandbox (v1 kill-sandbox parity for
+   * persistent sessions): the snapshot must reach Ready before the sandbox is
+   * killed, and the binding row survives so the next use restores from it.
+   * Runs in the background; a failed snapshot keeps the sandbox alive.
+   */
+  readonly suspend: (workspaceID: ID) => Effect.Effect<void, NotFound>
+  /** Drops a cached sandbox connection; the next use reconnects (reviving from snapshot when the sandbox died). */
+  readonly invalidate: (workspaceID: ID) => Effect.Effect<void>
+  /**
+   * Observational one-shot command against the cached sandbox connection
+   * (v1 OOM sampling parity): never refreshes lastActivity or the active
+   * counter, so sampling cannot keep an idle workspace alive. Undefined when
+   * no cached connection exists (the workspace is not in use here).
+   */
+  /** Reads the persisted binding without connecting; null when unbound. */
+  readonly rawBinding: (workspaceID: ID) => Effect.Effect<WorkspaceDriver.Binding | null, NotFound>
+  /** Reads the session-level sandbox resource spec for this workspace. */
+  readonly resource: (workspaceID: ID) => Effect.Effect<Record<string, string> | null, NotFound>
+  /** Explicitly snapshots the workspace's sandbox without killing it (v1 POST /snapshot parity). */
+  readonly snapshot: (workspaceID: ID) => Effect.Effect<{ readonly snapshotId: string }, NotFound | WorkspaceDriver.Error>
+  /** Updates the sandbox resource spec; takes effect at the next sandbox create. */
+  readonly setResource: (workspaceID: ID, resource: Record<string, string>) => Effect.Effect<void, NotFound>
+  readonly sample: (
+    workspaceID: ID,
+    command: string,
+    timeoutMs: number,
+  ) => Effect.Effect<{ readonly stdout: string } | undefined>
+  /**
+   * Writes a file into the workspace's sandbox (compaction history):
+   * provisions the sandbox when no cached connection exists and creates
+   * parent directories. Never refreshes the activity counters beyond the
+   * provision itself.
+   */
+  readonly writeFile: (workspaceID: ID, path: string, bytes: Uint8Array) => Effect.Effect<void>
 }
 
 export interface Options {
@@ -83,6 +125,11 @@ const layer = (options: Options) =>
       const registry = yield* WorkspaceDriver.RegistryService
       const lifetime = yield* Scope.Scope
       const connections = new Map<ID, Connection>()
+      const keptAlive = new Set<ID>()
+      // Inlined makeFiles (execDefaults + overrides): importing
+      // ./environment/index.js here would cycle (environment -> workspace).
+      const makeFiles = (driver: EnvironmentDriver.Driver) =>
+        ({ ...execDefaults(driver.spawner), ...driver.overrides }) as Files
       // Destroy cancels the racing provision body by settling the deferred.
       const attempts = new Map<ID, Deferred.Deferred<Info, ReadinessError>>()
       const locks = KeyedMutex.makeUnsafe<ID>()
@@ -97,6 +144,9 @@ const layer = (options: Options) =>
         if (!row) return yield* new NotFound({ workspaceID })
         return row
       })
+
+      const resource = (workspaceID: ID) =>
+        Effect.map(load(workspaceID), (row) => row.resource ?? null)
 
       const saveBinding = (workspaceID: ID, binding: WorkspaceDriver.Binding) =>
         db.update(WorkspaceTable).set({ binding }).where(eq(WorkspaceTable.id, workspaceID)).run().pipe(Effect.orDie)
@@ -124,7 +174,7 @@ const layer = (options: Options) =>
                   const row = yield* load(workspaceID)
                   if (row.binding) return info(row, row.binding)
                   const driver = yield* registry.get(row.provider)
-                  const result = yield* driver.create({ workspaceID })
+                  const result = yield* driver.create({ workspaceID, resource: row.resource ?? undefined })
                   yield* saveBinding(workspaceID, result.binding)
                   return info(row, result.binding)
                 }),
@@ -184,7 +234,7 @@ const layer = (options: Options) =>
       yield* Effect.gen(function* () {
         const now = yield* Clock.currentTimeMillis
         yield* Effect.forEach(
-          [...connections.entries()],
+          [...connections.entries()].filter(([id]) => !keptAlive.has(id)),
           ([workspaceID, expected]) =>
             locks.withLock(workspaceID)(
               Effect.gen(function* () {
@@ -215,6 +265,101 @@ const layer = (options: Options) =>
       }).pipe(Effect.repeat(Schedule.spaced(options.pollInterval ?? Duration.minutes(1))), Effect.forkScoped)
 
       return Service.of({
+        setKeepAlive: (workspaceID, enabled) =>
+          Effect.sync(() => {
+            if (enabled) keptAlive.add(workspaceID)
+            else keptAlive.delete(workspaceID)
+          }),
+        isKeepAlive: (workspaceID) => keptAlive.has(workspaceID),
+
+        sample: Effect.fn("Workspace.sample")(function* (workspaceID, command, timeoutMs) {
+          const connection = connections.get(workspaceID)
+          if (connection === undefined) return undefined
+          const settled = yield* Effect.gen(function* () {
+            const shell = yield* connection.environment.spawner
+              .spawn(ChildProcess.make("sh", ["-c", command]))
+              .pipe(
+                Effect.provideService(Scope.Scope, connection.scope),
+                Effect.orDie,
+              )
+            const out = yield* Stream.runCollect(Stream.decodeText(shell.stdout)).pipe(
+              Effect.map((chunks) => Array.from(chunks).join("")),
+              Effect.orDie,
+            )
+            yield* shell.exitCode.pipe(Effect.orDie)
+            return out
+          }).pipe(Effect.timeoutOption(`${timeoutMs} millis`))
+          if (Option.isNone(settled)) return undefined
+          return { stdout: settled.value }
+        }),
+        writeFile: Effect.fn("Workspace.writeFile")(function* (workspaceID, path, bytes) {
+          // History writes may be the first workspace use of a chat-only session,
+          // so provision instead of degrading to "no cached connection". provision
+          // takes the workspace lock itself, so it must run OUTSIDE withLock.
+          yield* Effect.suspend(() => (connections.has(workspaceID) ? Effect.void : provision(workspaceID))).pipe(
+            Effect.orDie,
+          )
+          const connection = yield* locks.withLock(workspaceID)(open(workspaceID)).pipe(Effect.orDie)
+          // execDefaults.write runs `mkdir -p $(dirname)` before writing.
+          yield* makeFiles(connection.environment).write(path, bytes).pipe(Effect.orDie)
+        }),
+        rawBinding: (workspaceID) => Effect.map(load(workspaceID), (row) => row.binding),
+        resource,
+        snapshot: Effect.fn("Workspace.snapshot")(function* (workspaceID) {
+          const row = yield* load(workspaceID)
+          if (row.binding === null) return yield* new NotFound({ workspaceID })
+          const driver = yield* registry.get(row.provider).pipe(Effect.orDie)
+          if (driver.snapshot === undefined)
+            return yield* new WorkspaceDriver.Error({ message: `provider ${row.provider} does not support snapshots` })
+          return yield* driver.snapshot({
+            workspaceID,
+            binding: row.binding,
+            saveBinding: (binding) => saveBinding(workspaceID, binding).pipe(Effect.orDie),
+          })
+        }),
+        setResource: (workspaceID, resource) =>
+          Effect.gen(function* () {
+            yield* load(workspaceID)
+            yield* db
+              .update(WorkspaceTable)
+              .set({ resource, last_used_at: yield* Clock.currentTimeMillis })
+              .where(eq(WorkspaceTable.id, workspaceID))
+              .run()
+              .pipe(Effect.orDie)
+          }),
+        invalidate: Effect.fn("Workspace.invalidate")(function* (workspaceID) {
+          const connection = connections.get(workspaceID)
+          if (connection === undefined) return
+          connections.delete(workspaceID)
+          yield* Scope.close(connection.scope, Exit.void).pipe(Effect.orDie)
+        }),
+        suspend: Effect.fn("Workspace.suspend")(function* (workspaceID) {
+          const row = yield* load(workspaceID)
+          if (row.binding === null) return yield* new NotFound({ workspaceID })
+          const driver = yield* registry.get(row.provider).pipe(Effect.orDie)
+          yield* driver
+            .suspendForIdle({
+              workspaceID,
+              binding: row.binding,
+              saveBinding: (binding) => saveBinding(workspaceID, binding).pipe(Effect.orDie),
+            })
+            .pipe(
+              // The per-connection idle sweep owns live connections; a manual
+              // suspend drops any cached connection the same way.
+              Effect.tap(() =>
+                Effect.sync(() => {
+                  connections.delete(workspaceID)
+                }),
+              ),
+              Effect.exit,
+              Effect.flatMap((exit) =>
+                Exit.isSuccess(exit)
+                  ? Effect.void
+                  : Effect.logError(`workspace suspend failed for ${workspaceID}`, exit.cause),
+              ),
+              Effect.forkIn(lifetime),
+            )
+        }),
         create: Effect.fn("Workspace.create")(function* (input) {
           const workspaceID = input.id ?? ID.create()
           const existing = yield* db
@@ -235,7 +380,14 @@ const layer = (options: Options) =>
           const now = yield* Clock.currentTimeMillis
           const inserted = yield* db
             .insert(WorkspaceTable)
-            .values({ id: workspaceID, provider: input.provider, binding: null, created_at: now, last_used_at: now })
+            .values({
+              id: workspaceID,
+              provider: input.provider,
+              binding: null,
+              resource: input.resource ?? null,
+              created_at: now,
+              last_used_at: now,
+            })
             .onConflictDoNothing()
             .returning({ id: WorkspaceTable.id })
             .get()
@@ -252,6 +404,39 @@ const layer = (options: Options) =>
         }),
         provision,
         connect: Effect.fn("Workspace.connect")(function* (workspaceID) {
+          // Per-operation acquire: nothing provisions or connects until a
+          // spawn or file call actually needs the workspace, so a connect on a
+          // cold workspace stays free (and a missing placement cannot fail it).
+          const acquire = Effect.acquireRelease(
+            Effect.suspend(() => (connections.has(workspaceID) ? Effect.void : provision(workspaceID))).pipe(
+              Effect.andThen(
+                locks.withLock(workspaceID)(
+                  Effect.gen(function* () {
+                    const connection = yield* open(workspaceID)
+                    yield* Ref.update(connection.active, (active) => active + 1)
+                    return connection
+                  }),
+                ),
+              ),
+              Effect.mapError((cause) =>
+                systemError({
+                  _tag: "Unknown",
+                  module: "Workspace",
+                  method: "connect",
+                  description: `Failed to wake workspace ${workspaceID}`,
+                  cause,
+                }),
+              ),
+            ),
+            (connection) =>
+              locks.withLock(workspaceID)(
+                Effect.gen(function* () {
+                  yield* Ref.update(connection.active, (active) => active - 1)
+                  yield* Ref.set(connection.lastActivity, yield* Clock.currentTimeMillis)
+                }),
+              ),
+          )
+
           const spawner = make((command) =>
             Effect.acquireRelease(
               // A live connection implies the binding is already persisted, so skip the provision hop.
@@ -285,8 +470,26 @@ const layer = (options: Options) =>
                 ),
             ).pipe(Effect.flatMap((connection) => connection.environment.spawner.spawn(command))),
           )
-          // Overrides are connection-bound; per-spawn routing is required before any driver ships them, so they are deliberately omitted.
-          return { spawner }
+
+          // A wake failure is a placement defect, not a file-operation error.
+          const connect = Effect.orDie(acquire)
+          const overrides: EnvironmentDriver.Driver["overrides"] = {
+            read: (path, range) =>
+              Effect.scoped(Effect.flatMap(connect, (connection) => makeFiles(connection.environment).read(path, range))),
+            write: (path, bytes) =>
+              Effect.scoped(Effect.flatMap(connect, (connection) => makeFiles(connection.environment).write(path, bytes))),
+            stat: (path) =>
+              Effect.scoped(Effect.flatMap(connect, (connection) => makeFiles(connection.environment).stat(path))),
+            list: (path) =>
+              Effect.scoped(Effect.flatMap(connect, (connection) => makeFiles(connection.environment).list(path))),
+            remove: (path) =>
+              Effect.scoped(Effect.flatMap(connect, (connection) => makeFiles(connection.environment).remove(path))),
+            move: (from, to) =>
+              Effect.scoped(Effect.flatMap(connect, (connection) => makeFiles(connection.environment).move(from, to))),
+            mkdir: (path) =>
+              Effect.scoped(Effect.flatMap(connect, (connection) => makeFiles(connection.environment).mkdir(path))),
+          }
+          return { spawner, overrides }
         }),
         destroy: Effect.fn("Workspace.destroy")(function* (workspaceID) {
           // Settling the shared attempt cancels its racing provision body and fails

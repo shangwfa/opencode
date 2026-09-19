@@ -60,12 +60,26 @@ export const latestCompaction = Effect.fnUntraced(function* (
 })
 
 export const decodeMessageRow = (row: typeof SessionMessageTable.$inferSelect) =>
-  decode({ ...row.data, id: row.id, type: row.type }).pipe(
-    Effect.tap((message) =>
-      SessionProviderContext.isCheckpoint(message)
-        ? SessionProviderContext.validate(message.providerContext)
-        : Effect.void,
-    ),
+  Effect.gen(function* () {
+    const input: Record<string, unknown> = { ...row.data, id: row.id, type: row.type }
+    // Legacy or corrupt `format` values must not fail the whole read path
+    // (v1 parity): drop the field and decode the rest of the message.
+    let message: SessionMessage.Info | undefined = yield* decode(input).pipe(Effect.orElseSucceed(() => undefined))
+    if (message === undefined && "format" in input) {
+      const sanitized = { ...input }
+      delete sanitized.format
+      message = yield* decode(sanitized).pipe(Effect.orElseSucceed(() => undefined))
+    }
+    if (message === undefined)
+      return yield* new MessageDecodeError({
+        sessionID: SessionSchema.ID.make(row.session_id),
+        messageID: SessionMessage.ID.make(row.id),
+      })
+    yield* SessionProviderContext.isCheckpoint(message)
+      ? SessionProviderContext.validate(message.providerContext)
+      : Effect.void
+    return message
+  }).pipe(
     Effect.mapError(
       () =>
         new MessageDecodeError({

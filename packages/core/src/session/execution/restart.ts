@@ -11,6 +11,7 @@ import { SessionSchema } from "../schema.js"
 import { SessionStore } from "../store.js"
 import { ShellResult } from "../../shell/result.js"
 import { SubagentCompletion } from "../subagent-completion.js"
+import { backfillAll } from "../../hitl/backfill.js"
 
 const CONTINUE_AFTER_SERVER_RESTART =
   "The server restarted while you were working. Continue from where you left off without repeating completed work."
@@ -72,6 +73,10 @@ export const layer = (options?: Options) =>
       const jobs = yield* Job.Service
       const sessions = yield* Session.Service
       const scope = yield* Effect.scope
+      // SaaS: deliver answers their dying run never consumed BEFORE resume —
+      // a resumed run reloads projected history and must see the backfilled
+      // terminal tool result instead of a dangling call (v1's answered-lost).
+      yield* backfillAll(bus)
       const maxAttempts = options?.maxAttempts ?? DEFAULT_MAX_ATTEMPTS
 
       const prepareResume = Effect.fnUntraced(function* (sessionID: SessionSchema.ID) {

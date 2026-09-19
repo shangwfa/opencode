@@ -18,6 +18,7 @@ export function fromRow(row: typeof SessionTable.$inferSelect): SessionSchema.In
     id: SessionSchema.ID.make(row.id),
     projectID: Project.ID.make(row.project_id),
     title: row.title ?? undefined,
+    appId: row.app_id ?? undefined,
     parentID: row.parent_id ? SessionSchema.ID.make(row.parent_id) : undefined,
     fork:
       row.fork_session_id && row.fork_boundary
