@@ -388,7 +388,7 @@ describe("Session.create", () => {
     }),
   )
 
-  it.effect("stores permission rules, inherits them through children and forks, and replaces them", () =>
+  it.effect("stores permission rules, inherits them through children and forks, and merges updates", () =>
     Effect.gen(function* () {
       const session = yield* Session.Service
       const bus = yield* Bus.Service
@@ -405,9 +405,13 @@ describe("Session.create", () => {
       const forked = yield* session.fork({ sessionID: created.id })
       expect(forked.permissions).toEqual(permissions)
 
+      // v1 PATCH semantics: updates append instead of replacing, and an empty
+      // array never clears existing rules (a later rule wins via findLast).
       const replaced = [{ action: "shell", resource: "*", effect: "ask" as const }]
       yield* session.setPermissions({ sessionID: created.id, permissions: replaced })
-      expect((yield* session.get(created.id)).permissions).toEqual(replaced)
+      expect((yield* session.get(created.id)).permissions).toEqual([...permissions, ...replaced])
+      yield* session.setPermissions({ sessionID: created.id, permissions: [] })
+      expect((yield* session.get(created.id)).permissions).toEqual([...permissions, ...replaced])
       expect(
         yield* session.setPermissions({ sessionID: Session.ID.create(), permissions: replaced }).pipe(Effect.flip),
       ).toBeInstanceOf(Session.NotFoundError)

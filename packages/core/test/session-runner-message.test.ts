@@ -1189,3 +1189,27 @@ Recent work
     ])
   })
 })
+
+test("checkpoint with historyPath carries the retrieval hint", () => {
+  const historyPath = "/workspace/.opencode/tool-output/tool_history_msg_hint.md"
+  const [message] = toLLMMessages(
+    [
+      SessionMessage.CompactionCompleted.make({
+        id: id("compaction"),
+        type: "compaction",
+        status: "completed",
+        reason: "auto",
+        summary: "Earlier work",
+        recent: "Recent work",
+        historyPath,
+        time: { created },
+      }),
+    ],
+    model,
+  )
+
+  const text = (message.content as Array<{ type: string; text: string }>)[0].text
+  expect(text).toContain(`available at ${historyPath}`)
+  expect(text).toContain("search that file with Grep or Read (offset/limit)")
+  expect(text.indexOf("</recent-context>")).toBeLessThan(text.indexOf(historyPath))
+})

@@ -16,6 +16,7 @@ import { SessionProjector } from "@opencode/core/session/projector"
 import { SessionRunnerModel } from "@opencode/core/session/runner/model"
 import { SessionTable } from "@opencode/core/session/sql"
 import { SessionStore } from "@opencode/core/session/store"
+import { Workspace } from "@opencode/core/workspace"
 import { Session } from "@opencode/core/session"
 import { Project } from "@opencode/core/project"
 import { ProjectTable } from "@opencode/core/project/sql"
@@ -77,6 +78,17 @@ const resolved = SessionRunnerModel.resolved(model, {
   cost,
   limit: { context: 200_000, output: 32_000 },
 })
+const writes: Array<{ readonly workspaceID: string; readonly path: string; readonly bytes: Uint8Array }> = []
+let failWrite = false
+const workspaceMock = Layer.mock(Workspace.Service)({
+  writeFile: (workspaceID, path, bytes) => {
+    if (failWrite) return Effect.die(new Error("sandbox write failed"))
+    writes.push({ workspaceID, path, bytes })
+    return Effect.void
+  },
+  sample: () => Effect.succeed(undefined),
+})
+
 const it = testEffect(
   AppNodeBuilder.build(
     LayerNode.group([
@@ -88,7 +100,11 @@ const it = testEffect(
       SessionModelRequest.node,
       PluginHooks.node,
     ]),
-    [Bus.node.replace(Bus.configured({ persist: true })), llmClient.replace(client)],
+    [
+      Bus.node.replace(Bus.configured({ persist: true })),
+      llmClient.replace(client),
+      Workspace.node.replace(workspaceMock),
+    ],
   ),
 )
 
@@ -590,5 +606,231 @@ it.effect("forked session compaction reuses the fork root prompt cache key", () 
 
     expect(requests).toHaveLength(1)
     expect(requests[0]?.promptCacheKey).toBe(rootID)
+  }),
+)
+
+test("serializeHistory keeps full tool output and section headers", () => {
+  const long = "x".repeat(5_000)
+  const history = SessionCompaction.serializeHistory([
+    Schema.decodeUnknownSync(SessionMessage.User)({
+      id: SessionMessage.ID.make("msg_user1"),
+      type: "user",
+      text: "Find the secret",
+      time: { created: 1_700_000_000_000 },
+    }),
+    Schema.decodeUnknownSync(SessionMessage.Shell)({
+      id: SessionMessage.ID.make("msg_shell1"),
+      type: "shell",
+      shellID: Shell.ID.make("sh_hist"),
+      status: "exited",
+      command: "cat big.log",
+      exit: 0,
+      output: { output: long, cursor: long.length, size: long.length, truncated: true },
+      time: { created: 1_700_000_001_000, completed: 1_700_000_002_000 },
+    }),
+  ])
+
+  expect(history).toContain("## msg_user1 | user | 2023-11-14T22:13:20.000Z")
+  expect(history).toContain("[User]: Find the secret")
+  expect(history).toContain("## msg_shell1 | shell | 2023-11-14T22:13:21.000Z")
+  expect(history).toContain(`[Shell]: cat big.log\n${long}`)
+  expect(history).not.toContain("[truncated]")
+})
+
+test("serializeHistory chains the previous compaction's history file", () => {
+  const previous = "/workspace/.opencode/tool-output/tool_history_msg_first.md"
+  const history = SessionCompaction.serializeHistory(
+    [
+      Schema.decodeUnknownSync(SessionMessage.CompactionCompleted)({
+        id: SessionMessage.ID.make("msg_prev"),
+        type: "compaction",
+        status: "completed",
+        reason: "auto",
+        summary: "Earlier summary",
+        recent: "Earlier recent",
+        historyPath: previous,
+        time: { created: 1_700_000_000_000 },
+      }),
+    ],
+    previous,
+  )
+
+  expect(history.startsWith(`> Earlier compacted history: ${previous}`)).toBe(true)
+})
+
+test("serializeHistory keeps full assistant tool output without truncation", () => {
+  const long = "y".repeat(5_000)
+  const history = SessionCompaction.serializeHistory([
+    Schema.decodeUnknownSync(SessionMessage.Assistant)({
+      id: SessionMessage.ID.make("msg_tool1"),
+      type: "assistant",
+      agent: Agent.defaultID,
+      model: { id: "test-model", providerID: "test-provider" },
+      content: [
+        {
+          type: "tool",
+          id: "call_1",
+          name: "read",
+          state: {
+            status: "completed",
+            input: { path: "big.txt" },
+            content: [{ type: "text", text: long }],
+          },
+          time: { created: 1_700_000_000_000 },
+        },
+      ],
+      time: { created: 1_700_000_000_000, completed: 1_700_000_001_000 },
+    }),
+  ])
+
+  expect(history).toContain("[Assistant tool call]: read(")
+  expect(history).toContain(`[Tool result]: ${long}`)
+  expect(history).not.toContain("[truncated]")
+})
+
+test("serializeHistory omits messages that carry no serializable body", () => {
+  const history = SessionCompaction.serializeHistory([
+    Schema.decodeUnknownSync(SessionMessage.User)({
+      id: SessionMessage.ID.make("msg_keep"),
+      type: "user",
+      text: "kept",
+      time: { created: 1_700_000_000_000 },
+    }),
+    Schema.decodeUnknownSync(SessionMessage.System)({
+      id: SessionMessage.ID.make("msg_system"),
+      type: "system",
+      text: "instruction update",
+      time: { created: 1_700_000_001_000 },
+    }),
+  ])
+
+  expect(history).toContain("## msg_keep | user |")
+  expect(history).not.toContain("msg_system")
+})
+
+it.effect("compaction writes the full history file and carries its path", () =>
+  Effect.gen(function* () {
+    requests = []
+    writes.length = 0
+    failWrite = false
+    const compaction = yield* SessionCompaction.Service
+    const store = yield* SessionStore.Service
+    const modelRequests = yield* SessionModelRequest.Service
+    const sessionID = Session.ID.make("ses_history_write")
+    const workspaceID = Workspace.ID.make("wrk_history_write")
+    const session = yield* insertSession(sessionID)
+    const loadedSession = { ...session, location: { ...session.location, workspaceID } }
+    const previousPath = "/workspace/.opencode/tool-output/tool_history_msg_previous.md"
+    const long = "z".repeat(5_000)
+    const messages = [
+      Schema.decodeUnknownSync(SessionMessage.CompactionCompleted)({
+        id: SessionMessage.ID.make("msg_previous"),
+        type: "compaction",
+        status: "completed",
+        reason: "auto",
+        summary: "earlier summary",
+        recent: "earlier recent",
+        historyPath: previousPath,
+        time: { created: 0 },
+      }),
+      SessionMessage.User.make({
+        id: SessionMessage.ID.make("msg_user_detail"),
+        type: "user",
+        text: "The secret detail lives in the tool output.",
+        time: { created: DateTime.makeUnsafe(1) },
+      }),
+      Schema.decodeUnknownSync(SessionMessage.Assistant)({
+        id: SessionMessage.ID.make("msg_assistant_detail"),
+        type: "assistant",
+        agent: Agent.defaultID,
+        model: { id: "test-model", providerID: "test-provider" },
+        content: [
+          {
+            type: "tool",
+            id: "call_long",
+            name: "read",
+            state: { status: "completed", input: { path: "big.txt" }, content: [{ type: "text", text: long }] },
+            time: { created: 2 },
+          },
+        ],
+        time: { created: 2, completed: 3 },
+      }),
+      SessionMessage.User.make({
+        id: SessionMessage.ID.make("msg_user_latest"),
+        type: "user",
+        text: "A latest exchange stays in the summary tail.",
+        time: { created: DateTime.makeUnsafe(4) },
+      }),
+    ]
+
+    const result = yield* compaction.compactManual({
+      session: loadedSession,
+      resolveContext: () => Effect.succeed(loaded(loadedSession, messages)),
+      prepare: modelRequests.compaction,
+      messages,
+      inputID: SessionMessage.ID.make("msg_history_input"),
+    })
+
+    expect(result).toEqual({ status: "completed" })
+    expect(writes).toHaveLength(1)
+    const write = writes[0]!
+    expect(write.workspaceID).toBe(workspaceID)
+    const body = new TextDecoder().decode(write.bytes)
+    expect(body.startsWith(`> Earlier compacted history: ${previousPath}`)).toBe(true)
+    expect(body).toContain("[User]: The secret detail lives in the tool output.")
+    expect(body).toContain(long)
+    expect(body).not.toContain("[truncated]")
+    expect(body).toContain("## msg_user_detail | user | ")
+
+    const message = (yield* store.context(sessionID)).find((entry) => entry.type === "compaction")
+    expect(message?.historyPath).toBe(write.path)
+    // The file name is derived from the projected compaction message id.
+    expect(write.path.endsWith(`tool_history_${message?.id}.md`)).toBe(true)
+  }),
+)
+
+it.effect("compaction completes without a history path when the write fails", () =>
+  Effect.gen(function* () {
+    requests = []
+    writes.length = 0
+    failWrite = true
+    const compaction = yield* SessionCompaction.Service
+    const store = yield* SessionStore.Service
+    const modelRequests = yield* SessionModelRequest.Service
+    const sessionID = Session.ID.make("ses_history_degrade")
+    const session = yield* insertSession(sessionID)
+    const loadedSession = {
+      ...session,
+      location: { ...session.location, workspaceID: Workspace.ID.make("wrk_history_degrade") },
+    }
+    const messages = [
+      SessionMessage.User.make({
+        id: SessionMessage.ID.make("msg_degrade_old"),
+        type: "user",
+        text: "Older content that will be compacted.",
+        time: { created: DateTime.makeUnsafe(0) },
+      }),
+      SessionMessage.User.make({
+        id: SessionMessage.ID.make("msg_degrade_latest"),
+        type: "user",
+        text: "Newest content stays in the tail.",
+        time: { created: DateTime.makeUnsafe(1) },
+      }),
+    ]
+
+    const result = yield* compaction.compactManual({
+      session: loadedSession,
+      resolveContext: () => Effect.succeed(loaded(loadedSession, messages)),
+      prepare: modelRequests.compaction,
+      messages,
+      inputID: SessionMessage.ID.make("msg_degrade_input"),
+    })
+
+    expect(result).toEqual({ status: "completed" })
+    expect(writes).toHaveLength(0)
+    const message = (yield* store.context(sessionID)).find((entry) => entry.type === "compaction")
+    expect(message?.summary).toBe("## Objective\n- manual summary")
+    expect(message?.historyPath).toBeUndefined()
+    failWrite = false
   }),
 )

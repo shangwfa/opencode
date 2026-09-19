@@ -1,7 +1,7 @@
 import { beforeEach, expect } from "bun:test"
 import { AppNodeBuilder } from "@opencode/core/effect/app-node-builder"
 import { Database } from "@opencode/core/database/database"
-import { makeMemoryDriver } from "@opencode/core/environment/index"
+import { makeFiles, makeMemoryDriver } from "@opencode/core/environment/index"
 import { Workspace } from "@opencode/core/workspace"
 import { WorkspaceDriver } from "@opencode/core/workspace/driver"
 import { WorkspaceTable } from "@opencode/core/workspace/sql"
@@ -32,16 +32,30 @@ const driver = WorkspaceDriver.make({
     calls.push({ operation: "suspendForIdle", binding })
     return saveBinding({ ...binding, generation: Number(binding.generation) + 1, suspended: true })
   },
+  snapshot: ({ binding, saveBinding }) => {
+    calls.push({ operation: "snapshot", binding })
+    return saveBinding({ ...binding, generation: Number(binding.generation) + 1, snapshotId: "snap_test" }).pipe(
+      Effect.as({ snapshotId: "snap_test" }),
+    )
+  },
   destroy: ({ binding }) => {
     calls.push({ operation: "destroy", binding })
     return Effect.void
   },
 })
 
+// A provider without the optional snapshot capability exercises the unsupported branch.
+const noSnapshotDriver = WorkspaceDriver.make({
+  create: ({ workspaceID }) => Effect.succeed({ binding: { workspaceID, generation: 0 } }),
+  connect: () => Effect.succeed(memory),
+  suspendForIdle: ({ binding }) => Effect.void,
+  destroy: () => Effect.void,
+})
+
 const it = testEffect(
   AppNodeBuilder.build(
     LayerNode.group([Database.node, Workspace.configured({ idleThreshold: "5 minutes", pollInterval: "1 minute" })]),
-    [WorkspaceDriver.node.replace(WorkspaceDriver.registryNode({ fake: driver, other: driver }))],
+    [WorkspaceDriver.node.replace(WorkspaceDriver.registryNode({ fake: driver, other: driver, nosnapshot: noSnapshotDriver }))],
   ),
 )
 
@@ -379,5 +393,78 @@ it.effect("surfaces wake failures through the spawn error channel", () =>
         description: `Failed to wake workspace ${created.id}`,
       },
     })
+  }),
+)
+
+it.effect("writeFile provisions the workspace and writes through its environment", () =>
+  Effect.gen(function* () {
+    const workspace = yield* Workspace.Service
+    const workspaceID = yield* workspace.create({ provider: "fake" })
+    expect(calls).toEqual([])
+
+    yield* workspace.writeFile(
+      workspaceID,
+      "/project/.opencode/tool-output/tool_history_msg_1.md",
+      new TextEncoder().encode("full history"),
+    )
+
+    expect(calls.map((call) => call.operation)).toEqual(["create", "connect"])
+    const file = yield* makeFiles(memory)
+      .read("/project/.opencode/tool-output/tool_history_msg_1.md", undefined)
+      .pipe(Effect.orDie)
+    expect(new TextDecoder().decode(file.bytes)).toBe("full history")
+  }),
+)
+
+it.effect("writeFile reuses a cached connection instead of provisioning again", () =>
+  Effect.gen(function* () {
+    const workspace = yield* Workspace.Service
+    const workspaceID = yield* workspace.create({ provider: "fake" })
+
+    yield* workspace.writeFile(workspaceID, "/a/first.md", new TextEncoder().encode("one"))
+    yield* workspace.writeFile(workspaceID, "/a/second.md", new TextEncoder().encode("two"))
+
+    expect(calls.map((call) => call.operation)).toEqual(["create", "connect"])
+    const file = yield* makeFiles(memory).read("/a/second.md", undefined).pipe(Effect.orDie)
+    expect(new TextDecoder().decode(file.bytes)).toBe("two")
+  }),
+)
+
+it.effect("writeFile fails as a defect when the environment write fails", () =>
+  Effect.gen(function* () {
+    const workspace = yield* Workspace.Service
+    const workspaceID = yield* workspace.create({ provider: "fake" })
+    yield* makeFiles(memory).mkdir!("/a/target.md").pipe(Effect.orDie)
+
+    const exit = yield* workspace.writeFile(workspaceID, "/a/target.md", new TextEncoder().encode("nope")).pipe(Effect.exit)
+    expect(exit._tag).toBe("Failure")
+    expect(String(exit)).not.toContain("Success")
+  }),
+)
+
+it.effect("snapshot delegates to the driver and records the snapshot id", () =>
+  Effect.gen(function* () {
+    const workspace = yield* Workspace.Service
+    const workspaceID = yield* workspace.create({ provider: "fake" })
+    yield* workspace.writeFile(workspaceID, "/a/first.md", new TextEncoder().encode("one"))
+    calls.splice(0)
+
+    const result = yield* workspace.snapshot(workspaceID)
+
+    expect(result.snapshotId).toBe("snap_test")
+    expect(calls.map((call) => call.operation)).toEqual(["snapshot"])
+    expect(yield* workspace.rawBinding(workspaceID)).toMatchObject({ snapshotId: "snap_test" })
+  }),
+)
+
+it.effect("snapshot reports providers without snapshot support", () =>
+  Effect.gen(function* () {
+    const workspace = yield* Workspace.Service
+    const workspaceID = yield* workspace.create({ provider: "nosnapshot" })
+    yield* workspace.writeFile(workspaceID, "/a/first.md", new TextEncoder().encode("one"))
+
+    const error = yield* workspace.snapshot(workspaceID).pipe(Effect.flip)
+    expect(error._tag).toBe("WorkspaceDriver.Error")
+    expect(String(error)).toContain("does not support snapshots")
   }),
 )

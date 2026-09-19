@@ -1,13 +1,20 @@
 import { describe, expect } from "bun:test"
-import { Deferred, Effect, Exit, Fiber } from "effect"
+import { Deferred, Effect, Exit, Fiber, Layer } from "effect"
 import { AppNodeBuilder } from "@opencode/core/effect/app-node-builder"
 import { LayerNode } from "@opencode/util/effect/layer-node"
 import { Bus } from "@opencode/core/bus"
 import { Form } from "@opencode/core/form"
+import { Location } from "@opencode/core/location"
+import { AbsolutePath } from "@opencode/core/schema"
 import { SessionSchema } from "@opencode/core/session/schema"
+import { location } from "./fixture/location"
 import { testEffect } from "./lib/effect"
 
-const forms = AppNodeBuilder.build(LayerNode.group([Bus.node, Form.node]))
+const current = Layer.succeed(
+  Location.Service,
+  Location.Service.of(location({ directory: AbsolutePath.make("/project") })),
+)
+const forms = AppNodeBuilder.build(LayerNode.group([Bus.node, Form.node]), [Location.node.replace(current)])
 const it = testEffect(forms)
 
 const formID = Form.ID.create("frm_test")
@@ -352,6 +359,36 @@ describe("Form", () => {
       yield* unsubscribe
       yield* service.reply({ id: formID, answer: { name: "Ava" } })
       expect(yield* service.state(formID)).toEqual({ status: "answered", answer: { name: "Ava" } })
+    }),
+  )
+})
+
+describe("Form HITL user scoping", () => {
+  it.effect("list filters entries by owning user and defaults to the public bucket", () =>
+    Effect.gen(function* () {
+      const service = yield* Form.Service
+      const created = yield* service.create({ ...input, id: Form.ID.create("frm_scoped") })
+
+      // Without a SessionStore in scope the recorded owner is the public bucket.
+      expect(yield* service.list({ userID: "" })).toEqual([created])
+      expect(yield* service.list({ userID: "user-b" })).toEqual([])
+      expect(yield* service.list()).toEqual([created])
+
+      yield* service.cancel(created.id)
+    }),
+  )
+
+  it.effect("reply from a different user reads as not-found (v1 cross-tenant guard)", () =>
+    Effect.gen(function* () {
+      const service = yield* Form.Service
+      const created = yield* service.create({ ...input, id: Form.ID.create("frm_guarded") })
+
+      const exit = yield* Effect.exit(service.reply({ id: created.id, answer: { name: "Eve" }, userID: "user-b" }))
+      expect(Exit.isFailure(exit)).toBe(true)
+
+      // The owner in the public bucket still answers fine.
+      yield* service.reply({ id: created.id, answer: { name: "Ava" }, userID: "" })
+      expect(yield* service.state(created.id)).toEqual({ status: "answered", answer: { name: "Ava" } })
     }),
   )
 })

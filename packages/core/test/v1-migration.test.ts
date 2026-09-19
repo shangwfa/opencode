@@ -41,6 +41,7 @@ const session = (
   directory: "/tmp/test",
   path: null,
   title: "Test",
+  app_id: null,
   version: "1",
   share_url: null,
   summary_additions: null,

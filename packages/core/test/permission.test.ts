@@ -1,5 +1,5 @@
 import { describe, expect } from "bun:test"
-import { Cause, Deferred, Effect, Fiber, Layer } from "effect"
+import { Cause, Deferred, Effect, Exit, Fiber, Layer } from "effect"
 import { Agent } from "@opencode/core/agent"
 import { Database } from "@opencode/core/database/database"
 import { AppNodeBuilder } from "@opencode/core/effect/app-node-builder"
@@ -706,4 +706,46 @@ describe("shell scanner permission impact", () => {
       )
     }
   }
+})
+
+describe("Permission HITL user scoping", () => {
+  it.effect("list filters pending asks by owning user", () =>
+    Effect.gen(function* () {
+      yield* setup([{ action: "read", resource: "*", effect: "ask" }])
+      const service = yield* Permission.Service
+      const value = { action: "read", resources: ["secret.txt"], sessionID: Session.ID.make("ses_test") }
+      const fiber = yield* service.assert(value).pipe(Effect.forkScoped)
+      const { request } = yield* waitForRequest()
+
+      // Without user-message metadata the recorded owner is the public bucket.
+      const own = yield* service.forSession(value.sessionID, "")
+      expect(own).toContain(request)
+      expect(yield* service.forSession(value.sessionID, "user-b")).toEqual([])
+
+      yield* service.reply({ requestID: request.id, reply: "reject", userID: "" })
+      yield* Fiber.interrupt(fiber)
+    }),
+  )
+
+  it.effect("reply from a different user fails as not-found and settles nothing", () =>
+    Effect.gen(function* () {
+      yield* setup([{ action: "read", resource: "*", effect: "ask" }])
+      const service = yield* Permission.Service
+      const fiber = yield* service.assert({
+        action: "read",
+        resources: ["secret.txt"],
+        sessionID: Session.ID.make("ses_test"),
+      }).pipe(Effect.forkScoped)
+      const { request } = yield* waitForRequest()
+
+      const exit = yield* Effect.exit(service.reply({ requestID: request.id, reply: "once", userID: "user-b" }))
+      expect(Exit.isFailure(exit)).toBe(true)
+
+      // The owner still holds a pending ask and can answer it.
+      const remaining = yield* service.forSession(request.sessionID, "")
+      expect(remaining).toContain(request)
+      yield* service.reply({ requestID: request.id, reply: "reject", userID: "" })
+      yield* Fiber.interrupt(fiber)
+    }),
+  )
 })

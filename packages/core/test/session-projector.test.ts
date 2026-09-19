@@ -333,6 +333,32 @@ describe("SessionProjector", () => {
     }),
   )
 
+  it.effect("removes the projected message row on session.message.removed", () =>
+    Effect.gen(function* () {
+      const db = yield* seedSession()
+      const bus = yield* Bus.Service
+      const inbox = yield* SessionInbox.Service
+      const id = SessionMessage.ID.make("msg_removed_test")
+      const admitted = yield* inbox.admit({
+        id,
+        sessionID,
+        item: { type: "user", payload: { text: "delete me" }, delivery: "steer" },
+      })
+      if (!admitted) return yield* Effect.die("Prompt admission failed")
+      yield* bus.publish(SessionEvent.InboxDelivered, { sessionID, inboxID: id })
+      expect(
+        yield* db.select().from(SessionMessageTable).where(eq(SessionMessageTable.id, id)).get().pipe(Effect.orDie),
+      ).toMatchObject({ session_id: sessionID, type: "user" })
+
+      yield* bus.publish(SessionEvent.MessageRemoved, { sessionID, messageID: id })
+      // Replayed removals stay idempotent: the delete is a no-op when the row is gone.
+      yield* bus.publish(SessionEvent.MessageRemoved, { sessionID, messageID: id })
+      expect(
+        yield* db.select().from(SessionMessageTable).where(eq(SessionMessageTable.id, id)).get().pipe(Effect.orDie),
+      ).toBeUndefined()
+    }),
+  )
+
   it.effect("projects durable context messages supported by the updater", () =>
     Effect.gen(function* () {
       const db = yield* seedSession({ agent: "plan", model: previousModel })
@@ -748,3 +774,34 @@ describe("SessionProjector", () => {
     }),
   )
 })
+
+  it.effect("carries the compaction history path through the projected message", () =>
+    Effect.gen(function* () {
+      yield* seedSession()
+      const store = yield* SessionStore.Service
+      const bus = yield* Bus.Service
+      const historyPath = "/workspace/.opencode/tool-output/tool_history_msg_path.md"
+
+      yield* bus.publish(SessionEvent.Compaction.Started, {
+        sessionID,
+        reason: "auto",
+        recent: "recent context",
+      })
+      yield* bus.publish(SessionEvent.Compaction.Ended, {
+        sessionID,
+        reason: "auto",
+        text: "summary",
+        recent: "recent context",
+        historyPath,
+      })
+
+      const messages = yield* store.messages({ sessionID })
+      expect(messages.find((message) => message.type === "compaction")).toMatchObject({
+        type: "compaction",
+        status: "completed",
+        summary: "summary",
+        historyPath,
+      })
+    }),
+  )
+
