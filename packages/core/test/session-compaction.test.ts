@@ -87,6 +87,7 @@ const workspaceMock = Layer.mock(Workspace.Service)({
     return Effect.void
   },
   sample: () => Effect.succeed(undefined),
+  isKeepAlive: () => false,
 })
 
 const it = testEffect(
@@ -782,7 +783,10 @@ it.effect("compaction writes the full history file and carries its path", () =>
     expect(body).not.toContain("[truncated]")
     expect(body).toContain("## msg_user_detail | user | ")
 
-    const message = (yield* store.context(sessionID)).find((entry) => entry.type === "compaction")
+    const message = (yield* store.context(sessionID)).find(
+      (entry): entry is SessionMessage.CompactionCompleted =>
+        entry.type === "compaction" && entry.status === "completed",
+    )
     expect(message?.historyPath).toBe(write.path)
     // The file name is derived from the projected compaction message id.
     expect(write.path.endsWith(`tool_history_${message?.id}.md`)).toBe(true)
@@ -828,7 +832,10 @@ it.effect("compaction completes without a history path when the write fails", ()
 
     expect(result).toEqual({ status: "completed" })
     expect(writes).toHaveLength(0)
-    const message = (yield* store.context(sessionID)).find((entry) => entry.type === "compaction")
+    const message = (yield* store.context(sessionID)).find(
+      (entry): entry is SessionMessage.CompactionCompleted =>
+        entry.type === "compaction" && entry.status === "completed",
+    )
     expect(message?.summary).toBe("## Objective\n- manual summary")
     expect(message?.historyPath).toBeUndefined()
     failWrite = false
