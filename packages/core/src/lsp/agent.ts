@@ -1,7 +1,7 @@
 export * as LspAgent from "./agent.js"
 
 import { ChildProcess } from "effect/unstable/process"
-import { Context, Duration, Effect, Layer, Schema, Scope } from "effect"
+import { Context, Duration, Effect, Layer, Schedule, Schema, Scope } from "effect"
 import { HttpClient, HttpClientRequest, HttpClientResponse } from "effect/unstable/http"
 import { Environment } from "../environment/index.js"
 import { makeLocationNode } from "@opencode/util/effect/app-node"
@@ -23,6 +23,7 @@ const StatusResponseSchema = Schema.Struct({
 export interface Interface {
   readonly touch: (sandboxPath: string) => Effect.Effect<{ version: number }>
   readonly diagnostics: (sandboxPath: string) => Effect.Effect<{ diagnostics: Record<string, unknown[]> }>
+  readonly shutdown: () => Effect.Effect<void>
   readonly hover: (sandboxPath: string, line: number, character: number) => Effect.Effect<unknown>
   readonly definition: (sandboxPath: string, line: number, character: number) => Effect.Effect<unknown>
   readonly references: (sandboxPath: string, line: number, character: number) => Effect.Effect<unknown>
@@ -116,6 +117,16 @@ const layer = Layer.effect(
       })
 
     return Service.of({
+      shutdown: () =>
+        Effect.gen(function* () {
+          const base = yield* baseUrl().pipe(Effect.orElseSucceed(() => ""))
+          if (!base) return
+          yield* doRequest(http, `${base}/lsp/shutdown`, {}).pipe(
+            Effect.timeout(HTTP_TIMEOUT),
+            Effect.catch(() => Effect.void),
+          )
+          state = undefined
+        }),
       touch: (sandboxPath) =>
         post("/lsp/touch", { path: sandboxPath }).pipe(
           Effect.map((res) => ({ version: (res as any).version ?? 0 })),
