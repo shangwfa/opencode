@@ -52,6 +52,8 @@ export const authorizationLayer = Layer.effect(
         // credential checks here; the connect handler consumes and validates the ticket.
         const url = new URL(request.url, "http://localhost")
         if (hasPtyConnectTicketURL(url) || hasPersistentPtyConnectTicketURL(url)) return yield* effect
+        // v1 parity: health endpoint is public.
+        if (url.pathname === "/global/health") return yield* effect
         if (yield* authorizedRequest(request, config)) return yield* effect
         yield* HttpEffect.appendPreResponseHandler((_request, response) =>
           Effect.succeed(HttpServerResponse.setHeader(response, "www-authenticate", WWW_AUTHENTICATE)),
