@@ -30,6 +30,7 @@ export const ExecLogTable = sqliteTable(
       .$type<
         | "bash"
         | "tool"
+        | "exec-async"
         | "file-read"
         | "file-write"
         | "file-create"

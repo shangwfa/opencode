@@ -214,6 +214,7 @@ const layer = (options: Options) =>
             Effect.provideService(Scope.Scope, scope),
             Effect.onError((cause) => Scope.close(scope, Exit.failCause(cause))),
           )
+        yield* recordSandboxEvent("restore")
         const now = yield* Clock.currentTimeMillis
         const connection: Connection = {
           driver,
