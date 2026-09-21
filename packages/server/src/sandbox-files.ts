@@ -40,6 +40,7 @@ export const handler = (services: SandboxFilesServices) => {
 
   const filesFor = Effect.fn("server.sandbox-files.for")(function* (sessionID: string) {
     const info = yield* sessions.get(Session.ID.make(sessionID))
+    if (info === undefined) return yield* Effect.fail({ status: 404, body: { error: "session not found" } })
     const workspaceID = info.location.workspaceID
     if (workspaceID === undefined) return yield* Effect.fail({ status: 404, body: { error: "session not found" } })
     const connection = yield* workspace.connect(workspaceID).pipe(

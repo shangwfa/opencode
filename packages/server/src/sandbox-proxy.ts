@@ -93,8 +93,9 @@ export const handler = (services: { readonly sessions: Session.Interface; readon
 
   const context = Effect.fn("server.sandbox-proxy.context")(function* (sessionID: string) {
     const info = yield* sessions.get(Session.ID.make(sessionID))
+    if (info === undefined) return yield* Effect.fail({ status: 404, body: { error: "session not found" } })
     const workspaceID = info.location.workspaceID
-    if (workspaceID === undefined) return yield* Effect.fail({ status: 502, body: { error: "sandbox unreachable" } })
+    if (workspaceID === undefined) return yield* Effect.fail({ status: 404, body: { error: "session not found" } })
     const row = yield* workspace.rawBinding(workspaceID)
     if (row === null) return yield* Effect.fail({ status: 502, body: { error: "sandbox unreachable" } })
     const sandboxId = row.sandboxId
