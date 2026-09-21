@@ -1,5 +1,4 @@
 import { describe, expect, test } from "bun:test"
-import { $ as sqliteExec, Database } from "bun:sqlite"
 import { Effect, Layer } from "effect"
 import { SqliteClient } from "@effect/sql-sqlite-bun"
 import { EffectDrizzleSqlite } from "../../src/database/drizzle.js"
