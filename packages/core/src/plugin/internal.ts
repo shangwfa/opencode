@@ -155,7 +155,6 @@ const services = [
   SessionGoalStore.Service,
   SessionTodoStore.Service,
   SessionMcpStore.Service,
-  SessionPluginStore.Service,
   SessionCompaction.Service,
   SessionInstructions.Service,
   Shell.Service,
