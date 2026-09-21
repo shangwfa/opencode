@@ -1,5 +1,6 @@
 import { Effect, Layer, Scope } from "effect"
 import { OtlpLogger } from "effect/unstable/observability"
+import { trace } from "@opentelemetry/api"
 import { runID } from "./shared.js"
 
 export interface Options {
@@ -105,5 +106,13 @@ export const tracingLayer = Effect.fnUntraced(function* (options: Options | unde
     ),
   )
 })
+
+/**
+ * Returns the OpenTelemetry trace_id of the current active span, if any.
+ * Empty when no OTLP exporter is configured or the call is outside a traced span.
+ */
+export function currentTraceId(): string | undefined {
+  return trace.getActiveSpan()?.spanContext().traceId
+}
 
 export * as Otlp from "./otlp.js"

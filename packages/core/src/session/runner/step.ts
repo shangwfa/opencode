@@ -11,6 +11,7 @@ import {
 } from "@opencode/ai"
 import type { Agent } from "@opencode/schema/agent"
 import { Cause, Data, Effect, Exit, Fiber, Option, Stream } from "effect"
+import { Metrics } from "../../observability/metrics.js"
 import { SessionError } from "@opencode/schema/session-error"
 import { Bus } from "../../bus.js"
 import { Permission } from "../../permission.js"
@@ -229,7 +230,7 @@ export const make = Effect.gen(function* () {
             ? { cost: SessionUsage.calculateCost(input.model.cost, record.finish.tokens), tokens: record.finish.tokens }
             : undefined
           if (record.failure) yield* publisher.publishStepFailure({ ...usage, snapshot, files })
-          if (record.finish && usage && !record.failure)
+          if (record.finish && usage && !record.failure) {
             yield* bus.publish(SessionEvent.Step.Ended, {
               sessionID: input.sessionID,
               assistantMessageID: yield* publisher.startAssistant(),
@@ -240,6 +241,11 @@ export const make = Effect.gen(function* () {
               snapshot,
               files,
             })
+            yield* Metrics.recordTokenUsage(
+              { input: usage.tokens.input, output: usage.tokens.output },
+              { provider: input.model.model.provider, model: input.model.model.id },
+            )
+          }
         }
 
         if (

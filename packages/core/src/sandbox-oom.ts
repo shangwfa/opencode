@@ -7,6 +7,7 @@ import { Database } from "./database/database.js"
 import { Workspace } from "./workspace.js"
 import { SessionID } from "@opencode/schema/session-id"
 import { insert as insertExecLog } from "./exec-log/index.js"
+import { recordSandboxEvent } from "./observability/metrics.js"
 import { ChildProcess } from "effect/unstable/process"
 import { Stream } from "effect"
 
@@ -116,7 +117,7 @@ const layer = Layer.effect(
       const rows = (yield* db
         .all<{ readonly id: string; readonly sandbox_id: string; readonly session_id: string }>(sql`
           select w.id, w.binding::jsonb->>'sandboxId' as sandbox_id,
-                 (select s.id from session_v2 s where s.workspace_id = w.id limit 1) as session_id
+                 (select s.id from session s where s.workspace_id = w.id limit 1) as session_id
           from workspace w
           where w.binding is not null
           order by w.last_used_at desc
@@ -173,6 +174,7 @@ const layer = Layer.effect(
             time_created: Date.now(),
             time_updated: Date.now(),
           })
+          yield* recordSandboxEvent("oom")
           yield* Effect.logWarning("sandbox OOM detected", {
             workspaceID: row.id,
             delta: verdict.delta,

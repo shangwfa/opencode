@@ -9,6 +9,7 @@ import { Bus } from "@opencode/core/bus"
 import { EventLogger } from "@opencode/core/event-logger"
 import { FileSystemSearch } from "@opencode/core/filesystem/search"
 import { Credential } from "@opencode/core/credential"
+import { Auth } from "@opencode/core/auth"
 import { Config } from "@opencode/core/config"
 import { PermissionSaved } from "@opencode/core/permission/saved"
 import { PtyTicket } from "@opencode/core/pty/ticket"
@@ -24,6 +25,7 @@ import { Instance } from "@opencode/core/instance/service"
 import { SessionTransfer } from "@opencode/core/session/transfer"
 import { ShellSelect } from "@opencode/core/shell/select"
 import { Job } from "@opencode/core/job"
+import { KV } from "@opencode/core/kv"
 import { Mcp } from "@opencode/core/mcp/index"
 import { Global } from "@opencode/util/global"
 import { InstructionDiscovery } from "@opencode/core/instruction-discovery"
@@ -36,6 +38,7 @@ import { SdkPlugins } from "@opencode/core/plugin/sdk"
 import { WellKnown } from "@opencode/core/wellknown"
 import { Workspace } from "@opencode/core/workspace"
 import { Watcher } from "@opencode/core/filesystem/watcher"
+import { Observability } from "@opencode/util/observability"
 import { HttpRouter } from "effect/unstable/http"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
 import { Context, Effect, Layer, Option } from "effect"
@@ -68,6 +71,7 @@ const workspaceReplacements = ((): LayerNode.Replacements => {
 
 const applicationServiceNodes = [
   Global.node,
+  Observability.node,
   Database.node,
   Bus.node,
   EventLogger.node,
@@ -85,6 +89,7 @@ const applicationServiceNodes = [
   PtyTicket.node,
   PersistentPty.node,
   Credential.node,
+  Auth.node,
   WellKnown.node,
   PtyEnvironment.node,
   LocationServiceMap.node,
@@ -93,6 +98,7 @@ const applicationServiceNodes = [
   SessionWatchdog.node,
   SessionExecAsync.node,
   SandboxOOM.node,
+  KV.node,
   Workspace.node,
 ] as const
 const applicationServices = LayerNode.group(applicationServiceNodes)

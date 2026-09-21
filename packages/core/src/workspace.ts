@@ -14,6 +14,7 @@ import { Database } from "./database/database.js"
 import { KeyedMutex } from "./effect/keyed-mutex.js"
 import { WorkspaceDriver } from "./workspace/driver.js"
 import { WorkspaceTable } from "./workspace/sql.js"
+import { recordSandboxEvent } from "./observability/metrics.js"
 
 export const ID = Workspace.ID
 export type ID = Workspace.ID
@@ -175,6 +176,7 @@ const layer = (options: Options) =>
                   if (row.binding) return info(row, row.binding)
                   const driver = yield* registry.get(row.provider)
                   const result = yield* driver.create({ workspaceID, resource: row.resource ?? undefined })
+                  yield* recordSandboxEvent("create")
                   yield* saveBinding(workspaceID, result.binding)
                   return info(row, result.binding)
                 }),
@@ -476,8 +478,12 @@ const layer = (options: Options) =>
           const overrides: EnvironmentDriver.Driver["overrides"] = {
             read: (path, range) =>
               Effect.scoped(Effect.flatMap(connect, (connection) => makeFiles(connection.environment).read(path, range))),
-            write: (path, bytes) =>
-              Effect.scoped(Effect.flatMap(connect, (connection) => makeFiles(connection.environment).write(path, bytes))),
+            write: (path, bytes, mode) =>
+              Effect.scoped(
+                Effect.flatMap(connect, (connection) =>
+                  makeFiles(connection.environment).write(path, bytes, mode),
+                ),
+              ),
             stat: (path) =>
               Effect.scoped(Effect.flatMap(connect, (connection) => makeFiles(connection.environment).stat(path))),
             list: (path) =>
@@ -486,10 +492,19 @@ const layer = (options: Options) =>
               Effect.scoped(Effect.flatMap(connect, (connection) => makeFiles(connection.environment).remove(path))),
             move: (from, to) =>
               Effect.scoped(Effect.flatMap(connect, (connection) => makeFiles(connection.environment).move(from, to))),
-            mkdir: (path) =>
-              Effect.scoped(Effect.flatMap(connect, (connection) => makeFiles(connection.environment).mkdir(path))),
+            mkdir: (path, mode) =>
+              Effect.scoped(Effect.flatMap(connect, (connection) => makeFiles(connection.environment).mkdir(path, mode))),
           }
-          return { spawner, overrides }
+          // Endpoint lookups are provider-owned and absent for local drivers.
+          const endpoint: EnvironmentDriver.Driver["endpoint"] = (port) =>
+            Effect.scoped(
+              Effect.flatMap(connect, (connection) =>
+                connection.environment.endpoint === undefined
+                  ? Effect.fail(new Error("workspace driver has no endpoint provider"))
+                  : connection.environment.endpoint(port),
+              ),
+            )
+          return { spawner, overrides, endpoint }
         }),
         destroy: Effect.fn("Workspace.destroy")(function* (workspaceID) {
           // Settling the shared attempt cancels its racing provision body and fails
@@ -519,6 +534,7 @@ const layer = (options: Options) =>
                   row.binding ? Effect.fail(error) : Effect.void,
                 ),
               )
+              yield* recordSandboxEvent("kill")
               yield* db.delete(WorkspaceTable).where(eq(WorkspaceTable.id, workspaceID)).run().pipe(Effect.orDie)
               return { destroyed: true }
             }),

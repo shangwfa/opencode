@@ -2,6 +2,7 @@ export * as ServerProcess from "./process"
 
 import { NodeHttpServer } from "@effect/platform-node"
 import { Bus } from "@opencode/core/bus"
+import { Metrics } from "@opencode/core/observability/metrics"
 import { Session as SessionCore } from "@opencode/core/session"
 import { Workspace as WorkspaceCore } from "@opencode/core/workspace"
 import { SessionRestart } from "@opencode/core/session/execution/restart"
@@ -9,7 +10,7 @@ import { InstallationEvent } from "@opencode/schema/installation-event"
 import { hasPtyConnectTicketURL } from "@opencode/protocol/groups/pty"
 import { hasPersistentPtyConnectTicketURL } from "@opencode/protocol/groups/persistent-pty"
 import { Global } from "@opencode/util/global"
-import { Cause, Context, Effect, Exit, Latch, Layer, Option, Ref, Scope } from "effect"
+import { Cause, Clock, Context, Effect, Exit, Latch, Layer, Metric, Option, Ref, Scope } from "effect"
 import {
   HttpMiddleware,
   HttpPlatform,
@@ -26,6 +27,7 @@ import { withoutParentSpan } from "./request-tracing"
 import { Database } from "@opencode/core/database/database"
 import { createRoutes } from "./routes"
 import { SandboxFiles } from "./sandbox-files"
+import { SandboxAttachments } from "./sandbox-attachments"
 import { SandboxProxy } from "./sandbox-proxy"
 import { ServerInfo } from "./server-info"
 import { Status } from "./service-status"
@@ -54,6 +56,25 @@ const errorResponseLogger = HttpMiddleware.make((app) =>
   ),
 )
 
+// Records http.server.request.duration per OpenTelemetry semantic conventions.
+// Safe when OTLP is not configured: Metric values sit in-process and are never flushed.
+const httpMetrics = HttpMiddleware.make((app) =>
+  Effect.gen(function* () {
+    const start = yield* Clock.currentTimeMillis
+    const request = yield* HttpServerRequest.HttpServerRequest
+    const response = yield* app
+    const end = yield* Clock.currentTimeMillis
+    const duration = (end - start) / 1000
+    const attrs: Record<string, string> = {
+      "http.request.method": request.method,
+      "http.response.status_code": String(response.status),
+    }
+    if (response.status >= 500) attrs["error.type"] = "Error"
+    yield* Metric.update(Metric.withAttributes(Metrics.httpRequestDuration, attrs), duration)
+    return response
+  }),
+)
+
 export const start = Effect.fn("ServerProcess.start")(function* <E, R>(
   options: ServerOptions,
   lifecycle?: Lifecycle<E, R>,
@@ -78,6 +99,7 @@ export const start = Effect.fn("ServerProcess.start")(function* <E, R>(
     .serve(
       dispatch(password, status, application, options.app?.version ?? "unknown", urls, Global.Path.tmp).pipe(
         HttpMiddleware.cors({ allowedOrigins: (origin) => isAllowedCorsOrigin(origin, options), maxAge: 86_400 }),
+        httpMetrics,
       ),
       errorResponseLogger,
     )
@@ -132,12 +154,16 @@ export const start = Effect.fn("ServerProcess.start")(function* <E, R>(
       database: Context.get(context, Database.Service),
       workspace: Context.get(context, WorkspaceCore.Service),
     })
+    const sandboxAttachmentsFallback = SandboxAttachments.handler({
+      sessions: Context.get(context, SessionCore.Service),
+      workspace: Context.get(context, WorkspaceCore.Service),
+    })
     yield* Ref.set(
       application,
       Option.some(
         transform
-          ? transform(sandboxFilesFallback(sandboxProxyFallback(app)))
-          : sandboxFilesFallback(sandboxProxyFallback(app)),
+          ? transform(sandboxAttachmentsFallback(sandboxFilesFallback(sandboxProxyFallback(app))))
+          : sandboxAttachmentsFallback(sandboxFilesFallback(sandboxProxyFallback(app))),
       ),
     )
     yield* status.ready
