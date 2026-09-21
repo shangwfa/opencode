@@ -5,10 +5,15 @@ const migration: DatabaseMigration.Migration = {
   id: "20260602002951_lowly_union_jack",
   up(tx) {
     return Effect.gen(function* () {
+      // Replace the v1 project-level permission table with the v2 saved-rule
+      // table (different schema: id PK + action/resource columns vs the v1
+      // project_id PK + data JSONB layout).
+      yield* tx.run(`DROP TABLE IF EXISTS \`permission\`;`)
       yield* tx.run(`
         CREATE TABLE \`permission\` (
           \`id\` text PRIMARY KEY,
           \`project_id\` text NOT NULL,
+          \`user_id\` text NOT NULL DEFAULT '',
           \`action\` text NOT NULL,
           \`resource\` text NOT NULL,
           \`time_created\` integer NOT NULL,
@@ -17,7 +22,7 @@ const migration: DatabaseMigration.Migration = {
         );
       `)
       yield* tx.run(
-        `CREATE UNIQUE INDEX \`permission_project_action_resource_idx\` ON \`permission\` (\`project_id\`,\`action\`,\`resource\`);`,
+        `CREATE UNIQUE INDEX \`permission_project_user_action_resource_idx\` ON \`permission\` (\`project_id\`,\`user_id\`,\`action\`,\`resource\`);`,
       )
     })
   },
