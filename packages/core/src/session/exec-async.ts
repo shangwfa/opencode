@@ -160,7 +160,7 @@ const layer = Layer.effect(
           command: input.command,
           working_directory: input.workingDirectory,
           status: "running",
-          source: "bash",
+          source: "exec-async",
           time_started: entry.startedAt,
           time_created: entry.startedAt,
           time_updated: entry.startedAt,
