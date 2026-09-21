@@ -1,7 +1,7 @@
 export * as SandboxFiles from "./sandbox-files.js"
 
-import { Effect, Scope, Stream } from "effect"
-import { HttpServerError, HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
+import { Effect, Option, Scope, Stream } from "effect"
+import { HttpBody, HttpServerError, HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
 import { ChildProcess } from "effect/unstable/process"
 import path from "node:path"
 import { Session } from "@opencode/core/session"
@@ -14,6 +14,9 @@ import { FSUtil } from "@opencode/util/fs-util"
 
 // v1 sandbox-proxy parity: 512 MiB upload limit.
 const MAX_UPLOAD_BYTES = 512 * 1024 * 1024
+// Files.read caps single-collect output at 64 MiB per the Files contract;
+// use range reads streamed via HttpBody.Stream for larger files.
+const MAX_SINGLE_READ = 64 * 1024 * 1024
 
 /**
  * Session-scoped file management endpoints (v1 sandbox-proxy parity):
@@ -170,6 +173,34 @@ export const handler = (services: SandboxFilesServices) => {
           if (packed === undefined) return fail(502, "failed to archive directory")
           yield* audit(sessionID, "file-download", { path: absolute, type: "directory", size: packed.bytes.byteLength })
           return raw(packed.bytes, "application/zip", `${path.basename(absolute)}.zip`)
+        }
+        // For files larger than the single-collect limit (64 MiB), stream via
+        // range reads so the response body is never fully buffered in server
+        // memory (v1 sandbox-proxy streaming parity).
+        if (stat.size > MAX_SINGLE_READ) {
+          const offsets: number[] = []
+          for (let o = 0; o < stat.size; o += MAX_SINGLE_READ) offsets.push(o)
+          const byteStream = Stream.fromIterable(offsets).pipe(
+            Stream.mapEffect((offset) =>
+              files.read(absolute, {
+                offset,
+                length: Math.min(MAX_SINGLE_READ, stat.size - offset),
+              }).pipe(
+                Effect.map((r) => r.bytes),
+                Effect.orElseSucceed(() => new Uint8Array(0)),
+              ),
+            ),
+          )
+          const mime = FSUtil.mimeType(absolute)
+          const name = path.basename(absolute)
+          yield* audit(sessionID, "file-download", { path: absolute, type: "file", size: stat.size })
+          return HttpServerResponse.stream(byteStream, {
+            contentType: mime,
+            headers: {
+              "content-disposition": `attachment; filename="download"; filename*=UTF-8''${encodeURIComponent(name)}`,
+              "content-length": String(stat.size),
+            },
+          })
         }
         const read = yield* files.read(absolute).pipe(Effect.orElseSucceed(() => undefined))
         if (read === undefined) return fail(404, "file not found")
