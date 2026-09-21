@@ -313,8 +313,8 @@ const layer = Layer.effect(
     }).pipe(Effect.uninterruptible)
     yield* Effect.addFinalizer(() => close)
 
-    const savedRules = Effect.fnUntraced(function* () {
-      return (yield* saved.list({ projectID: location.project.id })).map(
+    const savedRules = Effect.fnUntraced(function* (userID?: string) {
+      return (yield* saved.list({ projectID: location.project.id, userID })).map(
         (item): Permission.Rule => ({
           action: item.action,
           resource: item.resource,
@@ -326,7 +326,10 @@ const layer = Layer.effect(
     const configured = Effect.fnUntraced(function* (sessionID: SessionSchema.ID, agentID?: Agent.ID) {
       const session = yield* sessions.get(sessionID)
       if (!session) return yield* new SessionErrors.NotFoundError({ sessionID })
-      const agent = yield* agents.resolve(agentID ?? session.agent)
+      // Resolve session-scoped agents too, so a dynamic agent's permission rules
+      // apply to its own session's tool calls.
+      const id = agentID ?? session.agent
+      const agent = id ? yield* agents.sessionGet(id, sessionID) : yield* agents.resolve()
       return merge(agent?.permissions ?? missingAgentPermissions, session.permissions ?? [])
     })
 
@@ -338,10 +341,14 @@ const layer = Layer.effect(
       return rules.filter((rule) => Wildcard.match(input.action, rule.action))
     }
 
-    const evaluateInput = Effect.fnUntraced(function* (input: AssertInput) {
+    const evaluateInput = Effect.fnUntraced(function* (input: AssertInput, userID?: string) {
+      // SaaS: the sandbox is the isolation boundary, so workspace-external paths
+      // are always permitted regardless of any configured external_directory
+      // rule (allow/ask/deny are all ignored here).
+      if (input.action === "external_directory") return { effect: "allow" as const, rules: [] as Permission.Ruleset }
       const rules = yield* configured(input.sessionID, input.agent)
       if (denied(input, rules)) return { effect: "deny" as const, rules }
-      const all = [...rules, ...(yield* savedRules())]
+      const all = [...rules, ...(yield* savedRules(userID))]
       const effects = input.resources.map((resource) => evaluate(input.action, resource, all).effect)
       const effect: Permission.Effect = effects.includes("ask") ? "ask" : "allow"
       const event = yield* hooks.trigger("permission", "evaluate", {
@@ -407,13 +414,14 @@ const layer = Layer.effect(
 
     const ask = Effect.fn("Permission.ask")(function* (input: AssertInput) {
       if (closed) return { id: input.id ?? ID.create(), effect: "deny" as const }
-      const result = yield* evaluateInput(input)
+      // Resolve userID before evaluateInput so savedRules can scope always-allow
+      // rules to the requesting user (v1's per-user approval model).
+      const messages = yield* sessions.context(input.sessionID).pipe(Effect.orElseSucceed(() => []))
+      const userID = Hitl.userIDFromMessages(messages)
+      const result = yield* evaluateInput(input, userID)
       const value = request(input, result.message)
       if (result.effect === "ask") {
-        // Identity travels on the requesting user message metadata (v1 parity),
-        // so a bare HTTP reply can be scoped to the asking user.
-        const messages = yield* sessions.context(input.sessionID).pipe(Effect.orElseSucceed(() => []))
-        yield* create(value, input.agent, Hitl.userIDFromMessages(messages))
+        yield* create(value, input.agent, userID)
       }
       return { id: value.id, effect: result.effect }
     })
@@ -421,7 +429,11 @@ const layer = Layer.effect(
     const assert = Effect.fn("Permission.assert")((input: AssertInput) =>
       Effect.gen(function* () {
         if (closed) return yield* Effect.die(new DeclinedError())
-        const result = yield* evaluateInput(input)
+        // Resolve userID before evaluateInput so savedRules can scope always-allow
+        // rules to the requesting user (v1's per-user approval model).
+        const messages = yield* sessions.context(input.sessionID).pipe(Effect.orElseSucceed(() => []))
+        const userID = Hitl.userIDFromMessages(messages)
+        const result = yield* evaluateInput(input, userID)
         return yield* Effect.uninterruptibleMask((restore) =>
           Effect.gen(function* () {
             if (result.effect === "deny") {
@@ -447,8 +459,7 @@ const layer = Layer.effect(
               })
             }
             if (result.effect === "allow") return
-            const messages = yield* sessions.context(input.sessionID).pipe(Effect.orElseSucceed(() => []))
-            const item = yield* create(request(input, result.message), input.agent, Hitl.userIDFromMessages(messages))
+            const item = yield* create(request(input, result.message), input.agent, userID)
             return yield* restore(Deferred.await(item.deferred)).pipe(
               // Deliberate defect tunnel: leaves wrap execution in blanket `mapError`, which
               // must not convert a user's decline into model-facing tool output. The decline
@@ -540,6 +551,7 @@ const layer = Layer.effect(
           if (input.reply === "always" && existing.request.save?.length) {
             yield* saved.add({
               projectID: location.project.id,
+              userID: existing.userID,
               action: existing.request.action,
               resources: existing.request.save,
             })
@@ -549,7 +561,13 @@ const layer = Layer.effect(
           if (input.reply !== "always" || !existing.request.save?.length) return
 
           for (const [id, item] of pending) {
-            const result = yield* evaluateInput({ ...item.request, agent: item.agent }).pipe(
+            // Cascade only within the same session (v1 parity): the user's
+            // decision applies to this session's asks, not all sessions.
+            if (item.request.sessionID !== existing.request.sessionID) continue
+            const result = yield* evaluateInput(
+              { ...item.request, agent: item.agent },
+              item.userID,
+            ).pipe(
               Effect.catchTag("Session.NotFoundError", () => Effect.undefined),
             )
             if (result?.effect !== "allow") continue

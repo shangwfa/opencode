@@ -1,6 +1,6 @@
 export * as PermissionSaved from "./saved.js"
 
-import { eq } from "drizzle-orm"
+import { and, eq } from "drizzle-orm"
 import { Context, DateTime, Effect, Layer, Schema } from "effect"
 import { Project } from "@opencode/schema/project"
 import { Database } from "../database/database.js"
@@ -16,11 +16,13 @@ export type Info = typeof Info.Type
 
 export const ListInput = Schema.Struct({
   projectID: Project.ID.pipe(Schema.optional),
+  userID: Schema.optional(Schema.String),
 }).annotate({ identifier: "PermissionSaved.ListInput" })
 export type ListInput = typeof ListInput.Type
 
 export const AddInput = Schema.Struct({
   projectID: Project.ID,
+  userID: Schema.optional(Schema.String),
   action: Schema.String,
   resources: Schema.Array(Schema.String),
 }).annotate({ identifier: "PermissionSaved.AddInput" })
@@ -43,7 +45,12 @@ const layer = Layer.effect(
       const rows = yield* db
         .select()
         .from(PermissionTable)
-        .where(input?.projectID ? eq(PermissionTable.project_id, input.projectID) : undefined)
+        .where(
+          and(
+            input?.projectID ? eq(PermissionTable.project_id, input.projectID) : undefined,
+            input?.userID === undefined ? undefined : eq(PermissionTable.user_id, input.userID),
+          ),
+        )
         .all()
         .pipe(Effect.orDie)
       return rows.map(
@@ -68,6 +75,7 @@ const layer = Layer.effect(
           input.resources.map((resource) => ({
             id: ID.create(),
             project_id: input.projectID,
+            user_id: input.userID ?? "",
             action: input.action,
             resource,
           })),

@@ -12,9 +12,17 @@ export const PermissionTable = sqliteTable(
       .$type<Project.ID>()
       .notNull()
       .references(() => ProjectTable.id, { onDelete: "cascade" }),
+    user_id: text().notNull().default(""),
     action: text().notNull(),
     resource: text().notNull(),
     ...Timestamps,
   },
-  (table) => [uniqueIndex("permission_project_action_resource_idx").on(table.project_id, table.action, table.resource)],
+  (table) => [
+    uniqueIndex("permission_project_user_action_resource_idx").on(
+      table.project_id,
+      table.user_id,
+      table.action,
+      table.resource,
+    ),
+  ],
 )
