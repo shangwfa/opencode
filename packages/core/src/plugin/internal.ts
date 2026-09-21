@@ -12,6 +12,7 @@ import { Provider } from "../provider.js"
 import { Command } from "../command.js"
 import { Config } from "../config.js"
 import { Credential } from "../credential.js"
+import { Auth } from "../auth.js"
 import { ConfigAgentPlugin } from "../config/plugin/agent.js"
 import { ConfigCommandPlugin } from "../config/plugin/command.js"
 import { ConfigCompactionPlugin } from "../config/plugin/compaction.js"
@@ -35,6 +36,7 @@ import { WorktreeStrategies } from "../worktree/strategies.js"
 import { Bus } from "../bus.js"
 import { Environment } from "../environment/index.js"
 import { CodeModeSandbox } from "../codemode/sandbox.js"
+import { LspAgent } from "../lsp/agent.js"
 import { FileAccess } from "../file-access.js"
 import { FileMutation } from "../file-mutation.js"
 import { Formatter } from "../formatter.js"
@@ -42,6 +44,7 @@ import { Form } from "../form.js"
 import { FileSystem } from "../filesystem.js"
 import { LocationWatcherPolicy } from "../filesystem/location-watcher-policy.js"
 import { FSUtil } from "@opencode/util/fs-util"
+import { DiscoveryFS } from "../filesystem/discovery.js"
 import { Global } from "@opencode/util/global"
 import { Image } from "../image.js"
 import { InstructionDiscovery } from "../instruction-discovery.js"
@@ -57,6 +60,13 @@ import { Reference } from "../reference.js"
 import { WebSearch } from "../websearch.js"
 import { Ripgrep } from "../ripgrep.js"
 import { Session } from "../session.js"
+import { SessionCommandStore } from "../session/command-store.js"
+import { SessionSkillStore } from "../session/skill-store.js"
+import { SessionToolStore } from "../session/tool-store.js"
+import { SessionGoalStore } from "../session/goal-store.js"
+import { SessionTodoStore } from "../session/todo-store.js"
+import { SessionMcpStore } from "../session/mcp-store.js"
+import { SessionPluginStore } from "../session/plugin-store.js"
 import { SessionCompaction } from "../session/compaction.js"
 import { SessionInstructions } from "../session/instructions.js"
 import { Shell } from "../shell.js"
@@ -69,6 +79,7 @@ import { PatchTool } from "../tool/plugin/patch.js"
 import { EditTool } from "../tool/plugin/edit.js"
 import { GlobTool } from "../tool/plugin/glob.js"
 import { GrepTool } from "../tool/plugin/grep.js"
+import { LspTool } from "../tool/plugin/lsp.js"
 import { OpenCodeTools } from "../tool/plugin/opencode.js"
 import { QuestionTool } from "../tool/plugin/question.js"
 import { ReadToolFileSystem } from "../tool/read-filesystem.js"
@@ -86,6 +97,10 @@ import { AgentPlugin } from "./agent.js"
 import BrowserPlugin from "@opencode/plugin-browser"
 import { CommandPlugin } from "./command.js"
 import { IdentityPlugin } from "./identity.js"
+import { CcrPlugin } from "./ccr.js"
+import { SandboxSessionPlugins } from "./sandbox-session.js"
+import { AttachmentsPlugin } from "./attachments.js"
+import { SandboxPlugins } from "./sandbox.js"
 import { PlanPlugin } from "./plan.js"
 import { ModelsDevPlugin } from "./models-dev.js"
 import { McpCodeModeExclusionPlugin } from "./mcp-codemode-exclusion.js"
@@ -106,12 +121,14 @@ const services = [
   Command.Service,
   Config.Service,
   Credential.Service,
+  Auth.Service,
   Bus.Service,
   Environment.Service,
   FileAccess.Service,
   FileMutation.Service,
   Formatter.Service,
   LocationWatcherPolicy.Service,
+  DiscoveryFS.Service,
   FileSystem.Service,
   FSUtil.Service,
   Global.Service,
@@ -132,10 +149,18 @@ const services = [
   WebSearch.Service,
   Ripgrep.Service,
   Session.Service,
+  SessionCommandStore.Service,
+  SessionSkillStore.Service,
+  SessionToolStore.Service,
+  SessionGoalStore.Service,
+  SessionTodoStore.Service,
+  SessionMcpStore.Service,
+  SessionPluginStore.Service,
   SessionCompaction.Service,
   SessionInstructions.Service,
   Shell.Service,
   ShellSelect.Service,
+  SandboxPlugins.Service,
   Snapshot.Service,
   Skill.Service,
   SkillDiscovery.Service,
@@ -157,9 +182,11 @@ export const requirements = LayerNode.group([
   Command.node,
   Config.node,
   Credential.node,
+  Auth.node,
   Bus.node,
   Environment.node,
   CodeModeSandbox.node,
+  LspAgent.node,
   FileAccess.node,
   FileMutation.node,
   Formatter.node,
@@ -179,15 +206,24 @@ export const requirements = LayerNode.group([
   Npm.node,
   Permission.node,
   Form.node,
+  DiscoveryFS.node,
   ReadToolFileSystem.node,
   Reference.node,
   WebSearch.node,
   Ripgrep.node,
   Session.node,
+  SessionCommandStore.node,
+  SessionSkillStore.node,
+  SessionToolStore.node,
+  SessionGoalStore.node,
+  SessionTodoStore.node,
+  SessionMcpStore.node,
+  SessionPluginStore.node,
   SessionCompaction.node,
   SessionInstructions.node,
   Shell.node,
   ShellSelect.node,
+  SandboxPlugins.node,
   Snapshot.node,
   Skill.node,
   SkillDiscovery.node,
@@ -220,9 +256,11 @@ const pre = [
   // Render model prompts after the patch plugin selects the available editing tools.
   ...OptimizePlugin.Plugins,
   IdentityPlugin.Plugin,
+  CcrPlugin.Plugin,
   EditTool.Plugin,
   GlobTool.Plugin,
   GrepTool.Plugin,
+  LspTool.Plugin,
   OpenCodeTools.Plugin,
   QuestionTool.Plugin,
   ReadTool.Plugin,
@@ -252,6 +290,8 @@ const post = [
   ConfigProviderPlugin.Plugin,
   ConfigWebSearchPlugin.Plugin,
   ConfigPolicyPlugin.Plugin,
+  SandboxSessionPlugins.Plugin,
+  AttachmentsPlugin.Plugin,
 ] as const satisfies readonly InternalPlugin[]
 
 export const list = Effect.fn("PluginInternal.list")(function* () {
