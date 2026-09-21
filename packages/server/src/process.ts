@@ -245,6 +245,8 @@ function dispatch(
       if (!(yield* authorizedRequest(request, auth))) return unauthorized()
       return yield* infoResponse(status, version, urls, tmp)
     }
+    // v1 parity: health endpoint is public regardless of ready state.
+    if (request.method === "GET" && url.pathname === "/global/health") return yield* app.value
     if (
       (!ready || (!hasPtyConnectTicketURL(url) && !hasPersistentPtyConnectTicketURL(url))) &&
       !(yield* authorizedRequest(request, auth))
