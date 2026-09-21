@@ -2,6 +2,7 @@ export * as SandboxProxy from "./sandbox-proxy.js"
 
 import { Effect, Exit, Scope } from "effect"
 import { HttpServerError, HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
+import { Socket } from "effect/unstable/socket"
 import { Session } from "@opencode/core/session"
 import { Workspace } from "@opencode/core/workspace"
 import { SandboxOpenSandbox } from "@opencode/sandbox/opensandbox"
@@ -111,9 +112,38 @@ export const handler = (services: { readonly sessions: Session.Interface; readon
       Effect.catchCause(() => Effect.succeed(HttpServerResponse.jsonUnsafe({ error: "sandbox proxy failed" }, { status: 502 }))),
     )
 
+  const wsHandler = Effect.fn("server.sandbox-proxy.ws")(function* (
+    sessionID: string,
+    port: number,
+    subPath: string,
+  ) {
+    if (port < 1 || port > 65535) {
+      return HttpServerResponse.jsonUnsafe({ error: "invalid port" }, { status: 400 })
+    }
+    const ctx = yield* context(sessionID)
+    const endpoint = yield* SandboxOpenSandbox.resolveEndpoint(ctx.sandboxId, port).pipe(
+      Effect.mapError(() => ({ status: 502, body: { error: "sandbox unreachable" } })),
+    )
+    yield* Effect.scoped(
+      Effect.gen(function* () {
+        const request = yield* HttpServerRequest.HttpServerRequest
+        const client = yield* request.upgrade
+        const sandbox = yield* Socket.makeWebSocket(`ws://${endpoint}${subPath}`, {
+          closeCodeIsError: (code) => code !== 1000,
+        }).pipe(Effect.provide(Socket.layerWebSocketConstructorGlobal))
+        // Bidirectional bridge: messages from either side forward to the other.
+        yield* Effect.forkScoped(
+          sandbox.run((data) => Effect.flatMap(client.writer, (write) => write(data))).pipe(Effect.ignore),
+        )
+        yield* client.run((data) => Effect.flatMap(sandbox.writer, (write) => write(data))).pipe(Effect.ignore)
+      }),
+    )
+    return HttpServerResponse.empty()
+  })
+
   const pipeline = (api: App) =>
     api.pipe(
-      Effect.catchIf(isRouteNotFound, () =>
+      Effect.catchIf(isRouteNotFound, (error) =>
         HttpServerRequest.HttpServerRequest.pipe(
           Effect.flatMap((request) => {
             const url = new URL(request.url, "http://localhost")
@@ -139,10 +169,17 @@ export const handler = (services: { readonly sessions: Session.Interface; readon
             if (allErrors !== null)
               return Effect.succeed(HttpServerResponse.jsonUnsafe(sessionErrors(allErrors[1])))
             const proxy = /^\/api\/session\/(ses_[A-Za-z0-9]+)\/proxy\/(\d{1,5})(\/.*)?$/.exec(url.pathname)
-            if (proxy !== null) return handle(forward(proxy[1], Number(proxy[2]), proxy[3] ?? "/", request))
+            if (proxy !== null) {
+              // v1 parity: WebSocket upgrade requests bypass the fetch-based
+              // forward and use Effect's Socket upgrade path instead.
+              if (typeof request.headers["upgrade"] === "string" && request.headers["upgrade"].toLowerCase() === "websocket") {
+                return wsHandler(proxy[1], Number(proxy[2]), proxy[3] ?? "/")
+              }
+              return handle(forward(proxy[1], Number(proxy[2]), proxy[3] ?? "/", request))
+            }
             const endpoint = /^\/api\/session\/(ses_[A-Za-z0-9]+)\/endpoint\/(\d{1,5})$/.exec(url.pathname)
             if (endpoint !== null) return handle(resolve(Number(endpoint[2]), endpoint[1]))
-            return Effect.succeed(HttpServerResponse.empty({ status: 404 }))
+            return Effect.fail(error)
           }),
         ),
       ),
