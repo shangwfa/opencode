@@ -247,8 +247,10 @@ function dispatch(
     }
     // v1 parity: health endpoint is public regardless of ready state.
     if (request.method === "GET" && url.pathname === "/global/health") {
-      if (Option.isSome(app)) return yield* app.value
-      return yield* HttpServerResponse.jsonUnsafe({ healthy: false, version })
+      return yield* HttpServerResponse.jsonUnsafe({
+        healthy: state.type === "ready" && Option.isSome(app) ? (true as const) : (false as const),
+        version,
+      })
     }
     if (
       (!ready || (!hasPtyConnectTicketURL(url) && !hasPersistentPtyConnectTicketURL(url))) &&
