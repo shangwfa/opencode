@@ -8,12 +8,13 @@ export * as WriteTool from "./write.js"
 
 import type { Context } from "@opencode/plugin/effect/plugin"
 import { ToolFailure } from "@opencode/ai"
-import { Effect, Schema } from "effect"
+import { Effect, Option, Schema } from "effect"
 import { Bom } from "@opencode/util/bom"
 import { Environment } from "../../environment/index.js"
 import { FileMutation } from "../../file-mutation.js"
 import { Formatter } from "../../formatter.js"
 import { FileAccess } from "../../file-access.js"
+import { LspAgent } from "../../lsp/agent.js"
 import { Permission } from "../../permission.js"
 import { fileDiff } from "./file-diff.js"
 
@@ -89,9 +90,21 @@ export const Plugin = {
               if (yield* formatter.file(target.absolute)) {
                 yield* FileMutation.syncTextBom(environment.files, target.absolute, bom)
               }
-              return result
+
+              // LSP diagnostics: non-blocking, best-effort
+              const agentOpt = yield* Effect.serviceOption(LspAgent.Service)
+              if (Option.isSome(agentOpt)) {
+                const sandboxPath = target.resource
+                yield* agentOpt.value.touch(sandboxPath).pipe(Effect.ignore)
+                const diag = yield* agentOpt.value.diagnostics(sandboxPath).pipe(Effect.ignore, Effect.as({}))
+                return {
+                  output: result,
+                  content: toModelContent(result),
+                  metadata: { diagnostics: diag },
+                }
+              }
+              return { output: result, content: toModelContent(result) }
             }).pipe(
-              Effect.map((output) => ({ output, content: toModelContent(output) })),
               Effect.mapError((error) => new ToolFailure({ message: `Unable to write ${input.path}`, error })),
             ),
         }),

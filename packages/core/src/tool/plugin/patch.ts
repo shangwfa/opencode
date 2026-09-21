@@ -4,13 +4,14 @@ import type { Context } from "@opencode/plugin/effect/plugin"
 import type { SessionHooks } from "@opencode/plugin/effect/session"
 import { ToolFailure } from "@opencode/ai"
 import { FileDiff } from "@opencode/schema/file-diff"
-import { Effect, Result, Schema } from "effect"
+import { Effect, Option, Result, Schema } from "effect"
 import { Bom } from "@opencode/util/bom"
 import { Environment } from "../../environment/index.js"
 import { Formatter } from "../../formatter.js"
 import { FileMutation } from "../../file-mutation.js"
 import { Location } from "../../location.js"
 import { FileAccess } from "../../file-access.js"
+import { LspAgent } from "../../lsp/agent.js"
 import { Patch } from "@opencode/util/patch"
 import { Permission } from "../../permission.js"
 import DESCRIPTION from "../patch.txt"
@@ -276,7 +277,22 @@ export const Plugin = {
                 const target = change.type === "update" && change.moveTarget ? change.moveTarget : change.target
                 return patchFile(change, formatted.get(target.absolute))
               })
-              return { applied, files }
+
+              // LSP diagnostics: non-blocking, best-effort
+              const agentOpt = yield* Effect.serviceOption(LspAgent.Service)
+              const diagnostics: Array<{ resource: string; diagnostics: unknown }> = []
+              if (Option.isSome(agentOpt)) {
+                for (const item of applied) {
+                  if (item.type === "delete") continue
+                  yield* agentOpt.value.touch(item.resource).pipe(Effect.ignore)
+                  const diag = yield* agentOpt.value.diagnostics(item.resource).pipe(
+                    Effect.catch(() => Effect.succeed({})),
+                  )
+                  diagnostics.push({ resource: item.resource, diagnostics: diag })
+                }
+              }
+
+              return { applied, files, ...(diagnostics.length > 0 ? { diagnostics } : {}) }
             }).pipe(
               fileMutation.withLock(lockTargets),
               Effect.map((output) => ({

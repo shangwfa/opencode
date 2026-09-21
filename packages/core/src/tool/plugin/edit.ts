@@ -10,12 +10,13 @@ import type { Context } from "@opencode/plugin/effect/plugin"
 import { ToolFailure } from "@opencode/ai"
 import { FileDiff } from "@opencode/schema/file-diff"
 import { Bom } from "@opencode/util/bom"
-import { Effect, Schema } from "effect"
+import { Effect, Option, Schema } from "effect"
 import { Environment } from "../../environment/index.js"
 import { FileMutation } from "../../file-mutation.js"
 import { Formatter } from "../../formatter.js"
 import { Location } from "../../location.js"
 import { FileAccess } from "../../file-access.js"
+import { LspAgent } from "../../lsp/agent.js"
 import { Permission } from "../../permission.js"
 import { fileDiff } from "./file-diff.js"
 
@@ -205,9 +206,20 @@ export const Plugin = {
               const formatted = (yield* formatter.file(target.absolute))
                 ? yield* FileMutation.syncTextBom(environment.files, target.absolute, bom)
                 : (yield* FileMutation.readText(environment.files, target.absolute)).text
+
+              // LSP diagnostics: non-blocking, best-effort
+              const agentOpt = yield* Effect.serviceOption(LspAgent.Service)
+              let diagnostics: unknown = undefined
+              if (Option.isSome(agentOpt)) {
+                const sandboxPath = target.resource
+                yield* agentOpt.value.touch(sandboxPath).pipe(Effect.ignore)
+                diagnostics = yield* agentOpt.value.diagnostics(sandboxPath).pipe(Effect.catch(() => Effect.succeed({})))
+              }
+
               return {
                 files: [fileDiff(result.resource, source, formatted)],
                 replacements,
+                ...(diagnostics ? { diagnostics } : {}),
               } satisfies Output
             }).pipe(
               fileMutation.withLock([FileAccess.resolvePath(location.directory, input.path)]),
