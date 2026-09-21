@@ -79,7 +79,10 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
     const bus = yield* Bus.Service
     const requireOwnedForm = Effect.fnUntraced(function* (sessionID: Form.Info["sessionID"], formID: Form.ID) {
       const forms = yield* Form.Service
-      const info = yield* forms.get(formID).pipe(Effect.catchTag("Form.NotFoundError", () => missingForm(formID)))
+      // getOrLoad falls back to the persisted row, so a form whose holding
+      // graph was evicted stays gettable/replyable/cancellable over HTTP
+      // instead of reading as 404 (v1 answered straight from the row).
+      const info = yield* forms.getOrLoad(formID).pipe(Effect.catchTag("Form.NotFoundError", () => missingForm(formID)))
       if (info.sessionID !== sessionID) return yield* missingForm(formID)
       return { form: forms, info }
     })
@@ -1081,12 +1084,7 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
         "session.form.reply",
         Effect.fn(function* (ctx) {
           const owned = yield* requireOwnedForm(ctx.params.sessionID, ctx.params.formID)
-          const request = yield* HttpServerRequest.HttpServerRequest
-          yield* owned.form.reply({
-            id: ctx.params.formID,
-            answer: ctx.payload.answer,
-            userID: requestUserID(request),
-          }).pipe(
+          yield* owned.form.reply({ id: ctx.params.formID, answer: ctx.payload.answer }).pipe(
             Effect.catchTags({
               "Form.AlreadySettledError": (error) =>
                 new FormAlreadySettledError({ id: error.id, message: error.message }),

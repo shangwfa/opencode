@@ -19,7 +19,7 @@ const current = Layer.succeed(
 )
 const it = testEffect(AppNodeBuilder.build(LayerNode.group([Database.node]), [Location.node.replace(current)]))
 
-// hitl_request.session_id references session_v2, and the sqlite test
+// hitl_request.session_id references session, and the sqlite test
 // database enforces foreign keys: seed the rows the asks hang off.
 const seedSessions = Effect.gen(function* () {
   const { db } = yield* Database.Service
@@ -76,6 +76,8 @@ describe("hitl persistence", () => {
       const permission = (yield* Hitl.listPending({ kind: "permission", directory: "/project" })) ?? []
       expect(permission.map((row) => row.id)).toEqual(["per_test1", "per_u2"])
 
+      // A scoped filter keeps owned rows and keeps public-bucket rows (user_id="")
+      // visible to everyone, since those belong to no user (MCP elicitations).
       const scoped = (yield* Hitl.listPending({ kind: "permission", directory: "/project", userID: "user-b" })) ?? []
       expect(scoped.map((row) => row.id)).toEqual(["per_u2"])
 

@@ -9,7 +9,6 @@ import { Session } from "@opencode/schema/session"
 import { SessionEvent } from "@opencode/schema/session-event"
 import type { SessionMessage } from "@opencode/schema/session-message"
 import { Bus } from "./bus.js"
-import { SessionStore } from "./session/store.js"
 
 const RETENTION = Duration.minutes(10)
 
@@ -78,14 +77,10 @@ export type CreateInput = Omit<Form.Info, "id"> & { readonly id?: ID }
 export interface ReplyInput {
   readonly id: ID
   readonly answer: Answer
-  /** Acting user; when present a mismatched owner reads as not-found (v1 cross-tenant guard). */
-  readonly userID?: string
 }
 
 export interface ListInput {
   readonly sessionID?: Form.Info["sessionID"]
-  /** Restricts results to a single owner; omit for internal cross-user sweeps. */
-  readonly userID?: string
 }
 
 export interface Interface {
@@ -93,6 +88,13 @@ export interface Interface {
   readonly create: (input: CreateInput) => Effect.Effect<Info, AlreadyExistsError | InvalidFormError>
   readonly ask: (input: CreateInput) => Effect.Effect<TerminalState, AlreadyExistsError | InvalidFormError>
   readonly get: (id: ID) => Effect.Effect<Info, NotFoundError>
+  /**
+   * Like `get`, but falls back to rebuilding from the persisted hitl row when
+   * the local cache misses: the ask may live in a graph this instance cannot
+   * reach (an idle eviction detached it while its run still borrows it). v1
+   * read the row directly for the same reason.
+   */
+  readonly getOrLoad: (id: ID) => Effect.Effect<Info, NotFoundError>
   readonly list: (input?: ListInput) => Effect.Effect<ReadonlyArray<Info>>
   readonly state: (id: ID) => Effect.Effect<State, NotFoundError>
   readonly reply: (input: ReplyInput) => Effect.Effect<void, AlreadySettledError | InvalidAnswerError | NotFoundError>
@@ -113,8 +115,6 @@ export class Service extends Context.Service<Service, Interface>()("@opencode/Fo
 interface Entry {
   readonly form: Info
   readonly state: State
-  /** Owning user recorded at ask time; scopes list/reply without widening the public Info shape. */
-  readonly userID: string
   /**
    * Restored by boot recovery rather than created by this instance. Recovered
    * asks are not renewed so they reach the lease sweep that ends the dangling
@@ -199,9 +199,13 @@ export const layer = Layer.effect(
         ...base,
         error: {
           type: action.status === "rejected" ? "question.rejected" : "instance-restart",
-          message: action.status === "rejected" ? "The user declined to answer." : "实例重启，问题未回答",
+          message:
+            action.status === "rejected" ? "The user declined to answer." : "The instance restarted before the question was answered.",
         },
       })
+      // Terminalize after backfilling so the row leaves the sweeps (v1's
+      // salvage closed the request once its decision was delivered).
+      if (action.status === "rejected") yield* Hitl.markSwept(action.id, "closed", "decision-delivered")
       if (action.status === "pending") yield* Hitl.markSwept(action.id, "closed", "instance-restart")
     })
 
@@ -221,7 +225,6 @@ export const layer = Layer.effect(
         yield* Cache.set(forms, form.id, {
           form,
           state: { status: "pending" },
-          userID: row.user_id,
           recovered: true,
           deferred: Deferred.makeUnsafe<TerminalState>(),
         })
@@ -242,7 +245,7 @@ export const layer = Layer.effect(
       ),
     )
 
-    const create = Effect.fn("Form.create")((input: CreateInput, userID = "") =>
+    const create = Effect.fn("Form.create")((input: CreateInput) =>
       Effect.uninterruptible(
         Effect.gen(function* () {
           const id = input.id ?? ID.create()
@@ -260,18 +263,17 @@ export const layer = Layer.effect(
           const entry: Entry = {
             form,
             state: { status: "pending" },
-            userID,
             recovered: false,
             deferred: yield* Deferred.make<TerminalState>(),
           }
           yield* Cache.set(forms, id, entry)
-          // SaaS: mirror pending asks into the hitl table so they survive restarts.
+          // SaaS: mirror pending asks into the hitl table so they survive
+          // restarts. Forms are session-scoped, so the row records no owner.
           yield* Hitl.insertPending({
             id,
             kind: "question",
             directory: yield* directoryOf(),
             sessionID: input.sessionID,
-            userID,
             ownerID: ownerId,
             payload: { title: input.title, fields: input.fields, metadata: input.metadata ?? null },
           })
@@ -285,15 +287,7 @@ export const layer = Layer.effect(
     const ask = Effect.fn("Form.ask")((input: CreateInput) =>
       Effect.uninterruptibleMask((restore) =>
         Effect.gen(function* () {
-          // Identity travels on the requesting user message metadata (v1 parity).
-          // Session history is optional here so hosts without it still work.
-          const store = yield* Effect.serviceOption(SessionStore.Service)
-          const messages = Option.isNone(store)
-            ? []
-            : yield* store.value
-                .context(input.sessionID as Session.ID)
-                .pipe(Effect.orElseSucceed(() => []))
-          const form = yield* create(input, Hitl.userIDFromMessages(messages))
+          const form = yield* create(input)
           const entry = yield* requireEntry(form.id).pipe(Effect.orDie)
           return yield* restore(Deferred.await(entry.deferred)).pipe(
             Effect.onInterrupt(() => Effect.ignore(cancel(form.id))),
@@ -304,6 +298,16 @@ export const layer = Layer.effect(
 
     const get = Effect.fn("Form.get")(function* (id: ID) {
       return (yield* requireEntry(id)).form
+    })
+
+    const getOrLoad = Effect.fn("Form.getOrLoad")(function* (id: ID) {
+      const cached = yield* Cache.getSuccess(forms, id)
+      if (Option.isSome(cached)) return cached.value.form
+      const row = yield* Hitl.row(id)
+      if (row === undefined || row.kind !== "question") return yield* new NotFoundError({ id })
+      const form = formFromRow(row)
+      if (form === undefined) return yield* new NotFoundError({ id })
+      return form
     })
 
     // Live pendings live in the Location instance whose sandbox the run used,
@@ -322,10 +326,9 @@ export const layer = Layer.effect(
         .filter((entry) => entry.state.status === "pending")
         .filter((entry) => dropped === undefined || !dropped.has(entry.form.id))
         .filter((entry) => input?.sessionID === undefined || entry.form.sessionID === input.sessionID)
-        .filter((entry) => input?.userID === undefined || entry.userID === input.userID)
         .map((entry) => entry.form)
       const seen = new Set(local.map((form) => form.id))
-      const rows = yield* Hitl.listPending({ kind: "question", directory: yield* directoryOf(), userID: input?.userID })
+      const rows = yield* Hitl.listPending({ kind: "question", directory: yield* directoryOf() })
       const persisted = (rows ?? []).flatMap((row) => {
         const form = formFromRow(row)
         if (form === undefined || seen.has(form.id)) return []
@@ -350,8 +353,6 @@ export const layer = Layer.effect(
             const row = yield* Hitl.row(input.id)
             if (row === undefined || row.status !== "pending" || row.kind !== "question")
               return yield* new NotFoundError({ id: input.id })
-            if (input.userID !== undefined && row.user_id !== input.userID)
-              return yield* new NotFoundError({ id: input.id })
             const rebuilt = formFromRow(row)
             if (rebuilt === undefined) return yield* new NotFoundError({ id: input.id })
             const invalid = validateAnswer(rebuilt.fields, input.answer)
@@ -360,15 +361,11 @@ export const layer = Layer.effect(
               status: "replied",
               result: { answer: input.answer },
               closeReason: "answered-delivered",
-              ...(input.userID === undefined ? {} : { userID: input.userID }),
             })
             yield* bus.publish(Form.Event.Replied, { id: input.id, sessionID: row.session_id, answer: input.answer })
             return
           }
-          // A mismatched owner reads as not-found before any state is revealed.
           const settled = maybe.value
-          if (input.userID !== undefined && settled.userID !== input.userID)
-            return yield* new NotFoundError({ id: input.id })
           if (settled.state.status !== "pending") return yield* new AlreadySettledError({ id: input.id })
           const invalid = validateAnswer(settled.form.fields, input.answer)
           if (invalid) return yield* new InvalidAnswerError({ id: input.id, message: invalid })
@@ -377,7 +374,6 @@ export const layer = Layer.effect(
             status: "replied",
             result: { answer: input.answer },
             closeReason: "answered-delivered",
-            ...(input.userID === undefined ? {} : { userID: input.userID }),
           })
           yield* bus.publish(Form.Event.Replied, {
             id: input.id,
@@ -396,12 +392,13 @@ export const layer = Layer.effect(
           const entry = yield* requireEntry(id)
           if (entry.state.status !== "pending") return yield* new AlreadySettledError({ id })
           const next: TerminalState = { status: "cancelled" }
-          // Explicit user cancellation closes the row as shutdown; the layer's
-          // shutdown sweep calls this same path for every pending entry, and a
-          // restart must NOT consume the row — recovery on the next boot
-          // re-creates the form from the still-pending row. Distinguish by
-          // whether the shutdown sweep already started.
-          if (!closed) yield* Hitl.settle(id, { status: "closed", closeReason: "shutdown" })
+          // Explicit user cancellation settles the row as `rejected` (v1's
+          // decision path) so the sweep still backfills a failed tool result
+          // when the holding run is gone. The layer's shutdown sweep calls this
+          // same path after flipping `closed`, and a restart must NOT consume
+          // the row — recovery on the next boot re-creates the form from the
+          // still-pending row.
+          if (!closed) yield* Hitl.settle(id, { status: "rejected", closeReason: "decision-delivered" })
           yield* bus.publish(Form.Event.Cancelled, { id, sessionID: entry.form.sessionID })
           yield* Cache.set(forms, id, { ...entry, state: next })
           yield* Deferred.succeed(entry.deferred, next)
@@ -512,7 +509,7 @@ export const layer = Layer.effect(
       }
     })
 
-    return Service.of({ create, ask, get, list, state, reply, cancel, cancelBySession, close })
+    return Service.of({ create, ask, get, getOrLoad, list, state, reply, cancel, cancelBySession, close })
   }),
 )
 
