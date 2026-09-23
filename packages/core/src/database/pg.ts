@@ -15,6 +15,59 @@ import pgSchemaSql from "./pg-schema.sql" with { type: "text" }
 
 const TypeId = "~@opencode/core/database/Pg" as const
 
+const translateScalarMax = (query: string) => {
+  let result = ""
+  let quote = ""
+  for (let i = 0; i < query.length; ) {
+    if (quote) {
+      const char = query[i]
+      result += char
+      if (char === quote && query[i + 1] === quote) result += query[++i]
+      else if (char === quote) quote = ""
+      i++
+      continue
+    }
+    if (query[i] === "'" || query[i] === '"') {
+      quote = query[i]
+      result += query[i++]
+      continue
+    }
+    if (query.slice(i, i + 3).toLowerCase() !== "max" || /[\w]/.test(query[i - 1] ?? "")) {
+      result += query[i++]
+      continue
+    }
+    let open = i + 3
+    while (/\s/.test(query[open] ?? "")) open++
+    if (query[open] !== "(") {
+      result += query[i++]
+      continue
+    }
+    let depth = 1
+    let nestedQuote = ""
+    let comma = -1
+    let end = open + 1
+    for (; end < query.length && depth > 0; end++) {
+      const char = query[end]
+      if (nestedQuote) {
+        if (char === nestedQuote && query[end + 1] === nestedQuote) end++
+        else if (char === nestedQuote) nestedQuote = ""
+        continue
+      }
+      if (char === "'" || char === '"') nestedQuote = char
+      else if (char === "(") depth++
+      else if (char === ")") depth--
+      else if (char === "," && depth === 1 && comma < 0) comma = end
+    }
+    if (depth !== 0 || comma < 0) {
+      result += query[i++]
+      continue
+    }
+    result += `GREATEST(${translateScalarMax(query.slice(open + 1, comma))}, ${translateScalarMax(query.slice(comma + 1, end - 1))})`
+    i = end
+  }
+  return result
+}
+
 /**
  * Translates the sqlite-dialect SQL emitted by drizzle (and raw callers) into
  * PostgreSQL. Covers the constructs this repository actually emits:
@@ -55,6 +108,8 @@ const translate = (query: string): string => {
   pg = pg.replace(/\breal\b/gi, "double precision")
   pg = pg.replace(/\bnumeric\b/gi, "double precision")
   pg = pg.replace(/\binteger\b/gi, "bigint")
+  pg = pg.replace(/(ON CONFLICT\s*\()\s*"[^"]+"\./gi, "$1")
+  pg = translateScalarMax(pg)
   if (/insert\s+or\s+ignore\s+into/i.test(pg)) {
     pg = pg.replace(/insert\s+or\s+ignore\s+into/i, "INSERT INTO").replace(/\s*;\s*$/, "")
     pg += " ON CONFLICT DO NOTHING"
