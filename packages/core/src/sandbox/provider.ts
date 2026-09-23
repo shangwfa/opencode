@@ -6,7 +6,6 @@ import { makeLocationNode } from "@opencode/util/effect/app-node"
 import { SandboxConfig } from "./config.js"
 import { SandboxPath } from "./path.js"
 
-const CREATE_TIMEOUT_SECONDS = 60
 
 export interface ExecutionResult {
   readonly exitCode: number | null
@@ -156,9 +155,9 @@ const layer = Layer.effect(
         return sb
       }).pipe(
         Effect.timeoutOrElse({
-          duration: Duration.seconds(CREATE_TIMEOUT_SECONDS),
+          duration: Duration.seconds(config.createTimeoutSeconds),
           orElse: () =>
-            Effect.fail(new Error(`Sandbox create timed out after ${CREATE_TIMEOUT_SECONDS}s: ${sessionID}`)),
+            Effect.fail(new Error(`Sandbox create timed out after ${config.createTimeoutSeconds}s: ${sessionID}`)),
         }),
         Effect.withSpan("SandboxProvider.createSandbox"),
       )

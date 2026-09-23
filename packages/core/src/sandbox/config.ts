@@ -16,6 +16,8 @@ export interface Config {
   readonly image: string
   /** Remote sandbox TTL (seconds) when no volume is attached. */
   readonly timeoutSeconds: number
+  /** Sandbox.create upper bound; first pulls of large images need headroom. */
+  readonly createTimeoutSeconds: number
   /** CPU/memory request forwarded to the control plane. */
   readonly resource: { cpu: string; memory: string }
 }
@@ -39,6 +41,7 @@ export function load(): Config {
     useServerProxy: flag(env["OPENCODE_SANDBOX_USE_SERVER_PROXY"]),
     image: env["OPENCODE_SANDBOX_IMAGE"] || DEFAULT_IMAGE,
     timeoutSeconds: number(env["OPENCODE_SANDBOX_TIMEOUT_SECONDS"], 30 * 60),
+    createTimeoutSeconds: number(env["OPENCODE_SANDBOX_CREATE_TIMEOUT_SECONDS"], 120),
     resource: {
       cpu: env["OPENCODE_SANDBOX_CPU"] || "2",
       memory: env["OPENCODE_SANDBOX_MEMORY"] || "4Gi",

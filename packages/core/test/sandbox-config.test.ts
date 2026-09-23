@@ -9,6 +9,7 @@ const KEYS = [
   "OPENCODE_SANDBOX_USE_SERVER_PROXY",
   "OPENCODE_SANDBOX_IMAGE",
   "OPENCODE_SANDBOX_TIMEOUT_SECONDS",
+  "OPENCODE_SANDBOX_CREATE_TIMEOUT_SECONDS",
   "OPENCODE_SANDBOX_CPU",
   "OPENCODE_SANDBOX_MEMORY",
 ] as const
@@ -68,5 +69,13 @@ describe("SandboxConfig.load", () => {
     const config = SandboxConfig.load()
     expect(config.timeoutSeconds).toBe(600)
     expect(config.resource).toEqual({ cpu: "4", memory: "8Gi" })
+  })
+
+  it("defaults the create timeout and allows overriding it", () => {
+    expect(SandboxConfig.load().createTimeoutSeconds).toBe(120)
+    process.env["OPENCODE_SANDBOX_CREATE_TIMEOUT_SECONDS"] = "300"
+    expect(SandboxConfig.load().createTimeoutSeconds).toBe(300)
+    process.env["OPENCODE_SANDBOX_CREATE_TIMEOUT_SECONDS"] = "invalid"
+    expect(SandboxConfig.load().createTimeoutSeconds).toBe(120)
   })
 })
