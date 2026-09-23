@@ -1,0 +1,871 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sandbox Terminal (PTY) 测试面板</title>
+    <style>
+      :root {
+        --bg: #0d1117;
+        --panel: #161b22;
+        --border: #30363d;
+        --fg: #e6edf3;
+        --muted: #8b949e;
+        --accent: #58a6ff;
+        --green: #3fb950;
+        --red: #f85149;
+        --yellow: #d29922;
+        --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--fg);
+        font:
+          14px/1.5 -apple-system,
+          "PingFang SC",
+          sans-serif;
+      }
+      header {
+        padding: 12px 20px;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      header h1 {
+        font-size: 16px;
+        margin: 0;
+      }
+      main {
+        display: grid;
+        grid-template-columns: 400px 1fr;
+        gap: 12px;
+        padding: 12px 20px;
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 12px;
+        margin-bottom: 12px;
+      }
+      .panel h2 {
+        font-size: 13px;
+        margin: 0 0 10px;
+        color: var(--accent);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+      label {
+        display: block;
+        font-size: 12px;
+        color: var(--muted);
+        margin: 8px 0 2px;
+      }
+      input {
+        width: 100%;
+        background: #0d1117;
+        border: 1px solid var(--border);
+        color: var(--fg);
+        border-radius: 6px;
+        padding: 6px 8px;
+        font-family: var(--mono);
+        font-size: 12px;
+      }
+      input:focus {
+        outline: none;
+        border-color: var(--accent);
+      }
+      button {
+        background: #21262d;
+        border: 1px solid var(--border);
+        color: var(--fg);
+        border-radius: 6px;
+        padding: 6px 12px;
+        cursor: pointer;
+        font-size: 12px;
+        margin: 4px 4px 0 0;
+      }
+      button:hover {
+        border-color: var(--accent);
+      }
+      button.primary {
+        background: #1f6feb;
+        border-color: #1f6feb;
+        color: #fff;
+      }
+      button.danger {
+        border-color: var(--red);
+        color: var(--red);
+      }
+      button:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+      .row {
+        display: flex;
+        gap: 8px;
+      }
+      .row > * {
+        flex: 1;
+      }
+      .badge {
+        display: inline-block;
+        padding: 1px 8px;
+        border-radius: 10px;
+        font-size: 11px;
+        font-family: var(--mono);
+      }
+      .badge.running {
+        background: rgba(63, 185, 80, 0.15);
+        color: var(--green);
+      }
+      .badge.exited {
+        background: rgba(210, 153, 34, 0.15);
+        color: var(--yellow);
+      }
+      .badge.err {
+        background: rgba(248, 81, 73, 0.15);
+        color: var(--red);
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
+        font-family: var(--mono);
+      }
+      th,
+      td {
+        text-align: left;
+        padding: 4px 6px;
+        border-bottom: 1px solid var(--border);
+      }
+      th {
+        color: var(--muted);
+        font-weight: normal;
+      }
+      tr.selected td {
+        background: rgba(88, 166, 255, 0.08);
+      }
+      tr:hover td {
+        background: rgba(88, 166, 255, 0.04);
+        cursor: pointer;
+      }
+      #terminalWrap {
+        background: #010409;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        height: 480px;
+        padding: 8px;
+        overflow: hidden;
+      }
+      #terminal {
+        width: 100%;
+        height: 100%;
+      }
+      #log {
+        height: 200px;
+        overflow-y: auto;
+        background: #0d1117;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 8px;
+        font-family: var(--mono);
+        font-size: 11px;
+        white-space: pre-wrap;
+      }
+      .log-pass {
+        color: var(--green);
+      }
+      .log-fail {
+        color: var(--red);
+      }
+      .log-info {
+        color: var(--muted);
+      }
+      .log-warn {
+        color: var(--yellow);
+      }
+      #wsState {
+        font-family: var(--mono);
+        font-size: 12px;
+      }
+      .kv {
+        font-family: var(--mono);
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .kv b {
+        color: var(--fg);
+        font-weight: normal;
+      }
+      .kv input {
+        display: inline-block;
+        width: 260px;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Sandbox Terminal (PTY) 测试面板</h1>
+      <span class="kv">BASE <input id="base" value="http://localhost:14096" /></span>
+      <span id="health" class="kv"></span>
+      <button onclick="checkHealth()">健康检查</button>
+    </header>
+    <main>
+      <div>
+        <div class="panel">
+          <h2>Session</h2>
+          <label>Session ID（留空则新建）</label>
+          <input id="sid" placeholder="ses_..." />
+          <div>
+            <button class="primary" onclick="ensureSession()">创建 / 使用 Session</button>
+            <button class="danger" onclick="cleanupSession()">清理 Session</button>
+          </div>
+          <div class="kv" id="sidInfo"></div>
+        </div>
+
+        <div class="panel">
+          <h2>PTY CRUD（PTY-1 / PTY-6）</h2>
+          <label>标题</label>
+          <input id="ptyTitle" value="demo-terminal" />
+          <div class="row">
+            <div><label>命令（可空 = 默认 shell）</label><input id="ptyCmd" placeholder="/bin/sh" /></div>
+            <div><label>参数（空格分隔）</label><input id="ptyArgs" placeholder="-lc exit 23" /></div>
+          </div>
+          <div>
+            <button class="primary" onclick="createPty()">创建 PTY</button>
+            <button onclick="listPty()">刷新列表</button>
+          </div>
+          <div class="row" style="margin-top: 8px">
+            <div><label>新标题</label><input id="updTitle" value="renamed-terminal" /></div>
+            <div><label>rows</label><input id="updRows" type="number" value="37" /></div>
+            <div><label>cols</label><input id="updCols" type="number" value="119" /></div>
+          </div>
+          <div>
+            <button onclick="updatePty()">更新选中（PUT）</button>
+            <button onclick="getPty()">查询选中（GET）</button>
+            <button class="danger" onclick="deletePty()">删除选中（DELETE）</button>
+          </div>
+          <table style="margin-top: 8px">
+            <thead>
+              <tr>
+                <th>id</th>
+                <th>title</th>
+                <th>status</th>
+                <th>pid</th>
+              </tr>
+            </thead>
+            <tbody id="ptyList"></tbody>
+          </table>
+        </div>
+
+        <div class="panel">
+          <h2>自动化用例</h2>
+          <button onclick="testCrud()">PTY-1 CRUD</button>
+          <button onclick="testIsolation()">PTY-3 Session 隔离</button>
+          <button onclick="testExit()">PTY-6 退出态保留</button>
+          <button onclick="testWsIo()">PTY-4 WS IO + meta cursor</button>
+          <button onclick="testCursorReconnect()">PTY-5 cursor 重连</button>
+          <button onclick="testResize()">PTY-24 stty size</button>
+        </div>
+
+        <div class="panel">
+          <h2>日志</h2>
+          <div id="log"></div>
+          <button onclick="document.getElementById('log').innerHTML=''">清空</button>
+        </div>
+      </div>
+
+      <div>
+        <div class="panel">
+          <h2>WebSocket Terminal（ghostty-web 渲染）</h2>
+          <div class="kv">
+            状态 <b id="wsState">未连接</b> · ticket <b id="ticketInfo">-</b> · cursor <b id="cursorInfo">-</b> · 尺寸
+            <b id="sizeInfo">-</b>
+          </div>
+          <div>
+            <button class="primary" onclick="connectWs()">签发 ticket 并连接</button>
+            <button onclick="reconnectWs()">带 cursor 重连（PTY-5）</button>
+            <button onclick="sendText('printf \'PTY_WS_OK\\n\'\n')">printf 探针</button>
+            <button onclick="sendText('stty size\n')">stty size</button>
+            <button onclick="sendText('env | grep ^OPENCODE_PTY_AGENT_TOKEN= || echo TOKEN_NOT_EXPOSED\n')">
+              PTY-12 token 泄漏检查
+            </button>
+            <button class="danger" onclick="disconnectWs()">断开</button>
+          </div>
+          <div id="terminalWrap"><div id="terminal"></div></div>
+        </div>
+      </div>
+    </main>
+
+    <script type="module">
+      import { Ghostty, Terminal, FitAddon } from "https://cdn.jsdelivr.net/npm/ghostty-web@0.4.0/dist/ghostty-web.js"
+
+      const $ = (id) => document.getElementById(id)
+      const state = { sid: "", ptys: [], selected: "", ticket: "", cursor: -1, ws: null }
+
+      function log(msg, cls = "log-info") {
+        const el = document.createElement("div")
+        el.className = cls
+        el.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`
+        $("log").appendChild(el)
+        $("log").scrollTop = $("log").scrollHeight
+      }
+      const pass = (m) => log("✅ PASS " + m, "log-pass")
+      const fail = (m) => log("❌ FAIL " + m, "log-fail")
+      const warn = (m) => log("⚠️ " + m, "log-warn")
+
+      let term = null
+      let fitAddon = null
+      let resizeTimer = null
+
+      async function initTerminal() {
+        const ghostty = await Ghostty.load("https://cdn.jsdelivr.net/npm/ghostty-web@0.4.0/ghostty-vt.wasm")
+        term = new Terminal({
+          ghostty,
+          fontSize: 13,
+          fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+          cursorBlink: true,
+          cursorStyle: "bar",
+          scrollback: 10000,
+          theme: { background: "#010409", foreground: "#e6edf3" },
+        })
+        fitAddon = new FitAddon()
+        term.loadAddon(fitAddon)
+        term.open($("terminal"))
+        fitAddon.fit()
+        $("sizeInfo").textContent = `${term.cols}×${term.rows}`
+        term.onData((d) => {
+          if (state.ws?.readyState === WebSocket.OPEN) state.ws.send(d)
+        })
+        term.onResize(({ cols, rows }) => {
+          $("sizeInfo").textContent = `${cols}×${rows}`
+          clearTimeout(resizeTimer)
+          resizeTimer = setTimeout(() => syncSize(cols, rows), 300)
+        })
+        new ResizeObserver(() => fitAddon.fit()).observe($("terminalWrap"))
+        log("ghostty-web 终端已初始化")
+      }
+
+      async function syncSize(cols, rows) {
+        if (!state.sid || !state.selected) return
+        const { status } = await api(`/pty/${state.selected}?${q()}`, {
+          method: "PUT",
+          body: JSON.stringify({ size: { rows, cols } }),
+        })
+        if (status === 200) log(`终端尺寸已同步 ${rows}×${cols}`)
+      }
+
+      function base() {
+        return $("base").value.replace(/\/+$/, "")
+      }
+      function q() {
+        return `sessionID=${encodeURIComponent(state.sid)}`
+      }
+
+      async function api(path, opts = {}) {
+        const res = await fetch(base() + path, {
+          ...opts,
+          headers: { "Content-Type": "application/json", ...(opts.headers || {}) },
+        })
+        const text = await res.text()
+        let body
+        try {
+          body = JSON.parse(text)
+        } catch {
+          body = text
+        }
+        return { status: res.status, body }
+      }
+
+      async function checkHealth() {
+        try {
+          const { status, body } = await api("/global/health")
+          $("health").innerHTML =
+            status === 200 ? `<span class="badge running">healthy</span>` : `<span class="badge err">${status}</span>`
+          log(`health: ${status} ${JSON.stringify(body)}`)
+        } catch (e) {
+          $("health").innerHTML = `<span class="badge err">unreachable</span>`
+          fail("health: " + e.message)
+        }
+      }
+
+      async function newSession() {
+        const { status, body } = await api("/session", { method: "POST", body: "{}" })
+        if (status !== 200 && status !== 201) throw new Error(`创建 session 失败: ${status} ${JSON.stringify(body)}`)
+        return body.id
+      }
+
+      async function ensureSession() {
+        if (!$("sid").value.trim()) {
+          $("sid").value = await newSession()
+          log(`新建 session ${$("sid").value}`)
+        }
+        state.sid = $("sid").value.trim()
+        state.selected = ""
+        $("sidInfo").innerHTML = `当前 <b>${state.sid}</b>`
+        await listPty()
+      }
+
+      async function cleanupSession() {
+        if (!state.sid) return warn("无 session")
+        disconnectWs()
+        const { body } = await api(`/pty?${q()}`)
+        if (Array.isArray(body)) {
+          for (const p of body) await api(`/pty/${p.id}?${q()}`, { method: "DELETE" })
+        }
+        await api(`/session/${state.sid}/kill-sandbox`, { method: "POST" })
+        await api(`/session/${state.sid}`, { method: "DELETE" })
+        log(`已清理 session ${state.sid}`)
+        state.sid = ""
+        state.selected = ""
+        state.ptys = []
+        state.ticket = ""
+        state.cursor = -1
+        $("sid").value = ""
+        $("sidInfo").textContent = ""
+        renderList()
+      }
+
+      async function createPty(command, args, title) {
+        const payload = { title: title ?? $("ptyTitle").value }
+        const cmd = command ?? $("ptyCmd").value.trim()
+        const argStr = args ?? $("ptyArgs").value.trim()
+        if (cmd) payload.command = cmd
+        if (argStr) payload.args = argStr.split(/\s+/)
+        const { status, body } = await api(`/pty?${q()}`, { method: "POST", body: JSON.stringify(payload) })
+        if (status !== 200 && status !== 201) {
+          fail(`创建 PTY: ${status} ${JSON.stringify(body)}`)
+          return null
+        }
+        log(`创建 PTY ${body.id} status=${body.status} pid=${body.pid} cwd=${body.cwd}`)
+        await listPty()
+        return body
+      }
+
+      async function listPty() {
+        if (!state.sid) return
+        const { status, body } = await api(`/pty?${q()}`)
+        if (status !== 200) return fail(`list: ${status}`)
+        state.ptys = body
+        renderList()
+      }
+
+      function renderList() {
+        $("ptyList").innerHTML = state.ptys
+          .map(
+            (p) => `
+    <tr class="${p.id === state.selected ? "selected" : ""}" data-pty="${p.id}">
+      <td>${p.id.slice(0, 14)}…</td><td>${p.title}</td>
+      <td><span class="badge ${p.status}">${p.status}${p.exitCode != null ? " " + p.exitCode : ""}</span></td>
+      <td>${p.pid ?? "-"}</td>
+    </tr>`,
+          )
+          .join("")
+      }
+
+      $("ptyList").addEventListener("click", (e) => {
+        const tr = e.target.closest("tr[data-pty]")
+        if (!tr) return
+        state.selected = tr.dataset.pty
+        state.ticket = ""
+        renderList()
+        log(`选中 ${state.selected}`)
+      })
+
+      async function getPty() {
+        const { status, body } = await api(`/pty/${state.selected}?${q()}`)
+        log(`GET ${state.selected}: ${status} ${JSON.stringify(body)}`, status === 200 ? "log-info" : "log-fail")
+        return { status, body }
+      }
+
+      async function updatePty() {
+        const payload = { title: $("updTitle").value, size: { rows: +$("updRows").value, cols: +$("updCols").value } }
+        const { status, body } = await api(`/pty/${state.selected}?${q()}`, {
+          method: "PUT",
+          body: JSON.stringify(payload),
+        })
+        log(`PUT ${state.selected}: ${status} title=${body.title}`, status === 200 ? "log-info" : "log-fail")
+        await listPty()
+        return { status, body }
+      }
+
+      async function deletePty(id) {
+        const target = id ?? state.selected
+        const { status } = await api(`/pty/${target}?${q()}`, { method: "DELETE" })
+        log(`DELETE ${target}: ${status}`, status < 300 ? "log-info" : "log-fail")
+        if (target === state.selected) disconnectWs()
+        await listPty()
+        return status
+      }
+
+      async function mintTicket(ptyId) {
+        const { status, body } = await api(`/pty/${ptyId}/connect-token?${q()}`, {
+          method: "POST",
+          headers: { "x-opencode-ticket": "1" },
+        })
+        if (status !== 200) {
+          warn(`connect-token: ${status} ${JSON.stringify(body)}（本地模式可忽略，将直连）`)
+          return ""
+        }
+        const ttl = body.expires_in ?? body.expiresIn ?? "?"
+        $("ticketInfo").textContent = `${String(body.ticket).slice(0, 12)}… (expires_in=${ttl})`
+        log(`ticket 签发成功 expires_in=${ttl}`)
+        return body.ticket
+      }
+
+      function wsUrlFor(sid, ptyId, cursor, ticket) {
+        const url = new URL(`${base().replace(/^http/, "ws")}/pty/${ptyId}/connect`)
+        url.searchParams.set("sessionID", sid)
+        if (cursor !== undefined && cursor !== null) url.searchParams.set("cursor", String(cursor))
+        if (ticket) url.searchParams.set("ticket", ticket)
+        return url
+      }
+
+      function attachWs(ws, { silent } = {}) {
+        ws.binaryType = "arraybuffer"
+        ws.onopen = () => {
+          $("wsState").innerHTML = `<span class="badge running">已连接</span>`
+          if (!silent) log("WebSocket 已连接")
+          term?.focus()
+        }
+        ws.onmessage = (e) => {
+          const bytes = e.data instanceof ArrayBuffer ? new Uint8Array(e.data) : null
+          if (bytes && bytes[0] === 0) {
+            const meta = JSON.parse(new TextDecoder().decode(bytes.slice(1)))
+            state.cursor = meta.cursor
+            $("cursorInfo").textContent = meta.cursor
+            if (!silent) log(`meta cursor=${meta.cursor}`)
+            return
+          }
+          term?.write(bytes ?? e.data)
+        }
+        ws.onclose = (e) => {
+          if (state.ws === ws) $("wsState").innerHTML = `<span class="badge err">已断开 (${e.code})</span>`
+          if (!silent) log(`WebSocket 关闭 code=${e.code} reason=${e.reason || "-"}`)
+        }
+        ws.onerror = () => {
+          if (!silent) fail("WebSocket 错误")
+        }
+        return ws
+      }
+
+      async function connectWs(cursor) {
+        if (!state.selected) return warn("请先选中一个 PTY")
+        disconnectWs()
+        if (!state.ticket) state.ticket = await mintTicket(state.selected)
+        state.ws = attachWs(new WebSocket(wsUrlFor(state.sid, state.selected, cursor ?? state.cursor, state.ticket)))
+      }
+
+      async function reconnectWs() {
+        if (state.cursor < 0) return warn("尚无 cursor，请先连接一次")
+        log(`以 cursor=${state.cursor} 重连…`)
+        await connectWs(state.cursor)
+      }
+
+      function disconnectWs() {
+        if (state.ws) {
+          state.ws.onclose = null
+          state.ws.close()
+          state.ws = null
+        }
+        $("wsState").textContent = "未连接"
+      }
+
+      function sendText(t) {
+        if (!state.ws || state.ws.readyState !== 1) return warn("WebSocket 未连接")
+        state.ws.send(t)
+      }
+
+      async function testCrud() {
+        try {
+          const sid = await newSession()
+          log(`PTY-1 使用 session ${sid}`)
+          const p = await api(`/pty?sessionID=${sid}`, {
+            method: "POST",
+            body: JSON.stringify({ title: "sandbox-terminal" }),
+          })
+          p.status === 200 && p.body.id?.startsWith("pty_") && p.body.status === "running"
+            ? pass(`创建 id=${p.body.id} status=running pid=${p.body.pid} cwd=${p.body.cwd}`)
+            : fail(`创建 ${p.status} ${JSON.stringify(p.body)}`)
+
+          const g = await api(`/pty/${p.body.id}?sessionID=${sid}`)
+          g.status === 200 && g.body.id === p.body.id ? pass("GET 返回同一 PTY") : fail(`GET ${g.status}`)
+
+          const u = await api(`/pty/${p.body.id}?sessionID=${sid}`, {
+            method: "PUT",
+            body: JSON.stringify({ title: "renamed-terminal", size: { rows: 30, cols: 100 } }),
+          })
+          u.status === 200 && u.body.title === "renamed-terminal"
+            ? pass("PUT 标题/尺寸生效")
+            : fail(`PUT ${u.status} ${JSON.stringify(u.body)}`)
+
+          const d = await api(`/pty/${p.body.id}?sessionID=${sid}`, { method: "DELETE" })
+          const g2 = await api(`/pty/${p.body.id}?sessionID=${sid}`)
+          d.status < 300 && g2.status === 404
+            ? pass(`DELETE ${d.status}，再次 GET = 404`)
+            : fail(`DELETE ${d.status} GET=${g2.status}`)
+          await api(`/session/${sid}/kill-sandbox`, { method: "POST" })
+          await api(`/session/${sid}`, { method: "DELETE" })
+        } catch (e) {
+          fail("PTY-1 异常 " + e.message)
+        }
+      }
+
+      async function testIsolation() {
+        try {
+          const sidA = await newSession()
+          const sidB = await newSession()
+          const c = await api(`/pty?sessionID=${sidA}`, { method: "POST", body: JSON.stringify({ title: "owner-a" }) })
+          const id = c.body.id
+          const listB = await api(`/pty?sessionID=${sidB}`)
+          const g = await api(`/pty/${id}?sessionID=${sidB}`)
+          const u = await api(`/pty/${id}?sessionID=${sidB}`, {
+            method: "PUT",
+            body: JSON.stringify({ title: "stolen" }),
+          })
+          const d = await api(`/pty/${id}?sessionID=${sidB}`, { method: "DELETE" })
+          const gA = await api(`/pty/${id}?sessionID=${sidA}`)
+          const isolated =
+            Array.isArray(listB.body) &&
+            listB.body.length === 0 &&
+            g.status === 404 &&
+            u.status === 404 &&
+            d.status === 404
+          isolated
+            ? pass("B 对 A 的 list/get/update/delete 均隔离 (404)")
+            : fail(`listB=${JSON.stringify(listB.body)} get=${g.status} put=${u.status} del=${d.status}`)
+          gA.status === 200 && gA.body.status === "running"
+            ? pass("A 的 PTY 仍 running")
+            : fail(`A GET=${gA.status} ${JSON.stringify(gA.body)}`)
+          for (const s of [sidA, sidB]) {
+            await api(`/pty/${id}?sessionID=${s}`, { method: "DELETE" })
+            await api(`/session/${s}/kill-sandbox`, { method: "POST" })
+            await api(`/session/${s}`, { method: "DELETE" })
+          }
+        } catch (e) {
+          fail("PTY-3 异常 " + e.message)
+        }
+      }
+
+      async function testExit() {
+        try {
+          const sid = await newSession()
+          const c = await api(`/pty?sessionID=${sid}`, {
+            method: "POST",
+            body: JSON.stringify({ title: "exit-test", command: "/bin/sh", args: ["-lc", "exit 23"] }),
+          })
+          const id = c.body.id
+          await new Promise((r) => setTimeout(r, 2000))
+          const g = await api(`/pty/${id}?sessionID=${sid}`)
+          g.status === 200 && g.body.status === "exited" && g.body.exitCode === 23
+            ? pass(`exited 保留 exitCode=23`)
+            : fail(`GET ${g.status} ${JSON.stringify(g.body)}`)
+          const d = await api(`/pty/${id}?sessionID=${sid}`, { method: "DELETE" })
+          const g2 = await api(`/pty/${id}?sessionID=${sid}`)
+          d.status < 300 && g2.status === 404 ? pass("显式删除后 404") : fail(`del=${d.status} get=${g2.status}`)
+          await api(`/session/${sid}/kill-sandbox`, { method: "POST" })
+          await api(`/session/${sid}`, { method: "DELETE" })
+        } catch (e) {
+          fail("PTY-6 异常 " + e.message)
+        }
+      }
+
+      function wsOnce(url, timeoutMs = 10000) {
+        return new Promise((resolve, reject) => {
+          const ws = new WebSocket(url)
+          ws.binaryType = "arraybuffer"
+          const timer = setTimeout(() => {
+            ws.close()
+            reject(new Error("timeout"))
+          }, timeoutMs)
+          const done = (v) => {
+            clearTimeout(timer)
+            ws.close()
+            resolve(v)
+          }
+          let output = ""
+          let sawMeta = false
+          let metaCursor = -1
+          ws.onopen = () => ws.send("printf 'PTY_WS_OK\\n'\n")
+          ws.onmessage = (e) => {
+            const bytes = e.data instanceof ArrayBuffer ? new Uint8Array(e.data) : null
+            if (bytes && bytes[0] === 0) {
+              sawMeta = true
+              metaCursor = JSON.parse(new TextDecoder().decode(bytes.slice(1))).cursor
+              return
+            }
+            output += typeof e.data === "string" ? e.data : new TextDecoder().decode(bytes)
+            if (output.includes("PTY_WS_OK") && sawMeta) done({ output, metaCursor })
+          }
+          ws.onerror = () => {
+            clearTimeout(timer)
+            reject(new Error("ws error"))
+          }
+          ws.onclose = (e) => {
+            if (e.code !== 1000 && e.code !== 1005) {
+              clearTimeout(timer)
+              reject(new Error(`close ${e.code}`))
+            }
+          }
+        })
+      }
+
+      async function mintTicketFor(sid, ptyId) {
+        const r = await api(`/pty/${ptyId}/connect-token?sessionID=${sid}`, {
+          method: "POST",
+          headers: { "x-opencode-ticket": "1" },
+        })
+        if (r.status === 200) {
+          pass(`ticket 签发成功 expires_in=${r.body.expires_in ?? r.body.expiresIn}`)
+          return r.body.ticket
+        }
+        warn(`ticket 签发 ${r.status}（本地模式直连）`)
+        return ""
+      }
+
+      async function testWsIo() {
+        try {
+          const sid = await newSession()
+          const c = await api(`/pty?sessionID=${sid}`, { method: "POST", body: JSON.stringify({ title: "ws-io" }) })
+          const id = c.body.id
+          const ticket = await mintTicketFor(sid, id)
+          const { metaCursor } = await wsOnce(wsUrlFor(sid, id, -1, ticket))
+          pass(`收到 PTY_WS_OK 且 meta cursor=${metaCursor}`)
+          await api(`/pty/${id}?sessionID=${sid}`, { method: "DELETE" })
+          await api(`/session/${sid}/kill-sandbox`, { method: "POST" })
+          await api(`/session/${sid}`, { method: "DELETE" })
+        } catch (e) {
+          fail("PTY-4 异常 " + e.message)
+        }
+      }
+
+      async function testCursorReconnect() {
+        try {
+          const sid = await newSession()
+          const c = await api(`/pty?sessionID=${sid}`, {
+            method: "POST",
+            body: JSON.stringify({ title: "cursor-test" }),
+          })
+          const id = c.body.id
+          const ticket = await mintTicketFor(sid, id)
+
+          const first = await wsOnce(wsUrlFor(sid, id, -1, ticket))
+          pass(`首次连接 cursor=${first.metaCursor}`)
+
+          const marker = `AFTER_CURSOR_${Date.now()}`
+          await new Promise((resolve) => {
+            const ws = new WebSocket(wsUrlFor(sid, id, -1, ticket))
+            ws.onopen = () => {
+              ws.send(`printf '${marker}\\n'\n`)
+              setTimeout(() => {
+                ws.close()
+                resolve()
+              }, 1500)
+            }
+          })
+
+          const replay = await new Promise((resolve, reject) => {
+            const ws = new WebSocket(wsUrlFor(sid, id, first.metaCursor, ticket))
+            ws.binaryType = "arraybuffer"
+            const timer = setTimeout(() => {
+              ws.close()
+              reject(new Error("timeout"))
+            }, 10000)
+            let output = ""
+            let newCursor = -1
+            ws.onmessage = (e) => {
+              const bytes = e.data instanceof ArrayBuffer ? new Uint8Array(e.data) : null
+              if (bytes && bytes[0] === 0) {
+                newCursor = JSON.parse(new TextDecoder().decode(bytes.slice(1))).cursor
+                return
+              }
+              output += typeof e.data === "string" ? e.data : new TextDecoder().decode(bytes)
+              if (output.includes(marker)) {
+                clearTimeout(timer)
+                ws.close()
+                resolve({ output, newCursor })
+              }
+            }
+            ws.onerror = () => {
+              clearTimeout(timer)
+              reject(new Error("ws error"))
+            }
+          })
+          const count = replay.output.split(marker).length - 1
+          count === 1 && !replay.output.includes("PTY_WS_OK") && replay.newCursor > first.metaCursor
+            ? pass(`重连仅补发缺失输出（marker×1，无历史重放，新 cursor=${replay.newCursor}）`)
+            : fail(`marker×${count} 含历史=${replay.output.includes("PTY_WS_OK")} cursor=${replay.newCursor}`)
+          await api(`/pty/${id}?sessionID=${sid}`, { method: "DELETE" })
+          await api(`/session/${sid}/kill-sandbox`, { method: "POST" })
+          await api(`/session/${sid}`, { method: "DELETE" })
+        } catch (e) {
+          fail("PTY-5 异常 " + e.message)
+        }
+      }
+
+      async function testResize() {
+        try {
+          if (!state.sid || !state.selected) return warn("请先创建 Session 并选中 PTY")
+          if (!state.ws || state.ws.readyState !== 1) return warn("请先连接 WebSocket")
+          const rows = +$("updRows").value,
+            cols = +$("updCols").value
+          await updatePty()
+          const got = await new Promise((resolve) => {
+            let buf = ""
+            const prev = state.ws.onmessage
+            state.ws.onmessage = (e) => {
+              prev(e)
+              const bytes = e.data instanceof ArrayBuffer ? new Uint8Array(e.data) : null
+              if (bytes && bytes[0] === 0) return
+              buf += typeof e.data === "string" ? e.data : new TextDecoder().decode(bytes)
+              const m = buf.match(/(\d+)\s+(\d+)/)
+              if (m) {
+                state.ws.onmessage = prev
+                resolve(`${m[1]} ${m[2]}`)
+              }
+            }
+            state.ws.send("stty size\n")
+            setTimeout(() => {
+              state.ws.onmessage = prev
+              resolve(null)
+            }, 5000)
+          })
+          got === `${rows} ${cols}` ? pass(`stty size = ${got}`) : fail(`stty size = ${got}，期望 ${rows} ${cols}`)
+        } catch (e) {
+          fail("PTY-24 异常 " + e.message)
+        }
+      }
+
+      Object.assign(window, {
+        checkHealth,
+        ensureSession,
+        cleanupSession,
+        createPty,
+        listPty,
+        getPty,
+        updatePty,
+        deletePty,
+        connectWs,
+        reconnectWs,
+        disconnectWs,
+        sendText,
+        testCrud,
+        testIsolation,
+        testExit,
+        testWsIo,
+        testCursorReconnect,
+        testResize,
+      })
+
+      initTerminal().catch((e) => fail("ghostty-web 初始化失败: " + e.message))
+      checkHealth()
+    </script>
+  </body>
+</html>

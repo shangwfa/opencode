@@ -1,0 +1,78 @@
+diff --git a/node_modules/@openuidev/react-headless/dist/index.cjs b/node_modules/@openuidev/react-headless/dist/index.cjs
+index 0b252ce..205f405 100644
+--- a/node_modules/@openuidev/react-headless/dist/index.cjs
++++ b/node_modules/@openuidev/react-headless/dist/index.cjs
+@@ -1797,13 +1797,19 @@ const createChatStore = (configRef) => {
+ 				threadError: null,
+ 				executingToolCallIds: /* @__PURE__ */ new Set()
+ 			});
+-			threadStorage.getMessages(threadId).then((messages) => set({
+-				messages,
+-				isLoadingMessages: false
+-			})).catch((e) => set({
+-				threadError: e,
+-				isLoadingMessages: false
+-			}));
++			threadStorage.getMessages(threadId).then((messages) => {
++				if (get().selectedThreadId !== threadId) return;
++				set({
++					messages,
++					isLoadingMessages: false
++				});
++			}).catch((e) => {
++				if (get().selectedThreadId !== threadId) return;
++				set({
++					threadError: e,
++					isLoadingMessages: false
++				});
++			});
+ 		},
+ 		updateThread: (thread) => {
+ 			const setPending = (id, isPending) => set((s) => ({ threads: s.threads.map((t) => t.id === id ? {
+@@ -1876,6 +1882,7 @@ const createChatStore = (configRef) => {
+ 			} catch (e) {
+ 				if (!abortController.signal.aborted) set({ threadError: e instanceof Error ? e : new Error(String(e)) });
+ 			} finally {
++				if (get()._abortController !== abortController) return;
+ 				set({
+ 					_abortController: null,
+ 					isRunning: false,
+diff --git a/node_modules/@openuidev/react-headless/dist/index.mjs b/node_modules/@openuidev/react-headless/dist/index.mjs
+index 9c2404e..b8f2108 100644
+--- a/node_modules/@openuidev/react-headless/dist/index.mjs
++++ b/node_modules/@openuidev/react-headless/dist/index.mjs
+@@ -1796,13 +1796,19 @@ const createChatStore = (configRef) => {
+ 				threadError: null,
+ 				executingToolCallIds: /* @__PURE__ */ new Set()
+ 			});
+-			threadStorage.getMessages(threadId).then((messages) => set({
+-				messages,
+-				isLoadingMessages: false
+-			})).catch((e) => set({
+-				threadError: e,
+-				isLoadingMessages: false
+-			}));
++			threadStorage.getMessages(threadId).then((messages) => {
++				if (get().selectedThreadId !== threadId) return;
++				set({
++					messages,
++					isLoadingMessages: false
++				});
++			}).catch((e) => {
++				if (get().selectedThreadId !== threadId) return;
++				set({
++					threadError: e,
++					isLoadingMessages: false
++				});
++			});
+ 		},
+ 		updateThread: (thread) => {
+ 			const setPending = (id, isPending) => set((s) => ({ threads: s.threads.map((t) => t.id === id ? {
+@@ -1875,6 +1881,7 @@ const createChatStore = (configRef) => {
+ 			} catch (e) {
+ 				if (!abortController.signal.aborted) set({ threadError: e instanceof Error ? e : new Error(String(e)) });
+ 			} finally {
++				if (get()._abortController !== abortController) return;
+ 				set({
+ 					_abortController: null,
+ 					isRunning: false,

@@ -1,6 +1,7 @@
 export * as Database from "./database.js"
 
 import { EffectDrizzleSqlite } from "./drizzle.js"
+import { Reactivity } from "effect/unstable/reactivity"
 import { sqliteLayer, supportsForeignKeyToggle, supportsTuningPragmas } from "#sqlite"
 import { Context, Effect, Layer, Schema, Semaphore } from "effect"
 import type { SqlClient } from "effect/unstable/sql"
@@ -65,6 +66,13 @@ function lockFor(filename: string) {
 export function layer(options: Options = { path: ":memory:" }) {
   return Layer.unwrap(
     Effect.gen(function* () {
+      // SaaS PG mode: when a PG URL is configured, swap the whole storage
+      // layer for the PG bridge. Otherwise fall back to the local sqlite file.
+      const pgUrl = process.env["OPENCODE_DATABASE_URL"]
+      if (pgUrl !== undefined && pgUrl.length > 0) {
+        const { DatabasePg } = yield* Effect.promise(() => import("./pg.js"))
+        return DatabasePg.layer(pgUrl)
+      }
       const provide = (filename: string) =>
         databaseLayer(filename === ":memory:" ? Semaphore.make(1) : Effect.succeed(lockFor(filename))).pipe(
           Layer.provide(sqliteLayer({ filename })),
