@@ -1,7 +1,7 @@
 export * as SandboxProvider from "./provider.js"
 
 import { ConnectionConfig, Sandbox } from "@alibaba-group/opensandbox"
-import { Context, Deferred, Duration, Effect, Layer, Ref } from "effect"
+import { Context, Deferred, Duration, Effect, Layer, Ref, Semaphore } from "effect"
 import { makeLocationNode } from "@opencode/util/effect/app-node"
 import { SandboxConfig } from "./config.js"
 import { SandboxPath } from "./path.js"
@@ -108,6 +108,10 @@ const layer = Layer.effect(
 
     const entries = yield* Ref.make(new Map<string, Entry>())
     const creates = yield* Ref.make(new Map<string, Deferred.Deferred<Sandbox, Error>>())
+    // One bash session is shared per sandbox and its state is not
+    // concurrency-safe: commands must run one at a time per session (v1
+    // serialized the same way).
+    const commandLocks = yield* Ref.make(new Map<string, Semaphore.Semaphore>())
 
     const connectionConfig = new ConnectionConfig({
       domain: config.domain,
@@ -299,7 +303,14 @@ const layer = Layer.effect(
                   }),
                 )
               : consume.pipe(Effect.onInterrupt(() => Effect.sync(() => controller.abort())))
-          yield* guarded
+          const lock = yield* Ref.modify(commandLocks, (map) => {
+            const existing = map.get(commandSessionID)
+            if (existing) return [existing, map] as const
+            const created = Semaphore.makeUnsafe(1)
+            map.set(commandSessionID, created)
+            return [created, map] as const
+          })
+          yield* lock.withPermits(1)(guarded)
 
           if (timedOut) {
             const partial = [stdout.join(""), stderr.join("")].filter((part) => part.length > 0).join("\n")
@@ -316,7 +327,10 @@ const layer = Layer.effect(
             output: [stdout.join(""), stderr.join("")].filter((part) => part.length > 0).join("\n"),
             timedOut: false,
           } satisfies ExecutionResult
-        }).pipe(Effect.withSpan("SandboxProvider.run")),
+        }).pipe(
+          Effect.mapError((cause) => (cause instanceof Error ? cause : new Error(String(cause)))),
+          Effect.withSpan("SandboxProvider.run"),
+        ),
 
       interrupt: (sessionID) =>
         Effect.gen(function* () {

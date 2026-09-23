@@ -95,7 +95,11 @@ export const glob = Effect.fn("SandboxTools.glob")(
 )
 
 export const grep = Effect.fn("SandboxTools.grep")(
-  function* (deps: Deps, input: { pattern: string; path?: string; limit?: number }, context: Tool.Context) {
+  function* (
+    deps: Deps,
+    input: { pattern: string; path?: string; include?: string; literal?: boolean; caseSensitive?: boolean; limit?: number },
+    context: Tool.Context,
+  ) {
     const limit = input.limit ?? 200
     const absolute = path.resolve(deps.location.directory, input.path ?? ".")
     const sandboxPath = SandboxPath.toSandboxPath(absolute, deps.location.directory)
@@ -103,15 +107,22 @@ export const grep = Effect.fn("SandboxTools.grep")(
       action: "grep",
       resources: [input.pattern],
       save: ["*"],
-      metadata: { pattern: input.pattern, path: input.path },
+      metadata: { pattern: input.pattern, path: input.path, include: input.include },
       sessionID: context.sessionID,
       agent: context.agent,
       source: { type: "tool", messageID: context.messageID, id: context.id },
     })
+    const flags = [
+      input.include ? `--glob ${shellQuote(input.include)}` : "",
+      input.literal ? "-F" : "",
+      input.caseSensitive === false ? "-i" : "",
+    ]
+      .filter(Boolean)
+      .join(" ")
     const result = yield* exec(
       deps,
       context,
-      `rg --json ${shellQuote(input.pattern)} ${shellQuote(sandboxPath)} 2>/dev/null | rg -m ${limit + 1} '"type":"match"' | head -${limit + 1}`,
+      `rg --json ${flags} ${shellQuote(input.pattern)} ${shellQuote(sandboxPath)} 2>/dev/null | rg -m ${limit + 1} '"type":"match"' | head -${limit + 1}`,
       30_000,
     )
     const events = result.output
@@ -157,19 +168,37 @@ type RgMatch = {
 }
 
 export const read = Effect.fn("SandboxTools.read")(
-  function* (deps: { provider: SandboxProvider.Interface; location: Location.Interface }, input: { path: string; offset?: number; limit?: number }, context: Tool.Context) {
+  function* (
+    deps: { provider: SandboxProvider.Interface; location: Location.Interface },
+    input: { path: string; offset?: number; limit?: number },
+    context: Tool.Context,
+  ) {
     const absolute = path.resolve(deps.location.directory, input.path)
     const sandboxPath = SandboxPath.toSandboxPath(absolute, deps.location.directory)
     const stat = yield* deps.provider.fileStat(context.sessionID, sandboxPath)
     if (stat === null) return yield* Effect.fail(new Error(`File not found: ${input.path}`))
-    if (stat.isDirectory)
-      return yield* Effect.fail(
-        new Error(`Path is a directory: ${input.path}. Use the shell tool to list it inside the sandbox.`),
-      )
-    const content = yield* deps.provider.fileRead(context.sessionID, sandboxPath)
-    if (content === null) return yield* Effect.fail(new Error(`File not found: ${input.path}`))
     const offset = input.offset ?? 1
     const limit = input.limit ?? 2000
+    if (stat.isDirectory) {
+      const entries = yield* deps.provider.fileList(context.sessionID, sandboxPath)
+      const mapped = entries.map((entry) => ({
+        path: relative(
+          sandboxPath.endsWith("/") ? `${sandboxPath}${entry.name}` : `${sandboxPath}/${entry.name}`,
+          deps.location.directory,
+        ),
+        type: entry.isDirectory ? ("directory" as const) : ("file" as const),
+      }))
+      const page = mapped.slice(offset - 1, offset - 1 + limit)
+      const truncated = offset - 1 + limit < mapped.length
+      return {
+        type: "list-page" as const,
+        entries: page,
+        truncated,
+        ...(truncated ? { next: offset + limit } : {}),
+      }
+    }
+    const content = yield* deps.provider.fileRead(context.sessionID, sandboxPath)
+    if (content === null) return yield* Effect.fail(new Error(`File not found: ${input.path}`))
     const lines = content.split("\n")
     const page = lines.slice(offset - 1, offset - 1 + limit)
     const truncated = offset - 1 + limit < lines.length
