@@ -617,6 +617,9 @@ const layer = Layer.effectDiscard(
                 files: input.payload.files,
                 agents: input.payload.agents,
                 skills: input.payload.skills,
+                format: input.payload.format,
+                userName: input.payload.userName,
+                userId: input.payload.userId,
                 time: { created: DateTime.makeUnsafe(event.created) },
               }
             : {

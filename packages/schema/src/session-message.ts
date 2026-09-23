@@ -77,6 +77,10 @@ export const User = Schema.Struct({
   files: Prompt.fields.files,
   agents: Prompt.fields.agents,
   skills: Prompt.fields.skills,
+  /** Output shape requested with this prompt, kept on the stored user message for readback. */
+  format: Prompt.fields.format,
+  userName: Schema.String.pipe(optional),
+  userId: Schema.String.pipe(optional),
   type: Schema.tag("user"),
 }).annotate({ identifier: "Session.Message.User" })
 
@@ -227,6 +231,8 @@ export const Assistant = Schema.Struct({
   tokens: TokenUsage.Info.pipe(optional),
   error: SessionError.Error.pipe(optional),
   retry: AssistantRetry.pipe(optional),
+  /** Parsed value produced for a `json_schema` prompt; absent for plain text output. */
+  structured: Schema.Json.pipe(optional),
   time: Schema.Struct({
     created: DateTimeUtcFromMillis,
     /** When the provider response body ended, before tool settlement. */

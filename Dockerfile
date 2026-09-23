@@ -54,7 +54,7 @@ EXPOSE 4096
 
 # Debian 镜像无 wget；用 bun 探活。
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
-  CMD bun -e "fetch('http://127.0.0.1:'+(process.env.OPENCODE_SERVER_PORT||4096)+'/api/info').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
+  CMD bun -e "const password=process.env.OPENCODE_PASSWORD;const headers=password?{Authorization:'Basic '+Buffer.from('opencode:'+password).toString('base64')}:{};fetch('http://127.0.0.1:'+(process.env.OPENCODE_SERVER_PORT||4096)+'/api/info',{headers}).then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
 
 USER opencode
 

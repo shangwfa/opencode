@@ -241,6 +241,8 @@ describe("Session.prompt", () => {
       })
 
       expect(message.payload.text).toBe("Fix the failing tests")
+      expect(message.payload.userName).toBeUndefined()
+      expect(message.payload.userId).toBeUndefined()
       expect(yield* session.messages({ sessionID })).toEqual([])
       expect(yield* admitted(message.id)).toMatchObject({
         id: message.id,
@@ -248,6 +250,26 @@ describe("Session.prompt", () => {
         type: "user",
         payload: { text: "Fix the failing tests" },
         delivery: "steer",
+      })
+    }),
+  )
+
+  it.effect("persists user identity fields in the admitted prompt payload", () =>
+    Effect.gen(function* () {
+      yield* setup
+      const session = yield* Session.Service
+      const message = yield* session.prompt({
+        sessionID,
+        text: "identity fields",
+        userName: "alice",
+        userId: "user-123",
+        resume: false,
+      })
+
+      expect(message.payload).toMatchObject({ text: "identity fields", userName: "alice", userId: "user-123" })
+      expect(yield* admitted(message.id)).toMatchObject({
+        type: "user",
+        payload: { text: "identity fields", userName: "alice", userId: "user-123" },
       })
     }),
   )

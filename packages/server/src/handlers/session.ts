@@ -7,6 +7,7 @@ import { Form } from "@opencode/core/form"
 import { DateTime, Effect, Stream } from "effect"
 import { HttpApiBuilder, HttpApiSchema } from "effect/unstable/httpapi"
 import { Api } from "../api"
+import { HttpServerRequest } from "effect/unstable/http"
 import { SessionsCursor } from "@opencode/protocol/groups/session"
 import {
   ConflictError,
@@ -335,6 +336,7 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
       )
       .handle(
         "session.command",
+          const request = yield* HttpServerRequest.HttpServerRequest
         Effect.fn(function* (ctx) {
           yield* session
             .command({
@@ -345,6 +347,8 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
               agents: ctx.payload.agents,
               skills: ctx.payload.skills,
               delivery: ctx.payload.delivery,
+                userName: ctx.payload.userName,
+                userId: request.headers["x-user-id"] || undefined,
             })
             .pipe(
               Effect.catchTag("Session.NotFoundError", missingSession),

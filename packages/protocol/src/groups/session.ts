@@ -405,6 +405,8 @@ export const makeSessionGroup = <
           OpenApi.annotations({
             identifier: "session.prompt",
             summary: "Send message",
+          userName: Schema.String.pipe(Schema.optional),
+          userId: Schema.String.pipe(Schema.optional),
             description: "Durably admit one session input and schedule agent-loop execution unless resume is false.",
           }),
         ),

@@ -24,6 +24,8 @@ export type Input = {
   skills?: PromptInput.Prompt["skills"]
   metadata?: Record<string, unknown>
   delivery?: SessionInbox.Delivery
+  userName?: string
+  userId?: string
 }
 
 export const prepare = Effect.fn("SessionPrompt.prepare")(function* (request: {
@@ -50,6 +52,8 @@ export const prepare = Effect.fn("SessionPrompt.prepare")(function* (request: {
       delivery: request.input.delivery ?? "steer",
     })
     const input = event.prompt
+        userName: request.input.userName,
+        userId: request.input.userId,
     const files = input.files
       ? yield* Effect.forEach(input.files, materializeAttachment, { concurrency: 8 })
       : undefined
@@ -86,6 +90,8 @@ export const prepare = Effect.fn("SessionPrompt.prepare")(function* (request: {
         metadata: event.metadata,
       }),
       delivery: SessionInbox.Delivery.make(event.delivery),
+        userName: request.input.userName,
+        userId: request.input.userId,
     } satisfies SessionInbox.Item
   }).pipe(instances.provide(request.session))
 })
