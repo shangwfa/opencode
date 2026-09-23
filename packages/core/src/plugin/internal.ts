@@ -53,6 +53,7 @@ import { Mcp } from "../mcp/index.js"
 import { Npm } from "@opencode/util/npm"
 import { Permission } from "../permission.js"
 import { Reference } from "../reference.js"
+import { SandboxProvider } from "../sandbox/provider.js"
 import { WebSearch } from "../websearch.js"
 import { Ripgrep } from "../ripgrep.js"
 import { Session } from "../session.js"
@@ -128,6 +129,7 @@ const services = [
   Form.Service,
   ReadToolFileSystem.Service,
   Reference.Service,
+  SandboxProvider.Service,
   WebSearch.Service,
   Ripgrep.Service,
   Session.Service,
@@ -179,6 +181,7 @@ export const requirements = LayerNode.group([
   Form.node,
   ReadToolFileSystem.node,
   Reference.node,
+  SandboxProvider.node,
   WebSearch.node,
   Ripgrep.node,
   Session.node,

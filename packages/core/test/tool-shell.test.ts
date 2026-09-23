@@ -16,11 +16,13 @@ import { Environment } from "@opencode/core/environment/index"
 import { FSUtil } from "@opencode/util/fs-util"
 import { Global } from "@opencode/util/global"
 import { Location } from "@opencode/core/location"
+import { location as makeTestLocation } from "./fixture/location"
+import { AbsolutePath } from "@opencode/core/schema"
 import { FileAccess } from "@opencode/core/file-access"
+import { SandboxProvider } from "@opencode/core/sandbox/provider"
 import { LocationServiceMap } from "@opencode/core/location-service-map"
 import { Model } from "@opencode/core/model"
 import { Provider } from "@opencode/core/provider"
-import { AbsolutePath } from "@opencode/core/schema"
 import { Agent } from "@opencode/core/agent"
 import { Job } from "@opencode/core/job"
 import { Session } from "@opencode/core/session"
@@ -132,7 +134,9 @@ const shellPluginSupervisor = makeLocationNode({
     Config.node,
     Environment.node,
     FileAccess.node,
+    Location.node,
     Permission.node,
+    SandboxProvider.node,
     Session.node,
     Job.node,
     Shell.node,
@@ -147,15 +151,22 @@ const nodes = LayerNode.group([
   Job.node,
   Session.node,
   SessionExecution.node,
+  Location.node,
   LocationServiceMap.node,
+  SandboxProvider.node,
   filesystem,
   FSUtil.node,
   Global.node,
 ])
+const locationLayer = Layer.succeed(
+  Location.Service,
+  Location.Service.of(makeTestLocation(Location.Ref.make({ directory: AbsolutePath.make(process.cwd()) }))),
+)
 const replacements = [
   SessionExecution.node.replace(executionNode),
   Permission.node.replace(permission),
   Global.node.replace(tempGlobalLayer),
+  Location.node.replace(locationLayer),
   offlineModels,
 ] satisfies LayerNode.Replacements
 const productionIt = testEffect(AppNodeBuilder.build(nodes, replacements))
@@ -166,6 +177,7 @@ const permissionIt = testEffect(
   AppNodeBuilder.build(LayerNode.group([nodes, PermissionSaved.node]), [
     SessionExecution.node.replace(executionNode),
     Global.node.replace(tempGlobalLayer),
+    Location.node.replace(locationLayer),
     PluginSupervisor.node.replace(shellPluginSupervisor),
     offlineModels,
   ]),

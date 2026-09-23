@@ -5,12 +5,15 @@ import type { Context } from "@opencode/plugin/effect/plugin"
 import type { SessionHooks } from "@opencode/plugin/effect/session"
 import type { ShellCreateBefore } from "@opencode/plugin/effect/shell"
 import type { Tool } from "@opencode/schema/tool"
+import path from "path"
 import { Deferred, Effect, Schema, Scope } from "effect"
 import { Config } from "../../config.js"
 import { Environment } from "../../environment/index.js"
 import { Job } from "../../job.js"
 import { FileAccess } from "../../file-access.js"
+import { Location } from "../../location.js"
 import { Permission } from "../../permission.js"
+import { SandboxProvider } from "../../sandbox/provider.js"
 import { NonNegativeInt } from "../../schema.js"
 import { Session } from "../../session.js"
 import { SessionSchema } from "../../session/schema.js"
@@ -111,6 +114,8 @@ export const Plugin = {
     const compatibleShell = shellSelect.resolve({ priority: "compat" })
     const permission = yield* Permission.Service
     const config = yield* Config.Service
+    const sandboxProvider = yield* SandboxProvider.Service
+    const location = yield* Location.Service
 
     const prepare = Effect.fn("ShellTool.prepare")(function* (invocation: ShellCreateBefore, context: Tool.Context) {
       const source = {
@@ -194,6 +199,44 @@ export const Plugin = {
           output: Output,
           execute: (input, context) =>
             Effect.gen(function* () {
+              // OpenSandbox: sessions on a sandbox-enabled deployment execute
+              // commands remotely. Background execution is not supported there
+              // yet and falls back to a foreground run with no timeout.
+              if (sandboxProvider.enabled) {
+                const timeout = input.background === true ? 0 : (input.timeout ?? DEFAULT_TIMEOUT_MS)
+                const hostWorkdir = input.workdir
+                  ? path.resolve(location.directory, input.workdir)
+                  : location.directory
+                const source = {
+                  type: "tool" as const,
+                  messageID: context.messageID,
+                  id: context.id,
+                }
+                const parsed = yield* ShellParse.scan(input.command, "bash", hostWorkdir)
+                if (parsed.commands.length > 0)
+                  yield* permission.assert({
+                    action: name,
+                    resources: parsed.commands.map((command) => command.resource),
+                    save: parsed.commands.map((command) => command.save),
+                    sessionID: context.sessionID,
+                    agent: context.agent,
+                    source,
+                  })
+                const result = yield* sandboxProvider.run({
+                  sessionID: context.sessionID,
+                  command: input.command,
+                  ...(input.workdir !== undefined ? { cwd: hostWorkdir } : {}),
+                  hostWorkdir,
+                  timeoutMs: timeout,
+                })
+                return {
+                  output: result.output,
+                  ...(result.exitCode !== null ? { exit: result.exitCode } : {}),
+                  truncated: false,
+                  ...(result.timedOut ? { timeout: true } : {}),
+                  status: "completed" as const,
+                }
+              }
               const timeout = input.background === true ? (input.timeout ?? 0) : (input.timeout ?? DEFAULT_TIMEOUT_MS)
               let finalTimeout = timeout
               const info = yield* shell.create(
