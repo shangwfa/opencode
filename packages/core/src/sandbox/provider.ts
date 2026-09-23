@@ -169,6 +169,9 @@ const layer = Layer.effect(
               // remote sandbox is still converging.
               readyTimeoutSeconds: config.createTimeoutSeconds,
               resource: config.resource,
+              // Ownership tag: cleanup tooling must only ever touch sandboxes
+              // created by this service, never someone else's.
+              metadata: { managedBy: "opencode-saas", session: sessionID },
             })
             if (await Effect.runPromise(Ref.get(abandoned))) {
               await created.kill().catch(() => {})
