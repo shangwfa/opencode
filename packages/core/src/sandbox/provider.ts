@@ -30,6 +30,18 @@ export interface Interface {
   readonly run: (input: RunInput) => Effect.Effect<ExecutionResult, Error>
   readonly interrupt: (sessionID: string) => Effect.Effect<void>
   readonly destroy: (sessionID: string) => Effect.Effect<void>
+  /** null result means the path does not exist inside the sandbox. */
+  readonly fileStat: (
+    sessionID: string,
+    sandboxPath: string,
+  ) => Effect.Effect<{ readonly isDirectory: boolean } | null, Error>
+  /** null result means the path does not exist inside the sandbox. */
+  readonly fileRead: (sessionID: string, sandboxPath: string) => Effect.Effect<string | null, Error>
+  readonly fileWrite: (sessionID: string, sandboxPath: string, data: string) => Effect.Effect<void, Error>
+  readonly fileList: (
+    sessionID: string,
+    sandboxPath: string,
+  ) => Effect.Effect<ReadonlyArray<{ readonly name: string; readonly isDirectory: boolean }>, Error>
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/SandboxProvider") {}
@@ -62,7 +74,21 @@ type ExecCommands = {
   ): AsyncIterable<StreamEvent>
 }
 
+// Same runtime-vs-types gap as the command stream: the files API is reachable
+// on the sandbox instance and its JSON shapes are stable across 0.1.x.
+type SandboxFilesApi = {
+  getFileInfo(paths: string[]): Promise<Record<string, { mode?: number }>>
+  readFile(path: string, opts?: { encoding?: string }): Promise<string>
+  writeFiles(entries: { path: string; data: string }[]): Promise<void>
+  listDirectory(entry: { path: string }): Promise<Array<{ name?: string; mode?: number }>>
+}
+
 const commandsOf = (sb: Sandbox): ExecCommands => sb.commands as unknown as ExecCommands
+
+const filesOf = (sb: Sandbox): SandboxFilesApi => sb.files as unknown as SandboxFilesApi
+
+const isDirectoryMode = (mode: number | undefined) =>
+  typeof mode === "number" && (mode & 0o170000) === 0o040000
 
 const layer = Layer.effect(
   Service,
@@ -74,6 +100,10 @@ const layer = Layer.effect(
         run: () => Effect.die(new Error("Sandbox provider is disabled")),
         interrupt: () => Effect.void,
         destroy: () => Effect.void,
+        fileStat: () => Effect.die(new Error("Sandbox provider is disabled")),
+        fileRead: () => Effect.die(new Error("Sandbox provider is disabled")),
+        fileWrite: () => Effect.die(new Error("Sandbox provider is disabled")),
+        fileList: () => Effect.die(new Error("Sandbox provider is disabled")),
       })
 
     const entries = yield* Ref.make(new Map<string, Entry>())
@@ -280,6 +310,78 @@ const layer = Layer.effect(
         }),
 
       destroy: (sessionID) => destroySandbox(sessionID),
+
+      fileStat: (sessionID, sandboxPath) =>
+        Effect.gen(function* () {
+          const sb = yield* getOrCreate(sessionID)
+          const info = yield* Effect.tryPromise({
+            try: async () => {
+              const result: Record<string, { mode?: number }> = await filesOf(sb)
+                .getFileInfo([sandboxPath])
+                .catch((cause) => {
+                  if (
+                    typeof cause === "object" &&
+                    cause !== null &&
+                    "statusCode" in cause &&
+                    (cause as { statusCode?: number }).statusCode === 404
+                  )
+                    return {}
+                  throw cause
+                })
+              return result[sandboxPath] ?? null
+            },
+            catch: (cause) =>
+              new Error(`getFileInfo failed: ${sandboxPath}: ${cause instanceof Error ? cause.message : String(cause)}`),
+          })
+          if (!info) return null
+          return { isDirectory: isDirectoryMode(info.mode) }
+        }).pipe(Effect.withSpan("SandboxProvider.fileStat")),
+
+      fileRead: (sessionID, sandboxPath) =>
+        Effect.gen(function* () {
+          const sb = yield* getOrCreate(sessionID)
+          return yield* Effect.tryPromise({
+            try: async () =>
+              filesOf(sb).readFile(sandboxPath, { encoding: "utf-8" }).catch((cause) => {
+                if (
+                  typeof cause === "object" &&
+                  cause !== null &&
+                  "statusCode" in cause &&
+                  (cause as { statusCode?: number }).statusCode === 404
+                )
+                  return null
+                throw cause
+              }),
+            catch: (cause) =>
+              new Error(`readFile failed: ${sandboxPath}: ${cause instanceof Error ? cause.message : String(cause)}`),
+          })
+        }).pipe(Effect.withSpan("SandboxProvider.fileRead")),
+
+      fileWrite: (sessionID, sandboxPath, data) =>
+        Effect.gen(function* () {
+          const sb = yield* getOrCreate(sessionID)
+          yield* Effect.tryPromise({
+            try: () => filesOf(sb).writeFiles([{ path: sandboxPath, data }]),
+            catch: (cause) =>
+              new Error(`writeFiles failed: ${sandboxPath}: ${cause instanceof Error ? cause.message : String(cause)}`),
+          })
+        }).pipe(Effect.withSpan("SandboxProvider.fileWrite")),
+
+      fileList: (sessionID, sandboxPath) =>
+        Effect.gen(function* () {
+          const sb = yield* getOrCreate(sessionID)
+          const entries = yield* Effect.tryPromise({
+            try: () => filesOf(sb).listDirectory({ path: sandboxPath }),
+            catch: (cause) =>
+              new Error(
+                `listDirectory failed: ${sandboxPath}: ${cause instanceof Error ? cause.message : String(cause)}`,
+              ),
+          })
+          return entries.map((entry) => ({
+            name: entry.name ?? "",
+            isDirectory: isDirectoryMode(entry.mode),
+          }))
+        }).pipe(Effect.withSpan("SandboxProvider.fileList")),
     })
   }),
 )

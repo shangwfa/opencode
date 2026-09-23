@@ -8,6 +8,7 @@ import { AppNodeBuilder } from "@opencode/core/effect/app-node-builder"
 import { LayerNode } from "@opencode/util/effect/layer-node"
 import { Environment } from "@opencode/core/environment/index"
 import { Location } from "@opencode/core/location"
+import { SandboxProvider } from "@opencode/core/sandbox/provider"
 import { FileAccess } from "@opencode/core/file-access"
 import { Permission } from "@opencode/core/permission"
 import { AbsolutePath } from "@opencode/core/schema"
@@ -25,7 +26,7 @@ import { toolIdentity, executeTool, registerToolPlugin, toolDefinitions } from "
 const writeToolNode = makeLocationNode({
   name: "test/write-tool-plugin",
   layer: Layer.effectDiscard(registerToolPlugin(WriteTool.Plugin)),
-  deps: [Tool.node, FileAccess.node, FileMutation.node, Environment.node, Formatter.node, Permission.node],
+  deps: [Tool.node, FileAccess.node, FileMutation.node, Environment.node, Formatter.node, Permission.node, Location.node, SandboxProvider.node],
 })
 
 const sessionID = Session.ID.make("ses_write_tool_test")
@@ -79,8 +80,7 @@ const withTool = <A, E, R>(
     return yield* body(registry)
   }).pipe(
     Effect.provide(
-      AppNodeBuilder.build(LayerNode.group([Tool.node, FileAccess.node, FileMutation.node, writeToolNode]), [
-        Environment.node.replace(
+      AppNodeBuilder.build(LayerNode.group([Tool.node, Location.node, FileAccess.node, FileMutation.node, writeToolNode, SandboxProvider.node]), [        Environment.node.replace(
           transformEnvironmentFiles((files) => ({
             write: (target, content) =>
               Effect.sync(() => fixture.writes.push(target)).pipe(Effect.andThen(files.write(target, content))),

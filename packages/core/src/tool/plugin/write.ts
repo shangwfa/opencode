@@ -14,7 +14,10 @@ import { Environment } from "../../environment/index.js"
 import { FileMutation } from "../../file-mutation.js"
 import { Formatter } from "../../formatter.js"
 import { FileAccess } from "../../file-access.js"
+import { Location } from "../../location.js"
 import { Permission } from "../../permission.js"
+import { SandboxProvider } from "../../sandbox/provider.js"
+import { SandboxTools } from "../../sandbox/tools.js"
 import { fileDiff } from "./file-diff.js"
 
 export const name = "write"
@@ -51,6 +54,9 @@ export const Plugin = {
     const environment = yield* Environment.Service
     const formatter = yield* Formatter.Service
     const permission = yield* Permission.Service
+    const sandboxProvider = yield* SandboxProvider.Service
+    const location = yield* Location.Service
+    const sandboxDeps = { provider: sandboxProvider, location, permission }
 
     yield* ctx.tool
       .transform((editor) =>
@@ -63,6 +69,8 @@ export const Plugin = {
           output: Output,
           execute: (input, context) =>
             Effect.gen(function* () {
+              if (sandboxProvider.enabled)
+                return yield* SandboxTools.write(sandboxDeps, input, context, fileDiff)
               const source = {
                 type: "tool" as const,
                 messageID: context.messageID,

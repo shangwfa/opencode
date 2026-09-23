@@ -7,6 +7,7 @@ import { LayerNode } from "@opencode/util/effect/layer-node"
 import { FileSystem } from "@opencode/core/filesystem"
 import { FSUtil } from "@opencode/util/fs-util"
 import { Location } from "@opencode/core/location"
+import { SandboxProvider } from "@opencode/core/sandbox/provider"
 import { Image } from "@opencode/core/image"
 import { Permission } from "@opencode/core/permission"
 import { Session } from "@opencode/core/session"
@@ -36,6 +37,7 @@ const readToolNode = makeLocationNode({
     SessionInstructions.node,
     FSUtil.node,
     Location.node,
+    SandboxProvider.node,
   ],
 })
 
@@ -118,7 +120,7 @@ const unavailableImage = Layer.mock(Image.Service, {
 })
 const readLayer = (imageLayer: Layer.Layer<Image.Service>) =>
   Layer.mergeAll(
-    AppNodeBuilder.build(LayerNode.group([Tool.node, readToolNode]), [
+    AppNodeBuilder.build(LayerNode.group([Tool.node, readToolNode, SandboxProvider.node]), [
       ReadToolFileSystem.node.replace(reader),
       Permission.node.replace(permission),
       Config.node.replace(config),

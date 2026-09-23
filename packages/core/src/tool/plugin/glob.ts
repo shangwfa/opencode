@@ -11,6 +11,8 @@ import { FileAccess } from "../../file-access.js"
 import { Ripgrep } from "../../ripgrep.js"
 import { RelativePath } from "../../schema.js"
 import { Permission } from "../../permission.js"
+import { SandboxProvider } from "../../sandbox/provider.js"
+import { SandboxTools } from "../../sandbox/tools.js"
 
 export const name = "glob"
 
@@ -50,6 +52,8 @@ export const Plugin = {
     const location = yield* Location.Service
     const access = yield* FileAccess.Service
     const permission = yield* Permission.Service
+    const sandboxProvider = yield* SandboxProvider.Service
+    const sandboxDeps = { provider: sandboxProvider, location, permission }
 
     yield* ctx.tool
       .transform((editor) =>
@@ -61,6 +65,7 @@ export const Plugin = {
           output: Output,
           execute: (input, context) =>
             Effect.gen(function* () {
+              if (sandboxProvider.enabled) return yield* SandboxTools.glob(sandboxDeps, input, context)
               const searchPath = input.path === "undefined" || input.path === "null" ? undefined : input.path
               const source = { type: "tool" as const, messageID: context.messageID, id: context.id }
               const target = yield* access.resolve({ path: searchPath ?? ".", kind: "directory" })

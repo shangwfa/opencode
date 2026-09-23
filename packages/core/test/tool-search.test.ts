@@ -8,6 +8,7 @@ import { LayerNode } from "@opencode/util/effect/layer-node"
 import { Environment } from "@opencode/core/environment/index"
 import { FileSystem } from "@opencode/core/filesystem"
 import { Location } from "@opencode/core/location"
+import { SandboxProvider } from "@opencode/core/sandbox/provider"
 import { FileAccess } from "@opencode/core/file-access"
 import { Permission } from "@opencode/core/permission"
 import { Ripgrep } from "@opencode/core/ripgrep"
@@ -25,12 +26,12 @@ import { executeTool, registerToolPlugin, toolIdentity } from "./lib/tool"
 const globToolNode = makeLocationNode({
   name: "test/glob-tool-plugin",
   layer: Layer.effectDiscard(registerToolPlugin(GlobTool.Plugin)),
-  deps: [Tool.node, Environment.node, Ripgrep.node, Location.node, FileAccess.node, Permission.node],
+  deps: [Tool.node, Environment.node, Ripgrep.node, Location.node, FileAccess.node, Permission.node, SandboxProvider.node],
 })
 const grepToolNode = makeLocationNode({
   name: "test/grep-tool-plugin",
   layer: Layer.effectDiscard(registerToolPlugin(GrepTool.Plugin)),
-  deps: [Tool.node, Environment.node, Ripgrep.node, Location.node, FileAccess.node, Permission.node],
+  deps: [Tool.node, Environment.node, Ripgrep.node, Location.node, FileAccess.node, Permission.node, SandboxProvider.node],
 })
 const sessionID = Session.ID.make("ses_search_tool_test")
 
@@ -44,7 +45,7 @@ const withTools = <A, E, R>(
     return yield* body(registry)
   }).pipe(
     Effect.provide(
-      AppNodeBuilder.build(LayerNode.group([Tool.node, globToolNode, grepToolNode]), [
+      AppNodeBuilder.build(LayerNode.group([Tool.node, globToolNode, grepToolNode, SandboxProvider.node]), [
         Location.node.replace(
           Layer.succeed(Location.Service, Location.Service.of(location({ directory: AbsolutePath.make(directory) }))),
         ),

@@ -6,6 +6,8 @@ import { ToolFailure } from "@opencode/ai"
 import { Effect, Schema } from "effect"
 import { FSUtil } from "@opencode/util/fs-util"
 import { Location } from "../../location.js"
+import { SandboxProvider } from "../../sandbox/provider.js"
+import { SandboxTools } from "../../sandbox/tools.js"
 import { FileAccess } from "../../file-access.js"
 import { SessionInstructions } from "../../session/instructions.js"
 import { AbsolutePath } from "../../schema.js"
@@ -34,6 +36,7 @@ export const Plugin = {
     const sessionInstructions = yield* SessionInstructions.Service
     const fs = yield* FSUtil.Service
     const location = yield* Location.Service
+    const sandboxProvider = yield* SandboxProvider.Service
 
     yield* ctx.tool
       .transform((editor) =>
@@ -46,6 +49,10 @@ export const Plugin = {
           output: Output,
           execute: (input, context) => {
             return Effect.gen(function* () {
+              if (sandboxProvider.enabled)
+                return yield* SandboxTools.read({ provider: sandboxProvider, location }, input, context).pipe(
+                  Effect.map((output) => ({ output, path: input.path })),
+                )
               const read = (target: FileAccess.Target) =>
                 reader.read(target.absolute, target.resource, {
                   offset: input.offset,
