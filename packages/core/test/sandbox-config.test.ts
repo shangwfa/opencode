@@ -72,10 +72,10 @@ describe("SandboxConfig.load", () => {
   })
 
   it("defaults the create timeout and allows overriding it", () => {
-    expect(SandboxConfig.load().createTimeoutSeconds).toBe(120)
-    process.env["OPENCODE_SANDBOX_CREATE_TIMEOUT_SECONDS"] = "300"
     expect(SandboxConfig.load().createTimeoutSeconds).toBe(300)
+    process.env["OPENCODE_SANDBOX_CREATE_TIMEOUT_SECONDS"] = "600"
+    expect(SandboxConfig.load().createTimeoutSeconds).toBe(600)
     process.env["OPENCODE_SANDBOX_CREATE_TIMEOUT_SECONDS"] = "invalid"
-    expect(SandboxConfig.load().createTimeoutSeconds).toBe(120)
+    expect(SandboxConfig.load().createTimeoutSeconds).toBe(300)
   })
 })
