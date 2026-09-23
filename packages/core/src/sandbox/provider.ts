@@ -79,6 +79,7 @@ type SandboxFilesApi = {
   getFileInfo(paths: string[]): Promise<Record<string, { mode?: number }>>
   readFile(path: string, opts?: { encoding?: string }): Promise<string>
   writeFiles(entries: { path: string; data: string }[]): Promise<void>
+  createDirectories(entries: { path: string }[]): Promise<void>
   listDirectory(entry: { path: string }): Promise<Array<{ name?: string; mode?: number }>>
 }
 
@@ -137,30 +138,46 @@ const layer = Layer.effect(
     const createSandbox = (sessionID: string) =>
       Effect.gen(function* () {
         yield* Effect.logInfo("sandbox creating", { sessionID })
+        // A timed-out or interrupted create cannot cancel the in-flight HTTP
+        // request, so the created sandbox would leak. Track abandonment and
+        // let the resolve path destroy what nobody is waiting for.
+        const abandoned = yield* Ref.make(false)
         const sb = yield* Effect.tryPromise({
-          try: () =>
-            Sandbox.create({
+          try: async () => {
+            const created = await Sandbox.create({
               connectionConfig,
               image: config.image,
               timeoutSeconds: config.timeoutSeconds,
               resource: config.resource,
-            }),
+            })
+            if (await Effect.runPromise(Ref.get(abandoned))) {
+              await created.kill().catch(() => {})
+              await created.close().catch(() => {})
+              throw new Error(`Sandbox creation abandoned: ${sessionID}`)
+            }
+            return created
+          },
           catch: (cause) =>
             new Error(`Sandbox.create failed: ${cause instanceof Error ? cause.message : String(cause)}`),
-        })
+        }).pipe(
+          Effect.onInterrupt(() => Ref.set(abandoned, true)),
+          Effect.timeoutOrElse({
+            duration: Duration.seconds(config.createTimeoutSeconds),
+            orElse: () =>
+              Effect.gen(function* () {
+                yield* Ref.set(abandoned, true)
+                return yield* Effect.fail(
+                  new Error(`Sandbox create timed out after ${config.createTimeoutSeconds}s: ${sessionID}`),
+                )
+              }),
+          }),
+        )
         // No volume is attached, so the workspace directory must exist before
         // the first command can cd into it.
         yield* Effect.promise(() => commandsOf(sb).run("mkdir -p /workspace")).pipe(Effect.ignore)
         yield* Effect.logInfo("sandbox created", { sessionID, sandboxID: sb.id })
         return sb
-      }).pipe(
-        Effect.timeoutOrElse({
-          duration: Duration.seconds(config.createTimeoutSeconds),
-          orElse: () =>
-            Effect.fail(new Error(`Sandbox create timed out after ${config.createTimeoutSeconds}s: ${sessionID}`)),
-        }),
-        Effect.withSpan("SandboxProvider.createSandbox"),
-      )
+      }).pipe(Effect.withSpan("SandboxProvider.createSandbox"))
 
     const getOrCreate = (sessionID: string) =>
       Effect.gen(function* () {
@@ -359,6 +376,11 @@ const layer = Layer.effect(
       fileWrite: (sessionID, sandboxPath, data) =>
         Effect.gen(function* () {
           const sb = yield* getOrCreate(sessionID)
+          // The files API does not create parent directories; sandboxes here
+          // run without a volume, so nested paths need them first.
+          const parent = sandboxPath.slice(0, sandboxPath.lastIndexOf("/"))
+          if (parent.length > 0)
+            yield* Effect.promise(() => filesOf(sb).createDirectories([{ path: parent }])).pipe(Effect.ignore)
           yield* Effect.tryPromise({
             try: () => filesOf(sb).writeFiles([{ path: sandboxPath, data }]),
             catch: (cause) =>
