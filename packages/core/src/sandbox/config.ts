@@ -41,7 +41,7 @@ export function load(): Config {
     useServerProxy: flag(env["OPENCODE_SANDBOX_USE_SERVER_PROXY"]),
     image: env["OPENCODE_SANDBOX_IMAGE"] || DEFAULT_IMAGE,
     timeoutSeconds: number(env["OPENCODE_SANDBOX_TIMEOUT_SECONDS"], 30 * 60),
-    createTimeoutSeconds: number(env["OPENCODE_SANDBOX_CREATE_TIMEOUT_SECONDS"], 120),
+    createTimeoutSeconds: number(env["OPENCODE_SANDBOX_CREATE_TIMEOUT_SECONDS"], 300),
     resource: {
       cpu: env["OPENCODE_SANDBOX_CPU"] || "2",
       memory: env["OPENCODE_SANDBOX_MEMORY"] || "4Gi",

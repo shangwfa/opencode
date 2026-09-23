@@ -36,11 +36,19 @@ export interface Interface {
   ) => Effect.Effect<{ readonly isDirectory: boolean } | null, Error>
   /** null result means the path does not exist inside the sandbox. */
   readonly fileRead: (sessionID: string, sandboxPath: string) => Effect.Effect<string | null, Error>
+  /** Binary reads for the session-scoped fs.read route; null when absent. */
+  readonly fileReadBytes: (sessionID: string, sandboxPath: string) => Effect.Effect<Uint8Array | null, Error>
   readonly fileWrite: (sessionID: string, sandboxPath: string, data: string) => Effect.Effect<void, Error>
   readonly fileList: (
     sessionID: string,
     sandboxPath: string,
   ) => Effect.Effect<ReadonlyArray<{ readonly name: string; readonly isDirectory: boolean }>, Error>
+  /** Recursive filename search, used by the session-scoped fs.find route. */
+  readonly fileFind: (
+    sessionID: string,
+    sandboxPath: string,
+    query: string,
+  ) => Effect.Effect<ReadonlyArray<{ readonly path: string; readonly isDirectory: boolean }>, Error>
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/SandboxProvider") {}
@@ -78,9 +86,11 @@ type ExecCommands = {
 type SandboxFilesApi = {
   getFileInfo(paths: string[]): Promise<Record<string, { mode?: number }>>
   readFile(path: string, opts?: { encoding?: string }): Promise<string>
+  readBytes(path: string, opts?: { range?: string }): Promise<Uint8Array>
   writeFiles(entries: { path: string; data: string }[]): Promise<void>
   createDirectories(entries: { path: string }[]): Promise<void>
   listDirectory(entry: { path: string }): Promise<Array<{ name?: string; mode?: number }>>
+  search(entry: { path: string; pattern?: string }): Promise<Array<{ name?: string; path?: string; mode?: number }>>
 }
 
 const commandsOf = (sb: Sandbox): ExecCommands => sb.commands as unknown as ExecCommands
@@ -102,8 +112,10 @@ const layer = Layer.effect(
         destroy: () => Effect.void,
         fileStat: () => Effect.die(new Error("Sandbox provider is disabled")),
         fileRead: () => Effect.die(new Error("Sandbox provider is disabled")),
+        fileReadBytes: () => Effect.die(new Error("Sandbox provider is disabled")),
         fileWrite: () => Effect.die(new Error("Sandbox provider is disabled")),
         fileList: () => Effect.die(new Error("Sandbox provider is disabled")),
+        fileFind: () => Effect.die(new Error("Sandbox provider is disabled")),
       })
 
     const entries = yield* Ref.make(new Map<string, Entry>())
@@ -152,6 +164,10 @@ const layer = Layer.effect(
               connectionConfig,
               image: config.image,
               timeoutSeconds: config.timeoutSeconds,
+              // The SDK's own readiness wait defaults to 60s; first pulls of
+              // large images exceed that and fail client-side while the
+              // remote sandbox is still converging.
+              readyTimeoutSeconds: config.createTimeoutSeconds,
               resource: config.resource,
             })
             if (await Effect.runPromise(Ref.get(abandoned))) {
@@ -387,6 +403,26 @@ const layer = Layer.effect(
           })
         }).pipe(Effect.withSpan("SandboxProvider.fileRead")),
 
+      fileReadBytes: (sessionID, sandboxPath) =>
+        Effect.gen(function* () {
+          const sb = yield* getOrCreate(sessionID)
+          return yield* Effect.tryPromise({
+            try: async () =>
+              filesOf(sb).readBytes(sandboxPath).catch((cause) => {
+                if (
+                  typeof cause === "object" &&
+                  cause !== null &&
+                  "statusCode" in cause &&
+                  (cause as { statusCode?: number }).statusCode === 404
+                )
+                  return null
+                throw cause
+              }),
+            catch: (cause) =>
+              new Error(`readBytes failed: ${sandboxPath}: ${cause instanceof Error ? cause.message : String(cause)}`),
+          })
+        }).pipe(Effect.withSpan("SandboxProvider.fileReadBytes")),
+
       fileWrite: (sessionID, sandboxPath, data) =>
         Effect.gen(function* () {
           const sb = yield* getOrCreate(sessionID)
@@ -417,6 +453,20 @@ const layer = Layer.effect(
             isDirectory: isDirectoryMode(entry.mode),
           }))
         }).pipe(Effect.withSpan("SandboxProvider.fileList")),
+
+      fileFind: (sessionID, sandboxPath, query) =>
+        Effect.gen(function* () {
+          const sb = yield* getOrCreate(sessionID)
+          const entries = yield* Effect.tryPromise({
+            try: () => filesOf(sb).search({ path: sandboxPath, pattern: query }),
+            catch: (cause) =>
+              new Error(`search failed: ${sandboxPath}: ${cause instanceof Error ? cause.message : String(cause)}`),
+          })
+          return entries.map((entry) => ({
+            path: entry.path ?? entry.name ?? "",
+            isDirectory: isDirectoryMode(entry.mode),
+          }))
+        }).pipe(Effect.withSpan("SandboxProvider.fileFind")),
     })
   }),
 )

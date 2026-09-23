@@ -11,6 +11,7 @@ import { FileMutation } from "./file-mutation.js"
 import { Environment } from "./environment/index.js"
 import { Formatter } from "./formatter.js"
 import { FileSystem } from "./filesystem.js"
+import { SandboxProvider } from "./sandbox/provider.js"
 import { FileSystemSearch } from "./filesystem/search.js"
 import { Generate } from "./generate.js"
 import { Form } from "./form.js"
@@ -78,6 +79,7 @@ const nodes = [
   WorktreeStrategies.node,
   FileSystemSearch.node,
   FileSystem.node,
+  SandboxProvider.node,
   ShellSelect.node,
   Pty.node,
   Shell.node,

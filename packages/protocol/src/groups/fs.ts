@@ -6,8 +6,21 @@ import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema, OpenApi } from "effect/un
 import { FileNotFoundError } from "../errors.js"
 import { LocationQuery, locationQueryOpenApi } from "./location.js"
 
+const SessionQuery = Schema.Struct({
+  session: Schema.String.pipe(Schema.optional).annotate({
+    description:
+      "Session ID. When set, the operation runs inside that session's sandbox through its workspace mount; when omitted it reads the host filesystem.",
+  }),
+})
+
+const ReadQuery = Schema.Struct({
+  ...LocationQuery.fields,
+  ...SessionQuery.fields,
+})
+
 const ListQuery = Schema.Struct({
   ...LocationQuery.fields,
+  ...SessionQuery.fields,
   path: Schema.String.pipe(Schema.optional).annotate({
     description: "An absolute path or a path relative to the requested location. Defaults to the location directory.",
   }),
@@ -15,6 +28,7 @@ const ListQuery = Schema.Struct({
 
 const FindQuery = Schema.Struct({
   ...LocationQuery.fields,
+  ...SessionQuery.fields,
   query: FileSystem.FindInput.fields.query,
   type: FileSystem.FindInput.fields.type,
   limit: Schema.NumberFromString.pipe(Schema.decodeTo(PositiveInt), Schema.optional),
@@ -23,7 +37,7 @@ const FindQuery = Schema.Struct({
 export const FileSystemGroup = HttpApiGroup.make("server.fs")
   .add(
     HttpApiEndpoint.get("fs.read", "/api/fs/read/*", {
-      query: LocationQuery,
+      query: ReadQuery,
       success: Schema.Uint8Array.pipe(HttpApiSchema.asUint8Array()),
       error: FileNotFoundError,
     })
@@ -40,6 +54,7 @@ export const FileSystemGroup = HttpApiGroup.make("server.fs")
     HttpApiEndpoint.get("fs.list", "/api/fs/list", {
       query: ListQuery,
       success: Location.response(Schema.Array(FileSystem.Entry)),
+      error: FileNotFoundError,
     })
       .annotateMerge(locationQueryOpenApi)
       .annotateMerge(
@@ -55,6 +70,7 @@ export const FileSystemGroup = HttpApiGroup.make("server.fs")
     HttpApiEndpoint.get("fs.find", "/api/fs/find", {
       query: FindQuery,
       success: Location.response(Schema.Array(FileSystem.Entry)),
+      error: FileNotFoundError,
     })
       .annotateMerge(locationQueryOpenApi)
       .annotateMerge(
