@@ -19,7 +19,16 @@ WORKDIR /app
 COPY package.json bun.lock bunfig.toml ./
 COPY patches/ patches/
 COPY packages packages
-RUN --mount=type=cache,target=/root/.bun/install/cache,sharing=locked bun install --ignore-scripts
+# The SaaS server only ever runs packages/{cli,server,core} and their
+# transitive deps. A root-wide install pulls multi-GB build-only deps for the
+# desktop/console/docs/app workspaces (electron-builder, workerd, playwright,
+# mermaid, sst, pagefind…), which bloats the image. Filter the install to the
+# server workspace graph instead.
+RUN --mount=type=cache,target=/root/.bun/install/cache,sharing=locked \
+    bun install --ignore-scripts \
+      --filter '@opencode/cli' \
+      --filter '@opencode/server' \
+      --filter '@opencode/core'
 
 RUN find /app -path "*/node-pty/prebuilds/*/spawn-helper" -exec chmod +x {} \;
 
