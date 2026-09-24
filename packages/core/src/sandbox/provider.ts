@@ -1,7 +1,7 @@
 export * as SandboxProvider from "./provider.js"
 
 import { ConnectionConfig, Sandbox } from "@alibaba-group/opensandbox"
-import { Context, Deferred, Duration, Effect, Layer, Ref, Semaphore } from "effect"
+import { Context, Deferred, Duration, Effect, Layer, Option, Ref, Schedule, Semaphore } from "effect"
 import { makeLocationNode } from "@opencode/util/effect/app-node"
 import { SandboxConfig } from "./config.js"
 import { SandboxPath } from "./path.js"
@@ -131,6 +131,74 @@ const isNotFound = (cause: unknown) => {
   return /(?:file|path|directory) not found|no such file/i.test(message)
 }
 
+/**
+ * Waiting for a sandbox create/reconnect must be bounded: a cached entry can be
+ * stale and the remote control plane can hang, in which case an unbounded wait
+ * pins the command Semaphore and starves every later command for the session.
+ */
+const GET_OR_CREATE_TIMEOUT_SECONDS = 90
+/**
+ * Outer budget for "wait for the command lock + run" = the caller's execution
+ * timeout plus a backlog grace. The grace keeps a long queue wait from being
+ * misreported as the command itself timing out.
+ */
+const COMMAND_QUEUE_GRACE_SECONDS = 5
+const COMMAND_CLEANUP_TIMEOUT_SECONDS = 10
+const COMMAND_PERMIT_UNAVAILABLE = new Error("command semaphore unavailable")
+
+/** Fails an operation that exceeds its budget, naming the operation. */
+export const withOperationTimeout = <A, E, R>(
+  effect: Effect.Effect<A, E, R>,
+  seconds: number,
+  operation: string,
+): Effect.Effect<A, E | Error, R> =>
+  effect.pipe(
+    Effect.timeoutOrElse({
+      duration: Duration.seconds(seconds),
+      orElse: () => Effect.fail(new Error(`${operation} timed out after ${seconds}s`)),
+    }),
+  )
+
+/**
+ * Queues behind a Semaphore with a bounded wait. Availability is polled so the
+ * outer budget (execution timeout + backlog grace) always exceeds the caller's
+ * own exec timeout, keeping "queued too long" distinct from "ran too long".
+ */
+export const withSemaphoreWaitTimeout = <A, E, R>(
+  semaphore: Semaphore.Semaphore,
+  effect: Effect.Effect<A, E, R>,
+  timeoutSeconds: number,
+  operation: string,
+): Effect.Effect<A, E | Error, R> =>
+  withOperationTimeout(
+    semaphore.withPermitsIfAvailable(1)(effect).pipe(
+      Effect.flatMap((result) =>
+        Option.isSome(result) ? Effect.succeed(result.value) : Effect.fail(COMMAND_PERMIT_UNAVAILABLE),
+      ),
+      Effect.retry({
+        while: (error) => error === COMMAND_PERMIT_UNAVAILABLE,
+        schedule: Schedule.spaced(Duration.millis(10)),
+      }),
+    ),
+    timeoutSeconds + COMMAND_QUEUE_GRACE_SECONDS,
+    operation,
+  )
+
+/**
+ * Sandbox-level disappearance (sandbox or command session reaped while a turn
+ * waited on the user). Rebuilding and retrying once is safe because a gone
+ * sandbox can never have executed the command. Deliberately narrow matching:
+ * business-level "not found" must never trigger a retry.
+ */
+export const isSandboxGone = (error: unknown): boolean => {
+  const message = error instanceof Error ? error.message : String(error)
+  if (message.includes("Sandbox is no longer running")) return true
+  return (
+    /^runInSession failed:|^runDetached failed:|^Failed to create (command|detached) session:/i.test(message) &&
+    /not found|\b404\b/i.test(message)
+  )
+}
+
 const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
@@ -158,6 +226,10 @@ const layer = Layer.effect(
 
     const entries = yield* Ref.make(new Map<string, Entry>())
     const creates = yield* Ref.make(new Map<string, Deferred.Deferred<Sandbox, Error>>())
+    // Command-session creation is deduplicated per session: concurrent first
+    // commands all observe an empty commandSessionID, so without a claim the
+    // sandbox would end up with several leaked bash sessions.
+    const sessionCreates = yield* Ref.make(new Map<string, Deferred.Deferred<string, Error>>())
     // One bash session is shared per sandbox and its state is not
     // concurrency-safe: commands must run one at a time per session (v1
     // serialized the same way).
@@ -246,6 +318,15 @@ const layer = Layer.effect(
     const destroySandbox = (sessionID: string) =>
       Effect.gen(function* () {
         const entry = yield* drop(sessionID)
+        // Cancel any in-flight command-session claim so waiters fail fast
+        // instead of hanging on a sandbox that is being torn down.
+        const pendingSession = yield* Ref.modify(sessionCreates, (map) => {
+          const found = map.get(sessionID) ?? null
+          if (found) map.delete(sessionID)
+          return [found, map] as const
+        })
+        if (pendingSession)
+          yield* Deferred.fail(pendingSession, new Error(`Sandbox destroyed: ${sessionID}`)).pipe(Effect.ignore)
         const row = yield* dbGet(sessionID)
         let destroyed = false
         if (entry) {
@@ -366,87 +447,181 @@ const layer = Layer.effect(
           if (existing) return [existing, map] as const
           return [myToken, map.set(sessionID, myToken)] as const
         })
-        if (winner !== myToken) return yield* Deferred.await(winner).pipe(Effect.orDie)
+        if (winner !== myToken) return yield* Deferred.await(winner)
 
-        const sb = yield* Effect.gen(function* () {
+        const resolve = Effect.gen(function* () {
           const entry = yield* Ref.modify(entries, (map) => [map.get(sessionID) ?? null, map] as const)
-          if (!entry) {
-            const row = yield* dbGet(sessionID)
-            if (row?.state === "running" && !row.id.startsWith("pending-")) {
-              const connected = yield* Effect.tryPromise({
-                try: () => Sandbox.connect({ connectionConfig, sandboxId: row.id }),
-                catch: (cause) => new Error(`Sandbox reconnect failed: ${String(cause)}`),
-              }).pipe(Effect.catch(() => Effect.succeed(null)))
-              if (connected) {
-                yield* Ref.update(entries, (map) =>
-                  map.set(sessionID, {
-                    sb: connected,
-                    commandSessionID: row.command_session_id ?? "",
-                  }),
-                )
-                return connected
+          const sb = yield* Effect.gen(function* () {
+            if (!entry) {
+              const row = yield* dbGet(sessionID)
+              if (row?.state === "running" && !row.id.startsWith("pending-")) {
+                const connected = yield* Effect.tryPromise({
+                  try: () => Sandbox.connect({ connectionConfig, sandboxId: row.id }),
+                  catch: (cause) => new Error(`Sandbox reconnect failed: ${String(cause)}`),
+                }).pipe(Effect.catch(() => Effect.succeed(null)))
+                if (connected) {
+                  yield* Ref.update(entries, (map) =>
+                    map.set(sessionID, { sb: connected, commandSessionID: row.command_session_id ?? "" }),
+                  )
+                  return connected
+                }
               }
+              return yield* createSandbox(sessionID)
             }
+            const healthy = yield* Effect.promise(() => entry.sb.isHealthy()).pipe(
+              Effect.catchCause(() => Effect.succeed(false)),
+            )
+            if (healthy) return entry.sb
+            yield* Effect.logWarning("sandbox unhealthy, rebuilding", { sessionID })
+            yield* destroySandbox(sessionID)
             return yield* createSandbox(sessionID)
-          }
+          })
+          // Register every created sandbox here — file-only paths never touch
+          // the command session, and readiness checks, health rebuilds, and
+          // destroy all key off this entry.
+          yield* Ref.modify(entries, (map) => {
+            const previous = map.get(sessionID)
+            if (previous?.sb === sb) return [undefined, map] as const
+            map.set(sessionID, { sb, commandSessionID: "" })
+            return [undefined, map] as const
+          })
+          yield* touchSandbox(sessionID)
+          yield* Deferred.succeed(myToken, sb)
+          return sb
+        })
+
+        // Creation runs in a detached fiber: if the waiting request gives up
+        // (client disconnect, 90s budget) the create still runs to completion
+        // and succeeds the token, so a retry joins the in-flight creation via
+        // `creates` instead of starting a second sandbox. `ensuring` guarantees
+        // the token is always reclaimed, even on interruption, so no later
+        // command can wait on a Deferred that will never settle.
+        const creation = resolve.pipe(
+          Effect.catch((error) =>
+            Deferred.fail(myToken, error).pipe(Effect.ignore, Effect.andThen(Effect.fail(error))),
+          ),
+          Effect.ensuring(
+            Effect.gen(function* () {
+              const removed = yield* Ref.modify(creates, (map) => {
+                if (map.get(sessionID) !== myToken) return [false, map] as const
+                map.delete(sessionID)
+                return [true, map] as const
+              })
+              if (removed)
+                yield* Deferred.fail(myToken, new Error(`Sandbox creation interrupted: ${sessionID}`)).pipe(Effect.ignore)
+            }),
+          ),
+          Effect.withSpan("SandboxProvider.resolveSandbox"),
+        )
+        yield* Effect.forkDetach(creation)
+        return yield* Deferred.await(myToken)
+      })
+
+    /**
+     * Resolve the live sandbox for preview-style routes without ever creating
+     * one: a cached unhealthy entry or a missing running row reports null so
+     * the HTTP layer can answer 502 immediately instead of blocking behind a
+     * remote create. A known running row is reconnected and cached read-only.
+     */
+    const resolveExisting = (sessionID: string) =>
+      Effect.gen(function* () {
+        const entry = yield* Ref.modify(entries, (map) => [map.get(sessionID) ?? null, map] as const)
+        if (entry) {
           const healthy = yield* Effect.promise(() => entry.sb.isHealthy()).pipe(
             Effect.catchCause(() => Effect.succeed(false)),
           )
-          if (healthy) return entry.sb
-          yield* Effect.logWarning("sandbox unhealthy, rebuilding", { sessionID })
-          yield* destroySandbox(sessionID)
-          return yield* createSandbox(sessionID)
-        }).pipe(
-          Effect.catchCause((cause) =>
-            Effect.gen(function* () {
-              yield* Ref.modify(creates, (map) => {
-                map.delete(sessionID)
-                return [undefined, map] as const
-              })
-              yield* Deferred.fail(myToken, new Error("Sandbox creation failed")).pipe(Effect.ignore)
-              return yield* Effect.failCause(cause)
-            }),
-          ),
+          return healthy ? entry.sb : null
+        }
+        const row = yield* dbGet(sessionID)
+        if (!row || row.state !== "running" || row.id.startsWith("pending-")) return null
+        const connected = yield* Effect.tryPromise({
+          try: () => Sandbox.connect({ connectionConfig, sandboxId: row.id, skipHealthCheck: true }),
+          catch: (cause) => new Error(`Sandbox reconnect failed: ${String(cause)}`),
+        }).pipe(Effect.catch(() => Effect.succeed(null)))
+        if (!connected) return null
+        yield* Ref.update(entries, (map) =>
+          map.has(sessionID) ? map : map.set(sessionID, { sb: connected, commandSessionID: row.command_session_id ?? "" }),
         )
+        return connected
+      })
 
-        yield* Ref.modify(creates, (map) => {
-          map.delete(sessionID)
-          return [undefined, map] as const
-        })
-        // Register every created sandbox here — file-only paths never touch
-        // the command session, and readiness checks, health rebuilds, and
-        // destroy all key off this entry.
-        yield* Ref.modify(entries, (map) => {
-          const previous = map.get(sessionID)
-          if (previous?.sb === sb) return [undefined, map] as const
-          map.set(sessionID, { sb, commandSessionID: "" })
-          return [undefined, map] as const
-        })
-        yield* Deferred.succeed(myToken, sb)
-        yield* touchSandbox(sessionID)
-        return sb
-      }).pipe(Effect.orDie)
-
-    const commandSession = (sessionID: string, sb: Sandbox) =>
+    /** Drop cached state after a sandbox-level disappearance so a retry rebuilds. */
+    const invalidateSandbox = (sessionID: string) =>
       Effect.gen(function* () {
-        const existing = yield* Ref.modify(entries, (map) => [map.get(sessionID)?.commandSessionID ?? "", map] as const)
-        if (existing) return existing
-        const id = yield* Effect.tryPromise({
-          try: () => commandsOf(sb).createSession({ workingDirectory: SandboxPath.WORKDIR }),
-          catch: (cause) => new Error(`Sandbox command session failed: ${String(cause)}`),
-        })
-        yield* Ref.modify(entries, (map) => {
-          const current = map.get(sessionID)
-          if (current && !current.commandSessionID) map.set(sessionID, { ...current, commandSessionID: id })
+        yield* drop(sessionID)
+        yield* Ref.modify(sessionCreates, (map) => {
+          map.delete(sessionID)
           return [undefined, map] as const
         })
         yield* db
           .update(SandboxTable)
-          .set({ command_session_id: id, time_updated: Date.now() })
+          .set({ command_session_id: null, time_updated: Date.now() })
           .where(eq(SandboxTable.session_id, sessionID))
           .run()
           .pipe(Effect.orDie)
-        return id
+      })
+
+    const commandSession = (sessionID: string, sb: Sandbox) =>
+      Effect.gen(function* () {
+        const cached = yield* Ref.modify(entries, (map) => [map.get(sessionID)?.commandSessionID ?? "", map] as const)
+        if (cached) return cached
+
+        // Concurrent first commands all see an empty commandSessionID. Claim a
+        // token so only one createSession runs; the rest await its result and
+        // reuse it, otherwise the sandbox leaks duplicate bash sessions.
+        const myToken = yield* Deferred.make<string, Error>()
+        const winner = yield* Ref.modify(sessionCreates, (map) => {
+          const existing = map.get(sessionID)
+          if (existing) return [existing, map] as const
+          return [myToken, map.set(sessionID, myToken)] as const
+        })
+        if (winner !== myToken) return yield* Deferred.await(winner)
+
+        const creation = Effect.gen(function* () {
+          // Re-check inside the claim: a previous winner may have populated it.
+          const current = yield* Ref.modify(entries, (map) => [map.get(sessionID)?.commandSessionID ?? "", map] as const)
+          if (current) return current
+          const id = yield* withOperationTimeout(
+            Effect.tryPromise({
+              try: () => commandsOf(sb).createSession({ workingDirectory: SandboxPath.WORKDIR }),
+              catch: (cause) => new Error(`Failed to create command session: ${String(cause)}`),
+            }),
+            Math.max(1, Math.ceil(config.createTimeoutSeconds / 10)),
+            "create command session",
+          )
+          yield* Ref.modify(entries, (map) => {
+            const entry = map.get(sessionID)
+            if (entry && !entry.commandSessionID) map.set(sessionID, { ...entry, commandSessionID: id })
+            return [undefined, map] as const
+          })
+          yield* db
+            .update(SandboxTable)
+            .set({ command_session_id: id, time_updated: Date.now() })
+            .where(eq(SandboxTable.session_id, sessionID))
+            .run()
+            .pipe(Effect.orDie)
+          yield* Deferred.succeed(myToken, id)
+          return id
+        }).pipe(
+          Effect.catch((error) =>
+            Deferred.fail(myToken, error).pipe(Effect.ignore, Effect.andThen(Effect.fail(error))),
+          ),
+          Effect.ensuring(
+            Effect.gen(function* () {
+              const removed = yield* Ref.modify(sessionCreates, (map) => {
+                if (map.get(sessionID) !== myToken) return [false, map] as const
+                map.delete(sessionID)
+                return [true, map] as const
+              })
+              if (removed)
+                yield* Deferred.fail(myToken, new Error(`Command session creation interrupted: ${sessionID}`)).pipe(
+                  Effect.ignore,
+                )
+            }),
+          ),
+        )
+        yield* Effect.forkDetach(creation)
+        return yield* Deferred.await(myToken)
       })
 
     if (config.idleReapSeconds > 0) {
@@ -491,6 +666,21 @@ const layer = Layer.effect(
       )
     }
 
+    // A sandbox or command session can be reaped (idle, OOM, pod restart) while
+    // a turn is paused on the user. The first command after resuming then hits
+    // stale state. Retrying once after invalidating the cache is safe: a sandbox
+    // that is gone can never have executed the command.
+    const withRecreateRetry = <A, E, R>(sessionID: string, attempt: () => Effect.Effect<A, E, R>) =>
+      attempt().pipe(
+        Effect.catchIf(isSandboxGone, () =>
+          Effect.gen(function* () {
+            yield* Effect.logWarning("sandbox gone; recreating and retrying command once", { sessionID })
+            yield* invalidateSandbox(sessionID)
+            return yield* attempt()
+          }),
+        ),
+      )
+
     return Service.of({
       enabled: true,
       keepAlive: (sessionID) => dbSetKeepAlive(sessionID, true),
@@ -501,101 +691,144 @@ const layer = Layer.effect(
       destroy: destroySandbox,
 
       run: (input) =>
-        Effect.gen(function* () {
-          const sb = yield* getOrCreate(input.sessionID)
-          yield* db
-            .update(SandboxTable)
-            .set({ time_updated: Date.now() })
-            .where(eq(SandboxTable.session_id, input.sessionID))
-            .run()
-            .pipe(Effect.orDie)
-          const commands = commandsOf(sb)
-          const commandSessionID = yield* commandSession(input.sessionID, sb)
-          const workingDirectory = input.cwd
-            ? SandboxPath.toSandboxCwd(input.cwd, input.hostWorkdir)
-            : SandboxPath.WORKDIR
-          const timeoutMs = input.timeoutMs ?? 0
-          const timeoutSeconds = timeoutMs > 0 ? Math.ceil(timeoutMs / 1000) : 0
+        withRecreateRetry(input.sessionID, () =>
+          Effect.gen(function* () {
+            // Bounded wait: a stale cache entry or a hanging control plane must
+            // not pin the command Semaphore forever (v1 used 90s).
+            const sb = yield* withOperationTimeout(
+              getOrCreate(input.sessionID),
+              GET_OR_CREATE_TIMEOUT_SECONDS,
+              "get or create sandbox",
+            )
+            yield* touchSandbox(input.sessionID)
+            const commands = commandsOf(sb)
+            const commandSessionID = yield* commandSession(input.sessionID, sb)
+            const workingDirectory = input.cwd
+              ? SandboxPath.toSandboxCwd(input.cwd, input.hostWorkdir)
+              : SandboxPath.WORKDIR
+            const timeoutMs = input.timeoutMs ?? 0
+            const timeoutSeconds = timeoutMs > 0 ? Math.ceil(timeoutMs / 1000) : 0
 
-          const controller = new AbortController()
-          const stdout: string[] = []
-          const stderr: string[] = []
-          let errorValue: string | undefined
-          let exitCode: number | null = null
-          let completed = false
+            const controller = new AbortController()
+            const stdout: string[] = []
+            const stderr: string[] = []
+            let errorValue: string | undefined
+            let exitCode: number | null = null
+            let completed = false
 
-          const consume = Effect.promise(async () => {
-            for await (const event of commands.runInSessionStream(
-              commandSessionID,
-              input.command,
-              { workingDirectory, ...(timeoutSeconds > 0 ? { timeoutSeconds } : {}) },
-              controller.signal,
-            )) {
-              switch (event.type) {
-                case "stdout":
-                  stdout.push(event.text ?? "")
-                  break
-                case "stderr":
-                  stderr.push(event.text ?? "")
-                  break
-                case "error":
-                  errorValue = String(event.error?.evalue ?? event.error?.value ?? "")
-                  return
-                case "execution_complete":
-                  if (errorValue === undefined) exitCode = 0
-                  completed = true
-                  return
+            const consume = Effect.promise(async () => {
+              for await (const event of commands.runInSessionStream(
+                commandSessionID,
+                input.command,
+                { workingDirectory, ...(timeoutSeconds > 0 ? { timeoutSeconds } : {}) },
+                controller.signal,
+              )) {
+                switch (event.type) {
+                  case "stdout":
+                    stdout.push(event.text ?? "")
+                    break
+                  case "stderr":
+                    stderr.push(event.text ?? "")
+                    break
+                  case "error":
+                    errorValue = String(event.error?.evalue ?? event.error?.value ?? "")
+                    return
+                  case "execution_complete":
+                    if (errorValue === undefined) exitCode = 0
+                    completed = true
+                    return
+                }
               }
+            })
+
+            // A timed-out command keeps running in the sandbox, and the SDK
+            // interrupt leaves the persistent session in an immediately-EOF
+            // state. Recycle the command session so the next command rebuilds a
+            // clean one instead of reading crossed-over output.
+            const recycle = () =>
+              Effect.gen(function* () {
+                yield* Effect.promise(() => commands.deleteSession(commandSessionID)).pipe(Effect.ignore)
+                yield* Ref.modify(entries, (map) => {
+                  const entry = map.get(input.sessionID)
+                  if (entry && entry.commandSessionID === commandSessionID)
+                    map.set(input.sessionID, { ...entry, commandSessionID: "" })
+                  return [undefined, map] as const
+                })
+                yield* db
+                  .update(SandboxTable)
+                  .set({ command_session_id: null, time_updated: Date.now() })
+                  .where(eq(SandboxTable.session_id, input.sessionID))
+                  .run()
+                  .pipe(Effect.orDie)
+              })
+
+            let timedOut = false
+            const guarded =
+              timeoutSeconds > 0
+                ? consume.pipe(
+                    Effect.onInterrupt(() => Effect.sync(() => controller.abort())),
+                    Effect.timeoutOrElse({
+                      duration: Duration.seconds(timeoutSeconds + 15),
+                      orElse: () =>
+                        Effect.gen(function* () {
+                          timedOut = true
+                          yield* Effect.promise(() => commands.interrupt(commandSessionID)).pipe(Effect.ignore)
+                          yield* recycle().pipe(Effect.catchCause(() => Effect.void))
+                        }),
+                    }),
+                  )
+                : consume.pipe(Effect.onInterrupt(() => Effect.sync(() => controller.abort())))
+            const heartbeat = Effect.sleep(
+              Duration.seconds(Math.max(5, Math.min(60, Math.floor(config.idleReapSeconds / 3)))),
+            ).pipe(Effect.andThen(touchSandbox(input.sessionID)), Effect.forever)
+            const lock = yield* Ref.modify(commandLocks, (map) => {
+              const existing = map.get(commandSessionID)
+              if (existing) return [existing, map] as const
+              const created = Semaphore.makeUnsafe(1)
+              map.set(commandSessionID, created)
+              return [created, map] as const
+            })
+            const execute = Effect.raceFirst(guarded, heartbeat)
+            if (timeoutSeconds > 0) yield* withSemaphoreWaitTimeout(lock, execute, timeoutSeconds, "command queue wait")
+            else yield* lock.withPermits(1)(execute)
+
+            if (timedOut) {
+              const partial = [assembleStreamText(stdout), assembleStreamText(stderr)]
+                .filter((part) => part.length > 0)
+                .join("\n")
+              return {
+                exitCode: null,
+                output: `${partial}\n\nCommand exceeded timeout of ${timeoutMs} ms.`,
+                timedOut: true,
+              } satisfies ExecutionResult
             }
-          })
-
-          let timedOut = false
-          const guarded =
-            timeoutSeconds > 0
-              ? consume.pipe(
-                  Effect.onInterrupt(() => Effect.sync(() => controller.abort())),
-                  Effect.timeoutOrElse({
-                    duration: Duration.seconds(timeoutSeconds + 15),
-                    orElse: () =>
-                      Effect.gen(function* () {
-                        timedOut = true
-                        yield* Effect.promise(() => commands.interrupt(commandSessionID)).pipe(Effect.ignore)
-                      }),
-                  }),
-                )
-              : consume.pipe(Effect.onInterrupt(() => Effect.sync(() => controller.abort())))
-          const heartbeat = Effect.sleep(
-            Duration.seconds(Math.max(5, Math.min(60, Math.floor(config.idleReapSeconds / 3)))),
-          ).pipe(Effect.andThen(touchSandbox(input.sessionID)), Effect.forever)
-          const lock = yield* Ref.modify(commandLocks, (map) => {
-            const existing = map.get(commandSessionID)
-            if (existing) return [existing, map] as const
-            const created = Semaphore.makeUnsafe(1)
-            map.set(commandSessionID, created)
-            return [created, map] as const
-          })
-          yield* lock.withPermits(1)(Effect.raceFirst(guarded, heartbeat))
-
-          if (timedOut) {
-            const partial = [assembleStreamText(stdout), assembleStreamText(stderr)]
-              .filter((part) => part.length > 0)
-              .join("\n")
+            // No completion, no error and no exit code means the SDK silently
+            // drained a dead command session. Surface it as a sandbox-gone
+            // failure so the recreate retry rebuilds rather than reporting a
+            // bogus success.
+            if (!completed && errorValue === undefined && exitCode === null) {
+              return yield* Effect.fail(
+                new Error(
+                  `runInSession failed: command session ${commandSessionID} not found (empty execution stream)`,
+                ),
+              )
+            }
+            if (errorValue !== undefined && /^-?\d+$/.test(errorValue.trim())) exitCode = Number(errorValue.trim())
+            if (exitCode === 137)
+              yield* Effect.logWarning("command killed by SIGKILL — likely sandbox memory OOM", {
+                sessionID: input.sessionID,
+                sandboxID: sb.id,
+                command: input.command.slice(0, 80),
+              })
             return {
-              exitCode: null,
-              output: `${partial}\n\nCommand exceeded timeout of ${timeoutMs} ms.`,
-              timedOut: true,
+              exitCode,
+              output: [assembleStreamText(stdout), assembleStreamText(stderr)]
+                .filter((part) => part.length > 0)
+                .join("\n"),
+              timedOut: false,
             } satisfies ExecutionResult
-          }
-          if (errorValue !== undefined && /^-?\d+$/.test(errorValue.trim())) exitCode = Number(errorValue.trim())
-          void completed
-          return {
-            exitCode,
-            output: [assembleStreamText(stdout), assembleStreamText(stderr)]
-              .filter((part) => part.length > 0)
-              .join("\n"),
-            timedOut: false,
-          } satisfies ExecutionResult
-        }).pipe(
+          }),
+        ).pipe(
           Effect.mapError((cause) => (cause instanceof Error ? cause : new Error(String(cause)))),
           Effect.withSpan("SandboxProvider.run"),
         ),

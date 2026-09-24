@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
-import { Effect, Exit } from "effect"
-import { SandboxProvider, assembleStreamText } from "@opencode/core/sandbox/provider"
+import { Cause, Deferred, Effect, Exit, Fiber, Semaphore } from "effect"
+import { SandboxProvider, assembleStreamText, isSandboxGone, withOperationTimeout, withSemaphoreWaitTimeout } from "@opencode/core/sandbox/provider"
 import { AppNodeBuilder } from "@opencode/core/effect/app-node-builder"
 import { LayerNode } from "@opencode/util/effect/layer-node"
 import { Database } from "@opencode/core/database/database"
@@ -62,5 +62,67 @@ describe("SandboxProvider disabled layer", () => {
         .pipe(Effect.exit)
       expect(Exit.isFailure(exit)).toBe(true)
     }),
+  )
+})
+
+describe("SandboxProvider command resilience helpers", () => {
+  test("classifies sandbox-gone errors precisely", () => {
+    // Sandbox-level disappearance → rebuild and retry is safe.
+    expect(isSandboxGone(new Error("Sandbox is no longer running: ses_x/sb_y"))).toBe(true)
+    expect(isSandboxGone(new Error("runInSession failed: Execution exec_1 not found on sandbox sb_y"))).toBe(true)
+    expect(isSandboxGone(new Error("Failed to create command session: APIError 404"))).toBe(true)
+    expect(isSandboxGone(new Error("runDetached failed: sandbox not found"))).toBe(true)
+    // Business-level not-found / other errors → never retry (side effects).
+    expect(isSandboxGone(new Error("File not found: /workspace/app.py"))).toBe(false)
+    expect(isSandboxGone(new Error("command not found: pnpm"))).toBe(false)
+    expect(isSandboxGone(new Error("get or create sandbox timed out after 90s"))).toBe(false)
+  })
+
+  it.live("fails an operation that exceeds its budget, naming the operation", () =>
+    Effect.gen(function* () {
+      const exit = yield* withOperationTimeout(Effect.never, 0.02, "get or create sandbox").pipe(Effect.exit)
+      expect(Exit.isFailure(exit)).toBe(true)
+      if (Exit.isFailure(exit)) {
+        expect(Cause.pretty(exit.cause)).toContain("get or create sandbox timed out after 0.02s")
+      }
+    }),
+  )
+
+  it.live("returns a completed operation before the timeout", () =>
+    Effect.gen(function* () {
+      const value = yield* withOperationTimeout(Effect.succeed("ok"), 1, "op")
+      expect(value).toBe("ok")
+    }),
+  )
+
+  // The outer budget is timeoutSeconds + grace, so the permit wait must outlast a
+  // permit held for the caller's own exec timeout.
+  it.live("times out while waiting for a command semaphore permit", () =>
+    Effect.gen(function* () {
+      const semaphore = yield* Semaphore.make(1)
+      const acquired = yield* Deferred.make<void>()
+      const release = yield* Deferred.make<void>()
+      const holder = yield* semaphore
+        .withPermits(1)(
+          Effect.gen(function* () {
+            yield* Deferred.succeed(acquired, undefined)
+            yield* Deferred.await(release)
+          }),
+        )
+        .pipe(Effect.forkScoped)
+      yield* Deferred.await(acquired)
+
+      const exit = yield* withSemaphoreWaitTimeout(semaphore, Effect.succeed("ready"), 0.05, "command queue wait").pipe(
+        Effect.exit,
+      )
+      expect(Exit.isFailure(exit)).toBe(true)
+      if (Exit.isFailure(exit)) {
+        expect(Cause.pretty(exit.cause)).toContain("command queue wait timed out after 5.05s")
+      }
+
+      yield* Deferred.succeed(release, undefined)
+      yield* Fiber.join(holder)
+    }),
+    15000,
   )
 })
