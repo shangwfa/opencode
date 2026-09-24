@@ -21,7 +21,7 @@ const it = testEffect(
   ]),
 )
 
-const seedSessions = (rows: { id: string; updated: number }[]) =>
+const seedSessions = (rows: { id: string; updated: number; appId?: string }[]) =>
   Effect.gen(function* () {
     const database = yield* Database.Service
     const bus = yield* Bus.Service
@@ -32,6 +32,7 @@ const seedSessions = (rows: { id: string; updated: number }[]) =>
         const sessionID = Session.ID.make(row.id)
         yield* bus.publish(SessionEvent.Created, {
           sessionID,
+          appId: row.appId,
           projectID: Project.ID.global,
           location: { directory },
           slug: "store-test",
@@ -51,6 +52,29 @@ const seedSessions = (rows: { id: string; updated: number }[]) =>
   })
 
 describe("SessionStore", () => {
+  it.effect("filters by appId and combines it with search and pagination", () =>
+    Effect.gen(function* () {
+      yield* seedSessions([
+        { id: "ses_app_old", updated: 10, appId: "biz-proj-001" },
+        { id: "ses_app_new", updated: 20, appId: "biz-proj-001" },
+        { id: "ses_other", updated: 30, appId: "biz-proj-002" },
+        { id: "ses_unassigned", updated: 40 },
+      ])
+      const store = yield* SessionStore.Service
+      expect((yield* store.list({ appId: "biz-proj-001" })).map((session) => String(session.id))).toEqual([
+        "ses_app_new",
+        "ses_app_old",
+      ])
+      expect((yield* store.list({ appId: "no-such-app" }))).toEqual([])
+      expect((yield* store.list({ appId: "biz-proj-001", search: "old" })).map((session) => String(session.id))).toEqual([
+        "ses_app_old",
+      ])
+      expect((yield* store.list({ appId: "biz-proj-001", limit: 1 })).map((session) => String(session.id))).toEqual([
+        "ses_app_new",
+      ])
+    }),
+  )
+
   it.effect("lists by updated time and ID with exclusive two-item pages in either direction", () =>
     Effect.gen(function* () {
       yield* seedSessions([

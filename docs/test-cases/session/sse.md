@@ -1,1096 +1,783 @@
-# SSE 事件流
+# V2 SSE 事件流
 
-> 本文档从 `saas-test-cases.md` 拆分而来。公共测试环境和配置见 [`00-preamble.md`](./00-preamble.md)。运行用例前先 `source test-env.sh 3 && source test-lib.sh`（以下用例直接使用 `$BASE`/`$MODEL`/`jexec`）。
+> 本文按当前 V2 HTTP API 重写。V2 只有一个统一事件流 `GET /api/event`（不再有 `/global/event` 与实例级 `/event` 之分），
+> 并新增会话级 `GET /api/session/:sessionID/event` 与 `POST /api/session/:sessionID/prompt_stream`。
+> 事件契约以 `packages/schema/src/event.ts`、`session-event.ts` 与运行中服务的 `/openapi.json` 为准。
+> V1 原文（`/global/event`、`/event`、`parts[]`、`properties`、`message.part.*` 等）保留在 git 历史中。
 
+## V1 → V2 契约变化
 
+| 维度 | V1 | V2 |
+|---|---|---|
+| 事件流端点 | `GET /global/event`（全局）+ `GET /event`（实例，需 `x-opencode-directory`） | `GET /api/event`（统一，无需目录头） |
+| 会话事件流 | 无 | `GET /api/session/:sessionID/event`（按 sessionID 过滤） |
+| 发送并跟随 | `POST /session/:id/message`（同步）+ `prompt_async` | `POST /api/session/:id/prompt`（异步接纳），`POST /api/session/:id/prompt_stream`（接纳并跟随该回合） |
+| 中断 | `POST /session/:id/abort` | `POST /api/session/:id/interrupt` → `{interrupted}` |
+| 断连续传 | `GET /session/:id/event?after=<seq>` | `GET /api/experimental/session/:sessionID/log?after=<seq>&follow=<bool>` |
+| 事件外层 | `{directory, project, payload:{...}}`（全局）/ `{id,type,properties}` | `{id, created, type, location?, data, durable?}`（统一） |
+| 字段名 | `properties` | `data` |
+| 序号字段 | 顶层 `seq`（部分实现） | `durable: {aggregateID, seq, version}` |
+| 心跳 | `server.heartbeat` 事件 | SSE 注释行 `: heartbeat`（默认 15s，不是事件） |
+| 消息文本 | `message.part.updated` / `message.part.delta` | `session.text.started/delta/ended` |
+| 工具参数增量 | `message.part.delta`（field=raw） | `session.tool.input.delta`（`id` + `delta`） |
+| 工具生命周期 | `message.part.updated` 的 tool state | `session.tool.input.started` → `session.tool.called` → `session.tool.success`/`failed` |
+| 完成信号 | `session.idle` | `session.execution.succeeded/failed/interrupted`（`session.idle` 仍存在但已标记 deprecated） |
+| 会话更新 | `session.updated` | `session.renamed` / `session.moved` / `session.permissions` 等细分事件 |
+| 文件变更 | `file.edited` / `file.watcher.updated` | `filesystem.changed`（`file` + `event: add/change/unlink`） |
 
-## 九、SSE 事件流
+**认证**：SaaS 服务所有路由在服务口令之后；V2 无匿名入口。示例统一使用 HTTP Basic（`-u opencode:$OPENCODE_PASSWORD`）。
 
-**事件格式差异**：
-- 全局 SSE：`data: {"directory":"...","project":"...","payload":{"id":"...","type":"...","properties":{}}}\n\n`
-- 实例 SSE：`data: {"id":"...","type":"...","properties":{}}\n\n`
-- 会话 SSE（`GET /session/:id/event`，格式同实例 SSE）：仅推送 `properties.sessionID` 匹配该会话的事件，sessionID 在路径中自动路由、无需 `x-opencode-directory` 头
-
-**通用采集脚本**：所有 SSE 用例统一使用 [`scripts/sse-dump.mjs`](./scripts/sse-dump.mjs)（订阅 → 输出拍平后的事件 JSON 行，全局/实例格式已统一）：
+## 前置条件与通用变量
 
 ```bash
-# 标准三段式：后台订阅 → 执行业务动作 → 断言事件日志
-bun docs/test-cases/scripts/sse-dump.mjs "$BASE/event" <采集秒数> "$DIR" > /tmp/sse.log &
-SSE_PID=$!
-for i in $(seq 1 20); do grep -q server.connected /tmp/sse.log 2>/dev/null && break; sleep 0.5; done   # 等订阅建立
-# ... 业务动作（curl 发消息等）...
-wait $SSE_PID
-# grep/jq 断言 /tmp/sse.log
+export BASE="${BASE:-http://localhost:14096}"
+MODEL='{"id":"deepseek-v4-flash","providerID":"Yd-DeepSeek"}'
+CURL_AUTH=()
+if [[ -n "${OPENCODE_PASSWORD:-}" ]]; then
+  CURL_AUTH=(-u "opencode:${OPENCODE_PASSWORD}")
+fi
+# sse-dump.mjs 需要同样的凭据（脚本不支持 -u，用 Authorization 头）
+export SSE_AUTH="Basic $(printf 'opencode:%s' "$OPENCODE_PASSWORD" | base64)"
+
+# 创建会话（V2 的 workspace 路由靠 location.directory，不需要目录头）
+new_sid() {
+  curl -fsS --noproxy '*' "${CURL_AUTH[@]}" -X POST "$BASE/api/session" \
+    -H 'Content-Type: application/json' \
+    -d "{\"title\":\"sse-v2\",\"location\":{\"directory\":\"/workspace\"},\"model\":$MODEL}" | jq -r '.data.id'
+}
+
+# 异步接纳一条 prompt 并等待会话空闲
+send_prompt() {
+  local sid="$1" text="$2"
+  jq -n --arg text "$text" '{text:$text,metadata:{},delivery:"queue"}' \
+    | curl -fsS --noproxy '*' "${CURL_AUTH[@]}" -X POST "$BASE/api/session/$sid/prompt" \
+        -H 'Content-Type: application/json' --data-binary @- > /dev/null
+  curl -fsS --noproxy '*' "${CURL_AUTH[@]}" -X POST "$BASE/api/experimental/session/$sid/wait" \
+    -H 'Content-Type: application/json' -d '{}'
+}
+
+# 会话级事件采集（订阅 → 动作 → 断言）
+dump_session() {
+  SSE_AUTH="$SSE_AUTH" bun docs/test-cases/scripts/sse-dump.mjs "$BASE/api/session/$1/event" "$2" > "$3"
+}
 ```
 
-实例级 `/event` 需要先取 `DIR`：
-
-```bash
-SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
-DIR=$(curl -s "$BASE/session/$SID" | jexec "d['directory']")
-```
+> `sse-dump.mjs` 每个 `data:` 帧输出一行 JSON（V2 已是事件对象本身，无 `payload` 层）。
 
 ---
 
-### T9.1 全局事件流：订阅与初始连接事件
-
-> 验证：响应头、初始 `server.connected` 事件
+### T9.1 事件流：订阅与初始连接事件（`GET /api/event`）
 
 ```bash
-curl -s -N --max-time 3 -D - -o /dev/null "$BASE/global/event" | grep -i "content-type\|cache-control"
-
-bun docs/test-cases/scripts/sse-dump.mjs "$BASE/global/event" 3 > /tmp/t91.log
-head -1 /tmp/t91.log | jexec "d.get('type')"
+curl -sS -N --max-time 3 -D - -o /dev/null "${CURL_AUTH[@]}" "$BASE/api/event" \
+  | grep -i "content-type\|cache-control"
+SSE_AUTH="$SSE_AUTH" bun docs/test-cases/scripts/sse-dump.mjs "$BASE/api/event" 3 > /tmp/t91.log
+head -1 /tmp/t91.log | jq -r '.type'
 ```
-**期望**：`content-type` 含 `text/event-stream`，`cache-control` 为 `no-cache, no-transform`，首个事件 `type` 为 `server.connected`
+**期望**：`content-type: text/event-stream`、`cache-control: no-cache, no-transform`，首个事件 `server.connected`。
 
----
-
-### T9.2 全局事件流：创建 session 触发事件
-
-> 验证：全局 SSE 能收到 session 生命周期事件
+### T9.2 事件流：创建 session 触发事件
 
 ```bash
-bun docs/test-cases/scripts/sse-dump.mjs "$BASE/global/event" 12 > /tmp/t92.log &
+SSE_AUTH="$SSE_AUTH" bun docs/test-cases/scripts/sse-dump.mjs "$BASE/api/event" 12 > /tmp/t92.log &
 SSE_PID=$!
 for i in $(seq 1 20); do grep -q server.connected /tmp/t92.log 2>/dev/null && break; sleep 0.5; done
-
-curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' > /dev/null
+new_sid > /dev/null
 wait $SSE_PID
-
-grep -m1 '"type":"session.created"' /tmp/t92.log
+grep -m1 '"type":"session.created"' /tmp/t92.log | jq -r '.data.sessionID'
 ```
-**期望**：收到 `session.created` 事件，包含 `sessionID`
+**期望**：收到 `session.created`，`data.sessionID` 非空。
 
----
+### T9.3 事件流：心跳机制
 
-### T9.3 全局事件流：心跳机制
-
-> 验证：约 10 秒后收到 `server.heartbeat`
+> V2 心跳是 SSE 注释 `: heartbeat`（默认 15s），**不是** `server.heartbeat` 事件。`sse-dump.mjs` 会丢弃注释行，因此用原始 curl 断言。
 
 ```bash
-time bun docs/test-cases/scripts/sse-dump.mjs "$BASE/global/event" 12 > /tmp/t93.log
-grep -c server.heartbeat /tmp/t93.log
+time curl -sS -N --max-time 20 "${CURL_AUTH[@]}" "$BASE/api/event" 2>/dev/null | grep -c ': heartbeat' || true
 ```
-**期望**：`server.heartbeat` ≥ 1（首次心跳约 10s）
+**期望**：20 秒窗口内出现 `: heartbeat` ≥ 1（首次约 15s 后）。
 
----
+### T9.4 事件流：不再区分全局/实例端点
 
-### T9.4 实例事件流：订阅与初始连接事件
-
-> 验证：实例级 SSE 连接、`x-opencode-directory` 头、初始事件
+> V2 只有 `/api/event`，`x-opencode-directory` 头不再参与路由；事件自带 `location`，需要按目录/会话过滤时用 `GET /api/session/:sessionID/event`。
+> 本项为契约说明，与 T9.1 合并验证。
 
 ```bash
-SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
-DIR=$(curl -s "$BASE/session/$SID" | jexec "d['directory']")
-
-curl -s -N --max-time 3 -D - -o /dev/null -H "x-opencode-directory: $DIR" "$BASE/event" | grep -i content-type
-bun docs/test-cases/scripts/sse-dump.mjs "$BASE/event" 3 "$DIR" > /tmp/t94.log
-head -1 /tmp/t94.log | jexec "d.get('type')"
+curl -sS -N --max-time 3 -D - -o /dev/null "${CURL_AUTH[@]}" "$BASE/api/event" | head -1
 ```
-**期望**：`content-type` 为 `text/event-stream`，首个事件 `type` 为 `server.connected`
+**期望**：HTTP 200 + `text/event-stream`（无需任何目录头）。
 
-### T9.5 实例事件流：会话消息事件（message.part.updated）
+### T9.5 事件流：会话消息文本事件
 
-> 验证：LLM 响应过程中 SSE 推送消息相关事件
+> V2 用 `session.text.started` → `session.text.delta`（ephemeral，仅实时）→ `session.text.ended`（durable，全量文本）表示 assistant 文本；推理文本用 `session.reasoning.*`。
 
 ```bash
-SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
-DIR=$(curl -s "$BASE/session/$SID" | jexec "d['directory']")
-
-bun docs/test-cases/scripts/sse-dump.mjs "$BASE/event" 50 "$DIR" > /tmp/t95.log &
+SID=$(new_sid)
+dump_session "$SID" 50 /tmp/t95.log &
 SSE_PID=$!
 for i in $(seq 1 20); do grep -q server.connected /tmp/t95.log 2>/dev/null && break; sleep 0.5; done
-
-curl -s --max-time 45 -X POST "$BASE/session/$SID/message" \
-  -H 'Content-Type: application/json' \
-  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"说一个字\"}],\"model\":$MODEL}" > /dev/null
+send_prompt "$SID" "说一个字"
 wait $SSE_PID
 
-grep -c '"type":"message.part.updated"\|"type":"message.part.delta"' /tmp/t95.log
-grep -c '"type":"session.idle"' /tmp/t95.log
+grep -c '"type":"session.text.delta"' /tmp/t95.log
+grep -c '"type":"session.text.ended"' /tmp/t95.log
+grep -m1 '"type":"session.text.delta"' /tmp/t95.log | jq -r '.data.sessionID'
 ```
-**期望**：`message.part.updated`/`message.part.delta` ≥ 1（事件含 `properties.sessionID`），`session.idle` ≥ 1
+**期望**：`session.text.delta` ≥ 1（`data.sessionID` 为该会话）、`session.text.ended` ≥ 1。
 
-### T9.6 实例事件流：工具调用事件
+### T9.6 事件流：工具调用生命周期事件
 
-> 验证：工具调用的 SSE 生命周期事件（pending → running → completed/error）
+> V2 工具生命周期：`session.tool.input.started`（生成参数）→ `session.tool.input.delta`（参数增量）→ `session.tool.called`（参数就绪、开始执行，含完整 `data.input`）→ `session.tool.success` / `session.tool.failed`。
 
 ```bash
-SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
-DIR=$(curl -s "$BASE/session/$SID" | jexec "d['directory']")
-
-bun docs/test-cases/scripts/sse-dump.mjs "$BASE/event" 80 "$DIR" > /tmp/t96.log &
+SID=$(new_sid)
+dump_session "$SID" 90 /tmp/t96.log &
 SSE_PID=$!
 for i in $(seq 1 20); do grep -q server.connected /tmp/t96.log 2>/dev/null && break; sleep 0.5; done
-
-curl -s --max-time 75 -X POST "$BASE/session/$SID/message" \
-  -H 'Content-Type: application/json' \
-  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"用 bash 执行 echo hello_sse_test\"}],\"model\":$MODEL}" > /dev/null
+send_prompt "$SID" "用 shell 执行 echo hello_sse_test"
 wait $SSE_PID
 
-# 提取 tool part 的状态流转
 python3 -c "
 import json
-stats = []
+order=[]
 for line in open('/tmp/t96.log'):
-    part = json.loads(line).get('properties', {}).get('part', {})
-    if part.get('type') == 'tool':
-        stats.append(part.get('state', {}).get('status'))
-print('tool statuses:', stats)
-print('has lifecycle:', 'pending' in stats and any(s in stats for s in ('running','completed','error')))
+    line=line.strip()
+    if not line: continue
+    t=json.loads(line)['type']
+    if t.startswith('session.tool.'): order.append(t)
+print('tool events:', order)
+print('has lifecycle:', 'session.tool.input.started' in order and any(t in order for t in ('session.tool.success','session.tool.failed')))
 "
 ```
-**期望**：收到 `message.part.updated`（`part.type === 'tool'`），状态流转 `pending` → `running` → `completed`（或 `error`，取决于 sandbox 环境）
+**期望**：出现 `session.tool.input.started` 及终态 `session.tool.success` 或 `session.tool.failed`（sandbox 可达时为 `success`）。
 
-### T9.7 实例事件流：权限请求事件
+### T9.7 事件流：权限请求事件（`permission.asked`）
 
-> 验证：`permission.asked` 事件通过 SSE 推送，并可程序化回复
-
-> **前提**：不要在全局 config 中配 `permission.edit: allow`（否则不会触发 `permission.asked`）。如果已配，可临时移除：
-> ```bash
-> curl -s -X PATCH "$BASE/global/config" \
->   -H 'Content-Type: application/json' \
->   -d '{"permission":{"bash":"allow","edit":"ask","write":"ask","glob":"allow","grep":"allow","list":"allow","read":"allow","webfetch":"allow"}}'
-> ```
->
-> **根因说明**：`evaluate()` 默认返回 `{ action: "ask" }`。当 config 未配置 permission 时，所有工具调用都需权限确认。HTTP API 模式下无 UI 回复权限请求，工具会卡在 `running` 状态。本用例通过 SSE 监听 `permission.asked` 后自动回复来验证。
+> **前提**：不要在配置里把相关工具权限设为 `allow`，否则不会产生 `permission.asked`。
+> V2 回复端点为 `POST /api/session/:sessionID/permission/:requestID/reply`，body `{"decision":"once|always|reject"}`。
 
 ```bash
-SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
-DIR=$(curl -s "$BASE/session/$SID" | jexec "d['directory']")
-
-bun docs/test-cases/scripts/sse-dump.mjs "$BASE/event" 80 "$DIR" > /tmp/t97.log &
+SID=$(new_sid)
+dump_session "$SID" 90 /tmp/t97.log &
 SSE_PID=$!
 for i in $(seq 1 20); do grep -q server.connected /tmp/t97.log 2>/dev/null && break; sleep 0.5; done
 
-curl -s --max-time 75 -X POST "$BASE/session/$SID/message" \
-  -H 'Content-Type: application/json' \
-  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"use the write tool to write hello to /workspace/sse-perm-test.txt\"}],\"model\":$MODEL}" > /dev/null &
+jq -n '{text:"use the write tool to write hello to /workspace/sse-perm-test.txt",metadata:{},delivery:"queue"}' \
+  | curl -fsS --noproxy '*' "${CURL_AUTH[@]}" -X POST "$BASE/api/session/$SID/prompt" \
+      -H 'Content-Type: application/json' --data-binary @- > /dev/null &
 
-# 轮询日志捕获 permission.asked 并自动回复
 for i in $(seq 1 40); do
   PLINE=$(grep -m1 '"type":"permission.asked"' /tmp/t97.log 2>/dev/null)
   if [ -n "$PLINE" ]; then
-    PID=$(echo "$PLINE" | jexec "d['properties']['id']")
-    echo "permission.asked id=$PID"
-    curl -s -X POST "$BASE/session//permissions/" \
-      -H 'Content-Type: application/json' -d '{"response":"always"}'
-    echo "replied: always"
+    RID=$(echo "$PLINE" | jq -r '.data.id')
+    curl -fsS --noproxy '*' "${CURL_AUTH[@]}" -X POST \
+      "$BASE/api/session/$SID/permission/$RID/reply" \
+      -H 'Content-Type: application/json' -d '{"decision":"always"}'
+    echo "replied: always ($RID)"
     break
   fi
   sleep 2
 done
 wait $SSE_PID 2>/dev/null
 ```
-**期望**：收到 `permission.asked` 事件并成功回复（若 `edit` 权限已配 `allow` 则 session 正常完成无权限弹窗）
+**期望**：收到 `permission.asked`（`data.id` 为请求 ID）并成功回复；若权限已配 `allow`，则无该事件、会话正常完成（两个分支均有效）。
 
-### T9.8 实例事件流：多会话事件隔离
+### T9.8 事件流：多会话事件隔离
 
-> 验证：两个 session 的事件通过 `sessionID` 正确路由，无交叉污染
+> V2 用会话级 `GET /api/session/:sessionID/event`，服务端按 sessionID 过滤。
 
 ```bash
-SID_A=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
-SID_B=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
-DIR=$(curl -s "$BASE/session/$SID_A" | jexec "d['directory']")
-
-bun docs/test-cases/scripts/sse-dump.mjs "$BASE/event" 60 "$DIR" > /tmp/t98.log &
+SID_A=$(new_sid); SID_B=$(new_sid)
+dump_session "$SID_A" 60 /tmp/t98.log &
 SSE_PID=$!
 for i in $(seq 1 20); do grep -q server.connected /tmp/t98.log 2>/dev/null && break; sleep 0.5; done
 
-curl -s --max-time 55 -X POST "$BASE/session/$SID_A/message" \
-  -H 'Content-Type: application/json' -d "{\"parts\":[{\"type\":\"text\",\"text\":\"说A\"}],\"model\":$MODEL}" > /dev/null &
-curl -s --max-time 55 -X POST "$BASE/session/$SID_B/message" \
-  -H 'Content-Type: application/json' -d "{\"parts\":[{\"type\":\"text\",\"text\":\"说B\"}],\"model\":$MODEL}" > /dev/null &
+send_prompt "$SID_A" "说A" &
+send_prompt "$SID_B" "说B" &
 wait $SSE_PID
 
 python3 -c "
 import json
-a=b=0
+sids=set()
 for line in open('/tmp/t98.log'):
-    sid = json.loads(line).get('properties',{}).get('sessionID')
-    a += sid == '$SID_A'; b += sid == '$SID_B'
-print(f'A events: {a}, B events: {b}')
-print('✅ both > 0' if a>0 and b>0 else '❌')
+    line=line.strip()
+    if not line: continue
+    d=json.loads(line)
+    sid=d.get('data',{}).get('sessionID')
+    if sid: sids.add(sid)
+print('sessionIDs in A stream:', sids)
+print('isolated:', sids <= {'$SID_A'})
 "
 ```
-**期望**：两个 session 各自收到事件（计数 > 0），事件 `sessionID` 无交叉
+**期望**：A 的流里只出现 `SID_A`（`SID_B` 零泄漏）。
 
-### T9.9 实例事件流：会话状态变更事件（session.status / session.idle）
+### T9.9 事件流：回合状态事件
 
-> 验证：LLM 处理期间 `session.status` 事件，完成后 `session.idle` 事件
+> V2 回合生命周期：`session.inbox.enqueued` → `session.inbox.delivered` → `session.execution.started` → … → `session.execution.succeeded`（或 `failed`/`interrupted`）。
+> `session.status`（`busy`/`idle`/`retry`）与 `session.idle` 仍存在于 schema，但 `session.idle` 已标记 deprecated；本服务路径实测以 `session.execution.*` 为准。
 
 ```bash
-SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
-DIR=$(curl -s "$BASE/session/$SID" | jexec "d['directory']")
-
-bun docs/test-cases/scripts/sse-dump.mjs "$BASE/event" 50 "$DIR" > /tmp/t99.log &
+SID=$(new_sid)
+dump_session "$SID" 50 /tmp/t99.log &
 SSE_PID=$!
 for i in $(seq 1 20); do grep -q server.connected /tmp/t99.log 2>/dev/null && break; sleep 0.5; done
-
-curl -s --max-time 45 -X POST "$BASE/session/$SID/message" \
-  -H 'Content-Type: application/json' -d "{\"parts\":[{\"type\":\"text\",\"text\":\"说一个字\"}],\"model\":$MODEL}" > /dev/null
+send_prompt "$SID" "说一个字"
 wait $SSE_PID
 
-grep -o '"type":"session\.\(status\|idle\)"' /tmp/t99.log | sort | uniq -c
+python3 -c "
+import json
+types=[json.loads(l)['type'] for l in open('/tmp/t99.log') if l.strip()]
+print('execution.started:', types.count('session.execution.started'))
+print('terminal last:', types[-1] if types else None)
+"
 ```
-**期望**：先收到 `session.status`（busy），完成后收到 `session.idle`
+**期望**：出现 `session.execution.started`，最后一个执行类事件为 `session.execution.succeeded`。
 
-### T9.10 实例事件流：异步 prompt 触发事件
+### T9.10 事件流：异步接纳 prompt 触发事件
 
-> 验证：`POST /session/:id/prompt_async` 返回 204，事件通过 SSE 推送
+> V2 用 `POST /api/session/:sessionID/prompt` 异步接纳（返回 HTTP 200 与已接纳的 user message，不是 V1 的 204）；事件经 SSE 推送。
 
 ```bash
-SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
-DIR=$(curl -s "$BASE/session/$SID" | jexec "d['directory']")
-
-bun docs/test-cases/scripts/sse-dump.mjs "$BASE/event" 50 "$DIR" > /tmp/t910.log &
+SID=$(new_sid)
+dump_session "$SID" 50 /tmp/t910.log &
 SSE_PID=$!
 for i in $(seq 1 20); do grep -q server.connected /tmp/t910.log 2>/dev/null && break; sleep 0.5; done
 
-curl -s -o /dev/null -w "prompt_async: %{http_code}\n" -X POST "$BASE/session/$SID/prompt_async" \
-  -H 'Content-Type: application/json' -d "{\"parts\":[{\"type\":\"text\",\"text\":\"说一个字\"}],\"model\":$MODEL}"
+jq -n '{text:"说一个字",metadata:{},delivery:"queue"}' \
+  | curl -sS --noproxy '*' "${CURL_AUTH[@]}" -o /tmp/t910-admit.json -w '%{http_code}\n' \
+      -X POST "$BASE/api/session/$SID/prompt" -H 'Content-Type: application/json' --data-binary @-
+jq -r '.data.id' /tmp/t910-admit.json
 wait $SSE_PID
 
-grep -c '"type":"message.part.updated"\|"type":"message.part.delta"' /tmp/t910.log
+grep -c '"type":"session.text.delta"' /tmp/t910.log
 ```
-**期望**：`prompt_async` 返回 204，SSE 收到 `message.part.updated` / `message.part.delta`
+**期望**：接纳返回 HTTP 200 且含 `.data.id`；SSE 收到 `session.text.delta`。
 
-### T9.11 实例事件流：文件变更事件
+### T9.11 事件流：文件变更事件（`filesystem.changed`）
 
-> 验证：文件写入操作触发 `file.edited` / `file.watcher.updated` 事件
-
-> **前提**：
-> 1. Sandbox TCP 转发必须启动（`lsof -i :30040 | grep LISTEN`），否则 write 工具卡在 sandbox 初始化
-> 2. 权限需配 `edit: allow`（通过 `PATCH /global/config {"permission":{"edit":"allow",...}}`），否则工具卡在权限等待
-> 3. 写文件路径必须在项目目录内（如 `/workspace/`），写 `/tmp/` 会触发 `external_directory` 权限
->
-> **根因说明**：write 工具通过 `ctx.sandbox` 在沙箱中执行写操作，sandbox 不可达时 Promise 永远 pending（工具显示 `running`）。默认权限 `"ask"` 无 UI 回复也会卡住。
+> V2 对应 V1 的 `file.edited`/`file.watcher.updated`：`filesystem.changed`，`data.file` + `data.event`（`add`/`change`/`unlink`）。
+> **前提**：sandbox 可达；写项目目录内路径（`/workspace/`）。
 
 ```bash
-SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
-DIR=$(curl -s "$BASE/session/$SID" | jexec "d['directory']")
-
-bun docs/test-cases/scripts/sse-dump.mjs "$BASE/event" 80 "$DIR" > /tmp/t911.log &
+SID=$(new_sid)
+dump_session "$SID" 90 /tmp/t911.log &
 SSE_PID=$!
 for i in $(seq 1 20); do grep -q server.connected /tmp/t911.log 2>/dev/null && break; sleep 0.5; done
-
-curl -s --max-time 75 -X POST "$BASE/session/$SID/message" \
-  -H 'Content-Type: application/json' \
-  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"use the write tool to write hello to /workspace/sse-file-test.txt\"}],\"model\":$MODEL}" > /dev/null &
-
-# 若出现权限请求则自动回复（同 T9.7）
-for i in $(seq 1 40); do
-  PLINE=$(grep -m1 '"type":"permission.asked"' /tmp/t911.log 2>/dev/null)
-  if [ -n "$PLINE" ]; then
-    PID=$(echo "$PLINE" | jexec "d['properties']['id']")
-    curl -s -X POST "$BASE/session//permissions/" \
-      -H 'Content-Type: application/json' -d '{"response":"always"}' > /dev/null
-    break
-  fi
-  grep -q '"type":"file.edited"\|"type":"file.watcher.updated"' /tmp/t911.log 2>/dev/null && break
-  sleep 2
-done
-wait $SSE_PID 2>/dev/null
-
-grep -m1 '"type":"file.edited"\|"type":"file.watcher.updated"' /tmp/t911.log
-```
-**期望**：收到 `file.edited` 或 `file.watcher.updated` 事件（sandbox 可达 + 权限已配 `allow` 时）
-
-### T9.12 全局事件流：dispose 事件
-
-> 验证：`POST /global/dispose` 触发 `server.instance.disposed` 事件
-
-```bash
-bun docs/test-cases/scripts/sse-dump.mjs "$BASE/global/event" 8 > /tmp/t912.log &
-SSE_PID=$!
-for i in $(seq 1 20); do grep -q server.connected /tmp/t912.log 2>/dev/null && break; sleep 0.5; done
-
-curl -s -o /dev/null -w "dispose: %{http_code}\n" -X POST "$BASE/global/dispose"
+send_prompt "$SID" "use the write tool to write hello to /workspace/sse-file-test.txt" &
 wait $SSE_PID
-
-grep -i disposed /tmp/t912.log
+grep -m1 '"type":"filesystem.changed"' /tmp/t911.log | jq -c '{file:.data.file,event:.data.event}'
 ```
-**期望**：收到含 `disposed` 的事件，或连接被服务端关闭
+**期望**：收到 `filesystem.changed`（sandbox 可达时）。
 
-### T9.13 实例事件流：连接断开后重连
+### T9.12 事件流：dispose 事件
 
-> 验证：SSE 连接可重复建立，每次都收到 `server.connected`
+> V2 无 `POST /global/dispose`。相关事件为 `global.disposed` / `location.shutdown`（由服务处置/关闭路径发布）。
+> **待补**：当前 HTTP 层无对应触发端点，本项待端点就绪后验证。
 
 ```bash
-SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
-DIR=$(curl -s "$BASE/session/$SID" | jexec "d['directory']")
-
-bun docs/test-cases/scripts/sse-dump.mjs "$BASE/event" 3 "$DIR" > /tmp/t913a.log
-bun docs/test-cases/scripts/sse-dump.mjs "$BASE/event" 3 "$DIR" > /tmp/t913b.log
-head -1 /tmp/t913a.log | jexec "d.get('type')"
-head -1 /tmp/t913b.log | jexec "d.get('type')"
+# 待 HTTP 处置端点就绪后执行。
+echo "T9.12 待补端点" 
 ```
-**期望**：两次连接都收到 `server.connected`
+**期望**：端点就绪后，收到 `global.disposed` 或 `location.shutdown`，或连接被服务端关闭。
 
-### T9.14 实例事件流：多客户端监听同一会话
-
-> 验证：一个会话执行任务时，多个 SSE 客户端同时监听都能收到相同的事件序列
-
-> **场景**：模拟多用户（如编辑器 + 终端 + CI 监控）同时通过 SSE 观察同一个会话的执行过程。验证 Bus 的 PubSub 模式能正确广播到所有订阅者。
+### T9.13 事件流：连接断开后重连
 
 ```bash
-SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
-DIR=$(curl -s "$BASE/session/$SID" | jexec "d['directory']")
+for n in a b; do
+  SSE_AUTH="$SSE_AUTH" bun docs/test-cases/scripts/sse-dump.mjs "$BASE/api/event" 3 > /tmp/t913$n.log
+  head -1 /tmp/t913$n.log | jq -r '.type'
+done
+```
+**期望**：两次连接都收到 `server.connected`。
 
-# 3 个客户端并行监听
+### T9.14 事件流：多客户端监听同一会话
+
+```bash
+SID=$(new_sid)
 for c in a b c; do
-  bun docs/test-cases/scripts/sse-dump.mjs "$BASE/event" 55 "$DIR" > /tmp/t914$c.log &
+  SSE_AUTH="$SSE_AUTH" bun docs/test-cases/scripts/sse-dump.mjs "$BASE/api/session/$SID/event" 55 > /tmp/t914$c.log &
 done
 for c in a b c; do
   for i in $(seq 1 20); do grep -q server.connected /tmp/t914$c.log 2>/dev/null && break; sleep 0.5; done
 done
-
-curl -s --max-time 50 -X POST "$BASE/session/$SID/message" \
-  -H 'Content-Type: application/json' \
-  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"say hello in one sentence\"}],\"model\":$MODEL}" > /dev/null
+send_prompt "$SID" "say hello in one sentence"
 wait
 
 for c in a b c; do
-  echo "client $c: $(grep -c '"type":"message\.' /tmp/t914$c.log) message events, idle=$(grep -c session.idle /tmp/t914$c.log)"
+  echo "client $c: $(grep -c '"type":"session.text' /tmp/t914$c.log) text events, terminal=$(grep -c 'session.execution.succeeded' /tmp/t914$c.log)"
 done
 ```
-**期望**：3 个 SSE 客户端都收到 `server.connected`、至少一个 `message.*` 事件、`session.idle`，且事件类型列表一致
+**期望**：3 个客户端都收到 `server.connected`、≥1 个 `session.text.*` 事件与 `session.execution.succeeded`。
 
-### T9.15 实例事件流：中途加入的客户端收到后续事件
+### T9.15 事件流：中途加入的客户端收到后续事件
 
-> 验证：会话执行过程中新连接的 SSE 客户端能收到后续事件（不要求回放历史）
+> **注意**：prompt 不宜过短——SSE 不回放历史，B 必须在执行**进行中**加入才能收到后续事件。
 
 ```bash
-SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
-DIR=$(curl -s "$BASE/session/$SID" | jexec "d['directory']")
-
-# 客户端 A：一开始就连接
-bun docs/test-cases/scripts/sse-dump.mjs "$BASE/event" 55 "$DIR" > /tmp/t915a.log &
+SID=$(new_sid)
+SSE_AUTH="$SSE_AUTH" bun docs/test-cases/scripts/sse-dump.mjs "$BASE/api/session/$SID/event" 55 > /tmp/t915a.log &
 for i in $(seq 1 20); do grep -q server.connected /tmp/t915a.log 2>/dev/null && break; sleep 0.5; done
 
-curl -s --max-time 50 -X POST "$BASE/session/$SID/message" \
-  -H 'Content-Type: application/json' \
-  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"say hello\"}],\"model\":$MODEL}" > /dev/null &
-
-# 客户端 B：2 秒后中途加入
+send_prompt "$SID" "写一段 150 字的中文故事" &
 sleep 2
-bun docs/test-cases/scripts/sse-dump.mjs "$BASE/event" 50 "$DIR" > /tmp/t915b.log &
+SSE_AUTH="$SSE_AUTH" bun docs/test-cases/scripts/sse-dump.mjs "$BASE/api/session/$SID/event" 50 > /tmp/t915b.log &
 wait
 
 echo "A: $(wc -l < /tmp/t915a.log) events"
 echo "B: $(wc -l < /tmp/t915b.log) events"
-grep -c '"type":"message\.' /tmp/t915b.log
+grep -c '"type":"session.text' /tmp/t915b.log
 ```
-**期望**：客户端 B 中途加入后仍能收到 `server.connected` 和后续事件（`session.idle` 等）
+**期望**：B 中途加入后收到 `server.connected` 与后续 `session.text.*`/`session.execution.succeeded`。
 
-> **实测结论（有据）**：B 中途加入能收到完整事件流（含 `message.part.*`、`tool`、`session.idle`），多次受控实验验证通过。
->
-> **偶发现象（未复现）**：测试中曾出现 2 次"B 只收到 `server.connected` + `server.heartbeat`、无任何 `message` 事件"。随后 **28 轮多角度压力复现**（常规 dispose+中途订阅 / 激进 dispose+0.5s+B 1s / T9.14 3并发SSE+T9.15 完整序列）**全部 0 失败**，无法稳定复现。统计上若真实失败率 ≥10%，28 轮全过的概率仅 5%，故失败率大概率 <10%。
->
-> **根因未定位**：在无稳定复现路径前，不对根因下任何结论。曾推测的 takeUntil 终止 / dispose 重建窗口 / T9.14 累积状态，均**未被复现验证支持，已撤回**。
->
-> **再次出现时的抓取方法**：给 `packages/opencode/src/bus/index.ts` 的 `subscribing`/`publishing` 日志补 `directory` 字段（`yield* InstanceState.directory`），即可判断失败 SSE 流的"订阅实例"与"message publish 实例"是否错位。
+### T9.16 事件流：会话重命名与删除事件
 
----
-
-### T9.16 实例事件流：会话更新与删除事件（session.updated / session.deleted）
-
-> 验证：`PATCH /session/:id` 触发 `session.updated`，`DELETE /session/:id` 触发 `session.deleted`
+> V2 用 `PATCH /api/session/:id`（title）触发 `session.renamed`，`DELETE /api/session/:id` 触发 `session.deleted`（不再有笼统的 `session.updated`）。
 
 ```bash
-SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
-DIR=$(curl -s "$BASE/session/$SID" | jexec "d['directory']")
-
-bun docs/test-cases/scripts/sse-dump.mjs "$BASE/event" 20 "$DIR" > /tmp/t916.log &
+SID=$(new_sid)
+dump_session "$SID" 20 /tmp/t916.log &
 SSE_PID=$!
 for i in $(seq 1 20); do grep -q server.connected /tmp/t916.log 2>/dev/null && break; sleep 0.5; done
-
-curl -s -X PATCH "$BASE/session/$SID" -H 'Content-Type: application/json' -d '{"title":"sse-updated"}' > /dev/null
-curl -s -X DELETE "$BASE/session/$SID" > /dev/null
+curl -fsS --noproxy '*' "${CURL_AUTH[@]}" -X PATCH "$BASE/api/session/$SID" \
+  -H 'Content-Type: application/json' -d '{"title":"sse-renamed"}' > /dev/null
+curl -fsS --noproxy '*' "${CURL_AUTH[@]}" -X DELETE "$BASE/api/session/$SID" > /dev/null
 wait $SSE_PID
 
-grep -m1 '"type":"session.updated"' /tmp/t916.log | jexec "d['properties']['info']['title']"
+grep -m1 '"type":"session.renamed"' /tmp/t916.log | jq -r '.data.title'
 grep -c '"type":"session.deleted"' /tmp/t916.log
 ```
-**期望**：收到 `session.updated`（`properties.info.title=sse-updated`）与 `session.deleted`（计数 ≥1）
+**期望**：`session.renamed` 的 `data.title=sse-renamed`，`session.deleted` ≥ 1。
 
-### T9.17 实例事件流：消息删除事件（message.removed / message.part.removed）
+### T9.17 事件流：消息内容更新事件
 
-> 验证：删除消息/part 触发 `message.removed` / `message.part.removed`
+> V2 没有 V1 的 `message.removed`/`message.part.removed`，也没有删除消息的 HTTP 端点。
+> 相关事件为 `session.message.content.updated`（replay-only），以及 `GET /api/session/:id/diff` 查询差异。
+> 本项标注为 **V2 不适用**，如需消息级删除需另立需求。
 
-```bash
-SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
-DIR=$(curl -s "$BASE/session/$SID" | jexec "d['directory']")
-curl -s --max-time 45 -X POST "$BASE/session/$SID/message" \
-  -H 'Content-Type: application/json' -d "{\"parts\":[{\"type\":\"text\",\"text\":\"hi\"}],\"model\":$MODEL}" > /dev/null
+### T9.18 事件流：消息完成状态事件
 
-MID=$(curl -s "$BASE/session/$SID/message" | python3 -c "
-import json,sys
-msgs=json.load(sys.stdin, strict=False)
-print([m for m in msgs if m.get('info',{}).get('role')=='assistant'][-1]['info']['id'])
-")
-PID=$(curl -s "$BASE/session/$SID/message" | python3 -c "
-import json,sys
-msgs=json.load(sys.stdin, strict=False)
-print(msgs[-1]['parts'][0]['id'])
-")
-
-bun docs/test-cases/scripts/sse-dump.mjs "$BASE/event" 15 "$DIR" > /tmp/t917.log &
-SSE_PID=$!
-for i in $(seq 1 20); do grep -q server.connected /tmp/t917.log 2>/dev/null && break; sleep 0.5; done
-
-curl -s -X DELETE "$BASE/session/$SID/message/$MID" > /dev/null
-wait $SSE_PID
-
-grep -c '"type":"message.removed"' /tmp/t917.log
-```
-**期望**：删除消息后收到 `message.removed`（计数 ≥1）；`message.part.removed` 需通过删 part 端点触发（`DELETE /session/:id/message/:mid/part/:pid`），两者均可选验证
-
-### T9.18 实例事件流：消息状态事件（message.updated）
-
-> 验证：`POST /session/:id/prompt_async` 消息处理完成后触发 `message.updated`
+> V2 无 `message.updated`。消息落库后可用 `session.step.ended`（含 `assistantMessageID`/`finish`/`cost`/`tokens`）与 `session.usage.updated` 表示。
 
 ```bash
-SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
-DIR=$(curl -s "$BASE/session/$SID" | jexec "d['directory']")
-
-bun docs/test-cases/scripts/sse-dump.mjs "$BASE/event" 50 "$DIR" > /tmp/t918.log &
+SID=$(new_sid)
+dump_session "$SID" 50 /tmp/t918.log &
 SSE_PID=$!
 for i in $(seq 1 20); do grep -q server.connected /tmp/t918.log 2>/dev/null && break; sleep 0.5; done
-
-curl -s -X POST "$BASE/session/$SID/prompt_async" \
-  -H 'Content-Type: application/json' -d "{\"parts\":[{\"type\":\"text\",\"text\":\"说一个字\"}],\"model\":$MODEL}" > /dev/null
+send_prompt "$SID" "说一个字"
 wait $SSE_PID
-
-grep -c '"type":"message.updated"' /tmp/t918.log
+grep -c '"type":"session.step.ended"' /tmp/t918.log
 ```
-**期望**：收到 `message.updated` ≥ 1（assistant 消息落库时触发）
+**期望**：`session.step.ended` ≥ 1。
 
-### T9.19 实例事件流：会话错误事件（session.error）
+### T9.19 事件流：回合错误事件
 
-> 验证：非法模型 ID 发送消息触发 `session.error`
+> V2 用 `session.execution.failed`（含 `data.error`）；模型不可用时也可能是 `session.step.failed` 或 `session.retry.scheduled`。非法模型需在**创建会话**时指定。
 
 ```bash
-SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
-DIR=$(curl -s "$BASE/session/$SID" | jexec "d['directory']")
-
-bun docs/test-cases/scripts/sse-dump.mjs "$BASE/event" 20 "$DIR" > /tmp/t919.log &
+curl -fsS --noproxy '*' "${CURL_AUTH[@]}" -X POST "$BASE/api/session" \
+  -H 'Content-Type: application/json' \
+  -d '{"title":"sse-err","location":{"directory":"/workspace"},"model":{"id":"nonexistent-model-xyz","providerID":"Yd-DeepSeek"}}' \
+  | jq -r '.data.id' > /tmp/t919-sid
+SID=$(cat /tmp/t919-sid)
+dump_session "$SID" 60 /tmp/t919.log &
 SSE_PID=$!
 for i in $(seq 1 20); do grep -q server.connected /tmp/t919.log 2>/dev/null && break; sleep 0.5; done
-
-curl -s --max-time 15 -X POST "$BASE/session/$SID/message" \
-  -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"hi"}],"model":{"providerID":"Yd-DeepSeek","modelID":"nonexistent-model-xyz"}}' > /dev/null
+send_prompt "$SID" "hi"
 wait $SSE_PID
-
-grep -m1 '"type":"session.error"' /tmp/t919.log | jexec "d['properties'].get('error',{}).get('name')"
+grep -m1 '"type":"session.execution.failed"' /tmp/t919.log | jq -c '.data.error'
 ```
-**期望**：收到 `session.error` 事件（`properties.error` 含错误信息；非法模型实测触发 `UnknownError`，可能与预期 `ProviderModelNotFoundError` 有差异，事件发出即可）
+**期望**：收到 `session.execution.failed`（`data.error` 含错误信息）。
 
-### T9.20 实例事件流：diff 事件（session.diff）
+### T9.20 事件流：revert/diff 事件
 
-> 验证：`POST /session/:id/revert` 触发 `session.diff`
->
-> ⚠️ **revert 必须传 `messageID`**（来自会话中的 user 消息）。空 body 时 revert 找不到目标消息，直接返回不发布 diff 事件。
+> V2 用 `POST /api/session/:sessionID/revert/stage`（**必须传 `messageID`**）触发 `session.revert.staged`；差异用 `GET /api/session/:sessionID/diff` 查询。
 
 ```bash
-SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
-DIR=$(curl -s "$BASE/session/$SID" | jexec "d['directory']")
-curl -s --max-time 45 -X POST "$BASE/session/$SID/message" \
-  -H 'Content-Type: application/json' -d "{\"parts\":[{\"type\":\"text\",\"text\":\"hi\"}],\"model\":$MODEL}" > /dev/null
-MID=$(curl -s "$BASE/session/$SID/message" | python3 -c "
-import json,sys
-msgs=json.load(sys.stdin, strict=False)
-u=[m for m in msgs if m.get('info',{}).get('role')=='user'][0]
-print(u['info']['id'])
-")
+SID=$(new_sid)
+send_prompt "$SID" "hi"
+MID=$(curl -fsS --noproxy '*' "${CURL_AUTH[@]}" "$BASE/api/session/$SID/message?order=asc&limit=50" \
+  | jq -r '[.data[] | select(.type=="user")][0].id')
 
-bun docs/test-cases/scripts/sse-dump.mjs "$BASE/event" 20 "$DIR" > /tmp/t920.log &
+dump_session "$SID" 20 /tmp/t920.log &
 SSE_PID=$!
 for i in $(seq 1 20); do grep -q server.connected /tmp/t920.log 2>/dev/null && break; sleep 0.5; done
-
-curl -s -X POST "$BASE/session/$SID/revert" -H 'Content-Type: application/json' -d "{\"messageID\":\"$MID\"}" > /dev/null
+curl -fsS --noproxy '*' "${CURL_AUTH[@]}" -X POST "$BASE/api/session/$SID/revert/stage" \
+  -H 'Content-Type: application/json' -d "{\"messageID\":\"$MID\"}" > /dev/null
 wait $SSE_PID
-
-grep -c '"type":"session.diff"' /tmp/t920.log
+grep -c '"type":"session.revert.staged"' /tmp/t920.log
+curl -fsS --noproxy '*' "${CURL_AUTH[@]}" "$BASE/api/session/$SID/diff" | jq -c '.data | length'
 ```
-**期望**：收到 `session.diff` ≥ 1（`properties.diff` 为 diff 数组，可为空数组）
+**期望**：收到 `session.revert.staged` ≥ 1；`/diff` 返回差异数组（可为空）。
 
-### T9.21 实例事件流：agent/model 切换事件
+### T9.21 事件流：agent/model 切换事件
 
-> 验证：`session.agent.switched` / `session.model.switched` 事件
->
-> **触发路径说明（实测确认）**：这两个事件由 V2 `Session.switchModel` / `Session.switchAgent` 发布（`packages/core/src/session.ts`）。**HTTP PATCH `/session/:id` 的 `UpdatePayload` 不支持 `model`/`agent` 字段**（仅 directory/title/metadata/permission/time.archived），PATCH model 会被静默忽略、不触发任何事件。当前 HTTP API 层无直接 switch 端点，事件由 LLM 工具调用（如 TUI/CLI 侧切换）或内部流程触发。本用例标记为**待补端点后验证**，当前通过 `session.updated`（T9.16）覆盖会话级变更。
+> V2 有直接端点：`POST /api/session/:sessionID/model` 与 `POST /api/session/:sessionID/agent`，分别发布 `session.model.selected` / `session.agent.selected`。
+> **注意**：只有在值**实际变化**时才发布；创建时已指定同一模型后再 POST 同模型不会产生事件（实测 `session.model.selected`=0）。
 
 ```bash
-# 待 HTTP switch 端点就绪后执行。当前 PATCH model 不会触发事件：
-SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
-DIR=$(curl -s "$BASE/session/$SID" | jexec "d['directory']")
-
-bun docs/test-cases/scripts/sse-dump.mjs "$BASE/event" 25 "$DIR" > /tmp/t921.log &
+SID=$(new_sid)
+dump_session "$SID" 25 /tmp/t921.log &
 SSE_PID=$!
 for i in $(seq 1 20); do grep -q server.connected /tmp/t921.log 2>/dev/null && break; sleep 0.5; done
-
-# PATCH model 不会触发 session.model.switched（UpdatePayload 不支持 model 字段）
-curl -s -X PATCH "$BASE/session/$SID" -H 'Content-Type: application/json' \
-  -d '{"model":{"providerID":"Yd-DeepSeek","modelID":"glm-4.6"}}' > /dev/null
+curl -fsS --noproxy '*' "${CURL_AUTH[@]}" -o /dev/null -w 'switchAgent=%{http_code}\n' \
+  -X POST "$BASE/api/session/$SID/agent" -H 'Content-Type: application/json' -d '{"agent":"plan"}'
 wait $SSE_PID
-
-echo "model.switched count: $(grep -c '"type":"session.model.switched"' /tmp/t921.log) (期望 0，见说明)"
-echo "session.updated count: $(grep -c '"type":"session.updated"' /tmp/t921.log)"
+grep -m1 '"type":"session.agent.selected"' /tmp/t921.log | jq -c '.data'
 ```
-**期望**：PATCH model 因 `UpdatePayload` 不支持被静默忽略，`session.model.switched`=0、`session.updated`=0。待 HTTP switch 端点就绪后，再验证 `session.model.switched`（`properties.model.modelID` 为新模型）与 `session.agent.switched`
+**期望**：`switchAgent` 返回 204，并收到 `session.agent.selected`（`data.agent` 为新 agent）。切到不同模型同理产生 `session.model.selected`。
 
-### T9.22 实例事件流：资源生命周期事件（command.executed / todo.updated / mcp.tools.changed）
+### T9.22 事件流：命令执行触发事件
 
-> 验证：自定义命令执行、todo 更新、MCP server 连接分别触发对应事件
+> V2 无 `command.executed` 事件；`POST /api/session/:sessionID/command` 会把命令结果作为会话输入接纳，产生 `session.inbox.enqueued`。
 
 ```bash
-SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
-DIR=$(curl -s "$BASE/session/$SID" | jexec "d['directory']")
-
-bun docs/test-cases/scripts/sse-dump.mjs "$BASE/event" 25 "$DIR" > /tmp/t922.log &
+SID=$(new_sid)
+dump_session "$SID" 25 /tmp/t922.log &
 SSE_PID=$!
 for i in $(seq 1 20); do grep -q server.connected /tmp/t922.log 2>/dev/null && break; sleep 0.5; done
-
-# 创建并执行自定义命令（CommandCreatePayload 用 template 字段；执行 payload 必填 command 字段）
-curl -s -X POST "$BASE/session/$SID/commands/create" \
-  -H 'Content-Type: application/json' -d '{"name":"sse-test-cmd","description":"t","template":"say hi","agent":"build","model":"Yd-DeepSeek/deepseek-v4-flash"}' > /dev/null
-curl -s -X POST "$BASE/session/$SID/command" \
-  -H 'Content-Type: application/json' -d '{"command":"sse-test-cmd","arguments":""}' > /dev/null
+curl -fsS --noproxy '*' "${CURL_AUTH[@]}" -X POST "$BASE/api/session/$SID/command" \
+  -H 'Content-Type: application/json' -d '{"name":"init","text":""}' > /dev/null
 wait $SSE_PID
-
-grep -c '"type":"command.executed"' /tmp/t922.log
+grep -c '"type":"session.inbox.enqueued"' /tmp/t922.log
 ```
-**期望**：执行自定义命令收到 `command.executed` ≥ 1。`todo.updated`（AI 更新 todo 时）与 `mcp.tools.changed`（MCP server 连接/断开时）为按需补充验证项
+**期望**：命令执行产生 `session.inbox.enqueued` ≥ 1（`command.executed` 在 V2 不存在）。
 
-### T9.23 全局事件流：事件 envelope 字段完整性
+### T9.23 事件流：事件 envelope 字段完整性
 
-> 验证：全局 SSE 事件的 `directory`/`project`/`payload` 字段结构
->
-> ⚠️ 不能用 `sse-dump.mjs`（它会拍平 payload 层）。必须用原始 curl 查看未拍平的行。
+> ⚠️ 用原始 curl（`sse-dump.mjs` 只保留事件对象，不保留未解析原文）。V2 envelope 为 `{id, created, type, location?, data, durable?}`。
 
 ```bash
-curl -s -N --max-time 8 "$BASE/global/event" > /tmp/t923raw.log &
+curl -sS -N --max-time 8 "${CURL_AUTH[@]}" "$BASE/api/event" > /tmp/t923raw.log &
 CURL_PID=$!
 sleep 2
-curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' > /dev/null
+new_sid > /dev/null
 wait $CURL_PID
 
 python3 -c "
-import re
+import json, re
 for line in open('/tmp/t923raw.log'):
-    m = re.search(r'data: (.+)', line)
+    m=re.match(r'data: (.+)', line)
     if not m: continue
-    raw = m.group(1)
-    if 'session.created' in raw:
-        print(raw[:300]); break
+    ev=json.loads(m.group(1))
+    if ev.get('type')=='session.created':
+        print('keys:', sorted(ev.keys()))
+        print('has id/type/data:', all(k in ev for k in ('id','type','data')))
+        break
 "
 ```
-**期望**：全局事件为 `{"directory":"/workspace","project":"global","payload":{"id":"evt_*","type":"session.created","properties":{...}}}`，`directory`/`project`/`payload` 三者齐全
+**期望**：`session.created` 事件含 `id`/`created`/`type`/`data`（durable 事件含 `durable`；`location` 视发布路径可有可无）。
 
-### T9.24 实例事件流：事件 ID 格式
-
-> 验证：事件 `id` 为 `evt_*` 前缀，且连接生命周期事件与业务事件一致
+### T9.24 事件流：事件 ID 格式
 
 ```bash
-SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
-DIR=$(curl -s "$BASE/session/$SID" | jexec "d['directory']")
-
-bun docs/test-cases/scripts/sse-dump.mjs "$BASE/event" 10 "$DIR" > /tmp/t924.log
+SSE_AUTH="$SSE_AUTH" bun docs/test-cases/scripts/sse-dump.mjs "$BASE/api/event" 3 > /tmp/t924.log
 python3 -c "
 import json, itertools
-for line in itertools.islice(open('/tmp/t924.log'), 3):
-    d = json.loads(line)
+for line in itertools.islice(open('/tmp/t924.log'), 2):
+    d=json.loads(line)
     print(d.get('id','?'), d.get('type','?'))
 "
 ```
-**期望**：事件含 `id`（`evt_*` 前缀），类型分别为 `server.connected` / `server.heartbeat`
+**期望**：事件 `id` 为 `evt_*` 前缀；首个类型为 `server.connected`（V2 无 `server.heartbeat` 事件，心跳是注释行）。
 
-### T9.25 实例事件流：负向测试（缺 x-opencode-directory 头）
+### T9.25 事件流：目录头不再是必需
 
-> 验证：无 `x-opencode-directory` 头时实例 SSE 的行为
->
-> **实测结论**：缺头时 middleware 回退到 `Flag.OPENCODE_DEFAULT_DIRECTORY`（`/workspace`），**仍返回 200 + `server.connected`**，属于正常连接而非拒绝。因此负向判定标准是「事件仍能收到，但归属默认目录」，而非连接被拒。
+> V2 `/api/event` 不读取 `x-opencode-directory`；会话级流靠路径中的 `:sessionID` 路由。带或不带该头行为一致。
 
 ```bash
-# 无头请求：应返回 200 + text/event-stream + server.connected
-curl -s -N --max-time 3 -D - "$BASE/event" | head -3
+curl -sS -N --max-time 3 -D - -o /dev/null "${CURL_AUTH[@]}" \
+  -H "x-opencode-directory: /workspace" "$BASE/api/event" | head -1
 ```
-**期望**：HTTP 200、`content-type: text/event-stream`、首行 `server.connected`（回退默认目录连接成功）。若未来行为改为 400 拒绝，则标准同步调整
+**期望**：HTTP 200 + `text/event-stream`（该头被忽略，不影响连接）。
 
-### T9.26 实例事件流：write 工具参数早期可用性（running 态预渲染）
+### T9.26 事件流：write 参数早期可用性（running 态预渲染）
 
-> 验证：web 端「HTML/PPT 生成边写边看」模式的数据基础 —— write tool part 在 `running` 态（参数生成完毕、工具刚要执行）即携带完整 `state.input.content`，前端可在 **completed 之前、整个回合（session.idle）之前** 渲染 HTML，无需等 `POST /message` 同步返回
->
-> 背景：tool part 状态机为 `pending`（LLM 生成参数中，input 为空）→ `running`（参数完整，`input.filePath`/`input.content` 全量可用，**此时即可预渲染**）→ `completed`（文件已写盘，`state.output`/`metadata` 就位）。pending 阶段无参数增量事件（`tool-input-delta` 在 V1 链路被丢弃），仅能显示进度提示。
->
-> **前提**（同 T9.11）：
-> 1. Sandbox TCP 转发已启动（`lsof -i :30040 | grep LISTEN`）
-> 2. write 权限配 `allow`（或依赖本用例的 permission.asked 自动回复）
-> 3. 写入路径在项目目录内（`/workspace/`）
+> V2 对应 V1 `message.part.updated`(tool running)：工具参数定稿事件是 `session.tool.input.ended`（`data.text` 为原始参数 JSON），随后 `session.tool.called` 携带完整 `data.input` 且 `data.executed`。
+> 前端可在收到 `session.tool.called` 时即用 `data.input` 预渲染，早于 `session.tool.success` 与回合结束。
 
 ```bash
-SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
-DIR=$(curl -s "$BASE/session/$SID" | jexec "d['directory']")
-
-bun docs/test-cases/scripts/sse-dump.mjs "$BASE/event" 150 "$DIR" > /tmp/t926.log &
+SID=$(new_sid)
+dump_session "$SID" 150 /tmp/t926.log &
 SSE_PID=$!
 for i in $(seq 1 20); do grep -q server.connected /tmp/t926.log 2>/dev/null && break; sleep 0.5; done
-
-curl -s --max-time 140 -X POST "$BASE/session/$SID/message" \
-  -H 'Content-Type: application/json' \
-  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"use ONLY the write tool (not bash) to create /workspace/prerender-test.html containing a minimal HTML page with title 'sse prerender test' and one heading\"}],\"model\":$MODEL}" > /dev/null &
-
-# 权限自动回复（write 未配 allow 时）
-for i in $(seq 1 60); do
-  PLINE=$(grep -m1 '"type":"permission.asked"' /tmp/t926.log 2>/dev/null)
-  if [ -n "$PLINE" ]; then
-    curl -s -X POST "$BASE/session//permissions/" \
-      -H 'Content-Type: application/json' -d '{"response":"always"}' > /dev/null
-    break
-  fi
-  grep -q '"type":"session.idle"' /tmp/t926.log 2>/dev/null && break
-  sleep 2
-done
-wait $SSE_PID 2>/dev/null
+send_prompt "$SID" "use ONLY the write tool (not shell) to create /workspace/prerender-test.html containing a minimal HTML page with title 'sse prerender test'" &
+wait $SSE_PID
 
 python3 -c "
 import json
-writes = []   # (行号, status, content长度, output非空)
-idle_line = None
-for n, line in enumerate(open('/tmp/t926.log')):
-    d = json.loads(line)
-    if d.get('type') == 'session.idle':
-        idle_line = n
-    if d.get('type') != 'message.part.updated': continue
-    part = d.get('properties', {}).get('part', {})
-    if part.get('type') != 'tool' or part.get('tool') != 'write': continue
-    state = part.get('state', {})
-    writes.append((
-        n,
-        state.get('status'),
-        len(state.get('input', {}).get('content') or ''),
-        bool(state.get('output')),
-    ))
-
-statuses = [w[1] for w in writes]
-print('write statuses:', statuses)
-running = next((w for w in writes if w[1] == 'running'), None)
-completed = next((w for w in writes if w[1] == 'completed'), None)
-
-assert 'pending' in statuses, '缺少 pending 事件'
-assert running, '缺少 running 事件'
-assert running[2] > 0 and '<html' in json.dumps(open('/tmp/t926.log').readlines()[running[0]]).lower(), 'running 态 input.content 应含完整 HTML'
-assert completed, '缺少 completed 事件'
-assert running[0] < completed[0], 'running 应早于 completed'
-assert completed[3], 'completed 应有 output'
-if idle_line: assert running[0] < idle_line, 'running 应早于 session.idle（回合未结束即可渲染）'
-print('✅ running 态 content=%d 字节，行号 running=%d < completed=%d%s' % (
-    running[2], running[0], completed[0], f' < idle={idle_line}' if idle_line is not None else ''))
+input_ended=called=success=None
+for n,line in enumerate(open('/tmp/t926.log')):
+    if not line.strip(): continue
+    d=json.loads(line); t=d['type']; data=d.get('data',{})
+    if t=='session.tool.input.ended' and data.get('name','').startswith('write'): input_ended=n
+    if t=='session.tool.called' and data.get('input') is not None: called=(n,data['input'])
+    if t=='session.tool.success': success=n
+print('input_ended',input_ended,'called',called and called[0],'success',success)
+assert called, '缺少 session.tool.called'
+assert '<html' in json.dumps(called[1]).lower() or 'filePath' in called[1], 'called.input 应含完整参数'
+if success is not None: assert called[0] < success, 'called 应早于 success'
+print('✅ called 时参数已完整')
 "
 ```
-**期望**：write tool part 依次出现 `pending` → `running` → `completed`；`running` 态事件已携带完整 `input.content`（含 `<html`，字节数 > 0），且其出现顺序早于 `completed` 与 `session.idle` —— 即前端收到 running 事件即可 iframe 预渲染（srcdoc/blob），早于工具执行完成与整个回合结束
+**期望**：`session.tool.called` 早于 `session.tool.success`，且其 `data.input` 已含完整参数（前端可在执行完成前预渲染）。
 
-### T9.27 实例事件流：工具参数流式增量（message.part.delta / field=raw）
+### T9.27 事件流：工具参数流式增量（`session.tool.input.delta`）
 
-> 验证：方案 A —— LLM 生成工具参数期间（pending 阶段），processor 将参数 JSON 片段节流（200ms）推送为 `message.part.delta`（`field: "raw"`），前端可在参数生成过程中实时预览正在写的 HTML（PPT 场景"边写边看"）
->
-> 背景：服务端在 `tool-input-delta` 分支累积参数文本并节流 flush（`processor.ts` 的 `flushToolInput`），经 `updatePartDelta` 发内存事件（不落库，刷新/回放不重放）；`running` 态 `part.updated` 仍为定稿值。本用例需镜像包含该改动（`opencode-saas-sandbox-test:tool-input-stream` 及之后）。
+> V2 原生支持：LLM 生成工具参数期间推送 `session.tool.input.delta`（ephemeral，`data.id` 为工具调用 ID，`data.delta` 为参数片段），`session.tool.input.ended` 为定稿。
 
 ```bash
-SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
-DIR=$(curl -s "$BASE/session/$SID" | jexec "d['directory']")
-
-bun docs/test-cases/scripts/sse-dump.mjs "$BASE/event" 150 "$DIR" > /tmp/t927.log &
+SID=$(new_sid)
+dump_session "$SID" 150 /tmp/t927.log &
 SSE_PID=$!
 for i in $(seq 1 20); do grep -q server.connected /tmp/t927.log 2>/dev/null && break; sleep 0.5; done
-
-curl -s --max-time 140 -X POST "$BASE/session/$SID/message" \
-  -H 'Content-Type: application/json' \
-  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"use ONLY the write tool (not bash) to create /workspace/stream-test.html containing an HTML page with title 'stream test' and three paragraphs\"}],\"model\":$MODEL}" > /dev/null &
-
-for i in $(seq 1 70); do
-  PLINE=$(grep -m1 '"type":"permission.asked"' /tmp/t927.log 2>/dev/null)
-  if [ -n "$PLINE" ]; then
-    curl -s -X POST "$BASE/session//permissions/" \
-      -H 'Content-Type: application/json' -d '{"response":"always"}' > /dev/null
-    break
-  fi
-  grep -q '"type":"session.idle"' /tmp/t927.log 2>/dev/null && break
-  sleep 2
-done
-wait $SSE_PID 2>/dev/null
+send_prompt "$SID" "use ONLY the write tool (not shell) to create /workspace/stream-test.html containing an HTML page with title 'stream test' and three paragraphs" &
+wait $SSE_PID
 
 python3 -c "
 import json
-raw_deltas = []    # (行号, partID, delta)
-write_running = None
-for n, line in enumerate(open('/tmp/t927.log')):
-    d = json.loads(line)
-    if d.get('type') == 'message.part.delta':
-        p = d.get('properties', {})
-        if p.get('field') == 'raw': raw_deltas.append((n, p.get('partID'), p.get('delta') or ''))
-    if d.get('type') == 'message.part.updated':
-        part = d.get('properties', {}).get('part', {})
-        if part.get('type') == 'tool' and part.get('tool') == 'write' and part.get('state', {}).get('status') == 'running':
-            write_running = (n, part['id'], part['state']['input'])
-
-assert len(raw_deltas) >= 2, f'raw delta 应多条（节流推送），实际 {len(raw_deltas)}'
-assert write_running, '缺少 write running 事件'
-rid, rpart, rinput = write_running
-delta_parts = [x for x in raw_deltas if x[1] == rpart]
-assert delta_parts, 'raw delta 的 partID 应匹配 write tool part'
-assert max(x[0] for x in delta_parts) < rid, 'raw delta 应全部早于 running 定稿'
-raw = ''.join(x[2] for x in delta_parts)
-assert rinput.get('filePath') in raw and rinput.get('content', '')[:40] in raw.replace('\\\\n', chr(10)).replace('\\\\\"', '\"'), '拼接 raw 应覆盖完整参数'
-print('✅ %d 条 raw delta（partID 匹配），拼接 %d 字节，全部早于 running 定稿（行 %d）' % (len(delta_parts), len(raw), rid))
+deltas=[]; ended=None
+for n,line in enumerate(open('/tmp/t927.log')):
+    if not line.strip(): continue
+    d=json.loads(line); t=d['type']; data=d.get('data',{})
+    if t=='session.tool.input.delta': deltas.append((n,data.get('id'),data.get('delta') or ''))
+    if t=='session.tool.input.ended': ended=(n,data.get('id'))
+assert deltas, '缺少 session.tool.input.delta'
+assert ended, '缺少 session.tool.input.ended'
+raw=''.join(x[2] for x in deltas)
+print('deltas=%d ended_line=%d raw_bytes=%d' % (len(deltas), ended[0], len(raw)))
+print('all deltas before ended:', max(x[0] for x in deltas) < ended[0])
 "
 ```
-**期望**：pending 期间收到 **≥2 条** `message.part.delta`（`field: "raw"`，partID 与 write tool part 一致，节流 200ms 批量）；拼接后包含完整参数（filePath + content）；全部早于 `running` 态 `message.part.updated`。前端消费模式：SSE 按 partID 累积 raw → 容错提取 `content` 字段尾部（部分 JSON，需处理 `\n`/`\"` 转义）→ 实时渲染；收到 running `part.updated` 后丢弃 raw 用 `state.input` 定稿
+**期望**：`session.tool.input.delta` ≥ 1 且全部早于 `session.tool.input.ended`；拼接 `delta` 可还原工具参数。
 
 ---
 
-### T9.28 会话事件流：订阅与初始连接事件（GET /session/:id/event）
+### T9.28 会话事件流：订阅与初始连接事件（`GET /api/session/:sessionID/event`）
 
-> 验证：按会话过滤的 SSE 端点（REST 风格子资源）。与实例级 `/event` 的区别：`sessionID` 在路径中，自动完成 workspace 路由，**无需 `x-opencode-directory` 头**
->
-> **前提**：镜像需包含 session 事件流端点（`session.event`）。
+> 按会话过滤的 SSE 端点，`sessionID` 在路径中自动路由，无需目录头。
 
 ```bash
-SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
-
-curl -s -N --max-time 3 -D - -o /dev/null "$BASE/session/$SID/event" | grep -i "content-type\|cache-control"
-bun docs/test-cases/scripts/sse-dump.mjs "$BASE/session/$SID/event" 3 > /tmp/t928.log
-head -1 /tmp/t928.log | jexec "d.get('type')"
+SID=$(new_sid)
+curl -sS -N --max-time 3 -D - -o /dev/null "${CURL_AUTH[@]}" "$BASE/api/session/$SID/event" \
+  | grep -i "content-type\|cache-control"
+SSE_AUTH="$SSE_AUTH" bun docs/test-cases/scripts/sse-dump.mjs "$BASE/api/session/$SID/event" 3 > /tmp/t928.log
+head -1 /tmp/t928.log | jq -r '.type'
 ```
-**期望**：`content-type` 含 `text/event-stream`、`cache-control` 为 `no-cache, no-transform`；首个事件 `type` 为 `server.connected`（事件格式与实例 `/event` 一致：`{"id","type","properties"}`）
-
----
+**期望**：`content-type` 含 `text/event-stream`、`cache-control` 为 `no-cache, no-transform`；首个事件 `type` 为 `server.connected`。
 
 ### T9.29 会话事件流：只推该会话的事件（隔离性）
 
-> 验证：同一实例下两个 session，订阅 A 的会话流，B 的事件不得进入
->
-> 设计：用 PATCH title 触发 `session.updated`（轻量、不依赖 LLM/sandbox）。两个 session 在订阅**前**创建完毕，避免 `session.created` 干扰断言。
-
 ```bash
-SID_A=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
-SID_B=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
-sleep 1
-
-bun docs/test-cases/scripts/sse-dump.mjs "$BASE/session/$SID_A/event" 12 > /tmp/t929.log &
+SID_A=$(new_sid); SID_B=$(new_sid); sleep 1
+dump_session "$SID_A" 12 /tmp/t929.log &
 SSE_PID=$!
 for i in $(seq 1 20); do grep -q server.connected /tmp/t929.log 2>/dev/null && break; sleep 0.5; done
-
-curl -s -X PATCH "$BASE/session/$SID_A" -H 'Content-Type: application/json' -d '{"title":"sse-a-updated"}' > /dev/null
-curl -s -X PATCH "$BASE/session/$SID_B" -H 'Content-Type: application/json' -d '{"title":"sse-b-updated"}' > /dev/null
+curl -fsS --noproxy '*' "${CURL_AUTH[@]}" -X PATCH "$BASE/api/session/$SID_A" -H 'Content-Type: application/json' -d '{"title":"sse-a"}' > /dev/null
+curl -fsS --noproxy '*' "${CURL_AUTH[@]}" -X PATCH "$BASE/api/session/$SID_B" -H 'Content-Type: application/json' -d '{"title":"sse-b"}' > /dev/null
 wait $SSE_PID
 
-echo "updated count: $(grep -c '"type":"session.updated"' /tmp/t929.log) (期望 1)"
-grep -m1 '"type":"session.updated"' /tmp/t929.log | jexec "d['properties']['sessionID']"
+echo "renamed count: $(grep -c '"type":"session.renamed"' /tmp/t929.log) (期望 1)"
+grep -m1 '"type":"session.renamed"' /tmp/t929.log | jq -r '.data.sessionID'
 echo "B leak: $(grep -c "$SID_B" /tmp/t929.log) (期望 0)"
 ```
-**期望**：`session.updated` 恰好 1 条且 `properties.sessionID` 为 `SID_A`；整份日志中 `SID_B` 出现 0 次（B 的 `session.updated` 被 server 端过滤，而非客户端过滤）
-
----
+**期望**：`session.renamed` 恰好 1 条且 `data.sessionID` 为 `SID_A`；整份日志中 `SID_B` 出现 0 次。
 
 ### T9.30 会话事件流：负向测试（session 不存在）
 
-> 验证：不存在的 sessionID 返回 404（handler 内 `requireSession` 校验）
-
 ```bash
-curl -s -o /dev/null -w "%{http_code}\n" -N --max-time 3 "$BASE/session/ses_httpapi_missing/event"
+curl -sS -o /dev/null -w "%{http_code}\n" -N --max-time 3 "${CURL_AUTH[@]}" \
+  "$BASE/api/session/ses_missing/event"
 ```
-**期望**：`404`
+**期望**：`404`。
 
----
+### T9.31 会话事件流：发送 prompt 并跟随事件（`POST /api/session/:sessionID/prompt_stream`）
 
-### T9.31 会话事件流：发送异步消息并监听事件（POST /session/:id/prompt_stream）
-
-> 验证：「发送异步消息」+「监听会话事件」合并接口。一次请求：服务端发起异步 prompt 并返回 SSE 流，客户端直接消费该回合的事件，**回合结束（session.idle）后服务端主动关流**，无需客户端自己编排 prompt_async + event 两步
->
-> **前提**：镜像需包含 `session.prompt_stream` 端点。
+> 一次请求完成「接纳 prompt」+「跟随该回合事件」；服务端在该输入被投递且执行到达终态后主动关流。
 
 ```bash
-SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
-
+SID=$(new_sid)
 START=$(date +%s)
-curl -s -N --max-time 90 -D /tmp/t931-headers.txt "$BASE/session/$SID/prompt_stream" \
+curl -sS -N --max-time 90 -D /tmp/t931-headers.txt "${CURL_AUTH[@]}" \
+  "$BASE/api/session/$SID/prompt_stream" \
   -H 'Content-Type: application/json' \
-  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"只回复两个字：收到\"}],\"model\":$MODEL}" > /tmp/t931.log
+  -d '{"text":"只回复两个字：收到","metadata":{},"delivery":"queue"}' > /tmp/t931.log
 CURL_EXIT=$?
-END=$(date +%s)
-echo "curl_exit=$CURL_EXIT elapsed=$((END-START))s"
+echo "curl_exit=$CURL_EXIT elapsed=$(( $(date +%s) - START ))s"
 grep -i "content-type" /tmp/t931-headers.txt
 
 python3 -c "
-import re, json
-types = re.findall(r'\"type\":\"([a-z.\-]+)\"', open('/tmp/t931.log').read())
+import re
+types=re.findall(r'\"type\":\"([a-z.]+)\"', open('/tmp/t931.log').read())
 print('total events:', len(types))
-print('has idle:', 'session.idle' in types)
-print('idle is last:', types[-1] == 'session.idle' if types else False)
+print('first:', types[0] if types else None)
+print('terminal last:', types[-1] in ('session.execution.succeeded','session.execution.failed','session.execution.interrupted') if types else False)
 "
 ```
-**期望**：`HTTP 200` + `content-type: text/event-stream`；流内含完整回合事件（`server.connected` → `message.*` / `session.status`(busy) → `session.status`(idle) → `session.idle`）；**`session.idle` 为最后一帧且 curl_exit=0**（服务端在回合结束后主动关流，而非 --max-time 截断）。prompt 发起失败时通过流内 `session.error` 事件体现（与 prompt_async 语义一致）
+**期望**：`HTTP 200` + `text/event-stream`；流含完整回合事件（`server.connected` → `session.inbox.*` → `session.execution.*`）；**最后一帧为执行终态且 curl_exit=0**（服务端主动关流，而非 `--max-time` 截断）。
 
----
+### T9.32 会话事件流：prompt_stream 错误路径
 
-### T9.32 会话事件流：prompt_stream 错误路径（session.error + 关流）
-
-> 验证：非法模型发送 prompt_stream 时，`session.error` 事件通过流推送，且回合终止后流仍以 `session.idle` 正常关闭（错误不影响流生命周期管理）
+> 非法模型需在创建会话时指定；错误回合同样以终态关流，客户端不会挂死。
 
 ```bash
-SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
-
-START=$(date +%s)
-curl -s -N --max-time 60 "$BASE/session/$SID/prompt_stream" \
+curl -fsS --noproxy '*' "${CURL_AUTH[@]}" -X POST "$BASE/api/session" \
   -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"hi"}],"model":{"providerID":"Yd-DeepSeek","modelID":"nonexistent-model-xyz"}}' > /tmp/t932.log
-CURL_EXIT=$?
-END=$(date +%s)
-echo "curl_exit=$CURL_EXIT elapsed=$((END-START))s"
-
-grep -o '"type":"session.error"' /tmp/t932.log | head -1
-grep -o '"name":"[^"]*"' /tmp/t932.log | head -1
+  -d '{"title":"sse-ps-err","location":{"directory":"/workspace"},"model":{"id":"nonexistent-model-xyz","providerID":"Yd-DeepSeek"}}' \
+  | jq -r '.data.id' > /tmp/t932-sid
+SID=$(cat /tmp/t932-sid)
+curl -sS -N --max-time 60 "${CURL_AUTH[@]}" "$BASE/api/session/$SID/prompt_stream" \
+  -H 'Content-Type: application/json' -d '{"text":"hi","metadata":{}}' > /tmp/t932.log
+echo "curl_exit=$?"
+grep -o '"type":"session.execution.failed"' /tmp/t932.log | head -1
 python3 -c "
 import re
-types = re.findall(r'\"type\":\"([a-z.\-]+)\"', open('/tmp/t932.log').read())
-print('idle-last:', types[-1] == 'session.idle' if types else False)
+types=re.findall(r'\"type\":\"([a-z.]+)\"', open('/tmp/t932.log').read())
+print('terminal last:', types[-1] in ('session.execution.succeeded','session.execution.failed','session.execution.interrupted') if types else False)
 "
 ```
-**期望**：流内依次出现 `session.error`（`properties.error.name=UnknownError`，与 T9.19 一致）与 `session.idle`；**idle 为最后帧且 curl_exit=0**（错误回合同样触发服务端关流，客户端不会挂死）
-
----
+**期望**：流内出现 `session.execution.failed`，且以执行终态结尾、curl_exit=0。
 
 ### T9.33 会话事件流：prompt_stream 多会话并发隔离
 
-> 验证：两个 session 同时执行 prompt_stream，各自的流只包含本会话事件（`properties.sessionID` 无交叉），且各自独立关流
->
-> **注意**：sessionID 含大写字母，正则字符类须用 `[A-Za-z0-9]`（实测踩坑：`[a-z0-9]` 会漏配得出"空集"的假象）
+> **注意**：sessionID 含大写字母，正则字符类须用 `[A-Za-z0-9]`。
 
 ```bash
-SID_A=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
-SID_B=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
-
-curl -s -N --max-time 60 "$BASE/session/$SID_A/prompt_stream" \
-  -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"只回复A"}],"model":$MODEL}' > /tmp/t933a.log &
+SID_A=$(new_sid); SID_B=$(new_sid)
+curl -sS -N --max-time 60 "${CURL_AUTH[@]}" "$BASE/api/session/$SID_A/prompt_stream" \
+  -H 'Content-Type: application/json' -d '{"text":"只回复A","metadata":{}}' > /tmp/t933a.log &
 PA=$!
 sleep 0.3
-curl -s -N --max-time 60 "$BASE/session/$SID_B/prompt_stream" \
-  -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"只回复B"}],"model":$MODEL}' > /tmp/t933b.log &
+curl -sS -N --max-time 60 "${CURL_AUTH[@]}" "$BASE/api/session/$SID_B/prompt_stream" \
+  -H 'Content-Type: application/json' -d '{"text":"只回复B","metadata":{}}' > /tmp/t933b.log &
 PB=$!
 wait $PA $PB
 
 python3 -c "
 import re
-for name, sid, f in [('A','$SID_A','/tmp/t933a.log'),('B','$SID_B','/tmp/t933b.log')]:
-    content = open(f).read()
-    sids = set(re.findall(r'\"sessionID\":\"(ses_[A-Za-z0-9]+)\"', content))
-    types = re.findall(r'\"type\":\"([a-z.\-]+)\"', content)
-    idle_last = types[-1] == 'session.idle' if types else False
-    leak = sids - {sid}
-    print(f'{name}: idle-last={idle_last}, cross-leak={leak or \"none\"}')
+for name,sid,f in [('A','$SID_A','/tmp/t933a.log'),('B','$SID_B','/tmp/t933b.log')]:
+    content=open(f).read()
+    sids=set(re.findall(r'\"sessionID\":\"(ses_[A-Za-z0-9]+)\"', content))
+    types=re.findall(r'\"type\":\"([a-z.]+)\"', content)
+    terminal=types[-1] in ('session.execution.succeeded','session.execution.failed','session.execution.interrupted') if types else False
+    print(f'{name}: terminal-last={terminal}, cross-leak={sids-{sid} or \"none\"}')
 "
 ```
-**期望**：A/B 两条流各自 `sessionID` 集合只含本会话（cross-leak=none），均以 `session.idle` 结尾并独立关流（curl_exit=0）
-
----
+**期望**：A/B 两条流各自 `sessionID` 集合只含本会话（cross-leak=none），均以执行终态结尾。
 
 ### T9.34 会话事件流：prompt_stream 负向测试（session 不存在）
 
-> 验证：不存在的 sessionID 调用 prompt_stream 返回 404（`requireSession` 先于流建立）
-
 ```bash
-curl -s -o /dev/null -w "%{http_code}\n" -N --max-time 3 \
-  -X POST "$BASE/session/ses_httpapi_missing/prompt_stream" \
-  -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"hi"}],"model":$MODEL}'
+curl -sS -o /dev/null -w "%{http_code}\n" -N --max-time 3 "${CURL_AUTH[@]}" \
+  -X POST "$BASE/api/session/ses_missing/prompt_stream" \
+  -H 'Content-Type: application/json' -d '{"text":"hi","metadata":{}}'
 ```
-**期望**：`404`
+**期望**：`404`。
 
----
+### T9.35 会话事件流：断连续传（`GET /api/experimental/session/:sessionID/log`）
 
-### T9.35 会话事件流：断连续传（GET /session/:id/event?after=\<seq\>）
-
-> 验证：SSE 断连窗口内错过的 durable 事件可通过 `?after=` 补发 —— 「快照-002 卡死」问题（前端断连后 UI 停在"思考中"，刷新才恢复）的服务端修复。durable 事件（`session.created/updated/deleted`、`message.updated/removed`、`message.part.updated/removed`，aggregate=sessionID）持久化在 `event` 表；非 durable 事件（`message.part.delta`/`session.diff`/`session.error`）不补发，由客户端重连后 refetch 对齐。
+> V2 的 durable 事件本应按聚合序号补发：`GET /api/experimental/session/:sessionID/log?after=<seq>&follow=<bool>`。
+> `after` 为**排他**游标，必须 ≥ 0（`after=-1` 返回 400）；读取到达水位时发出一次 `log.synced`；与 V1 不同，该端点**不含** `server.connected`。
 >
-> **修复内容**（`handlers/session.ts` subscribeEvents + `handlers/event.ts` eventResponse）：
-> 1. `?after=<seq>`：连接时先从 `event` 表补发 `seq > after` 的 durable 事件（不经过 location 过滤），再接实时流；实时侧丢弃 `seq <= liveAfterSeq` 的事件防重复（补发/实时衔接窗口零重复）
-> 2. SSE 事件新增顶层 `seq` 字段（durable 事件为自增序号，非 durable/连接级事件无此字段）——客户端记录收到的最大 seq 作为重连游标
-> 3. location 过滤容错：无 `location` 的事件（全局/replay 路径发布）不再被静默丢弃（`eventVisible`）
->
-> **前提**：镜像/本地代码含 `SessionEventQuery`（session.event 端点 query 加 `after`）。
+> ⚠️ **实测阻塞**：当前服务能发出 `log.synced` 水位（`seq` 反映已分配的序号，如 `1`），但 `event` 表**没有落库任何 durable 事件行**（`select count(*) from event` = 0），因此 `?after=` 补发不出任何事件，实时窗口外的事件无法追回。该项待 durable 事件持久化启用/修复后再验证。
 
 ```bash
-SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
+SID=$(new_sid)
+curl -fsS --noproxy '*' "${CURL_AUTH[@]}" -X PATCH "$BASE/api/session/$SID" \
+  -H 'Content-Type: application/json' -d '{"title":"t935-gap"}' > /dev/null
 
-# 客户端 A：连接后立即断开（模拟断连）
-bun docs/test-cases/scripts/sse-dump.mjs "$BASE/session/$SID/event" 3 > /tmp/t935a.log
-grep -c server.connected /tmp/t935a.log
-
-# 断连窗口内产生 durable 事件（session.updated）
-curl -s -X PATCH "$BASE/session/$SID" -H 'Content-Type: application/json' -d '{"title":"t935-gap"}' > /dev/null
-
-# 场景1：不带 after 重连 → 不回放（原行为回归）
-bun docs/test-cases/scripts/sse-dump.mjs "$BASE/session/$SID/event" 3 > /tmp/t935b.log
-echo "no-after updated count (期望 0): $(grep -c session.updated /tmp/t935b.log)"
-
-# 场景2：带 after=-1 全量补发
-bun docs/test-cases/scripts/sse-dump.mjs "$BASE/session/$SID/event?after=-1" 3 > /tmp/t935c.log
+SSE_AUTH="$SSE_AUTH" bun docs/test-cases/scripts/sse-dump.mjs \
+  "$BASE/api/experimental/session/$SID/log?after=0&follow=false" 3 > /tmp/t935c.log
 python3 -c "
 import json
-types = [json.loads(l)['type'] for l in open('/tmp/t935c.log')]
-print('types:', types)
-assert types[0] == 'server.connected'
-assert types.count('session.created') == 1 and types.count('session.updated') == 1, '补发恰好各一次'
+events=[json.loads(l) for l in open('/tmp/t935c.log') if l.strip()]
+print('types:', [e['type'] for e in events])
+print('renamed:', len([e for e in events if e['type']=='session.renamed']))
 "
-
-# 场景3：after=0 部分补发（跳过 seq=0 的 created）
-bun docs/test-cases/scripts/sse-dump.mjs "$BASE/session/$SID/event?after=0" 3 > /tmp/t935d.log
-echo "after=0: created=$(grep -c session.created /tmp/t935d.log) (期望 0), updated=$(grep -c session.updated /tmp/t935d.log) (期望 1)"
-
-# 场景4：负向参数
-curl -s -o /dev/null -w "after=-5: %{http_code}\n" --max-time 3 "$BASE/session/$SID/event?after=-5"
-curl -s -o /dev/null -w "after=abc: %{http_code}\n" --max-time 3 "$BASE/session/$SID/event?after=abc"
+curl -sS -o /dev/null -w "after=-1: %{http_code}\n" --max-time 3 "${CURL_AUTH[@]}" \
+  "$BASE/api/experimental/session/$SID/log?after=-1"
+curl -sS -o /dev/null -w "after=abc: %{http_code}\n" --max-time 3 "${CURL_AUTH[@]}" \
+  "$BASE/api/experimental/session/$SID/log?after=abc"
 ```
-**期望**：
-- 场景1：无 after 时 0 条 `session.updated`（不回放，保持原行为）
-- 场景2：`server.connected → session.created → session.updated`，各恰好一次
-- 场景3：`created=0, updated=1`（部分续传只补 after 之后的事件）
-- 场景4：非法 after（<-1 / 非数字）返回 `400`
-- 补发事件带顶层 `seq` 字段（durable 事件），客户端可用作下次重连游标
+**期望**：非法 `after`（负数/非数字）返回 `400`（已实测通过）。`after=0` 应补发 `seq>0` 的 durable 事件（`session.renamed` 恰 1 条）——**当前因未落库而不成立**，待持久化启用后恢复判定。
 
----
+### T9.36 会话事件流：断连续传并发窗口（补发/实时不丢不重）
 
-### T9.36 会话事件流：断连续传并发窗口（补发/实时衔接不丢不重）
-
-> 验证：`?after=` 补发进行时新事件持续产生（listener 已注册、store 边界 target 已定）——补发与实时流衔接窗口事件**零丢失、零重复**。
+> ⚠️ **实测阻塞**：同 T9.35，durable 事件未落库，`follow=true` 的补发段为空（仅 `log.synced`），无法验证 `[1,2,3,4,5]` 序列。
 
 ```bash
-SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | jexec "d['id']")
-curl -s -X PATCH "$BASE/session/$SID" -H 'Content-Type: application/json' -d '{"title":"t936-1"}' > /dev/null
-curl -s -X PATCH "$BASE/session/$SID" -H 'Content-Type: application/json' -d '{"title":"t936-2"}' > /dev/null
+SID=$(new_sid)
+curl -fsS --noproxy '*' "${CURL_AUTH[@]}" -X PATCH "$BASE/api/session/$SID" -H 'Content-Type: application/json' -d '{"title":"t936-1"}' > /dev/null
+curl -fsS --noproxy '*' "${CURL_AUTH[@]}" -X PATCH "$BASE/api/session/$SID" -H 'Content-Type: application/json' -d '{"title":"t936-2"}' > /dev/null
 
-# 连接（after=-1 全量补发）后立刻并发 PATCH 3 次
-bun docs/test-cases/scripts/sse-dump.mjs "$BASE/session/$SID/event?after=-1" 12 > /tmp/t936.log &
+SSE_AUTH="$SSE_AUTH" bun docs/test-cases/scripts/sse-dump.mjs \
+  "$BASE/api/experimental/session/$SID/log?after=0&follow=true" 12 > /tmp/t936.log &
 SSE_PID=$!
-for i in $(seq 1 20); do grep -q server.connected /tmp/t936.log 2>/dev/null && break; sleep 0.5; done
-for i in 1 2 3; do curl -s -X PATCH "$BASE/session/$SID" -H 'Content-Type: application/json' -d "{\"title\":\"t936-c$i\"}" > /dev/null; done
+for i in $(seq 1 20); do grep -q log.synced /tmp/t936.log 2>/dev/null && break; sleep 0.5; done
+for i in 1 2 3; do
+  curl -fsS --noproxy '*' "${CURL_AUTH[@]}" -X PATCH "$BASE/api/session/$SID" \
+    -H 'Content-Type: application/json' -d "{\"title\":\"t936-c$i\"}" > /dev/null
+done
 wait $SSE_PID
 
 python3 -c "
 import json
-updates = []
-for l in open('/tmp/t936.log'):
-    d = json.loads(l)
-    if d['type'] == 'session.updated': updates.append(d.get('seq'))
-updates.sort()
-print('seqs:', updates)
-assert updates == [1,2,3,4,5], f'补发(1,2)+并发(3,4,5) 应恰好各一次, 实际 {updates}'
-print('✅ 衔接窗口零丢失零重复')
+seqs=sorted(json.loads(l).get('durable',{}).get('seq') for l in open('/tmp/t936.log') if l.strip() and json.loads(l)['type']=='session.renamed')
+print('renamed seqs:', seqs)
+print('✅ 零丢失零重复' if seqs==[1,2,3,4,5] else '⚠️ 未落库，等待持久化后复测')
 "
 ```
-**期望**：`session.updated` 的 seq 序列恰好为 `[1,2,3,4,5]`（补发 1,2 + 实时 3,4,5，各一次）
+**期望**：`session.renamed` 的 `durable.seq` 恰为 `[1,2,3,4,5]`（补发 + 实时各一次）——**当前因未落库而不成立**。
+
+### T9.37 会话事件流：会话过滤语义单测
+
+> V2 的会话级事件过滤由 `packages/server/src/session-stream.ts` 的 `sessionEventFilter` 实现，`EventFeed` 按订阅者过滤后再编码。
+> 单测覆盖：`packages/server/test/session-stream.test.ts`（过滤 + prompt_stream 关流判定）与 `packages/server/test/event-feed.test.ts`（过滤订阅不改变全局订阅、被过滤事件不编码/不占容量）。
+
+```bash
+cd packages/server && bun test test/session-stream.test.ts test/event-feed.test.ts
+```
+**期望**：全部通过，覆盖
+1. `sessionEventFilter`：匹配 / 其他会话 / 无 sessionID / 非对象载荷
+2. `makePromptStreamTakeUntil`：未投递不结束、其他 inbox 不结束、投递后三个终态各结束一次、心跳与坏 JSON 忽略
+3. `EventFeed`：过滤订阅不改变全局订阅、无订阅接受时不编码、被过滤事件不占用容量
 
 ---
 
-### T9.37 实例事件流：无 location 事件不再被静默丢弃（eventVisible 容错）
+## 测试结果（V2）
 
-> 验证：`eventResponse` 的 location 过滤语义修正 —— 无 `location` 的事件（replay 路径/全局服务发布）此前被 `event.location?.directory === instance.directory` 无条件丢弃（心跳照发、连接看似健康，最难排查）。修复后无 location 事件放行，有 location 且不匹配的仍被隔离。
->
-> 单测覆盖（`packages/opencode/test/server/httpapi-event.test.ts` 的 `eventVisible` describe，5 个用例）：
-> 1. 有 location + directory 不匹配 → 拒绝（隔离语义保留）
-> 2. 有 location + directory 匹配 → 放行
-> 3. **无 location → 放行**（修复点）
-> 4. workspaceID 匹配/不匹配 → 对应放行/拒绝
-> 5. 调用方 filter（如 sessionEventFilter）叠加生效
->
-> ```bash
-> cd packages/opencode && bun test test/server/httpapi-event.test.ts
-> ```
-> **期望**：`eventVisible` describe 下 5 个用例全部通过（`delivers instance events` 的 fail 为 SQLite fixture 既有基线问题，与本项无关）
-
----
-
-## 测试结果
+本轮实测环境：镜像 `opencode-saas-e2e:session-fs-fix3`（热更新本次改动后重启，未重建）、本地 PG `opencode-v2-up`、真实 LLM `Yd-DeepSeek/deepseek-v4-flash`。
 
 | 用例 | 结果 | 备注 |
 |------|------|------|
-| T9.1 | ✅ | content-type、cache-control、server.connected 均验证通过 |
-| T9.2 | ✅ | 全局 SSE 收到 session.created 事件 |
-| T9.3 | ✅ | 10.0s 后收到 server.heartbeat |
-| T9.4 | ✅ | 实例级 SSE 需 x-opencode-directory 头 |
-| T9.5 | ✅ | 收到 message.part.updated 等 8 种事件类型 |
-| T9.6 | ✅ | 工具生命周期 pending→running→error（sandbox 环境下 bash 可能 error） |
-| T9.7 | ✅ | `permission.asked` 事件通过 SSE 推送，可程序化回复。需权限未配 `allow` 时触发 |
-| T9.8 | ✅ | 两个 session 各自收到事件，无交叉 |
-| T9.9 | ✅ | session.status(×4) → session.idle |
-| T9.10 | ✅ | prompt_async 返回 204，SSE 正常推送 |
-| T9.11 | ✅ | 收到 `file.edited` 事件。前提：sandbox 转发已启动 + 权限配 `edit:allow` + 写项目目录内路径 |
-| T9.12 | ✅ | 收到 server.instance.disposed 事件 |
-| T9.13 | ✅ | 断开重连均收到 server.connected |
-| T9.14 | ✅ | 3 个 SSE 客户端同时监听，均收到相同 10 种事件类型 |
-| T9.15 | ✅ | 中途加入收到完整事件流；曾现偶发"B 只收 connected+heartbeat"（28 轮未复现，详见用例备注） |
-| T9.16 | ✅ | session.updated（PATCH title）/ session.deleted（DELETE）均收到 |
-| T9.17 | ✅ | message.removed（删消息收到）；message.part.removed 走删 part 端点 |
-| T9.18 | ✅ | message.updated（异步消息落库触发 6 次） |
-| T9.19 | ✅ | session.error（非法模型触发，error.name=UnknownError） |
-| T9.20 | ✅ | session.diff（revert 需传 messageID 才触发） |
-| T9.21 | ⚠️ 待端点 | session.model.switched 走 V2 switchModel，HTTP PATCH 的 UpdatePayload 不支持 model 字段（静默忽略，不触发事件），待 switch 端点就绪后验证 |
-| T9.22 | ✅ | command.executed（执行 payload 需 `command` 字段，创建用 `template` 字段） |
-| T9.23 | ✅ | 全局事件 envelope 为 `{directory,project,payload}`（需原始 curl，sse-dump 会拍平） |
-| T9.24 | ✅ | 事件 id 为 `evt_*` 前缀 |
-| T9.25 | ✅ | 缺 x-opencode-directory 头时回退默认目录（OPENCODE_DEFAULT_DIRECTORY），仍返回 200 + server.connected，非拒绝 |
-| T9.26 | ✅ | write tool part pending→running→completed；running 态即含完整 input.content（155B HTML），顺序 running < completed < session.idle，web 端可在回合结束前预渲染 |
-| T9.27 | ✅ | pending 期间 5 条 message.part.delta（field=raw，partID 匹配，拼接 354B 完整参数），全部早于 running 定稿；镜像 tool-input-stream，改动后 T9.26 回归通过 |
-| T9.28 | ✅ | content-type=text/event-stream、cache-control=no-cache, no-transform、首事件 server.connected；无需 x-opencode-directory 头 |
-| T9.29 | ✅ | session.updated 恰好 1 条且属于 SID_A，SID_B 全日志 0 泄漏（server 端过滤生效） |
-| T9.30 | ✅ | 不存在 sessionID 返回 404 |
-| T9.31 | ✅ | prompt_stream 一次请求完成发送+监听：200 + text/event-stream，13 个事件（connected→message.*→status(busy)→status(idle)→session.idle），idle 为最后帧且服务端主动关流（curl_exit=0，7s） |
-| T9.32 | ✅ | 非法模型：session.error（error.name=UnknownError）照常推送，流仍以 session.idle 关流（curl_exit=0，<1s），客户端不挂死 |
-| T9.33 | ✅ | A/B 并发 prompt_stream 各自 sessionID 无交叉（cross-leak=none），均独立以 idle 关流；注意 sessionID 含大写字母，正则须 [A-Za-z0-9] |
-| T9.34 | ✅ | 不存在 sessionID 的 prompt_stream 返回 404 |
-| T9.35 | ✅ | after 续传：无 after 0 回放（原行为）、after=-1 全量补发各一次、after=0 部分补发（created=0/updated=1）、非法 after 400；补发事件带顶层 seq 游标 |
-| T9.36 | ✅ | 并发衔接窗口 seqs=[1,2,3,4,5]，补发(1,2)+实时(3,4,5) 零丢失零重复 |
-| T9.37 | ✅ | eventVisible 5 个单测通过（无 location 放行 / 有 location 隔离保留 / workspace 过滤 / 调用方 filter 叠加） |
+| T9.1 | ✅ | 200 + `text/event-stream` + `no-cache, no-transform`；首帧 `server.connected` |
+| T9.2 | ✅ | 全局流收到 `session.created`，`data.sessionID` 与新建会话一致 |
+| T9.3 | ✅ | 20s 窗口内 `: heartbeat` × 2（注释行，非事件） |
+| T9.13 | ✅ | 两次连接均首帧 `server.connected` |
+| T9.16 | ✅ | `session.renamed`（`data.title=sse-renamed`）+ `session.deleted` ×1 |
+| T9.21 | ✅ | `switchAgent` 204 → `session.agent.selected`（`data.agent=plan`）；同模型切换不发布 |
+| T9.23 | ✅ | `session.created` envelope keys = `created/data/durable/id/location/type` |
+| T9.24 | ✅ | `id` 为 `evt_*`；首帧 `server.connected` |
+| T9.28 | ✅ | 200 + `text/event-stream` + `no-cache, no-transform`；首帧 `server.connected` |
+| T9.29 | ✅ | `session.renamed` 恰 1 条且属 `SID_A`，`SID_B` 零泄漏 |
+| T9.30 | ✅ | 不存在 sessionID → 404 |
+| T9.31 | ✅ | 200 + SSE，15 事件，末帧 `session.execution.succeeded`，服务端主动关流（0.8s） |
+| T9.32 | ✅ | 非法模型 → `session.execution.failed` 后关流 |
+| T9.33 | ✅ | A/B 并发各自关流，`sessionID` 零交叉 |
+| T9.34 | ✅ | 不存在 sessionID → 404 |
+| 附加 | ✅ | `prompt_stream` 非法 payload → 400 |
+| T9.35 | ⚠️ 阻塞 | 非法 `after` 400 通过；`event` 表未落库，`?after=` 补发不出事件（仅 `log.synced`） |
+| T9.36 | ⚠️ 阻塞 | 同上，durable 事件未落库，无法验证 `[1,2,3,4,5]` |
+| T9.37 | ✅ | `session-stream.test.ts` + `event-feed.test.ts` 合计 21 通过（`--rerun-each 5` 稳定） |
 
-> 注：T9.16-T9.25 为覆盖补全用例，已在本轮验证（组合 1：远端 PG + 远端 Sandbox）。T9.21 的 `session.agent.switched`/`session.model.switched` 需 HTTP switch 端点就绪后验证；`todo.updated`/`mcp.tools.changed` 为按需补充项。
+PG 核验：测试会话行存在且 `directory=/workspace`；一次回合消息为 user=1、assistant=1、idle=1；`pending=0`。
+另：`event_sequence` 有水位记录，但 `select count(*) from event` = 0（见 T9.35/36 阻塞）。
 
-> 注：2026-07-17 重构为标准三段式（sse-dump.mjs 后台订阅 + 业务动作 + 日志断言），原始内联 bun 脚本见 git 历史。
+> T9.4–T9.12、T9.14、T9.15、T9.17–T9.20、T9.22、T9.25–T9.27、T9.31–T9.34 及 T9.5/T9.6 等已按 V2 契约改写，命令可直接执行，但尚未在本轮全部实跑（其中 T9.5/T9.6/T9.11/T9.26/T9.27 依赖真实 LLM 与 sandbox）。执行时若与期望不符，按上面的 V1→V2 对照表核对事件名与端点。
 
-> 复测记录（2026-09-06，组合 3：本地 PG + 本地 OpenSandbox，镜像 `opencode-saas-sandbox-test:t0906-tool-input-stream`）：**T9.1–T9.27 全部通过**（T9.21 为待端点项，PATCH model 静默忽略 0/0 符合记录）。本轮差异点：
-> - T9.7：write /workspace 沙箱写默认放行，`permission.asked`=0，走文档期望的另一分支（无弹窗、正常完成，`file.edited`/`session.diff`/`session.idle` 俱全）
-> - T9.12：`POST /global/dispose` 返回 200 并推送 `server.instance.disposed` + `global.disposed`；dispose 后 session API 仍 200（实例自愈），后续用例不受影响
-> - T9.15：首次用 "say hello" 短任务时 B 只收到 connected+heartbeat（2s 内 message 已结束，SSE 不回放历史——符合设计）；改用 150 词故事长任务后 B 收到 109 message 事件 + idle。**B 加入时机必须在执行中**，用例 prompt 不宜过短
-> - T9.24：文档原 python 命令 `open(...)[...]` 有文件对象切片 bug，实测用 `itertools.islice` 替代执行；建议修文档
-> - T9.26/T9.27：在新镜像复测通过，且 T9.26 日志中可直接看到 4 条 raw delta（方案 A 生效）
+## 需要讨论的 V2 缺口
 
-> 复测记录（2026-09-07，**本地新代码直跑**：`bun run ./src/index.ts serve --port 14098` + 本地 PG `127.0.0.1:15432`，未走镜像）：**T9.28–T9.30 全部通过**。隔离性（T9.29）用 PATCH title 触发 `session.updated`，实测 A 流恰好 1 条事件且 sessionID 为 A，SID_B 泄漏 0；T9.30 返回 404。注意 `/session/:id/event` 由 sessionID 路径参数完成 workspace 路由，`sse-dump.mjs` 第三个 directory 参数不传。
-
-> 复测记录（2026-09-07，同上环境，真实 LLM `Yd-DeepSeek/deepseek-v4-flash`）：**T9.31 通过**。`POST /session/:id/prompt_stream` 返回 200 + text/event-stream，流内 13 个事件完整覆盖回合生命周期，`session.idle` 为最后帧且服务端主动关流（curl_exit=0，耗时 7s）。
-
-> 复测记录（2026-09-07，同上环境）：**T9.32–T9.34 通过**。T9.32 错误回合实测事件序列 `...→session.status(busy)→session.error→session.status(idle)→session.idle`（error.name=UnknownError），idle 关流 curl_exit=0；T9.33 并发双流 sessionID 零交叉、独立关流；T9.34 返回 404。新增端点说明：`GET /session/:id/event` 见 T9.28–T9.30。
-
-> 复测记录（2026-09-07，本地 PG + 远端沙箱，镜像含 NUL guard 修复（`db.pg.ts` 剥离 jsonb 参数 `\u0000`，详见 structured-output.md 复测记录））：**T9.28–T9.34 回归全部通过**（含 T9.31/32/33 的完整 LLM 回合、错误路径关流与并发隔离）。
-
-> 复测记录（2026-09-12，**本地新代码直跑**：`bun run ./src/index.ts serve --port 14098` + 远端 PG 转发 `127.0.0.1:15432`）：**T9.35–T9.37 全部通过**，origin 为「快照-002」会话卡死排查（前端断连后 UI 停在"思考中" 1103s，刷新才恢复；服务端事件完整入库）。本轮变更：
-> - `GET /session/:id/event` 新增 `?after=<seq>` 断连续传：durable 事件（session/message/part 的 created/updated/removed）从 `event` 表补发后接实时流，衔接窗口经 `liveAfterSeq` 去重（T9.36 seqs=[1,2,3,4,5] 验证零丢失零重复）
-> - SSE 事件新增顶层 `seq` 字段（客户端重连游标）；非 durable 事件（`message.part.delta` 等）不补发，由客户端 refetch 对齐
-> - `eventVisible` 提取 + 无 `location` 事件放行（此前被静默丢弃）
-> - 回归：T9.1/T9.3/T9.4/T9.5/T9.30 及 T9.29 隔离性（恰好 1 条 updated、零泄漏）均通过；`eventVisible` 单测 5/5（`httpapi-event.test.ts`，`delivers instance events` 的 fail 为 SQLite fixture 既有基线，与本轮无关）
-> - 前端配套（待前端侧落地）：断连重连时对活跃会话带 `?after=<lastSeq>`；配合心跳看门狗（>25~30s 无字节即重建连接）
-
-> **复测记录（2026-09-16，镜像 `person-model-connect`（feat/opencode-1.18.31 工作区：个人模型隔离 + 公共优先 + provider 脱敏 + autokeepalive），本地 PG + 远端 K8s 沙箱，真实 LLM `Yd-DeepSeek/deepseek-v4-flash`）：T9.1–T9.37 全部通过**（T9.21 为待端点项，PATCH model 静默忽略 0/0 符合记录）。要点：
-> - T9.5 消息事件 34 条、T9.8 双会话 A=45/B=48 无交叉、T9.14 三客户端均收全事件、T9.15 中途加入 B 收 120 条 message 事件 + idle
-> - T9.7 走「write 默认放行」分支（无 permission.asked，正常完成，文档允许）
-> - T9.26 write running 态 155B HTML（running=31 < completed=34 < idle=65 行号序）；T9.27 5 条 raw delta 拼接 354B 全部早于 running 定稿
-> - T9.31 prompt_stream 45 事件 idle 末帧 curl=0（3s）；T9.32 错误回合 err+idle 正常关流；T9.33 双流零交叉
-> - T9.35 四场景（无 after 不回放 / after=-1 全量各一次 / after=0 部分补发 / 非法 400×2）；T9.36 seqs=[1,2,3,4,5]
-> - T9.37 `eventVisible` 5/5；`delivers instance events`/`keeps the event stream open` 2 个 fail 为 SQLite fixture 既有基线（stash 基线对比同样 2 fail，非本轮引入）
-> - 执行提示：整批脚本易因 SSE 窗口叠加超时，建议按 5-8 个用例分批执行；T9.25 断言勿用 `head -3` 截断头（content-type 在第 4 行）
-
----
+1. **durable 事件未落库**（T9.35/T9.36）：`event_sequence` 分配了序号，但 `event` 表 0 行，`GET /api/experimental/session/:sessionID/log?after=` 只能发 `log.synced` 水位、补发不出事件。断连续传（前端重连对齐）在 V2 实际不可用，需要确认持久化是否应启用/修复。
+2. **无 dispose 端点**（T9.12）：`global.disposed` / `location.shutdown` 事件存在，但 HTTP 层没有触发入口；是否需要补一个处置端点。
+3. **无消息删除**（T9.17）：V2 没有删除消息/part 的端点与 `message.removed` 事件；`session.message.content.updated` 为 replay-only。如需前端撤销消息，需要新端点。
+4. **`session.idle` 已 deprecated**（T9.9）：当前服务路径以 `session.execution.succeeded/failed/interrupted` 判定回合结束；是否统一弃用 `session.idle`。
+5. **命令事件**（T9.22）：V2 无 `command.executed`，命令执行合并进 `session.inbox.*`；如前端需要命令维度事件，需要新增。

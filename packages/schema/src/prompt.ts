@@ -1,6 +1,7 @@
 import { Schema } from "effect"
 import { optional } from "./schema.js"
 import { statics } from "./schema.js"
+import { OutputFormat } from "./output-format.js"
 import { Skill } from "./skill.js"
 
 export interface PromptMention extends Schema.Schema.Type<typeof PromptMention> {}
@@ -67,6 +68,8 @@ export const Prompt = Schema.Struct({
   files: Schema.Array(FileAttachment).pipe(optional),
   agents: Schema.Array(AgentAttachment).pipe(optional),
   skills: Schema.Array(SkillAttachment).pipe(optional),
+  /** Output shape for this prompt; `json_schema` forces a structured tool call. */
+  format: OutputFormat.Format.pipe(optional),
 })
   .annotate({ identifier: "Prompt" })
   .pipe(

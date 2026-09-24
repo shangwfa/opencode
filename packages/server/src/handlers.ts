@@ -6,6 +6,7 @@ import { ProviderHandler } from "./handlers/provider"
 import { SessionHandler } from "./handlers/session"
 import { PermissionHandler } from "./handlers/permission"
 import { FileSystemHandler } from "./handlers/fs"
+import { SessionFileSystemHandler } from "./handlers/session-fs"
 import { FormHandler } from "./handlers/form"
 import { CommandHandler } from "./handlers/command"
 import { SkillHandler } from "./handlers/skill"
@@ -31,6 +32,8 @@ import { EventFeed } from "./event-feed"
 import { MigrationHandler } from "./handlers/migration"
 import { ConfigHandler } from "./handlers/config"
 
+const eventFeed = EventFeed.layer
+
 export const handlers = Layer.mergeAll(
   ServerHandler,
   DebugHandler,
@@ -38,7 +41,7 @@ export const handlers = Layer.mergeAll(
   LocationHandler,
   AgentHandler,
   PluginHandler,
-  SessionHandler,
+  SessionHandler.pipe(Layer.provide(eventFeed)),
   MessageHandler,
   ModelHandler,
   GenerateHandler,
@@ -51,10 +54,11 @@ export const handlers = Layer.mergeAll(
   FormHandler,
   PermissionHandler,
   FileSystemHandler,
+  SessionFileSystemHandler,
   CommandHandler,
   SkillHandler,
   RpcHandler,
-  EventHandler.pipe(Layer.provide(EventFeed.layer)),
+  EventHandler.pipe(Layer.provide(eventFeed)),
   PtyHandler,
   PersistentPtyHandler,
   ShellHandler,

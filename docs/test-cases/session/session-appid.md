@@ -149,3 +149,26 @@ curl -s "$BASE/session/$SID/message" | jq '.[] | {role: .info.role, texts: [.par
 
 | 2026-09-06 | T41.1.1/1.2/1.3 回归（merge v1.18.29 后） | ✅ | 镜像 t0906-merged-1.18.29；appId 创建/PG 落库/非法 400 均正常 |
 | 2026-09-14 | **全量复测**（镜像 `hitl-cbf2276a-wip2`（含 pgJsonb/LEASE_TOOLS/偏离修复），本地 PG + 远端沙箱） | ✅ 10/10 | T41.1.1 ✅（resp+PG 落库一致）/ T41.1.2 ✅（null）/ T41.1.3 ✅（400）/ T41.2.1 ✅（count=2 全匹配，不含他 appId）/ T41.2.2 ✅（0）/ T41.2.3 ✅（appId×limit 正交）/ T41.3.1 ✅（发消息后排序翻转 newer→older，`time_updated` delta=3534ms 已刷新）/ T41.4.1 ✅（回复 `2`、消息链 user→assistant、详情 appId=verify-app） |
+
+| 2026-09-24 | V2 API + 本地 PG/OpenSandbox（`session-appid-v2.mjs`） | ✅ 10 项断言通过 | T41.1.1/1.2/1.3 创建、详情、非法值和 PG 持久化通过；T41.2.1/2.2 过滤与空结果通过；T41.2.3 limit/search 与 cursor 翻页保持 appId 通过；T41.3.1 发消息后列表从 newer→older 翻转，`time_updated` 从 `1790200210609` 更新至 `1790200210875`；T41.4.1 SSE 实时收到终态 `succeeded`，助手回复 `2`，PG 中 user/assistant/idle 三条记录落库。PG 查询确认 `session_v2.app_id` 列和 `session_v2_app_id_idx` 索引存在。 |
+
+本次 V2 测试使用本地服务 `http://127.0.0.1:14105` 和真实模型 `Yd-DeepSeek/deepseek-v4-flash`。SSE 逐条实时打印事件。可复跑：
+
+```bash
+BASE=http://127.0.0.1:14105 OPENCODE_PASSWORD=pg-e2e-test-password \
+  node docs/test-cases/scripts/session-appid-v2.mjs
+```
+
+脚本对不满足预期的断言返回非零退出码。本记录反映当前 V2 实测结果；2026-08/09 的通过记录针对 V1 镜像，不能代表 V2 已实现 appId。
+
+PG 持久化和排序可用例中的 `$PG_URL` 查询确认：
+
+```sql
+SELECT id, title, app_id, time_created, time_updated
+FROM session_v2
+WHERE app_id IN ('biz-proj-001', 'biz-proj-002', 'sort-app', 'cursor-app')
+ORDER BY time_created DESC
+LIMIT 12;
+```
+
+V2 数据库变更通过 Core migration 完成；PG 新库 bootstrap schema 也已同步包含 `app_id`。PG 启动时会对 journal 中尚未执行的新增 migration 执行 DDL，再记录完成状态。

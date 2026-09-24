@@ -4,6 +4,27 @@
 > **仅适用于 opencode SaaS（PostgreSQL）**：沙箱记录持久化在 PG `sandbox` 表，多实例共享。
 > 公共测试环境和配置请参考 `docs/local-test-env.md`；环境变量 `$BASE $PG_URL $MODEL` 由 `test-env.sh` 全局提供。
 
+## V2 SaaS 实现验收
+
+下列脚本覆盖当前 V2 接口与 PG `sandbox` 表，不使用旧版 `/exec`、`/exec/async` 或 `exec_log`：
+
+```bash
+BASE=http://localhost:14106 \
+PG_URL='postgresql://local@127.0.0.1:5432/opencode-v2-up' \
+OPENCODE_PASSWORD="$OPENCODE_PASSWORD" \
+node docs/test-cases/scripts/sandbox-keepalive-v2.mjs
+
+# 独立服务启动时设置 OPENCODE_SESSION_AUTO_KEEPALIVE=0 后，验证 boot=false 延迟创建：
+BASE=http://localhost:14107 \
+PG_URL='postgresql://local@127.0.0.1:5432/opencode-v2-up' \
+OPENCODE_PASSWORD="$OPENCODE_PASSWORD" \
+node docs/test-cases/scripts/sandbox-keepalive-lazy-v2.mjs
+```
+
+V2 默认 root session 自动启用 keep-alive 并 boot；设置 `OPENCODE_SESSION_AUTO_KEEPALIVE=0` 可关闭。保活偏好保存在 PG `sandbox.keep_alive`，`boot=false` 写入 `pending-<sessionID>` 占位行；第一次 sandbox 工具执行时懒创建并继承偏好。`kill-sandbox` 与 session 删除将运行状态置为 `destroyed`，不会清除偏好；`release` 才会将其设为 false。
+
+旧版用例 T12.1（创建 session 后没有 sandbox 行）与 V1 源码的 root 自动 boot 语义不一致；V2 按 V1 源码行为执行，因此默认配置下应以本节脚本为准。旧版快照、按 sandbox ID 管理和复杂 PVC 用例不属于当前 V2 Provider 能力。
+
 ```bash
 # 环境变量（测试环境）
 export BASE=http://localhost:14096

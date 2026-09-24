@@ -103,6 +103,40 @@ function withTmp<A, E, R>(f: (directory: string) => Effect.Effect<A, E, R>) {
 }
 
 describe("Session.create", () => {
+  liveIt.live("persists appId, inherits it in child sessions, and filters the session list", () =>
+    withTmp((directory) =>
+      Effect.gen(function* () {
+        const sessions = yield* Session.Service
+        const store = yield* SessionStore.Service
+        const { db } = yield* Database.Service
+        const parent = yield* sessions.create({
+          location: Location.Ref.make({ directory: AbsolutePath.make(directory) }),
+          title: "app parent",
+          appId: "biz-proj-001",
+        })
+        const child = yield* sessions.create({ parentID: parent.id, title: "app child" })
+        const other = yield* sessions.create({
+          location: Location.Ref.make({ directory: AbsolutePath.make(directory) }),
+          title: "other app",
+          appId: "biz-proj-002",
+        })
+        const filtered = yield* store.list({ appId: "biz-proj-001" })
+        const row = yield* db
+          .select({ app_id: SessionTable.app_id })
+          .from(SessionTable)
+          .where(eq(SessionTable.id, parent.id))
+          .get()
+          .pipe(Effect.orDie)
+
+        expect(parent.appId).toBe("biz-proj-001")
+        expect(row?.app_id).toBe("biz-proj-001")
+        expect(child.appId).toBe("biz-proj-001")
+        expect(other.appId).toBe("biz-proj-002")
+        expect(filtered.map((item) => item.id).sort()).toEqual([child.id, parent.id].sort())
+      }),
+    ),
+  )
+
   liveIt.live("preserves the project canonical directory when creating a session in another clone", () =>
     withTmp((directory) =>
       Effect.gen(function* () {
@@ -360,9 +394,11 @@ describe("Session.create", () => {
       const bus = yield* Bus.Service
       const { db } = yield* Database.Service
       const metadata = { thread: "C123/1699999999.123", labels: ["support", 2] }
+      const appId = "biz-proj-001"
 
-      const created = yield* session.create({ location, metadata })
+      const created = yield* session.create({ location, metadata, appId })
       expect(created.metadata).toEqual(metadata)
+      expect(created.appId).toBe(appId)
       // The annotations are a durable creation fact, not just projected state.
       expect(
         yield* db
@@ -371,10 +407,11 @@ describe("Session.create", () => {
           .where(eq(EventTable.aggregate_id, created.id))
           .get()
           .pipe(Effect.orDie),
-      ).toMatchObject({ data: { metadata } })
+      ).toMatchObject({ data: { metadata, appId } })
 
       const inherited = yield* session.create({ parentID: created.id })
       expect(inherited.metadata).toEqual(metadata)
+      expect(inherited.appId).toBe(appId)
       const overridden = yield* session.create({ parentID: created.id, metadata: { thread: "other" } })
       expect(overridden.metadata).toEqual({ thread: "other" })
 
@@ -382,6 +419,7 @@ describe("Session.create", () => {
       yield* SessionInbox.promote(db, bus, created.id, "steer")
       const forked = yield* session.fork({ sessionID: created.id })
       expect(forked.metadata).toEqual(metadata)
+      expect(forked.appId).toBe(appId)
 
       // Absent stays absent: no empty-object normalization.
       expect((yield* session.create({ location })).metadata).toBeUndefined()
@@ -1273,7 +1311,7 @@ describe("SessionTransfer", () => {
 
       yield* transfer.import({
         data: {
-          info: { ...template, id: sessionID },
+            info: { ...template, id: sessionID, appId: "transfer-app" },
           messages: [
             { id: userID, type: "user", text: "Settled", time: { created: DateTime.makeUnsafe(1) } },
             {
@@ -1341,6 +1379,7 @@ describe("SessionTransfer", () => {
         completedShellID,
         completedCompactionID,
       ])
+      expect((yield* session.get(sessionID)).appId).toBe("transfer-app")
       expect(yield* Bus.latestSequence(db, sessionID)).toBe(4)
       expect((yield* transfer.export({ sessionID })).messages.at(-1)).toMatchObject({ model, providerState })
       expect((yield* transfer.export({ sessionID, sanitize: true })).messages.at(-1)).toMatchObject({

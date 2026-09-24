@@ -40,6 +40,10 @@ import { fileURLToPath } from "url"
 
 const promiseContract = compile(ClientApi, { groupNames, omitEndpoints: promiseOmitEndpoints })
 const effectContract = compile(ClientApi, { groupNames, omitEndpoints: effectOmitEndpoints })
+const openCodeEventOutput = {
+  name: "OpenCodeEvent",
+  import: 'import type { OpenCodeEvent } from "@opencode/protocol/groups/event"',
+}
 const effectTypeReferences = [
   ...namespaceTypes("Agent", "@opencode/schema/agent", Agent),
   ...namespaceTypes("Command", "@opencode/schema/command", Command),
@@ -104,10 +108,9 @@ await Effect.runPromise(
         emitEffectShape(effectContract, {
           typeReferences: effectTypeReferences,
           outputTypes: {
-            "event.subscribe": {
-              name: "OpenCodeEvent",
-              import: 'import type { OpenCodeEvent } from "@opencode/protocol/groups/event"',
-            },
+            "event.subscribe": openCodeEventOutput,
+            "session.event": openCodeEventOutput,
+            "session.promptStream": openCodeEventOutput,
           },
         }),
         fileURLToPath(new URL("../src/effect/api", import.meta.url)),

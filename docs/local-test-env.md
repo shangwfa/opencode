@@ -267,7 +267,7 @@ EOF
 
 # 启动本地 OpenSandbox server
 kill $(lsof -ti :8080) 2>/dev/null || true
-nohup env OPENSANDBOX_INSECURE_SERVER=YES uvx opensandbox-server \
+nohup env OPENSANDBOX_INSECURE_SERVER=YES uvx --from opensandbox-server==0.2.2 opensandbox-server --config ~/.sandbox.toml \
   > /tmp/opensandbox-server.log 2>&1 &
 
 # 验证健康状态
@@ -412,7 +412,7 @@ EOF
 
 # 启动本地 OpenSandbox server
 kill $(lsof -ti :8080) 2>/dev/null || true
-nohup env OPENSANDBOX_INSECURE_SERVER=YES uvx opensandbox-server \
+nohup env OPENSANDBOX_INSECURE_SERVER=YES uvx --from opensandbox-server==0.2.2 opensandbox-server --config ~/.sandbox.toml \
   > /tmp/opensandbox-server.log 2>&1 &
 
 # 验证健康状态

@@ -8,7 +8,7 @@
 
 ## 十、综合 E2E 场景
 
-> 运行前先全局加载环境：`source test-env.sh [1|2|3]`（见 [`00-preamble.md`](./00-preamble.md)）。以下用例直接用 `$BASE` `$PG_URL`，不重复定义。
+> 运行前先全局加载环境：`source test-env.sh [1|2|3] && source test-lib.sh`（见测试环境说明）。以下用例直接用 `$BASE` `$PG_URL`，不重复定义。AI 请求使用 `stream_prompt`（`POST /session/:id/prompt_stream`），正文增量和工具状态会实时输出到前台。
 
 ### T10.1 完整开发流程：创建项目 → 验证结构 → 运行
 
@@ -19,10 +19,12 @@ SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}
 echo "SID: $SID"
 
 # Step 1: 创建项目骨架（4 个文件）
-curl -s --max-time 120 -X POST "$BASE/session/$SID/message" \
-  -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"Create a Python project at /workspace/myapp with:\n1. myapp/__init__.py (empty)\n2. myapp/main.py with def main(): print(\"hello\")\n3. tests/__init__.py (empty)\n4. tests/test_main.py that imports myapp.main\nUse the write tool for each file."}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}}' \
-  | python3 -c "import json,sys;d=json.load(sys.stdin, strict=False);[print(p.get('text','')[:200]) for p in d.get('parts',[]) if p.get('type')=='text']"
+stream_prompt "$SID" 'Create a Python project at /workspace/myapp with:
+1. myapp/__init__.py (empty)
+2. myapp/main.py with def main(): print("hello")
+3. tests/__init__.py (empty)
+4. tests/test_main.py that imports myapp.main
+Use the write tool for each file.' 120
 ```
 
 ```bash
@@ -55,18 +57,14 @@ SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}
 echo "SID: $SID"
 
 # Step 1: 创建初始文件
-curl -s --max-time 120 -X POST "$BASE/session/$SID/message" \
-  -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"Use the write tool to create /workspace/calc.py with:\ndef add(a, b): return a + b\ndef multiply(a, b): return a * b"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}}' \
-  | python3 -c "import json,sys;d=json.load(sys.stdin, strict=False);[print(p.get('text','')[:200]) for p in d.get('parts',[]) if p.get('type')=='text']"
+stream_prompt "$SID" 'Use the write tool to create /workspace/calc.py with:
+def add(a, b): return a + b
+def multiply(a, b): return a * b' 120
 ```
 
 ```bash
 # Step 2: 修改代码（添加 subtract 函数）
-curl -s --max-time 120 -X POST "$BASE/session/$SID/message" \
-  -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"Use the edit tool to add a subtract function to /workspace/calc.py: def subtract(a, b): return a - b"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}}' \
-  | python3 -c "import json,sys;d=json.load(sys.stdin, strict=False);[print(p.get('text','')[:200]) for p in d.get('parts',[]) if p.get('type')=='text']"
+stream_prompt "$SID" 'Use the edit tool to add a subtract function to /workspace/calc.py: def subtract(a, b): return a - b' 120
 ```
 
 ```bash
@@ -101,11 +99,12 @@ const decoder = new TextDecoder()
 const eventLog = []
 
 setTimeout(async () => {
-  // 先创建文件
-  await fetch(BASE + '/session/' + SID + '/message', {
+  // 用流式接口触发回合；独立 /event 连接实时输出会话事件
+  const prompt = await fetch(BASE + '/session/' + SID + '/prompt_stream', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ parts: [{ type: 'text', text: 'Use the write tool to create /workspace/hello.py with: print(\"hello from SSE test\")' }], model: { providerID: 'Yd-DeepSeek', modelID: 'deepseek-v4-flash' } })
   })
+  if (!prompt.ok) console.error('prompt_stream failed:', prompt.status, await prompt.text())
 }, 500)
 
 while (true) {
@@ -120,6 +119,7 @@ while (true) {
       const evt = JSON.parse(line.slice(6))
       const p = evt.payload || evt
       eventLog.push({ type: p.type, time: new Date().toISOString().slice(11,19) })
+      console.log(new Date().toISOString().slice(11,19), p.type)
 
       if (p.type === 'permission.asked') {
         await fetch(BASE + '/session/' + SID + '/permissions/' + p.properties.id, {
@@ -166,17 +166,11 @@ echo "SID: $SID"
 
 # Round 1: 设定上下文
 echo "=== Round 1 ==="
-curl -s --max-time 60 -X POST "$BASE/session/$SID/message" \
-  -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"Remember this secret number: 42. Just reply OK."}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}}' \
-  | python3 -c "import json,sys;d=json.load(sys.stdin, strict=False);[print(p.get('text','')[:100]) for p in d.get('parts',[]) if p.get('type')=='text']"
+stream_prompt "$SID" 'Remember this secret number: 42. Just reply OK.' 60
 
 # Round 2: 验证记忆
 echo "=== Round 2 ==="
-curl -s --max-time 60 -X POST "$BASE/session/$SID/message" \
-  -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"What was the secret number I told you?"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}}' \
-  | python3 -c "import json,sys;d=json.load(sys.stdin, strict=False);[print(p.get('text','')[:100]) for p in d.get('parts',[]) if p.get('type')=='text']"
+stream_prompt "$SID" 'What was the secret number I told you?' 60
 ```
 **期望**：Round 2 回答包含 `42`
 
@@ -202,3 +196,6 @@ curl -s --max-time 60 -X POST "$BASE/session/$SID/message" \
 >
 > 附注：autokeepalive 下 session 创建即启动沙箱，T10.1/T10.2 的首次工具调用无沙箱冷启动等待。
 
+> **本地沙箱复测记录（2026-09-24，V2 SaaS + 本地 PG + 本地 OpenSandbox Docker runtime，`linux/arm64`，真实 LLM `Yd-DeepSeek/deepseek-v4-flash`）**：通过 `docs/test-cases/scripts/session-e2e-stream-v2.mjs` 执行 T10.1–T10.4。`prompt_stream` SSE 事件逐条实时输出；T10.1 收到 72 个事件、T10.2 write/edit 分别收到 28/25 个事件、T10.3 收到 26 个事件、T10.4 两轮分别收到 15/15 个事件。文件结构和 Python 输出、edit 工具成功事件、diff/计算结果 `5,3`、Round 2 回复 `42` 均验证通过，4/4 用例通过。
+>
+> **发现并修复**：T10.2 首轮发现 V2 `edit` 未走 `SandboxProvider`，在本地服务容器文件系统查找远端沙箱文件并报 `File not found`。现已增加沙箱文件读取、精确替换、权限检查和回写；单测 17/17 通过，Core 类型检查通过。`test-env.sh` 默认仍指向旧端口；本地 V2 测试服务使用 `BASE=http://127.0.0.1:14105`。

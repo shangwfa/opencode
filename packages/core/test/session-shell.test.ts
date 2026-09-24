@@ -7,6 +7,7 @@ import { AppNodeBuilder } from "@opencode/core/effect/app-node-builder"
 import { Location } from "@opencode/core/location"
 import { LocationServiceMap } from "@opencode/core/location-service-map"
 import { AbsolutePath } from "@opencode/core/schema"
+import { SandboxProvider } from "@opencode/core/sandbox/provider"
 import { Session } from "@opencode/core/session"
 import { SessionEvent } from "@opencode/core/session/event"
 import { SessionExecution } from "@opencode/core/session/execution"
@@ -63,6 +64,121 @@ const it = testEffect(
     offlineModels,
   ]).pipe(Layer.provideMerge(controlLayer)),
 )
+
+// Records what the sandboxed shell path forwards to the provider and answers
+// with scripted results; every other capability stays unusable so a sandboxed
+// shell test can never silently pass through the local process path.
+const sandboxRuns: Array<{
+  sessionID: string
+  command: string
+  hostWorkdir: string
+}> = []
+// Gate for the HOLD command: proves `start` returns before the sandbox run
+// settles, so shell.started is published while the command is still running.
+const holdStarted = Deferred.makeUnsafe<void>()
+const holdRelease = Deferred.makeUnsafe<void>()
+const sandboxProviderLayer = Layer.succeed(
+  SandboxProvider.Service,
+  SandboxProvider.Service.of({
+    enabled: true,
+    run: (input) =>
+      Effect.gen(function* () {
+        sandboxRuns.push({ sessionID: input.sessionID, command: input.command, hostWorkdir: input.hostWorkdir })
+        if (input.command.includes("SANDBOX-FAIL")) return yield* Effect.fail(new Error("sandbox exploded"))
+        if (input.command.includes("SANDBOX-TIMEOUT"))
+          return { exitCode: null, output: "timed out run", timedOut: true }
+        if (input.command.includes("SANDBOX-HOLD")) {
+          yield* Deferred.succeed(holdStarted, undefined)
+          yield* Deferred.await(holdRelease)
+          return { exitCode: 0, output: "held finished", timedOut: false }
+        }
+        return { exitCode: 3, output: "sandbox-hello", timedOut: false }
+      }),
+    interrupt: () => Effect.void,
+    destroy: () => Effect.void,
+    keepAlive: () => Effect.void,
+    release: () => Effect.void,
+    isKeepAlive: () => Effect.succeed(false),
+    sandboxId: () => Effect.succeed("sandbox-test"),
+    boot: () => Effect.succeed("sandbox-test"),
+    fileStat: () => Effect.die(new Error("not under test")),
+    fileRead: () => Effect.die(new Error("not under test")),
+    fileReadBytes: () => Effect.die(new Error("not under test")),
+    fileWrite: () => Effect.die(new Error("not under test")),
+    fileList: () => Effect.die(new Error("not under test")),
+    fileFind: () => Effect.die(new Error("not under test")),
+    isReady: () => Effect.succeed(true),
+  }),
+)
+
+// Every capability dies: a disabled provider must never be consulted, the
+// command has to run through the local Shell service instead.
+const disabledProviderLayer = Layer.succeed(
+  SandboxProvider.Service,
+  SandboxProvider.Service.of({
+    enabled: false,
+    run: () => Effect.die(new Error("disabled provider must not run")),
+    interrupt: () => Effect.die(new Error("disabled provider must not run")),
+    destroy: () => Effect.die(new Error("disabled provider must not run")),
+    keepAlive: () => Effect.die(new Error("disabled provider must not run")),
+    release: () => Effect.die(new Error("disabled provider must not run")),
+    isKeepAlive: () => Effect.succeed(false),
+    sandboxId: () => Effect.succeed(null),
+    boot: () => Effect.die(new Error("disabled provider must not run")),
+    fileStat: () => Effect.die(new Error("not under test")),
+    fileRead: () => Effect.die(new Error("not under test")),
+    fileReadBytes: () => Effect.die(new Error("not under test")),
+    fileWrite: () => Effect.die(new Error("not under test")),
+    fileList: () => Effect.die(new Error("not under test")),
+    fileFind: () => Effect.die(new Error("not under test")),
+    isReady: () => Effect.succeed(false),
+  }),
+)
+
+const baseNodes = LayerNode.group([
+  Bus.node,
+  Session.node,
+  SessionExecution.node,
+  LocationServiceMap.node,
+  SandboxProvider.node,
+])
+const baseReplacements = [
+  Bus.node.replace(Bus.configured({ persist: true })),
+  SessionExecution.node.replace(executionLayer.pipe(Layer.provide(controlLayer))),
+  offlineModels,
+]
+
+const sandboxIt = testEffect(
+  AppNodeBuilder.build(baseNodes, [
+    ...baseReplacements,
+    SandboxProvider.node.replace(sandboxProviderLayer),
+  ]).pipe(Layer.provideMerge(controlLayer)),
+)
+
+const localFallbackIt = testEffect(
+  AppNodeBuilder.build(baseNodes, [
+    ...baseReplacements,
+    SandboxProvider.node.replace(disabledProviderLayer),
+  ]).pipe(Layer.provideMerge(controlLayer)),
+)
+
+const sandboxSetup = Effect.gen(function* () {
+  const tmp = yield* tmpdirScoped()
+  const session = yield* Session.Service
+  const created = yield* session.create({ location: Location.Ref.make({ directory: AbsolutePath.make(tmp.path) }) })
+  const control = yield* ExecutionControl
+  return { tmp, session, created, control }
+})
+
+const shellMessage = (session: Session.Interface, sessionID: Session.ID) =>
+  session.messages({ sessionID, order: "asc" }).pipe(
+    Effect.map((messages) => messages.find((message) => message.type === "shell")),
+    Effect.repeat({
+      until: (message) => message !== undefined,
+      schedule: Schedule.spaced("10 millis"),
+    }),
+    Effect.timeout("5 seconds"),
+  )
 
 const setup = Effect.gen(function* () {
   const tmp = yield* tmpdirScoped()
@@ -376,6 +492,192 @@ describe("Session.shell", () => {
         },
       ])
       expect(fixture.control.wakes).toEqual([])
+    }),
+  )
+})
+
+describe("Session.shell on a sandbox-enabled deployment", () => {
+  // Polls until one shell message settles past `running`; sandbox completion is
+  // asynchronous (forked provider run) so the projection needs a moment.
+  const settledShell = (fixture: Effect.Success<typeof sandboxSetup>) =>
+    fixture.session
+      .messages({ sessionID: fixture.created.id, order: "asc" })
+      .pipe(
+        Effect.map((messages) => messages.find((item) => item.type === "shell" && item.status !== "running")),
+        Effect.repeat({
+          until: (found) => found !== undefined,
+          schedule: Schedule.spaced("10 millis"),
+        }),
+        Effect.timeout("5 seconds"),
+      )
+
+  sandboxIt.live("routes the command through the sandbox provider and closes the message lifecycle", () =>
+    Effect.gen(function* () {
+      const fixture = yield* sandboxSetup
+      sandboxRuns.length = 0
+      // The command embeds a local side effect: had the local Shell service
+      // picked it up, this file would appear in the session working directory.
+      const command = "echo sandbox-hello && touch local-side-effect.txt"
+
+      yield* fixture.session.shell({ sessionID: fixture.created.id, command })
+
+      expect(sandboxRuns).toEqual([
+        {
+          sessionID: fixture.created.id,
+          command,
+          hostWorkdir: fixture.tmp.path,
+        },
+      ])
+      const message = yield* settledShell(fixture)
+      expect(message).toMatchObject({
+        type: "shell",
+        status: "exited",
+        exit: 3,
+        metadata: { background: true },
+        output: { output: "sandbox-hello", truncated: false },
+      })
+      if (message.type !== "shell") throw new Error("expected a shell message")
+      expect(message.exit).toBe(3)
+      expect(yield* Effect.promise(() => Bun.file(`${fixture.tmp.path}/local-side-effect.txt`).exists())).toBe(false)
+      // Host paths stay out of the durable record the model can read back.
+      expect(JSON.stringify(message)).not.toContain(fixture.tmp.path)
+      expect(yield* fixture.session.inbox(fixture.created.id)).toMatchObject([
+        {
+          type: "synthetic",
+          payload: {
+            text: expect.stringContaining("sandbox-hello"),
+            metadata: { source: "shell", shellID: message.shellID, state: "completed" },
+          },
+        },
+      ])
+      // resume stays false: shell completions never wake the agent loop on their own.
+      expect(fixture.control.wakes).toEqual([])
+
+      // Durable events record running before completion, with the settled exit.
+      const events = yield* log(fixture.session, fixture.created.id).pipe(
+        Stream.filter((event) => event.type === "session.shell.started" || event.type === "session.shell.ended"),
+        Stream.runCollect,
+        Effect.map((items) => Array.from(items)),
+      )
+      expect(events.map((event) => event.type)).toEqual(["session.shell.started", "session.shell.ended"])
+      expect(events[0]).toMatchObject({ data: { shell: { id: message.shellID, status: "running", command } } })
+      expect(events[1]).toMatchObject({
+        data: { shell: { id: message.shellID, status: "exited", exit: 3 }, output: { output: "sandbox-hello" } },
+      })
+    }),
+  )
+
+  sandboxIt.live("publishes shell.started before the sandbox run settles and keeps concurrent shells independent", () =>
+    Effect.gen(function* () {
+      const fixture = yield* sandboxSetup
+      const held = yield* fixture.session
+        .shell({ sessionID: fixture.created.id, command: "SANDBOX-HOLD" })
+        .pipe(Effect.forkScoped)
+      yield* Deferred.await(holdStarted).pipe(Effect.timeout("5 seconds"))
+
+      // The provider run is still gated, yet the shell message already exists.
+      const running = yield* shellMessage(fixture.session, fixture.created.id)
+      expect(running).toMatchObject({ type: "shell", status: "running", command: "SANDBOX-HOLD" })
+
+      // A second shell settles on its own while the first is held.
+      yield* fixture.session.shell({ sessionID: fixture.created.id, command: "echo sandbox-hello" })
+      const settled = yield* settledShell(fixture)
+      expect(settled).toMatchObject({ type: "shell", status: "exited", exit: 3 })
+
+      yield* Deferred.succeed(holdRelease, undefined)
+      yield* Fiber.join(held).pipe(Effect.timeout("5 seconds"))
+      const messages = yield* fixture.session.messages({ sessionID: fixture.created.id, order: "asc" })
+      const shells = messages.filter((item) => item.type === "shell")
+      expect(shells).toMatchObject([
+        { status: "exited", exit: 0, output: { output: "held finished" } },
+        { status: "exited", exit: 3 },
+      ])
+      const notifications = (yield* fixture.session.inbox(fixture.created.id)).filter(
+        (item) => item.type === "synthetic",
+      )
+      expect(notifications.map((item) => (item as { payload: { metadata?: { state?: string } } }).payload.metadata?.state)).toEqual([
+        "completed",
+        "completed",
+      ])
+    }),
+  )
+
+  sandboxIt.live("closes the lifecycle with the failure text when the sandbox run fails", () =>
+    Effect.gen(function* () {
+      const fixture = yield* sandboxSetup
+      yield* fixture.session.shell({ sessionID: fixture.created.id, command: "SANDBOX-FAIL" })
+
+      const message = yield* settledShell(fixture)
+      expect(message).toMatchObject({ type: "shell", status: "exited" })
+      if (message.type !== "shell") throw new Error("expected a shell message")
+      expect(message.exit).toBeUndefined()
+      expect(yield* fixture.session.inbox(fixture.created.id)).toMatchObject([
+        {
+          type: "synthetic",
+          payload: {
+            text: expect.stringContaining("Sandbox execution failed: sandbox exploded"),
+            metadata: { state: "completed" },
+          },
+        },
+      ])
+    }),
+  )
+
+  sandboxIt.live("maps a timed-out sandbox run to the timeout status", () =>
+    Effect.gen(function* () {
+      const fixture = yield* sandboxSetup
+      yield* fixture.session.shell({ sessionID: fixture.created.id, command: "SANDBOX-TIMEOUT" })
+
+      const message = yield* settledShell(fixture)
+      expect(message).toMatchObject({ type: "shell", status: "timeout", output: { output: "timed out run" } })
+      if (message.type !== "shell") throw new Error("expected a shell message")
+      expect(message.exit).toBeUndefined()
+      expect(yield* fixture.session.inbox(fixture.created.id)).toMatchObject([
+        {
+          type: "synthetic",
+          payload: {
+            text: expect.stringContaining("timed out run"),
+            metadata: { state: "completed", timeout: true },
+          },
+        },
+      ])
+    }),
+  )
+})
+
+describe("Session.shell with a disabled sandbox provider", () => {
+  localFallbackIt.live("falls back to the local Shell service without consulting the provider", () =>
+    Effect.gen(function* () {
+      const fixture = yield* sandboxSetup
+      const command = process.platform === "win32" ? "[Console]::Out.Write('local-fallback')" : "printf local-fallback"
+
+      yield* fixture.session.shell({ sessionID: fixture.created.id, command })
+
+      const message = yield* fixture.session
+        .messages({ sessionID: fixture.created.id, order: "asc" })
+        .pipe(
+          Effect.map((messages) => messages.find((item) => item.type === "shell" && item.status !== "running")),
+          Effect.repeat({
+            until: (found) => found !== undefined,
+            schedule: Schedule.spaced("10 millis"),
+          }),
+          Effect.timeout("5 seconds"),
+        )
+      expect(message).toMatchObject({
+        type: "shell",
+        status: "exited",
+        exit: 0,
+        output: { output: expect.stringContaining("local-fallback") },
+      })
+      expect(yield* fixture.session.inbox(fixture.created.id)).toMatchObject([
+        {
+          type: "synthetic",
+          payload: {
+            text: expect.stringContaining("local-fallback"),
+            metadata: { source: "shell", state: "completed" },
+          },
+        },
+      ])
     }),
   )
 })

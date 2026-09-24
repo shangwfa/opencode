@@ -10,6 +10,7 @@ import { Formatter } from "@opencode/core/formatter"
 import { Location } from "@opencode/core/location"
 import { FileAccess } from "@opencode/core/file-access"
 import { Permission } from "@opencode/core/permission"
+import { SandboxProvider } from "@opencode/core/sandbox/provider"
 import { AbsolutePath } from "@opencode/core/schema"
 import { Session } from "@opencode/core/session"
 import { Tool } from "@opencode/core/tool"
@@ -33,6 +34,7 @@ const editToolNode = makeLocationNode({
     Formatter.node,
     Location.node,
     Permission.node,
+    SandboxProvider.node,
   ],
 })
 
@@ -42,6 +44,8 @@ const makeEditFixture = () => {
     assertions: Permission.AssertInput[]
     writes: string[]
     reads: number
+    sandboxFiles: Map<string, string>
+    sandboxWrites: string[]
     denyAction?: string
     afterRead: () => Effect.Effect<void>
     formatFile: (target: string) => Effect.Effect<boolean>
@@ -49,6 +53,8 @@ const makeEditFixture = () => {
     assertions: [],
     writes: [],
     reads: 0,
+    sandboxFiles: new Map(),
+    sandboxWrites: [],
     afterRead: () => Effect.void,
     formatFile: () => Effect.succeed(false),
   }
@@ -74,7 +80,31 @@ const makeEditFixture = () => {
     file: (target) => fixture.formatFile(target),
   })
 
-  return Object.assign(fixture, { permission, formatter })
+  const sandboxProvider = SandboxProvider.Service.of({
+    enabled: false,
+    run: () => Effect.die(new Error("sandbox command execution is not under test")),
+    interrupt: () => Effect.void,
+    destroy: () => Effect.void,
+    keepAlive: () => Effect.void,
+    release: () => Effect.void,
+    isKeepAlive: () => Effect.succeed(false),
+    sandboxId: () => Effect.succeed(null),
+    boot: () => Effect.succeed("sandbox-test"),
+    fileStat: (_sessionID, target) =>
+      Effect.succeed(fixture.sandboxFiles.has(target) ? { isDirectory: false } : null),
+    fileRead: (_sessionID, target) => Effect.succeed(fixture.sandboxFiles.get(target) ?? null),
+    fileReadBytes: () => Effect.succeed(null),
+    fileWrite: (_sessionID, target, content) =>
+      Effect.sync(() => {
+        fixture.sandboxWrites.push(target)
+        fixture.sandboxFiles.set(target, content)
+      }),
+    fileList: () => Effect.succeed([]),
+    fileFind: () => Effect.succeed([]),
+    isReady: () => Effect.succeed(true),
+  })
+
+  return Object.assign(fixture, { permission, formatter, sandboxProvider })
 }
 
 const withTool = <A, E, R>(
@@ -91,7 +121,7 @@ const withTool = <A, E, R>(
     return yield* body(registry)
   }).pipe(
     Effect.provide(
-      AppNodeBuilder.build(LayerNode.group([Tool.node, FileAccess.node, FileMutation.node, editToolNode]), [
+      AppNodeBuilder.build(LayerNode.group([Tool.node, FileAccess.node, FileMutation.node, SandboxProvider.node, editToolNode]), [
         Environment.node.replace(
           transformEnvironmentFiles((files) => ({
             read: (target, range) =>
@@ -107,6 +137,7 @@ const withTool = <A, E, R>(
         Location.node.replace(activeLocation),
         Formatter.node.replace(fixture.formatter),
         Permission.node.replace(fixture.permission),
+        SandboxProvider.node.replace(Layer.succeed(SandboxProvider.Service, fixture.sandboxProvider)),
       ]),
     ),
   )
@@ -637,6 +668,29 @@ describe("EditTool", () => {
             expect(edit.writes).toEqual([target])
           }),
         ),
+      )
+    }),
+  )
+
+  it.live("reads and edits sandbox files through SandboxProvider", () =>
+    withTempDir((tmp) => {
+      const edit = makeEditFixture()
+      edit.sandboxProvider = SandboxProvider.Service.of({ ...edit.sandboxProvider, enabled: true })
+      edit.sandboxFiles.set("/workspace/edit.txt", "before\nrest\n")
+      return withTool(tmp.path, edit, (registry) =>
+        Effect.gen(function* () {
+          const settled = yield* executeTool(
+            registry,
+            call({ path: "edit.txt", oldString: "before", newString: "after" }),
+          )
+          expect(settled.status).toBe("completed")
+          if (settled.status !== "completed") return
+          expect(settled.output).toMatchObject({ replacements: 1, files: [{ file: "edit.txt", status: "modified" }] })
+          expect(edit.sandboxFiles.get("/workspace/edit.txt")).toBe("after\nrest\n")
+          expect(edit.sandboxWrites).toEqual(["/workspace/edit.txt"])
+          expect(edit.assertions).toMatchObject([{ action: "edit", resources: ["edit.txt"] }])
+          expect(edit.writes).toEqual([])
+        }),
       )
     }),
   )

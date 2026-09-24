@@ -1,6 +1,6 @@
 export * as SessionRunnerLLM from "./llm.js"
 
-import { Message } from "@opencode/ai"
+import { Message, SystemPart } from "@opencode/ai"
 import { and, desc, eq, sql } from "drizzle-orm"
 import { Cause, Effect, Exit, FiberMap, Layer } from "effect"
 import { Database } from "../../database/database.js"
@@ -28,6 +28,7 @@ import { StepFailedError } from "../error.js"
 import { SessionRunnerRetry } from "./retry.js"
 import { SessionStep } from "./step.js"
 import { ToolOutput } from "../../tool-output.js"
+import { SessionStructuredOutput } from "../structured-output.js"
 import { Plugin } from "../../plugin.js"
 import { MAX_STEPS_PROMPT } from "./max-steps.js"
 
@@ -225,10 +226,14 @@ const layer = Layer.effect(
           continue
         }
         const stepLimitReached = loaded.agent.info.steps !== undefined && step >= loaded.agent.info.steps
+        const structuredSchema = SessionStructuredOutput.requestedJsonSchema(loaded.messages)
+        const tools = structuredSchema
+          ? SessionStructuredOutput.withTool(loaded.tools, structuredSchema)
+          : loaded.tools
         const transcript = SessionModelRequest.baseTranscript({
           agent: loaded.agent.info,
           model: loaded.model,
-          tools: loaded.tools,
+          tools,
           initial: loaded.initial,
           messages: loaded.messages,
         })
@@ -236,13 +241,16 @@ const layer = Layer.effect(
           session: loaded.session,
           agent: loaded.agent.id,
           model: loaded.model,
-          tools: loaded.tools,
-          system: transcript.system,
+          tools,
+          // `required` only forces *a* tool call, so the prompt names the one that carries the answer.
+          system: structuredSchema
+            ? [...transcript.system, SystemPart.make(SessionStructuredOutput.SystemPrompt)]
+            : transcript.system,
           messages: stepLimitReached
             ? [...transcript.messages, Message.assistant(MAX_STEPS_PROMPT)]
             : transcript.messages,
-          // Keep tool definitions on the final Step to preserve the provider's cached prefix.
-          toolChoice: stepLimitReached ? "none" : undefined,
+          // `required` (a mode) survives thinking mode; a named tool_choice does not.
+          toolChoice: structuredSchema ? "required" : stepLimitReached ? "none" : undefined,
           webSocket: "session",
         })
         const outcome = yield* steps.attempt({

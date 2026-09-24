@@ -1,4 +1,5 @@
 import { Session } from "@opencode/core/session"
+import { SandboxProvider } from "@opencode/core/sandbox/provider"
 import { SessionStats } from "@opencode/core/session/stats"
 import { SessionTitle } from "@opencode/core/session/title"
 import { SessionTransfer } from "@opencode/core/session/transfer"
@@ -6,9 +7,9 @@ import { InstructionEntry } from "@opencode/core/session/instruction-entry"
 import { Form } from "@opencode/core/form"
 import { DateTime, Effect, Stream } from "effect"
 import { HttpApiBuilder, HttpApiSchema } from "effect/unstable/httpapi"
+import { HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
 import { Api } from "../api"
-import { HttpServerRequest } from "effect/unstable/http"
-import { SessionsCursor } from "@opencode/protocol/groups/session"
+import { SessionPromptStreamPayload, SessionsCursor } from "@opencode/protocol/groups/session"
 import {
   ConflictError,
   CommandExecutionError,
@@ -25,6 +26,9 @@ import {
 } from "@opencode/protocol/errors"
 import { AbsolutePath } from "@opencode/core/schema"
 import { failedMessageDecode, failedSnapshot, missingMessage, missingSession } from "./session-error"
+import { Event } from "@opencode/schema/event"
+import { EventFeed } from "../event-feed"
+import { makePromptStreamTakeUntil, sessionEventFilter } from "../session-stream"
 
 const DefaultSessionsLimit = 50
 
@@ -36,6 +40,24 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
   Effect.gen(function* () {
     const session = yield* Session.Service
     const transfer = yield* SessionTransfer.Service
+    const feed = yield* EventFeed.Service
+    const eventResponse = (stream: Stream.Stream<string, EventFeed.Error>) =>
+      HttpServerResponse.stream(
+        stream.pipe(
+          Stream.merge(Stream.tick("15 seconds").pipe(Stream.map(() => ": heartbeat\n\n")), {
+            haltStrategy: "left",
+          }),
+          Stream.encodeText,
+        ),
+        {
+          contentType: "text/event-stream",
+          headers: {
+            "Cache-Control": "no-cache, no-transform",
+            "X-Accel-Buffering": "no",
+            "X-Content-Type-Options": "nosniff",
+          },
+        },
+      )
     const requireOwnedForm = Effect.fnUntraced(function* (sessionID: Form.Info["sessionID"], formID: Form.ID) {
       const form = yield* Form.Service
       const info = yield* form.get(formID).pipe(Effect.catchTag("Form.NotFoundError", () => missingForm(formID)))
@@ -129,6 +151,7 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
             data: yield* session
               .create({
                 id: ctx.payload.id,
+                appId: ctx.payload.appId,
                 title: ctx.payload.title,
                 agent: ctx.payload.agent,
                 model: ctx.payload.model,
@@ -194,6 +217,20 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
               .pipe(Effect.catchTag("Session.NotFoundError", missingSession)),
           }
         }),
+      )
+      .handleRaw(
+        "session.event",
+        (ctx) =>
+          feed.subscribeFiltered(sessionEventFilter(ctx.params.sessionID)).pipe(
+            Effect.map((live) => {
+              const connected = EventFeed.frame({
+                id: Event.ID.create(),
+                type: "server.connected",
+                data: {},
+              })
+              return eventResponse(Stream.make(connected).pipe(Stream.concat(live)))
+            }),
+          ),
       )
       .handle(
         "session.view",
@@ -301,6 +338,7 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
       .handle(
         "session.prompt",
         Effect.fn(function* (ctx) {
+          const request = yield* HttpServerRequest.HttpServerRequest
           return {
             data: yield* session
               .prompt({
@@ -310,6 +348,9 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
                 files: ctx.payload.files,
                 agents: ctx.payload.agents,
                 skills: ctx.payload.skills,
+                format: ctx.payload.format,
+                userName: ctx.payload.userName,
+                userId: request.headers["x-user-id"] || undefined,
                 metadata: ctx.payload.metadata,
                 delivery: ctx.payload.delivery,
                 resume: ctx.payload.resume,
@@ -334,9 +375,60 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
           }
         }),
       )
+      .handleRaw(
+        "session.promptStream",
+        (ctx) =>
+          Effect.gen(function* () {
+            const payload = yield* HttpServerRequest.schemaBodyJson(SessionPromptStreamPayload).pipe(
+              Effect.mapError(() => new InvalidRequestError({ message: "Invalid prompt payload" })),
+            )
+            const request = yield* HttpServerRequest.HttpServerRequest
+            // Subscribe first so fast executions cannot finish before the stream starts observing events.
+            const live = yield* feed.subscribeFiltered(sessionEventFilter(ctx.params.sessionID))
+            const accepted = yield* session
+              .prompt({
+                sessionID: ctx.params.sessionID,
+                id: payload.id,
+                text: payload.text,
+                files: payload.files,
+                agents: payload.agents,
+                skills: payload.skills,
+                userName: payload.userName,
+                userId: request.headers["x-user-id"] || undefined,
+                metadata: payload.metadata,
+                delivery: payload.delivery,
+                resume: payload.resume,
+                format: payload.format,
+              })
+              .pipe(
+                Effect.catchTag("Session.NotFoundError", missingSession),
+                Effect.catchTag("Session.PromptConflictError", (error) =>
+                  Effect.fail(
+                    new ConflictError({
+                      message: `Prompt message ID conflicts with an existing durable record: ${error.messageID}`,
+                      resource: error.messageID,
+                    }),
+                  ),
+                ),
+                Effect.catchTag("Session.AttachmentError", (error) =>
+                  Effect.fail(new InvalidRequestError({ message: error.message, field: "files" })),
+                ),
+                Effect.catchTag("Session.SkillNotFoundError", (error) =>
+                  Effect.fail(new InvalidRequestError({ message: `Skill not found: ${error.skill}`, field: "skills" })),
+                ),
+              )
+
+            const followed = live.pipe(Stream.takeUntil(makePromptStreamTakeUntil(accepted.id)))
+            const connected = EventFeed.frame({
+              id: Event.ID.create(),
+              type: "server.connected",
+              data: {},
+            })
+            return eventResponse(Stream.make(connected).pipe(Stream.concat(followed)))
+          }),
+      )
       .handle(
         "session.command",
-          const request = yield* HttpServerRequest.HttpServerRequest
         Effect.fn(function* (ctx) {
           yield* session
             .command({
@@ -347,8 +439,6 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
               agents: ctx.payload.agents,
               skills: ctx.payload.skills,
               delivery: ctx.payload.delivery,
-                userName: ctx.payload.userName,
-                userId: request.headers["x-user-id"] || undefined,
             })
             .pipe(
               Effect.catchTag("Session.NotFoundError", missingSession),
@@ -424,6 +514,47 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
             .shell({ sessionID: ctx.params.sessionID, id: ctx.payload.id, command: ctx.payload.command })
             .pipe(Effect.catchTag("Session.NotFoundError", missingSession))
           return HttpApiSchema.NoContent.make()
+        }),
+      )
+      .handle(
+        "session.keepAlive",
+        Effect.fn(function* (ctx) {
+          yield* session.get(ctx.params.sessionID).pipe(Effect.catchTag("Session.NotFoundError", missingSession))
+          const provider = yield* SandboxProvider.Service
+          const enabled = ctx.payload.enabled !== false
+          if (enabled) yield* provider.keepAlive(ctx.params.sessionID)
+          else yield* provider.release(ctx.params.sessionID)
+          const sandboxId = enabled && ctx.payload.boot === true && provider.enabled
+            ? yield* provider.boot(ctx.params.sessionID).pipe(Effect.catch(() => Effect.succeed(null)))
+            : null
+          return { sessionID: ctx.params.sessionID, keepAlive: enabled, sandboxId }
+        }),
+      )
+      .handle(
+        "session.keepAliveStatus",
+        Effect.fn(function* (ctx) {
+          yield* session.get(ctx.params.sessionID).pipe(Effect.catchTag("Session.NotFoundError", missingSession))
+          const provider = yield* SandboxProvider.Service
+          return { sessionID: ctx.params.sessionID, keepAlive: yield* provider.isKeepAlive(ctx.params.sessionID) }
+        }),
+      )
+      .handle(
+        "session.sandbox",
+        Effect.fn(function* (ctx) {
+          yield* session.get(ctx.params.sessionID).pipe(Effect.catchTag("Session.NotFoundError", missingSession))
+          const provider = yield* SandboxProvider.Service
+          return { sessionID: ctx.params.sessionID, sandboxId: yield* provider.sandboxId(ctx.params.sessionID) }
+        }),
+      )
+      .handle(
+        "session.killSandbox",
+        Effect.fn(function* (ctx) {
+          yield* session.get(ctx.params.sessionID).pipe(Effect.catchTag("Session.NotFoundError", missingSession))
+          const provider = yield* SandboxProvider.Service
+          const existing = yield* provider.sandboxId(ctx.params.sessionID)
+          if (existing && provider.enabled) yield* provider.destroy(ctx.params.sessionID)
+          const remaining = yield* provider.sandboxId(ctx.params.sessionID)
+          return { sessionID: ctx.params.sessionID, destroyed: existing !== null && remaining === null }
         }),
       )
       .handle(

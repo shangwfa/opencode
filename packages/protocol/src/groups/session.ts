@@ -42,6 +42,7 @@ import { EventLog } from "@opencode/schema/event-log"
 import { FileDiff } from "@opencode/schema/file-diff"
 import { Form } from "@opencode/schema/form"
 import { PublicSessionMessage } from "./message.js"
+import { OpenCodeEvent } from "./event.js"
 
 const ParentIDFilter = Schema.Union([
   Session.ID,
@@ -56,6 +57,7 @@ const ParentIDFilter = Schema.Union([
 })
 
 const SessionsQueryFields = {
+  appId: Session.AppId.pipe(Schema.optional),
   limit: Schema.NumberFromString.pipe(Schema.decodeTo(PositiveInt), Schema.optional).annotate({
     description: "Maximum number of sessions to return. Defaults to the newest 50 sessions.",
   }),
@@ -111,7 +113,18 @@ export const SessionsCursor = Schema.String.pipe(
     }
   }),
 )
+
 export type SessionsCursor = typeof SessionsCursor.Type
+
+export const SessionPromptStreamPayload = Schema.Struct({
+  id: SessionMessage.ID.pipe(Schema.optional),
+  ...PromptInput.Prompt.fields,
+  userName: Schema.String.pipe(Schema.optional),
+  userId: Schema.String.pipe(Schema.optional),
+  metadata: SessionInbox.UserPayload.fields.metadata,
+  delivery: SessionInbox.Delivery.pipe(Schema.optional),
+  resume: Schema.Boolean.pipe(Schema.optional),
+})
 
 const SessionActive = Schema.Struct({
   type: Schema.Literal("running"),
@@ -220,6 +233,7 @@ export const makeSessionGroup = <
       HttpApiEndpoint.post("session.create", "/api/session", {
         payload: Schema.Struct({
           id: Session.ID.pipe(Schema.optional),
+          appId: Session.AppId.pipe(Schema.optional),
           title: Schema.String.pipe(Schema.optional),
           agent: Agent.ID.pipe(Schema.optional),
           model: Model.Ref.pipe(Schema.optional),
@@ -393,6 +407,8 @@ export const makeSessionGroup = <
         payload: Schema.Struct({
           id: SessionMessage.ID.pipe(Schema.optional),
           ...PromptInput.Prompt.fields,
+          userName: Schema.String.pipe(Schema.optional),
+          userId: Schema.String.pipe(Schema.optional),
           metadata: SessionInbox.UserPayload.fields.metadata,
           delivery: SessionInbox.Delivery.pipe(Schema.optional),
           resume: Schema.Boolean.pipe(Schema.optional),
@@ -405,8 +421,6 @@ export const makeSessionGroup = <
           OpenApi.annotations({
             identifier: "session.prompt",
             summary: "Send message",
-          userName: Schema.String.pipe(Schema.optional),
-          userId: Schema.String.pipe(Schema.optional),
             description: "Durably admit one session input and schedule agent-loop execution unless resume is false.",
           }),
         ),
@@ -576,6 +590,59 @@ export const makeSessionGroup = <
           description: "Retrieve the active context messages for a session (all messages after the last compaction).",
         }),
       ),
+    )
+    .add(
+      HttpApiEndpoint.post("session.keepAlive", "/api/experimental/session/:sessionID/keep-alive", {
+        params: { sessionID: Session.ID },
+        payload: Schema.Struct({ enabled: Schema.Boolean.pipe(Schema.optional), boot: Schema.Boolean.pipe(Schema.optional) }),
+        success: Schema.Struct({ sessionID: Session.ID, keepAlive: Schema.Boolean, sandboxId: Schema.NullOr(Schema.String) }),
+        error: SessionNotFoundError,
+      })
+        .middleware(sessionLocationMiddleware)
+        .annotateMerge(OpenApi.annotations({
+          identifier: "session.keepAlive",
+          summary: "Set session sandbox keep-alive",
+          description: "Persist the session keep-alive preference; boot=true creates the sandbox immediately.",
+        })),
+    )
+    .add(
+      HttpApiEndpoint.get("session.keepAliveStatus", "/api/experimental/session/:sessionID/keep-alive", {
+        params: { sessionID: Session.ID },
+        success: Schema.Struct({ sessionID: Session.ID, keepAlive: Schema.Boolean }),
+        error: SessionNotFoundError,
+      })
+        .middleware(sessionLocationMiddleware)
+        .annotateMerge(OpenApi.annotations({
+          identifier: "session.keepAliveStatus",
+          summary: "Get session sandbox keep-alive status",
+          description: "Read the persisted session keep-alive preference.",
+        })),
+    )
+    .add(
+      HttpApiEndpoint.get("session.sandbox", "/api/session/:sessionID/sandbox", {
+        params: { sessionID: Session.ID },
+        success: Schema.Struct({ sessionID: Session.ID, sandboxId: Schema.NullOr(Schema.String) }),
+        error: SessionNotFoundError,
+      })
+        .middleware(sessionLocationMiddleware)
+        .annotateMerge(OpenApi.annotations({
+          identifier: "session.sandbox",
+          summary: "Get session sandbox ID",
+          description: "Return the ID of the running sandbox associated with the session, or null when absent.",
+        })),
+    )
+    .add(
+      HttpApiEndpoint.post("session.killSandbox", "/api/session/:sessionID/kill-sandbox", {
+        params: { sessionID: Session.ID },
+        success: Schema.Struct({ sessionID: Session.ID, destroyed: Schema.Boolean }),
+        error: SessionNotFoundError,
+      })
+        .middleware(sessionLocationMiddleware)
+        .annotateMerge(OpenApi.annotations({
+          identifier: "session.killSandbox",
+          summary: "Destroy session sandbox",
+          description: "Destroy the session sandbox while preserving its keep-alive preference.",
+        })),
     )
     .add(
       HttpApiEndpoint.get("session.diff", "/api/session/:sessionID/diff", {
@@ -895,6 +962,39 @@ export const makeSessionGroup = <
           description: "Mark the idle transition observed by the viewer as viewed.",
         }),
       ),
+    )
+    .add(
+      HttpApiEndpoint.get("session.event", "/api/session/:sessionID/event", {
+        params: { sessionID: Session.ID },
+        success: HttpApiSchema.StreamSse({ data: OpenCodeEvent }),
+        error: SessionNotFoundError,
+      })
+        .middleware(sessionLocationMiddleware)
+        .annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.event",
+            summary: "Subscribe to session events",
+            description:
+              "Subscribe to live public events for one session. The stream starts with server.connected and is filtered by sessionID; events during disconnection are not replayed.",
+          }),
+        ),
+    )
+    .add(
+      HttpApiEndpoint.post("session.promptStream", "/api/session/:sessionID/prompt_stream", {
+        params: { sessionID: Session.ID },
+        payload: SessionPromptStreamPayload,
+        success: HttpApiSchema.StreamSse({ data: OpenCodeEvent }),
+        error: [ConflictError, InvalidRequestError, SessionNotFoundError],
+      })
+        .middleware(sessionLocationMiddleware)
+        .annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.promptStream",
+            summary: "Send a prompt and stream session events",
+            description:
+              "Admit one prompt, then stream events for its session until that inbox item has been delivered and its execution succeeds, fails, or is interrupted. Uses the current session event contract.",
+          }),
+        ),
     )
     .annotateMerge(
       OpenApi.annotations({

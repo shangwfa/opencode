@@ -1,165 +1,185 @@
-# AI 对话与工具调用
+# V2 AI 对话与工具调用
 
-> 公共测试环境和配置请参考 [`00-preamble.md`](./00-preamble.md)。
->
-> **注意**：文档中的 `bun -e "fetch('http://127.0.0.1:4096/...')"` 原使用容器内部端口。本地测试时改用 `http://localhost:14096`（宿主机映射端口）。下方用例已统一为 `$BASE` 变量。
+> 本文按当前 V2 HTTP API 编写。接口地址以 `/api/...` 开头，会话工作目录使用 `/workspace`。
+> V2 API 契约以 `packages/protocol/src/groups/session.ts`、`message.ts` 和运行中服务的 `/openapi.json` 为准。
 
-### 通用变量
+## V1 到 V2 的接口变化
 
-```bash
-# 环境变量 $BASE $PG_URL $MODEL 由 test-env.sh 全局提供（source test-env.sh [1|2|3]）
-SID=$(curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
-echo "SID: $SID"
-```
+T4.1–T4.7 的功能在 V2 都有对应能力，但不能复用 V1 路径和响应结构：
 
-## 四、AI 对话与工具调用
-
-### T4.1 简单文本对话
-```bash
-curl -s --max-time 30 -X POST "$BASE/session/$SID/message" \
-  -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"1+1等于几"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}}'
-```
-**期望**：AI 返回包含 `2` 的文本
-
-### T4.2 多轮上下文记忆
-```bash
-# 第一轮
-curl -s --max-time 30 -X POST "$BASE/session/$SID/message" \
-  -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"记住我叫张三"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}}'
-
-# 第二轮
-curl -s --max-time 30 -X POST "$BASE/session/$SID/message" \
-  -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"我叫什么？"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}}'
-```
-**期望**：第二轮回复中含「张三」
-
-### T4.3 写文件工具
-```bash
-# 发送消息
-curl -s --max-time 60 -X POST "$BASE/session/$SID/message" \
-  -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"在 /workspace 创建 t4-3.txt 内容是 hello"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}}'
-
-# 验证工具调用（POST /message 返回的是文字总结，工具调用在前一条消息中）
-curl -s "$BASE/session/$SID/message" | python3 -c "
-import json, sys
-msgs = json.load(sys.stdin, strict=False)
-tools = []
-for m in msgs[-3:]:
-    for p in m.get('parts', []):
-        if p.get('type') == 'tool':
-            tools.append(p['tool'] + '(' + p.get('state', {}).get('status', '?') + ')')
-print('tools:', tools if tools else '❌ NO TOOLS')
-"
-```
-**期望**：`tools` 包含 `write(completed)` 或 `bash(completed)`；文字总结确认文件已创建
-
-### T4.4 读文件工具
-```bash
-curl -s --max-time 30 -X POST "$BASE/session/$SID/message" \
-  -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"读 /workspace/t4-3.txt"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}}'
-```
-**期望**：`tools` 包含 `read(completed)`；回复中含 `hello`
-
-### T4.5 bash 命令执行
-```bash
-curl -s --max-time 30 -X POST "$BASE/session/$SID/message" \
-  -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"执行 ls /workspace 命令"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}}'
-```
-**期望**：`tools` 包含 `bash(completed)` 或 `read(completed)`；回复中含文件列表或 `t4-3.txt`
-
-### T4.6 异步消息（不等结果）
-```bash
-curl -s -o /dev/null -w "%{http_code}" -X POST "$BASE/session/$SID/prompt_async" \
-  -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"写一首五言绝句"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}}'
-```
-**期望**：`status: 204`
-
-### T4.7 中断会话
-```bash
-# 先异步发送一个长任务
-curl -s -X POST "$BASE/session/$SID/prompt_async" \
-  -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"写一篇1万字的文章"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}}'
-
-# 立即中断
-sleep 1 && curl -s -X POST "$BASE/session/$SID/abort"
-```
-**期望**：abort 返回 `true`，session 不再是 `busy`。如果中断前 assistant message 已落库，最后一条消息应为 `finish=abort`、`finish=error` 或类似终止状态；如果在首个 assistant message 落库前中断，历史中可以没有 assistant message。
-
-**2026-07-22 实测**：等待 session 进入 `busy` 后调用 abort，返回 `true`，随后 session 从 busy status 列表移除；本次中断发生在首个 assistant message 落库前，因此没有 `finish` 字段，符合上述早期中断语义。
-
-**2026-08-19 复测**（镜像 `dd06ab0`，commit dd06ab076b，T4.1–T4.7 全部通过）：
-
-| 用例 | 结果 | 备注 |
+| V1 调用 | V2 调用 | V2 语义 |
 |---|---|---|
-| T4.1 简单文本对话 | ✅ | 回复 `2` |
-| T4.2 多轮上下文记忆 | ✅ | 第二轮回复「张三」 |
-| T4.3 写文件工具 | ✅ | `write(completed)` |
-| T4.4 读文件工具 | ✅ | 回复含 `hello` |
-| T4.5 bash 命令执行 | ✅ | 回复含 `t4-3.txt` |
-| T4.6 异步消息 | ✅ | HTTP 204 |
-| T4.7 中断会话 | ✅ | abort 返回 `true`；中断发生在 assistant message 落库后，`finish` 为空，parts 数量 8s 内无增长，确认已停止生成 |
+| `POST /session` | `POST /api/session` | 请求中传 `location.directory`；成功响应为 `{data: session}` |
+| `POST /session/:id/message` | `POST /api/session/:id/prompt`，再 `POST /api/experimental/session/:id/wait` | prompt 接纳后立即返回，不同步返回 assistant 回复 |
+| `POST /session/:id/prompt_async` | `POST /api/session/:id/prompt` | 返回 HTTP 200 和已接纳的 user message，不是 V1 的 204 |
+| `POST /session/:id/abort` | `POST /api/session/:id/interrupt` | 返回 `{interrupted: boolean}`；执行状态用 `/api/session/active` 查询 |
+| 消息 `parts[]` | `GET /api/session/:id/message` 的 `data[]` | assistant 内容在 `content[]`，工具调用是 `type: "tool"`，状态在 `state.status` |
 
----
+**当前没有 V1 HTTP 路径/响应格式的兼容层。** 如果 SaaS 外部调用方必须保持 V1 wire contract，需要另行决定是否提供兼容路由；本文只测 V2。沙箱会话的 `shell` 工具目前不支持 `background: true`，本用例只验证前台命令。
 
-**2026-08-31 复测**（镜像 `basesroute`，commit `cc0d5fecda` + docs `7aab8b011f`，组合 1，全新 session `ses_fa87b0780ffe…`，T4.1–T4.7 全部通过）：
+## 前置条件与通用变量
 
-| 用例 | 结果 | 备注 |
+- 服务已在 Docker 中启动，并连接要验证的 PG 和 sandbox；`BASE` 指向该服务的宿主机端口。
+- 服务端配置的口令放在 `OPENCODE_PASSWORD`。若服务关闭 HTTP Basic Auth，将 `CURL_AUTH=()` 留空。
+- `jq` 用于从 V2 JSON 响应中读取字段。
+
+```bash
+export BASE="${BASE:-http://localhost:14096}"
+MODEL='{"id":"deepseek-v4-flash","providerID":"Yd-DeepSeek"}'
+CURL_AUTH=()
+if [[ -n "${OPENCODE_PASSWORD:-}" ]]; then
+  CURL_AUTH=(-u "opencode:${OPENCODE_PASSWORD}")
+fi
+
+# 创建一个位于 /workspace 的 V2 会话，并固定模型。
+SID=$(curl -fsS --noproxy '*' "${CURL_AUTH[@]}" -X POST "$BASE/api/session" \
+  -H 'Content-Type: application/json' \
+  -d "{\"title\":\"T4 AI conversation\",\"location\":{\"directory\":\"/workspace\"},\"model\":$MODEL}" \
+  | jq -r '.data.id')
+echo "SID=$SID"
+
+# 发起一个 prompt 后等待该会话空闲。prompt 本身是异步接纳接口。
+send_prompt() {
+  local text="$1"
+  jq -n --arg text "$text" '{text:$text,metadata:{},delivery:"queue"}' \
+    | curl -fsS --noproxy '*' "${CURL_AUTH[@]}" -X POST "$BASE/api/session/$SID/prompt" \
+        -H 'Content-Type: application/json' --data-binary @-
+  curl -fsS --noproxy '*' "${CURL_AUTH[@]}" -X POST \
+    "$BASE/api/experimental/session/$SID/wait" -H 'Content-Type: application/json' -d '{}'
+}
+
+# 查看 V2 消息及真实工具状态。
+messages() {
+  curl -fsS --noproxy '*' "${CURL_AUTH[@]}" \
+    "$BASE/api/session/$SID/message?order=asc&limit=200"
+}
+messages | jq -r '.data[] | select(.type=="assistant") | .content[]? |
+  select(.type=="tool") | "\(.name)(\(.state.status))"'
+```
+
+## T4.1 简单文本对话
+
+```bash
+send_prompt '1+1等于几'
+messages | jq -r '.data[] | select(.type=="assistant") | .content[]? |
+  select(.type=="text") | .text'
+```
+
+**期望**：assistant 文本包含 `2`，assistant 消息的 `finish` 为正常结束状态。
+
+## T4.2 多轮上下文记忆
+
+```bash
+send_prompt '记住我叫张三'
+send_prompt '我叫什么？'
+messages | jq -r '.data[] | select(.type=="assistant") | .content[]? |
+  select(.type=="text") | .text' | tail -5
+```
+
+**期望**：第二轮回复包含「张三」。两轮必须使用同一个 `SID`。
+
+## T4.3 写文件工具
+
+```bash
+send_prompt '在 /workspace 创建 t4-3.txt 内容是 hello'
+messages | jq -r '.data[] | select(.type=="assistant") | .content[]? |
+  select(.type=="tool") | "\(.name)(\(.state.status))"'
+
+# 使用 session-scoped 沙箱文件接口核验实际文件，不以 assistant 自述作为写入证据。
+curl -fsS --noproxy '*' "${CURL_AUTH[@]}" \
+  "$BASE/api/session/$SID/fs/read/t4-3.txt"
+```
+
+**期望**：工具列表包含 `write(completed)`；文件接口返回内容 `hello`。
+
+## T4.4 读文件工具
+
+```bash
+send_prompt '读 /workspace/t4-3.txt'
+messages | jq -r '.data[] | select(.type=="assistant") | .content[]? |
+  select(.type=="tool") | "\(.name)(\(.state.status))"'
+messages | jq -r '.data[] | select(.type=="assistant") | .content[]? |
+  select(.type=="tool" and .name=="read") | .state.content[]?.text'
+```
+
+**期望**：真实调用 `read(completed)`，工具结果或 assistant 回复包含 `hello`。
+
+## T4.5 Shell 命令执行
+
+```bash
+send_prompt '执行 ls /workspace 命令'
+messages | jq -r '.data[] | select(.type=="assistant") | .content[]? |
+  select(.type=="tool") | "\(.name)(\(.state.status))"'
+```
+
+**期望**：调用 `shell(completed)`，shell 输出或回复中包含 `t4-3.txt`。V2 工具名是 `shell`，不再断言 V1 的 `bash` 名称。
+
+## T4.6 异步消息接纳
+
+```bash
+curl -sS --noproxy '*' "${CURL_AUTH[@]}" -o /tmp/t4-6-response.json \
+  -w 'HTTP %{http_code}\n' -X POST "$BASE/api/session/$SID/prompt" \
+  -H 'Content-Type: application/json' \
+  -d '{"text":"写一首五言绝句","metadata":{},"delivery":"queue"}'
+cat /tmp/t4-6-response.json | jq
+curl -fsS --noproxy '*' "${CURL_AUTH[@]}" -X POST \
+  "$BASE/api/experimental/session/$SID/wait" -H 'Content-Type: application/json' -d '{}'
+messages | jq -r '.data[] | select(.type=="assistant") | .content[]? |
+  select(.type=="text") | .text' | tail -5
+```
+
+**期望**：prompt 接纳请求快速返回 HTTP 200，响应含 `.data.id`；wait 返回 HTTP 204，完成后消息列表中有 assistant 内容。
+
+## T4.7 中断会话
+
+使用独立会话以避免中断前面用例。中断前先确认 session 出现在 `/api/session/active`，不要依赖旧版 `is_busy` 查询参数。
+
+```bash
+SID_ABORT=$(curl -fsS --noproxy '*' "${CURL_AUTH[@]}" -X POST "$BASE/api/session" \
+  -H 'Content-Type: application/json' \
+  -d "{\"title\":\"T4 interrupt\",\"location\":{\"directory\":\"/workspace\"},\"model\":$MODEL}" \
+  | jq -r '.data.id')
+
+curl -fsS --noproxy '*' "${CURL_AUTH[@]}" -X POST "$BASE/api/session/$SID_ABORT/prompt" \
+  -H 'Content-Type: application/json' \
+  -d '{"text":"请开始写一篇一万字的中文文章，不要先给提纲，持续写正文。","metadata":{},"delivery":"queue"}'
+
+# 等待 active map 出现 SID_ABORT 后立即中断。
+ACTIVE_SEEN=false
+for _ in $(seq 1 100); do
+  if curl -fsS --noproxy '*' "${CURL_AUTH[@]}" "$BASE/api/session/active" \
+    | jq -e --arg sid "$SID_ABORT" '.data[$sid].type == "running"' >/dev/null; then
+    ACTIVE_SEEN=true
+    break
+  fi
+  sleep 0.2
+done
+[[ "$ACTIVE_SEEN" == true ]] || { echo "session never became active: $SID_ABORT" >&2; exit 1; }
+curl -fsS --noproxy '*' "${CURL_AUTH[@]}" -X POST "$BASE/api/session/$SID_ABORT/interrupt" \
+  -H 'Content-Type: application/json' -d '{}'
+curl -fsS --noproxy '*' "${CURL_AUTH[@]}" -X POST \
+  "$BASE/api/experimental/session/$SID_ABORT/wait" -H 'Content-Type: application/json' -d '{}'
+curl -fsS --noproxy '*' "${CURL_AUTH[@]}" "$BASE/api/session/active" | jq --arg sid "$SID_ABORT" '.data[$sid] // null'
+```
+
+**期望**：active map 曾包含该会话；interrupt 返回 HTTP 200 且 `interrupted: true`；wait 后该会话不再出现在 active map。中断时如果 assistant 消息尚未落库，历史中没有 assistant 消息也属有效结果。
+
+## 2026-09-23 V2 实测记录
+
+环境：Docker 镜像 `opencode-saas-e2e:session-fs-fix3`（复用已有镜像，未重建）、本地 PG `opencode-v2-up`、远端 OpenSandbox、`Yd-DeepSeek/deepseek-v4-flash`。新建会话目录 `/workspace`。
+
+| 用例 | 结果 | 实际观察 |
 |---|---|---|
-| T4.1 简单文本对话 | ✅ | 回复 `2` |
-| T4.2 多轮上下文记忆 | ✅ | 第二轮回复「张三」 |
-| T4.3 写文件工具 | ✅ | `write(completed)`；沙箱内 `cat` 实锤内容 `hello` |
-| T4.4 读文件工具 | ✅ | `read(completed)`，回复含 `hello` |
-| T4.5 bash 命令执行 | ✅ | 回复含 `t4-3.txt` |
-| T4.6 异步消息 | ✅ | HTTP 204，异步完成后五言绝句正常落库 |
-| T4.7 中断会话 | ✅ | abort 返回 `true`；中断发生在 assistant message 落库后（parts=`step-start`,`reasoning`，无 `step-finish`），`finish` 为空，parts 8s 内无增长，确认停止生成 |
+| T4.1 | ✅ | assistant 回复 `2` |
+| T4.2 | ✅ | 第二轮回复包含「张三」 |
+| T4.3 | ✅ | `write(completed)`；session fs read 实际读回 `hello` |
+| T4.4 | ✅ | `read(completed)`；回复包含 `hello` |
+| T4.5 | ✅ | `shell(completed)`；输出列出 `t4-3.txt` |
+| T4.6 | ✅ | prompt HTTP 200 且含 message ID；wait HTTP 204；assistant 消息已落库 |
+| T4.7 | ✅ | active map 确认运行中；interrupt HTTP 200、`interrupted=true`；wait 后不再 active |
 
-> ⚠️ 发现：`GET /session?is_busy=true` 的过滤参数**未生效**（与无参数请求同样返回全量 100 条，limit 截断），无法用于 busy 判定。T4.7 改用文档期望的替代判据（abort=true + 最后 assistant 消息 `finish` 为空 + parts 停止增长）。该接口问题与本次改动无关（既有行为），建议后续修复或改用其他状态查询端点。
+PG 核验：T4.1–T4.6 session 行存在且 `directory=/workspace`；assistant 10 条、user 7 条、idle 7 条；数据库中的真实工具调用为 shell 1、write 1、read 1，状态全部 `completed`；T4.7 中断 session 也存在，两个 session 的 pending 数均为 0。测试 session 与对应 sandbox 已在核验后清理。
 
+## 需要讨论的兼容范围
 
-> 复测记录（2026-09-06，merge upstream/dev v1.18.29 后，镜像 `t0906-merged-1.18.29`，组合 3）：T4.1 ✅（finish=stop）/ T4.2 ✅（上下文记忆「蓝鲸47号」）/ T4.3+T4.4 ✅（write→read 闭环回读 `hello_merge_2026`）/ T4.6 ✅（async 204 + assistant 落库）。
-> ⚠️ T4.5 bash 本轮模型未真实调用（tools=0）：经 merge 前镜像（tool-input-stream）A/B 对照（各 3 次同 prompt，均 0/3 触发）+ 模型自报工具清单含 bash + config 无禁用，定性为 **deepseek-v4-flash 行为波动**，非 merge 回归；工具链路健康由 T4.3 write 闭环 + sse.md T9.6（早间真实触发 pending→running→completed）覆盖。T4.7 本轮未复测。
-
-> 复测记录（2026-09-07，镜像 `opencode-saas-sandbox-test:so-test`（含 NUL guard / format 读回修复 / session event + prompt_stream 新端点），本地 PG + 远端沙箱（K8s 30040 转发），真实 LLM `Yd-DeepSeek/deepseek-v4-flash`）：**T4.1–T4.7 全部通过**。
-> | 用例 | 结果 | 备注 |
-> |---|---|---|
-> | T4.1 | ✅ | 回复 `2` |
-> | T4.2 | ✅ | 第二轮回复「张三」 |
-> | T4.3 | ✅ | `write(completed)`，回复确认创建 |
-> | T4.4 | ✅ | `read(completed)`，回复含 `hello` |
-> | T4.5 | ✅ | `bash(completed)`，`ls /workspace` 列出 `t4-3.txt` |
-> | T4.6 | ✅ | HTTP 204，异步五言绝句落库（finish=stop） |
-> | T4.7 | ✅ | abort=true，8s parts 无增长（3→3），确认停止生成 |
->
-> ⚠️ **prompt 措辞踩坑（本轮实测）**：T4.3 若在原文后附加「只回复：已创建」这类限定语，模型会跳过工具直接文字作答（tools=NONE，文件不落盘），进而连带 T4.4 无文件可读（模型凭上下文直答 hello 的假象）、T4.5 `ls` 如实报空目录。复测务必使用文档原文 prompt。
-
-> **复测记录（2026-09-14，镜像 `hitl-cbf2276a-wip2`（含 pgJsonb/LEASE_TOOLS/四偏离修复 + maintain 首刷 delay），本地 PG + 远端沙箱，真实 LLM `Yd-DeepSeek/deepseek-v4-flash`，文档原文 prompt）：T4.1–T4.7 全部通过。**
-> | 用例 | 结果 | 备注 |
-> |---|---|---|
-> | T4.1 | ✅ | 回复 `2` |
-> | T4.2 | ✅ | 第二轮回复「张三。」 |
-> | T4.3 | ✅ | `write(completed)` |
-> | T4.4 | ✅ | `read(completed)`，回复含 `hello` |
-> | T4.5 | ✅ | bash `ls /workspace`，回复含 `t4-3.txt` |
-> | T4.6 | ✅ | HTTP 204；异步五言绝句落库（春晨/朝露润青芽…）。判定脚本注意：消息 JSON 无顶层 `role` 字段（PG data 结构），用「末条消息含非空 text part」而非 `role=='assistant'` 判完成，否则误报 |
-> | T4.7 | ✅ | abort=true；parts 52→52（8s 零增长）确认停止生成 |
-
-> **复测记录（2026-09-16，镜像 `person-model`（feat/opencode-1.18.31 工作区：个人模型 x-user-id 隔离 + 公共优先 + provider 脱敏 + autokeepalive），本地 PG + 远端 K8s 沙箱，真实 LLM `Yd-DeepSeek/deepseek-v4-flash`，文档原文 prompt，session `ses_f55f0191fffeI2pvfWamUzwU8E`）：T4.1–T4.7 全部通过。**
-> | 用例 | 结果 | 备注 |
-> |---|---|---|
-> | T4.1 | ✅ | 回复含 `2` |
-> | T4.2 | ✅ | 第二轮回复含「张三」 |
-> | T4.3 | ✅ | `write(completed)` |
-> | T4.4 | ✅ | `read(completed)`，回复 `hello` |
-> | T4.5 | ✅ | `bash(completed)`，回复含 `t4-3.txt`（本轮 bash 真实触发，无 09-06 的行为波动） |
-> | T4.6 | ✅ | HTTP 204；异步五言绝句落库（「寒窗映雪光，孤影对残墙」）；用「末条消息含非空 text part」判完成 |
-> | T4.7 | ✅ | abort=true；parts 零增长（8s）确认停止生成 |
->
-> 附注：本轮起 session 创建默认自动 keepalive + boot 沙箱（autokeepalive），全程工具调用无沙箱冷启动等待/502。
+本轮 T4 功能均由 V2 原生 API 支持，没有功能性阻塞。未提供的是旧版 HTTP endpoint 和 response shape 兼容：若有既有 SaaS 客户端仍依赖 `/session/:id/message`、`prompt_async`、`abort` 或 `parts[]`，需要另行讨论是否加兼容适配层；否则调用方应迁移到本文列出的 V2 路径。

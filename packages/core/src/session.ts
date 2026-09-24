@@ -12,6 +12,7 @@ import { SessionMessage } from "./session/message.js"
 import { PromptInput } from "@opencode/schema/prompt-input"
 import { Bus } from "./bus.js"
 import { Instance } from "./instance/service.js"
+import { SandboxProvider } from "./sandbox/provider.js"
 import { Database } from "./database/database.js"
 import { SessionProjector } from "./session/projector.js"
 import { SessionMessageTable } from "./session/sql.js"
@@ -81,6 +82,7 @@ export type ListInput = SessionStore.ListInput
 
 type CreateBaseInput = {
   id?: SessionSchema.ID
+  appId?: SessionSchema.Info["appId"]
   title?: string
   agent?: Agent.ID
   model?: Model.Ref
@@ -258,6 +260,7 @@ const layer = Layer.effect(
             SessionEvent.Created,
             {
               sessionID,
+              appId: input.appId ?? parent?.appId,
               slug: Slug.create(),
               version: app.version,
               projectID: project.id,
@@ -298,7 +301,25 @@ const layer = Layer.effect(
           )
         if (projected.type === "existing") return projected.session
         // TODO: Restore recorded sessions onto replacement synchronized workspaces in a future API slice.
-        return yield* result.get(sessionID).pipe(Effect.orDie)
+        const created = yield* result.get(sessionID).pipe(Effect.orDie)
+        if (!input.parentID && !["0", "false"].includes(process.env["OPENCODE_SESSION_AUTO_KEEPALIVE"] ?? "")) {
+          const autoKeepAlive = instances
+            .provide(created)(
+              Effect.gen(function* () {
+                const sandbox = yield* SandboxProvider.Service
+                if (!sandbox.enabled) return
+                yield* sandbox.keepAlive(sessionID)
+                yield* sandbox.boot(sessionID)
+              }),
+            )
+            .pipe(
+              Effect.catchCause((cause) =>
+                Effect.logError("Automatic session keep-alive boot failed", { sessionID, cause }),
+              ),
+            )
+          Effect.runForkWith(yield* Effect.context<never>())(autoKeepAlive)
+        }
+        return created
       }),
       fork: Effect.fn("Session.fork")(function* (input) {
         const parent = yield* result.get(input.sessionID)
@@ -349,12 +370,43 @@ const layer = Layer.effect(
       }),
       view: (input) => sessions.forSession(input.sessionID).view(input),
       remove: Effect.fn("Session.remove")(function* (sessionID) {
-        yield* result.get(sessionID)
+        const info = yield* result.get(sessionID)
         yield* execution.interrupt(sessionID)
         yield* execution.awaitIdle(sessionID)
+        yield* instances
+          .provide(info)(
+            Effect.gen(function* () {
+              const sandbox = yield* SandboxProvider.Service
+              if (sandbox.enabled) yield* sandbox.destroy(sessionID)
+            }),
+          )
+          .pipe(
+            Effect.catchCause((cause) => Effect.logWarning("Failed to destroy session sandbox", { sessionID, cause })),
+          )
         yield* transport.close(sessionID)
         const children = yield* result.list({ parentID: sessionID })
-        yield* Effect.forEach(children.data, (child) => result.remove(child.id), { concurrency: 1, discard: true })
+        yield* Effect.forEach(
+          children.data,
+          (child) =>
+            Effect.gen(function* () {
+              yield* execution.interrupt(child.id)
+              yield* execution.awaitIdle(child.id)
+              yield* instances
+                .provide(child)(
+                  Effect.gen(function* () {
+                    const sandbox = yield* SandboxProvider.Service
+                    if (sandbox.enabled) yield* sandbox.destroy(child.id)
+                  }),
+                )
+                .pipe(
+                  Effect.catchCause((cause) =>
+                    Effect.logWarning("Failed to destroy child session sandbox", { sessionID: child.id, cause }),
+                  ),
+                )
+              yield* result.remove(child.id)
+            }),
+          { concurrency: 1, discard: true },
+        )
         yield* environments.clear(sessionID)
         yield* bus.publish(SessionEvent.Deleted, { sessionID })
         yield* bus.remove(sessionID)

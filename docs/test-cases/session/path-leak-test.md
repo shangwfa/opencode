@@ -125,12 +125,12 @@ bun test test/session/instruction-path-mapping.test.ts
 | PL-1 | read 工具 | AI 消息：读取文件 | tool output 路径为 `/workspace/...` |
 | PL-2 | glob 工具 | AI 消息：搜索文件 | tool output 路径为 `/workspace/...` |
 | PL-3 | grep 工具 | AI 消息：搜索内容 | tool output 路径为 `/workspace/...` |
-| PL-4 | list 工具 | AI 消息：列出目录 | tool output 路径为 `/workspace/...` |
+| PL-4 | 目录列举 | V2 使用 glob `*` 列根目录 | tool output 路径为 `/workspace/...` |
 | PL-5 | write 工具 | AI 消息：写文件 | tool input/output 路径为 `/workspace/...` |
 | PL-6 | edit 工具 | AI 消息：编辑文件 | tool input/output 路径为 `/workspace/...` |
-| PL-7 | bash 工具 | AI 消息：执行命令 | tool output 中 pwd、路径均为 `/workspace/...` |
+| PL-7 | shell 工具 | V2 使用 `shell`（V1 名称为 bash）执行命令 | tool output 中 pwd、路径均为 `/workspace/...` |
 | PL-8 | git 操作 | AI 消息：git commit | tool output 路径为 `/workspace/...` |
-| PL-9 | 环境信息 | AI 报告 `<env>` 块 | Working directory = `/workspace`，Workspace root = `/` |
+| PL-9 | 环境信息 | AI 报告 `<env>` 块 | V2 SaaS 下 Working directory / Workspace root 均为 `/workspace` |
 
 ### 3.4 测试流程
 
@@ -344,7 +344,7 @@ main()
 与第三章相同，额外需要：
 
 - **GitLab 仓库**：`https://gitlab.shadow-rpa.net/frontend/xybot-front-home-v3.git`
-- **Access Token**：`eY8gCHMpNWrJpRLHDvK3f286MQp1OmJiCA.01.0y10q698d`（仅 clone 用，不推送远端）
+- **Access Token**：通过环境变量提供，不在测试文档或脚本中保存凭据；仅 clone 用，不推送远端。
 
 ### 4.2 测试用例
 
@@ -353,7 +353,7 @@ main()
 | WF-1 | 创建会话 | `POST /session` | session 正常创建 |
 | WF-2 | 配置权限 | `PATCH /global/config` | 所有工具权限 allow |
 | WF-3 | 拉取代码 | `POST /session/:sid/exec` → `git clone` | 沙箱内项目文件存在，exec 输出无宿主路径 |
-| WF-3.5 | 更新工作目录 | `PATCH /session/:sid` → `{ directory: "/workspace" }` | session directory 更新，实例 reload，code-agent cwd 指向项目根 |
+| WF-3.5 | 验证工作目录 | V2 Session 根目录固定 `/workspace`，仓库位于 `/workspace/<repo>` | 不将远端沙箱路径传给宿主机路径校验或 `session.move` |
 | WF-4 | keepAlive | `POST /session/:sid/keep-alive` | 防止沙箱被回收 |
 | WF-5 | AI 需求分析 | AI 消息：阅读项目结构 | glob/grep/ls/read 工具输出路径均为 `/workspace/...` |
 | WF-6 | AI 开发 | AI 消息：实现一个小功能 | write/edit/bash 工具 I/O 路径均为 `/workspace/...` |
@@ -366,7 +366,7 @@ main()
 ```
 Step 1:  健康检查 → 创建 Session → 配置权限 → 新 Session
 Step 2:  WF-3 exec git clone（带 token 认证，clone 到 /workspace）
-Step 3:  WF-3.5 PATCH session { directory: "/workspace" }（更新 code-agent 工作目录）
+Step 3:  WF-3.5 验证 Session 根目录为 /workspace；AI 后续显式使用仓库绝对路径
 Step 4:  WF-4 keepAlive
 Step 5:  WF-5 AI 需求分析："阅读项目结构，了解技术栈"
 Step 6:  WF-6 AI 开发：实现具体需求（AI 自主使用 read/glob/grep/write/edit/bash）
@@ -397,8 +397,7 @@ Step 9:  WF-9 汇总：扫描所有消息 + exec 结果
 
 #!/usr/bin/env node
 const BASE = "http://localhost:14096"
-const GIT_TOKEN = "eY8gCHMpNWrJpRLHDvK3f286MQp1OmJiCA.01.0y10q698d"
-const GIT_REPO = `https://oauth2:${GIT_TOKEN}@gitlab.shadow-rpa.net/frontend/xybot-front-home-v3.git`
+const GIT_REPO = process.env.GIT_REPO // 认证信息由调用者以环境变量注入
 const PROJECT_DIR = "/workspace/xybot-front-home-v3"
 
 const LEAK_PATTERNS = [
@@ -608,7 +607,7 @@ main()
 | 单元测试 | 52 个测试全通过 | `bun test` 在 `packages/opencode` |
 | 端到端（基础） | 0 处宿主机路径泄露 | 3.6 脚本 |
 | 端到端（真实流程） | 0 处宿主机路径泄露 | 4.5 脚本 |
-| `<env>` 块 | Working directory = `/workspace`，root = `/` | AI 自报告验证 |
+| `<env>` 块 | V2 SaaS 中 Working directory / root = `/workspace` | AI 自报告验证 |
 | 工具 I/O | 所有工具的 input/output/title 均为 `/workspace/...` | 消息扫描 |
 
 ---
@@ -726,3 +725,20 @@ AI 报告 <env>:
 
 结果: ✅ 通过
 ```
+
+### 6.4 V2 SaaS 回归（2026-09-24）
+
+脚本与测试：`docs/test-cases/scripts/path-leak-e2e-v2.mjs`、`docs/test-cases/scripts/path-leak-real-workflow-v2.mjs`、`packages/core/test/session-shell.test.ts`、`packages/core/test/database-pg-compat.test.ts`。
+
+| 场景 | 结果 | 详情 |
+|------|------|------|
+| shell → 沙箱文件 → AI read | ✅ | shell 写入文件后，AI read 读到相同内容；shell 状态从 `running` 收敛为 `exited` |
+| 基础路径泄露流程 | ✅ | 覆盖 V2 read/glob/grep/write/edit/shell 与 `<env>`，14 次工具调用，0 处宿主机路径命中 |
+| 真实开发流程（公开仓库） | ✅ | 匿名 clone `sindresorhus/is`，AI 分析/开发/review、shell git commit；32 次工具调用，0 处路径泄露 |
+| 指定 GitLab 仓库 | ⚠️ 阻塞 | 现有凭据被拒绝（`HTTP Basic: Access denied`）；更新 `GIT_REPO` 环境变量后可重跑指定仓库 |
+| V2 Session 根目录 | ✅ | 始终为 `/workspace`；远端 `/workspace/<repo>` 不调用宿主机路径校验或 `session.move` |
+| PG `json_extract` 与 shell Ended 投影 | ✅ | 修复 JSON path 空 key 后 Ended 将消息从 `running` 更新为 `exited`；PG 测试 5 项通过 |
+
+> **修复记录**：V2 `session.shell` 原先由服务容器本地 `ChildProcess` 执行，与 agent 的远端沙箱文件视图分离。现已路由到 `SandboxProvider.run`，并保留本地部署 fallback。另修复 PG `json_extract` 对 `$.key` 生成空首 key 的问题。
+
+> **单测结果**：核心包全量 5,429 pass、46 skip、19 fail；定向相关回归 123 pass。全量失败包含 watcher/plugin 超时与 ShellParse 兼容用例；本次 shell 与 PG 相关测试在定向回归中全部通过。

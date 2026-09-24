@@ -134,6 +134,7 @@ const NEXT_PROJECT_COLUMNS = {
 type NextSession = {
   readonly id: string
   readonly project_id: string
+  readonly app_id: string | null
   readonly workspace_id: string | null
   readonly parent_id: string | null
   readonly fork_session_id: string | null
@@ -169,6 +170,7 @@ type NextSession = {
 const NEXT_SESSION_COLUMNS = {
   id: "required",
   project_id: "required",
+  app_id: "nullable",
   workspace_id: "nullable",
   parent_id: "nullable",
   fork_session_id: "nullable",
@@ -563,6 +565,10 @@ export function run(options: Options = {}): Effect.Effect<RunResult, never, Data
       const projects = new Set(
         (yield* db.all<{ id: string }>(sql`SELECT id FROM project`)).map((project) => project.id),
       )
+      const legacySessionColumns = yield* db.all<{ name: string }>(sql`PRAGMA table_info(\`session\`)`)
+      const legacyAppID = legacySessionColumns.some((column) => column.name === "app_id")
+        ? sql.raw("app_id")
+        : sql.raw("NULL")
       while (true) {
         const state = yield* readState(db)
         const cursorValue = state?.phase === "sessions" ? state.cursor : undefined
@@ -591,13 +597,13 @@ export function run(options: Options = {}): Effect.Effect<RunResult, never, Data
                 })
               yield* tx.run(sql`
                   INSERT OR IGNORE INTO session_v2 (
-                    id, project_id, workspace_id, parent_id, slug, directory, path, title, version, share_url,
+                    id, project_id, app_id, workspace_id, parent_id, slug, directory, path, title, version, share_url,
                     summary_additions, summary_deletions, summary_files, summary_diffs, metadata, cost,
                     tokens_input, tokens_output, tokens_reasoning, tokens_cache_read, tokens_cache_write,
                     revert, permission, agent, model, time_created, time_updated, time_compacting, time_archived
                   )
                   SELECT
-                    id, ${projectID}, workspace_id, parent_id, slug, directory, path, title, version, share_url,
+                    id, ${projectID}, ${legacyAppID}, workspace_id, parent_id, slug, directory, path, title, version, share_url,
                     summary_additions, summary_deletions, summary_files, summary_diffs, metadata, cost,
                     tokens_input, tokens_output, tokens_reasoning, tokens_cache_read, tokens_cache_write,
                     revert, NULL, agent, model, time_created, time_updated, time_compacting, time_archived

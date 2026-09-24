@@ -17,6 +17,8 @@ import { Formatter } from "../../formatter.js"
 import { Location } from "../../location.js"
 import { FileAccess } from "../../file-access.js"
 import { Permission } from "../../permission.js"
+import { SandboxProvider } from "../../sandbox/provider.js"
+import { SandboxTools } from "../../sandbox/tools.js"
 import { fileDiff } from "./file-diff.js"
 
 export const name = "edit"
@@ -101,6 +103,20 @@ const findLineOccurrences = (content: string, search: string) => {
   }, [])
 }
 
+const replaceText = (source: string, input: typeof Input.Type) => {
+  const ending = source.includes(crlf) ? crlf : "\n"
+  const oldString = input.oldString.replaceAll(crlf, "\n").replaceAll("\n", ending)
+  const newString = input.newString.replaceAll(crlf, "\n").replaceAll("\n", ending)
+  const exact = findOccurrences(source, oldString)
+  const unicode = exact.length > 0 ? [] : findOccurrences(normalizeForMatch(source), normalizeForMatch(oldString))
+  const trailing = exact.length > 0 || unicode.length > 0 ? [] : findLineOccurrences(source, oldString)
+  const matches = exact.length > 0 ? exact : unicode.length > 0 ? unicode : trailing
+  const replaced = (input.replaceAll === true ? matches : matches.slice(0, 1))
+    .toReversed()
+    .reduce((content, match) => `${content.slice(0, match.start)}${newString}${content.slice(match.end)}`, source)
+  return { matches: matches.length, replacements: matches.length, replaced }
+}
+
 /** Deferred edit behavior and UX integrations remain visible at the model-facing seam. */
 // TODO: Publish watcher/file-edit events after watcher integration exists.
 // TODO: Add snapshots / undo after design exists.
@@ -115,6 +131,8 @@ export const Plugin = {
     const formatter = yield* Formatter.Service
     const location = yield* Location.Service
     const permission = yield* Permission.Service
+    const sandboxProvider = yield* SandboxProvider.Service
+    const sandboxDeps = { provider: sandboxProvider, location, permission }
 
     yield* ctx.tool
       .transform((editor) =>
@@ -127,6 +145,10 @@ export const Plugin = {
           output: Output,
           execute: (input, context) => {
             return Effect.gen(function* () {
+              if (sandboxProvider.enabled)
+                return yield* SandboxTools.edit(sandboxDeps, input, context, fileDiff, replaceText).pipe(
+                  Effect.mapError((error) => new ToolFailure({ message: error.message, error })),
+                )
               const permissionSource = {
                 type: "tool" as const,
                 messageID: context.messageID,
@@ -157,24 +179,9 @@ export const Plugin = {
                 ),
               )
               const source = original.text
-              const ending = source.includes(crlf) ? crlf : "\n"
-              const oldString = input.oldString.replaceAll(crlf, "\n").replaceAll("\n", ending)
-              const newString = input.newString.replaceAll(crlf, "\n").replaceAll("\n", ending)
-              const exact = findOccurrences(source, oldString)
-              // These one-to-one mappings preserve offsets into the original source.
-              const unicode =
-                exact.length > 0 ? [] : findOccurrences(normalizeForMatch(source), normalizeForMatch(oldString))
-              const trailing = exact.length > 0 || unicode.length > 0 ? [] : findLineOccurrences(source, oldString)
-              const matches = exact.length > 0 ? exact : unicode.length > 0 ? unicode : trailing
-              const replacements = matches.length
-              const replaced = (input.replaceAll === true ? matches : matches.slice(0, 1))
-                .toReversed()
-                .reduce(
-                  (content, match) => `${content.slice(0, match.start)}${newString}${content.slice(match.end)}`,
-                  source,
-                )
+              const { matches, replacements, replaced } = replaceText(source, input)
               const preview =
-                replacements > 0 && (replacements === 1 || input.replaceAll === true)
+                matches > 0 && (matches === 1 || input.replaceAll === true)
                   ? fileDiff(target.resource, source, replaced)
                   : undefined
               yield* permission.assert({
@@ -191,9 +198,9 @@ export const Plugin = {
                   message: `Could not find oldString in ${input.path}. It must match exactly, including whitespace and indentation.`,
                 })
               }
-              if (replacements > 1 && input.replaceAll !== true) {
+              if (matches > 1 && input.replaceAll !== true) {
                 return yield* new ToolFailure({
-                  message: `Found ${replacements} matches for oldString, but expected exactly one. Add more surrounding context to make oldString unique, or set replaceAll to true to replace every occurrence.`,
+                  message: `Found ${matches} matches for oldString, but expected exactly one. Add more surrounding context to make oldString unique, or set replaceAll to true to replace every occurrence.`,
                 })
               }
               const replacementBom = replaced.startsWith("\uFEFF")

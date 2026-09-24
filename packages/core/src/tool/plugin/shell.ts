@@ -203,7 +203,14 @@ export const Plugin = {
               // commands remotely. Background execution is not supported there
               // yet and falls back to a foreground run with no timeout.
               if (sandboxProvider.enabled) {
-                const timeout = input.background === true ? 0 : (input.timeout ?? DEFAULT_TIMEOUT_MS)
+                if (input.background === true)
+                  return yield* Effect.fail(
+                    new ToolFailure({
+                      message:
+                        "Background execution is not supported for sandboxed sessions yet. Re-run without `background`.",
+                    }),
+                  )
+                const timeout = input.timeout ?? DEFAULT_TIMEOUT_MS
                 const hostWorkdir = input.workdir
                   ? path.resolve(location.directory, input.workdir)
                   : location.directory
@@ -212,7 +219,8 @@ export const Plugin = {
                   messageID: context.messageID,
                   id: context.id,
                 }
-                const parsed = yield* ShellParse.scan(input.command, "bash", hostWorkdir)
+                const portable = Config.latest(yield* config.entries(), "experimental")?.portable_shell_scanner === true
+                const parsed = yield* ShellParse.scan(input.command, "bash", hostWorkdir, { portable })
                 if (parsed.commands.length > 0)
                   yield* permission.assert({
                     action: name,

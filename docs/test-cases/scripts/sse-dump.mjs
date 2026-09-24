@@ -30,6 +30,9 @@ const ctrl = new AbortController()
 const timer = setTimeout(() => ctrl.abort(), seconds * 1000)
 
 const headers = directory ? { "x-opencode-directory": directory } : {}
+// SaaS deployments terminate every route behind the server password; set SSE_AUTH to a full
+// Authorization value (for example "Basic <base64(openai:password)>") when the server requires it.
+if (process.env.SSE_AUTH) headers["Authorization"] = process.env.SSE_AUTH
 
 try {
   const r = await fetch(url, { signal: ctrl.signal, headers, proxy: "" })

@@ -34,6 +34,7 @@ import { SessionSchema } from "../src/session/schema.js"
 import { Session } from "../src/session/session.js"
 import { SessionTable } from "../src/session/sql.js"
 import { SessionStore } from "../src/session/store.js"
+import { SandboxProvider } from "../src/sandbox/provider.js"
 import { Shell } from "../src/shell.js"
 import { Skill } from "../src/skill.js"
 import { Snapshot } from "../src/snapshot.js"
@@ -531,6 +532,29 @@ describe("Session-owned handles", () => {
       const shell = yield* fixture.sessions
         .forSession(sessionID)
         .shell({ id: SessionMessage.ID.make("msg_owned_shell"), command: started.command })
+        .pipe(
+          Effect.provideService(
+            SandboxProvider.Service,
+            SandboxProvider.Service.of({
+              enabled: false,
+              run: () => Effect.die(new Error("disabled sandbox provider must not run")),
+              interrupt: () => Effect.die(new Error("disabled sandbox provider must not run")),
+              destroy: () => Effect.die(new Error("disabled sandbox provider must not run")),
+              keepAlive: () => Effect.die(new Error("disabled sandbox provider must not run")),
+              release: () => Effect.die(new Error("disabled sandbox provider must not run")),
+              isKeepAlive: () => Effect.succeed(false),
+              sandboxId: () => Effect.succeed(null),
+              boot: () => Effect.die(new Error("disabled sandbox provider must not run")),
+              fileStat: () => Effect.die(new Error("not under test")),
+              fileRead: () => Effect.die(new Error("not under test")),
+              fileReadBytes: () => Effect.die(new Error("not under test")),
+              fileWrite: () => Effect.die(new Error("not under test")),
+              fileList: () => Effect.die(new Error("not under test")),
+              fileFind: () => Effect.die(new Error("not under test")),
+              isReady: () => Effect.succeed(false),
+            }),
+          ),
+        )
         .pipe(Effect.forkScoped)
       yield* Deferred.await(blocked)
 

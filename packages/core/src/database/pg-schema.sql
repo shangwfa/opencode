@@ -86,6 +86,16 @@ CREATE TABLE "project" (
           "sandboxes" text NOT NULL,
           "commands" text
         );
+CREATE TABLE "sandbox" (
+          "id" text PRIMARY KEY,
+          "session_id" text NOT NULL,
+          "host" text NOT NULL,
+          "state" text NOT NULL,
+          "keep_alive" bigint DEFAULT false NOT NULL,
+          "command_session_id" text,
+          "time_created" bigint NOT NULL,
+          "time_updated" bigint NOT NULL
+        );
 CREATE TABLE "instruction_blob" (
           "hash" text PRIMARY KEY,
           "value" text
@@ -136,6 +146,7 @@ CREATE TABLE "session_pending" (
 CREATE TABLE "session_v2" (
           "id" text PRIMARY KEY,
           "project_id" text NOT NULL,
+          "app_id" text,
           "workspace_id" text,
           "parent_id" text,
           "fork_session_id" text,
@@ -190,6 +201,8 @@ CREATE TABLE "migration" (id TEXT PRIMARY KEY, time_completed bigint NOT NULL);
 CREATE UNIQUE INDEX "event_aggregate_seq_idx" ON "event" ("aggregate_id","seq");
 CREATE INDEX "event_aggregate_type_seq_idx" ON "event" ("aggregate_id","type","seq");
 CREATE UNIQUE INDEX "permission_project_action_resource_idx" ON "permission" ("project_id","action","resource");
+CREATE UNIQUE INDEX "sandbox_session_id_idx" ON "sandbox" ("session_id");
+CREATE INDEX "sandbox_state_time_updated_idx" ON "sandbox" ("state","time_updated");
 CREATE INDEX "session_inbox_session_delivery_seq_idx" ON "session_inbox" ("session_id","delivery","enqueued_seq");
 CREATE UNIQUE INDEX "session_inbox_session_enqueued_seq_idx" ON "session_inbox" ("session_id","enqueued_seq");
 CREATE UNIQUE INDEX "session_message_session_seq_idx" ON "session_message" ("session_id","seq");
@@ -200,6 +213,7 @@ CREATE INDEX "session_pending_session_delivery_seq_idx" ON "session_pending" ("s
 CREATE UNIQUE INDEX "session_pending_session_compaction_idx" ON "session_pending" ("session_id") WHERE "session_pending"."type" = 'compaction';
 CREATE UNIQUE INDEX "session_pending_session_admitted_seq_idx" ON "session_pending" ("session_id","admitted_seq");
 CREATE INDEX "session_v2_project_idx" ON "session_v2" ("project_id");
+CREATE INDEX "session_v2_app_id_idx" ON "session_v2" ("app_id");
 CREATE INDEX "session_v2_workspace_idx" ON "session_v2" ("workspace_id");
 CREATE INDEX "session_v2_parent_idx" ON "session_v2" ("parent_id");
 CREATE INDEX "session_v2_time_suspended_idx" ON "session_v2" ("time_suspended") WHERE "session_v2"."time_suspended" is not null;

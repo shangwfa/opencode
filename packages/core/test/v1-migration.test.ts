@@ -33,6 +33,7 @@ const session = (
 ): V1Migration.TransformInput["session"] => ({
   id: SessionSchema.ID.make("ses_test"),
   project_id: Project.ID.global,
+  app_id: null,
   workspace_id: null,
   parent_id: null,
   fork_session_id: null,
@@ -1042,6 +1043,23 @@ describe("V1Migration database workflow", () => {
         })
         expect(yield* db.get(sql`SELECT value FROM kv WHERE key = 'migration.v1-v2'`)).toEqual({
           value: '{"phase":"completed"}',
+        })
+      }),
+    )
+  })
+
+  test("preserves appId when migrating legacy sessions", async () => {
+    await database(
+      Effect.gen(function* () {
+        const { db } = yield* Database.Service
+        yield* db.run(sql`ALTER TABLE session ADD app_id text`)
+        yield* db.run(
+          sql`INSERT INTO session (id, project_id, app_id, slug, directory, title, version, time_created, time_updated) VALUES ('ses_app', 'global', 'biz-proj-001', 'app', '/tmp/app', 'App', '1', 1, 2)`,
+        )
+
+        expect(yield* V1Migration.run()).toEqual({ status: "completed" })
+        expect(yield* db.get(sql`SELECT app_id FROM session_v2 WHERE id = 'ses_app'`)).toEqual({
+          app_id: "biz-proj-001",
         })
       }),
     )

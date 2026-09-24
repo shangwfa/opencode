@@ -22,10 +22,12 @@ export type Input = {
   files?: PromptInput.Prompt["files"]
   agents?: PromptInput.Prompt["agents"]
   skills?: PromptInput.Prompt["skills"]
-  metadata?: Record<string, unknown>
-  delivery?: SessionInbox.Delivery
+  /** Output shape for this prompt; `json_schema` forces a structured tool call. */
+  format?: PromptInput.Prompt["format"]
   userName?: string
   userId?: string
+  metadata?: Record<string, unknown>
+  delivery?: SessionInbox.Delivery
 }
 
 export const prepare = Effect.fn("SessionPrompt.prepare")(function* (request: {
@@ -47,13 +49,14 @@ export const prepare = Effect.fn("SessionPrompt.prepare")(function* (request: {
         files: request.input.files?.slice(),
         agents: request.input.agents?.slice(),
         skills: request.input.skills?.slice(),
+        format: request.input.format,
+        userName: request.input.userName,
+        userId: request.input.userId,
       }),
       metadata: structuredClone(request.input.metadata),
       delivery: request.input.delivery ?? "steer",
     })
     const input = event.prompt
-        userName: request.input.userName,
-        userId: request.input.userId,
     const files = input.files
       ? yield* Effect.forEach(input.files, materializeAttachment, { concurrency: 8 })
       : undefined
@@ -86,12 +89,13 @@ export const prepare = Effect.fn("SessionPrompt.prepare")(function* (request: {
           agents: input.agents,
           files,
           skills: selected?.length ? selected : undefined,
+          format: input.format,
         }),
+        userName: request.input.userName,
+        userId: request.input.userId,
         metadata: event.metadata,
       }),
       delivery: SessionInbox.Delivery.make(event.delivery),
-        userName: request.input.userName,
-        userId: request.input.userId,
     } satisfies SessionInbox.Item
   }).pipe(instances.provide(request.session))
 })

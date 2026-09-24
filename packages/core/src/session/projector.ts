@@ -152,6 +152,7 @@ const projectFork = Effect.fn("SessionProjector.projectFork")(function* (
       fork_session_id: event.data.parentID,
       fork_boundary: event.data.boundary,
       project_id: parent.project_id,
+      app_id: parent.app_id,
       workspace_id: parent.workspace_id,
       slug: Slug.create(),
       directory: parent.directory,
@@ -442,6 +443,7 @@ const layer = Layer.effectDiscard(
           .values({
             id: event.data.sessionID,
             project_id: event.data.projectID,
+            app_id: event.data.appId,
             workspace_id: event.data.location.workspaceID ? Workspace.ID.make(event.data.location.workspaceID) : null,
             parent_id: event.data.parentID,
             slug: event.data.slug,

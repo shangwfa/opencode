@@ -4,6 +4,8 @@ import { Bus } from "@opencode/core/bus"
 import { Credential } from "@opencode/schema/credential"
 import { Event } from "@opencode/schema/event"
 import { IntegrationID } from "@opencode/schema/integration-id"
+import { SessionEvent } from "@opencode/schema/session-event"
+import { Session } from "@opencode/schema/session"
 import { Deferred, Effect, Exit, Fiber, Option, Schema, Stream } from "effect"
 import { it } from "../../core/test/lib/effect"
 import { EventFeed } from "../src/event-feed"
@@ -131,6 +133,87 @@ describe("EventFeed", () => {
       })
 
       expect(Array.from(yield* Fiber.join(received))).toEqual([Credential.Event.Switched.type])
+    }),
+  )
+
+  it.effect("filters public events per subscriber without changing the global subscription", () =>
+    Effect.gen(function* () {
+      const source = makeSource()
+      const feed = yield* EventFeed.make(source.observe, { encode: (event) => JSON.stringify(event) })
+      const sessionID = Session.ID.make("ses_feed_first")
+      const first = yield* feed.subscribeFiltered((event) =>
+        "sessionID" in event.data && event.data.sessionID === sessionID,
+      )
+      const global = yield* feed.subscribe
+      const firstFiber = yield* first.pipe(Stream.take(1), Stream.runCollect, Effect.forkScoped)
+      const globalFiber = yield* global.pipe(Stream.take(2), Stream.runCollect, Effect.forkScoped)
+      const renamed = (id: string): Event.Payload<typeof SessionEvent.Renamed> => ({
+        id: Event.ID.create(),
+        created: Date.now(),
+        type: SessionEvent.Renamed.type,
+        durable: { aggregateID: id, seq: 0 as Event.Seq, version: 1 as Event.Version },
+        data: { sessionID: Session.ID.make(id), title: "updated" },
+      })
+
+      yield* source.publish(renamed("ses_feed_other"))
+      yield* source.publish(renamed(sessionID))
+
+      const filtered = Array.from(yield* Fiber.join(firstFiber))
+      const all = Array.from(yield* Fiber.join(globalFiber))
+      expect(JSON.parse(filtered[0]!).data.sessionID).toBe(sessionID)
+      expect(all).toHaveLength(2)
+    }),
+  )
+
+  it.effect("does not encode events that no subscriber accepts", () =>
+    Effect.gen(function* () {
+      const source = makeSource()
+      let encodes = 0
+      const feed = yield* EventFeed.make(source.observe, {
+        encode: (event) => {
+          encodes += 1
+          return event.type
+        },
+      })
+      yield* feed.subscribeFiltered(() => false)
+
+      yield* source.publish(event("ignored"))
+      expect(encodes).toBe(0)
+
+      const global = yield* feed.subscribe
+      const received = yield* global.pipe(Stream.take(1), Stream.runCollect, Effect.forkScoped)
+      yield* source.publish(event("accepted"))
+
+      expect(Array.from(yield* Fiber.join(received))).toEqual([Agent.Event.Updated.type])
+      expect(encodes).toBe(1)
+    }),
+  )
+
+  it.effect("does not let filtered-out events overflow a filtered subscriber", () =>
+    Effect.gen(function* () {
+      const source = makeSource()
+      const feed = yield* EventFeed.make(source.observe, { capacity: 1, encode: (event) => event.id })
+      const sessionID = Session.ID.make("ses_feed_target")
+      const renamed = (id: string): Event.Payload<typeof SessionEvent.Renamed> => ({
+        id: Event.ID.create(),
+        created: Date.now(),
+        type: SessionEvent.Renamed.type,
+        durable: { aggregateID: id, seq: 0 as Event.Seq, version: 1 as Event.Version },
+        data: { sessionID: Session.ID.make(id), title: "updated" },
+      })
+      const filtered = yield* feed.subscribeFiltered(
+        (event) => event.type === SessionEvent.Renamed.type && event.data.sessionID === sessionID,
+      )
+      const received = yield* filtered.pipe(Stream.take(1), Stream.runCollect, Effect.forkScoped)
+      const target = renamed(sessionID)
+
+      yield* source.publish(renamed("ses_feed_a"))
+      yield* source.publish(renamed("ses_feed_b"))
+      yield* source.publish(renamed("ses_feed_c"))
+      yield* source.publish(target)
+
+      const frames = Array.from(yield* Fiber.join(received))
+      expect(frames).toEqual([target.id])
     }),
   )
 

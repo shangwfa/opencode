@@ -11,12 +11,14 @@ import { SessionID } from "./session-id.js"
 import { SessionMetadata } from "./session-metadata.js"
 import { Money } from "./money.js"
 import { Permission } from "./permission.js"
+import { AppId } from "./session-app-id.js"
 import { TokenUsage } from "./token-usage.js"
 import { Revert } from "./session-revert.js"
 import { SessionFork } from "./session-fork.js"
 
 export const ID = SessionID
 export type ID = SessionID
+export { AppId }
 
 export const Metadata = SessionMetadata
 export type Metadata = SessionMetadata
@@ -30,6 +32,7 @@ export type ForkBoundary = SessionFork.Boundary
 export interface Info extends Schema.Schema.Type<typeof Info> {}
 export const Info = Schema.Struct({
   id: ID,
+  appId: AppId.pipe(optional),
   parentID: ID.pipe(optional),
   fork: Schema.Struct({
     sessionID: ID,

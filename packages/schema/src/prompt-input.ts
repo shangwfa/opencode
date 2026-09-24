@@ -4,6 +4,7 @@ import { Schema } from "effect"
 import { AgentAttachment, PromptMention } from "./prompt.js"
 import { optional, statics } from "./schema.js"
 import { Skill } from "./skill.js"
+import { OutputFormat } from "./output-format.js"
 
 export interface FileAttachment extends Schema.Schema.Type<typeof FileAttachment> {}
 export const FileAttachment = Schema.Struct({
@@ -31,4 +32,6 @@ export const Prompt = Schema.Struct({
   files: Schema.Array(FileAttachment).pipe(optional),
   agents: Schema.Array(AgentAttachment).pipe(optional),
   skills: Schema.Array(SkillAttachment).pipe(optional),
+  /** Output shape for this prompt; `json_schema` forces a structured tool call. */
+  format: OutputFormat.Format.pipe(optional),
 }).annotate({ identifier: "PromptInput" })

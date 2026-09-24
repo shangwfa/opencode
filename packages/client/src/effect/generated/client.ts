@@ -66,6 +66,14 @@ import type {
   SessionRevertCommitOutput,
   SessionContextInput,
   SessionContextOutput,
+  SessionKeepAliveInput,
+  SessionKeepAliveOutput,
+  SessionKeepAliveStatusInput,
+  SessionKeepAliveStatusOutput,
+  SessionSandboxInput,
+  SessionSandboxOutput,
+  SessionKillSandboxInput,
+  SessionKillSandboxOutput,
   SessionDiffInput,
   SessionDiffOutput,
   SessionInboxListInput,
@@ -104,6 +112,16 @@ import type {
   SessionEnvironmentOutput,
   SessionViewInput,
   SessionViewOutput,
+  SessionEventInput,
+  SessionEventOutput,
+  SessionPromptStreamInput,
+  SessionPromptStreamOutput,
+  SessionFsSessionFsReadInput,
+  SessionFsSessionFsReadOutput,
+  SessionFsSessionFsListInput,
+  SessionFsSessionFsListOutput,
+  SessionFsSessionFsFindInput,
+  SessionFsSessionFsFindOutput,
   MessageListInput,
   MessageListOutput,
   ModelListInput,
@@ -342,6 +360,7 @@ const EndpointSessionList = (raw: RawClient["server.session"]) => (input?: Sessi
   preserveEffect<SessionListOutput>()(
     raw["session.list"]({
       query: {
+        appId: input?.["appId"],
         limit: input?.["limit"],
         order: input?.["order"],
         search: input?.["search"],
@@ -375,6 +394,7 @@ const EndpointSessionCreate = (raw: RawClient["server.session"]) => (input?: Ses
     raw["session.create"]({
       payload: {
         id: input?.["id"],
+        appId: input?.["appId"],
         title: input?.["title"],
         agent: input?.["agent"],
         model: input?.["model"],
@@ -475,6 +495,9 @@ const EndpointSessionPrompt = (raw: RawClient["server.session"]) => (input: Sess
         files: input["files"],
         agents: input["agents"],
         skills: input["skills"],
+        format: input["format"],
+        userName: input["userName"],
+        userId: input["userId"],
         metadata: input["metadata"],
         delivery: input["delivery"],
         resume: input["resume"],
@@ -495,6 +518,7 @@ const EndpointSessionCommand = (raw: RawClient["server.session"]) => (input: Ses
         files: input["files"],
         agents: input["agents"],
         skills: input["skills"],
+        format: input["format"],
         delivery: input["delivery"],
       },
     }).pipe(Effect.mapError(mapClientError)),
@@ -577,6 +601,29 @@ const EndpointSessionContext = (raw: RawClient["server.session"]) => (input: Ses
       Effect.mapError(mapClientError),
       Effect.map((value) => value.data),
     ),
+  )
+
+const EndpointSessionKeepAlive = (raw: RawClient["server.session"]) => (input: SessionKeepAliveInput) =>
+  preserveEffect<SessionKeepAliveOutput>()(
+    raw["session.keepAlive"]({
+      params: { sessionID: input["sessionID"] },
+      payload: { enabled: input["enabled"], boot: input["boot"] },
+    }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const EndpointSessionKeepAliveStatus = (raw: RawClient["server.session"]) => (input: SessionKeepAliveStatusInput) =>
+  preserveEffect<SessionKeepAliveStatusOutput>()(
+    raw["session.keepAliveStatus"]({ params: { sessionID: input["sessionID"] } }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const EndpointSessionSandbox = (raw: RawClient["server.session"]) => (input: SessionSandboxInput) =>
+  preserveEffect<SessionSandboxOutput>()(
+    raw["session.sandbox"]({ params: { sessionID: input["sessionID"] } }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const EndpointSessionKillSandbox = (raw: RawClient["server.session"]) => (input: SessionKillSandboxInput) =>
+  preserveEffect<SessionKillSandboxOutput>()(
+    raw["session.killSandbox"]({ params: { sessionID: input["sessionID"] } }).pipe(Effect.mapError(mapClientError)),
   )
 
 const EndpointSessionDiff = (raw: RawClient["server.session"]) => (input: SessionDiffInput) =>
@@ -737,6 +784,41 @@ const EndpointSessionView = (raw: RawClient["server.session"]) => (input: Sessio
     ),
   )
 
+const EndpointSessionEvent = (raw: RawClient["server.session"]) => (input: SessionEventInput) =>
+  preserveStream<SessionEventOutput>()(
+    Stream.unwrap(
+      raw["session.event"]({ params: { sessionID: input["sessionID"] } }).pipe(
+        Effect.mapError(mapClientError),
+        Effect.map((stream) => stream.pipe(Stream.mapError(mapClientError))),
+      ),
+    ),
+  )
+
+const EndpointSessionPromptStream = (raw: RawClient["server.session"]) => (input: SessionPromptStreamInput) =>
+  preserveStream<SessionPromptStreamOutput>()(
+    Stream.unwrap(
+      raw["session.promptStream"]({
+        params: { sessionID: input["sessionID"] },
+        payload: {
+          id: input["id"],
+          text: input["text"],
+          files: input["files"],
+          agents: input["agents"],
+          skills: input["skills"],
+          format: input["format"],
+          userName: input["userName"],
+          userId: input["userId"],
+          metadata: input["metadata"],
+          delivery: input["delivery"],
+          resume: input["resume"],
+        },
+      }).pipe(
+        Effect.mapError(mapClientError),
+        Effect.map((stream) => stream.pipe(Stream.mapError(mapClientError))),
+      ),
+    ),
+  )
+
 const adaptGroupSession = (raw: RawClient["server.session"]) => ({
   list: EndpointSessionList(raw),
   stats: EndpointSessionStats(raw),
@@ -764,6 +846,10 @@ const adaptGroupSession = (raw: RawClient["server.session"]) => ({
     commit: EndpointSessionRevertCommit(raw),
   },
   context: EndpointSessionContext(raw),
+  keepAlive: EndpointSessionKeepAlive(raw),
+  keepAliveStatus: EndpointSessionKeepAliveStatus(raw),
+  sandbox: EndpointSessionSandbox(raw),
+  killSandbox: EndpointSessionKillSandbox(raw),
   diff: EndpointSessionDiff(raw),
   inbox: {
     list: EndpointSessionInboxList(raw),
@@ -791,6 +877,42 @@ const adaptGroupSession = (raw: RawClient["server.session"]) => ({
   },
   environment: EndpointSessionEnvironment(raw),
   view: EndpointSessionView(raw),
+  event: EndpointSessionEvent(raw),
+  promptStream: EndpointSessionPromptStream(raw),
+})
+
+const EndpointSessionFsSessionFsRead = (raw: RawClient["server.session-fs"]) => (input: SessionFsSessionFsReadInput) =>
+  preserveEffect<SessionFsSessionFsReadOutput>()(
+    raw["session.fs.read"]({ params: { sessionID: input["sessionID"] } }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const EndpointSessionFsSessionFsList = (raw: RawClient["server.session-fs"]) => (input: SessionFsSessionFsListInput) =>
+  preserveEffect<SessionFsSessionFsListOutput>()(
+    raw["session.fs.list"]({ params: { sessionID: input["sessionID"] }, query: { path: input["path"] } }).pipe(
+      Effect.mapError(mapClientError),
+      Effect.map((value) => value.data),
+    ),
+  )
+
+const EndpointSessionFsSessionFsFind = (raw: RawClient["server.session-fs"]) => (input: SessionFsSessionFsFindInput) =>
+  preserveEffect<SessionFsSessionFsFindOutput>()(
+    raw["session.fs.find"]({
+      params: { sessionID: input["sessionID"] },
+      query: { query: input["query"], type: input["type"], limit: input["limit"] },
+    }).pipe(
+      Effect.mapError(mapClientError),
+      Effect.map((value) => value.data),
+    ),
+  )
+
+const adaptGroupSessionFs = (raw: RawClient["server.session-fs"]) => ({
+  session: {
+    fs: {
+      read: EndpointSessionFsSessionFsRead(raw),
+      list: EndpointSessionFsSessionFsList(raw),
+      find: EndpointSessionFsSessionFsFind(raw),
+    },
+  },
 })
 
 const EndpointMessageList = (raw: RawClient["server.message"]) => (input: MessageListInput) =>
@@ -1532,6 +1654,7 @@ const adaptClient = (raw: RawClient) => ({
   agent: adaptGroupAgent(raw["server.agent"]),
   plugin: adaptGroupPlugin(raw["server.plugin"]),
   session: adaptGroupSession(raw["server.session"]),
+  sessionFs: adaptGroupSessionFs(raw["server.session-fs"]),
   message: adaptGroupMessage(raw["server.message"]),
   model: adaptGroupModel(raw["server.model"]),
   generate: adaptGroupGenerate(raw["server.generate"]),

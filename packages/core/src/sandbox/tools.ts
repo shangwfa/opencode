@@ -2,12 +2,14 @@ export * as SandboxTools from "./tools.js"
 
 import path from "path"
 import { Effect } from "effect"
+import { FileDiff } from "@opencode/schema/file-diff"
 import type { Tool } from "@opencode/schema/tool"
 import { Location } from "../location.js"
 import { Permission } from "../permission.js"
 import { RelativePath } from "../schema.js"
 import { SandboxProvider } from "./provider.js"
 import { SandboxPath } from "./path.js"
+import { ReadToolFileSystem } from "../tool/read-filesystem.js"
 
 /**
  * Sandbox-backed implementations for the file-oriented built-in tools. Each
@@ -17,6 +19,17 @@ import { SandboxPath } from "./path.js"
  */
 
 const shellQuote = (value: string) => `'${value.replaceAll("'", `'\\''`)}'`
+
+// Mirrors host-side access.resolve containment: a request outside the
+// sandbox workspace is a defect, never a silent fallback — the local
+// FileSystem answers the same way ("Path escapes the location").
+const resolve = (directory: string, requested?: string) =>
+  Effect.gen(function* () {
+    const sandboxPath = SandboxPath.toSandboxPath(path.resolve(directory, requested ?? "."), directory)
+    if (!SandboxPath.isSandboxPath(sandboxPath))
+      return yield* Effect.die(new Error(`Path escapes the location: ${requested ?? "."}`))
+    return sandboxPath
+  })
 
 const relative = (sandboxPath: string, hostWorkdir: string) =>
   RelativePath.make(path.relative(hostWorkdir, SandboxPath.toHostPath(sandboxPath, hostWorkdir)) || ".")
@@ -43,11 +56,14 @@ export const write = Effect.fn("SandboxTools.write")(
     fileDiff: (resource: string, before: string, after: string, change: "added" | "modified") => unknown,
   ) {
     const absolute = path.resolve(deps.location.directory, input.path)
-    const sandboxPath = SandboxPath.toSandboxPath(absolute, deps.location.directory)
+    const sandboxPath = yield* resolve(deps.location.directory, input.path)
     const resource = path.relative(deps.location.directory, absolute) || "."
     const stat = yield* deps.provider.fileStat(context.sessionID, sandboxPath)
     const existed = stat !== null
-    const preview = fileDiff(resource, "", input.content, "added")
+    const current = existed
+      ? (yield* deps.provider.fileRead(context.sessionID, sandboxPath)) ?? ""
+      : ""
+    const preview = fileDiff(resource, current, input.content, existed ? "modified" : "added")
     yield* deps.permission.assert({
       action: "edit",
       resources: [resource],
@@ -62,11 +78,59 @@ export const write = Effect.fn("SandboxTools.write")(
   },
 )
 
+export const edit = Effect.fn("SandboxTools.edit")(
+  function* (
+    deps: Deps,
+    input: { path: string; oldString: string; newString: string; replaceAll?: boolean },
+    context: Tool.Context,
+    fileDiff: (resource: string, before: string, after: string) => FileDiff.Info,
+    replaceText: (
+      source: string,
+      input: { path: string; oldString: string; newString: string; replaceAll?: boolean },
+    ) => { matches: number; replacements: number; replaced: string },
+  ) {
+    const absolute = path.resolve(deps.location.directory, input.path)
+    const sandboxPath = yield* resolve(deps.location.directory, input.path)
+    const resource = path.relative(deps.location.directory, absolute) || "."
+    const stat = yield* deps.provider.fileStat(context.sessionID, sandboxPath)
+    if (stat === null) return yield* Effect.fail(new Error(`File not found: ${input.path}`))
+    if (stat.isDirectory) return yield* Effect.fail(new Error(`Path is a directory, not a file: ${input.path}`))
+    const source = yield* deps.provider.fileRead(context.sessionID, sandboxPath)
+    if (source === null) return yield* Effect.fail(new Error(`File not found: ${input.path}`))
+
+    const { matches, replacements, replaced } = replaceText(source, input)
+    const preview = matches === 1 || (matches > 0 && input.replaceAll) ? fileDiff(resource, source, replaced) : undefined
+
+    yield* deps.permission.assert({
+      action: "edit",
+      resources: [resource],
+      save: ["*"],
+      metadata: preview ? { files: [preview] } : undefined,
+      sessionID: context.sessionID,
+      agent: context.agent,
+      source: { type: "tool", messageID: context.messageID, id: context.id },
+    })
+
+    if (matches === 0)
+      return yield* Effect.fail(
+        new Error(`Could not find oldString in ${input.path}. It must match exactly, including whitespace and indentation.`),
+      )
+    if (matches > 1 && input.replaceAll !== true)
+      return yield* Effect.fail(
+        new Error(
+          `Found ${matches} matches for oldString, but expected exactly one. Add more surrounding context to make oldString unique, or set replaceAll to true to replace every occurrence.`,
+        ),
+      )
+
+    yield* deps.provider.fileWrite(context.sessionID, sandboxPath, replaced)
+    return { files: [fileDiff(resource, source, replaced)], replacements }
+  },
+)
+
 export const glob = Effect.fn("SandboxTools.glob")(
   function* (deps: Deps, input: { pattern: string; path?: string; hidden?: boolean; limit?: number }, context: Tool.Context) {
     const limit = input.limit ?? 200
-    const absolute = path.resolve(deps.location.directory, input.path ?? ".")
-    const sandboxPath = SandboxPath.toSandboxPath(absolute, deps.location.directory)
+    const sandboxPath = yield* resolve(deps.location.directory, input.path)
     yield* deps.permission.assert({
       action: "glob",
       resources: [input.pattern],
@@ -101,8 +165,7 @@ export const grep = Effect.fn("SandboxTools.grep")(
     context: Tool.Context,
   ) {
     const limit = input.limit ?? 200
-    const absolute = path.resolve(deps.location.directory, input.path ?? ".")
-    const sandboxPath = SandboxPath.toSandboxPath(absolute, deps.location.directory)
+    const sandboxPath = yield* resolve(deps.location.directory, input.path)
     yield* deps.permission.assert({
       action: "grep",
       resources: [input.pattern],
@@ -125,13 +188,37 @@ export const grep = Effect.fn("SandboxTools.grep")(
       `rg --json ${flags} ${shellQuote(input.pattern)} ${shellQuote(sandboxPath)} 2>/dev/null | rg -m ${limit + 1} '"type":"match"' | head -${limit + 1}`,
       30_000,
     )
-    const events = result.output
+    // Parse and validate in one pass: binary matches carry no line number
+    // or text and would fail the Match schema, so only complete line
+    // matches pass through.
+    type ParsedMatch = {
+      path: string
+      line: number
+      offset: number
+      text: string
+      submatches: Array<{ text: string; start: number; end: number }>
+    }
+    const events: ParsedMatch[] = result.output
       .split("\n")
       .filter((line) => line.includes('"type":"match"'))
       .slice(0, limit + 1)
-      .flatMap((line) => {
+      .flatMap<ParsedMatch>((line) => {
         try {
-          return [JSON.parse(line) as RgMatch]
+          const data = (JSON.parse(line) as RgMatch).data
+          if (data.line_number === undefined || !data.path?.text || !data.lines?.text || !data.submatches) return []
+          return [
+            {
+              path: data.path.text,
+              line: data.line_number,
+              offset: data.absolute_offset ?? 0,
+              text: data.lines.text.replace(/\n$/, ""),
+              submatches: data.submatches.map((submatch) => ({
+                text: submatch.match.text,
+                start: submatch.start,
+                end: submatch.end,
+              })),
+            },
+          ]
         } catch {
           return []
         }
@@ -140,17 +227,13 @@ export const grep = Effect.fn("SandboxTools.grep")(
     return {
       matches: events.slice(0, limit).map((event) => ({
         entry: {
-          path: relative(event.data.path.text, deps.location.directory),
+          path: relative(event.path, deps.location.directory),
           type: "file" as const,
         },
-        line: event.data.line_number,
-        offset: event.data.absolute_offset ?? 0,
-        text: event.data.lines.text.replace(/\n$/, ""),
-        submatches: event.data.submatches.map((submatch) => ({
-          text: submatch.match.text,
-          start: submatch.start,
-          end: submatch.end,
-        })),
+        line: event.line,
+        offset: event.offset,
+        text: event.text,
+        submatches: event.submatches,
       })),
       truncated,
     }
@@ -159,11 +242,11 @@ export const grep = Effect.fn("SandboxTools.grep")(
 
 type RgMatch = {
   data: {
-    path: { text: string }
-    lines: { text: string }
-    line_number: number
+    path?: { text?: string }
+    lines?: { text?: string }
+    line_number?: number
     absolute_offset?: number
-    submatches: Array<{ match: { text: string }; start: number; end: number }>
+    submatches?: Array<{ match: { text: string }; start: number; end: number }>
   }
 }
 
@@ -173,8 +256,7 @@ export const read = Effect.fn("SandboxTools.read")(
     input: { path: string; offset?: number; limit?: number },
     context: Tool.Context,
   ) {
-    const absolute = path.resolve(deps.location.directory, input.path)
-    const sandboxPath = SandboxPath.toSandboxPath(absolute, deps.location.directory)
+    const sandboxPath = yield* resolve(deps.location.directory, input.path)
     const stat = yield* deps.provider.fileStat(context.sessionID, sandboxPath)
     if (stat === null) return yield* Effect.fail(new Error(`File not found: ${input.path}`))
     const offset = input.offset ?? 1
@@ -190,25 +272,29 @@ export const read = Effect.fn("SandboxTools.read")(
       }))
       const page = mapped.slice(offset - 1, offset - 1 + limit)
       const truncated = offset - 1 + limit < mapped.length
-      return {
+      return new ReadToolFileSystem.ListPage({
         type: "list-page" as const,
         entries: page,
         truncated,
         ...(truncated ? { next: offset + limit } : {}),
-      }
+      })
     }
     const content = yield* deps.provider.fileRead(context.sessionID, sandboxPath)
     if (content === null) return yield* Effect.fail(new Error(`File not found: ${input.path}`))
+    // The local reader rejects non-text payloads before they reach the model;
+    // the files API returns decoded text, so a NUL byte marks binary content.
+    if (content.includes("\u0000"))
+      return yield* Effect.fail(new Error(`Unable to read ${input.path}: binary file is not supported yet`))
     const lines = content.split("\n")
     const page = lines.slice(offset - 1, offset - 1 + limit)
     const truncated = offset - 1 + limit < lines.length
-    return {
+    return new ReadToolFileSystem.TextPage({
       type: "text-page" as const,
       content: page.join("\n"),
       mime: "text/plain",
       offset,
       truncated,
       ...(truncated ? { next: offset + limit } : {}),
-    }
+    })
   },
 )

@@ -14,6 +14,7 @@ import { SessionStore } from "./store.js"
 import { toSessionError } from "./to-session-error.js"
 import { UserInterruptedError } from "./error.js"
 import { SessionInbox } from "./inbox.js"
+import { SandboxProvider } from "../sandbox/provider.js"
 
 export interface Interface {
   /** Snapshots active execution owned by this process. */
@@ -87,6 +88,19 @@ export const layer = Layer.effect(
     const releaseOnCommit = (sessionID: SessionSchema.ID) => ({
       commit: () => store.release(sessionID),
     })
+    const destroyUnkeptSandbox = (sessionID: SessionSchema.ID) =>
+      Effect.gen(function* () {
+        const session = yield* store.get(sessionID)
+        if (!session) return
+        yield* instances.provide(session)(
+          Effect.gen(function* () {
+            const sandbox = yield* SandboxProvider.Service
+            if (sandbox.enabled && !(yield* sandbox.isKeepAlive(sessionID))) yield* sandbox.destroy(sessionID)
+          }),
+        )
+      }).pipe(
+        Effect.catchCause((cause) => Effect.logWarning("Failed to destroy idle sandbox", { sessionID, cause })),
+      )
     const drain = Effect.fnUntraced(function* (
       sessionID: SessionSchema.ID,
       force: boolean,
@@ -147,7 +161,7 @@ export const layer = Layer.effect(
               releaseOnCommit(sessionID),
             )
           }),
-        ),
+        ).pipe(Effect.ensuring(destroyUnkeptSandbox(sessionID))),
     })
 
     return Service.of({

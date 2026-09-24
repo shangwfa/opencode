@@ -1,4 +1,10 @@
-# 会话派生：summaryFrom 摘要上下文
+# 会话派生：summaryFrom 摘要上下文（V2 适配状态）
+
+> **V2 当前阻塞：**当前 `POST /api/session` 请求 schema 仅接受 `id/title/agent/model/location/metadata/permissions`，没有 `summaryFrom` 字段（`packages/protocol/src/groups/session.ts`）。因此本文件后续记录的 V1 路径（`/session`、`/message`、`/event`）和断言不能直接作为 V2 测试执行；将 V1 路径替换成 `/api` 并不能补上缺失的产品行为。
+>
+> **待产品确认：**是否要在 V2 实现“创建会话时异步从源会话生成摘要并注入新会话上下文”的 `summaryFrom` 能力？确认实现后，再将下方用例迁移到 V2 的创建、prompt、会话事件流和 wait API，并通过 HTTP 接口及 PG 验证；若不实现，则将本文件改为 V1 历史记录或移除该功能测试。
+>
+> **本次迁移约束：**以下内容是 V1 行为与复测记录，暂作需求基线保留，不代表 V2 已支持或已通过。不要在 V2 环境运行这些命令。
 
 > **功能**：`POST /session` 创建新会话时传 `summaryFrom: <源会话ID>`，服务端创建会话后**异步**为源会话**现场生成一份全新摘要**（每次都调 LLM），写入**新会话**（user 消息带 compaction part + assistant 消息 `summary: true`），生成过程走正常消息事件流（`message.part.delta` → `session.idle`）。**源会话零写入**。
 >

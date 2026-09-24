@@ -121,8 +121,10 @@ const translate = (query: string): string => {
  * PG objects that emulate the sqlite surface this repository relies on:
  * `sqlite_master` / `pragma_table_info` for schema introspection, and
  * `json_extract` / `strftime` so raw caller SQL keeps working.
+ *
+ * Exported for tests that verify the compatibility functions against a real PG.
  */
-const COMPAT_DDL = /* sql */ `
+export const COMPAT_DDL = /* sql */ `
 CREATE OR REPLACE VIEW sqlite_master AS
   SELECT tablename AS name, 'table'::text AS type FROM pg_tables WHERE schemaname = 'public'
   UNION ALL
@@ -140,7 +142,15 @@ DECLARE
 BEGIN
   IF target IS NULL OR path IS NULL THEN RETURN NULL; END IF;
   IF btrim(path) = '$' THEN RETURN target; END IF;
-  keys := regexp_split_to_array(btrim(path, ' $"'), '[\\[\\].]+');
+  -- btrim leaves '.key' after stripping '$', and the split of '.key' yields an
+  -- empty first key; dropping empty keys makes jsonb_extract_path_text work.
+  -- NOTE: this file is a JS template literal, so each PG-level backslash is
+  -- written as a double backslash below (the class reaching PG is [\[\].]).
+  keys := array_remove(
+    regexp_split_to_array(btrim(path, ' $"'), '[\\[\\].]+'),
+    ''
+  );
+  IF cardinality(keys) = 0 THEN RETURN NULL; END IF;
   RETURN jsonb_extract_path_text(target::jsonb, VARIADIC keys);
 EXCEPTION WHEN others THEN RETURN NULL;
 END
@@ -244,14 +254,34 @@ export const layer = (url: string): Layer.Layer<Database.Service, never, Global.
           if (statement.trim().length === 0) continue
           yield* db.run(sql.raw(statement))
         }
-      }
-      yield* db.run(
-        sql`CREATE TABLE IF NOT EXISTS "migration" ("id" text PRIMARY KEY, "time_completed" bigint NOT NULL)`,
-      )
-      for (const migration of migrations) {
         yield* db.run(
-          sql`INSERT INTO "migration" ("id", "time_completed") VALUES (${migration.id}, ${Date.now()}) ON CONFLICT ("id") DO NOTHING`,
+          sql`CREATE TABLE IF NOT EXISTS "migration" ("id" text PRIMARY KEY, "time_completed" bigint NOT NULL)`,
         )
+        // The bootstrap dump already contains the complete schema at this
+        // revision, so record its migrations without replaying their ALTERs.
+        for (const migration of migrations) {
+          yield* db.run(
+            sql`INSERT INTO "migration" ("id", "time_completed") VALUES (${migration.id}, ${Date.now()}) ON CONFLICT ("id") DO NOTHING`,
+          )
+        }
+      } else {
+        yield* db.run(
+          sql`CREATE TABLE IF NOT EXISTS "migration" ("id" text PRIMARY KEY, "time_completed" bigint NOT NULL)`,
+        )
+        const completed = new Set(
+          (yield* db.all<{ id: string }>(sql`SELECT "id" FROM "migration"`)).map((row) => row.id),
+        )
+        for (const migration of migrations) {
+          if (completed.has(migration.id)) continue
+          yield* db.transaction((tx) =>
+            Effect.gen(function* () {
+              yield* migration.up(tx).pipe(Effect.provideService(Global.Service, global))
+              yield* tx.run(
+                sql`INSERT INTO "migration" ("id", "time_completed") VALUES (${migration.id}, ${Date.now()})`,
+              )
+            }),
+          )
+        }
       }
       return { db }
     }).pipe(Effect.orDie),

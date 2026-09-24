@@ -59,8 +59,21 @@ export const latestCompaction = Effect.fnUntraced(function* (
     .pipe(Effect.orDie)
 })
 
-export const decodeMessageRow = (row: typeof SessionMessageTable.$inferSelect) =>
-  decode({ ...row.data, id: row.id, type: row.type }).pipe(
+export const decodeMessageRow = (row: typeof SessionMessageTable.$inferSelect) => {
+  const data: Record<string, unknown> = {
+    ...(row.data as Record<string, unknown>),
+    id: row.id,
+    type: row.type,
+  }
+  // `format` is an optional field, so a legacy/invalid stored value must not take down the whole
+  // message read: retry once with just that field removed before declaring the row undecodable.
+  const dropFormat = () => {
+    const { format: _format, ...rest } = data
+    return rest
+  }
+  const decoded =
+    "format" in data ? decode(data).pipe(Effect.catch(() => decode(dropFormat()))) : decode(data)
+  return decoded.pipe(
     Effect.tap((message) =>
       SessionProviderContext.isCheckpoint(message)
         ? SessionProviderContext.validate(message.providerContext)
@@ -74,6 +87,7 @@ export const decodeMessageRow = (row: typeof SessionMessageTable.$inferSelect) =
         }),
     ),
   )
+}
 
 const messageEntries = Effect.fnUntraced(function* (
   db: DatabaseService,

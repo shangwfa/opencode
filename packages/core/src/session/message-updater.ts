@@ -2,6 +2,7 @@ import { castDraft, produce, type WritableDraft } from "immer"
 import { DateTime, Effect, Match, pipe, Schema } from "effect"
 import { SessionEvent } from "./event.js"
 import { SessionMessage } from "./message.js"
+import { SessionStructuredOutput } from "./structured-output.js"
 
 export interface Adapter {
   readonly getAgent: () => Effect.Effect<SessionMessage.AgentSelected["agent"] | undefined>
@@ -325,6 +326,10 @@ export function update(adapter: Adapter, event: SessionEvent.DurableEvent) {
             match.executed = event.data.executed
             match.providerState = event.data.state
             match.time.ran = created
+            // The forced structured call carries the answer as its arguments; round-trip through
+            // JSON so the field is a portable value rather than an open record of unknowns.
+            if (SessionStructuredOutput.isTool(match.name))
+              draft.structured = JSON.parse(JSON.stringify(event.data.input ?? {}))
             match.state = castDraft(
               SessionMessage.ToolStateRunning.make({
                 status: "running",

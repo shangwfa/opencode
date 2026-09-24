@@ -22,6 +22,9 @@ export type Error = SubscriberOverflowError | EncodingError
 
 export interface Interface {
   readonly subscribe: Effect.Effect<Stream.Stream<string, Error>, never, Scope.Scope>
+  readonly subscribeFiltered: (
+    filter: (event: OpenCodeEvent) => boolean,
+  ) => Effect.Effect<Stream.Stream<string, Error>, never, Scope.Scope>
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/server/EventFeed") {}
@@ -36,18 +39,22 @@ export const make = Effect.fn("EventFeed.make")(function* (
 ) {
   const capacity = options?.capacity ?? SubscriberCapacity
   const render = options?.encode ?? frame
-  const subscribers = new Set<Queue.Queue<string, Error>>()
+  const subscribers = new Set<{
+    readonly queue: Queue.Queue<string, Error>
+    readonly filter?: (event: OpenCodeEvent) => boolean
+  }>()
 
   const fail = (error: Error) =>
     Effect.sync(() => {
       const current = Array.from(subscribers)
       subscribers.clear()
-      for (const subscriber of current) Queue.failCauseUnsafe(subscriber, Cause.fail(error))
+      for (const subscriber of current) Queue.failCauseUnsafe(subscriber.queue, Cause.fail(error))
     })
 
   const publish = Effect.fnUntraced(function* (event: Event.Payload) {
     if (!isOpenCodeEvent(event)) return
-    if (subscribers.size === 0) return
+    const matching = Array.from(subscribers).filter((subscriber) => !subscriber.filter || subscriber.filter(event))
+    if (matching.length === 0) return
     const encoded = yield* Effect.try({
       try: () => render(event),
       catch: (cause) => new EncodingError({ eventID: event.id, eventType: event.type, cause }),
@@ -61,22 +68,29 @@ export const make = Effect.fn("EventFeed.make")(function* (
       ),
     )
     if (encoded === undefined) return
-    for (const subscriber of subscribers) {
-      if (Queue.offerUnsafe(subscriber, encoded)) continue
+    for (const subscriber of matching) {
+      if (Queue.offerUnsafe(subscriber.queue, encoded)) continue
       subscribers.delete(subscriber)
-      Queue.failCauseUnsafe(subscriber, Cause.fail(new SubscriberOverflowError({ capacity })))
+      Queue.failCauseUnsafe(subscriber.queue, Cause.fail(new SubscriberOverflowError({ capacity })))
     }
   })
 
   const unsubscribe = yield* observe(publish)
   yield* Effect.addFinalizer(() => unsubscribe)
 
+  const subscribe = (filter?: (event: OpenCodeEvent) => boolean) =>
+      Effect.acquireRelease(
+        Queue.dropping<string, Error>(capacity).pipe(
+          Effect.tap((queue) => Effect.sync(() => subscribers.add({ queue, filter }))),
+        ),
+        (queue) =>
+          Effect.sync(() => {
+            for (const subscriber of subscribers) if (subscriber.queue === queue) subscribers.delete(subscriber)
+          }).pipe(Effect.andThen(Queue.shutdown(queue)), Effect.asVoid),
+      ).pipe(Effect.map(Stream.fromQueue))
   return Service.of({
-    subscribe: Effect.acquireRelease(
-      Queue.dropping<string, Error>(capacity).pipe(Effect.tap((queue) => Effect.sync(() => subscribers.add(queue)))),
-      (queue) =>
-        Effect.sync(() => subscribers.delete(queue)).pipe(Effect.andThen(Queue.shutdown(queue)), Effect.asVoid),
-    ).pipe(Effect.map(Stream.fromQueue)),
+    subscribe: subscribe(),
+    subscribeFiltered: (filter) => subscribe(filter),
   })
 })
 

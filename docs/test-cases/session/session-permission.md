@@ -1,439 +1,361 @@
-# 会话级权限配置
+# 会话级权限配置（V2）
 
-> 公共测试环境和配置请参考 [`00-preamble.md`](../00-preamble.md)。
+> 本文按当前 V2 HTTP API 重写。V1 原文（`{permission,pattern,action}`、`/session`、PG `session` 表、PATCH 合并语义）保留在 git 历史。
+>
+> **环境**：`BASE`、`PG_URL`、`MODEL` 由 `test-env.sh` 提供；服务需 Basic Auth（`-u opencode:$OPENCODE_PASSWORD`）。
 
-## 验证标准
+## V1 → V2 契约变化
 
-| 层级 | 方法 | 判定标准 |
-|------|------|---------|
-| 1. HTTP 响应 | 调用 API 检查返回值 | 字段值与期望一致 |
-| 2. PG 记录 | 查询 `session` 表 `permission` 列 | 权限规则正确存储 |
-| 3. 工具行为 | 通过 AI 发送触发权限的指令，观察工具调用结果 | 按会话配置的规则执行 |
+| 维度 | V1 | V2 |
+|---|---|---|
+| 规则字段 | `{permission, pattern, action}` | **`{action, resource, effect}`** |
+| `effect`/action 取值 | `action: allow\|deny\|ask` | `effect: allow\|deny\|ask`；`action` 是**动作**（工具名/`read`/`edit`/`external_directory`/`*`） |
+| 创建 | `POST /session` + `permission` | `POST /api/session` + **`permissions`** |
+| 更新 | `PATCH /session/:id`，**增量合并** | `PATCH /api/session/:id`，**整体替换**，返回 **204**（无响应体） |
+| 空数组 | `[]` **不清除** | `[]` **真清除**（替换语义） |
+| PG | `session.permission` | **`session_v2.permission`**（单数列，`text`） |
+| shell 工具名 | `bash` | **`shell`**（`packages/core/src/tool/plugin/shell.ts:25`） |
+| 会话生命周期 | `keep-alive` 端点 | 无该端点（V2 无 keep-alive） |
+| 权限请求 | 无 HTTP API | **新增** `POST/GET /api/session/:id/permission[...]` 与 `POST .../reply` |
+| 事件 | — | `session.permissions`（durable）、`permission.asked`、`permission.replied` |
 
-## 通用变量
+## V2 评估语义（判定标准）
 
-> 运行前先全局加载环境：`source test-env.sh [1|2|3]`（见 [`00-preamble.md`](../00-preamble.md)）。用例直接用 `$BASE` `$PG_URL` `$MODEL`，不重复定义。
+```ts
+// packages/core/src/permission.ts
+configured = merge(agent.permissions ?? missingAgentPermissions, session.permissions ?? [])
+// session 规则后置 → evaluate() 用 findLast → 会话规则覆盖 agent/全局
+evaluate(action, resource, ...rulesets)  // findLast(Wildcard.match(action, rule.action) && match(resource, rule.resource))
+// 无匹配时默认 { effect: "ask" }
+// 无 agent 时 missingAgentPermissions = [{ action:"*", resource:"*", effect:"deny" }]
+// deny → Permission.BlockedError → { type: "permission.rejected", message: "Permission denied: ..." }
+```
+
+`action` 实际取值（谁调用 `permission.assert`）：
+
+| action | 触发方 | `resource` 形态 |
+|---|---|---|
+| `read` | `file-access.ts:161` | 相对 location 的路径 |
+| `edit` | `write`/`patch`/`edit` | 文件路径 |
+| `external_directory` | `file-access.ts:142` | 外部绝对路径（如 `/tmp/*`） |
+| `shell` | `shell.ts:140/226`（V1 为 `bash`） | 命令串（如 `curl*`） |
+| `glob`/`grep`/`webfetch`/`websearch`/`skill` | 各工具 | 工具相关 |
+| `<MCP 工具名>` | `mcp.ts:51` | `*` |
+| `*` | 通配（放行/拒绝一切） | `*` |
 
 ---
 
 ## 四、会话级权限规则 CRUD
 
-### T4.1 创建空 session（permission 默认空）
+### T4.1 创建空 session（permissions 默认为空）
 
 ```bash
-source test-lib.sh
-
-SID=$(new_sid -k)
-echo "SID: $SID"
-
-echo "--- PG 验证 (permission 为空) ---"
-pgval "SELECT permission FROM session WHERE id='$SID'"
-```
-
-**期望**：
-- HTTP：session 创建成功
-- PG：`permission IS NULL`（未设置时为空）
-
-### T4.2 POST 创建时直接传 permission
-
-```bash
-RESP=$(curl -s -X POST "$BASE/session" \
+SID=$(curl -fsS --noproxy '*' "${CURL_AUTH[@]}" -X POST "$BASE/api/session" \
   -H 'Content-Type: application/json' \
-  -d '{"title":"perm-test","permission":[{"permission":"external_directory","pattern":"/data/*","action":"allow"}]}')
-SID_CREATE=$(echo "$RESP" | jexec "d.get('id')")
-echo "SID: $SID_CREATE"
-
-echo "--- PG 验证 ---"
-pgval "SELECT permission FROM session WHERE id='$SID_CREATE'"
+  -d '{"title":"perm-empty","location":{"directory":"/workspace"}}' | jq -r '.data.id')
+echo "SID=$SID"
+curl -fsS --noproxy '*' "${CURL_AUTH[@]}" "$BASE/api/session/$SID" | jq -c '.data.permissions'
+psql "$PG_URL" -XAtc "select coalesce(permission,'<NULL>') from session_v2 where id='$SID'"
 ```
+**期望**：创建成功；GET `permissions=null`；PG `permission` 为 `<NULL>`。
 
-**期望**：
-- HTTP：200，`permission` 字段包含传入的规则
-- PG：`permission` 列包含 `external_directory:/data/*:allow`
-
-### T4.3 PATCH 设置 permission（替换语义）
+### T4.2 POST 创建时直接传 permissions
 
 ```bash
-PERM='[{"permission":"external_directory","pattern":"/tmp/*","action":"allow"},{"permission":"read","pattern":"/etc/*","action":"deny"}]'
-
-RESP=$(curl -s -X PATCH "$BASE/session/$SID" \
+SID=$(curl -fsS --noproxy '*' "${CURL_AUTH[@]}" -X POST "$BASE/api/session" \
   -H 'Content-Type: application/json' \
-  -d "{\"permission\":$PERM}")
-echo "PATCH response: $(echo "$RESP" | jexec 'd.keys()')"
-
-echo "--- PG 验证 ---"
-pgval "SELECT permission FROM session WHERE id='$SID'"
+  -d '{"title":"perm-create","location":{"directory":"/workspace"},
+       "permissions":[{"action":"external_directory","resource":"/data/*","effect":"allow"}]}' | jq -r '.data.id')
+curl -fsS --noproxy '*' "${CURL_AUTH[@]}" "$BASE/api/session/$SID" | jq -c '.data.permissions'
+psql "$PG_URL" -XAtc "select permission from session_v2 where id='$SID'"
 ```
+**期望**：GET 与 PG 均为 `[{"action":"external_directory","resource":"/data/*","effect":"allow"}]`。
 
-**期望**：
-- HTTP：200，返回 session 详情
-- PG：`permission` 包含 `external_directory:/tmp/*:allow` 和 `read:/etc/*:deny`
-
-### T4.4 PATCH 合并 permission（追加新规则）
+### T4.3 PATCH 设置 permissions（一次可设多条）
 
 ```bash
-PERM2='[{"permission":"bash","pattern":"curl*","action":"deny"}]'
-
-RESP=$(curl -s -X PATCH "$BASE/session/$SID" \
-  -H 'Content-Type: application/json' \
-  -d "{\"permission\":$PERM2}")
-echo "PATCH response: $(echo "$RESP" | jexec 'd.keys()')"
-
-echo "--- PG 验证 (合并后应有3条规则) ---"
-pgval "SELECT json_array_length(permission) FROM session WHERE id='$SID'"
+PERM='[{"action":"external_directory","resource":"/tmp/*","effect":"allow"},
+       {"action":"read","resource":"../etc/*","effect":"deny"},
+       {"action":"shell","resource":"curl*","effect":"deny"}]'
+curl -fsS --noproxy '*' "${CURL_AUTH[@]}" -o /dev/null -w 'PATCH=%{http_code}\n' \
+  -X PATCH "$BASE/api/session/$SID" -H 'Content-Type: application/json' -d "{\"permissions\":$PERM}"
+curl -fsS --noproxy '*' "${CURL_AUTH[@]}" "$BASE/api/session/$SID" | jq '.data.permissions | length'
+psql "$PG_URL" -XAtc "select permission from session_v2 where id='$SID'"
 ```
+**期望**：`PATCH=204`（无响应体，V1 是 200 + session 详情）；GET 与 PG 均为 **3 条**。
 
-**期望**：
-- HTTP：200
-- PG：`json_array_length=3`（追加而非替换）
+### T4.4 PATCH 是替换语义（不是追加）
 
-### T4.5 GET 返回 permission
+> ⚠️ **V2 语义变化**：`Session.setPermissions` 直接发布整组规则（`session.ts:76-82`），**不与旧规则合并**。
+> V1 期望的"追加成 3/4 条"在 V2 不成立。
 
 ```bash
-curl -s "$BASE/session/$SID" | python3 -c "
-import json, sys
-d = json.load(sys.stdin, strict=False)
-perm = d.get('permission', [])
-print(f'permission 规则数: {len(perm)}')
-for r in perm:
-    print(f'  {r[\"permission\"]} / {r[\"pattern\"]} \u2192 {r[\"action\"]}')
-print('PASS' if len(perm) == 3 else 'FAIL')
-"
+curl -fsS --noproxy '*' "${CURL_AUTH[@]}" -o /dev/null -w 'PATCH=%{http_code}\n' \
+  -X PATCH "$BASE/api/session/$SID" -H 'Content-Type: application/json' \
+  -d '{"permissions":[{"action":"external_directory","resource":"/tmp/*","effect":"deny"}]}'
+echo -n "count="; curl -fsS --noproxy '*' "${CURL_AUTH[@]}" "$BASE/api/session/$SID" | jq '.data.permissions | length'
 ```
+**期望**：`204`，`count=1`（**覆盖**了 T4.3 的 3 条，而非变成 4 条）。
 
-**期望**：返回 3 条规则，字段与设置一致
-
-### T4.6 PATCH 覆盖 permission（追加 deny 规则使旧 allow 失效）
-
-> PATCH 是增量合并语义（`merge(current, new)`），空数组 `[]` 不会清除已有规则。
-> 要让某条 allow 失效，追加一条相同 pattern 的 deny 规则即可（后者优先级更高）。
+### T4.5 GET 返回 permissions
 
 ```bash
-# 已有3条规则，其中 external_directory:/tmp/* → allow
-# 追加一条 deny 使其失效
-RESP=$(curl -s -X PATCH "$BASE/session/$SID" \
-  -H 'Content-Type: application/json' \
-  -d '{"permission":[{"permission":"external_directory","pattern":"/tmp/*","action":"deny"}]}')
-echo "PATCH response: $(echo "$RESP" | jexec 'd.keys()')"
-
-echo "--- PG 验证 (合并后应有4条规则) ---"
-pgval "SELECT jsonb_array_length(permission) FROM session WHERE id='$SID'"
+curl -fsS --noproxy '*' "${CURL_AUTH[@]}" "$BASE/api/session/$SID" \
+  | jq -c '{count:(.data.permissions|length), rules:.data.permissions}'
 ```
+**期望**：返回 T4.3 写入的 3 条规则，字段为 `action/resource/effect`。
 
-**期望**：
-- HTTP：200
-- PG：`jsonb_array_length=4`（追加而非替换）
-- 评估时 `/tmp/*` 匹配最后一条 deny（findLast 语义）
+### T4.6 空数组清除 permissions
+
+> ⚠️ **V2 语义变化**：替换语义下 `permissions: []` 会**真清除**（V1 文档记录的"空数组不清除"已不适用）。
+
+```bash
+curl -fsS --noproxy '*' "${CURL_AUTH[@]}" -o /dev/null -w 'PATCH=%{http_code}\n' \
+  -X PATCH "$BASE/api/session/$SID" -H 'Content-Type: application/json' -d '{"permissions":[]}'
+echo -n "count="; curl -fsS --noproxy '*' "${CURL_AUTH[@]}" "$BASE/api/session/$SID" | jq '.data.permissions | length'
+psql "$PG_URL" -XAtc "select coalesce(permission,'<NULL>') from session_v2 where id='$SID'"
+```
+**期望**：`204`；`count=0`；PG 为 `[]`。
 
 ### T4.7 跨 session 隔离
 
 ```bash
-SID_A=$(new_sid -k)
-SID_B=$(new_sid -k)
-
-curl -s -X PATCH "$BASE/session/$SID_A" \
-  -H 'Content-Type: application/json' \
-  -d '{"permission":[{"permission":"read","pattern":"/secret/*","action":"deny"}]}' > /dev/null
-
-echo "--- Session A permission ---"
-pgval "SELECT permission FROM session WHERE id='$SID_A'"
-
-echo "--- Session B permission (应为空) ---"
-pgval "SELECT permission FROM session WHERE id='$SID_B'"
+SA=$(curl -fsS --noproxy '*' "${CURL_AUTH[@]}" -X POST "$BASE/api/session" -H 'Content-Type: application/json' -d '{"title":"perm-a","location":{"directory":"/workspace"}}' | jq -r '.data.id')
+SB=$(curl -fsS --noproxy '*' "${CURL_AUTH[@]}" -X POST "$BASE/api/session" -H 'Content-Type: application/json' -d '{"title":"perm-b","location":{"directory":"/workspace"}}' | jq -r '.data.id')
+curl -fsS --noproxy '*' "${CURL_AUTH[@]}" -X PATCH "$BASE/api/session/$SA" -H 'Content-Type: application/json' \
+  -d '{"permissions":[{"action":"read","resource":"/secret/*","effect":"deny"}]}' >/dev/null
+echo -n "A="; curl -fsS --noproxy '*' "${CURL_AUTH[@]}" "$BASE/api/session/$SA" | jq -c '.data.permissions'
+echo -n "B="; curl -fsS --noproxy '*' "${CURL_AUTH[@]}" "$BASE/api/session/$SB" | jq -c '.data.permissions'
+psql "$PG_URL" -XAtc "select coalesce(permission,'<NULL>') from session_v2 where id='$SB'"
 ```
+**期望**：A 有 1 条规则；B 为 `null`、PG `<NULL>`。
 
-**期望**：
-- Session A：`permission` 非空
-- Session B：`permission IS NULL`
-- 两 session 互不影响
-
-### T4.8 非法 permission 格式返回 400
+### T4.8 非法 effect 返回 400
 
 ```bash
-HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X PATCH "$BASE/session/$SID" \
-  -H 'Content-Type: application/json' \
-  -d '{"permission":[{"permission":"read","pattern":"/tmp/*","action":"invalid_action"}]}')
-
-if [ "$HTTP_CODE" = "400" ]; then echo "PASS"; else echo "FAIL (status=$HTTP_CODE)"; fi
+curl -sS --noproxy '*' "${CURL_AUTH[@]}" -o /dev/null -w 'http=%{http_code}\n' \
+  -X PATCH "$BASE/api/session/$SID" -H 'Content-Type: application/json' \
+  -d '{"permissions":[{"action":"read","resource":"/tmp/*","effect":"invalid"}]}'
 ```
-
-**期望**：400 Bad Request
+**期望**：`400`。
 
 ### T4.9 PATCH 不存在 session 返回 404
 
 ```bash
-HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X PATCH "$BASE/session/ses_nonexistent" \
-  -H 'Content-Type: application/json' \
-  -d '{"permission":[{"permission":"read","pattern":"*","action":"allow"}]}')
-
-if [ "$HTTP_CODE" = "404" ]; then echo "PASS"; else echo "FAIL (status=$HTTP_CODE)"; fi
+curl -sS --noproxy '*' "${CURL_AUTH[@]}" -o /dev/null -w 'http=%{http_code}\n' \
+  -X PATCH "$BASE/api/session/ses_missing_perm" -H 'Content-Type: application/json' \
+  -d '{"permissions":[{"action":"read","resource":"*","effect":"allow"}]}'
 ```
+**期望**：`404`。
 
-**期望**：404 Not Found
-
-### T4.10 规则优先级：具体 pattern 优先于通配符
+### T4.10 规则优先级：具体 resource 与通配并存（存储）
 
 ```bash
-SID_PRIO=$(new_sid -k)
-
-# 设置两条规则：通配符 deny + 具体路径 allow
-curl -s -X PATCH "$BASE/session/$SID_PRIO" \
-  -H 'Content-Type: application/json' \
-  -d '{"permission":[
-    {"permission":"external_directory","pattern":"/tmp/*","action":"deny"},
-    {"permission":"external_directory","pattern":"/tmp/allow-this/*","action":"allow"}
-  ]}' > /dev/null
-
-echo "--- PG 验证 ---"
-pgval "SELECT permission FROM session WHERE id='$SID_PRIO'"
+curl -fsS --noproxy '*' "${CURL_AUTH[@]}" -X PATCH "$BASE/api/session/$SID" -H 'Content-Type: application/json' \
+  -d '{"permissions":[
+    {"action":"external_directory","resource":"/tmp/*","effect":"deny"},
+    {"action":"external_directory","resource":"/tmp/allow-this/*","effect":"allow"}]}' >/dev/null
+curl -fsS --noproxy '*' "${CURL_AUTH[@]}" "$BASE/api/session/$SID" | jq '.data.permissions | length'
+curl -fsS --noproxy '*' "${CURL_AUTH[@]}" "$BASE/api/session/$SID" | jq -c '.data.permissions'
 ```
+**期望**：2 条规则均存储（`findLast` 保证后写的 `allow` 对 `/tmp/allow-this/*` 生效）。
 
-**期望**：
-- PG：两条规则均存储
-- 评估时 `/tmp/allow-this/foo` 匹配 `allow`（具体 pattern 优先）
-- `/tmp/other/bar` 匹配 `deny`（通配符兜底）
-
-### T4.11 通配符 pattern 匹配所有路径
+### T4.11 通配符 `*`
 
 ```bash
-SID_WILD=$(new_sid -k)
-
-curl -s -X PATCH "$BASE/session/$SID_WILD" \
-  -H 'Content-Type: application/json' \
-  -d '{"permission":[{"permission":"external_directory","pattern":"*","action":"allow"}]}' > /dev/null
-
-echo "--- PG 验证 ---"
-pgval "SELECT permission FROM session WHERE id='$SID_WILD'"
+curl -fsS --noproxy '*' "${CURL_AUTH[@]}" -X PATCH "$BASE/api/session/$SID" -H 'Content-Type: application/json' \
+  -d '{"permissions":[{"action":"*","resource":"*","effect":"allow"}]}' >/dev/null
+curl -fsS --noproxy '*' "${CURL_AUTH[@]}" "$BASE/api/session/$SID" | jq -c '.data.permissions'
+psql "$PG_URL" -XAtc "select permission from session_v2 where id='$SID'"
 ```
-
-**期望**：
-- PG：`pattern: *` 正确存储
-- 任何外部目录路径均匹配该规则
+**期望**：`[{"action":"*","resource":"*","effect":"allow"}]` 落库；放行一切动作（含 MCP 工具）。
 
 ---
 
 ## 五、会话权限对工具行为的影响
 
-> 以下用例通过 AI 实际调用工具来验证会话权限规则生效。需要 `$MODEL` 可用。
+> 前提：**沙箱可用**。工具执行在权限评估前就需要沙箱启动，沙箱 `Pending` 时会直接报
+> `Sandbox.create failed: ... Last state: Pending`，与权限无关（见本轮实测记录）。
+
+通用流程（V2）：
+
+```bash
+new_sid() {
+  curl -fsS --noproxy '*' "${CURL_AUTH[@]}" -X POST "$BASE/api/session" \
+    -H 'Content-Type: application/json' \
+    -d "{\"title\":\"$1\",\"location\":{\"directory\":\"/workspace\"},\"model\":$MODEL$2}" | jq -r '.data.id'
+}
+# $2 形如 ,"permissions":[...]`；无规则时传空字符串
+send_prompt() {
+  jq -n --arg text "$2" '{text:$text,metadata:{},delivery:"queue"}' \
+    | curl -fsS --noproxy '*' "${CURL_AUTH[@]}" -X POST "$BASE/api/session/$1/prompt" \
+        -H 'Content-Type: application/json' --data-binary @- >/dev/null
+  curl -fsS --noproxy '*' "${CURL_AUTH[@]}" -X POST "$BASE/api/experimental/session/$1/wait" \
+    -H 'Content-Type: application/json' -d '{}' --max-time 240 >/dev/null || true
+}
+tools() {
+  curl -fsS --noproxy '*' "${CURL_AUTH[@]}" "$BASE/api/session/$1/message?order=asc&limit=200" \
+    | jq -c '[.data[]|select(.type=="assistant")|.content[]?|select(.type=="tool")
+             |{name,status:.state.status,error:(.state.error.type//null)}]'
+}
+```
+
+**判定标准（V2）**：
+- `effect=allow` → 工具 `status=completed` 且无 `error`
+- `effect=deny` → 工具 `status=error`、`error.type=permission.rejected`（`permission.rejected` 由 `to-session-error.ts:40` 映射 `BlockedError`）
+- `effect=ask` → `GET /api/session/:id/permission` 出现 pending request（`permission.asked` 事件），回复 `POST .../permission/:id/reply {decision}` 后才继续
+- 工具 `status=error` 且 `error.type=unknown` 且 message 含 `Sandbox.create failed` → **环境问题，不算权限用例**
 
 ### T5.1 会话 allow 外部目录
 
 ```bash
-source test-lib.sh
-
-SID=$(new_sid -kb)
-
-curl -s -X PATCH "$BASE/session/$SID" \
-  -H 'Content-Type: application/json' \
-  -d '{"permission":[{"permission":"external_directory","pattern":"/tmp/*","action":"allow"}]}' > /dev/null
-
-send_and_verify "$SID" "读取 /tmp 目录下的文件列表（用 ls /tmp/）" "T5.1 /tmp 读取"
+SID=$(new_sid perm-t5.1 ',"permissions":[{"action":"external_directory","resource":"/tmp/*","effect":"allow"}]')
+send_prompt "$SID" "执行 shell 工具跑 echo hi_t51"
+tools "$SID"
 ```
-
-**期望**：
-- 工具调用成功，`ls /tmp/` 正常执行
-- 无权限弹窗阻塞
+**期望**：`shell` 为 `completed`（沙箱可用时）。
 
 ### T5.2 会话 deny 外部目录
 
 ```bash
-SID=$(new_sid -kb)
-
-curl -s -X PATCH "$BASE/session/$SID" \
-  -H 'Content-Type: application/json' \
-  -d '{"permission":[{"permission":"external_directory","pattern":"/etc/*","action":"deny"}]}' > /dev/null
-
-send_and_verify "$SID" "读取 /etc/passwd 文件内容" "T5.2 /etc 读取被拒绝"
+SID=$(new_sid perm-t5.2 ',"permissions":[{"action":"external_directory","resource":"/etc/*","effect":"deny"}]')
+send_prompt "$SID" "执行 shell 工具跑 cat /etc/hostname"
+tools "$SID"
 ```
+**期望**：工具 `status=error`、`error.type=permission.rejected`。
 
-**期望**：
-- 工具调用被拒绝
-- AI 回复中提示无权限
-
-### T5.3 会话 allow 覆盖全局 deny
+### T5.3 会话 allow 覆盖 agent 默认
 
 ```bash
-SID=$(new_sid -kb)
-
-curl -s -X PATCH "$BASE/session/$SID" \
-  -H 'Content-Type: application/json' \
-  -d '{"permission":[{"permission":"external_directory","pattern":"/etc/*","action":"allow"}]}' > /dev/null
-
-send_and_verify "$SID" "读取 /etc/hostname 文件内容" "T5.3 会话允许覆盖全局拒绝"
+SID=$(new_sid perm-t5.3 ',"permissions":[{"action":"external_directory","resource":"/etc/*","effect":"allow"}]')
+send_prompt "$SID" "执行 shell 工具跑 cat /etc/hostname"
+tools "$SID"
 ```
+**期望**：会话 `allow` 后置覆盖 agent/默认规则 → 工具 `completed`、零 `permission.asked`。
 
-**期望**：
-- 即使全局配置拒绝 `/etc/*`，会话级别 `allow` 生效
-- 工具调用成功
-
-### T5.4 会话 deny 覆盖全局 allow
+### T5.4 会话 deny 覆盖全局
 
 ```bash
-SID=$(new_sid -kb)
-
-curl -s -X PATCH "$BASE/session/$SID" \
-  -H 'Content-Type: application/json' \
-  -d '{"permission":[{"permission":"external_directory","pattern":"/tmp/*","action":"deny"}]}' > /dev/null
-
-send_and_verify "$SID" "读取 /tmp 目录下的文件列表（用 ls /tmp/）" "T5.4 会话拒绝覆盖全局允许"
+SID=$(new_sid perm-t5.4 ',"permissions":[{"action":"external_directory","resource":"/tmp/*","effect":"deny"}]')
+send_prompt "$SID" "执行 shell 工具跑 sh -c 'echo x > /tmp/t54.txt'"
+tools "$SID"
 ```
+**期望**：`error.type=permission.rejected`。
 
-**期望**：
-- 即使全局配置允许 `/tmp/*`，会话级别 `deny` 生效
-- 工具调用被拒绝
-
-### T5.5 清除后回退到全局规则
+### T5.5 清除后回退到 agent/全局规则
 
 ```bash
-SID=$(new_sid -kb)
-
-curl -s -X PATCH "$BASE/session/$SID" \
-  -H 'Content-Type: application/json' \
-  -d '{"permission":[{"permission":"external_directory","pattern":"/tmp/*","action":"allow"}]}' > /dev/null
-
-curl -s -X PATCH "$BASE/session/$SID" \
-  -H 'Content-Type: application/json' \
-  -d '{"permission":[]}' > /dev/null
-
-send_and_verify "$SID" "读取 /tmp 目录下的文件列表（用 ls /tmp/）" "T5.5 清除后回退"
+SID=$(new_sid perm-t5.5 ',"permissions":[{"action":"external_directory","resource":"/tmp/*","effect":"allow"}]')
+curl -fsS --noproxy '*' "${CURL_AUTH[@]}" -X PATCH "$BASE/api/session/$SID" \
+  -H 'Content-Type: application/json' -d '{"permissions":[]}' >/dev/null
+send_prompt "$SID" "执行 shell 工具跑 echo hi_t55"
+tools "$SID"
 ```
+**期望**：`[]` 真清除（V2）→ 回退到 agent 规则（默认 `ask` 时出现 pending request）。
 
-**期望**：
-- 清除后，权限行为回退到全局/agent 规则
-- 如果全局规则是 `ask`，需要用户确认
-
-### T5.6 会话 permission 设为 ask 仍弹窗
+### T5.6 会话 permission 为 ask 时仍弹窗
 
 ```bash
-SID=$(new_sid -kb)
-
-curl -s -X PATCH "$BASE/session/$SID" \
-  -H 'Content-Type: application/json' \
-  -d '{"permission":[{"permission":"external_directory","pattern":"/tmp/*","action":"ask"}]}' > /dev/null
-
-send_and_verify "$SID" "读取 /tmp 目录下的文件列表（用 ls /tmp/）" "T5.6 ask 仍弹窗"
+SID=$(new_sid perm-t5.6 ',"permissions":[{"action":"shell","resource":"echo_perm_ask*","effect":"ask"}]')
+send_prompt "$SID" "执行 shell 工具跑 echo_perm_ask_hello"
+curl -fsS --noproxy '*' "${CURL_AUTH[@]}" "$BASE/api/session/$SID/permission" | jq -c '.data'
+# 授权后继续
+RID=$(curl -fsS --noproxy '*' "${CURL_AUTH[@]}" "$BASE/api/session/$SID/permission" | jq -r '.data[0].id')
+curl -fsS --noproxy '*' "${CURL_AUTH[@]}" -o /dev/null -w 'reply=%{http_code}\n' \
+  -X POST "$BASE/api/session/$SID/permission/$RID/reply" -H 'Content-Type: application/json' -d '{"decision":"once"}'
+tools "$SID"
 ```
+**期望**：`GET .../permission` 返回 1 条 pending（`action=shell`、`resources=[echo_perm_ask_hello]`）；回复 `once` 后工具 `completed`。
 
-**期望**：
-- 会话规则设为 `ask` 时，仍需用户确认
-- 等待用户响应后工具才执行
+### T5.7 read 权限
 
-### T5.7 会话 permission 影响其他工具操作（read）
+> ⚠️ **V2 行为差异**：`read` 会先做路径边界检查——越界路径直接报 `Path escapes the location: ...`（`type=unknown`），
+> **走不到权限评估**。V1 文档的 `../etc/*` 相对路径用法在 V2 会先被边界检查拒绝。因此本用例改为
+> 在 workspace 内用 `read` 的 `deny` 规则验证。
 
 ```bash
-SID=$(new_sid -kb)
-
-curl -s -X PATCH "$BASE/session/$SID" \
-  -H 'Content-Type: application/json' \
-  -d '{"permission":[{"permission":"read","pattern":"/etc/*","action":"deny"}]}' > /dev/null
-
-send_and_verify "$SID" "读取 /etc/hostname 文件内容" "T5.7 read 拒绝"
+SID=$(new_sid perm-t5.7 ',"permissions":[{"action":"read","resource":"*","effect":"deny"}]')
+send_prompt "$SID" "使用 read 工具读取 /workspace 下任意一个已存在的文件"
+tools "$SID"
 ```
+**期望**：`read` 工具 `error.type=permission.rejected`（`deny` 在路径检查之后、执行之前生效）。
 
-**期望**：
-- session 配置 `read` 为 `deny` 时，read 工具调用被拒绝
-- 权限弹窗不出现，直接返回拒绝
-
-### T5.8 会话 permission 影响 shell 工具（bash）
+### T5.8 会话 shell 权限（V2 工具名为 `shell`）
 
 ```bash
-SID=$(new_sid -kb)
-
-curl -s -X PATCH "$BASE/session/$SID" \
-  -H 'Content-Type: application/json' \
-  -d '{"permission":[{"permission":"bash","pattern":"curl*","action":"deny"}]}' > /dev/null
-
-send_and_verify "$SID" "执行 curl http://example.com" "T5.8 bash 拒绝"
+SID=$(new_sid perm-t5.8 ',"permissions":[{"action":"shell","resource":"curl*","effect":"deny"}]')
+send_prompt "$SID" "执行 shell 工具跑 curl http://example.com"
+tools "$SID"
+# 对照：不匹配的命令不受影响
+send_prompt "$SID" "执行 shell 工具跑 echo still_allowed"
+tools "$SID"
 ```
+**期望**：`curl*` 被拒（`permission.rejected`）；`echo` 仍 `completed`。
+> 注意：V1 的 `{"permission":"bash",...}` 在 V2 必须写 `{"action":"shell",...}`。
 
-**期望**：
-- session 配置 `bash` 为 `deny` 时，匹配 `curl*` 的 bash 命令被拒绝
-- 不匹配的命令不受影响
-
-### T5.9 规则优先级：具体 pattern 优先于通配符
+### T5.9 规则优先级：具体 resource 胜出
 
 ```bash
-SID=$(new_sid -kb)
-
-# 通配符 deny + 具体路径 allow
-curl -s -X PATCH "$BASE/session/$SID" \
-  -H 'Content-Type: application/json' \
-  -d '{"permission":[
-    {"permission":"external_directory","pattern":"/tmp/*","action":"deny"},
-    {"permission":"external_directory","pattern":"/tmp/allow-this/*","action":"allow"}
-  ]}' > /dev/null
-
-send_and_verify "$SID" "读取 /tmp/allow-this/test.txt 文件内容（如果文件不存在，先创建它）" "T5.9 具体路径允许"
+SID=$(new_sid perm-t5.9 ',"permissions":[
+  {"action":"external_directory","resource":"/tmp/*","effect":"deny"},
+  {"action":"external_directory","resource":"/tmp/allow-this/*","effect":"allow"}]')
+send_prompt "$SID" "执行 shell 工具跑 sh -c 'mkdir -p /tmp/allow-this && echo ok > /tmp/allow-this/t.txt && cat /tmp/allow-this/t.txt'"
+tools "$SID"
 ```
+**期望**：`/tmp/allow-this/*` 命中具体 `allow`（`findLast`）→ `completed`。
 
-**期望**：
-- `/tmp/allow-this/` 下的路径匹配具体 `allow` 规则，工具执行成功
-- 其他 `/tmp/` 路径匹配通配符 `deny` 规则，工具被拒绝
-
-### T5.10 会话 `permission: "*"` 通配放行一切（含 MCP 工具）
-
-**场景**：MCP 工具（如 `codegraph_codegraph_explore`）的权限询问 `permission` 类型是工具名本身（`session/tools.ts:530`），`external_directory: *` 这类规则**不匹配**它。验证 `{"permission":"*","pattern":"*","action":"allow"}` 通配规则能跨类型放行，MCP 工具调用不再挂起等人工授权（2026-08-19 `ses_fe76d6edaffeqduKwo76qF2rBM` 事故场景）。
+### T5.10 `action:"*"` 通配放行一切
 
 ```bash
-source test-lib.sh
-
-SID=$(new_sid -kb)
-
-# 通配规则：放行任何 permission 类型、任何 pattern
-curl -s -X PATCH "$BASE/session/$SID" \
-  -H 'Content-Type: application/json' \
-  -d '{"permission":[{"permission":"*","pattern":"*","action":"allow"}]}' > /dev/null
-
-# 诱导调用 codegraph MCP 工具（该工具每次执行前必发 ctx.ask({permission:"codegraph_codegraph_explore", patterns:["*"]})）
-send_and_verify "$SID" "使用 codegraph_codegraph_explore 工具在 /workspace 中查询任意符号" "T5.10 MCP 工具免授权"
-
-# 对比组：不设该规则的会话调 codegraph 会挂起等授权（permission.asked 事件 + 无响应）
+SID=$(new_sid perm-t5.10 ',"permissions":[{"action":"*","resource":"*","effect":"allow"}]')
+send_prompt "$SID" "执行 shell 工具跑 cat /etc/hostname"
+tools "$SID"
+psql "$PG_URL" -XAtc "select permission from session_v2 where id='$SID'"
 ```
-
-**期望**：
-- codegraph 工具调用**直接执行**（status=completed 或业务 error），**无** `permission.asked` 挂起、无「需要权限」人工干预
-- 对照组（仅设 `external_directory: * allow`）：codegraph 调用挂起等授权，300s 后被 stall 保护误杀（`Tool execution aborted` / `interrupted: true`）
-- PG 验证：`session.permission` 存为 `[{permission:"*",pattern:"*",action:"allow"}]`
-
-**注意事项**：
-- `permission: "*"` 是「本会话放弃一切权限防护」——bash 命令、read、任何 MCP 工具全免授权。生产环境建议收敛为精确规则：`{"permission":"codegraph_codegraph_explore","pattern":"*","action":"allow"}`
-- 若测试环境无 codegraph MCP 服务，可用任意已注册的 MCP 工具替代
+**期望**：工具免授权直接执行；PG 为 `[{action:*, resource:*, effect:allow}]`。
+**MCP 部分**：若测试环境无已注册 MCP 服务则 SKIP（V1 复测同样 SKIP）。
 
 ---
 
-## 验收汇总
+## 测试结果（V2）
 
-| 用例 | HTTP 响应 | PG 持久化 | 工具行为 | 结果 |
-|------|----------|----------|---------|------|
-| T4.1 创建空 session | 200，id 非空 | `permission IS NULL` | — | |
-| T4.2 POST 创建传 permission | 200，含 permission 字段 | `permission` 含规则 | — | |
-| T4.3 PATCH 设置 permission | 200 | `permission` 含规则 | — | |
-| T4.4 PATCH 合并 permission | 200 | `json_array_length=3` | — | |
-| T4.5 GET 返回 permission | 3 条规则 | — | — | |
-| T4.6 PATCH 覆盖 permission | 200 | `jsonb_array_length=4` | — | |
-| T4.7 跨 session 隔离 | — | A 有 B 无 | — | |
-| T4.8 非法格式 | 400 | — | — | |
-| T4.9 PATCH 不存在 session | 404 | — | — | |
-| T4.10 规则优先级 | — | 两条规则均存储 | 见 T5.9 | |
-| T4.11 通配符 pattern | 200 | `pattern: *` 存储 | — | |
-| T5.1 会话 allow 外部目录 | — | — | 工具执行成功 | |
-| T5.2 会话 deny 外部目录 | — | — | 工具被拒绝 | |
-| T5.3 会话 allow 覆盖全局 deny | — | — | 工具执行成功 | |
-| T5.4 会话 deny 覆盖全局 allow | — | — | 工具被拒绝 | |
-| T5.5 清除后回退全局 | — | — | 按全局规则 | |
-| T5.6 ask 仍弹窗 | — | — | 等待用户确认 | |
-| T5.7 read 拒绝 | — | — | read 被拒绝 | |
-| T5.8 bash 拒绝 | — | — | bash 被拒绝 | |
-| T5.9 规则优先级 | — | — | 具体 allow > 通配 deny | |
-| T5.10 `permission:"*"` 通配放行一切（含 MCP 工具） | — | — | MCP 工具免授权直接执行 | |
+> 2026-09-24 实测：镜像 `opencode-saas-e2e:session-fs-fix3`（权限为镜像自带功能，未改代码）、
+> 本地 PG `opencode-v2-up`、远端 OpenSandbox、真实 LLM `Yd-DeepSeek/deepseek-v4-flash`。
+
+### T4 系列（HTTP + PG）：11/11 通过
+
+| 用例 | 结果 | 实际观察 |
+|---|---|---|
+| T4.1 | ✅ | GET `permissions=null`、PG `<NULL>` |
+| T4.2 | ✅ | 创建带规则，GET 与 PG 均为 `{action,resource,effect}` |
+| T4.3 | ✅ | 一次 PATCH 3 条 → `204`、GET 3 条、PG 3 条 |
+| T4.4 | ✅ | `204`、`count=1` —— **替换语义**（V1 期望的 3→4 条不成立，语义已变） |
+| T4.5 | ✅ | GET 返回 3 条，字段为 `action/resource/effect` |
+| T4.6 | ✅ | `204`、`count=0`、PG `[]` —— **`[]` 真清除**（V1 说不清除，已反） |
+| T4.7 | ✅ | A 有规则；B `null`、PG `<NULL>`，跨会话隔离 |
+| T4.8 | ✅ | 非法 `effect` → `400` |
+| T4.9 | ✅ | 不存在 session → `404` |
+| T4.10 | ✅ | 2 条规则（通配 + 具体）均存储 |
+| T4.11 | ✅ | `{action:"*",resource:"*",effect:"allow"}` 落库 |
+
+### T5 系列（工具行为）：**环境阻塞，未完成**
+
+| 用例 | 结果 | 说明 |
+|---|---|---|
+| T5.1 allow | ⚠️ 部分 | 曾观测到 `shell` `status=completed`、`content=[hi_t5a]`（沙箱可用时 allow 生效）；多轮重试被沙箱超时打断 |
+| T5.2–T5.10 | ⚠️ 未完成 | 工具在**权限评估前**即失败：`error.type=unknown`、message `Sandbox.create failed: Timeout waiting for sandbox ... Elapsed: 60.1s, Last state: Pending` |
+
+**阻塞根因（非代码缺陷）**：远端沙箱间歇性 `Pending`（60s 创建超时），同一 prompt 的两次重试都停在 `Pending`；
+因此 deny/ask 路径拿不到 `permission.rejected` / pending request 结果，无法判定 T5 结论。沙箱恢复稳定后需补跑。
+
+**环境附带发现**：`read` 对越界路径先做边界检查，直接返回 `Path escapes the location: /etc/hostname`（`type=unknown`），
+早于权限评估 —— T5.7 若按 V1 用 `../etc/*` 无法验证 read 权限，需改用 workspace 内 `deny` 规则（见 T5.7 修正）。
 
 ---
-> **复测记录（2026-09-06，merge upstream/dev v1.18.29 后，镜像 `t0906-merged-1.18.29`）**：T4.1（默认空）/T4.2（创建传规则 + PG 落库一致）/T4.3+T4.4（PATCH 合并追加语义）/T4.7（跨会话隔离）/T4.8（400）/T4.9（404）✅。T5 系列工具级验证受模型调用波动影响未逐条复测，改由 `bun test test/permission/`（106 用例 0 fail）覆盖 ask/ruleset 链路（merge 触碰过 tools.ts 的 ask 区域，单测为证）。
->
-> **复测记录（2026-09-14，镜像 `hitl-cbf2276a-wip2`（含 pgJsonb/LEASE_TOOLS/偏离修复），本地 PG + 远端沙箱，全 21 例实测）**：
-> - **T4.1–T4.11 全 PASS**（CRUD/合并追加/隔离/400/404/优先级存储/通配存储；`jsonb` 读写经 pgJsonb customType 解码无恙）。
-> - **T5.1–T5.10 全 PASS**，其中三处按实现语义修正了用例命令/期望（均为上游既有语义，非代码缺陷）：
->   1. **T5.1/T5.4 命令选型**：`ls` 不在 shell 工具 external_directory 扫描的 `FILES` 集合（`shell.ts:33`，只含 cat/rm/cp/mv 等文件操作命令）——`ls /tmp/` 不触发 external 询问。改用 `cat` 验证：deny `/tmp/*` 下 `cat /tmp/x` 被规则拒绝、`cat /etc/hostname` 放行 ✅；allow 生效由 T5.3 强证（默认 ask 语义下 `cat /etc/hostname` 零弹窗 completed）。
->   2. **T5.5 期望段落过时**：PATCH 是合并语义，`"permission":[]` **不清除**已有规则（T4.6 注释已说明；实测 PATCH [] 后规则数=1、行为仍 allow）。如需真清除应逐条追加反向规则或删 session 重建。
->   3. **T5.7 pattern 语义**：read 工具的 ask pattern 是**相对实例目录的路径**（`read.ts:303` `path.relative(instance.directory, filepath)`）——`/etc/hostname` → `../etc/hostname`，用例书的 `/etc/*` 不匹配。改配 `{"permission":"read","pattern":"../etc/*","action":"deny"}` 后 read 被规则拒绝 ✅（bash 不受影响）。
-> - T5.8 ✅ `bash:curl* deny` 拒 curl、echo 不受影响；T5.9 ✅ 具体 allow 胜出（`cat /tmp/allow-this/t.txt` completed）+ 通配 deny 拒其他 /tmp 路径；T5.10 通配放行语义 ✅（`permission:"*"` 落库 + `cat /etc` 零弹窗），**MCP 部分环境无已注册 MCP 服务，SKIP**（待有 codegraph 或任意 MCP 的环境补测对照组）。
+
+## 需要讨论的差异 / 待办
+
+1. **PATCH 替换 vs V1 合并**：V2 `setPermissions` 是整体替换。若产品需要"增量追加规则"，需另加端点或查询参数；否则客户端必须每次读出-改-写回。
+2. **`read` 越界不进权限评估**：`Path escapes the location` 先于 `permission.assert`，使"read 外部目录"类权限用例无法覆盖。需确认这是有意（路径边界优先）还是应先评估 `external_directory` 权限。
+3. **沙箱不稳定**：`Sandbox.create ... Pending` 60s 超时，导致 T5 全系列不可判定。需沙箱侧排查/稳定后再补跑 T5。
+4. **MCP 权限用例**：当前测试环境无已注册 MCP 服务，T5.10 的 MCP 部分 SKIP（与 V1 复测一致）。

@@ -60,6 +60,14 @@ import type {
   SessionRevertCommitOutput,
   SessionContextInput,
   SessionContextOutput,
+  SessionKeepAliveInput,
+  SessionKeepAliveOutput,
+  SessionKeepAliveStatusInput,
+  SessionKeepAliveStatusOutput,
+  SessionSandboxInput,
+  SessionSandboxOutput,
+  SessionKillSandboxInput,
+  SessionKillSandboxOutput,
   SessionDiffInput,
   SessionDiffOutput,
   SessionInboxListInput,
@@ -98,6 +106,16 @@ import type {
   SessionEnvironmentOutput,
   SessionViewInput,
   SessionViewOutput,
+  SessionEventInput,
+  SessionEventOutput,
+  SessionPromptStreamInput,
+  SessionPromptStreamOutput,
+  SessionFsSessionFsReadInput,
+  SessionFsSessionFsReadOutput,
+  SessionFsSessionFsListInput,
+  SessionFsSessionFsListOutput,
+  SessionFsSessionFsFindInput,
+  SessionFsSessionFsFindOutput,
   MessageListInput,
   MessageListOutput,
   ModelListInput,
@@ -502,6 +520,7 @@ export function make(options: ClientOptions) {
             method: "GET",
             path: `/api/session`,
             query: {
+              appId: input?.["appId"],
               limit: input?.["limit"],
               order: input?.["order"],
               search: input?.["search"],
@@ -542,6 +561,7 @@ export function make(options: ClientOptions) {
             path: `/api/session`,
             body: {
               id: input?.["id"],
+              appId: input?.["appId"],
               title: input?.["title"],
               agent: input?.["agent"],
               model: input?.["model"],
@@ -683,6 +703,9 @@ export function make(options: ClientOptions) {
               files: input["files"],
               agents: input["agents"],
               skills: input["skills"],
+              format: input["format"],
+              userName: input["userName"],
+              userId: input["userId"],
               metadata: input["metadata"],
               delivery: input["delivery"],
               resume: input["resume"],
@@ -704,6 +727,7 @@ export function make(options: ClientOptions) {
               files: input["files"],
               agents: input["agents"],
               skills: input["skills"],
+              format: input["format"],
               delivery: input["delivery"],
             },
             successStatus: 204,
@@ -825,6 +849,51 @@ export function make(options: ClientOptions) {
           },
           requestOptions,
         ).then((value) => value.data),
+      keepAlive: (input: SessionKeepAliveInput, requestOptions?: RequestOptions) =>
+        request<SessionKeepAliveOutput>(
+          {
+            method: "POST",
+            path: `/api/experimental/session/${encodeURIComponent(input.sessionID)}/keep-alive`,
+            body: { enabled: input["enabled"], boot: input["boot"] },
+            successStatus: 200,
+            declaredStatuses: [400, 401, 404],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      keepAliveStatus: (input: SessionKeepAliveStatusInput, requestOptions?: RequestOptions) =>
+        request<SessionKeepAliveStatusOutput>(
+          {
+            method: "GET",
+            path: `/api/experimental/session/${encodeURIComponent(input.sessionID)}/keep-alive`,
+            successStatus: 200,
+            declaredStatuses: [400, 401, 404],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      sandbox: (input: SessionSandboxInput, requestOptions?: RequestOptions) =>
+        request<SessionSandboxOutput>(
+          {
+            method: "GET",
+            path: `/api/session/${encodeURIComponent(input.sessionID)}/sandbox`,
+            successStatus: 200,
+            declaredStatuses: [400, 401, 404],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      killSandbox: (input: SessionKillSandboxInput, requestOptions?: RequestOptions) =>
+        request<SessionKillSandboxOutput>(
+          {
+            method: "POST",
+            path: `/api/session/${encodeURIComponent(input.sessionID)}/kill-sandbox`,
+            successStatus: 200,
+            declaredStatuses: [400, 401, 404],
+            empty: false,
+          },
+          requestOptions,
+        ),
       diff: (input: SessionDiffInput, requestOptions?: RequestOptions) =>
         request<{ readonly data: SessionDiffOutput }>(
           {
@@ -1054,6 +1123,86 @@ export function make(options: ClientOptions) {
           },
           requestOptions,
         ),
+      event: (input: SessionEventInput, requestOptions?: RequestOptions): AsyncIterable<SessionEventOutput> =>
+        sse<SessionEventOutput>(
+          {
+            method: "GET",
+            path: `/api/session/${encodeURIComponent(input.sessionID)}/event`,
+            successStatus: 200,
+            declaredStatuses: [400, 401, 404],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      promptStream: (
+        input: SessionPromptStreamInput,
+        requestOptions?: RequestOptions,
+      ): AsyncIterable<SessionPromptStreamOutput> =>
+        sse<SessionPromptStreamOutput>(
+          {
+            method: "POST",
+            path: `/api/session/${encodeURIComponent(input.sessionID)}/prompt_stream`,
+            body: {
+              id: input["id"],
+              text: input["text"],
+              files: input["files"],
+              agents: input["agents"],
+              skills: input["skills"],
+              format: input["format"],
+              userName: input["userName"],
+              userId: input["userId"],
+              metadata: input["metadata"],
+              delivery: input["delivery"],
+              resume: input["resume"],
+            },
+            successStatus: 200,
+            declaredStatuses: [400, 401, 404, 409],
+            empty: false,
+          },
+          requestOptions,
+        ),
+    },
+    sessionFs: {
+      session: {
+        fs: {
+          read: (input: SessionFsSessionFsReadInput, requestOptions?: RequestOptions) =>
+            request<SessionFsSessionFsReadOutput>(
+              {
+                method: "GET",
+                path: `/api/session/${encodeURIComponent(input.sessionID)}/fs/read/${encodePath(input.path)}`,
+                successStatus: 200,
+                declaredStatuses: [400, 401, 404],
+                empty: false,
+                binary: true,
+              },
+              requestOptions,
+            ),
+          list: (input: SessionFsSessionFsListInput, requestOptions?: RequestOptions) =>
+            request<{ readonly data: SessionFsSessionFsListOutput }>(
+              {
+                method: "GET",
+                path: `/api/session/${encodeURIComponent(input.sessionID)}/fs/list`,
+                query: { path: input["path"] },
+                successStatus: 200,
+                declaredStatuses: [400, 401, 404],
+                empty: false,
+              },
+              requestOptions,
+            ).then((value) => value.data),
+          find: (input: SessionFsSessionFsFindInput, requestOptions?: RequestOptions) =>
+            request<{ readonly data: SessionFsSessionFsFindOutput }>(
+              {
+                method: "GET",
+                path: `/api/session/${encodeURIComponent(input.sessionID)}/fs/find`,
+                query: { query: input["query"], type: input["type"], limit: input["limit"] },
+                successStatus: 200,
+                declaredStatuses: [400, 401, 404],
+                empty: false,
+              },
+              requestOptions,
+            ).then((value) => value.data),
+        },
+      },
     },
     message: {
       list: (input: MessageListInput, requestOptions?: RequestOptions) =>
