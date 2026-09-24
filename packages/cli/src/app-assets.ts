@@ -17,10 +17,23 @@ export const load = Effect.fn("cli.app-assets.load")(function* () {
   return yield* sourceAssets()
 })
 
+// A missing dist only disables the web UI (fresh checkouts, slim images); the
+// API surface must stay up, so degrade to an empty asset map instead of
+// failing ServerProcess startup.
+const isNotFound = (error: unknown) =>
+  error instanceof Error && "reason" in error && (error as { reason: { _tag?: string } }).reason?._tag === "NotFound"
+
 const sourceAssets = Effect.fnUntraced(function* () {
   const fs = yield* FileSystem.FileSystem
   const root = path.resolve(import.meta.dirname, "../../app/dist")
-  const files = yield* fs.readDirectory(root, { recursive: true })
+  const files = yield* fs.readDirectory(root, { recursive: true }).pipe(
+    Effect.catchIf(isNotFound, () =>
+      Effect.sync(() => {
+        console.warn(`web UI assets not found at ${root}; serving API without a UI`)
+        return <readonly string[]>[]
+      }),
+    ),
+  )
   const assets = Object.fromEntries(
     (yield* Effect.forEach(
       files.filter((file) => !file.endsWith(".map")),
