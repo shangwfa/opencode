@@ -42,7 +42,7 @@
   │    └─ 通过 host.docker.internal:8080 → 本地 OpenSandbox server
   ├─ OpenSandbox server（localhost:8080）
   │    └─ Docker runtime 创建 sandbox 容器
-  └─ sandbox 镜像：由 packages/opencode/docker/Dockerfile 构建
+  └─ sandbox 镜像：由 packages/containers/sandbox/Dockerfile 构建
 ```
 
 | 组件 | 地址 | 说明 |
@@ -63,7 +63,7 @@
 | | SaaS 服务镜像 | OpenSandbox 沙箱镜像 |
 |---|---|---|
 | 用途 | 运行 opencode SaaS server（监听 `:4096`），即 `docker run` 启动的主容器 | 沙箱内执行 AI 工具/用户代码的容器，由 OpenSandbox server 按需拉起 |
-| Dockerfile | 根目录 `Dockerfile` | `packages/opencode/docker/Dockerfile` |
+| Dockerfile | 根目录 `Dockerfile` | `packages/containers/sandbox/Dockerfile` |
 | 镜像 tag | `opencode-saas-sandbox-test:slim` | `opencode-opensandbox:local` |
 | 哪些组合需要 | **三种组合都需要** | 仅组合 2、3（本地 OpenSandbox） |
 | 重新构建时机 | 根目录 `Dockerfile` 或 SaaS 代码改动时 | sandbox 内 ripgrep / Node 版本 / LSP daemon 改动时 |
@@ -94,17 +94,17 @@ docker build -t opencode-saas-sandbox-test:slim -f Dockerfile .
 > 私有 registry `registry.shadow-rpa.net` 不可达时，用公共镜像替代构建（见 7.6）：
 > ```bash
 > sed 's|registry.shadow-rpa.net/infra/opensandbox:2026-06-09|opensandbox/code-interpreter:latest|g' \
->   packages/opencode/docker/Dockerfile > /tmp/Dockerfile.sandbox
-> docker buildx build --platform linux/arm64 -t opencode-opensandbox:local -f /tmp/Dockerfile.sandbox --load packages/opencode
+>   packages/containers/sandbox/Dockerfile > /tmp/Dockerfile.sandbox
+> docker buildx build --platform linux/arm64 -t opencode-opensandbox:local -f /tmp/Dockerfile.sandbox --load packages/containers/sandbox
 > ```
 
 ```bash
-cd /Users/ruomu/code/opencode/packages/opencode
+cd /Users/ruomu/code/opencode/packages/containers/sandbox
 
 # Apple Silicon（M 系列）用 arm64；Intel Mac 改为 linux/amd64
 docker buildx build --platform linux/arm64 \
   -t opencode-opensandbox:local \
-  -f docker/Dockerfile \
+  -f Dockerfile \
   --load .
 
 # 验证镜像继承了 code-interpreter 入口，且 rg/node 可用。
@@ -121,7 +121,7 @@ docker run --rm --entrypoint /bin/bash opencode-opensandbox:local -lc \
 - `ripgrep 14.1.0` 或兼容版本正常输出
 - `node` / `python3` 正常输出
 
-> 不要在 `packages/opencode/docker/Dockerfile` 里覆盖 `ENTRYPOINT`。OpenSandbox 需要继承 `code-interpreter` 的入口脚本以便注入并启动 execd；覆盖入口会导致 `commands.run()` 返回 502。
+> 不要在 `packages/containers/sandbox/Dockerfile` 里覆盖 `ENTRYPOINT`。OpenSandbox 需要继承 `code-interpreter` 的入口脚本以便注入并启动 execd；覆盖入口会导致 `commands.run()` 返回 502。
 
 ### 2.2 确认远端连通性
 
@@ -286,7 +286,7 @@ done
 可选：验证 sandbox 镜像可用：
 
 ```bash
-cd /Users/ruomu/code/opencode/packages/opencode
+cd /Users/ruomu/code/opencode/packages/containers/sandbox
 
 OPENCODE_SANDBOX_DOMAIN=localhost:8080 OPENCODE_SANDBOX_API_KEY= bun -e '
 import { ConnectionConfig, Sandbox } from "@alibaba-group/opensandbox"
@@ -486,7 +486,7 @@ for p in d.get('parts',[]):
 > **备选：宿主机直接跑 server（跳过 SaaS 容器）**。本地 Docker runtime 的稳定回归路径是宿主机直接启动 opencode server，规避容器内外地址转换问题：
 
 ```bash
-cd /Users/ruomu/code/opencode/packages/opencode
+cd /Users/ruomu/code/opencode/packages/containers/sandbox
 
 env \
   OPENCODE_DATABASE_URL='postgresql://local@127.0.0.1:15432/opencode' \
@@ -706,7 +706,7 @@ POST /session/:sessionID/keep-alive {"enabled":false}
 | 404 from sandbox server proxy | `OPENCODE_SANDBOX_USE_SERVER_PROXY` 未设置 | 重新启动容器加 `-e OPENCODE_SANDBOX_USE_SERVER_PROXY=true` |
 | 本地 OpenSandbox `commands.run()` 502 | sandbox 镜像覆盖了 `code-interpreter` entrypoint，或 execd 崩溃 | 确认 sandbox 镜像继承 `/opt/opensandbox/code-interpreter.sh`，不要设置 `ENTRYPOINT ["opencode"]` |
 | 本地 arm64 上 execd 崩溃 | 使用了 amd64 镜像，Docker 通过 QEMU 运行 | 用 `docker buildx build --platform linux/arm64 --load` 构建本地镜像 |
-| opencode 二进制 `required file not found` | Ubuntu/glibc 基础镜像复制了 `*-musl` 二进制 | `packages/opencode/docker/Dockerfile` 应复制 `dist/opencode-linux-arm64/bin/opencode` 或 `dist/opencode-linux-x64-baseline/bin/opencode` |
+| opencode 二进制 `required file not found` | Ubuntu/glibc 基础镜像复制了 `*-musl` 二进制 | `packages/containers/sandbox/Dockerfile` 应复制 `dist/opencode-linux-arm64/bin/opencode` 或 `dist/opencode-linux-x64-baseline/bin/opencode` |
 | 本地 OpenSandbox 找不到镜像 | SaaS 容器指定的 image 名称不是 Docker daemon 中的本地镜像名 | 先 `docker images | grep opencode-opensandbox`，并设置 `OPENCODE_SANDBOX_IMAGE=opencode-opensandbox:local` |
 | 401 MISSING_API_KEY | proxy fetch 未带 API key | 检查代码是否有 `Flag.OPENCODE_SANDBOX_API_KEY` header 注入 |
 | ProviderModelNotFoundError | AI provider 未配置 | 确认容器连的是远端 PG（含 account 数据）|
@@ -793,10 +793,10 @@ net.createServer(c => {
 **解法**：用 Docker Hub 公共镜像替代。
 
 ```bash
-cd packages/opencode
+cd packages/containers/sandbox
 
 # 创建临时 Dockerfile，替换 FROM 行
-sed 's|registry.shadow-rpa.net/infra/opensandbox:2026-06-09|opensandbox/code-interpreter:latest|g' docker/Dockerfile > /tmp/Dockerfile.sandbox
+sed 's|registry.shadow-rpa.net/infra/opensandbox:2026-06-09|opensandbox/code-interpreter:latest|g' Dockerfile > /tmp/Dockerfile.sandbox
 
 docker build -t opencode-opensandbox:local -f /tmp/Dockerfile.sandbox .
 ```

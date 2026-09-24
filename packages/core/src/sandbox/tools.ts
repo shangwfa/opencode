@@ -2,6 +2,7 @@ export * as SandboxTools from "./tools.js"
 
 import path from "path"
 import { Effect } from "effect"
+import { ToolFailure } from "@opencode/ai"
 import { FileDiff } from "@opencode/schema/file-diff"
 import type { Tool } from "@opencode/schema/tool"
 import { Location } from "../location.js"
@@ -47,6 +48,37 @@ const exec = (deps: Deps, context: Tool.Context, command: string, timeoutMs: num
     hostWorkdir: deps.location.directory,
     timeoutMs,
   })
+
+// A sandbox image without ripgrep turns every rg pipeline into an empty result
+// ("No matches found") and silently misleads the model into retrying. Probe
+// once per session and surface the missing binary as an explicit tool failure.
+// Availability is an image-level property, so the probe result is cached for
+// the lifetime of the process.
+const ripgrepAvailable = new Map<string, boolean>()
+
+export const ensureRipgrep = (deps: Deps, context: Tool.Context) =>
+  Effect.gen(function* () {
+    const cached = ripgrepAvailable.get(context.sessionID)
+    if (cached === false)
+      return yield* Effect.fail(
+        new ToolFailure({
+          message:
+            "ripgrep (rg) is not available in the sandbox image. Rebuild the sandbox image with ripgrep installed (see packages/containers/sandbox), or use the shell tool with grep/find instead.",
+        }),
+      )
+    if (cached === true) return
+    const probe = yield* exec(deps, context, "command -v rg", 5_000)
+    const ok = probe.exitCode === 0 && probe.output.trim().length > 0
+    ripgrepAvailable.set(context.sessionID, ok)
+    if (!ok)
+      return yield* Effect.fail(
+        new ToolFailure({
+          message:
+            "ripgrep (rg) is not available in the sandbox image. Rebuild the sandbox image with ripgrep installed (see packages/containers/sandbox), or use the shell tool with grep/find instead.",
+        }),
+      )
+  })
+
 
 export const write = Effect.fn("SandboxTools.write")(
   function* (
@@ -140,6 +172,7 @@ export const glob = Effect.fn("SandboxTools.glob")(
       agent: context.agent,
       source: { type: "tool", messageID: context.messageID, id: context.id },
     })
+    yield* ensureRipgrep(deps, context)
     const flags = [`--glob ${shellQuote(input.pattern)}`, input.hidden ? "--hidden" : "", "--sortr modified"]
       .filter(Boolean)
       .join(" ")
@@ -175,6 +208,7 @@ export const grep = Effect.fn("SandboxTools.grep")(
       agent: context.agent,
       source: { type: "tool", messageID: context.messageID, id: context.id },
     })
+    yield* ensureRipgrep(deps, context)
     const flags = [
       input.include ? `--glob ${shellQuote(input.include)}` : "",
       input.literal ? "-F" : "",

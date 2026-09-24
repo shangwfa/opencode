@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CDP Live Viewer</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { height: 100%; }
+  body {
+    display: flex; flex-direction: column;
+    background: #111; color: #ddd;
+    font: 13px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  header {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 10px; background: #1b1b1b; border-bottom: 1px solid #2a2a2a;
+    flex: none; flex-wrap: wrap;
+  }
+  select, button {
+    background: #262626; color: #ddd; border: 1px solid #3a3a3a; border-radius: 4px;
+    padding: 4px 8px; font: inherit; cursor: pointer;
+  }
+  select { max-width: 340px; }
+  button:hover { background: #333; }
+  #dot { width: 9px; height: 9px; border-radius: 50%; background: #a33; flex: none; }
+  #dot.on { background: #3c6; }
+  #url {
+    flex: 1; min-width: 120px; white-space: nowrap; overflow: hidden;
+    text-overflow: ellipsis; color: #888;
+  }
+  #fps { color: #666; flex: none; }
+  main { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; }
+  #stage { position: relative; background: #000; }
+  #shot { display: block; width: 100%; height: 100%; image-rendering: auto; }
+  #hint { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+          color: #555; pointer-events: none; }
+</style>
+</head>
+<body>
+<header>
+  <span id="dot"></span>
+  <select id="targets"></select>
+  <button id="refresh" title="重新拉取 target 列表">刷新</button>
+  <button id="newtab" title="新建标签页并切换">新标签页</button>
+  <span id="url">未连接</span>
+  <span id="fps"></span>
+</header>
+<main>
+  <div id="stage"><img id="shot" alt=""><div id="hint">等待画面…</div></div>
+</main>
+<script>
+"use strict"
+
+const $ = (id) => document.getElementById(id)
+const dot = $("dot"), sel = $("targets"), urlEl = $("url"), fpsEl = $("fps")
+const stage = $("stage"), img = $("shot"), hint = $("hint")
+
+// ws 地址跟随页面自身协议/域名：直连 9222 与经 /session/:id/proxy/9222 均自动适配
+const wsBase = `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}`
+
+let ws = null
+let sessionId = 0
+let msgId = 0
+const pending = new Map()
+let reconnectTimer = null
+let keepaliveTimer = null
+let frameCount = 0
+let lastClick = { t: 0, x: 0, y: 0, count: 0 }
+let mouseButtons = 0
+
+function send(method, params) {
+  if (!ws || ws.readyState !== 1) return
+  ws.send(JSON.stringify({ id: ++msgId, method, params }))
+}
+
+function setLed(on) { dot.classList.toggle("on", on) }
+
+async function listTargets() {
+  try {
+    const res = await fetch("json/list", { cache: "no-store" })
+    const all = await res.json()
+    return all.filter((t) => t.type === "page")
+  } catch {
+    return []
+  }
+}
+
+async function refreshTargets(keepUrl) {
+  const targets = await listTargets()
+  const prev = keepUrl ? sel.value : null
+  sel.replaceChildren(...targets.map((t) => {
+    const opt = document.createElement("option")
+    opt.value = t.id
+    opt.textContent = `${t.title || t.url}`.slice(0, 60)
+    return opt
+  }))
+  if (prev && targets.some((t) => t.id === prev)) sel.value = prev
+  return targets
+}
+
+async function connect() {
+  clearTimeout(reconnectTimer)
+  if (!sel.value) {
+    const targets = await refreshTargets(false)
+    if (!targets.length) {
+      urlEl.textContent = "没有可用的 page target，稍后重试…"
+      reconnectTimer = setTimeout(connect, 3000)
+      return
+    }
+    sel.value = targets[0].id
+  }
+  urlEl.textContent = "连接中…"
+  const targetWs = `${wsBase}/devtools/page/${sel.value}`
+  ws = new WebSocket(targetWs)
+  ws.onopen = () => {
+    setLed(true)
+    send("Page.enable")
+    send("Runtime.enable")
+    send("Page.startScreencast", { format: "jpeg", quality: 65, maxWidth: 1920, maxHeight: 1080, everyNthFrame: 1 })
+    clearInterval(keepaliveTimer)
+    keepaliveTimer = setInterval(() => {
+      // 导航等场景 screencast 可能停发，周期性重发兜底
+      send("Page.startScreencast", { format: "jpeg", quality: 65, maxWidth: 1920, maxHeight: 1080, everyNthFrame: 1 })
+    }, 8000)
+  }
+  ws.onmessage = (ev) => {
+    const msg = JSON.parse(ev.data)
+    if (msg.id && pending.has(msg.id)) {
+      pending.get(msg.id)(msg)
+      pending.delete(msg.id)
+      return
+    }
+    if (msg.method === "Page.screencastFrame") {
+      const { data, metadata, sessionId: frameSid } = msg.params
+      img.src = `data:image/jpeg;base64,${data}`
+      hint.style.display = "none"
+      send("Page.screencastFrameAck", { sessionId: frameSid })
+      frameCount++
+    } else if (msg.method === "Page.frameNavigated" && msg.params.frame.parentId === undefined) {
+      urlEl.textContent = msg.params.frame.url
+    } else if (msg.method === "Runtime.evaluate" && msg.params?.exceptionDetails) {
+      // 控制脚本注入报错，忽略
+    }
+  }
+  ws.onclose = () => {
+    setLed(false)
+    clearInterval(keepaliveTimer)
+    urlEl.textContent = "连接断开，2s 后重连…"
+    reconnectTimer = setTimeout(connect, 2000)
+  }
+  ws.onerror = () => ws.close()
+}
+
+function switchTarget() {
+  if (ws) { ws.onclose = null; ws.close() }
+  clearInterval(keepaliveTimer)
+  hint.style.display = ""
+  img.removeAttribute("src")
+  connect()
+}
+
+// ── 画面自适应：img 尺寸 = 图片等比缩放尺寸，事件坐标映射无需处理黑边 ──
+function fitStage() {
+  const box = stage.parentElement.getBoundingClientRect()
+  const w = img.naturalWidth || 1280, h = img.naturalHeight || 800
+  const scale = Math.min(box.width / w, box.height / h)
+  stage.style.width = `${Math.max(1, Math.floor(w * scale))}px`
+  stage.style.height = `${Math.max(1, Math.floor(h * scale))}px`
+}
+img.onload = fitStage
+window.addEventListener("resize", fitStage)
+
+function pageXY(e) {
+  const rect = img.getBoundingClientRect()
+  const sx = img.naturalWidth / rect.width
+  const sy = img.naturalHeight / rect.height
+  return {
+    x: Math.round((e.clientX - rect.left) * sx),
+    y: Math.round((e.clientY - rect.top) * sy),
+  }
+}
+
+const BTN_NAME = { 0: "left", 1: "middle", 2: "right" }
+const MOD_SHIFT = 8, MOD_ALT = 2, MOD_CTRL = 2 * 2, MOD_META = 1
+function modifiersOf(e) {
+  return (e.shiftKey ? MOD_SHIFT : 0) | (e.altKey ? MOD_ALT : 0) |
+    (e.ctrlKey ? MOD_CTRL : 0) | (e.metaKey ? MOD_META : 0)
+}
+
+function dispatchMouse(type, e, extra) {
+  const { x, y } = pageXY(e)
+  send("Input.dispatchMouseEvent", {
+    type, x, y, modifiers: modifiersOf(e),
+    button: extra?.button ?? BTN_NAME[e.button] ?? "none",
+    buttons: e.buttons | 0,
+    clickCount: extra?.clickCount ?? 0,
+    ...extra,
+  })
+}
+
+img.addEventListener("mousedown", (e) => {
+  e.preventDefault()
+  mouseButtons = e.buttons | (1 << e.button)
+  const now = performance.now()
+  const near = Math.hypot(e.clientX - lastClick.x, e.clientY - lastClick.y) < 8
+  const clickCount = now - lastClick.t < 400 && near ? lastClick.count + 1 : 1
+  lastClick = { t: now, x: e.clientX, y: e.clientY, count: clickCount }
+  dispatchMouse("mousePressed", e, { buttons: mouseButtons, clickCount })
+})
+img.addEventListener("mouseup", (e) => {
+  mouseButtons = e.buttons & ~(1 << e.button)
+  dispatchMouse("mouseReleased", e, { buttons: mouseButtons, clickCount: lastClick.count || 1 })
+})
+img.addEventListener("mousemove", (e) => {
+  dispatchMouse("mouseMoved", e, { buttons: mouseButtons })
+})
+img.addEventListener("contextmenu", (e) => e.preventDefault())
+img.addEventListener("wheel", (e) => {
+  e.preventDefault()
+  dispatchMouse("mouseWheel", e, { deltaX: e.deltaX, deltaY: e.deltaY })
+}, { passive: false })
+
+// 键盘：可打印字符走 keyDown+text（触发输入），Enter 补 \r，其余 rawKeyDown/keyUp
+function dispatchKey(type, e, extra) {
+  send("Input.dispatchKeyEvent", {
+    type,
+    modifiers: modifiersOf(e),
+    windowsVirtualKeyCode: e.keyCode,
+    nativeVirtualKeyCode: e.keyCode,
+    code: e.code,
+    key: e.key,
+    autoRepeat: e.repeat,
+    ...extra,
+  })
+}
+
+const printable = (e) => e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey
+window.addEventListener("keydown", (e) => {
+  if (e.target === sel) return
+  e.preventDefault()
+  if (printable(e)) dispatchKey("keyDown", e, { text: e.key, unmodifiedText: e.key })
+  else if (e.key === "Enter") dispatchKey("keyDown", e, { text: "\r", unmodifiedText: "\r" })
+  else dispatchKey("rawKeyDown", e)
+})
+window.addEventListener("keyup", (e) => {
+  if (e.target === sel) return
+  e.preventDefault()
+  dispatchKey("keyUp", e)
+})
+
+// ── 工具栏 ──
+sel.addEventListener("change", switchTarget)
+$("refresh").addEventListener("click", async () => { await refreshTargets(true) })
+$("newtab").addEventListener("click", async () => {
+  const res = await fetch("json/new?about:blank", { method: "PUT" })
+  if (!res.ok) return
+  const t = await res.json()
+  await refreshTargets(true)
+  sel.value = t.id
+  switchTarget()
+})
+
+setInterval(() => { fpsEl.textContent = `${frameCount} f / 10s`; frameCount = 0 }, 10000)
+setInterval(() => { if (ws?.readyState === 1) refreshTargets(true) }, 15000)
+
+connect()
+</script>
+</body>
+</html>

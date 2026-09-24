@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { Cause, Deferred, Effect, Exit, Fiber, Semaphore } from "effect"
-import { SandboxProvider, assembleStreamText, isSandboxGone, withOperationTimeout, withSemaphoreWaitTimeout } from "@opencode/core/sandbox/provider"
+import { SandboxProvider, assembleStreamText, isSandboxGone, rootSessionID, withOperationTimeout, withSemaphoreWaitTimeout } from "@opencode/core/sandbox/provider"
 import { AppNodeBuilder } from "@opencode/core/effect/app-node-builder"
 import { LayerNode } from "@opencode/util/effect/layer-node"
 import { Database } from "@opencode/core/database/database"
@@ -61,6 +61,50 @@ describe("SandboxProvider disabled layer", () => {
         .run({ sessionID: "ses_x", command: "echo hi", hostWorkdir: "/workspace", timeoutMs: 1000 })
         .pipe(Effect.exit)
       expect(Exit.isFailure(exit)).toBe(true)
+    }),
+  )
+})
+
+describe("rootSessionID", () => {
+  const chain = (parents: Record<string, string | null>) => {
+    const seen: string[] = []
+    const lookup = (id: string) =>
+      Effect.gen(function* () {
+        seen.push(id)
+        return { parentID: parents[id] ?? null }
+      })
+    return { lookup, seen }
+  }
+
+  it.effect("returns the session itself when it has no parent", () =>
+    Effect.gen(function* () {
+      const { lookup } = chain({})
+      expect(yield* rootSessionID("ses_root", lookup)).toBe("ses_root")
+    }),
+  )
+
+  it.effect("resolves a subagent child chain to the root session", () =>
+    Effect.gen(function* () {
+      const { lookup, seen } = chain({ ses_child: "ses_parent", ses_parent: "ses_root" })
+      expect(yield* rootSessionID("ses_child", lookup)).toBe("ses_root")
+      // Full chain walked once, root lookup confirms the end.
+      expect(seen).toEqual(["ses_child", "ses_parent", "ses_root"])
+    }),
+  )
+
+  it.effect("stops after ten hops even on a cyclic chain", () =>
+    Effect.gen(function* () {
+      // a -> b -> a ... would loop forever without the hop bound.
+      const { lookup } = chain({ ses_a: "ses_b", ses_b: "ses_a" })
+      const result = yield* rootSessionID("ses_a", lookup)
+      expect(["ses_a", "ses_b"]).toContain(result)
+    }),
+  )
+
+  it.effect("keeps the current id when the lookup misses the session row", () =>
+    Effect.gen(function* () {
+      const lookup = () => Effect.succeed(null)
+      expect(yield* rootSessionID("ses_ghost", lookup)).toBe("ses_ghost")
     }),
   )
 })
