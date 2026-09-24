@@ -1,5 +1,7 @@
 # Read 工具多格式与受管附件测试用例
 
+> **当前 V2 实现说明（2026-09-24）**：受管附件功能已接入当前 API：`/api/session/:sessionID/attachment/:attachmentID`。本文后续的 V1 复测记录与旧版 `/session/:id/exec` 脚本是历史记录，不代表当前 V2 接口；V2 Docker + PostgreSQL + sandbox PVC 全流程 e2e 仍需在部署环境复测。
+
 本文验证 `read` 工具的字节级文件分类、文本分页、Sandbox PVC 附件持久化、稳定下载 URL、Range 响应、模型投影安全和 PostgreSQL payload 安全。
 
 ## 1. 测试范围
@@ -737,3 +739,17 @@ rm -f /tmp/read-last-response.json \
 > | T-READ-17 单测 | ✅ | `attachment.test.ts` + `message-v2.test.ts` **67 pass / 0 fail**（文档基线 ≥50） |
 >
 > 环境备注：远端 K8s 沙箱（组合 2/3 变体）而非文档前置的本地 OpenSandbox——T-READ-15/16 的 PVC 持久化语义在远端沙箱同样验证通过（附件存 PVC，跨沙箱重建与 SaaS 重启持久）。
+
+> **当前 V2 源码验证记录（2026-09-25）**：本次执行的是当前 checkout 的 V2 实现，不复用上方 V1 历史复测结果。
+> | 用例 | 结果 | 验证范围 |
+> |---|---|---|
+> | T-READ-01~04 | ⚠️ 部分 | 文本分页、空文件、UTF-8 校验单测通过；SVG magic 分类单测通过，但 read 工具端到端 SVG metadata 断言未执行 |
+> | T-READ-05~07 | ⚠️ 部分 | 本地 read 单测验证 PNG/PDF 只保存受管 URL、Office 分类单测通过；sandbox Office 工具链未做真实沙箱 API e2e |
+> | T-READ-08~11 | ✅ API 集成 | `session-attachment.test.ts` 连接 `opencode-v2-up` PostgreSQL，通过当前 ServerFetch API 验证 206/Range、416、304/ETag、响应 MIME/安全头和返回字节 |
+> | T-READ-12~13 | ⚠️ 部分 | ELF/二进制分类单测通过；真实 sandbox read 拒绝与 20MB 超限端到端用例未在当前服务上执行 |
+> | T-READ-14 | ⚠️ 存在宽泛文本命中 | 唯一命中位于既有 assistant `webfetch` 工具结果：外部搜索页的 Markdown 中含一张 1×1 profile image 的 Data URL；不是 read 附件记录。0 条命中 `\\u0000`。该页面文本原样保存在工具结果中 |
+> | T-READ-15~16 | ⏸️ 未执行 | 当前运行中的 `127.0.0.1:14096` 未通过 V2 CLI health 兼容性检查（响应内容类型不兼容）；不能用它验证本次 checkout 的代码与 PVC/进程重启持久性 |
+> | T-READ-17 | ✅ 部分单测 | 已验证无 SandboxProvider 时不把受管 URL交给模型、Office 附件被省略；provider 存在时的字节投影尚未接真实模型请求 |
+> | T-FE-01~04 | ⏸️ 未执行 | 本轮无已连接浏览器会话；文档片段为集成指南，不是自动化测试脚本 |
+>
+> 当前 checkout 自动化结果：core 4 个目标测试文件 **68 pass / 0 fail**；server PG API 集成 **1 pass / 0 fail**。PG 命中记录为 session `ses_f2e94fa1affeviUdp58e5Cqvxa`、message `msg_0d17345ac001zxTYST0aYhri03`，页面标题为 “Adaptive Zoom”；命中字符串来自网页 profile 图片的内嵌 Data URL，属于普通 `webfetch` 文本输出，不是附件二进制进入 PG。V2 CLI 对现有测试服务的探测失败，因此旧脚本中的 `/session/:id/exec`、`/session/:id/message` 等 V1 路径不能作为本次 V2 实测证据。

@@ -99,6 +99,7 @@ const makeEditFixture = () => {
         fixture.sandboxWrites.push(target)
         fixture.sandboxFiles.set(target, content)
       }),
+    fileDelete: () => Effect.void,
     fileList: () => Effect.succeed([]),
     fileFind: () => Effect.succeed([]),
     isReady: () => Effect.succeed(true),

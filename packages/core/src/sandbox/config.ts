@@ -24,11 +24,20 @@ export interface Config {
   readonly resource: { cpu: string; memory: string }
   /** Browser-reachable host for preview URLs; defaults to the request host. */
   readonly publicDomain?: string
+  /** Volume backend for session workspaces; `none` keeps sandboxes ephemeral. */
+  readonly volumeType: "none" | "pvc" | "host"
+  /** PVC claim backing all volume mounts when volumeType is `pvc`. */
+  readonly pvcClaimName: string
+  /** Cross-session shared package-cache mount point (PVC volumeType only). */
+  readonly packageCacheMount: string
 }
 
 const DEFAULT_IMAGE = "registry.cn-hangzhou.aliyuncs.com/opensandbox/opencode-sandbox:latest"
 
 const flag = (value: string | undefined) => value === "true" || value === "1"
+
+const volumeType = (value: string | undefined): Config["volumeType"] =>
+  value === "pvc" || value === "host" ? value : "none"
 
 const number = (value: string | undefined, fallback: number) => {
   const parsed = Number(value)
@@ -53,5 +62,8 @@ export function load(): Config {
       memory: env["OPENCODE_SANDBOX_MEMORY"] || "4Gi",
     },
     publicDomain: env["OPENCODE_SANDBOX_PUBLIC_DOMAIN"] || undefined,
+    volumeType: volumeType(env["OPENCODE_SANDBOX_VOLUME_TYPE"]),
+    pvcClaimName: env["OPENCODE_SANDBOX_PVC_CLAIM"] || "sandbox-test",
+    packageCacheMount: env["OPENCODE_SANDBOX_PACKAGE_CACHE_MOUNT"] || "/opt/pnpm-store",
   }
 }

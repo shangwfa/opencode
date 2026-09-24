@@ -11,6 +11,7 @@ import { Location } from "@opencode/core/location"
 import { FileAccess } from "@opencode/core/file-access"
 import { Model } from "@opencode/core/model"
 import { Permission } from "@opencode/core/permission"
+import { SandboxProvider } from "@opencode/core/sandbox/provider"
 import { Provider } from "@opencode/core/provider"
 import { AbsolutePath } from "@opencode/core/schema"
 import { Session } from "@opencode/core/session"
@@ -47,6 +48,7 @@ const patchToolNode = makeLocationNode({
     Formatter.node,
     Location.node,
     Permission.node,
+    SandboxProvider.node,
   ],
 })
 
@@ -60,6 +62,46 @@ let readsBeforeEditApproval = 0
 let editApproved = false
 let afterEditApproval = (): Effect.Effect<void> => Effect.void
 let formatFile = (_target: string): Effect.Effect<boolean> => Effect.succeed(false)
+let sandboxEnabled = false
+const sandboxFiles = new Map<string, string>()
+const sandboxWrites: string[] = []
+const sandboxDeletes: string[] = []
+let failSandboxDelete: string | undefined
+let failSandboxWrite: string | undefined
+
+const sandboxProvider: SandboxProvider.Interface = {
+  get enabled() {
+    return sandboxEnabled
+  },
+  run: () => Effect.succeed({ exitCode: 0, output: "", timedOut: false }),
+  interrupt: () => Effect.void,
+  destroy: () => Effect.void,
+  keepAlive: () => Effect.void,
+  release: () => Effect.void,
+  isKeepAlive: () => Effect.succeed(false),
+  sandboxId: () => Effect.succeed("sandbox-test"),
+  boot: () => Effect.succeed("sandbox-test"),
+  fileStat: (_id, target) => Effect.succeed(sandboxFiles.has(target) ? { isDirectory: false } : null),
+  fileRead: (_id, target) => Effect.succeed(sandboxFiles.get(target) ?? null),
+  fileReadBytes: () => Effect.succeed(null),
+  fileWrite: (_id, target, content) =>
+    failSandboxWrite === target
+      ? Effect.fail(new Error("forced sandbox write failure"))
+      : Effect.sync(() => {
+          sandboxWrites.push(target)
+          sandboxFiles.set(target, content)
+        }),
+  fileDelete: (_id, target) =>
+    failSandboxDelete === target
+      ? Effect.fail(new Error("forced sandbox delete failure"))
+      : Effect.sync(() => {
+          sandboxDeletes.push(target)
+          sandboxFiles.delete(target)
+        }),
+  fileList: () => Effect.succeed([]),
+  fileFind: () => Effect.succeed([]),
+  isReady: () => Effect.succeed(true),
+}
 
 const permission = permissionLayer({
   assert: (input) =>
@@ -92,6 +134,12 @@ const reset = () => {
   failRemoveTarget = undefined
   failRemoveErrorTarget = undefined
   failWriteTarget = undefined
+  sandboxEnabled = false
+  sandboxFiles.clear()
+  sandboxWrites.length = 0
+  sandboxDeletes.length = 0
+  failSandboxDelete = undefined
+  failSandboxWrite = undefined
   readsBeforeEditApproval = 0
   editApproved = false
   afterEditApproval = () => Effect.void
@@ -113,31 +161,37 @@ const withTool = <A, E, R>(
     return yield* body(yield* Tool.Service)
   }).pipe(
     Effect.provide(
-      AppNodeBuilder.build(LayerNode.group([Tool.node, FileAccess.node, FileMutation.node, patchToolNode]), [
-        Environment.node.replace(
-          transformEnvironmentFiles((files) => ({
-            read: (target, range) =>
-              Effect.sync(() => {
-                if (!editApproved) readsBeforeEditApproval++
-              }).pipe(Effect.andThen(files.read(target, range))),
-            remove: (target) => {
-              if (failRemoveTarget && path.basename(target) === failRemoveTarget)
-                return Effect.die("forced remove failure")
-              if (failRemoveErrorTarget && path.basename(target) === failRemoveErrorTarget)
-                return Effect.fail(new Environment.Failed({ path: target, cause: new Error("forced remove failure") }))
-              return files.remove(target)
-            },
-            write: (target, content) => {
-              if (failWriteTarget && path.basename(target) === failWriteTarget)
-                return Effect.fail(new Environment.Failed({ path: target, cause: new Error("forced write failure") }))
-              return files.write(target, content)
-            },
-          })),
-        ),
-        Location.node.replace(activeLocation),
-        Formatter.node.replace(formatter),
-        Permission.node.replace(permission),
-      ]),
+      AppNodeBuilder.build(
+        LayerNode.group([Tool.node, FileAccess.node, FileMutation.node, SandboxProvider.node, patchToolNode]),
+        [
+          Environment.node.replace(
+            transformEnvironmentFiles((files) => ({
+              read: (target, range) =>
+                Effect.sync(() => {
+                  if (!editApproved) readsBeforeEditApproval++
+                }).pipe(Effect.andThen(files.read(target, range))),
+              remove: (target) => {
+                if (failRemoveTarget && path.basename(target) === failRemoveTarget)
+                  return Effect.die("forced remove failure")
+                if (failRemoveErrorTarget && path.basename(target) === failRemoveErrorTarget)
+                  return Effect.fail(
+                    new Environment.Failed({ path: target, cause: new Error("forced remove failure") }),
+                  )
+                return files.remove(target)
+              },
+              write: (target, content) => {
+                if (failWriteTarget && path.basename(target) === failWriteTarget)
+                  return Effect.fail(new Environment.Failed({ path: target, cause: new Error("forced write failure") }))
+                return files.write(target, content)
+              },
+            })),
+          ),
+          Location.node.replace(activeLocation),
+          Formatter.node.replace(formatter),
+          Permission.node.replace(permission),
+          SandboxProvider.node.replace(Layer.succeed(SandboxProvider.Service, sandboxProvider)),
+        ],
+      ),
     ),
   )
 }
@@ -167,6 +221,110 @@ const withTempTool = <A, E, R>(body: (directory: string, registry: Tool.Interfac
   )
 
 describe("PatchTool", () => {
+  it.live("applies add, update, move, and delete operations in the session sandbox", () =>
+    withTempTool((directory, registry) =>
+      Effect.gen(function* () {
+        sandboxEnabled = true
+        sandboxFiles.set("/workspace/update.txt", "before\n")
+        sandboxFiles.set("/workspace/remove.txt", "remove\n")
+        sandboxFiles.set("/workspace/old.txt", "old\n")
+
+        const settled = yield* executeTool(
+          registry,
+          call(
+            "*** Begin Patch\n*** Add File: nested/new.txt\n+created\n*** Update File: update.txt\n@@\n-before\n+after\n*** Update File: old.txt\n*** Move to: renamed/name.txt\n@@\n-old\n+moved\n*** Delete File: remove.txt\n*** End Patch",
+          ),
+        )
+
+        expect(settled.status).toBe("completed")
+        expect(sandboxFiles).toEqual(
+          new Map([
+            ["/workspace/update.txt", "after\n"],
+            ["/workspace/renamed/name.txt", "moved\n"],
+            ["/workspace/nested/new.txt", "created\n"],
+          ]),
+        )
+        expect(sandboxWrites).toEqual([
+          "/workspace/nested/new.txt",
+          "/workspace/update.txt",
+          "/workspace/renamed/name.txt",
+        ])
+        expect(sandboxDeletes).toEqual(["/workspace/old.txt", "/workspace/remove.txt"])
+        expect(yield* exists(path.join(directory, "nested/new.txt"))).toBe(false)
+        expect(yield* exists(path.join(directory, "update.txt"))).toBe(false)
+        expect(assertions).toMatchObject([
+          {
+            action: "edit",
+            resources: ["nested/new.txt", "update.txt", "old.txt", "renamed/name.txt", "remove.txt"],
+          },
+        ])
+      }),
+    ),
+  )
+
+  it.live("rejects sandbox patch paths outside the session workspace", () =>
+    withTempTool((directory, registry) =>
+      Effect.gen(function* () {
+        sandboxEnabled = true
+        const settled = yield* executeTool(
+          registry,
+          call(`*** Begin Patch\n*** Add File: ${path.join(directory, "..", "outside.txt")}\n+nope\n*** End Patch`),
+        )
+        expect(settled.status).toBe("error")
+        expect(sandboxWrites).toEqual([])
+        expect(assertions).toEqual([])
+      }),
+    ),
+  )
+
+  it.live("reports sandbox delete failures without using the host filesystem", () =>
+    withTempTool((_directory, registry) =>
+      Effect.gen(function* () {
+        sandboxEnabled = true
+        sandboxFiles.set("/workspace/remove.txt", "remove\n")
+        failSandboxDelete = "/workspace/remove.txt"
+        const settled = yield* executeTool(
+          registry,
+          call("*** Begin Patch\n*** Delete File: remove.txt\n*** End Patch"),
+        )
+        expect(settled.status).toBe("error")
+        expect(sandboxFiles.get("/workspace/remove.txt")).toBe("remove\n")
+        expect(sandboxDeletes).toEqual([])
+      }),
+    ),
+  )
+
+  it.live("reports sandbox write failures without falling back to the host filesystem", () =>
+    withTempTool((directory, registry) =>
+      Effect.gen(function* () {
+        sandboxEnabled = true
+        failSandboxWrite = "/workspace/new.txt"
+        const settled = yield* executeTool(
+          registry,
+          call("*** Begin Patch\n*** Add File: new.txt\n+content\n*** End Patch"),
+        )
+        expect(settled.status).toBe("error")
+        expect(yield* exists(path.join(directory, "new.txt"))).toBe(false)
+        expect(sandboxWrites).toEqual([])
+      }),
+    ),
+  )
+
+  it.live("rejects sandbox updates when the source file is missing", () =>
+    withTempTool((_directory, registry) =>
+      Effect.gen(function* () {
+        sandboxEnabled = true
+        const settled = yield* executeTool(
+          registry,
+          call("*** Begin Patch\n*** Update File: missing.txt\n@@\n-old\n+new\n*** End Patch"),
+        )
+        expect(settled.status).toBe("error")
+        expect(assertions).toEqual([])
+        expect(sandboxWrites).toEqual([])
+      }),
+    ),
+  )
+
   it.live("selects the same edit tools for compaction and generate requests as the agent loop", () =>
     withTempTool(() =>
       Effect.gen(function* () {

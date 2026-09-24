@@ -53,11 +53,15 @@ export interface Interface {
   readonly fileStat: (
     sessionID: string,
     sandboxPath: string,
-  ) => Effect.Effect<{ readonly isDirectory: boolean } | null, Error>
+  ) => Effect.Effect<{ readonly isDirectory: boolean; readonly size?: number } | null, Error>
   /** null result means the path does not exist inside the sandbox. */
   readonly fileRead: (sessionID: string, sandboxPath: string) => Effect.Effect<string | null, Error>
   /** Binary reads for the session-scoped fs.read route; null when absent. */
-  readonly fileReadBytes: (sessionID: string, sandboxPath: string) => Effect.Effect<Uint8Array | null, Error>
+  readonly fileReadBytes: (
+    sessionID: string,
+    sandboxPath: string,
+    opts?: { readonly range?: string },
+  ) => Effect.Effect<Uint8Array | null, Error>
   readonly fileWrite: (sessionID: string, sandboxPath: string, data: string) => Effect.Effect<void, Error>
   readonly fileDelete: (sessionID: string, sandboxPath: string) => Effect.Effect<void, Error>
   readonly fileList: (
@@ -119,7 +123,7 @@ type ExecCommands = {
 // Same runtime-vs-types gap as the command stream: the files API is reachable
 // on the sandbox instance and its JSON shapes are stable across 0.1.x.
 type SandboxFilesApi = {
-  getFileInfo(paths: string[]): Promise<Record<string, { mode?: number; type?: string }>>
+  getFileInfo(paths: string[]): Promise<Record<string, { mode?: number; type?: string; size?: number }>>
   readFile(path: string, opts?: { encoding?: string }): Promise<string>
   readBytes(path: string, opts?: { range?: string }): Promise<Uint8Array>
   writeFiles(entries: { path: string; data: string }[]): Promise<void>
@@ -944,7 +948,7 @@ const layer = Layer.effect(
             const sb = yield* getOrCreate(key)
           const info = yield* Effect.tryPromise({
             try: async () => {
-              const result: Record<string, { mode?: number; type?: string }> = await filesOf(sb)
+              const result: Record<string, { mode?: number; type?: string; size?: number }> = await filesOf(sb)
                 .getFileInfo([sandboxPath])
                 .catch((cause) => {
                   if (isNotFound(cause)) return {}
@@ -960,7 +964,8 @@ const layer = Layer.effect(
           if (!info) return null
           if (info.type === "directory" || isDirectoryMode(info.mode)) return { isDirectory: true }
           const hasModeType = typeof info.mode === "number" && (info.mode & 0o170000) !== 0
-          if (info.type !== undefined || hasModeType) return { isDirectory: false }
+          if (info.type !== undefined || hasModeType)
+            return { isDirectory: false, ...(typeof info.size === "number" ? { size: info.size } : {}) }
           const quoted = `'${sandboxPath.replaceAll("'", `'\\''`)}'`
           const command = `python3 -c 'import os,sys; print("1" if os.path.isdir(sys.argv[1]) else "0")' ${quoted}`
           const output = yield* Effect.tryPromise({
@@ -975,7 +980,10 @@ const layer = Layer.effect(
             },
             catch: (cause) => new Error(`Could not determine file type for ${sandboxPath}: ${String(cause)}`),
           })
-          return { isDirectory: output === "1" }
+          return {
+            isDirectory: output === "1",
+            ...(typeof info.size === "number" ? { size: info.size } : {}),
+          }
         }).pipe(Effect.withSpan("SandboxProvider.fileStat")),
         ),
 
@@ -997,14 +1005,14 @@ const layer = Layer.effect(
           }).pipe(Effect.withSpan("SandboxProvider.fileRead")),
         ),
 
-      fileReadBytes: (sessionID, sandboxPath) =>
+      fileReadBytes: (sessionID, sandboxPath, opts) =>
         Effect.flatMap(resolveSandboxKey(sessionID), (key) =>
           Effect.gen(function* () {
             const sb = yield* getOrCreate(key)
             return yield* Effect.tryPromise({
               try: async () =>
                 filesOf(sb)
-                  .readBytes(sandboxPath)
+                  .readBytes(sandboxPath, opts?.range ? { range: opts.range } : undefined)
                   .catch((cause) => {
                     if (isNotFound(cause)) return null
                     throw cause

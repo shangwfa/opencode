@@ -240,10 +240,13 @@ describe("ReadTool", () => {
       })
       expect(execution.status).toBe("completed")
       if (execution.status !== "completed") return
-      expect(execution.content).toEqual([
+      expect(execution.content).toMatchObject([
         { type: "text", text: "Image read successfully" },
-        { type: "file", uri: `data:image/png;base64,${png}`, mime: "image/png", name: "pixel.png" },
+        { type: "file", mime: "image/png", name: "pixel.png" },
       ])
+      const file = execution.content?.[1]
+      if (file?.type === "file") expect(file.uri).toMatch(/^\/api\/session\/ses_read_tool_test\/attachment\/att_/)
+      expect(JSON.stringify(execution)).not.toContain(png)
       expect(readCalls).toEqual([
         {
           input: AbsolutePath.make(path.join(process.cwd(), "pixel.png")),
@@ -258,11 +261,17 @@ describe("ReadTool", () => {
       })
       expect(settled.status).toBe("completed")
       if (settled.status !== "completed") return
-      expect(settled.metadata).toEqual({ truncated: false })
+      expect(settled.metadata).toMatchObject({
+        truncated: false,
+        kind: "image",
+        mime: "image/png",
+        attachments: [{ type: "file", mime: "image/png", filename: "pixel.png" }],
+      })
       expect(settled.content).toMatchObject([
         { type: "text", text: "Image read successfully" },
-        { type: "file", mime: "image/png", uri: `data:image/png;base64,${png}` },
+        { type: "file", mime: "image/png" },
       ])
+      expect(JSON.stringify(settled)).not.toContain(png)
     }),
   )
 
@@ -293,19 +302,20 @@ describe("ReadTool", () => {
       expect(settled.status).toBe("completed")
       if (settled.status !== "completed") return
       expect(settled.output).toMatchObject({
-        uri: "file:///large.png",
-        name: "large.png",
+        type: "attachment",
+        filename: "large.png",
         mime: "image/png",
-        encoding: "base64",
+        audience: "model-and-display",
       })
-      expect(settled.content).toEqual([
+      expect(settled.content).toMatchObject([
         { type: "text", text: "Image read successfully" },
-        { type: "file", uri: `data:image/png;base64,${png}`, mime: "image/png", name: "large.png" },
+        { type: "file", mime: "image/png", name: "large.png" },
       ])
+      expect(JSON.stringify(settled)).not.toContain(png)
     }),
   )
 
-  itWithoutResizer.effect("returns the original image when the resizer is unavailable", () =>
+  itWithoutResizer.effect("keeps image bytes out of tool state when the resizer is unavailable", () =>
     Effect.gen(function* () {
       const png = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
       readResult = {
@@ -326,12 +336,12 @@ describe("ReadTool", () => {
         }),
       ).toMatchObject({
         status: "completed",
-        content: [{ type: "text" }, { type: "file", uri: `data:image/png;base64,${png}`, mime: "image/png" }],
+        content: [{ type: "text" }, { type: "file", mime: "image/png" }],
       })
     }),
   )
 
-  it.effect("drops undecodable image data from the outcome", () =>
+  it.effect("keeps undecodable image bytes out of durable tool state", () =>
     Effect.gen(function* () {
       readResult = {
         type: "file",
@@ -351,15 +361,12 @@ describe("ReadTool", () => {
         }),
       ).toMatchObject({
         status: "completed",
-        content: [
-          { type: "text", text: "Image read successfully" },
-          { type: "text", text: "[1 image omitted: could not be decoded.]" },
-        ],
+        content: [{ type: "text", text: "Image read successfully" }, { type: "file", mime: "image/png" }],
       })
     }),
   )
 
-  it.effect("drops oversized images from the outcome when resizing is disabled", () =>
+  it.effect("keeps oversized image bytes out of durable tool state", () =>
     Effect.gen(function* () {
       const photon = yield* Effect.promise(() => import("@silvia-odwyer/photon-node"))
       const source = new photon.PhotonImage(new Uint8Array(Array.from({ length: 16 * 4 }, () => 255)), 16, 1)
@@ -385,15 +392,12 @@ describe("ReadTool", () => {
         }),
       ).toMatchObject({
         status: "completed",
-        content: [
-          { type: "text", text: "Image read successfully" },
-          { type: "text", text: "[1 image omitted: could not be resized below the image size limit.]" },
-        ],
+        content: [{ type: "text", text: "Image read successfully" }, { type: "file", mime: "image/png" }],
       })
     }),
   )
 
-  it.effect("resizes images to configured dimensions before returning media", () =>
+  it.effect("returns image bytes only through the managed attachment reference", () =>
     Effect.gen(function* () {
       const photon = yield* Effect.promise(() => import("@silvia-odwyer/photon-node"))
       const source = new photon.PhotonImage(new Uint8Array(Array.from({ length: 16 * 4 }, () => 255)), 16, 1)
@@ -420,11 +424,8 @@ describe("ReadTool", () => {
       if (result.status !== "completed") return
       const media = result.content?.[1]
       expect(media?.type).toBe("file")
-      if (media?.type !== "file") return
-      const resized = photon.PhotonImage.new_from_byteslice(Buffer.from(media.uri.split(",")[1] ?? "", "base64"))
-      expect(resized.get_width()).toBeLessThanOrEqual(4)
-      expect(resized.get_height()).toBeLessThanOrEqual(2_000)
-      resized.free()
+      if (media?.type === "file") expect(media.uri).toMatch(/^\/api\/session\/ses_read_tool_test\/attachment\/att_/)
+      expect(JSON.stringify(result)).not.toContain("data:image/png;base64,")
     }),
   )
 
@@ -489,10 +490,7 @@ describe("ReadTool", () => {
         }),
       ).toMatchObject({
         status: "completed",
-        content: [
-          { type: "text", text: "Image read successfully" },
-          { type: "text", text: "[1 image omitted: could not be resized below the image size limit.]" },
-        ],
+        content: [{ type: "text", text: "Image read successfully" }, { type: "file", mime: "image/png" }],
       })
     }),
   )
@@ -523,7 +521,7 @@ describe("ReadTool", () => {
     }),
   )
 
-  it.effect("returns PDFs as native media", () =>
+  it.effect("returns PDFs as managed attachment references", () =>
     Effect.gen(function* () {
       const pdf = "JVBERi0xLjcK"
       readResult = {
@@ -546,7 +544,7 @@ describe("ReadTool", () => {
         status: "completed",
         content: [
           { type: "text", text: "PDF read successfully" },
-          { type: "file", uri: `data:application/pdf;base64,${pdf}`, mime: "application/pdf", name: "document.pdf" },
+          { type: "file", mime: "application/pdf", name: "document.pdf" },
         ],
       })
     }),
@@ -579,6 +577,10 @@ describe("ReadTool", () => {
     Effect.gen(function* () {
       const registry = yield* Tool.Service
       for (const [error, message] of [
+        [
+          new ReadToolFileSystem.InvalidUtf8Error({ resource: "malformed.txt" }),
+          "File is not valid UTF-8: malformed.txt",
+        ],
         [new ReadToolFileSystem.OffsetOutOfRangeError({ offset: 10 }), "Offset 10 is out of range"],
         [
           new ReadToolFileSystem.PathKindError({ resource: "socket", expected: "a file" }),

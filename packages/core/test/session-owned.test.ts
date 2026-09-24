@@ -549,6 +549,7 @@ describe("Session-owned handles", () => {
               fileRead: () => Effect.die(new Error("not under test")),
               fileReadBytes: () => Effect.die(new Error("not under test")),
               fileWrite: () => Effect.die(new Error("not under test")),
+              fileDelete: () => Effect.die(new Error("not under test")),
               fileList: () => Effect.die(new Error("not under test")),
               fileFind: () => Effect.die(new Error("not under test")),
               isReady: () => Effect.succeed(false),

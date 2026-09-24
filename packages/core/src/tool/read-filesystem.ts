@@ -18,7 +18,14 @@ const FIRST_CHUNK = 256 * 1024
 const MAX_LINE_LENGTH = 2_000
 const TREE_BASE = 6
 const MAX_LINE_SUFFIX = `... (line truncated to ${MAX_LINE_LENGTH} chars)`
-export const MEDIA_MIMES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp", "application/pdf"])
+export const MEDIA_MIMES = new Set([
+  "image/png",
+  "image/jpeg",
+  "image/gif",
+  "image/webp",
+  "image/bmp",
+  "application/pdf",
+])
 
 export class BinaryFileError extends Schema.TaggedError<BinaryFileError>()("ReadTool.BinaryFileError", {
   resource: Schema.String,
@@ -26,6 +33,27 @@ export class BinaryFileError extends Schema.TaggedError<BinaryFileError>()("Read
   override get message() {
     return `Cannot read binary file: ${this.resource}`
   }
+}
+
+export class InvalidUtf8Error extends Schema.TaggedError<InvalidUtf8Error>()("ReadTool.InvalidUtf8Error", {
+  resource: Schema.String,
+}) {
+  override get message() {
+    return `File is not valid UTF-8: ${this.resource}`
+  }
+}
+
+// V1 parity: a file whose decode produces mostly replacement characters is not
+// text. Occasional U+FFFD is tolerated (files may legitimately contain it),
+// so only an excessive ratio fails — matching v1 read.ts INVALID_UTF8_RATIO.
+export const INVALID_UTF8_RATIO = 0.3
+
+export function hasExcessiveInvalidUtf8(input: Uint8Array | string): boolean {
+  const text = typeof input === "string" ? input : new TextDecoder().decode(input)
+  if (text.length === 0) return false
+  let invalid = 0
+  for (let i = 0; i < text.length; i++) if (text.charCodeAt(i) === 0xfffd) invalid++
+  return invalid / Math.max(text.length, 1) > INVALID_UTF8_RATIO
 }
 
 export class MediaIngestLimitError extends Schema.TaggedError<MediaIngestLimitError>()(
@@ -62,6 +90,7 @@ export type ReadError =
   | Environment.NotFound
   | Environment.Failed
   | BinaryFileError
+  | InvalidUtf8Error
   | MediaIngestLimitError
   | OffsetOutOfRangeError
   | PathKindError
@@ -85,6 +114,17 @@ export class TextPage extends Schema.Class<TextPage>("ReadTool.TextPage")({
   offset: PositiveInt,
   truncated: Schema.Boolean,
   next: Schema.optionalKey(PositiveInt),
+}) {}
+
+export class AttachmentResult extends Schema.Class<AttachmentResult>("ReadTool.AttachmentResult")({
+  type: Schema.Literal("attachment"),
+  output: Schema.String,
+  kind: Schema.Literals(["image", "pdf", "office"]),
+  uri: Schema.String,
+  mime: Schema.String,
+  filename: Schema.String,
+  size: Schema.Number,
+  audience: Schema.Literals(["model-and-display", "display-only"]),
 }) {}
 
 export interface ListEntry extends Schema.Schema.Type<typeof ListEntry> {}
@@ -147,6 +187,8 @@ export const read = Effect.fn("ReadTool.read")(function* (
       mime: media,
     }
   }
+
+  if (hasExcessiveInvalidUtf8(first.bytes)) return yield* new InvalidUtf8Error({ resource })
 
   const paged = first.info.size > MAX_READ_BYTES || page.offset !== undefined || page.limit !== undefined
   if (!paged) {

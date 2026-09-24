@@ -13,6 +13,7 @@ import { SessionInstructions } from "../../session/instructions.js"
 import { AbsolutePath } from "../../schema.js"
 import { ReadToolFileSystem } from "../read-filesystem.js"
 import { Environment } from "../../environment/index.js"
+import { ToolAttachment } from "../attachment.js"
 
 export const name = "read"
 const FILENAME = "AGENTS.md"
@@ -26,7 +27,12 @@ const LocationInput = Schema.Struct({
   }),
 })
 export const Input = LocationInput
-const Output = Schema.Union([ReadToolFileSystem.FileContent, ReadToolFileSystem.TextPage, ReadToolFileSystem.ListPage])
+const Output = Schema.Union([
+  ReadToolFileSystem.FileContent,
+  ReadToolFileSystem.TextPage,
+  ReadToolFileSystem.ListPage,
+  ReadToolFileSystem.AttachmentResult,
+])
 
 export const Plugin = {
   id: "opencode.tool.read",
@@ -111,23 +117,69 @@ export const Plugin = {
                 Effect.catch(() => Effect.void),
                 Effect.catchDefect(() => Effect.void),
               )
-              if (
-                result.content.type === "file" &&
-                result.content.encoding === "base64" &&
-                !ReadToolFileSystem.MEDIA_MIMES.has(result.content.mime)
-              )
-                return yield* Effect.fail(new ReadToolFileSystem.BinaryFileError({ resource: result.target.resource }))
-              return { output: result.content, path: result.path }
+              let output: typeof Output.Type = result.content
+              if (result.content.type === "file" && result.content.encoding === "base64") {
+                const bytes = Buffer.from(result.content.content, "base64")
+                const filename = result.content.name ?? basename(result.path)
+                const kind = ToolAttachment.classify(filename, bytes)
+                if (kind.type === "image" || kind.type === "pdf" || kind.type === "office") {
+                  const stored = yield* ToolAttachment.storeLocal({
+                    sessionID: context.sessionID,
+                    filename,
+                    bytes,
+                  }).pipe(
+                    Effect.catchTag("ToolAttachment.TooLargeError", () =>
+                      Effect.fail(
+                        new ReadToolFileSystem.MediaIngestLimitError({
+                          resource: result.target.resource,
+                          maximumBytes: ToolAttachment.MAX_BYTES,
+                        }),
+                      ),
+                    ),
+                  )
+                  output = new ReadToolFileSystem.AttachmentResult({
+                    type: "attachment",
+                    output: kind.type === "image" ? "Image read successfully" : kind.type === "pdf" ? "PDF read successfully" : "Document",
+                    kind: kind.type,
+                    uri: stored.url,
+                    mime: stored.metadata.mime,
+                    filename: stored.metadata.filename,
+                    size: stored.metadata.size,
+                    audience: stored.metadata.audience,
+                  })
+                } else if (!ReadToolFileSystem.MEDIA_MIMES.has(result.content.mime)) {
+                  return yield* Effect.fail(new ReadToolFileSystem.BinaryFileError({ resource: result.target.resource }))
+                }
+              }
+              return { output, path: result.path }
             }).pipe(
               Effect.map((result) => ({
                 output: result.output,
                 content: toModelContent(result.path, input.offset, result.output),
-                metadata: { truncated: result.output.type === "file" ? false : result.output.truncated },
+                metadata:
+                  result.output.type === "attachment"
+                    ? {
+                        truncated: false,
+                        kind: result.output.kind,
+                        mime: result.output.mime,
+                        size: result.output.size,
+                        audience: result.output.audience,
+                        attachments: [
+                          {
+                            type: "file",
+                            url: result.output.uri,
+                            mime: result.output.mime,
+                            filename: result.output.filename,
+                          },
+                        ],
+                      }
+                    : { truncated: result.output.type === "file" ? false : result.output.truncated },
               })),
               Effect.mapError((error) => {
                 if (error instanceof ToolFailure) return error
                 const message =
                   error instanceof ReadToolFileSystem.BinaryFileError ||
+                  error instanceof ReadToolFileSystem.InvalidUtf8Error ||
                   error instanceof ReadToolFileSystem.MediaIngestLimitError ||
                   error instanceof ReadToolFileSystem.OffsetOutOfRangeError ||
                   error instanceof ReadToolFileSystem.PathKindError
@@ -174,6 +226,14 @@ export const Plugin = {
 }
 
 export const toModelContent = (path: string, offset: number | undefined, output: typeof Output.Type) => {
+  if (output.type === "attachment")
+    return output.audience === "model-and-display"
+      ? [
+          { type: "text", text: output.output },
+          { type: "file", uri: output.uri, mime: output.mime, name: output.filename },
+        ] as const
+      : output.output
+
   if (output.type === "file" && output.encoding === "base64")
     return [
       { type: "text", text: output.mime === "application/pdf" ? "PDF read successfully" : "Image read successfully" },

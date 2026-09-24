@@ -11,6 +11,7 @@ import { RelativePath } from "../schema.js"
 import { SandboxProvider } from "./provider.js"
 import { SandboxPath } from "./path.js"
 import { ReadToolFileSystem } from "../tool/read-filesystem.js"
+import { ToolAttachment } from "../tool/attachment.js"
 
 /**
  * Sandbox-backed implementations for the file-oriented built-in tools. Each
@@ -313,12 +314,54 @@ export const read = Effect.fn("SandboxTools.read")(
         ...(truncated ? { next: offset + limit } : {}),
       })
     }
+    const header = yield* deps.provider.fileReadBytes(context.sessionID, sandboxPath, { range: `bytes=0-${64 * 1024 - 1}` })
+    if (!header) return yield* Effect.fail(new Error(`File not found: ${input.path}`))
+    const kind = ToolAttachment.classify(path.basename(input.path), header)
+    if (kind.type === "binary") return yield* Effect.fail(new ReadToolFileSystem.BinaryFileError({ resource: input.path }))
+    if (kind.type === "image" || kind.type === "pdf" || kind.type === "office") {
+      if (stat.size !== undefined && stat.size > ToolAttachment.MAX_BYTES)
+        return yield* Effect.fail(
+          new ReadToolFileSystem.MediaIngestLimitError({
+            resource: input.path,
+            maximumBytes: ToolAttachment.MAX_BYTES,
+          }),
+        )
+      const stored = yield* ToolAttachment.store({
+        provider: deps.provider,
+        sessionID: context.sessionID,
+        sourcePath: sandboxPath,
+        filename: path.basename(input.path),
+      }).pipe(
+        Effect.catchTag("ToolAttachment.TooLargeError", () =>
+          Effect.fail(
+            new ReadToolFileSystem.MediaIngestLimitError({
+              resource: input.path,
+              maximumBytes: ToolAttachment.MAX_BYTES,
+            }),
+          ),
+        ),
+      )
+      return new ReadToolFileSystem.AttachmentResult({
+        type: "attachment",
+        output: kind.type === "image" ? "Image read successfully" : kind.type === "pdf" ? "PDF read successfully" : "Document",
+        kind: kind.type,
+        uri: stored.url,
+        mime: stored.metadata.mime,
+        filename: stored.metadata.filename,
+        size: stored.metadata.size,
+        audience: stored.metadata.audience,
+      })
+    }
     const content = yield* deps.provider.fileRead(context.sessionID, sandboxPath)
     if (content === null) return yield* Effect.fail(new Error(`File not found: ${input.path}`))
     // The local reader rejects non-text payloads before they reach the model;
     // the files API returns decoded text, so a NUL byte marks binary content.
     if (content.includes("\u0000"))
       return yield* Effect.fail(new Error(`Unable to read ${input.path}: binary file is not supported yet`))
+    // The files API decodes leniently and replaces invalid UTF-8 bytes. Reject
+    // files dominated by replacement characters before returning them as text.
+    if (ReadToolFileSystem.hasExcessiveInvalidUtf8(content))
+      return yield* Effect.fail(new ReadToolFileSystem.InvalidUtf8Error({ resource: input.path }))
     const lines = content.split("\n")
     const page = lines.slice(offset - 1, offset - 1 + limit)
     const truncated = offset - 1 + limit < lines.length

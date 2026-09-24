@@ -953,6 +953,16 @@
                       }
                     ]
                   },
+                  "pvcMode": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/components/schemas/Session.PvcMode"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "title": {
                     "anyOf": [
                       {
@@ -2140,6 +2150,16 @@
                   "format": {
                     "$ref": "#/components/schemas/OutputFormat"
                   },
+                  "model": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/components/schemas/Model.Ref"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "userName": {
                     "anyOf": [
                       {
@@ -2177,16 +2197,6 @@
                     "anyOf": [
                       {
                         "type": "boolean"
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  },
-                  "model": {
-                    "anyOf": [
-                      {
-                        "$ref": "#/components/schemas/Model.Ref"
                       },
                       {
                         "type": "null"
@@ -2651,13 +2661,21 @@
                   "timeoutSeconds": {
                     "anyOf": [
                       {
-                        "type": "integer",
-                        "minimum": 1
+                        "anyOf": [
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "string",
+                            "enum": ["Infinity", "-Infinity", "NaN"]
+                          }
+                        ]
                       },
                       {
                         "type": "null"
                       }
-                    ]
+                    ],
+                    "description": "Execution budget in seconds. On timeout the command is interrupted, the shell ends with status timeout, and the sandbox command session is recycled. Omit for no explicit deadline."
                   }
                 },
                 "required": ["command"],
@@ -5654,6 +5672,16 @@
                   "format": {
                     "$ref": "#/components/schemas/OutputFormat"
                   },
+                  "model": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/components/schemas/Model.Ref"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "userName": {
                     "anyOf": [
                       {
@@ -5691,16 +5719,6 @@
                     "anyOf": [
                       {
                         "type": "boolean"
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  },
-                  "model": {
-                    "anyOf": [
-                      {
-                        "$ref": "#/components/schemas/Model.Ref"
                       },
                       {
                         "type": "null"
@@ -6000,6 +6018,932 @@
         },
         "description": "Find files recursively inside the session sandbox workspace.",
         "summary": "Find session files"
+      }
+    },
+    "/api/session/{sessionID}/attachment/{attachmentID}": {
+      "get": {
+        "tags": ["session attachments"],
+        "operationId": "session.attachment",
+        "parameters": [
+          {
+            "name": "sessionID",
+            "in": "path",
+            "schema": {
+              "type": "string",
+              "pattern": "^ses"
+            },
+            "required": true
+          },
+          {
+            "name": "attachmentID",
+            "in": "path",
+            "schema": {
+              "type": "string",
+              "pattern": "^att_[0-9A-Za-z]+$"
+            },
+            "required": true
+          }
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "InvalidRequestError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UnauthorizedError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedErrorEncoded"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "SessionNotFoundError | FileNotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/FileNotFoundErrorEncoded"
+                    },
+                    {
+                      "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
+                    },
+                    {
+                      "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "UnknownError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnknownErrorEncoded"
+                }
+              }
+            }
+          }
+        },
+        "description": "Download a managed attachment stored in the session sandbox.",
+        "summary": "Read managed session attachment"
+      }
+    },
+    "/api/session/{sessionID}/vcs/diff": {
+      "get": {
+        "tags": ["session vcs"],
+        "operationId": "session.vcs.diff",
+        "parameters": [
+          {
+            "name": "sessionID",
+            "in": "path",
+            "schema": {
+              "type": "string",
+              "pattern": "^ses"
+            },
+            "required": true
+          },
+          {
+            "name": "mode",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/Vcs.Mode"
+            },
+            "required": true
+          },
+          {
+            "name": "base",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "name": "context",
+            "in": "query",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "required": false
+          }
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/FileDiff.Info"
+                      }
+                    }
+                  },
+                  "required": ["data"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "InvalidRequestError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UnauthorizedError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedErrorEncoded"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "SessionNotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
+                    },
+                    {
+                      "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "ServiceUnavailableError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailableErrorEncoded"
+                }
+              }
+            }
+          }
+        },
+        "description": "Diff the session's working directory inside its sandbox: HEAD to the working copy (working), the base merge-base to the working copy (branch), or the base merge-base to HEAD (committed). Untracked files are included except in committed mode.",
+        "summary": "Diff the session workspace"
+      }
+    },
+    "/api/session/{sessionID}/proxy/{port}/*": {
+      "get": {
+        "tags": ["session preview proxy"],
+        "operationId": "session.proxy.get",
+        "parameters": [
+          {
+            "name": "sessionID",
+            "in": "path",
+            "schema": {
+              "type": "string",
+              "pattern": "^ses"
+            },
+            "required": true
+          },
+          {
+            "name": "port",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "security": [],
+        "responses": {
+          "204": {
+            "description": "<No Content>"
+          },
+          "400": {
+            "description": "InvalidRequestError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
+                    },
+                    {
+                      "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UnauthorizedError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedErrorEncoded"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "SessionNotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "SandboxUnreachableError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SandboxUnreachableErrorEncoded"
+                }
+              }
+            }
+          }
+        },
+        "description": "Forward one request to a port inside the session sandbox. HTML responses are rewritten to the proxy prefix (runtime fetch/WebSocket/XHR patches plus static rewrites); JS/CSS get import/url rewrites; everything else streams through unchanged. WebSocket upgrades are bridged for HMR.",
+        "summary": "Proxy preview request (GET)"
+      },
+      "post": {
+        "tags": ["session preview proxy"],
+        "operationId": "session.proxy.post",
+        "parameters": [
+          {
+            "name": "sessionID",
+            "in": "path",
+            "schema": {
+              "type": "string",
+              "pattern": "^ses"
+            },
+            "required": true
+          },
+          {
+            "name": "port",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "security": [],
+        "responses": {
+          "204": {
+            "description": "<No Content>"
+          },
+          "400": {
+            "description": "InvalidRequestError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
+                    },
+                    {
+                      "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UnauthorizedError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedErrorEncoded"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "SessionNotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "SandboxUnreachableError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SandboxUnreachableErrorEncoded"
+                }
+              }
+            }
+          }
+        },
+        "description": "Forward one request to a port inside the session sandbox. HTML responses are rewritten to the proxy prefix (runtime fetch/WebSocket/XHR patches plus static rewrites); JS/CSS get import/url rewrites; everything else streams through unchanged. WebSocket upgrades are bridged for HMR.",
+        "summary": "Proxy preview request (POST)"
+      },
+      "put": {
+        "tags": ["session preview proxy"],
+        "operationId": "session.proxy.put",
+        "parameters": [
+          {
+            "name": "sessionID",
+            "in": "path",
+            "schema": {
+              "type": "string",
+              "pattern": "^ses"
+            },
+            "required": true
+          },
+          {
+            "name": "port",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "security": [],
+        "responses": {
+          "204": {
+            "description": "<No Content>"
+          },
+          "400": {
+            "description": "InvalidRequestError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
+                    },
+                    {
+                      "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UnauthorizedError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedErrorEncoded"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "SessionNotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "SandboxUnreachableError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SandboxUnreachableErrorEncoded"
+                }
+              }
+            }
+          }
+        },
+        "description": "Forward one request to a port inside the session sandbox. HTML responses are rewritten to the proxy prefix (runtime fetch/WebSocket/XHR patches plus static rewrites); JS/CSS get import/url rewrites; everything else streams through unchanged. WebSocket upgrades are bridged for HMR.",
+        "summary": "Proxy preview request (PUT)"
+      },
+      "delete": {
+        "tags": ["session preview proxy"],
+        "operationId": "session.proxy.delete",
+        "parameters": [
+          {
+            "name": "sessionID",
+            "in": "path",
+            "schema": {
+              "type": "string",
+              "pattern": "^ses"
+            },
+            "required": true
+          },
+          {
+            "name": "port",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "security": [],
+        "responses": {
+          "204": {
+            "description": "<No Content>"
+          },
+          "400": {
+            "description": "InvalidRequestError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
+                    },
+                    {
+                      "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UnauthorizedError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedErrorEncoded"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "SessionNotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "SandboxUnreachableError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SandboxUnreachableErrorEncoded"
+                }
+              }
+            }
+          }
+        },
+        "description": "Forward one request to a port inside the session sandbox. HTML responses are rewritten to the proxy prefix (runtime fetch/WebSocket/XHR patches plus static rewrites); JS/CSS get import/url rewrites; everything else streams through unchanged. WebSocket upgrades are bridged for HMR.",
+        "summary": "Proxy preview request (DELETE)"
+      },
+      "patch": {
+        "tags": ["session preview proxy"],
+        "operationId": "session.proxy.patch",
+        "parameters": [
+          {
+            "name": "sessionID",
+            "in": "path",
+            "schema": {
+              "type": "string",
+              "pattern": "^ses"
+            },
+            "required": true
+          },
+          {
+            "name": "port",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "security": [],
+        "responses": {
+          "204": {
+            "description": "<No Content>"
+          },
+          "400": {
+            "description": "InvalidRequestError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
+                    },
+                    {
+                      "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UnauthorizedError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedErrorEncoded"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "SessionNotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "SandboxUnreachableError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SandboxUnreachableErrorEncoded"
+                }
+              }
+            }
+          }
+        },
+        "description": "Forward one request to a port inside the session sandbox. HTML responses are rewritten to the proxy prefix (runtime fetch/WebSocket/XHR patches plus static rewrites); JS/CSS get import/url rewrites; everything else streams through unchanged. WebSocket upgrades are bridged for HMR.",
+        "summary": "Proxy preview request (PATCH)"
+      },
+      "head": {
+        "tags": ["session preview proxy"],
+        "operationId": "session.proxy.head",
+        "parameters": [
+          {
+            "name": "sessionID",
+            "in": "path",
+            "schema": {
+              "type": "string",
+              "pattern": "^ses"
+            },
+            "required": true
+          },
+          {
+            "name": "port",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "security": [],
+        "responses": {
+          "204": {
+            "description": "<No Content>"
+          },
+          "400": {
+            "description": "InvalidRequestError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
+                    },
+                    {
+                      "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UnauthorizedError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedErrorEncoded"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "SessionNotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "SandboxUnreachableError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SandboxUnreachableErrorEncoded"
+                }
+              }
+            }
+          }
+        },
+        "description": "Forward one request to a port inside the session sandbox. HTML responses are rewritten to the proxy prefix (runtime fetch/WebSocket/XHR patches plus static rewrites); JS/CSS get import/url rewrites; everything else streams through unchanged. WebSocket upgrades are bridged for HMR.",
+        "summary": "Proxy preview request (HEAD)"
+      },
+      "options": {
+        "tags": ["session preview proxy"],
+        "operationId": "session.proxy.options",
+        "parameters": [
+          {
+            "name": "sessionID",
+            "in": "path",
+            "schema": {
+              "type": "string",
+              "pattern": "^ses"
+            },
+            "required": true
+          },
+          {
+            "name": "port",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "security": [],
+        "responses": {
+          "204": {
+            "description": "<No Content>"
+          },
+          "400": {
+            "description": "InvalidRequestError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
+                    },
+                    {
+                      "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UnauthorizedError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedErrorEncoded"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "SessionNotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "SandboxUnreachableError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SandboxUnreachableErrorEncoded"
+                }
+              }
+            }
+          }
+        },
+        "description": "Forward one request to a port inside the session sandbox. HTML responses are rewritten to the proxy prefix (runtime fetch/WebSocket/XHR patches plus static rewrites); JS/CSS get import/url rewrites; everything else streams through unchanged. WebSocket upgrades are bridged for HMR.",
+        "summary": "Proxy preview request (OPTIONS)"
+      }
+    },
+    "/api/session/{sessionID}/endpoint/{port}": {
+      "get": {
+        "tags": ["session preview proxy"],
+        "operationId": "session.endpoint",
+        "parameters": [
+          {
+            "name": "sessionID",
+            "in": "path",
+            "schema": {
+              "type": "string",
+              "pattern": "^ses"
+            },
+            "required": true
+          },
+          {
+            "name": "port",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          },
+          {
+            "name": "mode",
+            "in": "query",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": ["direct", "proxy"]
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Force the access mode instead of preferring direct when available."
+            },
+            "required": false
+          }
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "SessionEndpointResponse",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionEndpointResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "InvalidRequestError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
+                    },
+                    {
+                      "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UnauthorizedError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedErrorEncoded"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "SessionNotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "SandboxUnreachableError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SandboxUnreachableErrorEncoded"
+                }
+              }
+            }
+          }
+        },
+        "description": "Resolve the sandbox address for one preview port. Returns the direct address, the server-proxy address, and the SaaS proxy fallback; unreachable sandboxes answer 502 and record a throttled session.preview.down event.",
+        "summary": "Resolve session preview endpoint"
+      }
+    },
+    "/api/session/{sessionID}/proxy-errors": {
+      "get": {
+        "tags": ["session preview proxy"],
+        "operationId": "session.proxy.errors",
+        "parameters": [
+          {
+            "name": "sessionID",
+            "in": "path",
+            "schema": {
+              "type": "string",
+              "pattern": "^ses"
+            },
+            "required": true
+          }
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Recent proxy errors for the session keyed by sandbox port.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionProxyErrorsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "InvalidRequestError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UnauthorizedError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedErrorEncoded"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "SessionNotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
+                }
+              }
+            }
+          }
+        },
+        "description": "Recent runtime/network errors the preview proxy collected for the session, grouped by port.",
+        "summary": "List session proxy errors"
       }
     },
     "/api/session/{sessionID}/message": {
@@ -13628,720 +14572,6 @@
           "required": true
         }
       }
-    },
-    "/api/session/{sessionID}/proxy/{port}/*": {
-      "get": {
-        "tags": ["session preview proxy"],
-        "operationId": "session.proxy.get",
-        "parameters": [
-          {
-            "name": "sessionID",
-            "in": "path",
-            "schema": {
-              "type": "string",
-              "pattern": "^ses"
-            },
-            "required": true
-          },
-          {
-            "name": "port",
-            "in": "path",
-            "schema": {
-              "type": "string"
-            },
-            "required": true
-          }
-        ],
-        "security": [],
-        "responses": {
-          "204": {
-            "description": "<No Content>"
-          },
-          "400": {
-            "description": "InvalidRequestError",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
-                    },
-                    {
-                      "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
-                    }
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "UnauthorizedError",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UnauthorizedErrorEncoded"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "SessionNotFoundError",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
-                }
-              }
-            }
-          },
-          "502": {
-            "description": "SandboxUnreachableError",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SandboxUnreachableErrorEncoded"
-                }
-              }
-            }
-          }
-        },
-        "description": "Forward one request to a port inside the session sandbox. HTML responses are rewritten to the proxy prefix (runtime fetch/WebSocket/XHR patches plus static rewrites); JS/CSS get import/url rewrites; everything else streams through unchanged. WebSocket upgrades are bridged for HMR.",
-        "summary": "Proxy preview request (GET)"
-      },
-      "post": {
-        "tags": ["session preview proxy"],
-        "operationId": "session.proxy.post",
-        "parameters": [
-          {
-            "name": "sessionID",
-            "in": "path",
-            "schema": {
-              "type": "string",
-              "pattern": "^ses"
-            },
-            "required": true
-          },
-          {
-            "name": "port",
-            "in": "path",
-            "schema": {
-              "type": "string"
-            },
-            "required": true
-          }
-        ],
-        "security": [],
-        "responses": {
-          "204": {
-            "description": "<No Content>"
-          },
-          "400": {
-            "description": "InvalidRequestError",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
-                    },
-                    {
-                      "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
-                    }
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "UnauthorizedError",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UnauthorizedErrorEncoded"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "SessionNotFoundError",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
-                }
-              }
-            }
-          },
-          "502": {
-            "description": "SandboxUnreachableError",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SandboxUnreachableErrorEncoded"
-                }
-              }
-            }
-          }
-        },
-        "description": "Forward one request to a port inside the session sandbox. HTML responses are rewritten to the proxy prefix (runtime fetch/WebSocket/XHR patches plus static rewrites); JS/CSS get import/url rewrites; everything else streams through unchanged. WebSocket upgrades are bridged for HMR.",
-        "summary": "Proxy preview request (POST)"
-      },
-      "put": {
-        "tags": ["session preview proxy"],
-        "operationId": "session.proxy.put",
-        "parameters": [
-          {
-            "name": "sessionID",
-            "in": "path",
-            "schema": {
-              "type": "string",
-              "pattern": "^ses"
-            },
-            "required": true
-          },
-          {
-            "name": "port",
-            "in": "path",
-            "schema": {
-              "type": "string"
-            },
-            "required": true
-          }
-        ],
-        "security": [],
-        "responses": {
-          "204": {
-            "description": "<No Content>"
-          },
-          "400": {
-            "description": "InvalidRequestError",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
-                    },
-                    {
-                      "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
-                    }
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "UnauthorizedError",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UnauthorizedErrorEncoded"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "SessionNotFoundError",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
-                }
-              }
-            }
-          },
-          "502": {
-            "description": "SandboxUnreachableError",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SandboxUnreachableErrorEncoded"
-                }
-              }
-            }
-          }
-        },
-        "description": "Forward one request to a port inside the session sandbox. HTML responses are rewritten to the proxy prefix (runtime fetch/WebSocket/XHR patches plus static rewrites); JS/CSS get import/url rewrites; everything else streams through unchanged. WebSocket upgrades are bridged for HMR.",
-        "summary": "Proxy preview request (PUT)"
-      },
-      "delete": {
-        "tags": ["session preview proxy"],
-        "operationId": "session.proxy.delete",
-        "parameters": [
-          {
-            "name": "sessionID",
-            "in": "path",
-            "schema": {
-              "type": "string",
-              "pattern": "^ses"
-            },
-            "required": true
-          },
-          {
-            "name": "port",
-            "in": "path",
-            "schema": {
-              "type": "string"
-            },
-            "required": true
-          }
-        ],
-        "security": [],
-        "responses": {
-          "204": {
-            "description": "<No Content>"
-          },
-          "400": {
-            "description": "InvalidRequestError",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
-                    },
-                    {
-                      "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
-                    }
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "UnauthorizedError",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UnauthorizedErrorEncoded"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "SessionNotFoundError",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
-                }
-              }
-            }
-          },
-          "502": {
-            "description": "SandboxUnreachableError",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SandboxUnreachableErrorEncoded"
-                }
-              }
-            }
-          }
-        },
-        "description": "Forward one request to a port inside the session sandbox. HTML responses are rewritten to the proxy prefix (runtime fetch/WebSocket/XHR patches plus static rewrites); JS/CSS get import/url rewrites; everything else streams through unchanged. WebSocket upgrades are bridged for HMR.",
-        "summary": "Proxy preview request (DELETE)"
-      },
-      "patch": {
-        "tags": ["session preview proxy"],
-        "operationId": "session.proxy.patch",
-        "parameters": [
-          {
-            "name": "sessionID",
-            "in": "path",
-            "schema": {
-              "type": "string",
-              "pattern": "^ses"
-            },
-            "required": true
-          },
-          {
-            "name": "port",
-            "in": "path",
-            "schema": {
-              "type": "string"
-            },
-            "required": true
-          }
-        ],
-        "security": [],
-        "responses": {
-          "204": {
-            "description": "<No Content>"
-          },
-          "400": {
-            "description": "InvalidRequestError",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
-                    },
-                    {
-                      "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
-                    }
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "UnauthorizedError",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UnauthorizedErrorEncoded"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "SessionNotFoundError",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
-                }
-              }
-            }
-          },
-          "502": {
-            "description": "SandboxUnreachableError",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SandboxUnreachableErrorEncoded"
-                }
-              }
-            }
-          }
-        },
-        "description": "Forward one request to a port inside the session sandbox. HTML responses are rewritten to the proxy prefix (runtime fetch/WebSocket/XHR patches plus static rewrites); JS/CSS get import/url rewrites; everything else streams through unchanged. WebSocket upgrades are bridged for HMR.",
-        "summary": "Proxy preview request (PATCH)"
-      },
-      "head": {
-        "tags": ["session preview proxy"],
-        "operationId": "session.proxy.head",
-        "parameters": [
-          {
-            "name": "sessionID",
-            "in": "path",
-            "schema": {
-              "type": "string",
-              "pattern": "^ses"
-            },
-            "required": true
-          },
-          {
-            "name": "port",
-            "in": "path",
-            "schema": {
-              "type": "string"
-            },
-            "required": true
-          }
-        ],
-        "security": [],
-        "responses": {
-          "204": {
-            "description": "<No Content>"
-          },
-          "400": {
-            "description": "InvalidRequestError",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
-                    },
-                    {
-                      "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
-                    }
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "UnauthorizedError",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UnauthorizedErrorEncoded"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "SessionNotFoundError",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
-                }
-              }
-            }
-          },
-          "502": {
-            "description": "SandboxUnreachableError",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SandboxUnreachableErrorEncoded"
-                }
-              }
-            }
-          }
-        },
-        "description": "Forward one request to a port inside the session sandbox. HTML responses are rewritten to the proxy prefix (runtime fetch/WebSocket/XHR patches plus static rewrites); JS/CSS get import/url rewrites; everything else streams through unchanged. WebSocket upgrades are bridged for HMR.",
-        "summary": "Proxy preview request (HEAD)"
-      },
-      "options": {
-        "tags": ["session preview proxy"],
-        "operationId": "session.proxy.options",
-        "parameters": [
-          {
-            "name": "sessionID",
-            "in": "path",
-            "schema": {
-              "type": "string",
-              "pattern": "^ses"
-            },
-            "required": true
-          },
-          {
-            "name": "port",
-            "in": "path",
-            "schema": {
-              "type": "string"
-            },
-            "required": true
-          }
-        ],
-        "security": [],
-        "responses": {
-          "204": {
-            "description": "<No Content>"
-          },
-          "400": {
-            "description": "InvalidRequestError",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
-                    },
-                    {
-                      "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
-                    }
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "UnauthorizedError",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UnauthorizedErrorEncoded"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "SessionNotFoundError",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
-                }
-              }
-            }
-          },
-          "502": {
-            "description": "SandboxUnreachableError",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SandboxUnreachableErrorEncoded"
-                }
-              }
-            }
-          }
-        },
-        "description": "Forward one request to a port inside the session sandbox. HTML responses are rewritten to the proxy prefix (runtime fetch/WebSocket/XHR patches plus static rewrites); JS/CSS get import/url rewrites; everything else streams through unchanged. WebSocket upgrades are bridged for HMR.",
-        "summary": "Proxy preview request (OPTIONS)"
-      }
-    },
-    "/api/session/{sessionID}/endpoint/{port}": {
-      "get": {
-        "tags": ["session preview proxy"],
-        "operationId": "session.endpoint",
-        "parameters": [
-          {
-            "name": "sessionID",
-            "in": "path",
-            "schema": {
-              "type": "string",
-              "pattern": "^ses"
-            },
-            "required": true
-          },
-          {
-            "name": "port",
-            "in": "path",
-            "schema": {
-              "type": "string"
-            },
-            "required": true
-          },
-          {
-            "name": "mode",
-            "in": "query",
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string",
-                  "enum": ["direct", "proxy"]
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Force the access mode instead of preferring direct when available."
-            },
-            "required": false
-          }
-        ],
-        "security": [],
-        "responses": {
-          "200": {
-            "description": "SessionEndpointResponse",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SessionEndpointResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "InvalidRequestError",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
-                    },
-                    {
-                      "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
-                    }
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "UnauthorizedError",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UnauthorizedErrorEncoded"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "SessionNotFoundError",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
-                }
-              }
-            }
-          },
-          "502": {
-            "description": "SandboxUnreachableError",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SandboxUnreachableErrorEncoded"
-                }
-              }
-            }
-          }
-        },
-        "description": "Resolve the sandbox address for one preview port. Returns the direct address, the server-proxy address, and the SaaS proxy fallback; unreachable sandboxes answer 502 and record a throttled session.preview.down event.",
-        "summary": "Resolve session preview endpoint"
-      }
-    },
-    "/api/session/{sessionID}/proxy-errors": {
-      "get": {
-        "tags": ["session preview proxy"],
-        "operationId": "session.proxy.errors",
-        "parameters": [
-          {
-            "name": "sessionID",
-            "in": "path",
-            "schema": {
-              "type": "string",
-              "pattern": "^ses"
-            },
-            "required": true
-          }
-        ],
-        "security": [],
-        "responses": {
-          "200": {
-            "description": "Recent proxy errors for the session keyed by sandbox port.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SessionProxyErrorsResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "InvalidRequestError",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "UnauthorizedError",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UnauthorizedErrorEncoded"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "SessionNotFoundError",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
-                }
-              }
-            }
-          }
-        },
-        "description": "Recent runtime/network errors the preview proxy collected for the session, grouped by port.",
-        "summary": "List session proxy errors"
-      }
     }
   },
   "components": {
@@ -18547,6 +18777,23 @@
         "required": ["_tag", "type", "message"],
         "additionalProperties": false
       },
+      "SandboxUnreachableErrorEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": ["SandboxUnreachableError"]
+          },
+          "sessionID": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": ["_tag", "sessionID", "message"],
+        "additionalProperties": false
+      },
       "ServerInfo": {
         "type": "object",
         "properties": {
@@ -18891,6 +19138,9 @@
           },
           "appId": {
             "$ref": "#/components/schemas/Session.AppId"
+          },
+          "pvcMode": {
+            "$ref": "#/components/schemas/Session.PvcMode"
           },
           "parentID": {
             "type": "string",
@@ -19284,6 +19534,9 @@
             "type": "string"
           },
           "recent": {
+            "type": "string"
+          },
+          "historyPath": {
             "type": "string"
           },
           "providerContext": {
@@ -19939,6 +20192,11 @@
         "required": ["providerID", "provider", "modelID", "route", "protocol", "endpoint"],
         "additionalProperties": false
       },
+      "Session.PvcMode": {
+        "type": "string",
+        "enum": ["session", "app"],
+        "description": "PVC sharing scope: per-session isolation or app-level sharing via appId."
+      },
       "Session.Revert": {
         "type": "object",
         "properties": {
@@ -20019,6 +20277,80 @@
           }
         },
         "required": ["_tag", "sessionID", "message"],
+        "additionalProperties": false
+      },
+      "SessionEndpointResponse": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": ["direct", "proxy"],
+            "description": "Resolved access mode; direct when the sandbox address is reachable, otherwise proxy."
+          },
+          "url": {
+            "type": "string"
+          },
+          "directUrl": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "proxyUrl": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "previewUrl": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "port": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "enum": ["Infinity", "-Infinity", "NaN"]
+              }
+            ]
+          },
+          "sandboxId": {
+            "type": "string"
+          },
+          "fallback": {
+            "type": "string",
+            "description": "SaaS-owned proxy path to use when neither resolved address works."
+          },
+          "degraded": {
+            "anyOf": [
+              {
+                "type": "boolean",
+                "description": "Both endpoint resolutions failed; url fell back to the proxy path."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": ["mode", "url", "directUrl", "proxyUrl", "previewUrl", "port", "sandboxId", "fallback"],
         "additionalProperties": false
       },
       "SessionGenerateResponse": {
@@ -20108,6 +20440,97 @@
         },
         "required": ["_tag", "sessionID", "message"],
         "additionalProperties": false
+      },
+      "SessionProxyError": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["runtime", "network", "compile"]
+          },
+          "message": {
+            "type": "string"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "line": {
+            "anyOf": [
+              {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "string",
+                    "enum": ["Infinity", "-Infinity", "NaN"]
+                  }
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "col": {
+            "anyOf": [
+              {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "string",
+                    "enum": ["Infinity", "-Infinity", "NaN"]
+                  }
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "stack": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "timestamp": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "enum": ["Infinity", "-Infinity", "NaN"]
+              }
+            ]
+          }
+        },
+        "required": ["type", "message", "timestamp"],
+        "additionalProperties": false
+      },
+      "SessionProxyErrorsResponse": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/SessionProxyError"
+          }
+        },
+        "description": "Recent proxy errors for the session keyed by sandbox port."
       },
       "SessionStats.Activity": {
         "type": "object",
@@ -20834,188 +21257,6 @@
         },
         "required": ["name", "data"],
         "additionalProperties": false
-      },
-      "SandboxUnreachableErrorEncoded": {
-        "type": "object",
-        "properties": {
-          "_tag": {
-            "type": "string",
-            "enum": ["SandboxUnreachableError"]
-          },
-          "sessionID": {
-            "type": "string"
-          },
-          "message": {
-            "type": "string"
-          }
-        },
-        "required": ["_tag", "sessionID", "message"],
-        "additionalProperties": false
-      },
-      "SessionEndpointResponse": {
-        "type": "object",
-        "properties": {
-          "mode": {
-            "type": "string",
-            "enum": ["direct", "proxy"],
-            "description": "Resolved access mode; direct when the sandbox address is reachable, otherwise proxy."
-          },
-          "url": {
-            "type": "string"
-          },
-          "directUrl": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "proxyUrl": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "previewUrl": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "port": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "string",
-                "enum": ["Infinity", "-Infinity", "NaN"]
-              }
-            ]
-          },
-          "sandboxId": {
-            "type": "string"
-          },
-          "fallback": {
-            "type": "string",
-            "description": "SaaS-owned proxy path to use when neither resolved address works."
-          },
-          "degraded": {
-            "anyOf": [
-              {
-                "type": "boolean",
-                "description": "Both endpoint resolutions failed; url fell back to the proxy path."
-              },
-              {
-                "type": "null"
-              }
-            ]
-          }
-        },
-        "required": ["mode", "url", "directUrl", "proxyUrl", "previewUrl", "port", "sandboxId", "fallback"],
-        "additionalProperties": false
-      },
-      "SessionProxyError": {
-        "type": "object",
-        "properties": {
-          "type": {
-            "type": "string",
-            "enum": ["runtime", "network", "compile"]
-          },
-          "message": {
-            "type": "string"
-          },
-          "url": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "line": {
-            "anyOf": [
-              {
-                "anyOf": [
-                  {
-                    "type": "number"
-                  },
-                  {
-                    "type": "string",
-                    "enum": ["Infinity", "-Infinity", "NaN"]
-                  }
-                ]
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "col": {
-            "anyOf": [
-              {
-                "anyOf": [
-                  {
-                    "type": "number"
-                  },
-                  {
-                    "type": "string",
-                    "enum": ["Infinity", "-Infinity", "NaN"]
-                  }
-                ]
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "stack": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "timestamp": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "string",
-                "enum": ["Infinity", "-Infinity", "NaN"]
-              }
-            ]
-          }
-        },
-        "required": ["type", "message", "timestamp"],
-        "additionalProperties": false
-      },
-      "SessionProxyErrorsResponse": {
-        "type": "object",
-        "additionalProperties": {
-          "type": "array",
-          "items": {
-            "$ref": "#/components/schemas/SessionProxyError"
-          }
-        },
-        "description": "Recent proxy errors for the session keyed by sandbox port."
       }
     },
     "securitySchemes": {}
@@ -21042,6 +21283,18 @@
     {
       "name": "session filesystem",
       "description": "Session-scoped filesystem routes backed by the session sandbox."
+    },
+    {
+      "name": "session attachments",
+      "description": "Session-scoped managed attachment downloads."
+    },
+    {
+      "name": "session vcs",
+      "description": "Session-scoped version control routes backed by the session sandbox."
+    },
+    {
+      "name": "session preview proxy",
+      "description": "Session-scoped preview access to dev servers running inside the session sandbox."
     },
     {
       "name": "session",
@@ -21139,10 +21392,6 @@
     {
       "name": "config",
       "description": "Location-scoped configuration routes."
-    },
-    {
-      "name": "session preview proxy",
-      "description": "Session-scoped preview access to dev servers running inside the session sandbox."
     }
   ]
 }

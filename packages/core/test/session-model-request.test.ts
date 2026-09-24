@@ -1,6 +1,7 @@
-import { describe, expect, test } from "bun:test"
+import { describe, expect, it, test } from "bun:test"
 import { Message, ToolResultPart } from "@opencode/ai"
-import { boundImages, unsupportedParts } from "@opencode/core/session/model-request"
+import { boundImages, materializeManagedAttachments, unsupportedParts } from "@opencode/core/session/model-request"
+import { Effect } from "effect"
 
 const capabilities = (input: string[]) => ({ tools: true, input, output: ["text"] })
 
@@ -62,6 +63,51 @@ describe("SessionModelRequest.unsupportedParts", () => {
   test("preserves supported media", () => {
     const message = Message.user({ type: "media", mediaType: "image/png", data: "aGVsbG8=" })
     expect(unsupportedParts([message], capabilities(["text", "image"]))[0]?.content).toEqual(message.content)
+  })
+})
+
+describe("SessionModelRequest.materializeManagedAttachments", () => {
+  it("omits managed media when no sandbox provider is available", async () => {
+    const messages = [
+      Message.tool(
+        ToolResultPart.make({
+          id: "call_1",
+          name: "read",
+          result: {
+            type: "content",
+            value: [
+              { type: "text", text: "Image read successfully" },
+              {
+                type: "file",
+                uri: "/api/session/ses_test/attachment/att_123",
+                mime: "image/png",
+                name: "logo.png",
+              },
+              {
+                type: "file",
+                uri: "/api/session/ses_test/attachment/att_456",
+                mime: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                name: "report.docx",
+              },
+            ],
+          },
+        }),
+      ),
+    ]
+
+    const result = await Effect.runPromise(materializeManagedAttachments(messages))
+    expect(result[0]?.content[0]).toMatchObject({
+      type: "tool-result",
+      result: {
+        type: "content",
+        value: [
+          { type: "text", text: "Image read successfully" },
+          { type: "text", text: "[Attachment omitted: logo.png]" },
+        ],
+      },
+    })
+    expect(JSON.stringify(result)).not.toContain("/api/session/")
+    expect(JSON.stringify(result)).not.toContain("att_123")
   })
 })
 

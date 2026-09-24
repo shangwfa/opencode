@@ -13,6 +13,8 @@ import { Location } from "../../location.js"
 import { FileAccess } from "../../file-access.js"
 import { Patch } from "@opencode/util/patch"
 import { Permission } from "../../permission.js"
+import { SandboxPath } from "../../sandbox/path.js"
+import { SandboxProvider } from "../../sandbox/provider.js"
 import DESCRIPTION from "../patch.txt"
 import { fileDiff } from "./file-diff.js"
 
@@ -73,6 +75,7 @@ export const Plugin = {
     const formatter = yield* Formatter.Service
     const location = yield* Location.Service
     const permission = yield* Permission.Service
+    const sandboxProvider = yield* SandboxProvider.Service
 
     yield* ctx.tool
       .transform((editor) =>
@@ -99,6 +102,10 @@ export const Plugin = {
                 message: `${operation}: ${errorMessage(error)}${completed ? `. Completed before failure: ${completed}` : ""}`,
               })
             }
+            const sandboxPath = (target: FileAccess.Target) => {
+              const value = SandboxPath.toSandboxPath(target.absolute, location.directory)
+              return SandboxPath.isSandboxPath(value) ? value : undefined
+            }
             return Effect.gen(function* () {
               const source = {
                 type: "tool" as const,
@@ -116,6 +123,11 @@ export const Plugin = {
               const updates = new Map<string, string>()
               const resolveTarget = Effect.fnUntraced(function* (value: string) {
                 const target = yield* access.resolve({ path: value, kind: "file" })
+                if (sandboxProvider.enabled) {
+                  if (!sandboxPath(target))
+                    return yield* new ToolFailure({ message: `Path escapes the sandbox workspace: ${value}` })
+                  return target
+                }
                 if (!target.externalDirectory) return target
                 yield* access.authorizeExternal([target], context, {
                   filepath: target.absolute,
@@ -123,6 +135,61 @@ export const Plugin = {
                 })
                 return target
               })
+              const readTarget = (target: FileAccess.Target, operation: string) => {
+                const displayPath =
+                  !sandboxProvider.enabled && operation === "read file to update" ? target.absolute : target.resource
+                const error = (cause: unknown) =>
+                  new ToolFailure({
+                    message: `patch verification failed: Failed to ${operation} ${displayPath}: ${errorMessage(cause)}`,
+                  })
+                if (!sandboxProvider.enabled)
+                  return FileMutation.readText(environment.files, target.absolute).pipe(Effect.mapError(error))
+                const sandboxFile = sandboxPath(target)
+                if (!sandboxFile)
+                  return Effect.fail(
+                    new ToolFailure({ message: `Path escapes the sandbox workspace: ${target.resource}` }),
+                  )
+                return Effect.gen(function* () {
+                  const stat = yield* sandboxProvider
+                    .fileStat(context.sessionID, sandboxFile)
+                    .pipe(Effect.mapError(error))
+                  if (!stat) return yield* Effect.fail(error(new Error("file does not exist")))
+                  if (stat.isDirectory) return yield* Effect.fail(error(new Error("path is a directory")))
+                  const content = yield* sandboxProvider
+                    .fileRead(context.sessionID, sandboxFile)
+                    .pipe(Effect.mapError(error))
+                  if (content === null) return yield* Effect.fail(error(new Error("file does not exist")))
+                  return Bom.split(content)
+                })
+              }
+              const writeTarget = (target: FileAccess.Target, content: string, operation: string) => {
+                if (!sandboxProvider.enabled)
+                  return environment.files
+                    .write(target.absolute, new TextEncoder().encode(content))
+                    .pipe(Effect.mapError((cause) => fail(operation, cause)))
+                const sandboxFile = sandboxPath(target)
+                if (!sandboxFile)
+                  return Effect.fail(
+                    new ToolFailure({ message: `Path escapes the sandbox workspace: ${target.resource}` }),
+                  )
+                return sandboxProvider
+                  .fileWrite(context.sessionID, sandboxFile, content)
+                  .pipe(Effect.mapError((cause) => fail(operation, cause)))
+              }
+              const removeTarget = (target: FileAccess.Target, operation: string) => {
+                if (!sandboxProvider.enabled)
+                  return environment.files
+                    .remove(target.absolute)
+                    .pipe(Effect.mapError((cause) => fail(operation, cause)))
+                const sandboxFile = sandboxPath(target)
+                if (!sandboxFile)
+                  return Effect.fail(
+                    new ToolFailure({ message: `Path escapes the sandbox workspace: ${target.resource}` }),
+                  )
+                return sandboxProvider
+                  .fileDelete(context.sessionID, sandboxFile)
+                  .pipe(Effect.mapError((cause) => fail(operation, cause)))
+              }
               for (const hunk of hunks) {
                 yield* Effect.gen(function* () {
                   const target = yield* resolveTarget(hunk.path)
@@ -139,14 +206,7 @@ export const Plugin = {
                     return
                   }
                   if (hunk.type === "delete") {
-                    const content = yield* FileMutation.readText(environment.files, target.absolute).pipe(
-                      Effect.mapError(
-                        (error) =>
-                          new ToolFailure({
-                            message: `patch verification failed: Failed to delete ${target.resource}: ${errorMessage(error)}`,
-                          }),
-                      ),
-                    )
+                    const content = yield* readTarget(target, "delete")
                     prepared.push({ ...hunk, target, before: content.text, after: "" })
                     return
                   }
@@ -154,14 +214,7 @@ export const Plugin = {
                   const original =
                     previous ??
                     (yield* Effect.gen(function* () {
-                      const content = yield* FileMutation.readText(environment.files, target.absolute).pipe(
-                        Effect.mapError(
-                          (error) =>
-                            new ToolFailure({
-                              message: `patch verification failed: Failed to read file to update ${target.absolute}: ${errorMessage(error)}`,
-                            }),
-                        ),
-                      )
+                      const content = yield* readTarget(target, "read file to update")
                       return Bom.join(content.text, content.bom)
                     }))
                   const before = Bom.split(original).text
@@ -212,9 +265,7 @@ export const Plugin = {
                 (change) =>
                   Effect.gen(function* () {
                     if (change.type === "delete") {
-                      yield* environment.files
-                        .remove(change.target.absolute)
-                        .pipe(Effect.mapError((error) => fail(`Failed to delete ${change.target.resource}`, error)))
+                      yield* removeTarget(change.target, `Failed to delete ${change.target.resource}`)
                       applied.push({
                         type: change.type,
                         resource: change.target.resource,
@@ -224,16 +275,11 @@ export const Plugin = {
                     }
                     if (change.type === "update" && change.moveTarget) {
                       const moveTarget = change.moveTarget
-                      yield* environment.files
-                        .write(moveTarget.absolute, new TextEncoder().encode(change.content))
-                        .pipe(Effect.mapError((error) => fail(`Failed to write ${moveTarget.resource}`, error)))
-                      yield* environment.files
-                        .remove(change.target.absolute)
-                        .pipe(
-                          Effect.mapError((error) =>
-                            fail(`Wrote ${moveTarget.resource} but failed to remove ${change.target.resource}`, error),
-                          ),
-                        )
+                      yield* writeTarget(moveTarget, change.content, `Failed to write ${moveTarget.resource}`)
+                      yield* removeTarget(
+                        change.target,
+                        `Wrote ${moveTarget.resource} but failed to remove ${change.target.resource}`,
+                      )
                       applied.push({
                         type: change.type,
                         resource: change.moveTarget.resource,
@@ -241,9 +287,7 @@ export const Plugin = {
                       })
                       return
                     }
-                    yield* environment.files
-                      .write(change.target.absolute, new TextEncoder().encode(change.content))
-                      .pipe(Effect.mapError((error) => fail(`Failed to write ${change.target.resource}`, error)))
+                    yield* writeTarget(change.target, change.content, `Failed to write ${change.target.resource}`)
                     applied.push({
                       type: change.type,
                       resource: change.target.resource,
@@ -257,6 +301,8 @@ export const Plugin = {
                 [...new Set(applied.filter((item) => item.type !== "delete").map((item) => item.target))],
                 (target) =>
                   Effect.gen(function* () {
+                    // A host formatter cannot safely read or mutate a remote sandbox path.
+                    if (sandboxProvider.enabled) return
                     const current = yield* FileMutation.readText(environment.files, target).pipe(
                       Effect.mapError((error) => fail(`Failed to read ${target}`, error)),
                     )

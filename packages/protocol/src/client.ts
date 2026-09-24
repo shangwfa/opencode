@@ -51,6 +51,7 @@ export const groupNames = {
   "server.permission": "permission",
   "server.fs": "file",
   "server.session-fs": "sessionFs",
+  "server.session-attachment": "sessionAttachment",
   "server.command": "command",
   "server.skill": "skill",
   "server.rpc": "rpc",

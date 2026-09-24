@@ -111,6 +111,18 @@ describe("ReadTool text serialization", () => {
   })
 })
 
+describe("ReadTool UTF-8 validation", () => {
+  it.effect("rejects excessive replacement characters while tolerating occasional U+FFFD", () =>
+    Effect.sync(() => {
+      expect(ReadToolFileSystem.hasExcessiveInvalidUtf8(new Uint8Array())).toBe(false)
+      expect(ReadToolFileSystem.hasExcessiveInvalidUtf8("valid text")).toBe(false)
+      expect(ReadToolFileSystem.hasExcessiveInvalidUtf8("hello\uFFFD world")).toBe(false)
+      expect(ReadToolFileSystem.hasExcessiveInvalidUtf8(Uint8Array.of(0xff, 0xfd))).toBe(true)
+      expect(ReadToolFileSystem.hasExcessiveInvalidUtf8("\uFFFD\uFFFD")).toBe(true)
+    }),
+  )
+})
+
 describe("ReadToolFileSystem", () => {
   it.effect("preserves the environment not-found error", () =>
     Effect.gen(function* () {
@@ -141,7 +153,7 @@ describe("ReadToolFileSystem", () => {
     }),
   )
 
-  it.effect("reads malformed UTF-8 lossily and still rejects null-byte binary content", () =>
+  it.effect("rejects malformed UTF-8 and null-byte binary content", () =>
     Effect.gen(function* () {
       const { environment, files, directory } = yield* fixture
       const binary = path.join(directory, "archive.dat")
@@ -150,11 +162,14 @@ describe("ReadToolFileSystem", () => {
       yield* files.writeFile(malformed, Uint8Array.of(0x68, 0x69, 0x80))
 
       const binaryError = yield* ReadToolFileSystem.read(environment, absolute(binary), "archive.dat").pipe(Effect.flip)
-      const malformedResult = yield* ReadToolFileSystem.read(environment, absolute(malformed), "malformed.txt")
+      const malformedError = yield* ReadToolFileSystem.read(environment, absolute(malformed), "malformed.txt").pipe(
+        Effect.flip,
+      )
 
       expect(binaryError).toBeInstanceOf(ReadToolFileSystem.BinaryFileError)
       expect(binaryError.message).toBe("Cannot read binary file: archive.dat")
-      expect(malformedResult).toMatchObject({ type: "file", content: "hi\uFFFD", encoding: "utf8" })
+      expect(malformedError).toBeInstanceOf(ReadToolFileSystem.InvalidUtf8Error)
+      expect(malformedError.message).toBe("File is not valid UTF-8: malformed.txt")
     }),
   )
 

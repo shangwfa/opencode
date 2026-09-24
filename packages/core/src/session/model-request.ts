@@ -22,13 +22,16 @@ import type {
 import type { Agent } from "@opencode/schema/agent"
 import type { Model } from "@opencode/schema/model"
 import type { Content } from "@opencode/schema/tool"
-import { Cause, Context, Effect, Layer, Result, Stream } from "effect"
+import { Cause, Context, Effect, Layer, Option, Result, Stream } from "effect"
 import { HttpClientRequest, HttpClientResponse } from "effect/unstable/http"
 import { makeLocationNode } from "@opencode/util/effect/app-node"
 import { App } from "../app.js"
+import { Image } from "../image.js"
 import { Permission } from "../permission.js"
 import { PluginHooks } from "../plugin/hooks.js"
 import { QuestionTool } from "../tool/plugin/question.js"
+import { SandboxProvider } from "../sandbox/provider.js"
+import { ToolAttachment } from "../tool/attachment.js"
 import { Tool } from "../tool.js"
 import { SessionModelTransport } from "./model-transport.js"
 import { SessionProviderContext } from "./provider-context.js"
@@ -43,6 +46,62 @@ const IMAGE_BYTES_TARGET = 15 * 1024 * 1024 // 15 MiB
 const IMAGE_REMOVED =
   "[This image was removed to reduce the request size and is no longer visible. Do not make claims about its contents from memory. If needed, retrieve it again with an available tool or ask the user to attach it again.]"
 const GENERATION_KEYS = new Set(Object.keys(GenerationOptions.fields))
+const MANAGED_ATTACHMENT = /^\/api\/session\/(ses_[0-9A-Za-z]+)\/attachment\/(att_[0-9A-Za-z]+)$/
+
+export const materializeManagedAttachments = Effect.fn("SessionModelRequest.materializeManagedAttachments")(
+  function* (messages: LLMRequest["messages"], provider?: SandboxProvider.Interface, image?: Image.Interface) {
+    return yield* Effect.forEach(messages, (message) =>
+      Effect.gen(function* () {
+        const content = yield* Effect.forEach(message.content, (part) =>
+          Effect.gen(function* () {
+            if (part.type !== "tool-result" || part.result.type !== "content") return part
+            const value = yield* Effect.forEach(part.result.value, (item) =>
+              Effect.gen(function* () {
+                if (item.type !== "file") return item
+                const match = MANAGED_ATTACHMENT.exec(item.uri)
+                if (!match) return item
+                if (!item.mime.startsWith("image/") && item.mime !== "application/pdf") return
+                if (!provider) return { type: "text" as const, text: `[Attachment omitted: ${item.name ?? item.mime}]` }
+                const attachmentInput = {
+                  sessionID: SessionSchema.ID.descending(match[1]),
+                  id: ToolAttachment.ID.make(match[2]),
+                }
+                const attachment = yield* (provider.enabled
+                  ? ToolAttachment.forModel({ ...attachmentInput, provider })
+                  : ToolAttachment.forModelLocal(attachmentInput)
+                ).pipe(
+                  Effect.catch(() => Effect.succeed(undefined)),
+                )
+                if (!attachment) return { type: "text" as const, text: `[Attachment omitted: ${item.name ?? item.mime}]` }
+                const normalized =
+                  image && item.mime.startsWith("image/")
+                    ? yield* image
+                        .normalize(item.name ?? item.mime, {
+                          uri: item.name ?? item.mime,
+                          content: attachment.data,
+                          encoding: "base64",
+                          mime: attachment.metadata.mime,
+                        })
+                        .pipe(
+                          Effect.map((value) => value.content),
+                          Effect.catchTag("Image.ResizerUnavailableError", () => Effect.succeed(attachment.data)),
+                          Effect.catchTag("Image.DecodeError", () => Effect.succeed(undefined)),
+                          Effect.catchTag("Image.SizeError", () => Effect.succeed(undefined)),
+                        )
+                    : attachment.data
+                return normalized
+                  ? { ...item, uri: `data:${attachment.metadata.mime};base64,${normalized}` }
+                  : { type: "text" as const, text: `[Attachment omitted: ${item.name ?? item.mime}]` }
+              }),
+            )
+            return { ...part, result: { ...part.result, value: value.filter((item) => item !== undefined) } }
+          }),
+        )
+        return Message.make({ ...message, content })
+      }),
+    )
+  },
+)
 
 /** Tool errors, plus the user declining a permission or dismissing a question. */
 export type ExecuteError = Tool.Error | Permission.DeclinedError | QuestionTool.CancelledError
@@ -203,6 +262,8 @@ export const layer = Layer.effect(
     >(kind: SessionRequestKind, input: Input, shape: (draft: SessionRequest, tools: Definitions) => Effect.Effect<S>) {
       const session = input.session
       const model = input.model
+      const sandboxProvider = Option.getOrUndefined(yield* Effect.serviceOption(SandboxProvider.Service))
+      const image = Option.getOrUndefined(yield* Effect.serviceOption(Image.Service))
       const scope = { sessionID: session.id, agent: input.agent, model: model.ref, kind }
       const tools = input.tools ?? {
         definitions: [],
@@ -246,7 +307,12 @@ export const layer = Layer.effect(
         // TODO: Persist cache lineage so nested forks reuse the root session's cache key.
         promptCacheKey: /^ses_[0-9a-f]{64}$/.test(root) ? root.slice(4) : root,
         system: shaped.system,
-        messages: boundImages(unsupportedParts(shaped.messages, model.capabilities)),
+        messages: boundImages(
+          unsupportedParts(
+            yield* materializeManagedAttachments(shaped.messages, sandboxProvider, image),
+            model.capabilities,
+          ),
+        ),
         tools: Array.from(hooked, ([name, t]) => ({ ...t, name })),
         toolChoice: input.toolChoice,
         generation: Object.keys(generation).length === 0 ? undefined : generation,
