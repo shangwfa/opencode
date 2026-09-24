@@ -244,6 +244,7 @@ export const makeSessionGroup = <
           sandbox: Session.SandboxResource.pipe(Schema.optional),
         }),
         success: Schema.Struct({ data: PublicSessionInfo }),
+        error: [SessionNotFoundError],
       }).annotateMerge(
         OpenApi.annotations({
           identifier: "session.create",

@@ -166,7 +166,7 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
               .create(ctx.payload.parentID
                 ? { ...createInput, parentID: ctx.payload.parentID }
                 : { ...createInput, location: ctx.payload.location ?? { directory: AbsolutePath.make(process.cwd()) } })
-              .pipe(Effect.orDie),
+              .pipe(Effect.catchTag("Session.NotFoundError", missingSession)),
           }
         }),
       )
