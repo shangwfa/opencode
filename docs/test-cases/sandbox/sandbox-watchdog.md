@@ -934,6 +934,88 @@ Code Agent 检查现场并决定是否重试（最多 2 次；写入操作先验
 
 ---
 
+## V2 执行记录（2026-09-24，本地 PG + 本地 OpenSandbox，容器 `opencode-saas-v2:proxy-endpoint --print-logs`）
+
+> V1 的三组机制在 V2 中的现状不同，以下为按 V2 API（`/api/session/:id/shell|fs/list|kill-sandbox|interrupt`）实测的结果。
+
+### 一、沙箱缓存性能
+
+| 用例 | 结果 | 说明 |
+|---|---|---|
+| T28.1 缓存命中 | ✅ | 首次 0.40s（root session auto-boot 已提前建沙箱）、后续 0.06–0.15s 全部 <0.2s（V2 缓存为内存 entries 常驻，无 TTL） |
+| T28.2 并发绕过 lock | ✅ | 5 并发 `fs/list` 总耗时 702ms（<1s，不串行） |
+| T28.3 TTL 过期 | ⏭️ 不适用 | V2 无 TTL 缓存（`entries` 常驻 + `isHealthy` 兜底 + 销毁时 drop），语义与 V1 的 5 分钟 TTL 不同 |
+| T28.4/T28.20 90s 获取超时 | ⚠️ 部分 | 不可达地址下 SDK 快速失败：shell 4s 返回 204、错误文本 `Sandbox.create failed: Unable to connect` 落 session log（错误可见 ✅）；90s 挂起上限存在于代码（`GET_OR_CREATE_TIMEOUT_SECONDS`）但本地无法制造"TCP 通而不响应"场景，且 V1 的 timeout/concurrency 单测未移植到 V2 |
+| T28.6 销毁后缓存失效 | ✅ | kill-sandbox 后 shell 2.24s 重建（非陈旧缓存秒回）；注意 V2 `fs` 接口为 fail-fast 语义（沙箱不在时 404 不重建） |
+| T28.7 init 失败日志 | ✅（本次修复） | **V2 原缺失**：createSandbox 失败无 ERROR 日志。已补 `Effect.logError("sandbox create failed", {sessionID, ms, error})`，实测输出 `level=ERROR ... error="Sandbox.create failed: Unable to connect..." ms=17` |
+| T28.8 阶段耗时日志 | ⚠️ 部分 | `--print-logs` 下有 `sandbox creating` → `sandbox created`（本次已补 `ms=3143` 耗时字段）；V1 的 `reconnect done ms=`/`isHealthy done ms=` 分阶段字段未移植（V2 结构中这两步在 `getOrCreate` 内联） |
+
+### 二、PG 命令生命周期超时
+
+| 用例 | 结果 | 说明 |
+|---|---|---|
+| T28.15/T28.19 注入测试 | ⏭️ SKIP | V2 无 `sandbox-provider-pg.test.ts` 等注入测试（V1 测试未移植） |
+| T28.16 semaphore 排队超时 | ⚠️ 部分 | 串行化存在：并发 `sleep 4`+`echo` 总耗时 4.97s 且 first 先完成；排队预算（`timeout+5s`）逻辑在 `withSemaphoreWaitTimeout` 内，黑盒下因命令执行超时先到期而不易单独触发 |
+| T28.17 前台命令超时 | ✅ PASS（2026-09-24 修复轮） | shell API 新增 `timeoutSeconds`：`sleep 30` + `timeoutSeconds=3` → 3.8s 返回 204，`session.shell.ended status=timeout`、输出含 `Command exceeded timeout of 3000 ms.`。修复内容：① protocol/handler/core 管道打通 `timeoutSeconds`；② provider 执行 guard 由 `timeout+15s` 改为 `timeout` 本值，保证执行超时先于外层排队预算（`timeout+5s`）到期，不再误报 `command queue wait timed out` |
+| T28.18 detached 超时 | ⏭️ SKIP | V2 无 `/exec/async` 等价物 |
+| T28.21 超时后恢复 | ✅ PASS（附已知边界） | 超时 recycle（interrupt+deleteSession）后 `echo recovered` 最终成功（`status=exited`，输出正确）；首条命令耗时 60–90s——超时回收后 command session 重建开销偏大（V1 已知边界的加重版，记录为**观察项**：recycle 后重建路径）。正常命令间不受影响（0.14s） |
+| T28.22 keep-alive 回归 | ✅ | `keep_alive=true` 下命令正常；PG `state=running, keep_alive=1, command_session_id` 一致 |
+
+### 三、Part Watchdog（T28.5/5b/9–14）— ✅ V2 已实现（2026-09-24）
+
+**V2 实现**（`packages/core/src/session/watchdog.ts`，参考 V1 但按 V2 事件架构重设计）：
+
+| V1 机制 | V2 等价实现 |
+|---|---|
+| 扫描 part 表（running + 超时 SQL） | 扫描 `execution.active` 会话的消息投影（`session_message.data->content[].state.status='running'` 且 `time.ran` 超阈值） |
+| `markTimedOut` CAS 条件更新 | **投影天然 CAS**：`session.tool.failed` 事件仅在 part 仍为 `running/streaming` 时应用（message-updater 幂等保护），多实例重复标记自动 no-op |
+| ToolExecution 注册表（本进程所有权） | 只扫 `execution.active`（本进程执行中的会话）——天然本进程所有权 |
+| interrupt 本进程执行 | `execution.interrupt(sessionID, {reason: "watchdog"})` → fiber 中断 → 沙箱命令 abort → step 的 `failUnsettledTools` 结算（uninterruptibleMask 保证事件落库） |
+| lease/orphan 多实例恢复 | 不在本服务内：进程崩溃遗留由 `SessionRestart.resumeSuspendedSessions` + drain 时的 `settleStaleToolCalls` 兜底（已有机制） |
+| retry 元数据（strategy/attempt） | 未移植——V2 中断后 turn 以 aborted 收敛,由模型在下一输入自然决定重试 |
+| MONITORED_TOOLS 白名单 | 反向**豁免名单**（`OPENCODE_WATCHDOG_EXEMPT_TOOLS`,默认 `subagent,task`）,适配 V2 插件/MCP 工具可扩展性 |
+
+**配置**:`OPENCODE_WATCHDOG_TIMEOUT_SEC`（默认 120,`=0` 禁用）、`OPENCODE_WATCHDOG_SCAN_INTERVAL_SEC`（默认 60）、`OPENCODE_WATCHDOG_EXEMPT_TOOLS`。
+
+**验证结果**（容器 `opencode-saas-watchdog-e2e`，14108,阈值 30s+扫描 10s,AI 经 bash `timeout=0` 执行 `sleep 600` 制造真实挂起）：
+
+| 验证点 | 结果 |
+|---|---|
+| 卡住 tool 被检测并中断 | ✅ ~35s 介入：`WARN watchdog stuck tools detected tools=["shell"] timeoutMs=30000` + `watchdog scan completed sessions=1 stuck=1 interrupted=1 durationMs=75` |
+| tool 状态收敛 | ✅ `session.tool.failed`（`{type:"aborted", message:"Tool execution interrupted"}`,由 step 结算路径发布） |
+| 执行事件 reason | ✅ `session.execution.interrupted reason=watchdog`（durable 事件,可 replay） |
+| 会话恢复 | ✅ 中断后同 session shell 命令正常执行 |
+| 单测 | ✅ `packages/core/test/session-watchdog.test.ts` 9 pass（超时标记/未超时不处理/streaming|completed|error 不处理/豁免名单/无 ran 跳过/仅本进程会话/自定义豁免/env 配置解析） |
+| CAS 防覆盖(T28.9)/多实例幂等(T28.10) | ✅ 由投影幂等结构性保证（failed 仅在 running/streaming 时应用）；黑盒实测：向 PG 插入「非活跃会话 + running 超 10 分钟」的遗留 tool part，2 轮扫描后仍 running 未被误杀 |
+| 崩溃遗留结算（补充） | ✅ 合法 running 遗留消息（schema 校验通过）在新 prompt 触发 drain 时由 `settleStaleToolCalls` 结算为 `error`（`Tool execution interrupted: read`），新 turn 正常执行 |
+| 未超时不处理(T28.12) | ✅ 单测覆盖 + 阈值前无动作 |
+| 可观测性(T28.13) | ✅ `watchdog stuck tools detected`（WARN）+ `watchdog scan completed`（sessions/stuck/interrupted/durationMs） |
+| T28.11 配置注入 | ✅ `layerWithConfig` + `scanOnce`（测试直调,不依赖后台调度） |
+
+### 四、健壮性修复轮（2026-09-24，测试中发现的三个问题）
+
+| 问题 | 根因 | 修复 | 验证 |
+|---|---|---|---|
+| 坏 `session_message` 卡死会话恢复 | 多个独立读取路径对单行坏数据直接 fail：history、message 列表/单条查询、projector 的 `getCurrentAssistant` 等 4 处 | 所有读取路径均按行容错：列表/history 跳过并 warning；单条 lookup 视同不存在；projector 返回 `null` 且调用点按"不存在"处理 | ✅ 向 PG 插入 schema 非法消息（model 缺 `id`、缺 `time`）后 prompt：10s 内 `session.execution.succeeded`，warning 可观测，无 `Failed to drain`；单测验证 `store.messages`/`sessions.messages`/`context`/`message` 一致视同不存在 |
+| prompt 非法 `model` 形态穿透到投影 | `session.prompt`/`promptStream` payload 用 `PromptInput.Prompt.fields` **未声明 `model`**，但 handler 读 `ctx.payload.model`——非法形态原样进入 assistant 消息，投影时 `Model.Ref` 解码炸 `Missing key ["model"]["id"]` | 两个 payload 补 `model: Model.Ref.pipe(optional)`：合法引用透传、非法形态在 API 边界拒绝 | ✅ `{providerID,modelID}` 形态 → `400 InvalidRequestError: Missing key ["model"]["id"]`；合法 `{providerID,id}` → 200 |
+| shell 无超时入口（T28.16/17/18 被 SKIP） | protocol/handler/core 均无 `timeoutSeconds` 管道，provider 的 `timeoutMs` 能力无入口触发；且执行 guard `timeout+15s` 晚于外层排队预算 `timeout+5s`，超时会误报 queue wait + `status=exited` | shell payload/handler/`Session.shell`/`SessionShell.start` 打通 `timeoutSeconds`（sandboxed → `provider.run({timeoutMs})`，本地 → `shell.create({timeout})`）；provider 执行 guard 改为 `Duration.seconds(timeoutSeconds)`（interrupt+recycle 兜底吸收流收尾） | ✅ 见 T28.17/T28.21 行 |
+
+### 本次代码改动
+
+- `packages/core/src/session/history.ts` + `packages/core/src/session/store.ts`：坏消息行级跳过（logWarning）；单条查询视同不存在
+- `packages/core/src/session/projector.ts`：`decodeRow` 容错返回 `null`，4 个调用点 null-safe
+- `packages/protocol/src/groups/session.ts`：`session.prompt`/`SessionPromptStreamPayload` 补 `model: Model.Ref`；`session.shell` payload 补 `timeoutSeconds`
+- `packages/server/src/handlers/session.ts`：shell 透传 `timeoutSeconds`
+- `packages/core/src/session/session.ts` + `packages/core/src/session/shell.ts`：`timeoutSeconds` 管道到 provider.run / shell.create
+- `packages/core/src/sandbox/provider.ts`：执行超时 guard `timeout+15s` → `timeout` 本值（保证先于排队预算到期，正确报 `status=timeout`）
+- `packages/core/src/sandbox/provider.ts`：createSandbox 失败 `logError`（含 ms/error）+ 成功日志补 `ms=` 字段（对应 T28.7/T28.8）
+- `packages/core/src/session/watchdog.ts`（**新建**）：Part Watchdog V2 实现（见"三"）
+- `packages/core/src/session/execution.ts` + `packages/schema/src/session-event.ts`：`InterruptReason`/interrupt API/`session.execution.interrupted` 事件新增 `"watchdog"` 字面量
+- `packages/server/src/routes.ts`：注册 `SessionWatchdog.node`
+- `packages/core/test/session-watchdog.test.ts`（**新建**）：9 个单测
+
+---
+
 ## 结果汇总（2026-08-08 全量复测，SaaS PG）
 
 | 用例 | 状态 | 说明 |

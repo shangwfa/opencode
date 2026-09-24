@@ -116,6 +116,7 @@ describe("public event manifest", () => {
         "session.moved.1",
         "session.renamed.1",
         "session.permissions.1",
+        "session.preview.down.1",
         "session.viewed.1",
         "session.message.content.updated.1",
         "session.usage.recorded.1",

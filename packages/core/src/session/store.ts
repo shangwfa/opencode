@@ -175,8 +175,20 @@ const layer = Layer.effect(
         )
         return yield* Effect.forEach(
           direction === "previous" ? rows.toReversed() : rows,
-          SessionHistory.decodeMessageRow,
-        )
+          // A corrupted row must not fail the whole listing: dropping it keeps
+          // history reads (and the UI message list) alive while the session
+          // history path logs the skip for observability.
+          (row) =>
+            SessionHistory.decodeMessageRow(row).pipe(
+              Effect.catch(() =>
+                Effect.logWarning("skipping undecodable session message", {
+                  sessionID: input.sessionID,
+                  messageID: row.id,
+                  seq: row.seq,
+                }).pipe(Effect.as(null)),
+              ),
+            ),
+        ).pipe(Effect.map((messages) => messages.filter((message) => message !== null)))
       }),
       context: Effect.fn("SessionStore.context")((sessionID) => SessionHistory.load(db, sessionID, "latest")),
       message: Effect.fn("SessionStore.message")(function* (messageID) {
@@ -186,10 +198,13 @@ const layer = Layer.effect(
           .where(eq(SessionMessageTable.id, messageID))
           .get()
           .pipe(Effect.orDie)
-        return row
+        if (!row) return undefined
+        // A corrupted row reads as absent rather than defecting the lookup.
+        const message = yield* SessionHistory.decodeMessageRow(row).pipe(Effect.catch(() => Effect.succeed(null)))
+        return message
           ? {
               sessionID: Session.ID.make(row.session_id),
-              message: yield* SessionHistory.decodeMessageRow(row).pipe(Effect.orDie),
+              message,
             }
           : undefined
       }),

@@ -119,6 +119,7 @@ export type SessionsCursor = typeof SessionsCursor.Type
 export const SessionPromptStreamPayload = Schema.Struct({
   id: SessionMessage.ID.pipe(Schema.optional),
   ...PromptInput.Prompt.fields,
+  model: Model.Ref.pipe(Schema.optional),
   userName: Schema.String.pipe(Schema.optional),
   userId: Schema.String.pipe(Schema.optional),
   metadata: SessionInbox.UserPayload.fields.metadata,
@@ -413,6 +414,10 @@ export const makeSessionGroup = <
         payload: Schema.Struct({
           id: SessionMessage.ID.pipe(Schema.optional),
           ...PromptInput.Prompt.fields,
+          // The handler forwards the selection into the assistant message;
+          // declaring it here rejects malformed refs at the API boundary
+          // instead of failing projection deep inside execution.
+          model: Model.Ref.pipe(Schema.optional),
           userName: Schema.String.pipe(Schema.optional),
           userId: Schema.String.pipe(Schema.optional),
           metadata: SessionInbox.UserPayload.fields.metadata,
@@ -499,6 +504,10 @@ export const makeSessionGroup = <
         payload: Schema.Struct({
           id: SessionMessage.ID.pipe(Schema.optional),
           command: Schema.String,
+          timeoutSeconds: Schema.Number.pipe(Schema.decodeTo(PositiveInt), Schema.optional).annotate({
+            description:
+              "Execution budget in seconds. On timeout the command is interrupted, the shell ends with status timeout, and the sandbox command session is recycled. Omit for no explicit deadline.",
+          }),
         }),
         success: HttpApiSchema.NoContent,
         error: SessionNotFoundError,

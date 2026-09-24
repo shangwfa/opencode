@@ -179,12 +179,16 @@ export const make = Effect.fn("Session.make")(function* () {
   )
   const shell = Effect.fn("Session.shell")(function* (
     sessionID: SessionSchema.ID,
-    input: { id?: SessionMessage.ID; command: string },
+    input: { id?: SessionMessage.ID; command: string; timeoutSeconds?: number },
   ) {
     const session = yield* get(sessionID)
     // The server owns completion recording even if the submitting client disconnects.
     const running = yield* Effect.gen(function* () {
-      const started = yield* SessionShell.start({ session, command: input.command }).pipe(
+      const started = yield* SessionShell.start({
+        session,
+        command: input.command,
+        timeoutSeconds: input.timeoutSeconds,
+      }).pipe(
         Effect.provideService(Instance.Service, instances),
         Effect.tapError((error) =>
           synthetic(sessionID, {

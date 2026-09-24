@@ -233,8 +233,17 @@ const projectFork = Effect.fn("SessionProjector.projectFork")(function* (
 
 function run(db: DatabaseService, event: MessageEvent) {
   return Effect.gen(function* () {
-    const decodeRow = (row: typeof SessionMessageTable.$inferSelect) =>
-      decodeMessage({ ...row.data, id: row.id, type: row.type })
+    // A corrupted row must never wedge projection-driven consumers (the
+    // runner's getCurrentAssistant, settlement, usage) the way it once wedged
+    // history reads: return null and let callers treat it as absent while the
+    // session-history path logs the skip.
+    const decodeRow = (row: typeof SessionMessageTable.$inferSelect): SessionMessage.Info | null => {
+      try {
+        return decodeMessage({ ...row.data, id: row.id, type: row.type })
+      } catch {
+        return null
+      }
+    }
     const updateMessage = (message: SessionMessage.Info) => {
       const encoded = encodeMessage(message)
       const { id, type, ...data } = encoded
@@ -316,7 +325,7 @@ function run(db: DatabaseService, event: MessageEvent) {
             .pipe(Effect.orDie)
           if (!row) return
           const message = decodeRow(row)
-          return message.type === "assistant" && !message.time.completed ? message : undefined
+          return message?.type === "assistant" && !message.time.completed ? message : undefined
         })
       },
       getAssistant(messageID) {
@@ -335,7 +344,7 @@ function run(db: DatabaseService, event: MessageEvent) {
             .pipe(Effect.orDie)
           if (!row) return
           const message = decodeRow(row)
-          return message.type === "assistant" ? message : undefined
+          return message?.type === "assistant" ? message : undefined
         })
       },
       getShell(shellID) {
@@ -356,7 +365,7 @@ function run(db: DatabaseService, event: MessageEvent) {
             .pipe(Effect.orDie)
           if (!row) return
           const message = decodeRow(row)
-          return message.type === "shell" ? message : undefined
+          return message?.type === "shell" ? message : undefined
         })
       },
       getCompaction() {
@@ -377,7 +386,7 @@ function run(db: DatabaseService, event: MessageEvent) {
             .pipe(Effect.orDie)
           if (!row) return
           const message = decodeRow(row)
-          return message.type === "compaction" ? message : undefined
+          return message?.type === "compaction" ? message : undefined
         })
       },
       updateAssistant: updateMessage,

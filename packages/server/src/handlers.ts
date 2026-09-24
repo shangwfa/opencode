@@ -8,6 +8,7 @@ import { PermissionHandler } from "./handlers/permission"
 import { FileSystemHandler } from "./handlers/fs"
 import { SessionFileSystemHandler } from "./handlers/session-fs"
 import { SessionVcsHandler } from "./handlers/session-vcs"
+import { SessionProxyHandler } from "./handlers/session-proxy"
 import { FormHandler } from "./handlers/form"
 import { CommandHandler } from "./handlers/command"
 import { SkillHandler } from "./handlers/skill"
@@ -57,6 +58,7 @@ export const handlers = Layer.mergeAll(
   FileSystemHandler,
   SessionFileSystemHandler,
   SessionVcsHandler,
+  SessionProxyHandler,
   CommandHandler,
   SkillHandler,
   RpcHandler,

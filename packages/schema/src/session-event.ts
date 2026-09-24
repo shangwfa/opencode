@@ -262,7 +262,7 @@ export namespace Execution {
   export const Interrupted = Event.durable({
     type: "session.execution.interrupted",
     ...options,
-    schema: { ...Base, reason: Schema.Literals(["user", "shutdown", "superseded", "inactivity"]) },
+    schema: { ...Base, reason: Schema.Literals(["user", "shutdown", "superseded", "inactivity", "watchdog"]) },
   })
   export type Interrupted = typeof Interrupted.Type
 }
@@ -309,6 +309,26 @@ export namespace Skill {
     },
   })
   export type Activated = typeof Activated.Type
+}
+
+export namespace Preview {
+  /**
+   * The session preview became unreachable through the SaaS proxy/endpoint
+   * APIs — the sandbox was reaped or the dev-server process died. Emitted
+   * throttled (once per session:port per minute) by the preview routes so
+   * operators can query the session log instead of container logs.
+   */
+  export const Down = Event.durable({
+    type: "session.preview.down",
+    ...options,
+    schema: {
+      ...Base,
+      port: PositiveInt,
+      reason: Schema.Literals(["sandbox-unreachable", "port-unreachable"]),
+      hint: Schema.String.pipe(optional),
+    },
+  })
+  export type Down = typeof Down.Type
 }
 
 export namespace Shell {
@@ -680,6 +700,7 @@ export const Definitions = Event.inventory(
   InstructionsUpdated,
   Synthetic,
   Skill.Activated,
+  Preview.Down,
   Shell.Started,
   Shell.Ended,
   Step.Started,

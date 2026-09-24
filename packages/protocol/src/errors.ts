@@ -129,6 +129,15 @@ export class FileNotFoundError extends Schema.TaggedError<FileNotFoundError>()(
   { httpApiStatus: 404 },
 ) {}
 
+export class SandboxUnreachableError extends Schema.TaggedError<SandboxUnreachableError>()(
+  "SandboxUnreachableError",
+  {
+    sessionID: Schema.String,
+    message: Schema.String,
+  },
+  { httpApiStatus: 502 },
+) {}
+
 export class AgentNotFoundError extends Schema.TaggedError<AgentNotFoundError>()(
   "AgentNotFoundError",
   {

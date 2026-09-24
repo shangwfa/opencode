@@ -858,7 +858,12 @@ const layer = Layer.effect(
                 ? consume.pipe(
                     Effect.onInterrupt(() => Effect.sync(() => controller.abort())),
                     Effect.timeoutOrElse({
-                      duration: Duration.seconds(timeoutSeconds + 15),
+                      // The execution deadline must expire *before* the outer
+                      // queue budget (timeout + grace) so timeouts are reported
+                      // as command timeouts, not queue waits. The interrupt +
+                      // recycle fallback in `orElse` absorbs slow stream
+                      // teardown, replacing the previous +15s slack.
+                      duration: Duration.seconds(timeoutSeconds),
                       orElse: () =>
                         Effect.gen(function* () {
                           timedOut = true

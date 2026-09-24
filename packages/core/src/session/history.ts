@@ -108,8 +108,20 @@ const messageEntries = Effect.fnUntraced(function* (
     .all()
     .pipe(Effect.orDie)
   const entries = yield* Effect.forEach(rows, (row) =>
-    decodeMessageRow(row).pipe(Effect.map((message) => ({ seq: row.seq, message }))),
-  )
+    decodeMessageRow(row).pipe(
+      // A single corrupted row must never wedge the whole session: dropping it
+      // keeps prompt delivery, stale-tool settlement, and restart recovery
+      // working while the warning makes the data damage observable.
+      Effect.map((message) => ({ seq: row.seq, message })),
+      Effect.catch(() =>
+        Effect.logWarning("skipping undecodable session message", {
+          sessionID,
+          messageID: row.id,
+          seq: row.seq,
+        }).pipe(Effect.as(null)),
+      ),
+    ),
+  ).pipe(Effect.map((rows) => rows.filter((row) => row !== null)))
   // Re-expansion may cross a native checkpoint whose completion already advanced the instruction
   // epoch: the baseline supersedes the chronological updates before it. Forks seed their baseline
   // at sequence 0 but retain parent sequences, so the copied checkpoint still retires them.

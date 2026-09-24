@@ -36,7 +36,7 @@ export interface Interface {
     sessionID: SessionSchema.ID,
     options?: {
       readonly resume?: boolean
-      readonly reason?: "user" | "inactivity"
+      readonly reason?: "user" | "inactivity" | "watchdog"
       readonly awaitSettlement?: boolean
     },
   ) => Effect.Effect<boolean>
@@ -47,7 +47,7 @@ export interface Interface {
 /** Routes execution from a Session ID to its selected instance's runner. */
 export class Service extends Context.Service<Service, Interface>()("@opencode/SessionExecution") {}
 
-type InterruptReason = "user" | "shutdown" | "inactivity"
+type InterruptReason = "user" | "shutdown" | "inactivity" | "watchdog"
 
 export function terminal(exit: Exit.Exit<void, SessionRunner.RunError>, reason?: InterruptReason) {
   if (Exit.isSuccess(exit)) return { type: "succeeded" as const }

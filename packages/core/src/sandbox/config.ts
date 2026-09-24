@@ -22,6 +22,8 @@ export interface Config {
   readonly createTimeoutSeconds: number
   /** CPU/memory request forwarded to the control plane. */
   readonly resource: { cpu: string; memory: string }
+  /** Browser-reachable host for preview URLs; defaults to the request host. */
+  readonly publicDomain?: string
 }
 
 const DEFAULT_IMAGE = "registry.cn-hangzhou.aliyuncs.com/opensandbox/opencode-sandbox:latest"
@@ -50,5 +52,6 @@ export function load(): Config {
       cpu: env["OPENCODE_SANDBOX_CPU"] || "2",
       memory: env["OPENCODE_SANDBOX_MEMORY"] || "4Gi",
     },
+    publicDomain: env["OPENCODE_SANDBOX_PUBLIC_DOMAIN"] || undefined,
   }
 }

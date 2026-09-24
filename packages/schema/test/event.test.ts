@@ -2,6 +2,8 @@ import { describe, expect, test } from "bun:test"
 import { Schema } from "effect"
 import { Event } from "../src/event.js"
 import { EventLog } from "../src/event-log.js"
+import { SessionEvent } from "../src/session-event.js"
+import { SessionID } from "../src/session-id.js"
 
 describe("public event schemas", () => {
   test("definition is pure", () => {
@@ -48,5 +50,17 @@ describe("public event schemas", () => {
       type: "log.synced",
       aggregateID: "ses_test",
     })
+  })
+})
+
+describe("session preview down event", () => {
+  test("omits optional diagnostics and encodes the port", () => {
+    const made = SessionEvent.Preview.Down.data.make({
+      sessionID: SessionID.make("ses_test"),
+      port: 5174,
+      reason: "sandbox-unreachable",
+    })
+    expect(made).toEqual({ sessionID: SessionID.make("ses_test"), port: 5174, reason: "sandbox-unreachable" })
+    expect("hint" in made).toBe(false)
   })
 })

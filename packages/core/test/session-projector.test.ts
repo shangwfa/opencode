@@ -262,7 +262,7 @@ describe("SessionProjector", () => {
     }).pipe(Effect.provide(sessionsLayer)),
   )
 
-  it.effect("maps malformed persisted rows consistently while single-message lookup defects", () =>
+  it.effect("treats malformed persisted rows as absent across every read path", () =>
     Effect.gen(function* () {
       const db = yield* seedSession()
       const messageID = SessionMessage.ID.make("msg_malformed")
@@ -281,13 +281,13 @@ describe("SessionProjector", () => {
 
       const sessions = yield* Session.Service
       const store = yield* SessionStore.Service
-      const expected = { _tag: "Session.MessageDecodeError", sessionID, messageID }
-      expect(yield* store.messages({ sessionID }).pipe(Effect.flip)).toMatchObject(expected)
-      expect(yield* sessions.messages({ sessionID }).pipe(Effect.flip)).toMatchObject(expected)
-      expect(yield* sessions.context(sessionID).pipe(Effect.flip)).toMatchObject(expected)
-      expect(yield* sessions.message({ sessionID, messageID }).pipe(Effect.catchDefect(Effect.succeed))).toMatchObject(
-        expected,
-      )
+      // A corrupted row must never wedge a read path: every consumer sees it
+      // as absent (the history path logs the skip) instead of failing or
+      // defecting the whole request.
+      expect(yield* store.messages({ sessionID })).toEqual([])
+      expect(yield* sessions.messages({ sessionID })).toEqual([])
+      expect(yield* sessions.context(sessionID)).toEqual([])
+      expect(yield* sessions.message({ sessionID, messageID })).toBeUndefined()
     }).pipe(Effect.provide(sessionsLayer)),
   )
 

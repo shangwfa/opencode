@@ -9,7 +9,11 @@ import { SandboxProvider } from "../sandbox/provider.js"
 import { Shell } from "../shell.js"
 import { ShellResult } from "../shell/result.js"
 
-const sandboxed = Effect.fn("SessionShell.sandboxed")(function* (input: { session: Session.Info; command: string }) {
+const sandboxed = Effect.fn("SessionShell.sandboxed")(function* (input: {
+  session: Session.Info
+  command: string
+  timeoutSeconds?: number
+}) {
   const provider = yield* SandboxProvider.Service
   if (!provider.enabled) return null
   const id = ShellSchema.ID.create()
@@ -29,6 +33,9 @@ const sandboxed = Effect.fn("SessionShell.sandboxed")(function* (input: { sessio
       sessionID: input.session.id,
       command: input.command,
       hostWorkdir: input.session.location.directory,
+      // The deadline covers queueing plus execution; the provider reports
+      // timeouts as a distinct result and recycles the command session.
+      timeoutMs: input.timeoutSeconds !== undefined ? input.timeoutSeconds * 1000 : undefined,
     })
     .pipe(
       Effect.map(
@@ -65,7 +72,11 @@ const sandboxed = Effect.fn("SessionShell.sandboxed")(function* (input: { sessio
   }
 })
 
-export const start = Effect.fn("SessionShell.start")(function* (input: { session: Session.Info; command: string }) {
+export const start = Effect.fn("SessionShell.start")(function* (input: {
+  session: Session.Info
+  command: string
+  timeoutSeconds?: number
+}) {
   const instances = yield* Instance.Service
   // Sandboxed deployments must run user shell commands inside the session
   // sandbox; the local process path would write outside the /workspace view
@@ -79,7 +90,7 @@ export const start = Effect.fn("SessionShell.start")(function* (input: { session
   const info = yield* shell.create({
     command: input.command,
     cwd: input.session.location.directory,
-    timeout: 0,
+    timeout: input.timeoutSeconds !== undefined ? input.timeoutSeconds * 1000 : 0,
     metadata: { sessionID: input.session.id, background: true },
   })
   // Keep completion tied to the original shell even if the Session moves.

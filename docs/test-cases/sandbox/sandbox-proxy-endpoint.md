@@ -4,6 +4,82 @@
 >
 > 运行前先 `source test-env.sh [1|2|3]`。以下用例直接使用 `$BASE`/`$PG_URL`/`$MODEL`。
 
+## V2 实现说明（2026-09-24）
+
+V2 已在 `feat/opencode-saas-2.0` 分支实现本套用例的等价功能，API 按 V2 契约风格（`/api` 前缀 + HttpApi 契约层）：
+
+| V1 API | V2 API | 差异 |
+|---|---|---|
+| `GET/POST /session/:id/proxy/:port/*` | `GET/POST/PUT/DELETE/PATCH/HEAD/OPTIONS /api/session/:id/proxy/:port/*` | prefix 为 `/api/session/...`；重写逻辑一致 |
+| `GET /session/:id/proxy/:port/__errors` | 同路径（落在通配路由内，handler 内部识别） | — |
+| `GET /session/:id/proxy-errors` | `GET /api/session/:id/proxy-errors` | — |
+| `GET /session/:id/endpoint/:port` | `GET /api/session/:id/endpoint/:port` | 响应结构一致（mode/url/directUrl/proxyUrl/previewUrl/port/sandboxId/fallback/degraded） |
+| `POST /session/:id/exec`、`/exec/async` | `POST /api/session/:id/shell`（命令内自行 `nohup ... &` 后台化） | V2 无 exec_log；命令输出走 session log |
+| preview-down 落库 `exec_log`（source=preview） | durable 事件 `session.preview.down` 落 **event 表**，经 `GET /api/experimental/session/:id/log` 回放 | 复用 session log 通道；60s/session:port 节流、proxy 热路径静默语义与 V1 一致 |
+
+实现文件：
+
+- `packages/core/src/sandbox/proxy-rewrite.ts` — HTML/JS/CSS 重写与注入（纯函数，单测 `packages/core/test/sandbox-proxy-rewrite.test.ts`）
+- `packages/core/src/sandbox/provider.ts` — `endpoint(sessionID, port, useServerProxy)`：解析沙箱端口地址，**不触发沙箱创建**（no-sandbox → 502）
+- `packages/protocol/src/groups/session-proxy.ts` + `packages/server/src/handlers/session-proxy.ts` — 契约与转发/WS 桥/诊断
+- `packages/schema/src/session-event.ts` — `session.preview.down` durable 事件
+
+自动化验证（Node 上游，覆盖注入/重写/透传/redirect/错误端点/端口校验/endpoint 直连/销毁 502/事件节流/**WebSocket 桥接**；直连访问在本地 TUN 代理环境下自动 SKIP）：
+
+```bash
+OPENCODE_PASSWORD="$OPENCODE_PASSWORD" \
+BASE=http://localhost:14106 \
+PG_URL='postgresql://local@127.0.0.1:15432/opencode-v2-up' \
+node docs/test-cases/scripts/sandbox-proxy-endpoint-v2.mjs
+```
+
+T11.38/39 的 PG 断言改为：
+
+```sql
+SELECT data FROM event WHERE aggregate_id='$SID' AND type LIKE 'session.preview.down%' ORDER BY seq;
+```
+
+### 补充验证（同日第二轮：真实 dev server + 直连 + HMR）
+
+| 用例 | 结果 | 说明 |
+|---|---|---|
+| T11.1–T11.5（真实 Vite 5） | ✅ | create-vite@5 react-ts + npm install 后经 proxy 全量验证：注入五项全 True、src/href 全 prefixed、**T11.4 `@react-refresh` PREFIXED=True**、main.tsx imports 全 prefixed |
+| @vite/client | ✅ | 200 + JS 透传无注入；`__HMR_*__`/`__SERVER_HOST__` 占位符全替换、base 指向 proxy prefix |
+| T11.31 HMR 完整链路 | ✅ | `ws://…/proxy/5173/` + **`vite-hmr` 子协议**（Vite 要求 HMR_HEADER 才处理 upgrade，裸连接会被忽略→桥接 1011，属预期）→ 握手 101 → `{"type":"connected"}` → shell 修改 App.tsx → **update 推送到达（path=/src/App.tsx）** |
+| T11.10 Hash route | ✅ | `#/about` 刷新 200（proxy 只看 pathname） |
+| T11.6 basename（近似） | ✅ | deep-link `/about` 返回 SPA fallback HTML；`window.__OC_PROXY_PREFIX__` 已注入（basename 是应用侧读取行为） |
+| T11.11 Next.js（create-next-app@14） | ✅ | 首页 200 |
+| T11.12 webpack publicPath | ✅ | `__webpack_require__.p="/api/session/{sid}/proxy/3000/_next/"` |
+| T11.13 RSC 路径 | ✅* | 真实 src/href 属性全部带 prefix；残留仅存在于 RSC flight **转义字符串**（新版 Next 14.2+ 将 preload 元数据放入内联 flight 数据；V1 当年产物无此形态）。运行时兜底闭环已验证：注入的 `HTMLLink/ScriptElement` setter patch 存在 + 重写后路径 200（layout.css=text/css、woff=font/woff） |
+| T11.34 多端口 | ✅ | 5173/8080/8082 均 mode=direct；9999 也 resolved（endpoint 解析不探测端口，与 V1 一致） |
+| T17.4/T17.5 直连 | ⏭️ 环境限制 | directUrl 为宿主机 fake-ip（TUN 代理）劫持地址，curl/Node 均拿不到响应体；K8s 环境无此问题 |
+| WS 桥对照实验 | ✅ | 同沙箱原生 RFC6455 echo（8082）经 proxy 双向回显正常，证明桥接本身可用；vite 裸连 1011 由子协议要求解释（见 T11.31） |
+
+> **执行注意（V2 shell 语义）**：后台启动命令必须用完全分离形态 `(nohup cmd >log 2>&1 </dev/null &) ; echo ok`——仅 `nohup … &` 会因后台进程持有 stdio 继承导致 shell API 响应挂起（命令实际已执行），后续命令排队阻塞，且 `interrupt` 后命令会话可能需要重建。Vite/Next 启动均已按此形式执行。
+
+### 复测记录（2026-09-24，V2 首次实现验证：本地 PG + 本地 OpenSandbox Docker runtime）
+
+容器 `opencode-saas-proxy-e2e`（镜像 `opencode-saas-v2:proxy-endpoint`，14106 端口，需 `OPENCODE_EVENTS_PERSIST=1` 才会持久化 durable 事件）。脚本全绿：
+
+| 分组 | 结果 | 说明 |
+|---|---|---|
+| T11.2/T11.3/T11.5/T11.7/T11.37 重写 | ✅ | data-oc-prefix + fetch/WebSocket/XHR patch 注入；src/href、静态/动态 import、export default、CSS url() 全部带 `/api/session/...` prefix |
+| T11.30/T11.35 透传 | ✅ | JS 无 HTML 注入；JSON 原样透传 |
+| redirect / T11.8 / T11.32 | ✅ | 302 location 加 prefix；__errors 与 proxy-errors 200；子路径代理 |
+| T11.31 WebSocket 桥接 | ✅ | 沙箱内原生 RFC6455 echo 服务经 proxy 双向文本帧回显正确（101 握手 + 帧转发） |
+| T11.9/T11.20 keepAlive | ✅ | sandboxId 不变，idle 后 proxy 仍 200 |
+| T11.33/T17.2 | ✅ | 无服务端口 502（带 diagnostics）；port=0/99999/abc 的 endpoint 与 proxy 均 400 |
+| T17.3 | ✅ | mode=direct、url/sandboxId/port/fallback/previewUrl 结构完整 |
+| T17.4/T17.5 直连对比 | ⏭️ SKIP | 本地 TUN 代理（fake-ip）劫持沙箱容器地址；K8s 环境无此问题 |
+| T17.6 销毁 | ✅ | endpoint/proxy 均 502，错误体 `_tag=SandboxUnreachableError` |
+| T11.38/39 可观测性 | ✅ | endpoint 502 → event 表落 1 条 `session.preview.down`（reason=sandbox-unreachable，含 hint）；60s 节流内重复调用与 proxy 502 不新增；沙箱存活时无事件；`GET /api/experimental/session/:id/log` 可回放 |
+
+Vite HMR 全链路（T11.6 basename、T11.11–T11.13 Next.js）与真实业务项目验证沿用下方 V1 手工步骤（proxy URL 前缀换成 `/api/session/{SID}/proxy/{port}/`，命令经 `POST /api/session/:id/shell` 执行）。
+
+以下 V1 用例原文保留作为行为基准。
+
+---
+
 ## 概述
 
 沙箱内运行的服务（dev server）可通过两种方式被外部访问：
