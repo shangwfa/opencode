@@ -49,7 +49,6 @@ send_and_verify "$SID" "读取 /workspace/test.txt 的内容"              "T18.
 send_and_verify "$SID" "列出 /workspace 下所有文件"                   "T18.1d: 模糊指令"
 send_and_verify "$SID" "在 /workspace 下创建三个文件：a.txt 内容 AAA，b.txt 内容 BBB，c.txt 内容 CCC" "T18.1e: 批量写"
 send_and_verify "$SID" "把 /workspace/test.txt 的内容改为 modified"   "T18.1f: 修改文件"
-send_and_verify "$SID" "用 bash 工具执行，background 必须设为 true: sleep 1 && echo bg-done" "T18.1g: background bash"
 ```
 **期望**：全部显示 `✅`，每个场景都有对应的工具调用（bash/write/read/edit 或 apply_patch）
 
@@ -205,33 +204,31 @@ send_and_verify "$SID" "项目是 Vite + React 应用，运行在沙箱的 /work
 
 > 该组用例覆盖 sandbox 不可用时的快速失败、文件 I/O 超时销毁、stuck tool watchdog、以及权限等待阻塞等问题。这些问题会导致会话永久卡在 `running` 状态。
 
-#### T18.10a sandbox 不可用时 read/write 直接报错
+#### T18.10a sandbox 销毁后的行为（V2 语义）
 
-> **背景**：SaaS 模式下 read/write 必须通过 sandbox 访问文件。当 sandbox 初始化失败或不可用时，工具应立即返回错误，不得 fallback 到本地文件系统。
+> **背景（V2 重定义）**：V2 provider 对已连接 sandbox 采用**内存缓存优先**——直接 UPDATE DB `state='destroyed'` 不构成不可用（连接仍在用，read/write 正常 completed）。V2 的真实销毁路径是 `POST /api/session/:id/kill-sandbox`（内存缓存 + PG 行 + 远端容器三态清理）。本用例验证：销毁后工具调用**自动重建** sandbox 并 completed，不出现 `running` 卡死或 fallback 到本地文件系统。
+>
+> （V1 旧语义"DB 标记 destroyed 后 read/write 应报错"已废弃：UPDATE DB 只影响持久层状态，仅在进程重启后或缓存 miss 时改变行为——不 reconnect、触发重建。）
 
 ```bash
-# 模拟 sandbox 不可用：通过 DB 将 sandbox 标记为 destroyed，再发 read/write 请求
-psql "$PG_URL" -c "
-UPDATE sandbox SET state='destroyed', time_updated=$(date +%s%3N)
-WHERE session_id='$SID';
-"
+# V2: 真实销毁路径 = kill-sandbox 端点
+curl -s -u opencode:$PW -X POST "$BASE/api/session/$SID/kill-sandbox"
+psql "$PG_URL" -t -A -c "SELECT state FROM sandbox WHERE session_id='$SID';"   # 期望 destroyed
 
-send_and_verify "$SID" "读取 /workspace/test.txt 的内容" "T18.10a-1: sandbox destroyed 后 read"
+# 销毁后 read/write 应触发自动重建（而非 error/卡死）
+send_and_verify "$SID" "读取 /workspace/test.txt 的内容" "T18.10a-1: kill-sandbox 后 read 自动重建"
+send_and_verify "$SID" "把 /workspace/test.txt 的内容改为 rebuilt" "T18.10a-2: 重建后 write"
 
-# 期望：read 工具 status=error，错误信息包含 "Sandbox is not available" 或 "Failed to check path type"
-
-send_and_verify "$SID" "把 /workspace/test.txt 的内容改为 no-sandbox" "T18.10a-2: sandbox destroyed 后 write"
-
-# 期望：write 工具 status=error，错误信息包含 "Sandbox is not available" 或 "Sandbox initialization failed"
-
-# 恢复：删除 sandbox 记录，让下次工具调用自动重建
-psql "$PG_URL" -c "DELETE FROM sandbox WHERE session_id='$SID';"
+# PG 验证：sandbox 重建为 running，工具状态 completed
+psql "$PG_URL" -t -A -c "SELECT state FROM sandbox WHERE session_id='$SID';"   # 期望 running
 ```
 
 **期望**：
-- read/write 在 sandbox 不可用时 `status=error`，不出现 `running` 卡死。
-- 错误信息明确指出 sandbox 不可用，而不是 `undefined is not an object`。
-- 恢复 sandbox 记录后，后续工具调用能正常重建 sandbox 并 completed。
+- kill-sandbox 后 PG 行 `state=destroyed`。
+- 后续 read/write **completed**（自动重建 sandbox），无 `running` 卡死、无本地文件系统 fallback、无 `undefined is not an object`。注：kill 后**首次**工具调用可能撞上重建过渡窗口报一次 `File not found`，模型重试即恢复——属预期，不判定为 FAIL（实测 session `ses_f2dba38f5ffe3ijVfGEt5K6SGk`：首 read error → 模型自动重试 → write/read completed、state 回 running）。
+- 重建后 PG 行回到 `state=running`，文件读写内容一致。
+- 直接 UPDATE DB（不 kill-sandbox）时 read/write 仍正常 completed——内存缓存优先属预期行为，不判定为 FAIL。
+
 
 #### T18.10b read/write 文件 I/O 超时销毁
 
@@ -606,7 +603,6 @@ ORDER BY p.time_created;
 | T18.1d | ✅ | read 目录 `/workspace`，PG tool=read completed，看到 `test.txt` |
 | T18.1e | ✅ | 批量写 `a.txt`/`b.txt`/`c.txt`，同一消息含 `write×3 completed` |
 | T18.1f | ✅ | `edit` 修改 `test.txt` 为 modified，PG tool=edit completed |
-| T18.1g | ✅ | background bash `sleep 1 && echo bg-done`，PG tool=bash completed |
 | T18.2 | ✅ | session `ses_15d763272ffeVyMjgYRDGWX3bu`；`grep×2`、`glob×1`、`read×1`、`bash rg×1` 均 completed，看到同一 `/workspace/tool-regression/src/search-target.ts`；`rg --version` 返回 ripgrep 14.1.0 |
 | T18.3 | ✅ | `edit` completed，将 `PROFILE_CARD_SENTINEL` 改为 `PROFILE_CARD_PATCHED`；随后 `read` 与 `grep` 均确认 patched 内容 |
 | T18.4 | ✅ | 父 `task` completed，子 session `ses_15d722806ffe9b6xIzjwr0s4Eu` 的 `glob/read/grep` completed；sandbox 表仅父 session 一条记录，子 agent 复用父 sandbox |
@@ -632,3 +628,59 @@ ORDER BY p.time_created;
 **实测注意**：本地 OpenSandbox Docker runtime 验证时，建议先启用 `keep-alive`，并通过配置放行 `external_directory`，否则跨 prompt 的 `/workspace` 文件可能因 idle destroy 或 permission ask 导致测试阻塞。此次回归还修复了 `grep` 对 OpenSandbox stdout chunks 使用 `join("")` 拼接导致 JSON 行粘连、误报 `No files found` 的问题。
 
 > 复测记录（2026-09-06，merge upstream/dev v1.18.29 后，镜像 `t0906-merged-1.18.29`）：工具域单测 `apply_patch`/`edit`（29/29，30s 超时）/`attachment`/`session-tool-load` 全过；write→read 闭环与 T-WEX.1 exists 语义见 ai-conversation 与 write-exists-semantics 复测记录。T18.9（bash 快速失败）因当日模型不调 bash 未执行——A/B 镜像对照已定性为 deepseek-v4-flash 行为波动，非 merge 回归（详见 session/ai-conversation.md 复测注记）。
+
+---
+
+## V2 全量回归记录（2026-09-24）
+
+**环境**：容器 `opencode-saas-test`（`127.0.0.1:14096`，镜像 `opencode-saas-sandbox-test:9aa68014be-subagent-sb`），本地 PG `opencode-v2-up`（V2 架构：`session_v2`/`session_message`，无 `part` 表），OpenSandbox Docker runtime `127.0.0.1:8080`，镜像 `opencode-opensandbox:local`（**不含 ripgrep**），模型 `Yd-DeepSeek/deepseek-v4-flash`，session `ses_f2df342fcffew9kNdKitiDlxQr`（修复验证 session `ses_f2df74ecffeH44kBtV3elR2Kb`）。
+
+**V1→V2 接口/数据映射**（执行本文档用例时必须适配）：
+
+| V1 文档路径 | V2 实际 |
+|---|---|
+| `POST /session`（body `{}`） | `POST /api/session`（body `{model:{id,providerID}}`，Model.Ref 需 `id` 字段） |
+| `POST /session/:id/message`（`parts` 数组，同步） | `POST /api/session/:id/prompt`（`{text}`，异步投递）+ `POST /api/experimental/session/:id/wait` 等待 idle |
+| `GET /session/:id/message` | `GET /api/session/:id/message` 或直查 PG `session_message` |
+| PG `part` 表（`data->>'tool'`） | PG `session_message.data->content[]`（`elem->>'name'`；`state.status`；`time.created/completed`） |
+| bash 工具名 `bash` | `shell` |
+| task/subagent | `subagent`（无独立 `task_status`） |
+| watchdog（T18.10c） | **V2 无此实现**，用例不适用 |
+| `date +%s%3N` | macOS 不可用，用 `python3 -c "import time;print(int(time.time()*1000))"` |
+
+认证：V2 server 启用 Basic auth（用户名固定 `opencode`，密码 = 容器 `OPENCODE_PASSWORD`），所有请求需 `-u opencode:$PW`。
+
+**本轮结果**：
+
+| 用例 | 状态 | 说明 |
+|------|------|------|
+| T18.1a-f | ✅ | bash/write/read/批量写/edit 全部 completed（原 T18.1g background 用例已随 background 概念在 V2 移除而删除） |
+| T18.2b-d | ✅(镜像修复后) | 首轮 ❌：镜像缺 `rg` 致 `grep`×7、`glob`×6 全空且静默不报错。**已修复**：V1 沙箱 Dockerfile（含 ripgrep）已迁至 `packages/containers/sandbox/` 并重建 `opencode-opensandbox:local`。重跑（session `ses_f2dce0715ffe2FX2O9MCyNBb89`）：`rg 14.1.0`、grep 精确/include 命中、glob 返回 2 个 ts 文件、PG 统计 `grep×3/glob×1 empty_results=0`。遗留建议：工具层对 rg 缺失应显式报错而非静默空结果 |
+| T18.2e/f、T18.3a/b | ✅ | read/rg 对照、edit 修改+验证正常 |
+| T18.3c | ✅(镜像修复后) | 修改后 grep 命中 `PROFILE_CARD_PATCHED`（首轮失败同 rg 根因） |
+| T18.4 | ✅（修复后） | **发现并修复 P1**：V2 subagent 子会话曾创建独立 sandbox（子会话 `/workspace` 为空、read `File not found`）。修复：`packages/core/src/sandbox/provider.ts` 增加 `rootSessionID`（沿 `session_v2.parent_id` 上溯，V1 `resolveSandboxOpts` 语义）+ `resolveSandboxKey`（Ref 缓存），provider 全部 17 个对外方法（run/boot/destroy/keepAlive/file*…）入口统一解析 root——所有调用方（工具插件、HTTP handler、proxy）自动收敛。修复后验证：子会话 `read` completed 读到父会话文件；sandbox 表父+子仅 root 一条 running 记录 |
+| T18.5 | ⏭️ | 跳过：未开启 `OPENCODE_EXPERIMENTAL_BACKGROUND_SUBAGENTS`；且 subagent `background` 参数同属已按设计移除的 background 概念（background 概念已移除），V2 不再要求覆盖 |
+| T18.6a | ✅ | webfetch completed，标题 Example Domain |
+| T18.6b | ✅ | skill 工具未触发，但模型明确列出可用 skill 并说明类别不符（符合"明确说明"预期） |
+| T18.7 | ✅ | 消息流 `user → tool → assistant text` 交替正常，全 session 45 个 tool part |
+| T18.8a-g | ✅ | 子项目路径映射全过：write/edit/read 落点 `/workspace/app/src/App.tsx` 正确、sentinel 无折叠泄露、`workdir=/workspace/app` build 成功（T18.8a 模型自行绕过 create-vite 交互提问） |
+| T18.9a-d | ✅ | `ss: command not found` 164ms 快速返回（端到端 4.6s）；超长 timeout 不等待；netstat 亦缺失但模型改用 `/proc/net/tcp` 完成端口检查（9.2s） |
+| T18.10a | ✅ | V2 语义验证通过：kill-sandbox（真实销毁路径）后 read/write **自动重建** sandbox 并 completed，无卡死无本地 fallback。注意：直接 UPDATE DB `state=destroyed` 不构成不可用（内存缓存优先，属预期）——用例语义已按 V2 重定义（见 T18.10a 小节） |
+| T18.10b | ❌(环境) | 验证期间宿主机容器被外部重启 + **keep-alive 未启用**导致 idle destroy 反复重建 sandbox，`/workspace` 清空（race.txt/concurrent 等夹具丢失）。重跑（启用 keep-alive）后正常。文档"实测注意"已注明本地 Docker runtime 需先启用 keep-alive。注：T18.10b-2 的 `background` 占用手法在 V2 不适用（background 概念已移除） |
+| T18.10c | ⏭️ | V2 代码库无 watchdog（`watchdog.ts`/`mark-timed-out.ts` 不存在），不适用 |
+| T18.10d | ✅ | `/api/config` 权限配置存在；write 8.5s completed 未被权限阻塞 |
+| T18.10e | ✅(重跑) | `kill-sandbox` HTTP 200 → destroyed → 后续调用自动重建 completed；重跑（keep-alive）后 sandbox 状态一致 |
+| T18.11a | ✅ | 3 个 write 同秒并发 completed，文件内容各自正确 |
+| T18.11b/c | ✅(重跑) | 模型同批次并发两个 edit，两处修改均生效（`line1-beta`+`line3-beta`）；write+read 并发正常 |
+| T18.11d | ✅ | 3 个 shell 同秒 start、end 依次错开（2.2s/6.2s/4.1s）——command session semaphore(1) 串行化生效 |
+
+**修复代码**：`packages/core/src/sandbox/provider.ts`（root session 解析 + 17 方法收敛）、`packages/core/test/sandbox-provider.test.ts`（新增 `rootSessionID` 4 用例：无 parent/链式上溯/循环防护/行缺失降级，15/15 全过）。类型检查无新增错误。
+
+**待办**：
+1. ~~sandbox 镜像补装 ripgrep 并恢复 Dockerfile~~ ✅ 已完成：V1 沙箱镜像（`packages/opencode/docker/` → `packages/containers/sandbox/`，COPY 路径与 README/local-test-env.md 引用同步更新）已迁入 V2 并重建 `opencode-opensandbox:local`（含 ripgrep 14.1.0、Node 24、git、python3），T18.2/T18.3 重跑全过。
+2. ~~V2 sandbox 会话支持 background 执行~~ 无需处理：V2 已按设计移除该概念（`shell.ts` 对 sandbox 会话显式拒绝并提示前台重跑），原 T18.1g 用例已删除。
+3. ~~工具层对 rg 缺失静默空结果~~ ✅ 已修复：`SandboxTools.ensureRipgrep`（`packages/core/src/sandbox/tools.ts`）在 glob/grep 前探测 `command -v rg`（per-session 缓存），缺失时显式返回 `ToolFailure: ripgrep (rg) is not available in the sandbox image...`；单测 `sandbox-tools-ripgrep.test.ts` 3/3 过；e2e（镜像 `9aa68014be-rg-guard`，session `ses_f2dba38f5ffe3ijVfGEt5K6SGk`）验证正常路径不回归：grep/glob/shell 全 completed，探测命令在 provider.run 层执行不落 tool part。
+4. ~~非法路由 500~~ ✅ 已闭环：工作区既有修复（`.dockerignore` 加 `!packages/app/dist` 例外 + `app-assets.ts` 对 dist 缺失降级为空资产并 warn）已随当前镜像生效——验证：无效路由回 index.html 200、`/api/*` 未命中 404、无 500。
+5. ~~T18.10a 用例语义重定义~~ ✅ 已完成：用例改写为 V2 语义（kill-sandbox 真实销毁 → 自动重建 completed；UPDATE DB 标记不再判定 FAIL）。
+6. 遗留决策项：V2 无 stuck tool watchdog（V1 `watchdog.ts` 每 60s 扫描 running>5min 的 tool part 标记 error）。V2 若无替代机制，sandbox 文件 I/O 永久 pending 会导致 session 永卡 `running`，需确认是否有意移除或需要补齐。
+

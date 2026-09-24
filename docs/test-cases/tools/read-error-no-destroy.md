@@ -105,3 +105,19 @@ summary
 | 2026-08-19 | `perf-rft`（组合 2：本地 PG + 远端沙箱，LSP 修复已撤销） | T-RDX.1 | ✅ PASS | 报 Offset 99999 is out of range (3 lines)，无 timed out |
 | 2026-08-19 | `perf-rft`（组合 2） | T-RDX.1b/1c | ✅ PASS | sandbox id 未变，exec 立即恢复 |
 | 2026-08-19 | `perf-rft`（组合 2） | T-RDX.2 | ✅ PASS | 48ms completed，内容完整 |
+
+### V2 全量回归（2026-09-24）
+
+**环境**：容器 `opencode-saas-test`（`127.0.0.1:14096`，镜像 `opencode-saas-sandbox-test:9aa68014be-rg-guard`），本地 PG `opencode-v2-up`（V2 架构 `session_v2`/`session_message`），sandbox 镜像 `opencode-opensandbox:local`，模型 `Yd-DeepSeek/deepseek-v4-flash`。
+
+**V1→V2 接口映射**（同 read-fast-timeout.md）：`exec` → `POST /api/session/:id/shell`（注意：shell 端点产出独立 `type='shell'` 消息，`data.time.completed` 标记完成，**不进** assistant content[]——轮询必须查 `type='shell'`）；`message` → `prompt`+`wait`；PG `part` → `session_message.content[]`；assistant 文本取 `type='assistant'` 消息 content 的最后一条 text（V2 模型可能拆多条消息，取首条会漏掉正文）。
+
+| 日期 | 用例 | 结果 | 备注 |
+|---|---|---|---|
+| 2026-09-24 | T-RDX.1 | ⚠ SKIP×4 | 模型（deepseek-v4-flash）四次均未按引导传 `offset=99999`，read 成功（文档预设的不对称断言分支）。**错误分类本身有单测兜底**：`tool-read-filesystem.test.ts` 断言 `Offset 2 is out of range` 原文传播、`tool-read.test.ts` 断言 `OffsetOutOfRangeError` 不被包装 |
+| 2026-09-24 | T-RDX.1b | ✅ PASS×3 | 越界引导未命中期间 read 均正常，sandbox id 三次全程未变（无销毁重建） |
+| 2026-09-24 | T-RDX.1c | ✅ PASS×2（修正后） | shell 端点立即恢复。首跑 FAIL 系用例脚本轮询误查 assistant content[] 所致（shell 消息在 `type='shell'`），修正后通过 |
+| 2026-09-24 | T-RDX.2 | ✅ PASS×2（修正后） | read completed 194~485ms，内容完整（alpha/beta/gamma）。首跑 FAIL 系断言取首条 assistant text（模型拆多条消息时为"I'll read the file."），改取最后一条后通过 |
+
+**结论**：`PASS=3 FAIL=0`（T-RDX.1 按预设 SKIP）。V2 的 read 路径全程无 destroy 调用（沙箱销毁自愈是 V1 的 `SandboxReadTimeout` 分支，V2 不存在），错误分类与"不销毁"语义天然满足；offset 越界分类由单测精确断言。待换配合度高的模型时可复测 T-RDX.1 主断言。
+

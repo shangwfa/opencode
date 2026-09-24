@@ -95,3 +95,19 @@ summary
 | 2026-08-19 | `perf-rft`（组合 2：本地 PG + 远端沙箱，LSP 修复已撤销） | T-LZY.1/1b | ✅ PASS | 冷会话首条 glob completed，sandbox running |
 | 2026-08-19 | `perf-rft`（组合 2） | T-LZY.2 | ✅ PASS | time_updated 递增（增量 7343ms） |
 | 2026-08-19 | `perf-rft`（组合 2） | T-LZY.3 | ✅ PASS | bash→read→write 全 completed |
+
+### V2 全量回归（2026-09-24）
+
+**环境**：容器 `opencode-saas-test`（`127.0.0.1:14096`，镜像含 `resolveSandboxKey`/`ensureRipgrep` 修复），本地 PG `opencode-v2-up`，sandbox 镜像 `opencode-opensandbox:local`，模型 `Yd-DeepSeek/deepseek-v4-flash`。
+
+**V1→V2 接口映射**（同前两篇）：`exec` → `POST /api/session/:id/shell`（独立 `type='shell'` 消息轮询）；`message` → `prompt`+`wait`；PG `part` → `session_message.content[]`；`part.tool='bash'` → `name='shell'`；`metadata.count` 结构同构直取。
+
+| 日期 | 用例 | 结果 | 备注 |
+|---|---|---|---|
+| 2026-09-24 | T-LZY.1 | ✅ PASS | 冷会话首条 glob `completed\|count=0\|(无error)`（/workspace 无 .json 属正常），无 "not available"——lazy getOrCreate 生效，且 `ensureRipgrep` 探测在冷路径正常放行 |
+| 2026-09-24 | T-LZY.1b | ✅ PASS | prompt 前 sandbox 记录为 `destroyed`（前次 kill 残留），glob 执行后 **`running`**——验证了 getOrCreate 对 destroyed 记录的 lazy 重建路径（不 reconnect、直接 create），比纯冷启动更强的 lazy 场景 |
+| 2026-09-24 | T-LZY.2 | ✅ PASS | 3 次 shell 后 `time_updated` 1790237126491 → 1790237140286（增量 13795ms），touch 语义保留，idle-reaper 活跃信号正常 |
+| 2026-09-24 | T-LZY.3 | ✅ PASS | shell→read→write 混合链路工具状态聚合 = `completed` |
+
+**结论**：`PASS=4 FAIL=0`。V2 中 lazy 语义天然成立（`SandboxTools`/shell 插件首访问经 `provider.getOrCreate` 创建），touch 由 provider `run`/heartbeat 的 `touchSandbox` 刷新；本轮新增的 `resolveSandboxKey`（subagent root 归一）与 `ensureRipgrep`（rg 探测）在冷会话路径均正常工作，未引入回归。
+

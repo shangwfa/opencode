@@ -123,3 +123,18 @@ summary
 | 2026-08-19 | `perf-rft`（组合 2：本地 PG + 远端沙箱，LSP 修复已撤销） | T-RFT.1 | ✅ PASS | read completed 52ms |
 | 2026-08-19 | `perf-rft`（组合 2） | T-RFT.2 | ✅ PASS | kill-sandbox 后 read 4364ms completed（远端沙箱快速重建），无 watchdog |
 | 2026-08-19 | `perf-rft`（组合 2） | T-RFT.3 | — | 近 24h 无 watchdog part，继续观察 |
+
+### V2 全量回归（2026-09-24）
+
+**环境**：容器 `opencode-saas-test`（`127.0.0.1:14096`，镜像 `opencode-saas-sandbox-test:9aa68014be-rg-guard`），本地 PG `opencode-v2-up`（V2 架构 `session_v2`/`session_message`），sandbox 镜像 `opencode-opensandbox:local`（V1 迁入版，含 ripgrep），模型 `Yd-DeepSeek/deepseek-v4-flash`。
+
+**V1→V2 接口映射**：`POST /session/:id/exec` → `POST /api/session/:id/shell`（`{command}`，NoContent 异步，轮询 PG shell 消息完成）；`POST /session/:id/message` → `POST /api/session/:id/prompt` + `wait`；PG `part` → `session_message.content[]`（`elem->>'name'='read'`，`time.start/end` → `time.created/completed`）；`state->>'error'` 仍为 JSON 字符串可直接匹配。
+
+| 日期 | 用例 | 结果 | 备注 |
+|---|---|---|---|
+| 2026-09-24 | T-RFT.1 | ✅ PASS | read `completed` **311ms**（<15s），消息总耗时 3s，session `ses_f2db5de6effeybcQKKmpS9035p` |
+| 2026-09-24 | T-RFT.2 | ✅ PASS | kill-sandbox 后 read **1943ms** 返回明确 error `File not found`（命中重建窗口，快速出结果），无 watchdog，消息总耗时 5s，session `ses_f2db54922ffepwzRsshJW3Vwbd` |
+| 2026-09-24 | T-RFT.3 | — 不适用 | **V2 无 watchdog 机制**（代码库无 `watchdog.ts`/`mark-timed-out.ts`/`OPENCODE_WATCHDOG_*`）；实测近 24h PG 中 watchdog 错误 part 数=0，与机制不存在一致 |
+
+**结论**：`PASS=2 FAIL=0`。V2 的 read 快速出结果由 provider 层保障（`getOrCreate` 有 bounded wait + 重建路径 `createTimeoutSeconds` 兜底），实测远优于 15s 阈值；V1 时代的 watchdog 120s 兜底在 V2 不存在，stuck tool 兜底机制缺口见 tool-calls.md 待办 #6（watchdog 决策项）。
+
