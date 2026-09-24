@@ -113,3 +113,21 @@ summary
 | 2026-08-19 | `perf-rft`（组合 2：本地 PG + 远端沙箱，LSP 修复已撤销） | T-GTR.1 | ✅ PASS | 300 匹配 → 100|true，142ms |
 | 2026-08-19 | `perf-rft`（组合 2） | T-GTR.2 | ✅ PASS | 5 万匹配 186ms completed，truncated=true |
 | 2026-08-19 | `perf-rft`（组合 2） | T-GTR.3 | ✅ PASS | 1|false 窄匹配无回归 |
+
+### V2 全量回归（2026-09-24）
+
+**环境**：容器 `opencode-saas-test`（`127.0.0.1:14096`），本地 PG `opencode-v2-up`，sandbox 镜像 `opencode-opensandbox:local`，模型 `Yd-DeepSeek/deepseek-v4-flash`。
+
+**V1→V2 接口映射**（同前几篇）：`exec` → `POST /api/session/:id/shell`（独立 `type='shell'` 消息轮询完成）；`message` → `prompt`+`wait`；PG `part` → `session_message.content[]`（`elem->>'name'='grep'`，`metadata.matches/truncated` 同构，`time.start/end` → `time.created/completed`）。
+
+**实现确认**：V2 `SandboxTools.grep` 的沙箱端管道截断已具备——`rg --json ... | rg -m <limit+1> '"type":"match"' | head -<limit+1>`（`packages/core/src/sandbox/tools.ts`），与本用例修复语义一致。
+
+**观察项（非 FAIL）**：sandbox 路径 `SandboxTools.grep` 默认 `limit = input.limit ?? 200`，而本地路径用 `FileSystem.DEFAULT_SEARCH_LIMIT = 100`——同一输入在两种执行路径下默认上限不一致（200 vs 100）。本轮用例通过 prompt 显式传 `limit=100` 对齐断言；建议后续统一默认值。
+
+| 日期 | 用例 | 结果 | 备注 |
+|---|---|---|---|
+| 2026-09-24 | T-GTR.1 | ✅ PASS | 300 匹配 → `completed\|100\|true`，**485ms**（截断语义不变） |
+| 2026-09-24 | T-GTR.2 | ✅ PASS | 5 万匹配（500 文件×100 行）→ `completed\|100\|true`，**737ms**（<10s 阈值；两周基线 p90 12.4s，管道 101 条即停生效） |
+| 2026-09-24 | T-GTR.3 | ✅ PASS | 唯一串 → `completed\|1\|false`，276ms（窄匹配无回归） |
+
+**结论**：`PASS=3 FAIL=0`。V2 沙箱端截断语义与性能均符合预期。
