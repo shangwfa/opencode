@@ -6,6 +6,14 @@ import { Context, Effect, Layer, Schema } from "effect"
 import { FSUtil } from "@opencode/util/fs-util"
 import { Location } from "./location.js"
 import { PositiveInt, RelativePath } from "./schema.js"
+import { SandboxConfig } from "./sandbox/config.js"
+
+/**
+ * Sandboxed deployments keep session working directories inside the sandbox
+ * volume, so host realpath probes must not gate location construction. Local
+ * (non-sandbox) placements stay strict: host canonicalization is load-bearing.
+ */
+const sandboxDeployed = SandboxConfig.load().enabled
 import { FileSystemSearch } from "./filesystem/search.js"
 import { Entry, FileSystem, FindInput } from "@opencode/schema/filesystem"
 export { Entry, Match, Submatch } from "@opencode/schema/filesystem"
@@ -76,9 +84,11 @@ const baseLayer = Layer.effect(
     // realpath probe at boot consults the wrong filesystem and would block
     // construction on servers without a matching local directory. Treat the
     // configured directory as canonical; local placements keep symlink
-    // canonicalization. This skip is boot-only: resolve/read/list below still
-    // access the host filesystem per operation (tracked in #44568).
-    const root = location.workspaceID ? location.directory : yield* fs.realPath(location.directory).pipe(Effect.orDie)
+    // canonicalization (#44568). Sandboxed sessions get the same exemption:
+    // their working directories live in the sandbox volume.
+    const root = location.workspaceID || sandboxDeployed
+      ? location.directory
+      : yield* fs.realPath(location.directory).pipe(Effect.orDie)
     const resolve = Effect.fnUntraced(function* (input?: RelativePath) {
       const absolute = path.resolve(location.directory, input ?? ".")
       if (!FSUtil.contains(location.directory, absolute))

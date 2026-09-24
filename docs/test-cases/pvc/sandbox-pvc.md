@@ -87,6 +87,20 @@ curl -s --max-time 60 -X POST "$BASE/session/$SID/exec" \
 
 ## 复测记录
 
+### 2026-09-24（V2 feat/opencode-saas-2.0，PVC 功能 V2 实现合入）
+
+环境：SaaS 容器（本地 PG `opencode-v2-up` + 本地 OpenSandbox Docker runtime，`OPENCODE_SANDBOX_VOLUME_TYPE=pvc`、claim `sandbox-test` 即 Docker named volume，subPath 语义与 K8s PVC 一致），镜像 `opencode-saas-sandbox-test:pvc-e2e`。
+
+V2 API 适配：`exec` → `POST /api/session/:id/shell`（输出读 session log）；`kill-sandbox` → `POST /api/session/:id/kill-sandbox`。用例由 [`scripts/session-pvc-mode-v2.mjs`](../scripts/session-pvc-mode-v2.mjs) 的 T5 组执行。
+
+| 用例 | 结果 | 备注 |
+|---|---|---|
+| T5.1 写入文件 | PASS | stdout `12345` |
+| T5.2 销毁沙箱 | PASS | `{"destroyed":true}` |
+| T5.3 重建后文件存在 | PASS | stdout `12345`，PVC 跨沙箱实例持久化正常 |
+| T5.4 多文件批量 | PASS | a/b/c 三文件内容均在 |
+| T5.5 目录持久化 | PASS | 深层目录 `DEEP` 完整 |
+
 ### 2026-08-21（commit 13b750953b，快照功能合入后回归）
 
 环境：SaaS 容器（本地 PG `opencode` 库 + 远端 K8s Sandbox），默认 `VOLUME_TYPE=pvc`、无快照开关，镜像 `opencode-saas-sandbox-test:13b750953b`。

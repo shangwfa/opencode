@@ -26,6 +26,7 @@ import {
 } from "@opencode/protocol/errors"
 import { AbsolutePath } from "@opencode/core/schema"
 import { failedMessageDecode, failedSnapshot, missingMessage, missingSession } from "./session-error"
+import { defaultDirectory } from "../location"
 import { Event } from "@opencode/schema/event"
 import { EventFeed } from "../event-feed"
 import { makePromptStreamTakeUntil, sessionEventFilter } from "../session-stream"
@@ -33,6 +34,10 @@ import { makePromptStreamTakeUntil, sessionEventFilter } from "../session-stream
 const DefaultSessionsLimit = 50
 const validSandboxResource = (value: { cpu: string; memory: string }) =>
   /^\d+(\.\d+)?m?$/.test(value.cpu) && /^\d+(Ki|Mi|Gi|Ti|K|M|G|T)$/.test(value.memory)
+
+/** App-scope PVC sessions share one volume prefix, so the appId must arrive with the mode. */
+const validPvcConfig = (pvcMode: string | undefined, appId: string | undefined) =>
+  !(pvcMode === "app" && !appId?.trim())
 
 function missingForm(id: Form.ID) {
   return new FormNotFoundError({ id, message: `Form not found: ${id}` })
@@ -151,9 +156,15 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
         Effect.fn(function* (ctx) {
           if (ctx.payload.sandbox && !validSandboxResource(ctx.payload.sandbox))
             return yield* new InvalidRequestError({ message: "Invalid sandbox resource format", field: "sandbox" })
+          if (!validPvcConfig(ctx.payload.pvcMode, ctx.payload.appId))
+            return yield* new InvalidRequestError({
+              message: "appId is required when pvcMode is app",
+              field: "appId",
+            })
           const createInput = {
             id: ctx.payload.id,
             appId: ctx.payload.appId,
+            pvcMode: ctx.payload.pvcMode,
             title: ctx.payload.title,
             agent: ctx.payload.agent,
             model: ctx.payload.model,
@@ -165,7 +176,7 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
             data: yield* session
               .create(ctx.payload.parentID
                 ? { ...createInput, parentID: ctx.payload.parentID }
-                : { ...createInput, location: ctx.payload.location ?? { directory: AbsolutePath.make(process.cwd()) } })
+                : { ...createInput, location: ctx.payload.location ?? { directory: AbsolutePath.make(defaultDirectory()) } })
               .pipe(Effect.catchTag("Session.NotFoundError", missingSession)),
           }
         }),

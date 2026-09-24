@@ -12,6 +12,7 @@ import { SessionMetadata } from "./session-metadata.js"
 import { Money } from "./money.js"
 import { Permission } from "./permission.js"
 import { AppId } from "./session-app-id.js"
+import { PvcMode } from "./session-pvc-mode.js"
 import { TokenUsage } from "./token-usage.js"
 import { Revert } from "./session-revert.js"
 import { SessionFork } from "./session-fork.js"
@@ -19,7 +20,7 @@ import { SessionSandboxResource } from "./session-sandbox-resource.js"
 
 export const ID = SessionID
 export type ID = SessionID
-export { AppId }
+export { AppId, PvcMode }
 
 export const Metadata = SessionMetadata
 export type Metadata = SessionMetadata
@@ -37,6 +38,7 @@ export interface Info extends Schema.Schema.Type<typeof Info> {}
 export const Info = Schema.Struct({
   id: ID,
   appId: AppId.pipe(optional),
+  pvcMode: PvcMode.pipe(optional),
   parentID: ID.pipe(optional),
   fork: Schema.Struct({
     sessionID: ID,

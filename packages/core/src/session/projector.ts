@@ -153,6 +153,10 @@ const projectFork = Effect.fn("SessionProjector.projectFork")(function* (
       fork_boundary: event.data.boundary,
       project_id: parent.project_id,
       app_id: parent.app_id,
+      // A fork gets a fresh session ID, so inheriting `session` PVC scope would
+      // only re-state the default. App scope must carry over: the fork shares
+      // the parent app's PVC prefix.
+      pvc_mode: parent.pvc_mode === "app" ? "app" : null,
       workspace_id: parent.workspace_id,
       slug: Slug.create(),
       directory: parent.directory,
@@ -445,6 +449,7 @@ const layer = Layer.effectDiscard(
             id: event.data.sessionID,
             project_id: event.data.projectID,
             app_id: event.data.appId,
+            pvc_mode: event.data.pvcMode,
             workspace_id: event.data.location.workspaceID ? Workspace.ID.make(event.data.location.workspaceID) : null,
             parent_id: event.data.parentID,
             slug: event.data.slug,

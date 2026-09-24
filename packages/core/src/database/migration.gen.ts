@@ -49,6 +49,7 @@ import m46 from "./migration/20260910120000_clear_v1_session_permission.js"
 import m47 from "./migration/20260923213513_session-app-id.js"
 import m48 from "./migration/20260923225130_sandbox.js"
 import m49 from "./migration/20260924020752_session_sandbox_resource.js"
+import m50 from "./migration/20260924062455_watery_prima.js"
 
 export const migrations = [
   m00,
@@ -101,4 +102,5 @@ export const migrations = [
   m47,
   m48,
   m49,
+  m50,
 ] satisfies DatabaseMigration.Migration[]

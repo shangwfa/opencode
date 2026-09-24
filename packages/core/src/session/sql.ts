@@ -28,6 +28,7 @@ export const SessionTable = sqliteTable(
       .notNull()
       .references(() => ProjectTable.id, { onDelete: "cascade" }),
     app_id: text().$type<SessionSchema.Info["appId"]>(),
+    pvc_mode: text().$type<SessionSchema.Info["pvcMode"]>(),
     workspace_id: text().$type<Workspace.ID>(),
     parent_id: text().$type<SessionSchema.ID>(),
     fork_session_id: text().$type<SessionSchema.ID>(),

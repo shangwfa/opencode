@@ -83,6 +83,7 @@ export type ListInput = SessionStore.ListInput
 type CreateBaseInput = {
   id?: SessionSchema.ID
   appId?: SessionSchema.Info["appId"]
+  pvcMode?: SessionSchema.Info["pvcMode"]
   title?: string
   agent?: Agent.ID
   model?: Model.Ref
@@ -266,6 +267,9 @@ const layer = Layer.effect(
             {
               sessionID,
               appId: input.appId ?? parent?.appId,
+              // Children join the parent's app PVC prefix; `session` scope is
+              // per-ID and stays unset so each child gets its own volume.
+              pvcMode: input.pvcMode ?? (parent?.pvcMode === "app" ? ("app" as const) : undefined),
               slug: Slug.create(),
               version: app.version,
               projectID: project.id,

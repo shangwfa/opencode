@@ -235,6 +235,7 @@ export const makeSessionGroup = <
           id: Session.ID.pipe(Schema.optional),
           parentID: Session.ID.pipe(Schema.optional),
           appId: Session.AppId.pipe(Schema.optional),
+          pvcMode: Session.PvcMode.pipe(Schema.optional),
           title: Schema.String.pipe(Schema.optional),
           agent: Agent.ID.pipe(Schema.optional),
           model: Model.Ref.pipe(Schema.optional),

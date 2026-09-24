@@ -96,6 +96,7 @@ const layer = Layer.effect(
               version: app.version,
               projectID: project.id,
               appId: input.data.info.appId,
+              pvcMode: input.data.info.pvcMode,
               location: input.location,
               subpath: RelativePath.make(
                 path.relative(project.directory, input.location.directory).replaceAll("\\", "/"),

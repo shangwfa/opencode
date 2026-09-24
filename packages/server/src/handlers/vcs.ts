@@ -5,6 +5,10 @@ import { HttpApiBuilder } from "effect/unstable/httpapi"
 import { Api } from "../api"
 import { response } from "../location"
 
+const unavailable = (message: string) => new ServiceUnavailableError({ service: "vcs", message })
+
+// Location-scoped routes over the server's own filesystem. Session sandboxes
+// are served by the session-vcs group instead.
 export const VcsHandler = HttpApiBuilder.group(Api, "server.vcs", (handlers) =>
   Effect.gen(function* () {
     return handlers
@@ -20,9 +24,7 @@ export const VcsHandler = HttpApiBuilder.group(Api, "server.vcs", (handlers) =>
         response(
           Effect.gen(function* () {
             const vcs = yield* Vcs.Service
-            return yield* vcs
-              .base()
-              .pipe(Effect.mapError((error) => new ServiceUnavailableError({ service: "vcs", message: error.message })))
+            return yield* vcs.base().pipe(Effect.mapError((error) => unavailable(error.message)))
           }),
         ),
       )
@@ -48,7 +50,7 @@ export const VcsHandler = HttpApiBuilder.group(Api, "server.vcs", (handlers) =>
             const vcs = yield* Vcs.Service
             return yield* vcs
               .diff(ctx.query.mode, { context: ctx.query.context, base: ctx.query.base })
-              .pipe(Effect.mapError((error) => new ServiceUnavailableError({ service: "vcs", message: error.message })))
+              .pipe(Effect.mapError((error) => unavailable(error.message)))
           }),
         ),
       )

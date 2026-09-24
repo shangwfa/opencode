@@ -5,6 +5,41 @@
 
 ---
 
+## V2 适配版（2026-09-24）
+
+> **本文档正文为 V1 API 用例**（`POST /session`、`/session/:id/exec`、`/vcs/diff` 等）。
+> V2 分支（feat/opencode-saas-2.0）已实现该功能的 V2 版本，用例由
+> [`scripts/session-pvc-mode-v2.mjs`](../scripts/session-pvc-mode-v2.mjs) 执行，**T38.1–T38.25 共 20 用例全 PASS（2026-09-24）**。
+>
+> **V2 API 语义映射**：
+> | V1 | V2 |
+> |---|---|
+> | `POST /session` | `POST /api/session`（响应 `{data}`） |
+> | `POST /session/:id/exec` | `POST /api/session/:id/shell`（204）+ `GET /api/experimental/session/:id/log` 读 `session.shell.ended` 输出 |
+> | `POST /session/:id/fork` | `POST /api/session/:id/fork`（需先有一条已投影消息作为 boundary） |
+> | `GET /path?sessionID=` | `GET /api/session/:id` → `data.location.directory` |
+> | `GET /vcs/diff?sessionID=` | `GET /api/session/:sessionID/vcs/diff`（session-scoped 路由，沙箱内以 session.directory 为 cwd 执行 git） |
+>
+> **V2 已知语义差异**：
+> 1. shell 命令 cwd 固定为沙箱内 `/workspace`（V1 默认 session.directory）；worktree 场景命令内自行 `cd`。
+> 2. 子会话/fork 继承语义与 V1 演进后一致：创建时直接继承落库（T38.20）。
+> 3. fork 前置条件：V2 fork 需要至少一条已投影消息（`ForkEmptyError`），用例先执行一条 shell 命令。
+>
+> **`/api/session/:sessionID/vcs/diff` 沙箱代理（2026-09-24 补齐，参考 V1）**：新 session-scoped 路由（`server.session-vcs` group，挂 sessionLocationMiddleware），在会话沙箱内以 `session.directory` 为 cwd 执行 git（`core/sandbox/vcs-diff.ts` 生成 heredoc node 脚本，支持 working/branch/committed 三模式 + base，含 untracked；沙箱未启用返回 503）。`GET /api/vcs/diff` 维持 location-scoped 本地实现不变。T38.22/24/25 已用该 API 断言。
+>
+> **V2 实现落点**：schema（`session-pvc-mode.ts`/`session.ts`/`session-event.ts`）、core（`session/sql.ts` `pvc_mode` 列 + migration `20260924062455`、projector Created/projectFork 继承、`session.ts` 创建继承、`sandbox/volumes.ts` buildVolumes、`sandbox/config.ts` volumeType/pvcClaimName、`sandbox/vcs-diff.ts` 沙箱 diff 命令、provider createSandbox 卷挂载）、protocol（create payload + `session-vcs` group + openapi）、server（`validPvcConfig` 400 校验、`OPENCODE_DEFAULT_DIRECTORY` 默认目录消费、`session-vcs` 沙箱 diff handler、filesystem/project 对沙箱目录的 realpath 容错）。
+>
+> **V2 测试环境**：本地 OpenSandbox（Docker runtime，`host.docker.internal:8080`，镜像 `opencode-opensandbox:local`）+ `OPENCODE_SANDBOX_VOLUME_TYPE=pvc` + `OPENCODE_SANDBOX_PVC_CLAIM=sandbox-test`（Docker named volume，subPath 隔离/共享语义与 K8s PVC 一致）+ 本地 PG `opencode-v2-up`。远端 K8s Sandbox（30040）的 PVC claim 创建失败（state: Failed），未采用。
+>
+> 运行方式：
+> ```bash
+> BASE=http://localhost:14096 AUTH=opencode:<password> \
+> PG_URL=postgresql://local@127.0.0.1:5432/opencode-v2-up \
+> node docs/test-cases/scripts/session-pvc-mode-v2.mjs
+> ```
+
+---
+
 ## 测试环境
 
 > 运行前先全局加载环境：`source test-env.sh [1|2|3]`（见 [`00-preamble.md`](./00-preamble.md)）。以下用例直接用 `$BASE` `$PG_URL`，不重复定义。
@@ -672,6 +707,7 @@ if (!pass) process.exitCode = 1
 | T38.23 | session 模式 worktree 代码写入位置验证 | ✅ (2026-08-02, 2026-08-21) |
 | T38.24 | session 模式 `/vcs/diff` 读取 `/workspace` | ✅ PASS (2026-07-30, 2026-08-21) |
 | T38.25 | app 模式 `/vcs/diff` 读取 session worktree | ✅ PASS (2026-07-30, 2026-08-21) |
+| T38.1–25（V2） | V2 API 适配版（session-pvc-mode-v2.mjs） | ✅ 20/20 PASS (2026-09-24) |
 
 > **2026-08-02 重跑**：T38.1-23 全通过（容器重建后）。**实现差异**：T38.20 文档原写"子任务会话不存 pvcMode，靠 resolveSandboxOpts 运行时追溯"，实测子任务会话（`parentID` 创建）**创建时直接继承**父会话的 `pvcMode=app` + `appId`（API 与 PG 均落库），数据共享同样成立——属实现演进（创建期继承字段，优于运行时追溯）。
 

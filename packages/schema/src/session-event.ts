@@ -27,6 +27,7 @@ import { Project } from "./project.js"
 import { SessionFork } from "./session-fork.js"
 import { Permission } from "./permission.js"
 import { AppId } from "./session-app-id.js"
+import { PvcMode } from "./session-pvc-mode.js"
 import { SessionSandboxResource } from "./session-sandbox-resource.js"
 
 export { FileAttachment }
@@ -57,6 +58,7 @@ export const Created = Event.durable({
     ...Base,
     projectID: Project.ID,
     appId: AppId.pipe(optional),
+    pvcMode: PvcMode.pipe(optional),
     location: Location.Ref,
     subpath: RelativePath.pipe(optional),
     parentID: SessionID.pipe(optional),

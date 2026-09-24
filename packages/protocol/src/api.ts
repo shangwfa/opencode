@@ -7,6 +7,7 @@ import { ModelGroup } from "./groups/model.js"
 import { ProviderGroup } from "./groups/provider.js"
 import { makeSessionGroup } from "./groups/session.js"
 import { makeSessionFileSystemGroup } from "./groups/session-fs.js"
+import { makeSessionVcsGroup } from "./groups/session-vcs.js"
 import { makePermissionGroup } from "./groups/permission.js"
 import { FileSystemGroup } from "./groups/fs.js"
 import { makeFormGroup } from "./groups/form.js"
@@ -62,6 +63,7 @@ type SessionGroups<
 > =
   | ReturnType<typeof makeSessionGroup<SessionLocationId, SessionLocationService, FormLocationId, FormLocationService>>
   | ReturnType<typeof makeSessionFileSystemGroup<SessionLocationId, SessionLocationService>>
+  | ReturnType<typeof makeSessionVcsGroup<SessionLocationId, SessionLocationService>>
   | typeof MessageGroup
 
 type FormGroups<LocationId extends HttpApiMiddleware.AnyId, LocationService> = ReturnType<
@@ -161,6 +163,7 @@ const makeApiFromGroup = <
     .add(PluginGroup.middleware(locationMiddleware))
     .add(makeSessionGroup(sessionLocationMiddleware, formLocationMiddleware))
     .add(makeSessionFileSystemGroup(sessionLocationMiddleware))
+    .add(makeSessionVcsGroup(sessionLocationMiddleware))
     .add(MessageGroup)
     .add(ModelGroup.middleware(locationMiddleware))
     .add(GenerateGroup)
