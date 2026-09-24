@@ -619,7 +619,7 @@ ORDER BY p.time_created;
 | T18.9a-d | ✅ | `ss: command not found` 164ms 快速返回（端到端 4.6s）；超长 timeout 不等待；**按收紧后断言**：netstat 在精简沙箱同样缺失属允许环境态，模型改用 `/proc/net/tcp` 完成端口检查（9.2s），核心断言（快速失败+自主恢复）达成 |
 | T18.10a | ✅ | V2 语义验证通过：kill-sandbox（真实销毁路径）后 read/write **自动重建** sandbox 并 completed，无卡死无本地 fallback。注意：直接 UPDATE DB `state=destroyed` 不构成不可用（内存缓存优先，属预期）——用例语义已按 V2 重定义（见 T18.10a 小节） |
 | T18.10b | ➖ 已移除 | 手法依赖已移除的 `background` 能力，且 files API 真实挂死需故障注入才能构造（首轮环境污染为次要因素）。kill→重建与失联快速返回的风险面已由 T18.10e / T-RFT.2 覆盖 |
-| T18.10c | ✅ | **V2 watchdog 已实现**（`session/watchdog.ts`，global node，中断即补救）。e2e 实测（短超时档 5s/3s，session `ses_f2d5cb3dcffeDAqdOi69aOn2Lc`）：shell sleep 30 被 11.6s 结算为 `error: Tool execution interrupted`；文件日志 `watchdog stuck tools detected tools=["shell"]` + `watchdog scan completed stuck=1 interrupted=1`；interrupt 后 session 恢复可对话。用例已按 V2 语义恢复 |
+| T18.10c | ✅ | **V2 watchdog 已实现并双档实测**（`session/watchdog.ts`，global node，中断即补救）。短超时档（5s/3s，session `ses_f2d5cb3dcffeDAqdOi69aOn2Lc`）：shell sleep 30 被 11.6s 结算；**默认档（120s/60s，session `ses_f2d392bb4ffe75TMH6wnL8GVjF`）：shell sleep 150 被 120662ms 结算**。两档均为 `error: Tool execution interrupted`、文件日志 `stuck tools detected` + `scan completed stuck=1 interrupted=1`、interrupt 后 session 恢复可对话。豁免分支由单测覆盖（`session-watchdog.test.ts`：subagent running 600s 不被标记 + 自定义豁免）。用例已按 V2 语义恢复 |
 | T18.10d | ✅ | `/api/config` 权限配置存在；write 8.5s completed 未被权限阻塞 |
 | T18.10e | ✅(重跑) | `kill-sandbox` HTTP 200 → destroyed → 后续调用自动重建 completed；重跑（keep-alive）后 sandbox 状态一致 |
 | T18.11a | ✅ | 3 个 write 同秒并发 completed，文件内容各自正确 |
