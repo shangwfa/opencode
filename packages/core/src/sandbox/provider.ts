@@ -107,6 +107,14 @@ type SandboxFilesApi = {
 
 const commandsOf = (sb: Sandbox): ExecCommands => sb.commands as unknown as ExecCommands
 
+/**
+ * execd emits one stdout/stderr stream event per output line with the trailing
+ * newline stripped (empty lines produce no event at all). Reassembling with
+ * "" would fuse every line into one, so line-oriented consumers (rg --files,
+ * rg --json, shell output) need the parts joined back with "\n".
+ */
+export const assembleStreamText = (parts: ReadonlyArray<string>): string => parts.join("\n")
+
 const filesOf = (sb: Sandbox): SandboxFilesApi => sb.files as unknown as SandboxFilesApi
 
 const isDirectoryMode = (mode: number | undefined) => typeof mode === "number" && (mode & 0o170000) === 0o040000
@@ -561,7 +569,9 @@ const layer = Layer.effect(
           yield* lock.withPermits(1)(Effect.raceFirst(guarded, heartbeat))
 
           if (timedOut) {
-            const partial = [stdout.join(""), stderr.join("")].filter((part) => part.length > 0).join("\n")
+            const partial = [assembleStreamText(stdout), assembleStreamText(stderr)]
+              .filter((part) => part.length > 0)
+              .join("\n")
             return {
               exitCode: null,
               output: `${partial}\n\nCommand exceeded timeout of ${timeoutMs} ms.`,
@@ -572,7 +582,9 @@ const layer = Layer.effect(
           void completed
           return {
             exitCode,
-            output: [stdout.join(""), stderr.join("")].filter((part) => part.length > 0).join("\n"),
+            output: [assembleStreamText(stdout), assembleStreamText(stderr)]
+              .filter((part) => part.length > 0)
+              .join("\n"),
             timedOut: false,
           } satisfies ExecutionResult
         }).pipe(

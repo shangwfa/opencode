@@ -16,7 +16,7 @@ opencode 的沙箱模式（`OPENCODE_SANDBOX_ENABLED=true`）下，所有文件�
 |---|---|
 | `apply_patch.ts` | 新增 `readFile`/`writeFile`/`removeFile`/`statFile` 四个 helper 函数，根据 `ctx.sandbox` 分发到沙箱或本地 |
 | `ls.ts` | 通过 `SandboxProvider.Service` 直接走 sandbox 路径（`rg --files` 在沙箱内搜索） |
-| `shell.ts` / `edit.ts` | 错误信息去除 "sandbox" 关键字（shell.ts:106 已修）。⚠️ **`read.ts:49` 与 `write.ts:46,49` 仍含 "Sandbox is not available"/"Sandbox initialization failed"**（2026-07-18 核对未修），T20.12 的 grep 会命中这两文件 |
+| `shell.ts` / `edit.ts` | 错误信息去除 "sandbox" 关键字（shell.ts:106 已修）。~~`read.ts:49` 与 `write.ts:46,49` 仍含 "Sandbox is not available"/"Sandbox initialization failed"~~ 2026-09-24 核对：这两个错误串在当前代码已不存在（重构时移除），T20.12 的 grep 不会再命中用户可见错误信息 |
 
 ### 1.3 设计原则
 
@@ -43,6 +43,8 @@ OPENCODE_SANDBOX_API_KEY=H68idVYzjadx
 OPENCODE_SANDBOX_IDLE_KILL_SEC=30
 OPENCODE_SANDBOX_MAX_TTL_SEC=3600
 ```
+
+> 2026-09-24 复测实际环境：容器 `opencode-saas-e2e`（镜像 `opencode-saas-v2:path-leak-e2e`，端口 14105→4096 之外另有 14101 映射），沙箱 `OPENCODE_SANDBOX_DOMAIN=host.docker.internal:30040`、`OPENCODE_SANDBOX_API_KEY=H68idVYzjadx` 与本文档一致；SDK `@alibaba-group/opensandbox@0.1.11`（`packages/core/node_modules`）。
 
 ---
 
@@ -207,6 +209,56 @@ docker exec -i opencode-saas bun run -e '<测试脚本>'
 | **总计** | **77** | **77** | **0** |
 
 > API 端到端（63 次工具调用）已归并至 20 文档，不计入本表。
+
+### 8.7 2026-09-24 复测记录
+
+按当前代码（`sandbox/path.ts` + `sandbox/tools.ts` + `tool/plugin/patch.ts` 重构后结构）重跑三~六章：
+
+| 章节 | 断言数 | 通过 | 失败 |
+|---|---|---|---|
+| 三、路径转换（容器内 import `sandbox/path.ts` 实测） | 23 | 23 | 0 |
+| 四、apply_patch 边界（SDK files/commands API 实测） | 15 | 15 | 0 |
+| 五、ls 边界（SDK find + LIMIT 模拟实测） | 10 | 10 | 0* |
+| 六、并发/压力（SDK 实测） | 10 | 10 | 0 |
+| provider 修复端到端验证（本地 provider 层 + 真实沙箱） | 7 | 7 | 0 |
+
+\* 第五章首轮 6 个失败，暴露生产 bug（见 8.8），修复后全部通过。
+
+### 8.8 2026-09-24 发现的问题与修复
+
+**问题**：`SandboxProvider.run`（`packages/core/src/sandbox/provider.ts`）聚合 execd SSE 流输出时对逐行事件使用 `stdout.join("")`。execd 协议是**每个 stdout/stderr 事件恰好一行、换行符被剥离**（空行不产生事件，实测 `seq 1 5` → 5 个事件、`printf 'a\n\nb\n'` → 2 个事件），`join("")` 把多行输出熔成一行。
+
+**影响**（沙箱模式下）：
+- `sandbox/tools.ts` `glob`：`rg --files | head` 多文件结果变成一个超长假路径，截断判断失效
+- `sandbox/tools.ts` `grep`：`rg --json` 逐行 JSON 拼接后无法 `JSON.parse`，全部匹配被丢弃（0 结果）
+- `shell` 工具：多行命令输出挤成一行返回给模型
+
+**修复**：`provider.ts` 新增导出 `assembleStreamText(parts)`（`join("\n")`，含协议契约注释），`run` 的正常与超时两处聚合改用它；`packages/core/test/sandbox-provider.test.ts` 补 5 个单测。修复后本地 provider 层连真实沙箱验证 7/7 通过（多行重建、`rg --files` 行解析、`rg --json` 逐行可解析、单行、空输出、stderr）。
+
+**V1 对照**（`feat/opencode-1.18.31` 分支）：V1 对 execd 事件是**知情区分**的，本次修复与 V1 语义对齐：
+
+| 场景 | V1 做法 | 位置 |
+|---|---|---|
+| 行导向多行输出（glob/grep/ls/文件路由/代理 shell/配置读取） | `join("\n")` + `split("\n")` | `tool/glob.ts:54`、`tool/grep.ts:85`、`tool/ls.ts:79`、`httpapi/handlers/file.ts:79,137`、`sandbox-proxy.ts:683`、`session-load-dot-opencode.ts:82` |
+| 恒单行标记判定（LSP 检测/isdir/诊断 JSON） | `join("").trim()` | `lsp/agent.ts:405`、`sandbox-proxy.ts:356,1095` |
+| 本地进程流 chunk（`Bun.spawn`，chunk 内含换行） | `join("")` | `tool/shell.ts:679` |
+
+V1 代码注释亦记录了 execd 已知怪癖：部分 execd `execution_complete` 缺失导致 exitCode 不可靠但 stdout 事件始终可靠；语法/运行错误会把命令源码回显混入 stdout；无会话 `/command` 在部分 execd 上不产出 stdout 事件（因此 V1 一律走 `createSession`+`runInSession`）。V2 `sandbox/tools.ts` 的命令形态（`rg --files | head`、`rg --json`）与 V1 同源，provider 聚合处的 `join("")` 属移植回归。
+
+**镜像级端到端验证（2026-09-24）**：基于含修复的镜像 `opencode-saas-v2:stream-fix-e2e` 重建 `opencode-saas-e2e` 容器（14101→4096，其余 env/挂载与旧容器一致），三层验证：
+
+| 验证层 | 方法 | 修复前（旧镜像 `path-leak-e2e`） | 修复后 |
+|---|---|---|---|
+| 确定性 shell API | `POST /api/session/:id/shell` 执行 `seq 1 8` | `"output": "12345678"`（8 行熔成一行） | `"1\n2\n3\n4\n5\n6\n7\n8"` ✅ |
+| AI 工具调用（glob） | prompt 要求调用 glob 搜 `*.e2e-proof.txt`（3 个文件） | 多文件挤成 1 个假路径（代码审查推断） | 3 个条目正确分行，`count: 3` ✅ |
+| AI 工具调用（grep） | prompt 要求 grep 字面量（3 处匹配） | `rg --json` 解析失败 → 0 匹配（代码审查推断） | `Found 3 matches`，`matches: 3` ✅ |
+| PG | `session_v2`/`sandbox`/`session_message` | — | 会话、sandbox `running`（id 与 boot 返回一致）、12 条消息持久化 ✅ |
+
+模型 deepseek-v4-flash；AI 层工具调用消息形态为 `state.content[].text` + `state.metadata`（count/matches）。
+
+**遗留说明**：
+- 空行信息在 execd 协议层丢失（无事件），`join("\n")` 只能恢复行序列、无法恢复空行，属协议限制
+- `provider.ts` 中 `fileStat` python fallback（单行 `echo 1/0`）与 `fileList` JSON fallback（单行 `json.dumps`）的 `join("")` 输出恒为单行（实测长单行仍为单事件、无 chunk 拆分），当前无 bug，未改动
 
 ---
 
