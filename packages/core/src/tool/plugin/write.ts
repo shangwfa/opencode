@@ -99,7 +99,14 @@ export const Plugin = {
               }
               return result
             }).pipe(
-              Effect.map((output) => ({ output, content: toModelContent(output) })),
+              Effect.map((output) => ({
+                output,
+                content: toModelContent(output),
+                // Machine-readable counterpart of the Wrote/Created model text so
+                // persisted parts answer "did this write overwrite a file" without
+                // string-matching the content.
+                metadata: { existed: output.existed },
+              })),
               Effect.mapError((error) => new ToolFailure({ message: `Unable to write ${input.path}`, error })),
             ),
         }),

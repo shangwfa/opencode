@@ -119,6 +119,7 @@ describe("WriteTool", () => {
               existed: false,
             },
             content: [{ type: "text", text: "Created file successfully: src/new.txt" }],
+            metadata: { existed: false },
           })
           expect(yield* Effect.promise(() => fs.readFile(path.join(tmp.path, "src", "new.txt"), "utf8"))).toBe(
             "created",
@@ -180,6 +181,7 @@ describe("WriteTool", () => {
             if (settled.status !== "completed") return
             expect(settled.content).toEqual([{ type: "text", text: "Wrote file successfully: existing.txt" }])
             expect(settled.output).toMatchObject({ resource: "existing.txt", existed: true })
+            expect(settled.metadata).toEqual({ existed: true })
             expect(fixture.assertions[0]?.metadata).toMatchObject({
               files: [
                 {
@@ -193,6 +195,32 @@ describe("WriteTool", () => {
             })
             expect(yield* Effect.promise(() => fs.readFile(path.join(tmp.path, "existing.txt"), "utf8"))).toBe("after")
             expect(fixture.writes).toHaveLength(1)
+          }),
+        ),
+      )
+    }),
+  )
+
+  it.live("overwrites an empty file reporting existed=true", () =>
+    withTempDir((tmp) => {
+      const fixture = makeWriteFixture()
+      const target = path.join(tmp.path, "empty.txt")
+      return Effect.promise(() => fs.writeFile(target, "")).pipe(
+        Effect.andThen(
+          withTool(tmp.path, fixture, (registry) =>
+            executeTool(registry, call({ path: "empty.txt", content: "filled" })),
+          ),
+        ),
+        Effect.andThen((settled) =>
+          Effect.gen(function* () {
+            // The V1 bug read `!!content` and treated empty files as new; the
+            // existence answer must come from stat-like semantics instead.
+            expect(settled.status).toBe("completed")
+            if (settled.status !== "completed") return
+            expect(settled.output).toMatchObject({ resource: "empty.txt", existed: true })
+            expect(settled.metadata).toEqual({ existed: true })
+            expect(settled.content).toEqual([{ type: "text", text: "Wrote file successfully: empty.txt" }])
+            expect(yield* Effect.promise(() => fs.readFile(target, "utf8"))).toBe("filled")
           }),
         ),
       )
