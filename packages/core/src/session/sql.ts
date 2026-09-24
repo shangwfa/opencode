@@ -43,6 +43,7 @@ export const SessionTable = sqliteTable(
     summary_files: integer(),
     summary_diffs: text({ mode: "json" }).$type<FileDiff.LegacyInfo[]>(),
     metadata: text({ mode: "json" }).$type<Session.Metadata>(),
+    sandbox: text({ mode: "json" }).$type<Session.SandboxResource>(),
     cost: real().notNull().default(0),
     tokens_input: integer().notNull().default(0),
     tokens_output: integer().notNull().default(0),

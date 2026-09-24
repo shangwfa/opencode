@@ -31,6 +31,8 @@ import { EventFeed } from "../event-feed"
 import { makePromptStreamTakeUntil, sessionEventFilter } from "../session-stream"
 
 const DefaultSessionsLimit = 50
+const validSandboxResource = (value: { cpu: string; memory: string }) =>
+  /^\d+(\.\d+)?m?$/.test(value.cpu) && /^\d+(Ki|Mi|Gi|Ti|K|M|G|T)$/.test(value.memory)
 
 function missingForm(id: Form.ID) {
   return new FormNotFoundError({ id, message: `Form not found: ${id}` })
@@ -147,18 +149,23 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
       .handle(
         "session.create",
         Effect.fn(function* (ctx) {
+          if (ctx.payload.sandbox && !validSandboxResource(ctx.payload.sandbox))
+            return yield* new InvalidRequestError({ message: "Invalid sandbox resource format", field: "sandbox" })
+          const createInput = {
+            id: ctx.payload.id,
+            appId: ctx.payload.appId,
+            title: ctx.payload.title,
+            agent: ctx.payload.agent,
+            model: ctx.payload.model,
+            metadata: ctx.payload.metadata,
+            permissions: ctx.payload.permissions,
+            sandbox: ctx.payload.sandbox,
+          }
           return {
             data: yield* session
-              .create({
-                id: ctx.payload.id,
-                appId: ctx.payload.appId,
-                title: ctx.payload.title,
-                agent: ctx.payload.agent,
-                model: ctx.payload.model,
-                metadata: ctx.payload.metadata,
-                permissions: ctx.payload.permissions,
-                location: ctx.payload.location ?? { directory: AbsolutePath.make(process.cwd()) },
-              })
+              .create(ctx.payload.parentID
+                ? { ...createInput, parentID: ctx.payload.parentID }
+                : { ...createInput, location: ctx.payload.location ?? { directory: AbsolutePath.make(process.cwd()) } })
               .pipe(Effect.orDie),
           }
         }),
@@ -308,6 +315,17 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
             yield* session
               .setPermissions({ sessionID: ctx.params.sessionID, permissions: ctx.payload.permissions })
               .pipe(Effect.catchTag("Session.NotFoundError", missingSession))
+          if (ctx.payload.sandbox !== undefined) {
+            if (!validSandboxResource(ctx.payload.sandbox))
+              return yield* new InvalidRequestError({ message: "Invalid sandbox resource format", field: "sandbox" })
+            yield* session
+              .setSandboxResource({ sessionID: ctx.params.sessionID, sandbox: ctx.payload.sandbox })
+              .pipe(Effect.catchTag("Session.NotFoundError", missingSession))
+            if (ctx.payload.recreate) {
+              const provider = yield* SandboxProvider.Service
+              yield* provider.destroy(ctx.params.sessionID)
+            }
+          }
           return HttpApiSchema.NoContent.make()
         }),
       )

@@ -27,6 +27,7 @@ import { Project } from "./project.js"
 import { SessionFork } from "./session-fork.js"
 import { Permission } from "./permission.js"
 import { AppId } from "./session-app-id.js"
+import { SessionSandboxResource } from "./session-sandbox-resource.js"
 
 export { FileAttachment }
 
@@ -66,10 +67,21 @@ export const Created = Event.durable({
     /** Host-supplied annotations resolved at creation, including any inherited from a parent. */
     metadata: SessionMetadata.pipe(optional),
     permissions: Permission.Ruleset.pipe(optional),
+    sandbox: SessionSandboxResource.Info.pipe(optional),
     version: Schema.String,
   },
 })
 export type Created = typeof Created.Type
+
+export const SandboxResourceUpdated = Event.durable({
+  type: "session.sandbox.resource.updated",
+  ...options,
+  schema: {
+    ...Base,
+    sandbox: SessionSandboxResource.Info.pipe(optional),
+  },
+})
+export type SandboxResourceUpdated = typeof SandboxResourceUpdated.Type
 
 export const AgentSelected = Event.durable({
   type: "session.agent.selected",
@@ -644,6 +656,7 @@ export namespace RevertEvent {
 
 export const Definitions = Event.inventory(
   Created,
+  SandboxResourceUpdated,
   AgentSelected,
   ModelSelected,
   Moved,

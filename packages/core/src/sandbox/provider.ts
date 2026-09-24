@@ -7,6 +7,8 @@ import { SandboxConfig } from "./config.js"
 import { SandboxPath } from "./path.js"
 import { Database } from "../database/database.js"
 import { SandboxTable } from "./sql.js"
+import { SessionTable } from "../session/sql.js"
+import { SessionSchema } from "../session/schema.js"
 import { and, eq, lt, or } from "drizzle-orm"
 
 export interface ExecutionResult {
@@ -300,6 +302,12 @@ const layer = Layer.effect(
     const createSandbox = (sessionID: string) =>
       Effect.gen(function* () {
         yield* Effect.logInfo("sandbox creating", { sessionID })
+        const session = yield* db
+          .select({ sandbox: SessionTable.sandbox })
+          .from(SessionTable)
+          .where(eq(SessionTable.id, SessionSchema.ID.make(sessionID)))
+          .get()
+          .pipe(Effect.orDie)
         // A timed-out or interrupted create cannot cancel the in-flight HTTP
         // request, so the created sandbox would leak. Track abandonment and
         // let the resolve path destroy what nobody is waiting for.
@@ -315,7 +323,7 @@ const layer = Layer.effect(
               // large images exceed that and fail client-side while the
               // remote sandbox is still converging.
               readyTimeoutSeconds: config.createTimeoutSeconds,
-              resource: config.resource,
+              resource: session?.sandbox ?? config.resource,
               // Ownership tag: cleanup tooling must only ever touch sandboxes
               // created by this service, never someone else's.
               metadata: { managedBy: "opencode-saas", session: sessionID },

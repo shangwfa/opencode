@@ -4,6 +4,8 @@
 >
 > 前置条件：SaaS 服务已启动（`docs/local-test-env.md`），本地 PG + 远端 Sandbox API 可用。
 
+> **2.0 分支说明（2026-09-24）**：当前 2.0 API 使用 `/api/...`，PG 投影表为 `session_v2`；沙箱无会话级配置时沿用 `OPENCODE_SANDBOX_CPU` / `OPENCODE_SANDBOX_MEMORY`，默认 `2 CPU / 4Gi`（不是下方旧版用例中的 `1 CPU / 2Gi`）。`POST /api/session/:id/keep-alive` 已迁移至 `/api/experimental/session/:id/keep-alive`，命令执行入口为 SDK/Session shell。下方原始命令针对 V1 API，2.0 分支本次实测结果见文末「2.0 分支实测补充」。
+
 ---
 
 ## 测试环境
@@ -378,6 +380,8 @@ bun test test/session/sandbox-resource.test.ts --test-name-pattern "Session.Info
 
 ### T29.14 内存不足 OOM → 进程被 SIGKILL → 信号/诊断透出
 
+> **2.0 执行方式**：V2 的 `session.shell` + durable session log/PG `session_message` 承接旧 `exec`/`exec_log` 的命令结果留痕。用 `POST /api/session/:id/shell` 执行命令后，从 `GET /api/experimental/session/:id/log` 的 `session.shell.ended` 事件及 `session_message` 检查命令、输出、状态和退出码。V2 shell 记录不等同于旧版 `signal/oomSuspected` 字段；OOM 是否发生需结合沙箱 cgroup 的 `memory.events`/`oom_kill` 计数或服务端 OOM 采样记录判断。
+
 ```bash
 # 1. 创建 512Mi 小内存会话并 boot 沙箱
 SID=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' \
@@ -504,7 +508,30 @@ psql "$PG_URL" -t -c "SELECT sandbox::text FROM session WHERE id='$SID';"
 | T29.14 | ✅ | 2026-09-08 组合 1（镜像 `oom-diag-v2`）实测：session `ses_f7edeca9affeTOE39fEL0yizqA`（512Mi），`tail /dev/zero` → `{exitCode:137, signal:SIGKILL, oomSuspected:true}` + 本次 WARN 日志。注意：node Array 撞 V8 堆、dd 撞 tmpfs size 都触发不了 cgroup OOM，`tail /dev/zero` 是确定性触发器 |
 | T29.15 | ✅ | 2026-09-08 同环境实测：UPDATE 4Gi + kill-sandbox 重建后 cgroup=4294967296，Buffer 1.6GB 分配 `exit=0 mem-allocated-ok`（旧 512Mi 必死） |
 | T29.16 | ✅ | 2026-09-09 组合 1（镜像 `preview-diag3`）实测：session `ses_f7edeca9affeTOE39fEL0yizqA`，PATCH `{sandbox:2cpu/4Gi, recreate:true}` → PG 持久化 ✅ → 旧沙箱销毁 → 重建后 cgroup=4096MB ✅ → exec_log 审计记录 ✅ |
-| T29.17 | ⏳ | 仅更新配置不带 recreate（当前实例不受影响）——用例已定义，待执行 |
+| T29.17 | ⏳ | 仅更新配置不带 recreate（当前实例不受影响）——旧版环境用例待执行；2.0 API/PG 配置更新验证见下方补充 |
+
+### 2.0 分支实测补充（2026-09-24）
+
+当前分支已将会话资源配置接入 `POST /api/session`、`PATCH /api/session/:id`、`session_v2.sandbox` 和 SandboxProvider：
+
+| 验证 | 结果 | 实测 |
+|------|------|------|
+| API + PG 持久化 | ✅ | `POST /api/session` 返回并写入 `{"cpu":"2","memory":"4Gi"}` |
+| 无配置 / 格式校验 | ✅ | 不传配置时响应省略 `sandbox`；非法 CPU、memory 均返回 HTTP 400 |
+| 沙箱资源生效 | ✅ | SDK 读取 cgroup：CPU quota `200000`、内存 `4294967296`（4Gi） |
+| PATCH + recreate | ✅ | PATCH 为 `1 CPU / 512Mi` 后旧实例销毁；重建 cgroup 为 quota `100000`、内存 `536870912` |
+| 子会话 / fork 继承 | ✅ | Server API 集成测试覆盖父会话创建、子会话创建、导入会话 fork 的配置继承 |
+| 单元 / API 集成 | ✅ | Schema、格式校验、持久化、继承、更新及默认不配置测试通过 |
+
+| 用例 | 结果 | 本轮执行情况 |
+|------|------|------|
+| T29.5 API 多资源组合 | ✅ | 1/2Gi、0.5/1Gi、500m/512Mi、0.25/256Mi、100m/128Mi、4/16Gi 均返回并保存请求规格 |
+| T29.6–T29.8 真实沙箱资源 | ⚠️ | 本轮再次尝试启动真实沙箱；SDK 创建资源遇到 `KUBERNETES::POD_READY_TIMEOUT`（Pod Pending），未能完成本轮 cgroup 复核。此前 2.0 e2e 的 2 CPU/4Gi 与 1 CPU/512Mi cgroup 实测仍有效，见上方记录 |
+| T29.14–T29.15 OOM / 扩容恢复 | ⚠️ | 2.0 应通过 `session.shell` 执行，并从 durable session log/PG `session_message` 验证 shell 状态、退出码与输出；结合 cgroup OOM 计数确认 OOM。当前远端 Pod Pending，本轮未能启动沙箱完成这组验证；旧版 `signal/oomSuspected` 字段不作为 2.0 验收项 |
+| T29.16 PATCH + recreate | ⚠️ | 既有 2.0 e2e 已验证 PATCH 后重建规格变化；本轮远端 Pod Pending，未重复完成 cgroup 检查 |
+| T29.17 PATCH 不带 recreate | ⚠️ | 本轮通过 API 验证 PATCH 返回 204，随后 GET 返回新配置 `1 CPU / 2Gi`；由于无法启动当前沙箱，未能核对运行中 cgroup 仍保持原规格 |
+
+本轮额外执行：Server 集成测试 12 项、Schema 测试 1 项、Core sandbox-provider/v1-migration 测试集、Core/Server/Protocol/Schema typecheck 和 migration check 均通过。API e2e 使用独立端口 `14107` 与 `opencode-v2-up` PG；已删除本轮测试会话和容器。**因此 T29.1–T29.17 尚未全部在当前 2.0 环境完整通过**：主要未完成项是真实沙箱因远端调度 Pending 而无法复核，以及 2.0 不支持的旧版 OOM 接口场景。
 
 ---
 

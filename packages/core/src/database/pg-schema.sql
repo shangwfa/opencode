@@ -162,6 +162,7 @@ CREATE TABLE "session_v2" (
           "summary_files" bigint,
           "summary_diffs" text,
           "metadata" text,
+          "sandbox" text,
           "cost" double precision DEFAULT 0 NOT NULL,
           "tokens_input" bigint DEFAULT 0 NOT NULL,
           "tokens_output" bigint DEFAULT 0 NOT NULL,

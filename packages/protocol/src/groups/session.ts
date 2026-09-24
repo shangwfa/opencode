@@ -233,6 +233,7 @@ export const makeSessionGroup = <
       HttpApiEndpoint.post("session.create", "/api/session", {
         payload: Schema.Struct({
           id: Session.ID.pipe(Schema.optional),
+          parentID: Session.ID.pipe(Schema.optional),
           appId: Session.AppId.pipe(Schema.optional),
           title: Schema.String.pipe(Schema.optional),
           agent: Agent.ID.pipe(Schema.optional),
@@ -240,6 +241,7 @@ export const makeSessionGroup = <
           location: Location.PublicRef.pipe(Schema.optional),
           metadata: Session.Metadata.pipe(Schema.optional),
           permissions: Permission.Ruleset.pipe(Schema.optional),
+          sandbox: Session.SandboxResource.pipe(Schema.optional),
         }),
         success: Schema.Struct({ data: PublicSessionInfo }),
       }).annotateMerge(
@@ -374,6 +376,8 @@ export const makeSessionGroup = <
         payload: Schema.Struct({
           title: Schema.String.pipe(Schema.optional),
           permissions: Permission.Ruleset.pipe(Schema.optional),
+          sandbox: Session.SandboxResource.pipe(Schema.optional),
+          recreate: Schema.Boolean.pipe(Schema.optional),
         }),
         success: HttpApiSchema.NoContent,
         error: SessionNotFoundError,

@@ -88,6 +88,7 @@ type CreateBaseInput = {
   model?: Model.Ref
   metadata?: SessionSchema.Metadata
   permissions?: Permission.Ruleset
+  sandbox?: SessionSchema.Info["sandbox"]
 }
 type CreateInput = CreateBaseInput &
   ({ location: Location.Ref; parentID?: never } | { parentID: SessionSchema.ID; location?: never })
@@ -175,6 +176,10 @@ export interface Interface {
   readonly setPermissions: (input: {
     sessionID: SessionSchema.ID
     permissions: Permission.Ruleset
+  }) => Effect.Effect<void, NotFoundError>
+  readonly setSandboxResource: (input: {
+    sessionID: SessionSchema.ID
+    sandbox?: SessionSchema.Info["sandbox"]
   }) => Effect.Effect<void, NotFoundError>
   readonly move: SessionMove.Interface["move"]
   readonly prompt: (
@@ -273,6 +278,7 @@ const layer = Layer.effect(
               // location, so host policies that read them treat the family uniformly.
               metadata: input.metadata ?? parent?.metadata,
               permissions: input.permissions ?? parent?.permissions,
+              sandbox: input.sandbox ?? parent?.sandbox,
               model: input.model
                 ? {
                     id: Model.ID.make(input.model.id),
@@ -470,6 +476,7 @@ const layer = Layer.effect(
       switchModel: (input) => sessions.forSession(input.sessionID).switchModel(input),
       rename: (input) => sessions.forSession(input.sessionID).rename(input),
       setPermissions: (input) => sessions.forSession(input.sessionID).setPermissions(input),
+      setSandboxResource: (input) => sessions.forSession(input.sessionID).setSandboxResource(input),
       move: moves.move,
       compact: (input) => sessions.forSession(input.sessionID).compact(input),
       wait: (sessionID) => sessions.forSession(sessionID).wait(),

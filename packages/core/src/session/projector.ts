@@ -28,7 +28,7 @@ import { ProjectTable } from "../project/sql.js"
 type DatabaseService = Database.Interface["db"]
 type MessageEvent = Exclude<
   SessionEvent.DurableEvent,
-  typeof SessionEvent.Forked.Type | typeof SessionEvent.Deleted.Type
+  typeof SessionEvent.Forked.Type | typeof SessionEvent.Deleted.Type | typeof SessionEvent.SandboxResourceUpdated.Type
 >
 
 const decodeMessage = Schema.decodeUnknownSync(SessionMessage.Info)
@@ -161,6 +161,7 @@ const projectFork = Effect.fn("SessionProjector.projectFork")(function* (
       agent: parent.agent,
       model: parent.model,
       metadata: parent.metadata,
+      sandbox: parent.sandbox,
       permission: parent.permission,
       version: parent.version,
       cost: 0,
@@ -453,6 +454,7 @@ const layer = Layer.effectDiscard(
             agent: event.data.agent,
             model: event.data.model,
             metadata: event.data.metadata,
+            sandbox: event.data.sandbox,
             permission: event.data.permissions,
             version: event.data.version,
             time_created: event.created,
@@ -579,6 +581,14 @@ const layer = Layer.effectDiscard(
       db
         .update(SessionTable)
         .set({ permission: event.data.permissions, time_updated: event.created })
+        .where(eq(SessionTable.id, event.data.sessionID))
+        .run()
+        .pipe(Effect.orDie),
+    )
+    yield* bus.project(SessionEvent.SandboxResourceUpdated, (event) =>
+      db
+        .update(SessionTable)
+        .set({ sandbox: event.data.sandbox, time_updated: event.created })
         .where(eq(SessionTable.id, event.data.sessionID))
         .run()
         .pipe(Effect.orDie),
