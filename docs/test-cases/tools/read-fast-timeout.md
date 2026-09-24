@@ -80,6 +80,24 @@ else
   fail "T-RFT.2" "read 未在 60s 内返回: $READ_ROW"
 fi
 
+# ============================================================
+# T-RFT.3 watchdog 中断结算观察（V2 语义）
+# ============================================================
+# V2 watchdog 为中断式（execution.interrupt reason=watchdog），part 落
+# error: Tool execution interrupted。观察近 24h 被中断 part 的耗时是否
+# 在 timeout+interval+余量 内（默认 120+60+25≈205000ms）。
+# 无样本（未发生 stuck）属正常，跳过。
+MAXGAP=$(psql "$PG_URL" -t -A -c "
+  SELECT max((elem->'time'->>'completed')::bigint - (elem->'time'->>'created')::bigint)
+  FROM session_message m, jsonb_array_elements(m.data::jsonb->'content') elem
+  WHERE elem->>'type'='tool' AND elem->'state'->>'error' LIKE '%Tool execution interrupted%'
+    AND m.time_created > (extract(epoch from now())-86400)*1000;")
+if [ -n "$MAXGAP" ] && [ "$MAXGAP" -gt 0 ]; then
+  echo "T-RFT.3 近24h watchdog 中断 part 最大耗时 ${MAXGAP}ms"
+  [ "$MAXGAP" -le 205000 ] && pass "T-RFT.3" || fail "T-RFT.3" "gap=${MAXGAP}ms 超 205s"
+else
+  echo "T-RFT.3 近24h 无 watchdog 中断 part，跳过（无 stuck 样本）"
+fi
 
 summary
 ```
@@ -90,8 +108,9 @@ summary
 |---|---|
 | T-RFT.1 | read `completed` 且耗时 <15s（正常路径无回归） |
 | T-RFT.2 | read 在 60s 内返回（成功或明确 error），**不出现** `timed out ... (watchdog)` |
+| T-RFT.3 | 近 24h 被 watchdog 中断结算的 tool part（`error=Tool execution interrupted`）耗时 ≤ `timeout+interval+余量`（默认档 120+60+25≈205s；V1 为 150s——其 interval 已从 60s 调至 15s） |
 
-> 原 T-RFT.3（watchdog 扫描间隔）已移除：验证对象为 watchdog 标记的 part 耗时，而 watchdog 机制在 V2 不存在（无 `watchdog.ts`/`OPENCODE_WATCHDOG_*`），永远无样本。若决策补齐 stuck tool watchdog 则恢复该用例。
+> **T-RFT.3 V2 语义**（原"watchdog 标记 part"已随机制升级）：V2 watchdog 是 `execution.interrupt({reason:"watchdog"})` **中断式**结算（非直接改 part 状态），part 落 `error: Tool execution interrupted`。观察 SQL 见 bash 块；无样本（24h 内未发生 stuck）时跳过属正常。触发链路的功能验证见 tool-calls.md 的 T18.10c。
 
 > 注：T-RFT.2 的 PASS 条件宽容（快速成功或快速 error 均可，核心=不挂死）。**已知盲区**：本轮与全部历史记录命中的都是"重建窗口 File not found / 快速重建"，`files API` **真实挂死 → 15s timeout → destroy 自愈路径从未被真正触发**——该场景需要故障注入（如 proxy 拦截 files API）才能覆盖，属跨文档共同盲区（与已移除的 T18.10b 同源）。
 
@@ -119,7 +138,7 @@ summary
 |---|---|---|---|
 | 2026-09-24 | T-RFT.1 | ✅ PASS | read `completed` **311ms**（<15s），消息总耗时 3s，session `ses_f2db5de6effeybcQKKmpS9035p` |
 | 2026-09-24 | T-RFT.2 | ✅ PASS | kill-sandbox 后 read **1943ms** 返回明确 error `File not found`（命中重建窗口，快速出结果），无 watchdog，消息总耗时 5s，session `ses_f2db54922ffepwzRsshJW3Vwbd` |
-| 2026-09-24 | T-RFT.3 | ➖ 已移除 | 用例随观察对象（watchdog 机制）在 V2 不存在而删除；实测近 24h PG watchdog 错误 part 数=0 与之一致。补齐机制后恢复 |
+| 2026-09-24 | T-RFT.3 | ✅ PASS | 按 V2 语义恢复（watchdog 中断式结算）：近 24h `error=Tool execution interrupted` part 1 条、max 耗时 11627ms ≤ 205s（e2e 触发样本）。观察 SQL 与语义说明见 bash 块 |
 
 **结论**：`PASS=2 FAIL=0`。V2 的 read 快速出结果由 provider 层保障（`getOrCreate` 有 bounded wait + 重建路径 `createTimeoutSeconds` 兜底），实测远优于 15s 阈值；V1 时代的 watchdog 120s 兜底在 V2 不存在，stuck tool 兜底机制缺口见 tool-calls.md 待办 #6（watchdog 决策项）。
 

@@ -197,7 +197,7 @@ send_and_verify "$SID" "项目是 Vite + React 应用，运行在沙箱的 /work
 
 ### T18.10 sandbox 生命周期与文件 I/O 健壮性
 
-> 该组用例覆盖 sandbox 不可用时的快速失败、权限等待阻塞等会导致会话永久卡在 `running` 的问题。（原 T18.10b 文件 I/O 超时销毁、T18.10c stuck tool watchdog 已移除：前者手法依赖已移除的 background 能力且需要故障注入才能构造，后者验证的 watchdog 机制在 V2 不存在——待决策是否补齐后恢复。）
+> 该组用例覆盖 sandbox 不可用时的快速失败、stuck tool watchdog、权限等待阻塞等会导致会话永久卡在 `running` 的问题。（原 T18.10b 文件 I/O 超时销毁已移除：手法依赖已移除的 background 能力且真实挂死需故障注入才能构造；kill→重建与失联快速返回的风险面由 T18.10a/T18.10e 覆盖。）
 
 #### T18.10a sandbox 销毁后的行为（V2 语义）
 
@@ -224,6 +224,43 @@ psql "$PG_URL" -t -A -c "SELECT state FROM sandbox WHERE session_id='$SID';"   #
 - 重建后 PG 行回到 `state=running`，文件读写内容一致。
 - 直接 UPDATE DB（不 kill-sandbox）时 read/write 仍正常 completed——内存缓存优先属预期行为，不判定为 FAIL。
 
+
+#### T18.10c stuck tool watchdog 自动恢复（V2 语义）
+
+> **V2 实现**（`packages/core/src/session/watchdog.ts`，V1 parity + 架构升级）：global node 定期扫描**活跃执行会话**的 tool parts，running 超预算（`OPENCODE_WATCHDOG_TIMEOUT_SEC`，默认 120s；0=禁用；扫描间隔 `OPENCODE_WATCHDOG_SCAN_INTERVAL_SEC` 默认 60s）即 `execution.interrupt({reason:"watchdog"})`——**中断即补救**：runner 的 `failUnsettledTools` 结算 + projection compare-and-set 保证幂等（V1 手写 mark-timed-out SQL 的替代）。默认豁免 `subagent`/`task`（`OPENCODE_WATCHDOG_EXEMPT_TOOLS` 可配）；孤儿 part 走 restart recovery（`resumeSuspendedSessions` + `settleStaleToolCalls`），不在本扫描内。
+>
+> **与 V1 手法差异**：V1 的"PG 插入 running part"不再有效——V2 扫内存活跃会话而非全表。V2 手法 = 短超时配置 + 真实长工具调用。
+
+```bash
+# 1. 触发配置（测试环境注入短超时并重启；生产默认 120s/60s，断言阈值相应放大）
+#    OPENCODE_WATCHDOG_TIMEOUT_SEC=5  OPENCODE_WATCHDOG_SCAN_INTERVAL_SEC=3
+
+# 2. shell 不在豁免列表——sleep 30 超过 5s 预算，应被 interrupt
+SID=$(new_sid -kb)
+send message "用 bash 执行: sleep 30 && echo done-after-sleep"
+sleep 45   # timeout + interval + 余量
+
+# 3. PG 验证：tool part 结算为 error（非永卡 running）
+SELECT status, error, completed-created
+FROM tool part → 'error' | 'Tool execution interrupted' | dur ≤ (timeout+interval+余量)*1000
+
+# 4. 文件日志验证（注意：V2 日志默认走文件，OPENCODE_PRINT_LOGS 未设时 docker logs 静默）
+docker exec <容器> grep -E 'watchdog stuck tools detected|watchdog scan completed' \
+  /home/opencode/.local/share/opencode/log/opencode-local.log
+# → WARN watchdog stuck tools detected sessionID=... tools=["shell"] timeoutMs=5000
+# → WARN watchdog scan completed ... stuck=1 interrupted=1
+
+# 5. interrupt 后 session 恢复响应（核心：不永卡 running）
+send message "回复 OK" → assistant text 'OK'
+
+# 6. 测完恢复默认配置（短超时会误杀长任务如 npm install）
+```
+
+**期望**：
+- PG 中被中断的 tool part `status=error`、错误为 `Tool execution interrupted`、耗时 ≤ timeout+interval+余量（短超时档 ~20s、默认档 ~205s）。
+- 文件日志出现 `watchdog stuck tools detected` 与 `watchdog scan completed ... stuck>=1 interrupted>=1`。
+- interrupt 后 session 立即恢复可对话（run 层结算幂等，不永卡 `running`）。
+- 默认豁免工具（subagent/task）不被误杀；`OPENCODE_WATCHDOG_TIMEOUT_SEC=0` 时 `enabled=false` 不扫描。
 
 #### T18.10d 权限等待不阻塞会话
 
@@ -582,7 +619,7 @@ ORDER BY p.time_created;
 | T18.9a-d | ✅ | `ss: command not found` 164ms 快速返回（端到端 4.6s）；超长 timeout 不等待；**按收紧后断言**：netstat 在精简沙箱同样缺失属允许环境态，模型改用 `/proc/net/tcp` 完成端口检查（9.2s），核心断言（快速失败+自主恢复）达成 |
 | T18.10a | ✅ | V2 语义验证通过：kill-sandbox（真实销毁路径）后 read/write **自动重建** sandbox 并 completed，无卡死无本地 fallback。注意：直接 UPDATE DB `state=destroyed` 不构成不可用（内存缓存优先，属预期）——用例语义已按 V2 重定义（见 T18.10a 小节） |
 | T18.10b | ➖ 已移除 | 手法依赖已移除的 `background` 能力，且 files API 真实挂死需故障注入才能构造（首轮环境污染为次要因素）。kill→重建与失联快速返回的风险面已由 T18.10e / T-RFT.2 覆盖 |
-| T18.10c | ➖ 已移除 | 验证对象（watchdog 机制）在 V2 不存在（`watchdog.ts`/`mark-timed-out.ts` 无）。**若决策补齐 stuck tool watchdog 则恢复本用例**——当前该缺口仍是遗留决策项（见待办） |
+| T18.10c | ✅ | **V2 watchdog 已实现**（`session/watchdog.ts`，global node，中断即补救）。e2e 实测（短超时档 5s/3s，session `ses_f2d5cb3dcffeDAqdOi69aOn2Lc`）：shell sleep 30 被 11.6s 结算为 `error: Tool execution interrupted`；文件日志 `watchdog stuck tools detected tools=["shell"]` + `watchdog scan completed stuck=1 interrupted=1`；interrupt 后 session 恢复可对话。用例已按 V2 语义恢复 |
 | T18.10d | ✅ | `/api/config` 权限配置存在；write 8.5s completed 未被权限阻塞 |
 | T18.10e | ✅(重跑) | `kill-sandbox` HTTP 200 → destroyed → 后续调用自动重建 completed；重跑（keep-alive）后 sandbox 状态一致 |
 | T18.11a | ✅ | 3 个 write 同秒并发 completed，文件内容各自正确 |
@@ -597,5 +634,6 @@ ORDER BY p.time_created;
 3. ~~工具层对 rg 缺失静默空结果~~ ✅ 已修复：`SandboxTools.ensureRipgrep`（`packages/core/src/sandbox/tools.ts`）在 glob/grep 前探测 `command -v rg`（per-session 缓存），缺失时显式返回 `ToolFailure: ripgrep (rg) is not available in the sandbox image...`；单测 `sandbox-tools-ripgrep.test.ts` 3/3 过；e2e（镜像 `9aa68014be-rg-guard`，session `ses_f2dba38f5ffe3ijVfGEt5K6SGk`）验证正常路径不回归：grep/glob/shell 全 completed，探测命令在 provider.run 层执行不落 tool part。
 4. ~~非法路由 500~~ ✅ 已闭环：工作区既有修复（`.dockerignore` 加 `!packages/app/dist` 例外 + `app-assets.ts` 对 dist 缺失降级为空资产并 warn）已随当前镜像生效——验证：无效路由回 index.html 200、`/api/*` 未命中 404、无 500。
 5. ~~T18.10a 用例语义重定义~~ ✅ 已完成：用例改写为 V2 语义（kill-sandbox 真实销毁 → 自动重建 completed；UPDATE DB 标记不再判定 FAIL）。
-6. 遗留决策项：V2 无 stuck tool watchdog（V1 `watchdog.ts` 每 60s 扫描 running>5min 的 tool part 标记 error）。V2 若无替代机制，sandbox 文件 I/O 永久 pending 会导致 session 永卡 `running`，需确认是否有意移除或需要补齐。相关用例（T18.10c、read-fast-timeout 的 T-RFT.3）已随之移除，若决策补齐机制则一并恢复。
+6. ~~遗留决策项：V2 无 stuck tool watchdog~~ ✅ **已闭环**：V2 watchdog 已实现（`packages/core/src/session/watchdog.ts`：global node 扫活跃会话、`execution.interrupt({reason:"watchdog"})` 中断即补救、runner 结算+projection CAS 幂等、subagent/task 豁免、孤儿走 restart recovery），单测 9/9 过、e2e 实测触发链路完整（见 T18.10c 记录）。相关用例 T18.10c / T-RFT.3 已按 V2 语义恢复。
+7. 遗留运维提示：watchdog 日志走**文件**（`/home/opencode/.local/share/opencode/log/opencode-local.log`）——`OPENCODE_PRINT_LOGS` 未设时 `docker logs` 静默，排障勿只看容器 stdout。
 
