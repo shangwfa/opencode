@@ -97,6 +97,7 @@ import { OptimizePlugin } from "./optimize.js"
 import { VcsGitPlugin } from "./vcs/git.js"
 import { WarmingPlugin } from "./warming.js"
 import { WellKnownPlugin } from "../wellknown/plugin.js"
+import { CcrPlugin } from "./ccr.js"
 
 const services = [
   Agent.Service,
@@ -234,6 +235,7 @@ const pre = [
   WebSearchTool.Plugin,
   WriteTool.Plugin,
   WarmingPlugin.Plugin,
+  CcrPlugin.Plugin,
 ] as const satisfies readonly InternalPlugin[]
 
 const post = [

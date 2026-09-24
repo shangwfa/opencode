@@ -3,6 +3,7 @@ import { Effect, Layer, RcMap, Scope } from "effect"
 import { AppNodeBuilder } from "@opencode/core/effect/app-node-builder"
 import { LayerNode } from "@opencode/util/effect/layer-node"
 import { Database } from "@opencode/core/database/database"
+import { KV } from "@opencode/core/kv"
 import { Bus } from "@opencode/core/bus"
 import { Instance } from "@opencode/core/instance/service"
 import { Location } from "@opencode/core/location"
@@ -39,6 +40,7 @@ const it = testEffect(
   AppNodeBuilder.build(
     LayerNode.group([
       Database.node,
+      KV.node,
       Bus.node,
       SessionProjector.node,
       SessionStore.node,
@@ -70,11 +72,16 @@ describe("Session.remove", () => {
       yield* Effect.acquireRelease(locations.contextEffect(location), () => locations.invalidate(location))
       closed.length = 0
 
+      const environments = yield* SessionEnvironment.Service
+      const kv = yield* KV.Service
+      yield* kv.set(`plugin/ccr/${parent.id}/parent-hash`, { original: "parent" })
+      yield* kv.set(`plugin/ccr/${child.id}/child-hash`, { original: "child" })
+      // Entries created before deletion must be removed with the session family.
       yield* session.remove(parent.id)
-
       expect((yield* session.list()).data).toEqual([])
       expect(closed).toEqual([parent.id, child.id])
-      const environments = yield* SessionEnvironment.Service
+      expect(yield* kv.get(`plugin/ccr/${parent.id}/parent-hash`)).toBeUndefined()
+      expect(yield* kv.get(`plugin/ccr/${child.id}/child-hash`)).toBeUndefined()
       expect(yield* environments.get(parent.id)).toBeUndefined()
       expect(yield* environments.get(child.id)).toBeUndefined()
       expect(yield* Effect.result(session.get(parent.id))).toMatchObject({ _tag: "Failure" })

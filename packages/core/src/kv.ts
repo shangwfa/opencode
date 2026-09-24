@@ -27,6 +27,7 @@ export interface ScanResult {
 export interface Interface {
   readonly get: (key: string) => Effect.Effect<Value | undefined>
   readonly set: (key: string, value: Value) => Effect.Effect<void>
+  readonly setIfAbsent: (key: string, value: Value) => Effect.Effect<boolean>
   readonly remove: (key: string) => Effect.Effect<void>
   readonly scan: (options: ScanOptions) => Effect.Effect<ScanResult>
 }
@@ -53,6 +54,16 @@ const layer = Layer.effect(
           .onConflictDoUpdate({ target: KVTable.key, set: { value, time_updated: Date.now() } })
           .run()
           .pipe(Effect.orDie)
+      }),
+      setIfAbsent: Effect.fn("KV.setIfAbsent")(function* (key, value) {
+        const inserted = yield* db
+          .insert(KVTable)
+          .values({ key, value })
+          .onConflictDoNothing({ target: KVTable.key })
+          .returning({ key: KVTable.key })
+          .get()
+          .pipe(Effect.orDie)
+        return inserted !== undefined
       }),
       remove: Effect.fn("KV.remove")(function* (key) {
         yield* db.delete(KVTable).where(eq(KVTable.key, key)).run().pipe(Effect.orDie)

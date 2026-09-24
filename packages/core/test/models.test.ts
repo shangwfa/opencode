@@ -173,6 +173,11 @@ const makeMockKV = (cache: MockCache) =>
   Layer.mock(KV.Service, {
     get: (key) => Effect.sync(() => cache.values.get(key)),
     set: (key, value) => Effect.sync(() => cache.values.set(key, value)).pipe(Effect.asVoid),
+    setIfAbsent: (key, value) => Effect.sync(() => {
+      if (cache.values.has(key)) return false
+      cache.values.set(key, value)
+      return true
+    }),
     remove: (key) => Effect.sync(() => cache.values.delete(key)).pipe(Effect.asVoid),
   })
 
@@ -194,6 +199,7 @@ const makeFailingWriteKV = (cache: MockCache) =>
   Layer.mock(KV.Service, {
     get: (key) => Effect.sync(() => cache.values.get(key)),
     set: () => Effect.die(new Error('Failed query: insert into "kv"')),
+    setIfAbsent: () => Effect.die(new Error('Failed query: insert into "kv"')),
     remove: (key) => Effect.sync(() => cache.values.delete(key)).pipe(Effect.asVoid),
   })
 

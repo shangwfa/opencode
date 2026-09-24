@@ -24,6 +24,15 @@ describe("KV", () => {
     }),
   )
 
+  it.effect("keeps the first value for a key across concurrent CCR writers", () =>
+    Effect.gen(function* () {
+      const kv = yield* KV.Service
+      expect(yield* kv.setIfAbsent("plugin/ccr/session/hash", { replacement: "first" })).toBe(true)
+      expect(yield* kv.setIfAbsent("plugin/ccr/session/hash", { replacement: "second" })).toBe(false)
+      expect(yield* kv.get("plugin/ccr/session/hash")).toEqual({ replacement: "first" })
+    }),
+  )
+
   it.effect("scans prefixes in deterministic pages", () =>
     Effect.gen(function* () {
       const kv = yield* KV.Service

@@ -43,6 +43,27 @@
 | `packages/opencode/src/server/routes/instance/httpapi/handlers/session.ts` | session remove 时清理 `plugin/ccr/<sid>` 条目                                               |
 | `test/plugin/ccr-*.test.ts`                                                | L0 单测（compressors / store / transform 三套件）                                           |
 
+### 当前分支 V2 移植状态
+
+当前代码分支使用 V2 Effect 插件与 KV 服务，CCR 入口为 `packages/core/src/plugin/ccr.ts`，由 `PluginInternal` 注册；请求视图在 `session.context` 与 `session.compaction` hook 中转换，entry 写入 KV（SaaS PG 后端），会话删除时清理对应 key。已移植 JSON 数组/对象（含 lossless `ccr_table`）、搜索结果、配置、日志、diff、表格、HTML、代码启发式及通用文本压缩；也支持历史图片面积预算缩放及编码尺寸预检、marker、TTL、父 session 回溯取回、并发 replacement 复用和 per-turn 日志。
+
+**V2 L0 用例覆盖（2026-09-24）**：`packages/core/test/ccr-plugin.test.ts`（12 项）以内存 mock KV 覆盖 V1 transform/store/retrieve 三套件的 V2 版断言——T-CCR.15（跨 session 独立 entry）、T-CCR.16（写失败透传+重试）、T-CCR.17/18（跨轮不同 query 复用相同 replacement 字节）、T-CCR.23（TTL env 语义）、retrieve 的 not_found/expired/父链回溯与 maxDepth；`ccr.test.ts` 覆盖压缩原语、策略路由与 T-CCR.19/20 边界（散文含单个 ERROR 词不误路由日志、日志尾行 ERROR/WARN 保留、hunk 内 `-- ` 开头删除行不误判文件头）；`ccr-bench.ts` 为性能基准（各策略 20–68 MB/s、1MB estimateTokens 6.3ms）。补测过程中修复两个真实缺陷：① KV 写失败以 defect（die）形式抛出时原 `Effect.catch` 挡不住会 500（生产 PG 桥接即此形态，已加 `Effect.catchDefect` 透传）；② 日志级别词误加 `/i` 致含小写 "error" 的散文误路由（已对齐 V1 大小写敏感）。L1–L14 容器/API/PG 验收仍未在 V2 运行（Docker 构建因磁盘 `NoSpaceLeft` 未完成）；文档后续 T-CCR 表中的 V1 容器实测记录不代表 V2 已通过。
+
+V2 的 entry 位于 `kv` 表（`value` 为 JSON 文本），观测查询示例：
+
+```sql
+SELECT key,
+       value::jsonb->>'tool' AS tool,
+       value::jsonb->>'strategy' AS strategy,
+       (value::jsonb->>'originalTokens')::numeric AS original_tokens,
+       (value::jsonb->>'compressedTokens')::numeric AS compressed_tokens,
+       (value::jsonb->>'retrievalCount')::numeric AS retrieval_count
+FROM kv
+WHERE key LIKE 'plugin/ccr/%'
+ORDER BY time_updated DESC
+LIMIT 20;
+```
+
 ## 配置
 
 | 环境变量                      | 默认    | 说明                                                                                        |

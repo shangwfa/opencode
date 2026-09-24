@@ -14,6 +14,7 @@ import { Bus } from "./bus.js"
 import { Instance } from "./instance/service.js"
 import { SandboxProvider } from "./sandbox/provider.js"
 import { Database } from "./database/database.js"
+import { KV } from "./kv.js"
 import { SessionProjector } from "./session/projector.js"
 import { SessionMessageTable } from "./session/sql.js"
 import { SessionSchema } from "./session/schema.js"
@@ -235,6 +236,7 @@ const layer = Layer.effect(
   Effect.gen(function* () {
     const app = yield* App.Metadata
     const database = yield* Database.Service
+    const kv = yield* KV.Service
     const db = database.db
     const bus = yield* Bus.Service
     const projects = yield* Project.Service
@@ -249,6 +251,16 @@ const layer = Layer.effect(
     const locations = yield* LocationServiceMap.Service
     const sessions = yield* Session.make()
     const isDurableSessionEvent = Schema.is(SessionEvent.Durable)
+    const clearCcrEntries = Effect.fn("Session.clearCcrEntries")(function* (sessionID: SessionSchema.ID) {
+      const prefix = `plugin/ccr/${sessionID}/`
+      let after: string | undefined
+      while (true) {
+        const page = yield* kv.scan({ prefix, after, limit: 1000 })
+        yield* Effect.forEach(page.entries, (entry) => kv.remove(entry.key), { discard: true })
+        if (!page.next) break
+        after = page.next
+      }
+    })
 
     const result = Service.of({
       create: Effect.fn("Session.create")(function* (input) {
@@ -414,10 +426,12 @@ const layer = Layer.effect(
                   ),
                 )
               yield* result.remove(child.id)
+              yield* clearCcrEntries(child.id)
             }),
           { concurrency: 1, discard: true },
         )
         yield* environments.clear(sessionID)
+        yield* clearCcrEntries(sessionID)
         yield* bus.publish(SessionEvent.Deleted, { sessionID })
         yield* bus.remove(sessionID)
       }),
@@ -522,6 +536,7 @@ export const node: LayerNode.Provider<Service, never, typeof Node.tags.values.gl
   layer,
   deps: [
     Job.node,
+    KV.node,
     SessionEnvironment.node,
     Database.node,
     Bus.node,
