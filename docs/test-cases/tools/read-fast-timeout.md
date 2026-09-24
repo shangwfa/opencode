@@ -80,22 +80,6 @@ else
   fail "T-RFT.2" "read 未在 60s 内返回: $READ_ROW"
 fi
 
-# ============================================================
-# T-RFT.3 watchdog 扫描间隔（观察项）
-# ============================================================
-# 若环境中存在任一被 watchdog 标记的 part，其 (end-start) 与
-# OPENCODE_WATCHDOG_TIMEOUT_SEC(默认120) 之差应 ≤ 扫描间隔+余量(~25s)
-MAXGAP=$(psql "$PG_URL" -t -A -c "
-  SELECT max((data->'state'->'time'->>'end')::bigint - (data->'state'->'time'->>'start')::bigint)
-  FROM part
-  WHERE data->>'type'='tool' AND data->'state'->>'error' LIKE '%watchdog%'
-    AND time_created > (extract(epoch from now())-86400)*1000")
-if [ -n "$MAXGAP" ] && [ "$MAXGAP" -gt 0 ]; then
-  echo "T-RFT.3 近24h watchdog part 最大耗时 ${MAXGAP}ms（修复前观测 170000~229000）"
-  [ "$MAXGAP" -le 150000 ] && pass "T-RFT.3" || fail "T-RFT.3" "gap=${MAXGAP}ms 超 150s"
-else
-  echo "T-RFT.3 近24h 无 watchdog part，跳过（无卡死样本）"
-fi
 
 summary
 ```
@@ -106,9 +90,10 @@ summary
 |---|---|
 | T-RFT.1 | read `completed` 且耗时 <15s（正常路径无回归） |
 | T-RFT.2 | read 在 60s 内返回（成功或明确 error），**不出现** `timed out ... (watchdog)` |
-| T-RFT.3 | 新产生的 watchdog part 耗时 ≤150s（120s 超时 + 15s 扫描 + 余量），修复前为 170~229s |
 
-> 注：T-RFT.2 依赖 kill-sandbox 后沙箱重建窗口期能命中 files API 挂死路径；若沙箱重建足够快导致 read 直接成功，也算 PASS（快速出结果即可），但建议复测多次争取命中重建窗口。
+> 原 T-RFT.3（watchdog 扫描间隔）已移除：验证对象为 watchdog 标记的 part 耗时，而 watchdog 机制在 V2 不存在（无 `watchdog.ts`/`OPENCODE_WATCHDOG_*`），永远无样本。若决策补齐 stuck tool watchdog 则恢复该用例。
+
+> 注：T-RFT.2 的 PASS 条件宽容（快速成功或快速 error 均可，核心=不挂死）。**已知盲区**：本轮与全部历史记录命中的都是"重建窗口 File not found / 快速重建"，`files API` **真实挂死 → 15s timeout → destroy 自愈路径从未被真正触发**——该场景需要故障注入（如 proxy 拦截 files API）才能覆盖，属跨文档共同盲区（与已移除的 T18.10b 同源）。
 
 ## 复测记录
 
@@ -134,7 +119,7 @@ summary
 |---|---|---|---|
 | 2026-09-24 | T-RFT.1 | ✅ PASS | read `completed` **311ms**（<15s），消息总耗时 3s，session `ses_f2db5de6effeybcQKKmpS9035p` |
 | 2026-09-24 | T-RFT.2 | ✅ PASS | kill-sandbox 后 read **1943ms** 返回明确 error `File not found`（命中重建窗口，快速出结果），无 watchdog，消息总耗时 5s，session `ses_f2db54922ffepwzRsshJW3Vwbd` |
-| 2026-09-24 | T-RFT.3 | — 不适用 | **V2 无 watchdog 机制**（代码库无 `watchdog.ts`/`mark-timed-out.ts`/`OPENCODE_WATCHDOG_*`）；实测近 24h PG 中 watchdog 错误 part 数=0，与机制不存在一致 |
+| 2026-09-24 | T-RFT.3 | ➖ 已移除 | 用例随观察对象（watchdog 机制）在 V2 不存在而删除；实测近 24h PG watchdog 错误 part 数=0 与之一致。补齐机制后恢复 |
 
 **结论**：`PASS=2 FAIL=0`。V2 的 read 快速出结果由 provider 层保障（`getOrCreate` 有 bounded wait + 重建路径 `createTimeoutSeconds` 兜底），实测远优于 15s 阈值；V1 时代的 watchdog 120s 兜底在 V2 不存在，stuck tool 兜底机制缺口见 tool-calls.md 待办 #6（watchdog 决策项）。
 
