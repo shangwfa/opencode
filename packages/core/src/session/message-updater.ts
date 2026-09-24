@@ -80,6 +80,7 @@ export function update(adapter: Adapter, event: SessionEvent.DurableEvent) {
     Match.type<SessionEvent.DurableEvent>(),
     Match.discriminatorsExhaustive("type")({
       "session.created": () => Effect.void,
+      "session.sandbox.resource.updated": () => Effect.void,
       "session.viewed": () => Effect.void,
       "session.message.content.updated": (event) =>
         updateOwnedAssistant(event.data.messageID, (draft) => {
@@ -183,6 +184,9 @@ export function update(adapter: Adapter, event: SessionEvent.DurableEvent) {
           }),
         )
       },
+      // Preview liveness diagnostics stay log-only; they never project into the
+      // conversation view (same treatment as the revert bookkeeping events).
+      "session.preview.down": () => Effect.void,
       "session.shell.started": (event) => {
         return adapter.appendMessage(
           SessionMessage.Shell.make({
@@ -439,6 +443,7 @@ export function update(adapter: Adapter, event: SessionEvent.DurableEvent) {
               summary: event.data.text,
               providerContext: event.data.providerContext,
               recent: event.data.recent,
+              historyPath: event.data.historyPath,
               cost: event.data.cost,
               tokens: event.data.tokens,
             })
@@ -456,6 +461,7 @@ export function update(adapter: Adapter, event: SessionEvent.DurableEvent) {
               summary: event.data.text,
               providerContext: event.data.providerContext,
               recent: event.data.recent,
+              historyPath: event.data.historyPath,
               cost: event.data.cost,
               tokens: event.data.tokens,
               time: { created },

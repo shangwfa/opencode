@@ -267,6 +267,8 @@ export const CompactionCompleted = Schema.Struct({
   providerState: ProviderState.pipe(optional),
   summary: Schema.String,
   recent: Schema.String,
+  /** Absolute path of the serialized pre-compaction history file; absent when the write was skipped or failed. */
+  historyPath: Schema.String.pipe(optional),
   providerContext: SessionProviderContext.Info.pipe(optional),
   ...CompactionUsage,
 }).annotate({ identifier: "Session.Message.Compaction.Completed" })

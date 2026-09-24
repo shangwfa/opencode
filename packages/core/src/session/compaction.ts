@@ -13,15 +13,21 @@ import {
 } from "@opencode/ai"
 import type { SessionCompactionResult } from "@opencode/plugin/effect/session"
 import { SessionError } from "@opencode/schema/session-error"
-import { Context, Effect, Layer, Stream } from "effect"
+import path from "path"
+import { Context, DateTime, Effect, Layer, Stream } from "effect"
+import { FSUtil } from "@opencode/util/fs-util"
+import { Global } from "@opencode/util/global"
 import { Bus } from "../bus.js"
 import { Database } from "../database/database.js"
 import { makeLocationNode } from "@opencode/util/effect/app-node"
 import { llmClient } from "../effect/app-node-platform.js"
+import { SandboxPath } from "../sandbox/path.js"
+import { SandboxProvider } from "../sandbox/provider.js"
+import { ToolOutput } from "../tool-output.js"
 import { SessionEvent } from "./event.js"
 import type { SessionContext } from "./context.js"
 import { SessionHistory } from "./history.js"
-import type { SessionMessage } from "./message.js"
+import { SessionMessage } from "./message.js"
 import { SessionModelRequest } from "./model-request.js"
 import { SessionProviderContext } from "./provider-context.js"
 import type { SessionRunnerModel } from "./runner/model.js"
@@ -257,9 +263,10 @@ export const serializeToolContent = (content: SessionMessage.ToolStateCompleted[
     )
     .join("\n")
 
-const serializeRecentMessage = (message: SessionMessage.Info) => {
+const serializeRecentMessage = (message: SessionMessage.Info, full = false) => {
   // Checkpoints and instruction updates are handled outside the serialized tail.
   if (message.type === "compaction" || message.type === "system") return ""
+  const output = (value: string) => (full ? value : truncateToolOutput(value))
   if (message.type === "user") {
     const files =
       message.files?.map(
@@ -283,7 +290,7 @@ const serializeRecentMessage = (message: SessionMessage.Info) => {
         if (part.state.status === "completed")
           return [
             `[Assistant tool call]: ${part.name}(${input})`,
-            `[Tool result]: ${truncateToolOutput(serializeToolContent(part.state.content))}`,
+            `[Tool result]: ${output(serializeToolContent(part.state.content))}`,
           ]
         if (part.state.status === "error")
           return [`[Assistant tool call]: ${part.name}(${input})`, `[Tool error]: ${part.state.error.message}`]
@@ -296,8 +303,16 @@ const serializeRecentMessage = (message: SessionMessage.Info) => {
   if (message.type === "shell")
     return message.metadata?.background === true
       ? ""
-      : `[Shell]: ${message.command}\n${truncateToolOutput(message.output?.output ?? "")}`
+      : `[Shell]: ${message.command}\n${output(message.output?.output ?? "")}`
   return ""
+}
+
+/** One compacted message as a full-history section: untruncated tool output under a `## id | type | ISO` heading. */
+export const serializeHistory = (message: SessionMessage.Info) => {
+  const text = serializeRecentMessage(message, true)
+  if (!text) return ""
+  const created = new Date(DateTime.toEpochMillis(message.time.created)).toISOString()
+  return `## ${message.id} | ${message.type} | ${created}\n${text}`
 }
 
 const splitHistory = (messages: readonly SessionMessage.Info[], keepTokens: number) => {
@@ -305,7 +320,11 @@ const splitHistory = (messages: readonly SessionMessage.Info[], keepTokens: numb
   if (tailStart === undefined) return
   return {
     messages: messages.slice(0, tailStart),
-    recent: messages.slice(tailStart).map(serializeRecentMessage).filter(Boolean).join("\n\n"),
+    recent: messages
+      .slice(tailStart)
+      .map((message) => serializeRecentMessage(message))
+      .filter(Boolean)
+      .join("\n\n"),
   }
 }
 
@@ -379,6 +398,9 @@ export const layer = Layer.effect(
     const bus = yield* Bus.Service
     const llm = yield* LLMClient.Service
     const db = (yield* Database.Service).db
+    const fs = yield* FSUtil.Service
+    const global = yield* Global.Service
+    const sandbox = yield* SandboxProvider.Service
 
     const state = State.create<Settings, Editor>({
       name: "session-compaction",
@@ -391,6 +413,49 @@ export const layer = Layer.effect(
         },
       }),
     })
+    /** Persist the compacted head beside tool outputs so the summary stays searchable. */
+    const writeHistory = Effect.fn("SessionCompaction.writeHistory")(function* (input: {
+      sessionID: SessionSchema.ID
+      messageID: SessionMessage.ID
+      messages: readonly SessionMessage.Info[]
+      previousHistoryPath?: string
+    }) {
+      const sections = input.messages.map(serializeHistory).filter(Boolean)
+      if (sections.length === 0) return undefined
+      const text = [
+        ...(input.previousHistoryPath
+          ? [
+              "## Earlier compacted history",
+              `The full record before this compaction is available at ${input.previousHistoryPath}. Search that file with Grep or Read (offset/limit) if needed.`,
+            ]
+          : []),
+        ...sections,
+      ].join("\n\n")
+      const name = `tool_history_${input.messageID}.md`
+      // A sandbox deployment executes tools inside the sandbox, so the record has
+      // to land under the /workspace mount for the checkpoint path to resolve.
+      if (sandbox.enabled) {
+        const file = path.join(SandboxPath.WORKDIR, ".opencode", ToolOutput.DIRECTORY, name)
+        yield* sandbox.fileWrite(input.sessionID, file, text)
+        return file
+      }
+      const file = path.join(global.data, ToolOutput.DIRECTORY, name)
+      yield* fs.ensureDir(path.dirname(file))
+      yield* fs.writeFileString(file, text)
+      return file
+    })
+    /** A failed write degrades to no historyPath; it never blocks the summary itself. */
+    const historyPathOf = (
+      sessionID: SessionSchema.ID,
+      messageID: SessionMessage.ID,
+      messages: readonly SessionMessage.Info[],
+      previous?: SessionMessage.CompactionCompleted,
+    ) =>
+      writeHistory({ sessionID, messageID, messages, previousHistoryPath: previous?.historyPath }).pipe(
+        Effect.catch((error) =>
+          Effect.logWarning("failed to write compaction history", { error: String(error) }).pipe(Effect.as(undefined)),
+        ),
+      )
     const failed = Effect.fnUntraced(function* (input: SessionEvent.Compaction.Failed["data"]) {
       yield* bus.publish(SessionEvent.Compaction.Failed, input)
       return { status: "failed" as const, error: input.error }
@@ -408,6 +473,7 @@ export const layer = Layer.effect(
       input: ExecuteInput,
       result: SessionCompactionResult,
       recent: string,
+      historyPath?: string,
     ) {
       const context = input.context
       const usage = result.tokens
@@ -428,6 +494,7 @@ export const layer = Layer.effect(
           providerState: result.providerState,
           text: result.summary,
           recent,
+          historyPath,
           ...usage,
         },
         { metadata: result.metadata },
@@ -572,6 +639,9 @@ export const layer = Layer.effect(
       )
     })
     const execute = Effect.fn("SessionCompaction.execute")(function* (input: ExecuteInput) {
+      // Fix the message ID up front so the history file name and the projected compaction message agree.
+      const messageID = input.inputID ?? SessionMessage.ID.create()
+      input = { ...input, inputID: messageID }
       const context = input.context
       const history = splitHistory(context.messages, state.get().tokens)
       if (!history)
@@ -603,7 +673,13 @@ export const layer = Layer.effect(
       // Checkpoints from the previous template ran far longer than this one asks for; its catch-all heading identifies them.
       const legacy = previous?.summary.includes(LEGACY_HEADING) ?? false
       const prepared = yield* compactionRequest(input, history.messages)
-      if (prepared.event.result) return yield* supplied(input, prepared.event.result, history.recent)
+      if (prepared.event.result)
+        return yield* supplied(
+          input,
+          prepared.event.result,
+          history.recent,
+          yield* historyPathOf(context.session.id, messageID, history.messages, previous),
+        )
       // Hooks see the transcript alone; the summary prompt is appended after they run.
       const first = LLMRequest.update(prepared.request, {
         messages: [...prepared.request.messages, Message.user(buildPrompt(previous !== undefined, legacy))],
@@ -701,6 +777,7 @@ export const layer = Layer.effect(
           ...usage,
         })
       }
+      const historyPath = yield* historyPathOf(context.session.id, messageID, history.messages, previous)
       yield* bus.publish(SessionEvent.Compaction.Ended, {
         sessionID: context.session.id,
         reason: input.reason,
@@ -708,6 +785,7 @@ export const layer = Layer.effect(
         providerState,
         text: summary,
         recent: history.recent,
+        historyPath,
         ...usage,
       })
       return { status: "completed" as const }
@@ -790,5 +868,5 @@ export const layer = Layer.effect(
 export const node = makeLocationNode({
   service: Service,
   layer,
-  deps: [Bus.node, Database.node, llmClient],
+  deps: [Bus.node, Database.node, llmClient, FSUtil.node, Global.node, SandboxProvider.node],
 })

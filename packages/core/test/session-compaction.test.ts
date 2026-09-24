@@ -1,10 +1,15 @@
 import { expect, test } from "bun:test"
+import fsSync from "fs"
+import os from "os"
+import path from "path"
 import { LLMClient, LLMEvent, LanguageModel, ToolDefinition, type LLMRequest } from "@opencode/ai"
 import { OpenAIChat } from "@opencode/ai/protocols"
 import { Database } from "@opencode/core/database/database"
 import { AppNodeBuilder } from "@opencode/core/effect/app-node-builder"
 import { llmClient } from "@opencode/core/effect/app-node-platform"
 import { LayerNode } from "@opencode/util/effect/layer-node"
+import { FSUtil } from "@opencode/util/fs-util"
+import { Global } from "@opencode/util/global"
 import { Bus } from "@opencode/core/bus"
 import { EventTable } from "@opencode/core/event/sql"
 import { SessionCompaction } from "@opencode/core/session/compaction"
@@ -16,6 +21,8 @@ import { SessionProjector } from "@opencode/core/session/projector"
 import { SessionRunnerModel } from "@opencode/core/session/runner/model"
 import { SessionTable } from "@opencode/core/session/sql"
 import { SessionStore } from "@opencode/core/session/store"
+import { SandboxProvider } from "@opencode/core/sandbox/provider"
+import { ToolOutput } from "@opencode/core/tool-output"
 import { Session } from "@opencode/core/session"
 import { Project } from "@opencode/core/project"
 import { ProjectTable } from "@opencode/core/project/sql"
@@ -89,6 +96,89 @@ const it = testEffect(
       PluginHooks.node,
     ]),
     [Bus.node.replace(Bus.configured({ persist: true })), llmClient.replace(client)],
+  ),
+)
+
+// History files land under Global.data/tool-output; pin both roots so the write and
+// the degraded write paths are observable without touching the developer's data dir.
+const historyData = path.join(os.tmpdir(), `opencode-compaction-history-${process.pid}`)
+const brokenHistoryData = path.join(os.tmpdir(), `opencode-compaction-history-broken-${process.pid}`)
+fsSync.rmSync(brokenHistoryData, { recursive: true, force: true })
+fsSync.mkdirSync(brokenHistoryData, { recursive: true })
+// The directory exists but tool-output is a plain file, so ensureDir must fail.
+fsSync.writeFileSync(path.join(brokenHistoryData, ToolOutput.DIRECTORY), "not a directory")
+
+const historyIt = (data: string) =>
+  testEffect(
+    AppNodeBuilder.build(
+      LayerNode.group([
+        Database.node,
+        Bus.node,
+        SessionProjector.node,
+        SessionStore.node,
+        SessionCompaction.node,
+        SessionModelRequest.node,
+        PluginHooks.node,
+        FSUtil.node,
+      ]),
+      [
+        Bus.node.replace(Bus.configured({ persist: true })),
+        llmClient.replace(client),
+        Global.node.replace(Global.layerWith({ data })),
+      ],
+    ),
+  )
+
+const itHistory = historyIt(historyData)
+const itBrokenHistory = historyIt(brokenHistoryData)
+
+// Sandbox deployments route every tool through the sandbox, so the history file
+// must land under /workspace for the checkpoint path to resolve for the agent.
+const sandboxWrites: { sessionID: string; path: string; data: string }[] = []
+let sandboxWriteFails = false
+const sandboxHistoryProvider = Layer.succeed(
+  SandboxProvider.Service,
+  SandboxProvider.Service.of({
+    enabled: true,
+    run: () => Effect.die("not under test"),
+    interrupt: () => Effect.void,
+    destroy: () => Effect.void,
+    keepAlive: () => Effect.void,
+    release: () => Effect.void,
+    isKeepAlive: () => Effect.succeed(false),
+    sandboxId: () => Effect.succeed("sandbox-test"),
+    boot: () => Effect.succeed("sandbox-test"),
+    fileStat: () => Effect.die("not under test"),
+    fileRead: () => Effect.die("not under test"),
+    fileReadBytes: () => Effect.die("not under test"),
+    fileWrite: (sessionID, sandboxPath, data) =>
+      sandboxWriteFails
+        ? Effect.fail(new Error("sandbox write exploded"))
+        : Effect.sync(() => void sandboxWrites.push({ sessionID, path: sandboxPath, data })),
+    fileDelete: () => Effect.die("not under test"),
+    fileList: () => Effect.die("not under test"),
+    fileFind: () => Effect.die("not under test"),
+    isReady: () => Effect.succeed(true),
+    endpoint: () => Effect.succeed({ _tag: "no-sandbox" }),
+  }),
+)
+const itSandboxHistory = testEffect(
+  AppNodeBuilder.build(
+    LayerNode.group([
+      Database.node,
+      Bus.node,
+      SessionProjector.node,
+      SessionStore.node,
+      SessionCompaction.node,
+      SessionModelRequest.node,
+      PluginHooks.node,
+      FSUtil.node,
+    ]),
+    [
+      Bus.node.replace(Bus.configured({ persist: true })),
+      llmClient.replace(client),
+      SandboxProvider.node.replace(sandboxHistoryProvider),
+    ],
   ),
 )
 
@@ -175,7 +265,7 @@ it.effect("auto compaction estimates current content against the buffered prompt
           id: SessionMessage.ID.make("msg_assistant"),
           type: "assistant",
           agent: Agent.defaultID,
-          model: { id: "test-model", providerID: "test-provider" },
+          model: Model.Ref.make({ id: Model.ID.make("test-model"), providerID: Provider.ID.make("test-provider") }),
           content: [{ type: "text", text: "Done" }],
           tokens: { input: tokens, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
           time: { created: 0, completed: 0 },
@@ -590,5 +680,348 @@ it.effect("forked session compaction reuses the fork root prompt cache key", () 
 
     expect(requests).toHaveLength(1)
     expect(requests[0]?.promptCacheKey).toBe(rootID)
+  }),
+)
+
+test("compaction history serializes full sections under typed headings", () => {
+  const detail = `config: violet-owl-42\n${"detail-line\n".repeat(600)}`
+  const tool = SessionMessage.AssistantTool.make({
+    type: "tool",
+    id: "call_read",
+    name: "read",
+    state: { status: "completed", input: { filePath: "src/foo.ts" }, content: [{ type: "text", text: detail }] },
+    time: { created: DateTime.makeUnsafe(1_000) },
+  })
+  const assistant = SessionMessage.Assistant.make({
+    id: SessionMessage.ID.make("msg_history_section"),
+    type: "assistant",
+    agent: Agent.defaultID,
+    model: Model.Ref.make({ id: Model.ID.make("test-model"), providerID: Provider.ID.make("test-provider") }),
+    content: [tool],
+    time: { created: DateTime.makeUnsafe(1_000) },
+  })
+
+  const section = SessionCompaction.serializeHistory(assistant)
+  expect(section).toMatch(/^## msg_history_section \| assistant \| 1970-01-01T00:00:01\.000Z\n/)
+  expect(section).toContain(`[Tool result]: ${detail}`)
+  expect(section).not.toContain("[truncated]")
+  // The default tail serialization would have truncated the same payload.
+  expect(SessionCompaction.truncateToolOutput(detail)).toContain("[truncated]")
+
+  const checkpoint = Schema.decodeUnknownSync(SessionMessage.CompactionCompleted)({
+    id: SessionMessage.ID.make("msg_history_checkpoint"),
+    type: "compaction",
+    status: "completed",
+    reason: "auto",
+    summary: "## Objective\n- earlier",
+    recent: "",
+    time: { created: 0 },
+  })
+  expect(SessionCompaction.serializeHistory(checkpoint)).toBe("")
+})
+
+itHistory.effect("manual compaction writes the full head history and chains the previous file", () =>
+  Effect.gen(function* () {
+    requests = []
+    const compaction = yield* SessionCompaction.Service
+    const store = yield* SessionStore.Service
+    const fs = yield* FSUtil.Service
+    const sessionID = Session.ID.make("ses_history_write")
+    const session = yield* insertSession(sessionID)
+    const modelRequests = yield* SessionModelRequest.Service
+    const detail = "violet-owl-42 detail ".repeat(300)
+    const userOne = SessionMessage.User.make({
+      id: SessionMessage.ID.make("msg_history_user_one"),
+      type: "user",
+      text: "FIRST_COMPACTION_SECRET=violet-owl-42 lives on line 42.",
+      time: { created: DateTime.makeUnsafe(0) },
+    })
+    const assistantOne = SessionMessage.Assistant.make({
+      id: SessionMessage.ID.make("msg_history_assistant_one"),
+      type: "assistant",
+      agent: Agent.defaultID,
+      model: Model.Ref.make({ id: Model.ID.make("test-model"), providerID: Provider.ID.make("test-provider") }),
+      content: [
+        SessionMessage.AssistantTool.make({
+          type: "tool",
+          id: "call_read",
+          name: "read",
+          state: { status: "completed", input: { filePath: "src/foo.ts" }, content: [{ type: "text", text: detail }] },
+          time: { created: DateTime.makeUnsafe(1) },
+        }),
+      ],
+      time: { created: DateTime.makeUnsafe(1) },
+    })
+    const userTwo = SessionMessage.User.make({
+      id: SessionMessage.ID.make("msg_history_user_two"),
+      type: "user",
+      text: "Recent follow-up question.",
+      time: { created: DateTime.makeUnsafe(2) },
+    })
+    const assistantTwo = SessionMessage.Assistant.make({
+      id: SessionMessage.ID.make("msg_history_assistant_two"),
+      type: "assistant",
+      agent: Agent.defaultID,
+      model: Model.Ref.make({ id: Model.ID.make("test-model"), providerID: Provider.ID.make("test-provider") }),
+      content: [{ type: "text", text: "Answering the recent question." }],
+      time: { created: DateTime.makeUnsafe(3) },
+    })
+    const messages = [userOne, assistantOne, userTwo, assistantTwo]
+
+    expect(
+      yield* compaction.compactManual({
+        session,
+        resolveContext: () => Effect.succeed(loaded(session, messages)),
+        prepare: modelRequests.compaction,
+        messages,
+        inputID: SessionMessage.ID.make("msg_history_first"),
+      }),
+    ).toEqual({ status: "completed" })
+
+    const firstFile = path.join(historyData, ToolOutput.DIRECTORY, "tool_history_msg_history_first.md")
+    const firstSection = yield* fs.readFileString(firstFile)
+    expect(firstSection).toContain("## msg_history_user_one | user | 1970-01-01T00:00:00.000Z")
+    expect(firstSection).toContain(`[Tool result]: ${detail}`)
+    expect(firstSection).not.toContain("[truncated]")
+    // The retained tail stays out of the file; it is already carried in the checkpoint.
+    expect(firstSection).not.toContain("Recent follow-up question.")
+
+    const afterFirst = yield* store.context(sessionID)
+    const first = afterFirst.findLast(
+      (message): message is SessionMessage.CompactionCompleted =>
+        message.type === "compaction" && message.status === "completed",
+    )
+    expect(first).toMatchObject({ historyPath: firstFile })
+    expect(first?.recent).toContain("Recent follow-up question.")
+
+    const userThree = SessionMessage.User.make({
+      id: SessionMessage.ID.make("msg_history_user_three"),
+      type: "user",
+      text: "Second round question.",
+      time: { created: DateTime.makeUnsafe(4) },
+    })
+    const assistantThree = SessionMessage.Assistant.make({
+      id: SessionMessage.ID.make("msg_history_assistant_three"),
+      type: "assistant",
+      agent: Agent.defaultID,
+      model: Model.Ref.make({ id: Model.ID.make("test-model"), providerID: Provider.ID.make("test-provider") }),
+      content: [{ type: "text", text: "Answering the second round." }],
+      time: { created: DateTime.makeUnsafe(5) },
+    })
+    const resumed = [userOne, assistantOne, userTwo, assistantTwo, first!, userThree, assistantThree]
+    expect(
+      yield* compaction.compactManual({
+        session,
+        resolveContext: () => Effect.succeed(loaded(session, resumed)),
+        prepare: modelRequests.compaction,
+        messages: resumed,
+        inputID: SessionMessage.ID.make("msg_history_second"),
+      }),
+    ).toEqual({ status: "completed" })
+
+    const secondFile = path.join(historyData, ToolOutput.DIRECTORY, "tool_history_msg_history_second.md")
+    const secondSection = yield* fs.readFileString(secondFile)
+    expect(secondSection.startsWith("## Earlier compacted history")).toBe(true)
+    expect(secondSection).toContain(`The full record before this compaction is available at ${firstFile}.`)
+    expect(secondSection).toContain("Recent follow-up question.")
+    expect(secondSection).not.toContain("Second round question.")
+    // Compaction checkpoints are referenced by path, never serialized again.
+    expect(secondSection).not.toContain("## Objective")
+
+    const afterSecond = yield* store.context(sessionID)
+    const second = afterSecond.findLast(
+      (message): message is SessionMessage.CompactionCompleted =>
+        message.type === "compaction" && message.status === "completed",
+    )
+    expect(second).toMatchObject({ id: SessionMessage.ID.make("msg_history_second"), historyPath: secondFile })
+  }),
+)
+
+itHistory.effect("compaction with only a prior checkpoint writes no history file", () =>
+  Effect.gen(function* () {
+    requests = []
+    const compaction = yield* SessionCompaction.Service
+    const store = yield* SessionStore.Service
+    const fs = yield* FSUtil.Service
+    const sessionID = Session.ID.make("ses_history_empty_head")
+    const session = yield* insertSession(sessionID)
+    const modelRequests = yield* SessionModelRequest.Service
+    const prior = SessionMessage.Compaction.make({
+      id: SessionMessage.ID.make("msg_history_empty_prior"),
+      type: "compaction",
+      status: "completed",
+      reason: "auto",
+      summary: "## Objective\n- prior checkpoint",
+      recent: "Retained recent tail.",
+      time: { created: DateTime.makeUnsafe(0) },
+    })
+    // Everything after the checkpoint is retained as recent, so the compacted head
+    // holds only the prior checkpoint and there is nothing to serialize.
+    const messages = [
+      prior,
+      SessionMessage.User.make({
+        id: SessionMessage.ID.make("msg_history_empty_user"),
+        type: "user",
+        text: "Only one short message.",
+        time: { created: DateTime.makeUnsafe(1) },
+      }),
+    ]
+
+    expect(
+      yield* compaction.compactManual({
+        session,
+        resolveContext: () => Effect.succeed(loaded(session, messages)),
+        prepare: modelRequests.compaction,
+        messages,
+        inputID: SessionMessage.ID.make("msg_history_empty"),
+      }),
+    ).toEqual({ status: "completed" })
+
+    const context = yield* store.context(sessionID)
+    const compacted = context.findLast(
+      (message): message is SessionMessage.CompactionCompleted =>
+        message.type === "compaction" && message.status === "completed",
+    )
+    expect(compacted?.summary).toContain("## Objective")
+    expect(compacted?.historyPath).toBeUndefined()
+    expect(yield* fs.exists(path.join(historyData, ToolOutput.DIRECTORY, "tool_history_msg_history_empty.md"))).toBe(
+      false,
+    )
+  }),
+)
+
+itBrokenHistory.effect("a failed history write degrades to a summary without historyPath", () =>
+  Effect.gen(function* () {
+    requests = []
+    const compaction = yield* SessionCompaction.Service
+    const store = yield* SessionStore.Service
+    const sessionID = Session.ID.make("ses_history_broken")
+    const session = yield* insertSession(sessionID)
+    const modelRequests = yield* SessionModelRequest.Service
+    const messages = [
+      SessionMessage.User.make({
+        id: SessionMessage.ID.make("msg_history_broken_user_one"),
+        type: "user",
+        text: "Compaction whose history file cannot be written.",
+        time: { created: DateTime.makeUnsafe(0) },
+      }),
+      SessionMessage.User.make({
+        id: SessionMessage.ID.make("msg_history_broken_user_two"),
+        type: "user",
+        text: "Recent tail.",
+        time: { created: DateTime.makeUnsafe(1) },
+      }),
+    ]
+
+    expect(
+      yield* compaction.compactManual({
+        session,
+        resolveContext: () => Effect.succeed(loaded(session, messages)),
+        prepare: modelRequests.compaction,
+        messages,
+        inputID: SessionMessage.ID.make("msg_history_broken"),
+      }),
+    ).toEqual({ status: "completed" })
+
+    const context = yield* store.context(sessionID)
+    const compacted = context.findLast(
+      (message): message is SessionMessage.CompactionCompleted =>
+        message.type === "compaction" && message.status === "completed",
+    )
+    expect(compacted?.summary).toContain("## Objective")
+    expect(compacted?.historyPath).toBeUndefined()
+  }),
+)
+
+const sandboxMessages = () => [
+  SessionMessage.User.make({
+    id: SessionMessage.ID.make("msg_sandbox_user_one"),
+    type: "user",
+    text: "Sandbox history lands in the session workspace.",
+    time: { created: DateTime.makeUnsafe(0) },
+  }),
+  SessionMessage.User.make({
+    id: SessionMessage.ID.make("msg_sandbox_user_two"),
+    type: "user",
+    text: "Recent tail.",
+    time: { created: DateTime.makeUnsafe(1) },
+  }),
+]
+
+itSandboxHistory.effect("sandbox deployments write the history into the session workspace", () =>
+  Effect.gen(function* () {
+    requests = []
+    sandboxWrites.length = 0
+    sandboxWriteFails = false
+    const compaction = yield* SessionCompaction.Service
+    const store = yield* SessionStore.Service
+    const sessionID = Session.ID.make("ses_sandbox_history")
+    const session = yield* insertSession(sessionID)
+    const modelRequests = yield* SessionModelRequest.Service
+    const messages = sandboxMessages()
+
+    expect(
+      yield* compaction.compactManual({
+        session,
+        resolveContext: () => Effect.succeed(loaded(session, messages)),
+        prepare: modelRequests.compaction,
+        messages,
+        inputID: SessionMessage.ID.make("msg_sandbox_history"),
+      }),
+    ).toEqual({ status: "completed" })
+
+    const expected = "/workspace/.opencode/tool-output/tool_history_msg_sandbox_history.md"
+    expect(sandboxWrites).toHaveLength(1)
+    expect(sandboxWrites[0]?.sessionID).toBe(sessionID)
+    expect(sandboxWrites[0]?.path).toBe(expected)
+    expect(sandboxWrites[0]?.data).toContain("## msg_sandbox_user_one | user | 1970-01-01T00:00:00.000Z")
+    expect(sandboxWrites[0]?.data).not.toContain("Recent tail.")
+
+    const context = yield* store.context(sessionID)
+    const compacted = context.findLast(
+      (message): message is SessionMessage.CompactionCompleted =>
+        message.type === "compaction" && message.status === "completed",
+    )
+    expect(compacted).toMatchObject({ historyPath: expected })
+    // The host-side directory stays untouched on a sandbox deployment.
+    expect(
+      yield* (yield* FSUtil.Service).exists(
+        path.join(historyData, ToolOutput.DIRECTORY, "tool_history_msg_sandbox_history.md"),
+      ),
+    ).toBe(false)
+  }),
+)
+
+itSandboxHistory.effect("a failed sandbox history write degrades to a summary without historyPath", () =>
+  Effect.gen(function* () {
+    requests = []
+    sandboxWrites.length = 0
+    sandboxWriteFails = true
+    const compaction = yield* SessionCompaction.Service
+    const store = yield* SessionStore.Service
+    const sessionID = Session.ID.make("ses_sandbox_history_broken")
+    const session = yield* insertSession(sessionID)
+    const modelRequests = yield* SessionModelRequest.Service
+    const messages = sandboxMessages()
+
+    expect(
+      yield* compaction.compactManual({
+        session,
+        resolveContext: () => Effect.succeed(loaded(session, messages)),
+        prepare: modelRequests.compaction,
+        messages,
+        inputID: SessionMessage.ID.make("msg_sandbox_history_broken"),
+      }),
+    ).toEqual({ status: "completed" })
+
+    sandboxWriteFails = false
+    expect(sandboxWrites).toHaveLength(0)
+    const context = yield* store.context(sessionID)
+    const compacted = context.findLast(
+      (message): message is SessionMessage.CompactionCompleted =>
+        message.type === "compaction" && message.status === "completed",
+    )
+    expect(compacted?.summary).toContain("## Objective")
+    expect(compacted?.historyPath).toBeUndefined()
   }),
 )

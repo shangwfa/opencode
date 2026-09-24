@@ -617,6 +617,7 @@ export namespace Compaction {
       providerContext: SessionMessage.CompactionCompleted.fields.providerContext,
       text: Schema.String,
       recent: Schema.String,
+      historyPath: SessionMessage.CompactionCompleted.fields.historyPath,
       // Repeats the internal `session.usage.recorded` figures: that event never reaches clients, and it
       // stays the accounting source for session totals and stats.
       cost: SessionMessage.CompactionCompleted.fields.cost,

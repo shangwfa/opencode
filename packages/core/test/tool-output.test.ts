@@ -153,4 +153,21 @@ describe("ToolOutput", () => {
       }),
     ),
   )
+
+  it.live("sweeps expired compaction history files with the rest of the tool output", () =>
+    withStore((output, fs, root) =>
+      Effect.gen(function* () {
+        const directory = path.join(root, ToolOutput.DIRECTORY)
+        const stale = path.join(directory, "tool_history_msg_stale.md")
+        const fresh = path.join(directory, "tool_history_msg_fresh.md")
+        yield* fs.ensureDir(directory)
+        yield* fs.writeFileString(stale, "old history")
+        yield* fs.writeFileString(fresh, "new history")
+        yield* fs.utimes(stale, new Date(), new Date(Date.now() - 8 * 24 * 60 * 60 * 1_000))
+        yield* output.cleanup()
+        expect(yield* fs.exists(stale)).toBe(false)
+        expect(yield* fs.exists(fresh)).toBe(true)
+      }),
+    ),
+  )
 })

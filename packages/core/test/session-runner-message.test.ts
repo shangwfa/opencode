@@ -202,6 +202,35 @@ Recent work
     ])
   })
 
+  test("compaction checkpoint points at the full history record", () => {
+    const messages = toLLMMessages(
+      [
+        SessionMessage.Compaction.make({
+          id: id("compaction"),
+          type: "compaction",
+          status: "completed",
+          reason: "auto",
+          summary: "Earlier work",
+          recent: "Recent work",
+          historyPath: "/data/tool-output/tool_history_msg_x.md",
+          time: { created },
+        }),
+      ],
+      model,
+    )
+
+    expect(messages).toHaveLength(1)
+    const content = messages[0]!.content
+    const text = Array.isArray(content) ? String((content[0] as { type: string; text?: string }).text) : String(content)
+    expect(text).toContain(
+      "The full record of the compacted conversation is available at /data/tool-output/tool_history_msg_x.md.",
+    )
+    expect(text).toContain(
+      "search that file with Grep or Read (offset/limit). Do NOT read the whole file - it may be very large.",
+    )
+    expect(text).toContain("</conversation-checkpoint>")
+  })
+
   describe("model-switched", () => {
     const ref = (variant?: string) =>
       Model.Ref.make({
