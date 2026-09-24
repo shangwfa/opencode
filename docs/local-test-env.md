@@ -11,7 +11,7 @@
 > | | 远端 PG | 本地 PG |
 > |---|---|---|
 > | 用户 / 密码 | `app` / `8zuhlMLd4gaeUG5k` | `local` / 无密码 |
-> | 连接串 | `postgresql://app:8zuhlMLd4gaeUG5k@host.docker.internal:15432/opencode` | `postgresql://local@host.docker.internal:15432/opencode` |
+> | 连接串 | `postgresql://app:8zuhlMLd4gaeUG5k@host.docker.internal:15432/opencode` | `postgresql://local@host.docker.internal:15432/opencode-v2-up` |
 > | 数据完整度 | account/auth/provider 历史数据完整 | 全空，需手动配置 provider 认证 |
 
 > **Docker runtime**：推荐使用 [OrbStack](https://orbstack.dev/) 替代 Docker Desktop——更轻量、启动快、镜像存储稳定。如果 Docker Desktop 出现 blob I/O error，切换到 OrbStack 即可（`docker context use orbstack`）。
@@ -64,7 +64,7 @@
 |---|---|---|
 | 用途 | 运行 opencode SaaS server（监听 `:4096`），即 `docker run` 启动的主容器 | 沙箱内执行 AI 工具/用户代码的容器，由 OpenSandbox server 按需拉起 |
 | Dockerfile | 根目录 `Dockerfile` | `packages/opencode/docker/Dockerfile` |
-| 镜像 tag | `opencode-saas-sandbox-test:v2fix` | `opencode-opensandbox:local` |
+| 镜像 tag | `opencode-saas-sandbox-test:slim` | `opencode-opensandbox:local` |
 | 哪些组合需要 | **三种组合都需要** | 仅组合 2、3（本地 OpenSandbox） |
 | 重新构建时机 | 根目录 `Dockerfile` 或 SaaS 代码改动时 | sandbox 内 ripgrep / Node 版本 / LSP daemon 改动时 |
 
@@ -76,7 +76,7 @@
 
 ```bash
 cd /Users/ruomu/code/opencode
-docker build -t opencode-saas-sandbox-test:v2fix -f Dockerfile .
+docker build -t opencode-saas-sandbox-test:slim -f Dockerfile .
 ```
 
 > 首次必须构建；后续仅当根目录 `Dockerfile` 或 SaaS 代码改动时才需重新构建。
@@ -195,7 +195,7 @@ docker run -d --name opencode-saas-test \
   -e OPENCODE_DATABASE_URL=postgresql://app:8zuhlMLd4gaeUG5k@host.docker.internal:15432/opencode \
   -e OPENCODE_SANDBOX_DOMAIN=host.docker.internal:30040 \
   -e OPENCODE_SANDBOX_USE_SERVER_PROXY=true \
-  opencode-saas-sandbox-test:v2fix
+  opencode-saas-sandbox-test:slim
 
 sleep 10 && docker logs opencode-saas-test 2>&1 | tail -3
 # 期望：Warning: OPENCODE_SERVER_PASSWORD is not set
@@ -341,7 +341,7 @@ docker run -d --name opencode-saas-test \
   -e OPENCODE_SANDBOX_DOMAIN=host.docker.internal:8080 \
   -e OPENCODE_SANDBOX_USE_SERVER_PROXY=true \
   -e OPENCODE_SANDBOX_IMAGE=opencode-opensandbox:local \
-  opencode-saas-sandbox-test:v2fix
+  opencode-saas-sandbox-test:slim
 
 sleep 10 && docker logs opencode-saas-test 2>&1 | tail -5
 ```
@@ -450,11 +450,11 @@ docker rm -f opencode-saas-test 2>/dev/null
 
 docker run -d --name opencode-saas-test \
   -p 14096:4096 \
-  -e OPENCODE_DATABASE_URL=postgresql://local@host.docker.internal:15432/opencode \
+  -e OPENCODE_DATABASE_URL=postgresql://local@host.docker.internal:15432/opencode-v2-up \
   -e OPENCODE_SANDBOX_DOMAIN=host.docker.internal:8080 \
   -e OPENCODE_SANDBOX_USE_SERVER_PROXY=true \
   -e OPENCODE_SANDBOX_IMAGE=opencode-opensandbox:local \
-  opencode-saas-sandbox-test:v2fix
+  opencode-saas-sandbox-test:slim
 
 sleep 10 && docker logs opencode-saas-test 2>&1 | tail -3
 ```
@@ -774,7 +774,7 @@ net.createServer(c => {
 **症状**：发送 AI 消息返回 `ProviderModelNotFoundError`。
 
 
-> 查看已有 credential：`psql postgresql://local@127.0.0.1:15432/opencode -c "SELECT connector_id, active FROM credential WHERE active = true"`
+> 查看已有 credential：`psql postgresql://local@127.0.0.1:15432/opencode-v2-up -c "SELECT connector_id, active FROM credential WHERE active = true"`
 
 ### 7.5 本地 PG 缺 account / auth 数据
 

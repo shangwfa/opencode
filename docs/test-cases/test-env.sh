@@ -21,7 +21,9 @@ case "$COMBO" in
     export PG_URL="postgresql://app:8zuhlMLd4gaeUG5k@127.0.0.1:15432/opencode"
     ;;
   3)
-    export PG_URL="postgresql://local@127.0.0.1:15432/opencode"
+    # 本地 Homebrew PG 直连（容器侧经 host.docker.internal:15432 转发，库名一致：
+    # opencode-v2-up，与 AGENTS.md / shell-perf.md 的启动命令保持同步）
+    export PG_URL="postgresql://local@127.0.0.1:5432/opencode-v2-up"
     ;;
   *)
     echo "test-env.sh: 未知组合 '$COMBO'，用法: source test-env.sh [1|2|3]" >&2
