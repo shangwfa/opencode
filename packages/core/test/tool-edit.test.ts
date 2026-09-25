@@ -103,6 +103,7 @@ const makeEditFixture = () => {
     fileList: () => Effect.succeed([]),
     fileFind: () => Effect.succeed([]),
     isReady: () => Effect.succeed(true),
+    endpoint: () => Effect.succeed({ _tag: "no-sandbox" }),
   })
 
   return Object.assign(fixture, { permission, formatter, sandboxProvider })

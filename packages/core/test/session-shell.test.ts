@@ -109,6 +109,7 @@ const sandboxProviderLayer = Layer.succeed(
     fileList: () => Effect.die(new Error("not under test")),
     fileFind: () => Effect.die(new Error("not under test")),
     isReady: () => Effect.succeed(true),
+    endpoint: () => Effect.succeed({ _tag: "no-sandbox" }),
   }),
 )
 
@@ -134,6 +135,7 @@ const disabledProviderLayer = Layer.succeed(
     fileList: () => Effect.die(new Error("not under test")),
     fileFind: () => Effect.die(new Error("not under test")),
     isReady: () => Effect.succeed(false),
+    endpoint: () => Effect.succeed({ _tag: "no-sandbox" }),
   }),
 )
 

@@ -101,6 +101,7 @@ const sandboxProvider: SandboxProvider.Interface = {
   fileList: () => Effect.succeed([]),
   fileFind: () => Effect.succeed([]),
   isReady: () => Effect.succeed(true),
+  endpoint: () => Effect.succeed({ _tag: "no-sandbox" }),
 }
 
 const permission = permissionLayer({

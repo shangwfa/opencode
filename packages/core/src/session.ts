@@ -47,6 +47,7 @@ import { SessionInbox } from "./session/inbox.js"
 import { InstructionState } from "./session/instruction-state.js"
 import { SessionGenerate } from "./session/generate.js"
 import { SessionCommand } from "./session/command.js"
+import { SubagentCompletion } from "./session/subagent-completion.js"
 import {
   SessionMove,
   DestinationNotFoundError,
@@ -484,8 +485,81 @@ const layer = Layer.effect(
       }),
       command: Effect.fn("Session.command")(function* (input) {
         const session = yield* result.get(input.sessionID)
-        return yield* SessionCommand.execute({ ...input, session }).pipe(
-          Effect.provideService(Instance.Service, instances),
+        const sessionHandle = sessions.forSession(input.sessionID)
+        return yield* instances.provide(session)(
+          Effect.gen(function* () {
+            const sandbox = yield* SandboxProvider.Service
+            return yield* SessionCommand.execute({
+              ...input,
+              session,
+              sandbox,
+              actions: {
+                prompt: (value) => sessionHandle.prompt(value),
+                switchAgent: (value) => sessionHandle.switchAgent(value),
+                switchModel: (value) => sessionHandle.switchModel(value),
+                subagent: Effect.fn("Session.commandSubagent")(function* ({ definition, text, prompt }) {
+                  const description = definition.description ?? definition.name
+                  const agent = definition.agent ? Agent.ID.make(definition.agent) : session.agent
+                  const model = definition.model
+                    ? typeof definition.model === "string"
+                      ? Model.Ref.parse(definition.model)
+                      : Model.Ref.make({
+                          id: Model.ID.make(definition.model.model),
+                          providerID: definition.model.providerID,
+                          ...(definition.model.variant ? { variant: Model.VariantID.make(definition.model.variant) } : {}),
+                        })
+                    : undefined
+                  const child = yield* result.create({
+                    parentID: session.id,
+                    title: description,
+                    ...(agent ? { agent } : {}),
+                    ...(model ? { model } : {}),
+                  })
+                  const recovery = {
+                    kind: "subagent" as const,
+                    parentSessionID: session.id,
+                    childSessionID: child.id,
+                    agent: String(child.agent ?? agent ?? ""),
+                    description,
+                  }
+                  yield* result.prompt({
+                    ...prompt,
+                    sessionID: child.id,
+                    text: ["You are a subagent spawned by another session.", text].join("\n"),
+                    resume: false,
+                  })
+                  yield* jobs.start({
+                    id: child.id,
+                    type: "subagent",
+                    title: description,
+                    metadata: {},
+                    recovery,
+                    run: Effect.gen(function* () {
+                      yield* result.resume(child.id)
+                      const messages = yield* result.messages({ sessionID: child.id, order: "desc", limit: 20 })
+                      const assistant = messages.find(
+                        (message) =>
+                          message.type === "assistant" && message.time.completed !== undefined && message.error === undefined,
+                      )
+                      return SubagentCompletion.text(assistant)
+                    }),
+                  })
+                  yield* jobs.background(child.id)
+                  yield* Effect.forkDetach(
+                    jobs.wait({ id: child.id }).pipe(
+                      Effect.flatMap(({ info }) =>
+                        info ? SubagentCompletion.deliver(result, jobs, { ...info, recovery }) : Effect.void,
+                      ),
+                    ),
+                  )
+                }),
+              },
+            }).pipe(
+              Effect.provideService(Instance.Service, instances),
+              Effect.provideService(Database.Service, database),
+              Effect.provideService(SandboxProvider.Service, sandbox),
+            )
+          }),
         )
       }),
       shell: (input) => sessions.forSession(input.sessionID).shell(input),

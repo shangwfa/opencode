@@ -45,6 +45,7 @@ export interface Interface extends State.Transformable<Editor> {
   readonly execute: (input: {
     readonly name: string
     readonly invocation: Invocation
+    readonly definition?: Definition
   }) => Effect.Effect<void, NotFoundError | ExecutionError>
 }
 
@@ -79,7 +80,7 @@ export const layer = Layer.effect(
       ),
       list: Effect.fn("Command.list")(() => Effect.sync(() => Array.from(state.get().values(), info))),
       execute: Effect.fn("Command.execute")(function* (input) {
-        const definition = state.get().get(input.name)
+        const definition = input.definition ?? state.get().get(input.name)
         if (!definition)
           return yield* new NotFoundError({ command: input.name, message: `Command not found: ${input.name}` })
         return yield* definition.execute(input.invocation).pipe(

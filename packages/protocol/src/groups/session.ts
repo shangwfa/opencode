@@ -43,6 +43,7 @@ import { FileDiff } from "@opencode/schema/file-diff"
 import { Form } from "@opencode/schema/form"
 import { PublicSessionMessage } from "./message.js"
 import { OpenCodeEvent } from "./event.js"
+import { SessionCommand } from "@opencode/schema/session-command"
 
 const ParentIDFilter = Schema.Union([
   Session.ID,
@@ -605,6 +606,72 @@ export const makeSessionGroup = <
           description: "Retrieve the active context messages for a session (all messages after the last compaction).",
         }),
       ),
+    )
+    .add(
+      HttpApiEndpoint.get("session.commandDefinitions.list", "/api/session/:sessionID/commands", {
+        params: { sessionID: Session.ID },
+        success: Schema.Struct({ data: Schema.Array(SessionCommand.Definition) }),
+        error: [SessionNotFoundError, UnknownError],
+      })
+        .middleware(sessionLocationMiddleware)
+        .annotateMerge(OpenApi.annotations({
+          identifier: "session.commandDefinitions.list",
+          summary: "List session commands",
+          description: "List effective commands merged from builtin, session PG definitions, and the session sandbox.",
+        })),
+    )
+    .add(
+      HttpApiEndpoint.post("session.commandDefinitions.create", "/api/session/:sessionID/commands", {
+        params: { sessionID: Session.ID },
+        payload: SessionCommand.CreatePayload,
+        success: SessionCommand.Definition,
+        error: [SessionNotFoundError, InvalidRequestError, UnknownError],
+      })
+        .middleware(sessionLocationMiddleware)
+        .annotateMerge(OpenApi.annotations({
+          identifier: "session.commandDefinitions.create",
+          summary: "Create or update a session command",
+          description: "Persist a session command definition in the database.",
+        })),
+    )
+    .add(
+      HttpApiEndpoint.delete("session.commandDefinitions.delete", "/api/session/:sessionID/commands/:name", {
+        params: { sessionID: Session.ID, name: Schema.String },
+        success: HttpApiSchema.NoContent,
+        error: [SessionNotFoundError, UnknownError],
+      })
+        .middleware(sessionLocationMiddleware)
+        .annotateMerge(OpenApi.annotations({
+          identifier: "session.commandDefinitions.delete",
+          summary: "Delete a session command",
+          description: "Delete a database-defined session command; a sandbox definition of the same name may remain active.",
+        })),
+    )
+    .add(
+      HttpApiEndpoint.delete("session.commandDefinitions.clear", "/api/session/:sessionID/commands", {
+        params: { sessionID: Session.ID },
+        success: HttpApiSchema.NoContent,
+        error: [SessionNotFoundError, UnknownError],
+      })
+        .middleware(sessionLocationMiddleware)
+        .annotateMerge(OpenApi.annotations({
+          identifier: "session.commandDefinitions.clear",
+          summary: "Clear session commands",
+          description: "Delete all database-defined commands for a session while preserving builtin and sandbox commands.",
+        })),
+    )
+    .add(
+      HttpApiEndpoint.post("session.commandDefinitions.refresh", "/api/session/:sessionID/commands/refresh", {
+        params: { sessionID: Session.ID },
+        success: Schema.Struct({ data: Schema.Array(SessionCommand.Definition) }),
+        error: [SessionNotFoundError, UnknownError],
+      })
+        .middleware(sessionLocationMiddleware)
+        .annotateMerge(OpenApi.annotations({
+          identifier: "session.commandDefinitions.refresh",
+          summary: "Refresh sandbox commands",
+          description: "Rescan command files in the session sandbox and return the effective command list.",
+        })),
     )
     .add(
       HttpApiEndpoint.post("session.keepAlive", "/api/experimental/session/:sessionID/keep-alive", {

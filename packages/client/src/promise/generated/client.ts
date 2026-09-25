@@ -60,6 +60,16 @@ import type {
   SessionRevertCommitOutput,
   SessionContextInput,
   SessionContextOutput,
+  SessionCommandDefinitionsListInput,
+  SessionCommandDefinitionsListOutput,
+  SessionCommandDefinitionsCreateInput,
+  SessionCommandDefinitionsCreateOutput,
+  SessionCommandDefinitionsDeleteInput,
+  SessionCommandDefinitionsDeleteOutput,
+  SessionCommandDefinitionsClearInput,
+  SessionCommandDefinitionsClearOutput,
+  SessionCommandDefinitionsRefreshInput,
+  SessionCommandDefinitionsRefreshOutput,
   SessionKeepAliveInput,
   SessionKeepAliveOutput,
   SessionKeepAliveStatusInput,
@@ -116,6 +126,28 @@ import type {
   SessionFsSessionFsListOutput,
   SessionFsSessionFsFindInput,
   SessionFsSessionFsFindOutput,
+  SessionAttachmentSessionAttachmentInput,
+  SessionAttachmentSessionAttachmentOutput,
+  ServerSessionVcsSessionVcsDiffInput,
+  ServerSessionVcsSessionVcsDiffOutput,
+  ServerSessionProxySessionProxyGetInput,
+  ServerSessionProxySessionProxyGetOutput,
+  ServerSessionProxySessionProxyPostInput,
+  ServerSessionProxySessionProxyPostOutput,
+  ServerSessionProxySessionProxyPutInput,
+  ServerSessionProxySessionProxyPutOutput,
+  ServerSessionProxySessionProxyDeleteInput,
+  ServerSessionProxySessionProxyDeleteOutput,
+  ServerSessionProxySessionProxyPatchInput,
+  ServerSessionProxySessionProxyPatchOutput,
+  ServerSessionProxySessionProxyHeadInput,
+  ServerSessionProxySessionProxyHeadOutput,
+  ServerSessionProxySessionProxyOptionsInput,
+  ServerSessionProxySessionProxyOptionsOutput,
+  ServerSessionProxySessionEndpointInput,
+  ServerSessionProxySessionEndpointOutput,
+  ServerSessionProxySessionProxyErrorsInput,
+  ServerSessionProxySessionProxyErrorsOutput,
   MessageListInput,
   MessageListOutput,
   ModelListInput,
@@ -561,16 +593,19 @@ export function make(options: ClientOptions) {
             path: `/api/session`,
             body: {
               id: input?.["id"],
+              parentID: input?.["parentID"],
               appId: input?.["appId"],
+              pvcMode: input?.["pvcMode"],
               title: input?.["title"],
               agent: input?.["agent"],
               model: input?.["model"],
               location: input?.["location"],
               metadata: input?.["metadata"],
               permissions: input?.["permissions"],
+              sandbox: input?.["sandbox"],
             },
             successStatus: 200,
-            declaredStatuses: [400, 401],
+            declaredStatuses: [400, 401, 404],
             empty: false,
           },
           requestOptions,
@@ -673,7 +708,12 @@ export function make(options: ClientOptions) {
           {
             method: "PATCH",
             path: `/api/session/${encodeURIComponent(input.sessionID)}`,
-            body: { title: input["title"], permissions: input["permissions"] },
+            body: {
+              title: input["title"],
+              permissions: input["permissions"],
+              sandbox: input["sandbox"],
+              recreate: input["recreate"],
+            },
             successStatus: 204,
             declaredStatuses: [400, 401, 404],
             empty: true,
@@ -704,6 +744,7 @@ export function make(options: ClientOptions) {
               agents: input["agents"],
               skills: input["skills"],
               format: input["format"],
+              model: input["model"],
               userName: input["userName"],
               userId: input["userId"],
               metadata: input["metadata"],
@@ -772,7 +813,7 @@ export function make(options: ClientOptions) {
           {
             method: "POST",
             path: `/api/session/${encodeURIComponent(input.sessionID)}/shell`,
-            body: { id: input["id"], command: input["command"] },
+            body: { id: input["id"], command: input["command"], timeoutSeconds: input["timeoutSeconds"] },
             successStatus: 204,
             declaredStatuses: [400, 401, 404],
             empty: true,
@@ -849,6 +890,73 @@ export function make(options: ClientOptions) {
           },
           requestOptions,
         ).then((value) => value.data),
+      commandDefinitions: {
+        list: (input: SessionCommandDefinitionsListInput, requestOptions?: RequestOptions) =>
+          request<{ readonly data: SessionCommandDefinitionsListOutput }>(
+            {
+              method: "GET",
+              path: `/api/session/${encodeURIComponent(input.sessionID)}/commands`,
+              successStatus: 200,
+              declaredStatuses: [400, 401, 404, 500],
+              empty: false,
+            },
+            requestOptions,
+          ).then((value) => value.data),
+        create: (input: SessionCommandDefinitionsCreateInput, requestOptions?: RequestOptions) =>
+          request<SessionCommandDefinitionsCreateOutput>(
+            {
+              method: "POST",
+              path: `/api/session/${encodeURIComponent(input.sessionID)}/commands`,
+              body: {
+                name: input["name"],
+                description: input["description"],
+                template: input["template"],
+                agent: input["agent"],
+                model: input["model"],
+                subagent: input["subagent"],
+                subtask: input["subtask"],
+                hints: input["hints"],
+              },
+              successStatus: 200,
+              declaredStatuses: [400, 401, 404, 500],
+              empty: false,
+            },
+            requestOptions,
+          ),
+        delete: (input: SessionCommandDefinitionsDeleteInput, requestOptions?: RequestOptions) =>
+          request<SessionCommandDefinitionsDeleteOutput>(
+            {
+              method: "DELETE",
+              path: `/api/session/${encodeURIComponent(input.sessionID)}/commands/${encodeURIComponent(input.name)}`,
+              successStatus: 204,
+              declaredStatuses: [400, 401, 404, 500],
+              empty: true,
+            },
+            requestOptions,
+          ),
+        clear: (input: SessionCommandDefinitionsClearInput, requestOptions?: RequestOptions) =>
+          request<SessionCommandDefinitionsClearOutput>(
+            {
+              method: "DELETE",
+              path: `/api/session/${encodeURIComponent(input.sessionID)}/commands`,
+              successStatus: 204,
+              declaredStatuses: [400, 401, 404, 500],
+              empty: true,
+            },
+            requestOptions,
+          ),
+        refresh: (input: SessionCommandDefinitionsRefreshInput, requestOptions?: RequestOptions) =>
+          request<{ readonly data: SessionCommandDefinitionsRefreshOutput }>(
+            {
+              method: "POST",
+              path: `/api/session/${encodeURIComponent(input.sessionID)}/commands/refresh`,
+              successStatus: 200,
+              declaredStatuses: [400, 401, 404, 500],
+              empty: false,
+            },
+            requestOptions,
+          ).then((value) => value.data),
+      },
       keepAlive: (input: SessionKeepAliveInput, requestOptions?: RequestOptions) =>
         request<SessionKeepAliveOutput>(
           {
@@ -1149,6 +1257,7 @@ export function make(options: ClientOptions) {
               agents: input["agents"],
               skills: input["skills"],
               format: input["format"],
+              model: input["model"],
               userName: input["userName"],
               userId: input["userId"],
               metadata: input["metadata"],
@@ -1202,6 +1311,146 @@ export function make(options: ClientOptions) {
               requestOptions,
             ).then((value) => value.data),
         },
+      },
+    },
+    sessionAttachment: {
+      session: {
+        attachment: (input: SessionAttachmentSessionAttachmentInput, requestOptions?: RequestOptions) =>
+          request<SessionAttachmentSessionAttachmentOutput>(
+            {
+              method: "GET",
+              path: `/api/session/${encodeURIComponent(input.sessionID)}/attachment/${encodeURIComponent(input.attachmentID)}`,
+              successStatus: 200,
+              declaredStatuses: [400, 401, 404, 500],
+              empty: false,
+              binary: true,
+            },
+            requestOptions,
+          ),
+      },
+    },
+    "server.session-vcs": {
+      session: {
+        vcs: {
+          diff: (input: ServerSessionVcsSessionVcsDiffInput, requestOptions?: RequestOptions) =>
+            request<{ readonly data: ServerSessionVcsSessionVcsDiffOutput }>(
+              {
+                method: "GET",
+                path: `/api/session/${encodeURIComponent(input.sessionID)}/vcs/diff`,
+                query: { mode: input["mode"], base: input["base"], context: input["context"] },
+                successStatus: 200,
+                declaredStatuses: [400, 401, 404, 503],
+                empty: false,
+              },
+              requestOptions,
+            ).then((value) => value.data),
+        },
+      },
+    },
+    "server.session-proxy": {
+      session: {
+        proxy: {
+          get: (input: ServerSessionProxySessionProxyGetInput, requestOptions?: RequestOptions) =>
+            request<ServerSessionProxySessionProxyGetOutput>(
+              {
+                method: "GET",
+                path: `/api/session/${encodeURIComponent(input.sessionID)}/proxy/${encodeURIComponent(input.port)}/${encodePath(input.path)}`,
+                successStatus: 204,
+                declaredStatuses: [400, 401, 404, 502],
+                empty: true,
+              },
+              requestOptions,
+            ),
+          post: (input: ServerSessionProxySessionProxyPostInput, requestOptions?: RequestOptions) =>
+            request<ServerSessionProxySessionProxyPostOutput>(
+              {
+                method: "POST",
+                path: `/api/session/${encodeURIComponent(input.sessionID)}/proxy/${encodeURIComponent(input.port)}/${encodePath(input.path)}`,
+                successStatus: 204,
+                declaredStatuses: [400, 401, 404, 502],
+                empty: true,
+              },
+              requestOptions,
+            ),
+          put: (input: ServerSessionProxySessionProxyPutInput, requestOptions?: RequestOptions) =>
+            request<ServerSessionProxySessionProxyPutOutput>(
+              {
+                method: "PUT",
+                path: `/api/session/${encodeURIComponent(input.sessionID)}/proxy/${encodeURIComponent(input.port)}/${encodePath(input.path)}`,
+                successStatus: 204,
+                declaredStatuses: [400, 401, 404, 502],
+                empty: true,
+              },
+              requestOptions,
+            ),
+          delete: (input: ServerSessionProxySessionProxyDeleteInput, requestOptions?: RequestOptions) =>
+            request<ServerSessionProxySessionProxyDeleteOutput>(
+              {
+                method: "DELETE",
+                path: `/api/session/${encodeURIComponent(input.sessionID)}/proxy/${encodeURIComponent(input.port)}/${encodePath(input.path)}`,
+                successStatus: 204,
+                declaredStatuses: [400, 401, 404, 502],
+                empty: true,
+              },
+              requestOptions,
+            ),
+          patch: (input: ServerSessionProxySessionProxyPatchInput, requestOptions?: RequestOptions) =>
+            request<ServerSessionProxySessionProxyPatchOutput>(
+              {
+                method: "PATCH",
+                path: `/api/session/${encodeURIComponent(input.sessionID)}/proxy/${encodeURIComponent(input.port)}/${encodePath(input.path)}`,
+                successStatus: 204,
+                declaredStatuses: [400, 401, 404, 502],
+                empty: true,
+              },
+              requestOptions,
+            ),
+          head: (input: ServerSessionProxySessionProxyHeadInput, requestOptions?: RequestOptions) =>
+            request<ServerSessionProxySessionProxyHeadOutput>(
+              {
+                method: "HEAD",
+                path: `/api/session/${encodeURIComponent(input.sessionID)}/proxy/${encodeURIComponent(input.port)}/${encodePath(input.path)}`,
+                successStatus: 204,
+                declaredStatuses: [400, 401, 404, 502],
+                empty: true,
+              },
+              requestOptions,
+            ),
+          options: (input: ServerSessionProxySessionProxyOptionsInput, requestOptions?: RequestOptions) =>
+            request<ServerSessionProxySessionProxyOptionsOutput>(
+              {
+                method: "OPTIONS",
+                path: `/api/session/${encodeURIComponent(input.sessionID)}/proxy/${encodeURIComponent(input.port)}/${encodePath(input.path)}`,
+                successStatus: 204,
+                declaredStatuses: [400, 401, 404, 502],
+                empty: true,
+              },
+              requestOptions,
+            ),
+          errors: (input: ServerSessionProxySessionProxyErrorsInput, requestOptions?: RequestOptions) =>
+            request<ServerSessionProxySessionProxyErrorsOutput>(
+              {
+                method: "GET",
+                path: `/api/session/${encodeURIComponent(input.sessionID)}/proxy-errors`,
+                successStatus: 200,
+                declaredStatuses: [400, 401, 404],
+                empty: false,
+              },
+              requestOptions,
+            ),
+        },
+        endpoint: (input: ServerSessionProxySessionEndpointInput, requestOptions?: RequestOptions) =>
+          request<ServerSessionProxySessionEndpointOutput>(
+            {
+              method: "GET",
+              path: `/api/session/${encodeURIComponent(input.sessionID)}/endpoint/${encodeURIComponent(input.port)}`,
+              query: { mode: input["mode"] },
+              successStatus: 200,
+              declaredStatuses: [400, 401, 404, 502],
+              empty: false,
+            },
+            requestOptions,
+          ),
       },
     },
     message: {

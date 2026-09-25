@@ -108,7 +108,9 @@ const translate = (query: string): string => {
   pg = pg.replace(/\breal\b/gi, "double precision")
   pg = pg.replace(/\bnumeric\b/gi, "double precision")
   pg = pg.replace(/\binteger\b/gi, "bigint")
-  pg = pg.replace(/(ON CONFLICT\s*\()\s*"[^"]+"\./gi, "$1")
+  pg = pg.replace(/(ON CONFLICT\s*\()([^)]*)(\))/gi, (_match, prefix: string, target: string, suffix: string) =>
+    `${prefix}${target.replace(/"[^"]+"\./g, "")}${suffix}`,
+  )
   pg = translateScalarMax(pg)
   if (/insert\s+or\s+ignore\s+into/i.test(pg)) {
     pg = pg.replace(/insert\s+or\s+ignore\s+into/i, "INSERT INTO").replace(/\s*;\s*$/, "")

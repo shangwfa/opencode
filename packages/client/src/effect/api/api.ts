@@ -17,15 +17,16 @@ import type { PromptInput } from "@opencode/schema/prompt-input"
 import type { AgentAttachment } from "@opencode/schema/prompt"
 import type { Schema } from "effect"
 import type { Skill } from "@opencode/schema/skill"
+import type { Provider } from "@opencode/schema/provider"
 import type { FileDiff } from "@opencode/schema/file-diff"
 import type { InstructionEntry } from "@opencode/schema/instruction-entry"
 import type { Event } from "@opencode/schema/event"
 import type { EventLog } from "@opencode/schema/event-log"
 import type { Shell } from "@opencode/schema/shell"
-import type { Provider } from "@opencode/schema/provider"
 import type { Form } from "@opencode/schema/form"
 import type { OpenCodeEvent } from "@opencode/protocol/groups/event"
 import type { FileSystem } from "@opencode/schema/filesystem"
+import type { Vcs } from "@opencode/schema/vcs"
 import type { Integration } from "@opencode/schema/integration"
 import type { Mcp } from "@opencode/schema/mcp"
 import type { Credential } from "@opencode/schema/credential"
@@ -35,7 +36,6 @@ import type { Pty } from "@opencode/schema/pty"
 import type { PtyTicket } from "@opencode/schema/pty-ticket"
 import type { Reference } from "@opencode/schema/reference"
 import type { Worktree } from "@opencode/schema/worktree"
-import type { Vcs } from "@opencode/schema/vcs"
 import type { WebSearch } from "@opencode/schema/websearch"
 import type { Config } from "@opencode/schema/config"
 
@@ -190,13 +190,16 @@ export type SessionStatsOperation<E = never> = (input?: SessionStatsInput) => Ef
 
 export type SessionCreateInput = {
   readonly id?: Session.ID | undefined
+  readonly parentID?: Session.ID | undefined
   readonly appId?: Session.AppId | undefined
+  readonly pvcMode?: Session.PvcMode | undefined
   readonly title?: string | undefined
   readonly agent?: Agent.ID | undefined
   readonly model?: Model.Ref | undefined
   readonly location?: Location.PublicRef | undefined
   readonly metadata?: Session.Metadata | undefined
   readonly permissions?: Permission.Ruleset | undefined
+  readonly sandbox?: Session.SandboxResource | undefined
 }
 export type SessionCreateOutput = Session.Info
 export type SessionCreateOperation<E = never> = (input?: SessionCreateInput) => Effect.Effect<SessionCreateOutput, E>
@@ -244,6 +247,8 @@ export type SessionUpdateInput = {
   readonly sessionID: Session.ID
   readonly title?: string | undefined
   readonly permissions?: Permission.Ruleset | undefined
+  readonly sandbox?: Session.SandboxResource | undefined
+  readonly recreate?: boolean | undefined
 }
 export type SessionUpdateOutput = void
 export type SessionUpdateOperation<E = never> = (input: SessionUpdateInput) => Effect.Effect<SessionUpdateOutput, E>
@@ -273,6 +278,7 @@ export type SessionPromptInput = {
           }
       )
     | undefined
+  readonly model?: Model.Ref | undefined
   readonly userName?: string | undefined
   readonly userId?: string | undefined
   readonly metadata?: { readonly [x: string]: unknown } | undefined
@@ -330,6 +336,7 @@ export type SessionShellInput = {
   readonly sessionID: Session.ID
   readonly id?: SessionMessage.ID | undefined
   readonly command: string
+  readonly timeoutSeconds?: number | undefined
 }
 export type SessionShellOutput = void
 export type SessionShellOperation<E = never> = (input: SessionShellInput) => Effect.Effect<SessionShellOutput, E>
@@ -371,6 +378,87 @@ export type SessionRevertCommitOperation<E = never> = (
 export type SessionContextInput = { readonly sessionID: Session.ID }
 export type SessionContextOutput = ReadonlyArray<SessionMessage.Info>
 export type SessionContextOperation<E = never> = (input: SessionContextInput) => Effect.Effect<SessionContextOutput, E>
+
+export type SessionCommandDefinitionsListInput = { readonly sessionID: Session.ID }
+export type SessionCommandDefinitionsListOutput = ReadonlyArray<{
+  readonly name: string
+  readonly description?: string | undefined
+  readonly template?: string | undefined
+  readonly agent?: string | undefined
+  readonly model?:
+    | { readonly providerID: Provider.ID; readonly model: Model.ID; readonly variant?: Model.VariantID | undefined }
+    | undefined
+  readonly subagent?: boolean | undefined
+  readonly subtask?: boolean | undefined
+  readonly hints: ReadonlyArray<string>
+  readonly source: "sandbox" | "session" | "builtin"
+  readonly sourcePath?: string | undefined
+}>
+export type SessionCommandDefinitionsListOperation<E = never> = (
+  input: SessionCommandDefinitionsListInput,
+) => Effect.Effect<SessionCommandDefinitionsListOutput, E>
+
+export type SessionCommandDefinitionsCreateInput = {
+  readonly sessionID: Session.ID
+  readonly name: string
+  readonly description?: string | undefined
+  readonly template: string
+  readonly agent?: string | undefined
+  readonly model?:
+    | { readonly providerID: Provider.ID; readonly model: Model.ID; readonly variant?: Model.VariantID | undefined }
+    | undefined
+  readonly subagent?: boolean | undefined
+  readonly subtask?: boolean | undefined
+  readonly hints?: ReadonlyArray<string> | undefined
+}
+export type SessionCommandDefinitionsCreateOutput = {
+  readonly name: string
+  readonly description?: string | undefined
+  readonly template?: string | undefined
+  readonly agent?: string | undefined
+  readonly model?:
+    | { readonly providerID: Provider.ID; readonly model: Model.ID; readonly variant?: Model.VariantID | undefined }
+    | undefined
+  readonly subagent?: boolean | undefined
+  readonly subtask?: boolean | undefined
+  readonly hints: ReadonlyArray<string>
+  readonly source: "sandbox" | "session" | "builtin"
+  readonly sourcePath?: string | undefined
+}
+export type SessionCommandDefinitionsCreateOperation<E = never> = (
+  input: SessionCommandDefinitionsCreateInput,
+) => Effect.Effect<SessionCommandDefinitionsCreateOutput, E>
+
+export type SessionCommandDefinitionsDeleteInput = { readonly sessionID: Session.ID; readonly name: string }
+export type SessionCommandDefinitionsDeleteOutput = void
+export type SessionCommandDefinitionsDeleteOperation<E = never> = (
+  input: SessionCommandDefinitionsDeleteInput,
+) => Effect.Effect<SessionCommandDefinitionsDeleteOutput, E>
+
+export type SessionCommandDefinitionsClearInput = { readonly sessionID: Session.ID }
+export type SessionCommandDefinitionsClearOutput = void
+export type SessionCommandDefinitionsClearOperation<E = never> = (
+  input: SessionCommandDefinitionsClearInput,
+) => Effect.Effect<SessionCommandDefinitionsClearOutput, E>
+
+export type SessionCommandDefinitionsRefreshInput = { readonly sessionID: Session.ID }
+export type SessionCommandDefinitionsRefreshOutput = ReadonlyArray<{
+  readonly name: string
+  readonly description?: string | undefined
+  readonly template?: string | undefined
+  readonly agent?: string | undefined
+  readonly model?:
+    | { readonly providerID: Provider.ID; readonly model: Model.ID; readonly variant?: Model.VariantID | undefined }
+    | undefined
+  readonly subagent?: boolean | undefined
+  readonly subtask?: boolean | undefined
+  readonly hints: ReadonlyArray<string>
+  readonly source: "sandbox" | "session" | "builtin"
+  readonly sourcePath?: string | undefined
+}>
+export type SessionCommandDefinitionsRefreshOperation<E = never> = (
+  input: SessionCommandDefinitionsRefreshInput,
+) => Effect.Effect<SessionCommandDefinitionsRefreshOutput, E>
 
 export type SessionKeepAliveInput = {
   readonly sessionID: Session.ID
@@ -484,6 +572,7 @@ export type SessionLogOutput =
             readonly sessionID: Session.ID
             readonly projectID: Project.ID
             readonly appId?: Session.AppId | undefined
+            readonly pvcMode?: Session.PvcMode | undefined
             readonly location: {
               readonly directory: AbsolutePath
               readonly workspaceID?: (string & Brand.Brand<"Workspace.ID">) | undefined
@@ -496,8 +585,23 @@ export type SessionLogOutput =
             readonly model?: Model.Ref | undefined
             readonly metadata?: Session.Metadata | undefined
             readonly permissions?: Permission.Ruleset | undefined
+            readonly sandbox?: Session.SandboxResource | undefined
             readonly version: string
           }
+        }
+      | {
+          readonly id: Event.ID
+          readonly created: number
+          readonly metadata?: { readonly [x: string]: unknown } | undefined
+          readonly type: "session.sandbox.resource.updated"
+          readonly durable: { readonly aggregateID: string; readonly seq: Event.Seq; readonly version: Event.Version }
+          readonly location?:
+            | {
+                readonly directory: AbsolutePath
+                readonly workspaceID?: (string & Brand.Brand<"Workspace.ID">) | undefined
+              }
+            | undefined
+          readonly data: { readonly sessionID: Session.ID; readonly sandbox?: Session.SandboxResource | undefined }
         }
       | {
           readonly id: Event.ID
@@ -758,7 +862,7 @@ export type SessionLogOutput =
             | undefined
           readonly data: {
             readonly sessionID: Session.ID
-            readonly reason: "user" | "shutdown" | "superseded" | "inactivity"
+            readonly reason: "user" | "shutdown" | "superseded" | "inactivity" | "watchdog"
           }
         }
       | {
@@ -815,6 +919,25 @@ export type SessionLogOutput =
             readonly id: Skill.ID
             readonly name: Skill.Name
             readonly text: string
+          }
+        }
+      | {
+          readonly id: Event.ID
+          readonly created: number
+          readonly metadata?: { readonly [x: string]: unknown } | undefined
+          readonly type: "session.preview.down"
+          readonly durable: { readonly aggregateID: string; readonly seq: Event.Seq; readonly version: Event.Version }
+          readonly location?:
+            | {
+                readonly directory: AbsolutePath
+                readonly workspaceID?: (string & Brand.Brand<"Workspace.ID">) | undefined
+              }
+            | undefined
+          readonly data: {
+            readonly sessionID: Session.ID
+            readonly port: number
+            readonly reason: "sandbox-unreachable" | "port-unreachable"
+            readonly hint?: string | undefined
           }
         }
       | {
@@ -1242,6 +1365,7 @@ export type SessionLogOutput =
               | undefined
             readonly text: string
             readonly recent: string
+            readonly historyPath?: string | undefined
             readonly cost?: (number & Brand.Brand<"Money.USD">) | undefined
             readonly tokens?:
               | {
@@ -1459,6 +1583,7 @@ export type SessionPromptStreamInput = {
           }
       )
     | undefined
+  readonly model?: Model.Ref | undefined
   readonly userName?: string | undefined
   readonly userId?: string | undefined
   readonly metadata?: { readonly [x: string]: unknown } | undefined
@@ -1497,6 +1622,13 @@ export interface SessionApi<E = never> {
     readonly commit: SessionRevertCommitOperation<E>
   }
   readonly context: SessionContextOperation<E>
+  readonly commandDefinitions: {
+    readonly list: SessionCommandDefinitionsListOperation<E>
+    readonly create: SessionCommandDefinitionsCreateOperation<E>
+    readonly delete: SessionCommandDefinitionsDeleteOperation<E>
+    readonly clear: SessionCommandDefinitionsClearOperation<E>
+    readonly refresh: SessionCommandDefinitionsRefreshOperation<E>
+  }
   readonly keepAlive: SessionKeepAliveOperation<E>
   readonly keepAliveStatus: SessionKeepAliveStatusOperation<E>
   readonly sandbox: SessionSandboxOperation<E>
@@ -1562,6 +1694,128 @@ export interface SessionFsApi<E = never> {
       readonly list: SessionFsSessionFsListOperation<E>
       readonly find: SessionFsSessionFsFindOperation<E>
     }
+  }
+}
+
+export type SessionAttachmentSessionAttachmentInput = {
+  readonly sessionID: Session.ID
+  readonly attachmentID: string & Brand.Brand<"Attachment.ID">
+}
+export type SessionAttachmentSessionAttachmentOutput = globalThis.Uint8Array
+export type SessionAttachmentSessionAttachmentOperation<E = never> = (
+  input: SessionAttachmentSessionAttachmentInput,
+) => Effect.Effect<SessionAttachmentSessionAttachmentOutput, E>
+
+export interface SessionAttachmentApi<E = never> {
+  readonly session: { readonly attachment: SessionAttachmentSessionAttachmentOperation<E> }
+}
+
+export type ServerSessionVcsSessionVcsDiffInput = {
+  readonly sessionID: Session.ID
+  readonly mode: Vcs.Mode
+  readonly base?: string | undefined
+  readonly context?: number | undefined
+}
+export type ServerSessionVcsSessionVcsDiffOutput = ReadonlyArray<FileDiff.Info>
+export type ServerSessionVcsSessionVcsDiffOperation<E = never> = (
+  input: ServerSessionVcsSessionVcsDiffInput,
+) => Effect.Effect<ServerSessionVcsSessionVcsDiffOutput, E>
+
+export interface ServerSessionVcsApi<E = never> {
+  readonly session: { readonly vcs: { readonly diff: ServerSessionVcsSessionVcsDiffOperation<E> } }
+}
+
+export type ServerSessionProxySessionProxyGetInput = { readonly sessionID: Session.ID; readonly port: string }
+export type ServerSessionProxySessionProxyGetOutput = void
+export type ServerSessionProxySessionProxyGetOperation<E = never> = (
+  input: ServerSessionProxySessionProxyGetInput,
+) => Effect.Effect<ServerSessionProxySessionProxyGetOutput, E>
+
+export type ServerSessionProxySessionProxyPostInput = { readonly sessionID: Session.ID; readonly port: string }
+export type ServerSessionProxySessionProxyPostOutput = void
+export type ServerSessionProxySessionProxyPostOperation<E = never> = (
+  input: ServerSessionProxySessionProxyPostInput,
+) => Effect.Effect<ServerSessionProxySessionProxyPostOutput, E>
+
+export type ServerSessionProxySessionProxyPutInput = { readonly sessionID: Session.ID; readonly port: string }
+export type ServerSessionProxySessionProxyPutOutput = void
+export type ServerSessionProxySessionProxyPutOperation<E = never> = (
+  input: ServerSessionProxySessionProxyPutInput,
+) => Effect.Effect<ServerSessionProxySessionProxyPutOutput, E>
+
+export type ServerSessionProxySessionProxyDeleteInput = { readonly sessionID: Session.ID; readonly port: string }
+export type ServerSessionProxySessionProxyDeleteOutput = void
+export type ServerSessionProxySessionProxyDeleteOperation<E = never> = (
+  input: ServerSessionProxySessionProxyDeleteInput,
+) => Effect.Effect<ServerSessionProxySessionProxyDeleteOutput, E>
+
+export type ServerSessionProxySessionProxyPatchInput = { readonly sessionID: Session.ID; readonly port: string }
+export type ServerSessionProxySessionProxyPatchOutput = void
+export type ServerSessionProxySessionProxyPatchOperation<E = never> = (
+  input: ServerSessionProxySessionProxyPatchInput,
+) => Effect.Effect<ServerSessionProxySessionProxyPatchOutput, E>
+
+export type ServerSessionProxySessionProxyHeadInput = { readonly sessionID: Session.ID; readonly port: string }
+export type ServerSessionProxySessionProxyHeadOutput = void
+export type ServerSessionProxySessionProxyHeadOperation<E = never> = (
+  input: ServerSessionProxySessionProxyHeadInput,
+) => Effect.Effect<ServerSessionProxySessionProxyHeadOutput, E>
+
+export type ServerSessionProxySessionProxyOptionsInput = { readonly sessionID: Session.ID; readonly port: string }
+export type ServerSessionProxySessionProxyOptionsOutput = void
+export type ServerSessionProxySessionProxyOptionsOperation<E = never> = (
+  input: ServerSessionProxySessionProxyOptionsInput,
+) => Effect.Effect<ServerSessionProxySessionProxyOptionsOutput, E>
+
+export type ServerSessionProxySessionEndpointInput = {
+  readonly sessionID: Session.ID
+  readonly port: string
+  readonly mode?: "direct" | "proxy" | undefined
+}
+export type ServerSessionProxySessionEndpointOutput = {
+  readonly mode: "direct" | "proxy"
+  readonly url: string
+  readonly directUrl: string | null
+  readonly proxyUrl: string | null
+  readonly previewUrl: string | null
+  readonly port: number
+  readonly sandboxId: string
+  readonly fallback: string
+  readonly degraded?: boolean | undefined
+}
+export type ServerSessionProxySessionEndpointOperation<E = never> = (
+  input: ServerSessionProxySessionEndpointInput,
+) => Effect.Effect<ServerSessionProxySessionEndpointOutput, E>
+
+export type ServerSessionProxySessionProxyErrorsInput = { readonly sessionID: Session.ID }
+export type ServerSessionProxySessionProxyErrorsOutput = {
+  readonly [x: number]: ReadonlyArray<{
+    readonly type: "runtime" | "network" | "compile"
+    readonly message: string
+    readonly url?: string | undefined
+    readonly line?: number | undefined
+    readonly col?: number | undefined
+    readonly stack?: string | undefined
+    readonly timestamp: number
+  }>
+}
+export type ServerSessionProxySessionProxyErrorsOperation<E = never> = (
+  input: ServerSessionProxySessionProxyErrorsInput,
+) => Effect.Effect<ServerSessionProxySessionProxyErrorsOutput, E>
+
+export interface ServerSessionProxyApi<E = never> {
+  readonly session: {
+    readonly proxy: {
+      readonly get: ServerSessionProxySessionProxyGetOperation<E>
+      readonly post: ServerSessionProxySessionProxyPostOperation<E>
+      readonly put: ServerSessionProxySessionProxyPutOperation<E>
+      readonly delete: ServerSessionProxySessionProxyDeleteOperation<E>
+      readonly patch: ServerSessionProxySessionProxyPatchOperation<E>
+      readonly head: ServerSessionProxySessionProxyHeadOperation<E>
+      readonly options: ServerSessionProxySessionProxyOptionsOperation<E>
+      readonly errors: ServerSessionProxySessionProxyErrorsOperation<E>
+    }
+    readonly endpoint: ServerSessionProxySessionEndpointOperation<E>
   }
 }
 
@@ -2441,6 +2695,9 @@ export interface AppApi<E = never> {
   readonly plugin: PluginApi<E>
   readonly session: SessionApi<E>
   readonly sessionFs: SessionFsApi<E>
+  readonly sessionAttachment: SessionAttachmentApi<E>
+  readonly "server.session-vcs": ServerSessionVcsApi<E>
+  readonly "server.session-proxy": ServerSessionProxyApi<E>
   readonly message: MessageApi<E>
   readonly model: ModelApi<E>
   readonly generate: GenerateApi<E>

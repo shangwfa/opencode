@@ -80,6 +80,29 @@ export const SessionTable = sqliteTable(
   ],
 )
 
+export const SessionCommandTable = sqliteTable(
+  "session_commands",
+  {
+    id: text().primaryKey(),
+    session_id: text()
+      .$type<SessionSchema.ID>()
+      .notNull()
+      .references(() => SessionTable.id, { onDelete: "cascade" }),
+    name: text().notNull(),
+    description: text(),
+    template: text().notNull(),
+    agent: text(),
+    model: text({ mode: "json" }).$type<import("@opencode/schema/config/model").ConfigModel.Selection>(),
+    subagent: integer({ mode: "boolean" }),
+    hints: text({ mode: "json" }).$type<string[]>().notNull().default(sql`'[]'`),
+    ...Timestamps,
+  },
+  (table) => [
+    index("session_commands_session_idx").on(table.session_id),
+    uniqueIndex("session_commands_session_name_idx").on(table.session_id, table.name),
+  ],
+)
+
 export const SessionMessageTable = sqliteTable(
   "session_message",
   {

@@ -34,6 +34,7 @@ const session = (
   id: SessionSchema.ID.make("ses_test"),
   project_id: Project.ID.global,
   app_id: null,
+  pvc_mode: null,
   workspace_id: null,
   parent_id: null,
   fork_session_id: null,

@@ -66,6 +66,16 @@ import type {
   SessionRevertCommitOutput,
   SessionContextInput,
   SessionContextOutput,
+  SessionCommandDefinitionsListInput,
+  SessionCommandDefinitionsListOutput,
+  SessionCommandDefinitionsCreateInput,
+  SessionCommandDefinitionsCreateOutput,
+  SessionCommandDefinitionsDeleteInput,
+  SessionCommandDefinitionsDeleteOutput,
+  SessionCommandDefinitionsClearInput,
+  SessionCommandDefinitionsClearOutput,
+  SessionCommandDefinitionsRefreshInput,
+  SessionCommandDefinitionsRefreshOutput,
   SessionKeepAliveInput,
   SessionKeepAliveOutput,
   SessionKeepAliveStatusInput,
@@ -122,6 +132,28 @@ import type {
   SessionFsSessionFsListOutput,
   SessionFsSessionFsFindInput,
   SessionFsSessionFsFindOutput,
+  SessionAttachmentSessionAttachmentInput,
+  SessionAttachmentSessionAttachmentOutput,
+  ServerSessionVcsSessionVcsDiffInput,
+  ServerSessionVcsSessionVcsDiffOutput,
+  ServerSessionProxySessionProxyGetInput,
+  ServerSessionProxySessionProxyGetOutput,
+  ServerSessionProxySessionProxyPostInput,
+  ServerSessionProxySessionProxyPostOutput,
+  ServerSessionProxySessionProxyPutInput,
+  ServerSessionProxySessionProxyPutOutput,
+  ServerSessionProxySessionProxyDeleteInput,
+  ServerSessionProxySessionProxyDeleteOutput,
+  ServerSessionProxySessionProxyPatchInput,
+  ServerSessionProxySessionProxyPatchOutput,
+  ServerSessionProxySessionProxyHeadInput,
+  ServerSessionProxySessionProxyHeadOutput,
+  ServerSessionProxySessionProxyOptionsInput,
+  ServerSessionProxySessionProxyOptionsOutput,
+  ServerSessionProxySessionEndpointInput,
+  ServerSessionProxySessionEndpointOutput,
+  ServerSessionProxySessionProxyErrorsInput,
+  ServerSessionProxySessionProxyErrorsOutput,
   MessageListInput,
   MessageListOutput,
   ModelListInput,
@@ -394,13 +426,16 @@ const EndpointSessionCreate = (raw: RawClient["server.session"]) => (input?: Ses
     raw["session.create"]({
       payload: {
         id: input?.["id"],
+        parentID: input?.["parentID"],
         appId: input?.["appId"],
+        pvcMode: input?.["pvcMode"],
         title: input?.["title"],
         agent: input?.["agent"],
         model: input?.["model"],
         location: input?.["location"],
         metadata: input?.["metadata"],
         permissions: input?.["permissions"],
+        sandbox: input?.["sandbox"],
       },
     }).pipe(
       Effect.mapError(mapClientError),
@@ -473,7 +508,12 @@ const EndpointSessionUpdate = (raw: RawClient["server.session"]) => (input: Sess
   preserveEffect<SessionUpdateOutput>()(
     raw["session.update"]({
       params: { sessionID: input["sessionID"] },
-      payload: { title: input["title"], permissions: input["permissions"] },
+      payload: {
+        title: input["title"],
+        permissions: input["permissions"],
+        sandbox: input["sandbox"],
+        recreate: input["recreate"],
+      },
     }).pipe(Effect.mapError(mapClientError)),
   )
 
@@ -496,6 +536,7 @@ const EndpointSessionPrompt = (raw: RawClient["server.session"]) => (input: Sess
         agents: input["agents"],
         skills: input["skills"],
         format: input["format"],
+        model: input["model"],
         userName: input["userName"],
         userId: input["userId"],
         metadata: input["metadata"],
@@ -554,7 +595,7 @@ const EndpointSessionShell = (raw: RawClient["server.session"]) => (input: Sessi
   preserveEffect<SessionShellOutput>()(
     raw["session.shell"]({
       params: { sessionID: input["sessionID"] },
-      payload: { id: input["id"], command: input["command"] },
+      payload: { id: input["id"], command: input["command"], timeoutSeconds: input["timeoutSeconds"] },
     }).pipe(Effect.mapError(mapClientError)),
   )
 
@@ -602,6 +643,58 @@ const EndpointSessionContext = (raw: RawClient["server.session"]) => (input: Ses
       Effect.map((value) => value.data),
     ),
   )
+
+const EndpointSessionCommandDefinitionsList =
+  (raw: RawClient["server.session"]) => (input: SessionCommandDefinitionsListInput) =>
+    preserveEffect<SessionCommandDefinitionsListOutput>()(
+      raw["session.commandDefinitions.list"]({ params: { sessionID: input["sessionID"] } }).pipe(
+        Effect.mapError(mapClientError),
+        Effect.map((value) => value.data),
+      ),
+    )
+
+const EndpointSessionCommandDefinitionsCreate =
+  (raw: RawClient["server.session"]) => (input: SessionCommandDefinitionsCreateInput) =>
+    preserveEffect<SessionCommandDefinitionsCreateOutput>()(
+      raw["session.commandDefinitions.create"]({
+        params: { sessionID: input["sessionID"] },
+        payload: {
+          name: input["name"],
+          description: input["description"],
+          template: input["template"],
+          agent: input["agent"],
+          model: input["model"],
+          subagent: input["subagent"],
+          subtask: input["subtask"],
+          hints: input["hints"],
+        },
+      }).pipe(Effect.mapError(mapClientError)),
+    )
+
+const EndpointSessionCommandDefinitionsDelete =
+  (raw: RawClient["server.session"]) => (input: SessionCommandDefinitionsDeleteInput) =>
+    preserveEffect<SessionCommandDefinitionsDeleteOutput>()(
+      raw["session.commandDefinitions.delete"]({ params: { sessionID: input["sessionID"], name: input["name"] } }).pipe(
+        Effect.mapError(mapClientError),
+      ),
+    )
+
+const EndpointSessionCommandDefinitionsClear =
+  (raw: RawClient["server.session"]) => (input: SessionCommandDefinitionsClearInput) =>
+    preserveEffect<SessionCommandDefinitionsClearOutput>()(
+      raw["session.commandDefinitions.clear"]({ params: { sessionID: input["sessionID"] } }).pipe(
+        Effect.mapError(mapClientError),
+      ),
+    )
+
+const EndpointSessionCommandDefinitionsRefresh =
+  (raw: RawClient["server.session"]) => (input: SessionCommandDefinitionsRefreshInput) =>
+    preserveEffect<SessionCommandDefinitionsRefreshOutput>()(
+      raw["session.commandDefinitions.refresh"]({ params: { sessionID: input["sessionID"] } }).pipe(
+        Effect.mapError(mapClientError),
+        Effect.map((value) => value.data),
+      ),
+    )
 
 const EndpointSessionKeepAlive = (raw: RawClient["server.session"]) => (input: SessionKeepAliveInput) =>
   preserveEffect<SessionKeepAliveOutput>()(
@@ -806,6 +899,7 @@ const EndpointSessionPromptStream = (raw: RawClient["server.session"]) => (input
           agents: input["agents"],
           skills: input["skills"],
           format: input["format"],
+          model: input["model"],
           userName: input["userName"],
           userId: input["userId"],
           metadata: input["metadata"],
@@ -846,6 +940,13 @@ const adaptGroupSession = (raw: RawClient["server.session"]) => ({
     commit: EndpointSessionRevertCommit(raw),
   },
   context: EndpointSessionContext(raw),
+  commandDefinitions: {
+    list: EndpointSessionCommandDefinitionsList(raw),
+    create: EndpointSessionCommandDefinitionsCreate(raw),
+    delete: EndpointSessionCommandDefinitionsDelete(raw),
+    clear: EndpointSessionCommandDefinitionsClear(raw),
+    refresh: EndpointSessionCommandDefinitionsRefresh(raw),
+  },
   keepAlive: EndpointSessionKeepAlive(raw),
   keepAliveStatus: EndpointSessionKeepAliveStatus(raw),
   sandbox: EndpointSessionSandbox(raw),
@@ -912,6 +1013,121 @@ const adaptGroupSessionFs = (raw: RawClient["server.session-fs"]) => ({
       list: EndpointSessionFsSessionFsList(raw),
       find: EndpointSessionFsSessionFsFind(raw),
     },
+  },
+})
+
+const EndpointSessionAttachmentSessionAttachment =
+  (raw: RawClient["server.session-attachment"]) => (input: SessionAttachmentSessionAttachmentInput) =>
+    preserveEffect<SessionAttachmentSessionAttachmentOutput>()(
+      raw["session.attachment"]({
+        params: { sessionID: input["sessionID"], attachmentID: input["attachmentID"] },
+      }).pipe(Effect.mapError(mapClientError)),
+    )
+
+const adaptGroupSessionAttachment = (raw: RawClient["server.session-attachment"]) => ({
+  session: { attachment: EndpointSessionAttachmentSessionAttachment(raw) },
+})
+
+const EndpointServerSessionVcsSessionVcsDiff =
+  (raw: RawClient["server.session-vcs"]) => (input: ServerSessionVcsSessionVcsDiffInput) =>
+    preserveEffect<ServerSessionVcsSessionVcsDiffOutput>()(
+      raw["session.vcsDiff"]({
+        params: { sessionID: input["sessionID"] },
+        query: { mode: input["mode"], base: input["base"], context: input["context"] },
+      }).pipe(
+        Effect.mapError(mapClientError),
+        Effect.map((value) => value.data),
+      ),
+    )
+
+const adaptGroupServerSessionVcs = (raw: RawClient["server.session-vcs"]) => ({
+  session: { vcs: { diff: EndpointServerSessionVcsSessionVcsDiff(raw) } },
+})
+
+const EndpointServerSessionProxySessionProxyGet =
+  (raw: RawClient["server.session-proxy"]) => (input: ServerSessionProxySessionProxyGetInput) =>
+    preserveEffect<ServerSessionProxySessionProxyGetOutput>()(
+      raw["session.proxy.get"]({ params: { sessionID: input["sessionID"], port: input["port"] } }).pipe(
+        Effect.mapError(mapClientError),
+      ),
+    )
+
+const EndpointServerSessionProxySessionProxyPost =
+  (raw: RawClient["server.session-proxy"]) => (input: ServerSessionProxySessionProxyPostInput) =>
+    preserveEffect<ServerSessionProxySessionProxyPostOutput>()(
+      raw["session.proxy.post"]({ params: { sessionID: input["sessionID"], port: input["port"] } }).pipe(
+        Effect.mapError(mapClientError),
+      ),
+    )
+
+const EndpointServerSessionProxySessionProxyPut =
+  (raw: RawClient["server.session-proxy"]) => (input: ServerSessionProxySessionProxyPutInput) =>
+    preserveEffect<ServerSessionProxySessionProxyPutOutput>()(
+      raw["session.proxy.put"]({ params: { sessionID: input["sessionID"], port: input["port"] } }).pipe(
+        Effect.mapError(mapClientError),
+      ),
+    )
+
+const EndpointServerSessionProxySessionProxyDelete =
+  (raw: RawClient["server.session-proxy"]) => (input: ServerSessionProxySessionProxyDeleteInput) =>
+    preserveEffect<ServerSessionProxySessionProxyDeleteOutput>()(
+      raw["session.proxy.delete"]({ params: { sessionID: input["sessionID"], port: input["port"] } }).pipe(
+        Effect.mapError(mapClientError),
+      ),
+    )
+
+const EndpointServerSessionProxySessionProxyPatch =
+  (raw: RawClient["server.session-proxy"]) => (input: ServerSessionProxySessionProxyPatchInput) =>
+    preserveEffect<ServerSessionProxySessionProxyPatchOutput>()(
+      raw["session.proxy.patch"]({ params: { sessionID: input["sessionID"], port: input["port"] } }).pipe(
+        Effect.mapError(mapClientError),
+      ),
+    )
+
+const EndpointServerSessionProxySessionProxyHead =
+  (raw: RawClient["server.session-proxy"]) => (input: ServerSessionProxySessionProxyHeadInput) =>
+    preserveEffect<ServerSessionProxySessionProxyHeadOutput>()(
+      raw["session.proxy.head"]({ params: { sessionID: input["sessionID"], port: input["port"] } }).pipe(
+        Effect.mapError(mapClientError),
+      ),
+    )
+
+const EndpointServerSessionProxySessionProxyOptions =
+  (raw: RawClient["server.session-proxy"]) => (input: ServerSessionProxySessionProxyOptionsInput) =>
+    preserveEffect<ServerSessionProxySessionProxyOptionsOutput>()(
+      raw["session.proxy.options"]({ params: { sessionID: input["sessionID"], port: input["port"] } }).pipe(
+        Effect.mapError(mapClientError),
+      ),
+    )
+
+const EndpointServerSessionProxySessionEndpoint =
+  (raw: RawClient["server.session-proxy"]) => (input: ServerSessionProxySessionEndpointInput) =>
+    preserveEffect<ServerSessionProxySessionEndpointOutput>()(
+      raw["session.endpoint"]({
+        params: { sessionID: input["sessionID"], port: input["port"] },
+        query: { mode: input["mode"] },
+      }).pipe(Effect.mapError(mapClientError)),
+    )
+
+const EndpointServerSessionProxySessionProxyErrors =
+  (raw: RawClient["server.session-proxy"]) => (input: ServerSessionProxySessionProxyErrorsInput) =>
+    preserveEffect<ServerSessionProxySessionProxyErrorsOutput>()(
+      raw["session.proxyErrors"]({ params: { sessionID: input["sessionID"] } }).pipe(Effect.mapError(mapClientError)),
+    )
+
+const adaptGroupServerSessionProxy = (raw: RawClient["server.session-proxy"]) => ({
+  session: {
+    proxy: {
+      get: EndpointServerSessionProxySessionProxyGet(raw),
+      post: EndpointServerSessionProxySessionProxyPost(raw),
+      put: EndpointServerSessionProxySessionProxyPut(raw),
+      delete: EndpointServerSessionProxySessionProxyDelete(raw),
+      patch: EndpointServerSessionProxySessionProxyPatch(raw),
+      head: EndpointServerSessionProxySessionProxyHead(raw),
+      options: EndpointServerSessionProxySessionProxyOptions(raw),
+      errors: EndpointServerSessionProxySessionProxyErrors(raw),
+    },
+    endpoint: EndpointServerSessionProxySessionEndpoint(raw),
   },
 })
 
@@ -1655,6 +1871,9 @@ const adaptClient = (raw: RawClient) => ({
   plugin: adaptGroupPlugin(raw["server.plugin"]),
   session: adaptGroupSession(raw["server.session"]),
   sessionFs: adaptGroupSessionFs(raw["server.session-fs"]),
+  sessionAttachment: adaptGroupSessionAttachment(raw["server.session-attachment"]),
+  "server.session-vcs": adaptGroupServerSessionVcs(raw["server.session-vcs"]),
+  "server.session-proxy": adaptGroupServerSessionProxy(raw["server.session-proxy"]),
   message: adaptGroupMessage(raw["server.message"]),
   model: adaptGroupModel(raw["server.model"]),
   generate: adaptGroupGenerate(raw["server.generate"]),

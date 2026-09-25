@@ -553,6 +553,7 @@ describe("Session-owned handles", () => {
               fileList: () => Effect.die(new Error("not under test")),
               fileFind: () => Effect.die(new Error("not under test")),
               isReady: () => Effect.succeed(false),
+              endpoint: () => Effect.succeed({ _tag: "no-sandbox" }),
             }),
           ),
         )

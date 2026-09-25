@@ -1,4 +1,5 @@
 import { Session } from "@opencode/core/session"
+import { SessionCommands } from "@opencode/core/session/commands"
 import { SandboxProvider } from "@opencode/core/sandbox/provider"
 import { SessionStats } from "@opencode/core/session/stats"
 import { SessionTitle } from "@opencode/core/session/title"
@@ -23,6 +24,7 @@ import {
   ServiceUnavailableError,
   SessionBusyError,
   SkillNotFoundError,
+  UnknownError,
 } from "@opencode/protocol/errors"
 import { AbsolutePath } from "@opencode/core/schema"
 import { failedMessageDecode, failedSnapshot, missingMessage, missingSession } from "./session-error"
@@ -489,6 +491,54 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
               ),
             )
           return HttpApiSchema.NoContent.make()
+        }),
+      )
+      .handle(
+        "session.commandDefinitions.list",
+        Effect.fn(function* (ctx) {
+          const info = yield* session.get(ctx.params.sessionID).pipe(Effect.catchTag("Session.NotFoundError", missingSession))
+          return {
+            data: yield* SessionCommands.list(info).pipe(
+              Effect.mapError((error) => new UnknownError({ message: error.message })),
+            ),
+          }
+        }),
+      )
+      .handle(
+        "session.commandDefinitions.create",
+        Effect.fn(function* (ctx) {
+          const info = yield* session.get(ctx.params.sessionID).pipe(Effect.catchTag("Session.NotFoundError", missingSession))
+          const name = ctx.payload.name.trim()
+          if (!SessionCommands.validName(name))
+            return yield* Effect.fail(new InvalidRequestError({ field: "name", message: "Invalid command name" }))
+          return yield* SessionCommands.create(info.id, { ...ctx.payload, name })
+        }),
+      )
+      .handle(
+        "session.commandDefinitions.delete",
+        Effect.fn(function* (ctx) {
+          yield* session.get(ctx.params.sessionID).pipe(Effect.catchTag("Session.NotFoundError", missingSession))
+          yield* SessionCommands.remove(ctx.params.sessionID, ctx.params.name)
+          return HttpApiSchema.NoContent.make()
+        }),
+      )
+      .handle(
+        "session.commandDefinitions.clear",
+        Effect.fn(function* (ctx) {
+          yield* session.get(ctx.params.sessionID).pipe(Effect.catchTag("Session.NotFoundError", missingSession))
+          yield* SessionCommands.clear(ctx.params.sessionID)
+          return HttpApiSchema.NoContent.make()
+        }),
+      )
+      .handle(
+        "session.commandDefinitions.refresh",
+        Effect.fn(function* (ctx) {
+          const info = yield* session.get(ctx.params.sessionID).pipe(Effect.catchTag("Session.NotFoundError", missingSession))
+          return {
+            data: yield* SessionCommands.refresh(info).pipe(
+              Effect.mapError((error) => new UnknownError({ message: error.message })),
+            ),
+          }
         }),
       )
       .handle(

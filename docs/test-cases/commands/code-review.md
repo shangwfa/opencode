@@ -236,12 +236,12 @@ print('✅ T31.6 PASS' if has_findings else '❌ T31.6 FAIL')
 
 | 用例 | 状态 | 说明 |
 |------|------|------|
-| T31.1 | ⏳ | |
-| T31.2 | ⏳ | |
-| T31.3 | ⏳ | |
-| T31.4 | ⏳ | |
-| T31.5 | ⏳ | |
-| T31.6 | ⏳ | |
+| T31.1 | ✅ | V2 沙箱 git fixture、staged bug diff 已建立 |
+| T31.2 | ⚠️ | `review` 真实模型审查通过；未观察到旧版期望的 task 子代理 |
+| T31.3 | ⛔ | `codex-review` 未注册，V2 返回 404 `CommandNotFoundError` |
+| T31.4 | ⏭️ | 依赖 T31.3，无法比较输出格式 |
+| T31.5 | ⛔ | 依赖未注册的 `codex-review` |
+| T31.6 | ⛔ | 依赖未注册的 `codex-review` |
 
 > 复测记录（2026-09-06，merge v1.18.29 后）：T31.1（git 环境 READY）+ T31.2（`/review` 经 `/command` 执行）✅——正确识别注入 bug.ts 的两个缺陷（`const x: string = 123` 类型不匹配 High；`as unknown as string` 类型安全漏洞 Medium）。命令只能经 `/command` 触发确认。
 
@@ -250,3 +250,11 @@ print('✅ T31.6 PASS' if has_findings else '❌ T31.6 FAIL')
 > - T31.2 /review ✅（HTTP 200，模型返回审查回复——但审查范围在 `/workspace` 根目录，子目录 fixture 未被扫描）
 > - T31.3 /codex-review ✅（HTTP 200，模型执行审查流程——发现无 staged/unstaged diff 时正确报告"nothing to review"并提示用户）
 > - ⚠️ 环境限制：`/review` 和 `/codex-review` 审查范围基于当前 workspace 的 git diff（staged/unstaged），**不自动扫描 commit history**——fixture 需要 uncommitted changes 才能触发实际审查内容。T31.4–T31.6 未跑（需仔细构造 diff/commit 场景）
+
+> **复测记录（2026-09-25，V2 API，镜像 `opencode-saas-sandbox-test:session-commands`，本地 PG + opensandbox，Yd-DeepSeek 真实模型）**：
+> - T31.1 ✅ 新建会话、切换模型、在 `/workspace` 初始化 git；提交 baseline 后 stage `bug.ts` 改动。V2 shell endpoint 返回 204，真实审查确认工作区准备成功。
+> - T31.2 ⚠️ **审查行为通过、旧 subtask 断言不成立**。通过 `POST /api/session/:id/command` 执行 `review`，API 返回 204；模型在 context 中给出自由文本，识别 `const value: string = 123` 类型错误和 `unknown as string` 不安全断言，并提供修复建议。执行中使用 `shell` 工具；未观察到 `task` 子代理调用，因此文档“review 必须触发 task（subtask=true）”不符合当前 V2 内置命令实现。
+> - T31.3 ❌ 当前实例的有效命令列表只有 `init`、`review`，没有 `codex-review`；执行返回 V2 `404 CommandNotFoundError`。T31.5、T31.6 同样依赖该命令，不能通过当前配置验证。
+> - T31.4 ⏭️ 因 `codex-review` 未注册，无法比较两种命令的输出。
+> - 环境清理 ✅ 测试会话、沙箱及临时服务容器均已清理。
+> - 结论：本轮实际通过 T31.1 与 T31.2 的审查功能；T31.2 的“必须启动 task 子代理”旧期望需按 V2 实现修订。T31.3–T31.6 不是模型失败，而是测试前置命令 `codex-review` 未定义；需先将其作为仓库沙箱 Markdown 命令或 PG 会话命令注册，再执行结构化输出、零发现和指定 commit 场景。
