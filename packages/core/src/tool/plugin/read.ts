@@ -156,24 +156,49 @@ export const Plugin = {
               Effect.map((result) => ({
                 output: result.output,
                 content: toModelContent(result.path, input.offset, result.output),
-                metadata:
-                  result.output.type === "attachment"
-                    ? {
-                        truncated: false,
-                        kind: result.output.kind,
-                        mime: result.output.mime,
-                        size: result.output.size,
-                        audience: result.output.audience,
-                        attachments: [
-                          {
-                            type: "file",
-                            url: result.output.uri,
-                            mime: result.output.mime,
-                            filename: result.output.filename,
-                          },
-                        ],
-                      }
-                    : { truncated: result.output.type === "file" ? false : result.output.truncated },
+                metadata: (() => {
+                  if (result.output.type === "attachment")
+                    return {
+                      truncated: false,
+                      kind: result.output.kind,
+                      mime: result.output.mime,
+                      size: result.output.size,
+                      audience: result.output.audience,
+                      ...(result.output.kind === "office" ? { textExtracted: false } : {}),
+                      attachments: [
+                        {
+                          type: "file",
+                          url: result.output.uri,
+                          mime: result.output.mime,
+                          filename: result.output.filename,
+                        },
+                      ],
+                    }
+                  const text =
+                    result.output.type === "text-page"
+                      ? result.output.content
+                      : result.output.type === "file" && result.output.encoding === "utf8"
+                        ? result.output.content
+                        : undefined
+                  if (text === undefined)
+                    return { truncated: result.output.type === "file" ? false : result.output.truncated }
+                  const kind = ToolAttachment.classify(basename(result.path), Buffer.from(text, "utf8"))
+                  return {
+                    truncated: result.output.type === "file" ? false : result.output.truncated,
+                    kind: kind.type === "binary" ? "text" : kind.type,
+                    mime:
+                      kind.type === "svg"
+                        ? kind.mime
+                        : "mime" in result.output
+                          ? result.output.mime
+                          : "text/plain",
+                    ...(result.output.type === "text-page"
+                      ? result.output.size === undefined
+                        ? {}
+                        : { size: result.output.size }
+                      : { size: Buffer.byteLength(text) }),
+                  }
+                })(),
               })),
               Effect.mapError((error) => {
                 if (error instanceof ToolFailure) return error

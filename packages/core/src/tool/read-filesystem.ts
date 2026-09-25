@@ -113,6 +113,7 @@ export class TextPage extends Schema.Class<TextPage>("ReadTool.TextPage")({
   mime: Schema.String,
   offset: PositiveInt,
   truncated: Schema.Boolean,
+  size: Schema.optionalKey(NonNegativeInt),
   next: Schema.optionalKey(PositiveInt),
 }) {}
 
@@ -206,7 +207,13 @@ export const read = Effect.fn("ReadTool.read")(function* (
   if (first.bytes.length >= first.info.size) {
     const result = textPage(first.bytes, true, page)
     if (result === undefined) return yield* Effect.die("Read page did not settle for a complete first chunk")
-    return yield* makeTextPage(input, resource, result, first.bytes.subarray(0, result.consumed).includes(0))
+    return yield* makeTextPage(
+      input,
+      resource,
+      result,
+      first.bytes.subarray(0, result.consumed).includes(0),
+      first.info.size,
+    )
   }
 
   const offset = page.offset || 1
@@ -243,7 +250,7 @@ export const read = Effect.fn("ReadTool.read")(function* (
           checked += leaf.summary.bytes
           return length > 0 && leaf.bytes.subarray(0, length).includes(0)
         })
-        return yield* makeTextPage(input, resource, translated, binary)
+        return yield* makeTextPage(input, resource, translated, binary, first.info.size)
       }
     }
 
@@ -276,6 +283,7 @@ const makeTextPage = Effect.fnUntraced(function* (
   resource: string,
   result: NonNullable<ReturnType<typeof textPage>>,
   binary: boolean,
+  size: number,
 ) {
   if (binary) return yield* new BinaryFileError({ resource })
   if (result.entries.length === 0 && result.offset !== 1)
@@ -286,6 +294,7 @@ const makeTextPage = Effect.fnUntraced(function* (
     mime: mimeType(input),
     offset: result.offset,
     truncated: result.next !== undefined,
+    size,
     ...(result.next === undefined ? {} : { next: result.next }),
   })
 })

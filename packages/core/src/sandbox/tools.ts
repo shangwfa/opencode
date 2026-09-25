@@ -371,6 +371,7 @@ export const read = Effect.fn("SandboxTools.read")(
       mime: "text/plain",
       offset,
       truncated,
+      ...(stat.size === undefined ? {} : { size: stat.size }),
       ...(truncated ? { next: offset + limit } : {}),
     })
   },

@@ -185,6 +185,12 @@ describe("ReadTool", () => {
         mime: "text/plain",
       })
       expect(execution.content).toEqual([{ type: "text", text: "Read file README.md, lines 1-1\n1: hello" }])
+      expect(execution.metadata).toMatchObject({
+        kind: "text",
+        mime: "text/plain",
+        size: Buffer.byteLength("hello"),
+        truncated: false,
+      })
       expect(assertions).toMatchObject([{ sessionID, action: "read", resources: ["README.md"], save: ["*"] }])
       expect(readCalls).toEqual([
         {
@@ -193,6 +199,37 @@ describe("ReadTool", () => {
         },
       ])
       expect(listCalls).toEqual([])
+    }),
+  )
+
+  it.effect("projects file kind, MIME, byte size, and SVG without creating an attachment", () =>
+    Effect.gen(function* () {
+      const svg = '<svg xmlns="http://www.w3.org/2000/svg"><circle r="2" /></svg>'
+      readResult = {
+        type: "file",
+        uri: "file:///vector.svg",
+        name: "vector.svg",
+        content: svg,
+        encoding: "utf8",
+        mime: "image/svg+xml",
+      }
+      const registry = yield* Tool.Service
+      const result = yield* executeTool(registry, {
+        sessionID,
+        ...toolIdentity,
+        call: { type: "tool-call", id: "call-svg-metadata", name: "read", input: { path: "vector.svg" } },
+      })
+
+      expect(result.status).toBe("completed")
+      if (result.status !== "completed") return
+      expect(result.metadata).toMatchObject({
+        kind: "svg",
+        mime: "image/svg+xml",
+        size: Buffer.byteLength(svg),
+        truncated: false,
+      })
+      expect(result.metadata).not.toHaveProperty("attachments")
+      expect(result.content?.some((part) => part.type === "text" && part.text.includes(svg))).toBe(true)
     }),
   )
 
@@ -922,7 +959,7 @@ describe("ReadTool", () => {
         output: { type: "text-page", content: "hello", mime: "text/plain", offset: 2, truncated: true, next: 3 },
       })
       if (result.status !== "completed") return
-      expect(result.metadata).toEqual({ truncated: true })
+      expect(result.metadata).toMatchObject({ truncated: true, kind: "text", mime: "text/plain" })
       expect(result.content).toEqual([
         {
           type: "text",

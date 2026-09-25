@@ -1,6 +1,6 @@
 # Read 工具多格式与受管附件测试用例
 
-> **当前 V2 实现说明（2026-09-24）**：受管附件功能已接入当前 API：`/api/session/:sessionID/attachment/:attachmentID`。本文后续的 V1 复测记录与旧版 `/session/:id/exec` 脚本是历史记录，不代表当前 V2 接口；V2 Docker + PostgreSQL + sandbox PVC 全流程 e2e 仍需在部署环境复测。
+> **当前 V2 实现说明（2026-09-25）**：受管附件下载 API 为 `/api/session/:sessionID/attachment/:attachmentID`。本文 2–11 节中的旧 shell 操作依赖 V1 `/session/:id/exec`、`/session/:id/message` 与 V1 `part` 表，不能直接用于当前 V2。当前 checkout 的可复现验证命令见下方“V2 当前验证入口”；旧命令和后续历史复测记录只作为 V1 历史资料。
 
 本文验证 `read` 工具的字节级文件分类、文本分页、Sandbox PVC 附件持久化、稳定下载 URL、Range 响应、模型投影安全和 PostgreSQL payload 安全。
 
@@ -15,6 +15,8 @@
 - 模型投影缺少 SandboxProvider 时不泄露内部附件 URL。
 
 ## 2. 前置条件
+
+> 本节以下原有 V1 shell 命令仅供旧环境参考。V2 不提供相同的 `/session/:id/exec` 接口；请使用 V2 当前验证入口和 `/api/...` 路由。
 
 从仓库根目录执行。环境应为本地 PostgreSQL + 本地 OpenSandbox：
 
@@ -348,7 +350,7 @@ bun test test/tool/attachment.test.ts test/session/message-v2.test.ts
 
 ### 12.1 数据契约
 
-工具完成后，`GET /session/:sessionID/message` 返回的 ToolPart 中包含受管附件：
+当前 V2 路径均带 `/api` 前缀。附件引用在已完成 Tool 状态的 metadata 中（示意）：
 
 ```jsonc
 {
@@ -362,15 +364,16 @@ bun test test/tool/attachment.test.ts test/session/message-v2.test.ts
       "mime": "image/png",
       "size": 4096,
       "truncated": false,
+      "audience": "model-and-display",
+      "attachments": [
+        {
+          "type": "file",
+          "mime": "image/png",
+          "filename": "screenshot.png",
+          "url": "/api/session/ses_123/attachment/att_123",
+        },
+      ],
     },
-    "attachments": [
-      {
-        "type": "file",
-        "mime": "image/png",
-        "filename": "screenshot.png",
-        "url": "/session/ses_123/attachment/att_123",
-      },
-    ],
   },
 }
 ```
@@ -388,7 +391,7 @@ bun test test/tool/attachment.test.ts test/session/message-v2.test.ts
 
 关键约束：
 
-- `url` 永远是相对路径 `/session/{sid}/attachment/{aid}`，不是 Data URL、不是 Sandbox 文件路径。
+- `url` 永远是相对路径 `/api/session/{sid}/attachment/{aid}`，不是 Data URL、不是 Sandbox 文件路径。
 - 响应体是原始字节，不是 JSON。
 - 未启用密码时可直接访问；启用认证时需带 `Authorization` 头。
 
@@ -498,7 +501,7 @@ function extractAttachments(messages) {
       return part.type === "tool" && part.state.status === "completed"
     })
     .flatMap(function (part) {
-      return part.state.attachments || []
+      return part.state.metadata?.attachments || []
     })
 }
 ```
@@ -706,6 +709,20 @@ rm -f /tmp/read-last-response.json \
 
 ## 14. 验收汇总
 
+### V2 当前验证入口
+
+从仓库根目录运行：
+
+```bash
+cd packages/core
+bun test test/attachment.test.ts test/tool-read-filesystem.test.ts test/tool-read.test.ts test/session-model-request.test.ts
+
+cd ../server
+OPENCODE_DATABASE_URL='postgresql://local@127.0.0.1:5432/opencode-v2-up' bun test test/session-attachment.test.ts
+```
+
+Core 用例验证分类、文本分页/UTF-8、非法二进制、20MB 限制、Office 不进入模型投影、缺少 SandboxProvider 时不泄漏 URL；Server API 用例验证 PNG/PDF/Office 下载、Range、ETag、206/304/416、404、认证及响应头。Server 测试会创建并删除自己的 session 和本地附件 fixture。
+
 | 编号         | 能力                | 通过标准                                  |
 | ------------ | ------------------- | ----------------------------------------- |
 | T-READ-01~04 | 文本、安全解码、SVG | 分页正确，空文件正常，非法 UTF-8 明确失败 |
@@ -743,13 +760,13 @@ rm -f /tmp/read-last-response.json \
 > **当前 V2 源码验证记录（2026-09-25）**：本次执行的是当前 checkout 的 V2 实现，不复用上方 V1 历史复测结果。
 > | 用例 | 结果 | 验证范围 |
 > |---|---|---|
-> | T-READ-01~04 | ⚠️ 部分 | 文本分页、空文件、UTF-8 校验单测通过；SVG magic 分类单测通过，但 read 工具端到端 SVG metadata 断言未执行 |
-> | T-READ-05~07 | ⚠️ 部分 | 本地 read 单测验证 PNG/PDF 只保存受管 URL、Office 分类单测通过；sandbox Office 工具链未做真实沙箱 API e2e |
-> | T-READ-08~11 | ✅ API 集成 | `session-attachment.test.ts` 连接 `opencode-v2-up` PostgreSQL，通过当前 ServerFetch API 验证 206/Range、416、304/ETag、响应 MIME/安全头和返回字节 |
-> | T-READ-12~13 | ⚠️ 部分 | ELF/二进制分类单测通过；真实 sandbox read 拒绝与 20MB 超限端到端用例未在当前服务上执行 |
-> | T-READ-14 | ⚠️ 存在宽泛文本命中 | 唯一命中位于既有 assistant `webfetch` 工具结果：外部搜索页的 Markdown 中含一张 1×1 profile image 的 Data URL；不是 read 附件记录。0 条命中 `\\u0000`。该页面文本原样保存在工具结果中 |
-> | T-READ-15~16 | ⏸️ 未执行 | 当前运行中的 `127.0.0.1:14096` 未通过 V2 CLI health 兼容性检查（响应内容类型不兼容）；不能用它验证本次 checkout 的代码与 PVC/进程重启持久性 |
-> | T-READ-17 | ✅ 部分单测 | 已验证无 SandboxProvider 时不把受管 URL交给模型、Office 附件被省略；provider 存在时的字节投影尚未接真实模型请求 |
-> | T-FE-01~04 | ⏸️ 未执行 | 本轮无已连接浏览器会话；文档片段为集成指南，不是自动化测试脚本 |
+> | T-READ-01~04 | ⚠️ 单测通过，V2 API E2E 未执行 | Core 覆盖分页、空文件、UTF-8、SVG 分类；尚未通过正在运行的 V2 SaaS/sandbox 真实触发 read 工具验证全部 metadata |
+> | T-READ-05~07 | ⚠️ 单测/API 下载通过，sandbox read E2E 未执行 | PNG/PDF/Office 分类及 PNG/PDF 受管引用有 Core 覆盖；下载 API 用 PNG/PDF/Office fixture 验证，真实 sandbox 产出附件未执行 |
+> | T-READ-08~11 | ✅ API 集成 | `session-attachment.test.ts` 在 `OPENCODE_DATABASE_URL` 指向 `opencode-v2-up` 时通过当前 ServerFetch API 验证 Range、206、416、304/ETag、MIME、安全头及原始字节完整性 |
+> | T-READ-12~13 | ⚠️ 单测通过，sandbox E2E 未执行 | ELF/二进制拒绝和超限行为有 Core 单测；真实 sandbox read 的无附件失败断言未在 SaaS 上执行 |
+> | T-READ-14 | ⚠️ 历史数据库全局扫描有文本命中 | 唯一命中位于既有 assistant `webfetch` 工具结果：外部网页 Markdown 中含 1×1 Profile Picture Data URL，不是 read 附件；0 条命中 `\\u0000`。该全局文本命中仍使“所有消息都不含 Base64 字符串”的原验收标准不成立 |
+> | T-READ-15~16 | ⏸️ 未执行 | OpenSandbox `127.0.0.1:8080/health` 返回 healthy，但当前 SaaS `127.0.0.1:14096` 要求认证且未通过当前 V2 CLI 健康检查；Docker CLI 查询超时。未能确认服务镜像对应当前 checkout，也没有执行 PVC/SaaS 重启 |
+> | T-READ-17 | ⚠️ 单测通过，provider 实际请求未执行 | 验证无 SandboxProvider 时不泄漏 URL、Office 不进入模型投影；provider 正常运行下模型请求的字节投影尚未进行模型端 E2E |
+> | T-FE-01~04 | ⚠️ API 响应头覆盖，浏览器 UI 未执行 | Server API 集成测试覆盖图像/PDF/Office MIME 与 inline/attachment disposition、Basic Auth；没有连接的浏览器会话执行渲染/下载交互 |
 >
-> 当前 checkout 自动化结果：core 4 个目标测试文件 **68 pass / 0 fail**；server PG API 集成 **1 pass / 0 fail**。PG 命中记录为 session `ses_f2e94fa1affeviUdp58e5Cqvxa`、message `msg_0d17345ac001zxTYST0aYhri03`，页面标题为 “Adaptive Zoom”；命中字符串来自网页 profile 图片的内嵌 Data URL，属于普通 `webfetch` 文本输出，不是附件二进制进入 PG。V2 CLI 对现有测试服务的探测失败，因此旧脚本中的 `/session/:id/exec`、`/session/:id/message` 等 V1 路径不能作为本次 V2 实测证据。
+> 当前 checkout 自动化结果：Core 4 个目标测试文件 **71 pass / 0 fail**；Server PG API 集成 **2 pass / 0 fail**。PG 命中记录为 session `ses_f2e94fa1affeviUdp58e5Cqvxa`、message `msg_0d17345ac001zxTYST0aYhri03`，页面标题为 “Adaptive Zoom”；命中字符串来自网页 profile 图片 Data URL 的普通 `webfetch` 文本，不是附件字节。全局扫描不应拿来单独判定附件落库，但全局“无 Data URL 文本”这一字面要求仍未达成。当前剩余未通过/未执行项均需要当前版本 SaaS + sandbox 的端到端环境或浏览器 UI；V1 路径不能作为 V2 证据。

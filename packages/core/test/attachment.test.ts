@@ -77,4 +77,26 @@ describe("ToolAttachment local persistence", () => {
       await fs.rm(path.join(Global.Path.data, "tool-attachments", sessionID), { recursive: true, force: true })
     }
   })
+
+  it("keeps Office documents display-only and out of model projection", async () => {
+    const sessionID = Session.ID.create()
+    const bytes = Uint8Array.from([0x50, 0x4b, 0x03, 0x04, 1, 2, 3])
+    const stored = await Effect.runPromise(ToolAttachment.storeLocal({ sessionID, filename: "report.docx", bytes }))
+    try {
+      expect(stored.metadata.audience).toBe("display-only")
+      expect(await Effect.runPromise(ToolAttachment.forModelLocal({ sessionID, id: stored.metadata.id }))).toBeUndefined()
+    } finally {
+      await fs.rm(path.join(Global.Path.data, "tool-attachments", sessionID), { recursive: true, force: true })
+    }
+  })
+
+  it("rejects media above the ingestion limit without creating attachment files", async () => {
+    const sessionID = Session.ID.create()
+    const bytes = new Uint8Array(ToolAttachment.MAX_BYTES + 1)
+    const error = await Effect.runPromise(
+      ToolAttachment.storeLocal({ sessionID, filename: "oversized.png", bytes }).pipe(Effect.flip),
+    )
+    expect(error).toBeInstanceOf(ToolAttachment.TooLargeError)
+    await expect(fs.stat(path.join(Global.Path.data, "tool-attachments", sessionID))).rejects.toThrow()
+  })
 })
