@@ -19,10 +19,11 @@ import {
 import { Database } from "../database/database.js"
 import { Bus } from "../bus.js"
 import { KeyedMutex } from "../effect/keyed-mutex.js"
+import { NotFoundError } from "./error.js"
 import { SessionEvent } from "./event.js"
 import { SessionMessage } from "./message.js"
 import { SessionSchema } from "./schema.js"
-import { SessionInboxTable, SessionMessageTable } from "./sql.js"
+import { SessionInboxTable, SessionMessageTable, SessionTable } from "./sql.js"
 
 type DatabaseService = Database.Interface["db"]
 
@@ -188,13 +189,17 @@ export const make = Effect.fn("SessionInbox.make")(function* () {
             ...request.item,
           }),
         ),
-        Effect.catchDefect((defect) =>
-          defect instanceof LifecycleConflict
-            ? find(db, request.id).pipe(
-                Effect.flatMap((stored) => (stored === undefined ? Effect.fail(defect) : Effect.succeed(stored))),
-              )
-            : Effect.die(defect),
-        ),
+        Effect.catchDefect((defect): Effect.Effect<Info, LifecycleConflict | NotFoundError> => {
+          if (defect instanceof LifecycleConflict) {
+            return find(db, request.id).pipe(
+              Effect.flatMap((stored) => (stored === undefined ? Effect.fail(defect) : Effect.succeed(stored))),
+            )
+          }
+          // A concurrent Session deletion surfaces here as a projected NotFoundError
+          // defect; the caller must observe the Session as gone rather than a defect.
+          if (defect instanceof NotFoundError) return Effect.fail(defect)
+          return Effect.die(defect)
+        }),
       )
     if (!matches(admitted, { ...request, type: request.item.type }))
       return yield* new LifecycleConflict({ id: request.id })
@@ -284,6 +289,16 @@ export const projectAdmitted = Effect.fn("SessionInbox.projectAdmitted")(functio
     readonly timeCreated: number
   },
 ) {
+  // The projection is the transaction's statement that the owning Session still exists.
+  // A missing row here means the Session was deleted after the caller's existence
+  // check; surface that as a typed NotFound while the transaction is still usable.
+  const session = yield* db
+    .select({ id: SessionTable.id })
+    .from(SessionTable)
+    .where(eq(SessionTable.id, request.sessionID))
+    .get()
+    .pipe(Effect.orDie)
+  if (session === undefined) return yield* Effect.die(new NotFoundError({ sessionID: request.sessionID }))
   const message = yield* db
     .select({ id: SessionMessageTable.id })
     .from(SessionMessageTable)
@@ -312,7 +327,29 @@ export const projectAdmitted = Effect.fn("SessionInbox.projectAdmitted")(functio
     .onConflictDoNothing()
     .returning({ id: SessionInboxTable.id })
     .get()
-    .pipe(Effect.orDie)
+    .pipe(
+      // Best-effort narrowing after a failed insert, only when the backend keeps the
+      // transaction usable (SQLite; the PG re-check dies on aborted-transaction and
+      // falls through to the original error below). The reliable detection is the
+      // pre-insert Session check above.
+      Effect.catch((error) =>
+        db
+          .select({ id: SessionTable.id })
+          .from(SessionTable)
+          .where(eq(SessionTable.id, request.sessionID))
+          .get()
+          .pipe(
+            Effect.orDie,
+            // The re-check itself failed (for example the database is unavailable);
+            // the original error is the honest signal.
+            Effect.catchDefect(() => Effect.die(error)),
+            Effect.flatMap((row) =>
+              Effect.die(row === undefined ? new NotFoundError({ sessionID: request.sessionID }) : error),
+            ),
+          ),
+      ),
+      Effect.orDie,
+    )
   if (!stored) return yield* Effect.die(new LifecycleConflict({ id: request.id }))
 })
 

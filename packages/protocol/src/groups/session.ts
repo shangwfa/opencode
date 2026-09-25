@@ -44,6 +44,7 @@ import { Form } from "@opencode/schema/form"
 import { PublicSessionMessage } from "./message.js"
 import { OpenCodeEvent } from "./event.js"
 import { SessionCommand } from "@opencode/schema/session-command"
+import { SessionAgentsMd } from "@opencode/schema/session-agents-md"
 
 const ParentIDFilter = Schema.Union([
   Session.ID,
@@ -791,6 +792,46 @@ export const makeSessionGroup = <
           description: "Change a pending inbox item's delivery mode. Steering wakes session execution.",
         }),
       ),
+    )
+     .add(
+      HttpApiEndpoint.get("session.agentsMd.get", "/api/session/:sessionID/agents-md", {
+        params: { sessionID: Session.ID },
+        success: Schema.Struct({ data: Schema.NullOr(SessionAgentsMd.Info) }),
+        error: [SessionNotFoundError, UnknownError],
+      })
+        .middleware(sessionLocationMiddleware)
+        .annotateMerge(OpenApi.annotations({
+          identifier: "session.agentsMd.get",
+          summary: "Get session AGENTS.md",
+          description: "Get the session-scoped AGENTS.md instruction overlay, or null when absent.",
+        })),
+    )
+    .add(
+      HttpApiEndpoint.post("session.agentsMd.put", "/api/session/:sessionID/agents-md", {
+        params: { sessionID: Session.ID },
+        payload: SessionAgentsMd.Payload,
+        success: Schema.Struct({ data: SessionAgentsMd.Info }),
+        error: [SessionNotFoundError, SessionAgentsMd.ContentTooLargeError, UnknownError],
+      })
+        .middleware(sessionLocationMiddleware)
+        .annotateMerge(OpenApi.annotations({
+          identifier: "session.agentsMd.put",
+          summary: "Create or replace session AGENTS.md",
+          description: "Persist one AGENTS.md instruction document for this session.",
+        })),
+    )
+    .add(
+      HttpApiEndpoint.delete("session.agentsMd.remove", "/api/session/:sessionID/agents-md", {
+        params: { sessionID: Session.ID },
+        success: HttpApiSchema.NoContent,
+        error: [SessionNotFoundError, UnknownError],
+      })
+        .middleware(sessionLocationMiddleware)
+        .annotateMerge(OpenApi.annotations({
+          identifier: "session.agentsMd.remove",
+          summary: "Delete session AGENTS.md",
+          description: "Remove the session instruction overlay; the change applies at the next model step.",
+        })),
     )
     .add(
       HttpApiEndpoint.get(

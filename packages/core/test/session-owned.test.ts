@@ -907,7 +907,7 @@ describe("SessionInbox command contracts", () => {
         })
         .pipe(
           Effect.satisfiesSuccessType<SessionInbox.User>(),
-          Effect.satisfiesErrorType<SessionInbox.LifecycleConflict>(),
+          Effect.satisfiesErrorType<SessionInbox.LifecycleConflict | NotFoundError>(),
         )
       const synthetic = yield* admission
         .admit({

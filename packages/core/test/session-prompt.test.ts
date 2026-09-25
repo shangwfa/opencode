@@ -91,7 +91,7 @@ const locations = makeGlobalNode({
 })
 const it = testEffect(
   AppNodeBuilder.build(
-    LayerNode.group([Database.node, Bus.node, SessionProjector.node, SessionStore.node, Session.node]),
+    LayerNode.group([Database.node, Bus.node, SessionProjector.node, SessionStore.node, Session.node, SessionInbox.node]),
     [
       Bus.node.replace(Bus.configured({ persist: true })),
       SessionExecution.node.replace(execution),
@@ -251,6 +251,33 @@ describe("Session.prompt", () => {
         payload: { text: "Fix the failing tests" },
         delivery: "steer",
       })
+    }),
+  )
+
+  it.effect("records a prompt-level model selection before the admitted turn", () =>
+    Effect.gen(function* () {
+      yield* setup
+      const session = yield* Session.Service
+      const model = Model.Ref.make({ id: Model.ID.make("sonnet"), providerID: Provider.ID.anthropic })
+
+      const message = yield* session.prompt({ sessionID, text: "use this model", model, resume: false })
+
+      expect(yield* session.get(sessionID)).toMatchObject({ model })
+      expect(yield* session.messages({ sessionID, order: "asc" })).toMatchObject([
+        { type: "model-switched", model },
+      ])
+      const { db } = yield* Database.Service
+      const types = (yield* db
+        .select({ seq: EventTable.seq, type: EventTable.type })
+        .from(EventTable)
+        .where(eq(EventTable.aggregate_id, sessionID))
+        .orderBy(EventTable.seq)
+        .all()
+        .pipe(Effect.orDie)).map((event) => event.type)
+      expect(types.indexOf("session.model.selected.1")).toBeLessThan(types.indexOf("session.inbox.enqueued.1"))
+      // Retrying the same message ID does not append a second switch event or prompt.
+      yield* session.prompt({ sessionID, id: message.id, text: "use this model", model, resume: false })
+      expect(yield* eventCount("session.model.selected.1")).toBe(1)
     }),
   )
 
@@ -594,6 +621,35 @@ describe("Session.prompt", () => {
       expect(second.id).not.toBe(first.id)
       expect(yield* session.messages({ sessionID })).toEqual([])
       expect(yield* admittedCount).toBe(2)
+    }),
+  )
+
+  it.effect("maps a Session deleted before admission to NotFound without durable residue", () =>
+    Effect.gen(function* () {
+      yield* setup
+      const inbox = yield* SessionInbox.Service
+      const missing = Session.ID.make("ses_deleted_before_admit")
+      const eventsBefore = yield* eventCount("session.inbox.enqueued.1")
+
+      // The Session row is gone by the time the projected inbox insert runs, which is
+      // exactly the delete-vs-prompt race window; admission must surface NotFound.
+      const failure = yield* inbox
+        .admit({
+          id: SessionMessage.ID.create(),
+          sessionID: missing,
+          item: {
+            type: "user",
+            payload: SessionInbox.UserPayload.make({ text: "race" }),
+            delivery: SessionInbox.Delivery.make("steer"),
+          },
+        })
+        .pipe(Effect.flip)
+
+      expect(failure._tag).toBe("Session.NotFoundError")
+      // The rolled-back transaction leaves neither the inbox row nor the durable event.
+      expect(yield* Database.Service.use(({ db }) => db.select().from(SessionInboxTable).all().pipe(Effect.orDie)))
+        .toHaveLength(0)
+      expect(yield* eventCount("session.inbox.enqueued.1")).toBe(eventsBefore)
     }),
   )
 

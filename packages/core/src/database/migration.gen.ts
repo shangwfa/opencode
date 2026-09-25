@@ -52,6 +52,7 @@ import m49 from "./migration/20260924020752_session_sandbox_resource.js"
 import m50 from "./migration/20260924062455_watery_prima.js"
 import m51 from "./migration/20260924225842_session_commands.js"
 import m52 from "./migration/20260924233159_session_command_hints.js"
+import m53 from "./migration/20260925084546_rare_sway.js"
 
 export const migrations = [
   m00,
@@ -107,4 +108,5 @@ export const migrations = [
   m50,
   m51,
   m52,
+  m53,
 ] satisfies DatabaseMigration.Migration[]

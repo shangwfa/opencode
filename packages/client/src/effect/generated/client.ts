@@ -92,6 +92,12 @@ import type {
   SessionInboxCancelOutput,
   SessionInboxUpdateInput,
   SessionInboxUpdateOutput,
+  SessionAgentsMdGetInput,
+  SessionAgentsMdGetOutput,
+  SessionAgentsMdPutInput,
+  SessionAgentsMdPutOutput,
+  SessionAgentsMdRemoveInput,
+  SessionAgentsMdRemoveOutput,
   SessionInstructionsEntryListInput,
   SessionInstructionsEntryListOutput,
   SessionInstructionsEntryPutInput,
@@ -753,6 +759,30 @@ const EndpointSessionInboxUpdate = (raw: RawClient["server.session"]) => (input:
     }).pipe(Effect.mapError(mapClientError)),
   )
 
+const EndpointSessionAgentsMdGet = (raw: RawClient["server.session"]) => (input: SessionAgentsMdGetInput) =>
+  preserveEffect<SessionAgentsMdGetOutput>()(
+    raw["session.agentsMd.get"]({ params: { sessionID: input["sessionID"] } }).pipe(
+      Effect.mapError(mapClientError),
+      Effect.map((value) => value.data),
+    ),
+  )
+
+const EndpointSessionAgentsMdPut = (raw: RawClient["server.session"]) => (input: SessionAgentsMdPutInput) =>
+  preserveEffect<SessionAgentsMdPutOutput>()(
+    raw["session.agentsMd.put"]({
+      params: { sessionID: input["sessionID"] },
+      payload: { content: input["content"] },
+    }).pipe(
+      Effect.mapError(mapClientError),
+      Effect.map((value) => value.data),
+    ),
+  )
+
+const EndpointSessionAgentsMdRemove = (raw: RawClient["server.session"]) => (input: SessionAgentsMdRemoveInput) =>
+  preserveEffect<SessionAgentsMdRemoveOutput>()(
+    raw["session.agentsMd.remove"]({ params: { sessionID: input["sessionID"] } }).pipe(Effect.mapError(mapClientError)),
+  )
+
 const EndpointSessionInstructionsEntryList =
   (raw: RawClient["server.session"]) => (input: SessionInstructionsEntryListInput) =>
     preserveEffect<SessionInstructionsEntryListOutput>()(
@@ -956,6 +986,11 @@ const adaptGroupSession = (raw: RawClient["server.session"]) => ({
     list: EndpointSessionInboxList(raw),
     cancel: EndpointSessionInboxCancel(raw),
     update: EndpointSessionInboxUpdate(raw),
+  },
+  agentsMd: {
+    get: EndpointSessionAgentsMdGet(raw),
+    put: EndpointSessionAgentsMdPut(raw),
+    remove: EndpointSessionAgentsMdRemove(raw),
   },
   instructions: {
     entry: {

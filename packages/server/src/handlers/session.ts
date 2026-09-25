@@ -1,5 +1,6 @@
 import { Session } from "@opencode/core/session"
 import { SessionCommands } from "@opencode/core/session/commands"
+import { SessionAgentsMd } from "@opencode/core/session/agents-md"
 import { SandboxProvider } from "@opencode/core/sandbox/provider"
 import { SessionStats } from "@opencode/core/session/stats"
 import { SessionTitle } from "@opencode/core/session/title"
@@ -385,6 +386,7 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
                 metadata: ctx.payload.metadata,
                 delivery: ctx.payload.delivery,
                 resume: ctx.payload.resume,
+                model: ctx.payload.model,
               })
               .pipe(
                 Effect.catchTag("Session.NotFoundError", missingSession),
@@ -430,6 +432,7 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
                 delivery: payload.delivery,
                 resume: payload.resume,
                 format: payload.format,
+                model: payload.model,
               })
               .pipe(
                 Effect.catchTag("Session.NotFoundError", missingSession),
@@ -773,6 +776,28 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
               : session.queueInbox({ sessionID: ctx.params.sessionID, inboxID: ctx.params.inboxID }),
             `Pending input cannot change to ${ctx.payload.delivery}`,
           )
+        }),
+      )
+      .handle(
+        "session.agentsMd.get",
+        Effect.fn(function* (ctx) {
+          const agentsMd = yield* SessionAgentsMd.Service
+          return { data: yield* agentsMd.get(ctx.params.sessionID) }
+        }),
+      )
+      .handle(
+        "session.agentsMd.put",
+        Effect.fn(function* (ctx) {
+          const agentsMd = yield* SessionAgentsMd.Service
+          return { data: yield* agentsMd.put(ctx.params.sessionID, ctx.payload.content) }
+        }),
+      )
+      .handle(
+        "session.agentsMd.remove",
+        Effect.fn(function* (ctx) {
+          const agentsMd = yield* SessionAgentsMd.Service
+          yield* agentsMd.remove(ctx.params.sessionID)
+          return HttpApiSchema.NoContent.make()
         }),
       )
       .handle(

@@ -521,6 +521,34 @@ export type SessionInboxUpdateOperation<E = never> = (
   input: SessionInboxUpdateInput,
 ) => Effect.Effect<SessionInboxUpdateOutput, E>
 
+export type SessionAgentsMdGetInput = { readonly sessionID: Session.ID }
+export type SessionAgentsMdGetOutput = {
+  readonly id: string & Brand.Brand<"SessionAgentsMd.ID">
+  readonly sessionID: Session.ID
+  readonly content: string
+  readonly time: { readonly created: DateTime.Utc; readonly updated: DateTime.Utc }
+} | null
+export type SessionAgentsMdGetOperation<E = never> = (
+  input: SessionAgentsMdGetInput,
+) => Effect.Effect<SessionAgentsMdGetOutput, E>
+
+export type SessionAgentsMdPutInput = { readonly sessionID: Session.ID; readonly content: string }
+export type SessionAgentsMdPutOutput = {
+  readonly id: string & Brand.Brand<"SessionAgentsMd.ID">
+  readonly sessionID: Session.ID
+  readonly content: string
+  readonly time: { readonly created: DateTime.Utc; readonly updated: DateTime.Utc }
+}
+export type SessionAgentsMdPutOperation<E = never> = (
+  input: SessionAgentsMdPutInput,
+) => Effect.Effect<SessionAgentsMdPutOutput, E>
+
+export type SessionAgentsMdRemoveInput = { readonly sessionID: Session.ID }
+export type SessionAgentsMdRemoveOutput = void
+export type SessionAgentsMdRemoveOperation<E = never> = (
+  input: SessionAgentsMdRemoveInput,
+) => Effect.Effect<SessionAgentsMdRemoveOutput, E>
+
 export type SessionInstructionsEntryListInput = { readonly sessionID: Session.ID }
 export type SessionInstructionsEntryListOutput = ReadonlyArray<InstructionEntry.Info>
 export type SessionInstructionsEntryListOperation<E = never> = (
@@ -1638,6 +1666,11 @@ export interface SessionApi<E = never> {
     readonly list: SessionInboxListOperation<E>
     readonly cancel: SessionInboxCancelOperation<E>
     readonly update: SessionInboxUpdateOperation<E>
+  }
+  readonly agentsMd: {
+    readonly get: SessionAgentsMdGetOperation<E>
+    readonly put: SessionAgentsMdPutOperation<E>
+    readonly remove: SessionAgentsMdRemoveOperation<E>
   }
   readonly instructions: {
     readonly entry: {

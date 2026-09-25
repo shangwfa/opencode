@@ -116,6 +116,13 @@ CREATE TABLE "instruction_state" (
           "initial_values" text NOT NULL,
           "current_values" text NOT NULL
         );
+CREATE TABLE "session_agents_md" (
+          "id" text PRIMARY KEY,
+          "session_id" text NOT NULL,
+          "content" text NOT NULL,
+          "time_created" bigint NOT NULL,
+          "time_updated" bigint NOT NULL
+        );
 CREATE TABLE "session_commands" (
           "id" text PRIMARY KEY,
           "session_id" text NOT NULL,
@@ -218,6 +225,7 @@ CREATE INDEX "event_aggregate_type_seq_idx" ON "event" ("aggregate_id","type","s
 CREATE UNIQUE INDEX "permission_project_action_resource_idx" ON "permission" ("project_id","action","resource");
 CREATE UNIQUE INDEX "sandbox_session_id_idx" ON "sandbox" ("session_id");
 CREATE INDEX "sandbox_state_time_updated_idx" ON "sandbox" ("state","time_updated");
+CREATE UNIQUE INDEX "session_agents_md_session_unique_idx" ON "session_agents_md" ("session_id");
 CREATE INDEX "session_commands_session_idx" ON "session_commands" ("session_id");
 CREATE UNIQUE INDEX "session_commands_session_name_idx" ON "session_commands" ("session_id","name");
 CREATE INDEX "session_inbox_session_delivery_seq_idx" ON "session_inbox" ("session_id","delivery","enqueued_seq");
@@ -241,6 +249,7 @@ ALTER TABLE "permission" ADD CONSTRAINT "fk_permission_project_id_project_id_fk"
 ALTER TABLE "project_directory" ADD CONSTRAINT "fk_project_directory_project_id_project_id_fk" FOREIGN KEY ("project_id") REFERENCES "project"("id") ON DELETE CASCADE;
 ALTER TABLE "instruction_entry" ADD CONSTRAINT "fk_instruction_entry_session_id_session_v2_id_fk" FOREIGN KEY ("session_id") REFERENCES "session_v2"("id") ON DELETE CASCADE;
 ALTER TABLE "instruction_state" ADD CONSTRAINT "fk_instruction_state_session_id_session_v2_id_fk" FOREIGN KEY ("session_id") REFERENCES "session_v2"("id") ON DELETE CASCADE;
+ALTER TABLE "session_agents_md" ADD CONSTRAINT "fk_session_agents_md_session_id_session_v2_id_fk" FOREIGN KEY ("session_id") REFERENCES "session_v2"("id") ON DELETE CASCADE;
 ALTER TABLE "session_commands" ADD CONSTRAINT "fk_session_commands_session_id_session_v2_id_fk" FOREIGN KEY ("session_id") REFERENCES "session_v2"("id") ON DELETE CASCADE;
 ALTER TABLE "session_inbox" ADD CONSTRAINT "fk_session_inbox_session_id_session_v2_id_fk" FOREIGN KEY ("session_id") REFERENCES "session_v2"("id") ON DELETE CASCADE;
 ALTER TABLE "session_message" ADD CONSTRAINT "fk_session_message_session_id_session_v2_id_fk" FOREIGN KEY ("session_id") REFERENCES "session_v2"("id") ON DELETE CASCADE;

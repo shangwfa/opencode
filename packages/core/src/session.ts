@@ -67,6 +67,7 @@ import { Job } from "./job.js"
 import type { Command } from "./command.js"
 import { SessionEnvironment } from "./session/environment.js"
 import { InstructionEntry } from "./session/instruction-entry.js"
+import { SessionAgentsMd } from "./session/agents-md.js"
 
 // get project -> project.locations
 //
@@ -369,7 +370,7 @@ const layer = Layer.effect(
         const inherited = yield* db
           .transaction(() =>
             Effect.all({
-              instructions: InstructionState.current(db, parent.id),
+              instructions: Effect.map(InstructionState.current(db, parent.id), SessionAgentsMd.fork),
               instructionEntries: InstructionEntry.snapshot(db, parent.id),
             }),
           )

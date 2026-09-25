@@ -86,6 +86,12 @@ import type {
   SessionInboxCancelOutput,
   SessionInboxUpdateInput,
   SessionInboxUpdateOutput,
+  SessionAgentsMdGetInput,
+  SessionAgentsMdGetOutput,
+  SessionAgentsMdPutInput,
+  SessionAgentsMdPutOutput,
+  SessionAgentsMdRemoveInput,
+  SessionAgentsMdRemoveOutput,
   SessionInstructionsEntryListInput,
   SessionInstructionsEntryListOutput,
   SessionInstructionsEntryPutInput,
@@ -1045,6 +1051,42 @@ export function make(options: ClientOptions) {
               body: { delivery: input["delivery"] },
               successStatus: 204,
               declaredStatuses: [400, 401, 404, 409],
+              empty: true,
+            },
+            requestOptions,
+          ),
+      },
+      agentsMd: {
+        get: (input: SessionAgentsMdGetInput, requestOptions?: RequestOptions) =>
+          request<{ readonly data: SessionAgentsMdGetOutput }>(
+            {
+              method: "GET",
+              path: `/api/session/${encodeURIComponent(input.sessionID)}/agents-md`,
+              successStatus: 200,
+              declaredStatuses: [400, 401, 404, 500],
+              empty: false,
+            },
+            requestOptions,
+          ).then((value) => value.data),
+        put: (input: SessionAgentsMdPutInput, requestOptions?: RequestOptions) =>
+          request<{ readonly data: SessionAgentsMdPutOutput }>(
+            {
+              method: "POST",
+              path: `/api/session/${encodeURIComponent(input.sessionID)}/agents-md`,
+              body: { content: input["content"] },
+              successStatus: 200,
+              declaredStatuses: [400, 401, 404, 413, 500],
+              empty: false,
+            },
+            requestOptions,
+          ).then((value) => value.data),
+        remove: (input: SessionAgentsMdRemoveInput, requestOptions?: RequestOptions) =>
+          request<SessionAgentsMdRemoveOutput>(
+            {
+              method: "DELETE",
+              path: `/api/session/${encodeURIComponent(input.sessionID)}/agents-md`,
+              successStatus: 204,
+              declaredStatuses: [400, 401, 404, 500],
               empty: true,
             },
             requestOptions,

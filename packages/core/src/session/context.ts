@@ -20,6 +20,7 @@ import { AgentNotFoundError } from "./error.js"
 import { SessionHistory } from "./history.js"
 import { SessionProviderContext } from "./provider-context.js"
 import { InstructionEntry } from "./instruction-entry.js"
+import { SessionAgentsMd } from "./agents-md.js"
 import { SessionMessage } from "./message.js"
 import { SessionModelRequest } from "./model-request.js"
 import { SessionRunnerModel } from "./runner/model.js"
@@ -80,6 +81,7 @@ const layer = Layer.effect(
     const db = (yield* Database.Service).db
     const discovery = yield* InstructionDiscovery.Service
     const entries = yield* InstructionEntry.Service
+    const agentsMd = yield* SessionAgentsMd.Service
     const location = yield* Location.Service
     const mcpInstructions = yield* McpInstructions.Service
     const mcpTools = yield* McpTool.Service
@@ -136,6 +138,7 @@ const layer = Layer.effect(
           references: referenceInstructions.load(),
           mcp: mcpInstructions.load(agent),
           entries: entries.load(sessionID),
+          agentsMd: Effect.succeed(agentsMd.load(sessionID)),
         },
         { concurrency: "unbounded" },
       )
@@ -143,6 +146,7 @@ const layer = Layer.effect(
         session,
         agent: { ...agent, info: agent.info },
         instructions: Instructions.combine([
+          loaded.agentsMd,
           loaded.builtins,
           CodeModeInstructions.make(loaded.tools.codeModeCatalog),
           loaded.discovery,
@@ -190,6 +194,7 @@ export const node = makeLocationNode({
     InstructionBuiltIns.node,
     InstructionDiscovery.node,
     InstructionEntry.node,
+    SessionAgentsMd.node,
     Location.node,
     McpInstructions.node,
     McpTool.node,

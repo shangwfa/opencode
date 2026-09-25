@@ -65,6 +65,7 @@ import { Tool } from "@opencode/core/tool"
 import type { Info as ToolInfo } from "@opencode/schema/tool"
 import { InstructionStateTable, SessionInboxTable, SessionMessageTable, SessionTable } from "@opencode/core/session/sql"
 import { InstructionEntry } from "@opencode/core/session/instruction-entry"
+import { SessionAgentsMd } from "@opencode/core/session/agents-md"
 import { SessionStore } from "@opencode/core/session/store"
 import { Instructions } from "@opencode/core/instructions/index"
 import { InstructionBuiltIns } from "@opencode/core/instructions/builtins"
@@ -465,6 +466,7 @@ const layer = Layer.unwrap(
         InstructionBuiltIns.node,
         InstructionDiscovery.node,
         InstructionEntry.node,
+        SessionAgentsMd.node,
         SkillInstructions.node,
         ReferenceInstructions.node,
         Config.node,
@@ -1949,6 +1951,48 @@ describe("SessionRunnerLLM", () => {
       Expected.text('The context under "deploy-target" no longer applies. Disregard it.'),
     ])
     expect(yield* contextEntries.list(sessionID)).toEqual([])
+  })
+
+  scenario("injects Session AGENTS.md before discovered instructions and applies updates", function* (s) {
+    const agentsMd = yield* SessionAgentsMd.Service
+    yield* agentsMd.put(sessionID, "SESSION_AGENTS_RULE_V1")
+    yield* s.runPrompt("First")
+
+    const initial = s.requests[0]?.system.map((part) => part.text).join("\n") ?? ""
+    expect(initial.indexOf("Session AGENTS.md:")).toBeGreaterThanOrEqual(0)
+    expect(initial.indexOf("SESSION_AGENTS_RULE_V1")).toBeLessThan(initial.indexOf("Initial context"))
+    expect(yield* Instructions.read(agentsMd.load(otherSessionID))).toMatchObject([
+      { key: SessionAgentsMd.Key, value: Instructions.removed },
+    ])
+
+    yield* agentsMd.put(sessionID, "SESSION_AGENTS_RULE_V2")
+    yield* s.runPrompt("Second")
+    expect(s.requests[1]?.messages.at(-2)?.content).toEqual([
+      Expected.text("Session AGENTS.md was updated:\nSESSION_AGENTS_RULE_V2"),
+    ])
+
+    yield* agentsMd.remove(sessionID)
+    yield* s.runPrompt("Third")
+    expect(s.requests[2]?.messages.at(-2)?.content).toEqual([
+      Expected.text("Session AGENTS.md was removed. Its instructions no longer apply."),
+    ])
+  })
+
+  scenario("does not seed a fork with the parent's Session AGENTS.md", function* (s) {
+    const agentsMd = yield* SessionAgentsMd.Service
+    yield* agentsMd.put(sessionID, "PARENT_ONLY_AGENTS")
+    yield* s.runPrompt("First")
+    const second = yield* s.runPrompt("Second")
+
+    const forked = yield* s.session.fork({ sessionID, before: second.id })
+    const state = yield* s.db
+      .select()
+      .from(InstructionStateTable)
+      .where(eq(InstructionStateTable.session_id, forked.id))
+      .get()
+    // The session-local key is filtered from the inherited values; the fork starts clean.
+    expect(state?.initial_values).not.toHaveProperty(SessionAgentsMd.Key)
+    expect(state?.current_values).not.toHaveProperty(SessionAgentsMd.Key)
   })
 
   scenario("retains JSON null API entries as values", function* (s) {

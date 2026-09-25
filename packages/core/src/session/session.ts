@@ -34,6 +34,8 @@ import { SessionStore } from "./store.js"
 type PromptRequest = SessionPrompt.Input & {
   id?: SessionMessage.ID
   resume?: boolean
+  /** One-turn model selection recorded before the user message so this turn resolves it. */
+  model?: Model.Ref
 }
 
 /**
@@ -147,6 +149,9 @@ export const make = Effect.fn("Session.make")(function* () {
     Effect.uninterruptibleMask((restore) =>
       Effect.gen(function* () {
         const session = yield* get(sessionID)
+        // Record the selection before admission so chronological history switches the
+        // model ahead of this turn, mirroring the switch-then-prompt command path.
+        if (input.model) yield* switchModel(sessionID, { model: input.model })
         const messageID = input.id ?? SessionMessage.ID.create()
         const admitted = yield* Effect.gen(function* () {
           const existing = yield* admission.reconcile({

@@ -103,6 +103,23 @@ export const SessionCommandTable = sqliteTable(
   ],
 )
 
+export const SessionAgentsMdTable = sqliteTable(
+  "session_agents_md",
+  {
+    id: text().$type<import("@opencode/schema/session-agents-md").SessionAgentsMd.ID>().primaryKey(),
+    session_id: text()
+      .$type<SessionSchema.ID>()
+      .notNull()
+      .references(() => SessionTable.id, { onDelete: "cascade" }),
+    content: text().notNull(),
+    ...Timestamps,
+  },
+  (table) => [
+    // The unique index already serves session_id lookups; a second plain index is redundant.
+    uniqueIndex("session_agents_md_session_unique_idx").on(table.session_id),
+  ],
+)
+
 export const SessionMessageTable = sqliteTable(
   "session_message",
   {

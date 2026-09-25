@@ -188,6 +188,13 @@ export type SessionCommandDefinition = {
   sourcePath?: string
 }
 
+export type SessionAgentsMdInfo = {
+  id: string
+  sessionID: string
+  content: string
+  time: { created: number; updated: number }
+}
+
 export type InstructionEntryKey = string
 
 export type SessionGenerateResponse = { data: { text: string } }
@@ -2614,6 +2621,18 @@ export type SessionBusyError = {
 }
 export const isSessionBusyError = (value: unknown): value is SessionBusyError =>
   typeof value === "object" && value !== null && "_tag" in value && value["_tag"] === "SessionBusyError"
+
+export type SessionAgentsMdContentTooLargeError = {
+  readonly _tag: "SessionAgentsMdContentTooLargeError"
+  readonly actualBytes: number
+  readonly maxBytes: number
+  readonly message: string
+}
+export const isSessionAgentsMdContentTooLargeError = (value: unknown): value is SessionAgentsMdContentTooLargeError =>
+  typeof value === "object" &&
+  value !== null &&
+  "_tag" in value &&
+  value["_tag"] === "SessionAgentsMdContentTooLargeError"
 
 export type InstructionEntryValueTooLargeError = {
   readonly _tag: "InstructionEntryValueTooLargeError"
@@ -5065,6 +5084,21 @@ export type SessionInboxUpdateInput = {
 }
 
 export type SessionInboxUpdateOutput = void
+
+export type SessionAgentsMdGetInput = { readonly sessionID: { readonly sessionID: string }["sessionID"] }
+
+export type SessionAgentsMdGetOutput = { data: SessionAgentsMdInfo | null }["data"]
+
+export type SessionAgentsMdPutInput = {
+  readonly sessionID: { readonly sessionID: string }["sessionID"]
+  readonly content: { readonly content: string }["content"]
+}
+
+export type SessionAgentsMdPutOutput = { data: SessionAgentsMdInfo }["data"]
+
+export type SessionAgentsMdRemoveInput = { readonly sessionID: { readonly sessionID: string }["sessionID"] }
+
+export type SessionAgentsMdRemoveOutput = void
 
 export type SessionInstructionsEntryListInput = { readonly sessionID: { readonly sessionID: string }["sessionID"] }
 
