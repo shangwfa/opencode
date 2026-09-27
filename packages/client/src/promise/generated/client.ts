@@ -70,6 +70,16 @@ import type {
   SessionCommandDefinitionsClearOutput,
   SessionCommandDefinitionsRefreshInput,
   SessionCommandDefinitionsRefreshOutput,
+  SessionAgentDefinitionsListInput,
+  SessionAgentDefinitionsListOutput,
+  SessionAgentDefinitionsCreateInput,
+  SessionAgentDefinitionsCreateOutput,
+  SessionAgentDefinitionsDeleteInput,
+  SessionAgentDefinitionsDeleteOutput,
+  SessionAgentDefinitionsClearInput,
+  SessionAgentDefinitionsClearOutput,
+  SessionAgentDefinitionsRefreshInput,
+  SessionAgentDefinitionsRefreshOutput,
   SessionKeepAliveInput,
   SessionKeepAliveOutput,
   SessionKeepAliveStatusInput,
@@ -94,6 +104,16 @@ import type {
   SessionAgentsMdRemoveOutput,
   SessionInstructionsEntryListInput,
   SessionInstructionsEntryListOutput,
+  SessionSkillDefinitionsListInput,
+  SessionSkillDefinitionsListOutput,
+  SessionSkillDefinitionsCreateInput,
+  SessionSkillDefinitionsCreateOutput,
+  SessionSkillDefinitionsDeleteInput,
+  SessionSkillDefinitionsDeleteOutput,
+  SessionSkillDefinitionsClearInput,
+  SessionSkillDefinitionsClearOutput,
+  SessionSkillDefinitionsRefreshInput,
+  SessionSkillDefinitionsRefreshOutput,
   SessionInstructionsEntryPutInput,
   SessionInstructionsEntryPutOutput,
   SessionInstructionsEntryRemoveInput,
@@ -963,6 +983,64 @@ export function make(options: ClientOptions) {
             requestOptions,
           ).then((value) => value.data),
       },
+      agentDefinitions: {
+        list: (input: SessionAgentDefinitionsListInput, requestOptions?: RequestOptions) =>
+          request<{ readonly data: SessionAgentDefinitionsListOutput }>(
+            {
+              method: "GET",
+              path: `/api/session/${encodeURIComponent(input.sessionID)}/agents`,
+              successStatus: 200,
+              declaredStatuses: [400, 401, 404, 500],
+              empty: false,
+            },
+            requestOptions,
+          ).then((value) => value.data),
+        create: (input: SessionAgentDefinitionsCreateInput, requestOptions?: RequestOptions) =>
+          request<SessionAgentDefinitionsCreateOutput>(
+            {
+              method: "POST",
+              path: `/api/session/${encodeURIComponent(input.sessionID)}/agents`,
+              body: { id: input["id"], config: input["config"] },
+              successStatus: 200,
+              declaredStatuses: [400, 401, 404, 413, 500],
+              empty: false,
+            },
+            requestOptions,
+          ),
+        delete: (input: SessionAgentDefinitionsDeleteInput, requestOptions?: RequestOptions) =>
+          request<SessionAgentDefinitionsDeleteOutput>(
+            {
+              method: "DELETE",
+              path: `/api/session/${encodeURIComponent(input.sessionID)}/agents/${encodeURIComponent(input.agentID)}`,
+              successStatus: 204,
+              declaredStatuses: [400, 401, 404],
+              empty: true,
+            },
+            requestOptions,
+          ),
+        clear: (input: SessionAgentDefinitionsClearInput, requestOptions?: RequestOptions) =>
+          request<SessionAgentDefinitionsClearOutput>(
+            {
+              method: "DELETE",
+              path: `/api/session/${encodeURIComponent(input.sessionID)}/agents`,
+              successStatus: 204,
+              declaredStatuses: [400, 401, 404],
+              empty: true,
+            },
+            requestOptions,
+          ),
+        refresh: (input: SessionAgentDefinitionsRefreshInput, requestOptions?: RequestOptions) =>
+          request<{ readonly data: SessionAgentDefinitionsRefreshOutput }>(
+            {
+              method: "POST",
+              path: `/api/session/${encodeURIComponent(input.sessionID)}/agents/refresh`,
+              successStatus: 200,
+              declaredStatuses: [400, 401, 404, 500],
+              empty: false,
+            },
+            requestOptions,
+          ).then((value) => value.data),
+      },
       keepAlive: (input: SessionKeepAliveInput, requestOptions?: RequestOptions) =>
         request<SessionKeepAliveOutput>(
           {
@@ -1129,6 +1207,71 @@ export function make(options: ClientOptions) {
               requestOptions,
             ),
         },
+      },
+      skillDefinitions: {
+        list: (input: SessionSkillDefinitionsListInput, requestOptions?: RequestOptions) =>
+          request<{ readonly data: SessionSkillDefinitionsListOutput }>(
+            {
+              method: "GET",
+              path: `/api/session/${encodeURIComponent(input.sessionID)}/skills`,
+              successStatus: 200,
+              declaredStatuses: [400, 401, 404, 500],
+              empty: false,
+            },
+            requestOptions,
+          ).then((value) => value.data),
+        create: (input: SessionSkillDefinitionsCreateInput, requestOptions?: RequestOptions) =>
+          request<SessionSkillDefinitionsCreateOutput>(
+            {
+              method: "POST",
+              path: `/api/session/${encodeURIComponent(input.sessionID)}/skills`,
+              body: {
+                id: input["id"],
+                name: input["name"],
+                description: input["description"],
+                autoinvoke: input["autoinvoke"],
+                content: input["content"],
+                resources: input["resources"],
+              },
+              successStatus: 200,
+              declaredStatuses: [400, 401, 404, 500],
+              empty: false,
+            },
+            requestOptions,
+          ),
+        delete: (input: SessionSkillDefinitionsDeleteInput, requestOptions?: RequestOptions) =>
+          request<SessionSkillDefinitionsDeleteOutput>(
+            {
+              method: "DELETE",
+              path: `/api/session/${encodeURIComponent(input.sessionID)}/skills/${encodeURIComponent(input.skillID)}`,
+              successStatus: 204,
+              declaredStatuses: [400, 401, 404],
+              empty: true,
+            },
+            requestOptions,
+          ),
+        clear: (input: SessionSkillDefinitionsClearInput, requestOptions?: RequestOptions) =>
+          request<SessionSkillDefinitionsClearOutput>(
+            {
+              method: "DELETE",
+              path: `/api/session/${encodeURIComponent(input.sessionID)}/skills`,
+              successStatus: 204,
+              declaredStatuses: [400, 401, 404],
+              empty: true,
+            },
+            requestOptions,
+          ),
+        refresh: (input: SessionSkillDefinitionsRefreshInput, requestOptions?: RequestOptions) =>
+          request<{ readonly data: SessionSkillDefinitionsRefreshOutput }>(
+            {
+              method: "POST",
+              path: `/api/session/${encodeURIComponent(input.sessionID)}/skills/refresh`,
+              successStatus: 200,
+              declaredStatuses: [400, 401, 404, 500],
+              empty: false,
+            },
+            requestOptions,
+          ).then((value) => value.data),
       },
       generate: (input: SessionGenerateInput, requestOptions?: RequestOptions) =>
         request<{ readonly data: SessionGenerateOutput }>(

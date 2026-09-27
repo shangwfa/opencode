@@ -625,3 +625,44 @@ curl -s -X POST "$BASE/session/$SID/prompt_async" -H 'Content-Type: application/
 > **注意**：grill-me（147c）与 grilling（841c）是轻量 content skill——grill-me 内容极短，主要靠链式调 grilling 生效，验证了元 skill 依赖链。
 >
 > **清理**：测试 session 已删除。
+
+---
+
+## V2 执行记录 2026-09-27
+
+> **环境**：Docker `opencode-saas-compose-e2e:local`（`localhost:14097`）、PostgreSQL `opencode-v2-up`、本地 OpenSandbox、`Yd-DeepSeek/deepseek-v4-flash`。
+>
+> **结果**：T47.1–T47.13 **13/13 通过**。10 个独立 Session Skills 均通过当前 V2 HTTP API 注册，并以 SSE 工具事件、Sandbox 命令和 PostgreSQL 记录验收。
+
+### V1 → V2 映射
+
+| V1 | V2 |
+|---|---|
+| `POST /session` | `POST /api/session` |
+| `POST /session/:id/skills/create` | `POST /api/session/:id/skills`（字段 `id`） |
+| `prompt_async` | `POST /api/session/:id/prompt_stream` |
+| `skills:["tdd"]` | `skills:[{id:"tdd"}]` |
+| `part` 中的工具名 | `session.tool.input.started.data.name` |
+
+### 实际证据
+
+| 用例 | 结果 | V2 关键证据 |
+|---|---|---|
+| T47.1–2 | ✅ | 创建 `ses_*`；Node 24.19.0、npm 11.17.0、git 2.43.0 |
+| T47.3 | ✅ | 10 个 Skill 全部注册 200，PG count=10；tdd 3185 chars+2 resources、setup 6860 chars+5 resources |
+| T47.4 | ✅ | 加载 tdd；`node --test` 两次，先 EXIT=1 再 EXIT=0，完成 add 的 red-green |
+| T47.5 | ✅ | 链式加载 `grill-me` 与 `grilling`；第一轮为编号 1–3 的三项具体追问，无方案、无 question 阻塞 |
+| T47.6 | ✅ | 加载 code-review，启动两个 subagent 进行 Standards / Spec 双轴审查 |
+| T47.7 | ✅ | 加载 diagnosing-bugs，重复运行取证 20/20 通过后，按 reproduce/minimise/hypothesise/instrument/fix/regression 提供计划 |
+| T47.8 | ✅ | 加载 implement；完成 sub 的 spec、red-green、双轴 review。tdd/code-review 已在同会话加载，未重复调用 skill 属上下文复用 |
+| T47.9 | ✅ | 不存在 Skill 不触发工具，直接说明并列出 tdd |
+| T47.10 | ✅ | baseline `6150 + 256 = 6406` |
+| T47.11 | ✅ | 10 个 Skill（总 60248 bytes）注册后 `6410 → 7354`，delta=944 ≤ 1000 |
+| T47.12 | ✅ | guidance 路径首工具为 tdd skill，输出 3816 字符 |
+| T47.13 | ✅ | 同会话精确切换至 grill-me（未加载 tdd），说明使用场景 |
+
+### 过程说明
+
+1. T47.4 真实执行的是 Node 内置 `node --test`，而不是文档示例的 vitest；两次测试明确给出 red（EXIT=1）与 green（EXIT=0），符合方法论验收。
+2. T47.5 的“1–3 个问题”应按编号问题计数，不能按 `？` 字符数判断；单条问题中可以有追问。
+3. 当前 V2 Session Skill 物化路径为 `/workspace/.opencode/.session-skills/<sessionID>/<digest>`，旧文档中的 `/home/sandbox/.local/share/opencode/session-skills/` 已过时。

@@ -76,6 +76,16 @@ import type {
   SessionCommandDefinitionsClearOutput,
   SessionCommandDefinitionsRefreshInput,
   SessionCommandDefinitionsRefreshOutput,
+  SessionAgentDefinitionsListInput,
+  SessionAgentDefinitionsListOutput,
+  SessionAgentDefinitionsCreateInput,
+  SessionAgentDefinitionsCreateOutput,
+  SessionAgentDefinitionsDeleteInput,
+  SessionAgentDefinitionsDeleteOutput,
+  SessionAgentDefinitionsClearInput,
+  SessionAgentDefinitionsClearOutput,
+  SessionAgentDefinitionsRefreshInput,
+  SessionAgentDefinitionsRefreshOutput,
   SessionKeepAliveInput,
   SessionKeepAliveOutput,
   SessionKeepAliveStatusInput,
@@ -100,6 +110,16 @@ import type {
   SessionAgentsMdRemoveOutput,
   SessionInstructionsEntryListInput,
   SessionInstructionsEntryListOutput,
+  SessionSkillDefinitionsListInput,
+  SessionSkillDefinitionsListOutput,
+  SessionSkillDefinitionsCreateInput,
+  SessionSkillDefinitionsCreateOutput,
+  SessionSkillDefinitionsDeleteInput,
+  SessionSkillDefinitionsDeleteOutput,
+  SessionSkillDefinitionsClearInput,
+  SessionSkillDefinitionsClearOutput,
+  SessionSkillDefinitionsRefreshInput,
+  SessionSkillDefinitionsRefreshOutput,
   SessionInstructionsEntryPutInput,
   SessionInstructionsEntryPutOutput,
   SessionInstructionsEntryRemoveInput,
@@ -702,6 +722,49 @@ const EndpointSessionCommandDefinitionsRefresh =
       ),
     )
 
+const EndpointSessionAgentDefinitionsList =
+  (raw: RawClient["server.session"]) => (input: SessionAgentDefinitionsListInput) =>
+    preserveEffect<SessionAgentDefinitionsListOutput>()(
+      raw["session.agentDefinitions.list"]({ params: { sessionID: input["sessionID"] } }).pipe(
+        Effect.mapError(mapClientError),
+        Effect.map((value) => value.data),
+      ),
+    )
+
+const EndpointSessionAgentDefinitionsCreate =
+  (raw: RawClient["server.session"]) => (input: SessionAgentDefinitionsCreateInput) =>
+    preserveEffect<SessionAgentDefinitionsCreateOutput>()(
+      raw["session.agentDefinitions.create"]({
+        params: { sessionID: input["sessionID"] },
+        payload: { id: input["id"], config: input["config"] },
+      }).pipe(Effect.mapError(mapClientError)),
+    )
+
+const EndpointSessionAgentDefinitionsDelete =
+  (raw: RawClient["server.session"]) => (input: SessionAgentDefinitionsDeleteInput) =>
+    preserveEffect<SessionAgentDefinitionsDeleteOutput>()(
+      raw["session.agentDefinitions.delete"]({
+        params: { sessionID: input["sessionID"], agentID: input["agentID"] },
+      }).pipe(Effect.mapError(mapClientError)),
+    )
+
+const EndpointSessionAgentDefinitionsClear =
+  (raw: RawClient["server.session"]) => (input: SessionAgentDefinitionsClearInput) =>
+    preserveEffect<SessionAgentDefinitionsClearOutput>()(
+      raw["session.agentDefinitions.clear"]({ params: { sessionID: input["sessionID"] } }).pipe(
+        Effect.mapError(mapClientError),
+      ),
+    )
+
+const EndpointSessionAgentDefinitionsRefresh =
+  (raw: RawClient["server.session"]) => (input: SessionAgentDefinitionsRefreshInput) =>
+    preserveEffect<SessionAgentDefinitionsRefreshOutput>()(
+      raw["session.agentDefinitions.refresh"]({ params: { sessionID: input["sessionID"] } }).pipe(
+        Effect.mapError(mapClientError),
+        Effect.map((value) => value.data),
+      ),
+    )
+
 const EndpointSessionKeepAlive = (raw: RawClient["server.session"]) => (input: SessionKeepAliveInput) =>
   preserveEffect<SessionKeepAliveOutput>()(
     raw["session.keepAlive"]({
@@ -787,6 +850,56 @@ const EndpointSessionInstructionsEntryList =
   (raw: RawClient["server.session"]) => (input: SessionInstructionsEntryListInput) =>
     preserveEffect<SessionInstructionsEntryListOutput>()(
       raw["session.instructions.entry.list"]({ params: { sessionID: input["sessionID"] } }).pipe(
+        Effect.mapError(mapClientError),
+        Effect.map((value) => value.data),
+      ),
+    )
+
+const EndpointSessionSkillDefinitionsList =
+  (raw: RawClient["server.session"]) => (input: SessionSkillDefinitionsListInput) =>
+    preserveEffect<SessionSkillDefinitionsListOutput>()(
+      raw["session.skillDefinitions.list"]({ params: { sessionID: input["sessionID"] } }).pipe(
+        Effect.mapError(mapClientError),
+        Effect.map((value) => value.data),
+      ),
+    )
+
+const EndpointSessionSkillDefinitionsCreate =
+  (raw: RawClient["server.session"]) => (input: SessionSkillDefinitionsCreateInput) =>
+    preserveEffect<SessionSkillDefinitionsCreateOutput>()(
+      raw["session.skillDefinitions.create"]({
+        params: { sessionID: input["sessionID"] },
+        payload: {
+          id: input["id"],
+          name: input["name"],
+          description: input["description"],
+          autoinvoke: input["autoinvoke"],
+          content: input["content"],
+          resources: input["resources"],
+        },
+      }).pipe(Effect.mapError(mapClientError)),
+    )
+
+const EndpointSessionSkillDefinitionsDelete =
+  (raw: RawClient["server.session"]) => (input: SessionSkillDefinitionsDeleteInput) =>
+    preserveEffect<SessionSkillDefinitionsDeleteOutput>()(
+      raw["session.skillDefinitions.delete"]({
+        params: { sessionID: input["sessionID"], skillID: input["skillID"] },
+      }).pipe(Effect.mapError(mapClientError)),
+    )
+
+const EndpointSessionSkillDefinitionsClear =
+  (raw: RawClient["server.session"]) => (input: SessionSkillDefinitionsClearInput) =>
+    preserveEffect<SessionSkillDefinitionsClearOutput>()(
+      raw["session.skillDefinitions.clear"]({ params: { sessionID: input["sessionID"] } }).pipe(
+        Effect.mapError(mapClientError),
+      ),
+    )
+
+const EndpointSessionSkillDefinitionsRefresh =
+  (raw: RawClient["server.session"]) => (input: SessionSkillDefinitionsRefreshInput) =>
+    preserveEffect<SessionSkillDefinitionsRefreshOutput>()(
+      raw["session.skillDefinitions.refresh"]({ params: { sessionID: input["sessionID"] } }).pipe(
         Effect.mapError(mapClientError),
         Effect.map((value) => value.data),
       ),
@@ -977,6 +1090,13 @@ const adaptGroupSession = (raw: RawClient["server.session"]) => ({
     clear: EndpointSessionCommandDefinitionsClear(raw),
     refresh: EndpointSessionCommandDefinitionsRefresh(raw),
   },
+  agentDefinitions: {
+    list: EndpointSessionAgentDefinitionsList(raw),
+    create: EndpointSessionAgentDefinitionsCreate(raw),
+    delete: EndpointSessionAgentDefinitionsDelete(raw),
+    clear: EndpointSessionAgentDefinitionsClear(raw),
+    refresh: EndpointSessionAgentDefinitionsRefresh(raw),
+  },
   keepAlive: EndpointSessionKeepAlive(raw),
   keepAliveStatus: EndpointSessionKeepAliveStatus(raw),
   sandbox: EndpointSessionSandbox(raw),
@@ -998,6 +1118,13 @@ const adaptGroupSession = (raw: RawClient["server.session"]) => ({
       put: EndpointSessionInstructionsEntryPut(raw),
       remove: EndpointSessionInstructionsEntryRemove(raw),
     },
+  },
+  skillDefinitions: {
+    list: EndpointSessionSkillDefinitionsList(raw),
+    create: EndpointSessionSkillDefinitionsCreate(raw),
+    delete: EndpointSessionSkillDefinitionsDelete(raw),
+    clear: EndpointSessionSkillDefinitionsClear(raw),
+    refresh: EndpointSessionSkillDefinitionsRefresh(raw),
   },
   generate: EndpointSessionGenerate(raw),
   log: EndpointSessionLog(raw),

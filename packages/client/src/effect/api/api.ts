@@ -460,6 +460,70 @@ export type SessionCommandDefinitionsRefreshOperation<E = never> = (
   input: SessionCommandDefinitionsRefreshInput,
 ) => Effect.Effect<SessionCommandDefinitionsRefreshOutput, E>
 
+export type SessionAgentDefinitionsListInput = { readonly sessionID: Session.ID }
+export type SessionAgentDefinitionsListOutput = ReadonlyArray<{
+  readonly agent: Agent.Info
+  readonly source: "global" | "session" | "sandbox"
+  readonly sourcePath?: string | undefined
+}>
+export type SessionAgentDefinitionsListOperation<E = never> = (
+  input: SessionAgentDefinitionsListInput,
+) => Effect.Effect<SessionAgentDefinitionsListOutput, E>
+
+export type SessionAgentDefinitionsCreateInput = {
+  readonly sessionID: Session.ID
+  readonly id: Agent.ID
+  readonly config: {
+    readonly model?:
+      | { readonly providerID: Provider.ID; readonly model: Model.ID; readonly variant?: Model.VariantID | undefined }
+      | undefined
+    readonly request?:
+      | {
+          readonly headers?: { readonly [x: string]: string } | undefined
+          readonly body?: { readonly [x: string]: Schema.Json } | undefined
+        }
+      | undefined
+    readonly system?: string | undefined
+    readonly description?: string | undefined
+    readonly mode?: "subagent" | "primary" | "all" | undefined
+    readonly hidden?: boolean | undefined
+    readonly color?: string | undefined
+    readonly steps?: number | undefined
+    readonly disabled?: boolean | undefined
+    readonly permissions?: Permission.Ruleset | undefined
+  }
+}
+export type SessionAgentDefinitionsCreateOutput = {
+  readonly agent: Agent.Info
+  readonly source: "global" | "session" | "sandbox"
+  readonly sourcePath?: string | undefined
+}
+export type SessionAgentDefinitionsCreateOperation<E = never> = (
+  input: SessionAgentDefinitionsCreateInput,
+) => Effect.Effect<SessionAgentDefinitionsCreateOutput, E>
+
+export type SessionAgentDefinitionsDeleteInput = { readonly sessionID: Session.ID; readonly agentID: Agent.ID }
+export type SessionAgentDefinitionsDeleteOutput = void
+export type SessionAgentDefinitionsDeleteOperation<E = never> = (
+  input: SessionAgentDefinitionsDeleteInput,
+) => Effect.Effect<SessionAgentDefinitionsDeleteOutput, E>
+
+export type SessionAgentDefinitionsClearInput = { readonly sessionID: Session.ID }
+export type SessionAgentDefinitionsClearOutput = void
+export type SessionAgentDefinitionsClearOperation<E = never> = (
+  input: SessionAgentDefinitionsClearInput,
+) => Effect.Effect<SessionAgentDefinitionsClearOutput, E>
+
+export type SessionAgentDefinitionsRefreshInput = { readonly sessionID: Session.ID }
+export type SessionAgentDefinitionsRefreshOutput = ReadonlyArray<{
+  readonly agent: Agent.Info
+  readonly source: "global" | "session" | "sandbox"
+  readonly sourcePath?: string | undefined
+}>
+export type SessionAgentDefinitionsRefreshOperation<E = never> = (
+  input: SessionAgentDefinitionsRefreshInput,
+) => Effect.Effect<SessionAgentDefinitionsRefreshOutput, E>
+
 export type SessionKeepAliveInput = {
   readonly sessionID: Session.ID
   readonly enabled?: boolean | undefined
@@ -554,6 +618,80 @@ export type SessionInstructionsEntryListOutput = ReadonlyArray<InstructionEntry.
 export type SessionInstructionsEntryListOperation<E = never> = (
   input: SessionInstructionsEntryListInput,
 ) => Effect.Effect<SessionInstructionsEntryListOutput, E>
+
+export type SessionSkillDefinitionsListInput = { readonly sessionID: Session.ID }
+export type SessionSkillDefinitionsListOutput = ReadonlyArray<{
+  readonly skill: Skill.Info
+  readonly source: "global" | "session" | "sandbox"
+  readonly sourcePath?: string | undefined
+  readonly resources: ReadonlyArray<{
+    readonly path: string
+    readonly type: "doc" | "script" | "template" | "asset"
+    readonly size: number
+    readonly digest: string
+  }>
+}>
+export type SessionSkillDefinitionsListOperation<E = never> = (
+  input: SessionSkillDefinitionsListInput,
+) => Effect.Effect<SessionSkillDefinitionsListOutput, E>
+
+export type SessionSkillDefinitionsCreateInput = {
+  readonly sessionID: Session.ID
+  readonly id: Skill.ID
+  readonly name?: Skill.Name | undefined
+  readonly description?: string | undefined
+  readonly autoinvoke?: boolean | undefined
+  readonly content: string
+  readonly resources?:
+    | ReadonlyArray<{
+        readonly path: string
+        readonly type: "doc" | "script" | "template" | "asset"
+        readonly content: string
+      }>
+    | undefined
+}
+export type SessionSkillDefinitionsCreateOutput = {
+  readonly skill: Skill.Info
+  readonly source: "global" | "session" | "sandbox"
+  readonly sourcePath?: string | undefined
+  readonly resources: ReadonlyArray<{
+    readonly path: string
+    readonly type: "doc" | "script" | "template" | "asset"
+    readonly size: number
+    readonly digest: string
+  }>
+}
+export type SessionSkillDefinitionsCreateOperation<E = never> = (
+  input: SessionSkillDefinitionsCreateInput,
+) => Effect.Effect<SessionSkillDefinitionsCreateOutput, E>
+
+export type SessionSkillDefinitionsDeleteInput = { readonly sessionID: Session.ID; readonly skillID: Skill.ID }
+export type SessionSkillDefinitionsDeleteOutput = void
+export type SessionSkillDefinitionsDeleteOperation<E = never> = (
+  input: SessionSkillDefinitionsDeleteInput,
+) => Effect.Effect<SessionSkillDefinitionsDeleteOutput, E>
+
+export type SessionSkillDefinitionsClearInput = { readonly sessionID: Session.ID }
+export type SessionSkillDefinitionsClearOutput = void
+export type SessionSkillDefinitionsClearOperation<E = never> = (
+  input: SessionSkillDefinitionsClearInput,
+) => Effect.Effect<SessionSkillDefinitionsClearOutput, E>
+
+export type SessionSkillDefinitionsRefreshInput = { readonly sessionID: Session.ID }
+export type SessionSkillDefinitionsRefreshOutput = ReadonlyArray<{
+  readonly skill: Skill.Info
+  readonly source: "global" | "session" | "sandbox"
+  readonly sourcePath?: string | undefined
+  readonly resources: ReadonlyArray<{
+    readonly path: string
+    readonly type: "doc" | "script" | "template" | "asset"
+    readonly size: number
+    readonly digest: string
+  }>
+}>
+export type SessionSkillDefinitionsRefreshOperation<E = never> = (
+  input: SessionSkillDefinitionsRefreshInput,
+) => Effect.Effect<SessionSkillDefinitionsRefreshOutput, E>
 
 export type SessionInstructionsEntryPutInput = {
   readonly sessionID: Session.ID
@@ -1657,6 +1795,13 @@ export interface SessionApi<E = never> {
     readonly clear: SessionCommandDefinitionsClearOperation<E>
     readonly refresh: SessionCommandDefinitionsRefreshOperation<E>
   }
+  readonly agentDefinitions: {
+    readonly list: SessionAgentDefinitionsListOperation<E>
+    readonly create: SessionAgentDefinitionsCreateOperation<E>
+    readonly delete: SessionAgentDefinitionsDeleteOperation<E>
+    readonly clear: SessionAgentDefinitionsClearOperation<E>
+    readonly refresh: SessionAgentDefinitionsRefreshOperation<E>
+  }
   readonly keepAlive: SessionKeepAliveOperation<E>
   readonly keepAliveStatus: SessionKeepAliveStatusOperation<E>
   readonly sandbox: SessionSandboxOperation<E>
@@ -1678,6 +1823,13 @@ export interface SessionApi<E = never> {
       readonly put: SessionInstructionsEntryPutOperation<E>
       readonly remove: SessionInstructionsEntryRemoveOperation<E>
     }
+  }
+  readonly skillDefinitions: {
+    readonly list: SessionSkillDefinitionsListOperation<E>
+    readonly create: SessionSkillDefinitionsCreateOperation<E>
+    readonly delete: SessionSkillDefinitionsDeleteOperation<E>
+    readonly clear: SessionSkillDefinitionsClearOperation<E>
+    readonly refresh: SessionSkillDefinitionsRefreshOperation<E>
   }
   readonly generate: SessionGenerateOperation<E>
   readonly log: SessionLogOperation<E>

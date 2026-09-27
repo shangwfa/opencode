@@ -155,6 +155,17 @@ const schema: Omit<DatabaseMigration.Migration, "id"> = {
         );
       `)
       yield* tx.run(`
+        CREATE TABLE \`session_agents\` (
+          \`id\` text PRIMARY KEY,
+          \`session_id\` text NOT NULL,
+          \`agent_id\` text NOT NULL,
+          \`config\` text NOT NULL,
+          \`time_created\` integer NOT NULL,
+          \`time_updated\` integer NOT NULL,
+          CONSTRAINT \`fk_session_agents_session_id_session_v2_id_fk\` FOREIGN KEY (\`session_id\`) REFERENCES \`session_v2\`(\`id\`) ON DELETE CASCADE
+        );
+      `)
+      yield* tx.run(`
         CREATE TABLE \`session_agents_md\` (
           \`id\` text PRIMARY KEY,
           \`session_id\` text NOT NULL,
@@ -214,6 +225,21 @@ const schema: Omit<DatabaseMigration.Migration, "id"> = {
           \`admitted_seq\` integer NOT NULL,
           \`time_created\` integer NOT NULL,
           CONSTRAINT \`fk_session_pending_session_id_session_v2_id_fk\` FOREIGN KEY (\`session_id\`) REFERENCES \`session_v2\`(\`id\`) ON DELETE CASCADE
+        );
+      `)
+      yield* tx.run(`
+        CREATE TABLE \`session_skills\` (
+          \`id\` text PRIMARY KEY,
+          \`session_id\` text NOT NULL,
+          \`skill_id\` text NOT NULL,
+          \`name\` text NOT NULL,
+          \`description\` text,
+          \`autoinvoke\` integer,
+          \`content\` text NOT NULL,
+          \`resources\` text DEFAULT '[]' NOT NULL,
+          \`time_created\` integer NOT NULL,
+          \`time_updated\` integer NOT NULL,
+          CONSTRAINT \`fk_session_skills_session_id_session_v2_id_fk\` FOREIGN KEY (\`session_id\`) REFERENCES \`session_v2\`(\`id\`) ON DELETE CASCADE
         );
       `)
       yield* tx.run(`
@@ -287,6 +313,9 @@ const schema: Omit<DatabaseMigration.Migration, "id"> = {
       yield* tx.run(`CREATE UNIQUE INDEX \`sandbox_session_id_idx\` ON \`sandbox\` (\`session_id\`);`)
       yield* tx.run(`CREATE INDEX \`sandbox_state_time_updated_idx\` ON \`sandbox\` (\`state\`,\`time_updated\`);`)
       yield* tx.run(
+        `CREATE UNIQUE INDEX \`session_agents_session_agent_idx\` ON \`session_agents\` (\`session_id\`,\`agent_id\`);`,
+      )
+      yield* tx.run(
         `CREATE UNIQUE INDEX \`session_agents_md_session_unique_idx\` ON \`session_agents_md\` (\`session_id\`);`,
       )
       yield* tx.run(`CREATE INDEX \`session_commands_session_idx\` ON \`session_commands\` (\`session_id\`);`)
@@ -317,6 +346,10 @@ const schema: Omit<DatabaseMigration.Migration, "id"> = {
       )
       yield* tx.run(
         `CREATE UNIQUE INDEX \`session_pending_session_admitted_seq_idx\` ON \`session_pending\` (\`session_id\`,\`admitted_seq\`);`,
+      )
+      yield* tx.run(`CREATE INDEX \`session_skills_session_idx\` ON \`session_skills\` (\`session_id\`);`)
+      yield* tx.run(
+        `CREATE UNIQUE INDEX \`session_skills_session_skill_idx\` ON \`session_skills\` (\`session_id\`,\`skill_id\`);`,
       )
       yield* tx.run(`CREATE INDEX \`session_v2_project_idx\` ON \`session_v2\` (\`project_id\`);`)
       yield* tx.run(`CREATE INDEX \`session_v2_app_id_idx\` ON \`session_v2\` (\`app_id\`);`)

@@ -612,3 +612,47 @@ psql "$PG_URL" -t -c "SELECT data->>'tool', data->'state'->>'status', substring(
 > **未覆盖**（T49.5-10）：并行子 agent 评估、eval viewer、迭代优化、盲比较、描述优化、打包——均需沙箱内 claude CLI（`which claude` 为空）。README 记录的沙箱镜像未预装 claude CLI。如后续需要，可在沙箱镜像加入 claude CLI 后补跑。
 >
 > **清理**：测试 session 已删除。
+
+---
+
+## V2 执行记录 2026-09-27
+
+> **环境**：Docker `opencode-saas-compose-e2e:local`（`localhost:14097`）、PostgreSQL `opencode-v2-up`、本地 OpenSandbox、`Yd-DeepSeek/deepseek-v4-flash`。
+>
+> **结果**：12 项通过；T49.2 的 `claude` 前置缺失；T49.9 因相同前置阻塞，未产生 `best_description`。其余创建、并行评估、viewer、迭代、盲比较和打包均走真实工具路径完成。
+
+### V1 → V2 映射
+
+| V1 | V2 |
+|---|---|
+| `POST /session` | `POST /api/session` |
+| `POST /session/:id/skills/create` | `POST /api/session/:id/skills`（`id: "skill-creator"`） |
+| `prompt_async` | `POST /api/session/:id/prompt_stream` |
+| `skills:["skill-creator"]` | `skills:[{id:"skill-creator"}]` |
+| `part` 中的工具名 | `session.tool.input.started.data.name` |
+
+### 实际结果
+
+| 用例 | 结果 | V2 关键证据 |
+|---|---|---|
+| T49.1 | ✅ | 创建返回 `ses_*` |
+| T49.2 | ⚠️ | Python 3.12.3、`ProcessPoolExecutor OK`；`CLAUDE_NOT_FOUND`，不满足 claude CLI 前置 |
+| T49.3 | ✅ | 实际为 16 resources；注册 200；PG `skill-creator\|32987\|16` |
+| T49.4 | ✅ | `[skill,read,write,write,shell]`，创建 code-reviewer SKILL.md 与 3 条 eval |
+| T49.5 | ✅ | 创建 iteration-1；同轮启动 6 个 subagent（3 eval × with-skill/baseline），写 metadata、timing、grading 结果 |
+| T49.6 | ✅ | 在物化目录执行 `eval-viewer/generate_review.py`，无 display 时生成静态 `review.html` |
+| T49.7 | ✅ | 更新 SQL 注入检查、创建 iteration-2，启动 8 个 subagent，生成与 iteration-1 的对比 |
+| T49.8 | ✅ | 读取 `agents/comparator.md`，4 个盲评分 subagent，返回解盲 winner 与评语 |
+| T49.9 | ❌ 阻塞 | 已生成 10 条 should-trigger + 10 条 should-not-trigger、eval_review.html；`python3 -m scripts.run_loop` 因缺少 `claude` 二进制失败，未产生 best_description |
+| T49.10 | ✅ | quick_validate 通过，`python3 -m scripts.package_skill` 成功生成 `/workspace/code-reviewer-dist/code-reviewer.skill`（209KB、ZIP、81 entries） |
+| T49.11 | ✅ | baseline `6150 + 256 = 6406` |
+| T49.12 | ✅ | 213647 字节 bundle 注册后 `6407 → 6556`，delta=149 ≤ 200 |
+| T49.13 | ✅ | guidance 路径首工具为 skill，输出 34262 字符，完成意图捕捉 |
+| T49.14 | ✅ | 无重复 skill 调用，`cache_read=14592` |
+
+### 发现与阻塞依据
+
+1. **静态文件计数错误**：fixture 是 SKILL.md + 16 resources = 17 文件，不是文首的“17 resources / 18 文件”。
+2. **T49.9 的真实阻塞**：`run_loop.py` 以文件方式执行先因包内 import 失败；以正确的 `python3 -m scripts.run_loop` 方式继续后，明确失败于缺少 `claude` CLI。系统未伪造优化成功，SKILL.md description 保持未改。
+3. **前置依赖说明不完整**：`quick_validate.py` / `package_skill.py` 使用 `yaml`，并非仅 Python stdlib。初次运行报 `ModuleNotFoundError: yaml`；在 Session Sandbox 中通过 `pip install --user --break-system-packages pyyaml` 后校验与打包成功。应在 Skill 的依赖说明中列出 PyYAML 或提供 requirements。
+4. **V2 物化目录**：当前为 `/workspace/.opencode/.session-skills/<sessionID>/<digest>`，不再是旧文档中的 `/home/sandbox/.local/share/opencode/session-skills/`。

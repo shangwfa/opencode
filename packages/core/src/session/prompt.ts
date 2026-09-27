@@ -6,7 +6,7 @@ import { SessionInbox } from "@opencode/schema/session-inbox"
 import type { Session } from "@opencode/schema/session"
 import type { SessionMessage } from "@opencode/schema/session-message"
 import { FSUtil } from "@opencode/util/fs-util"
-import { Effect } from "effect"
+import { Effect, Option } from "effect"
 import path from "path"
 import { fileURLToPath } from "url"
 import { Image } from "../image.js"
@@ -15,6 +15,7 @@ import { Mime } from "../mime.js"
 import { Plugin } from "../plugin/service.js"
 import { PluginHooks } from "../plugin/hooks.js"
 import { Skill } from "../skill.js"
+import { SessionSkills } from "./skills.js"
 import { AttachmentError, SkillNotFoundError } from "./error.js"
 
 export type Input = {
@@ -64,18 +65,33 @@ export const prepare = Effect.fn("SessionPrompt.prepare")(function* (request: {
     const selected = yield* Effect.gen(function* () {
       if (!requested?.length) return undefined
       const skillService = yield* Skill.Service
+      const overlay = Option.getOrUndefined(yield* Effect.serviceOption(SessionSkills.Service))
       const prepared = new Map<Skill.ID, Skill.Name>()
       return yield* Effect.forEach(requested, (attachment) =>
         Effect.gen(function* () {
           const name = prepared.get(attachment.id)
           if (name !== undefined) return { id: attachment.id, name, mention: attachment.mention }
-          const skill = yield* skillService.get(attachment.id)
+          const resolved = overlay ? yield* overlay.get(request.session, attachment.id) : undefined
+          const skill = resolved?.skill ?? (yield* skillService.get(attachment.id))
           if (!skill) return yield* new SkillNotFoundError({ skill: attachment.id })
           prepared.set(skill.id, skill.name)
+          // Sandbox skills own real Sandbox files; Session-private skills are materialized
+          // on demand. Neither has a host FS directory, so their virtual `/session/...`
+          // path must not be advertised as a base directory.
+          const directory =
+            resolved && overlay && resolved.source === "session"
+              ? (yield* overlay.materialize(request.session, resolved).pipe(Effect.catch(() => Effect.succeed(undefined)))) ?? null
+              : resolved && resolved.source === "sandbox"
+                ? path.dirname(skill.path)
+                : undefined
+          const text =
+            resolved && resolved.source !== "global"
+              ? Skill.toModelOutput(skill, [], directory)
+              : (yield* Skill.prepare(fs, skill).pipe(Effect.orDie)).output
           return {
             id: skill.id,
             name: skill.name,
-            text: (yield* Skill.prepare(fs, skill).pipe(Effect.orDie)).output,
+            text,
             mention: attachment.mention,
           }
         }),

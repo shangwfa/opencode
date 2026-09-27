@@ -21,6 +21,8 @@ import { SessionHistory } from "./history.js"
 import { SessionProviderContext } from "./provider-context.js"
 import { InstructionEntry } from "./instruction-entry.js"
 import { SessionAgentsMd } from "./agents-md.js"
+import { SessionAgents } from "./agents.js"
+import { SessionSkills } from "./skills.js"
 import { SessionMessage } from "./message.js"
 import { SessionModelRequest } from "./model-request.js"
 import { SessionRunnerModel } from "./runner/model.js"
@@ -76,6 +78,8 @@ const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
     const agents = yield* Agent.Service
+    const sessionAgents = yield* SessionAgents.Service
+    const sessionSkills = yield* SessionSkills.Service
     const builtins = yield* InstructionBuiltIns.Service
     const model = yield* Model.Service
     const db = (yield* Database.Service).db
@@ -95,7 +99,8 @@ const layer = Layer.effect(
     const resolveModel = (session: SessionSchema.Info) => models.resolve(session, model.available)
 
     const selectTitle = Effect.fn("SessionContext.selectTitle")(function* (session: SessionSchema.Info) {
-      const agent = yield* agents.get(Agent.ID.make("title"))
+      const selectedAgent = yield* sessionAgents.get(session, Agent.ID.make("title"))
+      const agent = selectedAgent?.agent
       if (!agent) return
       const primary = yield* resolveModel(session).pipe(Effect.orElseSucceed(() => undefined))
       const info = yield* Effect.gen(function* () {
@@ -127,14 +132,15 @@ const layer = Layer.effect(
         return yield* Effect.interrupt
 
       yield* mcpTools.flush
-      const agent = yield* agents.select(session.agent)
+      const agent = yield* sessionAgents.select(session, session.agent)
       if (!agent.info) return yield* new AgentNotFoundError({ sessionID: session.id, agent: session.agent ?? agent.id })
+      yield* sessionSkills.rematerialize(session)
       const loaded = yield* Effect.all(
         {
           tools: registry.snapshot(Permission.merge(agent.info.permissions, session.permissions ?? [])),
           builtins: builtins.load(sessionID),
           discovery: discovery.load(),
-          skills: skillInstructions.load(agent),
+          skills: skillInstructions.load(agent, session),
           references: referenceInstructions.load(),
           mcp: mcpInstructions.load(agent),
           entries: entries.load(sessionID),
@@ -195,6 +201,8 @@ export const node = makeLocationNode({
     InstructionDiscovery.node,
     InstructionEntry.node,
     SessionAgentsMd.node,
+    SessionAgents.node,
+    SessionSkills.node,
     Location.node,
     McpInstructions.node,
     McpTool.node,

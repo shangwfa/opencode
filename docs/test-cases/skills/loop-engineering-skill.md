@@ -556,3 +556,45 @@ psql "$PG_URL" -t -c "SELECT data->>'tool', data->'state'->>'status' FROM part W
 > **注意**：AI 装配 loop 时会主动发 `question`（目标项目/改进含义），需 reply `POST /session/$SID/question/$QID/reply` 才能继续（同 session-skills T15.14 的 question 阻塞机制）。
 >
 > **清理**：测试 session 已删除。
+
+---
+
+## V2 执行记录 2026-09-27
+
+> **环境**：Docker `opencode-saas-compose-e2e:local`（`localhost:14097`）、PostgreSQL `opencode-v2-up`、本地 OpenSandbox、`Yd-DeepSeek/deepseek-v4-flash`。
+>
+> **结果**：T49.1–T49.10、T49.12 通过；T49.11 的**恢复能力通过**，但文件权限断言失败（755，期望 644）。
+
+### V1 → V2 映射
+
+| V1 | V2 |
+|---|---|
+| `POST /session` | `POST /api/session` |
+| `POST /session/:id/skills/create` | `POST /api/session/:id/skills`（`id: "loop-engineering"`） |
+| `prompt_async` | `POST /api/session/:id/prompt_stream` |
+| `skills:["loop-engineering"]` | `skills:[{id:"loop-engineering"}]` |
+| `part` 的工具名 | `session.tool.input.started.data.name` |
+
+### 实际结果
+
+| 用例 | 结果 | V2 关键证据 |
+|---|---|---|
+| T49.1 | ✅ | 创建返回 `ses_*` |
+| T49.2 | ✅ | Node v24.19.0，`OK` |
+| T49.3 | ✅ | 注册 200；13 resources 无正文；PG `loop-engineering\|11432\|13` |
+| T49.4 | ✅ | `[skill, read ×9]`；读取 goal-forging/component-stack/manifest 等；输出采石、done_when、矩阵、YAML、双 runtime 命令与状态骨架 |
+| T49.5 | ✅ | 读取 `templates/manifest.json`、`component-matrix.md`，写入 `/workspace/manifest.json`（5 个 pending 单元） |
+| T49.6 | ✅ | 无 shell 调用；只渲染 Claude/Codex 命令，并要求用户确认后自行执行 |
+| T49.7 | ✅ | baseline `6151 + 256 = 6407` |
+| T49.8 | ✅ | 51746 字节 bundle 注册后 `6406 → 6497`，delta=91 |
+| T49.9 | ✅ | guidance 路径首工具为 `skill`，输出 12418 字符，正确解释采石 |
+| T49.10 | ✅ | skill 0 次、`cache_read=12416`，正确拆分 maker/checker |
+| T49.11 | ⚠️ | 删除物化目录后未调 skill 即恢复并成功 read manifest；`find` 得 15 文件，**但 mode 为 755，不符合 644 期望** |
+| T49.12 | ✅ | 不存在 skill 不触发工具，模型列出 `loop-engineering` |
+
+### 结论与发现
+
+1. 本地 `SKILL.md` 为 21156 UTF-8 字节；PostgreSQL `length(text)=11432` 和 skill output 12418 是字符计数/包装后的长度，不是内容截断。
+2. `Goodhart` 在 SKILL.md 本体中，不能用作资源泄漏标记；资源独有短语 `判据合格的唯一标准` 与 `命门：goal 定不好` 均未出现在 skill output。
+3. V2 物化路径是 `/workspace/.opencode/.session-skills/<sessionID>/<digest>`，不是旧文档的 `/home/sandbox/.local/share/opencode/session-skills/`。
+4. **待修复**：`packages/core/src/session/skills.ts` 的 `materialize()` 仅 `fileWrite`，未设定 mode；本次恢复后所有文件为 755。V1 的 `packages/opencode/src/tool/skill.ts` 曾明确对物化文件执行 `chmod 644`。恢复功能正常，但最小权限契约未保持。

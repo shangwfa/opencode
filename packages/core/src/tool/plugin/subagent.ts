@@ -10,6 +10,7 @@ import { Job } from "../../job.js"
 import { Model } from "../../model.js"
 import { Permission } from "../../permission.js"
 import { Session } from "../../session.js"
+import { SessionAgents } from "../../session/agents.js"
 import { SessionSchema } from "../../session/schema.js"
 import { SubagentCompletion } from "../../session/subagent-completion.js"
 import { SubagentJob } from "../../session/subagent-job.js"
@@ -65,8 +66,8 @@ export const Plugin = {
   id: "opencode.tool.subagent",
   effect: Effect.fn("SubagentTool.Plugin")(function* (ctx: Context) {
     const sessions = yield* Session.Service
+    const sessionAgents = yield* SessionAgents.Service
     const jobs = yield* Job.Service
-    const agents = yield* Agent.Service
     const config = yield* Config.Service
     const permission = yield* Permission.Service
     const models = yield* Model.Service
@@ -131,7 +132,7 @@ export const Plugin = {
                 return yield* new ToolFailure({
                   message: `Subagent depth limit reached (${limit}). Increase "experimental.subagent_depth" to allow nested subagents.`,
                 })
-              const agent = yield* agents.resolve(input.agent)
+              const agent = (yield* sessionAgents.get(parent, Agent.ID.make(input.agent)))?.agent
               if (agent === undefined) return yield* new ToolFailure({ message: `Unknown agent: ${input.agent}` })
               if (agent.mode === "primary")
                 return yield* new ToolFailure({ message: `Agent ${input.agent} cannot run as a subagent` })
@@ -272,9 +273,13 @@ export const Plugin = {
       Effect.gen(function* () {
         const tool = event.tools[name]
         if (!tool) return
-        const selected = yield* agents.resolve(event.agent)
+        const session = yield* sessions.get(event.sessionID).pipe(Effect.orDie)
+        // One merged read serves both lookups; separate `get`/`list` calls would rescan the sandbox.
+        const merged = yield* sessionAgents.list(session)
+        const selected = merged.find((item) => item.agent.id === event.agent)?.agent
         if (!selected) return
-        const available = (yield* agents.list())
+        const available = merged
+          .map((item) => item.agent)
           .filter(
             (agent) =>
               agent.mode !== "primary" &&

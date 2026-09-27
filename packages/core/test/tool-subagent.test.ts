@@ -22,6 +22,8 @@ import { Job } from "@opencode/core/job"
 import { KV } from "@opencode/core/kv"
 import { LocationServiceMap } from "@opencode/core/location-service-map"
 import { Session } from "@opencode/core/session"
+import { SessionAgents } from "@opencode/core/session/agents"
+import { ConfigAgent } from "@opencode/schema/config/agent"
 import { SessionEvent } from "@opencode/core/session/event"
 import { SessionExecution } from "@opencode/core/session/execution"
 import { SessionRestart } from "@opencode/core/session/execution/restart"
@@ -112,7 +114,7 @@ const executionNode = makeGlobalNode({
 const subagentPluginSupervisor = makeLocationNode({
   name: "test/subagent-plugins",
   layer: Layer.effectDiscard(registerToolPlugin(SubagentTool.Plugin)),
-  deps: [Agent.node, Config.node, Model.node, Permission.node, Session.node, Job.node, Tool.node],
+  deps: [Agent.node, Config.node, Model.node, Permission.node, Session.node, SessionAgents.node, Job.node, Tool.node],
 })
 
 const nodes = LayerNode.group([
@@ -121,6 +123,7 @@ const nodes = LayerNode.group([
   Job.node,
   Session.node,
   SessionExecution.node,
+  SessionAgents.node,
   LocationServiceMap.node,
 ])
 const replacements = [
@@ -441,6 +444,48 @@ describe("SubagentTool", () => {
           })
           const fallbackChild = yield* sessions.get(outputSessionID(fallback.metadata))
           expect(fallbackChild).toMatchObject({ parentID: parent.id, model: parentModel })
+        }),
+      ),
+    ),
+  )
+
+  it.live("dispatches a Session-defined subagent", () =>
+    Effect.acquireRelease(
+      Effect.promise(() => tmpdir()),
+      (dir) => Effect.promise(() => dir[Symbol.asyncDispose]()),
+    ).pipe(
+      Effect.flatMap((dir) =>
+        Effect.gen(function* () {
+          const location = Location.Ref.make({ directory: AbsolutePath.make(dir.path) })
+          const sessions = yield* Session.Service
+          const parent = yield* sessions.create({ location, model: parentModel })
+          yield* withSubagent(parent.location)
+          const sessionAgents = yield* SessionAgents.Service
+          const agentID = Agent.ID.make("session/translator")
+          yield* sessionAgents.create(parent.id, {
+            id: agentID,
+            config: ConfigAgent.Info.make({
+              description: "Session translator",
+              mode: "subagent",
+              system: "Translate the user's text into English.",
+            }),
+          })
+          const locations = yield* LocationServiceMap.Service
+          const registry = yield* Tool.Service.pipe(Effect.provide(locations.get(parent.location)))
+          const settled = yield* executeTool(registry, {
+            sessionID: parent.id,
+            ...toolIdentity,
+            call: {
+              type: "tool-call",
+              id: "call-session-subagent",
+              name: SubagentTool.name,
+              input: { agent: agentID, description: "translate", prompt: "hello" },
+            },
+          })
+
+          expect(settled).toMatchObject({ status: "completed", metadata: { status: "completed" } })
+          const child = yield* sessions.get(outputSessionID(settled.metadata))
+          expect(child).toMatchObject({ parentID: parent.id, agent: agentID, location: parent.location })
         }),
       ),
     ),

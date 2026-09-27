@@ -15,6 +15,7 @@ import { Location } from "@opencode/core/location"
 import { SandboxProvider } from "@opencode/core/sandbox/provider"
 import { FileAccess } from "@opencode/core/file-access"
 import { Model } from "@opencode/core/model"
+import { ModelsDev } from "@opencode/core/models-dev"
 import { Permission } from "@opencode/core/permission"
 import { Project } from "@opencode/core/project"
 import { Provider } from "@opencode/core/provider"
@@ -83,6 +84,8 @@ const testLayer = AppNodeBuilder.build(
     Permission.node.replace(permission),
     Config.node.replace(config),
     Image.node.replace(imageLayer),
+    // Keep the models catalog off the network; the test harness fails any test that phones home.
+    ModelsDev.node.replace(ModelsDev.configured({ fetch: false })),
   ],
 )
 

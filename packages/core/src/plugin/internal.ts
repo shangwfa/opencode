@@ -57,6 +57,8 @@ import { SandboxProvider } from "../sandbox/provider.js"
 import { WebSearch } from "../websearch.js"
 import { Ripgrep } from "../ripgrep.js"
 import { Session } from "../session.js"
+import { SessionAgents } from "../session/agents.js"
+import { SessionSkills } from "../session/skills.js"
 import { SessionCompaction } from "../session/compaction.js"
 import { SessionInstructions } from "../session/instructions.js"
 import { Shell } from "../shell.js"
@@ -134,6 +136,8 @@ const services = [
   WebSearch.Service,
   Ripgrep.Service,
   Session.Service,
+  SessionAgents.Service,
+  SessionSkills.Service,
   SessionCompaction.Service,
   SessionInstructions.Service,
   Shell.Service,
@@ -186,6 +190,8 @@ export const requirements = LayerNode.group([
   WebSearch.node,
   Ripgrep.node,
   Session.node,
+  SessionAgents.node,
+  SessionSkills.node,
   SessionCompaction.node,
   SessionInstructions.node,
   Shell.node,

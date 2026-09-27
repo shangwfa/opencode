@@ -9,6 +9,7 @@ import { Agent } from "./agent.js"
 import { SessionErrors } from "./session/error.js"
 import { SessionSchema } from "./session/schema.js"
 import { SessionStore } from "./session/store.js"
+import { SessionAgents } from "./session/agents.js"
 import { Wildcard } from "./util/wildcard.js"
 import { PermissionSaved } from "./permission/saved.js"
 import { PluginHooks } from "./plugin/hooks.js"
@@ -123,8 +124,8 @@ const layer = Layer.effect(
   Effect.gen(function* () {
     const bus = yield* Bus.Service
     const location = yield* Location.Service
-    const agents = yield* Agent.Service
     const sessions = yield* SessionStore.Service
+    const sessionAgents = yield* SessionAgents.Service
     const saved = yield* PermissionSaved.Service
     const hooks = yield* PluginHooks.Service
     const pending = new Map<ID, Pending>()
@@ -158,8 +159,8 @@ const layer = Layer.effect(
     const configured = Effect.fnUntraced(function* (sessionID: SessionSchema.ID, agentID?: Agent.ID) {
       const session = yield* sessions.get(sessionID)
       if (!session) return yield* new SessionErrors.NotFoundError({ sessionID })
-      const agent = yield* agents.resolve(agentID ?? session.agent)
-      return merge(agent?.permissions ?? missingAgentPermissions, session.permissions ?? [])
+      const selected = yield* sessionAgents.select(session, agentID ?? session.agent)
+      return merge(selected.info?.permissions ?? missingAgentPermissions, session.permissions ?? [])
     })
 
     function denied(input: Pick<Request, "action" | "resources">, rules: Permission.Ruleset) {
@@ -339,5 +340,13 @@ const layer = Layer.effect(
 export const node = makeLocationNode({
   service: Service,
   layer,
-  deps: [Bus.node, Location.node, Agent.node, SessionStore.node, PermissionSaved.node, PluginHooks.node],
+  deps: [
+    Bus.node,
+    Location.node,
+    Agent.node,
+    SessionAgents.node,
+    SessionStore.node,
+    PermissionSaved.node,
+    PluginHooks.node,
+  ],
 })

@@ -14,6 +14,7 @@ import { AbsolutePath } from "../../schema.js"
 import { ReadToolFileSystem } from "../read-filesystem.js"
 import { Environment } from "../../environment/index.js"
 import { ToolAttachment } from "../attachment.js"
+import { Permission } from "../../permission.js"
 
 export const name = "read"
 const FILENAME = "AGENTS.md"
@@ -43,6 +44,7 @@ export const Plugin = {
     const fs = yield* FSUtil.Service
     const location = yield* Location.Service
     const sandboxProvider = yield* SandboxProvider.Service
+    const permission = yield* Permission.Service
 
     yield* ctx.tool
       .transform((editor) =>
@@ -56,7 +58,7 @@ export const Plugin = {
           execute: (input, context) => {
             return Effect.gen(function* () {
               if (sandboxProvider.enabled)
-                return yield* SandboxTools.read({ provider: sandboxProvider, location }, input, context).pipe(
+                return yield* SandboxTools.read({ provider: sandboxProvider, location, permission }, input, context).pipe(
                   Effect.map((output) => ({ output, path: input.path })),
                 )
               const read = (target: FileAccess.Target) =>

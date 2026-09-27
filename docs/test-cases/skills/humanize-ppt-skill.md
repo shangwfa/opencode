@@ -527,3 +527,44 @@ psql "$PG_URL" -t -c "SELECT data->>'tool', data->'state'->>'status' FROM part W
 > **注意**：resource type 判定用扩展名——`.py/.mjs/.js/.ts/.sh` → script，其余 → doc（文档 T48.3 脚本一致）。contracts/*.json 归为 doc 是安全的（API 无 json 类型）。
 >
 > **清理**：测试 session 已删除。
+
+---
+
+## V2 执行记录 2026-09-27
+
+> **环境**：Docker `opencode-saas-compose-e2e:local`（`localhost:14097`）、PostgreSQL `opencode-v2-up`、本地 OpenSandbox、`Yd-DeepSeek/deepseek-v4-flash`。
+>
+> **结果**：T48.1–T48.11 **11/11 通过**。原用例为 V1 接口写法，执行时已映射至 V2 Session Skill API 和 SSE 事件。
+
+### V1 → V2 映射
+
+| V1 | V2 |
+|---|---|
+| `POST /session` | `POST /api/session` |
+| `POST /session/:id/skills/create` | `POST /api/session/:id/skills`（`id: "humanize-ppt"`） |
+| `prompt_async` | `POST /api/session/:id/prompt_stream` |
+| `skills:["humanize-ppt"]` | `skills:[{id:"humanize-ppt"}]` |
+| `part` 中的工具名 | `session.tool.input.started.data.name` |
+
+### 实际结果
+
+| 用例 | 结果 | V2 关键证据 |
+|---|---|---|
+| T48.1 | ✅ | Session 创建返回 `ses_*` |
+| T48.2 | ✅ | Python 3.12.3、Node v24.19.0 |
+| T48.3 | ✅ | 注册 200；API 返回 37 个无正文 resources；PG `humanize-ppt\|15776\|37` |
+| T48.4 | ✅ | 工具序列 `[skill,shell,read,read,read]`；skill 输出 16572 字符，物化路径为 `/workspace/.opencode/.session-skills/...`；生成 audience/state/media/brief AST 交付物 |
+| T48.5 | ✅ | 读取 `qa-failure-modes.md` 与 HTML deck，生成 `/workspace/qa_report.md`、`fix_prompt.md`；体检为 fail 2 / warn 1 并给出修复建议 |
+| T48.6 | ✅ | 全新会话工具序列 `[skill,shell]`，在物化目录 workdir 执行 `python3 scripts/smoke_check.py`，退出码 0 |
+| T48.7 | ✅ | baseline `6150 + 256 = 6406` tokens |
+| T48.8 | ✅ | 348559 字节 bundle 注册后 `6407 → 6504`，delta=97（远小于 2000） |
+| T48.9 | ✅ | guidance 路径首工具 `skill`，输出 16572 字符并正确解释 AST |
+| T48.10 | ✅ | 同会话无重复 `skill` 调用，`cache_read=10752` |
+| T48.11 | ✅ | 不存在 skill 不触发工具调用，模型说明不存在并列出 `humanize-ppt` |
+
+### 复验结论与文档修正点
+
+1. **实际 bundle 是 37 个 resources，不是文首的 36 个**：15 references + 10 scripts + 8 contracts + 4 adapters；连同 SKILL.md 共 39 个文件。
+2. **V2 Session Skill 物化目录已变化**：当前为 `/workspace/.opencode/.session-skills/<sessionID>/<digest>`，不是原用例声称的 `/home/sandbox/.local/share/opencode/session-skills/`。
+3. 原泄漏检查所用 `FAILURE_MODES` 和 `renderer_registry` 不是有效标记，因为它们本来就在 SKILL.md 中。改用仅位于 resource 正文的 `目录纪律`、`placeholder-residue` 验证，二者在 `skill` 输出中均为 false。
+4. 已加载 Skill 后，模型可复用已有 `resource_directory` 直接执行脚本而不重复调用 `skill`；T48.6 同时在全新会话验证了完整 `[skill,shell]` 路径。

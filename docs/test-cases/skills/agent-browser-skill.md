@@ -544,8 +544,8 @@ console.log(skillCount === 0 ? "✅ 缓存生效，未重复加载" : "❌ 重�
 
 | 用例 | 结果 | 验证详情 |
 |------|------|---------|
-| T45.1 创建 session | ⬜ | `new_sid -kb` 返回 ses_xxx |
-| T45.2 验证预装 | ⬜ | agent-browser + chromium + skills 子命令就绪 |
+| T45.1 创建 session | ✅ | `POST /api/session` 返回 ses_xxx（V2 复核，见下方 V2 执行记录） |
+| T45.2 验证预装 | ✅ | agent-browser 0.38.1 + Chromium 153 + `skills list` 含 core（V2 复核） |
 | T45.3 注册 session skill bundle | ✅ | PG `agent-browser\|<25000+>\|12`（SKILL.md + 12 resources） |
 | T45.4 AI 调用 CLI（基础） | ✅ | skill loaded + 5 bash 调用 cmd 含 `agent-browser`，AI 中文总结 |
 | T45.5 多元素批量提取 | ✅ | books.toscrape.com，3 bash（open+eval+close），20 行表格 |
@@ -568,6 +568,59 @@ console.log(skillCount === 0 ? "✅ 缓存生效，未重复加载" : "❌ 重�
 | 真实执行 | bash 命令实际驱动 chromium 打开页面 | ✅ |
 | 模式差异 | 工具类型为 `bash`（不是 `agent_browser_*`） | ✅ |
 | Progressive Disclosure | system prompt 仅 manifest；AI 用 `skill` tool 按需加载；缓存命中 | ✅ |
+
+---
+
+## V2 执行记录 2026-09-27
+
+> **环境**：Docker `opencode-saas-compose-e2e:local`、PostgreSQL `opencode-v2-up`、本地 OpenSandbox（`opencode-opensandbox:local`）、`Yd-DeepSeek/deepseek-v4-flash`。
+>
+> **结果**：T45.1–T45.13 按 V2 接口逐条执行，**13/13 通过**。
+>
+> 本文件正文仍是 V1 接口写法；下表给出 V2 映射后的实际结果与关键证据。
+
+### V1 → V2 接口映射
+
+| V1 | V2 | 说明 |
+|---|---|---|
+| `POST /session` | `POST /api/session` | 响应为 `{data:{id}}` |
+| `POST /session/:id/skills/create` | `POST /api/session/:id/skills` | Skill 标识字段为 `id`，`name` 可选 |
+| `POST /session/:id/exec` | 模型经 `shell` 工具执行 | 无直接 exec 端点，走产品工具路径 |
+| `POST /session/:id/prompt_async` | `POST /api/session/:id/prompt_stream`（SSE） | 无 `prompt_async` |
+| `skills:["agent-browser"]` | `skills:[{id:"agent-browser"}]` | 字符串数组会被拒绝 |
+| `part` 表 | Session 事件流 + `/api/session/:id/message` 投影 | — |
+| 工具名 `p.data->>'tool'` | 事件 `session.tool.input.started.data.name` | `session.tool.success.data.metadata.name` 是 **Skill 名**，不是工具名 |
+
+> **工具名读取陷阱**：V2 中 `session.tool.success` 的 `metadata.name` 为 Skill 名（此处为 `agent-browser`），与工具名 `shell`/`skill` 不同。仅凭该字段判断会把 `skill` 工具误读成 shell。
+
+### 逐条结果
+
+| 用例 | 结果 | V2 关键证据 |
+|---|---|---|
+| T45.1 | ✅ | 创建返回 `ses_*`，`GET /skills` 200 |
+| T45.2 | ✅ | `agent-browser 0.38.1`、`skills list` 含 `core`、`chromium`（Chrome for Testing 153.0.8010.12）可用 |
+| T45.3 | ✅ | 注册 200，`source=session`、`resources=12` 且不含 content；PG `agent-browser\|25381\|12` |
+| T45.4 | ✅ | 显式 attachment 后模型直接调用 shell；命令含 `agent-browser open/get title`；中文总结 example.com |
+| T45.5 | ✅ | books.toscrape 首页 20 本书，20 个 `£` 价格、22 行 Markdown 表格 |
+| T45.6 | ✅ | 沙箱内起本地表单服务后填表提交，回显 JSON 与四字段完全一致 |
+| T45.7 | ✅ | TodoMVC React 添加 3 项、完成「买牛奶」、删除「写代码」，剩余 2 项正确 |
+| T45.8 | ✅ | 使用 `agent-browser eval`，返回 20 条三元组 JSON 数组 |
+| T45.9 | ✅ | 不存在域名 `open` 非零退出，模型报 `net::ERR_CONNECTION_CLOSED` 与 `chrome-error://chromewebdata/`，中文说明 |
+| T45.10 | ✅ | baseline `input=6153 + cache_read=256 = 6409` |
+| T45.11 | ✅ | 注册 101505 字节 bundle 后 `6408 → 6594`，**delta=186 ≤ 400**，证明 bundle 内容不进 system prompt |
+| T45.12 | ✅ | 按需加载路径工具序列 `["skill","shell","shell"]`，`skill` 输出 **26612 字符**（完整 SKILL.md），随后 shell 驱动 CLI |
+| T45.13 | ✅ | 同 session 再发，工具序列 `["shell","shell"]`、`skill` 调用 **0 次**，`cache_read=69376` |
+
+### 与文档的关键行为差异
+
+1. **显式 `skills` attachment 不再触发 `skill` tool**：V2 会把该 Skill 的完整指令直接注入本次提示词，模型随即调用 shell。文档 T45.4/T45.12 描述的「第一步必调 skill tool」只在**不传 attachment、仅依赖 guidance** 时成立（已在 T45.12 以 guidance 路径复现该序列）。
+2. **不再有 `preloaded_skills` manifest 与 resource-level `resources` 参数**：`skill` tool 输入只有 `id`；resource 通过物化目录读取（`/workspace/.opencode/.session-skills/<sid>/<digest>/`）。
+3. **确认无需 manifest 化即安全**：T45.11 的 delta 186 tokens 证明 101KB bundle 不挤压 system prompt。
+4. **沙箱版本高于文档记录**：agent-browser 0.38.1（文档为 0.31.1），Chromium 153（文档为 151），`skills list` 已含 `core`/`agentcore`/`derive-client`/`dogfood` 等。
+
+### 未变更的已知噪声
+
+N45.1、N45.2 仍然成立：Skill 模式用任意 shell 命令链，审计粒度依赖 bash 命令字符串；如需细粒度授权，应通过 Session Permission 限制命令前缀。
 
 ---
 

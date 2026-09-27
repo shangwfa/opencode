@@ -602,3 +602,45 @@ psql "$PG_URL" -t -c "SELECT data->>'tool', data->'state'->>'status' FROM part W
 | T46.13 缓存命中 | ✅ | 同 session 换主题：skill/bash/read 调用 0 次，cache_read=12160 高位，AI 复用已加载 core-concepts.md |
 
 > **清理**：测试 session 已全部删除（DELETE /session/$SID）。
+
+---
+
+## V2 执行记录 2026-09-27
+
+> **环境**：Docker `opencode-saas-compose-e2e:local`（`localhost:14097`）、PostgreSQL `opencode-v2-up`、本地 OpenSandbox、`Yd-DeepSeek/deepseek-v4-flash`。
+>
+> **结果**：T46.1–T46.13 **13/13 通过**。全程通过 V2 HTTP API、SSE 工具事件、Sandbox 真实命令与 PostgreSQL 记录验收。
+
+### V1 → V2 映射
+
+| V1 | V2 |
+|---|---|
+| `POST /session` | `POST /api/session` |
+| `POST /session/:id/skills/create` | `POST /api/session/:id/skills`（`id: "mastra"`） |
+| `prompt_async` | `POST /api/session/:id/prompt_stream` |
+| `skills:["mastra"]` | `skills:[{id:"mastra"}]` |
+| `part` 中的工具名 | `session.tool.input.started.data.name` |
+
+### 实际证据
+
+| 用例 | 结果 | V2 关键证据 |
+|---|---|---|
+| T46.1 | ✅ | 创建返回 `ses_*` |
+| T46.2 | ✅ | Node 24.19.0、npm 11.17.0、`mastra.ai/llms.txt=200`、npm PONG |
+| T46.3 | ✅ | 注册 200；9 个 resources 均无正文；PG `mastra\|6334\|9` |
+| T46.4 | ✅ | `[skill,read,read,webfetch×3]`；skill 输出 7063 字符，读取 `core-concepts.md` 并以官方远程文档核验 Agent/Workflow |
+| T46.5 | ✅ | 读取 `create-mastra.md`，真实 `npm install`（382 packages + `@mastra/core`），创建入口及 weather agent，`npx tsc --noEmit` 退出 0 |
+| T46.6 | ✅ | 读取 `embedded-docs.md` 与 `@mastra/core@1.71.0` 内嵌文档，按当前 `new Agent(...)` API 写 Agent，tsc 通过 |
+| T46.7 | ✅ | 读取 `common-errors.md`，对 package.json、依赖、tsconfig 与 ESM/CommonJS 给出针对性排障 |
+| T46.8 | ✅ | 在 `/workspace/my-app` 执行物化的 `scripts/provider-registry.mjs --provider anthropic`，返回 15 个 Claude 模型 |
+| T46.9 | ✅ | 读取 `remote-docs.md`，未访问假设为空的 node_modules，给出 `mastra.ai/llms.txt` 远程查文档路径 |
+| T46.10 | ✅ | baseline `6149 + 256 = 6405` |
+| T46.11 | ✅ | 52213 字节 bundle 注册后 `6407 → 6560`，delta=153 ≤ 200 |
+| T46.12 | ✅ | guidance 路径 `[skill,read]`，skill 输出 7063 字符 |
+| T46.13 | ✅ | 无重复 skill 调用，`cache_read=6656`，正确比较 Agent/Workflow |
+
+### 过程说明
+
+1. T46.5/6 不使用测试端直连 Sandbox：项目初始化、依赖安装、文件写入与 TypeScript 编译均由模型调用 shell/read/write 工具完成。
+2. V2 资源目录为 `/workspace/.opencode/.session-skills/<sessionID>/<digest>`；旧文档中 `/home/sandbox/.local/share/opencode/session-skills/` 的说法不再适用。
+3. T46.4 的远程核验使用当前工具名 `webfetch`；这属于模型根据 Skill 指令获取 Mastra 官方资料的正常路径，并非 MCP `mastra_*` 工具。

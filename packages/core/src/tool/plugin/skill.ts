@@ -3,8 +3,11 @@ export * as SkillTool from "./skill.js"
 import type { Context } from "@opencode/plugin/effect/plugin"
 import { ToolFailure } from "@opencode/ai"
 import { Effect, Schema } from "effect"
+import path from "path"
 import { FSUtil } from "@opencode/util/fs-util"
 import { Skill } from "../../skill.js"
+import { SessionSkills } from "../../session/skills.js"
+import { Session } from "../../session.js"
 import { Permission } from "../../permission.js"
 
 export const name = "skill"
@@ -15,7 +18,8 @@ export const Input = Schema.Struct({
 
 export const Output = Schema.Struct({
   name: Skill.Name,
-  directory: Schema.String,
+  /** Absent for Session-private skills without materialized resources. */
+  directory: Schema.String.pipe(Schema.optional),
   output: Schema.String,
 })
 export const description = [
@@ -33,7 +37,8 @@ export const Plugin = {
   id: "opencode.tool.skill",
   effect: Effect.fn("SkillTool.Plugin")(function* (ctx: Context) {
     const fs = yield* FSUtil.Service
-    const skills = yield* Skill.Service
+    const skills = yield* SessionSkills.Service
+    const sessions = yield* Session.Service
     const permission = yield* Permission.Service
     yield* ctx.tool
       .transform((editor) =>
@@ -45,8 +50,10 @@ export const Plugin = {
           output: Output,
           execute: (input, context) =>
             Effect.gen(function* () {
-              const skill = yield* skills.get(input.id)
-              if (!skill) return yield* unableToLoad(input.id)
+              const session = yield* sessions.get(context.sessionID).pipe(Effect.mapError((error) => unableToLoad(input.id, error)))
+              const resolved = yield* skills.get(session, input.id)
+              if (!resolved) return yield* unableToLoad(input.id)
+              const skill = resolved.skill
               return yield* Effect.gen(function* () {
                 yield* permission.assert({
                   action: name,
@@ -56,13 +63,29 @@ export const Plugin = {
                   agent: context.agent,
                   source: { type: "tool", messageID: context.messageID, id: context.id },
                 })
-                return { name: skill.name, ...(yield* Skill.prepare(fs, skill)) }
+                const resourceDirectory = yield* skills.materialize(session, resolved)
+                // Session-private skills have no host directory; without materialized
+                // resources there is no base directory to advertise.
+                const prepared =
+                  resolved.source === "global"
+                    ? yield* Skill.prepare(fs, skill)
+                    : resolved.source === "sandbox"
+                      ? { directory: path.dirname(skill.path), output: Skill.toModelOutput(skill, []) }
+                      : { directory: resourceDirectory, output: Skill.toModelOutput(skill, [], resourceDirectory ?? null) }
+                return {
+                  name: skill.name,
+                  ...(prepared.directory === undefined ? {} : { directory: prepared.directory }),
+                  output:
+                    resourceDirectory === undefined
+                      ? prepared.output
+                      : `${prepared.output}\n<resource_directory>${resourceDirectory}</resource_directory>`,
+                }
               }).pipe(Effect.mapError((error) => unableToLoad(input.id, error)))
             }).pipe(
               Effect.map((output) => ({
                 output,
                 content: output.output,
-                metadata: { name: output.name, directory: output.directory },
+                metadata: { name: output.name, ...(output.directory === undefined ? {} : { directory: output.directory }) },
               })),
             ),
         }),

@@ -15,6 +15,8 @@ import { AbsolutePath } from "@opencode/core/schema"
 import { Session } from "@opencode/core/session"
 import { SessionTable } from "@opencode/core/session/sql"
 import { SessionStore } from "@opencode/core/session/store"
+import { SessionAgents } from "@opencode/core/session/agents"
+import { ConfigAgent } from "@opencode/schema/config/agent"
 import { ShellParse } from "@opencode/core/shell/parse"
 import { eq } from "drizzle-orm"
 import { location } from "./fixture/location"
@@ -26,7 +28,15 @@ const current = Layer.succeed(
 )
 const it = testEffect(
   AppNodeBuilder.build(
-    LayerNode.group([Database.node, Bus.node, SessionStore.node, PermissionSaved.node, Agent.node, Permission.node]),
+    LayerNode.group([
+      Database.node,
+      Bus.node,
+      SessionStore.node,
+      PermissionSaved.node,
+      Agent.node,
+      SessionAgents.node,
+      Permission.node,
+    ]),
     [Location.node.replace(current)],
   ),
 )
@@ -133,6 +143,20 @@ describe("Permission", () => {
       )
       expect(yield* service.ask(assertion({ agent: Agent.ID.make("reviewer") }))).toMatchObject({ effect: "ask" })
       expect(yield* service.get(Permission.ID.create("per_test"))).not.toHaveProperty("agent")
+    }),
+  )
+
+  it.effect("evaluates permission rules from the Session Agent override", () =>
+    Effect.gen(function* () {
+      yield* setup([{ action: "read", resource: "*", effect: "allow" }])
+      const sessionAgents = yield* SessionAgents.Service
+      yield* sessionAgents.create(Session.ID.make("ses_test"), {
+        id: Agent.ID.make("test"),
+        config: ConfigAgent.Info.make({ permissions: [{ action: "read", resource: "*", effect: "deny" }] }),
+      })
+      const service = yield* Permission.Service
+
+      expect(yield* service.ask(assertion())).toMatchObject({ effect: "deny" })
     }),
   )
 

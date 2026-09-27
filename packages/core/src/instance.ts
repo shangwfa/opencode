@@ -48,6 +48,8 @@ import { InstructionDiscovery } from "./instruction-discovery.js"
 import { InstructionBuiltIns } from "./instructions/builtins.js"
 import { InstructionEntry } from "./session/instruction-entry.js"
 import { SessionAgentsMd } from "./session/agents-md.js"
+import { SessionAgents } from "./session/agents.js"
+import { SessionSkills } from "./session/skills.js"
 import { SessionInstructions } from "./session/instructions.js"
 import { McpTool } from "./tool/mcp.js"
 import { ReadToolFileSystem } from "./tool/read-filesystem.js"
@@ -99,6 +101,8 @@ const nodes = [
   ReferenceInstructions.node,
   InstructionEntry.node,
   SessionAgentsMd.node,
+  SessionAgents.node,
+  SessionSkills.node,
   Form.node,
   Generate.node,
   ReadToolFileSystem.node,

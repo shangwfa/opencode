@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { Cause, Deferred, Effect, Exit, Fiber, Semaphore } from "effect"
-import { SandboxProvider, assembleStreamText, isSandboxGone, rootSessionID, withOperationTimeout, withSemaphoreWaitTimeout } from "@opencode/core/sandbox/provider"
+import { SandboxProvider, assembleStreamText, isCommandSessionGone, isSandboxGone, rootSessionID, withOperationTimeout, withSemaphoreWaitTimeout } from "@opencode/core/sandbox/provider"
 import { AppNodeBuilder } from "@opencode/core/effect/app-node-builder"
 import { LayerNode } from "@opencode/util/effect/layer-node"
 import { Database } from "@opencode/core/database/database"
@@ -120,6 +120,13 @@ describe("SandboxProvider command resilience helpers", () => {
     expect(isSandboxGone(new Error("File not found: /workspace/app.py"))).toBe(false)
     expect(isSandboxGone(new Error("command not found: pnpm"))).toBe(false)
     expect(isSandboxGone(new Error("get or create sandbox timed out after 90s"))).toBe(false)
+  })
+
+  test("keeps missing command contexts distinct from a missing sandbox", () => {
+    expect(isCommandSessionGone(new Error("SandboxApiException: error running in session. context not found"))).toBe(true)
+    expect(isCommandSessionGone(new Error("runInSession failed: command session cmd_1 not found (empty execution stream)"))).toBe(true)
+    expect(isCommandSessionGone(new Error("File not found: /workspace/app.py"))).toBe(false)
+    expect(isCommandSessionGone(new Error("Sandbox is no longer running: ses_x/sb_y"))).toBe(false)
   })
 
   it.live("fails an operation that exceeds its budget, naming the operation", () =>

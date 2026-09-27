@@ -34,15 +34,20 @@ export { Event } from "@opencode/schema/skill"
 export const available = (skills: ReadonlyArray<Info>, agent: Agent.Info) =>
   skills.filter((skill) => Permission.evaluate("skill", skill.id, agent.permissions).effect !== "deny")
 
-export const toModelOutput = (skill: Info, files: ReadonlyArray<string>) => {
-  const directory = path.dirname(skill.path)
+/**
+ * Renders model-facing skill content. `directory` overrides the advertised base
+ * directory; pass `null` when the skill has no real filesystem location, such as a
+ * Session-private skill without materialized resources. Omit it to use the skill path.
+ */
+export const toModelOutput = (skill: Info, files: ReadonlyArray<string>, directory?: string | null) => {
+  const base = directory === undefined ? path.dirname(skill.path) : directory
   return [
     `<skill_content name="${skill.name}">`,
     `# Skill: ${skill.name}`,
     "",
     skill.content.trim(),
     "",
-    `Base directory for this skill: ${directory}`,
+    ...(base === null ? [] : [`Base directory for this skill: ${base}`]),
     "Relative paths in this skill (e.g., scripts/, reference/) are relative to this base directory.",
     "Note: file list is sampled.",
     "",

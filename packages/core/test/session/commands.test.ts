@@ -10,6 +10,7 @@ import { Model } from "@opencode/schema/model"
 import { Provider } from "@opencode/schema/provider"
 import { AbsolutePath } from "@opencode/core/schema"
 import { SessionCommands } from "@opencode/core/session/commands"
+import { SandboxDefinitionCache } from "@opencode/core/session/scan"
 import { SandboxProvider } from "@opencode/core/sandbox/provider"
 import { DateTime, Effect } from "effect"
 
@@ -87,6 +88,13 @@ describe("SessionCommands", () => {
       "No placeholders here\n\nplain extra input",
     )
     expect(SessionCommands.interpolateArguments("No placeholders here", "   ")).toBe("No placeholders here")
+  })
+
+  test("replaces out-of-range placeholders with empty text and inserts arguments literally", () => {
+    // SAS-CM-07: missing / empty arguments and shell metacharacters in arguments.
+    expect(SessionCommands.interpolateArguments("A=$1 B=$2 C=$3", "one")).toBe("A=one B= C=")
+    expect(SessionCommands.interpolateArguments("A=$1 B=$2", "")).toBe("A= B=")
+    expect(SessionCommands.interpolateArguments("run $1", "a; rm -rf /")).toBe("run a; rm -rf /")
   })
 
   test("executes command templates and shell interpolation in the owning session sandbox", async () => {
@@ -307,7 +315,9 @@ describe("SessionCommands", () => {
             "/workspace/.opencode/command/malformed.md",
             "/workspace/.opencode/command/../outside.md",
             "/host/escape.md",
-          ].join("\n"),
+          ]
+            .map((path) => `${path}\t1000.0000000000\t0`)
+            .join("\n"),
           timedOut: false,
         })
       },
@@ -341,5 +351,35 @@ describe("SessionCommands", () => {
     await expect(Effect.runPromise(SessionCommands.scanSandbox(sessionID, "/host/repo", sandbox))).rejects.toThrow(
       "Sandbox command scan failed: sandbox unavailable",
     )
+  })
+
+  test("reuses unchanged sandbox command definitions until a fingerprint or force changes them", async () => {
+    const sessionID = Session.ID.make("ses_command_scan_incremental")
+    const cache = new SandboxDefinitionCache<SessionCommands.Definition>()
+    const hello = "/workspace/.opencode/commands/hello.md"
+    let fingerprint = "1"
+    let reads = 0
+    const sandbox = {
+      enabled: true,
+      run: () => Effect.succeed({ exitCode: 0, output: `${hello}\t${fingerprint}\t10`, timedOut: false }),
+      fileRead: () => {
+        reads++
+        return Effect.succeed("---\ndescription: Hello\n---\nSay $ARGUMENTS")
+      },
+    }
+    const scan = () => Effect.runPromise(SessionCommands.scanSandbox(sessionID, "/host/repo", sandbox, { cache }))
+
+    expect(await scan()).toHaveLength(1)
+    expect(reads).toBe(1)
+    // An unchanged fingerprint reuses the cached definition without touching the file again.
+    await scan()
+    expect(reads).toBe(1)
+    // A rewritten file changes its fingerprint and is read again.
+    fingerprint = "2"
+    await scan()
+    expect(reads).toBe(2)
+    // `force` re-reads every current file even when the fingerprint is unchanged.
+    await Effect.runPromise(SessionCommands.scanSandbox(sessionID, "/host/repo", sandbox, { cache, force: true }))
+    expect(reads).toBe(3)
   })
 })

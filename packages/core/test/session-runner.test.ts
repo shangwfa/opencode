@@ -63,9 +63,17 @@ import { Document, Info } from "@opencode/schema/config"
 import { ConfigCompaction } from "@opencode/schema/config/compaction"
 import { Tool } from "@opencode/core/tool"
 import type { Info as ToolInfo } from "@opencode/schema/tool"
-import { InstructionStateTable, SessionInboxTable, SessionMessageTable, SessionTable } from "@opencode/core/session/sql"
+import {
+  InstructionStateTable,
+  SessionAgentTable,
+  SessionInboxTable,
+  SessionMessageTable,
+  SessionTable,
+} from "@opencode/core/session/sql"
 import { InstructionEntry } from "@opencode/core/session/instruction-entry"
 import { SessionAgentsMd } from "@opencode/core/session/agents-md"
+import { SessionAgents } from "@opencode/core/session/agents"
+import { ConfigAgent } from "@opencode/schema/config/agent"
 import { SessionStore } from "@opencode/core/session/store"
 import { Instructions } from "@opencode/core/instructions/index"
 import { InstructionBuiltIns } from "@opencode/core/instructions/builtins"
@@ -467,6 +475,7 @@ const layer = Layer.unwrap(
         InstructionDiscovery.node,
         InstructionEntry.node,
         SessionAgentsMd.node,
+        SessionAgents.node,
         SkillInstructions.node,
         ReferenceInstructions.node,
         Config.node,
@@ -1993,6 +2002,36 @@ describe("SessionRunnerLLM", () => {
     // The session-local key is filtered from the inherited values; the fork starts clean.
     expect(state?.initial_values).not.toHaveProperty(SessionAgentsMd.Key)
     expect(state?.current_values).not.toHaveProperty(SessionAgentsMd.Key)
+  })
+
+  scenario("selects a Session-only Agent and uses its system prompt", function* (s) {
+    const sessionAgents = yield* SessionAgents.Service
+    const id = Agent.ID.make("session/reviewer")
+    yield* sessionAgents.create(sessionID, {
+      id,
+      config: ConfigAgent.Info.make({ system: "SESSION_ONLY_AGENT_SYSTEM", mode: "subagent" }),
+    })
+    yield* s.session.switchAgent({ sessionID, agent: id })
+    yield* s.runPrompt("Use the session Agent")
+
+    expect(s.requests[0]?.system.map((part) => part.text).join("\n")).toContain("SESSION_ONLY_AGENT_SYSTEM")
+  })
+
+  scenario("does not inherit Session Agent definitions when forking", function* (s) {
+    const sessionAgents = yield* SessionAgents.Service
+    const id = Agent.ID.make("session/reviewer")
+    yield* sessionAgents.create(sessionID, {
+      id,
+      config: ConfigAgent.Info.make({ system: "PARENT_SESSION_AGENT", mode: "subagent" }),
+    })
+    yield* s.runPrompt("Parent history")
+
+    const forked = yield* s.session.fork({ sessionID })
+    const child = yield* s.session.get(forked.id)
+    expect(yield* sessionAgents.get(child, id)).toBeUndefined()
+    expect(
+      yield* s.db.select().from(SessionAgentTable).where(eq(SessionAgentTable.session_id, forked.id)).all(),
+    ).toHaveLength(0)
   })
 
   scenario("retains JSON null API entries as values", function* (s) {

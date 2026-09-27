@@ -287,11 +287,26 @@ type RgMatch = {
 
 export const read = Effect.fn("SandboxTools.read")(
   function* (
-    deps: { provider: SandboxProvider.Interface; location: Location.Interface },
+    deps: {
+      provider: SandboxProvider.Interface
+      location: Location.Interface
+      permission: Permission.Interface
+    },
     input: { path: string; offset?: number; limit?: number },
     context: Tool.Context,
   ) {
     const sandboxPath = yield* resolve(deps.location.directory, input.path)
+    const absolute = path.resolve(deps.location.directory, input.path)
+    const resource = path.relative(deps.location.directory, absolute) || "."
+    yield* deps.permission.assert({
+      action: "read",
+      resources: [resource],
+      save: ["*"],
+      metadata: { path: input.path },
+      sessionID: context.sessionID,
+      agent: context.agent,
+      source: { type: "tool", messageID: context.messageID, id: context.id },
+    })
     const stat = yield* deps.provider.fileStat(context.sessionID, sandboxPath)
     if (stat === null) return yield* Effect.fail(new Error(`File not found: ${input.path}`))
     const offset = input.offset ?? 1

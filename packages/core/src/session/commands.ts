@@ -16,6 +16,15 @@ import { Provider } from "@opencode/schema/provider"
 import { ConfigCommand } from "@opencode/schema/config/command"
 import { ConfigMarkdown } from "../config/markdown.js"
 import { Option, Schema } from "effect"
+import {
+  SandboxDefinitionCache,
+  scanSandboxMarkdown,
+  type SandboxMarkdownScan,
+  type ScannedFile,
+  validName,
+} from "./scan.js"
+
+export { validName }
 
 export type Definition = SessionCommand.Definition
 export type CreateInput = SessionCommand.CreatePayload
@@ -28,10 +37,6 @@ export interface RuntimeActions extends Pick<Session.Interface, "prompt" | "swit
 }
 const decodeCommand = Schema.decodeUnknownOption(ConfigCommand.Info)
 
-export function validName(name: string) {
-  return name.length > 0 && /^[\p{L}\p{N}._/-]+$/u.test(name) && name.split("/").every((part) => part && part !== "." && part !== "..")
-}
-
 function inferHints(template: string) {
   const positional = [...template.matchAll(/\$(\d+)/g)].map((match) => Number(match[1]))
   if (template.includes("$ARGUMENTS")) return ["$ARGUMENTS"]
@@ -39,10 +44,7 @@ function inferHints(template: string) {
 }
 
 export const list = Effect.fn("SessionCommands.list")(function* (session: Session.Info) {
-  const builtin = yield* baseCommands(session)
-  const stored = yield* listStored(session.id)
-  const scanned = yield* scan(session)
-  return mergeCommands(builtin, stored, scanned)
+  return yield* collect(session, false)
 })
 
 export const get = Effect.fn("SessionCommands.get")(function* (session: Session.Info, name: string) {
@@ -102,7 +104,8 @@ export const clear = Effect.fn("SessionCommands.clear")(function* (sessionID: Se
 })
 
 export const refresh = Effect.fn("SessionCommands.refresh")(function* (session: Session.Info) {
-  return yield* list(session)
+  // Explicit refresh bypasses the fingerprint cache so it reports what is on disk right now.
+  return yield* collect(session, true)
 })
 
 export function executable(
@@ -168,58 +171,67 @@ function baseCommands(session: Session.Info) {
   })
 }
 
-function scan(session: Session.Info) {
+function collect(session: Session.Info, force: boolean) {
   return Effect.gen(function* () {
-    const sandbox = yield* SandboxProvider.Service
-    return yield* scanSandbox(session.id, session.location.directory, sandbox)
+    const builtin = yield* baseCommands(session)
+    const stored = yield* listStored(session.id)
+    const scanned = yield* scan(session, force)
+    return mergeCommands(builtin, stored, scanned)
   })
 }
 
+function scan(session: Session.Info, force: boolean) {
+  return Effect.gen(function* () {
+    const sandbox = yield* SandboxProvider.Service
+    return yield* scanSandbox(session.id, session.location.directory, sandbox, { force })
+  })
+}
+
+/** Discovery directories under the Session sandbox; the scan command is built by the shared scanner. */
+const SCAN_PREFIXES = ["/workspace/.opencode/command/", "/workspace/.opencode/commands/"]
+
+const definitionCache = new SandboxDefinitionCache<Definition>()
+
+function scanInput(
+  sessionID: Session.ID,
+  directory: string,
+  sandbox: Pick<SandboxProvider.Interface, "enabled" | "run" | "fileRead">,
+  options: { readonly force?: boolean; readonly cache?: SandboxDefinitionCache<Definition> } = {},
+): SandboxMarkdownScan<Definition> {
+  return {
+    sessionID,
+    directory,
+    sandbox,
+    label: "command",
+    prefixes: SCAN_PREFIXES,
+    cache: options.cache ?? definitionCache,
+    decode: decodeSandboxCommand,
+    force: options.force,
+  }
+}
+
 export const scanSandbox = Effect.fn("SessionCommands.scanSandbox")(
-  function* (sessionID: Session.ID, directory: string, sandbox: Pick<SandboxProvider.Interface, "enabled" | "run" | "fileRead">) {
-    if (!sandbox.enabled) return []
-    const startedAt = Date.now()
-    const command = `for d in /workspace/.opencode/command /workspace/.opencode/commands; do [ ! -d "$d" ] || find "$d" -type f -name '*.md' -print; done`
-    const result = yield* sandbox.run({ sessionID, command, cwd: "/workspace", hostWorkdir: directory, timeoutMs: 10_000 })
-    if (result.exitCode !== 0) return yield* Effect.fail(new Error(`Sandbox command scan failed: ${result.output}`))
-    const files = [...new Set(result.output.split("\n").map((item) => item.trim()).filter(Boolean))]
-      .filter((file) => file.startsWith("/workspace/.opencode/command/") || file.startsWith("/workspace/.opencode/commands/"))
-      .filter((file) => file.endsWith(".md"))
-      .sort()
-    const definitions = yield* Effect.forEach(files, (file) => readCommand(sandbox, sessionID, file), { concurrency: 8 }).pipe(
-      Effect.map((items) => items.filter((item): item is Definition => item !== undefined)),
+  function* (
+    sessionID: Session.ID,
+    directory: string,
+    sandbox: Pick<SandboxProvider.Interface, "enabled" | "run" | "fileRead">,
+    options: { readonly force?: boolean; readonly cache?: SandboxDefinitionCache<Definition> } = {},
+  ) {
+    return yield* scanSandboxMarkdown(scanInput(sessionID, directory, sandbox, options)).pipe(
+      Effect.mapError((error) => new Error(error.message)),
     )
-    // Names and counts only; template bodies, user arguments, and file contents stay out of logs.
-    yield* Effect.logInfo("Sandbox command scan completed", {
-      sessionID,
-      source: "sandbox" as const,
-      discovered: files.length,
-      loaded: definitions.length,
-      durationMs: Date.now() - startedAt,
-    })
-    return definitions
   },
 )
 
-function readCommand(sandbox: Pick<SandboxProvider.Interface, "fileRead">, sessionID: Session.ID, file: string) {
-  return Effect.gen(function* () {
-    const relative = file.replace(/^\/workspace\/\.opencode\/(?:command|commands)\//, "").replaceAll("\\", "/")
-    const name = relative.replace(/\.md$/i, "")
-    if (!validName(name)) return undefined
-    const raw = yield* sandbox.fileRead(sessionID, file).pipe(
-      Effect.tapError(() => Effect.logWarning("Failed to read sandbox command file", { sessionID, sourcePath: relative })),
-      Effect.catch(() => Effect.succeed(null)),
-    )
-    if (raw === null) return undefined
-    const parsed = decodeMarkdown(raw)
-    if (!parsed) return undefined
-    const decoded = SessionCommand.CreatePayload.make({ name, ...parsed })
-    return SessionCommand.Definition.make({
-      ...decoded,
-      hints: decoded.hints ?? inferHints(decoded.template),
-      source: "sandbox",
-      sourcePath: relative,
-    })
+function decodeSandboxCommand(file: ScannedFile, content: string): Definition | undefined {
+  const parsed = decodeMarkdown(content)
+  if (!parsed) return undefined
+  const decoded = SessionCommand.CreatePayload.make({ name: file.id, ...parsed })
+  return SessionCommand.Definition.make({
+    ...decoded,
+    hints: decoded.hints ?? inferHints(decoded.template),
+    source: "sandbox",
+    sourcePath: file.relative,
   })
 }
 

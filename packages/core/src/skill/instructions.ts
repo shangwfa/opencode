@@ -1,9 +1,11 @@
 export * as SkillInstructions from "./instructions.js"
 
 import { makeLocationNode } from "@opencode/util/effect/app-node"
-import { Context, Effect, Layer, Schema } from "effect"
+import { Context, Effect, Layer, Option, Schema } from "effect"
 import { Agent } from "../agent.js"
 import { Skill } from "../skill.js"
+import { SessionSkills } from "../session/skills.js"
+import type { Session } from "@opencode/schema/session"
 import { Instructions } from "../instructions/index.js"
 
 const Summary = Schema.Struct({
@@ -57,7 +59,7 @@ const update = (previous: ReadonlyArray<Summary>, current: ReadonlyArray<Summary
 }
 
 export interface Interface {
-  readonly load: (agent: Agent.Selection) => Effect.Effect<Instructions.List>
+  readonly load: (agent: Agent.Selection, session?: Session.Info) => Effect.Effect<Instructions.List>
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/SkillInstructions") {}
@@ -68,10 +70,12 @@ const layer = Layer.effect(
     const skills = yield* Skill.Service
 
     return Service.of({
-      load: Effect.fn("SkillInstructions.load")(function* (selection) {
+      load: Effect.fn("SkillInstructions.load")(function* (selection, session) {
         const agent = selection.info
         if (!agent) return Instructions.empty
-        const available = Skill.available(yield* skills.list(), agent)
+        const overlay = Option.getOrUndefined(yield* Effect.serviceOption(SessionSkills.Service))
+        const current = overlay && session ? (yield* overlay.list(session)).map((item) => item.skill) : yield* skills.list()
+        const available = Skill.available(current, agent)
           .flatMap((skill) =>
             skill.description === undefined || skill.autoinvoke === false
               ? []

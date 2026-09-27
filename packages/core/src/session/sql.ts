@@ -94,12 +94,53 @@ export const SessionCommandTable = sqliteTable(
     agent: text(),
     model: text({ mode: "json" }).$type<import("@opencode/schema/config/model").ConfigModel.Selection>(),
     subagent: integer({ mode: "boolean" }),
-    hints: text({ mode: "json" }).$type<string[]>().notNull().default(sql`'[]'`),
+    hints: text({ mode: "json" })
+      .$type<string[]>()
+      .notNull()
+      .default(sql`'[]'`),
     ...Timestamps,
   },
   (table) => [
     index("session_commands_session_idx").on(table.session_id),
     uniqueIndex("session_commands_session_name_idx").on(table.session_id, table.name),
+  ],
+)
+
+export const SessionAgentTable = sqliteTable(
+  "session_agents",
+  {
+    id: text().$type<import("@opencode/schema/session-agent").ID>().primaryKey(),
+    session_id: text()
+      .$type<SessionSchema.ID>()
+      .notNull()
+      .references(() => SessionTable.id, { onDelete: "cascade" }),
+    agent_id: text().$type<import("@opencode/schema/agent").Agent.ID>().notNull(),
+    config: text({ mode: "json" }).$type<import("@opencode/schema/config/agent").ConfigAgent.Info>().notNull(),
+    ...Timestamps,
+  },
+  (table) => [uniqueIndex("session_agents_session_agent_idx").on(table.session_id, table.agent_id)],
+)
+
+/** Durable, Session-private skill snapshots. Sandbox-discovered skills never write this table. */
+export const SessionSkillTable = sqliteTable(
+  "session_skills",
+  {
+    id: text().$type<import("@opencode/schema/session-skill").SessionSkill.ID>().primaryKey(),
+    session_id: text()
+      .$type<SessionSchema.ID>()
+      .notNull()
+      .references(() => SessionTable.id, { onDelete: "cascade" }),
+    skill_id: text().$type<import("@opencode/schema/skill").Skill.ID>().notNull(),
+    name: text().notNull(),
+    description: text(),
+    autoinvoke: integer({ mode: "boolean" }),
+    content: text().notNull(),
+    resources: text({ mode: "json" }).$type<import("@opencode/schema/session-skill").SessionSkill.ResourceInput[]>().notNull().default(sql`'[]'`),
+    ...Timestamps,
+  },
+  (table) => [
+    index("session_skills_session_idx").on(table.session_id),
+    uniqueIndex("session_skills_session_skill_idx").on(table.session_id, table.skill_id),
   ],
 )
 

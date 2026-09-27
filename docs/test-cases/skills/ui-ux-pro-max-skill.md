@@ -195,3 +195,36 @@ exec_in_sandbox "$SID" 'test -s /workspace/design-system/careops/MASTER.md && te
 | T50.5 | ✅ | 生成并读取 `design-system/careops/MASTER.md` 与 `pages/dashboard.md`，AI 正确说明 override 继承关系 |
 
 > 复测日期：2026-08-25。完整资源包包含 `google-fonts.csv` 时超过 `skills/create` 请求上限，因此测试注册核心资源子集；仓库内 bundle 已包含 React stack 数据。
+
+---
+
+## V2 执行记录 2026-09-27
+
+> **环境**：Docker `opencode-saas-compose-e2e:local`（`localhost:14097`）、PostgreSQL `opencode-v2-up`、本地 OpenSandbox、`Yd-DeepSeek/deepseek-v4-flash`。
+>
+> **结果**：T50.1–T50.5 **5/5 通过**。通过 V2 HTTP API、SSE 工具事件、模型驱动的 Sandbox 命令与 PostgreSQL 校验完成。
+
+### V1 → V2 映射
+
+| V1 | V2 |
+|---|---|
+| `POST /session` | `POST /api/session` |
+| `POST /session/:id/skills/create` | `POST /api/session/:id/skills`（`id: "ui-ux-pro-max"`） |
+| `prompt_async` | `POST /api/session/:id/prompt_stream` |
+| `skills:["ui-ux-pro-max"]` | `skills:[{id:"ui-ux-pro-max"}]` |
+
+### 实际证据
+
+| 用例 | 结果 | V2 关键证据 |
+|---|---|---|
+| T50.1 | ✅ | 创建返回 `ses_*` |
+| T50.2 | ✅ | Sandbox Python 3.12.3 |
+| T50.3 | ✅ | 核心 bundle 注册 200；19 resources、无正文；PG `ui-ux-pro-max\|13532\|19`；含 react.csv、不含 google-fonts.csv |
+| T50.4 | ✅ | `[skill,shell,glob,shell×3,…]`；真实执行 `search.py --design-system`、`--domain ux`、`--stack react`；输出医疗 dashboard 的颜色/字体/响应式/focus/对比度/reduced-motion/anti-patterns |
+| T50.5 | ✅ | 真实执行 `search.py … --design-system --persist -p "CareOps" --page dashboard --output-dir /workspace`；生成并 read 非空 MASTER.md（5552B）和 dashboard.md（1237B） |
+
+### 结果说明
+
+1. 当前 V2 Session Skill 物化目录为 `/workspace/.opencode/.session-skills/<sessionID>/<digest>`。
+2. 覆盖优先级已由实际生成文件和模型读取验证：`pages/dashboard.md` 的已声明规则覆盖 `MASTER.md`；页面未声明的规则（如该例的 spacing/typography）回落到 Master。
+3. 生成的 dashboard override 仍含 Hero/CTA 等 Operations Landing section 残留，和数据看板的 KPI/图表/表格结构不完全匹配。这是生成结果质量观察，不影响持久化、查询与覆盖语义验收；实际落地应替换该页面级 section 结构。

@@ -8,6 +8,7 @@ import { Permission } from "@opencode/core/permission"
 import { AbsolutePath } from "@opencode/core/schema"
 import { Session } from "@opencode/core/session"
 import { Skill } from "@opencode/core/skill"
+import { SessionSkills } from "@opencode/core/session/skills"
 import { SkillTool } from "@opencode/core/tool/plugin/skill"
 import { Tool } from "@opencode/core/tool"
 import { tmpdir } from "./fixture/tmpdir"
@@ -22,7 +23,7 @@ import { toolIdentity, executeTool, registerToolPlugin, toolDefinitions } from "
 const skillToolNode = makeLocationNode({
   name: "test/skill-tool-plugin",
   layer: Layer.effectDiscard(registerToolPlugin(SkillTool.Plugin)),
-  deps: [Tool.node, FSUtil.node, Skill.node, Permission.node],
+  deps: [Tool.node, FSUtil.node, Skill.node, SessionSkills.node, Session.node, Permission.node],
 })
 
 const sessionID = Session.ID.make("ses_skill_tool_test")
@@ -73,9 +74,17 @@ describe("SkillTool", () => {
             get: (id) => Effect.succeed(current.find((skill) => skill.id === id)),
             list: () => Effect.succeed(current),
           })
+          const sessionSkills = Layer.mock(SessionSkills.Service, {
+            get: (_session, id) => Effect.succeed(current.find((skill) => skill.id === id) ? { skill: current.find((skill) => skill.id === id)!, source: "global", resources: [] } : undefined),
+            list: () => Effect.succeed(current.map((skill) => ({ skill, source: "global", resources: [] }))),
+            materialize: () => Effect.succeed(undefined),
+          })
+          const sessions = Layer.mock(Session.Service, { get: (id) => Effect.succeed({ id } as Session.Info), revert: {} as Session.Interface["revert"] })
           const skillToolLayer = AppNodeBuilder.build(LayerNode.group([Tool.node, skillToolNode]), [
             Permission.node.replace(permission),
             Skill.node.replace(skills),
+            SessionSkills.node.replace(sessionSkills),
+            Session.node.replace(sessions),
             Image.node.replace(imagePassthrough),
           ])
 

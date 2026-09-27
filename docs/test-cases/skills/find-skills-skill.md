@@ -566,3 +566,45 @@ psql "$PG_URL" -t -c "SELECT data->>'tool', data->'state'->>'status', substring(
 > 2. **skills.sh 返回 308**（永久重定向），文档期望 200。站点可达但需 follow-redirect；`npx skills` CLI 内部已处理（搜索正常）。
 >
 > **清理**：除 T48.9 卡死 session 外，其余测试 session 已删除。
+
+---
+
+## V2 执行记录 2026-09-27
+
+> **环境**：Docker `opencode-saas-compose-e2e:local`（`localhost:14097`）、PostgreSQL `opencode-v2-up`、本地 OpenSandbox、`Yd-DeepSeek/deepseek-v4-flash`。
+>
+> **结果**：T48.1–T48.13 功能路径均通过。本文原有接口为 V1 写法，执行时已映射到 V2 API 与 SSE 事件。
+
+### V1 → V2 映射
+
+| V1 | V2 |
+|---|---|
+| `POST /session` | `POST /api/session` |
+| `POST /session/:id/skills/create` | `POST /api/session/:id/skills`（`id: "find-skills"`） |
+| `prompt_async` | `POST /api/session/:id/prompt_stream` |
+| `skills:["find-skills"]` | `skills:[{id:"find-skills"}]` |
+| `part` 表中的工具名 | `session.tool.input.started.data.name` |
+
+### 结果与证据
+
+| 用例 | 结果 | V2 证据 |
+|---|---|---|
+| T48.1 | ✅ | 创建返回 `ses_*` |
+| T48.2 | ✅ | Node 24.19.0、npm/npx 11.17.0、`npm ping` PONG、`skills.sh=200`（已跟随跳转）、CLI 含 find/add |
+| T48.3 | ✅ | 注册 200，`source=session`、resources=0；PG `find-skills\|5456\|0` |
+| T48.4 | ✅ | 实际执行多次 `npx skills find` 与 GitHub API quality check，返回 PR review 推荐 |
+| T48.5 | ✅ | `npx skills find "react" --owner vercel-labs`，返回 4 项并给出安装命令 |
+| T48.6 | ✅ | 搜索 6 组诗歌关键词；所有候选质量不足，明确建议谨慎/自建 |
+| T48.7 | ✅ | 搜索低质量 testing 候选，按 installs、stars、来源评估并拒绝直接推荐 |
+| T48.8 | ✅ | 实际执行 `npx skills add anthropics/skills@frontend-design -g -y`，退出码 0 |
+| T48.9 | ✅ | 搜索并安装 `mattpocock/skills@tdd`；读取其 SKILL.md 后完成 add 的 RED→GREEN 两轮 Node test |
+| T48.10 | ✅ | baseline `input=6151 + cache_read=256 = 6407` |
+| T48.11 | ✅ | 注册纯 content 后 `6406 → 6559`，delta=153，未注入 5.4KB 正文 |
+| T48.12 | ✅ | guidance 路径工具序列 `[skill, shell]`；skill 输出 5896 字符，实际执行 `npx -y skills find "browser testing"` |
+| T48.13 | ✅ | 同 session 工具序列 `[shell]`，skill 0 次、`cache_read=7552`，实际执行 `npx -y skills find "react performance"` |
+
+### 执行过程注意事项
+
+1. `npx -y skills find` 与文档中的 `npx skills find` 等价，断言应匹配可选的 `-y` 参数。
+2. 纯“搜索并推荐”的提示若不限制交互，模型可能在输出结果后调用 `question` 询问是否安装；无人答复时 watchdog 会在 120 秒后中断该工具。自动化用例应明确“不得安装、不得提问、输出后结束”，或测试端实现 `question` 回答。
+3. 历史记录中的 T48.9 `/root/.agents/...` read 卡死本次**未复现**：read 后的事件序列继续包含写入 `add.test.js`、两次 `node --test` 红/绿验证及 `add.js` 编辑。

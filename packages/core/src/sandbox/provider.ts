@@ -26,7 +26,23 @@ export interface RunInput {
   readonly hostWorkdir: string
   /** Milliseconds; 0 disables the timeout. */
   readonly timeoutMs?: number
+  /**
+   * Retry only operations known to be read-only and idempotent. General shell
+   * commands must never be replayed after an ambiguous transport failure.
+   */
+  readonly retryPolicy?: "safe-read"
 }
+
+/**
+ * Sandbox SDK calls reject on transport failures. `Effect.promise` would turn that rejection
+ * into a defect that bypasses typed error handling (including `Effect.ignore` and callers'
+ * `mapError`/`catchTag`), so route them through the error channel instead.
+ */
+const attempt = <A>(evaluate: () => PromiseLike<A>) =>
+  Effect.tryPromise({
+    try: evaluate,
+    catch: (cause) => (cause instanceof Error ? cause : new Error(String(cause))),
+  })
 
 /**
  * Outcome of resolving a sandbox port address. Proxy/preview routes must never
@@ -252,6 +268,22 @@ export const isSandboxGone = (error: unknown): boolean => {
   )
 }
 
+/** A command execution context disappeared while its owning sandbox may still live. */
+export const isCommandSessionGone = (error: unknown): boolean => {
+  const message = error instanceof Error ? error.message : String(error)
+  return /\bcontext not found\b/i.test(message) || /^runInSession failed: command session .+ not found/i.test(message)
+}
+
+class CommandSessionUnavailable extends Error {
+  constructor(
+    readonly commandSessionID: string,
+    cause: Error,
+  ) {
+    super(cause.message, { cause })
+    this.name = "CommandSessionUnavailable"
+  }
+}
+
 const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
@@ -410,7 +442,7 @@ const layer = Layer.effect(
         let destroyed = false
         if (entry) {
           if (entry.commandSessionID)
-            yield* Effect.promise(() => commandsOf(entry.sb).deleteSession(entry.commandSessionID)).pipe(Effect.ignore)
+            yield* attempt(() => commandsOf(entry.sb).deleteSession(entry.commandSessionID)).pipe(Effect.ignore)
           destroyed = yield* Effect.promise(() => entry.sb.kill()).pipe(
             Effect.as(true),
             Effect.catchCause((cause) =>
@@ -419,7 +451,7 @@ const layer = Layer.effect(
               ),
             ),
           )
-          yield* Effect.promise(() => entry.sb.close()).pipe(Effect.ignore)
+          yield* attempt(() => entry.sb.close()).pipe(Effect.ignore)
         } else if (row && (row.state === "running" || row.state === "killed") && !row.id.startsWith("pending-")) {
           const remote = yield* Effect.tryPromise({
             try: () => Sandbox.connect({ connectionConfig, sandboxId: row.id, skipHealthCheck: true }),
@@ -440,7 +472,7 @@ const layer = Layer.effect(
               ),
             ),
           )
-          yield* Effect.promise(() => remote.close()).pipe(Effect.ignore)
+          yield* attempt(() => remote.close()).pipe(Effect.ignore)
         } else {
           destroyed = true
         }
@@ -524,7 +556,7 @@ const layer = Layer.effect(
         if (volumes.length === 0) {
           // No volume is attached, so the workspace directory must exist before
           // the first command can cd into it. Volume mounts provide it already.
-          yield* Effect.promise(() => commandsOf(sb).run("mkdir -p /workspace")).pipe(Effect.ignore)
+          yield* attempt(() => commandsOf(sb).run("mkdir -p /workspace")).pipe(Effect.ignore)
         }
         yield* persistSandbox(sessionID, sb)
         yield* Effect.logInfo("sandbox created", { sessionID, sandboxID: sb.id, ms: Date.now() - startedAt })
@@ -716,6 +748,47 @@ const layer = Layer.effect(
         return yield* Deferred.await(myToken)
       })
 
+    /**
+     * Forget one poisoned persistent command context without tearing down its
+     * sandbox. The compare-and-set guards prevent a late failure from clearing
+     * a command session that a concurrent caller has already recreated.
+     */
+    const invalidateCommandSession = (sessionID: string, commandSessionID: string, sb?: Sandbox) =>
+      Effect.gen(function* () {
+        const invalidated = yield* Ref.modify(entries, (map) => {
+          const entry = map.get(sessionID)
+          if (!entry || entry.commandSessionID !== commandSessionID) return [null, map] as const
+          map.set(sessionID, { ...entry, commandSessionID: "" })
+          return [entry.sb, map] as const
+        })
+        if (!invalidated) return false
+        yield* Ref.modify(commandLocks, (map) => {
+          map.delete(commandSessionID)
+          return [undefined, map] as const
+        })
+        yield* db
+          .update(SandboxTable)
+          .set({ command_session_id: null, time_updated: Date.now() })
+          .where(and(eq(SandboxTable.session_id, sessionID), eq(SandboxTable.command_session_id, commandSessionID)))
+          .run()
+          .pipe(Effect.orDie)
+        // Cleanup cannot decide whether the context is reusable: it is already
+        // invalid locally. Bound it so a broken control plane cannot block recovery.
+        const cleanupSandbox = sb ?? invalidated
+        if (cleanupSandbox)
+          yield* withOperationTimeout(
+            attempt(() => commandsOf(cleanupSandbox).deleteSession(commandSessionID)),
+            5,
+            "delete command session",
+          ).pipe(
+            Effect.tapError((cause) =>
+              Effect.logWarning("Failed to delete stale command session", { sessionID, commandSessionID, cause }),
+            ),
+            Effect.ignore,
+          )
+        return true
+      })
+
     if (config.idleReapSeconds > 0) {
       const idleReap = Effect.gen(function* () {
         const cutoff = Date.now() - config.idleReapSeconds * 1000
@@ -758,10 +831,11 @@ const layer = Layer.effect(
       )
     }
 
-    // A sandbox or command session can be reaped (idle, OOM, pod restart) while
-    // a turn is paused on the user. The first command after resuming then hits
-    // stale state. Retrying once after invalidating the cache is safe: a sandbox
-    // that is gone can never have executed the command.
+    // A sandbox can be reaped (idle, OOM, pod restart) while a turn is paused
+    // on the user. The first command after resuming then hits stale state.
+    // Retrying once after invalidating the cache is safe: a gone sandbox can
+    // never have executed the command. Command-session failures are handled
+    // separately below because replay is not generally safe for them.
     const withRecreateRetry = <A, E, R>(sessionID: string, attempt: () => Effect.Effect<A, E, R>) =>
       attempt().pipe(
         Effect.catchIf(isSandboxGone, () =>
@@ -772,6 +846,53 @@ const layer = Layer.effect(
           }),
         ),
       )
+
+    /**
+     * A missing command context is narrower than a missing sandbox. Repair it
+     * first. Only callers which explicitly declare a read-only/idempotent
+     * operation may replay it; all other commands fail after the repair so a
+     * side-effecting command is never executed twice.
+     */
+    const withCommandSessionRecovery = <A, R>(
+      sessionID: string,
+      retryPolicy: RunInput["retryPolicy"],
+      execute: () => Effect.Effect<A, Error, R>,
+    ): Effect.Effect<A, Error, R> => {
+      const repair = (error: CommandSessionUnavailable) =>
+        invalidateCommandSession(sessionID, error.commandSessionID).pipe(
+          Effect.tap(() =>
+            Effect.logWarning("command session missing; invalidated stale session", {
+              sessionID,
+              commandSessionID: error.commandSessionID,
+            }),
+          ),
+        )
+      if (retryPolicy !== "safe-read")
+        return execute().pipe(Effect.tapError((error) => (error instanceof CommandSessionUnavailable ? repair(error) : Effect.void)))
+      return execute().pipe(
+        Effect.catchIf(
+          (error): error is CommandSessionUnavailable => error instanceof CommandSessionUnavailable,
+          (first) =>
+            repair(first).pipe(
+              Effect.andThen(execute),
+              Effect.catchIf(
+                (error): error is CommandSessionUnavailable => error instanceof CommandSessionUnavailable,
+                (second) =>
+                  Effect.gen(function* () {
+                    // Two fresh command contexts failed. For this explicitly safe
+                    // read, treat the command service as sandbox-level unhealthy.
+                    yield* Effect.logWarning("command session recovery failed; rebuilding sandbox for safe read", {
+                      sessionID,
+                      commandSessionID: second.commandSessionID,
+                    })
+                    yield* invalidateSandbox(sessionID)
+                    return yield* execute()
+                  }),
+              ),
+            ),
+        ),
+      )
+    }
 
     return Service.of({
       enabled: true,
@@ -786,7 +907,7 @@ const layer = Layer.effect(
       run: (input) =>
         Effect.flatMap(resolveSandboxKey(input.sessionID), (key) =>
           withRecreateRetry(key, () =>
-          Effect.gen(function* () {
+          withCommandSessionRecovery(key, input.retryPolicy, () => Effect.gen(function* () {
             // Bounded wait: a stale cache entry or a hanging control plane must
             // not pin the command Semaphore forever (v1 used 90s).
             const sb = yield* withOperationTimeout(
@@ -810,51 +931,47 @@ const layer = Layer.effect(
             let exitCode: number | null = null
             let completed = false
 
-            const consume = Effect.promise(async () => {
-              for await (const event of commands.runInSessionStream(
-                commandSessionID,
-                input.command,
-                { workingDirectory, ...(timeoutSeconds > 0 ? { timeoutSeconds } : {}) },
-                controller.signal,
-              )) {
-                switch (event.type) {
-                  case "stdout":
-                    stdout.push(event.text ?? "")
-                    break
-                  case "stderr":
-                    stderr.push(event.text ?? "")
-                    break
-                  case "error":
-                    errorValue = String(event.error?.evalue ?? event.error?.value ?? "")
-                    return
-                  case "execution_complete":
-                    if (errorValue === undefined) exitCode = 0
-                    completed = true
-                    return
+            // `tryPromise` (not `promise`) so a transport throw such as "context not found"
+            // becomes a typed failure the callers can degrade on, instead of a defect that
+            // bypasses `mapError`/`catchTag` and kills the whole turn.
+            const consume = Effect.tryPromise({
+              try: async () => {
+                for await (const event of commands.runInSessionStream(
+                  commandSessionID,
+                  input.command,
+                  { workingDirectory, ...(timeoutSeconds > 0 ? { timeoutSeconds } : {}) },
+                  controller.signal,
+                )) {
+                  switch (event.type) {
+                    case "stdout":
+                      stdout.push(event.text ?? "")
+                      break
+                    case "stderr":
+                      stderr.push(event.text ?? "")
+                      break
+                    case "error":
+                      errorValue = String(event.error?.evalue ?? event.error?.value ?? "")
+                      return
+                    case "execution_complete":
+                      if (errorValue === undefined) exitCode = 0
+                      completed = true
+                      return
+                  }
                 }
-              }
-            })
+              },
+              catch: (cause) => (cause instanceof Error ? cause : new Error(String(cause))),
+            }).pipe(
+              Effect.mapError((cause) =>
+                isCommandSessionGone(cause) ? new CommandSessionUnavailable(commandSessionID, cause) : cause,
+              ),
+            )
 
             // A timed-out command keeps running in the sandbox, and the SDK
             // interrupt leaves the persistent session in an immediately-EOF
             // state. Recycle the command session so the next command rebuilds a
             // clean one instead of reading crossed-over output.
             const recycle = () =>
-              Effect.gen(function* () {
-                yield* Effect.promise(() => commands.deleteSession(commandSessionID)).pipe(Effect.ignore)
-                yield* Ref.modify(entries, (map) => {
-                  const entry = map.get(key)
-                  if (entry && entry.commandSessionID === commandSessionID)
-                    map.set(key, { ...entry, commandSessionID: "" })
-                  return [undefined, map] as const
-                })
-                yield* db
-                  .update(SandboxTable)
-                  .set({ command_session_id: null, time_updated: Date.now() })
-                  .where(eq(SandboxTable.session_id, key))
-                  .run()
-                  .pipe(Effect.orDie)
-              })
+              invalidateCommandSession(key, commandSessionID, sb)
 
             let timedOut = false
             const guarded =
@@ -871,7 +988,7 @@ const layer = Layer.effect(
                       orElse: () =>
                         Effect.gen(function* () {
                           timedOut = true
-                          yield* Effect.promise(() => commands.interrupt(commandSessionID)).pipe(Effect.ignore)
+                          yield* attempt(() => commands.interrupt(commandSessionID)).pipe(Effect.ignore)
                           yield* recycle().pipe(Effect.catchCause(() => Effect.void))
                         }),
                     }),
@@ -902,16 +1019,18 @@ const layer = Layer.effect(
               } satisfies ExecutionResult
             }
             // No completion, no error and no exit code means the SDK silently
-            // drained a dead command session. Surface it as a sandbox-gone
-            // failure so the recreate retry rebuilds rather than reporting a
-            // bogus success.
+            // drained a dead command session. Surface the narrower typed error
+            // so only an explicitly safe read can be replayed.
             if (!completed && errorValue === undefined && exitCode === null) {
               return yield* Effect.fail(
-                new Error(
-                  `runInSession failed: command session ${commandSessionID} not found (empty execution stream)`,
+                new CommandSessionUnavailable(
+                  commandSessionID,
+                  new Error(`runInSession failed: command session ${commandSessionID} not found (empty execution stream)`),
                 ),
               )
             }
+            if (errorValue !== undefined && isCommandSessionGone(new Error(errorValue)))
+              return yield* Effect.fail(new CommandSessionUnavailable(commandSessionID, new Error(errorValue)))
             if (errorValue !== undefined && /^-?\d+$/.test(errorValue.trim())) exitCode = Number(errorValue.trim())
             if (exitCode === 137)
               yield* Effect.logWarning("command killed by SIGKILL — likely sandbox memory OOM", {
@@ -928,6 +1047,7 @@ const layer = Layer.effect(
             } satisfies ExecutionResult
           }),
         ),
+        ),
         ).pipe(
           Effect.mapError((cause) => (cause instanceof Error ? cause : new Error(String(cause)))),
           Effect.withSpan("SandboxProvider.run"),
@@ -938,7 +1058,7 @@ const layer = Layer.effect(
           Effect.gen(function* () {
             const entry = yield* Ref.modify(entries, (map) => [map.get(key) ?? null, map] as const)
             if (!entry?.commandSessionID) return
-            yield* Effect.promise(() => commandsOf(entry.sb).interrupt(entry.commandSessionID)).pipe(Effect.ignore)
+            yield* attempt(() => commandsOf(entry.sb).interrupt(entry.commandSessionID)).pipe(Effect.ignore)
           }),
         ),
 
@@ -1031,7 +1151,7 @@ const layer = Layer.effect(
             // run without a volume, so nested paths need them first.
             const parent = sandboxPath.slice(0, sandboxPath.lastIndexOf("/"))
             if (parent.length > 0)
-              yield* Effect.promise(() => filesOf(sb).createDirectories([{ path: parent }])).pipe(Effect.ignore)
+              yield* attempt(() => filesOf(sb).createDirectories([{ path: parent }])).pipe(Effect.ignore)
             yield* Effect.tryPromise({
               try: () => filesOf(sb).writeFiles([{ path: sandboxPath, data }]),
               catch: (cause) =>

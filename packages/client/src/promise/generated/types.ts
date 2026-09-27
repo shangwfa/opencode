@@ -197,6 +197,22 @@ export type SessionAgentsMdInfo = {
 
 export type InstructionEntryKey = string
 
+export type SkillInfo = {
+  id: string
+  name: string
+  description?: string
+  autoinvoke?: boolean
+  path: string
+  content: string
+}
+
+export type SessionSkillResource = {
+  path: string
+  type: "doc" | "script" | "template" | "asset"
+  size: number
+  digest: string
+}
+
 export type SessionGenerateResponse = { data: { text: string } }
 
 export type LocationRef = { directory: string; workspaceID?: string }
@@ -418,15 +434,6 @@ export type PermissionSavedInfo = {
 
 export type CommandInfo = { name: string; description?: string }
 
-export type SkillInfo = {
-  id: string
-  name: string
-  description?: string
-  autoinvoke?: boolean
-  path: string
-  content: string
-}
-
 export type RpcOutput = { output?: any }
 
 export type PtyTicketConnectToken = { ticket: string; expires_in: number }
@@ -606,6 +613,13 @@ export type SessionInboxCompaction = {
 export type InstructionEntryInfo = { key: InstructionEntryKey; value: JsonValue }
 
 export type InstructionEntrySnapshot = Array<{ key: InstructionEntryKey; value: JsonValue; removed: boolean }>
+
+export type SessionSkillInfo = {
+  skill: SkillInfo
+  source: "global" | "session" | "sandbox"
+  sourcePath?: string
+  resources: Array<SessionSkillResource>
+}
 
 export type SessionSandboxResourceUpdated = {
   id: string
@@ -2269,6 +2283,8 @@ export type FormFields = [FormField, ...Array<FormField>]
 
 export type FormFields1 = [FormField1, ...Array<FormField1>]
 
+export type SessionAgentInfo = { agent: AgentInfo; source: "global" | "session" | "sandbox"; sourcePath?: string }
+
 export type SessionsResponse = { data: Array<SessionInfo>; cursor: { previous?: string | null; next?: string | null } }
 
 export type SessionInboxInfo = SessionInboxUser | SessionInboxSynthetic | SessionInboxCompaction | SessionInboxMove
@@ -2622,6 +2638,15 @@ export type SessionBusyError = {
 export const isSessionBusyError = (value: unknown): value is SessionBusyError =>
   typeof value === "object" && value !== null && "_tag" in value && value["_tag"] === "SessionBusyError"
 
+export type SessionAgentContentTooLargeError = {
+  readonly _tag: "SessionAgentContentTooLargeError"
+  readonly actualBytes: number
+  readonly maxBytes: number
+  readonly message: string
+}
+export const isSessionAgentContentTooLargeError = (value: unknown): value is SessionAgentContentTooLargeError =>
+  typeof value === "object" && value !== null && "_tag" in value && value["_tag"] === "SessionAgentContentTooLargeError"
+
 export type SessionAgentsMdContentTooLargeError = {
   readonly _tag: "SessionAgentsMdContentTooLargeError"
   readonly actualBytes: number
@@ -2633,6 +2658,14 @@ export const isSessionAgentsMdContentTooLargeError = (value: unknown): value is 
   value !== null &&
   "_tag" in value &&
   value["_tag"] === "SessionAgentsMdContentTooLargeError"
+
+export type SessionSkillResourceError = {
+  readonly _tag: "SessionSkillResourceError"
+  readonly message: string
+  readonly path?: string
+}
+export const isSessionSkillResourceError = (value: unknown): value is SessionSkillResourceError =>
+  typeof value === "object" && value !== null && "_tag" in value && value["_tag"] === "SessionSkillResourceError"
 
 export type InstructionEntryValueTooLargeError = {
   readonly _tag: "InstructionEntryValueTooLargeError"
@@ -5025,6 +5058,75 @@ export type SessionCommandDefinitionsRefreshInput = { readonly sessionID: { read
 
 export type SessionCommandDefinitionsRefreshOutput = { data: Array<SessionCommandDefinition> }["data"]
 
+export type SessionAgentDefinitionsListInput = { readonly sessionID: { readonly sessionID: string }["sessionID"] }
+
+export type SessionAgentDefinitionsListOutput = { data: Array<SessionAgentInfo> }["data"]
+
+export type SessionAgentDefinitionsCreateInput = {
+  readonly sessionID: { readonly sessionID: string }["sessionID"]
+  readonly id: {
+    readonly id: string
+    readonly config: {
+      readonly model?: string | { readonly providerID: string; readonly model: string; readonly variant?: string }
+      readonly request?: {
+        readonly headers?: { readonly [x: string]: string }
+        readonly body?: { readonly [x: string]: JsonValue }
+      }
+      readonly system?: string
+      readonly description?: string
+      readonly mode?: "subagent" | "primary" | "all"
+      readonly hidden?: boolean
+      readonly color?: string
+      readonly steps?: number
+      readonly disabled?: boolean
+      readonly permissions?: ReadonlyArray<{
+        readonly action: string
+        readonly resource: string
+        readonly effect: "allow" | "deny" | "ask"
+      }>
+    }
+  }["id"]
+  readonly config: {
+    readonly id: string
+    readonly config: {
+      readonly model?: string | { readonly providerID: string; readonly model: string; readonly variant?: string }
+      readonly request?: {
+        readonly headers?: { readonly [x: string]: string }
+        readonly body?: { readonly [x: string]: JsonValue }
+      }
+      readonly system?: string
+      readonly description?: string
+      readonly mode?: "subagent" | "primary" | "all"
+      readonly hidden?: boolean
+      readonly color?: string
+      readonly steps?: number
+      readonly disabled?: boolean
+      readonly permissions?: ReadonlyArray<{
+        readonly action: string
+        readonly resource: string
+        readonly effect: "allow" | "deny" | "ask"
+      }>
+    }
+  }["config"]
+}
+
+export type SessionAgentDefinitionsCreateOutput = SessionAgentInfo
+
+export type SessionAgentDefinitionsDeleteInput = {
+  readonly sessionID: { readonly sessionID: string; readonly agentID: string }["sessionID"]
+  readonly agentID: { readonly sessionID: string; readonly agentID: string }["agentID"]
+}
+
+export type SessionAgentDefinitionsDeleteOutput = void
+
+export type SessionAgentDefinitionsClearInput = { readonly sessionID: { readonly sessionID: string }["sessionID"] }
+
+export type SessionAgentDefinitionsClearOutput = void
+
+export type SessionAgentDefinitionsRefreshInput = { readonly sessionID: { readonly sessionID: string }["sessionID"] }
+
+export type SessionAgentDefinitionsRefreshOutput = { data: Array<SessionAgentInfo> }["data"]
+
 export type SessionKeepAliveInput = {
   readonly sessionID: { readonly sessionID: string }["sessionID"]
   readonly enabled?: { readonly enabled?: boolean | undefined; readonly boot?: boolean | undefined }["enabled"]
@@ -5103,6 +5205,103 @@ export type SessionAgentsMdRemoveOutput = void
 export type SessionInstructionsEntryListInput = { readonly sessionID: { readonly sessionID: string }["sessionID"] }
 
 export type SessionInstructionsEntryListOutput = { data: Array<InstructionEntryInfo> }["data"]
+
+export type SessionSkillDefinitionsListInput = { readonly sessionID: { readonly sessionID: string }["sessionID"] }
+
+export type SessionSkillDefinitionsListOutput = { data: Array<SessionSkillInfo> }["data"]
+
+export type SessionSkillDefinitionsCreateInput = {
+  readonly sessionID: { readonly sessionID: string }["sessionID"]
+  readonly id: {
+    readonly id: string
+    readonly name?: string
+    readonly description?: string
+    readonly autoinvoke?: boolean
+    readonly content: string
+    readonly resources?: ReadonlyArray<{
+      readonly path: string
+      readonly type: "doc" | "script" | "template" | "asset"
+      readonly content: string
+    }>
+  }["id"]
+  readonly name?: {
+    readonly id: string
+    readonly name?: string
+    readonly description?: string
+    readonly autoinvoke?: boolean
+    readonly content: string
+    readonly resources?: ReadonlyArray<{
+      readonly path: string
+      readonly type: "doc" | "script" | "template" | "asset"
+      readonly content: string
+    }>
+  }["name"]
+  readonly description?: {
+    readonly id: string
+    readonly name?: string
+    readonly description?: string
+    readonly autoinvoke?: boolean
+    readonly content: string
+    readonly resources?: ReadonlyArray<{
+      readonly path: string
+      readonly type: "doc" | "script" | "template" | "asset"
+      readonly content: string
+    }>
+  }["description"]
+  readonly autoinvoke?: {
+    readonly id: string
+    readonly name?: string
+    readonly description?: string
+    readonly autoinvoke?: boolean
+    readonly content: string
+    readonly resources?: ReadonlyArray<{
+      readonly path: string
+      readonly type: "doc" | "script" | "template" | "asset"
+      readonly content: string
+    }>
+  }["autoinvoke"]
+  readonly content: {
+    readonly id: string
+    readonly name?: string
+    readonly description?: string
+    readonly autoinvoke?: boolean
+    readonly content: string
+    readonly resources?: ReadonlyArray<{
+      readonly path: string
+      readonly type: "doc" | "script" | "template" | "asset"
+      readonly content: string
+    }>
+  }["content"]
+  readonly resources?: {
+    readonly id: string
+    readonly name?: string
+    readonly description?: string
+    readonly autoinvoke?: boolean
+    readonly content: string
+    readonly resources?: ReadonlyArray<{
+      readonly path: string
+      readonly type: "doc" | "script" | "template" | "asset"
+      readonly content: string
+    }>
+  }["resources"]
+}
+
+export type SessionSkillDefinitionsCreateOutput = SessionSkillInfo
+
+export type SessionSkillDefinitionsDeleteInput = {
+  readonly sessionID: { readonly sessionID: string; readonly skillID: string }["sessionID"]
+  readonly skillID: { readonly sessionID: string; readonly skillID: string }["skillID"]
+}
+
+export type SessionSkillDefinitionsDeleteOutput = void
+
+export type SessionSkillDefinitionsClearInput = { readonly sessionID: { readonly sessionID: string }["sessionID"] }
+
+export type SessionSkillDefinitionsClearOutput = void
+
+export type SessionSkillDefinitionsRefreshInput = { readonly sessionID: { readonly sessionID: string }["sessionID"] }
+
+export type SessionSkillDefinitionsRefreshOutput = { data: Array<SessionSkillInfo> }["data"]
 
 export type SessionInstructionsEntryPutInput = {
   readonly sessionID: { readonly sessionID: string; readonly key: string }["sessionID"]

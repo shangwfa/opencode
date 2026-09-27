@@ -1,5 +1,7 @@
 import { Session } from "@opencode/core/session"
 import { SessionCommands } from "@opencode/core/session/commands"
+import { SessionAgents } from "@opencode/core/session/agents"
+import { SessionSkills } from "@opencode/core/session/skills"
 import { SessionAgentsMd } from "@opencode/core/session/agents-md"
 import { SandboxProvider } from "@opencode/core/sandbox/provider"
 import { SessionStats } from "@opencode/core/session/stats"
@@ -545,6 +547,53 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
         }),
       )
       .handle(
+        "session.agentDefinitions.list",
+        Effect.fn(function* (ctx) {
+          const agents = yield* SessionAgents.Service
+          const info = yield* session.get(ctx.params.sessionID).pipe(Effect.catchTag("Session.NotFoundError", missingSession))
+          // `list` degrades on sandbox scan failure; `refresh` is the explicit scan that reports it.
+          return { data: yield* agents.list(info) }
+        }),
+      )
+      .handle(
+        "session.agentDefinitions.create",
+        Effect.fn(function* (ctx) {
+          const agents = yield* SessionAgents.Service
+          const info = yield* session.get(ctx.params.sessionID).pipe(Effect.catchTag("Session.NotFoundError", missingSession))
+          if (!SessionAgents.validName(ctx.payload.id))
+            return yield* Effect.fail(new InvalidRequestError({ field: "id", message: "Invalid agent ID" }))
+          return yield* agents.create(info.id, ctx.payload)
+        }),
+      )
+      .handle(
+        "session.agentDefinitions.delete",
+        Effect.fn(function* (ctx) {
+          const agents = yield* SessionAgents.Service
+          yield* session.get(ctx.params.sessionID).pipe(Effect.catchTag("Session.NotFoundError", missingSession))
+          yield* agents.remove(ctx.params.sessionID, ctx.params.agentID)
+          return HttpApiSchema.NoContent.make()
+        }),
+      )
+      .handle(
+        "session.agentDefinitions.clear",
+        Effect.fn(function* (ctx) {
+          const agents = yield* SessionAgents.Service
+          yield* session.get(ctx.params.sessionID).pipe(Effect.catchTag("Session.NotFoundError", missingSession))
+          yield* agents.clear(ctx.params.sessionID)
+          return HttpApiSchema.NoContent.make()
+        }),
+      )
+      .handle(
+        "session.agentDefinitions.refresh",
+        Effect.fn(function* (ctx) {
+          const agents = yield* SessionAgents.Service
+          const info = yield* session.get(ctx.params.sessionID).pipe(Effect.catchTag("Session.NotFoundError", missingSession))
+          return {
+            data: yield* agents.refresh(info).pipe(Effect.mapError((error) => new UnknownError({ message: error.message }))),
+          }
+        }),
+      )
+      .handle(
         "session.skill",
         Effect.fn(function* (ctx) {
           yield* session
@@ -776,6 +825,50 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
               : session.queueInbox({ sessionID: ctx.params.sessionID, inboxID: ctx.params.inboxID }),
             `Pending input cannot change to ${ctx.payload.delivery}`,
           )
+        }),
+      )
+      .handle(
+        "session.skillDefinitions.list",
+        Effect.fn(function* (ctx) {
+          const skills = yield* SessionSkills.Service
+          const info = yield* session.get(ctx.params.sessionID).pipe(Effect.catchTag("Session.NotFoundError", missingSession))
+          return { data: yield* skills.list(info) }
+        }),
+      )
+      .handle(
+        "session.skillDefinitions.create",
+        Effect.fn(function* (ctx) {
+          const skills = yield* SessionSkills.Service
+          yield* session.get(ctx.params.sessionID).pipe(Effect.catchTag("Session.NotFoundError", missingSession))
+          return yield* skills.create(ctx.params.sessionID, ctx.payload)
+        }),
+      )
+      .handle(
+        "session.skillDefinitions.delete",
+        Effect.fn(function* (ctx) {
+          const skills = yield* SessionSkills.Service
+          yield* session.get(ctx.params.sessionID).pipe(Effect.catchTag("Session.NotFoundError", missingSession))
+          yield* skills.remove(ctx.params.sessionID, ctx.params.skillID)
+          return HttpApiSchema.NoContent.make()
+        }),
+      )
+      .handle(
+        "session.skillDefinitions.clear",
+        Effect.fn(function* (ctx) {
+          const skills = yield* SessionSkills.Service
+          yield* session.get(ctx.params.sessionID).pipe(Effect.catchTag("Session.NotFoundError", missingSession))
+          yield* skills.clear(ctx.params.sessionID)
+          return HttpApiSchema.NoContent.make()
+        }),
+      )
+      .handle(
+        "session.skillDefinitions.refresh",
+        Effect.fn(function* (ctx) {
+          const skills = yield* SessionSkills.Service
+          const info = yield* session.get(ctx.params.sessionID).pipe(Effect.catchTag("Session.NotFoundError", missingSession))
+          return {
+            data: yield* skills.refresh(info).pipe(Effect.mapError((error) => new UnknownError({ message: error.message }))),
+          }
         }),
       )
       .handle(
