@@ -709,6 +709,50 @@ export type SessionMcpDefinitionsClearOperation<E = never> = (
   input: SessionMcpDefinitionsClearInput,
 ) => Effect.Effect<SessionMcpDefinitionsClearOutput, E>
 
+export type SessionToolDefinitionsListInput = { readonly sessionID: Session.ID }
+export type SessionToolDefinitionsListOutput = ReadonlyArray<{
+  readonly id: string & Brand.Brand<"SessionTool.ID">
+  readonly name: string & Brand.Brand<"SessionTool.Name">
+  readonly description: string
+  readonly code: string
+  readonly time: { readonly created: number; readonly updated: number }
+}>
+export type SessionToolDefinitionsListOperation<E = never> = (
+  input: SessionToolDefinitionsListInput,
+) => Effect.Effect<SessionToolDefinitionsListOutput, E>
+
+export type SessionToolDefinitionsCreateInput = {
+  readonly sessionID: Session.ID
+  readonly name: string & Brand.Brand<"SessionTool.Name">
+  readonly description: string
+  readonly code: string
+}
+export type SessionToolDefinitionsCreateOutput = {
+  readonly id: string & Brand.Brand<"SessionTool.ID">
+  readonly name: string & Brand.Brand<"SessionTool.Name">
+  readonly description: string
+  readonly code: string
+  readonly time: { readonly created: number; readonly updated: number }
+}
+export type SessionToolDefinitionsCreateOperation<E = never> = (
+  input: SessionToolDefinitionsCreateInput,
+) => Effect.Effect<SessionToolDefinitionsCreateOutput, E>
+
+export type SessionToolDefinitionsDeleteInput = {
+  readonly sessionID: Session.ID
+  readonly name: string & Brand.Brand<"SessionTool.Name">
+}
+export type SessionToolDefinitionsDeleteOutput = void
+export type SessionToolDefinitionsDeleteOperation<E = never> = (
+  input: SessionToolDefinitionsDeleteInput,
+) => Effect.Effect<SessionToolDefinitionsDeleteOutput, E>
+
+export type SessionToolDefinitionsClearInput = { readonly sessionID: Session.ID }
+export type SessionToolDefinitionsClearOutput = void
+export type SessionToolDefinitionsClearOperation<E = never> = (
+  input: SessionToolDefinitionsClearInput,
+) => Effect.Effect<SessionToolDefinitionsClearOutput, E>
+
 export type SessionSkillDefinitionsCreateInput = {
   readonly sessionID: Session.ID
   readonly id: Skill.ID
@@ -1910,6 +1954,12 @@ export interface SessionApi<E = never> {
     readonly create: SessionMcpDefinitionsCreateOperation<E>
     readonly delete: SessionMcpDefinitionsDeleteOperation<E>
     readonly clear: SessionMcpDefinitionsClearOperation<E>
+  }
+  readonly toolDefinitions: {
+    readonly list: SessionToolDefinitionsListOperation<E>
+    readonly create: SessionToolDefinitionsCreateOperation<E>
+    readonly delete: SessionToolDefinitionsDeleteOperation<E>
+    readonly clear: SessionToolDefinitionsClearOperation<E>
   }
   readonly generate: SessionGenerateOperation<E>
   readonly log: SessionLogOperation<E>

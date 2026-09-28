@@ -48,6 +48,7 @@ import { SessionAgentsMd } from "@opencode/schema/session-agents-md"
 import { SessionAgent } from "@opencode/schema/session-agent"
 import { SessionSkill } from "@opencode/schema/session-skill"
 import { SessionMcp } from "@opencode/schema/session-mcp"
+import { SessionTool } from "@opencode/schema/session-tool"
 
 const ParentIDFilter = Schema.Union([
   Session.ID,
@@ -996,6 +997,68 @@ export const makeSessionGroup = <I extends HttpApiMiddleware.AnyId, S, FormI ext
         success: HttpApiSchema.NoContent,
         error: SessionNotFoundError,
       }).middleware(sessionLocationMiddleware),
+    )
+    .add(
+      HttpApiEndpoint.get("session.toolDefinitions.list", "/api/session/:sessionID/tools", {
+        params: { sessionID: Session.ID },
+        success: Schema.Struct({ data: Schema.Array(SessionTool.Info) }),
+        error: [SessionNotFoundError, UnknownError],
+      })
+        .middleware(sessionLocationMiddleware)
+        .annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.toolDefinitions.list",
+            summary: "List session tools",
+            description: "Get custom tool definitions attached to a specific Session.",
+          }),
+        ),
+    )
+    .add(
+      HttpApiEndpoint.post("session.toolDefinitions.create", "/api/session/:sessionID/tools", {
+        params: { sessionID: Session.ID },
+        payload: SessionTool.Payload,
+        success: SessionTool.Info,
+        error: [SessionNotFoundError, UnknownError],
+      })
+        .middleware(sessionLocationMiddleware)
+        .annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.toolDefinitions.create",
+            summary: "Create or update a session tool",
+            description:
+              "Upsert one custom tool definition by name. The code field holds a ToolDefinition module; updated code takes effect on the next request.",
+          }),
+        ),
+    )
+    .add(
+      HttpApiEndpoint.delete("session.toolDefinitions.delete", "/api/session/:sessionID/tools/:name", {
+        params: { sessionID: Session.ID, name: SessionTool.Name },
+        success: HttpApiSchema.NoContent,
+        error: SessionNotFoundError,
+      })
+        .middleware(sessionLocationMiddleware)
+        .annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.toolDefinitions.delete",
+            summary: "Delete a session tool",
+            description: "Remove one custom tool by name. Deleting is idempotent.",
+          }),
+        ),
+    )
+    .add(
+      HttpApiEndpoint.delete("session.toolDefinitions.clear", "/api/session/:sessionID/tools", {
+        params: { sessionID: Session.ID },
+        success: HttpApiSchema.NoContent,
+        error: SessionNotFoundError,
+      })
+        .middleware(sessionLocationMiddleware)
+        .annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.toolDefinitions.clear",
+            summary: "Clear session tools",
+            description: "Remove all custom tools attached to a specific Session. Clearing is idempotent.",
+          }),
+        ),
     )
     .add(
       HttpApiEndpoint.post("session.skillDefinitions.create", "/api/session/:sessionID/skills", {

@@ -114,6 +114,14 @@ import type {
   SessionMcpDefinitionsDeleteOutput,
   SessionMcpDefinitionsClearInput,
   SessionMcpDefinitionsClearOutput,
+  SessionToolDefinitionsListInput,
+  SessionToolDefinitionsListOutput,
+  SessionToolDefinitionsCreateInput,
+  SessionToolDefinitionsCreateOutput,
+  SessionToolDefinitionsDeleteInput,
+  SessionToolDefinitionsDeleteOutput,
+  SessionToolDefinitionsClearInput,
+  SessionToolDefinitionsClearOutput,
   SessionSkillDefinitionsCreateInput,
   SessionSkillDefinitionsCreateOutput,
   SessionSkillDefinitionsDeleteInput,
@@ -1321,6 +1329,53 @@ export function make(options: ClientOptions) {
             {
               method: "DELETE",
               path: `/api/session/${encodeURIComponent(input.sessionID)}/mcps`,
+              successStatus: 204,
+              declaredStatuses: [400, 401, 404],
+              empty: true,
+            },
+            requestOptions,
+          ),
+      },
+      toolDefinitions: {
+        list: (input: SessionToolDefinitionsListInput, requestOptions?: RequestOptions) =>
+          request<{ readonly data: SessionToolDefinitionsListOutput }>(
+            {
+              method: "GET",
+              path: `/api/session/${encodeURIComponent(input.sessionID)}/tools`,
+              successStatus: 200,
+              declaredStatuses: [400, 401, 404, 500],
+              empty: false,
+            },
+            requestOptions,
+          ).then((value) => value.data),
+        create: (input: SessionToolDefinitionsCreateInput, requestOptions?: RequestOptions) =>
+          request<SessionToolDefinitionsCreateOutput>(
+            {
+              method: "POST",
+              path: `/api/session/${encodeURIComponent(input.sessionID)}/tools`,
+              body: { name: input["name"], description: input["description"], code: input["code"] },
+              successStatus: 200,
+              declaredStatuses: [400, 401, 404, 500],
+              empty: false,
+            },
+            requestOptions,
+          ),
+        delete: (input: SessionToolDefinitionsDeleteInput, requestOptions?: RequestOptions) =>
+          request<SessionToolDefinitionsDeleteOutput>(
+            {
+              method: "DELETE",
+              path: `/api/session/${encodeURIComponent(input.sessionID)}/tools/${encodeURIComponent(input.name)}`,
+              successStatus: 204,
+              declaredStatuses: [400, 401, 404],
+              empty: true,
+            },
+            requestOptions,
+          ),
+        clear: (input: SessionToolDefinitionsClearInput, requestOptions?: RequestOptions) =>
+          request<SessionToolDefinitionsClearOutput>(
+            {
+              method: "DELETE",
+              path: `/api/session/${encodeURIComponent(input.sessionID)}/tools`,
               successStatus: 204,
               declaredStatuses: [400, 401, 404],
               empty: true,

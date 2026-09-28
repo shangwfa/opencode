@@ -232,6 +232,15 @@ CREATE TABLE "session_v2" (
           "time_suspended" bigint,
           "resume_attempts" bigint DEFAULT 0 NOT NULL
         );
+CREATE TABLE "session_tools" (
+          "id" text PRIMARY KEY,
+          "session_id" text NOT NULL,
+          "name" text NOT NULL,
+          "description" text NOT NULL,
+          "code" text NOT NULL,
+          "time_created" bigint NOT NULL,
+          "time_updated" bigint NOT NULL
+        );
 CREATE TABLE "workspace" (
           "id" text PRIMARY KEY,
           "provider" text NOT NULL,
@@ -275,6 +284,8 @@ CREATE INDEX "session_v2_app_id_idx" ON "session_v2" ("app_id");
 CREATE INDEX "session_v2_workspace_idx" ON "session_v2" ("workspace_id");
 CREATE INDEX "session_v2_parent_idx" ON "session_v2" ("parent_id");
 CREATE INDEX "session_v2_time_suspended_idx" ON "session_v2" ("time_suspended") WHERE "session_v2"."time_suspended" is not null;
+CREATE INDEX "session_tools_session_idx" ON "session_tools" ("session_id");
+CREATE UNIQUE INDEX "session_tools_session_name_idx" ON "session_tools" ("session_id","name");
 
 ALTER TABLE "account_state" ADD CONSTRAINT "fk_account_state_active_account_id_account_id_fk" FOREIGN KEY ("active_account_id") REFERENCES "account"("id") ON DELETE SET NULL;
 ALTER TABLE "event" ADD CONSTRAINT "fk_event_aggregate_id_event_sequence_aggregate_id_fk" FOREIGN KEY ("aggregate_id") REFERENCES "event_sequence"("aggregate_id") ON DELETE CASCADE;
@@ -291,4 +302,5 @@ ALTER TABLE "session_message" ADD CONSTRAINT "fk_session_message_session_id_sess
 ALTER TABLE "session_pending" ADD CONSTRAINT "fk_session_pending_session_id_session_v2_id_fk" FOREIGN KEY ("session_id") REFERENCES "session_v2"("id") ON DELETE CASCADE;
 ALTER TABLE "session_skills" ADD CONSTRAINT "fk_session_skills_session_id_session_v2_id_fk" FOREIGN KEY ("session_id") REFERENCES "session_v2"("id") ON DELETE CASCADE;
 ALTER TABLE "session_v2" ADD CONSTRAINT "fk_session_v2_project_id_project_id_fk" FOREIGN KEY ("project_id") REFERENCES "project"("id") ON DELETE CASCADE;
+ALTER TABLE "session_tools" ADD CONSTRAINT "fk_session_tools_session_id_session_v2_id_fk" FOREIGN KEY ("session_id") REFERENCES "session_v2"("id") ON DELETE CASCADE;
 ALTER TABLE "worktree" ADD CONSTRAINT "fk_worktree_project_id_project_id_fk" FOREIGN KEY ("project_id") REFERENCES "project"("id") ON DELETE CASCADE;

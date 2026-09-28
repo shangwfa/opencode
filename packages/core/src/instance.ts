@@ -51,6 +51,7 @@ import { SessionAgentsMd } from "./session/agents-md.js"
 import { SessionAgents } from "./session/agents.js"
 import { SessionSkills } from "./session/skills.js"
 import { SessionMcps } from "./session/mcps.js"
+import { SessionTools } from "./session/tools.js"
 import { SessionInstructions } from "./session/instructions.js"
 import { McpTool } from "./tool/mcp.js"
 import { ReadToolFileSystem } from "./tool/read-filesystem.js"
@@ -105,6 +106,7 @@ const nodes = [
   SessionAgents.node,
   SessionSkills.node,
   SessionMcps.node,
+  SessionTools.node,
   Form.node,
   Generate.node,
   ReadToolFileSystem.node,

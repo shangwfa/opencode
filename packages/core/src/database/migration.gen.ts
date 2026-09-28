@@ -56,6 +56,7 @@ import m53 from "./migration/20260925084546_rare_sway.js"
 import m54 from "./migration/20260925133852_session_agents.js"
 import m55 from "./migration/20260927014808_tan_shiver_man.js"
 import m56 from "./migration/20260927134128_chief_la_nuit.js"
+import m57 from "./migration/20260928110014_sparkling_la_nuit.js"
 
 export const migrations = [
   m00,
@@ -115,4 +116,5 @@ export const migrations = [
   m54,
   m55,
   m56,
+  m57,
 ] satisfies DatabaseMigration.Migration[]

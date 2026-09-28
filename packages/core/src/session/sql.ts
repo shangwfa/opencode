@@ -166,6 +166,26 @@ export const SessionMcpTable = sqliteTable(
   ],
 )
 
+/** Durable session-scoped custom tool definitions; loaded and executed at request time. */
+export const SessionToolTable = sqliteTable(
+  "session_tools",
+  {
+    id: text().$type<import("@opencode/schema/session-tool").SessionTool.ID>().primaryKey(),
+    session_id: text()
+      .$type<SessionSchema.ID>()
+      .notNull()
+      .references(() => SessionTable.id, { onDelete: "cascade" }),
+    name: text().$type<import("@opencode/schema/session-tool").SessionTool.Name>().notNull(),
+    description: text().notNull(),
+    code: text().notNull(),
+    ...Timestamps,
+  },
+  (table) => [
+    index("session_tools_session_idx").on(table.session_id),
+    uniqueIndex("session_tools_session_name_idx").on(table.session_id, table.name),
+  ],
+)
+
 export const SessionAgentsMdTable = sqliteTable(
   "session_agents_md",
   {

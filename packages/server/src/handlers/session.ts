@@ -3,6 +3,7 @@ import { SessionCommands } from "@opencode/core/session/commands"
 import { SessionAgents } from "@opencode/core/session/agents"
 import { SessionSkills } from "@opencode/core/session/skills"
 import { SessionMcps } from "@opencode/core/session/mcps"
+import { SessionTools } from "@opencode/core/session/tools"
 import { SessionAgentsMd } from "@opencode/core/session/agents-md"
 import { SandboxProvider } from "@opencode/core/sandbox/provider"
 import { SessionStats } from "@opencode/core/session/stats"
@@ -889,6 +890,40 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
             .get(ctx.params.sessionID)
             .pipe(Effect.catchTag("Session.NotFoundError", missingSession))
           yield* mcps.clear(info)
+          return HttpApiSchema.NoContent.make()
+        }),
+      )
+      .handle(
+        "session.toolDefinitions.list",
+        Effect.fn(function* (ctx) {
+          const tools = yield* SessionTools.Service
+          yield* session.get(ctx.params.sessionID).pipe(Effect.catchTag("Session.NotFoundError", missingSession))
+          return { data: yield* tools.list(ctx.params.sessionID) }
+        }),
+      )
+      .handle(
+        "session.toolDefinitions.create",
+        Effect.fn(function* (ctx) {
+          const tools = yield* SessionTools.Service
+          yield* session.get(ctx.params.sessionID).pipe(Effect.catchTag("Session.NotFoundError", missingSession))
+          return yield* tools.create(ctx.params.sessionID, ctx.payload)
+        }),
+      )
+      .handle(
+        "session.toolDefinitions.delete",
+        Effect.fn(function* (ctx) {
+          const tools = yield* SessionTools.Service
+          yield* session.get(ctx.params.sessionID).pipe(Effect.catchTag("Session.NotFoundError", missingSession))
+          yield* tools.remove(ctx.params.sessionID, ctx.params.name)
+          return HttpApiSchema.NoContent.make()
+        }),
+      )
+      .handle(
+        "session.toolDefinitions.clear",
+        Effect.fn(function* (ctx) {
+          const tools = yield* SessionTools.Service
+          yield* session.get(ctx.params.sessionID).pipe(Effect.catchTag("Session.NotFoundError", missingSession))
+          yield* tools.clear(ctx.params.sessionID)
           return HttpApiSchema.NoContent.make()
         }),
       )

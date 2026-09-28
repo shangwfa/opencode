@@ -24,6 +24,7 @@ import { SessionAgentsMd } from "./agents-md.js"
 import { SessionAgents } from "./agents.js"
 import { SessionSkills } from "./skills.js"
 import { SessionMcps } from "./mcps.js"
+import { SessionTools } from "./tools.js"
 import { SessionMessage } from "./message.js"
 import { SessionModelRequest } from "./model-request.js"
 import { SessionRunnerModel } from "./runner/model.js"
@@ -82,6 +83,7 @@ const layer = Layer.effect(
     const sessionAgents = yield* SessionAgents.Service
     const sessionSkills = yield* SessionSkills.Service
     const sessionMcps = yield* SessionMcps.Service
+    const sessionTools = yield* SessionTools.Service
     const builtins = yield* InstructionBuiltIns.Service
     const model = yield* Model.Service
     const db = (yield* Database.Service).db
@@ -138,16 +140,19 @@ const layer = Layer.effect(
       if (!agent.info) return yield* new AgentNotFoundError({ sessionID: session.id, agent: session.agent ?? agent.id })
       yield* sessionSkills.rematerialize(session)
       const sessionMcpTools = yield* sessionMcps.tools(session)
+      const sessionCustomTools = yield* sessionTools.load(session)
       const loaded = yield* Effect.all(
         {
-          tools: registry.snapshot(
-            Permission.merge(agent.info.permissions, session.permissions ?? []),
-            sessionMcpTools.map((tool) =>
+          tools: registry.snapshot(Permission.merge(agent.info.permissions, session.permissions ?? []), [
+            ...sessionMcpTools.map((tool) =>
               mcpTools.create(tool, ({ args }) =>
                 sessionMcps.call({ session, server: tool.server, name: tool.name, args }),
               ),
             ),
-          ),
+            // Session custom tools overlay same-named Location registrations for
+            // this request only; deleting one restores the builtin on the next select.
+            ...sessionCustomTools,
+          ]),
           builtins: builtins.load(sessionID),
           discovery: discovery.load(),
           skills: skillInstructions.load(agent, session),
@@ -214,6 +219,7 @@ export const node = makeLocationNode({
     SessionAgents.node,
     SessionSkills.node,
     SessionMcps.node,
+    SessionTools.node,
     Location.node,
     McpInstructions.node,
     McpTool.node,

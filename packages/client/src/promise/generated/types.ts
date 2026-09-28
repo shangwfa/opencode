@@ -215,6 +215,14 @@ export type SessionSkillResource = {
 
 export type McpProtocol = "legacy" | "auto" | "2026-07-28"
 
+export type SessionToolInfo = {
+  id: string
+  name: string
+  description: string
+  code: string
+  time: { created: number; updated: number }
+}
+
 export type SessionGenerateResponse = { data: { text: string } }
 
 export type LocationRef = { directory: string; workspaceID?: string }
@@ -5305,6 +5313,30 @@ export type SessionMcpDefinitionsDeleteOutput = void
 export type SessionMcpDefinitionsClearInput = { readonly sessionID: { readonly sessionID: string }["sessionID"] }
 
 export type SessionMcpDefinitionsClearOutput = void
+
+export type SessionToolDefinitionsListInput = { readonly sessionID: { readonly sessionID: string }["sessionID"] }
+
+export type SessionToolDefinitionsListOutput = { data: Array<SessionToolInfo> }["data"]
+
+export type SessionToolDefinitionsCreateInput = {
+  readonly sessionID: { readonly sessionID: string }["sessionID"]
+  readonly name: { readonly name: string; readonly description: string; readonly code: string }["name"]
+  readonly description: { readonly name: string; readonly description: string; readonly code: string }["description"]
+  readonly code: { readonly name: string; readonly description: string; readonly code: string }["code"]
+}
+
+export type SessionToolDefinitionsCreateOutput = SessionToolInfo
+
+export type SessionToolDefinitionsDeleteInput = {
+  readonly sessionID: { readonly sessionID: string; readonly name: string }["sessionID"]
+  readonly name: { readonly sessionID: string; readonly name: string }["name"]
+}
+
+export type SessionToolDefinitionsDeleteOutput = void
+
+export type SessionToolDefinitionsClearInput = { readonly sessionID: { readonly sessionID: string }["sessionID"] }
+
+export type SessionToolDefinitionsClearOutput = void
 
 export type SessionSkillDefinitionsCreateInput = {
   readonly sessionID: { readonly sessionID: string }["sessionID"]

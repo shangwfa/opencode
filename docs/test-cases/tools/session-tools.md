@@ -2,6 +2,47 @@
 
 > 前置条件：SaaS 服务已启动（`docs/local-test-env.md`），仅 PG 模式（SaaS）下生效。
 
+> **V2 状态（2026-09-28）**：历史命令使用 V1 `/session/:id/tools[/create]` 与 `part` 表契约。V2 映射：`POST /api/session/:sessionID/tools`（upsert）、`GET /api/session/:sessionID/tools`、`DELETE .../tools/:name`、`DELETE .../tools`；PG 表 `session_tools`（`stl_` id 沿用）；证据取 `GET /api/session/:sessionID/context` 的 tool part（V2 通用 tool state 为 `content` 数组，V1 的 `state.output` 等价于 `state.content` 文本；`title` 在 `state.metadata.title`）。V1 code（`import { tool } from "@opencode-ai/plugin"` + `tool.schema.*`）原样兼容：加载时由零依赖 shim 承接该 import。
+
+## V2 执行记录 2026-09-28
+
+> **环境**：Docker `opencode-saas-mcp-v2:local`（`localhost:14099`）、PostgreSQL `opencode-v2-up`、本地 OpenSandbox、`Yd-DeepSeek/deepseek-v4-flash`。
+>
+> **结果**：T32.1–T32.24、T32.27、T32.28 全部通过（T32.25/26 历史移除）。
+
+| 用例                    | 结果          | 证据                                                                                                                                                                                    |
+| ----------------------- | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T32.1–T32.9 CRUD/G1-G9  | ✅            | `stl_` id、按 name 排序、upsert 更新字段、删除/清空/隔离/级联（删 session 后 list=404、PG=0）全部符合；V2 收紧：不存在 session 的 create/list 均 404（V1 create=500 FK 特例取消）       |
+| T32.10 合并调用         | ✅            | `add-numbers` completed，输出 `8`                                                                                                                                                       |
+| T32.11 自定义工具可用   | ✅            | `reverse-text` completed，输出 `olleh`                                                                                                                                                  |
+| T32.12 坏 code 容错     | ✅            | `broken-tool`（语法错误）跳过 0 调用，`greet` 正常 `Hello from session tool!`                                                                                                           |
+| T32.13 完整工作流       | ✅            | 创建→调用 `100C = 212F`→列表存在→删除后消失                                                                                                                                             |
+| T32.14 tool.schema 类型 | ✅            | string/number/boolean 参数源码完整持久化                                                                                                                                                |
+| T32.15 非法 name        | ✅（V2 修复） | 空串与 `bad name` 均 400（V1 已知校验缺失在 V2 收紧达成期望）                                                                                                                           |
+| T32.16 内置零干扰       | ✅            | 3 个 session tools 注册后内置 shell 正常，输出含 `BUILTIN_STILL_WORKS`                                                                                                                  |
+| T32.17 时间戳           | ✅            | 创建时 created==updated；upsert 后 created 不变、updated 变大                                                                                                                           |
+| T32.18/19 幂等          | ✅            | 删不存在、连续 clear 均 204                                                                                                                                                             |
+| T32.20 execute 异常     | ✅            | `crash-tool`→error（`Simulated tool failure`），`safe-tool`→completed，session 不崩                                                                                                     |
+| T32.21 title 结构       | ✅            | `metadata.title="Greeted World"`，文本 `Hello, World!`                                                                                                                                  |
+| T32.22 多工具           | ✅            | `add=30`、`multiply=30` 均 completed                                                                                                                                                    |
+| T32.23 PG 一致性        | ✅            | API count 与 PG count 每步一致（2→1→0）                                                                                                                                                 |
+| T32.24 覆盖内置 + 回退  | ✅            | 覆盖期间 `shell` 返回 `SESSION_BASH_OVERRIDE:echo SHOULD_NOT_RUN`（未真执行）；删除后回退内置 shell，输出 `FALLBACK_SHELL_OK` 且无 override 标记（V1 的 `bash` 映射为 V2 内置 `shell`） |
+| T32.27 非法导出跳过     | ✅            | `not-a-tool` 存 PG 但不进工具目录（0 调用），`good-tool` 正常                                                                                                                           |
+| T32.28 code 热更新      | ✅            | 第一次 `VERSION_1`，upsert 新 code 后第二次 `VERSION_2`（按 code hash 缓存，无失效问题）                                                                                                |
+
+**实现要点（V2）**：
+
+1. 请求级 Tool overlay 注入（`Tool.snapshot`，与 Session MCP 同构）：同名覆盖内置工具、删除后下一次请求回退、会话之间零泄漏。
+2. session tools 注册为 `codemode: false`（原生工具列表直调，对齐 V1"LLM 直接调用"语义）。
+3. `importToolCode` 按 code 内容 hash 缓存模块；`tool()` 的 `args` zod shape 自动推导宽松 JsonSchema（type/description/required）；无 output schema 时声明 string output 并把 V1 `output` 文本同时写入 `content`。
+4. 执行上下文为 `{...Tool.Context, directory}`；不支持 V1 的 `ask` 桥接（当前用例未覆盖，后续可桥接 Permission）。
+5. **安全边界（与 V1 一致的既定决策）**：tool code 在 server 进程内动态加载执行，等价 V1 `importToolCode` 语义；沙箱化执行列为后续演进项。
+
+**E2E 期间发现并修复的实现问题**：
+
+- `Tool result declared output without an output schema`：registry 契约要求声明 output schema 才能返回 `output`——修正为声明 string output（或用户 code 的 `def.output`）并同步 `content`。
+- V2 通用 tool state 无 `output` 字段（仅 shell 特有），证据应取 `state.content`；用例断言的取值路径已映射。
+
 ## 设计概述
 
 Session Tools 允许在特定 session 中动态注册**自定义工具**。工具以 JS/TS 源码形式存储在 `session_tools` 表中（`name` / `description` / `code`），运行时通过 `importToolCode` 动态加载为模块，经 `fromSessionToolDef` 包装后与 opencode 内置工具通过 **Map 覆盖**合并，统一提供给 LLM。
@@ -34,10 +75,10 @@ const MODEL = { providerID: "Yd-DeepSeek", modelID: "deepseek-v4-flash" }
 ```js
 // code 字段的标准模板（用于 create 请求）
 function makeCode(opts) {
-  const { name = "test-tool", description = "Test tool", args = {}, body = 'return `result`' } = opts
-  const argsStr = Object.entries(args).map(([k, v]) =>
-    `${k}: tool.schema.${v}().describe("${k}")`
-  ).join(",\n    ")
+  const { name = "test-tool", description = "Test tool", args = {}, body = "return `result`" } = opts
+  const argsStr = Object.entries(args)
+    .map(([k, v]) => `${k}: tool.schema.${v}().describe("${k}")`)
+    .join(",\n    ")
   return `import { tool } from "@opencode-ai/plugin"
 
 export default tool({
@@ -76,7 +117,7 @@ async function sendAndWait(sid, body, timeout = 60000) {
                 if (!s || s === sid) {
                   clearTimeout(timer)
                   const msgs = await (await fetch(BASE + "/session/" + sid + "/message")).json()
-                  const lastAi = [...msgs].reverse().find(m => m.info?.role === "assistant")
+                  const lastAi = [...msgs].reverse().find((m) => m.info?.role === "assistant")
                   reader.cancel()
                   resolve(lastAi)
                   return
@@ -89,7 +130,8 @@ async function sendAndWait(sid, body, timeout = 60000) {
     }
     readLoop()
     await fetch(BASE + "/session/" + sid + "/prompt_async", {
-      method: "POST", headers: { "Content-Type": "application/json" },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     })
   })
@@ -102,17 +144,17 @@ async function sendAndWait(sid, body, timeout = 60000) {
 
 > 本节按 [`00-preamble.md` 附录 A](./00-preamble.md) 的 G1-G9 通用清单执行（含通用脚本模板），资源为 `tools`（`/session/:id/tools[/create]`），PG 表 `session_tools`。原始逐步脚本见 git 历史。
 
-| 用例 | 清单 | 资源参数 | 特有期望 |
-|---|---|---|---|
-| T32.1 | G1 | `{name, description, code}`（code 为 ToolDefinition 源码） | 返回对象 id 以 `stl_` 开头；PG 记录完整 |
-| T32.2 | G2 | 建 2 个 tool | 列表按 name 排序 |
-| T32.3 | G3 | 同名更新 description + code | 列表 count=1，字段已更新 |
-| T32.4 | G4 | 删单个 | DELETE 200，列表/PG 移除 |
-| T32.5 | G5 | 建 2 个后清空 | DELETE 200，列表/PG 空 |
-| T32.6 | G6 | A/B 各建同名 tool | 列表互相隔离 |
-| T32.7 | G7 | 删除 session | GET tools → 404（`requireSession`）；PG 级联 COUNT=0 |
-| T32.8 | G9 | 缺 name / description / code | 均 400 |
-| T32.9 | G8 | ses_NOTEXIST create/list | create=500（FK）；list=404（`requireSession`） |
+| 用例  | 清单 | 资源参数                                                   | 特有期望                                             |
+| ----- | ---- | ---------------------------------------------------------- | ---------------------------------------------------- |
+| T32.1 | G1   | `{name, description, code}`（code 为 ToolDefinition 源码） | 返回对象 id 以 `stl_` 开头；PG 记录完整              |
+| T32.2 | G2   | 建 2 个 tool                                               | 列表按 name 排序                                     |
+| T32.3 | G3   | 同名更新 description + code                                | 列表 count=1，字段已更新                             |
+| T32.4 | G4   | 删单个                                                     | DELETE 200，列表/PG 移除                             |
+| T32.5 | G5   | 建 2 个后清空                                              | DELETE 200，列表/PG 空                               |
+| T32.6 | G6   | A/B 各建同名 tool                                          | 列表互相隔离                                         |
+| T32.7 | G7   | 删除 session                                               | GET tools → 404（`requireSession`）；PG 级联 COUNT=0 |
+| T32.8 | G9   | 缺 name / description / code                               | 均 400                                               |
+| T32.9 | G8   | ses_NOTEXIST create/list                                   | create=500（FK）；list=404（`requireSession`）       |
 
 ### T32.10 session tool 出现在 LLM 可用工具列表中（合并验证）
 
@@ -196,6 +238,7 @@ async function sendAndWait(sid, body, timeout = 60000) {
 }
 '
 ```
+
 **期望**：LLM 成功调用 `add-numbers` 工具，输出包含 `8`
 
 ### T32.11 session tool 覆盖同名全局工具（Map 覆盖策略）
@@ -291,6 +334,7 @@ async function sendAndWait(sid, body, timeout = 60000) {
 }
 '
 ```
+
 **期望**：session tool `reverse-text` 被成功调用，输出包含 `olleh`（hello 的反转），证明合并后 LLM 能看到 session tools
 
 ### T32.12 语法错误的 code 不影响其他工具
@@ -374,6 +418,7 @@ async function sendAndWait(sid, body, timeout = 60000) {
 }
 '
 ```
+
 **期望**：broken-tool 静默跳过，greet 工具正常调用，内置工具不受影响
 
 ### T32.13 完整工作流（创建 → 执行 → 验证 → 清理）
@@ -463,6 +508,7 @@ const list2 = await (await fetch(BASE + "/session/" + SID.id + "/tools")).json()
 console.log("Step4 c-to-f deleted:", !list2.some(t => t.name === "c-to-f"))
 '
 ```
+
 **期望**：完整流程顺利执行：创建→LLM 调用返回 212→列表存在→删除后消失
 
 ### T32.14 code 使用 tool.schema 定义参数类型
@@ -495,6 +541,7 @@ console.log("code has tool.schema.number:", res.code.includes("tool.schema.numbe
 console.log("code has tool.schema.boolean:", res.code.includes("tool.schema.boolean"))
 '
 ```
+
 **期望**：tool 创建成功，code 包含多种 `tool.schema.*` 类型定义
 
 > **PG 验证**：`docker exec ai-nova-postgres psql -U postgres -d opencode -c "SELECT name FROM session_tools WHERE session_id='$SID' AND name='profile';"`
@@ -516,6 +563,7 @@ const empty = await fetch(BASE + "/session/" + SID.id + "/tools/create", {
 console.log("empty name:", empty.status, "(实际 200；若改为 NonEmptyString 则 400)")
 '
 ```
+
 **期望**：当前代码返回 200（空 name 被接受，已知校验缺失）；若 `name` 改为 `Schema.NonEmptyString`（与 plugin 对齐）则返回 400
 
 ### T32.16 内置工具不受 session tools 影响（零干扰验证）
@@ -590,6 +638,7 @@ console.log("shell tool called:", toolParts.some(p => p.tool === "shell"))
 console.log("output contains marker:", textParts.includes("BUILTIN_STILL_WORKS"))
 '
 ```
+
 **期望**：内置 shell 工具正常调用，输出包含 `BUILTIN_STILL_WORKS`，session tools 的存在不影响内置工具
 
 ### T32.17 time_created / time_updated 行为
@@ -622,6 +671,7 @@ console.log("time_created 不变:", r2.time_created === r1.time_created)
 console.log("time_updated 变大:", r2.time_updated > r1.time_updated)
 '
 ```
+
 **期望**：创建时 `time_created === time_updated`；更新后 `time_created` 不变，`time_updated > time_created`
 
 ### T32.18 删除不存在的 tool name（幂等）
@@ -637,6 +687,7 @@ const res = await fetch(BASE + "/session/" + SID.id + "/tools/nonexistent-tool",
 console.log("DELETE nonexistent:", res.status, "(expect 200)")
 '
 ```
+
 **期望**：返回 200，不报错（幂等删除）
 
 ### T32.19 清空空 session 的 tools（幂等）
@@ -655,6 +706,7 @@ const list = await (await fetch(BASE + "/session/" + SID.id + "/tools")).json()
 console.log("still empty:", list.length === 0)
 '
 ```
+
 **期望**：返回 200，列表仍为空
 
 ### T32.20 tool execute 运行时抛异常（容错验证）
@@ -754,6 +806,7 @@ console.log("safe-tool status:", safeCalls[0]?.state?.status)
 console.log("session not crashed:", msg !== undefined)
 '
 ```
+
 **期望**：crash-tool 被调用后返回错误状态，safe-tool 仍可正常调用，session 不崩溃
 
 ### T32.21 tool 返回带 title 的结构
@@ -836,6 +889,7 @@ console.log("title correct:", toolCall?.state?.title === "Greeted World")
 console.log("output correct:", toolCall?.state?.output === "Hello, World!")
 '
 ```
+
 **期望**：`title` 为 "Greeted World"，`output` 为 "Hello, World!"
 
 ### T32.22 多个 session tools 同时被 LLM 调用
@@ -924,6 +978,7 @@ console.log("multiply called:", mulCalls.length > 0, "output:", mulCalls[0]?.sta
 console.log("both correct:", addCalls[0]?.state?.output === "30" && mulCalls[0]?.state?.output === "30")
 '
 ```
+
 **期望**：add 返回 30，multiply 返回 30，两个工具都被成功调用
 
 ### T32.23 PG 直接验证（CRUD 用例的数据库层断言）
@@ -966,6 +1021,7 @@ console.log("请执行: psql -h 127.0.0.1 -U app -d opencode -c \"SELECT COUNT(*
 console.log("期望: 0")
 '
 ```
+
 **期望**：API 返回与 PG 直接查询一致；每步后附 PG 验证 SQL
 
 ### T32.24 真实覆盖内置工具名并删除后回退
@@ -1057,6 +1113,7 @@ async function sendAndWait(sid, body, timeout = 90000) {
 }
 '
 ```
+
 **期望**：覆盖期间 `bash` 调用返回 `SESSION_BASH_OVERRIDE`；删除 session tool 后，工具列表仍包含内置 `bash`，且不再出现 override marker
 
 ### T32.27 非 ToolDefinition 导出被跳过且不影响其他工具
@@ -1099,6 +1156,7 @@ console.log("registry keeps good tool:", text.includes("good-tool"))
 console.log("builtin still visible:", text.includes("bash") || text.includes("read") || text.includes("glob"))
 '
 ```
+
 **期望**：API list 能看到 `not-a-tool` 数据库记录；LLM 可用工具列表不包含 `not-a-tool`，但包含 `good-tool` 和内置工具
 
 ### T32.28 更新 code 后下次调用使用新实现
@@ -1191,6 +1249,7 @@ async function sendAndWait(sid, body, timeout = 90000) {
 }
 '
 ```
+
 **期望**：第一次调用返回 `VERSION_1`；upsert 更新 code 后第二次调用返回 `VERSION_2`，不会命中旧 code 缓存
 
 ---
@@ -1199,34 +1258,34 @@ async function sendAndWait(sid, body, timeout = 90000) {
 
 > **编号说明**：T32.25/T32.26 为历史移除用例，保留断档不重排（避免引用失效）。
 
-| 用例 | 状态 | 备注 |
-|---|---|---|
-| T32.1 | ✅ | 创建会话级 tool（name/description/code，id 以 stl_ 开头） |
-| T32.2 | ✅ | 列出会话 tools，按 name 排序 |
-| T32.3 | ✅ | Upsert 更新同名 tool（description + code 更新） |
-| T32.4 | ✅ | 删除单个 tool → 200 |
-| T32.5 | ✅ | 清空所有 tools → 列表为空 |
-| T32.6 | ✅ | 不同 session tools 互相隔离 |
-| T32.7 | ⬜ | 删除 session 后级联清理（ON DELETE cascade）— PG 级联删除，list 返回 404 |
-| T32.8 | ✅ | 缺少必填字段（name/description/code）→ 400 |
-| T32.9 | ⬜ | 不存在 session 创建 tool → 500（FK），list → 404 |
-| T32.10 | ✅ | session tool 出现在 LLM 工具列表中（gen-uuid 被调用，输出 UUID） |
-| T32.11 | ✅ | session tool 与全局工具合并后 LLM 可调用（reverse-text 精确反转） |
-| T32.12 | ✅ | 语法错误的 code 不影响其他工具（静默跳过） |
-| T32.13 | ✅ | 完整工作流（创建→执行→验证→清理） |
-| T32.14 | ✅ | code 使用 tool.schema 定义多种参数类型 |
+| 用例   | 状态    | 备注                                                                                                     |
+| ------ | ------- | -------------------------------------------------------------------------------------------------------- |
+| T32.1  | ✅      | 创建会话级 tool（name/description/code，id 以 stl\_ 开头）                                               |
+| T32.2  | ✅      | 列出会话 tools，按 name 排序                                                                             |
+| T32.3  | ✅      | Upsert 更新同名 tool（description + code 更新）                                                          |
+| T32.4  | ✅      | 删除单个 tool → 200                                                                                      |
+| T32.5  | ✅      | 清空所有 tools → 列表为空                                                                                |
+| T32.6  | ✅      | 不同 session tools 互相隔离                                                                              |
+| T32.7  | ⬜      | 删除 session 后级联清理（ON DELETE cascade）— PG 级联删除，list 返回 404                                 |
+| T32.8  | ✅      | 缺少必填字段（name/description/code）→ 400                                                               |
+| T32.9  | ⬜      | 不存在 session 创建 tool → 500（FK），list → 404                                                         |
+| T32.10 | ✅      | session tool 出现在 LLM 工具列表中（gen-uuid 被调用，输出 UUID）                                         |
+| T32.11 | ✅      | session tool 与全局工具合并后 LLM 可调用（reverse-text 精确反转）                                        |
+| T32.12 | ✅      | 语法错误的 code 不影响其他工具（静默跳过）                                                               |
+| T32.13 | ✅      | 完整工作流（创建→执行→验证→清理）                                                                        |
+| T32.14 | ✅      | code 使用 tool.schema 定义多种参数类型                                                                   |
 | T32.15 | ⚠️ NOTE | 非法 name（空字符串）实际返回 200（`Schema.String` 接受空，校验缺失；与 plugin `NonEmptyString` 不一致） |
-| T32.16 | ✅ | 内置工具不受 session tools 影响（对照组 11 内置工具，实验组 11 内置 + 3 session = 14 工具） |
-| T32.17 | ✅ | time_created 不变，time_updated 随 upsert 增大 |
-| T32.18 | ✅ | 删除不存在的 tool name → 200（幂等） |
-| T32.19 | ✅ | 清空空 session → 200（幂等） |
-| T32.20 | ✅ | crash-tool status=error，safe-tool 正常完成，session 不崩溃 |
-| T32.21 | ✅ | title="Greeted World"，output="Hello, World!" |
-| T32.22 | ✅ | add 输出 30，multiply 输出 30，两工具均被调用 |
-| T32.23 | ✅ | API 与 PG 直接查询一致（2→1→0） |
-| T32.24 | ✅ | 真实覆盖内置 bash，删除后回退内置 bash |
-| T32.27 | ✅ | 非 ToolDefinition 导出被 registry 跳过，不影响其他工具 |
-| T32.28 | ✅ | upsert 更新 code 后下次调用使用新实现，验证 code 内容缓存不陈旧 |
+| T32.16 | ✅      | 内置工具不受 session tools 影响（对照组 11 内置工具，实验组 11 内置 + 3 session = 14 工具）              |
+| T32.17 | ✅      | time_created 不变，time_updated 随 upsert 增大                                                           |
+| T32.18 | ✅      | 删除不存在的 tool name → 200（幂等）                                                                     |
+| T32.19 | ✅      | 清空空 session → 200（幂等）                                                                             |
+| T32.20 | ✅      | crash-tool status=error，safe-tool 正常完成，session 不崩溃                                              |
+| T32.21 | ✅      | title="Greeted World"，output="Hello, World!"                                                            |
+| T32.22 | ✅      | add 输出 30，multiply 输出 30，两工具均被调用                                                            |
+| T32.23 | ✅      | API 与 PG 直接查询一致（2→1→0）                                                                          |
+| T32.24 | ✅      | 真实覆盖内置 bash，删除后回退内置 bash                                                                   |
+| T32.27 | ✅      | 非 ToolDefinition 导出被 registry 跳过，不影响其他工具                                                   |
+| T32.28 | ✅      | upsert 更新 code 后下次调用使用新实现，验证 code 内容缓存不陈旧                                          |
 
 ## 单元测试覆盖
 
