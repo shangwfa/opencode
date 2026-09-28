@@ -7,6 +7,7 @@ const config = (overrides: Partial<SandboxConfig.Config> = {}): SandboxConfig.Co
   domain: "sandbox.test",
   protocol: "http",
   useServerProxy: false,
+  mcpServerProxy: false,
   image: "test-image",
   timeoutSeconds: 600,
   idleReapSeconds: 3600,
@@ -20,8 +21,9 @@ const config = (overrides: Partial<SandboxConfig.Config> = {}): SandboxConfig.Co
 
 const pvc = config({ volumeType: "pvc" })
 
-const subPaths = (volumes: SandboxVolumes.VolumeScope extends never ? never : ReturnType<typeof SandboxVolumes.buildVolumes>) =>
-  volumes.map((volume) => ({ name: volume.name, mountPath: volume.mountPath, subPath: volume.subPath }))
+const subPaths = (
+  volumes: SandboxVolumes.VolumeScope extends never ? never : ReturnType<typeof SandboxVolumes.buildVolumes>,
+) => volumes.map((volume) => ({ name: volume.name, mountPath: volume.mountPath, subPath: volume.subPath }))
 
 describe("SandboxVolumes.buildVolumes", () => {
   test("returns no volumes when volumeType is none", () => {
@@ -102,24 +104,27 @@ describe("SandboxVolumes.buildVolumes", () => {
 
 describe("SandboxVolumes package-cache mount validation", () => {
   test("rejects non-absolute paths", () => {
-    expect(() => SandboxVolumes.buildVolumes({ sessionID: "ses_1" }, config({ volumeType: "pvc", packageCacheMount: "cache" }))).toThrow(
-      "must be an absolute path",
-    )
-    expect(() => SandboxVolumes.buildVolumes({ sessionID: "ses_1" }, config({ volumeType: "pvc", packageCacheMount: "" }))).toThrow(
-      "must be an absolute path",
-    )
+    expect(() =>
+      SandboxVolumes.buildVolumes({ sessionID: "ses_1" }, config({ volumeType: "pvc", packageCacheMount: "cache" })),
+    ).toThrow("must be an absolute path")
+    expect(() =>
+      SandboxVolumes.buildVolumes({ sessionID: "ses_1" }, config({ volumeType: "pvc", packageCacheMount: "" })),
+    ).toThrow("must be an absolute path")
   })
 
   test("rejects the filesystem root", () => {
-    expect(() => SandboxVolumes.buildVolumes({ sessionID: "ses_1" }, config({ volumeType: "pvc", packageCacheMount: "/" }))).toThrow(
-      "cannot be /",
-    )
+    expect(() =>
+      SandboxVolumes.buildVolumes({ sessionID: "ses_1" }, config({ volumeType: "pvc", packageCacheMount: "/" })),
+    ).toThrow("cannot be /")
   })
 
   test("rejects mounts overlapping reserved session directories", () => {
     for (const mountPath of ["/workspace", "/workspace/cache", "/home", "/home/sandbox/.cache"]) {
       expect(() =>
-        SandboxVolumes.buildVolumes({ sessionID: "ses_1" }, config({ volumeType: "pvc", packageCacheMount: mountPath })),
+        SandboxVolumes.buildVolumes(
+          { sessionID: "ses_1" },
+          config({ volumeType: "pvc", packageCacheMount: mountPath }),
+        ),
       ).toThrow("conflicts with reserved mount path")
     }
   })

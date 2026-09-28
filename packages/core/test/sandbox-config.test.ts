@@ -7,6 +7,7 @@ const KEYS = [
   "OPENCODE_SANDBOX_PROTOCOL",
   "OPENCODE_SANDBOX_API_KEY",
   "OPENCODE_SANDBOX_USE_SERVER_PROXY",
+  "OPENCODE_SANDBOX_MCP_SERVER_PROXY",
   "OPENCODE_SANDBOX_IMAGE",
   "OPENCODE_SANDBOX_TIMEOUT_SECONDS",
   "OPENCODE_SANDBOX_CREATE_TIMEOUT_SECONDS",
@@ -50,6 +51,17 @@ describe("SandboxConfig.load", () => {
     expect(config.protocol).toBe("http")
     expect(config.apiKey).toBe("secret")
     expect(config.useServerProxy).toBe(true)
+  })
+
+  it("defaults the MCP server proxy to on and honors explicit opt-out", () => {
+    // Unset: cross-network safe default (gateway), independent of the global flag.
+    expect(SandboxConfig.load().mcpServerProxy).toBe(true)
+    process.env["OPENCODE_SANDBOX_MCP_SERVER_PROXY"] = "false"
+    expect(SandboxConfig.load().mcpServerProxy).toBe(false)
+    process.env["OPENCODE_SANDBOX_MCP_SERVER_PROXY"] = "0"
+    expect(SandboxConfig.load().mcpServerProxy).toBe(false)
+    process.env["OPENCODE_SANDBOX_MCP_SERVER_PROXY"] = "true"
+    expect(SandboxConfig.load().mcpServerProxy).toBe(true)
   })
 
   it("keeps defaults for invalid numbers and blanks", () => {

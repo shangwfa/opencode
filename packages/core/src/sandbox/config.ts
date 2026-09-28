@@ -13,6 +13,12 @@ export interface Config {
   readonly protocol: "http" | "https"
   readonly apiKey?: string
   readonly useServerProxy: boolean
+  /**
+   * MCP-only endpoint override: when true, MCP connections resolve through the
+   * OpenSandbox server gateway even if `useServerProxy` is false. Defaults to
+   * true so cross-network deployments never dial sandbox addresses directly.
+   */
+  readonly mcpServerProxy: boolean
   readonly image: string
   /** Remote sandbox TTL (seconds) when no volume is attached. */
   readonly timeoutSeconds: number
@@ -52,6 +58,9 @@ export function load(): Config {
     protocol: env["OPENCODE_SANDBOX_PROTOCOL"] === "http" ? "http" : "https",
     apiKey: env["OPENCODE_SANDBOX_API_KEY"] || undefined,
     useServerProxy: flag(env["OPENCODE_SANDBOX_USE_SERVER_PROXY"]),
+    // Unset defaults to true (gateway); an explicit value opts into/out of it.
+    mcpServerProxy:
+      env["OPENCODE_SANDBOX_MCP_SERVER_PROXY"] === undefined ? true : flag(env["OPENCODE_SANDBOX_MCP_SERVER_PROXY"]),
     image: env["OPENCODE_SANDBOX_IMAGE"] || DEFAULT_IMAGE,
     timeoutSeconds: number(env["OPENCODE_SANDBOX_TIMEOUT_SECONDS"], 30 * 60),
     idleReapSeconds:

@@ -135,12 +135,34 @@ export const SessionSkillTable = sqliteTable(
     description: text(),
     autoinvoke: integer({ mode: "boolean" }),
     content: text().notNull(),
-    resources: text({ mode: "json" }).$type<import("@opencode/schema/session-skill").SessionSkill.ResourceInput[]>().notNull().default(sql`'[]'`),
+    resources: text({ mode: "json" })
+      .$type<import("@opencode/schema/session-skill").SessionSkill.ResourceInput[]>()
+      .notNull()
+      .default(sql`'[]'`),
     ...Timestamps,
   },
   (table) => [
     index("session_skills_session_idx").on(table.session_id),
     uniqueIndex("session_skills_session_skill_idx").on(table.session_id, table.skill_id),
+  ],
+)
+
+/** Durable Session-private MCP configuration; live connections are never persisted. */
+export const SessionMcpTable = sqliteTable(
+  "session_mcps",
+  {
+    id: text().$type<import("@opencode/schema/session-mcp").SessionMcp.ID>().primaryKey(),
+    session_id: text()
+      .$type<SessionSchema.ID>()
+      .notNull()
+      .references(() => SessionTable.id, { onDelete: "cascade" }),
+    name: text().$type<import("@opencode/schema/session-mcp").SessionMcp.Name>().notNull(),
+    config: text({ mode: "json" }).$type<import("@opencode/schema/session-mcp").SessionMcp.Config>().notNull(),
+    ...Timestamps,
+  },
+  (table) => [
+    index("session_mcps_session_idx").on(table.session_id),
+    uniqueIndex("session_mcps_session_name_idx").on(table.session_id, table.name),
   ],
 )
 

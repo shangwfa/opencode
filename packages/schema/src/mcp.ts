@@ -25,7 +25,7 @@ export const Protocol = Schema.Literals(["legacy", "auto", "2026-07-28"]).annota
 
 export class LocalConfig extends Schema.Class<LocalConfig>("Mcp.LocalConfig")({
   type: Schema.Literal("local"),
-  command: Schema.String.pipe(Schema.Array),
+  command: Schema.String.pipe(Schema.Array, Schema.check(Schema.isNonEmpty())),
   cwd: Schema.String.pipe(optional).annotate({
     description: "Working directory for the MCP server process. Relative paths resolve from the workspace directory.",
   }),

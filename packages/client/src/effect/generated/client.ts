@@ -112,6 +112,14 @@ import type {
   SessionInstructionsEntryListOutput,
   SessionSkillDefinitionsListInput,
   SessionSkillDefinitionsListOutput,
+  SessionMcpDefinitionsListInput,
+  SessionMcpDefinitionsListOutput,
+  SessionMcpDefinitionsCreateInput,
+  SessionMcpDefinitionsCreateOutput,
+  SessionMcpDefinitionsDeleteInput,
+  SessionMcpDefinitionsDeleteOutput,
+  SessionMcpDefinitionsClearInput,
+  SessionMcpDefinitionsClearOutput,
   SessionSkillDefinitionsCreateInput,
   SessionSkillDefinitionsCreateOutput,
   SessionSkillDefinitionsDeleteInput,
@@ -864,6 +872,40 @@ const EndpointSessionSkillDefinitionsList =
       ),
     )
 
+const EndpointSessionMcpDefinitionsList =
+  (raw: RawClient["server.session"]) => (input: SessionMcpDefinitionsListInput) =>
+    preserveEffect<SessionMcpDefinitionsListOutput>()(
+      raw["session.mcpDefinitions.list"]({ params: { sessionID: input["sessionID"] } }).pipe(
+        Effect.mapError(mapClientError),
+        Effect.map((value) => value.data),
+      ),
+    )
+
+const EndpointSessionMcpDefinitionsCreate =
+  (raw: RawClient["server.session"]) => (input: SessionMcpDefinitionsCreateInput) =>
+    preserveEffect<SessionMcpDefinitionsCreateOutput>()(
+      raw["session.mcpDefinitions.create"]({
+        params: { sessionID: input["sessionID"] },
+        payload: { name: input["name"], config: input["config"] },
+      }).pipe(Effect.mapError(mapClientError)),
+    )
+
+const EndpointSessionMcpDefinitionsDelete =
+  (raw: RawClient["server.session"]) => (input: SessionMcpDefinitionsDeleteInput) =>
+    preserveEffect<SessionMcpDefinitionsDeleteOutput>()(
+      raw["session.mcpDefinitions.delete"]({ params: { sessionID: input["sessionID"], name: input["name"] } }).pipe(
+        Effect.mapError(mapClientError),
+      ),
+    )
+
+const EndpointSessionMcpDefinitionsClear =
+  (raw: RawClient["server.session"]) => (input: SessionMcpDefinitionsClearInput) =>
+    preserveEffect<SessionMcpDefinitionsClearOutput>()(
+      raw["session.mcpDefinitions.clear"]({ params: { sessionID: input["sessionID"] } }).pipe(
+        Effect.mapError(mapClientError),
+      ),
+    )
+
 const EndpointSessionSkillDefinitionsCreate =
   (raw: RawClient["server.session"]) => (input: SessionSkillDefinitionsCreateInput) =>
     preserveEffect<SessionSkillDefinitionsCreateOutput>()(
@@ -1125,6 +1167,12 @@ const adaptGroupSession = (raw: RawClient["server.session"]) => ({
     delete: EndpointSessionSkillDefinitionsDelete(raw),
     clear: EndpointSessionSkillDefinitionsClear(raw),
     refresh: EndpointSessionSkillDefinitionsRefresh(raw),
+  },
+  mcpDefinitions: {
+    list: EndpointSessionMcpDefinitionsList(raw),
+    create: EndpointSessionMcpDefinitionsCreate(raw),
+    delete: EndpointSessionMcpDefinitionsDelete(raw),
+    clear: EndpointSessionMcpDefinitionsClear(raw),
   },
   generate: EndpointSessionGenerate(raw),
   log: EndpointSessionLog(raw),

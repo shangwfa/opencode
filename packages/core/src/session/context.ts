@@ -23,6 +23,7 @@ import { InstructionEntry } from "./instruction-entry.js"
 import { SessionAgentsMd } from "./agents-md.js"
 import { SessionAgents } from "./agents.js"
 import { SessionSkills } from "./skills.js"
+import { SessionMcps } from "./mcps.js"
 import { SessionMessage } from "./message.js"
 import { SessionModelRequest } from "./model-request.js"
 import { SessionRunnerModel } from "./runner/model.js"
@@ -80,6 +81,7 @@ const layer = Layer.effect(
     const agents = yield* Agent.Service
     const sessionAgents = yield* SessionAgents.Service
     const sessionSkills = yield* SessionSkills.Service
+    const sessionMcps = yield* SessionMcps.Service
     const builtins = yield* InstructionBuiltIns.Service
     const model = yield* Model.Service
     const db = (yield* Database.Service).db
@@ -135,9 +137,17 @@ const layer = Layer.effect(
       const agent = yield* sessionAgents.select(session, session.agent)
       if (!agent.info) return yield* new AgentNotFoundError({ sessionID: session.id, agent: session.agent ?? agent.id })
       yield* sessionSkills.rematerialize(session)
+      const sessionMcpTools = yield* sessionMcps.tools(session)
       const loaded = yield* Effect.all(
         {
-          tools: registry.snapshot(Permission.merge(agent.info.permissions, session.permissions ?? [])),
+          tools: registry.snapshot(
+            Permission.merge(agent.info.permissions, session.permissions ?? []),
+            sessionMcpTools.map((tool) =>
+              mcpTools.create(tool, ({ args }) =>
+                sessionMcps.call({ session, server: tool.server, name: tool.name, args }),
+              ),
+            ),
+          ),
           builtins: builtins.load(sessionID),
           discovery: discovery.load(),
           skills: skillInstructions.load(agent, session),
@@ -203,6 +213,7 @@ export const node = makeLocationNode({
     SessionAgentsMd.node,
     SessionAgents.node,
     SessionSkills.node,
+    SessionMcps.node,
     Location.node,
     McpInstructions.node,
     McpTool.node,

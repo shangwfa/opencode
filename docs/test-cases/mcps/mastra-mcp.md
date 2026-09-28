@@ -4,14 +4,36 @@
 >
 > MCP 文档：https://mastra.ai/docs/getting-started/build-with-ai
 
+> **V2 状态（2026-09-28）**：历史命令使用 V1 `/session/:id/mcps/create` 与 `part` 表契约。V2 映射：`POST /api/session/:sessionID/mcps`，payload `{name, config:{type:"local", command:[...]}}`；PG 表 `session_mcps`（`config` JSON）；消息投影表 `session_message`；工具调用经 code-mode `execute` 的 `metadata.toolCalls` 记录 `mastra.*|completed`；异步发消息用 `POST /api/session/:sessionID/prompt` + 轮询 `GET /api/session/:sessionID/context` 至 `idle`（等价 V1 `message` + PG 验证语义）。
+
+## V2 执行记录 2026-09-28
+
+> **环境**：Docker `opencode-saas-mcp-v2:local`（`localhost:14099`）、PostgreSQL `opencode-v2-up`、本地 OpenSandbox（全网关 endpoint 模式）、`Yd-DeepSeek/deepseek-v4-flash`。
+>
+> **结果**：T41.1–T41.4 全部通过。
+
+| 用例              | 结果 | 证据                                                                                                                                           |
+| ----------------- | ---- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| T41.1 创建        | ✅   | 200；PG `mastra\|{"type":"local","command":["npx","-y","@mastra/mcp-docs-server@latest"]}`                                                     |
+| T41.2 AI 感知工具 | ✅   | AI 列出 7 个工具（mastraDocs/searchMastraDocs/listMastraPackages/getMastraExports/getMastraExportDetails/getMastraHelp/getMastraCourseStatus） |
+| T41.3 AI 查询文档 | ✅   | `mastra.getMastraCourseStatus + getMastraHelp + mastraDocs` completed，返回 agent 创建示例（含 `Agent` 定义）                                  |
+| T41.4 AI 生成代码 | ✅   | `mastra.mastraDocs` completed×2，`write` 生成 `/workspace/my-agent.ts`（2543 字节，含 7 处 `Agent`）                                           |
+
+**PG 持久化形态**：`session_message` 表含 `mastra.*` 的消息 12 条，与 API 投影 `metadata.toolCalls`（`mastra.*|completed`）一致；测试 session 删除后 `session_mcps` 残留 0。
+
+**观察**：
+
+1. `@mastra/mcp-docs-server` 首次 `npx` 下载较慢（历史记录同），注册 MCP 前经 session shell 预热一次后连接正常（日志 `session MCP endpoint resolved ... useServerProxy=true`）。
+2. T41.3 中模型两次以 `queryKeywords` 调用 `mastraDocs` 被工具以 `Invalid arguments ... paths: Missing key` 拒绝，收到错误后改用 `paths` 参数调用成功——工具错误透传与模型自纠路径正常，非产品缺陷。
+
 ## MCP Server 信息
 
-| 字段 | 值 |
-|------|-----|
-| 名称 | `@mastra/mcp-docs-server` |
-| 命令 | `npx -y @mastra/mcp-docs-server@latest` |
-| 类型 | local（sandbox 内启动 stdio 进程） |
-| 功能 | Mastra 框架文档查询、API 参考、代码示例、迁移工具 |
+| 字段          | 值                                                            |
+| ------------- | ------------------------------------------------------------- |
+| 名称          | `@mastra/mcp-docs-server`                                     |
+| 命令          | `npx -y @mastra/mcp-docs-server@latest`                       |
+| 类型          | local（sandbox 内启动 stdio 进程）                            |
+| 功能          | Mastra 框架文档查询、API 参考、代码示例、迁移工具             |
 | OpenCode 配置 | https://mastra.ai/docs/getting-started/build-with-ai#opencode |
 
 ---
@@ -86,6 +108,7 @@ curl -s -X POST "$BASE/session/$SID/exec" \
 ```
 
 **期望**：
+
 - AI 调用多个 mastra MCP 工具（`mastra_mastraDocs` 等）查询最新 API
 - AI 用 `write` 工具生成 `/workspace/my-agent.ts`
 - 文件含 Mastra Agent 定义（`new Agent({...})`）
@@ -94,12 +117,12 @@ curl -s -X POST "$BASE/session/$SID/exec" \
 
 ## 验收汇总
 
-| 用例 | 结果 | 验证详情 |
-|------|------|---------|
-| T41.1 创建 MCP | ✅ | PG `mastra\|local` |
-| T41.2 AI 感知工具 | ✅ | AI 列出 13 个 mastra 工具（listMastraPackages/getMastraExports/getMastraExportDetails/mastraDocs/searchMastraDocs 等） |
-| T41.3 AI 查询文档 | ✅ | `mastraDocs`×2 + `searchMastraDocs`×1 全部 completed，返回 agent 创建示例（`new Agent({...})`） |
-| T41.4 AI 生成代码 | ✅ | `mastraDocs`（docs/agents/using-tools）+ write → my-agent.ts（35 行，weatherAgent + weatherTool） |
+| 用例              | 结果 | 验证详情                                                                                                               |
+| ----------------- | ---- | ---------------------------------------------------------------------------------------------------------------------- |
+| T41.1 创建 MCP    | ✅   | PG `mastra\|local`                                                                                                     |
+| T41.2 AI 感知工具 | ✅   | AI 列出 13 个 mastra 工具（listMastraPackages/getMastraExports/getMastraExportDetails/mastraDocs/searchMastraDocs 等） |
+| T41.3 AI 查询文档 | ✅   | `mastraDocs`×2 + `searchMastraDocs`×1 全部 completed，返回 agent 创建示例（`new Agent({...})`）                        |
+| T41.4 AI 生成代码 | ✅   | `mastraDocs`（docs/agents/using-tools）+ write → my-agent.ts（35 行，weatherAgent + weatherTool）                      |
 
 > **2026-08-08 全量重跑记录**（容器 `opencode-saas-test`，`OPENCODE_EXPERIMENTAL_CODE_MODE=mcp`）：T41.1-4 全通过。PG 持久化 `mastra|local|true`；T41.2 AI 列出 mastra 工具表；T41.3 `mastra.getMastraHelp + searchMastraDocs + listMastraPackages + mastraDocs×4` 全 completed；T41.4 write 生成 `/workspace/src/mastra/`（weather-tool.ts + weather-agent.ts + index.ts），工具经 code-mode `execute` 内嵌调用（PG `part` 表记录 `mastra.*|completed`）。
 
@@ -107,12 +130,12 @@ curl -s -X POST "$BASE/session/$SID/exec" \
 
 **验证层级**：
 
-| 层级 | 标准 | 结果 |
-|------|------|------|
-| CRUD | 创建/PG 持久化 | ✅ |
-| AI 感知 | AI 列出 MCP 工具 | ✅ |
+| 层级    | 标准                        | 结果                    |
+| ------- | --------------------------- | ----------------------- |
+| CRUD    | 创建/PG 持久化              | ✅                      |
+| AI 感知 | AI 列出 MCP 工具            | ✅                      |
 | AI 调用 | AI 实际调用 mastra MCP 工具 | ✅ mastraDocs/completed |
-| AI 生成 | AI 基于 MCP 文档生成代码 | ✅ my-agent.ts |
+| AI 生成 | AI 基于 MCP 文档生成代码    | ✅ my-agent.ts          |
 
 ---
 

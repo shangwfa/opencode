@@ -213,6 +213,8 @@ export type SessionSkillResource = {
   digest: string
 }
 
+export type McpProtocol = "legacy" | "auto" | "2026-07-28"
+
 export type SessionGenerateResponse = { data: { text: string } }
 
 export type LocationRef = { directory: string; workspaceID?: string }
@@ -486,8 +488,6 @@ export type WebSearchProvider = { id: string; name: string }
 
 export type WebSearchResult = { url: string; title?: string; content?: string; time: { published?: number } }
 
-export type McpProtocol = "legacy" | "auto" | "2026-07-28"
-
 export type ConfigWorktree = { directory: string }
 
 export type ConfigShellOption = { path: string; name: string; acceptable: boolean }
@@ -619,6 +619,33 @@ export type SessionSkillInfo = {
   source: "global" | "session" | "sandbox"
   sourcePath?: string
   resources: Array<SessionSkillResource>
+}
+
+export type SessionMcpInfo = {
+  id: string
+  name: string
+  config:
+    | {
+        type: "local"
+        command: Array<string>
+        cwd?: string
+        environment?: { [x: string]: string }
+        disabled?: boolean
+        codemode?: boolean
+        timeout?: { startup?: number; catalog?: number; execution?: number }
+        protocol?: McpProtocol
+      }
+    | {
+        type: "remote"
+        url: string
+        headers?: { [x: string]: string }
+        oauth: false
+        disabled?: boolean
+        codemode?: boolean
+        timeout?: { startup?: number; catalog?: number; execution?: number }
+        protocol?: McpProtocol
+      }
+  time: { created: number; updated: number }
 }
 
 export type SessionSandboxResourceUpdated = {
@@ -5209,6 +5236,75 @@ export type SessionInstructionsEntryListOutput = { data: Array<InstructionEntryI
 export type SessionSkillDefinitionsListInput = { readonly sessionID: { readonly sessionID: string }["sessionID"] }
 
 export type SessionSkillDefinitionsListOutput = { data: Array<SessionSkillInfo> }["data"]
+
+export type SessionMcpDefinitionsListInput = { readonly sessionID: { readonly sessionID: string }["sessionID"] }
+
+export type SessionMcpDefinitionsListOutput = { data: Array<SessionMcpInfo> }["data"]
+
+export type SessionMcpDefinitionsCreateInput = {
+  readonly sessionID: { readonly sessionID: string }["sessionID"]
+  readonly name: {
+    readonly name: string
+    readonly config:
+      | {
+          readonly type: "local"
+          readonly command: ReadonlyArray<string>
+          readonly cwd?: string
+          readonly environment?: { readonly [x: string]: string }
+          readonly disabled?: boolean
+          readonly codemode?: boolean
+          readonly timeout?: { readonly startup?: number; readonly catalog?: number; readonly execution?: number }
+          readonly protocol?: "legacy" | "auto" | "2026-07-28"
+        }
+      | {
+          readonly type: "remote"
+          readonly url: string
+          readonly headers?: { readonly [x: string]: string }
+          readonly oauth: false
+          readonly disabled?: boolean
+          readonly codemode?: boolean
+          readonly timeout?: { readonly startup?: number; readonly catalog?: number; readonly execution?: number }
+          readonly protocol?: "legacy" | "auto" | "2026-07-28"
+        }
+  }["name"]
+  readonly config: {
+    readonly name: string
+    readonly config:
+      | {
+          readonly type: "local"
+          readonly command: ReadonlyArray<string>
+          readonly cwd?: string
+          readonly environment?: { readonly [x: string]: string }
+          readonly disabled?: boolean
+          readonly codemode?: boolean
+          readonly timeout?: { readonly startup?: number; readonly catalog?: number; readonly execution?: number }
+          readonly protocol?: "legacy" | "auto" | "2026-07-28"
+        }
+      | {
+          readonly type: "remote"
+          readonly url: string
+          readonly headers?: { readonly [x: string]: string }
+          readonly oauth: false
+          readonly disabled?: boolean
+          readonly codemode?: boolean
+          readonly timeout?: { readonly startup?: number; readonly catalog?: number; readonly execution?: number }
+          readonly protocol?: "legacy" | "auto" | "2026-07-28"
+        }
+  }["config"]
+}
+
+export type SessionMcpDefinitionsCreateOutput = SessionMcpInfo
+
+export type SessionMcpDefinitionsDeleteInput = {
+  readonly sessionID: { readonly sessionID: string; readonly name: string }["sessionID"]
+  readonly name: { readonly sessionID: string; readonly name: string }["name"]
+}
+
+export type SessionMcpDefinitionsDeleteOutput = void
+
+export type SessionMcpDefinitionsClearInput = { readonly sessionID: { readonly sessionID: string }["sessionID"] }
+
+export type SessionMcpDefinitionsClearOutput = void
 
 export type SessionSkillDefinitionsCreateInput = {
   readonly sessionID: { readonly sessionID: string }["sessionID"]

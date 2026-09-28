@@ -20,6 +20,7 @@ import type { Skill } from "@opencode/schema/skill"
 import type { Provider } from "@opencode/schema/provider"
 import type { FileDiff } from "@opencode/schema/file-diff"
 import type { InstructionEntry } from "@opencode/schema/instruction-entry"
+import type { Mcp } from "@opencode/schema/mcp"
 import type { Event } from "@opencode/schema/event"
 import type { EventLog } from "@opencode/schema/event-log"
 import type { Shell } from "@opencode/schema/shell"
@@ -28,7 +29,6 @@ import type { OpenCodeEvent } from "@opencode/protocol/groups/event"
 import type { FileSystem } from "@opencode/schema/filesystem"
 import type { Vcs } from "@opencode/schema/vcs"
 import type { Integration } from "@opencode/schema/integration"
-import type { Mcp } from "@opencode/schema/mcp"
 import type { Credential } from "@opencode/schema/credential"
 import type { PermissionSaved } from "@opencode/schema/permission-saved"
 import type { Command } from "@opencode/schema/command"
@@ -634,6 +634,80 @@ export type SessionSkillDefinitionsListOutput = ReadonlyArray<{
 export type SessionSkillDefinitionsListOperation<E = never> = (
   input: SessionSkillDefinitionsListInput,
 ) => Effect.Effect<SessionSkillDefinitionsListOutput, E>
+
+export type SessionMcpDefinitionsListInput = { readonly sessionID: Session.ID }
+export type SessionMcpDefinitionsListOutput = ReadonlyArray<{
+  readonly id: string & Brand.Brand<"SessionMcp.ID">
+  readonly name: string & Brand.Brand<"SessionMcp.Name">
+  readonly config:
+    | Mcp.LocalConfig
+    | {
+        readonly type: "remote"
+        readonly url: string
+        readonly headers?: { readonly [x: string]: string } | undefined
+        readonly oauth: false
+        readonly disabled?: boolean | undefined
+        readonly codemode?: boolean | undefined
+        readonly timeout?: Mcp.TimeoutConfig | undefined
+        readonly protocol?: Mcp.Protocol | undefined
+      }
+  readonly time: { readonly created: number; readonly updated: number }
+}>
+export type SessionMcpDefinitionsListOperation<E = never> = (
+  input: SessionMcpDefinitionsListInput,
+) => Effect.Effect<SessionMcpDefinitionsListOutput, E>
+
+export type SessionMcpDefinitionsCreateInput = {
+  readonly sessionID: Session.ID
+  readonly name: string & Brand.Brand<"SessionMcp.Name">
+  readonly config:
+    | Mcp.LocalConfig
+    | {
+        readonly type: "remote"
+        readonly url: string
+        readonly headers?: { readonly [x: string]: string } | undefined
+        readonly oauth: false
+        readonly disabled?: boolean | undefined
+        readonly codemode?: boolean | undefined
+        readonly timeout?: Mcp.TimeoutConfig | undefined
+        readonly protocol?: Mcp.Protocol | undefined
+      }
+}
+export type SessionMcpDefinitionsCreateOutput = {
+  readonly id: string & Brand.Brand<"SessionMcp.ID">
+  readonly name: string & Brand.Brand<"SessionMcp.Name">
+  readonly config:
+    | Mcp.LocalConfig
+    | {
+        readonly type: "remote"
+        readonly url: string
+        readonly headers?: { readonly [x: string]: string } | undefined
+        readonly oauth: false
+        readonly disabled?: boolean | undefined
+        readonly codemode?: boolean | undefined
+        readonly timeout?: Mcp.TimeoutConfig | undefined
+        readonly protocol?: Mcp.Protocol | undefined
+      }
+  readonly time: { readonly created: number; readonly updated: number }
+}
+export type SessionMcpDefinitionsCreateOperation<E = never> = (
+  input: SessionMcpDefinitionsCreateInput,
+) => Effect.Effect<SessionMcpDefinitionsCreateOutput, E>
+
+export type SessionMcpDefinitionsDeleteInput = {
+  readonly sessionID: Session.ID
+  readonly name: string & Brand.Brand<"SessionMcp.Name">
+}
+export type SessionMcpDefinitionsDeleteOutput = void
+export type SessionMcpDefinitionsDeleteOperation<E = never> = (
+  input: SessionMcpDefinitionsDeleteInput,
+) => Effect.Effect<SessionMcpDefinitionsDeleteOutput, E>
+
+export type SessionMcpDefinitionsClearInput = { readonly sessionID: Session.ID }
+export type SessionMcpDefinitionsClearOutput = void
+export type SessionMcpDefinitionsClearOperation<E = never> = (
+  input: SessionMcpDefinitionsClearInput,
+) => Effect.Effect<SessionMcpDefinitionsClearOutput, E>
 
 export type SessionSkillDefinitionsCreateInput = {
   readonly sessionID: Session.ID
@@ -1830,6 +1904,12 @@ export interface SessionApi<E = never> {
     readonly delete: SessionSkillDefinitionsDeleteOperation<E>
     readonly clear: SessionSkillDefinitionsClearOperation<E>
     readonly refresh: SessionSkillDefinitionsRefreshOperation<E>
+  }
+  readonly mcpDefinitions: {
+    readonly list: SessionMcpDefinitionsListOperation<E>
+    readonly create: SessionMcpDefinitionsCreateOperation<E>
+    readonly delete: SessionMcpDefinitionsDeleteOperation<E>
+    readonly clear: SessionMcpDefinitionsClearOperation<E>
   }
   readonly generate: SessionGenerateOperation<E>
   readonly log: SessionLogOperation<E>

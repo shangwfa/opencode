@@ -4,18 +4,46 @@
 >
 > 沙箱镜像 `opencode-opensandbox:local` 已预装 agent-browser 0.31.1 + chromium + 系统库（libgtk-3 / libnss3 等），整条链路开箱即用。
 
+> **V2 状态（2026-09-28）**：历史命令使用 V1 `/session/:id/mcps/create` 与 `part` 表契约。V2 映射：`POST /api/session/:sessionID/mcps`，payload `{name, config:{type:"local", command:[...]}}`；PG 表 `session_mcps`（`config` JSON）；消息投影表 `session_message`；工具调用经 code-mode `execute` 的 `metadata.toolCalls` 记录 `agent-browser.agent_browser_*`；异步发消息用 `POST /api/session/:sessionID/prompt` + 轮询 `GET /api/session/:sessionID/context` 至 `idle`。"注册 ≠ 启动、首次调用 lazy 启动并缓存复用"的语义与 V2 `SessionMcps.reconcile` 一致。
+
+## V2 执行记录 2026-09-28
+
+> **环境**：Docker `opencode-saas-mcp-v2:local`（`localhost:14099`）、PostgreSQL `opencode-v2-up`、本地 OpenSandbox `opencode-opensandbox:local`（预装 agent-browser 0.38.1 + Chrome for Testing 153，全网关 endpoint 模式）、`Yd-DeepSeek/deepseek-v4-flash`。
+>
+> **结果**：T44.1–T44.9 全部通过（T44.6 初判 FAIL 为断言脚本本地/服务端时钟偏差的假阴性，按 user prompt 时间分段核对后证据完整，见观察 3）。
+
+| 用例                      | 结果 | 证据                                                                                                                                                                  |
+| ------------------------- | ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T44.1 创建 session + 沙箱 | ✅   | session 建立、keepAlive+boot                                                                                                                                          |
+| T44.2 验证预装            | ✅   | `agent-browser 0.38.1`（mcp 子命令含 "Start an MCP stdio server"）、`/usr/local/bin/chromium`（153）；smoke test `open example.com → get title` 返回 `Example Domain` |
+| T44.3 注册 + PG           | ✅   | PG `agent-browser\|{"type":"local","command":["agent-browser","mcp","--tools","core"]}`                                                                               |
+| T44.4 基础调用            | ✅   | 本轮 `open+snapshot+get_title+get_text+close` 全 completed，AI 中文总结 Example Domain                                                                                |
+| T44.5 批量提取            | ✅   | 本轮 `open+eval` completed，Markdown 表格含 £ 价格                                                                                                                    |
+| T44.6 表单填写            | ✅   | 本轮 `open+snapshot+fill×3+check×3+eval+click+get_text` 全 completed，httpbin 原样回显 JSON（custname=张三、custtel、size、topping[cheese,mushroom]、comments）       |
+| T44.7 SPA 交互            | ✅   | 本轮 `open+snapshot+type×3+press×3+…` completed，返回剩余 todo（买牛奶/睡觉）                                                                                         |
+| T44.8 eval 结构化提取     | ✅   | 本轮 `open+eval` completed，返回 {title, price, availability}                                                                                                         |
+| T44.9 异常处理            | ✅   | 本轮 `open\|error`，AI 明确报告 `net::ERR_NAME_NOT_RESOLVED` + `chrome-error://chromewebdata/`，并正常 close                                                          |
+
+**PG 持久化形态**：`session_message` 表含 `agent-browser.*` 的消息 23 条（open 含 error 状态记录）；测试 session 删除后 `session_mcps` 残留 0。
+
+**观察**：
+
+1. **沙箱 DNS（同 playwright 用例）**：Docker Engine 生成的 `nameserver 0.250.250.200`（OrbStack）对域名返回无效 `::`，导致 smoke test `ERR_NAME_NOT_RESOLVED`；沙箱内改公共 DNS（223.5.5.5/8.8.8.8）后全部场景正常。本地 Docker runtime 环境注意项。
+2. **已知噪声复现**：N44.1 首次调用延迟明显（T44.4 约 24s，后续轮约 16s，lazy 启动 + 桥接 + 工具发现）；与"注册 ≠ 启动、成功后缓存复用"语义一致。
+3. **断言时钟偏差记录**：V2 `context` 消息时间戳为服务端时钟，跨进程断言按本地 `Date.now()` 过滤会有偏差；应按 user prompt 的 `time.created` 分段取本轮证据（本次 T44.6 即此假阴性，核对后通过）。
+
 ## MCP Server 信息
 
-| 字段 | 值 |
-|------|-----|
-| 名称 | `agent-browser` |
-| 二进制 | `agent-browser`（native Rust CLI，沙箱预装 0.31.1） |
-| MCP 启动命令 | `agent-browser mcp --tools core`（stdio） |
-| 类型 | **local**（沙箱内启动 stdio 进程，SaaS 自动桥接） |
-| 运行位置 | **沙箱**（`/workspace`） |
-| 浏览器 | 沙箱预装 `/usr/local/bin/chromium`（agent-browser 自动发现） |
-| 工具数 | 29（core profile：open/snapshot/click/fill/get_text/get_title/eval/close 等） |
-| 仓库 | https://github.com/vercel-labs/agent-browser |
+| 字段         | 值                                                                            |
+| ------------ | ----------------------------------------------------------------------------- |
+| 名称         | `agent-browser`                                                               |
+| 二进制       | `agent-browser`（native Rust CLI，沙箱预装 0.31.1）                           |
+| MCP 启动命令 | `agent-browser mcp --tools core`（stdio）                                     |
+| 类型         | **local**（沙箱内启动 stdio 进程，SaaS 自动桥接）                             |
+| 运行位置     | **沙箱**（`/workspace`）                                                      |
+| 浏览器       | 沙箱预装 `/usr/local/bin/chromium`（agent-browser 自动发现）                  |
+| 工具数       | 29（core profile：open/snapshot/click/fill/get_text/get_title/eval/close 等） |
+| 仓库         | https://github.com/vercel-labs/agent-browser                                  |
 
 > **local MCP 的桥接由 SaaS 自动处理**：用户只需要 `mcps/create` 注册命令，SaaS 在 AI 首次调用工具时自动在沙箱里启动 stdio 进程并桥接（`connectSandboxLocal`，`mcp/index.ts:684`）。用户不需要感知桥接细节。
 
@@ -23,12 +51,12 @@
 
 ## 接入流程概览
 
-| 步骤 | 动作 | 章节 |
-|------|------|------|
-| 1. 创建 session | `new_sid -k` 启动沙箱 | T44.1 |
-| 2. 验证预装 | 通过 `exec` 接口确认 agent-browser + chromium 可用 | T44.2 |
-| 3. 注册 local MCP | `mcps/create {type:"local", command:[...]}` 写入 PG | T44.3 |
-| 4. AI 调用 | `prompt_async` 触发，SaaS 在首次调用时 lazy 启动 MCP 进程 | T44.4 |
+| 步骤              | 动作                                                      | 章节  |
+| ----------------- | --------------------------------------------------------- | ----- |
+| 1. 创建 session   | `new_sid -k` 启动沙箱                                     | T44.1 |
+| 2. 验证预装       | 通过 `exec` 接口确认 agent-browser + chromium 可用        | T44.2 |
+| 3. 注册 local MCP | `mcps/create {type:"local", command:[...]}` 写入 PG       | T44.3 |
+| 4. AI 调用        | `prompt_async` 触发，SaaS 在首次调用时 lazy 启动 MCP 进程 | T44.4 |
 
 **关键**：步骤 3 只写 PG `session_mcps` 表，**不启动进程**。真正启动发生在步骤 4 —— AI 每轮 step 调用 `toolsForSession`（`session/tools.ts:413`）时按需启动 stdio MCP 子进程并桥接（`connectSandboxLocal`），成功后缓存复用。
 
@@ -38,11 +66,11 @@
 
 ### 1. 沙箱镜像已预装以下资源（`opencode-opensandbox:local` 默认包含）
 
-| 资源 | 路径 / 验证方式 |
-|------|----------------|
-| agent-browser ≥ 0.31.0 | `agent-browser --version`（含 `mcp` 子命令） |
-| chromium | `/usr/local/bin/chromium`（agent-browser 自动发现） |
-| Chrome 系统依赖 | libgtk-3-0t64、libnss3、libatk 等已预装 |
+| 资源                   | 路径 / 验证方式                                     |
+| ---------------------- | --------------------------------------------------- |
+| agent-browser ≥ 0.31.0 | `agent-browser --version`（含 `mcp` 子命令）        |
+| chromium               | `/usr/local/bin/chromium`（agent-browser 自动发现） |
+| Chrome 系统依赖        | libgtk-3-0t64、libnss3、libatk 等已预装             |
 
 > 若沙箱镜像版本较旧缺上述依赖，可通过 `exec` 接口手动补：`npm install -g agent-browser@latest` + `apt-get install -y chromium-browser libgtk-3-0 libnss3`。
 
@@ -113,6 +141,7 @@ exec_in_sandbox "$SID" 'agent-browser open https://example.com && agent-browser 
 ```
 
 **期望**：
+
 - `agent-browser --version` 返回 ≥ 0.31.0
 - `agent-browser mcp --help` 输出含 `Start an MCP stdio server`
 - `which chromium` 返回 `/usr/local/bin/chromium`，`chromium --version` 有版本号
@@ -134,6 +163,7 @@ psql "$PG_URL" -t -A -c "SELECT name, type, command FROM session_mcps WHERE sess
 ```
 
 **期望**：
+
 - 接口返回 `id=smc_xxx, name=agent-browser, type=local, command=["agent-browser","mcp","--tools","core"], enabled=true`
 - PG 行：`agent-browser|local|["agent-browser","mcp","--tools","core"]`
 
@@ -143,7 +173,7 @@ psql "$PG_URL" -t -A -c "SELECT name, type, command FROM session_mcps WHERE sess
 
 ## 四、AI 调用 MCP 工具驱动浏览器
 
-### T44.4 触发 AI 调用 agent_browser_*
+### T44.4 触发 AI 调用 agent*browser*\*
 
 ```bash
 curl -s -X POST "$BASE/session/$SID/prompt_async" \
@@ -187,6 +217,7 @@ psql "$PG_URL" -t -c "SELECT data->>'tool', data->'state'->>'status' FROM part W
 ```
 
 **期望**（实际验证记录，2026-07-20，组合 3 环境）：
+
 - `prompt_async` 返回 `HTTP 204`
 - 多个 `agent-browser_*` 工具调用全部 `completed`。工具组合由 AI 自行决定，常见组合：
   - `agent-browser_agent_browser_open` input=`{"url":"https://example.com"}` → 输出含 `Example Domain`
@@ -206,6 +237,7 @@ psql "$PG_URL" -t -c "SELECT data->>'tool', data->'state'->>'status' FROM part W
 ### T44.5 多元素批量提取：列表页数据
 
 **Prompt**：
+
 ```text
 用 agent-browser MCP 工具完成：
 1) 打开 https://books.toscrape.com
@@ -214,6 +246,7 @@ psql "$PG_URL" -t -c "SELECT data->>'tool', data->'state'->>'status' FROM part W
 ```
 
 **期望**：
+
 - 工具调用含 `agent_browser_open` + `agent_browser_snapshot` 或 `agent_browser_eval`
 - AI 返回 20 行表格，价格格式形如 `£12.34`
 - PG `part` 表存在对应工具记录
@@ -223,6 +256,7 @@ psql "$PG_URL" -t -c "SELECT data->>'tool', data->'state'->>'status' FROM part W
 ### T44.6 表单填写与提交
 
 **Prompt**：
+
 ```text
 用 agent-browser MCP 工具完成：
 1) 打开 https://httpbin.org/forms/post
@@ -232,6 +266,7 @@ psql "$PG_URL" -t -c "SELECT data->>'tool', data->'state'->>'status' FROM part W
 ```
 
 **期望**：
+
 - 工具调用含 `agent_browser_open` + `agent_browser_snapshot` + 多次 `agent_browser_fill`/`agent_browser_click`
 - 提交后 AI 返回的文本含 httpbin 回显的 JSON 字段：`custname`, `custtel`, `size`, `topping`
 - PG `part` 表至少 5 个 `agent-browser_*` 工具记录
@@ -241,6 +276,7 @@ psql "$PG_URL" -t -c "SELECT data->>'tool', data->'state'->>'status' FROM part W
 ### T44.7 SPA 动态交互
 
 **Prompt**：
+
 ```text
 用 agent-browser MCP 工具完成：
 1) 打开 https://todomvc.com/examples/react/dist/
@@ -251,6 +287,7 @@ psql "$PG_URL" -t -c "SELECT data->>'tool', data->'state'->>'status' FROM part W
 ```
 
 **期望**：
+
 - 工具调用含 `agent_browser_open` + `agent_browser_snapshot` + 多次 `agent_browser_fill`（输入框）+ `agent_browser_press`（回车确认）+ `agent_browser_click`（checkbox / destroy 按钮）
 - AI 返回剩余 todo：`睡觉`（active）+ `买牛奶`（completed）
 - 验证 SPA 状态正确响应（不是页面刷新）
@@ -260,6 +297,7 @@ psql "$PG_URL" -t -c "SELECT data->>'tool', data->'state'->>'status' FROM part W
 ### T44.8 高级场景：JS eval 提取结构化数据
 
 **Prompt**：
+
 ```text
 用 agent-browser MCP 工具完成：
 1) 打开 https://books.toscrape.com
@@ -268,6 +306,7 @@ psql "$PG_URL" -t -c "SELECT data->>'tool', data->'state'->>'status' FROM part W
 ```
 
 **期望**：
+
 - 工具调用含 `agent_browser_open` + `agent_browser_eval`（不是 snapshot）
 - `agent_browser_eval` 的 input.code 含 `Array.from(...).map(...)` 之类的提取逻辑
 - AI 返回 JSON 数组，至少 20 条，每条含 `title` / `price` / `availability` 三字段
@@ -278,11 +317,13 @@ psql "$PG_URL" -t -c "SELECT data->>'tool', data->'state'->>'status' FROM part W
 ### T44.9 异常处理：访问失败页面
 
 **Prompt**：
+
 ```text
 用 agent-browser MCP 工具打开 https://this-domain-does-not-exist-12345.com，告诉我页面状态和错误信息
 ```
 
 **期望**：
+
 - 工具调用含 `agent_browser_open`，状态可能为 `error` 或 `completed`（取决于 agent-browser 行为）
 - AI 不应卡死，应明确告诉用户"页面无法访问"或类似错误信息
 - 验证链路对网络异常的容错性
@@ -311,27 +352,27 @@ psql "$PG_URL" -t -c "SELECT data->>'tool', data->'state'->>'status' FROM part W
 
 ## 验收汇总
 
-| 用例 | 结果 | 验证详情 |
-|------|------|---------|
-| T44.1 创建 session | ✅ | `new_sid -kb` 返回 ses_xxx |
-| T44.2 验证预装 | ✅ | agent-browser 0.31.1 + chromium 151 + 系统库就绪；smoke test 打开 example.com 返回 Example Domain |
-| T44.3 注册 local MCP | ✅ | PG `agent-browser\|local\|["agent-browser","mcp","--tools","core"]` |
-| T44.4 AI 调用浏览器（基础） | ✅ | 多个 `agent-browser_*` 工具 completed（open+snapshot），AI 中文总结页面 |
-| T44.5 多元素批量提取 | ✅ | books.toscrape.com open + eval 提取，Markdown 表格 20 行（标题 + £价格） |
-| T44.6 表单填写与提交 | ✅ | httpbin 表单 6 字段填写（含多选 topping），提交后回显完整 JSON（custname/custtel/size/topping/comments） |
-| T44.7 SPA 动态交互 | ✅ | TodoMVC React 添加 3 todo + 标记完成 + 删除，返回剩余列表（买牛奶✅/睡觉⬜） |
-| T44.8 JS eval 数据提取 | ✅ | books.toscrape.com 用 eval 提结构化 JSON，20 条 {title, price, availability} |
-| T44.9 异常处理 | ✅ | 不存在域名 → agent_browser_open status=error，AI 明确报告 `net::ERR_NAME_NOT_RESOLVED` |
+| 用例                        | 结果 | 验证详情                                                                                                 |
+| --------------------------- | ---- | -------------------------------------------------------------------------------------------------------- |
+| T44.1 创建 session          | ✅   | `new_sid -kb` 返回 ses_xxx                                                                               |
+| T44.2 验证预装              | ✅   | agent-browser 0.31.1 + chromium 151 + 系统库就绪；smoke test 打开 example.com 返回 Example Domain        |
+| T44.3 注册 local MCP        | ✅   | PG `agent-browser\|local\|["agent-browser","mcp","--tools","core"]`                                      |
+| T44.4 AI 调用浏览器（基础） | ✅   | 多个 `agent-browser_*` 工具 completed（open+snapshot），AI 中文总结页面                                  |
+| T44.5 多元素批量提取        | ✅   | books.toscrape.com open + eval 提取，Markdown 表格 20 行（标题 + £价格）                                 |
+| T44.6 表单填写与提交        | ✅   | httpbin 表单 6 字段填写（含多选 topping），提交后回显完整 JSON（custname/custtel/size/topping/comments） |
+| T44.7 SPA 动态交互          | ✅   | TodoMVC React 添加 3 todo + 标记完成 + 删除，返回剩余列表（买牛奶✅/睡觉⬜）                             |
+| T44.8 JS eval 数据提取      | ✅   | books.toscrape.com 用 eval 提结构化 JSON，20 条 {title, price, availability}                             |
+| T44.9 异常处理              | ✅   | 不存在域名 → agent_browser_open status=error，AI 明确报告 `net::ERR_NAME_NOT_RESOLVED`                   |
 
 **验证层级**：
 
-| 层级 | 标准 | 结果 |
-|------|------|------|
-| 沙箱预装 | agent-browser + chromium + 系统库开箱可用 | ✅ |
-| 注册 | SaaS session local MCP CRUD + PG 持久化 | ✅ |
-| AI 感知 | AI 主动选择 `agent_browser_*` 工具 | ✅ |
-| 真实执行 | 工具实际驱动 chromium 打开 example.com | ✅ title=Example Domain |
-| 反馈 | AI 综合工具输出做中文总结 | ✅ |
+| 层级     | 标准                                      | 结果                    |
+| -------- | ----------------------------------------- | ----------------------- |
+| 沙箱预装 | agent-browser + chromium + 系统库开箱可用 | ✅                      |
+| 注册     | SaaS session local MCP CRUD + PG 持久化   | ✅                      |
+| AI 感知  | AI 主动选择 `agent_browser_*` 工具        | ✅                      |
+| 真实执行 | 工具实际驱动 chromium 打开 example.com    | ✅ title=Example Domain |
+| 反馈     | AI 综合工具输出做中文总结                 | ✅                      |
 
 > **2026-08-02 补充**：环境为 `OPENCODE_EXPERIMENTAL_CODE_MODE=all`，agent-browser 工具经 code-mode `execute` 内嵌调用（metadata.toolCalls 记录 `agent-browser.agent_browser_*`，PG `part` 表持久化为 execute 记录，内嵌 toolCalls 全量覆盖 8 种工具）。T44.5-T44.9 均为实测通过（同一 session 串行 6 轮，MCP 连接缓存复用）。
 

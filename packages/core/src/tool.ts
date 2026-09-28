@@ -39,7 +39,11 @@ type Data = {
 }
 
 export interface Interface extends State.Transformable<Editor> {
-  readonly snapshot: (permissions?: Permission.Ruleset) => Effect.Effect<Snapshot>
+  /**
+   * Builds one immutable request snapshot. `overlay` is session-scoped and is folded into the
+   * same registry/execution path as persistent Location registrations; it never mutates Location state.
+   */
+  readonly snapshot: (permissions?: Permission.Ruleset, overlay?: ReadonlyArray<Tool.Info>) => Effect.Effect<Snapshot>
 }
 
 /** A local execution result after hooks and content normalization. */
@@ -220,7 +224,7 @@ const layer = Layer.effect(
     return Service.of({
       transform: state.transform,
       reload: state.reload,
-      snapshot: Effect.fn("Tool.snapshot")((permissions) =>
+      snapshot: Effect.fn("Tool.snapshot")((permissions, overlay = []) =>
         Effect.sync(() => {
           const data = state.get()
           const active = new Map<string, Tool.Info>()
@@ -228,6 +232,14 @@ const layer = Layer.effect(
           for (const [name, tool] of data.tools) {
             if (whollyDisabled(tool.options?.permission ?? name, rules)) continue
             active.set(name, tool)
+          }
+          // A Session overlay has the narrowest scope, so it intentionally wins collisions with
+          // Location registrations for this request only. Invalid entries are ignored here because
+          // their producer validates durable input before creating the overlay.
+          for (const tool of overlay) {
+            const error = registrationError(tool)
+            if (error || whollyDisabled(tool.options?.permission ?? effectiveName(tool), rules)) continue
+            active.set(effectiveName(tool), tool)
           }
           const direct = new Map(Array.from(active).filter(([, tool]) => tool.options?.codemode === false))
           const codeModeTools = new Map(Array.from(active).filter(([, tool]) => tool.options?.codemode !== false))

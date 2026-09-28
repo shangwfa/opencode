@@ -106,6 +106,14 @@ import type {
   SessionInstructionsEntryListOutput,
   SessionSkillDefinitionsListInput,
   SessionSkillDefinitionsListOutput,
+  SessionMcpDefinitionsListInput,
+  SessionMcpDefinitionsListOutput,
+  SessionMcpDefinitionsCreateInput,
+  SessionMcpDefinitionsCreateOutput,
+  SessionMcpDefinitionsDeleteInput,
+  SessionMcpDefinitionsDeleteOutput,
+  SessionMcpDefinitionsClearInput,
+  SessionMcpDefinitionsClearOutput,
   SessionSkillDefinitionsCreateInput,
   SessionSkillDefinitionsCreateOutput,
   SessionSkillDefinitionsDeleteInput,
@@ -1272,6 +1280,53 @@ export function make(options: ClientOptions) {
             },
             requestOptions,
           ).then((value) => value.data),
+      },
+      mcpDefinitions: {
+        list: (input: SessionMcpDefinitionsListInput, requestOptions?: RequestOptions) =>
+          request<{ readonly data: SessionMcpDefinitionsListOutput }>(
+            {
+              method: "GET",
+              path: `/api/session/${encodeURIComponent(input.sessionID)}/mcps`,
+              successStatus: 200,
+              declaredStatuses: [400, 401, 404, 500],
+              empty: false,
+            },
+            requestOptions,
+          ).then((value) => value.data),
+        create: (input: SessionMcpDefinitionsCreateInput, requestOptions?: RequestOptions) =>
+          request<SessionMcpDefinitionsCreateOutput>(
+            {
+              method: "POST",
+              path: `/api/session/${encodeURIComponent(input.sessionID)}/mcps`,
+              body: { name: input["name"], config: input["config"] },
+              successStatus: 200,
+              declaredStatuses: [400, 401, 404, 500],
+              empty: false,
+            },
+            requestOptions,
+          ),
+        delete: (input: SessionMcpDefinitionsDeleteInput, requestOptions?: RequestOptions) =>
+          request<SessionMcpDefinitionsDeleteOutput>(
+            {
+              method: "DELETE",
+              path: `/api/session/${encodeURIComponent(input.sessionID)}/mcps/${encodeURIComponent(input.name)}`,
+              successStatus: 204,
+              declaredStatuses: [400, 401, 404],
+              empty: true,
+            },
+            requestOptions,
+          ),
+        clear: (input: SessionMcpDefinitionsClearInput, requestOptions?: RequestOptions) =>
+          request<SessionMcpDefinitionsClearOutput>(
+            {
+              method: "DELETE",
+              path: `/api/session/${encodeURIComponent(input.sessionID)}/mcps`,
+              successStatus: 204,
+              declaredStatuses: [400, 401, 404],
+              empty: true,
+            },
+            requestOptions,
+          ),
       },
       generate: (input: SessionGenerateInput, requestOptions?: RequestOptions) =>
         request<{ readonly data: SessionGenerateOutput }>(

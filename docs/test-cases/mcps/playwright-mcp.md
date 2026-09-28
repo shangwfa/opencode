@@ -4,17 +4,43 @@
 >
 > MCP 文档：https://github.com/microsoft/playwright-mcp
 
+> **V2 状态（2026-09-28）**：历史命令使用 V1 `/session/:id/mcps/create` 与 `part` 表契约。V2 映射：`POST /api/session/:sessionID/mcps`，payload `{name, config:{type:"local", command:[...]}}`；PG 表 `session_mcps`（`config` JSON）；消息投影表 `session_message`；工具调用经 code-mode `execute` 的 `metadata.toolCalls` 记录 `playwright.*|completed`；异步发消息用 `POST /api/session/:sessionID/prompt` + 轮询 `GET /api/session/:sessionID/context` 至 `idle`。V1 的 supergateway `--stateful` 修复已内含于 V2 `bridgeStartCommand`。
+
+## V2 执行记录 2026-09-28
+
+> **环境**：Docker `opencode-saas-mcp-v2:local`（`localhost:14099`）、PostgreSQL `opencode-v2-up`、本地 OpenSandbox（`opencode-opensandbox:local` 镜像预装 chromium-1243，全网关 endpoint 模式）、`Yd-DeepSeek/deepseek-v4-flash`。
+>
+> **结果**：T45.1–T45.7 全部通过（每轮工具调用均按消息时间线核对为本轮证据）。
+
+| 用例                      | 结果 | 证据                                                                                                                                 |
+| ------------------------- | ---- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| T45.1 创建 session + 沙箱 | ✅   | session 建立、keepAlive+boot、沙箱内预热 `@playwright/mcp` 包                                                                        |
+| T45.2 注册 + PG 持久化    | ✅   | PG `playwright\|{"type":"local","command":["npx","-y","@playwright/mcp@latest","--browser","chromium","--headless","--no-sandbox"]}` |
+| T45.3 AI 感知工具         | ✅   | AI 列出 `playwright` 命名空间 25 个 browser\_\* 工具                                                                                 |
+| T45.4 navigate + snapshot | ✅   | 本轮 `browser_navigate`+`browser_snapshot` completed，返回 Example Domain 标题/正文                                                  |
+| T45.5 表单填写            | ✅   | 本轮 `navigate+snapshot+fill_form+click+evaluate` 全 completed，httpbin 回显 custname/张三                                           |
+| T45.6 JS eval 提取        | ✅   | 本轮 `browser_navigate`+`browser_evaluate` completed，提取书籍标题与价格                                                             |
+| T45.7 异常处理            | ✅   | 本轮 `browser_navigate\|error`，AI 明确返回 `net::ERR_NAME_NOT_RESOLVED`，不卡死                                                     |
+
+**PG 持久化形态**：`session_message` 表含 `playwright.*` 的消息 12 条（error 与 completed 混合记录，符合重试自愈语义）；测试 session 删除后 `session_mcps` 残留 0。
+
+**观察（自愈过程，均在 T45.4 时间线上有据）**：
+
+1. **chromium 版本自愈**：镜像预装 `chromium-1243`，`@playwright/mcp@latest` 要求 `chromium-1246`——首次 `browser_navigate` error，AI 按提示自动安装匹配版本后重试成功（与历史记录"首次 error 后 AI 自动重装浏览器"一致）。
+2. **沙箱 DNS 异常由 AI 修复**：容器 DNS（`0.250.250.200`，OrbStack）对 `example.com` 返回无效解析，AI 诊断后修复 DNS 再导航成功。本地 Docker runtime 沙箱的 DNS 解析需注意（远端 K8s 沙箱无此现象）。
+3. **`--stateful` 桥接有效**：全程无 V1 记录的 `No connection established for request ID` 报错，playwright-mcp 的 initialize/roots 协商正常。
+
 ## MCP Server 信息
 
-| 字段 | 值 |
-|------|-----|
-| 名称 | `playwright` |
-| 命令 | `npx -y @playwright/mcp@latest --browser chromium --headless --no-sandbox` |
-| 类型 | local（sandbox 内启动 stdio 进程） |
-| 功能 | 浏览器自动化（基于 Playwright accessibility tree，非截图） |
-| 工具数 | 25+（browser_navigate/click/fill/snapshot/eval/close 等） |
-| 特点 | LLM-friendly：纯结构化数据，不需要 vision 模型 |
-| OpenCode 配置 | https://github.com/microsoft/playwright-mcp#opencode |
+| 字段          | 值                                                                         |
+| ------------- | -------------------------------------------------------------------------- |
+| 名称          | `playwright`                                                               |
+| 命令          | `npx -y @playwright/mcp@latest --browser chromium --headless --no-sandbox` |
+| 类型          | local（sandbox 内启动 stdio 进程）                                         |
+| 功能          | 浏览器自动化（基于 Playwright accessibility tree，非截图）                 |
+| 工具数        | 25+（browser_navigate/click/fill/snapshot/eval/close 等）                  |
+| 特点          | LLM-friendly：纯结构化数据，不需要 vision 模型                             |
+| OpenCode 配置 | https://github.com/microsoft/playwright-mcp#opencode                       |
 
 ---
 
@@ -73,6 +99,7 @@ psql "$PG_URL" -t -c "SELECT data->>'tool', data->'state'->>'status' FROM part W
 ```
 
 **期望**：
+
 - `playwright_browser_navigate(completed)`
 - `playwright_browser_snapshot(completed)`
 - AI 返回 "Example Domain" 标题和正文描述
@@ -116,29 +143,29 @@ curl -s --max-time 120 -X POST "$BASE/session/$SID/prompt_async" -H 'Content-Typ
 
 ## 验收汇总
 
-| 用例 | 验证点 | 结果 |
-|------|--------|------|
-| T45.1 | 创建 session + 沙箱 | ✅ |
-| T45.2 | 注册 MCP + PG 持久化 | ✅ `playwright\|local` |
-| T45.3 | AI 感知 browser_* 工具 | ✅ 24 个工具 |
-| T45.4 | AI 调用 navigate + snapshot | ✅ 返回 Example Domain 标题/正文 |
-| T45.5 | 表单填写 + 提交 | ✅ httpbin 回显 custname/custtel |
-| T45.6 | JS eval 数据提取 | ✅ browser_evaluate 返回 JSON 数组 |
-| T45.7 | 异常处理 | ✅ net::ERR_NAME_NOT_RESOLVED 正确上报 |
+| 用例  | 验证点                      | 结果                                   |
+| ----- | --------------------------- | -------------------------------------- |
+| T45.1 | 创建 session + 沙箱         | ✅                                     |
+| T45.2 | 注册 MCP + PG 持久化        | ✅ `playwright\|local`                 |
+| T45.3 | AI 感知 browser\_\* 工具    | ✅ 24 个工具                           |
+| T45.4 | AI 调用 navigate + snapshot | ✅ 返回 Example Domain 标题/正文       |
+| T45.5 | 表单填写 + 提交             | ✅ httpbin 回显 custname/custtel       |
+| T45.6 | JS eval 数据提取            | ✅ browser_evaluate 返回 JSON 数组     |
+| T45.7 | 异常处理                    | ✅ net::ERR_NAME_NOT_RESOLVED 正确上报 |
 
-> **2026-08-08 全量重跑记录**（容器 `opencode-saas-test`，`OPENCODE_EXPERIMENTAL_CODE_MODE=mcp`）：T45.1-7 全通过。PG 持久化 `playwright|local`；T45.3 AI 列出 24 个 browser_* 工具；T45.4 navigate+snapshot 返回 Example Domain（首次 navigate error 后 AI 自动重装浏览器自愈）；T45.5 httpbin.org 当日 503 不可用 → AI 触发 question 工具询问，回复"本地创建表单页面"后 AI 自动建 POST 服务器（`/workspace/form_server.py` @ 9095），fill_form+click 提交成功，`/post` 回显 `custname=张三 / custtel=13800138000`；T45.6 browser_evaluate×3 返回 `{h1_text, links}` JSON；T45.7 navigate 不存在域名返回 `net::ERR_NAME_NOT_RESOLVED`。PG `part` 表持久化 playwright.browser_navigate/fill_form/click/evaluate/wait_for 全 completed（navigate 含 error 状态正确记录）。
+> **2026-08-08 全量重跑记录**（容器 `opencode-saas-test`，`OPENCODE_EXPERIMENTAL_CODE_MODE=mcp`）：T45.1-7 全通过。PG 持久化 `playwright|local`；T45.3 AI 列出 24 个 browser\_\* 工具；T45.4 navigate+snapshot 返回 Example Domain（首次 navigate error 后 AI 自动重装浏览器自愈）；T45.5 httpbin.org 当日 503 不可用 → AI 触发 question 工具询问，回复"本地创建表单页面"后 AI 自动建 POST 服务器（`/workspace/form_server.py` @ 9095），fill_form+click 提交成功，`/post` 回显 `custname=张三 / custtel=13800138000`；T45.6 browser_evaluate×3 返回 `{h1_text, links}` JSON；T45.7 navigate 不存在域名返回 `net::ERR_NAME_NOT_RESOLVED`。PG `part` 表持久化 playwright.browser_navigate/fill_form/click/evaluate/wait_for 全 completed（navigate 含 error 状态正确记录）。
 
-> **2026-08-21 全量重跑记录**（容器 `opencode-saas-test:13b750953b`，本地 PG `opencode` + 本地 OpenSandbox `opencode-opensandbox:mini` 3.53G，模型 `opencode/muse-spark-1.2-contributor-free`）：T45.1-7 全通过。PG `playwright|local`；T45.3 列出 13+ 个 browser_* 工具（Muse Spark 输出截断）；T45.4 navigate（首次 error 后重试 completed）+ snapshot 返回 Example Domain；T45.5 fill_form + click 提交 httpbin 成功；T45.6 books.toscrape evaluate 返回 20 本书 JSON；T45.7 `net::ERR_NAME_NOT_RESOLVED` 正确上报。PG 有 `error` 与 `completed` 混合记录（符合重试自愈语义）。mini 镜像下 Chromium 正常，无回归。
+> **2026-08-21 全量重跑记录**（容器 `opencode-saas-test:13b750953b`，本地 PG `opencode` + 本地 OpenSandbox `opencode-opensandbox:mini` 3.53G，模型 `opencode/muse-spark-1.2-contributor-free`）：T45.1-7 全通过。PG `playwright|local`；T45.3 列出 13+ 个 browser\_\* 工具（Muse Spark 输出截断）；T45.4 navigate（首次 error 后重试 completed）+ snapshot 返回 Example Domain；T45.5 fill_form + click 提交 httpbin 成功；T45.6 books.toscrape evaluate 返回 20 本书 JSON；T45.7 `net::ERR_NAME_NOT_RESOLVED` 正确上报。PG 有 `error` 与 `completed` 混合记录（符合重试自愈语义）。mini 镜像下 Chromium 正常，无回归。
 
 **验证层级**：
 
-| 层级 | 标准 | 结果 |
-|------|------|------|
-| CRUD | 创建/PG 持久化 | ✅ |
-| AI 感知 | AI 列出 MCP 工具 | ✅ 24 个 browser_* 工具 |
-| AI 调用 | AI 实际调用 browser_* 工具 | ✅ navigate/snapshot/type/click/evaluate 全 completed |
-| 真实执行 | 工具驱动 chromium 打开页面 | ✅ |
-| 反馈 | AI 综合工具输出总结 | ✅ |
+| 层级     | 标准                         | 结果                                                  |
+| -------- | ---------------------------- | ----------------------------------------------------- |
+| CRUD     | 创建/PG 持久化               | ✅                                                    |
+| AI 感知  | AI 列出 MCP 工具             | ✅ 24 个 browser\_\* 工具                             |
+| AI 调用  | AI 实际调用 browser\_\* 工具 | ✅ navigate/snapshot/type/click/evaluate 全 completed |
+| 真实执行 | 工具驱动 chromium 打开页面   | ✅                                                    |
+| 反馈     | AI 综合工具输出总结          | ✅                                                    |
 
 ### 修复记录（2026-08-02）
 

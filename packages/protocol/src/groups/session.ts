@@ -47,6 +47,7 @@ import { SessionCommand } from "@opencode/schema/session-command"
 import { SessionAgentsMd } from "@opencode/schema/session-agents-md"
 import { SessionAgent } from "@opencode/schema/session-agent"
 import { SessionSkill } from "@opencode/schema/session-skill"
+import { SessionMcp } from "@opencode/schema/session-mcp"
 
 const ParentIDFilter = Schema.Union([
   Session.ID,
@@ -188,12 +189,10 @@ export const SessionsQuery = Schema.Struct({
   cursor: SessionsQueryCursor.pipe(Schema.optional),
 }).annotate({ identifier: "SessionsQuery" })
 
-export const makeSessionGroup = <
-  I extends HttpApiMiddleware.AnyId,
-  S,
-  FormI extends HttpApiMiddleware.AnyId,
-  FormS,
->(sessionLocationMiddleware: Context.Key<I, S>, formLocationMiddleware: Context.Key<FormI, FormS>) =>
+export const makeSessionGroup = <I extends HttpApiMiddleware.AnyId, S, FormI extends HttpApiMiddleware.AnyId, FormS>(
+  sessionLocationMiddleware: Context.Key<I, S>,
+  formLocationMiddleware: Context.Key<FormI, FormS>,
+) =>
   HttpApiGroup.make("server.session")
     .add(
       HttpApiEndpoint.get("session.list", "/api/session", {
@@ -593,9 +592,7 @@ export const makeSessionGroup = <
         error: [SessionNotFoundError, SessionBusyError],
       })
         .middleware(sessionLocationMiddleware)
-        .annotateMerge(
-          OpenApi.annotations({ identifier: "session.revert.commit", summary: "Commit staged revert" }),
-        ),
+        .annotateMerge(OpenApi.annotations({ identifier: "session.revert.commit", summary: "Commit staged revert" })),
     )
     .add(
       HttpApiEndpoint.get("session.context", "/api/session/:sessionID/context", {
@@ -617,11 +614,14 @@ export const makeSessionGroup = <
         error: [SessionNotFoundError, UnknownError],
       })
         .middleware(sessionLocationMiddleware)
-        .annotateMerge(OpenApi.annotations({
-          identifier: "session.commandDefinitions.list",
-          summary: "List session commands",
-          description: "List effective commands merged from builtin, session PG definitions, and the session sandbox.",
-        })),
+        .annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.commandDefinitions.list",
+            summary: "List session commands",
+            description:
+              "List effective commands merged from builtin, session PG definitions, and the session sandbox.",
+          }),
+        ),
     )
     .add(
       HttpApiEndpoint.post("session.commandDefinitions.create", "/api/session/:sessionID/commands", {
@@ -631,11 +631,13 @@ export const makeSessionGroup = <
         error: [SessionNotFoundError, InvalidRequestError, UnknownError],
       })
         .middleware(sessionLocationMiddleware)
-        .annotateMerge(OpenApi.annotations({
-          identifier: "session.commandDefinitions.create",
-          summary: "Create or update a session command",
-          description: "Persist a session command definition in the database.",
-        })),
+        .annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.commandDefinitions.create",
+            summary: "Create or update a session command",
+            description: "Persist a session command definition in the database.",
+          }),
+        ),
     )
     .add(
       HttpApiEndpoint.delete("session.commandDefinitions.delete", "/api/session/:sessionID/commands/:name", {
@@ -644,11 +646,14 @@ export const makeSessionGroup = <
         error: [SessionNotFoundError, UnknownError],
       })
         .middleware(sessionLocationMiddleware)
-        .annotateMerge(OpenApi.annotations({
-          identifier: "session.commandDefinitions.delete",
-          summary: "Delete a session command",
-          description: "Delete a database-defined session command; a sandbox definition of the same name may remain active.",
-        })),
+        .annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.commandDefinitions.delete",
+            summary: "Delete a session command",
+            description:
+              "Delete a database-defined session command; a sandbox definition of the same name may remain active.",
+          }),
+        ),
     )
     .add(
       HttpApiEndpoint.delete("session.commandDefinitions.clear", "/api/session/:sessionID/commands", {
@@ -657,11 +662,14 @@ export const makeSessionGroup = <
         error: [SessionNotFoundError, UnknownError],
       })
         .middleware(sessionLocationMiddleware)
-        .annotateMerge(OpenApi.annotations({
-          identifier: "session.commandDefinitions.clear",
-          summary: "Clear session commands",
-          description: "Delete all database-defined commands for a session while preserving builtin and sandbox commands.",
-        })),
+        .annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.commandDefinitions.clear",
+            summary: "Clear session commands",
+            description:
+              "Delete all database-defined commands for a session while preserving builtin and sandbox commands.",
+          }),
+        ),
     )
     .add(
       HttpApiEndpoint.post("session.commandDefinitions.refresh", "/api/session/:sessionID/commands/refresh", {
@@ -670,11 +678,13 @@ export const makeSessionGroup = <
         error: [SessionNotFoundError, UnknownError],
       })
         .middleware(sessionLocationMiddleware)
-        .annotateMerge(OpenApi.annotations({
-          identifier: "session.commandDefinitions.refresh",
-          summary: "Refresh sandbox commands",
-          description: "Rescan command files in the session sandbox and return the effective command list.",
-        })),
+        .annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.commandDefinitions.refresh",
+            summary: "Refresh sandbox commands",
+            description: "Rescan command files in the session sandbox and return the effective command list.",
+          }),
+        ),
     )
     .add(
       HttpApiEndpoint.get("session.agentDefinitions.list", "/api/session/:sessionID/agents", {
@@ -683,11 +693,13 @@ export const makeSessionGroup = <
         error: [SessionNotFoundError, UnknownError],
       })
         .middleware(sessionLocationMiddleware)
-        .annotateMerge(OpenApi.annotations({
-          identifier: "session.agentDefinitions.list",
-          summary: "List session agents",
-          description: "List effective agents merged from configured agents, session definitions, and sandbox files.",
-        })),
+        .annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.agentDefinitions.list",
+            summary: "List session agents",
+            description: "List effective agents merged from configured agents, session definitions, and sandbox files.",
+          }),
+        ),
     )
     .add(
       HttpApiEndpoint.post("session.agentDefinitions.create", "/api/session/:sessionID/agents", {
@@ -697,11 +709,13 @@ export const makeSessionGroup = <
         error: [SessionNotFoundError, SessionAgent.ContentTooLargeError, InvalidRequestError, UnknownError],
       })
         .middleware(sessionLocationMiddleware)
-        .annotateMerge(OpenApi.annotations({
-          identifier: "session.agentDefinitions.create",
-          summary: "Create or update a session agent",
-          description: "Persist a Session-scoped partial agent definition for the supplied Agent ID.",
-        })),
+        .annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.agentDefinitions.create",
+            summary: "Create or update a session agent",
+            description: "Persist a Session-scoped partial agent definition for the supplied Agent ID.",
+          }),
+        ),
     )
     .add(
       HttpApiEndpoint.delete("session.agentDefinitions.delete", "/api/session/:sessionID/agents/:agentID", {
@@ -710,11 +724,13 @@ export const makeSessionGroup = <
         error: SessionNotFoundError,
       })
         .middleware(sessionLocationMiddleware)
-        .annotateMerge(OpenApi.annotations({
-          identifier: "session.agentDefinitions.delete",
-          summary: "Delete a session agent override",
-          description: "Delete the database-defined override; a configured or sandbox definition may remain active.",
-        })),
+        .annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.agentDefinitions.delete",
+            summary: "Delete a session agent override",
+            description: "Delete the database-defined override; a configured or sandbox definition may remain active.",
+          }),
+        ),
     )
     .add(
       HttpApiEndpoint.delete("session.agentDefinitions.clear", "/api/session/:sessionID/agents", {
@@ -723,11 +739,13 @@ export const makeSessionGroup = <
         error: SessionNotFoundError,
       })
         .middleware(sessionLocationMiddleware)
-        .annotateMerge(OpenApi.annotations({
-          identifier: "session.agentDefinitions.clear",
-          summary: "Clear session agent overrides",
-          description: "Delete all database-defined agent overrides for this Session.",
-        })),
+        .annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.agentDefinitions.clear",
+            summary: "Clear session agent overrides",
+            description: "Delete all database-defined agent overrides for this Session.",
+          }),
+        ),
     )
     .add(
       HttpApiEndpoint.post("session.agentDefinitions.refresh", "/api/session/:sessionID/agents/refresh", {
@@ -736,25 +754,36 @@ export const makeSessionGroup = <
         error: [SessionNotFoundError, UnknownError],
       })
         .middleware(sessionLocationMiddleware)
-        .annotateMerge(OpenApi.annotations({
-          identifier: "session.agentDefinitions.refresh",
-          summary: "Refresh sandbox agents",
-          description: "Rescan agent markdown files in the Session sandbox and return the effective agent list.",
-        })),
+        .annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.agentDefinitions.refresh",
+            summary: "Refresh sandbox agents",
+            description: "Rescan agent markdown files in the Session sandbox and return the effective agent list.",
+          }),
+        ),
     )
     .add(
       HttpApiEndpoint.post("session.keepAlive", "/api/experimental/session/:sessionID/keep-alive", {
         params: { sessionID: Session.ID },
-        payload: Schema.Struct({ enabled: Schema.Boolean.pipe(Schema.optional), boot: Schema.Boolean.pipe(Schema.optional) }),
-        success: Schema.Struct({ sessionID: Session.ID, keepAlive: Schema.Boolean, sandboxId: Schema.NullOr(Schema.String) }),
+        payload: Schema.Struct({
+          enabled: Schema.Boolean.pipe(Schema.optional),
+          boot: Schema.Boolean.pipe(Schema.optional),
+        }),
+        success: Schema.Struct({
+          sessionID: Session.ID,
+          keepAlive: Schema.Boolean,
+          sandboxId: Schema.NullOr(Schema.String),
+        }),
         error: SessionNotFoundError,
       })
         .middleware(sessionLocationMiddleware)
-        .annotateMerge(OpenApi.annotations({
-          identifier: "session.keepAlive",
-          summary: "Set session sandbox keep-alive",
-          description: "Persist the session keep-alive preference; boot=true creates the sandbox immediately.",
-        })),
+        .annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.keepAlive",
+            summary: "Set session sandbox keep-alive",
+            description: "Persist the session keep-alive preference; boot=true creates the sandbox immediately.",
+          }),
+        ),
     )
     .add(
       HttpApiEndpoint.get("session.keepAliveStatus", "/api/experimental/session/:sessionID/keep-alive", {
@@ -763,11 +792,13 @@ export const makeSessionGroup = <
         error: SessionNotFoundError,
       })
         .middleware(sessionLocationMiddleware)
-        .annotateMerge(OpenApi.annotations({
-          identifier: "session.keepAliveStatus",
-          summary: "Get session sandbox keep-alive status",
-          description: "Read the persisted session keep-alive preference.",
-        })),
+        .annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.keepAliveStatus",
+            summary: "Get session sandbox keep-alive status",
+            description: "Read the persisted session keep-alive preference.",
+          }),
+        ),
     )
     .add(
       HttpApiEndpoint.get("session.sandbox", "/api/session/:sessionID/sandbox", {
@@ -776,11 +807,13 @@ export const makeSessionGroup = <
         error: SessionNotFoundError,
       })
         .middleware(sessionLocationMiddleware)
-        .annotateMerge(OpenApi.annotations({
-          identifier: "session.sandbox",
-          summary: "Get session sandbox ID",
-          description: "Return the ID of the running sandbox associated with the session, or null when absent.",
-        })),
+        .annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.sandbox",
+            summary: "Get session sandbox ID",
+            description: "Return the ID of the running sandbox associated with the session, or null when absent.",
+          }),
+        ),
     )
     .add(
       HttpApiEndpoint.post("session.killSandbox", "/api/session/:sessionID/kill-sandbox", {
@@ -789,11 +822,13 @@ export const makeSessionGroup = <
         error: SessionNotFoundError,
       })
         .middleware(sessionLocationMiddleware)
-        .annotateMerge(OpenApi.annotations({
-          identifier: "session.killSandbox",
-          summary: "Destroy session sandbox",
-          description: "Destroy the session sandbox while preserving its keep-alive preference.",
-        })),
+        .annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.killSandbox",
+            summary: "Destroy session sandbox",
+            description: "Destroy the session sandbox while preserving its keep-alive preference.",
+          }),
+        ),
     )
     .add(
       HttpApiEndpoint.get("session.diff", "/api/session/:sessionID/diff", {
@@ -861,18 +896,20 @@ export const makeSessionGroup = <
         }),
       ),
     )
-     .add(
+    .add(
       HttpApiEndpoint.get("session.agentsMd.get", "/api/session/:sessionID/agents-md", {
         params: { sessionID: Session.ID },
         success: Schema.Struct({ data: Schema.NullOr(SessionAgentsMd.Info) }),
         error: [SessionNotFoundError, UnknownError],
       })
         .middleware(sessionLocationMiddleware)
-        .annotateMerge(OpenApi.annotations({
-          identifier: "session.agentsMd.get",
-          summary: "Get session AGENTS.md",
-          description: "Get the session-scoped AGENTS.md instruction overlay, or null when absent.",
-        })),
+        .annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.agentsMd.get",
+            summary: "Get session AGENTS.md",
+            description: "Get the session-scoped AGENTS.md instruction overlay, or null when absent.",
+          }),
+        ),
     )
     .add(
       HttpApiEndpoint.post("session.agentsMd.put", "/api/session/:sessionID/agents-md", {
@@ -882,11 +919,13 @@ export const makeSessionGroup = <
         error: [SessionNotFoundError, SessionAgentsMd.ContentTooLargeError, UnknownError],
       })
         .middleware(sessionLocationMiddleware)
-        .annotateMerge(OpenApi.annotations({
-          identifier: "session.agentsMd.put",
-          summary: "Create or replace session AGENTS.md",
-          description: "Persist one AGENTS.md instruction document for this session.",
-        })),
+        .annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.agentsMd.put",
+            summary: "Create or replace session AGENTS.md",
+            description: "Persist one AGENTS.md instruction document for this session.",
+          }),
+        ),
     )
     .add(
       HttpApiEndpoint.delete("session.agentsMd.remove", "/api/session/:sessionID/agents-md", {
@@ -895,11 +934,13 @@ export const makeSessionGroup = <
         error: [SessionNotFoundError, UnknownError],
       })
         .middleware(sessionLocationMiddleware)
-        .annotateMerge(OpenApi.annotations({
-          identifier: "session.agentsMd.remove",
-          summary: "Delete session AGENTS.md",
-          description: "Remove the session instruction overlay; the change applies at the next model step.",
-        })),
+        .annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.agentsMd.remove",
+            summary: "Delete session AGENTS.md",
+            description: "Remove the session instruction overlay; the change applies at the next model step.",
+          }),
+        ),
     )
     .add(
       HttpApiEndpoint.get(
@@ -928,24 +969,61 @@ export const makeSessionGroup = <
       }).middleware(sessionLocationMiddleware),
     )
     .add(
+      HttpApiEndpoint.get("session.mcpDefinitions.list", "/api/session/:sessionID/mcps", {
+        params: { sessionID: Session.ID },
+        success: Schema.Struct({ data: Schema.Array(SessionMcp.Info) }),
+        error: [SessionNotFoundError, UnknownError],
+      }).middleware(sessionLocationMiddleware),
+    )
+    .add(
+      HttpApiEndpoint.post("session.mcpDefinitions.create", "/api/session/:sessionID/mcps", {
+        params: { sessionID: Session.ID },
+        payload: SessionMcp.Payload,
+        success: SessionMcp.Info,
+        error: [SessionNotFoundError, UnknownError],
+      }).middleware(sessionLocationMiddleware),
+    )
+    .add(
+      HttpApiEndpoint.delete("session.mcpDefinitions.delete", "/api/session/:sessionID/mcps/:name", {
+        params: { sessionID: Session.ID, name: SessionMcp.Name },
+        success: HttpApiSchema.NoContent,
+        error: SessionNotFoundError,
+      }).middleware(sessionLocationMiddleware),
+    )
+    .add(
+      HttpApiEndpoint.delete("session.mcpDefinitions.clear", "/api/session/:sessionID/mcps", {
+        params: { sessionID: Session.ID },
+        success: HttpApiSchema.NoContent,
+        error: SessionNotFoundError,
+      }).middleware(sessionLocationMiddleware),
+    )
+    .add(
       HttpApiEndpoint.post("session.skillDefinitions.create", "/api/session/:sessionID/skills", {
-        params: { sessionID: Session.ID }, payload: SessionSkill.Payload, success: SessionSkill.Info,
+        params: { sessionID: Session.ID },
+        payload: SessionSkill.Payload,
+        success: SessionSkill.Info,
         error: [SessionNotFoundError, SessionSkill.ResourceError, UnknownError],
       }).middleware(sessionLocationMiddleware),
     )
     .add(
       HttpApiEndpoint.delete("session.skillDefinitions.delete", "/api/session/:sessionID/skills/:skillID", {
-        params: { sessionID: Session.ID, skillID: Skill.ID }, success: HttpApiSchema.NoContent, error: SessionNotFoundError,
+        params: { sessionID: Session.ID, skillID: Skill.ID },
+        success: HttpApiSchema.NoContent,
+        error: SessionNotFoundError,
       }).middleware(sessionLocationMiddleware),
     )
     .add(
       HttpApiEndpoint.delete("session.skillDefinitions.clear", "/api/session/:sessionID/skills", {
-        params: { sessionID: Session.ID }, success: HttpApiSchema.NoContent, error: SessionNotFoundError,
+        params: { sessionID: Session.ID },
+        success: HttpApiSchema.NoContent,
+        error: SessionNotFoundError,
       }).middleware(sessionLocationMiddleware),
     )
     .add(
       HttpApiEndpoint.post("session.skillDefinitions.refresh", "/api/session/:sessionID/skills/refresh", {
-        params: { sessionID: Session.ID }, success: Schema.Struct({ data: Schema.Array(SessionSkill.Info) }), error: [SessionNotFoundError, UnknownError],
+        params: { sessionID: Session.ID },
+        success: Schema.Struct({ data: Schema.Array(SessionSkill.Info) }),
+        error: [SessionNotFoundError, UnknownError],
       }).middleware(sessionLocationMiddleware),
     )
     .add(

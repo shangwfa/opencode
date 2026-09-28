@@ -1,5 +1,53 @@
 # Session MCP（会话级动态 MCP）
 
+> **V2 状态（2026-09-27）**：本文件以下历史用例使用 V1 `/session/:id/mcps/create` 契约，不能作为当前实现的验收依据。V2 使用 `/api/session/:sessionID/mcps`，payload 为 `{name, config}`，其中 `config` 是当前 `Mcp.ServerConfig`（`disabled` 取代 V1 `enabled`）。
+
+## V2 执行记录 2026-09-27
+
+> **环境**：Docker `opencode-saas-mcp-v2:local`（`localhost:14099`）、PostgreSQL `opencode-v2-up`、本地 OpenSandbox（`supergateway` 已内置于 sandbox 镜像）、`Yd-DeepSeek/deepseek-v4-flash`。
+>
+> **结果**：本文件 T22.1–T22.19 全部用例已按 V2 契约重跑（历史 V1 脚本路径映射到 `/api/session/:sessionID/mcps`），全部通过。Core Tool overlay 单测 40/40、Server CRUD API 单测 1/1（16 assertions）通过；Docker HTTP + PG、真实模型 remote/local MCP 调用均通过。
+
+### 用例映射与结果
+
+> V1 契约到 V2 的映射：`POST /session/:id/mcps/create` → `POST /api/session/:sessionID/mcps`；`type/command/url/environment/headers` 收敛为 `config: Mcp.ServerConfig`；`enabled=false` → `disabled=true`；`prompt_async/prompt_stream` → `POST /api/session/:sessionID/prompt_stream`（SSE）；`/exec` → `POST /api/session/:sessionID/shell` + `GET /api/session/:sessionID/context` 读回输出；`keep-alive` → `POST /api/experimental/session/:sessionID/keep-alive`。
+
+| 用例                         | 结果 | 证据                                                                                                                                             |
+| ---------------------------- | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| T22.1 local 创建             | ✅   | `command:["npx","shadcn@latest","mcp"]+environment` 返回 `type=local`、command 3 段、`disabled=true`；PG 一致                                    |
+| T22.2 remote 创建            | ✅   | `url+headers:{Authorization:"Bearer test-token"}` 返回完整；PG 一致                                                                              |
+| T22.3 列表                   | ✅   | local+remote 同列 count=2                                                                                                                        |
+| T22.4 同名 upsert            | ✅   | local→remote 替换后单条记录、type 变更、command 清空                                                                                             |
+| T22.5 删除                   | ✅   | DELETE 204，列表/PG 移除                                                                                                                         |
+| T22.6 清空                   | ✅   | `DELETE /api/session/:id/mcps` 204，列表空                                                                                                       |
+| T22.7 会话隔离               | ✅   | A/B 同名 `shared`，A=local、B=remote；PG 两条                                                                                                    |
+| T22.8 Session 删除级联       | ✅   | 删 session 前 PG 1 条、删除后 0 条（FK ON DELETE CASCADE），DELETE 204                                                                           |
+| T22.9 不存在 Session         | ✅   | create/list 均 404（V2 收紧了 V1 list=200 的特例）                                                                                               |
+| T22.10 缺必填字段            | ✅   | 缺 name、缺 config 各 400                                                                                                                        |
+| T22.11 完整字段持久化        | ✅   | headers `x-token/x-extra` 完整落 PG                                                                                                              |
+| T22.12 disabled 持久化       | ✅   | `disabled:true` 持久化且不建立连接                                                                                                               |
+| T22.13 remote 工具执行 E2E   | ✅   | 模型经 Code Mode 调用 `echo.echo`，`metadata.toolCalls` completed，输出 `ECHO:session-mcp-e2e`                                                   |
+| T22.14 local 工具执行 E2E    | ✅   | sandbox 内经 `supergateway` 桥接，模型调用 `sandbox_everything.echo` 返回 `Echo: hello-sandbox-mcp`；第二轮 pid 不变（25），连接复用不再启动进程 |
+| T22.15 多轮可用              | ✅   | 同 session 三轮 `ECHO:round-1/2/3` 均返回，工具注入在每轮 step 循环生效                                                                          |
+| T22.16 local/remote 互斥校验 | ✅   | local 缺 command、command=[]、remote 缺 url、remote 未显式 `oauth:false`、非法 name 均 400，PG 无记录                                            |
+| T22.17 environment 注入      | ✅   | `MCP_ENV_TEST=hello-env-value` 经 `env` 前缀进入 MCP 进程，`/tmp/mcp-env-test` 内容为 `hello-env-value`                                          |
+| T22.18 shell 安全            | ✅   | 恶意 name `bad;touch /tmp/mcp-name-pwned;#` 被 Schema 拒绝 400；恶意 env key 经 quote 无注入（无 `ENV_PWNED`），`SAFE_MARKER` 正常写入           |
+| T22.19 local 生命周期        | ✅   | 启动后存在 `pid_everything-9100.pid/.log`；`DELETE .../mcps/pid_everything` 后进程 `PROC_GONE`、pid/log 删除；删 session 204、PG count=0         |
+
+### 执行中发现并修复的问题
+
+1. **shell 转义错误导致 local MCP 桥接无法启动**：`shellQuote` 的引号替换串写反（生成 `"'""'"'` 而非 `'"'"'`），`supergateway` 启动命令在 sandbox 的 exec 包装脚本中报 `unexpected EOF while looking for matching '`。已修正为标准 POSIX 转义并去掉 `sh -lc` 多余嵌套层；以 session shell 探针复现、修复后验证。
+2. **endpoint 策略不一致**：Session local MCP 桥接原先强制直连 endpoint，未遵循 `OPENCODE_SANDBOX_USE_SERVER_PROXY`；已改为与 session preview proxy 相同的 `SandboxConfig.useServerProxy` 策略。
+3. **运行时生命周期补强**：`remove/clear` 现在同步关闭已建连接并杀桥接进程/清 pid-log；`Session.remove` 在销毁 sandbox 前 `release` 会话全部 MCP 连接；桥接端口分配避免已用端口冲突。
+4. **测试夹具误判记录**：`@modelcontextprotocol/server` 的单 transport 夹具只接受一个 MCP 会话，跨测试复用时报 `Server already initialized`，一度被误判为产品连接失败；升级为按 `mcp-session-id` 路由的多会话夹具后通过。产品侧已在日志保留完整 cause（`Failed to connect session MCP ...: <cause>`）以便定位。
+
+### V2 设计约束
+
+1. `session_mcps` 只保存可序列化配置；连接、client、端口和进程均是 Location 运行时状态，绝不持久化。
+2. Session MCP 不注册进 Location 全局 Tool registry。`SessionContext.select` 为当前 session 构造不可变 Tool overlay，以同一 `Tool.snapshot` 执行/权限路径注入，避免同工作目录不同 session 相互可见。
+3. Session local MCP 在 SaaS Sandbox 启用时，经 session 自己的 Sandbox 以 `supergateway` stdio→Streamable HTTP 桥接；command、environment 和路径均逐值 shell quote，server name 限制为安全的 Tool namespace。
+4. Session remote MCP 使用当前 V2 的 headers、timeout、protocol 和 codemode 语义，但**必须显式 `oauth: false`**。OAuth credential 和授权回调属于全局 Integration/Credential 域，不适合无独立授权 API 的 session-private 配置；需要 OAuth 时应使用全局 MCP。
+
 > 前置条件：SaaS 服务已启动（`docs/local-test-env.md`），仅 PG 模式（SaaS）下生效。
 
 ## 公共配置
@@ -14,17 +62,17 @@ const BASE = "http://localhost:14096"
 
 > 本节按 [`00-preamble.md` 附录 A](./00-preamble.md) 的 G1-G9 通用清单执行（含通用脚本模板），资源为 `mcps`（`/session/:id/mcps[/create]`），PG 表 `session_mcps`。原始逐步脚本见 git 历史。
 
-| 用例 | 清单 | 资源参数 | 特有期望 |
-|---|---|---|---|
-| T22.1 | G1 | local：`{name:"sandbox-shadcn", type:"local", command:["npx","shadcn@latest","mcp"], environment:{NODE_ENV:"production"}}` | 返回 `type=local`、command 数组、`enabled=true`；PG 字段一致 |
-| T22.2 | G1 | remote：`{name:"search-api", type:"remote", url:"https://search.example.com/mcp", headers:{Authorization:"Bearer test-token"}}` | 返回 `type=remote`、url、headers 完整；PG 一致 |
-| T22.3 | G2 | 建 mcp-a(local) + mcp-b(remote) | local/remote 同列表，count=2 |
-| T22.4 | G3 | my-mcp：local v1 → remote v2 | type→remote，command→NULL，列表 count=1 |
-| T22.5 | G4 | 删 to-delete | DELETE 200，列表/PG 移除 |
-| T22.6 | G5 | 建 m1/m2 后清空 | DELETE 200，列表/PG 空 |
-| T22.7 | G6 | A/B 各建同名 shared（A=local，B=remote） | A 显示 local，B 显示 remote；PG 两条 |
-| T22.8 | G7 | 删除 session | ⚠️ mcps 特例：删 session 后 GET mcps 仍 200 空列表（mcps list 无 `requireSession`，见附录 A G8）；PG 级联 COUNT=0 |
-| T22.9 | G8 | ses_NOTEXIST create/list/delete | create=500（FK）；list=200 空数组（mcps 特例）；delete=200（幂等） |
+| 用例  | 清单 | 资源参数                                                                                                                        | 特有期望                                                                                                          |
+| ----- | ---- | ------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| T22.1 | G1   | local：`{name:"sandbox-shadcn", type:"local", command:["npx","shadcn@latest","mcp"], environment:{NODE_ENV:"production"}}`      | 返回 `type=local`、command 数组、`enabled=true`；PG 字段一致                                                      |
+| T22.2 | G1   | remote：`{name:"search-api", type:"remote", url:"https://search.example.com/mcp", headers:{Authorization:"Bearer test-token"}}` | 返回 `type=remote`、url、headers 完整；PG 一致                                                                    |
+| T22.3 | G2   | 建 mcp-a(local) + mcp-b(remote)                                                                                                 | local/remote 同列表，count=2                                                                                      |
+| T22.4 | G3   | my-mcp：local v1 → remote v2                                                                                                    | type→remote，command→NULL，列表 count=1                                                                           |
+| T22.5 | G4   | 删 to-delete                                                                                                                    | DELETE 200，列表/PG 移除                                                                                          |
+| T22.6 | G5   | 建 m1/m2 后清空                                                                                                                 | DELETE 200，列表/PG 空                                                                                            |
+| T22.7 | G6   | A/B 各建同名 shared（A=local，B=remote）                                                                                        | A 显示 local，B 显示 remote；PG 两条                                                                              |
+| T22.8 | G7   | 删除 session                                                                                                                    | ⚠️ mcps 特例：删 session 后 GET mcps 仍 200 空列表（mcps list 无 `requireSession`，见附录 A G8）；PG 级联 COUNT=0 |
+| T22.9 | G8   | ses_NOTEXIST create/list/delete                                                                                                 | create=500（FK）；list=200 空数组（mcps 特例）；delete=200（幂等）                                                |
 
 ### T22.10 输入校验：缺少必填字段
 
@@ -55,6 +103,7 @@ const badType = await fetch(BASE + "/session/" + SID.id + "/mcps/create", {
 console.log("bad type:", badType.status, "(expect 400)")
 '
 ```
+
 **期望**：缺 name、缺 type、非法 type 均返回 400
 
 ### T22.11 完整字段持久化
@@ -82,6 +131,7 @@ console.log("headers:", JSON.stringify(res.headers))
 console.log("enabled:", res.enabled)
 '
 ```
+
 **期望**：remote MCP 字段正确返回；remote 不接受 `environment`
 
 > **PG 验证**：`docker exec ai-nova-postgres psql -U postgres -d opencode -c "SELECT name, type, url, headers, enabled FROM session_mcps WHERE session_id='$SID';"`
@@ -101,6 +151,7 @@ const res = await (await fetch(BASE + "/session/" + SID.id + "/mcps/create", {
 console.log("name:", res.name, "enabled:", res.enabled, "(expect false)")
 '
 ```
+
 **期望**：enabled=false
 
 > **PG 验证**：`docker exec ai-nova-postgres psql -U postgres -d opencode -c "SELECT enabled FROM session_mcps WHERE session_id='$SID' AND name='off-mcp';"`
@@ -174,6 +225,7 @@ if (!ok) process.exit(1)
 ```
 
 **期望**：
+
 - MCP 注册成功（name=test-tools, type=remote）
 - AI 的消息中包含 `test_tools_echo` 工具调用
 - 工具执行状态为 completed，输出包含 `hello-mcp`
@@ -244,6 +296,7 @@ if (!ok) process.exit(1)
 ```
 
 **期望**：
+
 - MCP 在沙箱中通过 supergateway 桥接启动成功
 - `prompt_async` 返回 204
 - MCP 工具调用状态为 completed，输出包含 `hello-sandbox-mcp`
@@ -449,27 +502,27 @@ console.log("after cleanup:", check.stdout || "")
 
 > **编号说明**：T22.20 与 T22.9 完全重复（不存在 session 语义），2026-07-17 去重删除，编号保留断档。
 
-| 用例 | 状态 | 备注 |
-|---|---|---|
-| T22.1 | ✅ | 创建会话级 local MCP（command + environment） |
-| T22.2 | ✅ | 创建会话级 remote MCP（url + headers） |
-| T22.3 | ✅ | 列出会话 MCP，local + remote 同列 |
-| T22.4 | ✅ | Upsert 更新同名 MCP（local→remote） |
-| T22.5 | ✅ | 删除单个 MCP → 200，记录消失 |
-| T22.6 | ✅ | 清空所有 MCP → 200，列表为空 |
-| T22.7 | ✅ | 不同 session 同名 MCP 互相隔离 |
-| T22.8 | ✅ | 删除 session 后 MCP 级联清理；GET mcps 返回 200 空数组 |
-| T22.9 | ✅ | 不存在 session → create=500(FK), list=200([]), delete=200 |
-| T22.10 | ✅ | 输入校验：缺 name/缺 type/非法 type → 400 |
-| T22.11 | ✅ | remote 完整字段持久化（url/headers/enabled） |
-| T22.12 | ✅ | disabled MCP 的 enabled=false 持久化 |
-| T22.13 | ✅ | Remote MCP 工具执行验证：test-tools.echo 成功调用，输出 Echo: hello-mcp。⚠️ 环境为 `OPENCODE_EXPERIMENTAL_CODE_MODE=all`，工具经 code-mode `execute` 内嵌调用（metadata.toolCalls 记录 test-tools.echo completed），非顶层 MCP 工具 part |
-| T22.14 | ✅ | Local MCP 在 Sandbox 中执行验证：sandbox-everything_echo 工具成功调用，输出 Echo: hello-sandbox-mcp |
-| T22.15 | ✅ | Session MCP 工具多轮对话持续可用：3 轮 3 次调用全部成功 |
-| T22.16 | ✅ | 严格输入校验：local command 必填且非空，remote url 必填 → 全部 400 |
-| T22.17 | ✅ | local MCP environment 实际注入 sandbox 进程：`/tmp/mcp-env-test`=`hello-env-value` |
-| T22.18 | ✅ | shell 安全：恶意 name/env/command 不产生注入（SAFE_MARKER 存在，NAME_PWNED/ENV_PWNED 无）。⚠️ **修复前为 FAIL**：env key 未转义导致沙箱内任意命令执行 |
-| T22.19 | ✅ | local MCP pid/log 生命周期与清理：启动后存在 pid-everything-9100.{pid,log} + supergateway 进程；abort 回收后删除、进程消失 |
+| 用例   | 状态 | 备注                                                                                                                                                                                                                                     |
+| ------ | ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T22.1  | ✅   | 创建会话级 local MCP（command + environment）                                                                                                                                                                                            |
+| T22.2  | ✅   | 创建会话级 remote MCP（url + headers）                                                                                                                                                                                                   |
+| T22.3  | ✅   | 列出会话 MCP，local + remote 同列                                                                                                                                                                                                        |
+| T22.4  | ✅   | Upsert 更新同名 MCP（local→remote）                                                                                                                                                                                                      |
+| T22.5  | ✅   | 删除单个 MCP → 200，记录消失                                                                                                                                                                                                             |
+| T22.6  | ✅   | 清空所有 MCP → 200，列表为空                                                                                                                                                                                                             |
+| T22.7  | ✅   | 不同 session 同名 MCP 互相隔离                                                                                                                                                                                                           |
+| T22.8  | ✅   | 删除 session 后 MCP 级联清理；GET mcps 返回 200 空数组                                                                                                                                                                                   |
+| T22.9  | ✅   | 不存在 session → create=500(FK), list=200([]), delete=200                                                                                                                                                                                |
+| T22.10 | ✅   | 输入校验：缺 name/缺 type/非法 type → 400                                                                                                                                                                                                |
+| T22.11 | ✅   | remote 完整字段持久化（url/headers/enabled）                                                                                                                                                                                             |
+| T22.12 | ✅   | disabled MCP 的 enabled=false 持久化                                                                                                                                                                                                     |
+| T22.13 | ✅   | Remote MCP 工具执行验证：test-tools.echo 成功调用，输出 Echo: hello-mcp。⚠️ 环境为 `OPENCODE_EXPERIMENTAL_CODE_MODE=all`，工具经 code-mode `execute` 内嵌调用（metadata.toolCalls 记录 test-tools.echo completed），非顶层 MCP 工具 part |
+| T22.14 | ✅   | Local MCP 在 Sandbox 中执行验证：sandbox-everything_echo 工具成功调用，输出 Echo: hello-sandbox-mcp                                                                                                                                      |
+| T22.15 | ✅   | Session MCP 工具多轮对话持续可用：3 轮 3 次调用全部成功                                                                                                                                                                                  |
+| T22.16 | ✅   | 严格输入校验：local command 必填且非空，remote url 必填 → 全部 400                                                                                                                                                                       |
+| T22.17 | ✅   | local MCP environment 实际注入 sandbox 进程：`/tmp/mcp-env-test`=`hello-env-value`                                                                                                                                                       |
+| T22.18 | ✅   | shell 安全：恶意 name/env/command 不产生注入（SAFE_MARKER 存在，NAME_PWNED/ENV_PWNED 无）。⚠️ **修复前为 FAIL**：env key 未转义导致沙箱内任意命令执行                                                                                    |
+| T22.19 | ✅   | local MCP pid/log 生命周期与清理：启动后存在 pid-everything-9100.{pid,log} + supergateway 进程；abort 回收后删除、进程消失                                                                                                               |
 
 > **2026-08-08 全量重跑记录**（容器 `opencode-saas-test`，`OPENCODE_EXPERIMENTAL_CODE_MODE=mcp`）：T22.1-12/16 纯 API CRUD 全通过（含 PG 持久化与级联）；T22.17 env 注入 `/tmp/mcp-env-test`=`hello-env-value`；T22.18 shell 安全（SAFE_MARKER 存在、无注入）；T22.19 pid/log abort 后删除、进程归零；T22.13 remote MCP `test-tools.echo` 经 code-mode `execute` 内嵌调用（metadata.toolCalls 记录 completed，PG 一致）；T22.15 多轮 3/3 全成功。T22.13/14 环境为 `CODE_MODE=mcp`，MCP 工具经 `execute` 嵌套调用（非顶层 part），行为与文档记录一致。
 
@@ -491,6 +544,7 @@ T22.18 实测发现两个 local MCP sandbox 启动相关的安全问题，已修
 > 注：session MCP local 端口从 `SANDBOX_MCP_BASE_PORT=9100` 起（实测端口 9100，非文档旧假设）。
 
 > **复测记录（2026-09-06，merge upstream/dev v1.18.29 后，镜像 `t0906-merged-1.18.29`，组合 3）**：
+>
 > - T22.1（local create：type=local/command 数组/enabled=true，PG `session_mcps` 一致）/T22.2（remote create：type=remote/url/headers 完整）/T22.3（local+remote 同列表 count=2）✅
 > - T22.10（缺 name → 400）/T22.16（local 类型缺 command → 400）✅
 > - **T22.9 实测偏差（非回归）**：不存在 session 时 list=200 空数组 ✅（mcps list 无 requireSession）；**create=500、delete 单个=500、clear=500**（非文档所写 create 500 幂等 delete=200）。
@@ -500,25 +554,25 @@ T22.18 实测发现两个 local MCP sandbox 启动相关的安全问题，已修
 
 > **复测记录（2026-09-15，镜像 `hitl-cbf2276a-wip2`（含 pgJsonb/LEASE_TOOLS/偏离修复），本地 PG + 远端沙箱）**：
 >
-> | 用例 | 结果 | 实测 |
-> |---|---|---|
-> | 单测 2 文件 | ✅ **29/29** | session-mcp-crud(16) + session-mcp(13，含 shell 注入加固) |
-> | T22.1 local create | ✅ | `type=local`、command 数组、PG `command` JSON 一致 |
-> | T22.2 remote create | ✅ | `type=remote`、url、headers PG 一致 |
-> | T22.3 local+remote 同列表 | ✅ | count=2 |
-> | T22.4 upsert local→remote | ✅ | type 切换、count=1、PG type=remote |
-> | T22.5 删单个 | ✅ | DELETE 200，列表/PG 移除 |
-> | T22.6 清空 | ✅ | DELETE 200，list=0 PG=0 |
-> | T22.7 隔离 | ✅ | A=local B=remote 互不影响 |
-> | T22.8 级联 | ✅ | 删 session 后 PG=0 |
-> | T22.9 不存在 session | ✅（与 2026-09-06 记录一致） | create=500 / list=200 / delete=500（requireSession 错误映射偏差为既有问题） |
-> | T22.10 缺必填 | ✅ | 缺 name=400 / 缺 command=400 |
-> | T22.11 完整字段 | ✅ | name/type/url/headers/enabled 全落 PG |
-> | T22.12 disabled | ✅ | `enabled=false` PG 一致 |
-> | T22.16 互斥校验 | ✅ | remote+command=400 / local+url=400 |
-> | T22.17 environment 注入 | ✅（PG 层） | `{"MY_TEST_VAR":"hello-env-injection"}` 完整持久化 |
-> | T22.18 shell 安全 | ✅ | 恶意 name/env key 创建接受（宽松设计），但沙箱内 **NO_PWNED**——执行时 sanitize 生效 |
-> | T22.13 remote E2E | ⏭️ 未跑 | 需可达 remote MCP（无外部服务） |
-> | T22.14 local E2E | ✅（code-mode 复测覆盖） | echo MCP supergateway 桥接链路已在 code-mode 完整验证 |
-> | T22.15 agent 切换 | ⏭️ 未跑 | 依赖模型行为长流程 |
-> | T22.19 lifecycle | ✅（code-mode 覆盖） | pid/log 文件机制已在 code-mode 复测中验证 |
+> | 用例                      | 结果                         | 实测                                                                                |
+> | ------------------------- | ---------------------------- | ----------------------------------------------------------------------------------- |
+> | 单测 2 文件               | ✅ **29/29**                 | session-mcp-crud(16) + session-mcp(13，含 shell 注入加固)                           |
+> | T22.1 local create        | ✅                           | `type=local`、command 数组、PG `command` JSON 一致                                  |
+> | T22.2 remote create       | ✅                           | `type=remote`、url、headers PG 一致                                                 |
+> | T22.3 local+remote 同列表 | ✅                           | count=2                                                                             |
+> | T22.4 upsert local→remote | ✅                           | type 切换、count=1、PG type=remote                                                  |
+> | T22.5 删单个              | ✅                           | DELETE 200，列表/PG 移除                                                            |
+> | T22.6 清空                | ✅                           | DELETE 200，list=0 PG=0                                                             |
+> | T22.7 隔离                | ✅                           | A=local B=remote 互不影响                                                           |
+> | T22.8 级联                | ✅                           | 删 session 后 PG=0                                                                  |
+> | T22.9 不存在 session      | ✅（与 2026-09-06 记录一致） | create=500 / list=200 / delete=500（requireSession 错误映射偏差为既有问题）         |
+> | T22.10 缺必填             | ✅                           | 缺 name=400 / 缺 command=400                                                        |
+> | T22.11 完整字段           | ✅                           | name/type/url/headers/enabled 全落 PG                                               |
+> | T22.12 disabled           | ✅                           | `enabled=false` PG 一致                                                             |
+> | T22.16 互斥校验           | ✅                           | remote+command=400 / local+url=400                                                  |
+> | T22.17 environment 注入   | ✅（PG 层）                  | `{"MY_TEST_VAR":"hello-env-injection"}` 完整持久化                                  |
+> | T22.18 shell 安全         | ✅                           | 恶意 name/env key 创建接受（宽松设计），但沙箱内 **NO_PWNED**——执行时 sanitize 生效 |
+> | T22.13 remote E2E         | ⏭️ 未跑                      | 需可达 remote MCP（无外部服务）                                                     |
+> | T22.14 local E2E          | ✅（code-mode 复测覆盖）     | echo MCP supergateway 桥接链路已在 code-mode 完整验证                               |
+> | T22.15 agent 切换         | ⏭️ 未跑                      | 依赖模型行为长流程                                                                  |
+> | T22.19 lifecycle          | ✅（code-mode 覆盖）         | pid/log 文件机制已在 code-mode 复测中验证                                           |

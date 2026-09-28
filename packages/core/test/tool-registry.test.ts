@@ -74,6 +74,21 @@ const transform = (service: Tool.Interface, tools: Readonly<Record<string, Info>
   )
 
 describe("Tool", () => {
+  it.effect("keeps Session overlays request-local while giving them collision precedence", () =>
+    Effect.gen(function* () {
+      const service = yield* Tool.Service
+      yield* transform(service, { echo: constant("location") }, { namespace: "mcp", codemode: false })
+      const overlay: Info = { ...constant("session"), name: "echo", options: { namespace: "mcp", codemode: false } }
+
+      const session = yield* service.snapshot(undefined, [overlay])
+      expect(session.definitions.map((definition) => definition.name)).toContain("mcp_echo")
+      expect(yield* session.execute(call("mcp_echo"))).toMatchObject({ output: { text: "session" } })
+
+      const next = yield* service.snapshot()
+      expect(yield* next.execute(call("mcp_echo", "call-location"))).toMatchObject({ output: { text: "location" } })
+    }),
+  )
+
   it.effect("reads the current editor tools by effective name", () =>
     Effect.gen(function* () {
       const service = yield* Tool.Service

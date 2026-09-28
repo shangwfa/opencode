@@ -68,6 +68,7 @@ import type { Command } from "./command.js"
 import { SessionEnvironment } from "./session/environment.js"
 import { InstructionEntry } from "./session/instruction-entry.js"
 import { SessionAgentsMd } from "./session/agents-md.js"
+import { SessionMcps } from "./session/mcps.js"
 
 // get project -> project.locations
 //
@@ -400,6 +401,9 @@ const layer = Layer.effect(
         yield* instances
           .provide(info)(
             Effect.gen(function* () {
+              const mcps = yield* SessionMcps.Service
+              // Closing a stale client must not prevent sandbox teardown.
+              yield* mcps.release(info).pipe(Effect.catchCause(() => Effect.void))
               const sandbox = yield* SandboxProvider.Service
               if (sandbox.enabled) yield* sandbox.destroy(sessionID)
             }),
@@ -418,6 +422,9 @@ const layer = Layer.effect(
               yield* instances
                 .provide(child)(
                   Effect.gen(function* () {
+                    const mcps = yield* SessionMcps.Service
+                    // Closing a stale client must not prevent sandbox teardown.
+                    yield* mcps.release(child).pipe(Effect.catchCause(() => Effect.void))
                     const sandbox = yield* SandboxProvider.Service
                     if (sandbox.enabled) yield* sandbox.destroy(child.id)
                   }),
@@ -507,7 +514,9 @@ const layer = Layer.effect(
                       : Model.Ref.make({
                           id: Model.ID.make(definition.model.model),
                           providerID: definition.model.providerID,
-                          ...(definition.model.variant ? { variant: Model.VariantID.make(definition.model.variant) } : {}),
+                          ...(definition.model.variant
+                            ? { variant: Model.VariantID.make(definition.model.variant) }
+                            : {}),
                         })
                     : undefined
                   const child = yield* result.create({
@@ -540,18 +549,22 @@ const layer = Layer.effect(
                       const messages = yield* result.messages({ sessionID: child.id, order: "desc", limit: 20 })
                       const assistant = messages.find(
                         (message) =>
-                          message.type === "assistant" && message.time.completed !== undefined && message.error === undefined,
+                          message.type === "assistant" &&
+                          message.time.completed !== undefined &&
+                          message.error === undefined,
                       )
                       return SubagentCompletion.text(assistant)
                     }),
                   })
                   yield* jobs.background(child.id)
                   yield* Effect.forkDetach(
-                    jobs.wait({ id: child.id }).pipe(
-                      Effect.flatMap(({ info }) =>
-                        info ? SubagentCompletion.deliver(result, jobs, { ...info, recovery }) : Effect.void,
+                    jobs
+                      .wait({ id: child.id })
+                      .pipe(
+                        Effect.flatMap(({ info }) =>
+                          info ? SubagentCompletion.deliver(result, jobs, { ...info, recovery }) : Effect.void,
+                        ),
                       ),
-                    ),
                   )
                 }),
               },
