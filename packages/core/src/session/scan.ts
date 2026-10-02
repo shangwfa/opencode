@@ -113,6 +113,12 @@ export class SandboxDefinitionCache<D> {
     return true
   }
 
+  /**
+   * Drops a Session's cached definitions. Currently *not* wired into any production path:
+   * freshness comes from the fingerprint plus dropping files that disappear from the listing, so a
+   * rebuilt sandbox re-reads on its own. Kept for a future sandbox-lifecycle hook (explicit
+   * destroy) — treat it as reserved API, not as a covered production behavior.
+   */
   invalidate(sessionID: string): void {
     this.sessions.delete(sessionID)
   }

@@ -1,7 +1,9 @@
 import { describe, expect, test } from "bun:test"
 import { Effect, Exit } from "effect"
 import { SessionTool } from "@opencode/schema/session-tool"
-import { importToolCode, inputFromArgs, toResult, toToolInfo } from "@opencode/core/session/tools"
+import { inputFromArgs, toResult, toToolInfo } from "@opencode/core/session/tool-definition"
+import { mergeDefinitions } from "@opencode/core/session/tools"
+import { parseSandboxToolScan } from "@opencode/core/session/tool-scan"
 
 const context = {
   sessionID: "ses_x" as any,
@@ -11,34 +13,52 @@ const context = {
   progress: () => undefined as any,
 }
 
-const V1_CODE = (body: string) => `import { tool } from "@opencode-ai/plugin"
-export default tool({
-  description: "Test tool",
-  args: { text: tool.schema.string().describe("Text") },
-  async execute(args) { ${body} },
-})`
-
-describe("SessionTools source loading", () => {
-  test("caches modules by code content and picks up updated code", async () => {
-    const first = await importToolCode(V1_CODE(`return "V1"`))
-    const again = await importToolCode(V1_CODE(`return "V1"`))
-    expect(again).toBe(first)
-    const second = await importToolCode(V1_CODE(`return "V2"`))
-    expect(second).not.toBe(first)
-    expect(await second.default.execute({ text: "x" }, {})).toBe("V2")
-  })
-
-  test("rejects broken and non-tool exports", async () => {
-    await expect(importToolCode("export default {{{{ invalid")).rejects.toThrow()
-    const notATool = await importToolCode(`export default { foo: "bar" }`)
-    const def = notATool.default ?? notATool
-    expect(typeof def.execute).not.toBe("function")
-    // A failed import stays failed-cached, matching V1 content-cache semantics.
-    await expect(importToolCode("export default {{{{ invalid")).rejects.toThrow()
-  })
-})
-
 describe("SessionTools definition adaptation", () => {
+  test("sandbox project definitions take precedence over session definitions", () => {
+    const session = toToolInfo(
+      SessionTool.Name.make("priority-tool"),
+      {
+        description: "session",
+        args: {},
+        execute: () => "session",
+      },
+      "/workspace",
+    )
+    const sandbox = toToolInfo(
+      SessionTool.Name.make("priority-tool"),
+      {
+        description: "sandbox",
+        args: {},
+        execute: () => "sandbox",
+      },
+      "/workspace",
+    )
+
+    expect(mergeDefinitions([session], [sandbox])).toEqual([sandbox])
+    expect(mergeDefinitions([session], [])).toEqual([session])
+  })
+
+  test("scans only safe direct TS/JS tools and resolves legacy aliases deterministically", () => {
+    const parsed = parseSandboxToolScan(
+      [
+        "/workspace/.opencode/tool/probe.ts\t1\t10",
+        "/workspace/.opencode/tools/probe.js\t2\t20",
+        "/workspace/.opencode/tools/probe.ts\t3\t30",
+        "/workspace/.opencode/tools/bad name.ts\t4\t40",
+        "/workspace/.opencode/tools/nested/probe.ts\t5\t50",
+        "/workspace/.opencode/tools/ignored.md\t6\t60",
+      ].join("\n"),
+    )
+
+    expect(parsed.entries).toHaveLength(1)
+    expect(parsed.entries[0]).toMatchObject({
+      name: "probe",
+      path: "/workspace/.opencode/tools/probe.ts",
+      fingerprint: "3\t30",
+    })
+    expect(parsed.skipped).toBe(1)
+  })
+
   test("derives a permissive input schema from a V1 zod args shape", () => {
     const fakeZod = {
       description: "User name",

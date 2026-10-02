@@ -19,6 +19,22 @@ import type { Schema } from "effect"
 type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never
 type SessionMessageData = DistributiveOmit<(typeof SessionMessage.Info)["Encoded"], "type" | "id">
 
+/** Internal admission tombstones deliberately outlive Session deletion. */
+export const SandboxExecutionGateTable = sqliteTable("sandbox_execution_gate", {
+  root_session_id: text().primaryKey(),
+  epoch: integer().notNull().default(1),
+  state: text().$type<"open" | "closing" | "closed">().notNull().default("open"),
+  sandbox_id: text(),
+  time_updated: integer().notNull(),
+})
+export const SessionExecutionGateTable = sqliteTable("session_execution_gate", {
+  session_id: text().primaryKey(),
+  root_session_id: text().notNull(),
+  epoch: integer().notNull().default(1),
+  state: text().$type<"open" | "closing" | "closed">().notNull().default("open"),
+  time_updated: integer().notNull(),
+})
+
 export const SessionTable = sqliteTable(
   "session_v2",
   {

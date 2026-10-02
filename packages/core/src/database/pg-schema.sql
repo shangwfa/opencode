@@ -1,5 +1,51 @@
 -- 自动生成：上游 sqlite 迁移链的 PG 翻译（dump-pg-schema.ts 产出）
 -- 顺序：全部表（无 FK）-> 索引 -> FK 约束
+CREATE TABLE "session_snapshot" (
+          "id" text PRIMARY KEY,
+          "session_id" text,
+          "scope" text NOT NULL,
+          "state" text NOT NULL,
+          "reason" text,
+          "image" text,
+          "source_sandbox_id" text,
+          "arch" text,
+          "schema_version" bigint,
+          "runtime_version" text,
+          "restored_count" bigint DEFAULT 0 NOT NULL,
+          "last_restored_at" bigint,
+          "time_created" bigint NOT NULL,
+          "time_updated" bigint NOT NULL
+        );
+CREATE TABLE "snapshot_operation" (
+          "id" text PRIMARY KEY,
+          "session_id" text NOT NULL,
+          "sandbox_id" text,
+          "kind" text NOT NULL,
+          "state" text NOT NULL,
+          "attempts" bigint DEFAULT 0 NOT NULL,
+          "next_retry_at" bigint,
+          "lease_owner" text,
+          "lease_until" bigint,
+          "fencing_token" bigint DEFAULT 0 NOT NULL,
+          "error" text,
+          "time_created" bigint NOT NULL,
+          "time_updated" bigint NOT NULL
+        );
+CREATE TABLE "snapshot_refresh_operation" (
+          "id" text PRIMARY KEY,
+          "session_id" text NOT NULL,
+          "sandbox_id" text,
+          "kind" text NOT NULL,
+          "state" text NOT NULL,
+          "attempts" bigint DEFAULT 0 NOT NULL,
+          "next_retry_at" bigint,
+          "lease_owner" text,
+          "lease_until" bigint,
+          "fencing_token" bigint DEFAULT 0 NOT NULL,
+          "error" text,
+          "time_created" bigint NOT NULL,
+          "time_updated" bigint NOT NULL
+        );
 CREATE TABLE "account_state" (
           "id" bigint PRIMARY KEY,
           "active_account_id" text,
@@ -116,6 +162,13 @@ CREATE TABLE "instruction_state" (
           "initial_values" text NOT NULL,
           "current_values" text NOT NULL
         );
+CREATE TABLE "sandbox_execution_gate" (
+          "root_session_id" text PRIMARY KEY,
+          "epoch" bigint DEFAULT 1 NOT NULL,
+          "state" text DEFAULT 'open' NOT NULL,
+          "sandbox_id" text,
+          "time_updated" bigint NOT NULL
+        );
 CREATE TABLE "session_agents" (
           "id" text PRIMARY KEY,
           "session_id" text NOT NULL,
@@ -142,6 +195,13 @@ CREATE TABLE "session_commands" (
           "subagent" bigint,
           "hints" text DEFAULT '[]' NOT NULL,
           "time_created" bigint NOT NULL,
+          "time_updated" bigint NOT NULL
+        );
+CREATE TABLE "session_execution_gate" (
+          "session_id" text PRIMARY KEY,
+          "root_session_id" text NOT NULL,
+          "epoch" bigint DEFAULT 1 NOT NULL,
+          "state" text DEFAULT 'open' NOT NULL,
           "time_updated" bigint NOT NULL
         );
 CREATE TABLE "session_inbox" (
@@ -257,6 +317,13 @@ CREATE TABLE "worktree" (
         );
 CREATE TABLE "migration" (id TEXT PRIMARY KEY, time_completed bigint NOT NULL);
 
+CREATE INDEX "session_snapshot_session_idx" ON "session_snapshot" ("session_id","state");
+CREATE INDEX "snapshot_operation_claim_idx" ON "snapshot_operation" ("state","next_retry_at");
+CREATE INDEX "snapshot_operation_session_idx" ON "snapshot_operation" ("session_id","time_created");
+CREATE UNIQUE INDEX "snapshot_operation_active_uniq" ON "snapshot_operation" ("session_id","sandbox_id","kind") WHERE "snapshot_operation"."state" in ('pending', 'running');
+CREATE INDEX "snapshot_refresh_operation_claim_idx" ON "snapshot_refresh_operation" ("state","next_retry_at");
+CREATE INDEX "snapshot_refresh_operation_session_idx" ON "snapshot_refresh_operation" ("session_id","time_created");
+CREATE UNIQUE INDEX "snapshot_refresh_operation_active_uniq" ON "snapshot_refresh_operation" ("session_id","sandbox_id","kind") WHERE "snapshot_refresh_operation"."state" in ('pending', 'running');
 CREATE UNIQUE INDEX "event_aggregate_seq_idx" ON "event" ("aggregate_id","seq");
 CREATE INDEX "event_aggregate_type_seq_idx" ON "event" ("aggregate_id","type","seq");
 CREATE UNIQUE INDEX "permission_project_action_resource_idx" ON "permission" ("project_id","action","resource");

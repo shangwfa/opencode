@@ -4,14 +4,18 @@ export type { Context, Metadata, Namespace, Options, Result } from "@opencode/sc
 
 import { ToolDefinition, type ToolCall } from "@opencode/ai"
 import { Tool } from "@opencode/schema/tool"
-import { Context, Effect, Layer, Result, Schema, SchemaIssue, Types } from "effect"
+import { Context, Effect, Layer, Option, Result, Schema, SchemaIssue, Types } from "effect"
 import { makeLocationNode } from "@opencode/util/effect/app-node"
 import type { Agent } from "./agent.js"
 import { CodeModeCatalog } from "./codemode/catalog.js"
+import { CodeModeConfig } from "./codemode/config.js"
+import { CodeModeRunner } from "./codemode/runner.js"
 import { CodeModeTool } from "./codemode/tool.js"
 import { Image } from "./image.js"
 import { Permission } from "./permission.js"
 import { PluginHooks } from "./plugin/hooks.js"
+import { SandboxProvider } from "./sandbox/provider.js"
+import { SandboxPath } from "./sandbox/path.js"
 import { SessionMessage } from "./session/message.js"
 import { SessionSchema } from "./session/schema.js"
 import { State } from "./state.js"
@@ -72,6 +76,7 @@ const layer = Layer.effect(
   Effect.gen(function* () {
     const hooks = yield* PluginHooks.Service
     const image = yield* Image.Service
+    const codeModeConfig = CodeModeConfig.load()
 
     type NormalizedItem = Tool.Content | "decode" | "size"
     const normalizeImages = Effect.fnUntraced(function* (content: ReadonlyArray<Tool.Content>) {
@@ -247,10 +252,53 @@ const layer = Layer.effect(
           const codeModeInventory = { tools: codeModeTools, namespaces }
           const codeModeEnabled = !whollyDisabled("execute", rules)
           const codeModeTool = codeModeEnabled
-            ? CodeModeTool.create(codeModeInventory, (name, tool, input, context) =>
-                beforeExecute(name, input, context).pipe(
-                  Effect.flatMap((event) => executeTool(tool, name, event.input, context)),
-                ),
+            ? CodeModeTool.create(
+                codeModeInventory,
+                (name, tool, input, context) =>
+                  beforeExecute(name, input, context).pipe(
+                    Effect.flatMap((event) => executeTool(tool, name, event.input, context)),
+                  ),
+                {
+                  limits: codeModeConfig.limits,
+                  web: codeModeConfig.network !== "disabled",
+                  ...(codeModeConfig.executor === "sandbox"
+                    ? {
+                        execute: ({ code, context, tools, limits, tool, progress }) =>
+                          Effect.gen(function* () {
+                            const sandbox = Option.getOrUndefined(yield* Effect.serviceOption(SandboxProvider.Service))
+                            if (!sandbox?.enabled)
+                              return yield* Effect.fail(
+                                new Tool.Error({ message: "Code Mode requires an enabled Session Sandbox." }),
+                              )
+                            const endpoint = yield* CodeModeRunner.start({
+                              provider: sandbox,
+                              sessionID: context.sessionID,
+                              hostWorkdir: SandboxPath.WORKDIR,
+                            }).pipe(Effect.mapError((error) => new Tool.Error({ message: error.message })))
+                            const executionID = `cme_${globalThis.crypto.randomUUID()}`
+                            return yield* Effect.tryPromise({
+                              try: (signal) =>
+                                CodeModeRunner.execute({
+                                  endpoint: endpoint.endpoint,
+                                  executionID,
+                                  code,
+                                  tools,
+                                  limits: limits ?? {},
+                                  web: codeModeConfig.network === "sandbox",
+                                  signal,
+                                  tool: (call, callSignal) =>
+                                    Effect.runPromise(tool(call.tool, call.input), { signal: callSignal }),
+                                  progress: (calls) => Effect.runPromise(progress(calls), { signal }),
+                                }),
+                              catch: (cause) =>
+                                cause instanceof Error
+                                  ? new Tool.Error({ message: cause.message })
+                                  : new Tool.Error({ message: String(cause) }),
+                            })
+                          }),
+                      }
+                    : {}),
+                },
               )
             : undefined
           const names = Array.from(codeModeTools.keys()).join("\0")
@@ -258,7 +306,7 @@ const layer = Layer.effect(
           // definitions/executors fresh, but share the much larger rendered catalog across steps.
           const codeModeCatalog = !codeModeEnabled
             ? undefined
-            : catalog?.data === data && catalog.names === names
+            : overlay.length === 0 && catalog?.data === data && catalog.names === names
               ? catalog.value
               : CodeModeTool.catalog(codeModeInventory)
           if (codeModeCatalog) catalog = { data, names, value: codeModeCatalog }

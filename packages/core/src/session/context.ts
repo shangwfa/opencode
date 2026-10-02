@@ -25,6 +25,7 @@ import { SessionAgents } from "./agents.js"
 import { SessionSkills } from "./skills.js"
 import { SessionMcps } from "./mcps.js"
 import { SessionTools } from "./tools.js"
+import { SessionToolSandbox } from "./tool-sandbox.js"
 import { SessionMessage } from "./message.js"
 import { SessionModelRequest } from "./model-request.js"
 import { SessionRunnerModel } from "./runner/model.js"
@@ -84,6 +85,7 @@ const layer = Layer.effect(
     const sessionSkills = yield* SessionSkills.Service
     const sessionMcps = yield* SessionMcps.Service
     const sessionTools = yield* SessionTools.Service
+    const sessionToolSandbox = yield* SessionToolSandbox.Service
     const builtins = yield* InstructionBuiltIns.Service
     const model = yield* Model.Service
     const db = (yield* Database.Service).db
@@ -140,7 +142,7 @@ const layer = Layer.effect(
       if (!agent.info) return yield* new AgentNotFoundError({ sessionID: session.id, agent: session.agent ?? agent.id })
       yield* sessionSkills.rematerialize(session)
       const sessionMcpTools = yield* sessionMcps.tools(session)
-      const sessionCustomTools = yield* sessionTools.load(session)
+      const sessionCustomTools = yield* sessionTools.load(session).pipe(Effect.orDie)
       const loaded = yield* Effect.all(
         {
           tools: registry.snapshot(Permission.merge(agent.info.permissions, session.permissions ?? []), [
@@ -163,6 +165,7 @@ const layer = Layer.effect(
         },
         { concurrency: "unbounded" },
       )
+      sessionToolSandbox.capture(loaded.tools, sessionCustomTools)
       return {
         session,
         agent: { ...agent, info: agent.info },
@@ -209,6 +212,7 @@ export const node = makeLocationNode({
   service: Service,
   layer,
   deps: [
+    SessionToolSandbox.node,
     Agent.node,
     Model.node,
     Database.node,

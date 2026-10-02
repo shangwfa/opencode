@@ -11,6 +11,8 @@ const KEYS = [
   "OPENCODE_SANDBOX_IMAGE",
   "OPENCODE_SANDBOX_TIMEOUT_SECONDS",
   "OPENCODE_SANDBOX_CREATE_TIMEOUT_SECONDS",
+  "OPENCODE_SANDBOX_FILES_TIMEOUT_SECONDS",
+  "OPENCODE_SANDBOX_FILES_TIMEOUT_RETRIES",
   "OPENCODE_SANDBOX_CPU",
   "OPENCODE_SANDBOX_MEMORY",
 ] as const
@@ -89,5 +91,18 @@ describe("SandboxConfig.load", () => {
     expect(SandboxConfig.load().createTimeoutSeconds).toBe(600)
     process.env["OPENCODE_SANDBOX_CREATE_TIMEOUT_SECONDS"] = "invalid"
     expect(SandboxConfig.load().createTimeoutSeconds).toBe(300)
+  })
+
+  it("bounds files API reads and permits disabling timeout retries", () => {
+    expect(SandboxConfig.load().filesTimeoutSeconds).toBe(15)
+    expect(SandboxConfig.load().filesTimeoutRetries).toBe(1)
+    process.env["OPENCODE_SANDBOX_FILES_TIMEOUT_SECONDS"] = "8"
+    process.env["OPENCODE_SANDBOX_FILES_TIMEOUT_RETRIES"] = "0"
+    expect(SandboxConfig.load().filesTimeoutSeconds).toBe(8)
+    expect(SandboxConfig.load().filesTimeoutRetries).toBe(0)
+    process.env["OPENCODE_SANDBOX_FILES_TIMEOUT_SECONDS"] = "0"
+    process.env["OPENCODE_SANDBOX_FILES_TIMEOUT_RETRIES"] = "-1"
+    expect(SandboxConfig.load().filesTimeoutSeconds).toBe(15)
+    expect(SandboxConfig.load().filesTimeoutRetries).toBe(1)
   })
 })

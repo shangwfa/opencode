@@ -134,6 +134,8 @@ type ExecuteInput = AutoInput & {
   readonly inputID?: SessionMessage.ID
   readonly started?: boolean
   readonly instructionUpdate?: string
+  /** Render the generated summary as a normal assistant response instead of a compaction record. */
+  readonly output?: "compaction" | "assistant"
 }
 
 export type Outcome =
@@ -143,11 +145,38 @@ export type Outcome =
     })
   | Pick<SessionMessage.CompactionFailed, "status" | "error">
 
+/**
+ * Generates a fresh summary of `sourceSessionID` and installs it as the checkpoint of
+ * `targetSessionID`. This is the source of a derived Session's starting context: the summary lands
+ * in the target, while the source is only ever read (`SessionContext.select` + `SessionHistory.preview`
+ * on its ID), so deriving never writes the source's messages, history, or state.
+ */
+export type DeriveInput = {
+  readonly sourceSessionID: SessionSchema.ID
+  /** The Session that receives the generated summary; its request machinery drives the call. */
+  readonly target: SessionSchema.Info
+  readonly inputID?: SessionMessage.ID
+  /**
+   * The source's transcript. Defaults to its durable local history; injectable so the isolation
+   * contract (reads the source, writes only the target) can be exercised without an LLM harness.
+   */
+  readonly sourceMessages?: readonly SessionMessage.Info[]
+  /** Resolves the target's request machinery (agent/tools/model/prepare); the transcript comes from the source. */
+  readonly resolveContext: (
+    session: SessionSchema.Info,
+  ) => Effect.Effect<
+    SessionContext.Loaded & { readonly instructionUpdate: string },
+    SessionRunnerModel.Error | AgentNotFoundError | Instructions.InitializationBlocked
+  >
+  readonly prepare: SessionModelRequest.Interface["compaction"]
+}
+
 export interface Interface extends State.Transformable<Editor> {
   readonly enabled: () => boolean
   readonly required: (input: RequiredInput) => boolean
   readonly compact: (input: AutoInput) => Effect.Effect<Outcome>
   readonly compactManual: (input: ManualInput) => Effect.Effect<Outcome>
+  readonly deriveSummary: (input: DeriveInput) => Effect.Effect<Outcome>
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/SessionCompaction") {}
@@ -651,7 +680,18 @@ export const layer = Layer.effect(
           error: { type: "compaction.unavailable", message: "Nothing to compact yet" },
           inputID: input.inputID,
         })
-      yield* started(input, history.recent)
+      const assistantMessageID = messageID
+      let textStarted = false
+      if (input.output === "assistant") {
+        yield* bus.publish(SessionEvent.Step.Started, {
+          sessionID: context.session.id,
+          assistantMessageID,
+          agent: context.agent.id,
+          model: context.model.ref,
+        })
+      } else {
+        yield* started(input, history.recent)
+      }
 
       const chunks: string[] = []
       let failure: SessionError.Error | undefined
@@ -715,9 +755,26 @@ export const layer = Layer.effect(
               }
             if (LLMEvent.is.textDelta(event)) {
               chunks.push(event.text)
-              return bus.publish(SessionEvent.Compaction.Delta, {
-                sessionID: context.session.id,
-                text: event.text,
+              if (input.output !== "assistant")
+                return bus.publish(SessionEvent.Compaction.Delta, {
+                  sessionID: context.session.id,
+                  text: event.text,
+                })
+              return Effect.gen(function* () {
+                if (!textStarted) {
+                  textStarted = true
+                  yield* bus.publish(SessionEvent.Text.Started, {
+                    sessionID: context.session.id,
+                    assistantMessageID,
+                    ordinal: 0,
+                  })
+                }
+                yield* bus.publish(SessionEvent.Text.Delta, {
+                  sessionID: context.session.id,
+                  assistantMessageID,
+                  ordinal: 0,
+                  delta: event.text,
+                })
               })
             }
             if (LLMEvent.is.stepFinish(event)) {
@@ -769,6 +826,15 @@ export const layer = Layer.effect(
             ? "Compaction summary did not match the required template"
             : "Compaction produced no summary",
         }
+        if (input.output === "assistant") {
+          yield* bus.publish(SessionEvent.Step.Failed, {
+            sessionID: context.session.id,
+            assistantMessageID,
+            error,
+            ...(usage ?? SessionUsage.record(undefined, context.model.cost)),
+          })
+          return { status: "failed" as const, error }
+        }
         return yield* failed({
           sessionID: context.session.id,
           reason: input.reason,
@@ -776,6 +842,39 @@ export const layer = Layer.effect(
           inputID: input.inputID,
           ...usage,
         })
+      }
+      if (input.output === "assistant") {
+        if (!textStarted)
+          yield* bus.publish(SessionEvent.Text.Started, {
+            sessionID: context.session.id,
+            assistantMessageID,
+            ordinal: 0,
+          })
+        yield* bus.publish(SessionEvent.Text.Ended, {
+          sessionID: context.session.id,
+          assistantMessageID,
+          ordinal: 0,
+          text: summary,
+          state: providerState,
+        })
+        yield* bus.publish(SessionEvent.Step.Streamed, {
+          sessionID: context.session.id,
+          assistantMessageID,
+        })
+        yield* bus.publish(SessionEvent.Step.Ended, {
+          sessionID: context.session.id,
+          assistantMessageID,
+          finish: "stop",
+          providerState,
+          ...(usage ?? SessionUsage.record(undefined, context.model.cost)),
+        })
+        if (usage)
+          yield* bus.publish(SessionEvent.UsageRecorded, {
+            sessionID: context.session.id,
+            source: "compaction",
+            ...usage,
+          })
+        return { status: "completed" as const }
       }
       const historyPath = yield* historyPathOf(context.session.id, messageID, history.messages, previous)
       yield* bus.publish(SessionEvent.Compaction.Ended, {
@@ -823,6 +922,43 @@ export const layer = Layer.effect(
           : promptCeiling
       return estimateTokens(input) >= threshold
     }
+    /**
+     * Summarizes a *different* Session into this one. The transcript comes from the source, but
+     * every write, event, and history path targets the target Session, because `execute` only ever
+     * touches `context.session.id`. The source is therefore read-only by construction.
+     *
+     * `resolveContext` resolves the target's request machinery (agent/tools/model/prepare); pairing
+     * it with the source's messages is what makes the summary land in the new Session while
+     * describing the old one.
+     */
+    const deriveSummary = Effect.fn("SessionCompaction.deriveSummary")(function* (input: DeriveInput) {
+      // `original` reads the Session's durable transcript; passing the source ID keeps the read
+      // there while `context` (and therefore every write) stays on the target.
+      const source = input.sourceMessages ?? (yield* original(input.sourceSessionID))
+      if (findTailStart(source, state.get().tokens) === undefined)
+        return {
+          status: "failed" as const,
+          error: { type: "compaction.unavailable" as const, message: "Nothing to summarize in the source Session" },
+        }
+      return yield* input.resolveContext(input.target).pipe(
+        Effect.matchEffect({
+          onFailure: (cause) => Effect.succeed({ status: "failed" as const, error: toSessionError(cause) }),
+          onSuccess: (context) => {
+            const request = {
+              context: { ...context, messages: source },
+              instructionUpdate: context.instructionUpdate,
+              prepare: input.prepare,
+              reason: "manual" as const,
+              inputID: input.inputID,
+              started: true,
+              output: "assistant" as const,
+            }
+            return execute(request)
+          },
+        }),
+      )
+    })
+
     const compactManual = Effect.fn("SessionCompaction.compactManual")(function* (input: ManualInput) {
       if (findTailStart(input.messages, state.get().tokens) === undefined)
         return yield* failed({
@@ -861,6 +997,7 @@ export const layer = Layer.effect(
       required,
       compact,
       compactManual,
+      deriveSummary,
     })
   }),
 )

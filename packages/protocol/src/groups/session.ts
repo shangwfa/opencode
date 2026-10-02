@@ -248,6 +248,11 @@ export const makeSessionGroup = <I extends HttpApiMiddleware.AnyId, S, FormI ext
           metadata: Session.Metadata.pipe(Schema.optional),
           permissions: Permission.Ruleset.pipe(Schema.optional),
           sandbox: Session.SandboxResource.pipe(Schema.optional),
+          /**
+           * Create the Session, then asynchronously summarize this source Session into it as a
+           * starting checkpoint. The source is read-only; the summary is written to the new Session.
+           */
+          summaryFrom: Session.ID.pipe(Schema.optional),
         }),
         success: Schema.Struct({ data: PublicSessionInfo }),
         error: [SessionNotFoundError],
@@ -828,6 +833,79 @@ export const makeSessionGroup = <I extends HttpApiMiddleware.AnyId, S, FormI ext
             identifier: "session.killSandbox",
             summary: "Destroy session sandbox",
             description: "Destroy the session sandbox while preserving its keep-alive preference.",
+          }),
+        ),
+    )
+    .add(
+      HttpApiEndpoint.post("session.snapshot.create", "/api/session/:sessionID/snapshot", {
+        params: { sessionID: Session.ID },
+        success: Schema.Struct({
+          data: Schema.Struct({
+            snapshotID: Schema.String,
+            state: Schema.String,
+          }),
+        }),
+        error: [SessionNotFoundError, InvalidRequestError],
+      })
+        .middleware(sessionLocationMiddleware)
+        .annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.snapshot.create",
+            summary: "Create a sandbox snapshot",
+            description:
+              "Start a snapshot of the session sandbox and return its id immediately; the snapshot settles to Ready in the background (follow session.sandbox.snapshot events or GET this route). Requires the snapshot capability and a session persisting via snapshots.",
+          }),
+        ),
+    )
+    .add(
+      HttpApiEndpoint.get("session.snapshot.get", "/api/session/:sessionID/snapshot", {
+        params: { sessionID: Session.ID },
+        success: Schema.Struct({
+          data: Schema.NullOr(
+            Schema.Struct({
+              id: Schema.String,
+              state: Schema.String,
+              reason: Schema.NullOr(Schema.String),
+              createdAt: Schema.Number,
+              restoredCount: Schema.Number,
+            }),
+          ),
+        }),
+        error: [SessionNotFoundError, InvalidRequestError],
+      })
+        .middleware(sessionLocationMiddleware)
+        .annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.snapshot.get",
+            summary: "Get the latest sandbox snapshot",
+            description:
+              "Return the newest snapshot row for the session (any live state: creating/ready/stale/failed), or null when none exists.",
+          }),
+        ),
+    )
+    .add(
+      HttpApiEndpoint.get("session.snapshot.stats", "/api/session/:sessionID/snapshot/stats", {
+        params: { sessionID: Session.ID },
+        success: Schema.Struct({
+          data: Schema.Struct({
+            snapshots: Schema.Record(Schema.String, Schema.Number),
+            total: Schema.Number,
+            restoredTotal: Schema.Number,
+            operations: Schema.Struct({
+              destroy: Schema.Struct({ byState: Schema.Record(Schema.String, Schema.Number), total: Schema.Number }),
+              refresh: Schema.Struct({ byState: Schema.Record(Schema.String, Schema.Number), total: Schema.Number }),
+            }),
+          }),
+        }),
+        error: [SessionNotFoundError],
+      })
+        .middleware(sessionLocationMiddleware)
+        .annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.snapshot.stats",
+            summary: "Snapshot and operation aggregates for the session",
+            description:
+              "Aggregate snapshot counts by state plus durable destroy/refresh operation counts by state. Shared across server instances through PostgreSQL.",
           }),
         ),
     )

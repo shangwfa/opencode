@@ -1,0 +1,100 @@
+export * as SessionToolGate from "./tool-gate.js"
+
+import { Effect } from "effect"
+import { eq, sql } from "drizzle-orm"
+import type { Database } from "../database/database.js"
+import { SessionExecutionGateTable as Logical, SandboxExecutionGateTable as Root, SessionTable } from "./sql.js"
+import { rootSessionID } from "../sandbox/provider.js"
+import { SandboxTable } from "../sandbox/sql.js"
+
+/** A no-op UPDATE locks rows on PG and obtains a write transaction on SQLite. */
+export function make(db: Database.Interface["db"]) {
+  const root = (sessionID: string) =>
+    rootSessionID(sessionID, (id) =>
+      db
+        .select({ parentID: SessionTable.parent_id })
+        .from(SessionTable)
+        .where(eq(SessionTable.id, id as typeof SessionTable.$inferSelect.id))
+        .get()
+        .pipe(Effect.orDie),
+    )
+
+  const locked = <A, E, R>(
+    sessionID: string,
+    effect: (tx: Parameters<Parameters<typeof db.transaction>[0]>[0], rootID: string) => Effect.Effect<A, E, R>,
+  ) =>
+    Effect.gen(function* () {
+      const rootID = yield* root(sessionID)
+      return yield* db.transaction((tx) =>
+        Effect.gen(function* () {
+          const now = Date.now()
+          yield* tx.insert(Root).values({ root_session_id: rootID, time_updated: now }).onConflictDoNothing().run()
+          yield* tx.update(Root).set({ time_updated: now }).where(eq(Root.root_session_id, rootID)).run()
+          yield* tx
+            .insert(Logical)
+            .values({ session_id: sessionID, root_session_id: rootID, time_updated: now })
+            .onConflictDoNothing()
+            .run()
+          yield* tx.update(Logical).set({ time_updated: now }).where(eq(Logical.session_id, sessionID)).run()
+          return yield* effect(tx, rootID)
+        }),
+      )
+    }).pipe(Effect.mapError((cause) => (cause instanceof Error ? cause : new Error(String(cause)))))
+
+  return {
+    admit: <A, E, R>(sessionID: string, sandboxID: string, execute: (epoch: number) => Effect.Effect<A, E, R>) =>
+      locked(sessionID, (tx, rootID) =>
+        Effect.gen(function* () {
+          const exists = yield* tx
+            .select({ id: SessionTable.id })
+            .from(SessionTable)
+            .where(eq(SessionTable.id, sessionID as typeof SessionTable.$inferSelect.id))
+            .get()
+          const logical = yield* tx.select().from(Logical).where(eq(Logical.session_id, sessionID)).get()
+          const physical = yield* tx.select().from(Root).where(eq(Root.root_session_id, rootID)).get()
+          if (!exists || logical?.state !== "open" || physical?.state !== "open" || physical.sandbox_id !== sandboxID)
+            return yield* Effect.fail(new Error("Session tool admission is closed or Sandbox changed"))
+          return yield* execute(logical.epoch + physical.epoch)
+        }),
+      ),
+    booted: (sessionID: string, sandboxID: string) =>
+      locked(sessionID, (tx, rootID) =>
+        Effect.gen(function* () {
+          const physical = yield* tx.select().from(Root).where(eq(Root.root_session_id, rootID)).get()
+          const row = yield* tx.select().from(SandboxTable).where(eq(SandboxTable.session_id, rootID)).get()
+          if (!row || row.id !== sandboxID || row.state !== "running")
+            return yield* Effect.fail(new Error("Sandbox identity is no longer current"))
+          if (physical?.state === "closing") return yield* Effect.fail(new Error("Sandbox destruction is in progress"))
+          if (physical?.state === "closed" && physical.sandbox_id === sandboxID)
+            return yield* Effect.fail(new Error("Destroyed Sandbox cannot reopen admission"))
+          if (physical?.sandbox_id === sandboxID && physical.state === "open") return
+          yield* tx
+            .update(Root)
+            .set({ state: "open", sandbox_id: sandboxID, epoch: sql`${Root.epoch} + 1` })
+            .where(eq(Root.root_session_id, rootID))
+            .run()
+        }),
+      ),
+    close: (sessionID: string, physical: boolean) =>
+      locked(sessionID, (tx, rootID) =>
+        Effect.gen(function* () {
+          if (physical)
+            yield* tx
+              .update(Root)
+              .set({ state: "closing", epoch: sql`${Root.epoch} + 1` })
+              .where(eq(Root.root_session_id, rootID))
+              .run()
+          else
+            yield* tx
+              .update(Logical)
+              .set({ state: "closed", epoch: sql`${Logical.epoch} + 1` })
+              .where(eq(Logical.session_id, sessionID))
+              .run()
+        }),
+      ),
+    destroyed: (sessionID: string) =>
+      locked(sessionID, (tx, rootID) =>
+        tx.update(Root).set({ state: "closed" }).where(eq(Root.root_session_id, rootID)).run(),
+      ),
+  }
+}

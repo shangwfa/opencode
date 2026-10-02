@@ -5,6 +5,58 @@ const schema: Omit<DatabaseMigration.Migration, "id"> = {
   up(tx) {
     return Effect.gen(function* () {
       yield* tx.run(`
+        CREATE TABLE \`session_snapshot\` (
+          \`id\` text PRIMARY KEY,
+          \`session_id\` text,
+          \`scope\` text NOT NULL,
+          \`state\` text NOT NULL,
+          \`reason\` text,
+          \`image\` text,
+          \`source_sandbox_id\` text,
+          \`arch\` text,
+          \`schema_version\` integer,
+          \`runtime_version\` text,
+          \`restored_count\` integer DEFAULT 0 NOT NULL,
+          \`last_restored_at\` integer,
+          \`time_created\` integer NOT NULL,
+          \`time_updated\` integer NOT NULL
+        );
+      `)
+      yield* tx.run(`
+        CREATE TABLE \`snapshot_operation\` (
+          \`id\` text PRIMARY KEY,
+          \`session_id\` text NOT NULL,
+          \`sandbox_id\` text,
+          \`kind\` text NOT NULL,
+          \`state\` text NOT NULL,
+          \`attempts\` integer DEFAULT 0 NOT NULL,
+          \`next_retry_at\` integer,
+          \`lease_owner\` text,
+          \`lease_until\` integer,
+          \`fencing_token\` integer DEFAULT 0 NOT NULL,
+          \`error\` text,
+          \`time_created\` integer NOT NULL,
+          \`time_updated\` integer NOT NULL
+        );
+      `)
+      yield* tx.run(`
+        CREATE TABLE \`snapshot_refresh_operation\` (
+          \`id\` text PRIMARY KEY,
+          \`session_id\` text NOT NULL,
+          \`sandbox_id\` text,
+          \`kind\` text NOT NULL,
+          \`state\` text NOT NULL,
+          \`attempts\` integer DEFAULT 0 NOT NULL,
+          \`next_retry_at\` integer,
+          \`lease_owner\` text,
+          \`lease_until\` integer,
+          \`fencing_token\` integer DEFAULT 0 NOT NULL,
+          \`error\` text,
+          \`time_created\` integer NOT NULL,
+          \`time_updated\` integer NOT NULL
+        );
+      `)
+      yield* tx.run(`
         CREATE TABLE \`account_state\` (
           \`id\` integer PRIMARY KEY,
           \`active_account_id\` text,
@@ -155,6 +207,15 @@ const schema: Omit<DatabaseMigration.Migration, "id"> = {
         );
       `)
       yield* tx.run(`
+        CREATE TABLE \`sandbox_execution_gate\` (
+          \`root_session_id\` text PRIMARY KEY,
+          \`epoch\` integer DEFAULT 1 NOT NULL,
+          \`state\` text DEFAULT 'open' NOT NULL,
+          \`sandbox_id\` text,
+          \`time_updated\` integer NOT NULL
+        );
+      `)
+      yield* tx.run(`
         CREATE TABLE \`session_agents\` (
           \`id\` text PRIMARY KEY,
           \`session_id\` text NOT NULL,
@@ -189,6 +250,15 @@ const schema: Omit<DatabaseMigration.Migration, "id"> = {
           \`time_created\` integer NOT NULL,
           \`time_updated\` integer NOT NULL,
           CONSTRAINT \`fk_session_commands_session_id_session_v2_id_fk\` FOREIGN KEY (\`session_id\`) REFERENCES \`session_v2\`(\`id\`) ON DELETE CASCADE
+        );
+      `)
+      yield* tx.run(`
+        CREATE TABLE \`session_execution_gate\` (
+          \`session_id\` text PRIMARY KEY,
+          \`root_session_id\` text NOT NULL,
+          \`epoch\` integer DEFAULT 1 NOT NULL,
+          \`state\` text DEFAULT 'open' NOT NULL,
+          \`time_updated\` integer NOT NULL
         );
       `)
       yield* tx.run(`
@@ -328,6 +398,25 @@ const schema: Omit<DatabaseMigration.Migration, "id"> = {
           CONSTRAINT \`fk_worktree_project_id_project_id_fk\` FOREIGN KEY (\`project_id\`) REFERENCES \`project\`(\`id\`) ON DELETE CASCADE
         );
       `)
+      yield* tx.run(`CREATE INDEX \`session_snapshot_session_idx\` ON \`session_snapshot\` (\`session_id\`,\`state\`);`)
+      yield* tx.run(
+        `CREATE INDEX \`snapshot_operation_claim_idx\` ON \`snapshot_operation\` (\`state\`,\`next_retry_at\`);`,
+      )
+      yield* tx.run(
+        `CREATE INDEX \`snapshot_operation_session_idx\` ON \`snapshot_operation\` (\`session_id\`,\`time_created\`);`,
+      )
+      yield* tx.run(
+        `CREATE UNIQUE INDEX \`snapshot_operation_active_uniq\` ON \`snapshot_operation\` (\`session_id\`,\`sandbox_id\`,\`kind\`) WHERE "snapshot_operation"."state" in ('pending', 'running');`,
+      )
+      yield* tx.run(
+        `CREATE INDEX \`snapshot_refresh_operation_claim_idx\` ON \`snapshot_refresh_operation\` (\`state\`,\`next_retry_at\`);`,
+      )
+      yield* tx.run(
+        `CREATE INDEX \`snapshot_refresh_operation_session_idx\` ON \`snapshot_refresh_operation\` (\`session_id\`,\`time_created\`);`,
+      )
+      yield* tx.run(
+        `CREATE UNIQUE INDEX \`snapshot_refresh_operation_active_uniq\` ON \`snapshot_refresh_operation\` (\`session_id\`,\`sandbox_id\`,\`kind\`) WHERE "snapshot_refresh_operation"."state" in ('pending', 'running');`,
+      )
       yield* tx.run(`CREATE UNIQUE INDEX \`event_aggregate_seq_idx\` ON \`event\` (\`aggregate_id\`,\`seq\`);`)
       yield* tx.run(`CREATE INDEX \`event_aggregate_type_seq_idx\` ON \`event\` (\`aggregate_id\`,\`type\`,\`seq\`);`)
       yield* tx.run(

@@ -26,16 +26,49 @@ export interface Config {
   readonly idleReapSeconds: number
   /** Sandbox.create upper bound; first pulls of large images need headroom. */
   readonly createTimeoutSeconds: number
+  /** Per-attempt timeout for Sandbox files API reads. */
+  readonly filesTimeoutSeconds: number
+  /** Number of retries after a files API read times out. */
+  readonly filesTimeoutRetries: number
   /** CPU/memory request forwarded to the control plane. */
   readonly resource: { cpu: string; memory: string }
   /** Browser-reachable host for preview URLs; defaults to the request host. */
   readonly publicDomain?: string
-  /** Volume backend for session workspaces; `none` keeps sandboxes ephemeral. */
-  readonly volumeType: "none" | "pvc" | "host"
+  /** Volume backend for session workspaces; `none` keeps sandboxes ephemeral,
+   * `snapshot` keeps the workspace on the sandbox rootfs and persists it via
+   * sandbox snapshots taken before recycle. */
+  readonly volumeType: "none" | "pvc" | "host" | "snapshot"
   /** PVC claim backing all volume mounts when volumeType is `pvc`. */
   readonly pvcClaimName: string
   /** Cross-session shared package-cache mount point (PVC volumeType only). */
   readonly packageCacheMount: string
+  /** Per-Session bound for isolated command contexts such as Code Mode. */
+  readonly maxConcurrentCommandsPerSession: number
+  /** Process-wide bound for isolated command contexts. */
+  readonly maxConcurrentCommandsGlobal: number
+  /** Periodic OOM sampling of running sandboxes (see sandbox/oom-sample.ts). */
+  readonly oomScan: {
+    readonly enabled: boolean
+    readonly intervalSeconds: number
+    readonly batch: number
+    readonly pressureRatio: number
+  }
+  /** Sandbox snapshot persistence (see sandbox/snapshot.ts and docs/sandbox-snapshot-design.md). */
+  readonly snapshot: {
+    /** Master switch; snapshot requests for sessions without the persist mode return an error when off. */
+    readonly enabled: boolean
+    /** Retention before GC marks terminal snapshots deleted (default 14 days). */
+    readonly ttlMs: number
+    /** Upper bound for waiting a snapshot to become Ready (default 15 minutes). */
+    readonly waitMs: number
+    /** Physical remote deletion gate (default off: keep snapshots, let remote TTL reap them). */
+    readonly deleteEnabled: boolean
+    /** Idle window after which a running snapshot-persisted sandbox gets its snapshot refreshed
+     * in place (sandbox kept alive); 0 disables periodic refresh. */
+    readonly refreshSeconds: number
+    /** Prune rebuildable caches before taking a snapshot (workspace size is still measured). */
+    readonly prune: boolean
+  }
 }
 
 const DEFAULT_IMAGE = "registry.cn-hangzhou.aliyuncs.com/opensandbox/opencode-sandbox:latest"
@@ -43,11 +76,21 @@ const DEFAULT_IMAGE = "registry.cn-hangzhou.aliyuncs.com/opensandbox/opencode-sa
 const flag = (value: string | undefined) => value === "true" || value === "1"
 
 const volumeType = (value: string | undefined): Config["volumeType"] =>
-  value === "pvc" || value === "host" ? value : "none"
+  value === "pvc" || value === "host" || value === "snapshot" ? value : "none"
 
 const number = (value: string | undefined, fallback: number) => {
   const parsed = Number(value)
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
+}
+
+const integer = (value: string | undefined, fallback: number) => {
+  const parsed = Number(value)
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : fallback
+}
+
+const nonNegativeInteger = (value: string | undefined, fallback: number) => {
+  const parsed = Number(value)
+  return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : fallback
 }
 
 export function load(): Config {
@@ -66,6 +109,8 @@ export function load(): Config {
     idleReapSeconds:
       env["OPENCODE_SANDBOX_IDLE_REAP_SEC"] === "0" ? 0 : number(env["OPENCODE_SANDBOX_IDLE_REAP_SEC"], 60 * 60),
     createTimeoutSeconds: number(env["OPENCODE_SANDBOX_CREATE_TIMEOUT_SECONDS"], 300),
+    filesTimeoutSeconds: integer(env["OPENCODE_SANDBOX_FILES_TIMEOUT_SECONDS"], 15),
+    filesTimeoutRetries: nonNegativeInteger(env["OPENCODE_SANDBOX_FILES_TIMEOUT_RETRIES"], 1),
     resource: {
       cpu: env["OPENCODE_SANDBOX_CPU"] || "2",
       memory: env["OPENCODE_SANDBOX_MEMORY"] || "4Gi",
@@ -74,5 +119,28 @@ export function load(): Config {
     volumeType: volumeType(env["OPENCODE_SANDBOX_VOLUME_TYPE"]),
     pvcClaimName: env["OPENCODE_SANDBOX_PVC_CLAIM"] || "sandbox-test",
     packageCacheMount: env["OPENCODE_SANDBOX_PACKAGE_CACHE_MOUNT"] || "/opt/pnpm-store",
+    maxConcurrentCommandsPerSession: number(env["OPENCODE_SANDBOX_MAX_CONCURRENT_COMMANDS_PER_SESSION"], 4),
+    maxConcurrentCommandsGlobal: number(env["OPENCODE_SANDBOX_MAX_CONCURRENT_COMMANDS_GLOBAL"], 64),
+    oomScan: {
+      // Unset defaults to enabled; an explicit "0"/"false" opts out.
+      enabled:
+        env["OPENCODE_SANDBOX_OOM_SCAN_ENABLED"] === undefined
+          ? true
+          : env["OPENCODE_SANDBOX_OOM_SCAN_ENABLED"] !== "0" && env["OPENCODE_SANDBOX_OOM_SCAN_ENABLED"] !== "false",
+      intervalSeconds: number(env["OPENCODE_SANDBOX_OOM_SCAN_INTERVAL_SEC"], 60),
+      batch: number(env["OPENCODE_SANDBOX_OOM_SCAN_BATCH"], 50),
+      pressureRatio: number(env["OPENCODE_SANDBOX_OOM_PRESSURE_RATIO"], 0.85),
+    },
+    snapshot: {
+      enabled: flag(env["OPENCODE_SANDBOX_SNAPSHOT_ENABLED"]),
+      ttlMs: number(env["OPENCODE_SANDBOX_SNAPSHOT_TTL_SEC"], 14 * 24 * 3600) * 1000,
+      waitMs: number(env["OPENCODE_SANDBOX_SNAPSHOT_WAIT_SEC"], 900) * 1000,
+      deleteEnabled: flag(env["OPENCODE_SANDBOX_SNAPSHOT_DELETE_ENABLED"]),
+      refreshSeconds:
+        env["OPENCODE_SANDBOX_SNAPSHOT_REFRESH_SEC"] === "0"
+          ? 0
+          : number(env["OPENCODE_SANDBOX_SNAPSHOT_REFRESH_SEC"], 0),
+      prune: flag(env["OPENCODE_SANDBOX_SNAPSHOT_PRUNE"]),
+    },
   }
 }

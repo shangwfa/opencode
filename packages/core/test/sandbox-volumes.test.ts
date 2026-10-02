@@ -12,10 +12,23 @@ const config = (overrides: Partial<SandboxConfig.Config> = {}): SandboxConfig.Co
   timeoutSeconds: 600,
   idleReapSeconds: 3600,
   createTimeoutSeconds: 300,
+  filesTimeoutSeconds: 15,
+  filesTimeoutRetries: 1,
   resource: { cpu: "2", memory: "4Gi" },
   volumeType: "none",
   pvcClaimName: "sandbox-test",
   packageCacheMount: "/opt/pnpm-store",
+  maxConcurrentCommandsPerSession: 4,
+  maxConcurrentCommandsGlobal: 64,
+  oomScan: { enabled: true, intervalSeconds: 60, batch: 50, pressureRatio: 0.85 },
+  snapshot: {
+    enabled: false,
+    ttlMs: 14 * 24 * 3600 * 1000,
+    waitMs: 900_000,
+    deleteEnabled: false,
+    refreshSeconds: 0,
+    prune: false,
+  },
   ...overrides,
 })
 

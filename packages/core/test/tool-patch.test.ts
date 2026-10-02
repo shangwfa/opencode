@@ -76,7 +76,8 @@ const sandboxProvider: SandboxProvider.Interface = {
   run: () => Effect.succeed({ exitCode: 0, output: "", timedOut: false }),
   interrupt: () => Effect.void,
   destroy: () => Effect.void,
-  keepAlive: () => Effect.void,
+    keepAlive: () => Effect.void,
+    activity: () => Effect.void,
   release: () => Effect.void,
   isKeepAlive: () => Effect.succeed(false),
   sandboxId: () => Effect.succeed("sandbox-test"),
@@ -101,6 +102,19 @@ const sandboxProvider: SandboxProvider.Interface = {
   fileList: () => Effect.succeed([]),
   fileFind: () => Effect.succeed([]),
   isReady: () => Effect.succeed(true),
+  snapshot: () => Effect.die(new Error("not implemented")),
+  latestSnapshot: () => Effect.succeed(null),
+  deleteSnapshots: () => Effect.void,
+  snapshotStats: () =>
+    Effect.succeed({
+      snapshots: {},
+      total: 0,
+      restoredTotal: 0,
+      operations: {
+        destroy: { byState: {}, total: 0 },
+        refresh: { byState: {}, total: 0 },
+      },
+    }),
   endpoint: () => Effect.succeed({ _tag: "no-sandbox" }),
 }
 

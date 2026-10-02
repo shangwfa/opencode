@@ -144,6 +144,7 @@ const sandboxHistoryProvider = Layer.succeed(
     interrupt: () => Effect.void,
     destroy: () => Effect.void,
     keepAlive: () => Effect.void,
+    activity: () => Effect.void,
     release: () => Effect.void,
     isKeepAlive: () => Effect.succeed(false),
     sandboxId: () => Effect.succeed("sandbox-test"),
@@ -159,6 +160,19 @@ const sandboxHistoryProvider = Layer.succeed(
     fileList: () => Effect.die("not under test"),
     fileFind: () => Effect.die("not under test"),
     isReady: () => Effect.succeed(true),
+    snapshot: () => Effect.die(new Error("not implemented")),
+    latestSnapshot: () => Effect.succeed(null),
+    deleteSnapshots: () => Effect.void,
+    snapshotStats: () =>
+      Effect.succeed({
+        snapshots: {},
+        total: 0,
+        restoredTotal: 0,
+        operations: {
+          destroy: { byState: {}, total: 0 },
+          refresh: { byState: {}, total: 0 },
+        },
+      }),
     endpoint: () => Effect.succeed({ _tag: "no-sandbox" }),
   }),
 )
@@ -1023,5 +1037,122 @@ itSandboxHistory.effect("a failed sandbox history write degrades to a summary wi
     )
     expect(compacted?.summary).toContain("## Objective")
     expect(compacted?.historyPath).toBeUndefined()
+  }),
+)
+
+// `summaryFrom` relies on this contract: the source Session is read, and every write, event, and
+// history path stays on the target. Pin it directly, including that a running model never sees
+// the source as its Session.
+it.effect("deriveSummary installs the source's summary in the target and leaves the source untouched", () =>
+  Effect.gen(function* () {
+    requests = []
+    const compaction = yield* SessionCompaction.Service
+    const store = yield* SessionStore.Service
+    const db = (yield* Database.Service).db
+    const bus = yield* Bus.Service
+
+    const sourceID = Session.ID.make("ses_derive_source")
+    const targetID = Session.ID.make("ses_derive_target")
+    yield* insertSession(sourceID)
+    const target = yield* insertSession(targetID)
+
+    const sourceMessages = [
+      SessionMessage.User.make({
+        id: SessionMessage.ID.make("msg_derive_source_user"),
+        type: "user",
+        text: "Remember: the codename is phoenix.",
+        time: { created: DateTime.makeUnsafe(0) },
+      }),
+      SessionMessage.Assistant.make({
+        id: SessionMessage.ID.make("msg_derive_source_assistant"),
+        type: "assistant",
+        agent: Agent.defaultID,
+        model: { id: Model.ID.make("summary-model"), providerID: Provider.ID.make("test") },
+        content: [{ type: "text", text: "Noted: phoenix." }],
+        time: { created: DateTime.makeUnsafe(1), completed: DateTime.makeUnsafe(2) },
+      }),
+    ]
+
+    const modelRequests = yield* SessionModelRequest.Service
+    const sourceBefore = yield* store.context(sourceID)
+    const deltas = yield* bus
+      .subscribe(SessionEvent.Text.Delta)
+      .pipe(Stream.take(1), Stream.runCollect, Effect.forkScoped({ startImmediately: true }))
+    const events: string[] = []
+    yield* bus.project(SessionEvent.Compaction.Started, (event) =>
+      Effect.sync(() => void events.push(event.data.sessionID)),
+    )
+    yield* bus.project(SessionEvent.Compaction.Ended, (event) =>
+      Effect.sync(() => void events.push(event.data.sessionID)),
+    )
+
+    expect(
+      yield* compaction.deriveSummary({
+        sourceSessionID: sourceID,
+        target,
+        sourceMessages,
+        resolveContext: (session) => Effect.succeed(loaded(session, sourceMessages)),
+        prepare: modelRequests.compaction,
+        inputID: SessionMessage.ID.make("msg_derive_summary"),
+      }),
+    ).toEqual({ status: "completed" })
+
+    // The model was fed the source's conversation, and the call was attributed to the target.
+    expect(requests).toHaveLength(1)
+    expect(JSON.stringify(requests[0]?.messages)).toContain("phoenix")
+    expect(requests[0]?.promptCacheKey).toBe(targetID)
+
+    // The summary is a regular assistant message, with no compaction record.
+    const targetMessages = yield* store.context(targetID)
+    const assistant = targetMessages.findLast(
+      (message): message is SessionMessage.Assistant => message.type === "assistant",
+    )
+    expect(assistant?.content).toContainEqual(expect.objectContaining({ type: "text", text: expect.stringContaining("## Objective") }))
+    expect(Array.from(yield* Fiber.join(deltas)).some((event) => event.data.sessionID === targetID)).toBe(true)
+    expect(targetMessages.some((message) => message.type === "compaction")).toBe(false)
+
+    // …while the source is byte-for-byte unchanged and no event names it.
+    expect(yield* store.context(sourceID)).toEqual(sourceBefore)
+    expect(events).toEqual([])
+
+    // The durable event log belongs to the target only.
+    expect(
+      yield* db
+        .select({ aggregate: EventTable.aggregate_id })
+        .from(EventTable)
+        .where(eq(EventTable.aggregate_id, sourceID))
+        .all()
+        .pipe(Effect.orDie),
+    ).toEqual([])
+  }),
+)
+
+it.effect("deriveSummary reports an empty source as unavailable instead of writing anything", () =>
+  Effect.gen(function* () {
+    requests = []
+    const compaction = yield* SessionCompaction.Service
+    const store = yield* SessionStore.Service
+    const sourceID = Session.ID.make("ses_derive_empty")
+    const targetID = Session.ID.make("ses_derive_empty_target")
+    yield* insertSession(sourceID)
+    const target = yield* insertSession(targetID)
+    const modelRequests = yield* SessionModelRequest.Service
+
+    const outcome = yield* compaction.deriveSummary({
+      sourceSessionID: sourceID,
+      target,
+      sourceMessages: [],
+      resolveContext: () => Effect.die("an empty source must not resolve a model or agent"),
+      prepare: modelRequests.compaction,
+      inputID: SessionMessage.ID.make("msg_derive_empty"),
+    })
+
+    expect(outcome).toEqual({
+      status: "failed",
+      error: { type: "compaction.unavailable", message: "Nothing to summarize in the source Session" },
+    })
+    expect(requests).toEqual([])
+    // Empty input produces no assistant or compaction row.
+    expect(yield* store.context(targetID)).toEqual([])
   }),
 )

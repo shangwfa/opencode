@@ -1,15 +1,7 @@
 export * as CodeModeTool from "./tool.js"
 
 import { CodeMode, Namespace, Tool, toolError } from "@opencode/codemode"
-import type {
-  Content,
-  Context,
-  Error,
-  Info,
-  Metadata,
-  Namespace as ToolNamespace,
-  Result,
-} from "@opencode/schema/tool"
+import type { Content, Context, Error, Info, Metadata, Namespace as ToolNamespace, Result } from "@opencode/schema/tool"
 import { Effect, Ref, Schema, Semaphore } from "effect"
 import { definition, normalizedName } from "../tool/runtime.js"
 import { CodeModeCatalog } from "./catalog.js"
@@ -58,23 +50,49 @@ export type Inventory = {
   readonly namespaces?: ReadonlyMap<string, ToolNamespace>
 }
 
+export type Options = {
+  readonly limits?: CodeMode.ExecutionLimits
+  /** The host must explicitly opt into outbound network access. */
+  readonly web?: boolean
+  /** Replaces the in-process interpreter while preserving this tool's host calls and progress. */
+  readonly execute?: (input: {
+    readonly code: string
+    readonly context: Context
+    readonly tools: ReadonlyArray<{
+      readonly path: string
+      readonly description: string
+      readonly inputSchema: unknown
+      readonly outputSchema?: unknown
+    }>
+    readonly limits?: CodeMode.ExecutionLimits
+    readonly tool: (path: string, input: unknown) => Effect.Effect<unknown, unknown>
+    readonly progress: (calls: ReadonlyArray<ExecuteCall>) => Effect.Effect<void>
+  }) => Effect.Effect<CodeMode.Result, Error>
+}
+
 // Invariant model-facing guidance; the changing tool catalog is delivered through Instructions.
-const description = [
-  "Run JavaScript in a confined Code Mode runtime to script tool calls and HTTP requests and compose their results.",
-  "`fetch` is available for HTTP requests. Imports, direct filesystem access, and timers are unavailable; all other external access goes through `tools`.",
-  "Within `{ code }`, the only callable tools are those explicitly listed in the Code Mode catalog instructions or returned by the `search` function. Inside `{ code }`, ignore tools shown outside the Code Mode catalog. They are not available in the Code Mode runtime.",
-  'Call tools through `tools` using only exact paths and signatures from the catalog. Do not infer or normalize tool names; preserve bracket notation such as `tools.<namespace>["tool-name"](input)`.',
-  "Prefer an explicit `return`; if omitted, the final top-level expression becomes the result.",
-  "Await every call whose completion matters; pending calls are interrupted when execution ends. Run independent calls concurrently with `Promise.all`.",
-].join("\n")
+const description = (web: boolean) =>
+  [
+    web
+      ? "Run JavaScript in a confined Code Mode runtime to script tool calls and HTTP requests and compose their results."
+      : "Run JavaScript in a confined Code Mode runtime to script tool calls and compose their results.",
+    web
+      ? "`fetch` is available for HTTP requests. Imports, direct filesystem access, and timers are unavailable; all other external access goes through `tools`."
+      : "Imports, direct filesystem access, timers, and network fetch are unavailable; all external access goes through `tools`.",
+    "Within `{ code }`, the only callable tools are those explicitly listed in the Code Mode catalog instructions or returned by the `search` function. Inside `{ code }`, ignore tools shown outside the Code Mode catalog. They are not available in the Code Mode runtime.",
+    'Call tools through `tools` using only exact paths and signatures from the catalog. Do not infer or normalize tool names; preserve bracket notation such as `tools.<namespace>["tool-name"](input)`.',
+    "Prefer an explicit `return`; if omitted, the final top-level expression becomes the result.",
+    "Await every call whose completion matters; pending calls are interrupted when execution ends. Run independent calls concurrently with `Promise.all`.",
+  ].join("\n")
 
 export const create = (
   inventory: Inventory,
   executeTool: (name: string, tool: Info, input: unknown, context: Context) => Effect.Effect<Result, Error>,
+  options: Options = {},
 ) => {
   return {
     name: "execute",
-    description,
+    description: description(options.web === true),
     input: CodeMode.Input,
     output: ExecuteOutput,
     execute: ({ code }, context) =>
@@ -87,25 +105,37 @@ export const create = (
           lock.withPermit(
             Ref.updateAndGet(calls, update).pipe(Effect.tap((toolCalls) => context.progress({ toolCalls }))),
           )
-        const result = yield* runtime(
-          inventory,
-          (name, tool, input) =>
-            Effect.gen(function* () {
-              const index = yield* Ref.getAndUpdate(callIndex, (index) => index + 1)
-              const executed = yield* executeTool(name, tool, input, context)
-              const content =
-                typeof executed.content === "string"
-                  ? [{ type: "text" as const, text: executed.content }]
-                  : (executed.content ?? [])
-              const outputFileParts = outputFiles(content)
-              if (outputFileParts.length > 0)
-                yield* Ref.update(files, (items) => [...items, { index, files: outputFileParts }])
-              if (executed.output !== undefined) return executed.output
-              const text = content.flatMap((part) => (part.type === "text" ? [part.text] : [])).join("\n")
-              return text === "" ? null : text
-            }),
-          progressHooks(record),
-        ).execute(code)
+        const invoke = (name: string, tool: Info, input: unknown) =>
+          Effect.gen(function* () {
+            const index = yield* Ref.getAndUpdate(callIndex, (index) => index + 1)
+            const executed = yield* executeTool(name, tool, input, context)
+            const content =
+              typeof executed.content === "string"
+                ? [{ type: "text" as const, text: executed.content }]
+                : (executed.content ?? [])
+            const outputFileParts = outputFiles(content)
+            if (outputFileParts.length > 0)
+              yield* Ref.update(files, (items) => [...items, { index, files: outputFileParts }])
+            if (executed.output !== undefined) return executed.output
+            const text = content.flatMap((part) => (part.type === "text" ? [part.text] : [])).join("\n")
+            return text === "" ? null : text
+          })
+        const byPath = new Map(Array.from(inventory.tools, ([name, tool]) => [qualifiedName(tool), [name, tool] as const]))
+        const result = options.execute
+          ? yield* options.execute({
+              code,
+              context,
+              tools: manifest(inventory),
+              limits: options.limits,
+              tool: (path, input) => {
+                const found = byPath.get(path)
+                return found
+                  ? invoke(found[0], found[1], input)
+                  : Effect.fail(toolError(`No tool named "${path}" is currently available.`))
+              },
+              progress: (toolCalls) => record(() => [...toolCalls]),
+            })
+          : yield* runtime(inventory, invoke, progressHooks(record), options).execute(code)
         const toolCalls = yield* Ref.get(calls)
         const collected = (yield* Ref.get(files))
           .toSorted((left, right) => left.index - right.index)
@@ -138,6 +168,17 @@ export const create = (
       }),
   } satisfies Info
 }
+
+export const manifest = (inventory: Inventory) =>
+  Array.from(inventory.tools.values(), (registration) => {
+    const child = definition(registration)
+    return {
+      path: qualifiedName(registration),
+      description: child.description,
+      inputSchema: child.inputSchema,
+      ...(child.outputSchema === undefined ? {} : { outputSchema: child.outputSchema }),
+    }
+  })
 
 // Rows appear in start order; the same call object arrives at both hooks, so a call finds its row again.
 function progressHooks(record: (update: (items: Array<ExecuteCall>) => Array<ExecuteCall>) => Effect.Effect<unknown>) {
@@ -222,6 +263,7 @@ function runtime(
   inventory: Inventory,
   executeTool: (name: string, tool: Info, input: unknown) => Effect.Effect<unknown, unknown>,
   hooks?: CodeMode.Hooks,
+  options: Options = {},
 ) {
   // A path may carry namespace metadata, a callable tool, child tools, or all three.
   const root: ToolNode = { children: new Map() }
@@ -236,7 +278,12 @@ function runtime(
     })
   }
   const tools = renderTools(root)
-  return CodeMode.make<typeof tools>({ tools, extensions: [CodeModeWeb.extension], hooks })
+  return CodeMode.make<typeof tools>({
+    tools,
+    ...(options.web ? { extensions: [CodeModeWeb.extension] } : {}),
+    hooks,
+    limits: options.limits,
+  })
 }
 
 function getNode<T>(root: Node<T>, path: string) {

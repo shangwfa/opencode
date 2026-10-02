@@ -7,6 +7,8 @@ export interface VolumeScope {
   readonly sessionID: string
   readonly pvcMode?: "session" | "app"
   readonly appId?: string
+  /** Session-level persistence override; the deployment default applies when omitted. */
+  readonly persistMode?: "pvc" | "snapshot" | "none"
 }
 
 interface MountSpec {
@@ -35,26 +37,28 @@ const mountSpecs = (prefix: string): readonly MountSpec[] => [
  * a subPath of one PVC claim plus one cross-session package cache; `host` mode
  * bind-mounts per-session host paths (app scope is ignored, since host paths
  * are local to one node); `none` returns no volumes and the sandbox stays
- * ephemeral.
+ * ephemeral; `snapshot` also returns no volumes — the workspace lives on the
+ * sandbox rootfs and persists through snapshots taken before recycle.
  */
 export function buildVolumes(scope: VolumeScope, config: SandboxConfig.Config): Volume[] {
-  if (config.volumeType === "none") return []
+  const volumeType = scope.persistMode ?? config.volumeType
+  if (volumeType === "none" || volumeType === "snapshot") return []
   if (scope.pvcMode === "app" && !scope.appId?.trim()) {
     throw new Error(`app 模式缺少 appId，拒绝创建 sandbox（sessionID=${scope.sessionID}）`)
   }
-  const useApp = config.volumeType === "pvc" && scope.pvcMode === "app"
+  const useApp = volumeType === "pvc" && scope.pvcMode === "app"
   const prefix = useApp ? `apps/${scope.appId!.trim()}` : `sessions/${scope.sessionID}`
   const mounts = mountSpecs(prefix)
   const result = mounts.map((m) => {
     const base: Volume = { name: m.name, mountPath: m.mountPath, subPath: m.sub }
-    if (config.volumeType === "pvc") {
+    if (volumeType === "pvc") {
       base.pvc = { claimName: config.pvcClaimName }
     } else {
       base.host = { path: `/var/opencode/sessions/${scope.sessionID}/${m.name}` }
     }
     return base
   })
-  if (config.volumeType === "pvc") {
+  if (volumeType === "pvc") {
     const packageCacheMount = requirePackageCacheMount(config.packageCacheMount, mounts.map((m) => m.mountPath))
     result.push({
       name: "package-cache",

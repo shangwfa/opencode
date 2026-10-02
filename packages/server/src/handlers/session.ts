@@ -1,4 +1,5 @@
 import { Session } from "@opencode/core/session"
+import { clearProxyTargets } from "./session-proxy.js"
 import { SessionCommands } from "@opencode/core/session/commands"
 import { SessionAgents } from "@opencode/core/session/agents"
 import { SessionSkills } from "@opencode/core/session/skills"
@@ -178,6 +179,7 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
             metadata: ctx.payload.metadata,
             permissions: ctx.payload.permissions,
             sandbox: ctx.payload.sandbox,
+            summaryFrom: ctx.payload.summaryFrom,
           }
           return {
             data: yield* session
@@ -345,6 +347,7 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
             if (ctx.payload.recreate) {
               const provider = yield* SandboxProvider.Service
               yield* provider.destroy(ctx.params.sessionID)
+              clearProxyTargets(ctx.params.sessionID)
             }
           }
           return HttpApiSchema.NoContent.make()
@@ -676,7 +679,10 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
           const provider = yield* SandboxProvider.Service
           const enabled = ctx.payload.enabled !== false
           if (enabled) yield* provider.keepAlive(ctx.params.sessionID)
-          else yield* provider.release(ctx.params.sessionID)
+          else {
+            yield* provider.release(ctx.params.sessionID)
+            clearProxyTargets(ctx.params.sessionID)
+          }
           const sandboxId =
             enabled && ctx.payload.boot === true && provider.enabled
               ? yield* provider.boot(ctx.params.sessionID).pipe(Effect.catch(() => Effect.succeed(null)))
@@ -707,8 +713,45 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
           const provider = yield* SandboxProvider.Service
           const existing = yield* provider.sandboxId(ctx.params.sessionID)
           if (existing && provider.enabled) yield* provider.destroy(ctx.params.sessionID)
+          clearProxyTargets(ctx.params.sessionID)
           const remaining = yield* provider.sandboxId(ctx.params.sessionID)
           return { sessionID: ctx.params.sessionID, destroyed: existing !== null && remaining === null }
+        }),
+      )
+      .handle(
+        "session.snapshot.create",
+        Effect.fn(function* (ctx) {
+          yield* session.get(ctx.params.sessionID).pipe(Effect.catchTag("Session.NotFoundError", missingSession))
+          const provider = yield* SandboxProvider.Service
+          return {
+            data: yield* provider.snapshot(ctx.params.sessionID).pipe(
+              Effect.mapError((error) => new InvalidRequestError({ message: error.message, kind: "snapshot" })),
+            ),
+          }
+        }),
+      )
+      .handle(
+        "session.snapshot.get",
+        Effect.fn(function* (ctx) {
+          yield* session.get(ctx.params.sessionID).pipe(Effect.catchTag("Session.NotFoundError", missingSession))
+          const provider = yield* SandboxProvider.Service
+          return {
+            data: yield* provider.latestSnapshot(ctx.params.sessionID).pipe(
+              Effect.mapError((error) => new InvalidRequestError({ message: error.message, kind: "snapshot" })),
+            ),
+          }
+        }),
+      )
+      .handle(
+        "session.snapshot.stats",
+        Effect.fn(function* (ctx) {
+          yield* session.get(ctx.params.sessionID).pipe(Effect.catchTag("Session.NotFoundError", missingSession))
+          const provider = yield* SandboxProvider.Service
+          return {
+            data: yield* provider.snapshotStats(ctx.params.sessionID).pipe(
+              Effect.mapError((error) => new InvalidRequestError({ message: error.message, kind: "snapshot" })),
+            ),
+          }
         }),
       )
       .handle(

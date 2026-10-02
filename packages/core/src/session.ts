@@ -55,6 +55,10 @@ import {
   DestinationUnavailableError,
 } from "./session/move.js"
 import { SessionModelTransport } from "./session/model-transport.js"
+import { SessionCompaction } from "./session/compaction.js"
+import { SessionContext } from "./session/context.js"
+import { SessionHistory } from "./session/history.js"
+import { SessionProviderContext } from "./session/provider-context.js"
 import { llmClient } from "./effect/app-node-platform.js"
 import { Snapshot } from "./snapshot.js"
 import { Session } from "./session/session.js"
@@ -69,6 +73,8 @@ import { SessionEnvironment } from "./session/environment.js"
 import { InstructionEntry } from "./session/instruction-entry.js"
 import { SessionAgentsMd } from "./session/agents-md.js"
 import { SessionMcps } from "./session/mcps.js"
+import { SessionToolSandbox } from "./session/tool-sandbox.js"
+import { SessionToolGate } from "./session/tool-gate.js"
 
 // get project -> project.locations
 //
@@ -94,6 +100,11 @@ type CreateBaseInput = {
   metadata?: SessionSchema.Metadata
   permissions?: Permission.Ruleset
   sandbox?: SessionSchema.Info["sandbox"]
+  /**
+   * After creating this Session, asynchronously generate a fresh summary of `summaryFrom` and
+   * install it here as the starting checkpoint. The source Session is only read, never written.
+   */
+  summaryFrom?: SessionSchema.ID
 }
 type CreateInput = CreateBaseInput &
   ({ location: Location.Ref; parentID?: never } | { parentID: SessionSchema.ID; location?: never })
@@ -344,6 +355,55 @@ const layer = Layer.effect(
             )
           Effect.runForkWith(yield* Effect.context<never>())(autoKeepAlive)
         }
+        // Derive the starting checkpoint in the background: creation returns immediately, and a
+        // failure (missing source, nothing to summarize, provider error) is logged, never surfaced.
+        if (input.summaryFrom && input.summaryFrom !== sessionID) {
+          const source = input.summaryFrom
+          const derive = instances
+            .provide(created)(
+              Effect.gen(function* () {
+                const compaction = yield* SessionCompaction.Service
+                const context = yield* SessionContext.Service
+                yield* compaction.deriveSummary({
+                  sourceSessionID: source,
+                  target: created,
+                  resolveContext: (session) =>
+                    Effect.gen(function* () {
+                      const selected = yield* context.select(session.id)
+                      const model = yield* context.resolveModel(selected.session)
+                      // The target's own preview only supplies instruction/initial state; the
+                      // transcript that gets summarized is read from the source inside deriveSummary.
+                      const history = yield* SessionHistory.preview(
+                        db,
+                        session.id,
+                        selected.instructions,
+                        SessionProviderContext.provenance(model) ?? "local",
+                      )
+                      return {
+                        session: selected.session,
+                        agent: selected.agent,
+                        tools: selected.tools,
+                        model,
+                        initial: history.initial,
+                        messages: history.messages,
+                        instructionUpdate: history.instructionUpdate,
+                      }
+                    }),
+                  prepare: context.request.compaction,
+                })
+              }),
+            )
+            .pipe(
+              Effect.catchCause((cause) =>
+                Effect.logError("derive_summary failed", {
+                  sourceSessionID: source,
+                  targetSessionID: sessionID,
+                  cause,
+                }),
+              ),
+            )
+          Effect.runForkWith(yield* Effect.context<never>())(derive)
+        }
         return created
       }),
       fork: Effect.fn("Session.fork")(function* (input) {
@@ -396,16 +456,28 @@ const layer = Layer.effect(
       view: (input) => sessions.forSession(input.sessionID).view(input),
       remove: Effect.fn("Session.remove")(function* (sessionID) {
         const info = yield* result.get(sessionID)
+        yield* SessionToolGate.make(db).close(sessionID, false).pipe(Effect.orDie)
         yield* execution.interrupt(sessionID)
         yield* execution.awaitIdle(sessionID)
         yield* instances
           .provide(info)(
             Effect.gen(function* () {
               const mcps = yield* SessionMcps.Service
+              const tools = yield* SessionToolSandbox.Service
+              yield* tools.release(sessionID, info.parentID ? "session" : "sandbox")
               // Closing a stale client must not prevent sandbox teardown.
               yield* mcps.release(info).pipe(Effect.catchCause(() => Effect.void))
               const sandbox = yield* SandboxProvider.Service
-              if (sandbox.enabled) yield* sandbox.destroy(sessionID)
+              if (sandbox.enabled && !info.parentID) {
+                yield* sandbox.destroy(sessionID)
+                // Snapshot rows follow the session; the remote snapshots
+                // themselves are only deleted when the deployment enables it.
+                yield* sandbox.deleteSnapshots(sessionID).pipe(
+                  Effect.catchCause((cause) =>
+                    Effect.logWarning("Failed to delete session snapshots", { sessionID, cause }),
+                  ),
+                )
+              }
             }),
           )
           .pipe(
@@ -417,16 +489,18 @@ const layer = Layer.effect(
           children.data,
           (child) =>
             Effect.gen(function* () {
+              yield* SessionToolGate.make(db).close(child.id, false).pipe(Effect.orDie)
               yield* execution.interrupt(child.id)
               yield* execution.awaitIdle(child.id)
               yield* instances
                 .provide(child)(
                   Effect.gen(function* () {
                     const mcps = yield* SessionMcps.Service
+                    const tools = yield* SessionToolSandbox.Service
+                    yield* tools.release(child.id)
                     // Closing a stale client must not prevent sandbox teardown.
                     yield* mcps.release(child).pipe(Effect.catchCause(() => Effect.void))
-                    const sandbox = yield* SandboxProvider.Service
-                    if (sandbox.enabled) yield* sandbox.destroy(child.id)
+                    // Child tools share the root Sandbox; releasing a child never destroys it.
                   }),
                 )
                 .pipe(

@@ -541,6 +541,7 @@ describe("Session-owned handles", () => {
               interrupt: () => Effect.die(new Error("disabled sandbox provider must not run")),
               destroy: () => Effect.die(new Error("disabled sandbox provider must not run")),
               keepAlive: () => Effect.die(new Error("disabled sandbox provider must not run")),
+              activity: () => Effect.void,
               release: () => Effect.die(new Error("disabled sandbox provider must not run")),
               isKeepAlive: () => Effect.succeed(false),
               sandboxId: () => Effect.succeed(null),
@@ -553,6 +554,19 @@ describe("Session-owned handles", () => {
               fileList: () => Effect.die(new Error("not under test")),
               fileFind: () => Effect.die(new Error("not under test")),
               isReady: () => Effect.succeed(false),
+              snapshot: () => Effect.die(new Error("not implemented")),
+              latestSnapshot: () => Effect.succeed(null),
+              deleteSnapshots: () => Effect.void,
+              snapshotStats: () =>
+                Effect.succeed({
+                  snapshots: {},
+                  total: 0,
+                  restoredTotal: 0,
+                  operations: {
+                    destroy: { byState: {}, total: 0 },
+                    refresh: { byState: {}, total: 0 },
+                  },
+                }),
               endpoint: () => Effect.succeed({ _tag: "no-sandbox" }),
             }),
           ),

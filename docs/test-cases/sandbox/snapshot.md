@@ -1,6 +1,104 @@
 # 快照持久化（本地盘 + 快照分层）
 
-> 设计文档：[`../../sandbox-snapshot-design.md`](../../sandbox-snapshot-design.md)。
+> **V2 状态（2026-10-02 已实现，E2E 8/8 PASS）**：沙箱快照已在 V2 落地（第一版核心闭环，参考 V1 `feat/opencode-1.18.31` 的 `session-snapshot.ts` 状态机语义）：
+>
+> - **schema**：`SessionSandboxResource.persistMode?: "pvc"|"snapshot"|"none"`（会话级，缺省用部署默认）；durable 事件 `session.sandbox.snapshot.{ready,failed,restored}`。
+> - **表**：`packages/core/src/sandbox/snapshot.sql.ts`（`session_snapshot`，迁移 `20261002090000`；兼容性元数据 image/arch/schema_version、restored_count 消费计数）。
+> - **客户端**：`packages/core/src/sandbox/snapshot.ts` —— startSnapshot（creating 去重，并发复用）、awaitSnapshot（Ready→ready+清旧、Failed→failed、超时保持 creating 由 GC 对账）、markConsumed（stale 仍可回退恢复）、markRestoreFailed、gc（TTL/superseded/卡死对账含 404）、deleteAllForSession。
+> - **provider**：`createSandbox` 恢复路径（resolveForCreate → `Sandbox.create({snapshotId})`，失败降级镜像冷启动并 markRestoreFailed）；显式销毁不快照；**idle-reap 对 persistMode=snapshot 的会话先 CAS `running→snapshotting`，快照终态后才销毁**（Creating 中不杀，超时保持由 GC 对账后下轮处理）；GC 挂 300s reap 周期；会话删除联动 `deleteSnapshots`。
+> - **卷**：`volumeType/persistMode=snapshot` 时不挂卷（workspace 在 rootfs 随快照持久化）。
+> - **端点**：`POST /api/session/:id/snapshot`（发起，立即返回 `{data:{snapshotID,state:"creating"}}`）、`GET /api/session/:id/snapshot`（最新行，任意状态）、`GET /api/session/:id/snapshot/stats`（快照+双队列聚合观测）。
+> - **env**：`OPENCODE_SANDBOX_SNAPSHOT_ENABLED`（默认关）、`_TTL_SEC`（14d）、`_WAIT_SEC`（900）、`_DELETE_ENABLED`（默认关——远端物理删除闸门）、`_REFRESH_SEC`（默认 0=关，周期保鲜）、`_PRUNE`（默认关，快照前清理可重建缓存）。
+>
+> **多实例增强（2026-10-02 第二批，V1 T25.24–30/33–35 语义迁移）**：
+>
+> - **durable 双队列**：`snapshot_operation`（destroy）与 `snapshot_refresh_operation`（refresh，独立表防旧 worker 误杀）+ `packages/core/src/sandbox/snapshot-operation.ts`（迁移 `20261002034731`）。条件 UPDATE 领取（等价 `FOR UPDATE SKIP LOCKED` 去重语义）、5min 租约 + 心跳、fencing_token 单调递增（旧执行者 complete/fail/续租全失效）、失败指数退避（30s→10min，5 次转 failed）、7d 终态保留清理。显式 kill/idle-reap 对 snapshot 会话均先 CAS `running→snapshotting` 再入队，任意实例 drain；实例崩溃后租约过期被其他实例接管（执行体幂等：startSnapshot 按 creating 行去重）。
+> - **无变更复用**（T25.24）：`snapshot-reuse.ts` —— 快照 commit 前向 rootfs 写 marker+manifest（mode/size/SHA-256），销毁/保鲜前两级判定（mtime 快速路径 + 内容清单兜底），CLEAN 则复用既有快照不再新拍；未知/失败一律保守判 dirty。显式 `POST /snapshot` 不复用（业务要"现在"时点）。
+> - **兼容性校验**（T25.28）：恢复前比对 `schema_version`（V2 当前=1），不兼容 → 行 `failed|incompatible: schema X != 1` + 镜像冷启动；`arch` 随 marker 探测落库供观测。
+> - **周期保鲜**（T25.33/34）：`_REFRESH_SEC>0` 时，300s 扫描对 idle 超间隔的 running snapshot 会话入队 refresh——快照刷新但**沙箱保留**；快照已覆盖最后活动（time_created ≥ time_updated）或 workspace CLEAN 时跳过。
+> - **prune + 体积观测**（T25.30）：`_PRUNE=1` 时快照前清理 `/root/.cache` 等白名单；`session.sandbox.snapshot.ready` 事件携带 `workspaceKb`/`pruned`。
+> - **平台硬回收收敛**（T25.35 简化版）：destroy worker 发现沙箱已消失（连接失败）→ 行收敛 destroyed，恢复回退最近快照。
+>
+> 设计文档：[`../../sandbox-snapshot-design.md`](../../sandbox-snapshot-design.md)。以下为 V1 历史用例记录（V1 API/表），保留作语义参考；V2 验收见下方「V2 验收用例」。
+
+## V2 验收用例（T-SNAP，2026-10-02 实测 8/8 PASS）
+
+环境：`OPENCODE_SANDBOX_SNAPSHOT_ENABLED=true` 实例 + 本地 OpenSandbox（docker runtime，commit 后端）。会话创建带 `"sandbox":{"persistMode":"snapshot"}`。脚本：`docs/test-cases/scripts/sandbox-snapshot-v2.mjs`（T-SNAP.1–8）；`sandbox-snapshot-v2-extra.mjs`（T-SNAP.9–12，含 IDLE_REAP/DELETE/开关场景）；`sandbox-snapshot-v2-t25.mjs`（T25.5/17/18，需 TTL/DELETE env）；`sandbox-snapshot-v2-multi.mjs` + `sandbox-snapshot-v2-refresh.mjs` + `sandbox-snapshot-v2-prune.mjs`（2026-10-02 多实例批：双容器共享 PG，T25.24–30/33–35；refresh 实例需 `_REFRESH_SEC=30 _PRUNE=1`）。
+
+### 多实例验收（2026-10-02，双容器共享 PG + OpenSandbox）
+
+| 场景 | 断言 | 实测 |
+|---|---|---|
+| T25.24 复用主路径 | 无写入 kill：不新建快照（行数不变）、destroy op done、恢复保数据 | PASS（6 断言） |
+| T25.24 dirty 反向 | 写入后 kill 必新快照 + 新数据存活 | PASS |
+| T25.25 遗留操作接管 | ghost pending 行被**另一实例** drain 为 `done\|attempts=1\|fencing=1`；真实 kill 的 op done | PASS |
+| T25.26 fencing | 租约未过期不领取（保持 `running\|fencing=7`）；过期接管 `done\|fencing=8\|attempts=2` | PASS |
+| T25.27 幂等入队 | 并发 6 条 → active=1 | PASS |
+| T25.28 兼容性 | `schema=1`+`arch` 落库；999 → 冷启动 + `failed\|incompatible` | PASS（3 断言） |
+| T25.29 stats | `GET /api/session/:id/snapshot/stats` 返回快照分布 + destroy/refresh 队列计数 | PASS |
+| T25.30 prune 遥测 | ready 事件 `workspaceKb`+`pruned:true`；`.cache` 实际清理 | PASS（复验轮 3 断言） |
+| T25.33 周期保鲜 | idle 30s+300s 扫描 → 快照 ready、沙箱 running、refresh op done、零 destroy 入队 | PASS（4 断言） |
+| T25.34 覆盖跳过 | 再等一轮扫描无新快照 | PASS |
+| T25.35 平台硬回收 | 外部杀容器 → 恢复保数据、行收敛 running | PASS（2 断言；lag-warning 未迁移） |
+
+> ⚠️ **环境问题记录（第三次出现，本次已定位根因）**：测试中容器多次报 `TimeoutNegativeWarning`（-10~-30s）、一次跨 15 分钟的请求挂死。排查结论（2026-10-02）：
+> 1. **宿主处于电池 + 合盖的 Maintenance Sleep 循环**：pmset 日志显示测试窗口（12:33–15:30）内每 15–17 分钟入睡一次（共 30 次），另有大量 2–27s 的 DarkWake/Deep Idle 短睡；
+> 2. **OrbStack `power.pause_in_sleep: true`（默认）**：宿主每次入睡，VM/容器整体冻结，唤醒后跳变式重同步时钟（官方 issue #1822/#2003；v1.11.0 起行为，release notes 明言修复过 sleep 后 time drift）；
+> 3. 容器内 postgres.js 相对计时跨越冻结期 → 负超时；横跨 15 分钟长睡的 HTTP 请求挂死 → 脚本卡住。
+> 缓解：测试用 `caffeinate -ims` 包住；或 `orb config set power.pause_in_sleep false`；或接电源并 `sudo pmset -c sleep 0`。测试脚本已加 psql 超时防挂死。
+> 另：初版记录中"时钟前跳 2.5h 的未来行"为**误判**（查询未取日期，实为前一晚正常行）；"durable 事件暂态丢失"亦为误判（T25.30 FAIL 真因是事件 type 带版本后缀 `.1`，脚本用精确匹配查不到；"0 events" 是会话删除级联清事件）。
+
+| 用例 | 断言 | 实测 |
+|---|---|---|
+| T-SNAP.1 写工作区标记 | persistMode=snapshot 会话 shell 写 `/workspace/marker.txt` 成功 | PASS |
+| T-SNAP.2 发起快照 | `POST /api/session/:id/snapshot` → 200 `{data:{snapshotID,state:"creating"}}` | PASS |
+| T-SNAP.3 等待 Ready | 轮询 GET 至 `state=ready`；PG `session_snapshot` 行 `ready\|` | PASS（本地 commit 秒级） |
+| T-SNAP.4 显式销毁 | `kill-sandbox` 返回 `destroyed:true`（2026-10-02 队列化后：snapshot 会话显式销毁经 durable 队列**先快照/复用后销毁**，非 snapshot 会话仍直接销毁） | PASS |
+| T-SNAP.5 恢复保数据 | 下一次 shell 触发重建，从快照恢复，`cat /workspace/marker.txt` 返回原标记 | PASS |
+| T-SNAP.6 消费标记 | PG 行 `stale\|1`（markConsumed，stale 仍可回退） | PASS |
+| T-SNAP.7 durable 事件 | event 表出现 `session.sandbox.snapshot.*`（ready+restored ≥1） | PASS（n=2） |
+| T-SNAP.8 恢复后实例 | `GET /api/session/:id/sandbox` 返回新 running sandboxId | PASS |
+
+补充验收（T-SNAP.9–12，2026-10-02 补测 **4/4 PASS**）：
+
+| 用例 | 断言 | 实测 |
+|---|---|---|
+| T-SNAP.9 idle-reap 快照路径 | 非 keep-alive snapshot 会话空闲超时 → 沙箱行经 `snapshotting` → 快照 ready 后才销毁；恢复后 marker 保留 | PASS |
+| T-SNAP.10 会话删除联动 | DELETE 会话（`_DELETE_ENABLED=true`）→ `session_snapshot` 行 `deleted`（含远端删除） | PASS |
+| T-SNAP.11 快照失败降级 | 假 ready 行（远端无此快照）→ 恢复失败 → 行 `failed\|restore failed` → 镜像冷启动，会话正常 | PASS |
+| T-SNAP.12 能力开关 | `_ENABLED=false` 实例 POST snapshot → 400 `InvalidRequestError` | PASS |
+
+## V2 历史用例映射（V1 T25.x → V2 状态，2026-10-02 核对）
+
+| V1 用例 | V2 状态 | 说明 |
+|---|---|---|
+| T25.1 冷启动/rootfs、T25.15 端到端缩影、T25.36 检查点恢复 | ✅ 已验 | T-SNAP.1/5/8 等价 |
+| T25.2 idle 回收触发快照、T25.4b 失败保留沙箱 | ✅ 已验 | T-SNAP.9（startSnapshot 失败回 running 重试） |
+| T25.3/T25.3b 恢复数据与来源、T25.17 stale 二次恢复 | ✅ 已验 | T-SNAP.5/6 + T25 批（restored_count=2） |
+| T25.4/T25.16/T25.19 失败降级 | ✅ 已验 | T-SNAP.11 |
+| T25.5 多快照只保留最新 | ✅ 已验（2026-10-02） | 第二次快照 ready 后 sibling 行 `deleted`（superseded） |
+| T25.17 stale 二次恢复 | ✅ 已验（2026-10-02） | 两次 kill→恢复均保数据；`restored_count=2`（17a 断言初版把两行文件误比作空格连接，数据本身正确） |
+| T25.18 TTL GC | ⏳ 部分验证（2026-10-02） | TTL=2s 下行正确进入 `deleting`（TTL 分支触发）；等待窗口内终态未收敛到 `deleted`（远端删除或转发链路慢），复验待后续 |
+| T25.6 会话删除联动、T25.7/T25.9 显式 API 与开关 | ✅ 已验 | T-SNAP.10/2/3/12 |
+| T25.10 会话级镜像 | ✅ V2 已实现 | session image（`resolveSessionImage`，独立于快照） |
+| T25.12 子会话继承、T25.22 重启接管、T25.23 混合部署 | ✅ 机制同链路 | root 归并/reconnect/persistMode override 已有实现，未做快照专属变体 |
+| T25.11 pvcMode=app 失效不报错 | ✅ 行为成立 | snapshot 卷分支直接返回空，不检查 pvcMode |
+| T25.13 metadata 回填 | 🔁 有意变更 | V2 用 durable 事件（T-SNAP.7）替代 V1 裸 SQL 回填 |
+| T25.14 keepAlive 共存、T25.20 creating 卡死对账、T25.21 creating 期间消息 | ⏳ 实现已含未验 | gc reconcile/显式 API 路径已实现，专项验证待后续 |
+| T25.8 K8s 远端快照 | 🌐 环境差异 | 本地 docker commit 已验等价；K8s RBAC 环境专属 |
+| T25.24 无变更复用 | ✅ 已验（2026-10-02 多实例） | marker+manifest 两级判定：无写入 kill 复用（无新快照行、op done）、恢复保数据；dirty 写入后必新快照；显式 API 不复用 |
+| T25.25 durable 队列 + 接管 | ✅ 已验（2026-10-02 多实例） | 遗留 pending ghost 行被任意实例 drain `done\|attempts=1\|fencing=1`；真实 kill 的 op 落库 done |
+| T25.26 fencing | ✅ 已验（2026-10-02 多实例） | 租约未过期不领取（保持 `running\|fencing=7`）；过期接管 `done\|fencing=8\|attempts=2` |
+| T25.27 幂等唯一索引 | ✅ 已验（2026-10-02 多实例） | 并发 6 条插入 → active=1（部分唯一索引 `snapshot_operation_active_uniq`） |
+| T25.28 兼容性阻断 | ✅ 已验（2026-10-02 多实例） | `schema=1`+`arch` 落库；置 999 → 恢复冷启动（文件不存在）+ 行 `failed\|incompatible: schema 999 != 1` |
+| T25.29 聚合统计接口 | ✅ 已验（2026-10-02 多实例） | V2 形态：`GET /api/session/:id/snapshot/stats`（会话级快照状态分布 + destroy/refresh 双队列计数；V1 全局端点与 exec_log P50/P95 未迁移，有意变更） |
+| T25.30 prune 与体积观测 | ✅ 已验（2026-10-02 多实例） | `_PRUNE=1` 实例：ready 事件带 `workspaceKb`+`pruned:true`，`/workspace/.cache` 实际被清理；默认关闭时不清理（V1 exec_log 审计未迁移，遥测改走 durable 事件，有意变更） |
+| T25.33 周期保鲜 | ✅ 已验（2026-10-02 多实例） | `_REFRESH_SEC=30`：idle 超间隔 → 300s 扫描入队 refresh → 快照 ready、**沙箱保持 running**、`snapshot_refresh_operation` 行 done、无 destroy 入队 |
+| T25.34 已覆盖跳过 | ✅ 已验（2026-10-02 多实例） | 保鲜后再等一轮 300s 扫描：无新快照（时间覆盖快路径 + workspace CLEAN 判定） |
+| T25.35 平台硬回收 | ✅ 已验（简化版，2026-10-02 多实例） | 外部 `docker kill` 沙箱容器 → 下次使用重建并从最近快照恢复（数据在）、沙箱行收敛回 running；V1 的 `snapshot-lag-warning` 告警事件未迁移 |
+| T25.31/T25.32 失败原因/能力调研 | ✅/📄 | T25.31 由 T-SNAP.11b + T25.28c 覆盖；T25.32 为记录性调研 |
+
+## 以下为 V1 历史记录
 > **仅适用于快照模式**：`OPENCODE_SANDBOX_VOLUME_TYPE=snapshot` + `OPENCODE_SANDBOX_SNAPSHOT_ENABLED=true`。
 > workspace 位于沙箱 rootfs（本地盘），持久化依赖快照（docker commit / K8s SandboxSnapshot CRD）。
 > 公共测试环境参考 `docs/local-test-env.md`；宿主机直跑参考 `local-test-env.md` 备选方案。

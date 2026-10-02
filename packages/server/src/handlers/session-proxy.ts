@@ -60,6 +60,18 @@ function setProxyTarget(sessionID: string, port: number, target: { endpoint: str
   proxyTargets.set(key, { ...target, expiresAt: Date.now() + PROXY_TARGET_TTL_MS })
 }
 
+/**
+ * Drop every cached proxy target and error buffer for one session. Sandbox
+ * teardown paths must call this: a stale cached target keeps forwarding to a
+ * recycled sandbox's gateway address, which answers 404 that then leaks to the
+ * browser instead of the contract's 502 sandbox-unreachable.
+ */
+export function clearProxyTargets(sessionID: string) {
+  const prefix = `${sessionID}:`
+  for (const key of proxyTargets.keys()) if (key.startsWith(prefix)) proxyTargets.delete(key)
+  for (const key of errors.keys()) if (key.startsWith(prefix)) errors.delete(key)
+}
+
 function clearProxyTarget(sessionID: string, port: number) {
   proxyTargets.delete(proxyTargetKey(sessionID, port))
 }

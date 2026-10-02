@@ -331,6 +331,100 @@ export namespace Preview {
   export type Down = typeof Down.Type
 }
 
+export namespace SandboxOom {
+  /**
+   * The periodic sandbox OOM sampler observed new `oom_kill` events in a
+   * running session sandbox between two samples — typically a background
+   * process was killed while every command still exited cleanly, so the
+   * attribution would otherwise stay invisible. Emitted by the sandbox
+   * provider's scan loop; deltas below 1 are never reported.
+   */
+  export const Oom = Event.durable({
+    type: "session.sandbox.oom",
+    ...options,
+    schema: {
+      ...Base,
+      sandboxID: Schema.String,
+      oomKillDelta: PositiveInt,
+      oomKillTotal: NonNegativeInt,
+      usageBytes: NonNegativeInt.pipe(optional),
+      limitBytes: NonNegativeInt.pipe(optional),
+    },
+  })
+  export type Oom = typeof Oom.Type
+
+  /**
+   * Memory usage of a running session sandbox reached the pressure threshold
+   * (usage/limit ≥ configured ratio, default 85%). Throttled to one event per
+   * sandbox per 5 minutes by the sampler.
+   */
+  export const Pressure = Event.durable({
+    type: "session.sandbox.pressure",
+    ...options,
+    schema: {
+      ...Base,
+      sandboxID: Schema.String,
+      pct: PositiveInt,
+      usageBytes: NonNegativeInt,
+      limitBytes: NonNegativeInt,
+    },
+  })
+  export type Pressure = typeof Pressure.Type
+}
+
+export namespace SandboxSnapshot {
+  /**
+   * A sandbox snapshot was created for a session and reached the remote Ready
+   * state. Emitted by the sandbox provider after the await settles; failures
+   * and timeouts surface as `session.sandbox.snapshot.failed` instead.
+   */
+  export const Ready = Event.durable({
+    type: "session.sandbox.snapshot.ready",
+    ...options,
+    schema: {
+      ...Base,
+      snapshotID: Schema.String,
+      sourceSandboxID: Schema.String.pipe(optional),
+      image: Schema.String.pipe(optional),
+      /** Workspace size in KB measured right before the snapshot commit. */
+      workspaceKb: Schema.Number.pipe(optional),
+      /** Whether rebuildable caches were pruned before the snapshot commit. */
+      pruned: Schema.Boolean.pipe(optional),
+    },
+  })
+  export type Ready = typeof Ready.Type
+
+  /**
+   * A sandbox snapshot attempt ended in a terminal failure (remote Failed,
+   * incompatible, or a restore that fell back to a cold start). The session
+   * continues on image cold starts until a later snapshot succeeds.
+   */
+  export const Failed = Event.durable({
+    type: "session.sandbox.snapshot.failed",
+    ...options,
+    schema: {
+      ...Base,
+      snapshotID: Schema.String.pipe(optional),
+      reason: Schema.String,
+    },
+  })
+  export type Failed = typeof Failed.Type
+
+  /**
+   * A sandbox was created by restoring a session snapshot instead of a cold
+   * image start. Emitted after the restored sandbox passes its first command.
+   */
+  export const Restored = Event.durable({
+    type: "session.sandbox.snapshot.restored",
+    ...options,
+    schema: {
+      ...Base,
+      snapshotID: Schema.String,
+    },
+  })
+  export type Restored = typeof Restored.Type
+}
+
 export namespace Shell {
   export const Started = Event.durable({
     type: "session.shell.started",
