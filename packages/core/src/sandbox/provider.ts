@@ -9,6 +9,7 @@ import { SandboxOomSample } from "./oom-sample.js"
 import * as SandboxSnapshot from "./snapshot.js"
 import * as SandboxSnapshotOperation from "./snapshot-operation.js"
 import * as SandboxSnapshotReuse from "./snapshot-reuse.js"
+import * as SandboxCreateLease from "./create-lease.js"
 import { SandboxPath } from "./path.js"
 import { Database } from "../database/database.js"
 import { SandboxTable } from "./sql.js"
@@ -716,6 +717,15 @@ const layer = Layer.effect(
 
     const destroySandbox = (sessionID: string) =>
       Effect.gen(function* () {
+        // A create is in flight on some replica: destroying now would race the
+        // creator's persist and could orphan the fresh sandbox. Same semantics
+        // as kill-during-create: do not cancel, let the create finish; the
+        // next destroy (or idle reap) handles the running sandbox.
+        const early = yield* dbGet(sessionID)
+        if (early?.state === "creating") {
+          yield* Effect.logWarning("sandbox destroy skipped while create is in flight", { sessionID })
+          return
+        }
         clearOomBaseline(sessionID)
         yield* toolGate.close(sessionID, true).pipe(Effect.orDie)
         const active = yield* Ref.modify(activeCommands, (all) => {
@@ -1040,7 +1050,7 @@ const layer = Layer.effect(
         row?.state === "running" && !row.id.startsWith("pending-") ? row.id : null,
       )
 
-    const createSandbox = (sessionID: string) =>
+    const createSandbox = (sessionID: string, opts?: { persist?: boolean }) =>
       Effect.gen(function* () {
         const session = yield* db
           .select({ sandbox: SessionTable.sandbox, pvcMode: SessionTable.pvc_mode, appId: SessionTable.app_id })
@@ -1156,10 +1166,107 @@ const layer = Layer.effect(
           // the first command can cd into it. Volume mounts provide it already.
           yield* attempt(() => commandsOf(sb).run("mkdir -p /workspace")).pipe(Effect.ignore)
         }
-        yield* persistSandbox(sessionID, sb)
+        if (opts?.persist !== false) yield* persistSandbox(sessionID, sb)
         yield* Effect.logInfo("sandbox created", { sessionID, sandboxID: sb.id, ms: Date.now() - startedAt })
         return sb
       }).pipe(Effect.withSpan("SandboxProvider.createSandbox"))
+
+    /**
+     * Cross-instance create arbitration (multi-replica correctness): replicas
+     * share PostgreSQL, so the in-process single-flight alone used to let two
+     * replicas each create a remote sandbox for the same session. The winner
+     * creates; losers poll the row and reconnect to the winner's sandbox.
+     */
+    const CREATE_LEASE_MS = (config.createTimeoutSeconds + 60) * 1000
+    const createLease = SandboxCreateLease.create({
+      db,
+      leaseMs: CREATE_LEASE_MS,
+      host: config.domain,
+    })
+
+    const connectExisting = (sandboxID: string) =>
+      Effect.tryPromise({
+        try: () => Sandbox.connect({ connectionConfig, sandboxId: sandboxID }),
+        catch: (cause) => new Error(`Sandbox reconnect failed: ${String(cause)}`),
+      }).pipe(
+        // A pending health check can hang without a transport-level error; a
+        // bounded wait keeps waiters from blocking forever.
+        Effect.timeoutOrElse({ duration: Duration.seconds(30), orElse: () => Effect.succeed(null) }),
+        Effect.catch(() => Effect.succeed(null)),
+      )
+
+    /**
+     * Join a sandbox another replica created. A freshly persisted row can
+     * still fail a first connect (execd warming up), so retry before treating
+     * the row as stale: wrongly marking the winner's row destroyed would
+     * trigger a duplicate create.
+     */
+    const joinWithRetry = (sessionID: string, sandboxID: string) =>
+      Effect.gen(function* () {
+        for (let round = 0; round < 3; round++) {
+          const joined = yield* connectExisting(sandboxID)
+          if (joined) return joined
+          yield* Effect.sleep(Duration.seconds(5))
+        }
+        yield* markRowDestroyedIf(sessionID, sandboxID)
+        return null
+      })
+
+    const markRowDestroyedIf = (sessionID: string, sandboxID: string) =>
+      db
+        .update(SandboxTable)
+        .set({ state: "destroyed", time_updated: Date.now() })
+        .where(and(eq(SandboxTable.session_id, sessionID), eq(SandboxTable.id, sandboxID), eq(SandboxTable.state, "running")))
+        .run()
+        .pipe(Effect.ignore)
+
+    const createSandboxWithLease = (sessionID: string) =>
+      Effect.gen(function* () {
+        for (let attempt = 0; attempt < 3; attempt++) {
+          const claimed = yield* createLease.claim(sessionID)
+          if (claimed._tag === "running") {
+            const joined = yield* joinWithRetry(sessionID, claimed.sandboxID)
+            if (joined) return joined
+            // Row says running but the remote is gone; the row was converged
+            // by joinWithRetry so the next claim can create fresh.
+            continue
+          }
+          if (claimed._tag === "wait") {
+            const deadline = Date.now() + CREATE_LEASE_MS
+            while (Date.now() < deadline) {
+              yield* Effect.sleep(Duration.seconds(2))
+              const rows = yield* createLease.latest(sessionID)
+              const row = rows[0]
+              if (!row || row.state === "destroyed") break // creator failed or swept: retry claim
+              if (row.state === "running" && !SandboxCreateLease.isCreatingID(String(row.id)) && !SandboxCreateLease.isPendingID(String(row.id))) {
+                const joined = yield* joinWithRetry(sessionID, String(row.id))
+                if (joined) return joined
+                break
+              }
+              if (row.state === "creating" && Number(row.time_updated) < Date.now() - CREATE_LEASE_MS) break // expired: retry claim
+            }
+            continue
+          }
+          const sb = yield* createSandbox(sessionID, { persist: false }).pipe(
+            Effect.catch((error) =>
+              createLease
+                .release(sessionID)
+                .pipe(Effect.ignore, Effect.andThen(Effect.fail(error))),
+            ),
+          )
+          const persisted = yield* createLease.complete(sessionID, sb.id)
+          if (!persisted) {
+            // Our lease expired and another replica took the row: the sandbox
+            // we just created has no owner — dispose it and join the winner.
+            yield* Effect.logWarning("sandbox create lease lost; disposing duplicate", { sessionID, sandboxID: sb.id })
+            yield* Effect.tryPromise({ try: () => sb.kill(), catch: () => undefined }).pipe(Effect.ignore)
+            yield* Effect.tryPromise({ try: () => sb.close(), catch: () => undefined }).pipe(Effect.ignore)
+            continue
+          }
+          return sb
+        }
+        return yield* Effect.fail(new Error(`Sandbox create arbitration failed after retries: ${sessionID}`))
+      })
 
     const getOrCreate = (sessionID: string) =>
       Effect.gen(function* () {
@@ -1188,7 +1295,7 @@ const layer = Layer.effect(
                   return connected
                 }
               }
-              return yield* createSandbox(sessionID)
+              return yield* createSandboxWithLease(sessionID)
             }
             const healthy = yield* Effect.promise(() => entry.sb.isHealthy()).pipe(
               Effect.catchCause(() => Effect.succeed(false)),
@@ -1196,7 +1303,7 @@ const layer = Layer.effect(
             if (healthy) return entry.sb
             yield* Effect.logWarning("sandbox unhealthy, rebuilding", { sessionID })
             yield* destroySandbox(sessionID)
-            return yield* createSandbox(sessionID)
+            return yield* createSandboxWithLease(sessionID)
           })
           // Register every created sandbox here — file-only paths never touch
           // the command session, and readiness checks, health rebuilds, and
@@ -1399,6 +1506,10 @@ const layer = Layer.effect(
       const idleReap = Effect.gen(function* () {
         // Snapshot GC + reconciliation rides on the same 300s cadence.
         if (config.snapshot.enabled) yield* snapshots.gc().pipe(Effect.ignore)
+        // Converge create leases abandoned by crashed replicas.
+        yield* SandboxCreateLease.sweepStaleCreating(db, (config.createTimeoutSeconds + 60) * 1000).pipe(
+          Effect.ignore,
+        )
         yield* drainSnapshotDestroyOperations
         yield* enqueueSnapshotRefreshes
         const cutoff = Date.now() - config.idleReapSeconds * 1000

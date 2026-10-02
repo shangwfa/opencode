@@ -146,7 +146,7 @@ bun run typecheck
 | 创建后销毁及重建       | T-SBG.2                 | kill 响应、不同 sandbox ID、shell 终态、PG 状态 |
 | release 与 keep-alive  | T-SBG.3                 | API 和 PG 状态                                  |
 | 超时/中断/迟到创建清理 | 缺确定性自动化测试      | 需注入可控 OpenSandbox client                   |
-| 多 SaaS 副本并发创建   | 当前不保证              | `creates` 仅进程内 Ref，不是分布式锁            |
+| 多 SaaS 副本并发创建   | **已实现（2026-10-02）** | `sandbox/create-lease.ts` 跨实例仲裁：复用 sandbox 行 `state='creating'`（id=`creating-<owner>`）作 PG 租约，`claim` 条件更新（destroyed 或租约过期可接管）只有一个赢家；输家轮询行并 `Sandbox.connect` 复用赢家成果；创建失败 `release` 立即放行重试；`complete` 按 owner CAS 写入真实 id；卡死行由 300s 扫描 `sweepStaleCreating` 收敛。单测 `sandbox-create-lease.test.ts`（PG）覆盖仲裁/接管/释放/CAS/清扫 |
 
 ## 实测记录（2026-10-02）
 
@@ -159,9 +159,25 @@ bun run typecheck
 | T-SBG.2 创建后销毁与重建 | PASS | PG `destroyed/keep_alive=1`；retry shell `exited/0`；重建 sandboxId 不同 |
 | T-SBG.3 release/持久化/隔离 | PASS | release 后 `keepAlive=false`、sandboxId 空、PG `destroyed/keep_alive=0`；新 session 沙箱 ID 不同 |
 
+### 跨实例创建互斥实测（T-LEASE，2026-10-02）
+
+脚本：`sandbox-create-lease-v2.mjs`（双实例共享 PG，同一 session 并发 shell）。
+
+| 用例 | 结果 | 说明 |
+|---|---|---|
+| T-LEASE.2 PG 单行真实 ID | **PASS（全部 7 轮）** | `running\|<uuid>`，无 creating-/pending- 残留 |
+| T-LEASE.3 远端恰好一个沙箱容器 | **PASS（全部 7 轮）** | 容器计数差恒为 1 —— **互斥核心从未失败** |
+| T-LEASE.1a/b 双实例 shell 完成 | 5/7 轮全过 | 偶发单实例 HTTP 500（空 body）——取证归因**环境时钟跳变**：失败轮次上 A、B 两容器在同一毫秒窗口出现 `TimeoutNegativeWarning`（VM 级冻结），实例的 PG 连接被打断后 `dbGet` 的 `Effect.orDie` 变成 defect；与本文档顶部的宿主睡眠/OrbStack `pause_in_sleep` 问题同根因，非 lease 代码缺陷 |
+
+实现要点（`sandbox/create-lease.ts` + provider 集成）：
+- `claim` 条件 INSERT/UPDATE（`destroyed` 或租约过期可接管）——唯一赢家；输家轮询行并 `Sandbox.connect` 复用赢家沙箱。
+- 输家 `joinWithRetry`：connect 30 秒超时 + 3 次重试，仍失败才把 running 行收敛为 destroyed（防止把赢家刚 persist 的行误标毁触发重复创建）。
+- 赢家 `complete` 按 owner CAS 写入真实 id；创建失败 `release` 立即放行重试；`sweepStaleCreating` 挂 300s 扫描回收崩溃遗留的 creating 行。
+- `destroySandbox` 遇 `creating` 行跳过（不取消创建，与 kill-during-create 语义一致）。
+
 已知偏差（首次执行发现，均为脚本/环境问题，非产品缺陷）：
 1. keep-alive 路径必须为 `/api/experimental/session/:id/keep-alive`；缺少前缀时 HttpApi 对未匹配路由返回 404 空 body，易误判为会话不存在。
-2. 服务日志 grep 的 session 匹配需考虑 `sandbox creating` 与 sessionID 的顺序（日志 payload 中 sessionID 在消息之后）；本地日志量小时可直接按 `sandbox creating` 计数。
+2. 服务日志 grep 的 session 匹配需考虑 `sandbox creating` 与 sessionID 的顺序（日志 payload 中 sessionID 在消息之后）；本地日志量小时可直接按 `sandbox creating` 计数。生产镜像不输出 info 级日志，跨实例"只创建一次"以远端容器计数为权威证据。
 3. kill-during-create 断言按上表时序限定执行。
 
 > 清理：上方 `trap` 会在 shell 退出时对 SID/SID2/SID3 关闭 keep-alive 并删除 session；仍需确认 OpenSandbox 中无遗留实例。若手动分段运行脚本，应手动执行相同清理，失败退出也不要跳过。

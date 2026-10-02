@@ -1,7 +1,7 @@
 import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core"
 import { Timestamps } from "../database/schema.sql.js"
 
-export type State = "running" | "snapshotting" | "killed" | "destroyed"
+export type State = "creating" | "running" | "snapshotting" | "killed" | "destroyed"
 
 export const SandboxTable = sqliteTable(
   "sandbox",
