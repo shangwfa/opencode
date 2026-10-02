@@ -8,6 +8,7 @@ import { makeLocationNode } from "@opencode/util/effect/app-node"
 import { SandboxConfig } from "./config.js"
 import { SandboxOomSample } from "./oom-sample.js"
 import * as SandboxSnapshot from "./snapshot.js"
+import { expectedSandboxArch, snapshotDrift } from "./snapshot.js"
 import * as SandboxSnapshotOperation from "./snapshot-operation.js"
 import * as SandboxSnapshotReuse from "./snapshot-reuse.js"
 import * as SandboxCreateLease from "./create-lease.js"
@@ -250,6 +251,21 @@ export const resolveSessionImage = (sandbox: unknown, fallback: string): string 
   if (typeof image !== "string") return fallback
   return image.trim() || fallback
 }
+
+/**
+ * Refusal marker for create failures that must NOT be retried: the snapshot
+ * protection paths (disabled persistence, incompatible schema, failed restore)
+ * deliberately keep the checkpoint and reject cold-starting. A blind retry
+ * would re-resolve restorable=null (the failed mark clears the restorable
+ * set) and silently cold-start, defeating the data-protection decision.
+ * Everything else — remote timeout (cold-node Pending), transport errors —
+ * is transient and worth another attempt.
+ */
+const REFUSE_CREATE_TAG = "SandboxCreateRefused"
+export const refuseCreate = (reason: string) =>
+  new Error(`[${REFUSE_CREATE_TAG}] ${reason}`)
+export const shouldRetryCreate = (error: unknown, attempt: number, maxAttempts: number): boolean =>
+  attempt + 1 < maxAttempts && !(error instanceof Error && error.message.startsWith(`[${REFUSE_CREATE_TAG}]`))
 
 const filesOf = (sb: Sandbox): SandboxFilesApi => sb.files as unknown as SandboxFilesApi
 
@@ -1216,7 +1232,7 @@ const layer = Layer.effect(
         yield* Effect.logInfo("sandbox creating", { sessionID, volumeType: persistMode, volumes: volumes.length })
         // Never silently replace a persisted workspace with an empty image.
         if (persistMode === "snapshot" && !config.snapshot.enabled)
-          return yield* Effect.fail(new Error("Snapshot persistence is disabled; refusing cold start"))
+          return yield* Effect.fail(refuseCreate("Snapshot persistence is disabled; refusing cold start"))
         const restorable =
           persistMode === "snapshot" && config.snapshot.enabled
             ? yield* snapshots.resolveForCreate(sessionID)
@@ -1236,7 +1252,22 @@ const layer = Layer.effect(
             snapshotID: restorable.id,
             reason,
           })
-          return yield* Effect.fail(new Error(`Snapshot restore blocked: ${restorable.id}: ${reason}`))
+          return yield* Effect.fail(refuseCreate(`Snapshot restore blocked: ${restorable.id}: ${reason}`))
+        }
+        // V1 parity drift observability: warn (never block) when the restorable
+        // snapshot was taken from a different image or arch than this create
+        // will use; the remote platform remains the compatibility arbiter.
+        if (restorable) {
+          const drift = snapshotDrift(restorable, {
+            image: resolveSessionImage(session?.sandbox, config.image),
+            arch: expectedSandboxArch(process.arch),
+          })
+          if (drift)
+            yield* Effect.logWarning("snapshot image/arch drift; restoring anyway", {
+              sessionID,
+              snapshotID: restorable.id,
+              ...drift,
+            })
         }
         // A timed-out or interrupted create cannot cancel the in-flight HTTP
         // request, so the created sandbox would leak. Track abandonment and
@@ -1261,7 +1292,15 @@ const layer = Layer.effect(
                 // large images exceed that and fail client-side while the
                 // remote sandbox is still converging.
                 readyTimeoutSeconds: config.createTimeoutSeconds,
-                resource: session?.sandbox ?? config.resource,
+                // V1 parity (feat/opencode-1.18.31 sandbox-provider.ts): only
+                // cpu/memory may reach the control plane's resourceLimits.
+                // Leaking session-level fields (image/persistMode) makes the
+                // remote treat the request as invalid resources and the pod
+                // stays Pending until the server's synchronous create deadline
+                // — verified 2/2 failure with the leak vs 2/2 success clean.
+                resource: session?.sandbox
+                  ? { cpu: session.sandbox.cpu, memory: session.sandbox.memory }
+                  : config.resource,
                 // Ownership tag: cleanup tooling must only ever touch sandboxes
                 // created by this service, never someone else's.
                 metadata: { managedBy: "opencode-saas", session: sessionID },
@@ -1324,7 +1363,7 @@ const layer = Layer.effect(
                 reason: "restore failed: create failed",
               })
               .pipe(Effect.catch(() => Effect.void))
-            return yield* Effect.fail(new Error(`Snapshot restore failed; retry without cold start: ${restorable.id}`))
+            return yield* Effect.fail(refuseCreate(`Snapshot restore failed; retry without cold start: ${restorable.id}`))
           }
         }
         if (sb === null) sb = yield* attemptCreate({ image: resolveSessionImage(session?.sandbox, config.image) })
@@ -1428,13 +1467,24 @@ const layer = Layer.effect(
             }
             continue
           }
-          const sb = yield* createSandbox(sessionID, { persist: false }).pipe(
-            Effect.catch((error) =>
-              createLease
-                .release(sessionID, claimed.owner)
-                .pipe(Effect.ignore, Effect.andThen(Effect.fail(error))),
-            ),
-          )
+          // Transient create failures (cold-node image pull exceeding the
+          // remote's synchronous create deadline, transport blips) succeed on
+          // the very next attempt; refusals (snapshot protection) must fail
+          // fast — see shouldRetryCreate.
+          const createExit = yield* createSandbox(sessionID, { persist: false }).pipe(Effect.exit)
+          if (createExit._tag === "Failure") {
+            yield* createLease.release(sessionID, claimed.owner).pipe(Effect.ignore)
+            const error = Option.getOrElse(Cause.findErrorOption(createExit.cause), () => new Error(String(createExit.cause)))
+            if (!shouldRetryCreate(error, attempt, 3)) return yield* Effect.fail(error)
+            yield* Effect.logWarning("sandbox create failed; retrying", {
+              sessionID,
+              attempt: attempt + 1,
+              error: error.message,
+            })
+            yield* Effect.sleep(Duration.seconds(2))
+            continue
+          }
+          const sb = createExit.value
           const persisted = yield* createLease.complete(sessionID, claimed.owner, sb.id)
           if (!persisted) {
             // Our lease expired and another replica took the row: the sandbox

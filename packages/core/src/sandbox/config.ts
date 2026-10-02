@@ -123,7 +123,11 @@ export function load(): Config {
     maxTtlSeconds: number(env["OPENCODE_SANDBOX_MAX_TTL_SEC"], 3600),
     idleReapSeconds:
       env["OPENCODE_SANDBOX_IDLE_REAP_SEC"] === "0" ? 0 : number(env["OPENCODE_SANDBOX_IDLE_REAP_SEC"], 60 * 60),
-    createTimeoutSeconds: number(env["OPENCODE_SANDBOX_CREATE_TIMEOUT_SECONDS"], 300),
+    // 120s: remote control plane enforces its own synchronous create deadline
+    // (observed 60s on the K8s backend), so budgets beyond that only cover the
+    // local readiness wait; 120s aligns total create, SDK readyTimeout, and
+    // (this + 60s) the create-lease window.
+    createTimeoutSeconds: number(env["OPENCODE_SANDBOX_CREATE_TIMEOUT_SECONDS"], 120),
     filesTimeoutSeconds: integer(env["OPENCODE_SANDBOX_FILES_TIMEOUT_SECONDS"], 15),
     filesTimeoutRetries: nonNegativeInteger(env["OPENCODE_SANDBOX_FILES_TIMEOUT_RETRIES"], 1),
     resource: {

@@ -24,6 +24,33 @@ export type Deps = {
 
 const POLL_INTERVAL = Duration.seconds(5)
 
+/** Server-side arch label for a Node process.arch value (x64 → amd64), the
+ * same normalization snapshot-reuse.ts applies to `uname -m` output so stored
+ * snapshot arch values and live expectations compare equal. */
+export const expectedSandboxArch = (processArch: string): string =>
+  processArch === "x64" ? "amd64" : processArch
+
+/** V1 parity drift observability (feat/opencode-1.18.31 "snapshot image/arch
+ * drift; restoring anyway"): a restorable snapshot may have been taken from a
+ * different image or arch than the environment the create will use. This is a
+ * warning signal only — restore still proceeds and the remote platform stays
+ * the final compatibility arbiter. Missing stored values never warn. */
+export const snapshotDrift = (
+  restorable: { image?: string | null; arch?: string | null },
+  expected: { image: string; arch: string },
+): { image?: { snapshot: string; expected: string }; arch?: { snapshot: string; expected: string } } | null => {
+  const image =
+    restorable.image && restorable.image !== expected.image
+      ? { snapshot: restorable.image, expected: expected.image }
+      : undefined
+  const arch =
+    restorable.arch && restorable.arch !== expected.arch
+      ? { snapshot: restorable.arch, expected: expected.arch }
+      : undefined
+  return image || arch ? { ...(image ? { image } : {}), ...(arch ? { arch } : {}) } : null
+}
+
+
 /** V2 port of the V1 session-snapshot state machine (docs/sandbox-snapshot-design.md). */
 export function create<A, B>(deps: Deps) {
   // The provider's Effect-flavored drizzle handle; typed loosely here and
