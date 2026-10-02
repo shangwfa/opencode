@@ -111,6 +111,11 @@
 
 **多实例混版提示**：共享 PG 部署中，旧版本实例的 drain 也会 claim 操作队列并按旧逻辑写行（本批实测被 `pvc-default` 镜像的主容器干扰确认）。滚动升级期间建议先缩容旧版本再上线新版本，或接受混版期间的观测噪声。
 
+**TTL 对齐（2026-10-02 第三批，V1 语义）**：
+- `timeoutSeconds` 默认对齐 V1 **600s**（无卷沙箱 TTL）；新增 `maxTtlSeconds`（`OPENCODE_SANDBOX_MAX_TTL_SEC`，默认 3600s，挂卷沙箱与保活放大兜底）。
+- TTL 选择对齐 V1：`挂卷 ? maxTtl : timeout`；**keep-alive 沙箱 `max(base, maxTtl) × 10`**（默认 10h），确保保活沙箱不会在保鲜/活跃期间被平台自杀。
+- **保鲜间隔钳制**：`refreshSeconds = max(60, min(配置值, timeoutSeconds/3))`——修复默认组合的确定性丢失缺口（TTL 600s vs 保鲜 1800s + 扫描 300s：平台先杀、保鲜后到，空闲会话丢最后一段写入；钳制后默认 200s，保鲜（200s+300s 扫描+commit）稳定先于 TTL 完成）。单测锁定：TTL=600→refresh 200、TTL=7200→refresh 1800、显式 0 仍可关闭。
+
 ## 以下为 V1 历史记录
 > **仅适用于快照模式**：`OPENCODE_SANDBOX_VOLUME_TYPE=snapshot` + `OPENCODE_SANDBOX_SNAPSHOT_ENABLED=true`。
 > workspace 位于沙箱 rootfs（本地盘），持久化依赖快照（docker commit / K8s SandboxSnapshot CRD）。

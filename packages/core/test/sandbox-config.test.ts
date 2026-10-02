@@ -29,7 +29,7 @@ describe("SandboxConfig.load", () => {
     expect(config.protocol).toBe("https")
     expect(config.useServerProxy).toBe(false)
     expect(config.apiKey).toBeUndefined()
-    expect(config.timeoutSeconds).toBe(30 * 60)
+    expect(config.timeoutSeconds).toBe(600)
     expect(config.resource).toEqual({ cpu: "2", memory: "4Gi" })
     expect(config.image).toContain("opencode")
   })
@@ -72,7 +72,7 @@ describe("SandboxConfig.load", () => {
     process.env["OPENCODE_SANDBOX_API_KEY"] = ""
     process.env["OPENCODE_SANDBOX_IMAGE"] = ""
     const config = SandboxConfig.load()
-    expect(config.timeoutSeconds).toBe(30 * 60)
+    expect(config.timeoutSeconds).toBe(600)
     expect(config.apiKey).toBeUndefined()
     expect(config.image).toContain("opencode")
   })
@@ -107,16 +107,33 @@ describe("SandboxConfig.load", () => {
     expect(SandboxConfig.load().filesTimeoutRetries).toBe(1)
   })
 
-  it("defaults snapshot refresh to on with 1800s and honors explicit opt-out", () => {
+  it("defaults snapshot refresh on and clamps it to a third of the no-volume TTL", () => {
     // V1 parity: periodic refresh protects long-idle sandboxes from platform
-    // hard-kills losing every write since the last snapshot.
+    // hard-kills. Default TTL 600s clamps the V1 1800s default to 200s so
+    // refresh (interval + 300s scan + commit) lands before the platform
+    // reaps the sandbox — an unclamped interval loses every write.
+    expect(SandboxConfig.load().snapshot.refreshSeconds).toBe(200)
+    process.env["OPENCODE_SANDBOX_TIMEOUT_SECONDS"] = "7200"
     expect(SandboxConfig.load().snapshot.refreshSeconds).toBe(1800)
-    process.env["OPENCODE_SANDBOX_SNAPSHOT_REFRESH_SEC"] = "60"
-    expect(SandboxConfig.load().snapshot.refreshSeconds).toBe(60)
+    process.env["OPENCODE_SANDBOX_TIMEOUT_SECONDS"] = "600"
+    process.env["OPENCODE_SANDBOX_SNAPSHOT_REFRESH_SEC"] = "1500"
+    expect(SandboxConfig.load().snapshot.refreshSeconds).toBe(1500 > 200 ? 200 : 1500)
     process.env["OPENCODE_SANDBOX_SNAPSHOT_REFRESH_SEC"] = "0"
     expect(SandboxConfig.load().snapshot.refreshSeconds).toBe(0)
     delete process.env["OPENCODE_SANDBOX_SNAPSHOT_REFRESH_SEC"]
-    expect(SandboxConfig.load().snapshot.refreshSeconds).toBe(1800)
+    delete process.env["OPENCODE_SANDBOX_TIMEOUT_SECONDS"]
+    expect(SandboxConfig.load().snapshot.refreshSeconds).toBe(200)
+  })
+
+  it("aligns sandbox TTL defaults with V1 (600s no-volume, 3600s max)", () => {
+    expect(SandboxConfig.load().timeoutSeconds).toBe(600)
+    expect(SandboxConfig.load().maxTtlSeconds).toBe(3600)
+    process.env["OPENCODE_SANDBOX_TIMEOUT_SECONDS"] = "1200"
+    expect(SandboxConfig.load().timeoutSeconds).toBe(1200)
+    process.env["OPENCODE_SANDBOX_MAX_TTL_SEC"] = "7200"
+    expect(SandboxConfig.load().maxTtlSeconds).toBe(7200)
+    delete process.env["OPENCODE_SANDBOX_TIMEOUT_SECONDS"]
+    delete process.env["OPENCODE_SANDBOX_MAX_TTL_SEC"]
   })
 
   it("defaults the volume type to pvc; only snapshot is an accepted override (V1 parity)", () => {

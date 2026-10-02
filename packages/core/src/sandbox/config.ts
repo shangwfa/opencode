@@ -20,8 +20,13 @@ export interface Config {
    */
   readonly mcpServerProxy: boolean
   readonly image: string
-  /** Remote sandbox TTL (seconds) when no volume is attached. */
+  /** Remote sandbox TTL (seconds) when no volume is attached (V1 default 600). */
   readonly timeoutSeconds: number
+  /** Remote sandbox TTL (seconds) for volume-attached sandboxes and the floor
+   * for keep-alive TTL scaling (V1: hasVolume ? maxTtl : timeout; keepAlive →
+   * max(base, maxTtl) × 10 so a kept-alive sandbox never suicides underneath
+   * periodic snapshot refresh). */
+  readonly maxTtlSeconds: number
   /** Idle time before a running sandbox is reaped; 0 disables idle reap. */
   readonly idleReapSeconds: number
   /** Sandbox.create upper bound; first pulls of large images need headroom. */
@@ -68,7 +73,9 @@ export interface Config {
     /** Idle window after which a running snapshot-persisted sandbox gets its snapshot refreshed
      * in place (sandbox kept alive); 0 disables periodic refresh. Defaults to on (V1 parity):
      * without it, a platform hard-kill of a long-idle sandbox loses every write
-     * since the last snapshot. */
+     * since the last snapshot. The effective value is clamped to 1/3 of the
+     * sandbox TTL floor so refresh (plus the 300s scan and snapshot commit)
+     * always lands before the platform reaps an idle sandbox. */
     readonly refreshSeconds: number
     /** Prune rebuildable caches before taking a snapshot (workspace size is still measured). */
     readonly prune: boolean
@@ -112,7 +119,8 @@ export function load(): Config {
     mcpServerProxy:
       env["OPENCODE_SANDBOX_MCP_SERVER_PROXY"] === undefined ? true : flag(env["OPENCODE_SANDBOX_MCP_SERVER_PROXY"]),
     image: env["OPENCODE_SANDBOX_IMAGE"] || DEFAULT_IMAGE,
-    timeoutSeconds: number(env["OPENCODE_SANDBOX_TIMEOUT_SECONDS"], 30 * 60),
+    timeoutSeconds: number(env["OPENCODE_SANDBOX_TIMEOUT_SECONDS"], 600),
+    maxTtlSeconds: number(env["OPENCODE_SANDBOX_MAX_TTL_SEC"], 3600),
     idleReapSeconds:
       env["OPENCODE_SANDBOX_IDLE_REAP_SEC"] === "0" ? 0 : number(env["OPENCODE_SANDBOX_IDLE_REAP_SEC"], 60 * 60),
     createTimeoutSeconds: number(env["OPENCODE_SANDBOX_CREATE_TIMEOUT_SECONDS"], 300),
@@ -144,10 +152,19 @@ export function load(): Config {
       waitMs: number(env["OPENCODE_SANDBOX_SNAPSHOT_WAIT_SEC"], 900) * 1000,
       deleteEnabled: flag(env["OPENCODE_SANDBOX_SNAPSHOT_DELETE_ENABLED"]),
       // V1 parity: periodic refresh defaults to ON (1800s). Explicit "0" opts out.
+      // Clamp to 1/3 of the TTL floor: refresh must finish (interval + 300s
+      // scan + commit) before the platform TTL kills an idle no-volume sandbox
+      // (V1 default timeout 600s; unclamped 1800s would lose every write).
       refreshSeconds:
         env["OPENCODE_SANDBOX_SNAPSHOT_REFRESH_SEC"] === "0"
           ? 0
-          : number(env["OPENCODE_SANDBOX_SNAPSHOT_REFRESH_SEC"], 1800),
+          : Math.max(
+              60,
+              Math.min(
+                number(env["OPENCODE_SANDBOX_SNAPSHOT_REFRESH_SEC"], 1800),
+                Math.floor(number(env["OPENCODE_SANDBOX_TIMEOUT_SECONDS"], 600) / 3),
+              ),
+            ),
       prune: flag(env["OPENCODE_SANDBOX_SNAPSHOT_PRUNE"]),
     },
   }

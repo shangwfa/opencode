@@ -1235,7 +1235,13 @@ const layer = Layer.effect(
         // request, so the created sandbox would leak. Track abandonment and
         // let the resolve path destroy what nobody is waiting for.
         const abandoned = yield* Ref.make(false)
-        const timeoutSeconds = (yield* isKeepAlive(sessionID)) ? config.timeoutSeconds * 10 : config.timeoutSeconds
+        // V1 TTL semantics: volume-attached sandboxes run on maxTtl; keep-alive
+        // sandboxes scale max(base, maxTtl) × 10 so the remote never suicides
+        // underneath periodic snapshot refresh or an active session.
+        const baseTtl = volumes.length > 0 ? config.maxTtlSeconds : config.timeoutSeconds
+        const timeoutSeconds = (yield* isKeepAlive(sessionID))
+          ? Math.max(baseTtl, config.maxTtlSeconds) * 10
+          : baseTtl
         const startedAt = Date.now()
         const attemptCreate = (create: { snapshotId: string } | { image: string }) =>
           Effect.tryPromise({

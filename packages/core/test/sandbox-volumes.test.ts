@@ -10,6 +10,7 @@ const config = (overrides: Partial<SandboxConfig.Config> = {}): SandboxConfig.Co
   mcpServerProxy: false,
   image: "test-image",
   timeoutSeconds: 600,
+  maxTtlSeconds: 3600,
   idleReapSeconds: 3600,
   createTimeoutSeconds: 300,
   filesTimeoutSeconds: 15,
