@@ -22,7 +22,7 @@ import type {
 import type { Agent } from "@opencode/schema/agent"
 import type { Model } from "@opencode/schema/model"
 import type { Content } from "@opencode/schema/tool"
-import { Cause, Context, Effect, Layer, Option, Result, Stream } from "effect"
+import { Cause, Context, Effect, Layer, Option, Result, Stream, type Scope } from "effect"
 import { HttpClientRequest, HttpClientResponse } from "effect/unstable/http"
 import { makeLocationNode } from "@opencode/util/effect/app-node"
 import { App } from "../app.js"
@@ -34,6 +34,8 @@ import { SandboxProvider } from "../sandbox/provider.js"
 import { ToolAttachment } from "../tool/attachment.js"
 import { Tool } from "../tool.js"
 import { SessionModelTransport } from "./model-transport.js"
+import { SessionToolSandbox } from "./tool-sandbox.js"
+import { ModelRequestLog } from "./model-request-log.js"
 import { SessionProviderContext } from "./provider-context.js"
 import { SessionRunnerModel } from "./runner/model.js"
 import { SessionSchema } from "./schema.js"
@@ -243,7 +245,7 @@ type Definitions = PluginHooks.Domains["session"]["context"]["tools"]
 
 /** Builds the model request for each session flow. Each entry runs its own plugin hook. */
 export interface Interface {
-  readonly primary: (input: Input) => Effect.Effect<Prepared<SessionContext>>
+  readonly primary: (input: Input) => Effect.Effect<Prepared<SessionContext>, never, Scope.Scope>
   readonly compaction: (input: Input) => Effect.Effect<Prepared<SessionCompaction>>
   readonly generate: (input: Input) => Effect.Effect<Prepared<SessionGenerate>>
   readonly title: (input: Input) => Effect.Effect<Prepared<SessionTitle>>
@@ -406,6 +408,15 @@ export const layer = Layer.effect(
             })
           : undefined
 
+      // Audit the post-hook request the provider is about to receive, so tests can
+      // prove what did and did not reach the model. Opt-in, see ModelRequestLog.
+      ModelRequestLog.record({
+        sessionID: session.id,
+        kind,
+        agent: input.agent,
+        request,
+      })
+
       return {
         event: shaped,
         request,
@@ -437,7 +448,11 @@ export const layer = Layer.effect(
         hooks.trigger("session", name, { ...draft, agent, tools })
 
     return Service.of({
-      primary: (input) => prepare("primary", input, agentHook("context", input.agent)),
+      primary: (input) => Effect.gen(function* () {
+        const backend = Option.getOrUndefined(yield* Effect.serviceOption(SessionToolSandbox.Service))
+        const tools = input.tools && backend ? yield* backend.acquire(input.tools).pipe(Effect.orDie) : input.tools
+        return yield* prepare("primary", { ...input, tools }, agentHook("context", input.agent))
+      }),
       compaction: (input) => prepare("compaction", input, agentHook("compaction", input.agent)),
       generate: (input) => prepare("generate", input, agentHook("generate", input.agent)),
       title: (input) => prepare("title", input, (draft) => hooks.trigger("session", "title", draft)),

@@ -30,6 +30,7 @@ RUN --mount=type=cache,target=/root/.bun/install/cache,sharing=locked \
       --filter '@opencode/server' \
       --filter '@opencode/core'
 
+RUN bun packages/core/script/build-session-tool-host.ts
 RUN find /app -path "*/node-pty/prebuilds/*/spawn-helper" -exec chmod +x {} \;
 
 FROM base AS runtime

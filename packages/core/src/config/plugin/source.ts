@@ -164,7 +164,13 @@ const scan = Effect.fn("ConfigPluginSource.scan")(function* (
       const entrypoints: Host.Entrypoints = directory
         ? yield* Effect.sync(() => Host.resolve({ directory: operation.target }))
         : { server: pathToFileURL(operation.target).href }
-      if (!entrypoints.server) return []
+      if (!entrypoints.server) {
+        // A plugin directory with no resolvable server entrypoint is skipped
+        // here so one broken plugin cannot abort the whole scan. Say so: the
+        // alternative looks identical to a plugin that was never configured.
+        yield* Effect.logWarning("plugin directory has no server entrypoint", { target: operation.target })
+        return []
+      }
       if (directory) {
         const root = yield* fs.resolve(operation.target)
         const server = yield* fs.resolve(fileURLToPath(entrypoints.server))

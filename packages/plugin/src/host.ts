@@ -23,24 +23,30 @@ export function resolve(target: Target): Entrypoints {
       try {
         return resolveModule(specifier, target.directory)
       } catch (error) {
-        if (
-          !(error instanceof Error) ||
-          !("code" in error) ||
-          ![
-            "ENOENT",
-            "ENOTDIR",
-            "MODULE_NOT_FOUND",
-            "ERR_MODULE_NOT_FOUND",
-            "ERR_PACKAGE_PATH_NOT_EXPORTED",
-            "ERR_UNSUPPORTED_DIR_IMPORT",
-          ].includes(String(error.code))
-        )
-          throw error
+        if (!isMissingResolution(error)) throw error
       }
     }
     return undefined
   }
   return { server: entry(["server", ""]), tui: entry(["tui"]), rpc: entry(["rpc"]) }
+}
+
+// A missing subpath is expected while probing entrypoints; anything else must
+// propagate. Bun's `ResolveMessage` does not extend `Error`, so decide by the
+// resolution code rather than by prototype.
+const MISSING_RESOLUTION_CODES = new Set([
+  "ENOENT",
+  "ENOTDIR",
+  "MODULE_NOT_FOUND",
+  "ERR_MODULE_NOT_FOUND",
+  "ERR_PACKAGE_PATH_NOT_EXPORTED",
+  "ERR_UNSUPPORTED_DIR_IMPORT",
+])
+
+function isMissingResolution(error: unknown) {
+  if (typeof error !== "object" || error === null) return false
+  const code = (error as { code?: unknown }).code
+  return typeof code === "string" && MISSING_RESOLUTION_CODES.has(code)
 }
 
 export function load(entrypoint: string): Promise<unknown> {

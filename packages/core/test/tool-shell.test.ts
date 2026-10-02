@@ -190,6 +190,15 @@ const call = (input: typeof ShellTool.Input.Type, id = "call-shell") => ({
 })
 
 const isWindows = process.platform === "win32"
+// macOS still ships bash 3.2, which cannot `wait` on a process-substitution
+// PID and rejects a brace-less `f() case` function body. Fixtures relying on
+// those forms need bash >= 4; plain `f() for ...; done` runs on 3.2 fine.
+const bashMajor = (() => {
+  if (isWindows || !Bun.which("bash")) return 0
+  const probe = Bun.spawnSync(["bash", "-c", "echo ${BASH_VERSINFO[0]:-0}"])
+  const version = Number.parseInt(new TextDecoder().decode(probe.stdout).trim())
+  return Number.isFinite(version) ? version : 0
+})()
 const cwdCommand = isWindows ? "(Get-Location).Path; Start-Sleep -Milliseconds 100" : "pwd"
 const helloCommand = isWindows ? "[Console]::Out.Write('hello'); Start-Sleep -Milliseconds 100" : "printf hello"
 const stderrCommand = isWindows
@@ -539,7 +548,8 @@ describe("ShellTool scanner permissions", () => {
 })
 
 describe("ShellTool conditional process substitution", () => {
-  const test = isWindows || !Bun.which("bash") ? permissionIt.live.skip : permissionIt.live
+  const test =
+    isWindows || !Bun.which("bash") || bashMajor < 4 ? permissionIt.live.skip : permissionIt.live
   for (const portable of [false, true]) {
     test(`${portable ? "native" : "legacy"}: a nested deny prevents the substitution from running`, () =>
       withScanner(
@@ -650,7 +660,11 @@ describe("ShellTool compound syntax approval compatibility", () => {
       saved: ["printf *", "probe *"],
     },
   ]) {
-    const test = isWindows || !Bun.which(fixture.shell) ? permissionIt.live.skip : permissionIt.live
+    const needsModernBash = fixture.shell === "bash" && fixture.command.includes("case")
+    const test =
+      isWindows || !Bun.which(fixture.shell) || (needsModernBash && bashMajor < 4)
+        ? permissionIt.live.skip
+        : permissionIt.live
     for (const portable of [false, true]) {
       test(`${fixture.shell} ${portable ? "native" : "legacy equivalent"}: ${fixture.command}`, () =>
         withScanner(
@@ -858,7 +872,11 @@ describe("ShellTool ordinary shell syntax", () => {
 })
 
 describe("ShellTool", () => {
-  it.live("returns both parallel CodeMode shell results", () =>
+  // Code Mode routes tools.shell through the session sandbox; without an
+  // enabled sandbox provider it fails fast with a typed error. Run the case
+  // only when the sandbox environment is provided (see OPENCODE_SANDBOX_*).
+  const codemodeIt = process.env.OPENCODE_SANDBOX_ENABLED ? it.live : it.live.skip
+  codemodeIt("returns both parallel CodeMode shell results", () =>
     Effect.acquireUseRelease(
       Effect.promise(() => tmpdir()),
       (tmp) => {

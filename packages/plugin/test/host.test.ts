@@ -1,5 +1,5 @@
 import assert from "node:assert/strict"
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { describe, it } from "node:test"
@@ -11,7 +11,9 @@ const source = 'throw new Error("Plugin code must not run during resolution")'
 const name = "@fixture/plugin"
 
 async function fixture(files: Record<string, string>, installed = false) {
-  const root = await mkdtemp(path.join(tmpdir(), "opencode-host-"))
+  // Realpath the temp root so expectations match the resolver's URL form: on
+  // macOS the temp directory is reachable as both /var and /private/var.
+  const root = await realpath(await mkdtemp(path.join(tmpdir(), "opencode-host-")))
   const directory = installed ? path.join(root, "node_modules", name) : root
   await Promise.all(
     Object.entries(files).map(async ([file, content]) => {
@@ -151,6 +153,22 @@ describe("Host.resolve", () => {
       { "package.json": JSON.stringify({ name, exports: { "./tui": "./missing.js" } }) },
       true,
     )
+    assert.deepEqual(Host.resolve(plugin.target), { server: undefined, tui: undefined, rpc: undefined })
+  })
+
+  it("returns no entrypoints for a local directory whose package entrypoint is missing", async () => {
+    // Bun throws a `ResolveMessage` here, which does not extend `Error`. The
+    // memory of a broken local plugin directory (auto-discovered from
+    // {plugin,plugins}/) must not abort resolution for every other plugin.
+    await using plugin = await fixture({
+      "package.json": JSON.stringify({ name, type: "module", exports: { ".": "./missing.js" } }),
+      "unrelated.ts": source,
+    })
+    assert.deepEqual(Host.resolve(plugin.target), { server: undefined, tui: undefined, rpc: undefined })
+  })
+
+  it("returns no entrypoints for a local directory with no eligible files", async () => {
+    await using plugin = await fixture({ "package.json": JSON.stringify({ name, type: "module" }) })
     assert.deepEqual(Host.resolve(plugin.target), { server: undefined, tui: undefined, rpc: undefined })
   })
 })

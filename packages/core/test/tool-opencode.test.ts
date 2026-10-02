@@ -69,6 +69,7 @@ it.effect("groups available models by provider with paging", () =>
       model: Model.Ref.make({ providerID: Provider.ID.make("test"), id: Model.ID.make("alpha") }),
     })
     const registry = yield* Tool.Service
+    expect(JSON.stringify((yield* registry.snapshot()).codeModeCatalog)).toContain("session_move")
     const run = (input: Record<string, unknown>) =>
       executeTool(registry, {
         sessionID: session.id,

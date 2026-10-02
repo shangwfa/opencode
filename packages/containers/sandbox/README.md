@@ -108,6 +108,7 @@ cd packages/containers/sandbox
 # Apple Silicon（M 系列）用 arm64；Intel Mac 改 linux/amd64
 docker buildx build \
   --platform linux/arm64 \
+  --build-context repo=../../.. \
   -t opencode-opensandbox:local \
   -f Dockerfile \
   --load .

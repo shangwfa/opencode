@@ -4,6 +4,7 @@ import { Message, SystemPart } from "@opencode/ai"
 import { and, desc, eq, sql } from "drizzle-orm"
 import { Cause, Effect, Exit, FiberMap, Layer } from "effect"
 import { Database } from "../../database/database.js"
+import { Agent } from "../../agent.js"
 import { Bus } from "../../bus.js"
 import { LocationLifecycle } from "../../location-lifecycle.js"
 import { InstructionState } from "../instruction-state.js"
@@ -30,7 +31,7 @@ import { SessionStep } from "./step.js"
 import { ToolOutput } from "../../tool-output.js"
 import { SessionStructuredOutput } from "../structured-output.js"
 import { Plugin } from "../../plugin.js"
-import { MAX_STEPS_PROMPT } from "./max-steps.js"
+import { MAX_STEPS_SYSTEM_PROMPT } from "./max-steps.js"
 
 const CONTINUE_AFTER_INCOMPLETE_STREAM =
   "The previous response was interrupted. Continue from where you left off without repeating completed content."
@@ -42,6 +43,7 @@ const layer = Layer.effect(
     const lifecycle = yield* LocationLifecycle.Service
     const store = yield* SessionStore.Service
     const context = yield* SessionContext.Service
+    const agents = yield* Agent.Service
     const modelTransport = yield* SessionModelTransport.Service
     const db = (yield* Database.Service).db
     const compaction = yield* SessionCompaction.Service
@@ -197,6 +199,9 @@ const layer = Layer.effect(
 
     const prepareContext = Effect.fn("SessionRunner.prepareContext")(function* (sessionID: SessionSchema.ID) {
       const selected = yield* context.select(sessionID)
+      // Fail before spending a model call when the configured default is unusable. Listing and
+      // selection stay permissive, so this is the point where the misconfiguration becomes visible.
+      if (!selected.session.agent) yield* agents.default()
       // A blocked initial instruction baseline must leave admitted input pending.
       yield* InstructionState.prepare(db, bus, selected.instructions, sessionID)
       return selected
@@ -227,9 +232,13 @@ const layer = Layer.effect(
         }
         const stepLimitReached = loaded.agent.info.steps !== undefined && step >= loaded.agent.info.steps
         const structuredSchema = SessionStructuredOutput.requestedJsonSchema(loaded.messages)
+        // A normal step-limit response must be text-only: don't advertise tools on that
+        // request. Keep only the structured-output tool when the caller explicitly requested
+        // a schema-constrained response.
+        const availableTools = stepLimitReached ? { ...loaded.tools, definitions: [] } : loaded.tools
         const tools = structuredSchema
-          ? SessionStructuredOutput.withTool(loaded.tools, structuredSchema)
-          : loaded.tools
+          ? SessionStructuredOutput.withTool(availableTools, structuredSchema)
+          : availableTools
         const transcript = SessionModelRequest.baseTranscript({
           agent: loaded.agent.info,
           model: loaded.model,
@@ -237,47 +246,58 @@ const layer = Layer.effect(
           initial: loaded.initial,
           messages: loaded.messages,
         })
-        const prepared = yield* context.request.primary({
-          session: loaded.session,
-          agent: loaded.agent.id,
-          model: loaded.model,
-          tools,
-          // `required` only forces *a* tool call, so the prompt names the one that carries the answer.
-          system: structuredSchema
-            ? [...transcript.system, SystemPart.make(SessionStructuredOutput.SystemPrompt)]
-            : transcript.system,
-          messages: stepLimitReached
-            ? [...transcript.messages, Message.assistant(MAX_STEPS_PROMPT)]
-            : transcript.messages,
-          // `required` (a mode) survives thinking mode; a named tool_choice does not.
-          toolChoice: structuredSchema ? "required" : stepLimitReached ? "none" : undefined,
-          webSocket: "session",
-        })
-        const outcome = yield* steps.attempt({
-          isLocationClosed: lifecycle.isClosed,
-          sessionID,
-          assistantMessageID,
-          agent: loaded.agent.id,
-          model: loaded.model,
-          prepared,
-          retry: (cause, error, proposed) =>
-            retry.decide({
-              cause,
-              error,
+        const outcome = yield* Effect.scoped(
+          Effect.gen(function* () {
+            const prepared = yield* context.request.primary({
+              session: loaded.session,
               agent: loaded.agent.id,
-              model: loaded.model.ref,
-              hook: prepared.retry,
-              retry: proposed,
-            }),
-          recoverContinuation,
-          recoverOverflow: Effect.suspend(() =>
-            recoverOverflow && compaction.enabled()
-              ? compaction
-                  .compact({ ...compactionInput, overflow: true })
-                  .pipe(Effect.map((result) => result.status === "completed"))
-              : Effect.succeed(false),
-          ),
-        })
+              model: loaded.model,
+              tools,
+              // `required` only forces *a* tool call, so the prompt names the one that carries the answer.
+              system: [
+                ...transcript.system,
+                ...(structuredSchema ? [SystemPart.make(SessionStructuredOutput.SystemPrompt)] : []),
+                // Keep the step-limit instruction request-scoped; never synthesize an assistant turn
+                // that a thinking-enabled provider would expect to contain model-produced reasoning.
+                ...(stepLimitReached && !structuredSchema ? [SystemPart.make(MAX_STEPS_SYSTEM_PROMPT)] : []),
+              ],
+              messages: transcript.messages,
+              // Don't set `none`: some thinking-mode providers reject it when replaying prior
+              // reasoning. Normal final-step requests have no tools; structured output still needs
+              // its required output tool.
+              toolChoice: structuredSchema ? "required" : undefined,
+              webSocket: "session",
+            })
+            return yield* steps.attempt({
+              isLocationClosed: lifecycle.isClosed,
+              sessionID,
+              assistantMessageID,
+              agent: loaded.agent.id,
+              model: loaded.model,
+              prepared,
+              // A structured-output tool is a response format, not an agent action; preserve it on
+              // the final step while withholding every ordinary tool above.
+              toolsDisabled: stepLimitReached && !structuredSchema,
+              retry: (cause, error, proposed) =>
+                retry.decide({
+                  cause,
+                  error,
+                  agent: loaded.agent.id,
+                  model: loaded.model.ref,
+                  hook: prepared.retry,
+                  retry: proposed,
+                }),
+              recoverContinuation,
+              recoverOverflow: Effect.suspend(() =>
+                recoverOverflow && compaction.enabled()
+                  ? compaction
+                      .compact({ ...compactionInput, overflow: true })
+                      .pipe(Effect.map((result) => result.status === "completed"))
+                  : Effect.succeed(false),
+              ),
+            })
+          }),
+        )
         const completed = yield* SessionStep.Outcome.$match(outcome, {
           Completed: (outcome) => Effect.succeed(outcome.needsContinuation),
           Retry: (outcome) =>
@@ -373,6 +393,7 @@ export const node = makeLocationNode({
     Bus.node,
     LocationLifecycle.node,
     llmClient,
+    Agent.node,
     SessionContext.node,
     SessionModelTransport.node,
     SessionStore.node,

@@ -17,7 +17,7 @@ const context = {
 }
 
 const createCodeMode = (tools: ReadonlyMap<string, Info>) =>
-  CodeModeTool.create({ tools }, (_, tool, input, context) => execute(tool, input, context))
+  CodeModeTool.create({ tools }, (_, tool, input, context) => execute(tool, input, context), { web: true })
 
 test("execute describes invariant Code Mode behavior", () => {
   expect(createCodeMode(new Map()).description).toBe(
@@ -68,6 +68,42 @@ test("canonical execution distinguishes declared, model-only, and raw schema out
     output: { unchecked: true },
     content: [{ type: "text", text: "raw" }],
   })
+})
+
+test("Code Mode delegates interpretation while routing manifest calls through the captured Tool snapshot", async () => {
+  const add: Info = {
+    name: "add",
+    description: "Add two values",
+    options: { namespace: "math" },
+    input: Schema.Struct({ a: Schema.Number, b: Schema.Number }),
+    output: Schema.Number,
+    execute: ({ a, b }) => Effect.succeed({ output: a + b, content: "sum" }),
+  }
+  let receivedCode = ""
+  const codeMode = CodeModeTool.create(
+    { tools: new Map([["math.add", add]]) },
+    (_, tool, input, toolContext) => execute(tool, input, toolContext),
+    {
+      execute: ({ code, tools, tool, progress }) =>
+        Effect.gen(function* () {
+          receivedCode = code
+          expect(tools.map((entry) => entry.path)).toEqual(["math.add"])
+          yield* progress([{ tool: "math.add", status: "running", input: { a: 2, b: 3 } }])
+          const result = yield* tool("math.add", { a: 2, b: 3 })
+          yield* progress([{ tool: "math.add", status: "completed", input: { a: 2, b: 3 } }])
+          return { ok: true as const, value: result as number, toolCalls: [{ name: "math.add" }] }
+        }).pipe(
+          Effect.mapError(
+            (cause) => new Tool.Error({ message: cause instanceof Error ? cause.message : String(cause) }),
+          ),
+        ),
+    },
+  )
+
+  const result = await Effect.runPromise(codeMode.execute({ code: "return await tools.math.add({a:2,b:3})" }, context))
+  expect(receivedCode).toBe("return await tools.math.add({a:2,b:3})")
+  expect(result.output.output).toBe("5")
+  expect(result.output.toolCalls).toEqual([{ tool: "math.add", status: "completed", input: { a: 2, b: 3 } }])
 })
 
 test("declared outputs cannot bypass validation and raw outputs stay JSON-compatible", async () => {

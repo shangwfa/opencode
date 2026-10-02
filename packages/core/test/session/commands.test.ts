@@ -353,6 +353,51 @@ describe("SessionCommands", () => {
     )
   })
 
+  test("skips sandbox command discovery entirely when the sandbox is disabled", async () => {
+    // Local/no-sandbox mode. Command list propagates scan failures, so an unguarded scan would
+    // turn a disabled sandbox into a 500 instead of an empty sandbox contribution.
+    const sessionID = Session.ID.make("ses_command_scan_disabled")
+    const sandbox = {
+      enabled: false,
+      run: () => Effect.die(new Error("disabled sandbox must not run a scan")),
+      fileRead: () => Effect.die(new Error("disabled sandbox must not read a file")),
+    }
+    expect(await Effect.runPromise(SessionCommands.scanSandbox(sessionID, "/host/repo", sandbox))).toEqual([])
+  })
+
+  test("derives argument hints from a sandbox command template", async () => {
+    const sessionID = Session.ID.make("ses_command_hints")
+    const files = [
+      "/workspace/.opencode/commands/positional.md",
+      "/workspace/.opencode/commands/all.md",
+      "/workspace/.opencode/commands/plain.md",
+    ]
+    const bodies: Record<string, string> = {
+      positional: "A=$1 B=$3",
+      all: "Everything: $ARGUMENTS",
+      plain: "No placeholders",
+    }
+    const sandbox = {
+      enabled: true,
+      run: () =>
+        Effect.succeed({
+          exitCode: 0,
+          output: files.map((path) => `${path}\t1000.0000000000\t5`).join("\n"),
+          timedOut: false,
+        }),
+      fileRead: (_id: string, file: string) =>
+        Effect.succeed(bodies[file.slice(file.lastIndexOf("/") + 1, -3)] ?? ""),
+    }
+
+    const commands = await Effect.runPromise(SessionCommands.scanSandbox(sessionID, "/host/repo", sandbox))
+    // `$ARGUMENTS` wins over positional placeholders; positions are deduped and sorted.
+    expect(commands.map((item) => [item.name, item.hints])).toEqual([
+      ["all", ["$ARGUMENTS"]],
+      ["plain", []],
+      ["positional", ["$1", "$3"]],
+    ])
+  })
+
   test("reuses unchanged sandbox command definitions until a fingerprint or force changes them", async () => {
     const sessionID = Session.ID.make("ses_command_scan_incremental")
     const cache = new SandboxDefinitionCache<SessionCommands.Definition>()

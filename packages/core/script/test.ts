@@ -28,6 +28,9 @@ const environment = {
   XDG_CACHE_HOME: path.join(home, ".cache"),
   XDG_STATE_HOME: path.join(home, ".local", "state"),
   OPENCODE_CONFIG_DIR: path.join(home, ".config", "opencode"),
+  // Most Core tests exercise Tool snapshot behavior without a live Session Sandbox.
+  // The default executor is covered explicitly by codemode-config.test.ts.
+  OPENCODE_CODEMODE_EXECUTOR: "server",
   OPENCODE_CONFIG: undefined,
   OPENCODE_CONFIG_CONTENT: undefined,
   TMPDIR: temporary,

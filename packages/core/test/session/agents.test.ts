@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { Effect } from "effect"
+import { Effect, Logger } from "effect"
 import { Agent } from "@opencode/core/agent"
 import { SessionAgents } from "@opencode/core/session/agents"
 import { MAX_SCAN_FILES, SandboxDefinitionCache } from "@opencode/core/session/scan"
@@ -242,6 +242,48 @@ test("degrades sandbox Agent discovery to no definitions instead of failing the 
     SessionAgents.scanSandboxBestEffort(sessionID, "/host/repo", sandbox),
   )
   expect(definitions).toEqual([])
+})
+
+test("skips sandbox Agent discovery entirely when the sandbox is disabled", async () => {
+  // Local/no-sandbox mode: the provider's `run` dies rather than degrading, so the scanner must
+  // short-circuit on `enabled` before it ever asks. Removing that guard turns a disabled sandbox
+  // into a hard failure on the read path.
+  const sessionID = Session.ID.make("ses_agent_scan_disabled")
+  const sandbox = {
+    enabled: false,
+    run: () => Effect.die(new Error("disabled sandbox must not run a scan")),
+    fileRead: () => Effect.die(new Error("disabled sandbox must not read a file")),
+  }
+  expect(await Effect.runPromise(SessionAgents.scanSandbox(sessionID, "/host/repo", sandbox))).toEqual([])
+  expect(await Effect.runPromise(SessionAgents.scanSandboxBestEffort(sessionID, "/host/repo", sandbox))).toEqual([])
+})
+
+test("keeps sandbox file content out of scan logs", async () => {
+  // SAS-CM-04 / general assertion 2: a scan must be diagnosable by path and counts only.
+  // `readDefinition` is shared with commands, so this covers the common scanner log path.
+  const SECRET = "TOP-SECRET-BODY-MARKER"
+  const sessionID = Session.ID.make("ses_agent_scan_logs")
+  const logged: unknown[] = []
+  const logger = Logger.map(Logger.formatStructured, (entry) => {
+    logged.push(entry.message)
+  })
+  const sandbox = {
+    enabled: true,
+    run: () => Effect.succeed({ exitCode: 0, output: scanLine("/workspace/.opencode/agents/ok.md"), timedOut: false }),
+    fileRead: () => Effect.succeed(`---\nmode: impossible\n---\n${SECRET}`),
+  }
+
+  const definitions = await Effect.runPromise(
+    SessionAgents.scanSandbox(sessionID, "/host/repo", sandbox).pipe(Effect.provide(Logger.layer([logger]))),
+  )
+
+  expect(definitions).toEqual([])
+  const text = JSON.stringify(logged)
+  // The skip is observable with its provenance…
+  expect(text).toContain("Skipped sandbox Agent file that is not a valid definition")
+  expect(text).toContain("ok.md")
+  // …but the file body never reaches a log line.
+  expect(text).not.toContain(SECRET)
 })
 
 test("reads only sandbox Agent files whose fingerprint changed", async () => {

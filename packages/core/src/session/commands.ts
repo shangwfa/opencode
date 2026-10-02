@@ -16,6 +16,7 @@ import { Provider } from "@opencode/schema/provider"
 import { ConfigCommand } from "@opencode/schema/config/command"
 import { ConfigMarkdown } from "../config/markdown.js"
 import { Option, Schema } from "effect"
+import { SessionResourceOwner } from "./resource-owner.js"
 import {
   SandboxDefinitionCache,
   scanSandboxMarkdown,
@@ -52,8 +53,12 @@ export const get = Effect.fn("SessionCommands.get")(function* (session: Session.
   return definitions.find((item) => item.name === name)
 })
 
-export const create = Effect.fn("SessionCommands.create")(function* (sessionID: Session.ID, input: CreateInput) {
+export const create = Effect.fn("SessionCommands.create")(function* (
+  requestedSessionID: Session.ID,
+  input: CreateInput,
+) {
   const { db } = yield* Database.Service
+  const sessionID = yield* SessionResourceOwner.id(db, requestedSessionID)
   const now = Date.now()
   const id = `scmd_${crypto.randomUUID().replaceAll("-", "")}`
   const subagent = input.subagent ?? input.subtask ?? null
@@ -90,16 +95,18 @@ export const create = Effect.fn("SessionCommands.create")(function* (sessionID: 
   return fromRow(row, "session")
 })
 
-export const remove = Effect.fn("SessionCommands.remove")(function* (sessionID: Session.ID, name: string) {
+export const remove = Effect.fn("SessionCommands.remove")(function* (requestedSessionID: Session.ID, name: string) {
   const { db } = yield* Database.Service
+  const sessionID = yield* SessionResourceOwner.id(db, requestedSessionID)
   yield* db
     .delete(SessionCommandTable)
     .where(and(eq(SessionCommandTable.session_id, sessionID), eq(SessionCommandTable.name, name)))
     .pipe(Effect.orDie)
 })
 
-export const clear = Effect.fn("SessionCommands.clear")(function* (sessionID: Session.ID) {
+export const clear = Effect.fn("SessionCommands.clear")(function* (requestedSessionID: Session.ID) {
   const { db } = yield* Database.Service
+  const sessionID = yield* SessionResourceOwner.id(db, requestedSessionID)
   yield* db.delete(SessionCommandTable).where(eq(SessionCommandTable.session_id, sessionID)).pipe(Effect.orDie)
 })
 
@@ -133,7 +140,8 @@ export function executable(
           yield* actions.subagent({ definition, text, prompt: input.prompt })
           return
         }
-        if (definition.agent) yield* actions.switchAgent({ sessionID: session.id, agent: Agent.ID.make(definition.agent) })
+        if (definition.agent)
+          yield* actions.switchAgent({ sessionID: session.id, agent: Agent.ID.make(definition.agent) })
         if (model) yield* actions.switchModel({ sessionID: session.id, model })
         yield* actions.prompt({
           ...input.prompt,
@@ -145,9 +153,10 @@ export function executable(
   }
 }
 
-function listStored(sessionID: Session.ID) {
+function listStored(requestedSessionID: Session.ID) {
   return Effect.gen(function* () {
     const { db } = yield* Database.Service
+    const sessionID = yield* SessionResourceOwner.id(db, requestedSessionID)
     const rows = yield* db
       .select()
       .from(SessionCommandTable)
@@ -161,10 +170,7 @@ function listStored(sessionID: Session.ID) {
 function baseCommands(session: Session.Info) {
   return Effect.gen(function* () {
     const instances = yield* Instance.Service
-    const commands = yield* Plugin.awaitActivation.pipe(
-      Effect.andThen(Command.Service),
-      instances.provide(session),
-    )
+    const commands = yield* Plugin.awaitActivation.pipe(Effect.andThen(Command.Service), instances.provide(session))
     return (yield* commands.list()).map((item) =>
       SessionCommand.Definition.make({ name: item.name, description: item.description, hints: [], source: "builtin" }),
     )
@@ -210,18 +216,16 @@ function scanInput(
   }
 }
 
-export const scanSandbox = Effect.fn("SessionCommands.scanSandbox")(
-  function* (
-    sessionID: Session.ID,
-    directory: string,
-    sandbox: Pick<SandboxProvider.Interface, "enabled" | "run" | "fileRead">,
-    options: { readonly force?: boolean; readonly cache?: SandboxDefinitionCache<Definition> } = {},
-  ) {
-    return yield* scanSandboxMarkdown(scanInput(sessionID, directory, sandbox, options)).pipe(
-      Effect.mapError((error) => new Error(error.message)),
-    )
-  },
-)
+export const scanSandbox = Effect.fn("SessionCommands.scanSandbox")(function* (
+  sessionID: Session.ID,
+  directory: string,
+  sandbox: Pick<SandboxProvider.Interface, "enabled" | "run" | "fileRead">,
+  options: { readonly force?: boolean; readonly cache?: SandboxDefinitionCache<Definition> } = {},
+) {
+  return yield* scanSandboxMarkdown(scanInput(sessionID, directory, sandbox, options)).pipe(
+    Effect.mapError((error) => new Error(error.message)),
+  )
+})
 
 function decodeSandboxCommand(file: ScannedFile, content: string): Definition | undefined {
   const parsed = decodeMarkdown(content)
@@ -267,7 +271,12 @@ export function interpolateArguments(template: string, input: string) {
   return text
 }
 
-function expandTemplate(template: string, input: string, session: Session.Info, sandbox: Pick<SandboxProvider.Interface, "run">) {
+function expandTemplate(
+  template: string,
+  input: string,
+  session: Session.Info,
+  sandbox: Pick<SandboxProvider.Interface, "run">,
+) {
   return Effect.gen(function* () {
     const matches = [...template.matchAll(/!`([^`]+)`/g)]
     if (matches.length === 0) return interpolateArguments(template, input).trim()

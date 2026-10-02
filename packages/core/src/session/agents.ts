@@ -21,6 +21,7 @@ import {
 } from "./scan.js"
 import { SessionAgentTable } from "./sql.js"
 import { makeLocationNode } from "@opencode/util/effect/app-node"
+import { SessionResourceOwner } from "./resource-owner.js"
 
 export { validName }
 
@@ -88,7 +89,8 @@ const layer = Layer.effect(
       const selected = yield* agents.select(id)
       return { id: selected.id, info: find(selected.id)?.agent }
     })
-    const create = Effect.fn("SessionAgents.create")(function* (sessionID: Session.ID, input: Payload) {
+    const create = Effect.fn("SessionAgents.create")(function* (requestedSessionID: Session.ID, input: Payload) {
+      const sessionID = yield* SessionResourceOwner.id(db, requestedSessionID)
       const encoded = JSON.stringify(input.config)
       const actualBytes = Buffer.byteLength(encoded, "utf8")
       if (actualBytes > SessionAgentSchema.MaxContentBytes)
@@ -127,7 +129,8 @@ const layer = Layer.effect(
       return fromRow(row)
     })
 
-    const remove = Effect.fn("SessionAgents.remove")(function* (sessionID: Session.ID, id: Agent.ID) {
+    const remove = Effect.fn("SessionAgents.remove")(function* (requestedSessionID: Session.ID, id: Agent.ID) {
+      const sessionID = yield* SessionResourceOwner.id(db, requestedSessionID)
       yield* db
         .delete(SessionAgentTable)
         .where(and(eq(SessionAgentTable.session_id, sessionID), eq(SessionAgentTable.agent_id, id)))
@@ -135,7 +138,8 @@ const layer = Layer.effect(
         .pipe(Effect.orDie)
     })
 
-    const clear = Effect.fn("SessionAgents.clear")(function* (sessionID: Session.ID) {
+    const clear = Effect.fn("SessionAgents.clear")(function* (requestedSessionID: Session.ID) {
+      const sessionID = yield* SessionResourceOwner.id(db, requestedSessionID)
       yield* db.delete(SessionAgentTable).where(eq(SessionAgentTable.session_id, sessionID)).run().pipe(Effect.orDie)
     })
 
@@ -155,8 +159,9 @@ export const node = makeLocationNode({
   deps: [Database.node, Agent.node, SandboxProvider.node, Global.node],
 })
 
-function listStored(db: Database.Interface["db"], sessionID: Session.ID) {
+function listStored(db: Database.Interface["db"], requestedSessionID: Session.ID) {
   return Effect.gen(function* () {
+    const sessionID = yield* SessionResourceOwner.id(db, requestedSessionID)
     const rows = yield* db
       .select()
       .from(SessionAgentTable)

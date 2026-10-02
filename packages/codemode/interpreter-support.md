@@ -33,7 +33,12 @@ ultimate source of truth. Upstream test262 files run verbatim from `test/test262
 - [x] Tool calls through the host-provided `tools` tree only.
 - [x] The global `search(...)` built-in: synchronous tool discovery that counts as an admitted tool call and is
       shadowable by program declarations like other globals.
-- [x] Cooperative timeout, an optional total tool-call limit, output bounding, and unrestricted tool-call concurrency.
+- [x] An optional AST-step limit counts each evaluated statement and expression; absent means unlimited. Hosts can use
+      this to bound synchronous control-flow loops that a wall-clock timeout cannot preempt while the interpreter is
+      executing synchronously. It counts interpreter AST evaluations, not work inside one built-in operation or a host
+      tool call.
+- [x] Cooperative wall-clock timeout, an optional total tool-call limit, output bounding, and unrestricted tool-call
+      concurrency.
 - [x] The timeout fires between interpreter steps, so one built-in is bounded in what it may build: strings up to
       2^24 characters (`repeat`, `pad*`, `concat`, `join`, `+`, template literals, `JSON.stringify`), arrays up to
       10,000,000 elements (`Array(n)`, `length =`, `Array.from`, `split`, `matchAll`, `concat`, `flat`; below the JS

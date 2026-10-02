@@ -1188,6 +1188,7 @@ describe("CodeMode public contract", () => {
       RangeError,
     )
     expect(() => CodeMode.execute({ code: "return 1", limits: { maxToolCalls: -1 } })).toThrow(RangeError)
+    expect(() => CodeMode.execute({ code: "return 1", limits: { maxSteps: 0 } })).toThrow(RangeError)
     expect(() => CodeMode.execute({ code: "return 1", limits: { maxOutputBytes: -1 } })).toThrow(RangeError)
 
     const result = await Effect.runPromise(
@@ -1210,6 +1211,14 @@ describe("CodeMode public contract", () => {
     const result = await Effect.runPromise(CodeMode.execute({ tools, code: source, limits: { maxToolCalls: 0 } }))
     expect(result.ok).toBe(false)
     if (!result.ok) expect(result.error.kind).toBe("ToolCallLimitExceeded")
+  })
+
+  test("enforces the interpreter step limit as a stable diagnostic", async () => {
+    const result = await Effect.runPromise(
+      CodeMode.execute({ code: "let value = 0; while (true) value += 1", limits: { maxSteps: 20 } }),
+    )
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.error.kind).toBe("StepLimitExceeded")
   })
 
   test("timeoutMs and maxToolCalls have no defaults: absent means unlimited", async () => {

@@ -12,6 +12,16 @@
 # 支持 --platform linux/amd64 与 linux/arm64（Node 二进制按 TARGETARCH 自动选择）。
 
 # ── 阶段 0：按目标架构下载 Node 官方二进制 ──
+FROM oven/bun:1.3.14 AS codemode-runner
+WORKDIR /app
+COPY --from=repo package.json bun.lock bunfig.toml ./
+COPY --from=repo patches/ patches/
+COPY --from=repo packages/ packages/
+COPY opt/codemode-runner.ts /app/packages/codemode/codemode-runner.ts
+RUN bun install --ignore-scripts --filter '@opencode/codemode' \
+    && bun add ws@8.21.0 \
+    && bun build /app/packages/codemode/codemode-runner.ts --target=node --format=esm --outfile=/out/codemode-runner.mjs
+
 FROM ubuntu:24.04 AS node-dl
 ARG TARGETARCH
 RUN apt-get update && apt-get install -y --no-install-recommends curl xz-utils ca-certificates \
@@ -29,14 +39,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates curl wget git unzip zip tar bash xz-utils ripgrep util-linux \
     python3 python3-venv python3-pip \
     && rm -rf /var/lib/apt/lists/* \
-    && pip install --break-system-packages --no-cache-dir uv \
-      -i https://pypi.tuna.tsinghua.edu.cn/simple
+    && pip install --break-system-packages --no-cache-dir uv
 ENV PYTHONUNBUFFERED=1
 
 # ── 2. Node.js 24（单版本）──
 ENV NODE_ROOT=/opt/node
 COPY --from=node-dl /tmp/node-v24.19.0-linux-* $NODE_ROOT/24/
 ENV PATH="$NODE_ROOT/24/bin:/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin"
+COPY --from=codemode-runner /out/codemode-runner.mjs /opt/opencode-codemode-runner.mjs
 
 # ── 3. npm/pnpm 淘宝源 + pnpm@10 ──
 RUN npm config set registry https://registry.npmmirror.com --global \

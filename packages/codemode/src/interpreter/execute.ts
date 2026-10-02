@@ -42,7 +42,7 @@ export const executeProgram = <R>(
         Effect.gen(function* () {
           const program = parseProgram(code)
           const pending = new Pending<R>(scope, builtins.Promise)
-          const ctx = new Interpreter<R>({ tools, pending, builtins, logs, globals })
+          const ctx = new Interpreter<R>({ tools, pending, builtins, logs, globals, maxSteps: limits.maxSteps })
           const result = (yield* toBoundary(ctx, yield* ctx.run(program))) ?? null
           returned = { value: result, pending }
           const warnings = yield* pending.interrupt()

@@ -2,7 +2,7 @@ export * as Agent from "./agent.js"
 
 import path from "path"
 import { makeLocationNode } from "@opencode/util/effect/app-node"
-import { Array, Context, Effect, Layer, Types } from "effect"
+import { Array, Context, Effect, Layer, Schema, Types } from "effect"
 import { Agent } from "@opencode/schema/agent"
 import { Global } from "@opencode/util/global"
 import { Bus } from "./bus.js"
@@ -23,6 +23,19 @@ export const Info = Agent.Info
 export type Info = Agent.Info
 
 export { Event } from "@opencode/schema/agent"
+
+/**
+ * A configured `default_agent` that cannot run sessions. Typed rather than thrown so the
+ * Session runner settles the pending execution instead of leaving the stream open.
+ */
+export class DefaultAgentUnusableError extends Schema.TaggedError<DefaultAgentUnusableError>()(
+  "Agent.DefaultAgentUnusableError",
+  { agent: ID },
+) {
+  override get message() {
+    return `Configured default_agent "${this.agent}" cannot run as a session default`
+  }
+}
 
 export interface Selection {
   readonly id: ID
@@ -46,6 +59,12 @@ export interface Interface extends State.Transformable<Editor> {
   readonly get: (id: ID) => Effect.Effect<Info | undefined>
   readonly resolve: (id?: ID | string) => Effect.Effect<Info | undefined>
   readonly select: (id?: ID | string) => Effect.Effect<Selection>
+  /**
+   * Resolves the Agent a Session without an explicit selection would run. Unlike `select`, an
+   * unusable configured `default_agent` fails here: the operator named a default, so silently
+   * running a different Agent would hide the misconfiguration.
+   */
+  readonly default: () => Effect.Effect<Info, DefaultAgentUnusableError>
   readonly list: () => Effect.Effect<Info[]>
 }
 
@@ -91,6 +110,20 @@ const layer = Layer.effect(
     })
     const selectable = (agent: Info | undefined) =>
       agent && agent.mode !== "subagent" && !agent.hidden ? agent : undefined
+    /** Reason a configured `default_agent` cannot serve sessions, or undefined when it can. */
+    const defaultConfigError = () => {
+      const data = state.get()
+      if (data.default === undefined) return undefined
+      const configured = data.agents.get(data.default)
+      if (!configured) return `default_agent "${data.default}" is not a known Agent`
+      if (configured.mode === "subagent")
+        return `default_agent "${data.default}" runs as a subagent and cannot be a session default`
+      if (configured.hidden) return `default_agent "${data.default}" is hidden and cannot be a session default`
+      return undefined
+    }
+    // Listing and selection stay permissive so one misconfigured `default_agent` cannot take the
+    // whole service down. `Agent.default` is the strict read the Session runner uses before it
+    // spends a model call on an Agent the operator did not actually choose.
     const selectedDefault = () => {
       const data = state.get()
       const configured = data.default ? selectable(data.agents.get(data.default)) : undefined
@@ -120,6 +153,14 @@ const layer = Layer.effect(
         }
         const info = selectedDefault()
         return { id: info?.id ?? defaultID, info }
+      }),
+      default: Effect.fn("Agent.default")(function* () {
+        const data = state.get()
+        if (data.default !== undefined && defaultConfigError())
+          return yield* new DefaultAgentUnusableError({ agent: data.default })
+        const info = selectedDefault()
+        if (!info) return yield* new DefaultAgentUnusableError({ agent: defaultID })
+        return info
       }),
       list: Effect.fn("Agent.list")(function* () {
         const agents = Array.fromIterable(state.get().agents.values())

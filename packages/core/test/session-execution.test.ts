@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test"
+import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { AIError, TransportError } from "@opencode/ai"
 import { Database } from "@opencode/core/database/database"
 import { AppNodeBuilder } from "@opencode/core/effect/app-node-builder"
@@ -23,7 +23,7 @@ import { SessionRunner } from "@opencode/core/session/runner/index"
 import { SessionInboxTable, SessionTable } from "@opencode/core/session/sql"
 import { SessionStore } from "@opencode/core/session/store"
 import { Cause, Context, Deferred, Effect, Exit, Fiber, Layer, LayerMap, Scope } from "effect"
-import { eq } from "drizzle-orm"
+import { eq, inArray } from "drizzle-orm"
 import { testEffect } from "./lib/effect"
 
 const it = testEffect(
@@ -31,6 +31,26 @@ const it = testEffect(
     LayerNode.group([Database.node, Bus.node, SessionStore.node, SessionInbox.node, Job.node, KV.node, Session.node]),
   ),
 )
+
+const testSessionIDs = new Set<Session.ID>()
+const testSessionID = (value: string) => {
+  const id = Session.ID.make(`${value}_${crypto.randomUUID()}`)
+  testSessionIDs.add(id)
+  return id
+}
+
+beforeEach(() => testSessionIDs.clear())
+afterEach(async () => {
+  const sessionIDs = Array.from(testSessionIDs)
+  if (sessionIDs.length === 0) return
+  await Effect.runPromise(
+    Effect.gen(function* () {
+      const database = yield* Database.Service
+      yield* database.db.delete(SessionTable).where(inArray(SessionTable.id, sessionIDs)).run().pipe(Effect.orDie)
+    }).pipe(Effect.provide(AppNodeBuilder.build(LayerNode.group([Database.node])))),
+  )
+  testSessionIDs.clear()
+})
 
 describe("SessionExecution lifecycle", () => {
   test("classifies success and typed failure terminals", () => {
@@ -60,9 +80,9 @@ describe("SessionExecution lifecycle", () => {
     Effect.gen(function* () {
       const database = yield* Database.Service
       const store = yield* SessionStore.Service
-      const parent = Session.ID.make("ses_recover_parent")
-      const child = Session.ID.make("ses_recover_child")
-      const idle = Session.ID.make("ses_recover_idle")
+      const parent = testSessionID("ses_recover_parent")
+      const child = testSessionID("ses_recover_child")
+      const idle = testSessionID("ses_recover_idle")
       yield* seedSessions(database, [parent], { time_suspended: Date.now() })
       yield* seedSessions(database, [idle])
       // Children recover through background Job records, never through the root claim sweep.
@@ -79,8 +99,8 @@ describe("SessionExecution lifecycle", () => {
   it.effect("claims at execution start, releases on completion, and preserves through teardown", () =>
     Effect.gen(function* () {
       const database = yield* Database.Service
-      const interrupted = Session.ID.make("ses_claim_interrupted")
-      const completed = Session.ID.make("ses_claim_completed")
+      const interrupted = testSessionID("ses_claim_interrupted")
+      const completed = testSessionID("ses_claim_completed")
       yield* seedSessions(database, [interrupted, completed])
 
       // Each drain signals once it runs; the claim commits before the drain starts.
@@ -126,7 +146,7 @@ describe("SessionExecution lifecycle", () => {
   it.effect("a user interrupt releases the claim so the turn never resurrects", () =>
     Effect.gen(function* () {
       const database = yield* Database.Service
-      const sessionID = Session.ID.make("ses_claim_user_cancel")
+      const sessionID = testSessionID("ses_claim_user_cancel")
       yield* seedSessions(database, [sessionID])
 
       const draining = yield* Deferred.make<void>()
@@ -148,7 +168,7 @@ describe("SessionExecution lifecycle", () => {
 
   it.effect("reports an idle interrupt as a no-op", () =>
     Effect.gen(function* () {
-      const sessionID = Session.ID.make("ses_idle_cancel")
+      const sessionID = testSessionID("ses_idle_cancel")
       const scope = yield* Scope.make()
       yield* Effect.addFinalizer(() => Scope.close(scope, Exit.void))
       const context = yield* buildExecution(scope, () => Effect.never)
@@ -163,8 +183,8 @@ describe("SessionExecution lifecycle", () => {
   it.effect("does not resume a user-cancelled background child whose notification was not admitted", () =>
     Effect.gen(function* () {
       const database = yield* Database.Service
-      const parent = Session.ID.make("ses_cancelled_background_parent")
-      const child = Session.ID.make("ses_cancelled_background_child")
+      const parent = testSessionID("ses_cancelled_background_parent")
+      const child = testSessionID("ses_cancelled_background_child")
       yield* seedSessions(database, [parent])
       yield* seedSessions(database, [child], { parent_id: parent })
 
@@ -223,7 +243,7 @@ describe("SessionExecution lifecycle", () => {
   it.effect("starts every claimed execution without waiting for earlier drains to finish", () =>
     Effect.gen(function* () {
       const database = yield* Database.Service
-      const sessionIDs = Array.from({ length: 5 }, (_, index) => Session.ID.make(`ses_resume_concurrent_${index}`))
+      const sessionIDs = Array.from({ length: 5 }, (_, index) => testSessionID(`ses_resume_concurrent_${index}`))
       yield* seedSessions(database, sessionIDs, { time_suspended: Date.now() })
 
       const fourStarted = yield* Deferred.make<void>()
@@ -249,8 +269,8 @@ describe("SessionExecution lifecycle", () => {
     Effect.gen(function* () {
       const database = yield* Database.Service
       const bus = yield* Bus.Service
-      const first = Session.ID.make("ses_resume_first")
-      const second = Session.ID.make("ses_resume_second")
+      const first = testSessionID("ses_resume_first")
+      const second = testSessionID("ses_resume_second")
       yield* seedSessions(database, [first, second], { time_suspended: Date.now() })
 
       const drained: string[] = []
@@ -295,7 +315,7 @@ describe("SessionExecution lifecycle", () => {
     Effect.gen(function* () {
       const database = yield* Database.Service
       const bus = yield* Bus.Service
-      const sessionID = Session.ID.make("ses_resume_exhausted")
+      const sessionID = testSessionID("ses_resume_exhausted")
       // A claim from a dead process, already resumed twice without completing.
       yield* seedSessions(database, [sessionID], { time_suspended: Date.now(), resume_attempts: 2 })
 
@@ -321,7 +341,7 @@ describe("SessionExecution lifecycle", () => {
   it.effect("counts every resume durably and never consumes the claim it recovers", () =>
     Effect.gen(function* () {
       const database = yield* Database.Service
-      const sessionID = Session.ID.make("ses_resume_counted")
+      const sessionID = testSessionID("ses_resume_counted")
       yield* seedSessions(database, [sessionID], { time_suspended: Date.now() })
 
       const draining = yield* Deferred.make<void>()
@@ -352,7 +372,7 @@ describe("SessionExecution lifecycle", () => {
     Effect.gen(function* () {
       const database = yield* Database.Service
       const bus = yield* Bus.Service
-      const sessionID = Session.ID.make("ses_resume_local_active")
+      const sessionID = testSessionID("ses_resume_local_active")
       yield* seedSessions(database, [sessionID])
 
       const draining = yield* Deferred.make<void>()
@@ -385,8 +405,8 @@ describe("SessionRestart background recovery", () => {
       const store = yield* SessionStore.Service
       const jobs = yield* Job.Service
       const bus = yield* Bus.Service
-      const parent = Session.ID.make("ses_background_recovery_parent")
-      const child = Session.ID.make("ses_background_recovery_child")
+      const parent = testSessionID("ses_background_recovery_parent")
+      const child = testSessionID("ses_background_recovery_child")
       yield* seedSessions(database, [parent])
       yield* seedSessions(database, [child], { parent_id: parent, time_suspended: Date.now() })
       yield* seedBackground(jobs, parent, [
@@ -472,7 +492,7 @@ describe("SessionRestart background recovery", () => {
       const database = yield* Database.Service
       const store = yield* SessionStore.Service
       const jobs = yield* Job.Service
-      const parent = Session.ID.make("ses_background_existing_parent")
+      const parent = testSessionID("ses_background_existing_parent")
       yield* seedSessions(database, [parent])
       yield* seedBackground(jobs, parent, [{ id: "call-running-shell", shellID: "sh_running", command: "sleep 60" }])
 
@@ -492,7 +512,7 @@ describe("SessionRestart background recovery", () => {
     Effect.gen(function* () {
       const database = yield* Database.Service
       const jobs = yield* Job.Service
-      const sessionID = Session.ID.make("ses_background_completed_shell")
+      const sessionID = testSessionID("ses_background_completed_shell")
       yield* seedSessions(database, [sessionID])
       const complete = yield* Deferred.make<string>()
       yield* jobs.start({
@@ -550,7 +570,7 @@ describe("SessionRestart background recovery", () => {
         const bus = yield* Bus.Service
         const jobs = yield* Job.Service
         const sessions = yield* Session.Service
-        const sessionID = Session.ID.make("ses_shell_notification_retry")
+        const sessionID = testSessionID("ses_shell_notification_retry")
         yield* seedSessions(database, [sessionID])
         yield* seedBackground(jobs, sessionID, [
           { id: "call-shell-notified", shellID: "sh_notified", command: "echo done" },
@@ -592,7 +612,7 @@ describe("SessionRestart background recovery", () => {
     Effect.gen(function* () {
       const database = yield* Database.Service
       const jobs = yield* Job.Service
-      const sessionID = Session.ID.make("ses_background_deleted")
+      const sessionID = testSessionID("ses_background_deleted")
       yield* seedSessions(database, [sessionID])
       yield* seedBackground(jobs, sessionID, [{ id: "call-deleted-shell", shellID: "sh_deleted", command: "sleep 60" }])
       yield* database.db.delete(SessionTable).where(eq(SessionTable.id, sessionID)).run().pipe(Effect.orDie)
@@ -613,7 +633,7 @@ describe("SessionRestart background recovery", () => {
       const jobs = yield* Job.Service
       const store = yield* SessionStore.Service
       const bus = yield* Bus.Service
-      const parent = Session.ID.make("ses_background_claimed_parent")
+      const parent = testSessionID("ses_background_claimed_parent")
       yield* seedSessions(database, [parent], { time_suspended: Date.now() })
       yield* seedBackground(jobs, parent, [{ id: "call-claimed-shell", shellID: "sh_claimed", command: "sleep 60" }])
 
@@ -654,7 +674,7 @@ describe("SessionRestart background recovery", () => {
     Effect.gen(function* () {
       const database = yield* Database.Service
       const jobs = yield* Job.Service
-      const sessionID = Session.ID.make("ses_shell_recovery_exhausted")
+      const sessionID = testSessionID("ses_shell_recovery_exhausted")
       yield* seedSessions(database, [sessionID], { time_suspended: Date.now(), resume_attempts: 2 })
       yield* seedBackground(jobs, sessionID, [
         { id: "call-exhausted-shell", shellID: "sh_exhausted", command: "sleep 60" },
@@ -697,8 +717,8 @@ describe("SessionRestart background recovery", () => {
             const jobs = yield* Job.Service
             const bus = yield* Bus.Service
             const store = yield* SessionStore.Service
-            const parent = Session.ID.make("ses_shell_child_parent")
-            const child = Session.ID.make("ses_shell_child")
+            const parent = testSessionID("ses_shell_child_parent")
+            const child = testSessionID("ses_shell_child")
             yield* seedSessions(database, [parent])
             yield* seedSessions(database, [child], {
               parent_id: parent,
@@ -793,9 +813,9 @@ describe("SessionRestart background recovery", () => {
     Effect.gen(function* () {
       const database = yield* Database.Service
       const jobs = yield* Job.Service
-      const parent = Session.ID.make("ses_subagent_recovery_parent")
-      const child = Session.ID.make("ses_subagent_recovery_child")
-      const unrelated = Session.ID.make("ses_subagent_unrelated_child")
+      const parent = testSessionID("ses_subagent_recovery_parent")
+      const child = testSessionID("ses_subagent_recovery_child")
+      const unrelated = testSessionID("ses_subagent_unrelated_child")
       yield* seedSessions(database, [parent], { time_suspended: Date.now(), resume_attempts: 1 })
       yield* seedSessions(database, [child, unrelated], { parent_id: parent, time_suspended: Date.now() })
       yield* jobs.start({
@@ -873,8 +893,8 @@ describe("SessionRestart background recovery", () => {
     Effect.gen(function* () {
       const database = yield* Database.Service
       const jobs = yield* Job.Service
-      const parent = Session.ID.make("ses_subagent_completed_parent")
-      const child = Session.ID.make("ses_subagent_completed_child")
+      const parent = testSessionID("ses_subagent_completed_parent")
+      const child = testSessionID("ses_subagent_completed_child")
       yield* seedSessions(database, [parent])
       yield* seedSessions(database, [child], { parent_id: parent })
       const complete = yield* Deferred.make<string>()
@@ -925,8 +945,8 @@ describe("SessionRestart background recovery", () => {
       const admission = yield* SessionInbox.Service
       const jobs = yield* Job.Service
       const sessions = yield* Session.Service
-      const parent = Session.ID.make("ses_completion_conflict_parent")
-      const child = Session.ID.make("ses_completion_conflict_child")
+      const parent = testSessionID("ses_completion_conflict_parent")
+      const child = testSessionID("ses_completion_conflict_child")
       yield* seedSessions(database, [parent])
       yield* seedSessions(database, [child], { parent_id: parent })
       yield* jobs.start({
@@ -968,10 +988,10 @@ describe("SessionRestart background recovery", () => {
         const database = yield* Database.Service
         const bus = yield* Bus.Service
         const jobs = yield* Job.Service
-        const parent = Session.ID.make("ses_subagent_budget_parent")
+        const parent = testSessionID("ses_subagent_budget_parent")
         const children = [
-          Session.ID.make("ses_subagent_budget_child_1"),
-          Session.ID.make("ses_subagent_budget_child_2"),
+          testSessionID("ses_subagent_budget_child_1"),
+          testSessionID("ses_subagent_budget_child_2"),
         ]
         yield* seedSessions(database, [parent], { time_suspended: Date.now(), resume_attempts: resumeAttempts })
         yield* seedSessions(database, children, { parent_id: parent })
@@ -1044,8 +1064,8 @@ describe("SessionRestart background recovery", () => {
     Effect.gen(function* () {
       const database = yield* Database.Service
       const jobs = yield* Job.Service
-      const parent = Session.ID.make("ses_subagent_exhausted_parent")
-      const child = Session.ID.make("ses_subagent_exhausted_child")
+      const parent = testSessionID("ses_subagent_exhausted_parent")
+      const child = testSessionID("ses_subagent_exhausted_child")
       yield* seedSessions(database, [parent])
       yield* seedSessions(database, [child], { parent_id: parent, time_suspended: Date.now(), resume_attempts: 2 })
       yield* jobs.start({
@@ -1098,7 +1118,7 @@ describe("SessionExecution interrupt continuation", () => {
   it.effect("resumes only steering input after an interrupt with continue", () =>
     Effect.gen(function* () {
       const database = yield* Database.Service
-      const sessionID = Session.ID.make("ses_continue_steer")
+      const sessionID = testSessionID("ses_continue_steer")
       yield* seedSessions(database, [sessionID])
       yield* seedInbox(database, sessionID, ["steer", "queue"])
 
@@ -1131,7 +1151,7 @@ describe("SessionExecution interrupt continuation", () => {
   it.effect("stays parked after an interrupt with continue when only queued work remains", () =>
     Effect.gen(function* () {
       const database = yield* Database.Service
-      const sessionID = Session.ID.make("ses_continue_parked")
+      const sessionID = testSessionID("ses_continue_parked")
       yield* seedSessions(database, [sessionID])
       yield* seedInbox(database, sessionID, ["queue"])
 
@@ -1160,7 +1180,7 @@ describe("SessionExecution interrupt continuation", () => {
   it.effect("an idle interrupt with continue resumes pending steers", () =>
     Effect.gen(function* () {
       const database = yield* Database.Service
-      const sessionID = Session.ID.make("ses_continue_idle")
+      const sessionID = testSessionID("ses_continue_idle")
       yield* seedSessions(database, [sessionID])
       yield* seedInbox(database, sessionID, ["steer"])
 
@@ -1182,7 +1202,7 @@ describe("SessionExecution interrupt continuation", () => {
   it.effect("an interrupt with continue resumes a queued compaction next in line", () =>
     Effect.gen(function* () {
       const database = yield* Database.Service
-      const sessionID = Session.ID.make("ses_continue_compaction")
+      const sessionID = testSessionID("ses_continue_compaction")
       yield* seedSessions(database, [sessionID])
       yield* seedInbox(database, sessionID, [{ delivery: "queue", type: "compaction" }])
 
@@ -1215,7 +1235,7 @@ describe("SessionExecution interrupt continuation", () => {
   it.effect("keeps a control item parked behind a queued prompt on continue", () =>
     Effect.gen(function* () {
       const database = yield* Database.Service
-      const sessionID = Session.ID.make("ses_continue_control_behind")
+      const sessionID = testSessionID("ses_continue_control_behind")
       yield* seedSessions(database, [sessionID])
       yield* seedInbox(database, sessionID, ["queue", { delivery: "queue", type: "compaction" }])
 
@@ -1314,10 +1334,13 @@ function seedSessions(
   })
 }
 
-function claims(database: Database.Service["Service"]) {
+function claims(database: Database.Service["Service"]): Effect.Effect<Record<string, boolean>, never> {
+  const sessionIDs = Array.from(testSessionIDs)
+  if (sessionIDs.length === 0) return Effect.succeed({})
   return database.db
     .select({ id: SessionTable.id, claimed: SessionTable.time_suspended })
     .from(SessionTable)
+    .where(inArray(SessionTable.id, sessionIDs))
     .all()
     .pipe(
       Effect.orDie,

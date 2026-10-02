@@ -1,6 +1,6 @@
 import path from "path"
 import { describe, expect } from "bun:test"
-import { Effect, Exit, Fiber, Layer, Scope, Stream } from "effect"
+import { Cause, Effect, Exit, Fiber, Layer, Scope, Stream } from "effect"
 import { Agent } from "@opencode/core/agent"
 import { Bus } from "@opencode/core/bus"
 import { AppNodeBuilder } from "@opencode/core/effect/app-node-builder"
@@ -86,6 +86,120 @@ describe("Agent", () => {
       expect((yield* agent.list()).map((info) => String(info.id))).toEqual(["reviewer", "build", "explore"])
     }),
   )
+
+  describe("default agent selection", () => {
+    // Transforms accumulate in the shared Location state, so every case resets `default`
+    // inside a single transform and declares its agents there.
+    const setup = (fn: (editor: Agent.Editor) => void) =>
+      Effect.gen(function* () {
+        const agent = yield* Agent.Service
+        yield* agent.transform((editor) => {
+          editor.default(undefined)
+          fn(editor)
+        })
+      })
+    const define = (editor: Agent.Editor, id: string, mode: "primary" | "subagent" | "all" = "primary", hidden = false) =>
+      editor.update(Agent.ID.make(id), (info) => {
+        info.mode = mode
+        info.hidden = hidden
+      })
+    const failure = Effect.fn("defaultFailure")(function* () {
+      const agent = yield* Agent.Service
+      const exit = yield* agent.default().pipe(Effect.exit)
+      return Exit.isFailure(exit) ? Cause.pretty(exit.cause) : undefined
+    })
+    const unusable = Effect.fn("defaultError")(function* () {
+      const agent = yield* Agent.Service
+      return yield* agent
+        .default()
+        .pipe(
+          Effect.map(() => undefined),
+          Effect.catchTag("Agent.DefaultAgentUnusableError", (error) => Effect.succeed(error)),
+        )
+    })
+
+    it.effect("falls back to build when no default is configured", () =>
+      Effect.gen(function* () {
+        const agent = yield* Agent.Service
+        // This layer omits AgentPlugin, so the built-ins are declared explicitly.
+        yield* setup((editor) => {
+          define(editor, "reviewer")
+          define(editor, "build")
+        })
+
+        expect((yield* agent.default()).id).toBe(Agent.defaultID)
+      }),
+    )
+
+    it.effect("uses a configured primary default", () =>
+      Effect.gen(function* () {
+        const agent = yield* Agent.Service
+        yield* setup((editor) => {
+          define(editor, "reviewer")
+          editor.default(Agent.ID.make("reviewer"))
+        })
+
+        expect((yield* agent.default()).id).toBe(Agent.ID.make("reviewer"))
+      }),
+    )
+
+    it.effect("accepts a default with mode all", () =>
+      Effect.gen(function* () {
+        const agent = yield* Agent.Service
+        yield* setup((editor) => {
+          define(editor, "reviewer", "all")
+          editor.default(Agent.ID.make("reviewer"))
+        })
+
+        expect((yield* agent.default()).id).toBe(Agent.ID.make("reviewer"))
+      }),
+    )
+
+    it.effect("fails when the default names an unknown agent", () =>
+      Effect.gen(function* () {
+        yield* setup((editor) => editor.default(Agent.ID.make("missing")))
+
+        expect(yield* unusable()).toMatchObject({ agent: "missing" })
+        expect(yield* failure()).toContain('default_agent "missing"')
+      }),
+    )
+
+    it.effect("fails when the default is a subagent", () =>
+      Effect.gen(function* () {
+        yield* setup((editor) => {
+          define(editor, "worker", "subagent")
+          editor.default(Agent.ID.make("worker"))
+        })
+
+        expect(yield* unusable()).toMatchObject({ agent: "worker" })
+      }),
+    )
+
+    it.effect("fails when the default is hidden", () =>
+      Effect.gen(function* () {
+        yield* setup((editor) => {
+          define(editor, "secret", "primary", true)
+          editor.default(Agent.ID.make("secret"))
+        })
+
+        expect(yield* unusable()).toMatchObject({ agent: "secret" })
+      }),
+    )
+
+    it.effect("keeps listing and selection permissive when the default is invalid", () =>
+      Effect.gen(function* () {
+        const agent = yield* Agent.Service
+        yield* setup((editor) => {
+          define(editor, "reviewer")
+          define(editor, "build")
+          editor.default(Agent.ID.make("missing"))
+        })
+
+        expect((yield* agent.list()).map((info) => String(info.id))).toContain("reviewer")
+        expect((yield* agent.select()).id).toBe(Agent.defaultID)
+      }),
+    )
+  })
 
   it.effect("rebuilds state when a transform is replaced", () =>
     Effect.gen(function* () {

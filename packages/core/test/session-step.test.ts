@@ -34,11 +34,11 @@ const it = testEffect(
 )
 
 for (const fixture of [
-  { finish: "stop", toolChoice: undefined },
-  { finish: "content-filter", toolChoice: undefined },
-  { finish: "stop", toolChoice: "none" },
+  { finish: "stop", toolsDisabled: false },
+  { finish: "content-filter", toolsDisabled: false },
+  { finish: "stop", toolsDisabled: true },
 ] as const) {
-  it.effect(`settles ${fixture.finish} with tool choice ${fixture.toolChoice ?? "default"}`, () =>
+  it.effect(`settles ${fixture.finish} with tools ${fixture.toolsDisabled ? "disabled" : "enabled"}`, () =>
     Effect.gen(function* () {
       const db = (yield* Database.Service).db
       const llm = yield* TestLLM.Test
@@ -107,7 +107,7 @@ for (const fixture of [
           model,
           prepared: {
             retry: () => Effect.void,
-            request: LLM.request({ model: model.model, prompt: "Run one tool", toolChoice: fixture.toolChoice }),
+            request: LLM.request({ model: model.model, prompt: "Run one tool" }),
             options: {},
             executeTool: () =>
               Effect.sync(() => {
@@ -115,6 +115,7 @@ for (const fixture of [
                 return { content: [{ type: "text", text: "Completed tool" }] }
               }),
           },
+          toolsDisabled: fixture.toolsDisabled,
           retry: (_cause, _error, retry) =>
             Effect.succeed(retry ? { retry: true, attempt: 2, delay: 0 } : { retry: false }),
           recoverContinuation: true,
@@ -122,10 +123,10 @@ for (const fixture of [
         })
         .pipe(Effect.exit)
       expect(Exit.isSuccess(result)).toBe(fixture.finish === "stop")
-      expect(executions).toBe(fixture.toolChoice === "none" ? 0 : 1)
+      expect(executions).toBe(fixture.toolsDisabled ? 0 : 1)
       if (Exit.isSuccess(result))
         expect(result.value).toEqual(
-          SessionStep.Outcome.Completed({ needsContinuation: fixture.toolChoice !== "none" }),
+          SessionStep.Outcome.Completed({ needsContinuation: !fixture.toolsDisabled }),
         )
       expect(yield* llm.requests()).toHaveLength(1)
       expect(captures).toBe(2)
@@ -138,7 +139,7 @@ for (const fixture of [
         finish: fixture.finish,
         tokens: { input: 10, output: 4, reasoning: 2, cache: { read: 3, write: 2 } },
         snapshot: { start, end, files },
-        content: [{ type: "tool", state: { status: fixture.toolChoice === "none" ? "error" : "completed" } }],
+        content: [{ type: "tool", state: { status: fixture.toolsDisabled ? "error" : "completed" } }],
       })
       expect(message?.data).toHaveProperty("cost", expect.closeTo(0.0000233, 10))
       const events = yield* db
@@ -153,7 +154,7 @@ for (const fixture of [
       expect(types.filter((type) => type === terminal)).toHaveLength(1)
       expect(types.indexOf("session.step.streamed.1")).toBeLessThan(types.indexOf(terminal))
       expect(
-        types.indexOf(fixture.toolChoice === "none" ? "session.tool.failed.2" : "session.tool.success.2"),
+        types.indexOf(fixture.toolsDisabled ? "session.tool.failed.2" : "session.tool.success.2"),
       ).toBeLessThan(types.indexOf(terminal))
     }),
   )

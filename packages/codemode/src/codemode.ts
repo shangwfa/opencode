@@ -27,6 +27,8 @@ export type ExecutionLimits = {
   readonly timeoutMs?: number
   /** Maximum number of tool calls admitted by the runtime. No default: absent means unlimited. */
   readonly maxToolCalls?: number
+  /** Maximum AST evaluation steps. Bounds synchronous loops that wall-clock timeouts cannot preempt. */
+  readonly maxSteps?: number
   /**
    * Maximum UTF-8 bytes retained from the result and logs. Warnings have a separate equal budget;
    * truncation notices and host formatting are additional.
@@ -37,6 +39,7 @@ export type ExecutionLimits = {
 export type ResolvedExecutionLimits = {
   readonly timeoutMs: number | undefined
   readonly maxToolCalls: number | undefined
+  readonly maxSteps: number | undefined
   readonly maxOutputBytes: number | undefined
 }
 
@@ -73,6 +76,7 @@ export const DiagnosticKind = Schema.Literals([
   "InvalidToolOutput",
   "InvalidDataValue",
   "ToolCallLimitExceeded",
+  "StepLimitExceeded",
   "TimeoutExceeded",
   "ToolFailure",
   "ExecutionFailure",
@@ -133,6 +137,7 @@ const validateLimit = (name: keyof ExecutionLimits, value: number | undefined, m
 const resolveExecutionLimits = (limits?: ExecutionLimits): ResolvedExecutionLimits => ({
   timeoutMs: validateLimit("timeoutMs", limits?.timeoutMs, 1),
   maxToolCalls: validateLimit("maxToolCalls", limits?.maxToolCalls, 0),
+  maxSteps: validateLimit("maxSteps", limits?.maxSteps, 1),
   maxOutputBytes: validateLimit("maxOutputBytes", limits?.maxOutputBytes, 0),
 })
 

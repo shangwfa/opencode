@@ -9,25 +9,25 @@ import { SessionAgentTable, SessionTable } from "@opencode/core/session/sql"
 import { ConfigAgent } from "@opencode/schema/config/agent"
 import { LayerNode } from "@opencode/util/effect/layer-node"
 import { testEffect } from "../lib/effect"
+import { ensureSession, removeIfCreated, sessionInfo } from "../lib/session"
 
-const it = testEffect(AppNodeBuilder.build(LayerNode.group([Database.node, SessionAgents.node])))
+const it = testEffect(AppNodeBuilder.build(LayerNode.group([Database.node, Agent.node, SessionAgents.node])))
 const pgTest = process.env.OPENCODE_DATABASE_URL ? it.effect : it.effect.skip
 
 pgTest("persists and upserts session agent overrides in PostgreSQL", () =>
   Effect.gen(function* () {
     const { db } = yield* Database.Service
-    const [session] = yield* db.select().from(SessionTable).limit(1).all()
-    if (!session) throw new Error("No test session")
+    const { session, created } = yield* ensureSession(db)
 
     const sessionID = session.id
     const agentID = Agent.ID.make(`pg-${crypto.randomUUID()}`)
     const agents = yield* SessionAgents.Service
     try {
-      const created = yield* agents.create(sessionID, {
+      const stored = yield* agents.create(sessionID, {
         id: agentID,
         config: ConfigAgent.Info.make({ system: "first value", mode: "subagent" }),
       })
-      expect(created.agent.system).toBe("first value")
+      expect(stored.agent.system).toBe("first value")
 
       yield* agents.create(sessionID, {
         id: agentID,
@@ -38,6 +38,7 @@ pgTest("persists and upserts session agent overrides in PostgreSQL", () =>
       expect(rows.find((row) => row.agent_id === agentID)?.config.system).toBe("updated value")
     } finally {
       yield* db.delete(SessionAgentTable).where(eq(SessionAgentTable.agent_id, agentID)).run()
+      yield* removeIfCreated(db, session, created)
     }
   }),
 )
@@ -45,8 +46,7 @@ pgTest("persists and upserts session agent overrides in PostgreSQL", () =>
 pgTest("advances time_updated monotonically across same-session upserts", () =>
   Effect.gen(function* () {
     const { db } = yield* Database.Service
-    const [session] = yield* db.select().from(SessionTable).limit(1).all()
-    if (!session) throw new Error("No test session")
+    const { session, created } = yield* ensureSession(db)
 
     const sessionID = session.id
     const agentID = Agent.ID.make(`pg-monotonic-${crypto.randomUUID()}`)
@@ -72,6 +72,7 @@ pgTest("advances time_updated monotonically across same-session upserts", () =>
       expect(second?.time_updated ?? 0).toBeGreaterThan(first?.time_updated ?? 0)
     } finally {
       yield* db.delete(SessionAgentTable).where(eq(SessionAgentTable.agent_id, agentID)).run()
+      yield* removeIfCreated(db, session, created)
     }
   }),
 )
@@ -79,17 +80,16 @@ pgTest("advances time_updated monotonically across same-session upserts", () =>
 pgTest("cascades PostgreSQL session agent rows when the owning session is deleted", () =>
   Effect.gen(function* () {
     const { db } = yield* Database.Service
-    const [existing] = yield* db.select().from(SessionTable).limit(1).all()
-    if (!existing) throw new Error("No test session")
+    const { session: template, created } = yield* ensureSession(db)
 
-    const sessionID = `ses_agent_cascade_${crypto.randomUUID().replaceAll("-", "")}` as typeof existing.id
+    const sessionID = `ses_agent_cascade_${crypto.randomUUID().replaceAll("-", "")}` as typeof template.id
     const agentID = Agent.ID.make(`cascade-${crypto.randomUUID()}`)
     const now = Date.now()
     const agents = yield* SessionAgents.Service
     yield* db
       .insert(SessionTable)
       .values({
-        ...existing,
+        ...template,
         id: sessionID,
         slug: `session-agent-cascade-${crypto.randomUUID()}`,
         parent_id: null,
@@ -119,6 +119,46 @@ pgTest("cascades PostgreSQL session agent rows when the owning session is delete
     } finally {
       yield* db.delete(SessionAgentTable).where(eq(SessionAgentTable.session_id, sessionID)).run()
       yield* db.delete(SessionTable).where(eq(SessionTable.id, sessionID)).run()
+      yield* removeIfCreated(db, template, created)
+    }
+  }),
+)
+
+pgTest("select prefers the merged session override and falls back for unknown ids", () =>
+  Effect.gen(function* () {
+    const { db } = yield* Database.Service
+    const { session, created } = yield* ensureSession(db)
+    const agents = yield* SessionAgents.Service
+    const globalAgents = yield* Agent.Service
+    // The Agent `select()` resolves with no id is exactly what `SessionAgents.select` indirection
+    // ends up looking up in the merged list, so override that one instead of hard-coding a name.
+    const agentID = (yield* globalAgents.select()).id
+    const info = sessionInfo(session)
+    try {
+      yield* agents.create(session.id, {
+        id: agentID,
+        config: ConfigAgent.Info.make({ system: "SESSION_SELECTED_SYSTEM" }),
+      })
+
+      // An explicit id resolves through the merged list, so the session override wins over the
+      // global definition instead of falling back to the global `Agent.select`.
+      const explicit = yield* agents.select(info, agentID)
+      expect(explicit.id).toBe(agentID)
+      expect(explicit.info?.system).toBe("SESSION_SELECTED_SYSTEM")
+
+      // No id: resolve the default Agent, then look *that* up in the merged list. Permission
+      // resolution depends on this indirection, so the override must survive it.
+      const implicit = yield* agents.select(info)
+      expect(implicit.id).toBe(agentID)
+      expect(implicit.info?.system).toBe("SESSION_SELECTED_SYSTEM")
+
+      // An unknown id has no merged definition; the fallback returns the id with no info.
+      const missing = yield* agents.select(info, Agent.ID.make("does-not-exist"))
+      expect(missing.id).toBe(Agent.ID.make("does-not-exist"))
+      expect(missing.info).toBeUndefined()
+    } finally {
+      yield* db.delete(SessionAgentTable).where(eq(SessionAgentTable.agent_id, agentID)).run()
+      yield* removeIfCreated(db, session, created)
     }
   }),
 )

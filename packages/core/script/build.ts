@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url"
 process.chdir(fileURLToPath(new URL("..", import.meta.url)))
 
 await rm("dist", { recursive: true, force: true })
+await $`bun script/build-session-tool-host.ts dist/session/tool-host/artifacts`
 await $`bun tsc -p tsconfig.build.json`
 
 const root = path.resolve("src")

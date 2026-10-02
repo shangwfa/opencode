@@ -126,9 +126,7 @@ export const Plugin = {
                 content: `Moved session ${sessionID} to ${input.directory}.`,
               }
             }).pipe(
-              Effect.mapError(
-                (error) => new ToolFailure({ message: `Unable to move session to ${input.directory}`, error }),
-              ),
+              Effect.mapError((error) => new ToolFailure({ message: `Unable to move session to ${input.directory}`, error })),
             ),
         })
         draft.add({

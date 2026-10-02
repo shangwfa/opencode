@@ -8,6 +8,7 @@ import { Database } from "../database/database.js"
 import { Instructions } from "../instructions/index.js"
 import { SessionAgentsMdTable } from "./sql.js"
 import { SessionSchema } from "./schema.js"
+import { SessionResourceOwner } from "./resource-owner.js"
 
 export const ID = SessionAgentsMdSchema.ID
 export type ID = SessionAgentsMdSchema.ID
@@ -35,7 +36,8 @@ const layer = Layer.effect(
   Effect.gen(function* () {
     const { db } = yield* Database.Service
 
-    const get = Effect.fn("SessionAgentsMd.get")(function* (sessionID: SessionSchema.ID) {
+    const get = Effect.fn("SessionAgentsMd.get")(function* (requestedSessionID: SessionSchema.ID) {
+      const sessionID = yield* SessionResourceOwner.id(db, requestedSessionID)
       const row = yield* db
         .select()
         .from(SessionAgentsMdTable)
@@ -45,7 +47,8 @@ const layer = Layer.effect(
       return row ? fromRow(row) : null
     })
 
-    const put = Effect.fn("SessionAgentsMd.put")(function* (sessionID: SessionSchema.ID, content: string) {
+    const put = Effect.fn("SessionAgentsMd.put")(function* (requestedSessionID: SessionSchema.ID, content: string) {
+      const sessionID = yield* SessionResourceOwner.id(db, requestedSessionID)
       // The content renders into every later provider request, so cap it like the
       // sibling instruction entries surface; the limit is a UTF-8 byte count.
       const actualBytes = Buffer.byteLength(content, "utf8")
@@ -71,20 +74,32 @@ const layer = Layer.effect(
       return fromRow(row)
     })
 
-    const remove = Effect.fn("SessionAgentsMd.remove")(function* (sessionID: SessionSchema.ID) {
-      yield* db.delete(SessionAgentsMdTable).where(eq(SessionAgentsMdTable.session_id, sessionID)).run().pipe(Effect.orDie)
+    const remove = Effect.fn("SessionAgentsMd.remove")(function* (requestedSessionID: SessionSchema.ID) {
+      const sessionID = yield* SessionResourceOwner.id(db, requestedSessionID)
+      yield* db
+        .delete(SessionAgentsMdTable)
+        .where(eq(SessionAgentsMdTable.session_id, sessionID))
+        .run()
+        .pipe(Effect.orDie)
     })
 
     const load = (sessionID: SessionSchema.ID): Instructions.List =>
       Instructions.make<string>({
         key: Key,
         codec: Schema.toCodecJson(Schema.String),
-        read: db
-          .select({ content: SessionAgentsMdTable.content })
-          .from(SessionAgentsMdTable)
-          .where(eq(SessionAgentsMdTable.session_id, sessionID))
-          .get()
-          .pipe(Effect.map((row) => (row ? row.content : Instructions.removed)), Effect.orDie),
+        read: SessionResourceOwner.id(db, sessionID).pipe(
+          Effect.flatMap((ownerID) =>
+            db
+              .select({ content: SessionAgentsMdTable.content })
+              .from(SessionAgentsMdTable)
+              .where(eq(SessionAgentsMdTable.session_id, ownerID))
+              .get()
+              .pipe(
+                Effect.map((row) => (row ? row.content : Instructions.removed)),
+                Effect.orDie,
+              ),
+          ),
+        ),
         render: {
           initial: (content) => `Session AGENTS.md:\n${content}`,
           changed: (_previous, content) => `Session AGENTS.md was updated:\n${content}`,
@@ -108,7 +123,7 @@ export function fromRow(row: typeof SessionAgentsMdTable.$inferSelect): Info {
   })
 }
 
-/** Session AGENTS.md is intentionally session-local and is not inherited by forks. */
+/** Explicit history forks get a fresh domain; internal children read their root's current source. */
 export function fork(values: Instructions.Values | undefined): Instructions.Values | undefined {
   if (!values) return values
   return Object.fromEntries(Object.entries(values).filter(([key]) => key !== Key))

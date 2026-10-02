@@ -48,6 +48,8 @@ interface Input {
   readonly agent: Agent.ID
   readonly model: SessionRunnerModel.Resolved
   readonly prepared: Omit<SessionModelRequest.Prepared, "event">
+  /** Final step of an Agent with `steps`: the model must summarize instead of calling tools. */
+  readonly toolsDisabled: boolean
   readonly retry: (
     cause: AIError,
     error: SessionError.Error,
@@ -85,8 +87,10 @@ export const make = Effect.gen(function* () {
     }> = []
     const interruptTools = Effect.suspend(() => Fiber.interruptAll(toolRuns.map((run) => run.fiber)))
     const executeTool = (call: ToolCall) => {
-      if (input.prepared.request.toolChoice?.type === "none")
-        return new Tool.Error({ message: "Tools are disabled after the maximum agent steps" })
+      // The last step answers with a text summary. Keep this a runner decision instead of
+      // `toolChoice: "none"`: providers that replay a thinking-enabled history reject the
+      // request outright when tool choice is narrowed.
+      if (input.toolsDisabled) return new Tool.Error({ message: "Tools are disabled after the maximum agent steps" })
       return input.prepared.executeTool({
         sessionID: input.sessionID,
         agent: input.agent,
@@ -261,7 +265,7 @@ export const make = Effect.gen(function* () {
         if (tools.interrupted && Exit.isFailure(joined)) return yield* Effect.failCause(joined.cause)
         if (record.failure) return yield* new StepFailedError({ error: record.failure })
         return Outcome.Completed({
-          needsContinuation: input.prepared.request.toolChoice?.type !== "none" && record.needsContinuation,
+          needsContinuation: !input.toolsDisabled && record.needsContinuation,
         })
       }),
     )

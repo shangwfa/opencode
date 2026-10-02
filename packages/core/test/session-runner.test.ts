@@ -1396,7 +1396,7 @@ describe("SessionRunnerLLM", () => {
       expect(s.requests).toHaveLength(2)
       expect(messageRoles(s.requests[1])?.slice(0, 3)).toEqual(["user", "assistant", "tool"])
       expect(s.requests[0]?.toolChoice).toBeUndefined()
-      expect(s.requests[1]?.toolChoice).toMatchObject({ type: "none" })
+      expect(s.requests[1]?.toolChoice).toBeUndefined()
       expect(
         (yield* recordedEventTypes(sessionID)).filter(
           (type) => type === "session.step.started.1" || type === "session.moved.1",
@@ -2964,7 +2964,7 @@ describe("SessionRunnerLLM", () => {
     )
     yield* s.runPrompt("Second real request")
     expect(s.requests).toHaveLength(4)
-    expect(s.requests[2].toolChoice).not.toEqual({ type: "none" })
+    expect(s.requests[2].toolChoice).toBeUndefined()
     expect(s.executions).toEqual(["continue"])
     expect(JSON.stringify(s.requests[2].messages)).toContain("first")
     const installed = (yield* s.messages).filter((message) => message.type === "compaction")
@@ -4921,13 +4921,12 @@ describe("SessionRunnerLLM", () => {
 
     expect(s.requests).toHaveLength(2)
     expect(s.requests[0]?.toolChoice).toBeUndefined()
-    expect(s.requests[1]?.toolChoice).toMatchObject({ type: "none" })
-    // Protocols with native "none" keep these definitions for prompt caching.
-    expect(s.requests[1]?.tools.map((tool) => tool.name)).toContain("echo")
-    expect(s.requests[1]?.messages.at(-1)).toMatchObject({
-      role: "assistant",
-      content: [{ type: "text", text: expect.stringContaining("MAXIMUM STEPS REACHED") }],
-    })
+    // Keep provider defaults for thinking-history replay, but don't advertise tools on the final
+    // text-only request. SessionStep remains a guard if a provider still emits a tool call.
+    expect(s.requests[1]?.toolChoice).toBeUndefined()
+    expect(s.requests[1]?.tools).toEqual([])
+    expect(s.requests[1]?.system.at(-1)?.text).toContain("maximum number of steps")
+    expect(JSON.stringify(s.requests[1]?.messages)).not.toContain("MAXIMUM STEPS REACHED")
     expect(s.executions).toEqual(["done"])
     expect(yield* s.context).toMatchObject([
       Expected.user("Finish at the limit"),
@@ -4958,7 +4957,7 @@ describe("SessionRunnerLLM", () => {
     expect(s.requests).toHaveLength(3)
     expect(s.requests[1]?.toolChoice).toBeUndefined()
     expect(s.requests[1]?.tools).not.toEqual([])
-    expect(s.requests[2]?.toolChoice).toMatchObject({ type: "none" })
+    expect(s.requests[2]?.toolChoice).toBeUndefined()
     expect(s.executions).toEqual(["before", "after"])
   })
 
@@ -5680,17 +5679,12 @@ describe("SessionRunnerLLM", () => {
     expect(s.requests[0]?.tools.map((tool) => tool.name)).toContain("echo")
     expect(s.requests[1]?.toolChoice).toBeUndefined()
     expect(s.requests[1]?.tools.map((tool) => tool.name)).toContain("echo")
-    expect(s.requests[1]?.messages.at(-1)).not.toMatchObject({
-      role: "assistant",
-      content: [{ type: "text", text: expect.stringContaining("MAXIMUM STEPS REACHED") }],
-    })
-    expect(s.requests[2]?.toolChoice).toMatchObject({ type: "none" })
-    // The final step keeps tool definitions to preserve provider prompt caching.
-    expect(s.requests[2]?.tools.map((tool) => tool.name)).toContain("echo")
-    expect(s.requests[2]?.messages.at(-1)).toMatchObject({
-      role: "assistant",
-      content: [{ type: "text", text: expect.stringContaining("MAXIMUM STEPS REACHED") }],
-    })
+    expect(JSON.stringify(s.requests[1]?.messages)).not.toContain("MAXIMUM STEPS REACHED")
+    expect(s.requests[2]?.toolChoice).toBeUndefined()
+    // The final text-only step doesn't advertise tools.
+    expect(s.requests[2]?.tools).toEqual([])
+    expect(s.requests[2]?.system.at(-1)?.text).toContain("maximum number of steps")
+    expect(JSON.stringify(s.requests[2]?.messages)).not.toContain("MAXIMUM STEPS REACHED")
     expect(s.executions).toEqual(["recovered"])
     const eventTypes = yield* recordedEventTypes(sessionID)
     expect(eventTypes.filter((type) => type === "session.step.started.1")).toHaveLength(3)
@@ -5990,7 +5984,7 @@ describe("SessionRunnerLLM", () => {
 
     expect(s.requests).toHaveLength(2)
     expect(s.requests[0]?.toolChoice).toBeUndefined()
-    expect(s.requests[1]?.toolChoice).toMatchObject({ type: "none" })
+    expect(s.requests[1]?.toolChoice).toBeUndefined()
     expect((yield* recordedEventTypes(sessionID)).filter((type) => type === "session.tool.failed.2")).toHaveLength(2)
   })
 

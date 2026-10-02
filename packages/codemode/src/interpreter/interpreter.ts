@@ -53,6 +53,7 @@ import {
   GeneratorReturn,
   IteratorSymbol,
   OptionalShortCircuit,
+  PendingThrow,
   invalidData,
   Throw,
   rangeError,
@@ -256,6 +257,8 @@ export class Interpreter<R> {
   readonly builtins: Builtins
   readonly logs: Array<string>
   private readonly root: Frame<R>
+  private readonly maxSteps: number | undefined
+  private steps = 0
 
   constructor(options: {
     readonly tools: ToolRuntime<R>
@@ -263,11 +266,13 @@ export class Interpreter<R> {
     readonly builtins: Builtins
     readonly logs?: Array<string>
     readonly globals?: (ctx: Interpreter<R>) => ReadonlyArray<readonly [string, unknown]>
+    readonly maxSteps?: number
   }) {
     this.tools = options.tools
     this.pending = options.pending
     this.builtins = options.builtins
     this.logs = options.logs ?? []
+    this.maxSteps = options.maxSteps
     const globalScope = new Map<string, Binding>()
     // Calling back into the program never reads frame state, so any frame serves; the root is always alive.
     this.root = new Frame(this, new ScopeStack([globalScope]))
@@ -290,6 +295,17 @@ export class Interpreter<R> {
 
   iterate(value: unknown) {
     return this.root.iterate(value)
+  }
+
+  step(node: AstNode) {
+    this.steps += 1
+    if (this.maxSteps !== undefined && this.steps > this.maxSteps)
+      throw new PendingThrow(
+        "RangeError",
+        `Execution exceeded the ${this.maxSteps}-step limit. Simplify the program or use fewer loop iterations.`,
+        node,
+        "StepLimitExceeded",
+      )
   }
 
   /** Runs one host tool: arguments cross as JSON and the result comes back as program values. */
@@ -369,6 +385,7 @@ class Frame<R> {
   }
 
   private evaluateStatement(node: Statement | ModuleDeclaration): Effect.Effect<StatementResult, unknown, R> {
+    this.ctx.step(node)
     switch (node.type) {
       case "ExpressionStatement":
         return Effect.as(this.evaluateExpression(node.expression), { kind: "none" })
@@ -1224,6 +1241,7 @@ class Frame<R> {
   }
 
   private evaluateExpression(node: Expression): Effect.Effect<unknown, unknown, R> {
+    this.ctx.step(node)
     switch (node.type) {
       case "Literal": {
         const regex = node.regex

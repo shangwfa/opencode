@@ -1,6 +1,24 @@
 import { describe, expect, test } from "bun:test"
 import { retry } from "./retry.js"
 
+/**
+ * Whether a thrown value carries a transient network signal, mirroring the
+ * shape `isTransientError` matches on. Kept runtime-agnostic on purpose:
+ * runtimes disagree on the error class they raise for the same failure
+ * (Bun: `Error{code:"ECONNRESET"}`, Node/undici: `TypeError: fetch failed`).
+ */
+function carriesTransientSignal(error: unknown): boolean {
+  if (!(error instanceof Error)) return false
+  const code = "code" in error && typeof error.code === "string" ? error.code : ""
+  const text = `${error.message} ${code}`.toLowerCase()
+  return (
+    error instanceof TypeError ||
+    ["econnreset", "econnrefused", "etimedout", "socket hang up", "fetch failed", "network"].some((item) =>
+      text.includes(item),
+    )
+  )
+}
+
 describe("client retry", () => {
   test("retries transient failures up to the configured attempt count", async () => {
     const failures: string[] = []
@@ -44,7 +62,12 @@ describe("client retry", () => {
       server.stop(true)
     }
     expect(failures).toHaveLength(3)
-    expect(failures.every((cause) => cause instanceof TypeError)).toBe(true)
+    // The contract is that a real transport failure carries a transient signal
+    // `isTransientError` can find, not that a particular runtime throws a
+    // particular error class. Bun reports a terminated socket as
+    // `Error{code:"ECONNRESET"}` while other runtimes use
+    // `TypeError: Failed to fetch`; both must be accepted.
+    for (const cause of failures) expect(carriesTransientSignal(cause)).toBe(true)
   })
 
   test("does not retry a transport error whose cause is not transient", async () => {

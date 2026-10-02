@@ -13,6 +13,7 @@ import { SandboxConfig } from "../sandbox/config.js"
 import { Environment } from "../environment/index.js"
 import type { Session } from "../session.js"
 import { SessionMcpTable } from "./sql.js"
+import { SessionResourceOwner } from "./resource-owner.js"
 
 export type Info = SessionMcp.Info
 export type Payload = SessionMcp.Payload
@@ -103,15 +104,19 @@ const layer = Layer.effect(
     const root = yield* Effect.scope
     const runtimes = new Map<Session.ID, Map<SessionMcp.Name, Runtime>>()
     const stored = (sessionID: Session.ID) =>
-      db
-        .select()
-        .from(SessionMcpTable)
-        .where(eq(SessionMcpTable.session_id, sessionID))
-        .all()
-        .pipe(
-          Effect.map((rows) => rows.map(fromRow).toSorted((a, b) => a.name.localeCompare(b.name))),
-          Effect.orDie,
-        )
+      SessionResourceOwner.id(db, sessionID).pipe(
+        Effect.flatMap((ownerID) =>
+          db
+            .select()
+            .from(SessionMcpTable)
+            .where(eq(SessionMcpTable.session_id, ownerID))
+            .all()
+            .pipe(
+              Effect.map((rows) => rows.map(fromRow).toSorted((a, b) => a.name.localeCompare(b.name))),
+              Effect.orDie,
+            ),
+        ),
+      )
 
     const stop = Effect.fnUntraced(function* (session: Session.Info, name: SessionMcp.Name, runtime: Runtime) {
       yield* Scope.close(runtime.scope, Exit.void)
@@ -248,8 +253,9 @@ const layer = Layer.effect(
 
     return Service.of({
       list: stored,
-      create: (sessionID, input) =>
+      create: (requestedSessionID, input) =>
         Effect.gen(function* () {
+          const sessionID = yield* SessionResourceOwner.id(db, requestedSessionID)
           const now = Date.now()
           yield* db
             .insert(SessionMcpTable)
@@ -278,6 +284,7 @@ const layer = Layer.effect(
         }),
       remove: (session, name) =>
         Effect.gen(function* () {
+          const ownerID = yield* SessionResourceOwner.id(db, session.id)
           const current = runtimes.get(session.id)
           const runtime = current?.get(name)
           if (runtime) {
@@ -286,18 +293,19 @@ const layer = Layer.effect(
           }
           yield* db
             .delete(SessionMcpTable)
-            .where(and(eq(SessionMcpTable.session_id, session.id), eq(SessionMcpTable.name, name)))
+            .where(and(eq(SessionMcpTable.session_id, ownerID), eq(SessionMcpTable.name, name)))
             .run()
             .pipe(Effect.orDie)
         }),
       clear: (session) =>
         Effect.gen(function* () {
+          const ownerID = yield* SessionResourceOwner.id(db, session.id)
           const current = runtimes.get(session.id)
           if (current) {
             yield* Effect.forEach(current, ([name, runtime]) => stop(session, name, runtime), { discard: true })
             runtimes.delete(session.id)
           }
-          yield* db.delete(SessionMcpTable).where(eq(SessionMcpTable.session_id, session.id)).run().pipe(Effect.orDie)
+          yield* db.delete(SessionMcpTable).where(eq(SessionMcpTable.session_id, ownerID)).run().pipe(Effect.orDie)
         }),
       release: (session) =>
         Effect.gen(function* () {

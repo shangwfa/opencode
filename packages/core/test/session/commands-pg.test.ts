@@ -7,6 +7,7 @@ import { SessionCommands } from "@opencode/core/session/commands"
 import { AppNodeBuilder } from "@opencode/core/effect/app-node-builder"
 import { LayerNode } from "@opencode/util/effect/layer-node"
 import { testEffect } from "../lib/effect"
+import { ensureSession, removeIfCreated } from "../lib/session"
 import { Session } from "@opencode/schema/session"
 
 const it = testEffect(AppNodeBuilder.build(LayerNode.group([Database.node])))
@@ -14,8 +15,7 @@ const pgTest = process.env.OPENCODE_DATABASE_URL ? it.effect : it.effect.skip
 
 pgTest("upserts a session command through the PostgreSQL compatibility layer", () => Effect.gen(function* () {
   const { db } = yield* Database.Service
-  const [session] = yield* db.select().from(SessionTable).limit(1).all()
-  if (!session) throw new Error("No test session")
+  const { session, created } = yield* ensureSession(db)
   const name = `debug-${crypto.randomUUID()}`
   const sessionID = Session.ID.make(session.id)
   const input = {
@@ -40,4 +40,5 @@ pgTest("upserts a session command through the PostgreSQL compatibility layer", (
     .delete(SessionCommandTable)
     .where(eq(SessionCommandTable.name, name))
     .run()
+  yield* removeIfCreated(db, session, created)
 }))

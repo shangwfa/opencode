@@ -1,9 +1,9 @@
 export * as DatabasePg from "./pg.js"
 
-import { Context, Effect, Layer } from "effect"
+import { Context, Duration, Effect, Layer } from "effect"
 import { sql } from "drizzle-orm"
 import { SqlClient } from "effect/unstable/sql"
-import { classifySqliteError, SqlError } from "effect/unstable/sql/SqlError"
+import { classifySqliteError, SqlError, StatementTimeoutError } from "effect/unstable/sql/SqlError"
 import { Reactivity } from "effect/unstable/reactivity"
 import { Global } from "@opencode/util/global"
 import postgres from "postgres"
@@ -187,6 +187,119 @@ const PG_TYPES = {
   },
 }
 
+/**
+ * A non-positive or unparsable value is a configuration mistake, not a request
+ * to disable the guard: silently turning a timeout into 0 would restore the
+ * unbounded hang this exists to prevent. Fall back to the default instead.
+ */
+const positiveMs = (env: Readonly<Record<string, string | undefined>>, name: string, fallback: number) => {
+  const raw = env[name]
+  if (raw === undefined) return fallback
+  const value = Number(raw)
+  return Number.isFinite(value) && value > 0 ? value : fallback
+}
+
+export interface PostgresOptions {
+  readonly max: number
+  readonly prepare: boolean
+  readonly onnotice: () => void
+  readonly types: typeof PG_TYPES
+  /** Handshake budget; a server-side GUC cannot cover a socket that never connects. */
+  readonly connect_timeout: number
+  /** Startup parameters — the only channel that reaches PG server-side GUCs. */
+  readonly connection: {
+    readonly statement_timeout: number
+    readonly lock_timeout: number
+    readonly idle_in_transaction_session_timeout: number
+  }
+  /** Client-side fallback for a half-open socket the server can never answer. */
+  readonly queryTimeoutMs: number
+  /** Reap connections abandoned by a client-side timeout. */
+  readonly idle_timeout: number
+  readonly max_lifetime: number
+}
+
+const DEFAULT_STATEMENT_TIMEOUT_MS = 30_000
+const DEFAULT_IDLE_TX_TIMEOUT_MS = 60_000
+const DEFAULT_CONNECT_TIMEOUT_MS = 10_000
+const DEFAULT_IDLE_TIMEOUT_MS = 30_000
+const DEFAULT_MAX_LIFETIME_MS = 600_000
+// V1 defaulted the client bound to the same value as statement_timeout.
+// Keep 0 as the default so the client is a strict fallback: a query PG can
+// answer is always cancelled server-side first, with the real cause.
+const DEFAULT_QUERY_GRACE_MS = 0
+
+export const makePostgresOptions = (
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): PostgresOptions => {
+  const statementTimeoutMs = positiveMs(env, "OPENCODE_PG_STATEMENT_TIMEOUT_MS", DEFAULT_STATEMENT_TIMEOUT_MS)
+  return {
+    max: 1,
+    prepare: false,
+    onnotice: () => {},
+    types: PG_TYPES,
+    // postgres.js takes connect_timeout in seconds.
+    connect_timeout: positiveMs(env, "OPENCODE_PG_CONNECT_TIMEOUT_MS", DEFAULT_CONNECT_TIMEOUT_MS) / 1000,
+    // A client-timed-out query leaves its half-open connection to postgres.js;
+    // these bound how long such a connection can occupy the pool (V2 runs
+    // max: 1, so a single leaked connection stalls every query behind it).
+    idle_timeout: positiveMs(env, "OPENCODE_PG_IDLE_TIMEOUT_MS", DEFAULT_IDLE_TIMEOUT_MS) / 1000,
+    max_lifetime: positiveMs(env, "OPENCODE_PG_MAX_LIFETIME_MS", DEFAULT_MAX_LIFETIME_MS) / 1000,
+    connection: {
+      statement_timeout: statementTimeoutMs,
+      lock_timeout: statementTimeoutMs,
+      // A client-timed-out query can abandon a connection mid-transaction; this
+      // reaps it so a leaked one cannot starve the pool (max 1).
+      idle_in_transaction_session_timeout: positiveMs(
+        env,
+        "OPENCODE_PG_IDLE_TX_TIMEOUT_MS",
+        DEFAULT_IDLE_TX_TIMEOUT_MS,
+      ),
+    },
+    // Wider than the server GUC on purpose: a normal slow query must be
+    // cancelled by PG — which reports the real cause — before the client
+    // fallback would fire. The client bound only catches requests that never
+    // reach the server at all.
+    queryTimeoutMs: statementTimeoutMs + positiveMs(env, "OPENCODE_PG_QUERY_GRACE_MS", DEFAULT_QUERY_GRACE_MS),
+  }
+}
+
+/**
+ * Bound one terminal query. postgres.js has no socket read/write timeout, so a
+ * half-open connection hangs forever: connect_timeout only covers the
+ * handshake, and a server-side statement_timeout cannot cancel a request that
+ * never arrives. Without this the owning run never completes and the Session
+ * stops responding (the 2026-08-21 incident).
+ */
+/**
+ * Bind a terminal query executor to the client-side budget. Extracted so the
+ * wiring itself is testable: a correct `withQueryTimeout` that nothing calls
+ * would leave the 2026-08-21 hang in place.
+ */
+export const boundQuery = <A, E, R>(
+  execute: Effect.Effect<A, E, R>,
+  queryTimeoutMs: number,
+): Effect.Effect<A, E | SqlError, R> => withQueryTimeout(execute, queryTimeoutMs)
+
+export const withQueryTimeout = <A, E, R>(
+  effect: Effect.Effect<A, E, R>,
+  timeoutMs: number,
+): Effect.Effect<A, E | SqlError, R> =>
+  effect.pipe(
+    Effect.timeoutOrElse({
+      duration: Duration.millis(timeoutMs),
+      orElse: () =>
+        Effect.fail(
+          new SqlError({
+            reason: new StatementTimeoutError({
+              cause: new Error(`PG query timed out after ${timeoutMs}ms`),
+              message: `PG query timed out after ${timeoutMs}ms`,
+            }),
+          }),
+        ),
+    }),
+  )
+
 const isPragma = (query: string) => /^\s*PRAGMA\b/i.test(query)
 
 export const layer = (url: string): Layer.Layer<Database.Service, never, Global.Service> =>
@@ -194,45 +307,48 @@ export const layer = (url: string): Layer.Layer<Database.Service, never, Global.
     Database.Service,
     Effect.gen(function* () {
       const global = yield* Global.Service
-      const native = postgres(url, {
-        max: 1,
-        prepare: false,
-        onnotice: () => {},
-        types: PG_TYPES,
-      })
+      const pgOptions = makePostgresOptions()
+      const { queryTimeoutMs, ...clientOptions } = pgOptions
+      const native = postgres(url, clientOptions)
       yield* Effect.addFinalizer(() => Effect.promise(() => native.end({ timeout: 5 })))
       // sqlite-shim views/functions must exist before migrations introspect.
       yield* Effect.tryPromise(() => native.unsafe(COMPAT_DDL))
 
       const run = (query: string, params: ReadonlyArray<unknown> = []) => {
         if (isPragma(query)) return Effect.succeed([])
-        return Effect.tryPromise({
-          try: async () =>
-            (await native.unsafe(
-              translate(query),
-              [...params] as unknown as Parameters<typeof native.unsafe>[1],
-            )) as Array<Record<string, unknown>>,
-          catch: (cause) =>
-            new SqlError({
-              reason: classifySqliteError(cause, { message: "Failed to execute statement", operation: "execute" }),
-            }),
-        })
+        return boundQuery(
+          Effect.tryPromise({
+            try: async () =>
+              (await native.unsafe(
+                translate(query),
+                [...params] as unknown as Parameters<typeof native.unsafe>[1],
+              )) as Array<Record<string, unknown>>,
+            catch: (cause) =>
+              new SqlError({
+                reason: classifySqliteError(cause, { message: "Failed to execute statement", operation: "execute" }),
+              }),
+          }),
+          queryTimeoutMs,
+        )
       }
       const runValues = (query: string, params: ReadonlyArray<unknown> = []) => {
         if (isPragma(query)) return Effect.succeed([])
-        return Effect.tryPromise({
-          try: async () => {
-            const rows = await native.unsafe(
-              translate(query),
-              [...params] as unknown as Parameters<typeof native.unsafe>[1],
-            )
-            return (rows as Array<Record<string, unknown>>).map((row) => Object.values(row))
-          },
-          catch: (cause) =>
-            new SqlError({
-              reason: classifySqliteError(cause, { message: "Failed to execute statement", operation: "executeValues" }),
-            }),
-        })
+        return boundQuery(
+          Effect.tryPromise({
+            try: async () => {
+              const rows = await native.unsafe(
+                translate(query),
+                [...params] as unknown as Parameters<typeof native.unsafe>[1],
+              )
+              return (rows as Array<Record<string, unknown>>).map((row) => Object.values(row))
+            },
+            catch: (cause) =>
+              new SqlError({
+                reason: classifySqliteError(cause, { message: "Failed to execute statement", operation: "executeValues" }),
+              }),
+          }),
+          queryTimeoutMs,
+        )
       }
 
       const connection = Sqlite.makeConnection(run, runValues, {})
