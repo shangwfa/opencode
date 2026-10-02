@@ -144,12 +144,19 @@ curl -fsS "${H[@]}" -X DELETE "$BASE/api/session/$SID"
 
 ## 验收汇总
 
-| 用例        | 验证内容                                              | 当前结论                                                     |
+| 用例        | 验证内容                                              | 实测结论（2026-10-02）                                       |
 | ----------- | ----------------------------------------------------- | ------------------------------------------------------------ |
-| T20.1       | V2 插件到 SandboxTools/Provider 的代码路径            | 应通过静态检查                                               |
-| T20.2–T20.7 | write/read/edit/glob/grep/shell 的实际 Agent 工具调用 | 以 session messages、sandbox 文件及 PG 状态共同判定          |
-| T20.8       | `patch` 工具沙箱新增/更新/移动/删除及越界拒绝         | `tool-patch.test.ts` 沙箱分支；Agent E2E 需支持 patch 的模型 |
-| T20.9       | session 删除后的 sandbox 生命周期                     | PG 行应为 `destroyed`                                        |
+| T20.1       | V2 插件到 SandboxTools/Provider 的代码路径            | PASS（静态检查：write/read/edit/glob/grep 均路由 SandboxTools；shell.ts 引用 SandboxProvider） |
+| T20.2       | write 工具写入沙箱                                    | PASS（文件证据：marker 落在 /workspace）                     |
+| T20.3       | read 工具读取沙箱文件                                 | PASS（assistant 原样报告）                                   |
+| T20.4       | edit 工具修改沙箱文件                                 | PASS（文件内容变为 edited-marker，经 shell 复核）            |
+| T20.5       | glob 工具列目录                                       | PASS                                                         |
+| T20.6       | grep 工具搜索                                         | PASS                                                         |
+| T20.7       | shell 工具执行                                        | PASS                                                         |
+| T20.8       | `patch` 工具沙箱新增/更新/移动/删除及越界拒绝         | 单测佐证：`packages/core/test/tool-patch.test.ts` 沙箱分支通过；Agent E2E 需支持 patch 的 GPT 模型，本环境（Yd-DeepSeek）不暴露 patch，未执行 |
+| T20.9       | session 删除后的 sandbox 生命周期                     | PASS（HTTP 204；PG 行 `destroyed`）                          |
+
+实测方式：T20.2–T20.7 走真实 Agent 多轮（`saas-tool-sandbox-verify-v2.mjs`，模型 Yd-DeepSeek，每轮 prompt + wait），文件级证据由会话内 shell `cat` 复核；T20.1 为静态 grep；T20.9 在删除后查 PG。全部断言 rc=0。
 
 ## 历史记录说明
 

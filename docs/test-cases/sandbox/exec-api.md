@@ -75,3 +75,18 @@ node docs/test-cases/scripts/sandbox-idle-reap-v2.mjs
 这些脚本会检查 API 响应和 PG 状态，并在结束时删除测试 session。idle-reap 脚本会重启指定 Docker 容器两次，请勿将 `RESTART_CONTAINER` 指向非测试服务。
 
 旧版依赖 `/exec`、`/exec/async` 或 `exec_log` 的 T19 用例不适用于 V2，不应作为当前服务的验收标准。
+
+## 实测记录（2026-10-02）
+
+环境：本地 Docker 双实例 + 本地 PG（`opencode-v2-up`）+ 本地 OpenSandbox（docker runtime）。标准实例跑 T19.1/2/5；`OPENCODE_SESSION_AUTO_KEEPALIVE=0` 实例跑 T19.4；`OPENCODE_SANDBOX_IDLE_REAP_SEC=60` 实例跑 T19.6。
+
+| 用例 | 脚本 | 结果 |
+|---|---|---|
+| T19.1 命令执行及事件持久化 | `exec-api-v2.mjs` | PASS（HTTP 204、started/ended 事件、exit=42、400/404 校验、log 回放，6 断言） |
+| T19.2 root session 自动 boot | `sandbox-keepalive-v2.mjs` | PASS（PG `running/keep_alive=true`、boot sandboxId 匹配） |
+| T19.3 release、销毁与重建 | `sandbox-keepalive-v2.mjs` + T-SBG.2 | PASS（release 后 API/PG 均 false 且销毁；destroy→rebuild 新 sandboxId；kill 保留 keep_alive 偏好） |
+| T19.4 延迟启动 | `sandbox-keepalive-lazy-v2.mjs`（`AUTO_KEEPALIVE=0` 实例） | PASS（boot=false 写 pending 行不启动；首次 shell 创建并继承 keep_alive=true） |
+| T19.5 shell 校验与 fork | `exec-api-v2.mjs` + `sandbox-keepalive-v2.mjs` | PASS（fork 不自动 boot、首次 shell 创建、删除 fork 销毁其沙箱） |
+| T19.6 idle-reap | `sandbox-idle-reap-v2.mjs`（`IDLE_REAP_SEC=60`，`RESTART_CONTAINER` 指向测试容器） | PASS（重启后按 PG ID reconnect；`time_updated` 置旧后回收销毁；keep_alive 保留） |
+
+> 注意：脚本默认 `BASE`/`PG_URL` 指向旧端口，执行时需按 `docs/local-test-env.md` 显式传参。

@@ -148,4 +148,20 @@ bun run typecheck
 | 超时/中断/迟到创建清理 | 缺确定性自动化测试      | 需注入可控 OpenSandbox client                   |
 | 多 SaaS 副本并发创建   | 当前不保证              | `creates` 仅进程内 Ref，不是分布式锁            |
 
+## 实测记录（2026-10-02）
+
+环境：本地 Docker 实例 + 本地 PG + 本地 OpenSandbox（镜像已缓存，创建亚秒级完成）。脚本：`sandbox-create-background-v2.sh`（自本文提取，keep-alive 路径补 `/api/experimental` 前缀）。
+
+| 用例 | 结果 | 说明 |
+|---|---|---|
+| T-SBG.1 同 session 并发首执行 | PASS | 两 shell 均 HTTP 204 且 `exited/0`；sandboxId 非空；PG 恰一行 `running/keep_alive=1` |
+| T-SBG.2 创建中 kill | PASS（时序限定） | 本地创建 <1s 完成。kill 到达时创建已结束，返回 `destroyed:true`。该分支非回归：文档的 `destroyed:false` 分支要求 kill 落在创建窗口内，仅在慢创建环境（远端首次拉镜像）可达。首 shell 仍 `exited/0` |
+| T-SBG.2 创建后销毁与重建 | PASS | PG `destroyed/keep_alive=1`；retry shell `exited/0`；重建 sandboxId 不同 |
+| T-SBG.3 release/持久化/隔离 | PASS | release 后 `keepAlive=false`、sandboxId 空、PG `destroyed/keep_alive=0`；新 session 沙箱 ID 不同 |
+
+已知偏差（首次执行发现，均为脚本/环境问题，非产品缺陷）：
+1. keep-alive 路径必须为 `/api/experimental/session/:id/keep-alive`；缺少前缀时 HttpApi 对未匹配路由返回 404 空 body，易误判为会话不存在。
+2. 服务日志 grep 的 session 匹配需考虑 `sandbox creating` 与 sessionID 的顺序（日志 payload 中 sessionID 在消息之后）；本地日志量小时可直接按 `sandbox creating` 计数。
+3. kill-during-create 断言按上表时序限定执行。
+
 > 清理：上方 `trap` 会在 shell 退出时对 SID/SID2/SID3 关闭 keep-alive 并删除 session；仍需确认 OpenSandbox 中无遗留实例。若手动分段运行脚本，应手动执行相同清理，失败退出也不要跳过。

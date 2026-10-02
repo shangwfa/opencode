@@ -52,3 +52,20 @@ node docs/test-cases/scripts/files-api-v2.mjs
 ## 旧版用例迁移说明
 
 旧版 `/session/:id/files/mkdir|create|upload|remove|download`、`/find/file`、`/file`、`exec_log` 和 PVC/app 共享卷用例不适用于 V2。V2 的目录枚举和搜索端点分别是 `session.fs.list`、`session.fs.find`；`session.fs.read` 只读单个文件，不打包目录。V2 暂无专用文件写入/删除接口与 PVC 持久化语义。
+
+## 实测记录（2026-10-02）
+
+环境：本地 Docker 实例（`OPENCODE_SESSION_AUTO_KEEPALIVE=0`）+ 本地 PG + 本地 OpenSandbox。
+
+> 前提：T-FILE-V2.1 的"未 boot 会话不创建沙箱"断言要求 lazy 实例。默认 auto keep-alive 实例在会话创建后异步 boot 沙箱；该实例上此断言会因竞态失败。本记录在 lazy 实例执行。
+
+| 用例 | 结果 |
+|---|---|
+| T-FILE-V2.1 未启动 sandbox 时不触发创建 | PASS（fs/list 404；PG 无沙箱行） |
+| T-FILE-V2.2 shell 夹具与目录列表 | PASS（workspace 相对路径与条目类型） |
+| T-FILE-V2.3 文件读取 | PASS（文本/二进制与 MIME 含 PNG 魔数） |
+| T-FILE-V2.4 文件搜索 | PASS（过滤与空结果） |
+| T-FILE-V2.5 错误与边界 | PASS（缺失文件与路径逃逸 404） |
+| T-FILE-V2.6 销毁后的行为 | PASS（kill-sandbox 后 fs/list 不重建，返回 404；PG 行保留 destroyed） |
+
+脚本：`files-api-v2.mjs`（7 断言全部通过，rc=0）。
