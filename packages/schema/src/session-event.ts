@@ -423,6 +423,31 @@ export namespace SandboxSnapshot {
     },
   })
   export type Restored = typeof Restored.Type
+
+  /**
+   * A sandbox died outside the service's control (platform TTL hard-kill, OOM,
+   * node eviction) while its latest snapshot was behind the last workspace
+   * write — writes after the snapshot may be lost on restore. Emitted from the
+   * destroy and refresh paths when the sandbox is already gone. The verdict
+   * compares the newest restorable snapshot with the sandbox's last activity:
+   * a snapshot that covers the last activity (including CLEAN-reused ones)
+   * does not warn, fixing V1's age-only false positives.
+   */
+  export const LagWarning = Event.durable({
+    type: "session.sandbox.snapshot.lag_warning",
+    ...options,
+    schema: {
+      ...Base,
+      snapshotID: Schema.String.pipe(optional),
+      /** Age of the newest restorable snapshot in ms; null when none exists. */
+      snapshotAgeMs: Schema.Number.pipe(optional),
+      /** Wall-clock of the last observed sandbox activity (ms). */
+      lastActivityMs: Schema.Number,
+      /** Where the dead sandbox was detected: destroy or refresh path. */
+      cause: Schema.Literals(["destroy", "refresh"]),
+    },
+  })
+  export type LagWarning = typeof LagWarning.Type
 }
 
 export namespace Shell {

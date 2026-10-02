@@ -318,6 +318,7 @@ CREATE TABLE "worktree" (
 CREATE TABLE "migration" (id TEXT PRIMARY KEY, time_completed bigint NOT NULL);
 
 CREATE INDEX "session_snapshot_session_idx" ON "session_snapshot" ("session_id","state");
+CREATE UNIQUE INDEX "session_snapshot_creating_uniq" ON "session_snapshot" ("session_id","scope") WHERE "session_snapshot"."state" = 'creating';
 CREATE INDEX "snapshot_operation_claim_idx" ON "snapshot_operation" ("state","next_retry_at");
 CREATE INDEX "snapshot_operation_session_idx" ON "snapshot_operation" ("session_id","time_created");
 CREATE UNIQUE INDEX "snapshot_operation_active_uniq" ON "snapshot_operation" ("session_id","sandbox_id","kind") WHERE "snapshot_operation"."state" in ('pending', 'running');

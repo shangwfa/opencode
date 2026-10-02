@@ -33,12 +33,13 @@ const mountSpecs = (prefix: string): readonly MountSpec[] => [
 ]
 
 /**
- * Volume mounts for one sandbox. `pvc` mode mounts every session directory as
- * a subPath of one PVC claim plus one cross-session package cache; `host` mode
- * bind-mounts per-session host paths (app scope is ignored, since host paths
- * are local to one node); `none` returns no volumes and the sandbox stays
- * ephemeral; `snapshot` also returns no volumes — the workspace lives on the
- * sandbox rootfs and persists through snapshots taken before recycle.
+ * Volume mounts for one sandbox. The PVC backend mounts every session directory
+ * as a subPath of one PVC claim plus one cross-session package cache; the
+ * sharing scope comes from `pvcMode` (`app` shares `apps/{appId}`, otherwise
+ * `sessions/{sessionID}`). A session-level `none` persist mode keeps this one
+ * sandbox ephemeral, and `snapshot` mounts no volumes either — the workspace
+ * lives on the sandbox rootfs and persists through snapshots taken before
+ * recycle.
  */
 export function buildVolumes(scope: VolumeScope, config: SandboxConfig.Config): Volume[] {
   const volumeType = scope.persistMode ?? config.volumeType
@@ -46,27 +47,23 @@ export function buildVolumes(scope: VolumeScope, config: SandboxConfig.Config): 
   if (scope.pvcMode === "app" && !scope.appId?.trim()) {
     throw new Error(`app 模式缺少 appId，拒绝创建 sandbox（sessionID=${scope.sessionID}）`)
   }
-  const useApp = volumeType === "pvc" && scope.pvcMode === "app"
-  const prefix = useApp ? `apps/${scope.appId!.trim()}` : `sessions/${scope.sessionID}`
+  // The only surviving backend is PVC: one claim per sandbox, subPath selects
+  // the sharing scope.
+  const prefix = scope.pvcMode === "app" ? `apps/${scope.appId!.trim()}` : `sessions/${scope.sessionID}`
   const mounts = mountSpecs(prefix)
-  const result = mounts.map((m) => {
-    const base: Volume = { name: m.name, mountPath: m.mountPath, subPath: m.sub }
-    if (volumeType === "pvc") {
-      base.pvc = { claimName: config.pvcClaimName }
-    } else {
-      base.host = { path: `/var/opencode/sessions/${scope.sessionID}/${m.name}` }
-    }
-    return base
+  const result: Volume[] = mounts.map((m) => ({
+    name: m.name,
+    mountPath: m.mountPath,
+    subPath: m.sub,
+    pvc: { claimName: config.pvcClaimName },
+  }))
+  const packageCacheMount = requirePackageCacheMount(config.packageCacheMount, mounts.map((m) => m.mountPath))
+  result.push({
+    name: "package-cache",
+    mountPath: packageCacheMount,
+    subPath: "shared/package-cache",
+    pvc: { claimName: config.pvcClaimName },
   })
-  if (volumeType === "pvc") {
-    const packageCacheMount = requirePackageCacheMount(config.packageCacheMount, mounts.map((m) => m.mountPath))
-    result.push({
-      name: "package-cache",
-      mountPath: packageCacheMount,
-      subPath: "shared/package-cache",
-      pvc: { claimName: config.pvcClaimName },
-    })
-  }
   return result
 }
 

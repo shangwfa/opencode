@@ -15,6 +15,7 @@ const KEYS = [
   "OPENCODE_SANDBOX_FILES_TIMEOUT_RETRIES",
   "OPENCODE_SANDBOX_CPU",
   "OPENCODE_SANDBOX_MEMORY",
+  "OPENCODE_SANDBOX_VOLUME_TYPE",
 ] as const
 
 afterEach(() => {
@@ -104,5 +105,37 @@ describe("SandboxConfig.load", () => {
     process.env["OPENCODE_SANDBOX_FILES_TIMEOUT_RETRIES"] = "-1"
     expect(SandboxConfig.load().filesTimeoutSeconds).toBe(15)
     expect(SandboxConfig.load().filesTimeoutRetries).toBe(1)
+  })
+
+  it("defaults snapshot refresh to on with 1800s and honors explicit opt-out", () => {
+    // V1 parity: periodic refresh protects long-idle sandboxes from platform
+    // hard-kills losing every write since the last snapshot.
+    expect(SandboxConfig.load().snapshot.refreshSeconds).toBe(1800)
+    process.env["OPENCODE_SANDBOX_SNAPSHOT_REFRESH_SEC"] = "60"
+    expect(SandboxConfig.load().snapshot.refreshSeconds).toBe(60)
+    process.env["OPENCODE_SANDBOX_SNAPSHOT_REFRESH_SEC"] = "0"
+    expect(SandboxConfig.load().snapshot.refreshSeconds).toBe(0)
+    delete process.env["OPENCODE_SANDBOX_SNAPSHOT_REFRESH_SEC"]
+    expect(SandboxConfig.load().snapshot.refreshSeconds).toBe(1800)
+  })
+
+  it("defaults the volume type to pvc; only snapshot is an accepted override (V1 parity)", () => {
+    // V1 supported exactly two backends and defaulted to `pvc`: forgetting the
+    // env var kept workspaces persistent. Unset, empty, `none`, `host`, and
+    // unknown values must all resolve to `pvc` — never silently lose
+    // persistence — while an explicit `snapshot` selects the snapshot backend.
+    expect(SandboxConfig.load().volumeType).toBe("pvc")
+    process.env["OPENCODE_SANDBOX_VOLUME_TYPE"] = "snapshot"
+    expect(SandboxConfig.load().volumeType).toBe("snapshot")
+    process.env["OPENCODE_SANDBOX_VOLUME_TYPE"] = "pvc"
+    expect(SandboxConfig.load().volumeType).toBe("pvc")
+    process.env["OPENCODE_SANDBOX_VOLUME_TYPE"] = "none"
+    expect(SandboxConfig.load().volumeType).toBe("pvc")
+    process.env["OPENCODE_SANDBOX_VOLUME_TYPE"] = "host"
+    expect(SandboxConfig.load().volumeType).toBe("pvc")
+    process.env["OPENCODE_SANDBOX_VOLUME_TYPE"] = "bogus"
+    expect(SandboxConfig.load().volumeType).toBe("pvc")
+    process.env["OPENCODE_SANDBOX_VOLUME_TYPE"] = ""
+    expect(SandboxConfig.load().volumeType).toBe("pvc")
   })
 })

@@ -34,10 +34,12 @@ export interface Config {
   readonly resource: { cpu: string; memory: string }
   /** Browser-reachable host for preview URLs; defaults to the request host. */
   readonly publicDomain?: string
-  /** Volume backend for session workspaces; `none` keeps sandboxes ephemeral,
-   * `snapshot` keeps the workspace on the sandbox rootfs and persists it via
-   * sandbox snapshots taken before recycle. */
-  readonly volumeType: "none" | "pvc" | "host" | "snapshot"
+  /** Volume backend for session workspaces. Only two backends exist: `pvc`
+   * (default, V1 parity — all seven session directories plus the package cache
+   * mount as subPaths of one PVC claim) and `snapshot` (workspace stays on the
+   * sandbox rootfs and persists via snapshots taken before recycle). Any other
+   * or missing env value falls back to `pvc`. */
+  readonly volumeType: "pvc" | "snapshot"
   /** PVC claim backing all volume mounts when volumeType is `pvc`. */
   readonly pvcClaimName: string
   /** Cross-session shared package-cache mount point (PVC volumeType only). */
@@ -64,7 +66,9 @@ export interface Config {
     /** Physical remote deletion gate (default off: keep snapshots, let remote TTL reap them). */
     readonly deleteEnabled: boolean
     /** Idle window after which a running snapshot-persisted sandbox gets its snapshot refreshed
-     * in place (sandbox kept alive); 0 disables periodic refresh. */
+     * in place (sandbox kept alive); 0 disables periodic refresh. Defaults to on (V1 parity):
+     * without it, a platform hard-kill of a long-idle sandbox loses every write
+     * since the last snapshot. */
     readonly refreshSeconds: number
     /** Prune rebuildable caches before taking a snapshot (workspace size is still measured). */
     readonly prune: boolean
@@ -75,8 +79,11 @@ const DEFAULT_IMAGE = "registry.cn-hangzhou.aliyuncs.com/opensandbox/opencode-sa
 
 const flag = (value: string | undefined) => value === "true" || value === "1"
 
+// V1 parity: `pvc` is the only default. Only an explicit `snapshot` selects the
+// snapshot backend; unset, empty, `none`, `host`, and unknown values all fall
+// back to `pvc` so a misconfigured deployment never silently loses persistence.
 const volumeType = (value: string | undefined): Config["volumeType"] =>
-  value === "pvc" || value === "host" || value === "snapshot" ? value : "none"
+  value === "snapshot" ? "snapshot" : "pvc"
 
 const number = (value: string | undefined, fallback: number) => {
   const parsed = Number(value)
@@ -136,10 +143,11 @@ export function load(): Config {
       ttlMs: number(env["OPENCODE_SANDBOX_SNAPSHOT_TTL_SEC"], 14 * 24 * 3600) * 1000,
       waitMs: number(env["OPENCODE_SANDBOX_SNAPSHOT_WAIT_SEC"], 900) * 1000,
       deleteEnabled: flag(env["OPENCODE_SANDBOX_SNAPSHOT_DELETE_ENABLED"]),
+      // V1 parity: periodic refresh defaults to ON (1800s). Explicit "0" opts out.
       refreshSeconds:
         env["OPENCODE_SANDBOX_SNAPSHOT_REFRESH_SEC"] === "0"
           ? 0
-          : number(env["OPENCODE_SANDBOX_SNAPSHOT_REFRESH_SEC"], 0),
+          : number(env["OPENCODE_SANDBOX_SNAPSHOT_REFRESH_SEC"], 1800),
       prune: flag(env["OPENCODE_SANDBOX_SNAPSHOT_PRUNE"]),
     },
   }

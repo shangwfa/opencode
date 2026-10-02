@@ -49,7 +49,12 @@ export function create<A, B>(deps: Deps) {
       }
     }
     insert: (table: unknown) => {
-      values: (values: Record<string, unknown>) => { run: () => Effect.Effect<unknown> }
+      values: (values: Record<string, unknown>) => {
+        run: () => Effect.Effect<unknown>
+        onConflictDoNothing: () => {
+          returning: (fields: Record<string, unknown>) => { all: () => Effect.Effect<Array<{ id: unknown }>> }
+        }
+      }
     }
   }
 
@@ -186,9 +191,12 @@ export function create<A, B>(deps: Deps) {
 
   /**
    * Start a snapshot: createSnapshot on the remote plus a `creating` row.
-   * Returns the existing creating snapshot when one is already in flight
-   * (concurrent fibers wait on the same snapshot instead of double-committing;
-   * a wedged creating row is reconciled by gc).
+   * Returns the existing creating snapshot when one is already in flight.
+   * The partial unique index `session_snapshot_creating_uniq` (V1
+   * advisory-lock semantics) arbitrates cross-instance races: the loser's
+   * insert conflicts, its just-created remote snapshot is rolled back
+   * (gated by deleteEnabled; otherwise the remote TTL reaps it), and it
+   * joins the winner's snapshot. A wedged creating row is reconciled by gc.
    */
   const startSnapshot = (
     sandboxID: string,
@@ -215,7 +223,11 @@ export function create<A, B>(deps: Deps) {
         try: () => manager.createSnapshot(sandboxID, { name: sessionID }),
         catch: (cause) => new Error(`createSnapshot failed: ${String(cause)}`),
       })
-      yield* db
+      const rollbackRemote = Effect.tryPromise({
+        try: () => manager.deleteSnapshot(info.id),
+        catch: () => undefined,
+      }).pipe(Effect.catchCause(() => Effect.void))
+      const inserted = yield* db
         .insert(SessionSnapshotTable)
         .values({
           id: info.id,
@@ -230,8 +242,38 @@ export function create<A, B>(deps: Deps) {
           time_created: Date.now(),
           time_updated: Date.now(),
         })
-        .run()
-        .pipe(Effect.orDie)
+        .onConflictDoNothing()
+        .returning({ id: SessionSnapshotTable.id })
+        .all()
+        .pipe(Effect.result)
+      if (inserted._tag === "Failure") {
+        // The row could not be persisted: roll the remote snapshot back so it
+        // does not leak, then surface the failure to the caller.
+        if (deps.deleteEnabled) yield* rollbackRemote
+        return yield* Effect.fail(new Error(`snapshot row insert failed: ${sessionID}`))
+      }
+      if (inserted.success.length === 0) {
+        // Lost the creating race to another replica: roll our duplicate back
+        // and join the winner's snapshot.
+        if (deps.deleteEnabled) yield* rollbackRemote
+        const winner = yield* db
+          .select()
+          .from(SessionSnapshotTable)
+          .where(
+            and(
+              eq(SessionSnapshotTable.session_id, sessionID),
+              eq(SessionSnapshotTable.scope, "session"),
+              eq(SessionSnapshotTable.state, "creating"),
+            ),
+          )
+          .orderBy(desc(SessionSnapshotTable.time_created))
+          .limit(1)
+          .all()
+        if (winner[0]) return winner[0].id
+        // The winner settled between our conflict and re-read: awaiting our
+        // own id is still safe — awaitSnapshot reconciles a missing row.
+        return info.id
+      }
       return info.id
     })
 

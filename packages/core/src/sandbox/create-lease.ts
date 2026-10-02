@@ -24,7 +24,7 @@ import { SandboxTable } from "./sql.js"
  */
 
 export type Claim =
-  | { readonly _tag: "claimed" }
+  | { readonly _tag: "claimed"; readonly owner: string }
   | { readonly _tag: "running"; readonly sandboxID: string }
   | { readonly _tag: "wait"; readonly holderID: string }
 
@@ -71,7 +71,6 @@ export interface Deps {
 
 export function create(deps: Deps) {
   const db = deps.db as Db
-  const owner = randomUUID()
 
   const row = (sessionID: string) =>
     db
@@ -85,9 +84,15 @@ export function create(deps: Deps) {
    * Try to become the creator. The conflict update only fires when the row is
    * terminal (`destroyed`) or the holder's lease expired; a healthy `creating`
    * row or a persisted `running` row leaves the row untouched.
+   *
+   * The owner is minted per claim, never per lease instance: `creating-<owner>`
+   * is the sandbox primary key, and one shared instance-level owner made the
+   * second concurrent session's insert collide on that PK (the conflict clause
+   * only arbitrates `session_id`).
    */
   const claim = (sessionID: string) =>
     Effect.gen(function* () {
+      const owner = randomUUID()
       const now = Date.now()
       const inserted = yield* db
         .insert(SandboxTable)
@@ -112,7 +117,7 @@ export function create(deps: Deps) {
         .returning({ id: SandboxTable.id, state: SandboxTable.state })
         .all()
       const current = inserted[0]
-      if (current && current.id === creatingID(owner)) return { _tag: "claimed" } as const
+      if (current && current.id === creatingID(owner)) return { _tag: "claimed", owner } as const
       if (current && current.state === "running" && !isCreatingID(String(current.id)) && !isPendingID(String(current.id)))
         return { _tag: "running", sandboxID: String(current.id) } as const
       if (current && current.state === "creating") return { _tag: "wait", holderID: String(current.id) } as const
@@ -127,7 +132,7 @@ export function create(deps: Deps) {
     })
 
   /** Refresh the lease while a long create (image pull) is in flight. */
-  const heartbeat = (sessionID: string) =>
+  const heartbeat = (sessionID: string, owner: string) =>
     db
       .update(SandboxTable)
       .set({ time_updated: Date.now() })
@@ -139,7 +144,7 @@ export function create(deps: Deps) {
    * Persist the created sandbox id. The CAS on our own creating row keeps a
    * late takeover from overwriting another creator's result.
    */
-  const complete = (sessionID: string, sandboxID: string) =>
+  const complete = (sessionID: string, owner: string, sandboxID: string) =>
     db
       .update(SandboxTable)
       .set({ id: sandboxID, state: "running", host: deps.host, time_updated: Date.now() })
@@ -149,7 +154,7 @@ export function create(deps: Deps) {
       .pipe(Effect.map((rows) => rows.length > 0))
 
   /** Give the lease back after a failed create so waiters retry immediately. */
-  const release = (sessionID: string) =>
+  const release = (sessionID: string, owner: string) =>
     db
       .update(SandboxTable)
       .set({ state: "destroyed", time_updated: Date.now() })
@@ -159,7 +164,7 @@ export function create(deps: Deps) {
   /** Latest row snapshot for waiters. */
   const latest = (sessionID: string) => row(sessionID)
 
-  return { owner, claim, heartbeat, complete, release, latest }
+  return { claim, heartbeat, complete, release, latest }
 }
 
 export type CreateLease = ReturnType<typeof create>

@@ -15,7 +15,7 @@ const config = (overrides: Partial<SandboxConfig.Config> = {}): SandboxConfig.Co
   filesTimeoutSeconds: 15,
   filesTimeoutRetries: 1,
   resource: { cpu: "2", memory: "4Gi" },
-  volumeType: "none",
+  volumeType: "pvc",
   pvcClaimName: "sandbox-test",
   packageCacheMount: "/opt/pnpm-store",
   maxConcurrentCommandsPerSession: 4,
@@ -32,15 +32,21 @@ const config = (overrides: Partial<SandboxConfig.Config> = {}): SandboxConfig.Co
   ...overrides,
 })
 
-const pvc = config({ volumeType: "pvc" })
+const pvc = config()
 
 const subPaths = (
   volumes: SandboxVolumes.VolumeScope extends never ? never : ReturnType<typeof SandboxVolumes.buildVolumes>,
 ) => volumes.map((volume) => ({ name: volume.name, mountPath: volume.mountPath, subPath: volume.subPath }))
 
 describe("SandboxVolumes.buildVolumes", () => {
-  test("returns no volumes when volumeType is none", () => {
-    expect(SandboxVolumes.buildVolumes({ sessionID: "ses_1" }, config())).toEqual([])
+  test("the deployment default is pvc, not an ephemeral sandbox", () => {
+    // V1 parity: a missing OPENCODE_SANDBOX_VOLUME_TYPE must resolve to pvc,
+    // never to a volume-less sandbox that silently loses the workspace.
+    expect(SandboxVolumes.buildVolumes({ sessionID: "ses_1" }, config())).toHaveLength(8)
+  })
+
+  test("returns no volumes when the session opts out with persistMode none", () => {
+    expect(SandboxVolumes.buildVolumes({ sessionID: "ses_1", persistMode: "none" }, config())).toEqual([])
   })
 
   test("pvc mode mounts seven session directories plus the shared package cache", () => {
@@ -93,17 +99,6 @@ describe("SandboxVolumes.buildVolumes", () => {
     expect(() => SandboxVolumes.buildVolumes({ sessionID: "ses_1", pvcMode: "app", appId: "  " }, pvc)).toThrow(
       "app 模式缺少 appId",
     )
-  })
-
-  test("host mode mounts per-session host paths and ignores app scope", () => {
-    const host = config({ volumeType: "host" })
-    const volumes = SandboxVolumes.buildVolumes({ sessionID: "ses_1", pvcMode: "app", appId: "app-42" }, host)
-    expect(volumes).toHaveLength(7)
-    for (const volume of volumes) {
-      expect(volume.pvc).toBeUndefined()
-      expect(volume.host?.path.startsWith("/var/opencode/sessions/ses_1/")).toBe(true)
-    }
-    expect(volumes[0]!.subPath).toBe("sessions/ses_1/workspace")
   })
 
   test("volume names stay valid DNS labels", () => {

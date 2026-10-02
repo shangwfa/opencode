@@ -400,6 +400,9 @@ const schema: Omit<DatabaseMigration.Migration, "id"> = {
       `)
       yield* tx.run(`CREATE INDEX \`session_snapshot_session_idx\` ON \`session_snapshot\` (\`session_id\`,\`state\`);`)
       yield* tx.run(
+        `CREATE UNIQUE INDEX \`session_snapshot_creating_uniq\` ON \`session_snapshot\` (\`session_id\`,\`scope\`) WHERE "session_snapshot"."state" = 'creating';`,
+      )
+      yield* tx.run(
         `CREATE INDEX \`snapshot_operation_claim_idx\` ON \`snapshot_operation\` (\`state\`,\`next_retry_at\`);`,
       )
       yield* tx.run(

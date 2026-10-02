@@ -52,12 +52,14 @@ pgTest("only one of two replicas wins the claim; the loser waits", () =>
     const b = SandboxCreateLease.create({ db, leaseMs: 60_000, host: "h" })
     try {
       const first = yield* a.claim(sessionID)
-      expect(first._tag).toBe("claimed")
+      expect(first._tag).toBe("claimed"
+      )
+      if (first._tag !== "claimed") return
       const second = yield* b.claim(sessionID)
       expect(second._tag).toBe("wait")
       const row = yield* rowOf(db, sessionID)
       expect(row!.state).toBe("creating")
-      expect(String(row!.id)).toBe(SandboxCreateLease.creatingID(a.owner))
+      expect(String(row!.id)).toBe(SandboxCreateLease.creatingID(first.owner))
     } finally {
       yield* cleanup(db, sessionID)
     }
@@ -71,12 +73,14 @@ pgTest("waiter joins once the winner completes; late takeover cannot overwrite",
     const a = SandboxCreateLease.create({ db, leaseMs: 60_000, host: "h" })
     const b = SandboxCreateLease.create({ db, leaseMs: 60_000, host: "h" })
     try {
-      expect((yield* a.claim(sessionID))._tag).toBe("claimed")
+      const ac = yield* a.claim(sessionID)
+      expect(ac._tag).toBe("claimed")
+      if (ac._tag !== "claimed") return
       expect((yield* b.claim(sessionID))._tag).toBe("wait")
       const realID = "sb-real-1"
-      expect(yield* a.complete(sessionID, realID)).toBe(true)
+      expect(yield* a.complete(sessionID, ac.owner, realID)).toBe(true)
       // 另一持有者的 complete 被拒（行已不归它）
-      expect(yield* b.complete(sessionID, "sb-bogus")).toBe(false)
+      expect(yield* b.complete(sessionID, "not-an-owner", "sb-bogus")).toBe(false)
       const row = yield* rowOf(db, sessionID)
       expect(row!.state).toBe("running")
       expect(String(row!.id)).toBe(realID)
@@ -97,8 +101,10 @@ pgTest("failed creator releases so a waiter retries immediately", () =>
     const a = SandboxCreateLease.create({ db, leaseMs: 60_000, host: "h" })
     const b = SandboxCreateLease.create({ db, leaseMs: 60_000, host: "h" })
     try {
-      expect((yield* a.claim(sessionID))._tag).toBe("claimed")
-      yield* a.release(sessionID)
+      const ac = yield* a.claim(sessionID)
+      expect(ac._tag).toBe("claimed")
+      if (ac._tag !== "claimed") return
+      yield* a.release(sessionID, ac.owner)
       const row = yield* rowOf(db, sessionID)
       expect(row!.state).toBe("destroyed")
       // 释放后等待者可立即重新仲裁
@@ -116,7 +122,9 @@ pgTest("an expired lease is taken over by another replica", () =>
     const a = SandboxCreateLease.create({ db, leaseMs: 60_000, host: "h" })
     const b = SandboxCreateLease.create({ db, leaseMs: 60_000, host: "h" })
     try {
-      expect((yield* a.claim(sessionID))._tag).toBe("claimed")
+      const ac = yield* a.claim(sessionID)
+      expect(ac._tag).toBe("claimed")
+      if (ac._tag !== "claimed") return
       // 模拟 a 崩溃：把 time_updated 拨到 lease 之前
       yield* db
         .update(SandboxTable)
@@ -126,9 +134,36 @@ pgTest("an expired lease is taken over by another replica", () =>
       const takeover = yield* b.claim(sessionID)
       expect(takeover._tag).toBe("claimed")
       const row = yield* rowOf(db, sessionID)
-      expect(String(row!.id)).toBe(SandboxCreateLease.creatingID(b.owner))
+      if (takeover._tag !== "claimed") return
+      expect(String(row!.id)).toBe(SandboxCreateLease.creatingID(takeover.owner))
     } finally {
       yield* cleanup(db, sessionID)
+    }
+  }),
+)
+
+pgTest("one lease instance claiming two different sessions must not collide on the creating primary key", () =>
+  // 回归：provider 全进程共享一个 lease 实例（同一 owner）。第一个 session 的
+  // claim 落下 id=creating-<owner> 行后，第二个 session 用同一 id insert 会撞
+  // sandbox 主键（onConflictDoUpdate 只仲裁 session_id），沙箱创建整体失败。
+  Effect.gen(function* () {
+    const { db } = yield* Database.Service
+    const lease = SandboxCreateLease.create({ db, leaseMs: 60_000, host: "h" })
+    const s1 = `lease-${Date.now()}-f1`
+    const s2 = `lease-${Date.now()}-f2`
+    try {
+      const first = yield* lease.claim(s1)
+      expect(first._tag).toBe("claimed")
+      const second = yield* lease.claim(s2)
+      expect(second._tag).toBe("claimed")
+      const row1 = yield* rowOf(db, s1)
+      const row2 = yield* rowOf(db, s2)
+      expect(row1!.state).toBe("creating")
+      expect(row2!.state).toBe("creating")
+      expect(row1!.id).not.toBe(row2!.id)
+    } finally {
+      yield* cleanup(db, s1)
+      yield* cleanup(db, s2)
     }
   }),
 )

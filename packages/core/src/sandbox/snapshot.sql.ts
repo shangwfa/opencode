@@ -31,7 +31,15 @@ export const SessionSnapshotTable = sqliteTable(
     last_restored_at: integer(),
     ...Timestamps,
   },
-  (table) => [index("session_snapshot_session_idx").on(table.session_id, table.state)],
+  (table) => [
+    index("session_snapshot_session_idx").on(table.session_id, table.state),
+    // Cross-instance create dedup (V1 advisory-lock semantics): at most one
+    // `creating` row per session+scope; a concurrent creator's insert hits
+    // this index, rolls its remote snapshot back, and joins the existing one.
+    uniqueIndex("session_snapshot_creating_uniq")
+      .on(table.session_id, table.scope)
+      .where(sql`${table.state} = 'creating'`),
+  ],
 )
 
 export type OperationState = "pending" | "running" | "done" | "failed"
