@@ -182,8 +182,105 @@ stream_prompt "$SID" 'What was the secret number I told you?' 60
 |------|------|------|
 | T10.1 | ✅ | 4 个 .py 文件创建成功，`python3 -c "from myapp.main import main; main()"` 输出 hello |
 | T10.2 | ✅ | edit 工具添加 subtract 函数，`subtract(5,2)` 输出 3 |
-| T10.3 | ✅ | SSE 监听 79 个事件、14 种类型，含 file.edited 完整时间线 |
+| T10.3 | ✅ | SSE 监听完整事件流，文件内容验证通过 |
 | T10.4 | ✅ | Round 1 设定 42，Round 2 正确回忆 42 |
+
+## 2026-09-29 V2 实测记录
+
+环境：SaaS `opencode-saas-sandbox-test:9d86bde786-t4`、沙箱 `opencode-opensandbox:local`（`7057c941ec64`）、本地 PG + 本地 OpenSandbox、`Yd-DeepSeek/deepseek-v4-flash`。
+
+**执行方式**：直接跑现成的 V2 脚本 `docs/test-cases/scripts/session-e2e-stream-v2.mjs`（235 行，T10.1–T10.4 均带 `assert` 硬断言）：
+
+```bash
+BASE=http://localhost:14096 \
+OPENCODE_PASSWORD=... \
+bun docs/test-cases/scripts/session-e2e-stream-v2.mjs
+```
+
+> 本文档正文的 bash 用例仍是 V1 写法（`POST /session`、`/session/:id/exec`、`/event`、`prompt_stream` 的 V1 路径），**V2 下不可直接执行**。以脚本为准。
+
+**结果：T10.1–T10.4 全部通过，连续两轮可复现。**
+
+| 用例 | SSE 事件数 | 断言验证 |
+|---|---|---|
+| T10.1 | 103 | 4 个 .py 文件（`find … \| wc -l` = 4）；`python3 -c 'from myapp.main import main; main()'` 输出 `hello` |
+| T10.2 | 26 + 24 | `assertToolSucceeded(events, "edit")` 通过；`add(2,3),subtract(5,2)` 输出 `5,3`；`git diff` 含 `subtract` |
+| T10.3 | 25 | 收到 25 个流式事件；`cat /workspace/hello.py` 含 `hello from SSE test` |
+| T10.4 | 15 + 18 | Round 2 终态回复匹配 `\b42\b` |
+
+### 独立证据（不依赖脚本自述）
+
+用 session-scoped fs 接口直接读 AI 产出的文件：
+
+```
+T10.1  fs/list /workspace/myapp/myapp → [__init__.py(file), __pycache__(dir), main.py(file)]
+       fs/list /workspace/myapp/tests  → [__init__.py(file), test_main.py(file)]
+       fs/read myapp/myapp/main.py     → def main():\n    print("hello")
+
+T10.2  fs/read calc.py → def add(a, b): return a + b
+                          def multiply(a, b): return a * b
+                          def subtract(a, b): return a - b     ← 由 edit 工具添加
+```
+
+`subtract` 只可能由第二轮的 `edit` 调用产生 —— 该文件的存在本身即证明两轮工具调用都真实执行了。
+
+PG 侧工具记录（`session_message.data.content[]` 展开）同样显示 `write(completed)` / `edit(completed)` / `shell(completed)`，与断言一致。
+
+### V1 → V2 映射
+
+| V1 | V2 |
+|---|---|
+| `POST /session` | `POST /api/session`（需 `location.directory`） |
+| `POST /session/:id/message`（同步） | `POST /api/session/:id/prompt` + `wait` |
+| `POST /session/:id/exec`（同步 stdout） | `POST /api/session/:id/shell`（204 异步），终态从 PG `type='shell'` + `status='exited'` 读 |
+| `POST /session/:id/prompt_stream` | `POST /api/session/:id/prompt_stream`（加 `/api` 前缀） |
+| `GET /event` | `GET /api/session/:id/log`（SSE 事件契约不同） |
+| PG 表 `session` / `message` | `session_v2` / `session_message` |
+
+### 清理
+
+本轮 8 个会话（两轮 × 4）及其 sandbox 已删除。清理与验证的写法见下方「清理陷阱」。
+
+---
+
+## ⚠️ 清理陷阱：zsh 下 `for s in $SIDS` 只迭代一次
+
+测试后清理会话时踩到的坑，**会导致「看起来清理干净、实际一个没删」**。
+
+```bash
+SIDS=$(psql ... -t -A -c "SELECT id FROM session_v2 WHERE ...")
+for s in $SIDS; do curl -X DELETE ".../session/$s"; done     # ← zsh 下只跑 1 次
+```
+
+zsh 默认不对未加引号的变量做分词（`SH_WORD_SPLIT` 关闭），`$SIDS` 被当成**一个含换行的 word**，URL 变成 `.../session/id1\nid2\nid3` → 404，再加上 `-o /dev/null` 把失败吞掉。
+
+**更隐蔽的是验证方式**。如果用同样的拼接去验证：
+
+```bash
+psql -c "... WHERE id IN ('$(echo "$SIDS" | tr ' ' ',')')"
+```
+
+会生成 `IN ('id1,id2,id3')` —— 这是个**字符串字面量**，不是 3 个 id，结构上不可能匹配任何行，于是永远返回 `0`。看起来「已清理干净」，实际什么都没删。
+
+> 本轮实测：首次清理报告「已清理 23 个」，紧接着复查 `残留=23` —— 那个 `0`/`23` 的矛盾正是本坑暴露的。修正后重新清理，58 个残留会话全部删除（返回 204），复查 `count=0`。
+
+**正确写法**：
+
+```bash
+# 清理：逐行读，不用 for s in $SIDS
+psql ... -t -A -c "SELECT id FROM session_v2 WHERE <条件>" \
+| while IFS= read -r s; do
+    [ -z "$s" ] && continue
+    curl -sS ... -X DELETE "$BASE/api/session/$s" -o /dev/null -w '%{http_code}\n'
+  done
+
+# 验证：直接 count，绝不拼 IN 列表
+psql ... -t -A -c "SELECT count(*) FROM session_v2 WHERE <同样的条件>"
+```
+
+另外，删除接口会返回 HTTP 204，**逐个打印状态码**才能确认每个都成功；全部静默 `-o /dev/null` 会把失败一起吞掉。
+
+> 若必须用数组，写 `"${SIDS[@]}"`（bash/zsh 通用）而非 `$SIDS`。
 
 > **复测记录（2026-09-16，镜像 `person-model-connect`（feat/opencode-1.18.31 工作区：个人模型隔离 + 公共优先 + provider 脱敏 + autokeepalive），本地 PG + 远端 K8s 沙箱，真实 LLM `Yd-DeepSeek/deepseek-v4-flash`）**：T10.1–T10.4 全部通过。**本轮 AI 消息统一改走流式接口**（`POST /session/:id/prompt_stream`，即 `test-lib.sh` 的 `stream_prompt`，实时渲染正文增量 + `[tool]` 状态流转），断言仍以 exec API / 消息终态为准：
 >

@@ -1,829 +1,857 @@
-# Code-Mode（execute 工具）端到端验证
+# Code Mode（V2 `execute`）测试
 
-> 验证 SaaS 环境下 Code-Mode 功能完整链路：MCP 工具发现 → `execute` 工具注册 → 受限 JS 解释器编排 → 子工具调用 → 权限/并发/错误/附件 → PG 元数据持久化。
+> 本文使用当前 V2 HTTP、Session Message、Tool snapshot 和数据库契约编写。所有端到端场景经 SaaS HTTP API 发起，并同时验证 assistant tool state 与 PostgreSQL；自然语言回复不能单独作为通过依据。
 >
-> 设计文档：`packages/codemode/codemode.md`；工具实现：`packages/opencode/src/tool/code-mode.ts`
+> 实现位置：`packages/codemode`、`packages/core/src/codemode`、`packages/core/src/tool.ts`。Sandbox 迁移设计：[`docs/design/codemode-session-sandbox-execution.md`](../../design/codemode-session-sandbox-execution.md)。
 
-本验收采用两层测试：SaaS E2E 验证 HTTP、PG、sandbox 和 session MCP 生命周期；确定性自动化测试验证工具目录渲染、结构化内容、附件/resource、日志、权限和并发上限。不要用模型自然语言回复代替状态或数据断言。
+## 0. 当前执行能力与验收边界
 
-## 运行模式
-
-通过 `OPENCODE_EXPERIMENTAL_CODE_MODE` 选择模式：
-
-| 值              | execute 内可编排工具                                                    | 兼容性       |
-| --------------- | ----------------------------------------------------------------------- | ------------ |
-| `false` / `off` | 无，关闭 Code-Mode                                                      | 原关闭行为   |
-| `true` / `mcp`  | 仅 MCP                                                                  | 原有默认行为 |
-| `read`          | MCP + read/glob/grep/lsp/webfetch/websearch/repo_overview               | 扩展只读模式 |
-| `all`           | MCP + 除 execute/task/question/skill/todowrite 等控制工具外的已物化工具 | 扩展完整模式 |
-
-`OPENCODE_EXPERIMENTAL=true` 仍映射为 `mcp`。扩展工具统一位于 `tools.opencode.<tool>`；原生工具继续直接暴露，不改变旧调用方式。目录与执行使用同一请求内、完成权限和插件定义过滤后的工具快照。
-
-## 前置条件
-
-| 条件       | 说明                                                              |
-| ---------- | ----------------------------------------------------------------- |
-| SaaS 容器  | `opencode-saas-sandbox-test:ccr`，`OPENCODE_EXPERIMENTAL_CODE_MODE=all`（本文件全套默认在 all 模式跑；T50.27 额外要求 mcp 模式对照） |
-| 组合       | 组合 1（远端 PG + 远端 Sandbox，见 `docs/local-test-env.md`）     |
-| 沙箱转发器 | `0.0.0.0:30040` → `172.18.32.15:30040` 运行中                     |
-| PG         | 远端 `postgresql://app:8zuhlMLd4gaeUG5k@172.18.32.14:5432/opencode`（容器内经 `host.docker.internal:15432` 转发；若转发不可用改直连，见 local-test-env.md） |
-| MCP Server | 需要至少一个 MCP server（本测试用 echo / calculate 类工具）       |
-| 图片模型   | `moonshotai-cn/kimi-k3`，通过 SaaS `PUT /auth/moonshotai-cn` 配置（仅 T50.20 需要，无 key 时跳过） |
-
-图片测试的凭据只写入 SaaS auth，不写入仓库、文档或 shell history：
-
-```bash
-read -rsp 'Moonshot API key: ' MOONSHOT_KEY; echo
-curl -s -X PUT "$BASE/auth/moonshotai-cn" -H 'Content-Type: application/json' \
-  -d "$(jq -nc --arg key "$MOONSHOT_KEY" '{type:"api",key:$key}')" | jq -e '. == true'
-unset MOONSHOT_KEY
-
-# Provider/Auth 在进程启动时加载；首次设置后重启测试容器，再验证连接。
-docker restart opencode-saas-test >/dev/null
-for _ in $(seq 1 30); do
-  curl -sf "$BASE/provider" | jq -e '.connected | index("moonshotai-cn") != null' && break
-  sleep 1
-done
-```
-
-运行前加载公共环境，并为本文件创建独立 Session。所有步骤必须串行执行，PG 查询通过执行前时间水位限定到本次请求，禁止读取不加边界的“最新一条”记录：
-
-```bash
-source test-env.sh 1
-source test-lib.sh
-
-mark_execute() {
-  pgval "SELECT coalesce(max(time_created), 0) FROM part WHERE session_id='$SID' AND data->>'tool'='execute'"
-}
-
-execute_state_after() {
-  pgval "SELECT data->'state' FROM part WHERE session_id='$SID' AND data->>'tool'='execute' AND time_created > $1 ORDER BY time_created DESC LIMIT 1"
-}
-
-wait_execute_running() {
-  local after=$1 status
-  for _ in $(seq 1 60); do
-    status=$(pgval "SELECT data->'state'->>'status' FROM part WHERE session_id='$SID' AND data->>'tool'='execute' AND time_created > $after ORDER BY time_created DESC LIMIT 1")
-    [ "$status" = "running" ] && return 0
-    sleep 1
-  done
-  return 1
-}
-
-wait_execute_terminal() {
-  local after=$1 status
-  for _ in $(seq 1 60); do
-    status=$(pgval "SELECT data->'state'->>'status' FROM part WHERE session_id='$SID' AND data->>'tool'='execute' AND time_created > $after ORDER BY time_created DESC LIMIT 1")
-    case "$status" in completed|error|aborted) return 0 ;; esac
-    sleep 1
-  done
-  return 1
-}
-```
-
----
-
-## 一、准备 session + MCP 工具
-
-### T50.1 创建 session
-
-```bash
-SID=$(new_sid -kb)
-echo "SID: $SID"
-```
-
-**期望**：返回 `ses_xxx`；沙箱就绪。
-
-### T50.2 注册测试用 local MCP
-
-注册一个返回结构化数据的 echo MCP，用于后续 code-mode 编排：
-
-```bash
-curl -s -X POST "$BASE/session/$SID/mcps/create" -H 'Content-Type: application/json' \
-  -d '{
-    "name":"echo",
-    "type":"local",
-    "command":["npx","-y","@modelcontextprotocol/server-everything"]
-  }'
-
-# PG 验证
-psql "$PG_URL" -t -A -c "SELECT name, type FROM session_mcps WHERE session_id='$SID' AND name='echo'"
-```
-
-**期望**：`echo|local`，PG 持久化正确。
-
-### T50.3 验证 MCP 配置可读
-
-```bash
-curl -s "$BASE/session/$SID/mcps" | jq -e '.[] | select(.name=="echo" and .enabled==true)'
-```
-
-**期望**：返回 echo 配置。当前没有 session MCP connection-status HTTP 接口；真实连接由 T50.4 的首次成功调用验证，不使用固定 `sleep` 或 Web UI fallback 路由。
-
-### T50.3b 沙箱测试项目准备（内置工具用例前置）
-
-> ⚠️ **关键**：会话工具在**远端沙箱**内执行，沙箱的 `/workspace` 与 server 容器文件系统隔离。**在 server 容器（docker exec）建文件对沙箱不可见**，必须用 `/session/:id/exec` 写进沙箱。跳过此步会导致所有读文件用例报 `file not found`。
-
-```bash
-curl -s --max-time 120 -X POST "$BASE/session/$SID/exec" -H 'Content-Type: application/json' \
-  -d '{"command":"mkdir -p /workspace/src/config && echo {\"name\":\"code-mode-demo\",\"version\":\"1.0.0\",\"dependencies\":{\"react\":\"^19\",\"zod\":\"^4\"},\"devDependencies\":{\"typescript\":\"^5\"}} > /workspace/package.json && for f in agent provider flag; do echo \"export const $f = 1\" > /workspace/src/config/$f.ts; done && ls -R /workspace"}' \
-  | jq -e '.exitCode == 0'
-```
-
-**期望**：`exitCode == 0`，stdout 含 `package.json` 与 3 个 `.ts` 文件。
-
-> **HTTP 响应陷阱**：`POST /session/:id/message` 同步等待，返回的只是**最后一条 assistant**（常为无 tool part 的总结文本）。含 tool part 的中间 assistant 消息必须查 PG（`execute_state_after` 水位查询），不要用 HTTP 响应断言工具行为。模型也可能幻觉"已调用"（parts 里无 tool）或自主改用直接调用——PG 无 execute part 即判模型未调用，重发 prompt（措辞更直接）而非判功能失败。
-
----
-
-## 二、execute 工具发现与注册
-
-### T50.4 首次调用验证连接与 execute 注册
-
-当 session 有已连接的 MCP 工具时，模型应看到唯一的 `execute` 工具（而非逐个暴露的 MCP 工具）：
-
-```bash
-BEFORE=$(mark_execute)
-curl -s --max-time 180 -X POST "$BASE/session/$SID/message" -H 'Content-Type: application/json' \
-  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"必须使用 execute，执行精确代码：return await tools.echo.echo({message: \\\"discovery-ok\\\"})\"}],\"model\":$MODEL}" >/dev/null
-execute_state_after "$BEFORE" | jq -e '
-  .status == "completed" and
-  .output == "Echo: discovery-ok" and
-  .metadata.toolCalls == [{"tool":"echo.echo","status":"completed","input":{"message":"discovery-ok"}}]
-'
-```
-
-**期望**：硬断言通过，证明 MCP 已连接且模型能够调用 `execute`。模型回复文本仅用于诊断。
-
-### T50.5 describeCatalog 生成指令包含工具树
-
-description 不对外持久化，不能通过 Session GET 或历史 part 间接验证。使用确定性自动化测试验证完整目录：
-
-```bash
-cd packages/opencode
-bun test test/tool/code-mode.test.ts test/tool/code-mode-integration.test.ts \
-  --test-name-pattern 'catalog|signature'
-```
-
-**期望**：测试通过，验证 `## Workflow`、完整/部分目录、schema signature、特殊命名空间和搜索提示。
-
----
-
-## 三、基础编排：单工具调用
-
-### T50.6 execute 调用单个 MCP 工具
-
-让 AI 使用 execute 编排一次 echo 工具调用：
-
-```bash
-BEFORE=$(mark_execute)
-curl -s --max-time 120 -X POST "$BASE/session/$SID/message" -H 'Content-Type: application/json' \
-  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"用 execute 工具调用 tools.echo.echo 传入 message=\\\"hello code-mode\\\"，只返回 echo 的响应文本\"}],\"model\":$MODEL}"
-```
-
-**期望**：
-
-- AI 调用 `execute` 工具，code 参数为类似 `return await tools.echo.echo({message: "hello code-mode"})` 的脚本
-- 执行成功，AI 返回包含 `hello code-mode` 的文本
-
-### T50.7 PG 验证 toolCalls 元数据
-
-```bash
-execute_state_after "$BEFORE" | jq -e '
-  .status == "completed" and
-  (.output | contains("hello code-mode")) and
-  .metadata.toolCalls == [{"tool":"echo.echo","status":"completed","input":{"message":"hello code-mode"}}]
-'
-```
-
-**期望**：`toolCalls` 数组包含一条 `{tool: "echo.echo", status: "completed"}` 记录，并包含调用 input。
-
----
-
-## 四、顺序依赖编排
-
-### T50.8 多步顺序调用
-
-让 AI 在一个 execute 脚本内完成有依赖的多步调用：
-
-```bash
-BEFORE=$(mark_execute)
-curl -s --max-time 120 -X POST "$BASE/session/$SID/message" -H 'Content-Type: application/json' \
-  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"用 execute 完成：1) 调用 tools.echo.echo 传 message=\\\"step1\\\" 2) 用上一步的结果作为 message 再调一次 tools.echo.echo 3) 返回最终结果\"}],\"model\":$MODEL}"
-```
-
-**期望**：
-
-- execute 执行成功
-- toolCalls 有 2 条记录（均为 completed）
-- AI 返回包含 `step1` 的结果
-
-### T50.9 PG 验证子工具调用顺序
-
-```bash
-psql "$PG_URL" -t -A -c "
-  SELECT jsonb_agg(jsonb_build_object('tool', call->>'tool', 'input', call->'input') ORDER BY ordinality)
-  FROM part
-  CROSS JOIN LATERAL jsonb_array_elements(data->'state'->'metadata'->'toolCalls') WITH ORDINALITY AS calls(call, ordinality)
-  WHERE session_id='$SID' AND data->>'tool'='execute' AND time_created > $BEFORE
-  GROUP BY part.id, part.time_created
-  ORDER BY part.time_created DESC LIMIT 1
-" | jq -e '. == [
-  {"tool":"echo.echo","input":{"message":"step1"}},
-  {"tool":"echo.echo","input":{"message":"Echo: step1"}}
-]'
-```
-
-**期望**：精确数组断言通过，验证调用顺序和第二次输入依赖第一次输出。T50.8 发送请求前必须重新设置 `BEFORE=$(mark_execute)`。
-
----
-
-## 五、并发编排
-
-### T50.10 Promise.all 并发调用
-
-```bash
-BEFORE=$(mark_execute)
-curl -s --max-time 120 -X POST "$BASE/session/$SID/message" -H 'Content-Type: application/json' \
-  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"用 execute 并发调用 tools.echo.echo 3 次，分别传 message=\\\"a\\\"、\\\"b\\\"、\\\"c\\\"，用 Promise.all，返回所有结果拼接\"}],\"model\":$MODEL}"
-```
-
-**期望**：
-
-- execute 执行成功
-- toolCalls 有 3 条记录
-- AI 返回包含 a、b、c 的结果
-
-在进入 T50.11 前，用 PG 硬断言本次并发调用，而不是依赖模型总结：
-
-```bash
-execute_state_after "$BEFORE" | jq -e '
-  .status == "completed" and
-  (.metadata.toolCalls | length) == 3 and
-  all(.metadata.toolCalls[]; .status == "completed")
-'
-```
-
-### T50.11 确定性验证并发上限
-
-```bash
-cd packages/codemode
-bun test test/promise.test.ts --test-name-pattern 'caps live tool-call concurrency'
-```
-
-**期望**：测试通过，并通过 active/maxActive barrier 硬断言同时执行数不超过 8。T50.10 仅负责 SaaS 链路上的 Promise.all 功能验证，不再用调用数量冒充并发证明。
-
----
-
-## 六、错误处理
-
-### T50.12 子工具错误捕获
-
-让 execute 脚本调用一个会失败的 MCP 工具。注意：echo 会**忽略多余参数**（传 `invalid_param` 仍返回 completed），必须用**缺必填参数**触发真 error：
-
-```bash
-BEFORE=$(mark_execute)
-curl -s --max-time 120 -X POST "$BASE/session/$SID/message" -H 'Content-Type: application/json' \
-  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"用 execute 执行精确代码：try { const r = await tools.echo.echo({}); return \\\"UNEXPECTED:\\\"+r; } catch (e) { return \\\"CAUGHT:\\\"+String(e).slice(0,200); }\"}],\"model\":$MODEL}"
-```
-
-**期望**：
-
-- execute 执行成功（脚本本身不崩溃）
-- toolCalls 中对应调用 status 为 `error`
-- AI 返回错误描述文本
-
-```bash
-execute_state_after "$BEFORE" | jq -e '
-  .status == "completed" and
-  (.metadata.toolCalls | length) == 1 and
-  .metadata.toolCalls[0].status == "error" and
-  (.output | length) > 0
-'
-```
-
-### T50.13 脚本语法错误
-
-```bash
-BEFORE=$(mark_execute)
-curl -s --max-time 120 -X POST "$BASE/session/$SID/message" -H 'Content-Type: application/json' \
-  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"用 execute 工具执行以下代码：这是一个语法错误代码 this is not valid javascript {{{\"}],\"model\":$MODEL}"
-```
-
-**期望**：
-
-- execute 返回 error metadata
-- AI 提示代码有语法错误
-
-### T50.14 PG 验证 error 标记
-
-```bash
-execute_state_after "$BEFORE" | jq -e '
-  .status == "error" and
-  .metadata.error == true and
-  (.error | contains("Failed to parse TypeScript"))
-'
-```
-
-**期望**：`true`（最近一次 execute 因语法错误失败）。
-
----
-
-## 七、沙箱限制
-
-### T50.15 禁止 eval / Function 构造器
-
-```bash
-BEFORE=$(mark_execute)
-curl -s --max-time 120 -X POST "$BASE/session/$SID/message" -H 'Content-Type: application/json' \
-  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"用 execute 工具执行代码：eval(\\\"1+1\\\")，告诉我结果\"}],\"model\":$MODEL}"
-```
-
-**期望**：
-
-- execute 执行失败（eval 不可用）
-- AI 提示 eval 不被支持
-
-```bash
-execute_state_after "$BEFORE" | jq -e '.status == "error" and .metadata.error == true and (.error | test("eval"; "i"))'
-```
-
-### T50.16 禁止 require / process / fs
-
-```bash
-BEFORE=$(mark_execute)
-curl -s --max-time 120 -X POST "$BASE/session/$SID/message" -H 'Content-Type: application/json' \
-  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"用 execute 工具执行代码：const fs = require(\\\"fs\\\"); return fs.readFileSync(\\\"/etc/passwd\\\")\"}],\"model\":$MODEL}"
-```
-
-**期望**：
-
-- execute 执行失败
-- AI 提示 require 不可用
-
-```bash
-execute_state_after "$BEFORE" | jq -e '.status == "error" and .metadata.error == true and (.error | test("require"; "i"))'
-```
-
-### T50.17 内置 stdlib 可用
-
-验证受限解释器支持标准库操作：
-
-```bash
-BEFORE=$(mark_execute)
-curl -s --max-time 120 -X POST "$BASE/session/$SID/message" -H 'Content-Type: application/json' \
-  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"用 execute 工具执行代码：const arr = [3,1,2]; return JSON.stringify({sorted: arr.sort(), len: arr.length, max: Math.max(...arr), upper: \\\"hello\\\".toUpperCase()})\"}],\"model\":$MODEL}"
-```
-
-**期望**：
-
-- execute 执行成功
-- AI 返回 `{"sorted":[1,2,3],"len":3,"max":3,"upper":"HELLO"}`
-
-```bash
-execute_state_after "$BEFORE" | jq -e '.status == "completed" and .output == "{\"sorted\":[1,2,3],\"len\":3,\"max\":3,\"upper\":\"HELLO\"}"'
-```
-
----
-
-## 八、权限过滤
-
-### T50.18 deny 规则隐藏工具
-
-设置权限规则拒绝某个 MCP 工具，验证它在 execute 的工具目录中不可见：
-
-```bash
-# 添加 deny 规则
-curl -s -X PATCH "$BASE/session/$SID" -H 'Content-Type: application/json' \
-  -d '{"permission":[{"permission":"echo_echo","pattern":"*","action":"deny"}]}'
-
-# AI 尝试使用被隐藏的工具
-BEFORE=$(mark_execute)
-curl -s --max-time 120 -X POST "$BASE/session/$SID/message" -H 'Content-Type: application/json' \
-  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"用 execute 调用 tools.echo.echo 传 message=\\\"test\\\"\"}],\"model\":$MODEL}"
-```
-
-**期望**：
-
-- echo 工具不在 execute 的工具目录中（`tools.echo` 命名空间不存在）
-- AI 无法调用，提示工具不可用或目录为空
-
-```bash
-DENIED_COUNT=$(pgval "SELECT count(*) FROM part WHERE session_id='$SID' AND data->>'tool'='execute' AND time_created > $BEFORE")
-if [ "$DENIED_COUNT" != "0" ]; then
-  # 语义断言（2026-09-04 实测）：模型被 deny 后会探索（Object.keys/search），最后一条
-  # 未必是 error。不断言"最新一条"，而断言：存在 Unknown tool error，且无任何
-  # completed 的被 deny 工具调用。
-  pgval "SELECT data->'state' FROM part WHERE session_id='$SID' AND data->>'tool'='execute' AND time_created > $BEFORE ORDER BY time_created" | python3 -c "
-import json,sys
-states=[json.loads(l[l.index('{'):]) for l in sys.stdin if '{' in l]
-has_unknown=any('Unknown tool' in str(s.get('error','')) for s in states)
-no_completed_echo=not any(
-  s['status']=='completed' and any(c.get('tool')=='echo.echo' for c in s.get('metadata',{}).get('toolCalls',[]))
-  for s in states)
-print('PASS' if (has_unknown and no_completed_echo) else 'FAIL')"
-fi
-```
-
-### T50.19 后置 allow 覆盖 deny 后恢复
-
-```bash
-# 后置 allow 规则覆盖 deny
-curl -s -X PATCH "$BASE/session/$SID" -H 'Content-Type: application/json' \
-  -d '{"permission":[{"permission":"echo_echo","pattern":"*","action":"allow"}]}'
-
-BEFORE=$(mark_execute)
-curl -s --max-time 120 -X POST "$BASE/session/$SID/message" -H 'Content-Type: application/json' \
-  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"用 execute 调用 tools.echo.echo 传 message=\\\"restored\\\"\"}],\"model\":$MODEL}"
-```
-
-**期望**：echo 工具恢复可见，调用成功。
-
-```bash
-execute_state_after "$BEFORE" | jq -e '
-  .status == "completed" and
-  (.output | contains("restored")) and
-  .metadata.toolCalls[0].tool == "echo.echo" and
-  .metadata.toolCalls[0].status == "completed"
-'
-```
-
----
-
-## 九、附件处理
-
-> 仅 T50.20 需要 moonshotai-cn key。无 key 时跳过本节（`curl -sf "$BASE/provider" | jq -e '.connected | index("moonshotai-cn") != null'` 不通过即跳过），不计入 FAIL。
-
-### T50.20 工具返回图片内容
-
-使用 server-everything 的固定小图片工具和支持图片输入的 Kimi K3，验证 execute 收集附件：
-
-```bash
-BEFORE=$(mark_execute)
-SAVED_MODEL=$MODEL
-MODEL=$KIMI_MODEL
-curl -s --max-time 120 -X POST "$BASE/session/$SID/message" -H 'Content-Type: application/json' \
-  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"用 execute 调用返回图片的 MCP 工具，告诉我图片是否成功返回\"}],\"model\":$MODEL}"
-MODEL=$SAVED_MODEL
-
-# 以精确代码重新执行并将 PG 水位绑定到这一次调用。
-BEFORE=$(mark_execute)
-jq -nc \
-  --arg text '必须使用 execute，执行精确代码：return await tools.echo["get-tiny-image"]({})。然后只说明是否收到图片。' \
-  --argjson model "$KIMI_MODEL" \
-  '{parts:[{type:"text",text:$text}],model:$model}' | \
-  curl -s --max-time 180 -X POST "$BASE/session/$SID/message" -H 'Content-Type: application/json' --data-binary @- >/dev/null
-
-execute_state_after "$BEFORE" | jq -e '
-  .status == "completed" and
-  (.attachments | length) >= 1 and
-  all(.attachments[]; .type == "file" and (.mime | startswith("image/"))) and
-  .metadata.toolCalls == [{"tool":"echo.get-tiny-image","status":"completed"}] and
-  ((.output | test("base64|data:image"; "i")) | not)
-'
-```
-
-**期望**：PG 硬断言通过；Kimi K3 成功完成工具回合，图片以 file attachment 保存，base64/data URL 不进入 execute 文本。自动化集成测试同时验证固定 PNG 字节不会进入 sandbox 或模型文本。
-
----
-
-## 十、中止与超时
-
-### T50.21 用户中止
-
-```bash
-BEFORE=$(mark_execute)
-# prompt_async 立即返回；必须等 execute 真正进入 running 后才能中止。
-curl -s -X POST "$BASE/session/$SID/prompt_async" -H 'Content-Type: application/json' \
-  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"用 execute 调用 tools.echo[\\\"trigger-long-running-operation\\\"]，duration=30，steps=30\"}],\"model\":$MODEL}"
-
-wait_execute_running "$BEFORE" || { echo 'execute 未进入 running'; false; }
-curl -s -X POST "$BASE/session/$SID/abort"
-wait_execute_terminal "$BEFORE" || { echo 'execute 未进入终态'; false; }
-```
-
-**期望**：execute 返回 `error: true`；AI 提示被中止。
-
-### T50.22 中止后状态验证
-
-> 语义说明（2026-09-04 实测）：用户 abort 后 part 状态为 `error`（"Tool execution aborted"），但 metadata 是 `{"interrupted": true}`——**没有 `error: true` 也没有 toolCalls**。与早期 `error:true` 约定不一致，实现与文档待对齐（产品决策：保留 interrupted 语义则改断言，改回 error:true 则改实现）。
-
-```bash
-execute_state_after "$BEFORE" | jq -e '
-  (.status == "error" or .status == "aborted") and
-  .metadata.interrupted == true
-'
-```
-
-**期望**：`error` + `interrupted:true`。
-
----
-
-## 十一、工具目录搜索
-
-### T50.23 $codemode.search 搜索工具
-
-```bash
-curl -s --max-time 120 -X POST "$BASE/session/$SID/message" -H 'Content-Type: application/json' \
-  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"用 execute 执行代码：const result = await tools.\\$codemode.search({query: \\\"echo\\\"}); return JSON.stringify(result)\"}],\"model\":$MODEL}"
-```
-
-**期望**：返回包含 `echo.echo` 工具的搜索结果。
-
-### T50.24 $codemode.search 空查询分页语义
-
-```bash
-curl -s --max-time 120 -X POST "$BASE/session/$SID/message" -H 'Content-Type: application/json' \
-  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"用 execute 执行代码：const result = await tools.\\$codemode.search({query: \\\"\\\"}); return JSON.stringify(result.items.map(item => item.path))\"}],\"model\":$MODEL}"
-```
-
-**期望**：返回当前页路径且包含 `tools.echo.echo`。空查询单页结果不能宣称“列举全部”；`remaining`、`next.offset` 和完整分页行为由 `packages/codemode` 的 search 自动化测试覆盖。
-
----
-
-## 十二、输出大小限制
-
-### T50.25 大输出截断
-
-```bash
-BEFORE=$(mark_execute)
-curl -s --max-time 120 -X POST "$BASE/session/$SID/message" -H 'Content-Type: application/json' \
-  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"用 execute 执行代码：return \\\"x\\\".repeat(100000)，告诉我返回了多少字符\"}],\"model\":$MODEL}"
-```
-
-```bash
-execute_state_after "$BEFORE" | jq -e '
-  .status == "completed" and
-  .metadata.truncated == true and
-  (.metadata.outputPath | type) == "string" and
-  (.output | length) < 100000
-'
-```
-
-**期望**：PG 断言 `truncated=true` 且有 `outputPath`；AI 文本不作为截断判据。
-
----
-
-## 十三、并发限制
-
-### T50.26 超过 8 并发工具调用
-
-```bash
-BEFORE=$(mark_execute)
-curl -s --max-time 180 -X POST "$BASE/session/$SID/message" -H 'Content-Type: application/json' \
-  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"用 execute 执行代码：const results = await Promise.all(Array.from({length:12}).map((_,i) => tools.echo.echo({message:String(i)}))); return results.length\"}],\"model\":$MODEL}"
-```
-
-```bash
-execute_state_after "$BEFORE" | jq -e '
-  .status == "completed" and
-  .output == "12" and
-  (.metadata.toolCalls | length) == 12 and
-  all(.metadata.toolCalls[]; .status == "completed")
-'
-```
-
-**期望**：
-
-- execute 执行成功（最多 8 并发，其余排队）
-- toolCalls 有 12 条记录
-- 所有调用最终完成
-- “最多 8 并发”由 T50.11 的 active/maxActive barrier 自动化测试证明
-
----
-
-## 十四、清理
-
-### T50.27 删除 MCP 并验证 execute 消失
-
-```bash
-curl -s -X DELETE "$BASE/session/$SID/mcps/echo"
-
-for _ in $(seq 1 30); do
-  [ "$(pgval "SELECT count(*) FROM session_mcps WHERE session_id='$SID'")" = "0" ] && break
-  sleep 1
-done
-
-# 强制要求调用；若 execute 不在发送给模型的工具 schema 中，不会产生 execute part。
-BEFORE=$(mark_execute)
-curl -s --max-time 120 -X POST "$BASE/session/$SID/message" -H 'Content-Type: application/json' \
-  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"列出你当前可用的所有工具\"}],\"model\":$MODEL}"
-
-jq -nc --arg text '现在必须使用 execute 执行 return 1；不要根据历史消息推断工具可用性' --argjson model "$MODEL" \
-  '{parts:[{type:"text",text:$text}],model:$model}' | \
-  curl -s --max-time 120 -X POST "$BASE/session/$SID/message" -H 'Content-Type: application/json' --data-binary @- >/dev/null
-
-[ "$(pgval "SELECT count(*) FROM part WHERE session_id='$SID' AND data->>'tool'='execute' AND time_created > $BEFORE")" = "0" ]
-curl -s -X DELETE "$BASE/session/$SID" >/dev/null
-```
-
-**期望**：MCP 行数为 0，删除后请求没有产生新的 execute part。模型自然语言工具列表不作为判据。
-
-> ⚠️ **模式差异说明（2026-08-01 实测）**：本用例的"删除 MCP 后 execute 消失"仅在 **`mcp` 模式**（`OPENCODE_EXPERIMENTAL_CODE_MODE=mcp`）下成立——此时 execute 仅在 session 有已连接 MCP 工具时注册，删除后 execute 从工具列表消失。在 **`all` 模式**下，execute **始终保留**（可编排本地工具 read/glob/grep 等，见运行模式表），删除 MCP 后 execute 仍在注册表（`/experimental/tool/ids` 仍含 `execute`），会继续产生 execute part。因此 T50.27 应使用 `mcp` 模式执行，或在 `all` 模式下改为验证"MCP 工具命名空间（tools.echo）消失、execute 保留但无法调用被删除的 MCP 工具"。
-
----
-
-## 十五、all 模式内置工具编排（需 T50.3b 沙箱项目）
-
-> 本组验证 `all` 模式核心价值：`tools.opencode.read/glob/grep` 在脚本内编排。echo MCP 测不出"内置工具输出格式 × 脚本"的真实交互（如 read 返回的 XML-like 行号文本会导致 naive `JSON.parse` 失败，模型需 1-2 轮自我修复收敛——属正常行为，不判失败）。
-
-### T50.28 read + glob 编排真实文件
-
-```bash
-BEFORE=$(mark_execute)
-curl -s --max-time 180 -X POST "$BASE/session/$SID/message" -H 'Content-Type: application/json' \
-  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"用 execute 工具：read /workspace/package.json，glob src/config/*.ts，返回 {name, tsFileCount}。read 返回的是带行号的文本格式，注意先提取再解析。\"}],\"model\":$MODEL}" >/dev/null
-execute_state_after "$BEFORE" | jq -e '
-  .status == "completed" and
-  (.output | contains("code-mode-demo")) and
-  ([.metadata.toolCalls[] | select(.status == "completed")] | length) >= 2
-'
-```
-
-**期望**：硬断言通过。允许模型中途 error 后自我修复（多条 execute part），只断言最终成功的 part。
-
-### T50.29 grep + read 组合定位
-
-```bash
-BEFORE=$(mark_execute)
-curl -s --max-time 180 -X POST "$BASE/session/$SID/message" -H 'Content-Type: application/json' \
-  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"用 execute 工具：grep 找出 src 下包含 export const 的文件，再 read 其中一个，把文件名和第一行返回为 {file, firstLine}。\"}],\"model\":$MODEL}" >/dev/null
-execute_state_after "$BEFORE" | jq -e '
-  .status == "completed" and
-  (.output | contains("src/config/")) and
-  (.output | contains("export const"))
-'
-```
-
-**期望**：硬断言通过，验证跨工具数据流（grep 结果驱动 read 参数）。
-
----
-
-## 十六、省 token 效果对比
-
-> code-mode 核心卖点"中间结果不进对话"的唯一量化验证：同一任务两种做法的 input token 差。
-
-### T50.30 脚本内汇总 vs 直接调用
-
-> 设计要点：对比的必须是**任务完成后的下一轮** input（历史是否携带中间结果），而非任务轮本身（任务轮 input 含当轮工具定义等固定开销，且长短会话基线不可比）。
-
-```bash
-# 会话 A：execute 脚本内读 3 个文件并汇总（中间输出不出对话），再发一轮简单问题
-SIDA=$(new_sid -kb)
-curl -s --max-time 120 -X POST "$BASE/session/$SIDA/exec" -H 'Content-Type: application/json' \
-  -d '{"command":"mkdir -p /workspace/src/config && for f in agent provider flag; do echo \"export const $f = 1\" > /workspace/src/config/$f.ts; done"}' >/dev/null
-# 第一轮：execute 汇总（只返回数字）
-curl -s --max-time 180 -X POST "$BASE/session/$SIDA/message" -H 'Content-Type: application/json' \
-  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"用 execute 工具：read src/config 下全部 3 个 ts 文件，在脚本内拼接它们的内容总字符数，只返回 {totalChars} 一个数字。\"}],\"model\":$MODEL}" >/dev/null
-# 第二轮：简单问题，本轮 input 即"携带 execute 小输出的历史"代价
-curl -s --max-time 60 -X POST "$BASE/session/$SIDA/message" -H 'Content-Type: application/json' \
-  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"reply with exactly: ok-a\"}],\"model\":$MODEL}" >/dev/null
-TOK_A=$(pgval "SELECT data->'tokens'->>'input' FROM message WHERE session_id='$SIDA' ORDER BY time_created DESC LIMIT 1")
-
-# 会话 B：直接调用 read 3 次再汇总，同样再发一轮简单问题
-SIDB=$(new_sid -kb)
-curl -s --max-time 120 -X POST "$BASE/session/$SIDB/exec" -H 'Content-Type: application/json' \
-  -d '{"command":"mkdir -p /workspace/src/config && for f in agent provider flag; do echo \"export const $f = 1\" > /workspace/src/config/$f.ts; done"}' >/dev/null
-curl -s --max-time 180 -X POST "$BASE/session/$SIDB/message" -H 'Content-Type: application/json' \
-  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"逐个 read src/config 下全部 3 个 ts 文件，把它们的内容总字符数返回为 {totalChars}。不要用 execute。\"}],\"model\":$MODEL}" >/dev/null
-curl -s --max-time 60 -X POST "$BASE/session/$SIDB/message" -H 'Content-Type: application/json' \
-  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"reply with exactly: ok-b\"}],\"model\":$MODEL}" >/dev/null
-TOK_B=$(pgval "SELECT data->'tokens'->>'input' FROM message WHERE session_id='$SIDB' ORDER BY time_created DESC LIMIT 1")
-
-echo "execute做法次轮input=$TOK_A 直接调用次轮input=$TOK_B"
-curl -s -X DELETE "$BASE/session/$SIDA" >/dev/null; curl -s -X DELETE "$BASE/session/$SIDB" >/dev/null
-```
-
-**期望**：`TOK_A < TOK_B`（脚本内中间结果不进对话；实测 3 个小文件即 276 vs 1350，省约 1K tok，文件越大差值越大）。本用例只断言方向不设阈值。
-
----
-
-## 十七、已知问题（非阻塞记录）
-
-### T50.31 工具自然卡死的 watchdog 行为（观察项）
-
-`read /`（沙箱根目录）在远端沙箱挂起不返回时，watchdog 尝试 mark 超时 → `PG query timed out after 30000ms` → 标记失败 → 约 45s 后重试，形成无限循环并持续占用 PG 连接，期间同实例其他会话的模型行为可能异常（拒调工具/幻觉）。`docker restart` 可清。复现即记录，不判 FAIL：
-
-```bash
-docker logs opencode-saas-test 2>&1 | grep -c "mark timed out failed" || true
-```
-
-**期望**：记录次数与现象。根治（mark 操作熔断/超时 part 强制回收）超出本文件范围，另立议题。
-
----
-
-## 测试矩阵
-
-| 编号   | 分类 | 场景             | 关键验证点                      |
-| ------ | ---- | ---------------- | ------------------------------- |
-| T50.1  | 准备 | 创建 session     | 沙箱就绪                        |
-| T50.2  | 准备 | 注册 MCP         | PG 持久化                       |
-| T50.3  | 准备 | MCP 配置读取     | 配置存在且启用                  |
-| T50.4  | 发现 | 首次真实调用     | execute completed               |
-| T50.5  | 发现 | 目录生成         | description 含工具树            |
-| T50.6  | 基础 | 单工具调用       | echo 返回正确                   |
-| T50.7  | 基础 | toolCalls 元数据 | PG 有调用记录                   |
-| T50.8  | 顺序 | 多步依赖调用     | 2 次顺序调用                    |
-| T50.9  | 顺序 | 调用顺序验证     | toolCalls input 顺序正确        |
-| T50.10 | 并发 | Promise.all      | 3 并发调用                      |
-| T50.11 | 并发 | 并发上限验证     | maxActive<=8                    |
-| T50.12 | 错误 | 子工具错误捕获   | status=error                    |
-| T50.13 | 错误 | 语法错误         | error=true                      |
-| T50.14 | 错误 | PG error 标记    | metadata.error=true             |
-| T50.15 | 沙箱 | 禁止 eval        | 执行失败                        |
-| T50.16 | 沙箱 | 禁止 require     | 执行失败                        |
-| T50.17 | 沙箱 | stdlib 可用      | sort/Math/JSON 正常             |
-| T50.18 | 权限 | deny 隐藏工具    | 工具不可见                      |
-| T50.19 | 权限 | allow 覆盖 deny  | 调用成功                        |
-| T50.20 | 附件 | Kimi K3 图片内容 | file attachment，无 base64 泄漏 |
-| T50.21 | 中止 | 用户取消         | error=true                      |
-| T50.22 | 中止 | 状态验证         | status=error                    |
-| T50.23 | 搜索 | $codemode.search | 返回搜索结果                    |
-| T50.24 | 搜索 | 空查询分页       | 当前页 + 自动化分页覆盖         |
-| T50.25 | 限制 | 大输出截断       | truncated + outputPath          |
-| T50.26 | 限制 | 超并发排队       | 12 调用全部完成                 |
-| T50.27 | 清理 | 删除 MCP         | execute 消失                    |
-| T50.3b | 准备 | 沙箱测试项目     | exec 写文件进沙箱               |
-| T50.28 | 内置 | read+glob 编排   | 真实文件，自我修复收敛          |
-| T50.29 | 内置 | grep+read 组合   | 跨工具数据流                    |
-| T50.30 | 收益 | 脚本汇总对比     | input token 方向性更优          |
-| T50.31 | 已知 | 卡死观察         | 记录，不判 FAIL                 |
-
-## 确定性自动化覆盖
-
-SaaS E2E 通过后必须运行以下测试，不能用 E2E 中的模型回复替代：
-
-```bash
-(cd packages/opencode && bun test test/tool/code-mode.test.ts test/tool/code-mode-integration.test.ts)
-(cd packages/opencode && bun test test/mcp/session-mcp.test.ts)
-(cd packages/opencode && bun test test/mcp/lifecycle.test.ts)
-(cd packages/codemode && bun test test/promise.test.ts)
-```
-
-这些文件必须分进程运行，因为 `session-mcp.test.ts` 使用进程级 MCP SDK mock。
-
-自动化层覆盖：完整/部分 catalog、schema signature、特殊工具名、structuredContent、图片与 resource blob/link、base64 隔离、console 日志、权限 ask/deny、错误传播、预中止、实时 metadata、搜索分页、并发上限、session cache 隔离、client 关闭与重连、remote/local MCP 失败隔离及 timeout 清理。
-
----
-
-## 复测记录
-
-| 日期 | 环境 | 结果 |
+| 能力 | 当前状态 | 本文如何验收 |
 |---|---|---|
-| 2026-09-04 | 组合 1（远端 PG+远端沙箱），镜像 `:ccr`，all 模式（T50.27 用 mcp 模式），Yd-DeepSeek/deepseek-v4-flash | E2E 29/30 通过：T50.1–19 ✅（T50.8 重跑一次，T50.12 改缺参触发，T50.18 按语义判），T50.20 ⏭️（Kimi provider 500，网关问题），T50.21 ✅，T50.22 ⚠️（interrupted 语义与文档旧断言不一致，已修正断言），T50.23–26 ✅，T50.27 ✅（mcp 模式 0 新 part），T50.28–30 ✅（T50.30 实验设计修正为两轮对比，276 vs 1350）。自动化：code-mode catalog 8 ✅ / session-mcp 13 ✅ / lifecycle 21 ✅ / promise 35 ✅ |
+| V2 `execute({ code })`、受限解释器、工具调用及 progress metadata | server 兼容执行器与 Sandbox Runner 路径均接入 Tool snapshot | 单测 + HTTP/PG E2E |
+| step / timeout / tool-call / output 限额 | CodeMode 配置与解释器已有实现 | 配置单测 + E2E 失败状态检查 |
+| Session 权限、工具定义过滤与调用 | 沿用 SaaS Tool snapshot 路径 | HTTP/PG E2E |
+| Runner daemon、Sandbox 镜像 bundle、WebSocket execute/tool.call/result/progress/cancel | 已实现基础链路；容器内 smoke 覆盖解释器、工具 RPC、重叠路径、危险路径拒绝及 progress | 单测 + 容器内协议 smoke；不足以替代 SaaS HTTP/PG E2E |
+| Tool snapshot execute dispatch、Session Sandbox 启动及 SaaS tool callback | 已接入代码 | 必须通过启用的 OpenSandbox + SaaS HTTP API 验证；本地 Runner 测试不替代此验收 |
+| PG execution/call ledger、nonce/owner lease、多实例路由 | **尚未接入** | 不得宣称完整架构验收或可审计的 execution/call 状态已完成 |
 
-> 复测记录（2026-09-06，merge upstream/dev v1.18.29 后，镜像 `t0906-merged-1.18.29` + `OPENCODE_EXPERIMENTAL_CODE_MODE=all`，组合 3 本地沙箱，模型 Yd-DeepSeek）：
-> - 单测：`code-mode.test.ts`/`code-mode-integration.test.ts`/`code-mode-policy.test.ts`/`code-mode-tool-script-parity.test.ts` **89/89 ✅**（catalog/signature/sandbox 限制/权限可见性/截断——覆盖 T50.5 及错误处理、沙箱限制、权限过滤、大输出截断的代码逻辑面）
-> - 集成（execute 全链，deepseek 稳定触发，同 read 属"必须执行才能答"任务）：T50.4 ✅（echo `Echo: discovery-ok`，toolCalls 元数据精确匹配）、T50.6/7 ✅（`Echo: hello code-mode`）、T50.8/9 ✅（顺序依赖：step1 → `Echo: step1` 传递，PG 水位新增 2 execute）、T50.10/11 ✅（并发 3 条 toolCalls a/b/c 全 completed）
-> - ⚠️ 执行要点：模型可能幻觉"已调用 execute"或复用上一轮代码——**必须用 PG 水位**（记录调用前 execute part 数，只查新增）判定，勿用 HTTP 同步响应或"最后一条 execute"；措辞用「先调用 execute 跑精确代码，再原样报告 output」
-> - 图片类 T50.20（需 moonshot key）、内置工具编排长链用例未逐条跑（单测覆盖代码逻辑）
+Code Mode 当前默认选择 Sandbox executor，且默认由 Sandbox Runner 的原生 `fetch` 发起网络请求；设置 `OPENCODE_CODEMODE_EXECUTOR=server` 才会使用兼容的服务端执行器及其网络。已完成的 server executor HTTP/PG 测试属于显式 server 配置下的历史基线。Sandbox executor 代码路径现已连接 Tool snapshot callback，但尚未通过本地 OpenSandbox + HTTP/PG E2E，也没有 PG execution/call ledger、nonce 握手或 owner lease。
 
-> **复测记录（2026-09-14，镜像 `hitl-cbf2276a-wip2`（含 pgJsonb/LEASE_TOOLS/偏离修复）+ `OPENCODE_EXPERIMENTAL_CODE_MODE=all`，本地 PG + 远端 K8s 沙箱，Yd-DeepSeek）**：
->
-> **单测层 ✅ 326/326**：
-> - `packages/opencode` code-mode 4 文件（catalog/integration/policy/tool-script-parity）：**89/89** ✅
-> - `packages/codemode` 6 文件（codemode/enumeration/parity/signature/stdlib/promise）：**237/237** ✅
->
-> **E2E 集成层 ⚠️ 未完成——逐步排查后定位到 fixture 问题（非网络/非平台缺陷）**：
->
-> 排查过程（用户质疑"远端沙箱 9100 不可达不应该"后深入验证）：
-> 1. ✅ **proxy URL 网络层完全通**：`http://host.docker.internal:30040/sandboxes/{id}/proxy/9100/mcp` 从 SaaS 容器 node fetch → `status:200` + `mcp-session-id` 正确返回——远端 K8s 沙箱的 proxy endpoint 工作正常
-> 2. ✅ **supergateway 可正常启动**：手动 `supergateway --stdio "node echo-mcp.mjs" --outputTransport streamableHttp --port 9100` 后 `/mcp` POST initialize 返回 200 + SSE + session-id
-> 3. ❌ **fixture 的 echo-mcp.mjs 依赖缺失**：沙箱里没有 `@modelcontextprotocol/sdk`（`npm install` 后又发现 fixture 的 `setRequestHandler` 参数用字符串而非 SDK 的 `ListToolsRequestSchema/CallToolRequestSchema`——修正后 supergateway 能桥接成功）
-> 4. ⚠️ **系统自动启动的 supergateway 产生嵌套**：`mcp/index.ts` 的 bridge 命令是 `supergateway --stdio "npx -y supergateway --stdio node /workspace/echo-mcp.mjs" --outputTransport streamableHttp --port 9100`——外层 supergateway 的 stdio 子命令本身又是一层 `npx supergateway`，造成多层进程链（实测沙箱内出现 `npm exec → sh → supergateway → node` 四层），启动极慢且状态不稳定
->
-> **结论**：不是"远端 K8s 沙箱端口不可达"（此前记录有误——proxy URL 完全通），而是 **local MCP 的 stdio→HTTP 桥接在沙箱内的启动链过长**（supergateway 嵌套 + npm 下载 + node 启动），MCP connect 30 次重试 × 32s 窗口内不稳定完成。**fixture 问题已定位但受时间限制未完整闭环 E2E**——建议下一步：
-> - 用**预装好依赖的沙箱镜像**（sandbox Dockerfile 里 `npm install -g supergateway @modelcontextprotocol/sdk`）重跑
-> - 或用 `type:"remote"` 直连外部 MCP URL（绕过沙箱内桥接）
-> - 单测层 326/326 已覆盖 code-mode 全部代码逻辑（catalog/signature/sandbox 限制/权限/截断/promise/并发/stdlib），E2E 的增量验证主要是发现+桥接链路稳定性
+完整 Sandbox 验收仍须通过 HTTP 请求验证 Runner → SaaS Tool snapshot callback，并在 PG 中检查现有 Session/Message/Tool 状态。配置值被接受、Runner 能单独启动或 WebSocket 单测通过，都不能替代 HTTP/PG 端到端验收。
 
-> **复测记录补遗（2026-09-14/15，方案 B fixture 自带依赖验证通过后 E2E 核心链路重跑）**：
->
-> **方案 B 确认**：fixture 在 `/workspace/mcp-server/` 下独立项目 + `npm install @modelcontextprotocol/sdk`，MCP command 直接 `node /workspace/mcp-server/echo.mjs`——**无需改沙箱 Dockerfile**，MCP server 作者自带依赖是正确定位。
->
-> | 用例 | 结果 | 实测 |
-> |---|---|---|
-> | T50.4 execute 发现+连接 | ✅ | 水位 0→1，`Echo: fixture-b-ok` |
-> | T50.6 单工具 | ✅ | `Echo: single-call` |
-> | T50.7 toolCalls 元数据 | ✅ | `[{"tool":"test-echo.echo","input":{"text":"a"},"status":"completed"},...]` |
-> | T50.8 顺序依赖 | ✅ | step1 传递：`Echo: step2:step1` |
-> | T50.9 调用顺序 PG 验证 | ✅ | toolCalls 数组完整记录顺序与状态 |
-> | T50.10 Promise.all 并发 | ✅ | `Echo: a|Echo: b|Echo: c` |
-> | T50.11/26 并发上限 | ✅ | 12 并发 `count=12` 全 completed |
-> | T50.12 子工具错误捕获 | ✅ | try/catch 捕获（echo 传 number 参数正常返回 `Echo: ` 前缀） |
-> | T50.13 语法错误 | ✅ | `error: Failed to parse TypeScript: Expression expected.` |
-> | T50.14 PG error 标记 | ✅ | part status=error + error 文本持久化 |
-> | T50.15 禁止 eval | ✅ | `blocked: Unknown identifier 'eval'` |
-> | T50.16 禁止 require | ✅ | `blocked: Unknown identifier 'require'` |
-> | T50.17 内置 stdlib | ✅ | `stdlib=123{"a":1}5`（sort/JSON/Math 全可用） |
-> | T50.23 工具搜索 | ✅ | `tools.n.search({query:'echo'})` → `items:[{path:'tools["test-echo"].echo',...}]`（⚠️ 文档旧写法 `$codemode.search` 已过时，正确 API 是 `tools.n.search`） |
-> | T50.24 命名空间搜索 | ✅ | `namespace:'test-echo'` 过滤正确 |
-> | T50.25 大输出 | ✅ | 50K 字符全量返回（`len:153225`——含 JSON 包装），截断阈值正常 |
-> | T50.18 deny 隐藏工具 | ✅ | session permission deny `test-echo.echo` → `Unknown identifier 'echo'` |
-> | T50.19 allow 恢复 | ✅（新 session） | toolCalls 记录 echo 调用 completed；⚠️ 同一 session 内 MCP 删→重建后 execute 的工具注入不刷新（连接生命周期限制，新 session 正常） |
-> | T50.27 删 MCP 后工具消失 | ✅ | 删除后 `Unknown identifier 'echo'` |
-> | T50.28 all 模式内置工具 | ⚠️ NOTE | 无 MCP 的新 session `no-read`（all 模式内置工具未注入到无 MCP 上下文）——单测覆盖逻辑，E2E 行为需进一步确认 |
-> | T50.5 describeCatalog | ✅（单测覆盖） | code-mode.test.ts catalog 8 例全过 |
-> | T50.20 图片/T50.21/22 中止/T50.29/30 内置编排 | ⏭️ 未跑 | 需图片 provider / 长流程 / 特定上下文 |
->
-> **E2E 累计：20 PASS + 1 NOTE + 3 未跑**（加单测 326/326）
+### Code Mode 核心价值覆盖矩阵
+
+| 社区所述核心价值 | 当前用例 | 覆盖结论 | 缺口 / 补充用例 |
+| --- | --- | --- | --- |
+| 减少大工具目录的 schema/context 占用 | TCM2.8、TCM2.9 验证 snapshot 过滤和 `search()` | **部分**：证明按需搜索正确，不证明大目录未将全部 schema 送入模型 | TCM2.9a：大目录按需发现与 model request 审计 |
+| 中间结果留在执行环境、只回传聚合结果 | TCM2.4a 对 3 条 issue 做汇总 | **部分**：证明小数据聚合正确，不证明大结果未污染后续模型上下文 | TCM2.4c：大结果 Sandbox 聚合与后续 model request 哨兵检查 |
+| 循环、条件、顺序依赖和并发编排 | TCM2.4a、TCM2.5、TCM2.6、TCM2.7 | **覆盖**：自然触发、依赖传值、`Promise.all`、错误捕获均有断言 | 保持 HTTP/PG 回归 |
+| 在隔离环境执行代码和处理数据 | TCM2.S1–S8、TCM2.13、TCM2.15 | **定义已覆盖，E2E 未通过**：S8 要求以 fixture egress identity 证明 fetch 源于 Sandbox | TCM2.S1–S8 与 S9 必须在 OpenSandbox + HTTP/PG 环境复跑 |
+
+## 1. 环境与安全约定
+
+测试环境要求：
+
+- SaaS 服务按项目约定运行在 Docker 中；测试请求发往该容器公开的 SaaS HTTP API。
+- 数据库使用当前环境对应的 PostgreSQL；`BASE`、`PG_URL`、`MODEL` 由环境脚本提供，不在文档中固化密码或 API key。
+- API 路径以当前 V2 `/api/...` 为准。不要使用 V1 `/session/:id/message`、`/prompt_async` 或 `/exec`。
+- 每轮执行使用独立 Session，避免历史 Tool part、权限规则或 MCP 状态污染结果。
+- 对每个场景先记录本 Session 的 `session_message.seq` 水位，只检查水位之后新写入的记录；不得查询“不加边界的最新一行”。
+- 所有命令应检查 HTTP status 和响应 JSON；不要仅用 `curl -s` 后忽略错误。
+
+从仓库根目录加载本地 PG（`opencode-v2-up`）测试环境与 `pgval` 帮助函数：
+
+```bash
+source docs/test-cases/test-env.sh 3
+source docs/test-cases/test-lib.sh
+test -n "$BASE" && test -n "$PG_URL" && test -n "$MODEL"
+```
+
+### 当前配置
+
+```text
+OPENCODE_CODEMODE_EXECUTOR=server|sandbox   # 默认 sandbox；server 是显式兼容回退
+OPENCODE_CODEMODE_NETWORK=disabled|server|sandbox  # 随 executor 默认：sandbox 或 server
+OPENCODE_CODEMODE_TIMEOUT_MS=<正整数>        # 未设置 = 不限
+OPENCODE_CODEMODE_MAX_TOOL_CALLS=<正整数>    # 未设置 = 不限
+OPENCODE_CODEMODE_MAX_STEPS=<正整数>         # 未设置 = 不限
+OPENCODE_CODEMODE_MAX_OUTPUT_BYTES=<正整数>  # 未设置 = 不限
+```
+
+本地组合 3 的 Sandbox executor E2E 必须额外传入 `OPENCODE_SANDBOX_ENABLED=true` 和 `OPENCODE_SANDBOX_PROTOCOL=http`：前者未设置时 Code Mode 会明确拒绝“requires an enabled Session Sandbox”，后者若遗漏会使用默认 HTTPS，无法连接本地 HTTP OpenSandbox `:8080`。
+
+`OPENCODE_CODEMODE_NETWORK=sandbox` 只允许与 Sandbox executor 同用，Runner 通过 Sandbox 进程的原生 `fetch` 直接发请求；请求不会经过 SaaS。`OPENCODE_CODEMODE_NETWORK=server` 只允许与显式 `executor=server` 同用。设置 `disabled` 会从脚本全局环境移除 `fetch`。
+
+四个限额默认全部不设，与 V2 线一致：限额是部署侧可选策略，不是产品默认。显式设置但不是正整数会在启动时报配置错误，不会静默取消该预算。
+
+默认不限额意味着 `while (true) {}` 这类同步死循环不会被 `timeoutMs`/`maxSteps` 打断：协作式 timeout 在解释器同步执行段无法抢占。生产部署应显式设置 `OPENCODE_CODEMODE_TIMEOUT_MS` 与 `OPENCODE_CODEMODE_MAX_STEPS`；测试限额相关场景时必须显式设置对应变量，否则该场景不会触发限额。
+
+注意：当前 `server` executor 未设置 `OPENCODE_CODEMODE_NETWORK` 时默认为 `server`，因此会启用由 SaaS 进程提供的 `fetch` capability。联网测试必须明确记录该配置并使用受控 URL；`disabled` 才是关闭 fetch 的对照组。当前 web extension 使用全局 fetch，测试不要向其中放入凭据或访问非测试资源。
+
+## 2. V2 HTTP 与 PG 观察方式
+
+### 2.1 创建 Session 并提交 prompt
+
+当前 API 是 `POST /api/session` 创建 Session，`POST /api/session/:sessionID/prompt` 持久接收用户输入并调度 agent loop。Prompt body 使用 `text`，不是旧版 `parts` 数组。
+
+```bash
+api_curl() {
+  test -n "${OPENCODE_PASSWORD:-}" || { echo "OPENCODE_PASSWORD is required" >&2; return 2; }
+  curl --fail-with-body -sS --user "opencode:$OPENCODE_PASSWORD" "$@"
+}
+
+new_session() {
+  jq -nc --argjson model "$V2_MODEL" '{model:$model}' |
+    api_curl -X POST "$BASE/api/session" \
+      -H 'Content-Type: application/json' --data-binary @- |
+    jq -er '.data.id'
+}
+
+send_prompt() {
+  local sid=$1 text=$2
+  jq -nc --arg text "$text" '{text:$text}' |
+    api_curl -X POST "$BASE/api/session/$sid/prompt" \
+      -H 'Content-Type: application/json' --data-binary @-
+}
+```
+
+> `session.prompt` 是 durable admission API，通常返回接纳结果而不是整轮 assistant 最终回复。异步执行完成与否必须检查持久化消息（或订阅当前 V2 event stream）和 PG 状态。
+
+### 2.2 水位和当前 Session Message 结构
+
+当前存储模型为 `session_message`：消息类型与消息数据分列，assistant 数据中的 `content` 包含 `type='tool'` 的 Tool part；Tool state 使用 `streaming`、`running`、`completed` 或 `error`，终态为 `completed` / `error`（`streaming` 只表示 input 仍在流式拼接）。本地 SaaS PG 中 `data` 列为 `text`，查询前必须转换为 `jsonb`。这与 V1 的 `part` 表、`data->'state'` JSON 形状不同。
+
+```bash
+message_watermark() {
+  pgval "SELECT coalesce(max(seq), 0) FROM session_message WHERE session_id='$1'"
+}
+
+assistant_tool_messages_after() {
+  local sid=$1 after=$2
+  pgval "SELECT jsonb_build_object(
+    'message_id', id,
+    'seq', seq,
+    'content', (data::jsonb)->'content'
+  )
+  FROM session_message
+  WHERE session_id='$sid'
+    AND type='assistant'
+    AND seq > $after
+    AND jsonb_path_exists(data::jsonb, '$.content[*] ? (@.type == \"tool\")')
+  ORDER BY seq"
+}
+```
+
+该 PG cast 已按本地 `opencode-v2-up` 的 `session_message.data:text` 定义编写；若测试数据库 schema 不同，应先检查 `information_schema.columns` 并显式适配。消息 HTTP readback 可通过 `GET /api/session/:sessionID/message/:messageID`，响应需按当前协议的 `{ data }` envelope 解包。
+
+### 2.3 等待执行终态
+
+轮询水位后的 assistant Tool part，直到 `state.status` 变成 `completed` 或 `error`，并设置有界 deadline。不要用固定长 `sleep` 代替终态检查。
+
+```bash
+wait_for_execute_terminal() {
+  local sid=$1 after=$2
+  for _ in $(seq 1 120); do
+    local rows
+    rows=$(assistant_tool_messages_after "$sid" "$after")
+    if printf '%s\n' "$rows" | jq -es '
+      [.[]? | .content[]? | select(.type == "tool" and .name == "execute")] as $calls |
+      ($calls | length) > 0 and
+      all($calls[]; .state.status == "completed" or .state.status == "error")
+    ' >/dev/null; then
+      printf '%s\n' "$rows"
+      return 0
+    fi
+    sleep 1
+  done
+  echo "execute did not reach a terminal state before deadline" >&2
+  return 1
+}
+
+wait_for_assistant_completed() {
+  local sid=$1 after=$2
+  for _ in $(seq 1 120); do
+    if [ "$(pgval "SELECT count(*) FROM session_message
+      WHERE session_id='$sid' AND type='assistant' AND seq > $after
+        AND data::jsonb->'time'->>'completed' IS NOT NULL")" -gt 0 ]; then
+      return 0
+    fi
+    sleep 1
+  done
+  echo "assistant turn did not complete before deadline" >&2
+  return 1
+}
+
+# 一条 prompt 的回合可能链式触发多次 execute（先取数再加工）。「首条 assistant
+# completed」只说明某一步落库，不说明回合结束；回合结束的持久信号是 idle 消息。
+# TCM2.4a 这类断言聚合整轮的场景，必须等 idle 后再取数。
+wait_for_turn_idle() {
+  local sid=$1 after=$2
+  for _ in $(seq 1 120); do
+    if [ "$(pgval "SELECT count(*) FROM session_message
+      WHERE session_id='$sid' AND type='idle' AND seq > $after")" -gt 0 ]; then
+      return 0
+    fi
+    sleep 1
+  done
+  echo "turn did not reach idle before deadline" >&2
+  return 1
+}
+```
+
+以下测试示例中的 JSON 检查都应先选取水位之后 `name == "execute"` 的 Tool part。若一轮产生多次 execute（模型自我修复等），按 seq 和 content 顺序断言，不能只断言无边界的“最新一条”。
+
+### 2.4 E2E fixture 前置
+
+模型 E2E 使用独立 Session MCP fixture。五个 fixture（`echo`、`workitems`、`workitems-large`、`inventory`、`delay`）位于服务端 checkout 的 `docs/test-cases/code-mode/fixtures/`，但**不能假设新 Session 的 `/workspace` 已有仓库文件**：Session Sandbox 独立于 SaaS 容器。创建每个 Session 后，必须通过该 Session 的 V2 shell API 将 fixture 内容安装进其 Sandbox，再注册本地 MCP。Sandbox 需要 Node.js 和 `supergateway`（Session MCP bridge 依赖）；无需安装 fixture 的 npm 依赖。
+
+- `echo({message:string})` 稳定返回 `Echo: <message>`；
+- `workitems.search_open({repository:string})` 返回固定的三个 open issue：`OPS-101`、`OPS-102`、`OPS-103`；
+- `workitems.get_issue({key:string})` 返回固定详情：101=`critical`、102=`minor`、103=`major`；
+- `workitems-large.list()` 返回 1,000 条、总正文大于 1 MiB 的唯一 sentinel 记录；
+- `inventory.lookupBySKU({sku:"SKU-42"})` 与 200 个无关 schema 一同注册；
+- 另为取消测试提供一个可控的长任务工具。
+
+Fixture 不得依赖每次运行时 `npx` 下载或未固定版本的公共 MCP 服务。每个 E2E Session 都重新注册 MCP，避免连接状态和历史消息复用。
+
+```bash
+# Session sandbox 的 workspace 根目录固定为 /workspace。
+export ECHO_MCP_COMMAND='["node","/workspace/docs/test-cases/code-mode/fixtures/echo-mcp.mjs"]'
+export WORKITEMS_MCP_COMMAND='["node","/workspace/docs/test-cases/code-mode/fixtures/workitems-mcp.mjs"]'
+export WORKITEMS_LARGE_MCP_COMMAND='["node","/workspace/docs/test-cases/code-mode/fixtures/workitems-large-mcp.mjs"]'
+export INVENTORY_MCP_COMMAND='["node","/workspace/docs/test-cases/code-mode/fixtures/inventory-mcp.mjs"]'
+export DELAY_MCP_COMMAND='["node","/workspace/docs/test-cases/code-mode/fixtures/delay-mcp.mjs"]'
+
+install_session_mcp_fixture() {
+  local sid=$1 fixture=$2 name marker encoded command before
+  name=$(basename "$fixture")
+  marker="mcp-fixture-installed-${sid}"
+  encoded=$(base64 < "$fixture" | tr -d '\n')
+  command="mkdir -p /workspace/docs/test-cases/code-mode/fixtures && printf '%s' '$encoded' | base64 -d > '/workspace/docs/test-cases/code-mode/fixtures/$name' && node --check '/workspace/docs/test-cases/code-mode/fixtures/$name' && command -v supergateway >/dev/null && printf '%s\\n' '$marker'"
+  before=$(message_watermark "$sid")
+  jq -nc --arg command "$command" '{command:$command}' |
+    api_curl -X POST "$BASE/api/session/$sid/shell" \
+      -H 'Content-Type: application/json' --data-binary @- >/dev/null
+  for _ in $(seq 1 60); do
+    if [ "$(pgval "SELECT count(*) FROM session_message
+      WHERE session_id='$sid' AND type='shell' AND seq > $before
+        AND data::jsonb->>'status' = 'exited'
+        AND data::jsonb->>'command' LIKE '%$marker%'
+        AND data::jsonb->'output'->>'output' LIKE '%$marker%'")" -gt 0 ]; then
+      return 0
+    fi
+    sleep 1
+  done
+  echo "MCP fixture installation failed or timed out: session=$sid fixture=$name" >&2
+  return 1
+}
+
+register_echo_mcp() {
+  local sid=$1
+  install_session_mcp_fixture "$sid" "$(git rev-parse --show-toplevel)/docs/test-cases/code-mode/fixtures/echo-mcp.mjs"
+  jq -nc --argjson command "$ECHO_MCP_COMMAND" \
+    '{name:"echo",config:{type:"local",command:$command}}' |
+    api_curl -X POST "$BASE/api/session/$sid/mcps" \
+      -H 'Content-Type: application/json' --data-binary @-
+}
+
+register_workitems_mcp() {
+  local sid=$1
+  install_session_mcp_fixture "$sid" "$(git rev-parse --show-toplevel)/docs/test-cases/code-mode/fixtures/workitems-mcp.mjs"
+  jq -nc --argjson command "$WORKITEMS_MCP_COMMAND" \
+    '{name:"workitems",config:{type:"local",command:$command}}' |
+    api_curl -X POST "$BASE/api/session/$sid/mcps" \
+      -H 'Content-Type: application/json' --data-binary @-
+}
+
+register_workitems_large_mcp() {
+  local sid=$1
+  install_session_mcp_fixture "$sid" "$(git rev-parse --show-toplevel)/docs/test-cases/code-mode/fixtures/workitems-large-mcp.mjs"
+  jq -nc --argjson command "$WORKITEMS_LARGE_MCP_COMMAND" \
+    '{name:"workitems-large",config:{type:"local",command:$command}}' |
+    api_curl -X POST "$BASE/api/session/$sid/mcps" \
+      -H 'Content-Type: application/json' --data-binary @-
+}
+
+register_inventory_mcp() {
+  local sid=$1
+  install_session_mcp_fixture "$sid" "$(git rev-parse --show-toplevel)/docs/test-cases/code-mode/fixtures/inventory-mcp.mjs"
+  jq -nc --argjson command "$INVENTORY_MCP_COMMAND" \
+    '{name:"inventory",config:{type:"local",command:$command}}' |
+    api_curl -X POST "$BASE/api/session/$sid/mcps" \
+      -H 'Content-Type: application/json' --data-binary @-
+}
+
+register_delay_mcp() {
+  local sid=$1
+  install_session_mcp_fixture "$sid" "$(git rev-parse --show-toplevel)/docs/test-cases/code-mode/fixtures/delay-mcp.mjs"
+  jq -nc --argjson command "$DELAY_MCP_COMMAND" \
+    '{name:"delay",config:{type:"local",command:$command}}' |
+    api_curl -X POST "$BASE/api/session/$sid/mcps" \
+      -H 'Content-Type: application/json' --data-binary @-
+}
+
+assert_echo_mcp_configured() {
+  api_curl "$BASE/api/session/$1/mcps" |
+    jq -e '.data | any(.[]; .name == "echo" and .config.type == "local" and .config.disabled != true)'
+}
+```
+
+MCP 配置 GET 只能证明配置存在，不能证明进程已连接；必须由下方真实 `tools.echo.echo` 调用成功来证明连接和 dispatch。若部署的 GET response envelope 与示例不同，应依照当前 V2 OpenAPI 契约调整 jq，而不是跳过断言。
+
+### 2.5 模型请求审计（TCM2.4c / 2.9a / S9 的前置条件）
+
+「初始模型请求没有携带全部 schema」「后续请求没有重新携带大正文」这类断言，只能对**真实 provider 请求**成立。仅检查 Session 持久消息或最终回复无法排除请求本身已污染的情况。
+
+实现：Core 在 `SessionModelRequest.prepare` 末尾（已过 CCR 与全部插件 hook、provider 即将收到请求的时刻）按行追加审计记录。开关环境变量是 `OPENCODE_MODEL_REQUEST_LOG=<目录>`（E2E 脚本里对应 `AUDIT_DIR`）。默认关闭，不设置环境变量时不创建目录、不做投影。
+
+```bash
+# 部署侧（容器启动时）
+docker run -d --name opencode-saas-codemode-current -p 14096:4096 \
+  -e OPENCODE_PASSWORD=codemode-e2e-local \
+  -e OPENCODE_DATABASE_URL=postgresql://local@host.docker.internal:15432/opencode-v2-up \
+  -e OPENCODE_SANDBOX_ENABLED=true -e OPENCODE_SANDBOX_PROTOCOL=http \
+  -e OPENCODE_SANDBOX_DOMAIN=host.docker.internal:8080 -e OPENCODE_SANDBOX_USE_SERVER_PROXY=true \
+  -e OPENCODE_SANDBOX_IMAGE=opencode-opensandbox:codemode-local \
+  -e OPENCODE_MODEL_REQUEST_LOG=/audit -v /tmp/codemode-audit:/audit \
+  opencode-saas-codemode-current:local
+```
+
+每行一个 JSONL 记录，字段为 `sessionID`、`kind`、`agent`、`model`、`toolNames`、`tools`（name/description/inputSchema，namespace 递归展开）、`system`、`messages`、`toolChoice`、`truncated`。`kind` 取值为 `primary` / `generate` / `compaction` / `title`，其中 `title` 请求不携带工具目录；脚本用 `AGENT_KINDS` 只对携带目录的轮次做工具断言。
+
+**审计边界（必须如实理解）**：
+
+- 刻意**不**记录 `http` 与 `providerOptions`，二者承载凭据与 provider 设置；`ModelRequestLog` 单测断言密钥不出现在文件中。
+- 记录的是 provider 即将收到的**模型可见请求**（post-hook）。它能证明模型看到了什么工具与什么消息内容；它不是 provider 网络层抓包，不证明 wire 上的字节完全一致。
+- 单条超过 32 MiB 时降级为 `truncated: true` 并丢弃 `system`/`messages`。**截断记录不能用于"内容缺席"证明**，脚本因此强制断言全部记录 `truncated === false`。
+- 该能力对所有 provider 生效（记录点在 Core，不在具体 route），因此不依赖测试 provider 是否可替换。
+
+`docs/test-cases/code-mode/run-audit-e2e.mjs` 封装了建 Session、装 fixture、注册 MCP、逐轮等待 assistant 终态、读取审计日志与 PG 校验、最后删除 Session 的全过程。等待逻辑按轮次比较"新出现的已完成 assistant 消息"，避免上一轮尚未结束就提交下一轮。
+
+## 3. 先决检查与确定性测试
+
+### TCM2.1 CodeMode package 单测
+
+```bash
+bun run --cwd packages/codemode test
+```
+
+**通过条件**：解释器、工具 catalog、Schema 输入/输出、promise/并发、step 预算、超时与错误测试全部通过。若全包包含与本次改动无关的已知失败，必须逐项报告失败测试名、断言和归属；不能把整包失败简单归因于环境。
+
+### TCM2.2 Core Code Mode / Sandbox 单测
+
+```bash
+bun run --cwd packages/core typecheck
+bun run --cwd packages/core test \
+  test/codemode.test.ts \
+  test/codemode-config.test.ts \
+  test/codemode-fixtures.test.ts \
+  test/codemode-runner.test.ts \
+  test/codemode/catalog.test.ts \
+  test/codemode/instructions.test.ts \
+  test/session-model-request-log.test.ts \
+  test/tool-execute.test.ts \
+  test/sandbox-config.test.ts \
+  test/sandbox-volumes.test.ts \
+  test/sandbox-tools-read.test.ts \
+  test/sandbox-tools-write.test.ts \
+  test/sandbox-tools-ripgrep.test.ts \
+  test/sandbox-proxy-rewrite.test.ts \
+  test/plugin/mcp-codemode-exclusion.test.ts
+```
+
+**通过条件**：命令退出码为 0，并记录通过/失败/跳过数量。该组测试验证可确定的 Core 行为，不替代 HTTP 与 PG E2E。
+
+### TCM2.3 当前 V2 接口与消息 readback
+
+```bash
+SID=$(new_session)
+api_curl "$BASE/api/session/$SID/message" | jq -e '.data | type == "array"'
+```
+
+**通过条件**：服务提供 V2 `/api` 协议；Session message list 使用当前 wire contract。不得以 V1 `/experimental/tool/ids` 或旧工具 catalog 测试代替。
+
+## 4. 服务端 executor HTTP + PG 基线
+
+执行前确认服务进程配置 `OPENCODE_CODEMODE_EXECUTOR=server`（这些场景是 server executor 历史基线），创建独立 Session。每个场景都执行以下准备：
+
+```bash
+SID=$(new_session)
+BEFORE=$(message_watermark "$SID")
+```
+
+`prompt` 提交后从 PG 等待 `execute` Tool part；必要时用 message GET 或当前 V2 事件接口辅助定位，但最终状态和子工具输入/结果以 PG 持久化的 Session Message 为准。
+
+### TCM2.4 execute 暴露与单工具编排
+
+创建 Session、注册并验证 deterministic echo MCP，然后记录水位、提交 prompt 并等待所有新增 execute Tool part 进入终态：
+
+```bash
+SID=$(new_session)
+register_echo_mcp "$SID"
+assert_echo_mcp_configured "$SID"
+BEFORE=$(message_watermark "$SID")
+send_prompt "$SID" '必须调用 execute，执行：return await tools.echo.echo({message:"v2-single"})'
+ROWS=$(wait_for_execute_terminal "$SID" "$BEFORE")
+printf '%s\n' "$ROWS" | jq -es '
+  [.[] | .content[] | select(.type == "tool" and .name == "execute")] as $calls |
+  ($calls | length) == 1 and
+  $calls[0].state.status == "completed" and
+  ($calls[0].state.input.code | contains("v2-single")) and
+  ($calls[0].state.content | tostring | contains("Echo: v2-single")) and
+  $calls[0].state.metadata.toolCalls == [{"tool":"echo.echo","status":"completed","input":{"message":"v2-single"}}]
+'
+```
+
+**断言**：
+
+1. assistant tool content 中有 `name == "execute"` 的 Tool part；state 最终为 `completed`。
+2. `execute` 的 input.code 包含预期脚本语义（不要求模型生成文本逐字一致）。
+3. execute 输出包含 echo 的结构化结果；execute state metadata 中子工具调用记录为 completed，路径及 input 与测试值吻合。
+4. child tool 的实际执行仍经过 SaaS Tool snapshot；PG 中 Session Message 有对应 progress/tool-call 记录。
+5. 不以 prompt endpoint 返回值或 assistant 自然语言声称“完成”作为通过依据。
+
+### TCM2.4a 真实业务任务：批量 triage 工单并自然触发 Code Mode
+
+此场景刻意**不在用户 prompt 中提 `execute`、Code Mode 或脚本**，检验模型是否会在需要多工具取数、汇总和派生计算时自行选择 Code Mode。每次运行使用新 Session 和 deterministic `workitems` MCP：
+
+```bash
+SID=$(new_session)
+register_workitems_mcp "$SID"
+api_curl "$BASE/api/session/$SID/mcps" |
+  jq -e '.data | any(.[]; .name == "workitems" and .config.disabled != true)'
+BEFORE=$(message_watermark "$SID")
+
+send_prompt "$SID" '请整理 acme/api 仓库当前所有未关闭 issue：先找出 issue，再检查每条详情；这些详情查询彼此独立，可以并行完成。将 critical 和 major 视为高优先级。只返回 JSON：repository、openCount、highPriorityCount、highPriorityIssues；highPriorityIssues 按 issue 编号升序排列；不要修改 issue。'
+wait_for_execute_terminal "$SID" "$BEFORE"
+wait_for_turn_idle "$SID" "$BEFORE"   # 回合可能链式多次 execute，等 idle 再聚合取数
+ROWS=$(assistant_tool_messages_after "$SID" "$BEFORE")
+# 最终答案在回合末尾的纯文本 assistant 消息里；剥离 ```json 围栏后解析。
+FINAL_JSON=$(pgval "SELECT (data::jsonb)->'content' FROM session_message
+  WHERE session_id='$SID' AND type='assistant'
+    AND (data::jsonb)->'time'->>'completed' IS NOT NULL
+  ORDER BY seq DESC LIMIT 1" |
+  jq -c '[.[]? | select(.type == "text") | .text
+    | gsub("^```(json)?\\s*|\\s*```$"; "") | try fromjson catch null]')
+
+printf '%s\n' "$ROWS" | jq -es --argjson final "$FINAL_JSON" '
+  [.[] | .content[] | select(.type == "tool" and .name == "execute")] as $execs |
+  ($execs | map(select(.state.status == "completed"))) as $ok |
+  ($ok | last) as $last |
+  ($ok | length) >= 1 and ($last != null) and
+  # 自然触发通常是两次 execute（先 search_open 再 get_issue），断言必须聚合整轮，
+  # 不能只看最后一个 execute；也不能只看单条 input.code。
+  (([$ok[].state.input.code] | join("\n")) | contains("search_open")) and
+  (([$ok[].state.input.code] | join("\n")) | contains("get_issue")) and
+  ([$ok[].state.metadata.toolCalls[]?] as $calls |
+    any($calls[]; .tool == "workitems.search_open" and .status == "completed" and .input.repository == "acme/api") and
+    ([$calls[] | select(.tool == "workitems.get_issue" and .status == "completed") | .input.key] | sort) == ["OPS-101","OPS-102","OPS-103"] and
+    ([$calls[] | select(.status == "error")] | length) == 0 and
+    all($calls[]; .tool == "search" or .tool == "workitems.search_open" or .tool == "workitems.get_issue")
+  ) and
+  # 最终 JSON 在回合末尾的纯文本 assistant 消息里，不在最后一个 execute 的
+  # content 里（那是脚本返回值）；highPriorityIssues 条目可能是编号或对象，
+  # 文本可能带 ```json 围栏，先剥离再解析。
+  ($final | any(
+    . != null and
+    .repository == "acme/api" and
+    .openCount == 3 and
+    .highPriorityCount == 2 and
+    ((.highPriorityIssues | map(.key // .) | sort) == ["OPS-101","OPS-103"])
+  ))
+'
+```
+
+**过程与结果断言**：
+
+1. 新增 assistant Tool content 中实际出现 `name == "execute"`；只看到自然语言总结或直接返回答案不算触发成功。
+2. execute 输入是本任务的 CodeMode 程序；最终成功的 execute 至少经由 Tool snapshot 完成 1 次搜索和 3 次详情调用，PG 中记录的工具名、input、completed 状态与 fixture 一致。
+3. 最终结构化 JSON 精确反映 fixture 的 3 个 open issue、2 个高优先级 issue 及编号排序；没有对 MCP 执行写操作。
+4. 若模型先失败后自我修复，按 Session Message 顺序保留并检查完整 execute 序列；最终成功结果通过即可，但中间失败及其调用也必须记录，不能只摘录最后输出。
+
+为了观察“正常触发”而非单次偶然结果，建议用 3 个独立 Session 重复该 prompt，记录 `触发次数/总次数`、完成率和结果正确率；触发率与执行正确率分开统计。
+
+### TCM2.4b 负向对照：简单计算不应无故调用工具
+
+在新 Session 中注册同一 fixture，提交不需要外部数据的简单请求：
+
+```bash
+SID=$(new_session)
+register_workitems_mcp "$SID"
+BEFORE=$(message_watermark "$SID")
+send_prompt "$SID" '直接计算 17 × 23，只回答整数，不要查询外部数据。'
+wait_for_assistant_completed "$SID" "$BEFORE"
+assistant_tool_messages_after "$SID" "$BEFORE" | jq -es '
+  [.[] | .content[]? | select(.type == "tool" and .name == "execute")] | length == 0
+'
+pgval "SELECT jsonb_build_object('content',(data::jsonb)->'content')
+  FROM session_message WHERE session_id='$SID' AND type='assistant' AND seq > $BEFORE
+  ORDER BY seq DESC LIMIT 1" |
+  jq -e 'any(.content[]?; .type == "text" and (.text | test("391")))'
+```
+
+等待该轮 assistant 完成后，从 `BEFORE` 之后的 `session_message` 检查：预期没有 `execute` Tool part，也没有 `workitems.*` 调用，assistant 文本答案为 `391`。这是触发精确率对照；与 TCM2.4a 的真实工具任务一起报告，不能只测“总会触发”而不检查不必要触发。
+
+### TCM2.4c 大中间结果在 Sandbox 内聚合
+
+新增 deterministic `workitems-large` MCP fixture：`list` 返回至少 1,000 条记录，每条包含唯一、不可从汇总推导的 `bodySentinel`（总内容至少 1 MiB）；`get` 返回该 sentinel 的完整正文。prompt 要求计算计数、分组和前 N 项标题，只返回小型 JSON，不得返回正文。
+
+```bash
+SID=$(new_session)
+register_workitems_large_mcp "$SID"
+BEFORE=$(message_watermark "$SID")
+send_prompt "$SID" '必须调用 execute：读取 workitems-large.list 的全部数据，在代码中统计 even/odd 数量并返回前 3 个 title。只返回 JSON，不要返回任何 bodySentinel 或正文。'
+ROWS=$(wait_for_execute_terminal "$SID" "$BEFORE")
+```
+
+断言对象必须是**真实 provider 请求**，因此必须先开启 `OPENCODE_MODEL_REQUEST_LOG`（见 2.5）。脚本会提交两条 prompt：第一条要求在 execute 内聚合，第二条只要求解释上一轮口径，从而把"后续 model request"也纳入检查。
+
+```bash
+BASE="$BASE" OPENCODE_PASSWORD="$OPENCODE_PASSWORD" \
+MODEL_PROVIDER=Yd-DeepSeek MODEL_ID=deepseek-v4-flash \
+FIXTURE=workitems-large-mcp.mjs MCP_NAME=workitems-large \
+AUDIT_DIR="$AUDIT_DIR" SENTINEL=BODY-SENTINEL \
+PROMPTS='["必须调用 execute：读取 workitems-large.list 的全部数据，在代码中统计 even/odd 数量并返回前 3 个 title。只返回 JSON，不要返回任何 bodySentinel 或正文。","不要调用任何工具，只用一句话说明上一轮 even/odd 的统计口径。"]' \
+node docs/test-cases/code-mode/run-audit-e2e.mjs
+```
+
+**断言**：
+
+1. execute 实际读取 fixture 大结果，最终 execute 输出只含要求的聚合 JSON，且小于 16 KiB。
+2. 本 Session 的**每一条** provider model request 的 messages 都不包含任一 `bodySentinel`；PG 中 execute Tool part 与最终 assistant 文本同样不含。
+3. 第二轮 model request 必须包含第一轮的聚合 JSON（证明历史确实被携带），但不含大正文；若 provider/adaptor 将原始 MCP 结果重新写入模型上下文，此用例必须 FAIL。
+4. 脚本必须额外断言"最后一条 prompt 确实出现在某条被审计的请求里"，否则"内容缺席"可能只是"请求没发生"造成的假通过。
+5. 在 `executor=sandbox` 下记录 Runner/Sandbox 证据；不能用 server executor 的结果标记 Sandbox 数据局部性通过。
+
+### TCM2.5 顺序依赖与调用顺序审计
+
+一次 execute 内先传 `v2-first` 调用 echo，再将其结果作为第二次调用输入。
+
+**断言**：execute 完成；调用 metadata 顺序为 first call → dependent call；第二次 input 精确依赖第一次的返回值。不得只验证 toolCalls 数量。
+
+### TCM2.6 Promise.all 并发与总调用预算
+
+执行脚本并行发出 3 个相互独立的 echo 调用，随后执行 12 个调用的压力变体。
+
+**断言**：
+
+- 3 调用场景：所有调用 completed，结果可关联到各自 input。
+- `OPENCODE_CODEMODE_MAX_TOOL_CALLS` 限制一次执行准入的**总调用数**，不是并发数；该变量默认不设，显式设置为 20 时 12 次调用不得超限。
+- 当前 CodeMode runtime 不承诺 `maxActive` 上限；`packages/codemode/test/promise.test.ts` 的对应契约为“不限制 live tool-call concurrency”。barrier 测试应验证 Promise.all 确实有重叠执行，而不是与不存在的并发配置比较。
+- 若调用的具体工具内部使用 SandboxProvider semaphore，其排队/并发上限属于 Sandbox command 层，必须作为独立资源并发测试，不能推断为 CodeMode 调用上限。
+- PG tool-call 数量、status、input/result 与 HTTP 请求水位匹配。
+
+### TCM2.7 子工具错误与脚本错误
+
+分两种错误：
+
+1. **子工具失败可捕获**：向必填参数校验严格的测试工具传缺参，在 Code Mode 脚本 `try/catch` 中捕获。
+2. **Code Mode 解析/执行失败**：分别提交非法语法和不允许的 capability（如 `require`、`eval`、`process`）。
+
+**断言**：可捕获的 child tool failure 在 `metadata.toolCalls` 中为 error，脚本可继续并以 execute `completed` 返回捕获结果。当前 CodeMode 解析/解释器失败是 `CodeMode.Result` diagnostic，由 `CodeModeTool` 转为 execute 的返回文本及 `metadata.error=true`；外层 assistant Tool state 通常仍是 `completed`，只有 Core Tool executor 自身失败才应为 `state.status=error`。断言需同时检查内层诊断、metadata 和外层 state，不能把两种错误状态混为一谈。不允许的 global 不得成功读取或执行。
+
+### TCM2.8 权限、工具快照与定义过滤
+
+对 Session 设置 deny 规则后发送 execute 请求，随后改为 allow 并重试。规则的 API payload 以当前 `Permission` wire schema 为准，不照搬 V1 permission 字段。
+
+当前 Session 更新契约的字段为 `permissions`，Rule 形状为 `{action, resource, effect}`。针对 permission action 为 `echo_echo` 的测试工具，可拒绝其所有资源：
+
+```bash
+jq -nc '{permissions:[{action:"echo_echo",resource:"*",effect:"deny"}]}' |
+  api_curl -X PATCH "$BASE/api/session/$SID" \
+    -H 'Content-Type: application/json' --data-binary @-
+```
+
+恢复时将 `effect` 改为 `allow`，并在**新 prompt**中重新检查 snapshot。示例中的 `echo_echo` 来自 MCP permission action `<server>_<tool>` 的规范化命名；测试应先按 `McpTool.name(server, tool)` 核实真实 action。工具目录过滤不是授权本身，调用时仍由 MCP leaf 的 `Permission.assert` 执行授权。
+
+**断言**：deny 状态下工具目录不包含该工具且无法执行成功；恢复 allow 后新请求的新 Tool snapshot 能发现并成功调用；旧请求不应在执行中途悄然变更 snapshot。PG 状态应反映拒绝/成功结果，不得出现 deny 工具成功调用。
+
+### TCM2.9 搜索与目录可见性
+
+由脚本调用当前 CodeMode 内建搜索函数 `search({query:"echo"})`（也可用 `tools.search({query:"echo"})`），分别验证关键词搜索、namespace 过滤、空查询分页与 offset/remaining。搜索签名定义在 `packages/codemode/src/tool-runtime.ts`，不得使用 `$codemode.search`。
+
+**断言**：搜索只返回当前 snapshot 可见工具；分页单测负责完整分页边界；HTTP E2E 验证真实请求中的权限过滤及结果。
+
+### TCM2.9a 大工具目录按需发现
+
+新增 Session MCP fixture，注册至少 200 个具有不同 description/input schema 的只读工具；其中只有 `inventory.lookupBySKU` 与任务相关。断言对象必须是**真实 provider 请求**，因此必须先开启 `OPENCODE_MODEL_REQUEST_LOG`（见 2.5），否则本用例记为 BLOCKED 而不是 PASS。
+
+```bash
+BASE="$BASE" OPENCODE_PASSWORD="$OPENCODE_PASSWORD" \
+MODEL_PROVIDER=Yd-DeepSeek MODEL_ID=deepseek-v4-flash \
+FIXTURE=inventory-mcp.mjs MCP_NAME=inventory \
+AUDIT_DIR="$AUDIT_DIR" FORBIDDEN_TOOL_PREFIX=inventory. EXPECT_CATALOG_TOTAL=201 \
+PROMPTS='["必须调用 execute：先搜索 SKU 相关工具，再查询 SKU-42；只返回 sku、title、quantity 的 JSON。"]' \
+node docs/test-cases/code-mode/run-audit-e2e.mjs
+```
+
+**断言**：
+
+1. provider 原生 tool definitions 仅包含 `execute` 与当前明确 `codemode:false` 的直接工具，不得包含任何 `inventory.*` schema。
+2. Code Mode catalog 是**有界摘要**而不是全量展开：namespace 行报告真实工具数，并只内联预算内的少量条目。当前实现对内联条目渲染完整 input schema，因此可验证的上限是"内联条目数 < 该 namespace 工具数"，实测 `inventory 8/201`、`browser 7/44`；**不得**断言"请求里完全没有无关工具的 schema 文本"，那是与实现不符的过强断言。
+3. execute 通过 `search({query:"SKU"})` 发现 `inventory.lookupBySKU`，仅调用该工具并返回 fixture 固定结果。
+4. deny 一个无关工具不应改变该任务结果；deny `inventory.lookupBySKU` 后新 snapshot 的搜索与调用必须失败，证明按需发现仍遵守 snapshot/权限过滤。
+
+> 已知取舍（非本用例失败项）：catalog 内联条目当前带完整 input schema，占用与预算内条目数成正比。若产品要进一步压缩 system prompt，应改为内联只给 path + 描述、schema 由 `search()` 按需返回；这属于 catalog 呈现策略变更，需要独立评估后再改，不能在验收用例里假装已满足。
+
+### TCM2.10 预算、输出大小与超时
+
+使用低测试配置启动独立 SaaS 实例（不得在线修改进程级 env）。这四个限额默认都不设，因此本节每个子场景都必须显式设置对应变量，否则限额不会触发：
+
+> **就绪门控**：全新实例上 Session MCP 工具可能迟迟不进入 Code Mode 工具清单（2026-10-01 实测：45s 沉降 + 预热轮后 CCR 工具已在而 MCP 工具仍缺，`search` 返回空、调用报 `Unknown tool`）。每个预算子场景断言前必须先确认目标工具可见（例如先跑一轮 `search({query:"echo"})` 且结果包含该工具）；不可见时本场景记 BLOCKED，不得把"工具未就绪"误判为限额行为。
+
+- `OPENCODE_CODEMODE_MAX_STEPS`：低步数触发 step limit。
+- `OPENCODE_CODEMODE_TIMEOUT_MS`：超时脚本触发 deadline。
+- `OPENCODE_CODEMODE_MAX_TOOL_CALLS`：超过预算后不再启动更多工具调用。
+- `OPENCODE_CODEMODE_MAX_OUTPUT_BYTES`：超长结果触发截断诊断/返回文本限制。
+
+**断言**：step/tool-call 超限形成相应 CodeMode diagnostic；timeout 使 Tool 执行进入终态；输出限制检查 execute 返回文本中的 `[result truncated:` 提示。`CodeModeTool` 当前把 `CodeMode.Result` 格式化为文本，PG Tool metadata 并不承诺暴露 `truncated` 字段或 `outputPath`；测试不能断言这些未定义字段。tool 总调用数不超过上限，PG 状态属于本次水位。
+
+### TCM2.11 Session interrupt 与工具调用中断
+
+提交一个可控的长耗时 child tool，观察 PG 中 execute state 到达 `running` 后调用当前接口：
+
+```bash
+api_curl -X POST "$BASE/api/session/$SID/interrupt" \
+  -H 'Content-Type: application/json' -d '{}'
+```
+
+**断言**：assistant Tool part 进入当前协议定义的中断终态（以实际 `SessionMessage.ToolState` 和保存状态为准）；等待中的 child tool 不继续产生副作用；同一服务中其它 Session 的执行不被误中断。不要沿用 V1 `aborted`、`metadata.interrupted` 或 `/abort` 断言，除非当前 V2 wire/storage contract 明确提供该字段。
+
+### TCM2.12 删除 MCP / Session 清理
+
+用当前接口 `DELETE /api/session/:sessionID/mcps/:name` 删除测试 MCP，并 GET 当前 Session MCP 配置确认持久记录已移除。随后提交新 prompt。
+
+**断言**：新 Tool snapshot 不含已删除的 MCP 工具且无法调用；执行完成后通过当前 Session 删除 API 清理测试 Session。不要断言 execute 工具整体消失：Code Mode 是否可见取决于当前注册、权限和配置，不等同于单个 MCP 的生命周期。
+
+### TCM2.13 沙箱文件与 Session 隔离
+
+V2 shell API 使用 `POST /api/session/:sessionID/shell`（body `command`），不是旧 `/exec`。shell route 返回 NoContent；完成状态和 bounded output 从 PG 的 `session_message` 中 `type='shell'` 消息读取。以下命令使用两个 Session 的唯一哨兵值，避免跨用例误读：
+
+```bash
+SID_A=$(new_session); SID_B=$(new_session)
+BEFORE_A=$(message_watermark "$SID_A"); BEFORE_B=$(message_watermark "$SID_B")
+
+run_shell() {
+  local sid=$1 command=$2
+  jq -nc --arg command "$command" '{command:$command}' |
+    api_curl -X POST "$BASE/api/session/$sid/shell" \
+      -H 'Content-Type: application/json' --data-binary @- -o /dev/null
+}
+
+wait_shell_output() {
+  local sid=$1 after=$2 marker=$3
+  for _ in $(seq 1 60); do
+    local output
+    output=$(pgval "SELECT data::jsonb->'output'->>'output'
+      FROM session_message
+      WHERE session_id='$sid' AND type='shell' AND seq > $after
+        AND data::jsonb->>'status' = 'exited'
+        AND data::jsonb->>'command' LIKE '%$marker%'
+      ORDER BY seq DESC LIMIT 1")
+    [ -n "$output" ] && { printf '%s' "$output"; return 0; }
+    sleep 1
+  done
+  echo "shell did not finish: session=$sid marker=$marker" >&2
+  return 1
+}
+
+run_shell "$SID_A" 'mkdir -p /workspace && printf A-only > /workspace/code-mode-isolation.txt'
+run_shell "$SID_B" 'mkdir -p /workspace && printf B-only > /workspace/code-mode-isolation.txt'
+run_shell "$SID_A" 'cat /workspace/code-mode-isolation.txt # read-A-7f6a'
+run_shell "$SID_B" 'cat /workspace/code-mode-isolation.txt # read-B-1c9d'
+OUT_A=$(wait_shell_output "$SID_A" "$BEFORE_A" 'read-A-7f6a')
+OUT_B=$(wait_shell_output "$SID_B" "$BEFORE_B" 'read-B-1c9d')
+test "$OUT_A" = 'A-only' && test "$OUT_B" = 'B-only'
+```
+
+**断言**：Session A 只能读到 A 内容，Session B 只能读到 B 内容；PG sandbox/session 记录的关联符合部署数据模型。CodeMode interpreter 本身不提供 `fs`、`require` 或直接 workspace API；但宿主可把文件工具显式放进 Code Mode tool snapshot。测试必须确认当前 snapshot 中哪些工具被暴露，不能把“无直接文件系统 capability”误解为“经授权工具无法读写文件”。
+
+### TCM2.14 图片/附件结果
+
+使用返回 image content 的测试 MCP 与支持图片输入的模型。图片凭据只通过受支持的 secret/auth 管理界面配置，不写入文档、仓库或命令历史。
+
+**断言**：工具附件按当前 `Tool.Content` / Session Message contract 保留；execute 可安全汇总可见文本；不得将原始 base64 或 data URL 注入不该接收附件的 execute 文本。Provider 不可用时记为 BLOCKED/SKIPPED，并附可复核错误，不计为 PASS。
+
+### TCM2.15 网络 capability 的显式开关
+
+在两个独立 SaaS 测试实例中分别配置 `OPENCODE_CODEMODE_EXECUTOR=sandbox` 与 `OPENCODE_CODEMODE_NETWORK=disabled`、`sandbox`；使用受控的本地 HTTP fixture，不访问任意公网地址。fixture 必须记录请求的 TCP peer/可信 egress identity，并在响应中返回该观测值。`sandbox` 网络模式将 `fetch` capability 直接运行在 Session Sandbox，不能回退到 SaaS 进程网络。另可用显式 server executor + `network=server` 作为兼容基线。
+
+**断言**：
+
+- `disabled`：Code Mode 不暴露 `fetch`，脚本调用应得到受控的 `Unknown identifier 'fetch'` 类诊断，不发出 HTTP 请求。
+- `sandbox`：脚本 `await fetch(fixtureURL)` 成功，返回 fixture 固定值；Tool progress 中只记录 fetch method/URL，最终 output 受 `maxOutputBytes` 限制。
+- `sandbox`：fixture 记录的 peer/egress identity 必须映射到该 Session Sandbox，并与 SaaS 服务进程 identity 不同。若部署使用统一 NAT，测试环境必须提供可信的 egress identity 映射；只看到 HTTP 200 不足以证明请求来自 Sandbox。
+- `server`：仅显式 `executor=server` + `network=server` 的兼容实例可请求 fixture；fixture 应观测到 SaaS 服务进程 identity，不得将其记为 Sandbox 网络访问。
+- 不能使用带凭据的 URL/header；不能把可访问云 metadata、内网或任意目标的结果作为通过标准。
+
+## 5. Sandbox executor 验收门槛（当前 BLOCKED）
+
+本节是功能接通后的强制 E2E 清单；当前不得执行后将结果记为通过。满足以下前置条件后，另起测试环境灰度：
+
+1. prompt 发起的 `execute` 由 SaaS 创建 execution，并在该 Session Sandbox Runner 中解释执行；不能只启动 Runner daemon 或仍调用服务端 interpreter。
+2. SaaS 主动通过内部 `sandbox.endpoint(sessionID, 9911, true)` 连接 Runner；端口不公开到浏览器 proxy。
+3. Runner 握手具有 nonce/owner 校验；nonce 不通过 argv、环境变量或 workspace 文件传递。
+4. Runner `tool.call` 经 SaaS 当前权限与 Tool snapshot dispatch；Runner 不持有 SaaS tool 实现、PG 凭据或 provider key。脚本 `fetch` 是 Runner 进程的 Sandbox-local capability，不得经 SaaS 代理。
+5. Execution 和 Call 状态在 PG 可审计；`(executionID, ordinal)` 重试幂等，不重复触发有副作用工具。
+6. 取消、超时、Session/Sandbox 销毁以及服务重启均能收敛到确定终态；只取消目标 operation，不误伤该 Session 其它 isolated command。
+
+达成以上门槛后补跑下表，并要求 HTTP、执行过程和 PG 三方面同时满足：
+
+| 编号 | 场景 | 必须观察的 HTTP/执行过程 | 必须观察的 PG / Sandbox |
+|---|---|---|---|
+| TCM2.S1 | 首次启动与 endpoint | 新 Session prompt 可完成；SaaS 通过 server gateway 连接 Runner | runner readiness、execution owner 与 Session/Sandbox 关联一致 |
+| TCM2.S2 | 双向工具 dispatch | Runner 发 tool.call，SaaS 以原 snapshot 工具执行并回传结果 | call 按 ordinal 唯一；input、授权决策、状态可审计 |
+| TCM2.S3 | 并发执行 | 同 Session 两个独立 isolated command 和 Runner tool call 可并行完成 | 每个 operation 输出/取消隔离，并发不超过配置 semaphore |
+| TCM2.S4 | 幂等与断线 | 注入重复 frame、断线重连；非幂等调用不得重复 | `(executionID, ordinal)` 唯一约束/等效幂等记录生效 |
+| TCM2.S5 | 中止与清理 | interrupt、deadline、删除 Session 均及时停止对应执行 | execution/call 均进入终态；没有遗留 active lease/context |
+| TCM2.S6 | 安全边界 | 无 nonce、错误 owner、过期 execution 均拒绝；公开 proxy 不能连接 Runner | 拒绝原因可审计；无 capability 明文/密钥存储 |
+| TCM2.S7 | 进程恢复 | SaaS/Runner 进程重启后旧执行不得被重放 | lease 过期与 interrupted 状态一致，新 execution 正常 |
+| TCM2.S8 | Sandbox-local fetch | `network=sandbox` 脚本请求受控 fixture；fixture 返回值与 fetch progress 均正确 | fixture peer/egress identity 映射到该 Session Sandbox，且不等于 SaaS identity；`disabled` 对照组没有 fixture 请求 |
+| TCM2.S9 | Sandbox-local 大结果处理 | Runner 读取大 fixture、过滤/聚合后只返回小 JSON；后续 model request 不含正文 sentinel | Runner/Sandbox 身份、Session Message 与 provider request 审计共同证明数据未回流 SaaS 解释器或模型上下文 |
+
+## 6. 清理与结果记录
+
+每个场景完成后清理 MCP 和 Session；保留失败场景的 request ID、Session ID、message ID、Tool call ID 和脱敏 PG 结果，便于复现。不要清理或修改生产数据。
+
+| 日期 | 镜像/commit | executor/network | 数据库/Sandbox 环境 | 模型 | 自动化结果 | HTTP + PG E2E | 阻塞/失败证据 |
+|---|---|---|---|---|---|---|---|
+| YYYY-MM-DD |  | server |  |  |  |  |  |
+
+### 本次执行记录（2026-09-28）
+
+| 检查 | 结果 | 证据/说明 |
+|---|---|---|
+| 本地 PG 连通性 | PASS | `opencode-v2-up` 可连接；存在 `session_v2`、`session_message`、`sandbox` 表；未发现 `code_mode_executions` 表 |
+| Docker SaaS 容器健康 | PASS | `opencode-saas-test` 状态 `running healthy` |
+| Core 相关单测 + typecheck | PASS | 10 个相关测试文件 **126 pass / 0 fail**；Core typecheck 通过 |
+| Core CodeMode/Runner/Tool 重点用例 | PASS | **10 pass / 0 fail** |
+| CodeMode 全包 | FAIL | **1268 pass / 2 fail**：RegExp String methods `lastIndex`；OpenAPI fixture `skipped` 数量 |
+| Core 全包 | FAIL | **5681 pass / 52 skip / 30 fail / 3 errors**；失败涉及 MCP、Session、Shell、PluginSupervisor、GitHub Copilot 网络依赖与 Watcher 等多个区域 |
+| Server typecheck | PASS | `bun run --cwd packages/server typecheck` 通过 |
+| V2 HTTP + PG E2E | PASS（认证/API/PG 基础路径） | Basic Auth 配置后，V2 CLI `GET /api/info`、创建 Session、写入 Session Sandbox 文件、提交 prompt、读取 Session Message 与本地 PG 均成功 |
+| 新增真实场景脚本静态检查 | PASS | 从文档提取的 15 个 Bash 代码块通过 `bash -n`；PG `session_message.data::jsonb` 查询表达式在本地库执行成功 |
+| E2E MCP fixture | PASS（本地协议烟测） | 新增 `fixtures/echo-mcp.mjs`、`fixtures/workitems-mcp.mjs`；Node 语法检查通过，stdio initialize、tools/list、search_open、get_issue 返回符合固定数据的 JSON-RPC 响应 |
+| 无提示词 Code Mode 触发观察 | 未触发 | Session `ses_f1777dd36ffebz6Klg8dVRRQS4`，DeepSeek V4 Flash；多文件 issue 汇总结果正确（open=4、高优先级=3），但 assistant 只调用 4 次 `read`，没有 `execute` Tool part。PG 用户消息 seq 2、assistant tool 消息 seq 9、最终回复 seq 30。一次运行只能说明该任务本次未触发，不能代表所有任务 |
+| 显式 execute 冒烟 | PASS | 同一 Session 用户消息 seq 39 后，assistant seq 45 调用 `execute`，`state.status=completed`、输入 `return 2 + 2`、输出 `4`、`metadata.toolCalls=[]`；assistant 最终回复 seq 54。证明该部署上 execute 路径可用，但不证明模型会自然选择它 |
+| TCM2.4a / TCM2.4b 模型场景 | BLOCKED | 当前 `14096` 部署的 OpenAPI 没有 `/api/session/{sessionID}/mcps` 与 `/api/session/{sessionID}/mcps/{name}` 路由；按当前版本的 Session MCP endpoint 注册 fixture 得到 404，因此无法执行原设计的 MCP 正向/负向场景。部署 OpenAPI 的 prompt schema 也没有 `model` 字段；模型须在 Session 创建时设置。当前代码协议定义包含 prompt model 和 Session MCP 字段，需部署与当前源码一致的镜像后复测 |
+| Sandbox executor E2E | BLOCKED | 当前缺 execution/call PG ledger，且 SaaS prompt → Runner → Tool Gateway 尚未接通；不得记为通过 |
+
+### 本轮完整用例复跑（2026-09-28）
+
+执行环境：`opencode-saas-test`（Docker，`http://localhost:14096`，Basic Auth）、本地 PG `opencode-v2-up`、Session 模型 `Yd-DeepSeek/deepseek-v4-flash`。本轮新建的五个 Session 均已通过 V2 DELETE 清理，PG 中对应 `session_v2` 记录为 0。
+
+| 用例 | 结果 | 本轮证据 / 阻塞 |
+|---|---|---|
+| TCM2.1 CodeMode package 单测 | FAIL | `bun run --cwd packages/codemode test`：1268 pass / 2 fail。失败为 `RegExp > String methods read and update lastIndex like exec` 和 `OpenAPI.fromSpec > converts representative opencode operations into the expected tool shape`；其余 CodeMode 测试通过 |
+| TCM2.2 Core Code Mode / Sandbox 单测 | PASS | Core typecheck 通过；文档指定的 10 个测试文件 126 pass / 0 fail |
+| TCM2.3 V2 Session message readback | PASS | 认证 V2 API 获取 `/api/session/{id}/message` 返回 `.data` 数组；创建 Session 与读取通过 |
+| TCM2.4 显式 execute + echo MCP | BLOCKED | 显式 execute 路径以无外部工具脚本实测通过（见下方）；但完整 echo MCP 用例被 Session MCP API 缺失阻塞：`GET /api/session/{id}/mcps` 返回 HTTP 404 |
+| TCM2.4a 无提示词 triage 自然触发 | BLOCKED | 需要注册 `workitems` Session MCP；同一 MCP API 404，无法验证本轮触发率。历史样本 `ses_f1777dd36ffebz6Klg8dVRRQS4` 未触发，不能算本轮通过 |
+| TCM2.4b 简单计算负向对照 | PASS | Session `ses_f17637c4bffetzU8SeRa0fjpIq`，PG assistant 完成消息仅含文本 `391`，无 execute Tool part；断言通过 |
+| TCM2.5 顺序依赖 / TCM2.6 Promise.all 工具调用 | BLOCKED（E2E） | 指定 echo MCP 未能注册（HTTP 404）；CodeMode 包 Promise 并发测试属于单测覆盖，不替代 HTTP/PG 工具编排断言 |
+| TCM2.7 受限 global 错误 | PASS（部分） | Session `ses_f1762d82effeUfj9hbq9ByIgV3`；PG 中 execute `completed`，输入为 `return require("fs")`，内部输出 `ReferenceError: Unknown identifier 'require'`。子工具可捕获错误、非法语法等分支未完成 E2E |
+| TCM2.8 权限过滤 / TCM2.9 CodeMode 搜索 | BLOCKED（E2E） | 需要 MCP 工具目录与真实工具调用；Session MCP API 404。相关确定性 CodeMode/Core 单测已通过，不代表 HTTP/PG 权限和目录 E2E 通过 |
+| TCM2.10 低预算 / 超时配置 | BLOCKED | 需要独立启动带低预算 env 的 SaaS 容器；现有容器配置不能在线修改，本轮未重建低预算测试容器 |
+| TCM2.11 中断长耗时子工具 | BLOCKED | 需要可控长耗时 MCP child tool，Session MCP 注册路由缺失 |
+| TCM2.12 MCP 删除与 Session 清理 | BLOCKED（MCP 删除） | Session DELETE 清理已实测成功；MCP 注册/删除端点在当前部署缺失，不能验证 MCP 目录移除 |
+| TCM2.13 Sandbox 文件隔离 | PASS | 两个 Session 的 shell 分别写入同路径唯一内容；PG 中 A 读到 `A-only`、B 读到 `B-only`，隔离断言通过 |
+| TCM2.14 图片 / 附件结果 | SKIPPED | 当前未配置可复核的图片 MCP fixture 与支持图片输入的测试 Provider |
+| TCM2.15 Network capability 开关 | BLOCKED（历史） | 当时仅规划 `disabled` / `server` 对照，尚未有 Sandbox Runner 直连 fetch 实现；当前用例定义见 TCM2.15 与 TCM2.S8 |
+| TCM2.S1–S8 Sandbox executor | BLOCKED（历史） | 当时 Sandbox Runner 尚未接入 SaaS execute dispatch；当前 Runner 路径需按 S1–S8 重新执行 HTTP/PG E2E |
+
+本轮新增的核心执行证据：Session `ses_f1763bf5fffedTEoDhttRSoaJv` 的 PG assistant seq 5 有 `execute` Tool part，state 为 `completed`，input.code 为 `return 2 + 2`，content 为 `4`，metadata.toolCalls 为空。该证据验证显式 execute 在当前部署可触发且执行正确；不证明其已在 Sandbox 执行，也不证明模型会对业务任务自然选择 Code Mode。
+
+关键部署阻塞依据：当前容器 `opencode-saas-test` 由 V2 CLI 成功完成认证、`GET /api/info` 与创建 Session；但对新建 Session 的 `GET /api/session/{sessionID}/mcps` 返回 HTTP 404。故依赖 Session MCP 的多工具模型 E2E 本轮均未计为 PASS。
+
+### 当前源码镜像复测（2026-09-28，后续覆盖旧镜像阻塞项）
+
+为排除旧镜像影响，以当前工作区构建 `opencode-saas-codemode-e2e:local`，独立运行于 `14099`；健康检查通过。用本地 PG `opencode-v2-up`、DeepSeek V4 Flash 测试。另起限额实例 `14100`（timeout=1500ms、tool calls=2、steps=20、output=64 bytes、network=disabled）及工具调用预算实例 `14102`（tool calls=2、steps=1000）。测试 fixture 通过 shell API 按 Session 安装，未依赖 Sandbox 预置仓库。测试完成后清理了临时 Session 和容器。
+
+| 用例 | 当前源码镜像结果 | HTTP、执行路径与 PG 证据 |
+|---|---|---|
+| V2 MCP API + fixture bridge | PASS | `GET /api/session/{id}/mcps` 返回 200；安装 fixture 后 `POST` 注册成功；`SessionMcps` 在 Sandbox 启动 `supergateway` 并完成工具发现/调用。旧镜像 404 已证实为部署版本差异 |
+| TCM2.4 显式 execute + echo | PASS | Session `ses_f175f154bffeZWF0jQ7l3Idv1u`；PG seq 13 execute completed，调用 `echo.echo({message:"v2-single"})`，子调用 completed，输出 `Echo: v2-single` |
+| TCM2.4a 无提示词自然触发 | PASS，3/3 | Sessions `ses_f175be354ffeFYJEqNrr6X7vOc`、`ses_f175b1ae4ffe2K3Yr2nAeiHmD8`、`ses_f175af0ceffe1FGtcuRmUNH770`。每个 Session 均自然生成两次 execute：先 `workitems.search_open`，再 `Promise.all` 查询 OPS-101/102/103；PG 子调用全 completed，最终 JSON 均为 openCount=3、highPriorityCount=2、highPriorityIssues=[OPS-101, OPS-103] |
+| TCM2.4b 简单计算负向对照 | PASS | Session `ses_f17502350ffeVL1eUkccYav4CZ`；挂载 workitems MCP 仍未触发任何工具，PG 最终文本为 `391` |
+| TCM2.5 顺序依赖 | PASS | Session `ses_f175a3b0fffeiqgmMy3GK50Z8I`；PG calls 顺序为 `v2-first` 后 `Echo: v2-first`，最终 `Echo: Echo: v2-first` |
+| TCM2.6 Promise.all / 总调用预算常规值 | PASS | Session `ses_f175a0891ffeOwlCdYVXhyyTVm` 的 3 调用与 `ses_f1759e741ffeA261hSRONflNVO` 的 12 调用均 completed，input/result 一一匹配 |
+| TCM2.7 子工具错误捕获 | PASS | Session `ses_f17595510ffemy2yAWYRqlsxcq`；缺少必填 message 的 `echo.echo` 在 PG metadata 为 error，脚本 catch 后 execute completed；同 Session 后续 deny/remove 检查也成功 |
+| TCM2.8 deny / allow 快照 | PASS | deny 后 `search({query:"echo"})` 返回空、直接调用为 `Unknown tool 'echo.echo'` 且无 MCP 调用；更新为 allow 后新 prompt 搜索到工具并成功调用，PG child call completed |
+| TCM2.9 CodeMode search | PASS | 当前 Session 快照中搜索结果为 `tools.echo.echo`；MCP 删除后新 prompt 搜索返回空 |
+| TCM2.10 step / output / tool-call / timeout budgets | PASS | steps=20 时有限 100 次循环返回 `Execution exceeded the 20-step limit`；64-byte 输出含 `[result truncated: ...]`；tool calls=2 时三调用脚本只准入前两次，第三次触发 `Execution exceeded its tool-call limit of 2`；delay fixture 10 秒调用在 1500ms 后返回 timeout，PG execute/child tool 均终态 |
+| TCM2.11 Session interrupt | PASS | Session `ses_f1751898affezVbi6SZ0Ut6cf3`；等待 execute 为 running 后调用 V2 interrupt，API 返回 `interrupted:true`，PG execute state 为 `error`、error.type=`aborted`，delay child call 为 error |
+| TCM2.12 删除 MCP | PASS | 对 `echo` 执行当前 Session MCP DELETE 后 GET 列表为空；下一次 execute 的搜索结果为空 |
+| TCM2.13 Session Sandbox 文件隔离 | PASS（前一轮） | Session `ses_f176335fdffecf3KRsKhUfHbZZ`、`ses_f176331c5ffeQYHirnPXsxNjJT` 分别读到 `A-only`、`B-only`；由 shell Tool Message PG 记录验证 |
+| TCM2.15 network disabled / server | PASS（历史 server 基线） | disabled 实例 `14100` 的 execute 读取 fetch 得 `Unknown identifier 'fetch'`；server 实例 `14099` fetch 本地受控 HTTP fixture 成功返回 `codemode-network-ok`，PG progress 记录 GET URL；不证明 Sandbox-local fetch |
+| TCM2.14 图片 / 附件 | SKIPPED | 本轮无受支持的图片输入 Provider 与图片 MCP fixture |
+| TCM2.S1–S8 Sandbox CodeMode executor | BLOCKED（历史） | 当时源码中 CodeMode 仍走服务端 executor；当前 Sandbox Runner 路径需按 S1–S8 重新执行 HTTP/PG E2E，Runner → Tool snapshot callback 与 execution/call PG ledger 验收仍未完成 |
+
+### Sandbox 大数据与大目录复测（2026-09-29，含模型请求审计）
+
+复测在上述基础上开启 `OPENCODE_MODEL_REQUEST_LOG=/audit`（宿主目录 `/tmp/codemode-audit`），并改用 `run-audit-e2e.mjs` 驱动，因此下列结论基于**真实 provider 请求**而非仅持久消息。
+
+| 用例 | 结果 | 本轮证据 |
+|---|---|---|
+| TCM2.4c 大中间结果聚合 | PASS | Session `ses_f15399cf5ffeQfpwb2yDQ3u80P`。3 条 agent 轮次请求全部 `truncated=false`；execute `completed`，聚合结果 total=1000/even=500/odd=500；**每条**请求的 messages 均不含 `BODY-SENTINEL`；第二轮请求确实携带第一轮聚合 JSON（`firstThreeTitles`）与第二条 prompt，但不含大正文；PG 侧 sentinel 计数 0 |
+| TCM2.9a 大目录按需发现 | PASS | Session `ses_f15396710ffed0kbyldgYkvoFl`。2 条 agent 轮次请求的原生 tool definitions 为 13 个直接工具（`ccr_retrieve,edit,glob,grep,question,read,shell,skill,subagent,webfetch,websearch,write,execute`），**无任何 `inventory.*`**；catalog 实测 `inventory 8/201`、`browser 7/44`，即有界摘要而非全量展开；execute 经 `search` 只调用 `inventory.lookupBySKU` 并返回固定结果 |
+| TCM2.S9 Sandbox-local 大结果处理 | PASS | 复用 4c 的同一 Session 证据链：Sandbox Runner 聚合 + provider 请求审计 + PG sentinel 检查三者同时成立，可判定大正文未回流模型上下文 |
+| 审计能力单测 | PASS | `test/session-model-request-log.test.ts` 4 pass：默认关闭、凭据与 provider 设置不落盘、按 Session 分行、32 MiB 降级为 `truncated` |
+
+审计过程中修正的两处自身缺陷：等待函数原先不区分轮次，会在上一轮未完成时提交下一轮，使"后续请求无 sentinel"成为假通过；现按轮次比较新 assistant 消息，并强制断言最后一条 prompt 出现在被审计请求中。
+
+### Sandbox 大数据与大目录复测（2026-09-29，首轮，审计上线前）
+
+执行环境：当前工作树构建的 `opencode-saas-codemode-current:local` 与 `opencode-opensandbox:codemode-local`，本地 OpenSandbox `http://host.docker.internal:8080`、PG `opencode-v2-up`、DeepSeek V4 Flash。SaaS 明确设置 `OPENCODE_SANDBOX_ENABLED=true`、`OPENCODE_SANDBOX_PROTOCOL=http`、`OPENCODE_CODEMODE_EXECUTOR=sandbox`（默认）。
+
+| 用例 | 结果 | 本轮证据 / 未满足项 |
+|---|---|---|
+| Runner >1 MiB tool.result transport | PASS（定向容器验证） | 原 `maxPayload=1 MiB` 在 1,000 条大结果时复现 `RangeError: Max payload size exceeded` 并导致 daemon 退出；提升到 16 MiB 且处理 socket error 后，同一 Runner 镜像聚合 1,000 条并返回 `{count:1000,first:0}` |
+| Runner gateway readiness | PASS | OpenSandbox 对未监听端口也返回 resolved endpoint，曾导致 `Code Mode Runner connection closed before completion`；修复为始终执行幂等 launcher。Core `codemode-runner.test.ts` 覆盖 resolved endpoint 情况 |
+| TCM2.4c 大中间结果聚合 | BLOCKED（部分通过，已被上节取代） | 首轮仅验证 Sandbox execute 与 PG 侧结果，缺 provider 请求审计，无法检查第二轮模型请求。已在审计上线后重跑并判为 PASS |
+| TCM2.9a 大目录按需发现 | BLOCKED（部分通过，已被上节取代） | 首轮仅验证 `search` 结果与目标工具调用，缺 provider 请求审计。已重跑并判为 PASS |
+| TCM2.S9 Sandbox-local 大结果处理 | BLOCKED（部分通过，已被上节取代） | 首轮缺 provider 请求审计与后续轮次断言。已重跑并判为 PASS |
+
+以上五个本轮临时 Session 已通过 V2 `DELETE /api/session/:id` 清理，并在 PG 验证对应 `session_v2` 记录数为 0；独立 SaaS 与 Runner 测试容器已移除。
+
+**触发结论**：在同一模型、同一 prompt 下，未提及 execute/Code Mode 的 triage 任务自然触发率为 **3/3（本轮样本）**，且执行结果与固定 fixture 完全一致；简单计算负向对照为 **0 次 execute**。样本量仅 3，不能据此声称总体触发率为 100%。
+
+**默认状态说明**：默认 Tool snapshot 未配置 deny 时会暴露 `execute`；自然触发样本实际证明模型可发现并选择该工具。前述自然触发 HTTP/PG 样本是在显式 server executor 基线中运行，不能证明当前默认 Sandbox executor 的 HTTP/PG 端到端行为。
+
+Core 全量日志：`/private/var/folders/zk/8qd0lv657wn8kvpp__hwjj400000gn/T/opencode-core-tests-rerun.log`。CodeMode 全量日志：`/private/var/folders/zk/8qd0lv657wn8kvpp__hwjj400000gn/T/codemode-full-test.log`。
+
+### 本轮全量复跑（2026-10-01，含 flock 锁缺陷修复）
+
+环境：镜像 `opencode-saas-sandbox-test:latest` 由当前工作区构建；`opencode-saas-test`（`http://localhost:14096`，Basic Auth）、本地 PG `opencode-v2-up`、OpenSandbox `host.docker.internal:8080`、`Yd-DeepSeek/deepseek-v4-flash`。`OPENCODE_CODEMODE_EXECUTOR` 未设置（默认 sandbox）。审计/低预算/网络对照分别用独立临时实例（14098/14101/14103）。所有临时 Session 与实例均已清理，PG Session 数回到基线。
+
+#### 过程中发现并修复的缺陷：Runner 启动锁被守护进程继承
+
+- 现象：同一 Session 内第 2 次及以后的 `execute` 稳定失败，`state.error.message = "Failed to start Code Mode Runner: Command exceeded timeout of 10000 ms."`（`error.type=tool.execution`）；单 execute 场景全部正常。TCM2.4a 首轮 6 连败、TCM2.8-allow 两轮连败、最小复现（`return 11` → `return 22`）三连败，均可稳定复现。
+- 根因：`packages/core/src/codemode/runner.ts` 的启动器 `flock -x <pid.lock> -c '<启动脚本>'` 中，锁 fd 被 `nohup` 起的守护进程继承；守护进程存活期间一直持有排他锁，后续每次启动器 `flock -x` 阻塞直至 `timeoutMs: 10_000` 超时。沙箱内直接证据：`/proc/<runner-pid>/fd` 存在 `3 -> /tmp/opencode-codemode-runner.pid.lock`。4a 中模型 `kill` 掉 runner 后下一次 execute 立即成功，与该机制完全吻合。
+- 修复：`startCommand()` 改为 `flock -x -o`（`-o` 在执行命令前关闭锁 fd，阻止继承），并在 `packages/core/test/codemode-runner.test.ts` 增加回归断言（`flock -x -o`），该文件 7/7 通过。
+- 修复验证：重建镜像后同一 Session 连续三次 execute 全部 completed；TCM2.8 双断言 PASS；TCM2.4a PASS。预热轮内 4 个连续 execute 亦全部 completed，证明 runner 可反复复用。
+
+#### 结果汇总
+
+| 用例 | 结果 | 本轮证据 / 说明 |
+|---|---|---|
+| TCM2.1 CodeMode package 单测 | FAIL（既有） | 1268 pass / 2 fail，与 2026-09-28 记录一致：`RegExp > String methods ... lastIndex`、`OpenAPI.fromSpec ... skipped` 数量（5→9，V2 API 端点数变化），均与 Code Mode 无关 |
+| TCM2.2 Core Code Mode / Sandbox 单测 | PASS | Core typecheck 通过；文档指定 15 个测试文件 164 pass / 0 fail（含本轮新增 runner 回归测试后 165） |
+| TCM2.3 V2 接口与消息 readback | PASS | `POST /api/session`、`GET /api/session/:id/message`（`.data` 数组）、`DELETE` 204 |
+| TCM2.4 显式 execute + echo MCP | PASS | `metadata.toolCalls == [{"tool":"echo.echo","status":"completed","input":{"message":"v2-single"}}]`，输出 `Echo: v2-single` |
+| TCM2.4a 无提示词自然触发 | PASS（修复后） | 修复 runner 锁后多轮验证：编排链 `workitems.search_open` → `workitems.get_issue`×3 全 completed，无 error 调用；最终 JSON `repository=acme/api, openCount=3, highPriorityCount=2, highPriorityIssues=[OPS-101, OPS-103]`。修复前因锁缺陷出现 6 连败 + 模型自我修复（kill runner），符合文档"自修复可过"条款但当时 JSON 形态不符已按文档断言 FAIL 记录 |
+| TCM2.4b 简单计算负向对照 | PASS | 无 execute part；最终文本 `391` |
+| TCM2.4c 大中间结果聚合（审计） | PASS | 独立审计实例；3 条 provider 请求全部 `truncated=false`，messages 均不含 `BODY-SENTINEL`；第二轮携带第一轮聚合结果；PG 持久消息 sentinel 计数 0 |
+| TCM2.5 顺序依赖 | PASS | calls 顺序 `v2-first` → `Echo: v2-first`，第二次 input 精确依赖第一次返回值 |
+| TCM2.6 Promise.all 并发 | PASS | 3 路并发 echo 全部 completed，input 一一对应 |
+| TCM2.7 子工具错误 / 脚本错误 | PASS | 7a：缺参 `echo.echo` 在 metadata 记为 error、脚本捕获后 execute completed；7b：`return require("fs")` → `ReferenceError: Unknown identifier 'require'` 且 `metadata.error=true`（该子项存在模型不调用 execute 的波动，强化措辞后稳定复现） |
+| TCM2.8 deny/allow 快照 | PASS（修复后） | deny：`echo_echo` 无成功调用；allow：新 prompt 新快照成功调用 `after-allow`。修复前的失败均为 runner 锁超时（最终文本含确切错误），非权限回归 |
+| TCM2.9 search 可见性 | PASS | `search({query:"echo"})` 返回 `tools.echo.echo` |
+| TCM2.9a 大目录按需发现（审计） | PASS | 原生 tool definitions 无任何 `inventory.*`；catalog `inventory 8/201`、`browser 7/44`；仅调用 `inventory.lookupBySKU` |
+| TCM2.10 预算 | steps PASS / output PASS / timeout PASS / tool-call **BLOCKED** | steps=20 → `Execution exceeded the 20-step limit`；output=64B → `[result truncated:`；timeout=1500ms → execute 进入终态（符合本用例断言口径）。tool-call 子项三次尝试均因**新起低预算实例上 Session MCP 未进入 Code Mode 工具清单**（search 空/`Unknown tool 'echo.echo'`，45s 沉降 + 预热轮后 CCR browser 工具已在而 echo 仍缺）无法触发限额路径，按 BLOCKED 记录；限额行为由单测覆盖 |
+| TCM2.11 Session interrupt | PASS | interrupt 返回 200；execute `error` 终态（`error.type=aborted`）；等待中的 child call 未完成；另一 Session 并发执行不受影响 |
+| TCM2.12 删除 MCP | PASS | DELETE 204；GET 列表为空；删除后 `search` 不再返回 echo |
+| TCM2.13 沙箱文件隔离 | PASS | A/B Session 分别读到 `A-only` / `B-only` |
+| TCM2.14 图片/附件 | SKIPPED | 无图片输入 Provider 与图片 MCP fixture |
+| TCM2.15 网络 capability | PASS（功能）/ 观察受限 | disabled：`Unknown identifier 'fetch'`；sandbox（默认）：fetch 受控 fixture 成功且 progress 记录；server（显式 executor=server）：同样成功。egress identity 区分在本地 OrbStack 统一 NAT（peer 均为 127.0.0.1）下不可判定，符合本节"统一 NAT 不足以证明来源"的既有口径 |
+| TCM2.S1–S8 | 维持 BLOCKED | §5 门槛未变（无 PG execution/call ledger、nonce/owner 校验）；S9 的等价证据链（Sandbox 聚合 + provider 请求审计 + PG sentinel）已由 TCM2.4c 满足 |
+
+#### 本轮观察项（未判 FAIL，需产品侧评估）
+
+1. **中断不保留 in-flight 子调用记录**：sandbox executor 下 interrupt 后 `state.metadata.toolCalls` 为空（`runner.ts` abort 立即 `finish(new Error)` 关闭连接，不回传最终 progress）。与 2026-09-28 server executor 时代"child call 记为 error"的观察不同；本用例文档断言不受影响，但可审计性下降，建议 abort 前先落一条最终 progress 或在 error state 保留最后已知 toolCalls。
+2. **新起实例 Session MCP 冷启动**：全新实例上 Session MCP 工具可能长时间不进入 Code Mode 工具清单（内置/CCR 工具正常），长运行实例无此问题。影响低预算等需要独立实例的场景；建议为 Session MCP 桥接增加就绪探测/重试。
+3. **主容器两次非预期退出（exit 130）**：均发生在高强度 Code Mode E2E 期间，退出前日志出现 `postgres.js TimeoutNegativeWarning: -10681ms`（负数超时，系统时钟回拨特征）。疑与时钟跳变相关的 PG 重连风暴，未定位到根因，需环境侧关注。
+
+#### 本轮测试方法修正（已回写到正文）
+
+- 2.3 新增 `wait_for_turn_idle`：回合可能链式多次 execute，"首条 assistant completed"不代表回合结束，聚合断言前必须等 `idle` 消息。
+- TCM2.4a 断言改为聚合整轮 execute（历史"两次 execute"模式下旧断言永远取不到 search_open），最终 JSON 从回合末尾纯文本 assistant 消息读取（不在最后一个 execute 的 content 里），剥离 ```` ```json ```` 围栏，`highPriorityIssues` 接受编号或对象两种形态。
+- TCM2.10 增加就绪门控：预算断言前必须先确认 `search` 能看到目标工具，否则记 BLOCKED，避免把"工具未就绪"误判为限额行为（本轮三次误判根源）。
+- TCM2.11 子调用断言对齐文档口径（未完成 + 无副作用），不再强求 error 记录。
+
+结果只能标记为 `PASS`、`FAIL`、`BLOCKED` 或 `SKIPPED`：
+
+- `PASS`：预期行为、执行路径和持久化断言全部满足。
+- `FAIL`：可复现的行为与契约不符，附请求、日志和 PG 证据。
+- `BLOCKED`：功能/环境前置条件缺失；列明缺少项，不计通过。
+- `SKIPPED`：可选 provider 或凭据不可用；注明原因，不计通过。

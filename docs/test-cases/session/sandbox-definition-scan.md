@@ -41,6 +41,8 @@
 | SAS-AG-09 | 模拟 sandbox 不可达/scan timeout（测试环境关闭该 Session sandbox 或使用 SDK fault 注入） | GET agents；refresh | GET 可降级为全局 + Session 定义且不 5xx；显式 refresh 返回可识别失败；PG 与既有行不受影响 |
 | SAS-AG-10 | API 创建同 ID 的 Session Agent，再放同 ID sandbox 文件，字段分别设置不同标记 | refresh | sandbox 优先级覆盖同字段，未设置的字段保留 Session 值；删除 sandbox 文件后恢复 Session 值 |
 | SAS-AG-11 | sandbox 文件 `disabled: true` 覆盖全局/Session Agent | refresh，删除该文件后再 refresh | 生效列表中该 ID 消失；删除后恢复。该项须同时由产品确认 sandbox 文件是否被允许影响 permissions，未确认前不得用它验证权限放大 |
+| SAS-AG-12 | 关闭 Session 沙箱（provider `enabled=false`，即本地/无沙箱模式） | agent list 与 refresh，以及 best-effort 读取 | 扫描短路为空贡献：返回仅 global/session 定义，**不调用** `sandbox.run`/`fileRead`，也不因 provider 在 disabled 下 `run` 直接 die 而变成 5xx |
+| SAS-AG-13 | 用 `Agent.select()` 解析出的默认 Agent 建 Session 覆盖，再对「显式 id」「无 id」「未知 id」分别调用 `SessionAgents.select` | 调用 `SessionAgents.select` | 显式 id 与无 id 都命中**合并后**的定义（覆盖生效，而不是回退全局 `Agent.select`）；未知 id 回退为 `{ id, info: undefined }`。无 id 分支是权限解析所依赖的间接查找 |
 
 ## 3. Command 扫描用例
 
@@ -52,6 +54,8 @@
 | SAS-CM-04 | 非法 name、无效 frontmatter、超长/含敏感正文模板 | refresh | 非法文件跳过且不影响合法项；错误和日志不得泄露 template/参数正文 |
 | SAS-CM-05 | Session API 创建与 sandbox 同名 command | list，执行 command | 明确并断言既定优先级；执行事件使用获胜定义。若 sandbox command 包含 ``!`cmd` `` 插值，必须记录 shell 权限事件和完整执行结果 |
 | SAS-CM-06 | sandbox scan timeout/非零退出 | list；refresh | **当前 Command list 与 refresh 都会失败**（扫描错误向上冒泡）；HTTP 错误映射应为稳定、可识别的非 2xx，不能伪装为空列表成功。若产品要求与 Agent list 一样 best-effort，先改实现并另行更新此预期 |
+| SAS-CM-09 | 关闭 Session 沙箱（provider `enabled=false`） | command list 与 refresh | 扫描短路为空贡献：返回仅 builtin/session 定义；不得因 provider 在 disabled 下 `run` 直接 die 而变成 500 |
+| SAS-CM-10 | sandbox command 模板分别含 `$1/$3`、`$ARGUMENTS`、无占位符 | refresh | `hints` 推导：`$ARGUMENTS` 优先于位置号，位置号去重并升序，无占位符为空数组 |
 
 ---
 
@@ -79,7 +83,7 @@
 
 | 层级 | 最低门禁 |
 |---|---|
-| Core | `packages/core/test/session/scan.test.ts` 覆盖 path 解析、上限、fingerprint 新增/修改/删除、cache eviction；Agent/Command 测试覆盖合并、降级与显式 refresh |
+| Core | `packages/core/test/session/scan.test.ts` 覆盖 path 解析/右侧切分、`validName`、`MAX_SCAN_FILES` 上限与 `discovered`/`skipped`、错误截断、cache 上限/FIFO 淘汰/会话隔离、晚完成旧扫描回滚拒绝、并发读、双实例独立缓存。fingerprint 新增/修改/删除与 force 重读落在 `agents.test.ts:247` / `commands.test.ts`（含 disabled 短路、hints 推导）。Agent 侧另有合并优先级、`disabled`、权限展开、`select`；Command 侧另有 `interpolateArguments`、`!` 插值、agent/model 切换、subagent 派发 |
 | HTTP + PG | 使用真实 Docker 服务运行 AG-01/03/05/09/10、CM-01/03/06、SH-02；脚本用 `psql` 验证扫描不落库及 API 覆盖行的隔离 |
 | Runtime E2E | 用真实模型完成 fixture 写入、refresh/list、subagent root-share（SH-01）；检查 SSE 工具完成、session execution succeeded、持久化消息与 sandbox 文件内容 |
 
@@ -101,6 +105,7 @@
 | SAS-DEF-01 | sandbox Agent 对既有 global/session ID 设置 `permissions`，并通过 prompt 触发受保护的 read/edit/shell；另测新 sandbox-only Agent | list 后实际执行工具 | 验证权限来源、deny/ask/allow 优先级及审计事件；若 sandbox 文件来源不可信，必须证明其不能扩大授权。该项当前有产品策略待定，策略确认前不能判通过 |
 | SAS-CM-07 | sandbox command 的 template 引用不存在参数、空参数、含 shell 特殊字符参数；分别测试普通执行和 `!` 插值 | 通过 HTTP/Prompt 执行并检查 SSE 与消息 | 结果符合参数展开契约；shell 插值经过权限检查，失败不泄漏/执行部分命令；记录有效定义来源和实际 template 版本 |
 | SAS-CM-08 | `.opencode/command` 与 `.opencode/commands` 同时存在同名定义；再在 sandbox 与 Session API 各放同名定义 | refresh/list 后执行 | 断言唯一、稳定的获胜来源及执行内容；不得因目录遍历顺序或 Map 插入顺序随机改变。若产品尚未规定优先级，此用例阻止发布直到契约明确 |
+| SAS-SCAN-04 | 命令上下文消失（`CommandSessionUnavailable`），分别用默认策略与 `retryPolicy: "safe-read"`；另注入一次普通错误 | 注入 `repair`/`rebuild` 计数并断言 `execute` 次数 | 默认策略只 repair、**绝不重放**（`execute` 恰好 1 次后报错）；safe-read 修复后重放 1 次，连续两次失败才 rebuild 再放行 1 次（`execute` 上限 3 次）；非命令上下文错误既不 repair 也不重放 |
 
 ## 7. 目录生命周期、扫描竞态与缓存恢复
 
@@ -140,6 +145,15 @@ fixture 全部经 `prompt_stream` 驱动 shell 工具写入；Agent/Command 的 
 - HTTP+PG（边界/故障注入）：`docs/test-cases/scripts/sandbox-definition-scan-edge-v2.mjs` **7 项断言通过**；覆盖 Unicode/深层目录/符号链接、非零 `find`、10 秒超时与超时后恢复。
 - 三个脚本结束时 `session_v2`/`session_agents`/`session_commands` 均零残留。
 
+### 2026-09-30 补充用例（覆盖缺口）
+
+对实现复核后发现 4 处无自动化覆盖，已补 Core 用例；同时修掉 PG 用例的空库前置依赖。
+
+- Core：`packages/core/test/session/` **48 pass / 0 fail**（`OPENCODE_DATABASE_URL` 指向专用测试库）；`sandbox-provider.test.ts` **25 pass / 0 fail**。
+- **PG 用例空库前置依赖（可复现缺陷，已修）**：`agents-pg.test.ts` / `commands-pg.test.ts` 原先用 `db.select().from(SessionTable).limit(1)` 取「库里已有的 session」，空库直接 `throw "No test session"`。实测全新空库 **0 pass / 3 fail**。现改为共享夹具 `test/lib/session.ts` 的 `ensureSession`：复用已有 session，空库则自建并在用例结束删除。修复后全新空库 **5 pass / 0 fail 且 `session_v2` 零残留**。
+- 新增用例：SAS-AG-12、SAS-AG-13、SAS-CM-09、SAS-CM-10、SAS-SCAN-04（见下表），并把 SAS-CM-04 的日志脱敏从「部分」补成可断言。
+- `SandboxProvider`：把 `safe-read` 重试编排抽成可注入的 `withCommandSessionRecovery`（导出 `CommandSessionUnavailable`/`CommandSessionRecoveryHooks`），layer 改为绑定 repair/rebuild 副作用；语义未变，使「普通命令绝不重放」这一安全属性首次可被直接断言。
+
 | 用例 | 结果 | 依据 |
 |---|---|---|
 | SAS-AG-01/02 | 通过（HTTP+PG） | id/source/sourcePath/正文 system 正确；singular+plural 均发现；PG 无新增行 |
@@ -155,7 +169,7 @@ fixture 全部经 `prompt_stream` 驱动 shell 工具写入；Agent/Command 的 
 | SAS-CM-01 | 通过（HTTP+PG） | name/source/sourcePath/template 正确；PG 无新增行 |
 | SAS-CM-02 | 通过（HTTP） | 同名折叠为单一定义，跨 read/refresh 稳定 |
 | SAS-CM-03 | 通过（HTTP+PG） | 改 template 与删除后下一次读取即反映 |
-| SAS-CM-04 | 部分 | Core 覆盖非法 frontmatter 跳过；日志脱敏未逐条核对 |
+| SAS-CM-04 | 通过（Core） | `commands.test.ts` 覆盖非法 frontmatter 跳过；`agents.test.ts` 断言共享扫描器日志只含来源路径与计数，正文标记未出现在任何日志行 |
 | SAS-CM-05 | 通过（HTTP） | sandbox 命令覆盖同名 Session 命令；执行使用获胜模板 |
 | SAS-CM-06 | 通过（HTTP fault） | 沙箱不可达时 command list 与 refresh 均返回 500，且不泄露 template |
 | SAS-CM-07 | 通过（Core） | `$n`/`$ARGUMENTS` 缺失与空参数、shell 特殊字符、`!` 插值均由既有 Core 用例覆盖 |
@@ -180,6 +194,11 @@ fixture 全部经 `prompt_stream` 驱动 shell 工具写入；Agent/Command 的 
 | SAS-LIFE-03 | 通过（HTTP sandbox） | `.MD` 不匹配；Unicode 文件及深层目录按预期发现 |
 | SAS-API-01 | 通过（HTTP+PG） | 不存在 Session 的 agent/command list 与 refresh 均 404 |
 | SAS-API-02 | 部分 | AG-10 覆盖「删 sandbox 恢复 session」；clear overrides 由 Core/Server 用例覆盖 |
+| SAS-AG-12 | 通过（Core） | `agents.test.ts` 关闭沙箱：`scanSandbox` 与 best-effort 均返回 `[]`；`run`/`fileRead` 用 `Effect.die` 守卫，证明未触达 |
+| SAS-AG-13 | 通过（Core+PG） | `agents-pg.test.ts`：覆盖默认 Agent 后，显式 id 与无 id 的 `select` 都取到合并后的 system；未知 id 回退 `info: undefined` |
+| SAS-CM-09 | 通过（Core） | `commands.test.ts` 关闭沙箱：`scanSandbox` 返回 `[]`，不触发 `run`/`fileRead` |
+| SAS-CM-10 | 通过（Core） | `commands.test.ts`：`$1/$3` → `["$1","$3"]`，`$ARGUMENTS` → `["$ARGUMENTS"]`，无占位符 → `[]` |
+| SAS-SCAN-04 | 通过（Core） | `sandbox-provider.test.ts`：默认策略 `execute` 恰好 1 次且报错；safe-read 为 2 次；两次失败后 rebuild 并放行第 3 次；普通错误既不 repair 也不重放 |
 
 **统计**：本轮新增 edge 脚本 7 项均通过；SAS-SCAN-02、SAS-SCAN-03、SAS-LIFE-03 的沙箱侧变体已完成。其余“部分”项仅限策略待定或未实现的专门故障类型。
 
@@ -197,3 +216,4 @@ fixture 全部经 `prompt_stream` 驱动 shell 工具写入；Agent/Command 的 
 **仍未覆盖（及原因）**
 
 - **SAS-AG-11 / SAS-DEF-01**：机制已验证，**是否允许 sandbox 文件影响 permissions 属产品策略**，策略确认前不判通过。
+- **`SandboxDefinitionCache.invalidate`**：产品路径（`agents.ts` / `commands.ts` / `skills.ts`）均无调用点，仅 `scan.test.ts` 直接覆盖。判为**预留 API**（换新靠 fingerprint + 列表消失自然失效），已在 `scan.ts` 就地注明「reserved API, not a covered production behavior」。若要真正接线（如 `sandbox.destroy` 时清缓存），属独立改动，不在本文档范围。

@@ -1,144 +1,52 @@
-# Read 工具快速超时（files API 挂死快速失败）
+# V2 Read 快速返回与超时能力边界
 
-> 前置条件：SaaS 服务已启动（`docs/local-test-env.md`），PG 模式。环境变量 `$BASE $PG_URL $MODEL` 由 `test-env.sh` 提供。
+## 已实现与已验证
 
-## 背景
+T-RFT.1（正常路径）由 [`scripts/tools-v2-e2e.mjs`](../scripts/tools-v2-e2e.mjs) 覆盖：预置小文本文件后调用 read，检查 tool part `completed` 且内容包含预期文本。
 
-对最近一周 `exec_log` / `part` 数据的诊断发现（2026-08-19）：
+T-RFT.2（kill Sandbox 后恢复）由同一脚本的 T18.10a 覆盖 Sandbox kill 后再次执行工具并检查 PG 状态；这只能验证销毁/重建路径，不是 files API 请求挂死的故障注入测试。
 
-- 全部 11 条 60s+ 的 `read` 工具调用均为 `Tool execution timed out after 120s (watchdog)` 错误——即 files API（`sb.files.getFileInfo` / `readBytes`）挂死后无自身超时，只能等外层 watchdog 120s 兜底，实际记录耗时 170~229s（120s 超时 + 最多 60s 扫描间隔 + 落库延迟）。
-- 同会话同期的 exec 命令通道全部毫秒级正常，排除排队/锁/PVC I/O 假说。
-- 观测到 agent 自救有效：read 超时后换宿主机路径重试 27ms 成功——只要快速失败，agent 能立即恢复。
+`SandboxProvider.fileStat`、`fileRead`、`fileReadBytes` 现在都有独立的 files API 请求预算，默认每次 15 秒，并在 timeout 时重试 1 次。可通过 `OPENCODE_SANDBOX_FILES_TIMEOUT_SECONDS` 和 `OPENCODE_SANDBOX_FILES_TIMEOUT_RETRIES` 配置（重试次数允许设为 0）。只有 timeout 会重试；普通 API 错误及 404 不会重试，timeout 本身不销毁 Sandbox。请求通过 SDK 的 `ConnectionConfig.fetch` 发出并传入 AbortSignal，超时会取消底层 HTTP 请求。
 
-**修复**（`packages/opencode/src/tool/read.ts`）：
+单测/传输故障注入：`packages/core/test/sandbox-files-timeout.test.ts` 对实际 OpenSandbox SDK 连接和挂起的 `/files/download` HTTP 请求做故障注入，验证在预算内返回 typed timeout 且服务端观测到客户端取消；`packages/core/test/sandbox-provider.test.ts` 覆盖 timeout 重试、重试耗尽、取消次数，以及 404/普通错误不重试；`packages/core/test/sandbox-config.test.ts` 覆盖默认值、环境变量和无效值回退。
 
-- `getFileInfo` / `readBytes`(header) / `readTextPage`(正文) 三处 files API 调用改为 **15s 超时 + 重试 1 次**，仍失败则快速返回错误（header/正文路径保留 destroy 沙箱自愈）。
-- `watchdog.ts` 扫描间隔 60s → 15s（`OPENCODE_WATCHDOG_SCAN_INTERVAL_SEC` 可配），卡死工具标记落库延迟收敛。
+## 服务级故障注入 E2E（已通过）
 
-**预期效果**：read 挂死场景从 170~230s 收敛到最多 ~30s（15s×2）。
+[`scripts/read-files-timeout-v2-e2e.mjs`](../scripts/read-files-timeout-v2-e2e.mjs) 配合 [`scripts/opensandbox-files-fault-proxy.mjs`](../scripts/opensandbox-files-fault-proxy.mjs) 在 **opencode SaaS 容器 + PG + 真实 OpenSandbox** 上注入挂起的 files endpoint，连续两次运行 `0 failed assertion(s)`：
 
-## 用例
+| 断言 | 证据 |
+|---|---|
+| Read tool part 持久化 timeout | tool part `status=error`，`Sandbox files getFileInfo timed out after 2s` |
+| 挂起请求被客户端取消 | 代理观测 `hits === aborted`（attempt + retry 各一次） |
+| timeout 触发一次重试 | `attempts >= 2` |
+| timeout 不销毁/替换 Sandbox | 前后 Sandbox ID 一致 |
+| PG 落库 timeout tool part | `session_message` 中匹配到 timeout part |
+| timeout 后 Sandbox 仍可用 | 同一 Sandbox 执行 shell `exit=0` |
+| PG 保留原 running Sandbox | `count(*)=1` |
+
+故障代理要点：SaaS 容器通过 `OPENCODE_SANDBOX_DOMAIN` 指向代理；代理把 OpenSandbox 返回的 `endpoint`（`127.0.0.1:8080/sandboxes/<id>/proxy/44772`）改写为容器可达地址（`FAULT_PROXY_ADVERTISE`，如 `host.docker.internal:8081`），并按 `/sandboxes/<id>/(proxy|port)/44772/files/(info|download)` 匹配目标 `path` 后保留响应不返回，交由 SaaS 的 AbortSignal 取消。
+
+运行前置：SaaS 容器需设置 `OPENCODE_SANDBOX_FILES_TIMEOUT_SECONDS` / `..._RETRIES`，`OPENCODE_SANDBOX_USE_SERVER_PROXY=true`，且 `OPENCODE_SANDBOX_DOMAIN` 指向故障代理。命令示例：
 
 ```bash
-source docs/test-cases/test-env.sh
-source docs/test-cases/test-lib.sh
+FAULT_PROXY_HOST=0.0.0.0 FAULT_PROXY_PORT=8081 \
+FAULT_PROXY_ADVERTISE=host.docker.internal:8081 \
+OPENSANDBOX_UPSTREAM=http://127.0.0.1:8080 \
+  node docs/test-cases/scripts/opensandbox-files-fault-proxy.mjs
 
-# ============================================================
-# T-RFT.1 正常 read 回归（不受快速超时影响）
-# ============================================================
-SID=$(new_sid)
-curl -s --noproxy '*' -m 90 -X POST "$BASE/session/$SID/exec" -H 'Content-Type: application/json' \
-  -d '{"command":"echo fast-timeout-ok > /workspace/rft.txt"}' > /dev/null
-
-START=$(date +%s)
-curl -s --noproxy '*' --max-time 120 -X POST "$BASE/session/$SID/message" -H 'Content-Type: application/json' \
-  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"用 read 工具读取 /workspace/rft.txt 并原样告诉我内容，不要用 bash\"}],\"model\":$MODEL}" \
-  | jexec "d['info'] if 'info' in d else d" > /dev/null
-DUR=$(( $(date +%s) - START ))
-
-# 查 read part 的状态与耗时
-READ_ROW=$(psql "$PG_URL" -t -A -c "
-  SELECT data->'state'->>'status' || '|' ||
-    ((data->'state'->'time'->>'end')::bigint - (data->'state'->'time'->>'start')::bigint)
-  FROM part WHERE session_id='$SID' AND data->>'tool'='read'
-  ORDER BY time_created DESC LIMIT 1")
-echo "T-RFT.1 read part: $READ_ROW, 消息总耗时 ${DUR}s"
-
-STATUS=${READ_ROW%%|*}; RDUR=${READ_ROW##*|}
-[ "$STATUS" = "completed" ] && [ "$RDUR" -lt 15000 ] && pass "T-RFT.1" || fail "T-RFT.1" "status=$STATUS dur=${RDUR}ms"
-
-# ============================================================
-# T-RFT.2 沙箱失联后 read 快速失败（核心用例）
-# ============================================================
-# kill-sandbox 制造 files API 不可达/半开窗口，read 应在 ~35s 内
-# 返回明确错误（而非修复前挂 170~230s 等 watchdog）。
-SID2=$(new_sid)
-curl -s --noproxy '*' -m 90 -X POST "$BASE/session/$SID2/exec" -H 'Content-Type: application/json' \
-  -d '{"command":"echo x > /workspace/rft2.txt"}' > /dev/null
-curl -s --noproxy '*' -m 10 -X POST "$BASE/session/$SID2/kill-sandbox" > /dev/null
-
-START=$(date +%s)
-curl -s --noproxy '*' --max-time 120 -X POST "$BASE/session/$SID2/message" -H 'Content-Type: application/json' \
-  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"用 read 工具读取 /workspace/rft2.txt，只报告成功或失败及原因\"}],\"model\":$MODEL}" \
-  > /dev/null
-DUR=$(( $(date +%s) - START ))
-
-READ_ROW=$(psql "$PG_URL" -t -A -c "
-  SELECT coalesce(data->'state'->>'status','(pending)') || '|' ||
-    coalesce(((data->'state'->'time'->>'end')::bigint - (data->'state'->'time'->>'start')::bigint)::text,'-') || '|' ||
-    coalesce(left(data->'state'->>'error',60),'')
-  FROM part WHERE session_id='$SID2' AND data->>'tool'='read'
-  ORDER BY time_created DESC LIMIT 1")
-echo "T-RFT.2 read part: $READ_ROW, 消息总耗时 ${DUR}s"
-
-STATUS2=${READ_ROW%%|*}; RDUR2=$(echo "$READ_ROW" | cut -d'|' -f2)
-# 无论成功（沙箱快速重建）还是失败，都必须快速出结果；不允许出现 watchdog 超时错误
-echo "$READ_ROW" | grep -q "watchdog" && fail "T-RFT.2" "出现 watchdog 超时：$READ_ROW"
-if [ "$RDUR2" != "-" ] && [ "$RDUR2" -lt 60000 ]; then
-  pass "T-RFT.2" "read 快速返回 (${RDUR2}ms, status=$STATUS2)"
-else
-  fail "T-RFT.2" "read 未在 60s 内返回: $READ_ROW"
-fi
-
-# ============================================================
-# T-RFT.3 watchdog 中断结算观察（V2 语义）
-# ============================================================
-# V2 watchdog 为中断式（execution.interrupt reason=watchdog），part 落
-# error: Tool execution interrupted。观察近 24h 被中断 part 的耗时是否
-# 在 timeout+interval+余量 内（默认 120+60+25≈205000ms）。
-# 无样本（未发生 stuck）属正常，跳过。
-MAXGAP=$(psql "$PG_URL" -t -A -c "
-  SELECT max((elem->'time'->>'completed')::bigint - (elem->'time'->>'created')::bigint)
-  FROM session_message m, jsonb_array_elements(m.data::jsonb->'content') elem
-  WHERE elem->>'type'='tool' AND elem->'state'->>'error' LIKE '%Tool execution interrupted%'
-    AND m.time_created > (extract(epoch from now())-86400)*1000;")
-if [ -n "$MAXGAP" ] && [ "$MAXGAP" -gt 0 ]; then
-  echo "T-RFT.3 近24h watchdog 中断 part 最大耗时 ${MAXGAP}ms"
-  [ "$MAXGAP" -le 205000 ] && pass "T-RFT.3" || fail "T-RFT.3" "gap=${MAXGAP}ms 超 205s"
-else
-  echo "T-RFT.3 近24h 无 watchdog 中断 part，跳过（无 stuck 样本）"
-fi
-
-summary
+OPENCODE_PASSWORD="$OPENCODE_PASSWORD" \
+PG_URL='postgresql://local@127.0.0.1:5432/opencode-v2-up' \
+BASE=http://127.0.0.1:14096 FAULT_PROXY=http://127.0.0.1:8081 \
+  node docs/test-cases/scripts/read-files-timeout-v2-e2e.mjs
 ```
 
-## 期望汇总
 
-| 用例 | 期望 |
-|---|---|
-| T-RFT.1 | read `completed` 且耗时 <15s（正常路径无回归） |
-| T-RFT.2 | read 在 60s 内返回（成功或明确 error），**不出现** `timed out ... (watchdog)` |
-| T-RFT.3 | 近 24h 被 watchdog 中断结算的 tool part（`error=Tool execution interrupted`）耗时 ≤ `timeout+interval+余量`（默认档 120+60+25≈205s；V1 为 150s——其 interval 已从 60s 调至 15s） |
+运行方法、认证、PG 表结构和脚本清理见 [`tool-calls.md`](./tool-calls.md)。
 
-> **T-RFT.3 V2 语义**（原"watchdog 标记 part"已随机制升级）：V2 watchdog 是 `execution.interrupt({reason:"watchdog"})` **中断式**结算（非直接改 part 状态），part 落 `error: Tool execution interrupted`。观察 SQL 见 bash 块；无样本（24h 内未发生 stuck）时跳过属正常。触发链路的功能验证见 tool-calls.md 的 T18.10c。
+## 能力边界
 
-> 注：T-RFT.2 的 PASS 条件宽容（快速成功或快速 error 均可，核心=不挂死）。**已知盲区**：本轮与全部历史记录命中的都是"重建窗口 File not found / 快速重建"，`files API` **真实挂死 → 15s timeout → destroy 自愈路径从未被真正触发**——该场景需要故障注入（如 proxy 拦截 files API）才能覆盖，属跨文档共同盲区（与已移除的 T18.10b 同源）。
+超时重试耗尽后将错误返回调用方，不主动销毁 Sandbox；是否销毁应交由后续健康检查或独立 Sandbox 生命周期流程决定。挂起注入已覆盖传输取消、timeout helper 及通过 SaaS API + PG + 真实 Sandbox 的服务级断言（见上）；仍不能用 Sandbox kill 后重建替代。
 
-## 复测记录
+## Watchdog 边界
 
-| 日期 | 镜像 tag | 用例 | 结果 | 备注 |
-|---|---|---|---|---|
-| 2026-08-19 | `9b9a352b5a-rft2`（本地 PG + 远端沙箱） | T-RFT.1 | ✅ PASS | read completed，86ms |
-| 2026-08-19 | `9b9a352b5a-rft2`（本地 PG + 远端沙箱） | T-RFT.2 | ✅ PASS | kill-sandbox 后 read 4390ms 完成（沙箱快速重建），无 watchdog 错误，消息总耗时 10s |
-| | | T-RFT.3 | | 近 24h 无 watchdog part，待后续观察 |
-| 2026-08-19 | `files-api-test` + 沙箱 `opencode-opensandbox:local`（组合 3，含 header 单飞改动） | T-RFT.1 | ✅ PASS | read completed 70ms，消息总耗时 8s |
-| 2026-08-19 | `files-api-test` + 沙箱 `opencode-opensandbox:local`（组合 3，含 header 单飞改动） | T-RFT.2 | ✅ PASS | kill-sandbox 后 read 1847ms completed（沙箱快速重建），无 watchdog 错误，消息总耗时 7s |
-| 2026-08-19 | `files-api-test`（组合 3） | T-RFT.3 | — | 近 24h 无 watchdog part，继续观察 |
-| 2026-08-19 | `perf-rft`（组合 2：本地 PG + 远端沙箱，LSP 修复已撤销） | T-RFT.1 | ✅ PASS | read completed 52ms |
-| 2026-08-19 | `perf-rft`（组合 2） | T-RFT.2 | ✅ PASS | kill-sandbox 后 read 4364ms completed（远端沙箱快速重建），无 watchdog |
-| 2026-08-19 | `perf-rft`（组合 2） | T-RFT.3 | — | 近 24h 无 watchdog part，继续观察 |
-
-### V2 全量回归（2026-09-24）
-
-**环境**：容器 `opencode-saas-test`（`127.0.0.1:14096`，镜像 `opencode-saas-sandbox-test:9aa68014be-rg-guard`），本地 PG `opencode-v2-up`（V2 架构 `session_v2`/`session_message`），sandbox 镜像 `opencode-opensandbox:local`（V1 迁入版，含 ripgrep），模型 `Yd-DeepSeek/deepseek-v4-flash`。
-
-**V1→V2 接口映射**：`POST /session/:id/exec` → `POST /api/session/:id/shell`（`{command}`，NoContent 异步，轮询 PG shell 消息完成）；`POST /session/:id/message` → `POST /api/session/:id/prompt` + `wait`；PG `part` → `session_message.content[]`（`elem->>'name'='read'`，`time.start/end` → `time.created/completed`）；`state->>'error'` 仍为 JSON 字符串可直接匹配。
-
-| 日期 | 用例 | 结果 | 备注 |
-|---|---|---|---|
-| 2026-09-24 | T-RFT.1 | ✅ PASS | read `completed` **311ms**（<15s），消息总耗时 3s，session `ses_f2db5de6effeybcQKKmpS9035p` |
-| 2026-09-24 | T-RFT.2 | ✅ PASS | kill-sandbox 后 read **1943ms** 返回明确 error `File not found`（命中重建窗口，快速出结果），无 watchdog，消息总耗时 5s，session `ses_f2db54922ffepwzRsshJW3Vwbd` |
-| 2026-09-24 | T-RFT.3 | ✅ PASS | 按 V2 语义恢复（watchdog 中断式结算）：近 24h `error=Tool execution interrupted` part 1 条、max 耗时 11627ms ≤ 205s（e2e 触发样本）。观察 SQL 与语义说明见 bash 块 |
-
-**结论**：`PASS=2 FAIL=0`。V2 的 read 快速出结果由 provider 层保障（`getOrCreate` 有 bounded wait + 重建路径 `createTimeoutSeconds` 兜底），实测远优于 15s 阈值；V1 时代的 watchdog 120s 兜底在 V2 不存在，stuck tool 兜底机制缺口见 tool-calls.md 待办 #6（watchdog 决策项）。
-
+Session watchdog 中断的是超预算的活跃执行，不是 read files API 的专属 timeout。其实现和测试位于 `packages/core/src/session/watchdog.ts` 及 `packages/core/test/session-watchdog.test.ts`。如果需要 watchdog API E2E，应由可控长时间 shell 执行构造独立 Session 场景，并核对 tool part 的 `Tool execution interrupted` 与 Session 恢复；不能用历史 V1 `part` 查询或无样本跳过来宣称测试通过。

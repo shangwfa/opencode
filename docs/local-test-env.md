@@ -338,6 +338,8 @@ docker rm -f opencode-saas-test 2>/dev/null
 docker run -d --name opencode-saas-test \
   -p 14096:4096 \
   -e OPENCODE_DATABASE_URL=postgresql://app:8zuhlMLd4gaeUG5k@host.docker.internal:15432/opencode \
+  -e OPENCODE_SANDBOX_ENABLED=true \
+  -e OPENCODE_SANDBOX_PROTOCOL=http \
   -e OPENCODE_SANDBOX_DOMAIN=host.docker.internal:8080 \
   -e OPENCODE_SANDBOX_USE_SERVER_PROXY=true \
   -e OPENCODE_SANDBOX_IMAGE=opencode-opensandbox:local \
@@ -451,6 +453,8 @@ docker rm -f opencode-saas-test 2>/dev/null
 docker run -d --name opencode-saas-test \
   -p 14096:4096 \
   -e OPENCODE_DATABASE_URL=postgresql://local@host.docker.internal:15432/opencode-v2-up \
+  -e OPENCODE_SANDBOX_ENABLED=true \
+  -e OPENCODE_SANDBOX_PROTOCOL=http \
   -e OPENCODE_SANDBOX_DOMAIN=host.docker.internal:8080 \
   -e OPENCODE_SANDBOX_USE_SERVER_PROXY=true \
   -e OPENCODE_SANDBOX_IMAGE=opencode-opensandbox:local \

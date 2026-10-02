@@ -193,7 +193,7 @@ FROM part p WHERE p.session_id='$SID' AND p.data->>'tool'='bash' ORDER BY p.time
 
 ### T42.2.4 watchdog 超时中断不计入连续失败（保护机制交互）
 
-**场景**：watchdog 对 `MONITORED_TOOLS`（read 等）超时中断走 `ToolExecution.interrupt` → `raceAbort` 产生 **interrupt**（非 Effect fail）→ 不经 `tapError`，**不应**计入连续失败。若误记，watchdog 超时 1 次 + 真实失败 2 次就会让第 4 次调用被错误 fail-block。参考 [`tools/read-fast-timeout.md`](../tools/read-fast-timeout.md) 的短 watchdog 配置方式。
+**场景**：watchdog 对 `MONITORED_TOOLS`（read 等）超时中断走 `ToolExecution.interrupt` → `raceAbort` 产生 **interrupt**（非 Effect fail）→ 不经 `tapError`，**不应**计入连续失败。若误记，watchdog 超时 1 次 + 真实失败 2 次就会让第 4 次调用被错误 fail-block。watchdog API 用例边界见 [`tools/read-fast-timeout.md`](../tools/read-fast-timeout.md)，具体短超时配置属于服务级 E2E 环境设置。
 
 ```bash
 # 容器以 OPENCODE_WATCHDOG_TIMEOUT_SEC=10 启动（缩短超时），沙箱内预置 FIFO

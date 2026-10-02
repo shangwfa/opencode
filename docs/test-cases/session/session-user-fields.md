@@ -105,3 +105,15 @@ psql "$PG_URL" -v sid="$SID" -c \
 ```
 
 **期望**：查询结果与消息列表断言一致。测试不得仅凭 prompt HTTP 成功就判定数据库断言通过。
+
+## 自动化实测记录
+
+2026-09-30 使用独立 Docker 容器 `opencode-user-fields-tmp`（14101）、隔离 PG 库 `opencode-v2-test`、真实 HTTP API 验证：
+
+- T25.1/T25.2：请求头 `x-user-id` 覆盖伪造的 body `userId`，`userName` 与 `userId` 均出现在消息读取结果。
+- T25.3：省略用户标识字段的请求兼容，消息没有 `userId`。
+- T25.4：只有不可信 body `userId` 时不写入身份标识，`userName` 保留。
+- T25.5：同一 session 的三轮交替用户标识逐条正确，历史消息没有被后续用户覆盖。
+- PG：6 条 user 消息的 text、userName、userId 均与预期一致。
+
+结果：全部通过。脚本 `docs/test-cases/scripts/session-user-fields-e2e.mjs` 已增加 `finally` 清理；测试 session 删除后，隔离库 session 行数恢复为运行前的 14 条。

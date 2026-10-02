@@ -1,7 +1,61 @@
 # 沙箱 OOM 采样与内存水位预警（SaaS / PG）
 
+> **V2 状态（2026-10-02 已实现）**：周期 OOM 采样已在 V2 落地，行为对齐 V1 语义、落库改为 V2 durable session 事件：
+>
+> - 实现：`packages/core/src/sandbox/oom-sample.ts`（采样命令 / `parseOomSample` / `classifyOomSample` 纯函数 / `sampleSandbox` 一次性命令会话执行）+ `packages/core/src/sandbox/provider.ts` 采样 fiber（扫 `state=running`、按 `time_updated desc` 批量、仅采样本进程持有句柄的沙箱、基准含 sandboxID 跨世代不互吞、销毁/失效时清基准）+ `packages/schema/src/session-event.ts` 的 `session.sandbox.oom` / `session.sandbox.pressure` durable 事件。
+> - env（`packages/core/src/sandbox/config.ts`）：`OPENCODE_SANDBOX_OOM_SCAN_ENABLED`（默认开，`0/false` 关）、`OPENCODE_SANDBOX_OOM_SCAN_INTERVAL_SEC`（60）、`OPENCODE_SANDBOX_OOM_SCAN_BATCH`（50）、`OPENCODE_SANDBOX_OOM_PRESSURE_RATIO`（0.85）。
+> - 归因：`oom_kill` 差值 >0 → `session.sandbox.oom`（含 delta/total/usage/limit）；无 OOM 且 usage/limit ≥ ratio → `session.sandbox.pressure`（每沙箱 5 分钟窗口一条）；首轮只立基准；负差值（重建）静默重置；OOM 优先于 pressure。
+> - 审计读取：`GET /api/experimental/session/:id/log` 回放，或查 event 表 `type='session.sandbox.oom'`；V1 的 `exec_log(source="sandbox-oom")` 不存在于 V2。
+> - 采样不 touch 心跳（不影响 idle-reap），被动诊断（proxy 502 时读 cgroup，`proxy-rewrite.ts`）保留作互补。
+> - 单测：`packages/core/test/sandbox-oom-sample.test.ts`（parse/classify 全语义 + 命令 cgroup v1/v2 兼容 + 一次性会话清理）。
+>
+> 正文其余内容为 V1 历史记录（`packages/opencode/src/tool/sandbox-provider.ts` 已移除），保留作背景；不要按 V1 命令执行。
+
 > **仅适用于 opencode SaaS（PostgreSQL）**。
 > 公共测试环境和配置请参考 `docs/local-test-env.md`。
+
+## V2 验收用例（T61.V2）
+
+自动化脚本：`docs/test-cases/scripts/sandbox-oom-v2.mjs`（128Mi 会话 + 后台炸弹 + event 断言；实例需 `OPENCODE_SANDBOX_OOM_SCAN_INTERVAL_SEC=5`，2026-10-02 实测 4/4 轮 PASS）。
+
+公共 helper 见 `sandbox-watchdog.md` 的 V2 执行约定。低内存沙箱经会话级资源配置创建（`"sandbox":{"cpu":"1","memory":"128Mi"}`，见 [`session-sandbox-resource.md`](./session-sandbox-resource.md)）。
+
+### T61.V2.1 正常运行不误报
+
+`OPENCODE_SANDBOX_OOM_SCAN_INTERVAL_SEC` 默认 60 的实例上跑几轮正常命令，等待 ≥3 个采样周期后：
+
+```bash
+psql "$PG_URL" -At -c "select count(*) from event where aggregate_id='$SID' and type='session.sandbox.oom'"
+# 期望 0；且沙箱未被采样行为保活（非 keep-alive 会话照常 idle-reap，T61.V2.5）
+```
+
+### T61.V2.2 后台进程 OOM 归因（核心：invisible OOM kill）
+
+专用实例设 `OPENCODE_SANDBOX_OOM_SCAN_INTERVAL_SEC=5`；创建 128Mi 会话，warmup 后**先等待 ≥1 个采样周期让采样器立基准**（否则首轮采样可能已包含全部 kill，基准即峰值、后续 delta 恒 0——2026-10-02 实测踩坑），再启动后台内存炸弹（接口层不可见）：
+
+```bash
+run_shell "$SID" 'cat /sys/fs/cgroup/memory.events'      # 基准 oom_kill
+run_shell "$SID" '(nohup sh -c "a=x; while :; do a=$a$a; done" >/tmp/bomb.log 2>&1 </dev/null &); echo started'
+sleep 15                                                    # ≥2 个采样周期
+run_shell "$SID" 'cat /sys/fs/cgroup/memory.events'      # oom_kill 增长
+psql "$PG_URL" -At -c "select type, data from event where aggregate_id='$SID' and type like 'session.sandbox.%' order by seq"
+```
+
+期望：cgroup `oom_kill` 增长；event 表出现 `session.sandbox.oom`，`data` 含 `oomKillDelta ≥ 1`、`oomKillTotal`、`usageBytes/limitBytes`；所有 shell 命令本身仍 `exited`（接口层无异常——这正是 invisible 的含义）。
+
+### T61.V2.3 水位预警
+
+128Mi 会话内 `run_shell` 分配 ~120Mi（`head -c 120000000 /dev/zero | tail -c 1` 类占用），保持存活跨过一个采样周期：期望 `session.sandbox.pressure`（`pct ≥ 85`），且 5 分钟窗口内不重复。
+
+### T61.V2.4 关闭开关
+
+`OPENCODE_SANDBOX_OOM_SCAN_ENABLED=0` 的实例上重复 T61.V2.2：期望无任何 `session.sandbox.*` 事件。
+
+### T61.V2.5 采样不影响 idle-reap
+
+非 keep-alive 会话在 `OPENCODE_SANDBOX_IDLE_REAP_SEC` 缩短的实例上照常被回收（采样命令走一次性会话、不 touch 心跳）。
+
+## 以下为 V1 历史记录
 
 > **与其他文档的关系**：
 > - 沙箱生命周期与空闲回收见 [`sandbox-lifecycle.md`](./sandbox-lifecycle.md)（T12/T30）

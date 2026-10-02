@@ -1,84 +1,17 @@
-# Read 非超时错误不销毁沙箱（错误分类修复）
+# V2 Read 错误分类
 
-> 前置条件：SaaS 服务已启动（`docs/local-test-env.md`），PG 模式。环境变量 `$BASE $PG_URL $MODEL` 由 `test-env.sh` 提供。
+## 自动化边界
 
-## 背景
-
-read 快速超时改造（`docs/test-cases/tools/read-fast-timeout.md`）最初的兜底实现中，`readTextPage` 失败统一走"重试 + destroy 沙箱 + 报 Read timed out"。这会把**用户输入类错误**（offset 越界、二进制内容、非 UTF-8）误当成沙箱故障：
-
-- 销毁整个沙箱（工作区状态丢失、后续命令需等重建）
-- 错误信息被伪装成 `Read timed out`，误导 agent 和排障
-
-**修复**（`packages/opencode/src/tool/read.ts`）：超时改用 tagged error `SandboxReadTimeout`，仅该错误参与重试与 destroy；offset 越界/二进制/UTF-8 等错误原样传播，沙箱不受影响。附带优化：文件 ≤64KB 时直接复用 header 读取结果做文本分页，省去第二次 `readBytesStream` 往返。
-
-## 用例
+Read 的非法 offset、二进制内容和无效 UTF-8 都需要确定性输入；不依赖模型按 prompt 传入特定非法参数。当前由 Core 单测覆盖。仓库根 `bunfig.toml` 禁止从根跑测试，必须在 `packages/core` 下执行：
 
 ```bash
-source docs/test-cases/test-env.sh
-source docs/test-cases/test-lib.sh
-
-# ============================================================
-# T-RDX.2 小文件读取内容完整（header 单飞路径回归）
-# ============================================================
-SID2=$(new_sid -kb)
-curl -s --noproxy '*' -m 60 -X POST "$BASE/session/$SID2/exec" -H 'Content-Type: application/json' \
-  -d '{"command":"printf \"alpha\\nbeta\\ngamma\\n\" > /workspace/rdx-small.txt"}' > /dev/null
-
-curl -s --noproxy '*' --max-time 120 -X POST "$BASE/session/$SID2/message" -H 'Content-Type: application/json' \
-  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"用 read 工具读取 /workspace/rdx-small.txt（不要传 offset/limit），原样告诉我每一行内容\"}],\"model\":$MODEL}" \
-  > /dev/null
-
-ROW2=$(pgval "SELECT data->'state'->>'status' || '|' ||
-  ((data->'state'->'time'->>'end')::bigint-(data->'state'->'time'->>'start')::bigint)
-  FROM part WHERE session_id='$SID2' AND data->>'tool'='read'
-  ORDER BY time_created DESC LIMIT 1")
-# text part 无 role 字段（role 在 message 级），关联 message 表取 assistant 文本
-ASSIST=$(pgval "SELECT left(p.data->>'text',400) FROM part p
-  JOIN message m ON m.id = p.message_id
-  WHERE p.session_id='$SID2' AND p.data->>'type'='text' AND m.data->>'role'='assistant'
-  ORDER BY p.time_created ASC LIMIT 1")
-echo "T-RDX.2 read part: $ROW2, 回复: ${ASSIST:0:120}"
-STATUS2=${ROW2%%|*}; DUR2=$(echo "$ROW2" | cut -d'|' -f2)
-echo "$ASSIST" | grep -q "alpha" && echo "$ASSIST" | grep -q "gamma" && [ "$STATUS2" = "completed" ] && [ "$DUR2" -lt 15000 ] \
-  && pass "T-RDX.2" || fail "T-RDX.2" "status=$STATUS2 dur=${DUR2}ms 回复缺内容"
-
-summary
+cd packages/core && bun test test/tool-read.test.ts test/tool-read-filesystem.test.ts
 ```
 
-## 期望汇总
+断言应检查错误类型/原始错误信息传播；这些是工具内部错误映射测试，不应通过“Sandbox 是否被 destroy”推断，因为 V2 当前 read 实现没有 V1 的 `SandboxReadTimeout` destroy 分支。
 
-| 用例 | 期望 |
-|---|---|
-| T-RDX.2 | 小文件（<64KB）read completed、内容完整、<15s（header 单飞路径回归） |
+正常小文件 read 闭环见 [`scripts/tools-v2-e2e.mjs`](../scripts/tools-v2-e2e.mjs) 的 T-RDX.2。其 API/E2E 证据检查 tool part 和文件内容；环境运行方式见 [`tool-calls.md`](./tool-calls.md)。
 
-> **原 T-RDX.1/1b/1c 已移除**（2026-09-24）：e2e 手法依赖模型按引导传反直觉参数 `offset=99999`，deepseek-v4-flash 四次均自主纠正不传（"成功即 SKIP" 分支恒命中，断言实际不可达）；1b/1c 依附该场景且 V2 的 read 路径无 destroy 调用（断言恒真）。错误分类行为已由单测稳定覆盖：`tool-read-filesystem.test.ts`（`Offset 2 is out of range` 原文传播）、`tool-read.test.ts`（`OffsetOutOfRangeError` 不被包装）。
+## 删除的旧 E2E
 
-
-## 复测记录
-
-| 日期 | 镜像 tag | 用例 | 结果 | 备注 |
-|---|---|---|---|---|
-| 2026-08-19 | `7da2f4d43d-perf1` + 沙箱 `opencode-opensandbox:local`（组合 3：本地 PG + 本地 OpenSandbox，daemon 含 500ms 修复） | T-RDX.1 | ✅ PASS | 报 Offset 99999 is out of range，无 timed out |
-| 2026-08-19 | `7da2f4d43d-perf1` + 沙箱 `opencode-opensandbox:local`（组合 3：本地 PG + 本地 OpenSandbox，daemon 含 500ms 修复） | T-RDX.1b/1c | ✅ PASS | sandbox id 未变，exec 立即恢复 |
-| 2026-08-19 | `7da2f4d43d-perf1` + 沙箱 `opencode-opensandbox:local`（组合 3：本地 PG + 本地 OpenSandbox，daemon 含 500ms 修复） | T-RDX.2 | ✅ PASS | 66ms completed，内容完整；用例 SQL 初版误用 part.role（不存在），修正为 JOIN message 取 assistant 文本 |
-| 2026-08-19 | `files-api-test` + 沙箱 `opencode-opensandbox:local`（组合 3，含 header 单飞改动） | T-RDX.1 | ✅ PASS | 报 Offset 99999 is out of range (3 lines)，无 timed out |
-| 2026-08-19 | `files-api-test` + 沙箱 `opencode-opensandbox:local`（组合 3，含 header 单飞改动） | T-RDX.1b/1c | ✅ PASS | sandbox id 未变，exec 立即恢复 |
-| 2026-08-19 | `files-api-test` + 沙箱 `opencode-opensandbox:local`（组合 3，含 header 单飞改动） | T-RDX.2 | ✅ PASS | 60ms completed，内容完整（header 单飞路径回归） |
-| 2026-08-19 | `perf-rft`（组合 2：本地 PG + 远端沙箱，LSP 修复已撤销） | T-RDX.1 | ✅ PASS | 报 Offset 99999 is out of range (3 lines)，无 timed out |
-| 2026-08-19 | `perf-rft`（组合 2） | T-RDX.1b/1c | ✅ PASS | sandbox id 未变，exec 立即恢复 |
-| 2026-08-19 | `perf-rft`（组合 2） | T-RDX.2 | ✅ PASS | 48ms completed，内容完整 |
-
-### V2 全量回归（2026-09-24）
-
-**环境**：容器 `opencode-saas-test`（`127.0.0.1:14096`，镜像 `opencode-saas-sandbox-test:9aa68014be-rg-guard`），本地 PG `opencode-v2-up`（V2 架构 `session_v2`/`session_message`），sandbox 镜像 `opencode-opensandbox:local`，模型 `Yd-DeepSeek/deepseek-v4-flash`。
-
-**V1→V2 接口映射**（同 read-fast-timeout.md）：`exec` → `POST /api/session/:id/shell`（注意：shell 端点产出独立 `type='shell'` 消息，`data.time.completed` 标记完成，**不进** assistant content[]——轮询必须查 `type='shell'`）；`message` → `prompt`+`wait`；PG `part` → `session_message.content[]`；assistant 文本取 `type='assistant'` 消息 content 的最后一条 text（V2 模型可能拆多条消息，取首条会漏掉正文）。
-
-| 日期 | 用例 | 结果 | 备注 |
-|---|---|---|---|
-| 2026-09-24 | T-RDX.1 | ➖ 已移除 | 模型（deepseek-v4-flash）四次均未按引导传 `offset=99999`，"成功即 SKIP" 分支恒命中、断言不可达。错误分类由单测稳定覆盖：`tool-read-filesystem.test.ts`（`Offset 2 is out of range` 原文传播）、`tool-read.test.ts`（`OffsetOutOfRangeError` 不被包装） |
-| 2026-09-24 | T-RDX.1b/1c | ➖ 已移除 | 依附 T-RDX.1 场景且 V2 的 read 路径无 destroy 调用（断言恒真）。执行期间 1c 曾暴露用例脚本轮询 bug（shell 消息在 `type='shell'`），修正后 PASS×2 |
-| 2026-09-24 | T-RDX.2 | ✅ PASS×2（修正后） | read completed 194~485ms，内容完整（alpha/beta/gamma）。首跑 FAIL 系断言取首条 assistant text（模型拆多条消息时为"I'll read the file."），改取最后一条后通过 |
-
-**结论**：现存用例 T-RDX.2 ✅ PASS×2。原 T-RDX.1/1b/1c 已按“无价值即移除”原则删除（e2e 断言不可达、单测已覆盖分类）；V2 的 read 路径全程无 destroy 调用（沙箱销毁自愈是 V1 的 `SandboxReadTimeout` 分支，V2 不存在），“非超时错误不销毁沙箱”语义由代码结构与单测共同保证。
-
+依赖模型主动传 `offset=99999` 的旧用例已移除：模型可以忽略该参数，导致错误分支断言不可达。V1 `/session`、`/exec`、`part` 查询以及“非超时错误后 Sandbox ID 不变”断言也不适用于 V2 当前实现。

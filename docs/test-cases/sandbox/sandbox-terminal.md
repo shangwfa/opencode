@@ -1,7 +1,9 @@
 # 沙箱 Terminal（PTY）
 
-> 公共测试环境和配置请参考 [`../00-preamble.md`](../00-preamble.md)。
-> 技术方案请参考 [`../../../specs/sandbox-terminal.md`](../../../specs/sandbox-terminal.md)。
+> **V2 状态（2026-10-01 核对）**：当前 V2 的 PTY 面（`/api/pty`、`/api/experimental/session/:sessionID/terminal`、`/api/experimental/persistent-pty/*`）运行在 **Server 进程本地**，不绑定 Session 沙箱：handler 与 core 实现（`packages/server/src/handlers/{pty,persistent-pty}.ts`、`packages/core/src/{pty,persistent-pty}.ts`）均无 SandboxProvider 关联；实测 `POST /api/pty` 创建的进程可在 Server 容器 `/proc/<pid>` 观察到。因此本文的「PTY 运行于 Session 沙箱 / keepAlive lease 联动 / sessionID 隔离」验收目标**暂不适用于当前 V2**（`?sessionID=` 参数也不存在，V2 为 `location[directory]`）。本文保留作为该能力接入沙箱后的验收基线；在此之前不要按正文执行。
+>
+> 公共测试环境和配置请参考 [`../test-env.sh`](../test-env.sh)（`source docs/test-cases/test-env.sh 3`）。
+> ~~技术方案请参考 `specs/sandbox-terminal.md`~~（该文件已不存在；协议定义见 `packages/protocol/src/groups/pty.ts` 与 `persistent-pty.ts`）。
 
 ## 验收目标
 

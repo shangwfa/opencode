@@ -1,5 +1,15 @@
 # 环境切换与预装依赖缓存
 
+> **V2 状态与执行约定（2026-10-01 核对，必读）**：当前 V2 沙箱镜像（`opencode-opensandbox:local`）**未预装 mise、无 `/opt/pnpm-store`**——实测沙箱内仅 `/opt/node/24` 单版本（`node`/`npm`/`pnpm` 同源）。因此正文「一、环境切换（mise shims）」全部用例在 V2 **不可执行**；引用的 [`00-preamble.md`](./00-preamble.md) 与 `packages/opencode/docker/README.md` 已不存在。
+>
+> **V2 可执行替代**（远端环境侧验证）：
+>
+> 1. 运行时可用性：`POST /api/session/:id/shell` 执行 `node -v && npm -v && pnpm -v && which mise || echo no-mise`（期望输出版本号与 `no-mise`）。
+> 2. 包缓存挂载机制：V2 保留 `OPENCODE_SANDBOX_PACKAGE_CACHE_MOUNT`（默认 `/opt/pnpm-store`，`packages/core/src/sandbox/config.ts`；仅 PVC 卷模式实际挂载共享 subPath，见 `packages/core/src/sandbox/volumes.ts` 与单测 `sandbox-volumes.test.ts`）。非 PVC 部署下沙箱内无共享 store，首次安装走网络属预期。
+> 3. 多版本切换需求在 V2 沙箱以「会话级镜像选择」替代（`sandbox.image`，见 `session-sandbox-resource.md`），而非镜像内多版本。
+>
+> 正文其余内容为 V1 历史记录，保留作背景；不要按 V1 命令（`/session/:id/exec` 等）执行。
+
 > 公共测试环境和配置请参考 [`00-preamble.md`](./00-preamble.md)。
 > 实现详见 [`../../packages/opencode/docker/README.md`](../../packages/opencode/docker/README.md)。
 >

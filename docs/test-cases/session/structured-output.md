@@ -66,6 +66,15 @@ get_structured() {
 }
 ```
 
+可复跑脚本（覆盖 TSO.1–TSO.7，走 HTTP API 与 PG 校验，并在 `finally` 删除测试 session）：
+
+```bash
+BASE="${BASE:-http://127.0.0.1:14103}" \
+PG_URL="${PG_URL:-postgresql://local@127.0.0.1:5432/opencode-v2-test}" \
+OPENCODE_PASSWORD="$OPENCODE_PASSWORD" \
+  bun docs/test-cases/scripts/structured-output-v2.mjs
+```
+
 ## TSO.1 同步接口：format 透传与 structured 结果
 
 ```bash
@@ -175,19 +184,21 @@ jq -c '[.data[]|{type, format}] | .[0]' /tmp/tso7.json
 
 ## 测试结果（V2）
 
-> 2026-09-23 复测：镜像 `opencode-saas-e2e:session-fs-fix3` 热更新本轮改动后重启（未重建），本地 PG `opencode-v2-up`，真实 LLM `Yd-DeepSeek/deepseek-v4-flash`。**TSO.1–TSO.7 全部通过。**
+> 2026-09-30 复测：独立 Docker 服务 `opencode-structured-tmp`（14103）、隔离 PG `opencode-v2-test`、真实 LLM `Yd-DeepSeek/deepseek-v4-flash`。**TSO.1–TSO.7 共 15 项 API/PG 断言全部通过。**
 
 | 用例 | 结果 | 备注 |
 |------|------|------|
-| TSO.1 | ✅ | `structured={"answer": true, "city": "北京"}`，由 `StructuredOutput` 工具入参投影而来 |
-| TSO.2 | ✅ | 列表与单条 GET 均 200；`user.format=json_schema` 两处一致 |
-| TSO.3 | ✅ | 接纳 HTTP 200 + message ID；wait 后 `structured={"color": "蓝色"}` |
-| TSO.4 | ✅ | 流 200、末帧 `session.execution.succeeded`、curl_exit=0；`structured={"days": 7}` |
-| TSO.5 | ✅ | `type=xml` → 400、`schema=42` → 400 |
-| TSO.6 | ✅ | `structured=null` + 正常文本回复 |
-| TSO.7 | ✅ | PG 写入脏 `format` 后 GET 200，`format` 丢弃为 `null` |
+| TSO.1 | ✅ | `structured={"answer":true,"city":"北京"}`；PG JSON 投影一致 |
+| TSO.2 | ✅ | 列表、单条 user GET 与 assistant GET 均 200；`format` / `structured` 读回正确 |
+| TSO.3 | ✅ | 异步接纳 HTTP 200 + message ID；wait 后读到 `structured.color` |
+| TSO.4 | ✅ | `prompt_stream` HTTP 200、末事件 `session.execution.succeeded`；`structured.days=7` |
+| TSO.5 | ✅ | 非法 `type=xml` 和 `schema=42` 均 HTTP 400 |
+| TSO.6 | ✅ | 显式 text 模式无 `structured`，普通 assistant 文本存在 |
+| TSO.7 | ✅ | PG 写入非法 `format` 后消息 GET 200，解码丢弃该字段 |
 
-**单测**：`packages/schema/test/output-format.test.ts` 6 项通过（含"普通存储对象可 encode"的 V1 400 回归）；`packages/core/test/structured-output.test.ts` 9 项通过（schema 取用、跨回合不串、工具定义与透传、`$schema` 剔除、system prompt 与工具名一致）；`packages/core/test/session-runner.test.ts` 210 项通过（`toolChoice` 改动无回归）。
+**单测**：本轮 `packages/schema/test/output-format.test.ts` **6 pass**；`packages/core/test/structured-output.test.ts` **9 pass**。文档此前记录的 `session-runner.test.ts` 210 项回归通过于 2026-09-23，本轮未重跑该文件。
+
+测试 session 已通过 API 删除，隔离 PG `session_v2` 行数恢复为运行前的 14；临时容器已清理。
 
 ## 已知限制与待办
 

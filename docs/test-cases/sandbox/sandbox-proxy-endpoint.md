@@ -39,6 +39,33 @@ T11.38/39 的 PG 断言改为：
 SELECT data FROM event WHERE aggregate_id='$SID' AND type LIKE 'session.preview.down%' ORDER BY seq;
 ```
 
+### V2 执行约定（阅读下方历史手工步骤时必须套用）
+
+下方正文保留 T11.x 的历史手工步骤（含 V1 路径与 `/exec` 调用）。**执行时统一按以下规则换算**，不要照抄 V1 命令：
+
+1. 认证：所有请求带 `curl -u "opencode:$OPENCODE_PASSWORD"`（`source docs/test-cases/test-env.sh 3` 后可用）。
+2. URL 前缀：`/session/:id/...` 一律读作 `/api/session/:id/...`（proxy、endpoint、kill-sandbox 同理）。
+3. 命令执行：`POST /session/:id/exec`（同步返回 stdout）读作「`POST /api/session/:id/shell`（HTTP 204）+ 从 `session_message` 或 `GET /api/experimental/session/:id/log` 读输出」。
+4. 后台进程必须用完全分离形态：`(nohup cmd >log 2>&1 </dev/null &)`，否则 shell API 响应会挂起（见上方执行注意）。
+
+```bash
+# V2 helper：发命令并等待 exited 后打印输出
+run_shell() { # <sid> <command>
+  local before
+  before=$(psql "$PG_URL" -At -c "select coalesce(max(seq),0) from session_message where session_id='$1'")
+  curl -sS -u "opencode:$OPENCODE_PASSWORD" -X POST "$BASE/api/session/$1/shell" \
+    -H 'Content-Type: application/json' -d "$(jq -nc --arg c "$2" '{command:$c}')" -o /dev/null
+  for _ in $(seq 1 60); do
+    out=$(psql "$PG_URL" -At -c "select data::jsonb->'output'->>'output' from session_message
+      where session_id='$1' and type='shell' and seq > $before and data::jsonb->>'status'='exited'
+      order by seq desc limit 1")
+    [ -n "$out" ] && { printf '%s\n' "$out"; return 0; }
+    sleep 1
+  done
+  echo "shell did not finish: $2" >&2; return 1
+}
+```
+
 ### 补充验证（同日第二轮：真实 dev server + 直连 + HMR）
 
 | 用例 | 结果 | 说明 |

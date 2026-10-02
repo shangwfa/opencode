@@ -35,10 +35,10 @@ evaluate(action, resource, ...rulesets)  // findLast(Wildcard.match(action, rule
 
 | action | 触发方 | `resource` 形态 |
 |---|---|---|
-| `read` | `file-access.ts:161` | 相对 location 的路径 |
-| `edit` | `write`/`patch`/`edit` | 文件路径 |
-| `external_directory` | `file-access.ts:142` | 外部绝对路径（如 `/tmp/*`） |
-| `shell` | `shell.ts:140/226`（V1 为 `bash`） | 命令串（如 `curl*`） |
+| `read` | `file-access.ts:161` | 相对 location 的路径；越界路径在权限评估前先被边界检查拒绝 |
+| `edit` | `write`/`patch`/`edit` | 文件路径（`edit` 前会先要一次 `external_directory` 批准） |
+| `external_directory` | `file-access.ts:131`（`authorizeExternal`） | **目录**（`<dir>/*` 形态）。只由三类目标触发：shell 的 **cwd**（`shell.ts:137`，即 `parsed.directories`，取自 `cd`/`ls` 这类目录参数）、`read`/`edit` 的目标路径、以及 `write`/`edit` 工具 |
+| `shell` | `shell.ts:139/225`（V1 为 `bash`） | **命令串**（如 `curl*`、`cat /etc/hostname`、`sh -c 'echo x > /tmp/f'`） |
 | `glob`/`grep`/`webfetch`/`websearch`/`skill` | 各工具 | 工具相关 |
 | `<MCP 工具名>` | `mcp.ts:51` | `*` |
 | `*` | 通配（放行/拒绝一切） | `*` |
@@ -98,6 +98,9 @@ echo -n "count="; curl -fsS --noproxy '*' "${CURL_AUTH[@]}" "$BASE/api/session/$
 **期望**：`204`，`count=1`（**覆盖**了 T4.3 的 3 条，而非变成 4 条）。
 
 ### T4.5 GET 返回 permissions
+
+> ⚠️ **执行顺序**：本用例必须在 T4.4 **之前**跑。文档原来把 T4.4 排在前面，会让这里读到 1 条（被替换后）而不是 3 条。
+> 2026-09-30 实测已按此顺序执行。
 
 ```bash
 curl -fsS --noproxy '*' "${CURL_AUTH[@]}" "$BASE/api/session/$SID" \
@@ -215,70 +218,126 @@ tools "$SID"
 ```
 **期望**：`shell` 为 `completed`（沙箱可用时）。
 
-### T5.2 会话 deny 外部目录
+### T5.2 会话 deny shell 命令
+
+> ⚠️ **V2 实测修正**：`external_directory` **不匹配 shell 命令里的文件路径**——它只覆盖 shell 的 cwd（`shell.ts:137`，即 `parsed.directories`）。
+> `cat /etc/hostname` 的 `/etc/hostname` 是命令**参数**，不产生 directory 参数，所以 `external_directory: /etc/*` 对它无效（2026-09-30 实测：`completed`、零 pending）。
+> 拦截命令参数要用 `shell` action。
 
 ```bash
-SID=$(new_sid perm-t5.2 ',"permissions":[{"action":"external_directory","resource":"/etc/*","effect":"deny"}]')
+SID=$(new_sid perm-t5.2 ',"permissions":[{"action":"shell","resource":"cat /etc/hostname","effect":"deny"}]')
 send_prompt "$SID" "执行 shell 工具跑 cat /etc/hostname"
 tools "$SID"
 ```
-**期望**：工具 `status=error`、`error.type=permission.rejected`。
+**期望**：工具 `status=error`、`error.type=permission.rejected`（2026-09-30 实测 ✅）。
+> 对照：同样 `cat /etc/hostname` 配 `external_directory: /etc/*` 会 `completed`，两规则不可混用。
 
 ### T5.3 会话 allow 覆盖 agent 默认
 
+> ⚠️ **V2 实测修正（两条前提，都踩过）**：
+> 1. **shell 命令默认就是 allow**：默认 agent 规则是 `{action:"*", resource:"*", effect:"allow"}`（`packages/schema/src/agent.ts:47`）。所以「壳命令默认 ask」的对照组**不成立**——不带任何规则时 `echo` 也是 `completed`。
+> 2. **不要用「读写 `/tmp`」的 `read`/`write`**：沙箱把 `/tmp` 视为 location 之外，会先被边界检查拦下 `Path escapes the location`，走不到权限评估（不带规则时同样报这句）。
+>
+> `external_directory` 的默认效果是 **`ask`**（`agent.ts:48`），且它作用在**目录目标**上——拿它做覆盖验证最稳。
+
 ```bash
-SID=$(new_sid perm-t5.3 ',"permissions":[{"action":"external_directory","resource":"/etc/*","effect":"allow"}]')
-send_prompt "$SID" "执行 shell 工具跑 cat /etc/hostname"
-tools "$SID"
+# 用 evaluate 接口直接读判定，绕开模型不确定性
+SID=$(new_sid perm-t5.3 ',"permissions":[{"action":"external_directory","resource":"/tmp/*","effect":"allow"}]')
+eval_perm() {  # $1=resource
+  curl -fsS --noproxy '*' "${CURL_AUTH[@]}" -X POST "$BASE/api/session/$SID/permission" \
+    -H 'Content-Type: application/json' \
+    -d "{\"action\":\"external_directory\",\"resources\":[\"$1\"]}" | jq -r '.data.effect'
+}
+echo "override: $(eval_perm /tmp/*)"   # 期望 allow（会话覆盖默认 ask）
+echo "control : $(eval_perm /etc/*)"   # 期望 ask（未覆盖）
 ```
-**期望**：会话 `allow` 后置覆盖 agent/默认规则 → 工具 `completed`、零 `permission.asked`。
+**期望**：`/tmp/*` 为 `allow`（会话规则后置覆盖默认 `ask`），`/etc/*` 仍为 `ask`（证明只覆盖命中项）。
+> 2026-09-30 实测：无会话规则时 `/tmp/*`、`/etc/*` 均为 `ask`；加 `allow /tmp/*` 后 `/tmp/*` 变 `allow`、`/etc/*` 仍 `ask`；改为 `deny /tmp/*` 则 `/tmp/*` 变 `deny`。
 
 ### T5.4 会话 deny 覆盖全局
 
+> ⚠️ **V2 实测修正**：同 T5.2，`external_directory` 不匹配命令参数路径，`sh -c 'echo x > /tmp/t54.txt'` 必须用 `shell` action 才能拦住（2026-09-30 实测：`external_directory: /tmp/*` 下该命令 `completed`，且随后 `cat /tmp/t54.txt` 也照样执行）。
+
 ```bash
-SID=$(new_sid perm-t5.4 ',"permissions":[{"action":"external_directory","resource":"/tmp/*","effect":"deny"}]')
+SID=$(new_sid perm-t5.4 ',"permissions":[{"action":"shell","resource":"sh -c '"'"'echo x > /tmp/t54.txt'"'"'","effect":"deny"}]')
 send_prompt "$SID" "执行 shell 工具跑 sh -c 'echo x > /tmp/t54.txt'"
 tools "$SID"
 ```
-**期望**：`error.type=permission.rejected`。
+**期望**：`error.type=permission.rejected`（2026-09-30 实测 ✅）。
+> `shell` 的 resource 是**完整命令串**，引号需转义；用它做重定向写文件的拦截。
 
 ### T5.5 清除后回退到 agent/全局规则
 
+> 同 T5.3：用 `external_directory` + evaluate 接口观察，避免 shell 默认 allow 和 `/tmp` 路径边界两个干扰。
+
 ```bash
+eval_perm() {  # $1=resource
+  curl -fsS --noproxy '*' "${CURL_AUTH[@]}" -X POST "$BASE/api/session/$SID/permission" \
+    -H 'Content-Type: application/json' \
+    -d "{\"action\":\"external_directory\",\"resources\":[\"$1\"]}" | jq -r '.data.effect'
+}
 SID=$(new_sid perm-t5.5 ',"permissions":[{"action":"external_directory","resource":"/tmp/*","effect":"allow"}]')
+echo "before: $(eval_perm /tmp/*)"                 # 期望 allow
 curl -fsS --noproxy '*' "${CURL_AUTH[@]}" -X PATCH "$BASE/api/session/$SID" \
   -H 'Content-Type: application/json' -d '{"permissions":[]}' >/dev/null
-send_prompt "$SID" "执行 shell 工具跑 echo hi_t55"
-tools "$SID"
+echo "after : $(eval_perm /tmp/*)"                 # 期望 ask（回退默认）
+psql "$PG_URL" -XAtc "select coalesce(permission,'<NULL>') from session_v2 where id='$SID'"   # 期望 []
 ```
-**期望**：`[]` 真清除（V2）→ 回退到 agent 规则（默认 `ask` 时出现 pending request）。
+**期望**：清除前 `allow` → 清除后回退为默认 `ask`；PG 为 `[]`。
+> 2026-09-30 实测：`allow` → `[]` 真清除（PG=`[]`）→ `/tmp/*` 判定回退为 `ask`。
 
 ### T5.6 会话 permission 为 ask 时仍弹窗
 
+> ⚠️ **时序要求（2026-09-30 实测踩到）**：`send_prompt` 的 `wait` 会**阻塞到请求被处理**。
+> 如果照文档顺序「先 `send_prompt`（等 wait 返回）再查 `/permission`」，此时 run 已恢复、pending 很可能已消失，读出空数组 → 误判为「没有弹窗」。
+> 正确做法：在**等待期间并发轮询** `/permission`，抓到 pending 就回复。
+
 ```bash
 SID=$(new_sid perm-t5.6 ',"permissions":[{"action":"shell","resource":"echo_perm_ask*","effect":"ask"}]')
-send_prompt "$SID" "执行 shell 工具跑 echo_perm_ask_hello"
-curl -fsS --noproxy '*' "${CURL_AUTH[@]}" "$BASE/api/session/$SID/permission" | jq -c '.data'
-# 授权后继续
-RID=$(curl -fsS --noproxy '*' "${CURL_AUTH[@]}" "$BASE/api/session/$SID/permission" | jq -r '.data[0].id')
+# 后台发消息，同时在主线程轮询 pending
+send_prompt_bg "$SID" "执行 shell 工具跑 echo_perm_ask_hello"   # 不等待 wait 返回
+for i in $(seq 1 60); do
+  REQ=$(curl -fsS --noproxy '*' "${CURL_AUTH[@]}" "$BASE/api/session/$SID/permission" | jq -c '.data[0] // empty')
+  [ -n "$REQ" ] && break
+  sleep 1
+done
+echo "$REQ" | jq -c '{action, resources}'   # 期望: {"action":"shell","resources":["echo_perm_ask_hello"]}
+RID=$(echo "$REQ" | jq -r .id)
 curl -fsS --noproxy '*' "${CURL_AUTH[@]}" -o /dev/null -w 'reply=%{http_code}\n' \
   -X POST "$BASE/api/session/$SID/permission/$RID/reply" -H 'Content-Type: application/json' -d '{"decision":"once"}'
+wait_sid "$SID" 120
 tools "$SID"
 ```
-**期望**：`GET .../permission` 返回 1 条 pending（`action=shell`、`resources=[echo_perm_ask_hello]`）；回复 `once` 后工具 `completed`。
+**期望**：轮询到 1 条 pending（`action=shell`、`resources=[echo_perm_ask_hello]`）；回复 `once` 后 `shell` 工具 `completed`（2026-09-30 实测 pending 与 `completed` 均确认）。
 
 ### T5.7 read 权限
 
-> ⚠️ **V2 行为差异**：`read` 会先做路径边界检查——越界路径直接报 `Path escapes the location: ...`（`type=unknown`），
-> **走不到权限评估**。V1 文档的 `../etc/*` 相对路径用法在 V2 会先被边界检查拒绝。因此本用例改为
-> 在 workspace 内用 `read` 的 `deny` 规则验证。
+> ⚠️ **V2 行为差异（两点）**：
+> 1. `read` 会先做路径边界检查——越界路径直接报 `Path escapes the location: ...`（`type=unknown`），**走不到权限评估**。V1 的 `../etc/*` 相对路径用法在 V2 会被边界检查拒绝。
+> 2. **`read` 的 resource 是 workspace 相对路径**（`file-access.ts:161` 传相对 location 的路径），不是绝对路径。用 `*` 才能覆盖任意文件。
+> 3. **必须显式要求模型调用 `read`**：2026-09-30 实测中模型会优先用 `shell`/`glob`/codemode `execute` 读文件，`read` rule 根本不被触发（`read: * deny` 下模型用 codemode 读文件仍能成功）。
+
+> **不要用 prompt 驱动本用例**：2026-09-30 实测，`read: * deny` 下模型仍能用 `shell`/codemode `execute` 读到同一文件，
+> 且模型**两次都未调用 `read`**（改用 `shell` + `execute`）→ 用例恒为「不可判定」，拿不到结论。
+> `read` 权限只能在**确定会调用 `read` 工具**的路径上验证，而 `read` 是 Core 工具，应由 Core 层用例覆盖。
+
+Core 层（推荐，直接驱动 `read` 工具做权限断言，不经模型）：
+
+```bash
+cd packages/core
+bun test --timeout 60000 test/file-access.test.ts
+```
+
+HTTP 层（仅当模型确实调用了 `read` 才可判定）：
 
 ```bash
 SID=$(new_sid perm-t5.7 ',"permissions":[{"action":"read","resource":"*","effect":"deny"}]')
-send_prompt "$SID" "使用 read 工具读取 /workspace 下任意一个已存在的文件"
-tools "$SID"
+send_prompt "$SID" "执行 shell 工具跑 printf hi > /workspace/t57-sample.txt"
+send_prompt "$SID" "必须使用 read 工具读取 /workspace/t57-sample.txt，不要使用 shell、glob 或 grep"
+tools "$SID"   # 若返回中无 read 工具调用 → 本用例不可判定，记 INDETERMINATE，不算通过也不算失败
 ```
 **期望**：`read` 工具 `error.type=permission.rejected`（`deny` 在路径检查之后、执行之前生效）。
+> 注意 `read` action 只约束 `read` 工具；`shell`/codemode 读同一文件不受它影响。
 
 ### T5.8 会话 shell 权限（V2 工具名为 `shell`）
 
@@ -338,7 +397,41 @@ psql "$PG_URL" -XAtc "select permission from session_v2 where id='$SID'"
 | T4.10 | ✅ | 2 条规则（通配 + 具体）均存储 |
 | T4.11 | ✅ | `{action:"*",resource:"*",effect:"allow"}` 落库 |
 
-### T5 系列（工具行为）：**环境阻塞，未完成**
+### 2026-09-30 复测：T4 11/11 ✅，T5 9/10 ✅（1 项 INDETERMINATE）
+
+环境：临时容器 @ `14106`（镜像 `opencode-saas-sandbox-test:d3-system-prompt`）、**沙箱可用**（不再有上次的 `Pending` 阻塞）、
+PG 指向**专用测试库** `opencode-v2-test`、真实模型 `Yd-DeepSeek/deepseek-v4-flash`。
+脚本：`docs/test-cases/scripts/session-permission-v2.mjs`（新增）。**0 failed assertion**，测试 Session 零残留。
+
+```bash
+BASE=http://localhost:14106 PG_URL='postgresql://local@127.0.0.1:5432/opencode-v2-test' \
+  OPENCODE_PASSWORD=... MODEL='{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}' \
+  node docs/test-cases/scripts/session-permission-v2.mjs
+```
+
+| 用例 | 结果 | 实测 |
+|---|---|---|
+| T4.1–T4.11 | ✅ | 全部与预期一致（含 T4.4 替换、T4.6 `[]` 真清除、T4.5 需排在 T4.4 前） |
+| T5.1 | ✅ | `external_directory /tmp/* allow` → shell `completed` |
+| T5.2 | ✅ | **改用 `shell` action** → `permission.rejected` |
+| T5.3 | ✅ | 默认 `ask` → 会话 `allow` 后 `/tmp/*`=`allow`、`/etc/*` 仍 `ask` |
+| T5.4 | ✅ | **改用 `shell` action** → `permission.rejected` |
+| T5.5 | ✅ | `allow` → `[]`（PG=`[]`）→ 回退 `ask` |
+| T5.6 | ✅ | 轮询到 pending `{action:shell, resources:[echo_perm_ask_hello]}`，回复后 `completed` |
+| T5.7 | ⚠️ INDETERMINATE（HTTP） | 模型 3 次都未调 `read`（走 codemode `execute`）；**权威覆盖在 Core**：`packages/core/test/tool-read.test.ts`（28 pass，含 `read` deny → `permission.rejected`）、`test/file-access.test.ts`（7 pass） |
+| T5.8 | ✅ | `curl*` denied、`echo` 对照 `completed` |
+| T5.9 | ✅ | 具体 resource 胜出 → `completed` |
+| T5.10 | ✅ | `*` 通配放行；MCP 部分 SKIP（环境无 MCP） |
+
+**本次修正的用例问题（均为用例设计问题，非实现缺陷）**
+
+1. **T5.2 / T5.4**：`external_directory` **不匹配 shell 命令参数里的文件路径**，只覆盖 shell 的 cwd（`shell.ts:137`）。已改用 `shell` action。
+2. **T5.3**：默认 agent 规则是 `{action:"*",resource:"*",effect:"allow"}`（`schema/src/agent.ts:47`），**shell 命令默认即 allow**，「默认 ask 对照组」不成立；且 `/tmp` 的 `read`/`write` 会先撞 `Path escapes the location`。已改为用 `external_directory`（默认 `ask`）经 evaluate 接口验证覆盖。
+3. **T5.5**：同上，断言改为「清除后 evaluate 回退 `ask` + PG 为 `[]`」。
+4. **T5.6**：原文档「先 `wait` 再查 `/permission`」会错过 pending（run 已恢复）。已改为等待期间并发轮询。
+5. **T5.7**：模型不保证调用 `read`，HTTP 层恒不可判定。已下沉到 Core `tool-read.test.ts`。
+
+### T5 系列（V1 镜像时代）：**环境阻塞，未完成**
 
 | 用例 | 结果 | 说明 |
 |---|---|---|

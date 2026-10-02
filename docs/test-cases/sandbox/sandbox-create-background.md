@@ -23,8 +23,8 @@ pgval() { psql "$PG_URL" -X -A -t -v ON_ERROR_STOP=1 -c "$1" | tr -d '[:space:]'
 cleanup() {
   for id in "${SID3:-}" "${SID2:-}" "${SID:-}"; do
     [ -n "$id" ] || continue
-    curl -sS "${H[@]}" -X POST "$BASE/session/$id/keep-alive" -d '{"enabled":false}' >/dev/null || true
-    curl -sS "${H[@]}" -X DELETE "$BASE/session/$id" >/dev/null || true
+    curl -sS "${H[@]}" -X POST "$BASE/api/experimental/session/$id/keep-alive" -H 'Content-Type: application/json' -d '{"enabled":false}' >/dev/null || true
+    curl -sS "${H[@]}" -X DELETE "$BASE/api/session/$id" >/dev/null || true
   done
 }
 trap cleanup EXIT
@@ -35,17 +35,17 @@ trap cleanup EXIT
 ## T-SBG.1：同 session 并发首执行
 
 ```bash
-SID=$(curl -fsS "${H[@]}" -X POST "$BASE/session" -d '{}' | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')
-curl -fsS "${H[@]}" -X POST "$BASE/session/$SID/keep-alive" -d '{"enabled":true}'
+SID=$(curl -fsS "${H[@]}" -X POST "$BASE/api/session" -H 'Content-Type: application/json' -d '{}' | python3 -c 'import json,sys; print(json.load(sys.stdin)["data"]["id"])')
+curl -fsS "${H[@]}" -X POST "$BASE/api/experimental/session/$SID/keep-alive" -H 'Content-Type: application/json' -d '{"enabled":true}'
 
-curl -sS -o /tmp/sbg-a.json -w '%{http_code}\n' "${H[@]}" -X POST "$BASE/session/$SID/shell" \
-  -d '{"id":"msg_sbg_a","command":"echo sbg-a"}' & A=$!
-curl -sS -o /tmp/sbg-b.json -w '%{http_code}\n' "${H[@]}" -X POST "$BASE/session/$SID/shell" \
-  -d '{"id":"msg_sbg_b","command":"echo sbg-b"}' & B=$!
+curl -sS -o /tmp/sbg-a.json -w '%{http_code}\n' "${H[@]}" -X POST "$BASE/api/session/$SID/shell" \
+  -H 'Content-Type: application/json' -d '{"id":"msg_sbg_a","command":"echo sbg-a"}' & A=$!
+curl -sS -o /tmp/sbg-b.json -w '%{http_code}\n' "${H[@]}" -X POST "$BASE/api/session/$SID/shell" \
+  -H 'Content-Type: application/json' -d '{"id":"msg_sbg_b","command":"echo sbg-b"}' & B=$!
 wait "$A"; wait "$B"
 
-curl -fsS "${H[@]}" "$BASE/session/$SID/sandbox" > /tmp/sbg-sandbox.json
-curl -fsS "${H[@]}" "$BASE/session/$SID/message?order=asc" > /tmp/sbg-messages.json
+curl -fsS "${H[@]}" "$BASE/api/session/$SID/sandbox" > /tmp/sbg-sandbox.json
+curl -fsS "${H[@]}" "$BASE/api/session/$SID/message?order=asc" > /tmp/sbg-messages.json
 python3 - <<'PY'
 import json
 messages = json.load(open('/tmp/sbg-messages.json'))['data']
@@ -69,15 +69,15 @@ test "$(pgval "SELECT count(*) FROM sandbox WHERE session_id='$SID' AND state='r
 等待 Provider 明确记录 `sandbox creating` 后再调用 kill，避免用固定 sleep 猜测是否处于创建窗口。请确保日志未轮转，且 SaaS 容器名为 `opencode-saas-test`。
 
 ```bash
-SID2=$(curl -fsS "${H[@]}" -X POST "$BASE/session" -d '{}' | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')
-curl -fsS "${H[@]}" -X POST "$BASE/session/$SID2/keep-alive" -d '{"enabled":true}'
+SID2=$(curl -fsS "${H[@]}" -X POST "$BASE/api/session" -H 'Content-Type: application/json' -d '{}' | python3 -c 'import json,sys; print(json.load(sys.stdin)["data"]["id"])')
+curl -fsS "${H[@]}" -X POST "$BASE/api/session/$SID2/keep-alive" -H 'Content-Type: application/json' -d '{"enabled":true}'
 rm -f /tmp/sbg-creating.log
 docker logs -f opencode-saas-test 2>&1 | grep --line-buffered "$SID2.*sandbox creating" > /tmp/sbg-creating.log & LOG_PID=$!
-curl -sS -o /tmp/sbg-first.json -w '%{http_code}\n' "${H[@]}" -X POST "$BASE/session/$SID2/shell" \
-  -d '{"id":"msg_sbg_first","command":"pwd"}' & FIRST=$!
+curl -sS -o /tmp/sbg-first.json -w '%{http_code}\n' "${H[@]}" -X POST "$BASE/api/session/$SID2/shell" \
+  -H 'Content-Type: application/json' -d '{"id":"msg_sbg_first","command":"pwd"}' & FIRST=$!
 for i in $(seq 1 120); do [ -s /tmp/sbg-creating.log ] && break; sleep 0.25; done
 test -s /tmp/sbg-creating.log
-curl -fsS "${H[@]}" -X POST "$BASE/session/$SID2/kill-sandbox" -d '{}' > /tmp/sbg-kill-pending.json
+curl -fsS "${H[@]}" -X POST "$BASE/api/session/$SID2/kill-sandbox" -H 'Content-Type: application/json' -d '{}' > /tmp/sbg-kill-pending.json
 kill "$LOG_PID" 2>/dev/null || true
 wait "$FIRST"
 python3 - <<'PY'
@@ -86,7 +86,7 @@ result = json.load(open('/tmp/sbg-kill-pending.json'))
 assert result.get('destroyed') is False, result
 PY
 
-curl -fsS "${H[@]}" -X POST "$BASE/session/$SID2/kill-sandbox" -d '{}' > /tmp/sbg-kill-ready.json
+curl -fsS "${H[@]}" -X POST "$BASE/api/session/$SID2/kill-sandbox" -H 'Content-Type: application/json' -d '{}' > /tmp/sbg-kill-ready.json
 python3 - <<'PY'
 import json
 assert json.load(open('/tmp/sbg-kill-ready.json')).get('destroyed') is True
@@ -94,11 +94,11 @@ PY
 OLD_ID=$(psql "$PG_URL" -X -A -t -c "SELECT id FROM sandbox WHERE session_id='$SID2'")
 test "$(pgval "SELECT count(*) FROM sandbox WHERE session_id='$SID2' AND state='destroyed' AND keep_alive=1")" = 1
 
-curl -sS -o /tmp/sbg-retry.json -w '%{http_code}\n' "${H[@]}" -X POST "$BASE/session/$SID2/shell" \
-  -d '{"id":"msg_sbg_retry","command":"echo recovered"}'
-NEW_ID=$(curl -fsS "${H[@]}" "$BASE/session/$SID2/sandbox" | python3 -c 'import json,sys; print(json.load(sys.stdin)["sandboxId"])')
+curl -sS -o /tmp/sbg-retry.json -w '%{http_code}\n' "${H[@]}" -X POST "$BASE/api/session/$SID2/shell" \
+  -H 'Content-Type: application/json' -d '{"id":"msg_sbg_retry","command":"echo recovered"}'
+NEW_ID=$(curl -fsS "${H[@]}" "$BASE/api/session/$SID2/sandbox" | python3 -c 'import json,sys; print(json.load(sys.stdin)["sandboxId"])')
 test -n "$OLD_ID" && test -n "$NEW_ID" && test "$OLD_ID" != "$NEW_ID"
-curl -fsS "${H[@]}" "$BASE/session/$SID2/message?order=asc" > /tmp/sbg2-messages.json
+curl -fsS "${H[@]}" "$BASE/api/session/$SID2/message?order=asc" > /tmp/sbg2-messages.json
 python3 - <<'PY'
 import json
 messages = json.load(open('/tmp/sbg2-messages.json'))['data']
@@ -114,16 +114,16 @@ PY
 
 ```bash
 # release 关闭保活并销毁
-curl -fsS "${H[@]}" -X POST "$BASE/session/$SID2/keep-alive" -d '{"enabled":false}'
-curl -fsS "${H[@]}" "$BASE/session/$SID2/keep-alive"
-curl -fsS "${H[@]}" "$BASE/session/$SID2/sandbox"
+curl -fsS "${H[@]}" -X POST "$BASE/api/session/$SID2/keep-alive" -H 'Content-Type: application/json' -d '{"enabled":false}'
+curl -fsS "${H[@]}" "$BASE/api/session/$SID2/keep-alive"
+curl -fsS "${H[@]}" "$BASE/api/session/$SID2/sandbox"
 test "$(pgval "SELECT count(*) FROM sandbox WHERE session_id='$SID2' AND state='destroyed' AND keep_alive=0")" = 1
 
 # 新 session 不得复用 SID2 的 sandbox
-SID3=$(curl -fsS "${H[@]}" -X POST "$BASE/session" -d '{}' | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')
-curl -sS -o /dev/null -w '%{http_code}\n' "${H[@]}" -X POST "$BASE/session/$SID3/shell" \
-  -d '{"id":"msg_sbg_isolation","command":"echo isolated"}'
-ID3=$(curl -fsS "${H[@]}" "$BASE/session/$SID3/sandbox" | python3 -c 'import json,sys; print(json.load(sys.stdin)["sandboxId"])')
+SID3=$(curl -fsS "${H[@]}" -X POST "$BASE/api/session" -H 'Content-Type: application/json' -d '{}' | python3 -c 'import json,sys; print(json.load(sys.stdin)["data"]["id"])')
+curl -sS -o /dev/null -w '%{http_code}\n' "${H[@]}" -X POST "$BASE/api/session/$SID3/shell" \
+  -H 'Content-Type: application/json' -d '{"id":"msg_sbg_isolation","command":"echo isolated"}'
+ID3=$(curl -fsS "${H[@]}" "$BASE/api/session/$SID3/sandbox" | python3 -c 'import json,sys; print(json.load(sys.stdin)["sandboxId"])')
 test -n "$ID3" && test "$ID3" != "$NEW_ID"
 ```
 

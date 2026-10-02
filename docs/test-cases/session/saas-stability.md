@@ -1,256 +1,248 @@
-# SaaS 稳定性补充
+# SaaS 稳定性补充（V2）
 
 > 本文档从 `saas-test-cases.md` 拆分而来。公共测试环境和配置请参考 [`00-INDEX.md`](./00-INDEX.md)。
 
-## 十三、SaaS 稳定性补充
+## ⚠️ V1 路径已失效（2026-09-29）
 
-> 前置条件：同第十一节，使用本地测试环境（`docs/local-test-env.md`）。
+原文档全部使用 V1 路径，**V2 无兼容层**。V1 请求会命中 **SPA fallback 返回 HTML 200**，判定端点存在必须看 `content-type`。
 
-```bash
-# 环境变量 $BASE $PG_URL $MODEL 由 test-env.sh 全局提供（source test-env.sh [1|2|3]）
-SID=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
-echo "SID: $SID"
-```
+| V1 | V2 |
+|---|---|
+| `POST /session` | `POST /api/session` |
+| `POST /session/:id/message` | `POST /api/session/:id/prompt`（**异步接纳，返回 200 而非 204**）+ `wait` |
+| `POST /session/:id/prompt_async` | 同上（V2 一律异步） |
+| `POST /session/:id/abort` | `POST /api/session/:id/interrupt` → `{interrupted: bool}` |
+| `POST /session/:id/exec`（同步 stdout） | `POST /api/session/:id/shell`（**204 异步**），终态从 PG `type='shell'` + `status='exited'` 读 |
+| `GET /session/status` | `GET /api/session/active`（**只列运行中**） |
+| `POST /instance/dispose` | **无此端点** |
+| `PUT/DELETE /auth/*` | **无此端点** |
+| 日志 `~/.local/share/opencode/log/dev.log` | `~/.local/share/opencode/log/opencode-local.log` |
+| PG 表 `session` / `message` / `part` | `session_v2` / `session_message` /（V2 无 part 表） |
 
-### T13.1 单 session kill-sandbox
-```bash
-curl -s --max-time 60 -X POST "$BASE/session/$SID/message" \
-  -H 'Content-Type: application/json' \
-  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"用 bash 执行: echo kill-test > /workspace/kill-test.txt\"}],\"model\":$MODEL}" > /dev/null
-curl -s -X POST "$BASE/session/$SID/kill-sandbox" -w "\nkill-sandbox: %{http_code}\n"
-```
-**期望**：HTTP 200，返回 `{"sessionID":"...","destroyed":true}`，日志中出现该 `SID` 对应的 sandbox destroyed 记录
-
-### T13.2 kill-sandbox 后 PVC 保留并自动重建
-
-> **交叉引用**：同类验证见 T5.3（04 文档）与 T12.8（10 文档，容器重启场景）；本条覆盖 kill-sandbox 显式销毁场景。
+## 公共环境
 
 ```bash
-curl -s --max-time 60 -X POST "$BASE/session/$SID/message" \
-  -H 'Content-Type: application/json' \
-  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"用 bash 执行: cat /workspace/kill-test.txt\"}],\"model\":$MODEL}" \
-  | python3 -c "import json,sys;[print(p.get('text','')[:200]) for p in json.load(sys.stdin).get('parts',[]) if p.get('type')=='text']"
+export BASE="${BASE:-http://localhost:14096}"
+export PG_URL="${PG_URL:-postgresql://local@127.0.0.1:5432/opencode-v2-up}"
+export MODEL='{"id":"deepseek-v4-flash","providerID":"Yd-DeepSeek"}'
+CURL_AUTH=(-u "opencode:${OPENCODE_PASSWORD}")
+LOG=/home/opencode/.local/share/opencode/log/opencode-local.log
+api(){ curl -sS --noproxy '*' "${CURL_AUTH[@]}" "$@"; }
+pgval(){ psql "$PG_URL" -t -A -c "$1"; }
+new_session(){ jq -nc --argjson m "$MODEL" '{location:{directory:"/workspace"}, model:$m}' \
+  | api -X POST "$BASE/api/session" -H 'Content-Type: application/json' --data-binary @- \
+  | python3 -c "import json,sys;print(json.load(sys.stdin)['data']['id'])"; }
+prompt(){ jq -nc --arg t "$2" '{text:$t,metadata:{},delivery:"queue"}' \
+  | api -X POST "$BASE/api/session/$1/prompt" -H 'Content-Type: application/json' --data-binary @- >/dev/null; }
+wait_sid(){ curl -s --noproxy '*' "${CURL_AUTH[@]}" -o /dev/null --max-time "${2:-180}" \
+  -X POST "$BASE/api/experimental/session/$1/wait" -H 'Content-Type: application/json' -d '{}'; }
+# V2 shell 替代 V1 同步 exec
+run_shell(){ # $1=SID $2=cmd [超时]  -> $SHELL_OUT / $SHELL_EXIT
+  local sid="$1" cmd="$2" to="${3:-60}" before
+  before=$(pgval "SELECT coalesce(max(seq),0) FROM session_message WHERE session_id='$sid'")
+  jq -nc --arg c "$cmd" '{command:$c}' | api -X POST "$BASE/api/session/$sid/shell" \
+    -H 'Content-Type: application/json' --data-binary @- >/dev/null 2>&1
+  for _ in $(seq 1 $((to*2))); do
+    if [ "$(pgval "SELECT count(*) FROM session_message WHERE session_id='$sid' AND type='shell' AND seq>$before AND data::jsonb->>'status'='exited'")" -gt 0 ]; then
+      SHELL_OUT=$(pgval "SELECT data::jsonb->'output'->>'output' FROM session_message WHERE session_id='$sid' AND type='shell' AND seq>$before AND data::jsonb->>'status'='exited' ORDER BY seq DESC LIMIT 1")
+      SHELL_EXIT=$(pgval "SELECT coalesce((data::jsonb->>'exit')::text,'?') FROM session_message WHERE session_id='$sid' AND type='shell' AND seq>$before AND data::jsonb->>'status'='exited' ORDER BY seq DESC LIMIT 1")
+      return 0; fi
+    sleep 0.5
+  done
+  SHELL_OUT=""; SHELL_EXIT="timeout"; return 1
+}
 ```
-**期望**：输出含 `kill-test`，证明 kill 只销毁 sandbox runtime，不删除 PVC 数据
-
-### T13.3 同一 session 并发首条消息只创建一个 sandbox
-
-> **去重说明**（2026-07-17）：与 [`39-concurrency-p0-fixes.md`](./39-concurrency-p0-fixes.md) T39.3.1 完全重复（同一场景：3 条并发 prompt_async → 只建 1 个 sandbox）。执行脚本以 T39.3.1 为准；本条目保留作 11 文档的结果索引。
-
-**期望**：同一个 session 只创建 1 个 sandbox；不能出现多个可用 sandbox runtime 绑定同一 session
-
-### T13.4 dispose 与正在执行的 prompt 并发
-```bash
-SID_BUSY=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
-curl -s --max-time 60 -X POST "$BASE/session/$SID_BUSY/prompt_async" \
-  -H 'Content-Type: application/json' \
-  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"用 bash 执行: sleep 30 && echo late-output\"}],\"model\":$MODEL}" &
-sleep 2
-curl -s -X POST "$BASE/instance/dispose" -w "\ndispose: %{http_code}\n"
-sleep 5
-curl -s "$BASE/session/status" | python3 -m json.tool
-```
-**期望**：dispose 返回 200；正在执行的任务最终进入 idle/abort/error 中的明确状态，不应永久 running
-
-### T13.9 服务重启后 session/message/part 仍可查询
-```bash
-SID_RESTART=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -d '{"title":"restart-pg-test"}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
-curl -s --max-time 60 -X POST "$BASE/session/$SID_RESTART/message" \
-  -H 'Content-Type: application/json' \
-  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"回复 restart-pg-ok\"}],\"model\":$MODEL}" > /dev/null
-docker restart opencode-saas-test
-sleep 10
-curl -s "$BASE/session/$SID_RESTART" | python3 -m json.tool
-curl -s "$BASE/session/$SID_RESTART/message" | python3 -c "import json,sys;print(len(json.load(sys.stdin)))"
-```
-**期望**：重启后 session 可查询，message 数量大于 0
-
-### T13.10 prompt_async 落库与 abort 状态
-```bash
-SID_ABORT=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
-curl -s --max-time 60 -X POST "$BASE/session/$SID_ABORT/prompt_async" \
-  -H 'Content-Type: application/json' \
-  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"写一篇很长的文章，持续输出\"}],\"model\":$MODEL}" -w "async: %{http_code}\n"
-sleep 1
-curl -s -X POST "$BASE/session/$SID_ABORT/abort"
-sleep 5
-curl -s "$BASE/session/$SID_ABORT/message" | python3 -m json.tool | head -120
-```
-**期望**：异步请求返回 204；abort 后消息已落库，最后状态是 abort/error/idle 中的明确结果，不应永久 running
-
-### T13.11 PG FK 完整性与删除级联
-```bash
-SID_DEL=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
-curl -s --max-time 60 -X POST "$BASE/session/$SID_DEL/message" \
-  -H 'Content-Type: application/json' \
-  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"用 bash 执行: echo pg-integrity\"}],\"model\":$MODEL}" > /dev/null
-docker exec ai-nova-postgres psql -U postgres -d opencode_test -t -A -c "SELECT COUNT(*) FROM message WHERE session_id = '$SID_DEL';"
-docker exec ai-nova-postgres psql -U postgres -d opencode_test -t -A -c "SELECT COUNT(*) FROM part WHERE session_id = '$SID_DEL';"
-curl -s -X DELETE "$BASE/session/$SID_DEL"
-docker exec ai-nova-postgres psql -U postgres -d opencode_test -t -A -c "SELECT COUNT(*) FROM message WHERE session_id = '$SID_DEL';"
-docker exec ai-nova-postgres psql -U postgres -d opencode_test -t -A -c "SELECT COUNT(*) FROM part WHERE session_id = '$SID_DEL';"
-docker exec ai-nova-postgres psql -U postgres -d opencode_test -t -A -c "SELECT COUNT(*) FROM part p LEFT JOIN message m ON p.message_id = m.id WHERE m.id IS NULL;"
-```
-**期望**：删除前 message/part 大于 0；删除后该 session 的 message/part 为 0；全局 orphan part 为 0
-
-### T13.12 订阅额度月度 reset 与 rate limit
-```bash
-cd /Users/ruomu/code/opencode/packages/console/core && bun test test/subscription.test.ts
-cd /Users/ruomu/code/opencode/packages/console/app && bun test test/rateLimiter.test.ts
-```
-**期望**：全部通过，覆盖 usage reset、rate-limited、Retry-After、usagePercent cap
-
-### T13.13 rate limit 命中后不执行工具
-```bash
-# 需要外部服务或测试桩把当前用户/org 标记为 rate-limited 后再执行
-curl -s --max-time 60 -X POST "$BASE/session/$SID/message" \
-  -H 'Content-Type: application/json' \
-  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"用 bash 执行: echo should-not-run > /workspace/rate-limit.txt\"}],\"model\":$MODEL}" \
-  -w "\nstatus: %{http_code}\n"
-curl -s "$BASE/file/content?path=/workspace/rate-limit.txt&sessionID=$SID"
-```
-**期望**：请求返回明确 rate limit 错误；`rate-limit.txt` 不应存在。若限流由外部服务完成，本用例在外部网关层执行
-
-### T13.14 sandbox 安全：禁止访问宿主路径
-```bash
-curl -s --max-time 60 -X POST "$BASE/session/$SID/message" \
-  -H 'Content-Type: application/json' \
-  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"用 bash 执行: ls /Users /var/run/docker.sock /home/opencode/.ssh 2>&1 || true\"}],\"model\":$MODEL}" \
-  | python3 -c "import json,sys;[print(p.get('text','')[:500]) for p in json.load(sys.stdin).get('parts',[]) if p.get('type')=='text']"
-```
-**期望**：不能读取宿主机用户目录、Docker socket 或 SSH 私钥；输出应是不存在或权限拒绝
-
-### T13.15 sandbox 安全：禁止路径逃逸
-```bash
-curl -s --max-time 60 -X POST "$BASE/session/$SID/message" \
-  -H 'Content-Type: application/json' \
-  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"用 bash 执行: cd /workspace && ln -s /etc/passwd escape-passwd 2>/dev/null || true && cat escape-passwd 2>&1 || true && cat ../../etc/passwd 2>&1 || true\"}],\"model\":$MODEL}" \
-  | python3 -c "import json,sys;[print(p.get('text','')[:800]) for p in json.load(sys.stdin).get('parts',[]) if p.get('type')=='text']"
-```
-**期望**：不能通过软链或相对路径读到 sandbox 外敏感文件；如果 sandbox 内 `/etc/passwd` 可读，应确认不包含宿主机用户信息
-
-### T13.16 sandbox 安全：敏感环境变量不泄露
-```bash
-curl -s --max-time 60 -X POST "$BASE/session/$SID/message" \
-  -H 'Content-Type: application/json' \
-  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"用 bash 执行: env | grep -Ei 'TOKEN|SECRET|KEY|PASSWORD|COOKIE' || true\"}],\"model\":$MODEL}" \
-  | python3 -c "import json,sys;[print(p.get('text','')[:800]) for p in json.load(sys.stdin).get('parts',[]) if p.get('type')=='text']"
-```
-**期望**：不应暴露外部服务密钥、数据库密码、provider key、cookie 等敏感信息；允许出现无敏感值的测试变量
-
-### T13.17 幂等性：重复 instance/dispose
-```bash
-for i in 1 2 3; do
-  curl -s -X POST "$BASE/instance/dispose" -w "dispose-$i: %{http_code}\n"
-done
-```
-**期望**：重复调用都稳定返回 200/true，不产生异常日志或残留 sandbox
-
-### T13.18 幂等性：重复 kill-sandbox
-```bash
-for i in 1 2 3; do
-  curl -s -X POST "$BASE/session/$SID/kill-sandbox" -w "kill-$i: %{http_code}\n"
-done
-```
-**期望**：重复调用返回稳定结果；若 sandbox 已不存在，必须是明确成功或明确错误，不应 500
-
-### T13.19 幂等性：重复删除 session 和 provider 凭据
-```bash
-SID_DELETE=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
-for i in 1 2; do curl -s -X DELETE "$BASE/session/$SID_DELETE" -w "delete-session-$i: %{http_code}\n"; done
-curl -s -X PUT "$BASE/auth/test-provider" -H 'Content-Type: application/json' -d '{"type":"api","key":"idempotent-key"}'
-for i in 1 2; do curl -s -X DELETE "$BASE/auth/test-provider" -w "delete-auth-$i: %{http_code}\n"; done
-```
-**期望**：重复删除行为明确。第二次可以是 200/true 或 404，但不能 500 或产生不一致状态
-
-### T13.20 观测性：sandbox 生命周期日志
-```bash
-SID_LOG=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
-curl -s --max-time 60 -X POST "$BASE/session/$SID_LOG/message" \
-  -H 'Content-Type: application/json' \
-  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"用 bash 工具执行，background 必须设为 true: echo log-observe\"}],\"model\":$MODEL}" > /dev/null
-sleep 2
-docker exec opencode-saas-test grep "$SID_LOG" /home/opencode/.local/share/opencode/log/dev.log 2>/dev/null | grep -E 'sandbox created|keep alive enabled|sandbox destroyed' | tail -10
-```
-**期望**：日志包含 `sessionID`，并能定位 sandbox created、keepAlive、destroyed 等生命周期事件
-
-### T13.21 观测性：错误可关联 sessionID
-```bash
-SID_ERR=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
-curl -s --max-time 30 -X POST "$BASE/session/$SID_ERR/message" \
-  -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"hi"}],"model":{"providerID":"not-exist","modelID":"fake"}}' \
-  -w "\nstatus: %{http_code}\n"
-sleep 2
-docker exec opencode-saas-test grep "$SID_ERR" /home/opencode/.local/share/opencode/log/dev.log 2>/dev/null | tail -20
-```
-**期望**：provider/sandbox/session 错误日志能关联到 `SID_ERR`
-
-### T13.22 观测性：usage/计费记录可关联 session
-```bash
-SID_USAGE=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
-curl -s --max-time 60 -X POST "$BASE/session/$SID_USAGE/message" \
-  -H 'Content-Type: application/json' \
-  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"回复 usage-observe\"}],\"model\":$MODEL}" > /dev/null
-docker exec ai-nova-postgres psql -U postgres -d opencode_test -t -A -c "SELECT id, data->>'role', data->'metadata' FROM message WHERE session_id = '$SID_USAGE' ORDER BY time_created DESC LIMIT 5;"
-```
-**期望**：消息或相关 usage 表中能关联 `sessionID`、model、token/成本信息；若当前尚未落 usage，标记为待实现
-
-### T13.23 恢复语义：重启后 running session 状态明确
-```bash
-SID_RUN=$(curl -s -X POST $BASE/session -H 'Content-Type: application/json' -d '{}' | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
-curl -s --max-time 60 -X POST "$BASE/session/$SID_RUN/prompt_async" \
-  -H 'Content-Type: application/json' \
-  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"用 bash 执行: sleep 60 && echo after-restart\"}],\"model\":$MODEL}" > /dev/null
-sleep 2
-docker restart opencode-saas-test
-sleep 10
-curl -s "$BASE/session/status" | python3 -m json.tool
-curl -s "$BASE/session/$SID_RUN/message" | python3 -m json.tool | head -120
-```
-**期望**：`SID_RUN` 不应永久 running；最终应变为 idle/abort/error 中的明确状态
-
-### T13.24 恢复语义：重启后无孤儿 sandbox
-```bash
-docker restart opencode-saas-test
-sleep 10
-docker ps --format '{{.Names}}' | grep -i sandbox || true
-docker exec opencode-saas-test grep -E 'orphan|cleanup|sandbox' /home/opencode/.local/share/opencode/log/dev.log 2>/dev/null | tail -50
-```
-**期望**：重启后旧 sandbox 不应成为无法管理的孤儿资源；如设计为外部 runtime 自动清理，日志应能体现清理或重新接管
 
 ---
 
-## 结果汇总
+## 十三、SaaS 稳定性补充
 
-| 用例 | 状态 | 说明 |
-|------|------|------|
-| T13.1 | ✅ | kill-sandbox → destroyed=true |
-| T13.2 | ✅ | kill 后 exec 读到 PVC 数据（kill-test），自动重建 |
-| T13.3 | ✅ | 3 个并发 exec 返回同一 sandboxId（4da9a966），只创建 1 个 sandbox |
-| T13.4 | ✅ | dispose 200，sessions 清零 |
-| T13.5-T13.8 | — | proxy 相关，已移除 |
-| T13.9 | ✅ | docker restart 后 session 可查、messages=2 |
-| T13.10 | ✅ | prompt_async 204 → abort 200，messages=2 |
-| T13.11 | ✅ | 删除前 messages=3 parts=8，删除后 0/0，orphan=0 |
-| T13.12 | ⏭️ | 订阅额度单元测试，需单独跑 |
-| T13.13 | ⏭️ | 依赖外部限流网关 |
-| T13.14 | ✅ | /Users、docker.sock、.ssh 均 No such file |
-| T13.15 | ⚠️ | sandbox 内 /etc/passwd 可读（容器自身 root 用户，非宿主机） |
-| T13.16 | ⚠️ | 暴露 JUPYTER_TOKEN（sandbox 内部 token，非外部密钥） |
-| T13.17 | ✅ | 3 次 dispose 均 200 |
-| T13.18 | ✅ | 3 次 kill-sandbox 均返回 destroyed=true |
-| T13.19 | ✅ | 首次 delete session 200，重复 404；auth delete 均 200 |
-| T13.20 | ✅ | 日志含 sandbox created / keep alive enabled / destroying / destroyed 完整生命周期 |
-| T13.21 | ✅ | 不存在 provider 返回 500，日志含 sessionID 可关联 |
-| T13.22 | ✅ | cost=0.038, tokens=input:277/output:69/reasoning:177, PG 4 条 message |
-| T13.23 | ✅ | 重启后 0 个 running session |
-| T13.24 | ✅ | PG 有 1 个 keep_alive=false 的 running 记录，zombie cleanup 会处理 |
+### T13.1 单 session kill-sandbox
 
-> **复测记录（2026-09-16，镜像 `person-model-connect`（feat/opencode-1.18.31 工作区：个人模型隔离 + 公共优先 + provider 脱敏 + autokeepalive），本地 PG + 远端 K8s 沙箱，真实 LLM `Yd-DeepSeek/deepseek-v4-flash`）**：T13.1–T13.24 全部通过（T13.3 按去重说明以 T39.3.1 为准不重复执行；T13.13 依赖外部限流网关 SKIP）。适配说明：
-> - T13.11/T13.22 的 PG 访问从旧环境 `docker exec ai-nova-postgres psql -U postgres -d opencode_test` 适配为当前 `$PG_URL`（本地 PG `local@127.0.0.1:15432/opencode`）；T13.20/21/24 的日志路径从 `dev.log` 适配为 `opencode.log`
-> - T13.23/T13.24 合并一次 `docker restart` 执行（sleep 60 任务运行中重启 → 终态非 busy + PG running 记录由 idle-reap/zombie 兜底）
-> - T13.12 console 单测：subscription 6 用例 + rateLimiter 3 用例全过
-> - autokeepalive 影响下 T13.20 的 keepalive 生命周期日志依然可关联（session 创建即启用 keepalive，1 条以上 sandbox/keepalive 记录）
-> - 沙箱安全三连（T13.14/15/16）：无宿主用户目录/docker.sock/SSH 痕迹；`/etc/passwd` 仅容器自身内容；环境变量无 provider key、DB 连接串、APIKEY 泄露
+```bash
+run_shell "$SID" "echo kill-test > /workspace/kill-test.txt"
+api -X POST "$BASE/api/session/$SID/kill-sandbox" -H 'Content-Type: application/json' -d '{}'
+pgval "SELECT state FROM sandbox WHERE session_id='$SID'"
+```
 
+**期望**：返回 `{"sessionID":"...","destroyed":true}`；PG 中该 sandbox `state=destroyed`。
+
+### T13.2 kill-sandbox 后数据保留并自动重建
+
+```bash
+run_shell "$SID" "cat /workspace/kill-test.txt 2>&1"
+pgval "SELECT state FROM sandbox WHERE session_id='$SID'"
+```
+
+**期望**：读到 `kill-test`（kill 只销毁 runtime，不删数据）；sandbox 自动重建为 `running`。
+
+### T13.3 同 session 并发首条消息只创建一个 sandbox
+
+```bash
+for i in 1 2 3; do prompt "$SID3" "回复 $i 即可" & done; wait; wait_sid "$SID3" 200
+pgval "SELECT count(*) FROM sandbox WHERE session_id='$SID3' AND state='running'"
+```
+
+**期望**：`count=1`。
+
+### T13.4 dispose 与正在执行的 prompt 并发
+
+⛔ **不适用**。V2 无 `instance/dispose` 端点（openapi 实测 0 条）。V2 用重启（`docker restart`）替代，语义见 T13.23。
+
+### T13.9 服务重启后 session/message 仍可查询
+
+```bash
+prompt "$SID9" '回复 restart-pg-ok'; wait_sid "$SID9" 120
+docker restart opencode-saas-test
+# 等 /api/info 可用后
+api -o /dev/null -w '%{http_code}\n' "$BASE/api/session/$SID9"
+pgval "SELECT count(*) FROM session_message WHERE session_id='$SID9'"
+```
+
+**期望**：重启后 session GET 200，message 数 > 0。
+
+### T13.10 prompt 落库与 interrupt 状态
+
+```bash
+api -X POST "$BASE/api/session/$SIDA/prompt" -H 'Content-Type: application/json' \
+  -d '{"text":"写一篇很长的文章，持续输出","metadata":{},"delivery":"queue"}'   # 期望 200
+api -X POST "$BASE/api/session/$SIDA/interrupt" -H 'Content-Type: application/json' -d '{}'
+pgval "SELECT string_agg(type||'='||c,' ') FROM (SELECT type,count(*) c FROM session_message WHERE session_id='$SIDA' GROUP BY type) t"
+```
+
+**期望**：prompt **200**（V1 是 204）；interrupt `{"interrupted":true}`；user 已落库；最终进入 `idle` 终态而非永久 running。
+
+### T13.11 PG FK 完整性与删除级联
+
+```bash
+pgval "SELECT count(*) FROM session_message WHERE session_id='$SIDD'"   # 删除前 > 0
+api -o /dev/null -X DELETE "$BASE/api/session/$SIDD"
+pgval "SELECT count(*) FROM session_message WHERE session_id='$SIDD'"   # 0
+pgval "SELECT count(*) FROM session_v2 WHERE id='$SIDD'"                # 0
+```
+
+**期望**：删除后 message/session 级联清零，无 orphan。
+
+### T13.12 订阅额度与 rate limit 单测
+
+```bash
+cd packages/console/core && bun test test/subscription.test.ts
+cd packages/console/app   && bun test test/rateLimiter.test.ts
+```
+
+### T13.13 rate limit 命中后不执行工具
+
+⛔ **不适用**（依赖外部限流网关，本地无法构造）。
+
+### T13.14–T13.16 沙箱安全三连
+
+```bash
+run_shell "$SID" "ls /Users /var/run/docker.sock /home/opencode/.ssh 2>&1 || true"
+run_shell "$SID" "cd /workspace && ln -sf /etc/passwd escape-pw 2>/dev/null; cat escape-pw 2>&1 | head -3; echo '---REL---'; cat ../../etc/passwd 2>&1 | head -3"
+run_shell "$SID" "env | grep -Ei 'TOKEN|SECRET|KEY|PASSWORD|COOKIE|DATABASE_URL' || true"
+```
+
+**期望**：
+- 宿主路径 / docker.sock / .ssh 均 `No such file` 或权限拒绝
+- 路径逃逸读到的 `/etc/passwd` 是**沙箱容器自身**内容，不含宿主机用户
+- 环境变量**无** DB 连接串、API key、provider key 泄露
+
+### T13.17 幂等性：重复 dispose
+
+⛔ **不适用**（无 dispose 端点）。
+
+### T13.18 幂等性：重复 kill-sandbox
+
+```bash
+for i in 1 2 3; do api -o /dev/null -w '%{http_code}\n' -X POST "$BASE/api/session/$SID/kill-sandbox" -H 'Content-Type: application/json' -d '{}'; done
+```
+
+**期望**：均返回 200，不产生 500。
+
+### T13.19 幂等性：重复删除
+
+```bash
+code -X DELETE "$BASE/api/session/$SIDDEL"   # 首次 204
+code -X DELETE "$BASE/api/session/$SIDDEL"   # 重复 404
+```
+
+**期望**：首次 204，重复 **404**（非 500）。V2 无 `/auth/*` 端点，凭据部分不适用。
+
+### T13.20 / T13.21 观测性：日志可关联 sessionID
+
+```bash
+prompt "$SIDL" '用 shell 工具执行 echo log-observe'; wait_sid "$SIDL" 120
+docker exec opencode-saas-test grep -c "$SIDL" "$LOG"
+```
+
+**期望**：日志能按 sessionID 关联到 sandbox 生命周期与错误记录。
+
+### T13.22 usage/计费记录关联 session
+
+```bash
+pgval "SELECT 'cost='||cost||' in='||tokens_input||' out='||tokens_output FROM session_v2 WHERE id='$SIDU'"
+```
+
+**期望**：token 计数按 session 落库（`cost` 取决于 provider 是否计价）。
+
+### T13.23 / T13.24 重启后无 running 残留与孤儿 sandbox
+
+```bash
+prompt "$SIDR" '用 shell 工具执行 sleep 60 && echo after-restart'; sleep 6
+docker restart opencode-saas-test
+# 等服务就绪
+api "$BASE/api/session/active" | jq -c --arg s "$SIDR" '.data[$s] // empty'   # 应为空
+```
+
+**期望**：重启后该会话不在 `active` 中；无孤儿 running sandbox。
+
+---
+
+## 2026-09-29 V2 实测记录
+
+环境：SaaS `opencode-saas-sandbox-test:9d86bde786-t4`、沙箱 `opencode-opensandbox:local`（`7057c941ec64`）、本地 PG + 本地 OpenSandbox。**26 条断言 PASS，0 FAIL，4 条不适用。**
+
+| 用例 | 结果 | 实际观察 |
+|---|---|---|
+| T13.1 | ✅ | `{"destroyed":true}`；PG `state=destroyed` |
+| T13.2 | ✅ | kill 后读到 `kill-test`；sandbox 自动重建为 `running` |
+| T13.3 | ✅ | 并发 3 条消息，`running` sandbox **count=1** |
+| T13.4 | ⏭️ 不适用 | V2 无 `instance/dispose`（openapi 0 条） |
+| T13.9 | ✅ | 重启前 message=3 → 重启后 GET 200、message=3 |
+| T13.10 | ✅ | prompt **200**；interrupt `{"interrupted":true}`；消息 `user=1 assistant=1 idle=1` |
+| T13.11 | ✅ | 删除前 message=4 → 删除后 message=0、session=0、orphan=0 |
+| T13.12 | ✅ | subscription **6 pass**、rateLimiter **3 pass**，0 fail |
+| T13.13 | ⏭️ 不适用 | 依赖外部限流网关 |
+| T13.14 | ✅ | `/Users`、`/var/run/docker.sock`、`/home/opencode/.ssh` 均 `No such file` |
+| T13.15 | ✅ | 软链与相对路径逃逸读到的都是**沙箱容器自身** `/etc/passwd`（root/daemon/bin），无宿主机用户 |
+| T13.16 | ✅ | 敏感变量匹配结果为**空** —— 无 DB 连接串 / API key 泄露 |
+| T13.17 | ⏭️ 不适用 | 无 dispose 端点 |
+| T13.18 | ✅ | 三次 kill-sandbox 均 **200** |
+| T13.19 | ✅ | 首次删除 **204**，重复删除 **404**（非 500）；auth 部分不适用 |
+| T13.20 | ✅ | 日志中出现该 sessionID **10 次** |
+| T13.21 | ✅ | 错误场景日志中出现 sessionID |
+| T13.22 | ✅ | `session_v2` 落库 token 计数（in/out 均有值），`cost=0` |
+| T13.23 | ✅ | 重启前 `active={"type":"running"}` → 重启后**不在 active 中** |
+| T13.24 | ✅ | 无本轮遗留的孤儿 running sandbox |
+
+**不适用**：T13.4、T13.13、T13.17（无 dispose/rate-limit 环境）、T13.19 的 auth 部分。
+
+### 与 V1 记录的差异
+
+| 用例 | V1 | V2 |
+|---|---|---|
+| T13.1/13.18 | kill-sandbox | 路径仅加 `/api` 前缀，语义一致 |
+| T13.4 / T13.17 | `POST /instance/dispose` 200 | **无 dispose 端点** |
+| T13.10 | prompt_async **204** | prompt **200** + `interrupt` 替代 `abort` |
+| T13.12 | console 单测 | 路径变为 `packages/console/{core,app}`，6+3 用例全过 |
+| T13.19 | 含 `/auth/test-provider` 幂等 | V2 **无 `/auth/*` 端点** |
+| T13.20/21/24 | 日志 `dev.log` | 日志 `opencode-local.log` |
+| T13.16 | 暴露 JUPYTER_TOKEN | **本轮无任何敏感变量命中**（沙箱镜像已加固） |
+
+**清理**：本轮 11 个会话已全部删除，直接 `count` 复查为 0。
+
+---
+
+## 历史记录（V1 时期，保留备查）
+
+> 2026-09-16 复测（镜像 `person-model-connect`，本地 PG + 远端 K8s 沙箱）：T13.1–T13.24 全部通过（T13.13 依赖外部网关 SKIP）。其中 T13.15 记录「sandbox 内 /etc/passwd 可读（容器自身）」、T13.16 记录「暴露 JUPYTER_TOKEN」为**已知可接受项**。

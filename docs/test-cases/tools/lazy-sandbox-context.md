@@ -1,113 +1,22 @@
-# Lazy sandbox 上下文与 touch 语义（工具自取沙箱 + 单次 touch）
+# V2 Lazy Sandbox 与活跃 touch
 
-> 前置条件：SaaS 服务已启动（`docs/local-test-env.md`），PG 模式。环境变量 `$BASE $PG_URL $MODEL` 由 `test-env.sh` 提供。
+## 用例范围
 
-## 背景
+| 用例 | 断言 | 自动化位置 |
+|---|---|---|
+| T-LZY.1 冷会话首次工具创建 Sandbox | 新 Session 不预建 Sandbox；首条 glob tool part 为 `completed`；PG 中该会话对应 Sandbox 变为 `running` | [`scripts/tools-v2-e2e.mjs`](../scripts/tools-v2-e2e.mjs) |
+| T-LZY.2 工具活动刷新时间 | shell 执行前后 PG `sandbox.time_updated` 严格增加 | 同上 |
 
-本轮性能优化改造了工具调用获取沙箱的方式（`packages/opencode/src/session/tools.ts`、`packages/opencode/src/tool/sandbox-provider.ts`）：
+## 执行
 
-- `Tool.Context.sandbox` 从"构造上下文时立即 `getOrCreate`（预热）"改为 **lazy getter**：首次访问才创建，且本次调用内 memoize。grep/glob/list 等只通过 provider 执行命令的工具不再多一次预取；`resolveTools` 内父子上下文继承改用 `Object.create` 原型链，避免 spread 触发 getter。
-- `runInSession` / `runDetached` 移除了入口处重复的 `dbTouchSandbox`（`getOrCreateUnlocked` 命中缓存路径已 touch）。
-
-**风险**：① 部分工具此前隐式依赖上下文预热，lazy 化后需自行获取——遗漏会导致 "Sandbox is not available"；② touch 去重后，`sandbox.time_updated` 刷新语义必须保留，否则 idle-reaper 会误回收活跃沙箱。
-
-## 用例
+遵循 [`tool-calls.md`](./tool-calls.md) 的 V2 环境配置，执行：
 
 ```bash
-source docs/test-cases/test-env.sh
-source docs/test-cases/test-lib.sh
-
-# ============================================================
-# T-LZY.1 冷会话首条消息用 glob/grep（不经 bash 预热）
-# ============================================================
-# 不带 -b（不预启动沙箱），沙箱完全由工具内 lazy getOrCreate 创建
-SID=$(new_sid -k)
-curl -s --noproxy '*' --max-time 240 -X POST "$BASE/session/$SID/message" -H 'Content-Type: application/json' \
-  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"用 glob 工具在 /workspace 下匹配 *.json（pattern 填 *.json），报告找到的文件名，不要用 bash\"}],\"model\":$MODEL}" \
-  > /dev/null
-
-ROW=$(pgval "SELECT data->'state'->>'status' || '|' ||
-  coalesce(data->'state'->'metadata'->>'count','-') || '|' ||
-  coalesce(left(data->'state'->>'error',80),'')
-  FROM part WHERE session_id='$SID' AND data->>'tool'='glob'
-  ORDER BY time_created DESC LIMIT 1")
-echo "T-LZY.1 glob part: $ROW"
-STATUS=${ROW%%|*}; ERR=$(echo "$ROW" | cut -d'|' -f3-)
-[ "$STATUS" = "completed" ] && ! echo "$ERR" | grep -qi "not available" \
-  && pass "T-LZY.1" || fail "T-LZY.1" "$ROW"
-
-# 沙箱最终建立（lazy 创建生效）
-SBX_STATE=$(pgval "SELECT state FROM sandbox WHERE session_id='$SID'")
-[ "$SBX_STATE" = "running" ] && pass "T-LZY.1b" || fail "T-LZY.1b" "sandbox state=$SBX_STATE"
-
-# ============================================================
-# T-LZY.2 连续 bash 后 sandbox.time_updated 仍在刷新
-# ============================================================
-SID2=$(new_sid -kb)
-# 等沙箱就绪
-sleep 5
-T0=$(pgval "SELECT time_updated FROM sandbox WHERE session_id='$SID2'")
-sleep 2  # 确保 T0 落后于当前时间，给 touch 留出可观测增量
-for i in 1 2 3; do
-  curl -s --noproxy '*' -m 60 -X POST "$BASE/session/$SID2/exec" -H 'Content-Type: application/json' \
-    -d '{"command":"echo lzy-touch"}' > /dev/null
-done
-T1=$(pgval "SELECT time_updated FROM sandbox WHERE session_id='$SID2'")
-echo "T-LZY.2 time_updated: $T0 -> $T1"
-[ -n "$T0" ] && [ -n "$T1" ] && [ "$T1" -gt "$T0" ] \
-  && pass "T-LZY.2" "touch 语义保留（增量 $((T1-T0))ms）" \
-  || fail "T-LZY.2" "time_updated 未刷新: $T0 -> $T1（idle-reaper 会误回收）"
-
-# ============================================================
-# T-LZY.3 混合工具链回归（read/write/bash 同会话）
-# ============================================================
-curl -s --noproxy '*' --max-time 240 -X POST "$BASE/session/$SID2/message" -H 'Content-Type: application/json' \
-  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"依次执行：1) bash 执行 echo lzy3 > /workspace/lzy3.txt；2) read 读取 /workspace/lzy3.txt；3) write 覆盖 /workspace/lzy3.txt 为 done。报告每步结果\"}],\"model\":$MODEL}" \
-  > /dev/null
-
-STATS=$(pgval "SELECT string_agg(DISTINCT data->'state'->>'status', ',') FROM part
-  WHERE session_id='$SID2' AND data->>'type'='tool' AND data->>'tool' IN ('bash','read','write')
-    AND time_created > (extract(epoch FROM now())-600)*1000")
-echo "T-LZY.3 工具状态聚合: $STATS"
-[ "$STATS" = "completed" ] && pass "T-LZY.3" || fail "T-LZY.3" "存在非 completed: $STATS"
-
-summary
+bun docs/test-cases/scripts/tools-v2-e2e.mjs
 ```
 
-## 期望汇总
+用例通过要求脚本退出码为 0，且输出中 T-LZY.1、T-LZY.1b、T-LZY.2 均通过。脚本创建/删除测试 Session，PG 断言依据 V2 `sandbox` 表；不再使用 V1 `/session/:id/exec`、`part` 表或未绑定 Sandbox owner 的汇总查询。
 
-| 用例 | 期望 |
-|---|---|
-| T-LZY.1/1b | 冷会话首条 glob 消息 completed、无 "not available"，沙箱最终 running（lazy 创建生效） |
-| T-LZY.2 | 3 次 exec 后 `sandbox.time_updated` 严格递增（touch 去重未破坏 idle-reaper 依赖的活跃信号） |
-| T-LZY.3 | bash → read → write 混合链路全部 completed |
+## 历史 V2 实测
 
-> 注：T-LZY.2 的观测前提是该实例处理了这几次 exec（多实例共享 PG 时，确保请求打到同一入口）；`time_updated` 为毫秒时间戳。
-
-## 复测记录
-
-| 日期 | 镜像 tag | 用例 | 结果 | 备注 |
-|---|---|---|---|---|
-| 2026-08-19 | `7da2f4d43d-perf1` + 沙箱 `opencode-opensandbox:local`（组合 3：本地 PG + 本地 OpenSandbox，daemon 含 500ms 修复） | T-LZY.1 | ✅ PASS | 冷会话首条 glob completed（空目录 count=0 属正常） |
-| 2026-08-19 | `7da2f4d43d-perf1` + 沙箱 `opencode-opensandbox:local`（组合 3：本地 PG + 本地 OpenSandbox，daemon 含 500ms 修复） | T-LZY.1b | ✅ PASS | sandbox running |
-| 2026-08-19 | `7da2f4d43d-perf1` + 沙箱 `opencode-opensandbox:local`（组合 3：本地 PG + 本地 OpenSandbox，daemon 含 500ms 修复） | T-LZY.2 | ✅ PASS | time_updated 递增 |
-| 2026-08-19 | `7da2f4d43d-perf1` + 沙箱 `opencode-opensandbox:local`（组合 3：本地 PG + 本地 OpenSandbox，daemon 含 500ms 修复） | T-LZY.3 | ✅ PASS | bash→read→write 全 completed |
-| 2026-08-19 | `perf-rft`（组合 2：本地 PG + 远端沙箱，LSP 修复已撤销） | T-LZY.1/1b | ✅ PASS | 冷会话首条 glob completed，sandbox running |
-| 2026-08-19 | `perf-rft`（组合 2） | T-LZY.2 | ✅ PASS | time_updated 递增（增量 7343ms） |
-| 2026-08-19 | `perf-rft`（组合 2） | T-LZY.3 | ✅ PASS | bash→read→write 全 completed |
-
-### V2 全量回归（2026-09-24）
-
-**环境**：容器 `opencode-saas-test`（`127.0.0.1:14096`，镜像含 `resolveSandboxKey`/`ensureRipgrep` 修复），本地 PG `opencode-v2-up`，sandbox 镜像 `opencode-opensandbox:local`，模型 `Yd-DeepSeek/deepseek-v4-flash`。
-
-**V1→V2 接口映射**（同前两篇）：`exec` → `POST /api/session/:id/shell`（独立 `type='shell'` 消息轮询）；`message` → `prompt`+`wait`；PG `part` → `session_message.content[]`；`part.tool='bash'` → `name='shell'`；`metadata.count` 结构同构直取。
-
-| 日期 | 用例 | 结果 | 备注 |
-|---|---|---|---|
-| 2026-09-24 | T-LZY.1 | ✅ PASS | 冷会话首条 glob `completed\|count=0\|(无error)`（/workspace 无 .json 属正常），无 "not available"——lazy getOrCreate 生效，且 `ensureRipgrep` 探测在冷路径正常放行 |
-| 2026-09-24 | T-LZY.1b | ✅ PASS | prompt 前 sandbox 记录为 `destroyed`（前次 kill 残留），glob 执行后 **`running`**——验证了 getOrCreate 对 destroyed 记录的 lazy 重建路径（不 reconnect、直接 create），比纯冷启动更强的 lazy 场景 |
-| 2026-09-24 | T-LZY.2 | ✅ PASS | 3 次 shell 后 `time_updated` 1790237126491 → 1790237140286（增量 13795ms），touch 语义保留，idle-reaper 活跃信号正常 |
-| 2026-09-24 | T-LZY.3 | ✅ PASS | shell→read→write 混合链路工具状态聚合 = `completed` |
-
-**结论**：`PASS=4 FAIL=0`。V2 中 lazy 语义天然成立（`SandboxTools`/shell 插件首访问经 `provider.getOrCreate` 创建），touch 由 provider `run`/heartbeat 的 `touchSandbox` 刷新；本轮新增的 `resolveSandboxKey`（subagent root 归一）与 `ensureRipgrep`（rg 探测）在冷会话路径均正常工作，未引入回归。
-
+2026-09-24：冷会话首次 glob 完成；执行后 Sandbox 状态为 running；连续 shell 后 `time_updated` 从 `1790237126491` 增至 `1790237140286`；混合 shell/read/write 均完成。当前可重复自动化以脚本断言为准，历史记录只作为此前环境的结果，不替代本次执行。

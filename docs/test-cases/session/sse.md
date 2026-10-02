@@ -678,7 +678,7 @@ curl -sS -o /dev/null -w "%{http_code}\n" -N --max-time 3 "${CURL_AUTH[@]}" \
 > V2 的 durable 事件本应按聚合序号补发：`GET /api/experimental/session/:sessionID/log?after=<seq>&follow=<bool>`。
 > `after` 为**排他**游标，必须 ≥ 0（`after=-1` 返回 400）；读取到达水位时发出一次 `log.synced`；与 V1 不同，该端点**不含** `server.connected`。
 >
-> ⚠️ **实测阻塞**：当前服务能发出 `log.synced` 水位（`seq` 反映已分配的序号，如 `1`），但 `event` 表**没有落库任何 durable 事件行**（`select count(*) from event` = 0），因此 `?after=` 补发不出任何事件，实时窗口外的事件无法追回。该项待 durable 事件持久化启用/修复后再验证。
+> **配置相关**：durable 事件是否持久化由 `events.persist` 控制；SaaS 容器通过 `OPENCODE_EVENTS_PERSIST` 配置。未启用时 event 表为空，补发无历史事件；启用后应验证 PG 落库与 `?after=` 补发。
 
 ```bash
 SID=$(new_sid)
@@ -698,11 +698,11 @@ curl -sS -o /dev/null -w "after=-1: %{http_code}\n" --max-time 3 "${CURL_AUTH[@]
 curl -sS -o /dev/null -w "after=abc: %{http_code}\n" --max-time 3 "${CURL_AUTH[@]}" \
   "$BASE/api/experimental/session/$SID/log?after=abc"
 ```
-**期望**：非法 `after`（负数/非数字）返回 `400`（已实测通过）。`after=0` 应补发 `seq>0` 的 durable 事件（`session.renamed` 恰 1 条）——**当前因未落库而不成立**，待持久化启用后恢复判定。
+**期望**：非法 `after`（负数/非数字）返回 `400`；持久化开启时，`after=0` 应补发 `seq>0` 的 durable 事件（`session.renamed` 恰 1 条）。
 
 ### T9.36 会话事件流：断连续传并发窗口（补发/实时不丢不重）
 
-> ⚠️ **实测阻塞**：同 T9.35，durable 事件未落库，`follow=true` 的补发段为空（仅 `log.synced`），无法验证 `[1,2,3,4,5]` 序列。
+> 持久化未开启时无法验证本用例；应在 `events.persist=true` 的环境中检查补发与实时窗口无丢失、无重复。
 
 ```bash
 SID=$(new_sid)
@@ -726,7 +726,7 @@ print('renamed seqs:', seqs)
 print('✅ 零丢失零重复' if seqs==[1,2,3,4,5] else '⚠️ 未落库，等待持久化后复测')
 "
 ```
-**期望**：`session.renamed` 的 `durable.seq` 恰为 `[1,2,3,4,5]`（补发 + 实时各一次）——**当前因未落库而不成立**。
+**期望**：本例产生的 `session.renamed` 的 `durable.seq` 连续，补发与实时各一次，无丢失、无重复。
 
 ### T9.37 会话事件流：会话过滤语义单测
 
@@ -745,7 +745,7 @@ cd packages/server && bun test test/session-stream.test.ts test/event-feed.test.
 
 ## 测试结果（V2）
 
-本轮实测环境：镜像 `opencode-saas-e2e:session-fs-fix3`（热更新本次改动后重启，未重建）、本地 PG `opencode-v2-up`、真实 LLM `Yd-DeepSeek/deepseek-v4-flash`。
+此前的逐项实测记录如下；更近期的 SSE smoke 复测见表后补充记录。
 
 | 用例 | 结果 | 备注 |
 |------|------|------|
@@ -765,18 +765,32 @@ cd packages/server && bun test test/session-stream.test.ts test/event-feed.test.
 | T9.33 | ✅ | A/B 并发各自关流，`sessionID` 零交叉 |
 | T9.34 | ✅ | 不存在 sessionID → 404 |
 | 附加 | ✅ | `prompt_stream` 非法 payload → 400 |
-| T9.35 | ⚠️ 阻塞 | 非法 `after` 400 通过；`event` 表未落库，`?after=` 补发不出事件（仅 `log.synced`） |
-| T9.36 | ⚠️ 阻塞 | 同上，durable 事件未落库，无法验证 `[1,2,3,4,5]` |
+| T9.35 | ⚠️ 当时阻塞 | 当时服务未启用 durable event 持久化；不能据此判断开启持久化时的回放功能 |
+| T9.36 | ⚠️ 当时未验证 | 当时服务未启用 durable event 持久化 |
 | T9.37 | ✅ | `session-stream.test.ts` + `event-feed.test.ts` 合计 21 通过（`--rerun-each 5` 稳定） |
 
-PG 核验：测试会话行存在且 `directory=/workspace`；一次回合消息为 user=1、assistant=1、idle=1；`pending=0`。
-另：`event_sequence` 有水位记录，但 `select count(*) from event` = 0（见 T9.35/36 阻塞）。
+PG 核验：上述历史测试时 `event_sequence` 有水位记录，但 `event` 表为 0 行；此结论只代表该次运行配置。
+
+### 2026-09-30 SSE API smoke 复测
+
+使用独立 Docker 容器 `opencode-sse-tmp`（14102）、隔离 PG `opencode-v2-test`，设置 `OPENCODE_EVENTS_PERSIST=true`，通过 `docs/test-cases/scripts/sse-smoke-v2.mjs` 和真实 HTTP API 验证：
+
+| 覆盖项 | 结果 | 证据 |
+|---|---|---|
+| T9.1/T9.2 全局连接及创建事件 | ✅ | `server.connected` 与对应 `session.created` 均收到 |
+| T9.5 文本事件 | ✅ | `session.text.delta` 与 `session.text.ended` 均收到 |
+| T9.9/T9.31 执行生命周期 | ✅ | `prompt_stream` 末事件为 `session.execution.succeeded` |
+| T9.29 会话隔离 | ✅ | 会话流未出现其他 sessionID |
+| T9.35 durable 落库与补发 | ✅ | PG 该会话 `event` 行 13 条；`after=0&follow=false` 回放 13 个事件，含执行成功事件 |
+| T9.36 replay + live 并发窗口 | 未完成 | 本轮 smoke 脚本等待 `follow=true` 的 `log.synced` 时超时，尚未确认 HTTP 层并发窗口行为；Core `session-log.test.ts` / `bus.test.ts` 对回放交接有覆盖 |
+
+本轮单测：`packages/server/test/session-stream.test.ts` 与 `event-feed.test.ts` **21 pass**；`packages/core/test/session-log.test.ts` 与 `bus.test.ts` **58 pass**。成功 smoke 产生的测试会话由脚本通过 API 删除；探索 `follow=true` 时中断的 3 个测试会话按确切 ID 从隔离库清理，PG session 行数恢复为运行前的 14；临时容器已清理。
 
 > T9.4–T9.12、T9.14、T9.15、T9.17–T9.20、T9.22、T9.25–T9.27、T9.31–T9.34 及 T9.5/T9.6 等已按 V2 契约改写，命令可直接执行，但尚未在本轮全部实跑（其中 T9.5/T9.6/T9.11/T9.26/T9.27 依赖真实 LLM 与 sandbox）。执行时若与期望不符，按上面的 V1→V2 对照表核对事件名与端点。
 
 ## 需要讨论的 V2 缺口
 
-1. **durable 事件未落库**（T9.35/T9.36）：`event_sequence` 分配了序号，但 `event` 表 0 行，`GET /api/experimental/session/:sessionID/log?after=` 只能发 `log.synced` 水位、补发不出事件。断连续传（前端重连对齐）在 V2 实际不可用，需要确认持久化是否应启用/修复。
+1. **T9.36 HTTP follow 行为待核实**：Core 的 bus/session-log 单测通过；但本轮 HTTP smoke 等待 `follow=true` 的 `log.synced` 超时，需在后续单独复现 HTTP/SSE 层行为。T9.35 已在 `OPENCODE_EVENTS_PERSIST=true` 环境通过。
 2. **无 dispose 端点**（T9.12）：`global.disposed` / `location.shutdown` 事件存在，但 HTTP 层没有触发入口；是否需要补一个处置端点。
 3. **无消息删除**（T9.17）：V2 没有删除消息/part 的端点与 `message.removed` 事件；`session.message.content.updated` 为 replay-only。如需前端撤销消息，需要新端点。
 4. **`session.idle` 已 deprecated**（T9.9）：当前服务路径以 `session.execution.succeeded/failed/interrupted` 判定回合结束；是否统一弃用 `session.idle`。

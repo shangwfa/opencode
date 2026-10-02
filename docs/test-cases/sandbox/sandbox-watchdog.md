@@ -1,5 +1,46 @@
 # 沙箱性能优化与 Watchdog 兜底（SaaS / PG）
 
+> **V2 执行约定（2026-10-01，必读）**：本文三个主题在 V2 均有对应实现，但正文历史命令基于 V1 API。执行时**必须按以下规则换算**，不要照抄 V1 命令：
+>
+> 1. 认证：所有请求带 `-u "opencode:$OPENCODE_PASSWORD"`（`source docs/test-cases/test-env.sh 3` 后可用）。
+> 2. 创建会话：`POST "$BASE/api/session" -H 'Content-Type: application/json' -d '{"model":{"providerID":"Yd-DeepSeek","id":"deepseek-v4-flash"}}'`，响应取 `.data.id`（不再是顶层 `id`）。
+> 3. 文件读接口（T28.1–T28.3 用于触发沙箱获取）：V1 `$BASE/file/content?path=...&sessionID=...` 读作 V2 `GET "$BASE/api/session/$SID/fs/list?path=."`（GET `/api/session/:id/fs/list`，探索确认存在；同样触发 `getOrCreate`，时延断言语义不变）。
+> 4. 命令执行：V1 `/session/:id/exec`（同步返回 stdout）读作「`POST /api/session/:id/shell`（HTTP 204）+ 从 `session_message` 读输出/状态/退出码」。
+> 5. 落库表：V1 `exec_log` 读作 V2 `session_message`（`type='shell'`，`data->>'status'`、`data->'exit'`）；durable 事件经 `GET /api/experimental/session/:id/log` 回放。
+> 6. 后台命令用完全分离形态 `(nohup cmd >log 2>&1 </dev/null &)`。
+>
+> ```bash
+> source docs/test-cases/test-env.sh 3
+> api() { curl -sS --fail-with-body -u "opencode:$OPENCODE_PASSWORD" "$@"; }
+> api_raw() { curl -sS -u "opencode:$OPENCODE_PASSWORD" "$@"; }
+> new_sid_v2() { api_raw -X POST "$BASE/api/session" -H 'Content-Type: application/json' \
+>   -d '{"model":{"providerID":"Yd-DeepSeek","id":"deepseek-v4-flash"}}' | jq -er .data.id; }
+> run_shell() { # <sid> <command> [timeoutSeconds]
+>   local before out
+>   before=$(psql "$PG_URL" -At -c "select coalesce(max(seq),0) from session_message where session_id='$1'")
+>   api_raw -X POST "$BASE/api/session/$1/shell" -H 'Content-Type: application/json' \
+>     -d "$(jq -nc --arg c "$2" --argjson t "${3:-120}" '{command:$c,timeoutSeconds:$t}')" -o /dev/null
+>   for _ in $(seq 1 90); do
+>     out=$(psql "$PG_URL" -At -c "select data::jsonb->'output'->>'output' from session_message
+>       where session_id='$1' and type='shell' and seq > $before and data::jsonb->>'status'='exited'
+>       order by seq desc limit 1")
+>     [ -n "$out" ] && { printf '%s\n' "$out"; return 0; }
+>     sleep 1
+>   done
+>   echo "shell did not finish: $2" >&2; return 1
+> }
+> ```
+>
+> **三主题的 V2 对应与承接**：
+>
+> | 主题 | V2 实现 | V2 承接文档 |
+> |---|---|---|
+> | 一、沙箱缓存性能（T28.1–T28.4、T28.6–T28.8） | `packages/core/src/sandbox/provider.ts` 的 `getOrCreate` 进程内缓存与 single-flight 合并 | 本文（按上方约定执行）+ `shell-perf.md` ST.S3/S4（有界等待、无 TTL 复用） |
+> | 二、PG 命令生命周期超时（T28.15–T28.22） | V2 shell API 的 `timeoutSeconds`（超时后 shell 消息 `status=timeout`）；V1 command session/exec_log/`/exec/async` 机制在 V2 **不存在** | `shell-perf.md` ST.S1/S2（串行化、双建检查）+ `exec-api.md` T19.1/T19.5（退出码/错误场景） |
+> | 三、Part Watchdog（T28.5、T28.5b、T28.9–T28.14） | `packages/core/src/session/watchdog.ts`（`OPENCODE_WATCHDOG_TIMEOUT_SEC`/`SCAN_INTERVAL_SEC`/`EXEMPT_TOOLS`；无 V1 `MONITORED_TOOLS` 白名单） | `../session/watchdog-coverage.md`（V2 完整验收 + `watchdog-v2-e2e.mjs` 自动化 + 单测 9 pass） |
+>
+> 下文「改动清单/关键常量」中的 `packages/opencode/src/...` 均为 V1 历史路径（该包已移除），仅作背景记录；V2 实现见上表。
+
 > **仅适用于 opencode SaaS（PostgreSQL）**。
 > 公共测试环境和配置请参考 `docs/local-test-env.md`。
 

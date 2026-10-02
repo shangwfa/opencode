@@ -1,10 +1,18 @@
-# 会话派生：summaryFrom 摘要上下文（V2 适配状态）
+# 会话派生：summaryFrom 摘要上下文（V2）
 
-> **V2 当前阻塞：**当前 `POST /api/session` 请求 schema 仅接受 `id/title/agent/model/location/metadata/permissions`，没有 `summaryFrom` 字段（`packages/protocol/src/groups/session.ts`）。因此本文件后续记录的 V1 路径（`/session`、`/message`、`/event`）和断言不能直接作为 V2 测试执行；将 V1 路径替换成 `/api` 并不能补上缺失的产品行为。
+> **2026-09-30：V2 已实现。**`POST /api/session` 新增 `summaryFrom`（`packages/protocol/src/groups/session.ts`），
+> Core 走 `SessionCompaction.deriveSummary({ sourceSessionID, target })`（`packages/core/src/session/compaction.ts`），
+> 在 `Session.create` 创建完成后后台 fork（`packages/core/src/session.ts`）。复用 compaction 的提示词、历史切分、模型调用与重试，
+> 但结果通过标准 `session.step.*` / `session.text.*` 事件流成为目标会话的**普通 assistant 消息**；不创建 compaction 记录。
 >
-> **待产品确认：**是否要在 V2 实现“创建会话时异步从源会话生成摘要并注入新会话上下文”的 `summaryFrom` 能力？确认实现后，再将下方用例迁移到 V2 的创建、prompt、会话事件流和 wait API，并通过 HTTP 接口及 PG 验证；若不实现，则将本文件改为 V1 历史记录或移除该功能测试。
+> **核心契约：源会话只读。**`deriveSummary` 用源会话的消息作为输入，所有 assistant 消息、事件与 usage 都写目标会话；
+> 源会话的消息、事件、`time_updated` 一律不变。摘要以 `session.text.delta` 实时输出，并以 `session.text.ended` 完成持久化。
+> Core 单测 `packages/core/test/session-compaction.test.ts` 有两条用例把这钉死。
 >
-> **本次迁移约束：**以下内容是 V1 行为与复测记录，暂作需求基线保留，不代表 V2 已支持或已通过。不要在 V2 环境运行这些命令。
+> 下方为 V1 需求基线原文与历史复测记录（保留作为行为参考）。**V1 命令（`/session`、`/message`、`/event`、
+> `message`/`part`/`exec_log` 表）为历史记录，不要执行。**V2 可复跑脚本见文末。
+
+> **V1 原始功能说明**：`POST /session` 创建新会话时传 `summaryFrom: <源会话ID>`，服务端创建会话后**异步**为源会话**现场生成一份全新摘要**（每次都调 LLM），写入**新会话**（user 消息带 compaction part + assistant 消息 `summary: true`），生成过程走正常消息事件流（`message.part.delta` → `session.idle`）。**源会话零写入**。
 
 > **功能**：`POST /session` 创建新会话时传 `summaryFrom: <源会话ID>`，服务端创建会话后**异步**为源会话**现场生成一份全新摘要**（每次都调 LLM），写入**新会话**（user 消息带 compaction part + assistant 消息 `summary: true`），生成过程走正常消息事件流（`message.part.delta` → `session.idle`）。**源会话零写入**。
 >
@@ -288,3 +296,61 @@ curl -s -X POST "$BASE/session" -H 'Content-Type: application/json' -d '{"title"
 > 本轮执行暴露并修复 2 个实现缺陷：① `deriveSummary` 缺 idle 恢复（SSE 无完成信号、状态永停 busy）→ `Effect.ensuring(status.set(idle))`；② `forkDeriveSummary` 缺会话锁 → 摘要流式期间发消息触发空 compaction 竞态 → 包 `withSessionLock`（`handlers/session.ts`）。`wait_derived` 判据同步加强为「等 summary assistant 的 finish 落库」。
 
 | 2026-09-14 | **全量复测**（镜像 `hitl-cbf2276a-wip2`（含 pgJsonb/LEASE_TOOLS/偏离修复），本地 PG + 远端沙箱） | ✅ 15/15 | T43.1.1 ✅（user compaction part + assistant summary=true + 摘要含「凤凰」）/ T43.1.2 ✅（**行为演进**：user 行 `summary={"diffs":[]}` 而非 09-10 时的 null——compaction 元数据随消息落库，结构断言核心不变：compaction part=1 + assistant summary=true）/ T43.1.3 ✅（exec_log 审计含 summaryFrom、title 未继承源标题）/ T43.2.1 ✅（delta×47 + part.updated×6 + `session.idle`）/ T43.3.1 ✅（before=after=2 零污染）/ T43.4.1 ✅（回复「凤凰」）/ T43.5.1 ✅（西瓜开门硬校验 ×2 + 芝麻开门软校验 ×2，真实合并）/ T43.6.1/6.2/6.3 ✅（空源 0 消息 / 不存在源正常创建 / 400）/ T43.7.1 ✅（phoenix 命中 ×4）/ T43.8.1 ✅（pvcMode=app + appId + 摘要照常）/ T43.9.1 ✅（并发两 ID 各自生成）/ T43.10.1 ✅（排队回复 ok、消息数 4）/ T43.11.1 ✅ |
+
+---
+
+## V2 实现与实测（2026-09-30）
+
+### 实现落点
+
+| 层 | 文件 | 改动 |
+|---|---|---|
+| 契约 | `packages/protocol/src/groups/session.ts` | `session.create` payload 增 `summaryFrom: Session.ID`（可选） |
+| 服务 | `packages/core/src/session/compaction.ts` | 新增 `DeriveInput` / `Interface.deriveSummary`；复用 `execute`/`executeProvider` |
+| 接线 | `packages/core/src/session.ts` | `CreateBaseInput.summaryFrom`；创建完成后 `instances.provide(created)(…)` 后台 fork，失败只 log |
+| 传输 | `packages/server/src/handlers/session.ts` | `createInput` 透传 `summaryFrom` |
+
+**输出语义**：V2 复用 compaction 生成逻辑（源历史切分、旧摘要锚点、摘要模板、LLM stream 与重试），但 `deriveSummary` 将输出模式设为 `assistant`：
+`session.step.started` 创建普通 assistant 行，`session.text.delta` 逐段实时广播，`session.text.ended` 把完整文本投影到该行，最后 `session.step.ended` 收尾。不会发布 `Compaction.Started/Ended/Delta`，也不会写 `type=compaction` 或 history checkpoint。
+
+**与 V1 的差异**：V1 生成普通 assistant 消息并绕过 prompt loop 直接跑 processor，因此要手补 `status.set(idle)` 和 `withSessionLock`。V2 通过 Step/Text 生命周期落一条完整 assistant 消息；创建后台任务不会占用 prompt runner 的忙闲状态。
+
+### 源会话只读（契约，Core 单测锁定）
+
+```
+deriveSummary:
+  源会话  → sessionMessages（输入）                      ← 只读
+  目标会话 → Step.Started/ Text.Started/ Text.Delta/ Text.Ended/ Step.Ended
+             → 一条普通 assistant 消息 + usage           ← 全部写
+             → 不写 compaction 消息 / checkpoint / historyPath
+```
+
+`packages/core/test/session-compaction.test.ts`：
+
+- `deriveSummary installs the source's summary in the target and leaves the source untouched`
+  —— 断言目标得到 assistant 文本与实时 `Text.Delta`、没有 compaction 行、源 `store.context` 不变、模型请求归属目标；
+- `deriveSummary reports an empty source as unavailable instead of writing anything`
+  —— 空源直接 `compaction.unavailable`，不 resolve 模型、不产生摘要。
+
+`packages/core/test/session-compaction.test.ts` 全 19 例、compaction 相关回归 31 例、session 相关回归 217 例均通过。
+
+**普通消息流改造后的实测（2026-09-30）**：Docker 临时容器 `opencode-sumfrom-stream`（14107）、本地 PG `opencode-v2-test`、真实模型与沙箱；V2 脚本 **18/18 断言通过**。观测到目标会话 285 个 `session.text.delta` 事件，增量拼接文本与最终持久化文本完全一致；PG 有 1 条 assistant 摘要行、没有 compaction 行。额外验证了源会话已有 compaction checkpoint 且之后有新消息时，两部分信息都进入派生摘要。源会话消息数、事件数与 `time_updated` 均未变化。测试后临时容器和测试会话已清理。
+
+### V2 可复跑脚本
+
+```bash
+BASE=http://localhost:14107 PG_URL='postgresql://local@127.0.0.1:5432/opencode-v2-test' \
+  OPENCODE_PASSWORD=... MODEL='{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}' \
+  node docs/test-cases/scripts/session-summary-from-v2.mjs
+```
+
+映射到 V2 断言：
+
+| V1 用例 | V2 断言 |
+|---|---|
+| T43.1.1 摘要消息 | `summaryFrom` 创建后轮询到普通 assistant 完成消息，摘要含源会话要点 |
+| T43.1.2 PG 落库 | `session_message` 中目标会话有 assistant 摘要行、无 compaction 行 |
+| T43.3.1 零污染 | 源会话消息逐字节不变 + 源 `event` 表 0 行 + `time_updated` 不变 |
+| T43.4.1 端到端 | 目标会话追问源会话事实，回复含「凤凰」 |
+| T43.6.1/6.2/6.3 兜底 | 空源 200、不存在源 200、非法格式 400 |
+| T43.9.1 并发 | 同一源并发两个派生，各自生成摘要 |

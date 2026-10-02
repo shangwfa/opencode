@@ -604,15 +604,50 @@ main()
 
 | 层级 | 标准 | 方法 |
 |------|------|------|
-| 单元测试 | 52 个测试全通过 | `bun test` 在 `packages/opencode` |
-| 端到端（基础） | 0 处宿主机路径泄露 | 3.6 脚本 |
-| 端到端（真实流程） | 0 处宿主机路径泄露 | 4.5 脚本 |
+| 单元测试 | `session-shell.test.ts` 全通过 | 见 6.1 |
+| 端到端（基础） | 0 处宿主机路径泄露 | 3.6 脚本的 V2 版 |
+| 端到端（真实流程） | 0 处宿主机路径泄露 | 4.5 脚本的 V2 版 |
 | `<env>` 块 | V2 SaaS 中 Working directory / root = `/workspace` | AI 自报告验证 |
 | 工具 I/O | 所有工具的 input/output/title 均为 `/workspace/...` | 消息扫描 |
 
 ---
 
-## 六、测试结果
+## 2026-09-29 V2 实测记录
+
+环境：SaaS `opencode-saas-sandbox-test:9d86bde786-t4`、沙箱 `opencode-opensandbox:local`（`7057c941ec64`）、本地 PG + 本地 OpenSandbox、`Yd-DeepSeek/deepseek-v4-flash`。**全部通过，0 处路径泄露。**
+
+本文档正文脚本均为 V1 写法，**V2 下不可执行**。用现成的 V2 脚本（已断言化）：
+
+```bash
+# 第三章 基础工具
+BASE=http://localhost:14096 OPENCODE_PASSWORD=... \
+  node docs/test-cases/scripts/path-leak-e2e-v2.mjs
+
+# 第四章 真实开发流程（GIT_REPO 需调用方注入凭据；本轮用公开仓库）
+BASE=http://localhost:14096 OPENCODE_PASSWORD=... \
+  GIT_REPO="https://github.com/sindresorhus/is.git" PROJECT_DIR="/workspace/is-repo" \
+  node docs/test-cases/scripts/path-leak-real-workflow-v2.mjs
+
+# 相关单测
+cd packages/core && bun test test/session-shell.test.ts
+```
+
+| 场景 | 结果 | 详情 |
+|------|------|------|
+| 单测 `session-shell.test.ts` | ✅ | **14 pass / 0 fail** |
+| 基础路径泄露流程（第三章） | ✅ | 33 条消息、7 次工具调用（read/glob/grep/write/edit/shell），**0 处泄露** |
+| 真实开发流程（第四章） | ✅ | 25 条消息、**35 次工具调用**（glob/read/ccr_retrieve/write/edit/shell），**0 处泄露** |
+| `<env>` 块（PL-9） | ✅ | AI 自报告 Working directory=`/workspace`、Workspace root=`/workspace` |
+| WF-3.5 session 根目录 | ✅ | 始终 `/workspace`；远端仓库按沙箱绝对路径访问，不做宿主机路径换算 |
+| WF-8 git 提交 | ✅ | clone + commit 均 exit=0 |
+
+> **与 V1 记录的差异**：本轮 AI 自报告中 `Workspace root folder` 为 **`/workspace`**，V1 记录中是 `/`。两者都不含宿主机路径，判定标准（无泄露）满足。
+
+**清理**：2 个会话已删除，直接 `count` 复查为 0。
+
+---
+
+## 六、测试结果（历史记录）
 
 ### 6.1 单元测试
 
