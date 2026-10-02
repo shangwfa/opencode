@@ -1,5 +1,20 @@
 # 快照持久化（本地盘 + 快照分层）
 
+## 当前安全策略（2026-10-02 优化批次，优先于下方历史记录）
+
+- OpenSandbox TTL 经 API 实测为绝对 `expiresAt`，命令不自动续期；活跃操作按剩余寿命续租，快照前预留等待时间。`TTL/3` 仅为调度启发式，**不保证快照先于平台到期**。
+- 恢复失败/不兼容会保留 ready/stale 记录、发布失败事件并阻止冷启动；数据库查询失败也不能当成“没有快照”。下方历史用例中的“降级冷启动”预期不再适用。
+- 网络失败/健康检查失败不再直接销毁重建；非 Running 的快照拒绝不等价于永久死亡。明确缺失证据才能重建。
+- 快照创建在远端调用前用会话行事务锁仲裁，部分唯一索引为兼容后备。重叠服务请求可加入其请求期间完成的同源快照。
+- manifest 身份固化于 `session_snapshot.manifest_token`，迁移 `20261002145754_snapshot_manifest_token`；失败尝试/不同快照的本地清单不得用于 CLEAN。旧记录没有 token 时重新创建快照。
+- manifest 包含文件、目录、符号链接元数据及文件 hash；扫描/hash 失败通过 pipefail 传递，准备失败不发起远端快照。
+- 周期检查点按快照/检查年龄调度，不依赖空闲；关闭 idle-reap 不关闭持久化。内容检查后 CLEAN 复用，完成的检查用于合并连续扫描；扫描批次使用游标避免前 20 条长期占位。
+- 丢租/续租失败会停止工作 fiber；过期 owner 不可自行续租、完成或失败。worker 检查源沙箱代次，销毁及 admission 终态写入绑定源 ID。
+- 销毁检查点期间阻止新 provider 操作；检测到活动变化保留源沙箱。**尚未实现跨所有写入路径的原子静默屏障，也不能冻结后台进程**，不宣称应用级一致性或零数据丢失。
+- 新快照 Ready 不立即删除旧恢复点；本地 GC 不删除最新 ready/stale 恢复点。远端保留期仍须单独配置，平台自主过期不受本地 GC 保护。
+
+实测脚本与局限见 [快照安全优化验收](snapshot-safety-optimization.md)。下方记录保留为历史，不以旧默认值或旧降级语义作为当前验收依据。
+
 > **V2 状态（2026-10-02 已实现，E2E 8/8 PASS）**：沙箱快照已在 V2 落地（第一版核心闭环，参考 V1 `feat/opencode-1.18.31` 的 `session-snapshot.ts` 状态机语义）：
 >
 > - **schema**：`SessionSandboxResource.persistMode?: "pvc"|"snapshot"|"none"`（会话级，缺省用部署默认）；durable 事件 `session.sandbox.snapshot.{ready,failed,restored}`。

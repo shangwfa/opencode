@@ -21,16 +21,18 @@ describe("snapshot dirty-check command", () => {
     const command = snapshotDirtyCheckCommand()
     expect(command).toContain(`[ -f ${SNAPSHOT_MANIFEST_PATH} ] || { echo DIRTY; exit 0; }`)
     // 两段 timeout 各自包裹，不用 `timeout N { ...; }` 的错误形态
-    expect(command).toContain("( timeout 15 find /workspace -type f -printf")
+    expect(command).toContain("timeout 15 find")
+    expect(command).toContain("bash -o pipefail")
     expect(command).not.toContain("timeout 10 {")
   })
 
   test("manifest command writes a sorted mode/size/hash listing", () => {
     const command = snapshotManifestCommand()
-    expect(command).toContain("find /workspace -type f -printf '%m %s %p\\n'")
+    expect(command).toContain("%y %m %s %p %l")
+    expect(command).toContain("bash -o pipefail")
     expect(command).toContain("sha256sum")
     expect(command).toContain("LC_ALL=C sort")
-    expect(command).toContain(`> ${SNAPSHOT_MANIFEST_PATH}`)
+    expect(command).toContain(SNAPSHOT_MANIFEST_PATH)
   })
 })
 

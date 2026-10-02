@@ -61,6 +61,7 @@ import m58 from "./migration/20260930143322_jazzy_prowler.js"
 import m59 from "./migration/20261002034731_snapshot_operations.js"
 import m60 from "./migration/20261002090000_session_snapshot.js"
 import m61 from "./migration/20261002114719_snapshot_creating_uniq.js"
+import m62 from "./migration/20261002145754_snapshot_manifest_token.js"
 
 export const migrations = [
   m00,
@@ -125,4 +126,5 @@ export const migrations = [
   m59,
   m60,
   m61,
+  m62,
 ] satisfies DatabaseMigration.Migration[]

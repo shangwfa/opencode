@@ -104,6 +104,19 @@ it.live("physical closure blocks every logical session and rejects reopening an 
 )
 
 // Multiple DB connections are needed to demonstrate PG row-lock ordering.
+it.live("stale generation completion cannot close a replacement Sandbox admission", () =>
+  Effect.gen(function* () {
+    const { db, root, sandboxID, gate } = yield* fixture
+    yield* gate.close(root, true)
+    yield* gate.destroyed(root, sandboxID)
+    const replacement = `${sandboxID}-replacement`
+    yield* db.update(SandboxTable).set({ id: replacement }).where(eq(SandboxTable.session_id, root)).run()
+    yield* gate.booted(root, replacement)
+    yield* gate.destroyed(root, sandboxID)
+    expect(yield* gate.admit(root, replacement, () => Effect.succeed(true))).toBe(true)
+  }),
+)
+
 const pg = process.env.OPENCODE_DATABASE_URL ? it.live : it.live.skip
 pg("PG admission and destroy serialize until dispatch acknowledgement, then reject late admission", () =>
   Effect.gen(function* () {

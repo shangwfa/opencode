@@ -1,7 +1,7 @@
 export * as SessionToolGate from "./tool-gate.js"
 
 import { Effect } from "effect"
-import { eq, sql } from "drizzle-orm"
+import { and, eq, sql } from "drizzle-orm"
 import type { Database } from "../database/database.js"
 import { SessionExecutionGateTable as Logical, SandboxExecutionGateTable as Root, SessionTable } from "./sql.js"
 import { rootSessionID } from "../sandbox/provider.js"
@@ -92,9 +92,9 @@ export function make(db: Database.Interface["db"]) {
               .run()
         }),
       ),
-    destroyed: (sessionID: string) =>
+    destroyed: (sessionID: string, sandboxID?: string) =>
       locked(sessionID, (tx, rootID) =>
-        tx.update(Root).set({ state: "closed" }).where(eq(Root.root_session_id, rootID)).run(),
+        tx.update(Root).set({ state: "closed" }).where(and(eq(Root.root_session_id, rootID), ...(sandboxID ? [eq(Root.sandbox_id, sandboxID)] : []))).run(),
       ),
   }
 }

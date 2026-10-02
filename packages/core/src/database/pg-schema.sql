@@ -11,6 +11,7 @@ CREATE TABLE "session_snapshot" (
           "arch" text,
           "schema_version" bigint,
           "runtime_version" text,
+          "manifest_token" text,
           "restored_count" bigint DEFAULT 0 NOT NULL,
           "last_restored_at" bigint,
           "time_created" bigint NOT NULL,

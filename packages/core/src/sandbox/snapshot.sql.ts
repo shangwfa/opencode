@@ -27,6 +27,8 @@ export const SessionSnapshotTable = sqliteTable(
     arch: text(),
     schema_version: integer(),
     runtime_version: text(),
+    /** Identity of the workspace manifest captured by this checkpoint. */
+    manifest_token: text(),
     restored_count: integer().notNull().default(0),
     last_restored_at: integer(),
     ...Timestamps,

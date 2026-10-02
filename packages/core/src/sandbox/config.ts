@@ -70,12 +70,12 @@ export interface Config {
     readonly waitMs: number
     /** Physical remote deletion gate (default off: keep snapshots, let remote TTL reap them). */
     readonly deleteEnabled: boolean
-    /** Idle window after which a running snapshot-persisted sandbox gets its snapshot refreshed
+    /** Target checkpoint interval for a running snapshot-persisted sandbox (active or idle), refreshed
      * in place (sandbox kept alive); 0 disables periodic refresh. Defaults to on (V1 parity):
      * without it, a platform hard-kill of a long-idle sandbox loses every write
      * since the last snapshot. The effective value is clamped to 1/3 of the
-     * sandbox TTL floor so refresh (plus the 300s scan and snapshot commit)
-     * always lands before the platform reaps an idle sandbox. */
+      * sandbox TTL floor as a scheduling heuristic, not a durability guarantee:
+      * queue delay, commit latency and platform TTL semantics still matter. */
     readonly refreshSeconds: number
     /** Prune rebuildable caches before taking a snapshot (workspace size is still measured). */
     readonly prune: boolean
@@ -152,9 +152,8 @@ export function load(): Config {
       waitMs: number(env["OPENCODE_SANDBOX_SNAPSHOT_WAIT_SEC"], 900) * 1000,
       deleteEnabled: flag(env["OPENCODE_SANDBOX_SNAPSHOT_DELETE_ENABLED"]),
       // V1 parity: periodic refresh defaults to ON (1800s). Explicit "0" opts out.
-      // Clamp to 1/3 of the TTL floor: refresh must finish (interval + 300s
-      // scan + commit) before the platform TTL kills an idle no-volume sandbox
-      // (V1 default timeout 600s; unclamped 1800s would lose every write).
+      // Best-effort scheduling only: this does not bound queue/commit latency
+      // or guarantee completion before platform expiry.
       refreshSeconds:
         env["OPENCODE_SANDBOX_SNAPSHOT_REFRESH_SEC"] === "0"
           ? 0

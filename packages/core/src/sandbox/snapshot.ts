@@ -3,8 +3,10 @@ export * as SandboxSnapshot from "./snapshot.js"
 import { SandboxApiException, SandboxManager } from "@alibaba-group/opensandbox"
 import type { ConnectionConfig } from "@alibaba-group/opensandbox"
 import { Duration, Effect } from "effect"
-import { and, desc, eq, inArray, lt, or, sql } from "drizzle-orm"
+import { and, desc, eq, gte, inArray, lt, or, sql } from "drizzle-orm"
 import { SessionSnapshotTable, type State } from "./snapshot.sql.js"
+import { SessionTable } from "../session/sql.js"
+import { randomUUID } from "node:crypto"
 
 export type Row = typeof SessionSnapshotTable.$inferSelect
 export const SCHEMA_VERSION = 1
@@ -17,6 +19,7 @@ export type Deps = {
   readonly waitMs: number
   /** Physical remote deletion gate; when off, TTL/superseded/session-delete keep snapshots and the remote TTL reaps them. */
   readonly deleteEnabled: boolean
+  readonly manager?: Pick<ReturnType<typeof SandboxManager.create>, "createSnapshot" | "deleteSnapshot" | "getSnapshot">
 }
 
 const POLL_INTERVAL = Duration.seconds(5)
@@ -26,7 +29,7 @@ export function create<A, B>(deps: Deps) {
   // The provider's Effect-flavored drizzle handle; typed loosely here and
   // narrowed at the call sites that provider.ts already exercises.
   const db = deps.db as never as DrizzleDb
-  const manager = SandboxManager.create({ connectionConfig: deps.connectionConfig })
+  const manager = deps.manager ?? SandboxManager.create({ connectionConfig: deps.connectionConfig })
 
   type Selected = {
     from: (table: unknown) => {
@@ -39,6 +42,7 @@ export function create<A, B>(deps: Deps) {
     }
   }
   type DrizzleDb = {
+    transaction: <T>(work: (tx: DrizzleDb) => Effect.Effect<T, Error>) => Effect.Effect<T, Error>
     select: ((fields: Record<string, unknown>) => Selected) & (() => Selected)
     update: (table: unknown) => {
       set: (values: Record<string, unknown>) => {
@@ -106,21 +110,20 @@ export function create<A, B>(deps: Deps) {
       return { snapshots, total: rows.length, restoredTotal }
     })
 
-  /** Before createSandbox: return the restorable snapshot (or null → cold start). */
+  /** Only absence permits cold start; a database failure must propagate. */
   const resolveForCreate = (sessionID: string) =>
     findRestorable(sessionID).pipe(
       Effect.map((rows) => {
         const row = rows[0]
         return row ? { id: row.id, image: row.image, arch: row.arch, schemaVersion: row.schema_version } : null
       }),
-      Effect.catchCause(() => Effect.succeed(null)),
     )
 
-  /** Restore failed: mark failed so the next create cold-starts. */
+  /** Keep the restorable checkpoint on restore failure; retry must not cold-start. */
   const markRestoreFailed = (sessionID: string, snapshotID: string, reason: string) =>
     db
       .update(SessionSnapshotTable)
-        .set({ state: "failed", reason, time_updated: Date.now() })
+      .set({ reason, time_updated: Date.now() })
       .where(
         and(
           eq(SessionSnapshotTable.id, snapshotID),
@@ -179,7 +182,9 @@ export function create<A, B>(deps: Deps) {
           and(
             eq(SessionSnapshotTable.session_id, sessionID),
             eq(SessionSnapshotTable.scope, "session"),
-            inArray(SessionSnapshotTable.state, ["ready", "stale", "failed"]),
+            // Keep previous restorable versions until retention GC; creation
+            // success alone does not prove the new checkpoint can be restored.
+            eq(SessionSnapshotTable.state, "failed"),
           ),
         )
         .all()
@@ -192,42 +197,74 @@ export function create<A, B>(deps: Deps) {
   /**
    * Start a snapshot: createSnapshot on the remote plus a `creating` row.
    * Returns the existing creating snapshot when one is already in flight.
-   * The partial unique index `session_snapshot_creating_uniq` (V1
-   * advisory-lock semantics) arbitrates cross-instance races: the loser's
-   * insert conflicts, its just-created remote snapshot is rolled back
-   * (gated by deleteEnabled; otherwise the remote TTL reaps it), and it
-   * joins the winner's snapshot. A wedged creating row is reconciled by gc.
+   * A session-row transaction lock arbitrates before remote creation; the
+   * partial unique index remains a backstop for older/mixed-version writers.
+   * A wedged creating row is reconciled by gc. Remote calls cannot participate
+   * in the PG transaction: a lost response can still leave an orphan remotely.
    */
   const startSnapshot = (
     sandboxID: string,
     sessionID: string,
-    opts?: { image?: string | null; arch?: string | null; schemaVersion?: number | null; runtimeVersion?: string | null },
+    opts?: {
+      image?: string | null; arch?: string | null; schemaVersion?: number | null; runtimeVersion?: string | null
+      prepare?: (token: string) => Effect.Effect<{ arch: string | null }, Error>
+      /** Coalesce an overlapping request even if its winner already settled. */
+      requestedAt?: number
+    },
   ) =>
-    Effect.gen(function* () {
-      const existing = yield* db
+    db.transaction((tx) => Effect.gen(function* () {
+      // Lock the session before the remote call. A no-op UPDATE uses the same
+      // cross-instance transaction locking pattern as SessionToolGate.
+      const locked = yield* tx
+        .update(SessionTable)
+        .set({ time_updated: sql`${SessionTable.time_updated}` })
+        .where(eq(SessionTable.id, sessionID as typeof SessionTable.$inferSelect.id))
+        .returning({ id: SessionTable.id })
+        .all()
+      if (locked.length === 0) return yield* Effect.fail(new Error(`Snapshot session not found: ${sessionID}`))
+      const existing = yield* tx
         .select()
         .from(SessionSnapshotTable)
         .where(
           and(
             eq(SessionSnapshotTable.session_id, sessionID),
             eq(SessionSnapshotTable.scope, "session"),
-            eq(SessionSnapshotTable.state, "creating"),
+            or(
+              eq(SessionSnapshotTable.state, "creating"),
+              ...(opts?.requestedAt !== undefined ? [and(
+                inArray(SessionSnapshotTable.state, ["ready", "stale"]),
+                gte(SessionSnapshotTable.time_created, opts.requestedAt),
+                eq(SessionSnapshotTable.source_sandbox_id, sandboxID),
+              )] : []),
+            ),
           ),
         )
         .orderBy(desc(SessionSnapshotTable.time_created))
         .limit(1)
         .all()
-      if (existing[0]) return existing[0].id
+      if (existing[0]) {
+        if (existing[0].source_sandbox_id !== sandboxID)
+          return yield* Effect.fail(new Error(`Snapshot source generation changed: ${sessionID}`))
+        return existing[0].id
+      }
 
+      const token = randomUUID()
+      const prepared = opts?.prepare ? yield* opts.prepare(token) : null
+      const startedAt = Date.now()
       const info = yield* Effect.tryPromise({
         try: () => manager.createSnapshot(sandboxID, { name: sessionID }),
         catch: (cause) => new Error(`createSnapshot failed: ${String(cause)}`),
       })
+      yield* Effect.logInfo("snapshot remote create completed", { sessionID, sandboxID, snapshotID: info.id, ms: Date.now() - startedAt })
+      const registered = yield* tx.select().from(SessionSnapshotTable)
+        .where(eq(SessionSnapshotTable.id, info.id)).limit(1).all()
+      if (registered.length > 0)
+        return yield* Effect.fail(new Error(`Remote snapshot ID already registered; retained: ${info.id}`))
       const rollbackRemote = Effect.tryPromise({
         try: () => manager.deleteSnapshot(info.id),
         catch: () => undefined,
       }).pipe(Effect.catchCause(() => Effect.void))
-      const inserted = yield* db
+      const inserted = yield* tx
         .insert(SessionSnapshotTable)
         .values({
           id: info.id,
@@ -236,9 +273,10 @@ export function create<A, B>(deps: Deps) {
           state: "creating",
           source_sandbox_id: sandboxID,
           image: opts?.image ?? null,
-          arch: opts?.arch ?? null,
+          arch: prepared?.arch ?? opts?.arch ?? null,
           schema_version: opts?.schemaVersion ?? SCHEMA_VERSION,
           runtime_version: opts?.runtimeVersion ?? null,
+          manifest_token: prepared ? token : null,
           time_created: Date.now(),
           time_updated: Date.now(),
         })
@@ -256,7 +294,7 @@ export function create<A, B>(deps: Deps) {
         // Lost the creating race to another replica: roll our duplicate back
         // and join the winner's snapshot.
         if (deps.deleteEnabled) yield* rollbackRemote
-        const winner = yield* db
+        const winner = yield* tx
           .select()
           .from(SessionSnapshotTable)
           .where(
@@ -269,16 +307,16 @@ export function create<A, B>(deps: Deps) {
           .orderBy(desc(SessionSnapshotTable.time_created))
           .limit(1)
           .all()
-        if (winner[0]) return winner[0].id
-        // The winner settled between our conflict and re-read: awaiting our
-        // own id is still safe — awaitSnapshot reconciles a missing row.
-        return info.id
+        if (winner[0]?.source_sandbox_id === sandboxID) return winner[0].id
+        // Our remote snapshot may already be deleted. Never return that ID
+        // as a successful checkpoint; the source must survive and retry.
+        return yield* Effect.fail(new Error(`Snapshot creation winner settled; retry: ${sessionID}`))
       }
       return info.id
-    })
+    }))
 
   /**
-   * Wait for a snapshot to settle. Ready → mark ready + clean siblings.
+   * Wait for a snapshot to settle. Ready → mark ready; retain older recovery points.
    * Failed/timeout → mark failed (timeout keeps `creating` for gc to reconcile;
    * the caller must keep the source sandbox alive while a snapshot is still
    * Creating — killing it mid-commit fails the snapshot).
@@ -351,24 +389,31 @@ export function create<A, B>(deps: Deps) {
    * TTL-expired terminal snapshots → remote delete; wedged `creating` rows →
    * reconcile against the remote (Ready fix-up, Failed/404 → failed).
    */
-  const gc = () =>
+  const gc = (sessionID?: string) =>
     Effect.gen(function* () {
       const now = Date.now()
       const expired = yield* db
         .select()
         .from(SessionSnapshotTable)
         .where(
-          or(
+          and(
+            ...(sessionID ? [eq(SessionSnapshotTable.session_id, sessionID)] : []),
+            or(
             eq(SessionSnapshotTable.state, "deleting"),
             and(
               inArray(SessionSnapshotTable.state, ["ready", "stale", "failed"]),
               lt(SessionSnapshotTable.time_created, now - deps.ttlMs),
+            ),
             ),
           ),
         )
         .limit(50)
         .all()
       for (const row of expired) {
+        if (row.session_id && (row.state === "ready" || row.state === "stale")) {
+          const latest = yield* findRestorable(row.session_id)
+          if (latest[0]?.id === row.id) continue // never GC the only/latest recovery point
+        }
         yield* deleteSnapshot(row, row.state === "deleting" ? row.reason ?? "delete retry" : "ttl expired").pipe(
           Effect.ignore,
         )
@@ -378,7 +423,7 @@ export function create<A, B>(deps: Deps) {
         .select()
         .from(SessionSnapshotTable)
         .where(
-          and(eq(SessionSnapshotTable.state, "creating"), lt(SessionSnapshotTable.time_created, now - deps.waitMs - 60_000)),
+            and(eq(SessionSnapshotTable.state, "creating"), lt(SessionSnapshotTable.time_created, now - deps.waitMs - 60_000), ...(sessionID ? [eq(SessionSnapshotTable.session_id, sessionID)] : [])),
         )
         .limit(20)
         .all()

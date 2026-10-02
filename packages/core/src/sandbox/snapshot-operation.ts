@@ -1,7 +1,7 @@
 export * as SandboxSnapshotOperation from "./snapshot-operation.js"
 
 import { randomUUID } from "node:crypto"
-import { and, eq, inArray, isNull, lt, or, sql } from "drizzle-orm"
+import { and, eq, gt, inArray, isNull, lt, or, sql } from "drizzle-orm"
 import { Effect } from "effect"
 import {
   SnapshotOperationTable,
@@ -99,16 +99,19 @@ export function create(dbInput: unknown, queue: Queue) {
       return active[0]?.id ?? id
     })
 
-  const claim = () =>
+  const claim = (sessionID?: string) =>
     Effect.gen(function* () {
       const now = Date.now()
       const candidates = yield* db
         .select()
         .from(table)
         .where(
-          or(
+          and(
+            ...(sessionID ? [eq(table.session_id, sessionID)] : []),
+            or(
             and(eq(table.state, "pending"), or(isNull(table.next_retry_at), lt(table.next_retry_at, now))),
             and(eq(table.state, "running"), lt(table.lease_until, now)),
+            ),
           ),
         )
         .orderBy(table.time_created)
@@ -147,7 +150,7 @@ export function create(dbInput: unknown, queue: Queue) {
     db
       .update(table)
       .set({ lease_until: Date.now() + LEASE_MS, time_updated: Date.now() })
-      .where(and(eq(table.id, id), eq(table.lease_owner, owner), eq(table.fencing_token, token), eq(table.state, "running")))
+      .where(and(eq(table.id, id), eq(table.lease_owner, owner), eq(table.fencing_token, token), eq(table.state, "running"), gt(table.lease_until, Date.now())))
       .returning({ id: table.id })
       .all()
       .pipe(Effect.map((rows) => rows.length > 0))
@@ -156,7 +159,7 @@ export function create(dbInput: unknown, queue: Queue) {
     db
       .update(table)
       .set({ state: "done", lease_owner: null, lease_until: null, error: null, time_updated: Date.now() })
-      .where(and(eq(table.id, id), eq(table.lease_owner, owner), eq(table.fencing_token, token), eq(table.state, "running")))
+      .where(and(eq(table.id, id), eq(table.lease_owner, owner), eq(table.fencing_token, token), eq(table.state, "running"), gt(table.lease_until, Date.now())))
       .returning({ id: table.id })
       .all()
       .pipe(Effect.map((rows) => rows.length > 0))
@@ -177,7 +180,7 @@ export function create(dbInput: unknown, queue: Queue) {
         error: reason,
         time_updated: now,
       })
-      .where(and(eq(table.id, id), eq(table.lease_owner, owner), eq(table.fencing_token, token), eq(table.state, "running")))
+      .where(and(eq(table.id, id), eq(table.lease_owner, owner), eq(table.fencing_token, token), eq(table.state, "running"), gt(table.lease_until, now)))
       .returning({ id: table.id })
       .all()
       .pipe(Effect.map((rows) => rows.length > 0))
@@ -185,6 +188,12 @@ export function create(dbInput: unknown, queue: Queue) {
 
   const retention = (now = Date.now()) =>
     db.delete(table).where(and(inArray(table.state, ["done", "failed"]), lt(table.time_updated, now - RETENTION_MS))).run()
+
+  /** A successful CLEAN check also coalesces repeated scans for this generation. */
+  const checkedSince = (sessionID: string, sandboxID: string, cutoff: number) =>
+    db.select().from(table)
+      .where(and(eq(table.session_id, sessionID), eq(table.sandbox_id, sandboxID), eq(table.state, "done"), gt(table.time_updated, cutoff)))
+      .limit(1).all().pipe(Effect.map((rows) => rows.length > 0))
 
   /** Session-scoped operation counts by state for observability (GET /snapshot/stats parity). */
   const stats = (sessionID: string) =>
@@ -202,7 +211,7 @@ export function create(dbInput: unknown, queue: Queue) {
         Effect.catch(() => Effect.succeed({ byState: {}, total: 0 })),
       )
 
-  return { enqueue, claim, heartbeat, complete, fail, retention, stats, owner }
+  return { enqueue, claim, heartbeat, complete, fail, retention, stats, checkedSince, owner }
 }
 
 export type SnapshotOperations = ReturnType<typeof create>

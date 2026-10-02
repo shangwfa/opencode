@@ -16,6 +16,7 @@ const schema: Omit<DatabaseMigration.Migration, "id"> = {
           \`arch\` text,
           \`schema_version\` integer,
           \`runtime_version\` text,
+          \`manifest_token\` text,
           \`restored_count\` integer DEFAULT 0 NOT NULL,
           \`last_restored_at\` integer,
           \`time_created\` integer NOT NULL,

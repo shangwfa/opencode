@@ -20,13 +20,21 @@ import { Cause, Duration, Effect } from "effect"
 
 export const SNAPSHOT_MARKER_PATH = "/var/tmp/.opencode-snapshot-marker"
 export const SNAPSHOT_MANIFEST_PATH = "/var/tmp/.opencode-snapshot-manifest"
+export const SNAPSHOT_TOKEN_PATH = "/var/tmp/.opencode-snapshot-token"
 
 /** Rebuildable artifacts pruned before a snapshot when enabled (T25.30). */
 export const SNAPSHOT_PRUNE_COMMAND = "rm -rf /root/.cache /home/sandbox/.cache /workspace/.cache 2>/dev/null; true"
 
 /** Content manifest generator; LC_ALL=C keeps ordering stable across runs. */
+const quote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`
+const manifestScan = (workspace: string, timeoutSec = 0) => {
+  const timeout = timeoutSec > 0 ? `timeout ${timeoutSec} ` : ""
+  return `{ ${timeout}find ${quote(workspace)} -printf '%y %m %s %p %l\\n' && ${timeout}find ${quote(workspace)} -type f -exec sha256sum {} +; } | LC_ALL=C sort`
+}
 export function snapshotManifestCommand(workspace = "/workspace", manifest = SNAPSHOT_MANIFEST_PATH) {
-  return `{ find ${workspace} -type f -printf '%m %s %p\\n'; find ${workspace} -type f -exec sha256sum {} \\; ; } 2>/dev/null | LC_ALL=C sort > ${manifest}`
+  // pipefail prevents a failed find/hash from becoming a successful partial
+  // manifest. Include directory/symlink topology as well as regular files.
+  return `bash -o pipefail -c ${quote(`${manifestScan(workspace)} > ${quote(manifest)}`)}`
 }
 
 /**
@@ -44,10 +52,7 @@ export function snapshotDirtyCheckCommand(
   const guardedQuick = timeoutSec > 0 ? `timeout ${timeoutSec} ${quick}` : quick
   // The scan must wrap two `timeout` calls in a subshell: `timeout N { ...; }`
   // makes the shell treat `{` as the command name.
-  const guardedScan =
-    timeoutSec > 0
-      ? `( timeout ${timeoutSec + 5} find ${workspace} -type f -printf '%m %s %p\\n' 2>/dev/null; timeout ${timeoutSec + 5} find ${workspace} -type f -exec sha256sum {} \\; 2>/dev/null ) | LC_ALL=C sort`
-      : `{ find ${workspace} -type f -printf '%m %s %p\\n'; find ${workspace} -type f -exec sha256sum {} \\; ; } 2>/dev/null | LC_ALL=C sort`
+  const guardedScan = `bash -o pipefail -c ${quote(manifestScan(workspace, timeoutSec > 0 ? timeoutSec + 5 : 0))}`
   return [
     `out=$(${guardedQuick}); rc=$?; if [ "$rc" -ne 0 ] || [ -n "$out" ]; then echo DIRTY; exit 0; fi`,
     `[ -f ${manifest} ] || { echo DIRTY; exit 0; }`,
@@ -125,8 +130,12 @@ export function runEphemeral(sb: Sandbox, command: string, timeoutSeconds = 15):
 }
 
 /** True only when the workspace is provably unchanged since the last snapshot. */
-export function workspaceUnchangedSinceSnapshot(sb: Sandbox): Effect.Effect<boolean> {
-  return Effect.map(runEphemeral(sb, snapshotDirtyCheckCommand()), isCleanVerdict)
+export function workspaceUnchangedSinceSnapshot(sb: Sandbox, token?: string | null): Effect.Effect<boolean> {
+  // A failed/newer snapshot attempt may have replaced the local manifest.
+  // Reuse only the manifest belonging to the selected restorable checkpoint.
+  if (!token || !/^[a-f0-9-]{36}$/i.test(token)) return Effect.succeed(false)
+  const identity = `[ "$(cat ${SNAPSHOT_TOKEN_PATH} 2>/dev/null)" = '${token}' ] || { echo DIRTY; exit 0; }`
+  return Effect.map(runEphemeral(sb, `${identity}; ${snapshotDirtyCheckCommand()}`), isCleanVerdict)
 }
 
 /**
@@ -135,9 +144,14 @@ export function workspaceUnchangedSinceSnapshot(sb: Sandbox): Effect.Effect<bool
  */
 export function touchSnapshotMarker(
   sb: Sandbox,
-  opts?: { prune?: boolean },
-): Effect.Effect<{ workspaceKb: number | null; arch: string | null }> {
+  opts?: { prune?: boolean; token?: string },
+): Effect.Effect<{ workspaceKb: number | null; arch: string | null }, Error> {
   const prune = opts?.prune ? `${SNAPSHOT_PRUNE_COMMAND}; ` : ""
-  const cmd = `${prune}touch ${SNAPSHOT_MARKER_PATH} && ${snapshotManifestCommand()} && du -sk /workspace 2>/dev/null | cut -f1; uname -m 2>/dev/null`
-  return Effect.map(runEphemeral(sb, cmd), parseMarkerOutput)
+  const identity = opts?.token ? `printf '%s' ${quote(opts.token)} > ${SNAPSHOT_TOKEN_PATH} && ` : ""
+  const cmd = `${prune}${identity}touch ${SNAPSHOT_MARKER_PATH} && ${snapshotManifestCommand()} && { du -sk /workspace 2>/dev/null | cut -f1; uname -m; echo SNAPSHOT_MARKER_READY; }`
+  return Effect.flatMap(runEphemeral(sb, cmd), (stdout) =>
+    stdout.split("\n").some((line) => line.trim() === "SNAPSHOT_MARKER_READY")
+      ? Effect.succeed(parseMarkerOutput(stdout))
+      : Effect.fail(new Error("Snapshot manifest preparation failed; source retained")),
+  )
 }
