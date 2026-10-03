@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// Session PVC 模式 V2 用例（T38.1–T38.25）
-// 文档：docs/test-cases/pvc/session-pvc-mode.md（V2 API 适配版）
+// Session PVC 模式 V2 用例（T38.1–T38.27）
+// 文档：docs/test-cases/sandbox/store/pvc/session-pvc-mode.md（V2 API 适配版）
 //
 // 用法：
 //   BASE=http://localhost:14096 AUTH=opencode:<password> \
@@ -342,7 +342,46 @@ async function t38_25() {
     `status=${res.status} files=[${files.join(",")}] main-only排除=${!files.includes("main-only.txt")} +app-changed=${(tracked?.patch ?? "").includes("+app-changed")} +app-new=${(added?.patch ?? "").includes("+app-new")}`)
 }
 
-// ---------- 五、沙箱与 PVC 持久化（docs/test-cases/pvc/sandbox-pvc.md T5.1–T5.5 V2 适配） ----------
+// ---------- 四（续）、边界行为（2026-10-02 新增） ----------
+
+// 孤儿 appId：只传 appId 不传 pvcMode。创建成功，app_id 落库，但卷前缀仍按
+// sessions/{sessionID}，同 appId 的 app 会话读不到它的文件（不进入 app 空间）。
+async function t38_26() {
+  const APP_ID = "orphan-" + ts()
+  const orphan = await createSession({ appId: APP_ID })
+  const app = await createSession({ pvcMode: "app", appId: APP_ID })
+  const pg = psql(`SELECT coalesce(pvc_mode,'NULL'), coalesce(app_id,'NULL') FROM session_v2 WHERE id='${orphan.id}'`)
+  await shell(orphan.id, "mkdir -p /workspace/repo && echo orphan-data > /workspace/repo/orphan.txt")
+  const read = await shell(app.id, "cat /workspace/repo/orphan.txt 2>&1")
+  const metaOk = orphan.pvcMode === undefined && orphan.appId === APP_ID
+  const isolated = (read.output ?? "").includes("No such file")
+  const pass = metaOk && isolated && pg === `NULL|${APP_ID}`
+  record("T38.26", "孤儿 appId 按会话 ID 隔离", pass,
+    `meta=${metaOk} isolated=${isolated} pg=[${pg}] app读取=[${(read.output ?? "").trim().slice(0, 30)}]`)
+}
+
+// V2 沙箱 diff 脚本 context 缺省为 3（V1 为全上下文）。改大文件中间一行，
+// patch 只带前后各 3 行上下文：第 2-8 行在、第 1/10 行不在。
+async function t38_27() {
+  const session = await createSession({ pvcMode: "session" })
+  await shell(
+    session.id,
+    "cd /workspace && git init -q && git config user.email test@test.com && git config user.name Test && seq 1 10 > big.txt && git add -A && git commit -qm baseline && sed -i 's/^5$/changed/' big.txt",
+  )
+  const res = await api("GET", `/api/session/${session.id}/vcs/diff?mode=working`)
+  const row = (res.body?.data ?? []).find((d) => d.file === "big.txt")
+  const lines = (row?.patch ?? "").split("\n")
+  const contextLine = (n) => lines.includes(` ${n}`)
+  const pass =
+    res.status === 200 &&
+    lines.includes("+changed") &&
+    contextLine(2) && contextLine(8) &&
+    !contextLine(1) && !contextLine(10)
+  record("T38.27", "vcs/diff 默认上下文 3 行", pass,
+    `status=${res.status} +changed=${lines.includes("+changed")} ctx2=${contextLine(2)} ctx8=${contextLine(8)} ctx1=${contextLine(1)} ctx10=${contextLine(10)}`)
+}
+
+// ---------- 五、沙箱与 PVC 持久化（docs/test-cases/sandbox/store/pvc/sandbox-pvc.md T5.1–T5.5 V2 适配） ----------
 
 async function t5_1_to_5() {
   const session = await createSession({})
@@ -391,6 +430,7 @@ const cases = [
   ["T38.10", t38_10], ["T38.11", t38_11], ["T38.12", t38_12],
   ["T38.18", t38_18], ["T38.19", t38_19], ["T38.20", t38_20], ["T38.21", t38_21],
   ["T38.22", t38_22], ["T38.23", t38_23], ["T38.24", t38_24], ["T38.25", t38_25],
+  ["T38.26", t38_26], ["T38.27", t38_27],
   ["T5", t5_1_to_5],
 ]
 

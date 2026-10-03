@@ -6,6 +6,9 @@
 - 要在docker中启动服务（orbstack）
 - 连接本地PG数据库：127.0.0.1:5432/opencode-v2-up
 - 通过接口进行测试
+- 有两个镜像
+  - 一个是opencode saas服务镜像
+  - 另一个是opensandbox镜像
 
 opencode sass 作为一个code-agent ,主要负责跟AI打交道，通过各种工具，驱动任务的执行
 
@@ -21,6 +24,9 @@ opencode sass 作为一个code-agent ,主要负责跟AI打交道，通过各种�
 - 通过在沙箱中拉取代码仓库
 - 用户完成需求开发
 - 执行任务过程中，主会话创建的子会话，使用的沙箱同主会话一样
+- 代码持久有两种模式(opensandbox)
+  - pvc模式：代码持久化到PVC中
+  - snapshot模式：代码持久化到快照中
 
 测试要求：
 
