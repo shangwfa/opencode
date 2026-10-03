@@ -7,6 +7,7 @@ import { and, desc, eq, gte, inArray, lt, or, sql } from "drizzle-orm"
 import { SessionSnapshotTable, type State } from "./snapshot.sql.js"
 import { SessionTable } from "../session/sql.js"
 import { randomUUID } from "node:crypto"
+import { measureSnapshotStage } from "./snapshot-latency.js"
 
 export type Row = typeof SessionSnapshotTable.$inferSelect
 export const SCHEMA_VERSION = 1
@@ -246,12 +247,13 @@ export function create<A, B>(deps: Deps) {
     db.transaction((tx) => Effect.gen(function* () {
       // Lock the session before the remote call. A no-op UPDATE uses the same
       // cross-instance transaction locking pattern as SessionToolGate.
-      const locked = yield* tx
+      const context = { sessionID, sandboxID }
+      const locked = yield* measureSnapshotStage(context, "session_lock", tx
         .update(SessionTable)
         .set({ time_updated: sql`${SessionTable.time_updated}` })
         .where(eq(SessionTable.id, sessionID as typeof SessionTable.$inferSelect.id))
         .returning({ id: SessionTable.id })
-        .all()
+        .all())
       if (locked.length === 0) return yield* Effect.fail(new Error(`Snapshot session not found: ${sessionID}`))
       const existing = yield* tx
         .select()
@@ -282,10 +284,10 @@ export function create<A, B>(deps: Deps) {
       const token = randomUUID()
       const prepared = opts?.prepare ? yield* opts.prepare(token) : null
       const startedAt = Date.now()
-      const info = yield* Effect.tryPromise({
+      const info = yield* measureSnapshotStage(context, "create_request", Effect.tryPromise({
         try: () => manager.createSnapshot(sandboxID, { name: sessionID }),
         catch: (cause) => new Error(`createSnapshot failed: ${String(cause)}`),
-      })
+      }))
       yield* Effect.logInfo("snapshot remote create completed", { sessionID, sandboxID, snapshotID: info.id, ms: Date.now() - startedAt })
       const registered = yield* tx.select().from(SessionSnapshotTable)
         .where(eq(SessionSnapshotTable.id, info.id)).limit(1).all()

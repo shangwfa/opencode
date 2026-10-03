@@ -1,6 +1,7 @@
 export * as SandboxProvider from "./provider.js"
 import { SessionToolGate } from "../session/tool-gate.js"
 import { ensureSandboxLifetime, reconnectSandbox, withSnapshotLease } from "./snapshot-safety.js"
+import { measureSnapshotStage, type SnapshotTimingContext } from "./snapshot-latency.js"
 
 import { ConnectionConfig, SandboxApiException, Sandbox } from "@alibaba-group/opensandbox"
 import { Cause, Context, Deferred, Duration, Effect, Layer, Option, Ref, Schedule, Schema, Semaphore, Stream } from "effect"
@@ -896,25 +897,27 @@ const layer = Layer.effect(
     const snapshotWithMarker = (
       sessionID: string,
       sandbox: Sandbox,
+      timing: SnapshotTimingContext = {},
     ): Effect.Effect<{
       settled: "ready" | "failed" | "timeout"
       marker: { workspaceKb: number | null; arch: string | null }
       snapshotID: string
     }, Error> =>
       Effect.gen(function* () {
+        const context = { ...timing, sessionID, sandboxID: sandbox.id }
         let marker: { workspaceKb: number | null; arch: string | null } = { workspaceKb: null, arch: null }
         // Reserve enough lifetime for the bounded wait. This is protective
         // renewal, not a claim that snapshots can survive platform failure.
-        yield* ensureSandboxLifetime(sandbox, config.timeoutSeconds, config.snapshot.waitMs / 1000 + 120)
+        yield* measureSnapshotStage(context, "lifetime", ensureSandboxLifetime(sandbox, config.timeoutSeconds, config.snapshot.waitMs / 1000 + 120))
         // A non-Running rejection can mean paused/stopping, not destroyed.
         // Retain the source and retry; only the control-plane 404 proves absence.
         const snapshotID = yield* snapshots.startSnapshot(sandbox.id, sessionID, {
           prepare: (token) => Effect.gen(function* () {
-            marker = yield* SandboxSnapshotReuse.touchSnapshotMarker(sandbox, { prune: config.snapshot.prune, token })
+            marker = yield* measureSnapshotStage(context, "manifest", SandboxSnapshotReuse.touchSnapshotMarker(sandbox, { prune: config.snapshot.prune, token }))
             return marker
           }),
         })
-        const settled = yield* snapshots.awaitSnapshot(sessionID, snapshotID)
+        const settled = yield* measureSnapshotStage({ ...context, snapshotID }, "settle", snapshots.awaitSnapshot(sessionID, snapshotID))
         return { settled, marker, snapshotID }
       })
 
@@ -967,6 +970,7 @@ const layer = Layer.effect(
         const operation = yield* destroyOperations.claim()
         if (!operation) break
         const result = yield* withLease(destroyOperations, operation, Effect.gen(function* () {
+          const timing = { sessionID: operation.session_id, sandboxID: operation.sandbox_id ?? undefined, operationID: operation.id, kind: operation.kind }
           if (!config.snapshot.enabled) return
           const sandboxRow = yield* dbGet(operation.session_id)
           if (!sandboxRow || sandboxRow.id !== operation.sandbox_id) return
@@ -978,21 +982,21 @@ const layer = Layer.effect(
             yield* drop(operation.session_id)
             // The sandbox is claimed for destroy: reuse the last snapshot when
             // the workspace is provably unchanged, else take a final snapshot.
-            const sb = yield* sandboxFor(operation.session_id)
+            const sb = yield* measureSnapshotStage(timing, "connect", sandboxFor(operation.session_id))
             if (sb) {
               const restorableRows = yield* snapshots
                 .restorable(operation.session_id)
                 .pipe(Effect.catch(() => Effect.succeed([] as SandboxSnapshot.Row[])))
               const restorable = restorableRows[0] ?? null
               const unchanged =
-                restorable !== null ? yield* SandboxSnapshotReuse.workspaceUnchangedSinceSnapshot(sb, restorable.manifest_token) : false
+                restorable !== null ? yield* measureSnapshotStage(timing, "content_check", SandboxSnapshotReuse.workspaceUnchangedSinceSnapshot(sb, restorable.manifest_token)) : false
               if (restorable && unchanged) {
                 yield* Effect.logInfo("snapshot reused (workspace unchanged)", {
                   sessionID: operation.session_id,
                   snapshotID: restorable.id,
                 })
               } else {
-                const outcome = yield* snapshotWithMarker(operation.session_id, sb).pipe(
+                const outcome = yield* snapshotWithMarker(operation.session_id, sb, timing).pipe(
                   Effect.result,
                 )
                 // E2B-parity degradation: on the queue's last retry, accept the
@@ -1062,7 +1066,7 @@ const layer = Layer.effect(
               .run().pipe(Effect.orDie)
             return yield* Effect.fail(new Error("Sandbox activity changed during checkpoint; source retained"))
           }
-          yield* destroySandbox(operation.session_id, operation.sandbox_id)
+          yield* measureSnapshotStage(timing, "destroy", destroySandbox(operation.session_id, operation.sandbox_id))
         })).pipe(Effect.result)
         if (result._tag === "Success") {
           yield* destroyOperations.complete(operation.id, operation.fencing_token)
@@ -1112,12 +1116,13 @@ const layer = Layer.effect(
         const operation = yield* refreshOperations.claim()
         if (!operation) break
         const result = yield* withLease(refreshOperations, operation, Effect.gen(function* () {
+          const timing = { sessionID: operation.session_id, sandboxID: operation.sandbox_id ?? undefined, operationID: operation.id, kind: operation.kind }
           const sandboxRow = yield* dbGet(operation.session_id)
           if (!sandboxRow || sandboxRow.id !== operation.sandbox_id || sandboxRow.state !== "running" || sandboxRow.id.startsWith("pending-")) return
           // Same stale-handle hazard as the destroy worker: force a real
           // reconnect so a platform-killed sandbox surfaces as 404.
           yield* drop(operation.session_id)
-          const sb = yield* sandboxFor(operation.session_id)
+          const sb = yield* measureSnapshotStage(timing, "connect", sandboxFor(operation.session_id))
           if (!sb) {
             // Platform already killed the sandbox: warn about unsnapshotted
             // writes and converge the row so the next scan stops re-enqueuing.
@@ -1129,14 +1134,14 @@ const layer = Layer.effect(
             .restorable(operation.session_id)
             .pipe(Effect.catch(() => Effect.succeed([] as SandboxSnapshot.Row[])))
           const restorable = restorableRows[0] ?? null
-          if (restorable && (yield* SandboxSnapshotReuse.workspaceUnchangedSinceSnapshot(sb, restorable.manifest_token))) {
+          if (restorable && (yield* measureSnapshotStage(timing, "content_check", SandboxSnapshotReuse.workspaceUnchangedSinceSnapshot(sb, restorable.manifest_token)))) {
             yield* Effect.logInfo("snapshot refresh skipped (workspace unchanged)", {
               sessionID: operation.session_id,
               snapshotID: restorable.id,
             })
             return
           }
-          const outcome = yield* snapshotWithMarker(operation.session_id, sb).pipe(
+          const outcome = yield* snapshotWithMarker(operation.session_id, sb, timing).pipe(
             Effect.result,
           )
           if (outcome._tag === "Failure") {

@@ -2,6 +2,7 @@ export * as SandboxSnapshotReuse from "./snapshot-reuse.js"
 
 import { Sandbox } from "@alibaba-group/opensandbox"
 import { Cause, Duration, Effect } from "effect"
+import { logSnapshotStage, type SnapshotStage } from "./snapshot-latency.js"
 
 /**
  * Workspace-unchanged detection for snapshot reuse (V1 semantics, see
@@ -37,7 +38,9 @@ const manifestScan = (workspace: string, timeoutSec = 0) => {
   // presence after a restore (28-row manifest diff, all `d` rows, zero file
   // diffs), which made every restore-then-destroy take a new ~20-45s snapshot
   // instead of reusing. Files and symlinks keep topology (%y %l) monitoring.
-  return `{ ${timeout}find ${quote(workspace)} \\( -type f -o -type l \\) -printf '%y %m %s %p %l\\n' && ${timeout}find ${quote(workspace)} -type f -exec sha256sum {} +; } | LC_ALL=C sort`
+  // One traversal emits the same file/symlink metadata and batched file hashes.
+  // GNU find propagates failures from -exec ... +; the caller keeps pipefail.
+  return `${timeout}find ${quote(workspace)} \\( -type f -printf '%y %m %s %p %l\\n' -exec sha256sum {} + \\) -o \\( -type l -printf '%y %m %s %p %l\\n' \\) | LC_ALL=C sort`
 }
 export function snapshotManifestCommand(workspace = "/workspace", manifest = SNAPSHOT_MANIFEST_PATH) {
   // pipefail prevents a failed find/hash from becoming a successful partial
@@ -108,24 +111,41 @@ const commandsOf = (sb: Sandbox) => sb.commands as unknown as ExecCommands
  * stream never terminates on some execd builds). Any failure or timeout
  * returns "" so callers treat the result as unknown → conservative.
  */
-export function runEphemeral(sb: Sandbox, command: string, timeoutSeconds = 15): Effect.Effect<string> {
-  return Effect.tryPromise(async () => {
-    const commands = commandsOf(sb)
-    const sessionID = await commands.createSession({ workingDirectory: "/workspace" })
-    try {
-      let out = ""
-      for await (const event of commands.runInSessionStream(sessionID, command, {
-        workingDirectory: "/workspace",
-        timeoutSeconds,
-      })) {
-        if (event.type === "stdout") out += (event.text ?? "") + "\n"
-        if (event.type === "error") return out
-        if (event.type === "execution_complete") return out
-      }
-      return out
-    } finally {
-      await commands.deleteSession(sessionID).catch(() => undefined)
+export function runEphemeral(sb: Sandbox, command: string, timeoutSeconds = 15, phase: "content_check" | "manifest" | "probe" = "probe"): Effect.Effect<string> {
+  const context = { sandboxID: sb.id, phase }
+  const commands = commandsOf(sb)
+  return Effect.suspend(() => {
+    const timings: Array<{ stage: SnapshotStage; ms: number; outcome: "success" | "failure" }> = []
+    const measure = async <A>(stage: SnapshotStage, run: () => Promise<A>) => {
+      const start = Date.now()
+      let outcome: "success" | "failure" = "failure"
+      try {
+        const value = await run()
+        outcome = "success"
+        return value
+      } finally { timings.push({ stage, ms: Date.now() - start, outcome }) }
     }
+    return Effect.tryPromise(async () => {
+      const sessionID = await measure("command_create", () => commands.createSession({ workingDirectory: "/workspace" }))
+      try {
+        return await measure("command_run", async () => {
+          let out = ""
+          for await (const event of commands.runInSessionStream(sessionID, command, {
+            workingDirectory: "/workspace",
+            timeoutSeconds,
+          })) {
+            if (event.type === "stdout") out += (event.text ?? "") + "\n"
+            if (event.type === "error") return out
+            if (event.type === "execution_complete") return out
+          }
+          return out
+        })
+      } finally {
+        await measure("command_delete", () => commands.deleteSession(sessionID)).catch(() => undefined)
+      }
+    }).pipe(Effect.onExit(() => Effect.forEach(timings, (timing) =>
+      logSnapshotStage(context, timing.stage, timing.ms, timing.outcome), { discard: true },
+    )))
   }).pipe(
     Effect.catchCause((cause) =>
       Effect.logWarning("snapshot ephemeral command failed", { command: command.slice(0, 120), cause: Cause.pretty(cause) }).pipe(
@@ -143,7 +163,7 @@ export function workspaceUnchangedSinceSnapshot(sb: Sandbox, token?: string | nu
   // Reuse only the manifest belonging to the selected restorable checkpoint.
   if (!token || !/^[a-f0-9-]{36}$/i.test(token)) return Effect.succeed(false)
   const identity = `[ "$(cat ${SNAPSHOT_TOKEN_PATH} 2>/dev/null)" = '${token}' ] || { echo DIRTY; exit 0; }`
-  return Effect.map(runEphemeral(sb, `${identity}; ${snapshotDirtyCheckCommand()}`), isCleanVerdict)
+  return Effect.map(runEphemeral(sb, `${identity}; ${snapshotDirtyCheckCommand()}`, 15, "content_check"), isCleanVerdict)
 }
 
 /**
@@ -157,7 +177,7 @@ export function touchSnapshotMarker(
   const prune = opts?.prune ? `${SNAPSHOT_PRUNE_COMMAND}; ` : ""
   const identity = opts?.token ? `printf '%s' ${quote(opts.token)} > ${SNAPSHOT_TOKEN_PATH} && ` : ""
   const cmd = `${prune}${identity}touch ${SNAPSHOT_MARKER_PATH} && ${snapshotManifestCommand()} && { du -sk /workspace 2>/dev/null | cut -f1; uname -m; echo SNAPSHOT_MARKER_READY; }`
-  return Effect.flatMap(runEphemeral(sb, cmd), (stdout) =>
+  return Effect.flatMap(runEphemeral(sb, cmd, 15, "manifest"), (stdout) =>
     stdout.split("\n").some((line) => line.trim() === "SNAPSHOT_MARKER_READY")
       ? Effect.succeed(parseMarkerOutput(stdout))
       : Effect.fail(new Error("Snapshot manifest preparation failed; source retained")),

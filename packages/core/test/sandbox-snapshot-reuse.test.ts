@@ -40,9 +40,21 @@ describe("snapshot dirty-check command", () => {
     // 文件与 symlink 保留（含 %y %l 拓扑），目录必须排除：
     // 远端 overlayfs 快照/恢复会翻转空目录的存缺（pnpm store 前缀目录），
     // 目录行进 manifest 会让恢复后必然 DIRTY、复用失效。
-    expect(command).toContain(`\\( -type f -o -type l \\) -printf`)
+    expect(command).toContain(`\\( -type f -printf`)
+    expect(command).toContain(`-o \\( -type l -printf`)
     // 旧形态（find 后直接 -printf，目录也会进清单）必须不存在
     expect(command).not.toContain(`find '/workspace' -printf`)
+  })
+
+  test("manifest performs one traversal with batched hashes and pipefail", () => {
+    const command = snapshotManifestCommand()
+    expect(command.match(/find '/g)).toHaveLength(1)
+    expect(command).toContain("-exec sha256sum {} +")
+    expect(command).toContain("bash -o pipefail")
+  })
+
+  test("guarded content scan retains a traversal timeout", () => {
+    expect(snapshotDirtyCheckCommand()).toContain("timeout 15 find")
   })
 })
 

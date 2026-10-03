@@ -163,6 +163,20 @@ const stats = "du -sk /workspace; find /workspace -type f | wc -l"
 const verify = "sha256sum -c /workspace/.probe.sha256 >/dev/null"
 const fingerprint = "find /workspace -type f ! -name .probe.sha256 -exec sha256sum {} + | LC_ALL=C sort > /workspace/.probe.sha256"
 
+async function manifestChecks(sid) {
+  const { snapshotManifestCommand, snapshotDirtyCheckCommand } = await import("/app/packages/core/src/sandbox/snapshot-reuse.ts")
+  const old = (workspace, target) => `bash -o pipefail -c ${quote(`{ find ${quote(workspace)} \\( -type f -o -type l \\) -printf '%y %m %s %p %l\\n' && find ${quote(workspace)} -type f -exec sha256sum {} +; } | LC_ALL=C sort > ${quote(target)}`)}`
+  const dir = "/workspace/_manifest-probe"
+  const marker = "/tmp/probe-marker"
+  const target = "/tmp/probe-new-manifest"
+  const check = snapshotDirtyCheckCommand(marker, target, dir)
+  await command(sid, "manifest契约校验", `mkdir -p ${dir}/empty; printf AAAA > ${dir}/file; printf text > '${dir}/space file'; ln ${dir}/file ${dir}/hardlink; ln -s file ${dir}/link; ln -s missing ${dir}/dangling; touch ${marker}; ${old(dir, "/tmp/probe-old-manifest")}; ${snapshotManifestCommand(dir, target)}; cmp /tmp/probe-old-manifest ${target}; verdict=$(bash -c ${quote(check)}); test "$verdict" = CLEAN; printf BBBB > ${dir}/file; touch -r ${marker} ${dir}/file; verdict=$(bash -c ${quote(check)}); test "$verdict" = DIRTY; if ${snapshotManifestCommand("/workspace/does-not-exist", "/tmp/probe-invalid-manifest")}; then echo 'invalid manifest accepted'; exit 1; fi; rm -r ${dir}; echo 'MANIFEST_CONTRACT_PASS'`)
+  const original = old("/workspace", "/tmp/probe-old-manifest")
+  const current = snapshotManifestCommand("/workspace", target)
+  const timed = (name, script) => `start=$(date +%s%N); ${script}; end=$(date +%s%N); echo ${name}_MS=$(( (end-start)/1000000 ))`
+  await command(sid, "manifest同沙箱交错对照", `${timed("OLD1", original)}; ${timed("NEW1", current)}; cmp /tmp/probe-old-manifest ${target}; ${timed("NEW2", current)}; ${timed("OLD2", original)}; cmp /tmp/probe-old-manifest ${target}; ${timed("OLD3", original)}; ${timed("NEW3", current)}; cmp /tmp/probe-old-manifest ${target}`)
+}
+
 try {
   assert(Number(report.config.waitSec) === 900, "有效 SNAPSHOT_WAIT_SEC 必须为 900")
   assert(Number.isInteger(rounds) && rounds > 0 && rounds <= 5, "轮数必须为 1–5")
@@ -179,6 +193,7 @@ try {
     await command(sid, "基线", `printf 'base v1\\n' > a.txt; printf 'base v1\\n' > b.txt; ${fingerprint}; ${stats}`)
     await checkpoint(sid, round, "基线_2文件")
     await command(sid, "恢复并安装依赖", `${verify}; printf '%s' '{"name":"snapshot-probe","private":true,"scripts":{"build":"next build"},"dependencies":{"next":"16.3.8","react":"19.3.0","react-dom":"19.3.0"}}' > package.json; printf 'store-dir=.pnpm-store\\nregistry=https://registry.npmmirror.com/\\n' > .npmrc; pnpm install > /tmp/probe-install.log 2>&1 || { tail -40 /tmp/probe-install.log; exit 1; }; test -f node_modules/next/package.json; ${fingerprint}; ${stats}`)
+    if (process.env.PROBE_MANIFEST_CHECKS === "1" && round === 1) await manifestChecks(sid)
     await checkpoint(sid, round, "依赖安装_约344MB")
     for (let edit = 1; edit <= 3; edit++) {
       await command(sid, `恢复并小改${edit}`, `${verify}; printf '\\n// small edit round ${edit}\\n' >> a.txt; ${fingerprint}; ${stats}`)
