@@ -29,7 +29,15 @@ export const SNAPSHOT_PRUNE_COMMAND = "rm -rf /root/.cache /home/sandbox/.cache 
 const quote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`
 const manifestScan = (workspace: string, timeoutSec = 0) => {
   const timeout = timeoutSec > 0 ? `timeout ${timeoutSec} ` : ""
-  return `{ ${timeout}find ${quote(workspace)} -printf '%y %m %s %p %l\\n' && ${timeout}find ${quote(workspace)} -type f -exec sha256sum {} +; } | LC_ALL=C sort`
+  // V1 parity: directories are excluded from the content manifest. Directory
+  // rows are redundant with the mtime quick path (any child create/delete
+  // bumps the parent directory mtime), and empty directories are NOT stable
+  // across the control plane's overlayfs snapshot/restore — verified on the
+  // remote K8s backend: pnpm's content-addressed prefix directories flip
+  // presence after a restore (28-row manifest diff, all `d` rows, zero file
+  // diffs), which made every restore-then-destroy take a new ~20-45s snapshot
+  // instead of reusing. Files and symlinks keep topology (%y %l) monitoring.
+  return `{ ${timeout}find ${quote(workspace)} \\( -type f -o -type l \\) -printf '%y %m %s %p %l\\n' && ${timeout}find ${quote(workspace)} -type f -exec sha256sum {} +; } | LC_ALL=C sort`
 }
 export function snapshotManifestCommand(workspace = "/workspace", manifest = SNAPSHOT_MANIFEST_PATH) {
   // pipefail prevents a failed find/hash from becoming a successful partial
