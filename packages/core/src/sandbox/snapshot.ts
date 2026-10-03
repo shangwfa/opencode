@@ -2,7 +2,7 @@ export * as SandboxSnapshot from "./snapshot.js"
 
 import { SandboxApiException, SandboxManager } from "@alibaba-group/opensandbox"
 import type { ConnectionConfig } from "@alibaba-group/opensandbox"
-import { Duration, Effect } from "effect"
+import { Clock, Duration, Effect } from "effect"
 import { and, desc, eq, gte, inArray, lt, or, sql } from "drizzle-orm"
 import { SessionSnapshotTable, type State } from "./snapshot.sql.js"
 import { SessionTable } from "../session/sql.js"
@@ -22,7 +22,11 @@ export type Deps = {
   readonly manager?: Pick<ReturnType<typeof SandboxManager.create>, "createSnapshot" | "deleteSnapshot" | "getSnapshot">
 }
 
-const POLL_INTERVAL = Duration.seconds(5)
+/** Observe normal checkpoints promptly; cap traffic for long jobs or API failures. */
+export const snapshotPollIntervalMs = (elapsedMs: number, consecutiveErrors = 0): number =>
+  consecutiveErrors > 0
+    ? Math.min(5_000, 1_000 * 2 ** Math.min(consecutiveErrors, 3))
+    : elapsedMs < 60_000 ? 1_000 : 5_000
 
 /** Server-side arch label for a Node process.arch value (x64 → amd64), the
  * same normalization snapshot-reuse.ts applies to `uname -m` output so stored
@@ -350,14 +354,17 @@ export function create<A, B>(deps: Deps) {
    */
   const awaitSnapshot = (sessionID: string, snapshotID: string, waitMs = deps.waitMs) =>
     Effect.gen(function* () {
-      const deadline = Date.now() + waitMs
+      const startedAt = yield* Clock.currentTimeMillis
+      const deadline = startedAt + waitMs
       let last: { reason?: string; message?: string } | null = null
-      while (Date.now() < deadline) {
+      let consecutiveErrors = 0
+      while ((yield* Clock.currentTimeMillis) < deadline) {
         const statusExit = yield* Effect.tryPromise({
           try: async () => (await manager.getSnapshot(snapshotID)).status,
           catch: (cause) => new Error(`getSnapshot failed: ${String(cause)}`),
         }).pipe(Effect.result)
         if (statusExit._tag === "Success") {
+          consecutiveErrors = 0
           const current = statusExit.success
           last = current
           if (current.state === "Ready") {
@@ -382,8 +389,14 @@ export function create<A, B>(deps: Deps) {
             ).pipe(Effect.ignore)
             return "failed" as const
           }
+        } else {
+          consecutiveErrors++
         }
-        yield* Effect.sleep(POLL_INTERVAL)
+        const now = yield* Clock.currentTimeMillis
+        const remaining = deadline - now
+        if (remaining > 0) {
+          yield* Effect.sleep(Duration.millis(Math.min(remaining, snapshotPollIntervalMs(now - startedAt, consecutiveErrors))))
+        }
       }
       const detail = last ? failureDetail(last) : ""
       yield* setState(
