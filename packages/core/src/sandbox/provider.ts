@@ -3,13 +3,14 @@ import { SessionToolGate } from "../session/tool-gate.js"
 import { ensureSandboxLifetime, reconnectSandbox, withSnapshotLease } from "./snapshot-safety.js"
 
 import { ConnectionConfig, SandboxApiException, Sandbox } from "@alibaba-group/opensandbox"
-import { Cause, Context, Deferred, Duration, Effect, Layer, Option, Ref, Schedule, Schema, Semaphore } from "effect"
+import { Cause, Context, Deferred, Duration, Effect, Layer, Option, Ref, Schedule, Schema, Semaphore, Stream } from "effect"
 import { makeLocationNode } from "@opencode/util/effect/app-node"
 import { SandboxConfig } from "./config.js"
 import { SandboxOomSample } from "./oom-sample.js"
 import * as SandboxSnapshot from "./snapshot.js"
 import { expectedSandboxArch, snapshotDrift } from "./snapshot.js"
 import * as SandboxSnapshotOperation from "./snapshot-operation.js"
+import type { OperationRow as SandboxSnapshotOperationRow } from "./snapshot-operation.js"
 import * as SandboxSnapshotReuse from "./snapshot-reuse.js"
 import * as SandboxCreateLease from "./create-lease.js"
 import { SandboxPath } from "./path.js"
@@ -266,6 +267,19 @@ export const refuseCreate = (reason: string) =>
   new Error(`[${REFUSE_CREATE_TAG}] ${reason}`)
 export const shouldRetryCreate = (error: unknown, attempt: number, maxAttempts: number): boolean =>
   attempt + 1 < maxAttempts && !(error instanceof Error && error.message.startsWith(`[${REFUSE_CREATE_TAG}]`))
+
+/**
+ * Destroy-snapshot degradation gate (E2B parity, see
+ * docs/sandbox-snapshot-industry-research-2026-10.md §三.2): degrade only on
+ * the queue's FINAL retry, and only when a stale restore point already
+ * exists — with no restorable checkpoint, data protection wins and the
+ * existing retry/retention path still applies.
+ */
+export const shouldDegradeDestroy = (
+  attempts: number,
+  maxAttempts: number,
+  restorableID: string | null | undefined,
+): boolean => attempts + 1 >= maxAttempts && !!restorableID
 
 const filesOf = (sb: Sandbox): SandboxFilesApi => sb.files as unknown as SandboxFilesApi
 
@@ -918,6 +932,36 @@ const layer = Layer.effect(
         })
         .pipe(Effect.catch(() => Effect.void))
 
+    /**
+     * E2B-parity destroy degradation (see
+     * docs/sandbox-snapshot-industry-research-2026-10.md §三.2): after the
+     * operation queue exhausts its retries, a destroy whose final snapshot
+     * keeps failing accepts the stale restore point instead of dead-lettering
+     * with the sandbox row stuck in `snapshotting` forever. Never degrades
+     * when no restorable checkpoint exists — data protection wins and the
+     * existing retry/retention path still applies.
+     */
+    const degradeDestroySnapshot = (sessionID: string, restorableID: string | null, reason: string): Effect.Effect<boolean> =>
+      Effect.gen(function* () {
+        if (!restorableID) return false
+        // Record the accepted loss window explicitly (lag warning), then make
+        // the degradation durable so the event log explains the stale restore.
+        yield* warnSnapshotLag(sessionID, "destroy")
+        yield* bus
+          .publish(SessionEvent.SandboxSnapshot.Failed, {
+            sessionID: sessionID as SessionID,
+            snapshotID: restorableID,
+            reason: `degraded: final snapshot failed (${reason}); accepted stale restore point`,
+          })
+          .pipe(Effect.catch(() => Effect.void))
+        yield* Effect.logWarning("snapshot destroy degraded to stale restore point", {
+          sessionID,
+          snapshotID: restorableID,
+          reason,
+        })
+        return true
+      })
+
     const drainSnapshotDestroyOperations = Effect.gen(function* () {
       for (let index = 0; index < 20; index++) {
         const operation = yield* destroyOperations.claim()
@@ -951,13 +995,29 @@ const layer = Layer.effect(
                 const outcome = yield* snapshotWithMarker(operation.session_id, sb).pipe(
                   Effect.result,
                 )
+                // E2B-parity degradation: on the queue's last retry, accept the
+                // stale restore point (if any) and proceed to destroy instead
+                // of dead-lettering with the row stuck in `snapshotting`.
+                const degrade = (reason: string) =>
+                  shouldDegradeDestroy(operation.attempts, SandboxSnapshotOperation.MAX_ATTEMPTS, restorable?.id ?? null)
+                    ? degradeDestroySnapshot(operation.session_id, restorable?.id ?? null, reason)
+                    : Effect.succeed(false)
                 if (outcome._tag === "Failure") {
-                  return yield* Effect.fail(outcome.failure)
-                }
+                  if (yield* degrade(outcome.failure.message)) {
+                    // degraded: fall through to heartbeat/activity check/destroy
+                  } else {
+                    return yield* Effect.fail(outcome.failure)
+                  }
+                } else {
                 const { settled, marker, snapshotID } = outcome.success
-                if (settled === "timeout")
-                  return yield* Effect.fail(new Error("snapshot still creating; lease renewed, retry later"))
-                if (settled === "failed") {
+                if (settled === "timeout") {
+                  if (!(yield* degrade("snapshot still creating"))) {
+                    return yield* Effect.fail(new Error("snapshot still creating; lease renewed, retry later"))
+                  }
+                } else if (settled === "failed") {
+                  if (yield* degrade("snapshot failed")) {
+                    // degraded: keep `snapshotting` and fall through to destroy
+                  } else {
                   // T25.4b safety promise: a failed snapshot never destroys the source.
                   // Keep time_updated at its real value ($onUpdate would stamp it
                   // on every retry round and poison the lag-warning verdict).
@@ -973,8 +1033,11 @@ const layer = Layer.effect(
                     .run()
                     .pipe(Effect.orDie)
                   return yield* Effect.fail(new Error("snapshot failed; source sandbox retained"))
+                  }
+                } else {
+                  yield* publishSnapshotReady(operation.session_id, snapshotID, sb.id, marker)
                 }
-                yield* publishSnapshotReady(operation.session_id, snapshotID, sb.id, marker)
+                }
               }
             } else {
               // The row says snapshotting but the sandbox is gone (platform
@@ -1146,6 +1209,58 @@ const layer = Layer.effect(
       Effect.forkDetach,
       Effect.asVoid,
     )
+
+    /**
+     * Turn-completion checkpoints (industry parity, see
+     * docs/sandbox-snapshot-industry-research-2026-10.md §四 P0): finishing an
+     * execution requests a content checkpoint shortly after, closing the
+     * loss window between task completion and the next periodic refresh or
+     * destroy. Unchanged workspaces reuse via the refresh drain's CLEAN
+     * verdict, so repeated completions stay cheap; failures/interrupts also
+     * request a checkpoint — partial work is worth persisting too.
+     */
+    const TURN_CHECKPOINT_DEBOUNCE_MS = 10_000
+    const turnCheckpointAt = new Map<string, number>()
+    yield* Stream.runForEach(
+      bus.subscribe([
+        SessionEvent.Execution.Succeeded,
+        SessionEvent.Execution.Failed,
+        SessionEvent.Execution.Interrupted,
+      ]),
+      (event) =>
+        Effect.gen(function* () {
+          const sessionID = String(event.data.sessionID)
+          const now = Date.now()
+          if (now - (turnCheckpointAt.get(sessionID) ?? 0) < TURN_CHECKPOINT_DEBOUNCE_MS) return
+          turnCheckpointAt.set(sessionID, now)
+          if (turnCheckpointAt.size > 1_000) {
+            for (const [key, at] of turnCheckpointAt) {
+              if (now - at > TURN_CHECKPOINT_DEBOUNCE_MS * 6) turnCheckpointAt.delete(key)
+            }
+          }
+          if (!config.snapshot.enabled) return
+          const session = yield* db
+            .select({ sandbox: SessionTable.sandbox })
+            .from(SessionTable)
+            .where(eq(SessionTable.id, SessionSchema.ID.make(sessionID)))
+            .get()
+            .pipe(Effect.orDie)
+          const persistMode = session?.sandbox?.persistMode ?? config.volumeType
+          if (persistMode !== "snapshot") return
+          const row = yield* dbGet(sessionID)
+          if (!row || row.state !== "running" || row.id.startsWith("pending-")) return
+          const active = yield* refreshOperations
+            .findActive(sessionID, row.id, "snapshot_refresh")
+            .pipe(Effect.catch(() => Effect.succeed([] as SandboxSnapshotOperationRow[])))
+          if (active.length > 0) return
+          yield* refreshOperations
+            .enqueue({ sessionID, sandboxID: row.id, kind: "snapshot_refresh" })
+            .pipe(Effect.ignore)
+          yield* nudgeRefreshDrain
+        }).pipe(
+          Effect.catchCause((cause) => Effect.logWarning("turn checkpoint request failed", { cause })),
+        ),
+    ).pipe(Effect.forkScoped)
 
     /**
      * Explicit destroy (kill-sandbox API, keepalive release) for snapshot

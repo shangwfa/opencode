@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test"
-import { refuseCreate, shouldRetryCreate } from "../src/sandbox/provider.js"
+import { refuseCreate, shouldDegradeDestroy, shouldRetryCreate } from "../src/sandbox/provider.js"
 import { expectedSandboxArch, snapshotDrift } from "../src/sandbox/snapshot.js"
 
 describe("sandbox create retry policy", () => {
@@ -26,6 +26,23 @@ describe("sandbox create retry policy", () => {
 
   it("keeps the refusal reason readable in the message", () => {
     expect(refuseCreate("some reason").message).toBe("[SandboxCreateRefused] some reason")
+  })
+})
+
+describe("destroy-snapshot degradation gate", () => {
+  it("degrades only on the final retry with an existing restore point", () => {
+    expect(shouldDegradeDestroy(4, 5, "snap-1")).toBe(true)
+  })
+
+  it("never degrades before the final retry", () => {
+    expect(shouldDegradeDestroy(0, 5, "snap-1")).toBe(false)
+    expect(shouldDegradeDestroy(3, 5, "snap-1")).toBe(false)
+  })
+
+  it("never degrades without a restorable checkpoint (data protection wins)", () => {
+    expect(shouldDegradeDestroy(4, 5, null)).toBe(false)
+    expect(shouldDegradeDestroy(4, 5, undefined)).toBe(false)
+    expect(shouldDegradeDestroy(4, 5, "")).toBe(false)
   })
 })
 

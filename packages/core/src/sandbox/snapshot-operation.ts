@@ -11,12 +11,13 @@ import {
 } from "./snapshot.sql.js"
 
 const LEASE_MS = 5 * 60_000
-const MAX_ATTEMPTS = 5
+export const MAX_ATTEMPTS = 5
 const BASE_BACKOFF_MS = 30_000
 const MAX_BACKOFF_MS = 10 * 60_000
 const RETENTION_MS = 7 * 24 * 60 * 60_000
 
 type Row = typeof SnapshotOperationTable.$inferSelect
+export type OperationRow = Row
 type Queue = "destroy" | "refresh"
 type Table = typeof SnapshotOperationTable
 
@@ -211,7 +212,7 @@ export function create(dbInput: unknown, queue: Queue) {
         Effect.catch(() => Effect.succeed({ byState: {}, total: 0 })),
       )
 
-  return { enqueue, claim, heartbeat, complete, fail, retention, stats, checkedSince, owner }
+  return { enqueue, claim, heartbeat, complete, fail, retention, stats, checkedSince, findActive, owner }
 }
 
 export type SnapshotOperations = ReturnType<typeof create>
