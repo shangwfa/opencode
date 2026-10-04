@@ -148,6 +148,7 @@ const sandboxHistoryProvider = Layer.succeed(
     release: () => Effect.void,
     isKeepAlive: () => Effect.succeed(false),
     sandboxId: () => Effect.succeed("sandbox-test"),
+    lifecycle: () => Effect.succeed({ sandboxID: "sandbox-test", state: "running", persistMode: "pvc" }),
     boot: () => Effect.succeed("sandbox-test"),
     fileStat: () => Effect.die("not under test"),
     fileRead: () => Effect.die("not under test"),

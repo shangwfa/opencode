@@ -1,11 +1,62 @@
 import { describe, expect } from "bun:test"
 import { Duration, Effect, Layer } from "effect"
-import { ensureSandboxLifetime, reconnectSandbox, withSnapshotLease } from "../src/sandbox/snapshot-safety"
+import { ensureSandboxLifetime, reconnectSandbox, requireReadySnapshot, withSnapshotLease } from "../src/sandbox/snapshot-safety"
 import { testEffect } from "./lib/effect"
 
 const it = testEffect(Layer.empty)
 
 describe("snapshot safety", () => {
+  for (const state of ["failed", "timeout"] as const) {
+    it.effect(`${state} retains dirty writes and the old recovery point on every retry`, () =>
+      Effect.gen(function* () {
+        const source = { writes: "v2", destroyed: false }
+        const oldSnapshot = { id: "s1", writes: "v1", state: "stale" }
+        let readyEvents = 0
+        for (let attempts = 1; attempts <= 6; attempts++) {
+          const result = yield* Effect.gen(function* () {
+            yield* requireReadySnapshot(state)
+            readyEvents++
+            source.destroyed = true
+          }).pipe(Effect.result)
+          expect(result._tag).toBe("Failure")
+          if (result._tag === "Failure") expect(result.failure.message).toContain("source sandbox retained")
+          expect(source).toEqual({ writes: "v2", destroyed: false })
+          expect(oldSnapshot).toEqual({ id: "s1", writes: "v1", state: "stale" })
+        }
+        expect(readyEvents).toBe(0)
+      }),
+    )
+  }
+
+  it.effect("a create or marker error never reaches destroy", () =>
+    Effect.gen(function* () {
+      const error = new Error("snapshot create failed")
+      let destroyed = false
+      const result = yield* Effect.gen(function* () {
+        const state = yield* Effect.fail(error)
+        yield* requireReadySnapshot(state)
+        destroyed = true
+      }).pipe(Effect.result)
+      expect(result._tag).toBe("Failure")
+      if (result._tag === "Failure") expect(result.failure).toBe(error)
+      expect(destroyed).toBe(false)
+    }),
+  )
+
+  it.effect("a Ready checkpoint allows destroy after failed attempts", () =>
+    Effect.gen(function* () {
+      for (const state of ["failed", "timeout", "ready"] as const) {
+        let destroyed = false
+        const result = yield* Effect.gen(function* () {
+          yield* requireReadySnapshot(state)
+          destroyed = true
+        }).pipe(Effect.result)
+        expect(result._tag).toBe(state === "ready" ? "Success" : "Failure")
+        expect(destroyed).toBe(state === "ready")
+      }
+    }),
+  )
+
   it.effect("renews an absolute expiry before checkpoint work", () =>
     Effect.gen(function* () {
       const renewed: number[] = []

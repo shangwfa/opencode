@@ -274,7 +274,10 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
       .handle(
         "session.remove",
         Effect.fn(function* (ctx) {
-          yield* session.remove(ctx.params.sessionID).pipe(Effect.catchTag("Session.NotFoundError", missingSession))
+          yield* session.remove(ctx.params.sessionID).pipe(
+            Effect.catchTag("Session.NotFoundError", missingSession),
+            Effect.catchTag("Session.SandboxRetainedError", (error) => Effect.fail(new ConflictError({ message: error.message }))),
+          )
           return HttpApiSchema.NoContent.make()
         }),
       )
@@ -681,7 +684,6 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
           if (enabled) yield* provider.keepAlive(ctx.params.sessionID)
           else {
             yield* provider.release(ctx.params.sessionID)
-            clearProxyTargets(ctx.params.sessionID)
           }
           const sandboxId =
             enabled && ctx.payload.boot === true && provider.enabled
@@ -711,11 +713,12 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
         Effect.fn(function* (ctx) {
           yield* session.get(ctx.params.sessionID).pipe(Effect.catchTag("Session.NotFoundError", missingSession))
           const provider = yield* SandboxProvider.Service
-          const existing = yield* provider.sandboxId(ctx.params.sessionID)
-          if (existing && provider.enabled) yield* provider.destroy(ctx.params.sessionID)
-          clearProxyTargets(ctx.params.sessionID)
-          const remaining = yield* provider.sandboxId(ctx.params.sessionID)
-          return { sessionID: ctx.params.sessionID, destroyed: existing !== null && remaining === null }
+          const existing = yield* provider.lifecycle(ctx.params.sessionID)
+          if (existing.state && existing.state !== "destroyed" && provider.enabled) yield* provider.destroy(ctx.params.sessionID)
+          const remaining = yield* provider.lifecycle(ctx.params.sessionID)
+          const destroyed = existing.state !== null && existing.state !== "destroyed" && remaining.state === "destroyed"
+          if (destroyed) clearProxyTargets(ctx.params.sessionID)
+          return { sessionID: ctx.params.sessionID, destroyed }
         }),
       )
       .handle(

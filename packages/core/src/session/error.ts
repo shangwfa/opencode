@@ -11,6 +11,14 @@ export class NotFoundError extends Schema.TaggedError<NotFoundError>()("Session.
   sessionID: SessionSchema.ID,
 }) {}
 
+export class SandboxRetainedError extends Schema.TaggedError<SandboxRetainedError>()("Session.SandboxRetainedError", {
+  sessionID: SessionSchema.ID,
+}) {
+  override get message() {
+    return `Sandbox cleanup is incomplete; session and recovery points retained: ${this.sessionID}`
+  }
+}
+
 export class MessageNotFoundError extends Schema.TaggedError<MessageNotFoundError>()("Session.MessageNotFoundError", {
   sessionID: SessionSchema.ID,
   messageID: SessionMessage.ID,

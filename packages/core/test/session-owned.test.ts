@@ -545,6 +545,7 @@ describe("Session-owned handles", () => {
               release: () => Effect.die(new Error("disabled sandbox provider must not run")),
               isKeepAlive: () => Effect.succeed(false),
               sandboxId: () => Effect.succeed(null),
+              lifecycle: () => Effect.succeed({ sandboxID: null, state: null, persistMode: "pvc" }),
               boot: () => Effect.die(new Error("disabled sandbox provider must not run")),
               fileStat: () => Effect.die(new Error("not under test")),
               fileRead: () => Effect.die(new Error("not under test")),

@@ -1,5 +1,13 @@
 import { Duration, Effect } from "effect"
 
+/** Only a Ready checkpoint protects new writes; an older snapshot is not a substitute. */
+export const requireReadySnapshot = (state: "ready" | "failed" | "timeout") =>
+  state === "ready"
+    ? Effect.void
+    : Effect.fail(new Error(state === "timeout"
+      ? "snapshot still creating; source sandbox retained, retry later"
+      : "snapshot failed; source sandbox retained"))
+
 /** OpenSandbox TTL is an absolute deadline; command traffic does not renew it. */
 export const ensureSandboxLifetime = (
   sandbox: { getInfo(): Promise<{ expiresAt: Date | null }>; renew(seconds: number): Promise<unknown> },

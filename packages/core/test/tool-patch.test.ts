@@ -81,6 +81,7 @@ const sandboxProvider: SandboxProvider.Interface = {
   release: () => Effect.void,
   isKeepAlive: () => Effect.succeed(false),
   sandboxId: () => Effect.succeed("sandbox-test"),
+  lifecycle: () => Effect.succeed({ sandboxID: "sandbox-test", state: "running", persistMode: "pvc" }),
   boot: () => Effect.succeed("sandbox-test"),
   fileStat: (_id, target) => Effect.succeed(sandboxFiles.has(target) ? { isDirectory: false } : null),
   fileRead: (_id, target) => Effect.succeed(sandboxFiles.get(target) ?? null),

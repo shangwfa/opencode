@@ -198,8 +198,11 @@ export function create<A, B>(deps: Deps) {
       }
       const removed = yield* Effect.tryPromise({
         try: () => manager.deleteSnapshot(row.id),
-        catch: (cause) => (cause instanceof SandboxApiException && cause.statusCode === 404 ? null : cause),
-      }).pipe(Effect.result)
+        catch: (cause) => cause,
+      }).pipe(
+        Effect.catchIf((cause) => cause instanceof SandboxApiException && cause.statusCode === 404, () => Effect.void),
+        Effect.result,
+      )
       if (removed._tag === "Success") {
         yield* setState(row.id, "deleted", reason, ["deleting"]).pipe(Effect.ignore)
       }
@@ -472,8 +475,11 @@ export function create<A, B>(deps: Deps) {
       for (const row of stuck) {
         const statusExit = yield* Effect.tryPromise({
           try: async () => (await manager.getSnapshot(row.id)).status,
-          catch: (cause) => (cause instanceof SandboxApiException && cause.statusCode === 404 ? null : cause),
-        }).pipe(Effect.result)
+          catch: (cause) => cause,
+        }).pipe(
+          Effect.catchIf((cause) => cause instanceof SandboxApiException && cause.statusCode === 404, () => Effect.succeed(null)),
+          Effect.result,
+        )
         if (statusExit._tag === "Failure") continue
         const current = statusExit.success
         if (current === null) {

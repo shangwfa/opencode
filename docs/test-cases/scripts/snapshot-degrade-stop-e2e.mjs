@@ -1,3 +1,6 @@
+// 历史脚本：曾验证接受旧恢复点后销毁dirty源，已不符合当前保护契约。
+// 保留历史步骤作审计，禁止运行；新入口使用专用代理，不停止源容器。
+throw new Error("旧降级验收已停用，请运行 docs/test-cases/scripts/sandbox-lifecycle-safety-v2.mjs")
 // 降级档全链路验收 v2（本地平台直连 + 停容器注入快照失败）：
 // 1) 正常：建会话 → 基线快照 → 恢复 → 制造 dirty
 // 2) 注入：docker stop 沙箱容器（execd 不可用 → marker/快照必然失败）

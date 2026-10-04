@@ -61,6 +61,7 @@ import { SessionHistory } from "./session/history.js"
 import { SessionProviderContext } from "./session/provider-context.js"
 import { llmClient } from "./effect/app-node-platform.js"
 import { Snapshot } from "./snapshot.js"
+import { SandboxRetainedError } from "./session/error.js"
 import { Session } from "./session/session.js"
 import { SessionDiff, TurnRangeError } from "./session/diff.js"
 import { LocationServiceMap } from "./location-service-map.js"
@@ -147,7 +148,7 @@ export interface Interface {
     readonly variables?: SessionEnvironment.Variables
   }) => Effect.Effect<SessionEnvironment.Variables | undefined, NotFoundError>
   readonly view: (input: { sessionID: SessionSchema.ID; idle: number }) => Effect.Effect<void, NotFoundError>
-  readonly remove: (sessionID: SessionSchema.ID) => Effect.Effect<void, NotFoundError>
+  readonly remove: (sessionID: SessionSchema.ID) => Effect.Effect<void, NotFoundError | SandboxRetainedError>
   readonly messages: (
     input: SessionStore.MessagesInput,
   ) => Effect.Effect<SessionMessage.Info[], NotFoundError | MessageDecodeError>
@@ -455,68 +456,128 @@ const layer = Layer.effect(
       }),
       view: (input) => sessions.forSession(input.sessionID).view(input),
       remove: Effect.fn("Session.remove")(function* (sessionID) {
-        const info = yield* result.get(sessionID)
-        yield* SessionToolGate.make(db).close(sessionID, false).pipe(Effect.orDie)
-        yield* execution.interrupt(sessionID)
-        yield* execution.awaitIdle(sessionID)
-        yield* instances
-          .provide(info)(
-            Effect.gen(function* () {
-              const mcps = yield* SessionMcps.Service
-              const tools = yield* SessionToolSandbox.Service
-              yield* tools.release(sessionID, info.parentID ? "session" : "sandbox")
-              // Closing a stale client must not prevent sandbox teardown.
-              yield* mcps.release(info).pipe(Effect.catchCause(() => Effect.void))
-              const sandbox = yield* SandboxProvider.Service
-              if (sandbox.enabled && !info.parentID) {
-                yield* sandbox.destroy(sessionID)
-                // Snapshot rows follow the session; the remote snapshots
-                // themselves are only deleted when the deployment enables it.
-                yield* sandbox.deleteSnapshots(sessionID).pipe(
-                  Effect.catchCause((cause) =>
-                    Effect.logWarning("Failed to delete session snapshots", { sessionID, cause }),
-                  ),
-                )
-              }
-            }),
+        const gate = SessionToolGate.make(db)
+        const closures: SessionToolGate.Closure[] = []
+        const close = (id: string) =>
+          gate.close(id, false).pipe(
+            Effect.tap((closure) =>
+              Effect.sync(() => {
+                if (closure) closures.push(closure)
+              }),
+            ),
+            Effect.orDie,
+            Effect.uninterruptible,
           )
-          .pipe(
-            Effect.catchCause((cause) => Effect.logWarning("Failed to destroy session sandbox", { sessionID, cause })),
+        return yield* Effect.gen(function* () {
+          const info = yield* result.get(sessionID)
+          yield* close(sessionID)
+          yield* execution.interrupt(sessionID)
+          yield* execution.awaitIdle(sessionID)
+          const children = yield* result.list({ parentID: sessionID })
+          const descendants = [...children.data]
+          const visited = new Set([sessionID, ...descendants.map((child) => child.id)])
+          for (let index = 0; index < descendants.length; index++) {
+            const nested = yield* result.list({ parentID: descendants[index].id })
+            for (const child of nested.data) {
+              if (visited.has(child.id)) continue
+              visited.add(child.id)
+              descendants.push(child)
+            }
+          }
+          // Stop child execution before touching their shared physical Sandbox.
+          for (const child of descendants) {
+            yield* close(child.id)
+            yield* execution.interrupt(child.id)
+            yield* execution.awaitIdle(child.id)
+          }
+          const cleanup = yield* instances
+            .provide(info)(
+              Effect.gen(function* () {
+                const mcps = yield* SessionMcps.Service
+                const tools = yield* SessionToolSandbox.Service
+                yield* tools.release(sessionID, info.parentID ? "session" : "sandbox")
+                // Closing a stale client must not prevent sandbox teardown.
+                yield* mcps.release(info).pipe(Effect.catchCause(() => Effect.void))
+                const sandbox = yield* SandboxProvider.Service
+                if (sandbox.enabled && !info.parentID) {
+                  yield* sandbox.destroy(sessionID)
+                  const remaining = yield* sandbox.lifecycle(sessionID)
+                  if (remaining.state && remaining.state !== "destroyed")
+                    return yield* Effect.fail(new SandboxRetainedError({ sessionID }))
+                  // Snapshot rows follow the session; the remote snapshots
+                  // themselves are only deleted when the deployment enables it.
+                  yield* sandbox
+                    .deleteSnapshots(sessionID)
+                    .pipe(
+                      Effect.catchCause((cause) =>
+                        Effect.logWarning("Failed to delete session snapshots", { sessionID, cause }),
+                      ),
+                    )
+                }
+              }),
+            )
+            .pipe(Effect.exit)
+          if (cleanup._tag === "Failure") {
+            yield* Effect.logWarning("Session cleanup incomplete; metadata retained", {
+              sessionID,
+              cause: cleanup.cause,
+            })
+            return yield* Effect.fail(new SandboxRetainedError({ sessionID }))
+          }
+          yield* transport.close(sessionID)
+          yield* Effect.forEach(
+            children.data,
+            (child) =>
+              Effect.gen(function* () {
+                yield* close(child.id)
+                yield* execution.interrupt(child.id)
+                yield* execution.awaitIdle(child.id)
+                yield* instances
+                  .provide(child)(
+                    Effect.gen(function* () {
+                      const mcps = yield* SessionMcps.Service
+                      const tools = yield* SessionToolSandbox.Service
+                      yield* tools.release(child.id)
+                      // Closing a stale client must not prevent sandbox teardown.
+                      yield* mcps.release(child).pipe(Effect.catchCause(() => Effect.void))
+                      // Child tools share the root Sandbox; releasing a child never destroys it.
+                    }),
+                  )
+                  .pipe(
+                    Effect.catchCause((cause) =>
+                      Effect.logWarning("Failed to destroy child session sandbox", { sessionID: child.id, cause }),
+                    ),
+                  )
+                yield* result.remove(child.id)
+                yield* clearCcrEntries(child.id)
+              }),
+            { concurrency: 1, discard: true },
           )
-        yield* transport.close(sessionID)
-        const children = yield* result.list({ parentID: sessionID })
-        yield* Effect.forEach(
-          children.data,
-          (child) =>
-            Effect.gen(function* () {
-              yield* SessionToolGate.make(db).close(child.id, false).pipe(Effect.orDie)
-              yield* execution.interrupt(child.id)
-              yield* execution.awaitIdle(child.id)
-              yield* instances
-                .provide(child)(
-                  Effect.gen(function* () {
-                    const mcps = yield* SessionMcps.Service
-                    const tools = yield* SessionToolSandbox.Service
-                    yield* tools.release(child.id)
-                    // Closing a stale client must not prevent sandbox teardown.
-                    yield* mcps.release(child).pipe(Effect.catchCause(() => Effect.void))
-                    // Child tools share the root Sandbox; releasing a child never destroys it.
-                  }),
-                )
-                .pipe(
-                  Effect.catchCause((cause) =>
-                    Effect.logWarning("Failed to destroy child session sandbox", { sessionID: child.id, cause }),
-                  ),
-                )
-              yield* result.remove(child.id)
-              yield* clearCcrEntries(child.id)
-            }),
-          { concurrency: 1, discard: true },
+          yield* environments.clear(sessionID)
+          yield* clearCcrEntries(sessionID)
+          yield* bus.publish(SessionEvent.Deleted, { sessionID })
+          yield* bus.remove(sessionID)
+        }).pipe(
+          Effect.onExit((exit) =>
+            exit._tag === "Success"
+              ? Effect.void
+              : Effect.forEach(
+                  [...closures].reverse(),
+                  (closure) =>
+                    gate
+                      .reopen(closure.sessionID, closure)
+                      .pipe(
+                        Effect.catchCause((cause) =>
+                          Effect.logWarning("Failed to reopen retained session admission", {
+                            sessionID: closure.sessionID,
+                            cause,
+                          }),
+                        ),
+                      ),
+                  { discard: true },
+                ),
+          ),
         )
-        yield* environments.clear(sessionID)
-        yield* clearCcrEntries(sessionID)
-        yield* bus.publish(SessionEvent.Deleted, { sessionID })
-        yield* bus.remove(sessionID)
       }),
       list: Effect.fn("Session.list")(function* (input) {
         return { data: yield* store.list(input) }

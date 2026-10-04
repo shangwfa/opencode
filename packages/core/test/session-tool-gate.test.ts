@@ -89,11 +89,12 @@ it.live("child closure preserves root admission and leaves a deletion tombstone"
 it.live("physical closure blocks every logical session and rejects reopening an old Sandbox", () =>
   Effect.gen(function* () {
     const { db, root, child, sandboxID, gate } = yield* fixture
-    yield* gate.close(root, true)
+    const closure = yield* gate.close(root, true, sandboxID)
+    if (!closure) return yield* Effect.die(new Error("missing closure"))
     for (const id of [root, child])
       expect(yield* gate.admit(id, sandboxID, () => Effect.succeed(true)).pipe(Effect.isFailure)).toBe(true)
     expect(yield* gate.booted(root, sandboxID).pipe(Effect.isFailure)).toBe(true)
-    yield* gate.destroyed(root)
+    yield* gate.destroyed(root, closure)
     expect(yield* gate.booted(root, sandboxID).pipe(Effect.isFailure)).toBe(true)
     const replacement = `${sandboxID}-replacement`
     yield* db.update(SandboxTable).set({ id: replacement }).where(eq(SandboxTable.session_id, root)).run()
@@ -107,17 +108,110 @@ it.live("physical closure blocks every logical session and rejects reopening an 
 it.live("stale generation completion cannot close a replacement Sandbox admission", () =>
   Effect.gen(function* () {
     const { db, root, sandboxID, gate } = yield* fixture
-    yield* gate.close(root, true)
-    yield* gate.destroyed(root, sandboxID)
+    const closure = yield* gate.close(root, true, sandboxID)
+    if (!closure) return yield* Effect.die(new Error("missing closure"))
+    yield* gate.destroyed(root, closure)
     const replacement = `${sandboxID}-replacement`
     yield* db.update(SandboxTable).set({ id: replacement }).where(eq(SandboxTable.session_id, root)).run()
     yield* gate.booted(root, replacement)
-    yield* gate.destroyed(root, sandboxID)
+    yield* gate.destroyed(root, closure)
     expect(yield* gate.admit(root, replacement, () => Effect.succeed(true))).toBe(true)
   }),
 )
 
 const pg = process.env.OPENCODE_DATABASE_URL ? it.live : it.live.skip
+for (const state of ["snapshotting", "killed", "destroyed"] as const) {
+  it.live(`tool admission rejects a PG ${state} source even when its gate is open`, () =>
+    Effect.gen(function* () {
+      const { db, root, sandboxID, gate } = yield* fixture
+      yield* db.update(SandboxTable).set({ state }).where(eq(SandboxTable.session_id, root)).run()
+      let executed = false
+      expect(
+        yield* gate
+          .admit(root, sandboxID, () =>
+            Effect.sync(() => {
+              executed = true
+            }),
+          )
+          .pipe(Effect.isFailure),
+      ).toBe(true)
+      expect(executed).toBe(false)
+    }),
+  )
+}
+
+it.live("a stale physical close cannot change replacement admission", () =>
+  Effect.gen(function* () {
+    const { db, root, sandboxID, gate } = yield* fixture
+    const replacement = `${sandboxID}-replacement`
+    yield* db.update(SandboxTable).set({ id: replacement }).where(eq(SandboxTable.session_id, root)).run()
+    yield* gate.booted(root, replacement)
+    expect(yield* gate.close(root, true, sandboxID)).toBeNull()
+    expect(yield* gate.admit(root, replacement, () => Effect.succeed(true))).toBe(true)
+  }),
+)
+
+it.live("an older logical closure cannot reopen a newer closure", () =>
+  Effect.gen(function* () {
+    const { root, sandboxID, gate } = yield* fixture
+    const first = yield* gate.close(root, false)
+    const second = yield* gate.close(root, false)
+    if (!first || !second) return yield* Effect.die(new Error("closure tokens were not returned"))
+    expect(yield* gate.reopen(root, first)).toBe(false)
+    expect(yield* gate.admit(root, sandboxID, () => Effect.void).pipe(Effect.isFailure)).toBe(true)
+    expect(yield* gate.reopen(root, second)).toBe(true)
+    expect(yield* gate.admit(root, sandboxID, () => Effect.succeed(true))).toBe(true)
+  }),
+)
+
+it.live("an older physical closure cannot reopen a newer physical closure", () =>
+  Effect.gen(function* () {
+    const { root, sandboxID, gate } = yield* fixture
+    const first = yield* gate.close(root, true, sandboxID)
+    const second = yield* gate.close(root, true, sandboxID)
+    if (!first || !second) return yield* Effect.die(new Error("closure tokens were not returned"))
+    expect(yield* gate.destroyed(root, first)).toBe(false)
+    expect(yield* gate.retained(root, first)).toBe(false)
+    expect(yield* gate.admit(root, sandboxID, () => Effect.void).pipe(Effect.isFailure)).toBe(true)
+    expect(yield* gate.retained(root, second)).toBe(true)
+  }),
+)
+
+pg("an independent PG lifecycle writer waits for tool dispatch acknowledgement", () =>
+  Effect.gen(function* () {
+    const url = process.env.OPENCODE_DATABASE_URL
+    if (!url) return yield* Effect.die(new Error("PG test requires a dedicated database"))
+    const remote = new Bun.SQL(url)
+    yield* Effect.addFinalizer(() => Effect.promise(() => remote.close()))
+    yield* Effect.promise(() => remote`select 1`)
+    const { root, sandboxID, gate } = yield* fixture
+    const entered = yield* Deferred.make<void>()
+    const accepted = yield* Deferred.make<void>()
+    const admission = yield* gate
+      .admit(root, sandboxID, () => Deferred.succeed(entered, undefined).pipe(Effect.andThen(Deferred.await(accepted))))
+      .pipe(Effect.forkScoped)
+    yield* Deferred.await(entered)
+    let transitioned = false
+    const update = yield* Effect.promise(
+      () => remote`update sandbox set state='snapshotting' where session_id=${root} and id=${sandboxID}`,
+    ).pipe(
+      Effect.tap(() =>
+        Effect.sync(() => {
+          transitioned = true
+        }),
+      ),
+      Effect.forkScoped,
+    )
+    yield* Effect.sleep("50 millis")
+    expect(transitioned).toBe(false)
+    yield* Deferred.succeed(accepted, undefined)
+    yield* Fiber.join(admission)
+    yield* Fiber.join(update)
+    expect(transitioned).toBe(true)
+    expect(yield* gate.admit(root, sandboxID, () => Effect.void).pipe(Effect.isFailure)).toBe(true)
+  }),
+)
+
 pg("PG admission and destroy serialize until dispatch acknowledgement, then reject late admission", () =>
   Effect.gen(function* () {
     const { root, sandboxID, gate } = yield* fixture
@@ -135,7 +229,7 @@ pg("PG admission and destroy serialize until dispatch acknowledgement, then reje
       )
       .pipe(Effect.forkScoped)
     yield* Deferred.await(entered)
-    const closing = yield* gate.close(root, true).pipe(
+    const closing = yield* gate.close(root, true, sandboxID).pipe(
       Effect.tap(() => Effect.sync(() => order.push("closed"))),
       Effect.forkScoped,
     )

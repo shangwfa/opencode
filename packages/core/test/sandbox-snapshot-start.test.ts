@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto"
 import { expect } from "bun:test"
 import { eq } from "drizzle-orm"
 import { Effect } from "effect"
-import { ConnectionConfig, SandboxManager } from "@alibaba-group/opensandbox"
+import { ConnectionConfig, SandboxManager, SandboxApiException } from "@alibaba-group/opensandbox"
 import { Database } from "../src/database/database"
 import { AppNodeBuilder } from "../src/effect/app-node-builder"
 import { SessionTable } from "../src/session/sql"
@@ -15,6 +15,9 @@ import { LayerNode } from "@opencode/util/effect/layer-node"
 import { Location } from "../src/location"
 import { AbsolutePath } from "@opencode/schema/schema"
 import { testEffect } from "./lib/effect"
+import { SessionToolGate } from "../src/session/tool-gate"
+import { SandboxTable } from "../src/sandbox/sql"
+import { SandboxExecutionGateTable, SessionExecutionGateTable } from "../src/session/sql"
 
 const it = testEffect(AppNodeBuilder.build(LayerNode.group([Database.node]), [
   Location.node.replace(Location.boundNode({ directory: AbsolutePath.make("/project") })),
@@ -42,6 +45,70 @@ const fixture = <A>(run: (db: Database.Interface["db"], sessionID: string) => Ef
 
 const snapshot = (db: Database.Interface["db"], manager: Pick<ReturnType<typeof SandboxManager.create>, "createSnapshot" | "getSnapshot" | "deleteSnapshot">, deleteEnabled = true) =>
   SandboxSnapshot.create({ db, manager, connectionConfig: new ConnectionConfig({ domain: "127.0.0.1:1", protocol: "http" }), ttlMs: 1, waitMs: 100, deleteEnabled })
+
+for (const operation of ["delete", "reconcile"] as const) {
+  pgTest(`snapshot ${operation} converges a remote 404`, () => fixture((db, sessionID) =>
+    Effect.gen(function* () {
+      const id = randomUUID()
+      yield* db.insert(SessionSnapshotTable).values({ id, session_id: sessionID, scope: "session", state: operation === "delete" ? "deleting" : "creating", time_created: 0, time_updated: 0 }).run()
+      const missing = async () => { throw new SandboxApiException({ message: "not found", statusCode: 404 }) }
+      const service = snapshot(db, { createSnapshot: async () => { throw new Error("unexpected create") }, getSnapshot: missing, deleteSnapshot: missing })
+      if (operation === "delete") yield* service.deleteAllForSession(sessionID)
+      else yield* service.gc(sessionID)
+      expect((yield* db.select().from(SessionSnapshotTable).where(eq(SessionSnapshotTable.id, id)).get())?.state).toBe(operation === "delete" ? "deleted" : "failed")
+    }),
+  ))
+}
+
+pgTest("retained physical gate reopens only the current running generation", () => fixture((db, sessionID) =>
+  Effect.gen(function* () {
+    const id = randomUUID()
+    const gate = SessionToolGate.make(db)
+    try {
+      yield* db.insert(SandboxTable).values({ id, session_id: sessionID, host: "test", state: "running" }).run()
+      yield* gate.booted(sessionID, id)
+      const closure = yield* gate.close(sessionID, true, id)
+      if (!closure) return yield* Effect.die(new Error("missing physical closure"))
+      yield* gate.retained(sessionID, { ...closure, sandboxID: "old" })
+      expect((yield* db.select().from(SandboxExecutionGateTable).where(eq(SandboxExecutionGateTable.root_session_id, sessionID)).get())?.state).toBe("closing")
+      yield* db.update(SandboxTable).set({ state: "snapshotting" }).where(eq(SandboxTable.id, id)).run()
+      yield* gate.retained(sessionID, closure)
+      expect((yield* db.select().from(SandboxExecutionGateTable).where(eq(SandboxExecutionGateTable.root_session_id, sessionID)).get())?.state).toBe("closing")
+      yield* db.update(SandboxTable).set({ state: "running" }).where(eq(SandboxTable.id, id)).run()
+      yield* gate.retained(sessionID, closure)
+      expect(yield* gate.admit(sessionID, id, () => Effect.succeed("allowed"))).toBe("allowed")
+      const logical = yield* gate.close(sessionID, false)
+      if (!logical) return yield* Effect.die(new Error("missing logical closure"))
+      expect((yield* gate.admit(sessionID, id, () => Effect.void).pipe(Effect.result))._tag).toBe("Failure")
+      yield* gate.reopen(sessionID, logical)
+      expect(yield* gate.admit(sessionID, id, () => Effect.succeed("resumed"))).toBe("resumed")
+      const terminal = yield* gate.close(sessionID, true, id)
+      if (!terminal) return yield* Effect.die(new Error("missing terminal closure"))
+      yield* gate.destroyed(sessionID, terminal)
+      yield* gate.retained(sessionID, terminal)
+      expect((yield* gate.admit(sessionID, id, () => Effect.void).pipe(Effect.result))._tag).toBe("Failure")
+    } finally {
+      yield* db.delete(SessionExecutionGateTable).where(eq(SessionExecutionGateTable.session_id, sessionID)).run()
+      yield* db.delete(SandboxExecutionGateTable).where(eq(SandboxExecutionGateTable.root_session_id, sessionID)).run()
+      yield* db.delete(SandboxTable).where(eq(SandboxTable.session_id, sessionID)).run()
+    }
+  }),
+))
+
+for (const operation of ["delete", "reconcile"] as const) {
+  pgTest(`snapshot ${operation} retains state on a non-404 platform failure`, () => fixture((db, sessionID) =>
+    Effect.gen(function* () {
+      const id = randomUUID()
+      const initial = operation === "delete" ? "deleting" : "creating"
+      yield* db.insert(SessionSnapshotTable).values({ id, session_id: sessionID, scope: "session", state: initial, time_created: 0, time_updated: 0 }).run()
+      const unavailable = async () => { throw new SandboxApiException({ message: "unavailable", statusCode: 500 }) }
+      const service = snapshot(db, { createSnapshot: async () => { throw new Error("unexpected create") }, getSnapshot: unavailable, deleteSnapshot: unavailable })
+      if (operation === "delete") yield* service.deleteAllForSession(sessionID)
+      else yield* service.gc(sessionID)
+      expect((yield* db.select().from(SessionSnapshotTable).where(eq(SessionSnapshotTable.id, id)).get())?.state).toBe(initial)
+    }),
+  ))
+}
 
 pgTest("concurrent replicas acquire creation rights before making one remote snapshot", () => fixture((db, sessionID) =>
   Effect.gen(function* () {

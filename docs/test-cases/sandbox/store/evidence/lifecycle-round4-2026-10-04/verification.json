@@ -1,0 +1,53 @@
+{
+  "head": "fa4c537e639bfdea4558292c2444fe75849f00ff",
+  "source": "最终未提交工作区；未构建或部署新镜像",
+  "sourceSha256": {
+    "packages/core/src/sandbox/create-lease.ts": "6618e863349215ad180e775ec2d197d245b1add20d9347db871cf27cb73a9eb2",
+    "packages/core/src/sandbox/provider.ts": "6fd1e19d1134a98843064183df9515ceeef4eac33538a12f2c591adaa91933c4",
+    "packages/core/src/sandbox/command-session.ts": "ef8c5dd9dcece162a2df33598cf10ca6f83099a5b25e2481d1ab434232e20a7f",
+    "packages/core/src/session/tool-gate.ts": "30068b192af9738ba0227a15bcf5d7ff50086ece075ec508aacb7f8180495df1",
+    "packages/core/src/session.ts": "8944370d232373d69ede6057d2c1f52b8939f752d38f17fdfa3dc5d2a454b979"
+  },
+  "tests": {
+    "red": { "files": 2, "pass": 12, "fail": 12 },
+    "sandboxAndGate": { "files": 27, "pass": 377, "fail": 0, "expect": 1071 },
+    "retainedDelete": { "pass": 4, "fail": 0, "expect": 25 },
+    "toolsAndSessions": { "files": 5, "pass": 116, "fail": 0, "expect": 607 },
+    "server": { "files": 4, "pass": 20, "fail": 0, "expect": 73 },
+    "fullSessionRemove": {
+      "pass": 6, "fail": 1,
+      "knownFailure": "removes unloaded sessions and children without initializing an instance：Location RcMap即时清空断言，前轮HEAD文件级对照已复现，未修改断言"
+    }
+  },
+  "checks": { "coreTypecheck": true, "serverTypecheck": true, "targetedOxlint": true, "diffCheck": true },
+  "docker": {
+    "snapshot": {
+      "pass": true, "checks": 28,
+      "log": "lifecycle-round4-final-snapshot-e2e.log",
+      "evidence": "../lifecycle-snapshot-1791104857929-e9807f2f/result.json",
+      "pgPostcheck": "../lifecycle-snapshot-1791104857929-e9807f2f/pg-postcheck.json"
+    },
+    "pvc": {
+      "pass": true, "checks": 15,
+      "evidence": "../lifecycle-pvc-1791104857929-20f1e59d/result.json",
+      "pgPostcheck": "../lifecycle-pvc-1791104857929-20f1e59d/pg-postcheck.json"
+    }
+  },
+  "logDirectory": "/private/var/folders/zk/8qd0lv657wn8kvpp__hwjj400000gn/T/opencode/",
+  "logPrefix": "lifecycle-round4-",
+  "recheck": {
+    "date": "2026-10-04",
+    "result": "未发现新问题",
+    "confirmations": [
+      "refresh不置snapshotting（provider.ts:1128），admit的running检查只阻塞销毁意图",
+      "admit锁范围=dispatch RPC，consume在事务外",
+      "Root→Logical→Sandbox锁序一致，无死锁环；max:1下新行锁只影响跨副本",
+      "destroySandbox ensuring修复PVC直连kill失败gate泄漏；destroyed后retained不会误开",
+      "全部gate调用点已迁移Closure签名；sessionCreates全部代际key",
+      "close的Effect.uninterruptible保证令牌记录原子性"
+    ],
+    "untested": "PVC直连destroy kill失败的gate重开无独立单测（队列路径已测，直连与Ensuring共享同一实现）",
+    "supersededProbe": "第三轮probes脚本使用已移除的gate旧签名，场景由新单测取代"
+  },
+  "limits": "函数/PG交错与API shell验收不等于完整双副本E2E、真实模型/default code-mode、全rootfs或后台多文件写事务一致性"
+}

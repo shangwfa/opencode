@@ -1,0 +1,63 @@
+{
+  "v1Commit": "152c8587db67195b707b581aa41bf50b4fe6a9e2",
+  "v2Head": "fa4c537e639bfdea4558292c2444fe75849f00ff",
+  "v2Source": "当前未提交工作区，不是仅HEAD",
+  "script": "/private/var/folders/zk/8qd0lv657wn8kvpp__hwjj400000gn/T/opencode/lifecycle-round3-probes.ts",
+  "scope": "补偿函数模拟提交回包失败；工具gate使用真实专用PG；commandSession提取当前完整函数体并注入确定性调度。没有调用真实远端kill或执行跨副本E2E。PG用例仅操作并清理自身UUID测试行。",
+  "sourceSha256": {
+    "packages/core/src/sandbox/provider.ts": "913bc24e971897e1aa315122804eec0ceaee99aa9ba1c745173470fa6cdb8612",
+    "packages/core/src/sandbox/create-lease.ts": "959aa6981e674d4ea423cee789a3fb6b038c9432c16d1ab872a4c559372d6f99",
+    "packages/core/src/sandbox/snapshot.ts": "b5700de2c88c85ca94461f9eb6f3accf7a6723cdb903b50da25bfbe713720127",
+    "packages/core/src/session.ts": "f0ee5910330d6f329a4aa6e76b0c8ee3da9a81885d3ea830f80b5e9ca116509b",
+    "packages/core/src/session/tool-gate.ts": "c1aaa098c518020603a1fe0141f90974441e582d7286a45fb2b3230174f53199"
+  },
+  "results": [
+    {
+      "probe": "command-session-populated-between-two-reads",
+      "source": "exact extracted current commandSession body",
+      "reads": 2,
+      "exit": "Failure",
+      "error": "Command session creation interrupted: probe-session"
+    },
+    {
+      "probe": "commit-unknown-same-generation",
+      "state": "running",
+      "exit": "Success",
+      "calls": []
+    },
+    {
+      "probe": "commit-unknown-same-generation",
+      "state": "snapshotting",
+      "exit": "Failure",
+      "calls": ["kill", "close", "release"]
+    },
+    {
+      "probe": "commit-unknown-same-generation",
+      "state": "killed",
+      "exit": "Failure",
+      "calls": ["kill", "close", "release"]
+    },
+    {
+      "probe": "PG-snapshotting-with-open-gate",
+      "exit": "Success",
+      "executed": true
+    },
+    {
+      "probe": "older-delete-reopens-newer-close",
+      "first": { "state": "closed", "epoch": 2 },
+      "second": { "state": "closed", "epoch": 3 },
+      "reopened": { "state": "open", "epoch": 4 }
+    },
+    {
+      "probe": "unfenced-physical-close-after-generation-change",
+      "replacementIsClosed": true
+    }
+  ],
+  "regression": {
+    "files": 25,
+    "pass": 353,
+    "fail": 0,
+    "expect": 1011,
+    "log": "/private/var/folders/zk/8qd0lv657wn8kvpp__hwjj400000gn/T/opencode/lifecycle-round3-regression.log"
+  }
+}

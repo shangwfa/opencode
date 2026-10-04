@@ -2,7 +2,7 @@ export * as SandboxCreateLease from "./create-lease.js"
 
 import { randomUUID } from "node:crypto"
 import { and, eq, like, lt, or, sql } from "drizzle-orm"
-import { Effect } from "effect"
+import { Cause, Effect } from "effect"
 import { SandboxTable } from "./sql.js"
 
 /**
@@ -168,6 +168,45 @@ export function create(deps: Deps) {
 }
 
 export type CreateLease = ReturnType<typeof create>
+
+/** Compensate failed persistence without replacing the lease/CAS arbitration. */
+export const persistCreatedSandbox = (
+  lease: {
+    complete(sessionID: string, owner: string, sandboxID: string): Effect.Effect<boolean, Error>
+    latest(sessionID: string): Effect.Effect<Array<Record<string, unknown>>, Error>
+    release(sessionID: string, owner: string): Effect.Effect<unknown, Error>
+  },
+  sessionID: string,
+  owner: string,
+  sandbox: { id: string; kill(): Promise<unknown>; close(): Promise<unknown> },
+) => Effect.gen(function* () {
+  const persisted = yield* lease.complete(sessionID, owner, sandbox.id).pipe(Effect.exit)
+  if (persisted._tag === "Success" && persisted.value) return true
+  const cause = persisted._tag === "Failure" ? Cause.squash(persisted.cause) : undefined
+  const error = cause instanceof Error ? cause : new Error("Sandbox persistence failed", { cause })
+
+  // A lost response or CAS miss does not prove this source is unowned.
+  // Lifecycle changes do not revoke ownership of a committed generation.
+  const checked = yield* lease.latest(sessionID).pipe(Effect.exit)
+  if (checked._tag === "Failure") {
+    return yield* Effect.fail(new Error(`Sandbox persistence could not be reconciled; source retained: ${sessionID}/${sandbox.id}`, { cause: error }))
+  }
+  const row = checked.value[0]
+  if (row?.id === sandbox.id) {
+    if (row.state === "running") return true
+    return yield* Effect.fail(new Error(`Persisted Sandbox lifecycle changed; source retained: ${sessionID}/${sandbox.id}/${row.state}`, { cause: error }))
+  }
+
+  yield* Effect.tryPromise({
+    try: () => sandbox.kill(),
+    catch: (cause) => new Error(`Unpersisted sandbox cleanup failed; source retained: ${sessionID}/${sandbox.id}`, { cause }),
+  })
+  yield* Effect.tryPromise({ try: () => sandbox.close(), catch: (cause) => cause }).pipe(Effect.ignore)
+  // Releasing is fenced by creating-<owner>; it cannot erase a takeover.
+  yield* lease.release(sessionID, owner).pipe(Effect.ignore)
+  if (persisted._tag === "Failure") return yield* Effect.fail(error)
+  return false
+})
 
 /** GC hook: rows stuck in `creating` past the lease converge to `destroyed`. */
 export const sweepStaleCreating = (dbInput: unknown, leaseMs: number, limit = 20) => {

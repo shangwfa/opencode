@@ -91,10 +91,15 @@ export const layer = Layer.effect(
     const destroyUnkeptSandbox = (sessionID: SessionSchema.ID) =>
       Effect.gen(function* () {
         const session = yield* store.get(sessionID)
-        if (!session) return
+        // Child completion owns only its logical execution. The shared physical
+        // Sandbox lifecycle is managed by the root, regardless of keepAlive.
+        if (!session || session.parentID) return
+        // Snapshot persistence owns idle recycling, not a root turn's terminal.
+        if (session.sandbox?.persistMode === "snapshot") return
         yield* instances.provide(session)(
           Effect.gen(function* () {
             const sandbox = yield* SandboxProvider.Service
+            if ((yield* sandbox.lifecycle(sessionID)).persistMode === "snapshot") return
             if (sandbox.enabled && !(yield* sandbox.isKeepAlive(sessionID))) yield* sandbox.destroy(sessionID)
           }),
         )

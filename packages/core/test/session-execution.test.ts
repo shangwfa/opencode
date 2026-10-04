@@ -53,6 +53,53 @@ afterEach(async () => {
 })
 
 describe("SessionExecution lifecycle", () => {
+  for (const outcome of ["success", "failure", "interrupted"] as const) {
+    it.effect(`a snapshot root ${outcome} does not enter turn teardown`, () =>
+      Effect.gen(function* () {
+        const database = yield* Database.Service
+        const root = testSessionID("ses_snapshot_root")
+        yield* seedSessions(database, [root], { sandbox: { cpu: "1", memory: "1Gi", persistMode: "snapshot" } })
+        const provided: Session.ID[] = []
+        const scope = yield* Scope.make()
+        yield* Effect.addFinalizer(() => Scope.close(scope, Exit.void))
+        const context = yield* buildExecution(scope, () => outcome === "success" ? Effect.void
+          : Effect.fail(outcome === "interrupted" ? new UserInterruptedError() : new AIError({
+            reason: new TransportError({ message: "test failure", transport: "http", operation: "request" }),
+          })), undefined, undefined, (id) => provided.push(id))
+        const execution = Context.get(context, SessionExecution.Service)
+        yield* execution.resume(root).pipe(Effect.exit)
+        yield* execution.awaitIdle(root)
+        expect(provided).toEqual([root])
+        expect((yield* claims(database))[root]).toBe(false)
+      }),
+    )
+  }
+  for (const outcome of ["success", "failure", "interrupted"] as const) {
+    it.effect(`a child ${outcome} never enters the Sandbox lifecycle Location scope`, () =>
+      Effect.gen(function* () {
+        const database = yield* Database.Service
+        const parent = testSessionID("ses_lifecycle_parent")
+        const child = testSessionID("ses_lifecycle_child")
+        yield* seedSessions(database, [parent])
+        yield* seedSessions(database, [child], { parent_id: parent })
+        const provided: Session.ID[] = []
+        const scope = yield* Scope.make()
+        yield* Effect.addFinalizer(() => Scope.close(scope, Exit.void))
+        const context = yield* buildExecution(scope, () => outcome === "success"
+          ? Effect.void
+          : Effect.fail(outcome === "interrupted" ? new UserInterruptedError() : new AIError({
+            reason: new TransportError({ message: "test failure", transport: "http", operation: "request" }),
+          })), undefined, undefined, (id) => provided.push(id))
+        const execution = Context.get(context, SessionExecution.Service)
+        yield* execution.resume(child).pipe(Effect.exit)
+        yield* execution.awaitIdle(child)
+        // One Location acquisition for the drain, none for physical Sandbox cleanup.
+        expect(provided).toEqual([child])
+        expect((yield* claims(database))[child]).toBe(false)
+      }),
+    )
+  }
+
   test("classifies success and typed failure terminals", () => {
     expect(SessionExecution.terminal(Exit.succeed(undefined))).toEqual({ type: "succeeded" })
     expect(
@@ -1307,7 +1354,7 @@ function seedInbox(
 function seedSessions(
   database: Database.Service["Service"],
   sessionIDs: ReadonlyArray<Session.ID>,
-  values: Partial<Pick<typeof SessionTable.$inferInsert, "time_suspended" | "resume_attempts" | "parent_id">> = {},
+  values: Partial<Pick<typeof SessionTable.$inferInsert, "time_suspended" | "resume_attempts" | "parent_id" | "sandbox">> = {},
 ) {
   return Effect.gen(function* () {
     yield* database.db
@@ -1366,6 +1413,7 @@ function buildExecution(
   drain: (input: Parameters<SessionRunner.Interface["drain"]>[0]) => Effect.Effect<void, SessionRunner.RunError>,
   options?: SessionRestart.Options,
   overrideJobs?: Job.Interface,
+  onProvide?: (sessionID: Session.ID) => void,
 ) {
   return Effect.gen(function* () {
     const database = yield* Database.Service
@@ -1411,7 +1459,18 @@ function buildExecution(
         Layer.provide(Layer.succeed(Job.Service, jobs)),
         // Do not reuse the outer harness's selector with its already-captured Location map.
         Layer.provide(
-          AppNodeBuilder.build(Instance.node, [LocationServiceMap.node.replace(locations)]).pipe(Layer.fresh),
+          Layer.effect(Instance.Service, Effect.gen(function* () {
+            const instance = yield* Instance.Service
+            return Instance.Service.of({
+              ...instance,
+              provide: (session) => (effect) => {
+                onProvide?.(session.id)
+                return instance.provide(session)(effect)
+              },
+            })
+          })).pipe(Layer.provide(
+            AppNodeBuilder.build(Instance.node, [LocationServiceMap.node.replace(locations)]).pipe(Layer.fresh),
+          )),
         ),
       ),
       scope,

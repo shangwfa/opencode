@@ -1,6 +1,9 @@
 export * as SandboxProvider from "./provider.js"
 import { SessionToolGate } from "../session/tool-gate.js"
-import { ensureSandboxLifetime, reconnectSandbox, withSnapshotLease } from "./snapshot-safety.js"
+import { ensureSandboxLifetime, reconnectSandbox, requireReadySnapshot, withSnapshotLease } from "./snapshot-safety.js"
+import { isCurrentSandbox, touchCurrentSandbox, resumeRetainedSandbox } from "./generation.js"
+import { recoverIteration } from "./background.js"
+import { claimCommandSession, commandSessionKey } from "./command-session.js"
 import { measureSnapshotStage, type SnapshotTimingContext } from "./snapshot-latency.js"
 
 import { ConnectionConfig, SandboxApiException, Sandbox } from "@alibaba-group/opensandbox"
@@ -88,6 +91,12 @@ export interface Interface {
   readonly release: (sessionID: string) => Effect.Effect<void>
   readonly isKeepAlive: (sessionID: string) => Effect.Effect<boolean>
   readonly sandboxId: (sessionID: string) => Effect.Effect<string | null>
+  /** PG lifecycle truth; a non-running instance is not necessarily destroyed. */
+  readonly lifecycle: (sessionID: string) => Effect.Effect<{
+    readonly sandboxID: string | null
+    readonly state: import("./sql.js").State | null
+    readonly persistMode: string
+  }>
   readonly boot: (sessionID: string) => Effect.Effect<string, Error>
   /**
    * Start a snapshot of the session's sandbox. Resolves immediately with the
@@ -268,19 +277,6 @@ export const refuseCreate = (reason: string) =>
   new Error(`[${REFUSE_CREATE_TAG}] ${reason}`)
 export const shouldRetryCreate = (error: unknown, attempt: number, maxAttempts: number): boolean =>
   attempt + 1 < maxAttempts && !(error instanceof Error && error.message.startsWith(`[${REFUSE_CREATE_TAG}]`))
-
-/**
- * Destroy-snapshot degradation gate (E2B parity, see
- * docs/sandbox-snapshot-industry-research-2026-10.md §三.2): degrade only on
- * the queue's FINAL retry, and only when a stale restore point already
- * exists — with no restorable checkpoint, data protection wins and the
- * existing retry/retention path still applies.
- */
-export const shouldDegradeDestroy = (
-  attempts: number,
-  maxAttempts: number,
-  restorableID: string | null | undefined,
-): boolean => attempts + 1 >= maxAttempts && !!restorableID
 
 const filesOf = (sb: Sandbox): SandboxFilesApi => sb.files as unknown as SandboxFilesApi
 
@@ -546,6 +542,7 @@ const layer = Layer.effect(
         release: () => Effect.void,
         isKeepAlive: () => Effect.succeed(false),
         sandboxId: () => Effect.succeed(null),
+        lifecycle: () => Effect.succeed({ sandboxID: null, state: null, persistMode: config.volumeType }),
         boot: () => Effect.die(new Error("Sandbox provider is disabled")),
         snapshot: () => Effect.die(new Error("Sandbox provider is disabled")),
         latestSnapshot: () => Effect.succeed(null),
@@ -637,9 +634,10 @@ const layer = Layer.effect(
 
     const bus = yield* Bus.Service
 
-    const drop = (sessionID: string) =>
+    const drop = (sessionID: string, sandboxID?: string) =>
       Ref.modify(entries, (map) => {
-        const found = map.get(sessionID) ?? null
+        const candidate = map.get(sessionID)
+        const found = candidate && (!sandboxID || candidate.sb.id === sandboxID) ? candidate : null
         if (found) map.delete(sessionID)
         return [found, map] as const
       })
@@ -727,15 +725,11 @@ const layer = Layer.effect(
         .pipe(Effect.orDie)
 
     const lifetimeChecks = new Map<string, number>()
-    const touchSandbox = (sessionID: string) => Effect.gen(function* () {
-      yield* db
-        .update(SandboxTable)
-        .set({ time_updated: Date.now() })
-        .where(eq(SandboxTable.session_id, sessionID))
-        .run()
-        .pipe(Effect.orDie)
+    const touchSandbox = (sessionID: string, sandboxID: string) => Effect.gen(function* () {
+      if (!(yield* touchCurrentSandbox(db, sessionID, sandboxID).pipe(Effect.orDie)))
+        return yield* Effect.fail(new Error(`Sandbox lifecycle changed: ${sessionID}/${sandboxID}`))
       const entry = yield* Ref.modify(entries, (map) => [map.get(sessionID) ?? null, map] as const)
-      if (!entry || (lifetimeChecks.get(entry.sb.id) ?? 0) > Date.now()) return
+      if (!entry || entry.sb.id !== sandboxID || (lifetimeChecks.get(entry.sb.id) ?? 0) > Date.now()) return
       const session = yield* db.select({ sandbox: SessionTable.sandbox }).from(SessionTable)
         .where(eq(SessionTable.id, SessionSchema.ID.make(sessionID))).get().pipe(Effect.orDie)
       const base = (session?.sandbox?.persistMode ?? config.volumeType) === "pvc" ? config.maxTtlSeconds : config.timeoutSeconds
@@ -756,94 +750,133 @@ const layer = Layer.effect(
     const oomBaselines = new Map<string, SandboxOomSample.OomSample>()
     const oomPressureAt = new Map<string, number>()
     const OOM_PRESSURE_WINDOW_MS = 5 * 60_000
-    const clearOomBaseline = (sessionID: string) => {
-      for (const key of oomBaselines.keys()) if (key.startsWith(`${sessionID}:`)) oomBaselines.delete(key)
-      for (const key of oomPressureAt.keys()) if (key.startsWith(`${sessionID}:`)) oomPressureAt.delete(key)
+    const clearOomBaseline = (sessionID: string, sandboxID?: string) => {
+      const matches = (key: string) => sandboxID ? key === `${sessionID}:${sandboxID}` : key.startsWith(`${sessionID}:`)
+      for (const key of oomBaselines.keys()) if (matches(key)) oomBaselines.delete(key)
+      for (const key of oomPressureAt.keys()) if (matches(key)) oomPressureAt.delete(key)
     }
 
-    const destroySandbox = (sessionID: string, expectedSandboxID?: string) =>
-      Effect.gen(function* () {
-        // A create is in flight on some replica: destroying now would race the
-        // creator's persist and could orphan the fresh sandbox. Same semantics
-        // as kill-during-create: do not cancel, let the create finish; the
-        // next destroy (or idle reap) handles the running sandbox.
-        const early = yield* dbGet(sessionID)
-        if (expectedSandboxID && early?.id !== expectedSandboxID)
-          return yield* Effect.logWarning("sandbox generation changed; stale destroy skipped", { sessionID, expectedSandboxID })
-        if (early?.state === "creating") {
-          yield* Effect.logWarning("sandbox destroy skipped while create is in flight", { sessionID })
-          return
-        }
-        clearOomBaseline(sessionID)
-        yield* toolGate.close(sessionID, true).pipe(Effect.orDie)
-        const active = yield* Ref.modify(activeCommands, (all) => {
-          const found = all.get(sessionID) ?? new Map<string, ActiveCommand>()
-          const next = new Map(all)
-          next.delete(sessionID)
-          return [Array.from(found.values()), next] as const
-        })
-        yield* Effect.forEach(
-          active,
-          (command) =>
-            attempt(() => commandsOf(command.sandbox).interrupt(command.commandSessionID)).pipe(Effect.ignore),
-          { discard: true },
-        )
-        const entry = yield* drop(sessionID)
-        // Cancel any in-flight command-session claim so waiters fail fast
-        // instead of hanging on a sandbox that is being torn down.
-        const pendingSession = yield* Ref.modify(sessionCreates, (map) => {
-          const found = map.get(sessionID) ?? null
-          if (found) map.delete(sessionID)
-          return [found, map] as const
-        })
-        if (pendingSession)
-          yield* Deferred.fail(pendingSession, new Error(`Sandbox destroyed: ${sessionID}`)).pipe(Effect.ignore)
-        const row = yield* dbGet(sessionID)
-        if (expectedSandboxID && row?.id !== expectedSandboxID) return
-        if (entry && row && entry.sb.id !== row.id) return
-        let destroyed = false
-        if (entry) {
-          if (entry.commandSessionID)
-            yield* attempt(() => commandsOf(entry.sb).deleteSession(entry.commandSessionID)).pipe(Effect.ignore)
-          destroyed = yield* Effect.promise(() => entry.sb.kill()).pipe(
-            Effect.as(true),
-            Effect.catchCause((cause) => killResult(sessionID, entry.sb.id, cause)),
-          )
-          yield* attempt(() => entry.sb.close()).pipe(Effect.ignore)
-        } else if (row && (row.state === "running" || row.state === "killed" || row.state === "snapshotting") && !row.id.startsWith("pending-")) {
-          let gone = false
-          const remote = yield* Effect.tryPromise({
-            try: () => Sandbox.connect({ connectionConfig, sandboxId: row.id, skipHealthCheck: true }),
-            // Preserve the runtime exception as `cause`: a 404 (already gone)
-            // must stay distinguishable from transport failures.
-            catch: (cause) => new Error(`Sandbox reconnect failed: ${String(cause)}`, { cause }),
-          }).pipe(
-            Effect.catch((cause) => {
-              gone = remoteSandboxGone(cause)
-              return Effect.logWarning("Sandbox reconnect for delete failed", {
-                sessionID,
-                sandboxID: row.id,
-                cause,
-              }).pipe(Effect.as(null))
-            }),
-          )
-          if (!remote) {
-            // The runtime no longer knows this sandbox: the row must not
-            // outlive it. Unknown failures keep the row for a later retry.
-            if (!gone) return
-            destroyed = true
-          } else {
-            destroyed = yield* Effect.promise(() => remote.kill()).pipe(
-              Effect.as(true),
-              Effect.catchCause((cause) => killResult(sessionID, row.id, cause)),
-            )
-            yield* attempt(() => remote.close()).pipe(Effect.ignore)
+    const destroySandbox = (
+      sessionID: string,
+      expectedSandboxID?: string,
+      onClosed?: (closure: SessionToolGate.Closure) => void,
+    ) =>
+      Effect.suspend(() => {
+        let owned: SessionToolGate.Closure | undefined
+        return Effect.gen(function* () {
+          // A create is in flight on some replica: destroying now would race the
+          // creator's persist and could orphan the fresh sandbox. Same semantics
+          // as kill-during-create: do not cancel, let the create finish; the
+          // next destroy (or idle reap) handles the running sandbox.
+          const early = yield* dbGet(sessionID)
+          if (expectedSandboxID && early?.id !== expectedSandboxID)
+            return yield* Effect.logWarning("sandbox generation changed; stale destroy skipped", {
+              sessionID,
+              expectedSandboxID,
+            })
+          if (early?.state === "creating") {
+            yield* Effect.logWarning("sandbox destroy skipped while create is in flight", { sessionID })
+            return
           }
-        } else {
-          destroyed = true
-        }
-        if (row && destroyed && (yield* markDestroyed(sessionID, row.id)))
-          yield* toolGate.destroyed(sessionID, row.id).pipe(Effect.orDie)
+          if (!early || early.state === "destroyed") return
+          const sandboxID = expectedSandboxID ?? early.id
+          const closure = yield* toolGate.close(sessionID, true, sandboxID).pipe(Effect.orDie)
+          if (!closure) return
+          owned = closure
+          onClosed?.(closure)
+          clearOomBaseline(sessionID, sandboxID)
+          const active = yield* Ref.modify(activeCommands, (all) => {
+            const found = all.get(sessionID) ?? new Map<string, ActiveCommand>()
+            const selected = Array.from(found.entries()).filter(([, command]) => command.sandbox.id === sandboxID)
+            const next = new Map(all)
+            const remaining = new Map(found)
+            for (const [id] of selected) remaining.delete(id)
+            if (remaining.size) next.set(sessionID, remaining)
+            else next.delete(sessionID)
+            return [selected.map(([, command]) => command), next] as const
+          })
+          yield* Effect.forEach(
+            active,
+            (command) =>
+              attempt(() => commandsOf(command.sandbox).interrupt(command.commandSessionID)).pipe(Effect.ignore),
+            { discard: true },
+          )
+          const entry = yield* drop(sessionID, sandboxID)
+          // Cancel any in-flight command-session claim so waiters fail fast
+          // instead of hanging on a sandbox that is being torn down.
+          const pendingSession = yield* Ref.modify(sessionCreates, (map) => {
+            const key = commandSessionKey(sessionID, sandboxID)
+            const found = map.get(key) ?? null
+            if (found) map.delete(key)
+            return [found, map] as const
+          })
+          if (pendingSession)
+            yield* Deferred.fail(pendingSession, new Error(`Sandbox destroyed: ${sessionID}`)).pipe(Effect.ignore)
+          const row = yield* dbGet(sessionID)
+          if (row?.id !== sandboxID) return
+          if (entry && row && entry.sb.id !== row.id) return
+          let destroyed = false
+          if (entry) {
+            if (entry.commandSessionID)
+              yield* attempt(() => commandsOf(entry.sb).deleteSession(entry.commandSessionID)).pipe(Effect.ignore)
+            destroyed = yield* Effect.promise(() => entry.sb.kill()).pipe(
+              Effect.as(true),
+              Effect.catchCause((cause) => killResult(sessionID, entry.sb.id, cause)),
+            )
+            yield* attempt(() => entry.sb.close()).pipe(Effect.ignore)
+          } else if (
+            row &&
+            (row.state === "running" || row.state === "killed" || row.state === "snapshotting") &&
+            !row.id.startsWith("pending-")
+          ) {
+            let gone = false
+            const remote = yield* Effect.tryPromise({
+              try: () => Sandbox.connect({ connectionConfig, sandboxId: row.id, skipHealthCheck: true }),
+              // Preserve the runtime exception as `cause`: a 404 (already gone)
+              // must stay distinguishable from transport failures.
+              catch: (cause) => new Error(`Sandbox reconnect failed: ${String(cause)}`, { cause }),
+            }).pipe(
+              Effect.catch((cause) => {
+                gone = remoteSandboxGone(cause)
+                return Effect.logWarning("Sandbox reconnect for delete failed", {
+                  sessionID,
+                  sandboxID: row.id,
+                  cause,
+                }).pipe(Effect.as(null))
+              }),
+            )
+            if (!remote) {
+              // The runtime no longer knows this sandbox: the row must not
+              // outlive it. Unknown failures keep the row for a later retry.
+              if (!gone) return
+              destroyed = true
+            } else {
+              destroyed = yield* Effect.promise(() => remote.kill()).pipe(
+                Effect.as(true),
+                Effect.catchCause((cause) => killResult(sessionID, row.id, cause)),
+              )
+              yield* attempt(() => remote.close()).pipe(Effect.ignore)
+            }
+          } else {
+            destroyed = true
+          }
+          if (row && destroyed && (yield* markDestroyed(sessionID, row.id)))
+            yield* toolGate.destroyed(sessionID, closure).pipe(Effect.orDie)
+        }).pipe(
+          Effect.ensuring(
+            Effect.suspend(() =>
+              owned
+                ? toolGate
+                    .retained(sessionID, owned)
+                    .pipe(
+                      Effect.catchCause((cause) =>
+                        Effect.logWarning("Failed to reopen retained Sandbox admission", { sessionID, cause }),
+                      ),
+                    )
+                : Effect.void,
+            ),
+          ),
+        )
       })
 
     /** In-memory sandbox handle when connected, otherwise reconnect from the PG row.
@@ -935,45 +968,27 @@ const layer = Layer.effect(
         })
         .pipe(Effect.catch(() => Effect.void))
 
-    /**
-     * E2B-parity destroy degradation (see
-     * docs/sandbox-snapshot-industry-research-2026-10.md §三.2): after the
-     * operation queue exhausts its retries, a destroy whose final snapshot
-     * keeps failing accepts the stale restore point instead of dead-lettering
-     * with the sandbox row stuck in `snapshotting` forever. Never degrades
-     * when no restorable checkpoint exists — data protection wins and the
-     * existing retry/retention path still applies.
-     */
-    const degradeDestroySnapshot = (sessionID: string, restorableID: string | null, reason: string): Effect.Effect<boolean> =>
-      Effect.gen(function* () {
-        if (!restorableID) return false
-        // Record the accepted loss window explicitly (lag warning), then make
-        // the degradation durable so the event log explains the stale restore.
-        yield* warnSnapshotLag(sessionID, "destroy")
-        yield* bus
-          .publish(SessionEvent.SandboxSnapshot.Failed, {
-            sessionID: sessionID as SessionID,
-            snapshotID: restorableID,
-            reason: `degraded: final snapshot failed (${reason}); accepted stale restore point`,
-          })
-          .pipe(Effect.catch(() => Effect.void))
-        yield* Effect.logWarning("snapshot destroy degraded to stale restore point", {
-          sessionID,
-          snapshotID: restorableID,
-          reason,
-        })
-        return true
-      })
-
     const drainSnapshotDestroyOperations = Effect.gen(function* () {
       for (let index = 0; index < 20; index++) {
         const operation = yield* destroyOperations.claim()
         if (!operation) break
+        let closure: SessionToolGate.Closure | undefined
         const result = yield* withLease(destroyOperations, operation, Effect.gen(function* () {
           const timing = { sessionID: operation.session_id, sandboxID: operation.sandbox_id ?? undefined, operationID: operation.id, kind: operation.kind }
           if (!config.snapshot.enabled) return
-          const sandboxRow = yield* dbGet(operation.session_id)
+          let sandboxRow = yield* dbGet(operation.session_id)
           if (!sandboxRow || sandboxRow.id !== operation.sandbox_id) return
+          if (sandboxRow.state === "destroyed") return
+          if (sandboxRow.state === "running") {
+            // New work after a retained failure cancels this old teardown intent.
+            if (sandboxRow.time_updated > operation.time_created) return
+            const claimed = yield* db.update(SandboxTable)
+              .set({ state: "snapshotting", time_updated: sql`${SandboxTable.time_updated}` })
+              .where(and(eq(SandboxTable.session_id, operation.session_id), eq(SandboxTable.id, operation.sandbox_id), eq(SandboxTable.state, "running"), eq(SandboxTable.time_updated, sandboxRow.time_updated)))
+              .returning().all().pipe(Effect.orDie)
+            if (!claimed[0]) return
+            sandboxRow = claimed[0]
+          }
           if (sandboxRow.state !== "snapshotting")
             return yield* Effect.fail(new Error("Snapshot destroy admission is not closed"))
           if (sandboxRow && sandboxRow.state === "snapshotting" && !sandboxRow.id.startsWith("pending-")) {
@@ -999,48 +1014,33 @@ const layer = Layer.effect(
                 const outcome = yield* snapshotWithMarker(operation.session_id, sb, timing).pipe(
                   Effect.result,
                 )
-                // E2B-parity degradation: on the queue's last retry, accept the
-                // stale restore point (if any) and proceed to destroy instead
-                // of dead-lettering with the row stuck in `snapshotting`.
-                const degrade = (reason: string) =>
-                  shouldDegradeDestroy(operation.attempts, SandboxSnapshotOperation.MAX_ATTEMPTS, restorable?.id ?? null)
-                    ? degradeDestroySnapshot(operation.session_id, restorable?.id ?? null, reason)
-                    : Effect.succeed(false)
                 if (outcome._tag === "Failure") {
-                  if (yield* degrade(outcome.failure.message)) {
-                    // degraded: fall through to heartbeat/activity check/destroy
-                  } else {
-                    return yield* Effect.fail(outcome.failure)
-                  }
+                  return yield* Effect.fail(outcome.failure)
                 } else {
-                const { settled, marker, snapshotID } = outcome.success
-                if (settled === "timeout") {
-                  if (!(yield* degrade("snapshot still creating"))) {
-                    return yield* Effect.fail(new Error("snapshot still creating; lease renewed, retry later"))
+                  const { settled, marker, snapshotID } = outcome.success
+                  if (settled === "failed") {
+                    // Preserve the source even when retries are exhausted or an
+                    // older recovery point exists (V1 snapshot-before-kill).
+                    // Keep the actual last-activity timestamp for lag warnings.
+                    yield* db
+                      .update(SandboxTable)
+                      .set({
+                        state: "running",
+                        time_updated: sql`${SandboxTable.time_updated}`,
+                      })
+                      .where(
+                        and(eq(SandboxTable.session_id, operation.session_id), eq(SandboxTable.id, operation.sandbox_id), eq(SandboxTable.state, "snapshotting")),
+                      )
+                      .run()
+                      .pipe(Effect.orDie)
                   }
-                } else if (settled === "failed") {
-                  if (yield* degrade("snapshot failed")) {
-                    // degraded: keep `snapshotting` and fall through to destroy
-                  } else {
-                  // T25.4b safety promise: a failed snapshot never destroys the source.
-                  // Keep time_updated at its real value ($onUpdate would stamp it
-                  // on every retry round and poison the lag-warning verdict).
-                  yield* db
-                    .update(SandboxTable)
-                    .set({
-                      state: "running",
-                      time_updated: sql`${SandboxTable.time_updated}`,
-                    })
-                    .where(
-                      and(eq(SandboxTable.session_id, operation.session_id), eq(SandboxTable.state, "snapshotting")),
-                    )
-                    .run()
-                    .pipe(Effect.orDie)
-                  return yield* Effect.fail(new Error("snapshot failed; source sandbox retained"))
-                  }
-                } else {
+                  yield* requireReadySnapshot(settled)
+                  // A timeout may have reopened admission while this snapshot
+                  // was creating. Never destroy using that now-obsolete capture.
+                  const ready = (yield* snapshots.restorable(operation.session_id))[0]
+                  if (ready?.id !== snapshotID || !(yield* SandboxSnapshotReuse.workspaceUnchangedSinceSnapshot(sb, ready.manifest_token)))
+                    return yield* Effect.fail(new Error("Snapshot content no longer matches source; source retained"))
                   yield* publishSnapshotReady(operation.session_id, snapshotID, sb.id, marker)
-                }
                 }
               }
             } else {
@@ -1066,12 +1066,19 @@ const layer = Layer.effect(
               .run().pipe(Effect.orDie)
             return yield* Effect.fail(new Error("Sandbox activity changed during checkpoint; source retained"))
           }
-          yield* measureSnapshotStage(timing, "destroy", destroySandbox(operation.session_id, operation.sandbox_id))
-        })).pipe(Effect.result)
+          yield* measureSnapshotStage(timing, "destroy", destroySandbox(operation.session_id, operation.sandbox_id, (closed) => { closure = closed }))
+          const destroyed = yield* dbGet(operation.session_id)
+          if (destroyed?.id === operation.sandbox_id && destroyed.state !== "destroyed")
+            return yield* Effect.fail(new Error("Remote destruction was not confirmed; source retained"))
+        })).pipe(Effect.exit)
         if (result._tag === "Success") {
           yield* destroyOperations.complete(operation.id, operation.fencing_token)
         } else {
-          yield* destroyOperations.fail(operation.id, operation.fencing_token, String(result.failure), operation.attempts)
+          if (operation.sandbox_id && (yield* destroyOperations.heartbeat(operation.id, operation.fencing_token))) {
+            yield* resumeRetainedSandbox(db, operation.session_id, operation.sandbox_id).pipe(Effect.orDie)
+            if (closure) yield* toolGate.retained(operation.session_id, closure).pipe(Effect.orDie)
+          }
+          yield* destroyOperations.fail(operation.id, operation.fencing_token, Cause.pretty(result.cause), operation.attempts)
         }
       }
       yield* destroyOperations.retention().pipe(Effect.ignore)
@@ -1151,11 +1158,11 @@ const layer = Layer.effect(
           if (settled === "timeout") return yield* Effect.fail(new Error("refresh snapshot still creating"))
           if (settled === "failed") return yield* Effect.fail(new Error("refresh snapshot failed"))
           yield* publishSnapshotReady(operation.session_id, snapshotID, sb.id, marker)
-        })).pipe(Effect.result)
+        })).pipe(Effect.exit)
         if (result._tag === "Success") {
           yield* refreshOperations.complete(operation.id, operation.fencing_token)
         } else {
-          yield* refreshOperations.fail(operation.id, operation.fencing_token, String(result.failure), operation.attempts)
+          yield* refreshOperations.fail(operation.id, operation.fencing_token, Cause.pretty(result.cause), operation.attempts)
         }
       }
       yield* refreshOperations.retention().pipe(Effect.ignore)
@@ -1235,6 +1242,15 @@ const layer = Layer.effect(
       (event) =>
         Effect.gen(function* () {
           const sessionID = String(event.data.sessionID)
+          if (!config.snapshot.enabled) return
+          const session = yield* db
+            .select({ sandbox: SessionTable.sandbox, parentID: SessionTable.parent_id })
+            .from(SessionTable)
+            .where(eq(SessionTable.id, SessionSchema.ID.make(sessionID)))
+            .get()
+            .pipe(Effect.orDie)
+          // Child terminals do not drive the root Sandbox's physical lifecycle.
+          if (!session || session.parentID) return
           const now = Date.now()
           if (now - (turnCheckpointAt.get(sessionID) ?? 0) < TURN_CHECKPOINT_DEBOUNCE_MS) return
           turnCheckpointAt.set(sessionID, now)
@@ -1243,13 +1259,6 @@ const layer = Layer.effect(
               if (now - at > TURN_CHECKPOINT_DEBOUNCE_MS * 6) turnCheckpointAt.delete(key)
             }
           }
-          if (!config.snapshot.enabled) return
-          const session = yield* db
-            .select({ sandbox: SessionTable.sandbox })
-            .from(SessionTable)
-            .where(eq(SessionTable.id, SessionSchema.ID.make(sessionID)))
-            .get()
-            .pipe(Effect.orDie)
           const persistMode = session?.sandbox?.persistMode ?? config.volumeType
           if (persistMode !== "snapshot") return
           const row = yield* dbGet(sessionID)
@@ -1268,7 +1277,7 @@ const layer = Layer.effect(
     ).pipe(Effect.forkScoped)
 
     /**
-     * Explicit destroy (kill-sandbox API, keepalive release) for snapshot
+     * Explicit destroy (kill-sandbox API) for snapshot
      * sessions goes through the durable queue so the final snapshot happens
      * before the kill even when this instance dies mid-flight; every other
      * session destroys inline as before. Enqueue, nudge the background drain,
@@ -1287,6 +1296,7 @@ const layer = Layer.effect(
         if (!config.snapshot.enabled)
           return yield* Effect.logWarning("snapshot persistence disabled; source sandbox retained", { sessionID })
         const row = yield* dbGet(sessionID)
+        if (row?.state === "creating") return
         if (row && !row.id.startsWith("pending-") && row.state !== "destroyed") {
           yield* db
             .update(SandboxTable)
@@ -1294,7 +1304,7 @@ const layer = Layer.effect(
             // lag-warning verdict compares snapshots against; stamping it here
             // would make every covered snapshot look stale.
             .set({ state: "snapshotting", time_updated: sql`${SandboxTable.time_updated}` })
-            .where(and(eq(SandboxTable.session_id, sessionID), eq(SandboxTable.state, "running")))
+            .where(and(eq(SandboxTable.session_id, sessionID), eq(SandboxTable.id, row.id), eq(SandboxTable.state, "running")))
             .run()
             .pipe(Effect.orDie)
           yield* destroyOperations
@@ -1322,7 +1332,6 @@ const layer = Layer.effect(
     const releaseSandbox = (sessionID: string) =>
       Effect.gen(function* () {
         yield* dbSetKeepAlive(sessionID, false)
-        yield* destroyViaQueue(sessionID)
       })
 
     const isKeepAlive = (sessionID: string) => Effect.map(dbGet(sessionID), (row) => Boolean(row?.keep_alive))
@@ -1605,13 +1614,11 @@ const layer = Layer.effect(
             continue
           }
           const sb = createExit.value
-          const persisted = yield* createLease.complete(sessionID, claimed.owner, sb.id)
+          const persisted = yield* SandboxCreateLease.persistCreatedSandbox(createLease, sessionID, claimed.owner, sb)
           if (!persisted) {
             // Our lease expired and another replica took the row: the sandbox
             // we just created has no owner — dispose it and join the winner.
             yield* Effect.logWarning("sandbox create lease lost; disposing duplicate", { sessionID, sandboxID: sb.id })
-            yield* Effect.tryPromise({ try: () => sb.kill(), catch: () => undefined }).pipe(Effect.ignore)
-            yield* Effect.tryPromise({ try: () => sb.close(), catch: () => undefined }).pipe(Effect.ignore)
             continue
           }
           return sb
@@ -1630,10 +1637,19 @@ const layer = Layer.effect(
           if (existing) return [existing, map] as const
           return [myToken, map.set(sessionID, myToken)] as const
         })
-        if (winner !== myToken) return yield* Deferred.await(winner)
+        if (winner !== myToken) {
+          const joined = yield* Deferred.await(winner)
+          if (!isCurrentSandbox(yield* dbGet(sessionID), joined.id))
+            return yield* Effect.fail(new Error(`Sandbox lifecycle changed while awaiting creation: ${sessionID}`))
+          return joined
+        }
 
         const resolve = Effect.gen(function* () {
-          const entry = yield* Ref.modify(entries, (map) => [map.get(sessionID) ?? null, map] as const)
+          let entry = yield* Ref.modify(entries, (map) => [map.get(sessionID) ?? null, map] as const)
+          if (entry && !isCurrentSandbox(yield* dbGet(sessionID), entry.sb.id)) {
+            yield* drop(sessionID)
+            entry = null
+          }
           const sb = yield* Effect.gen(function* () {
             if (!entry) {
               const row = yield* dbGet(sessionID)
@@ -1670,7 +1686,7 @@ const layer = Layer.effect(
             map.set(sessionID, { sb, commandSessionID: "" })
             return [undefined, map] as const
           })
-          yield* touchSandbox(sessionID)
+          yield* touchSandbox(sessionID, sb.id)
           yield* Deferred.succeed(myToken, sb)
           return sb
         })
@@ -1712,20 +1728,28 @@ const layer = Layer.effect(
      */
     const resolveExisting = (sessionID: string) =>
       Effect.gen(function* () {
-        const entry = yield* Ref.modify(entries, (map) => [map.get(sessionID) ?? null, map] as const)
+        const row = yield* dbGet(sessionID)
+        let entry = yield* Ref.modify(entries, (map) => [map.get(sessionID) ?? null, map] as const)
+        if (entry && !isCurrentSandbox(row, entry.sb.id)) {
+          yield* drop(sessionID)
+          entry = null
+        }
         if (entry) {
           const healthy = yield* Effect.promise(() => entry.sb.isHealthy()).pipe(
             Effect.catchCause(() => Effect.succeed(false)),
           )
-          return healthy ? entry.sb : null
+          return healthy && isCurrentSandbox(yield* dbGet(sessionID), entry.sb.id) ? entry.sb : null
         }
-        const row = yield* dbGet(sessionID)
         if (!row || row.state !== "running" || row.id.startsWith("pending-")) return null
         const connected = yield* Effect.tryPromise({
           try: () => Sandbox.connect({ connectionConfig, sandboxId: row.id, skipHealthCheck: true }),
           catch: (cause) => new Error(`Sandbox reconnect failed: ${String(cause)}`),
         }).pipe(Effect.catch(() => Effect.succeed(null)))
         if (!connected) return null
+        if (!isCurrentSandbox(yield* dbGet(sessionID), connected.id)) {
+          yield* attempt(() => connected.close()).pipe(Effect.ignore)
+          return null
+        }
         yield* Ref.update(entries, (map) =>
           map.has(sessionID)
             ? map
@@ -1738,42 +1762,49 @@ const layer = Layer.effect(
     const invalidateSandbox = (sessionID: string) =>
       Effect.gen(function* () {
         clearOomBaseline(sessionID)
-        yield* drop(sessionID)
-        yield* Ref.modify(sessionCreates, (map) => {
-          map.delete(sessionID)
-          return [undefined, map] as const
-        })
-        yield* db
-          .update(SandboxTable)
-          .set({ command_session_id: null, time_updated: Date.now() })
-          .where(eq(SandboxTable.session_id, sessionID))
-          .run()
-          .pipe(Effect.orDie)
+        const entry = yield* drop(sessionID)
+        if (entry) {
+          const pending = yield* Ref.modify(sessionCreates, (map) => {
+            const key = commandSessionKey(sessionID, entry.sb.id)
+            const token = map.get(key)
+            map.delete(key)
+            return [token, map] as const
+          })
+          if (pending) yield* Deferred.fail(pending, new Error(`Sandbox invalidated: ${sessionID}/${entry.sb.id}`))
+        }
+        if (entry) yield* touchCurrentSandbox(db, sessionID, entry.sb.id, { id: null }).pipe(Effect.orDie)
       })
 
     const commandSession = (sessionID: string, sb: Sandbox) =>
       Effect.gen(function* () {
-        const cached = yield* Ref.modify(entries, (map) => [map.get(sessionID)?.commandSessionID ?? "", map] as const)
-        if (cached) return cached
+        const key = commandSessionKey(sessionID, sb.id)
+        const cached = yield* Ref.modify(entries, (map) => {
+          const entry = map.get(sessionID)
+          return [entry?.sb.id === sb.id ? entry.commandSessionID : "", map] as const
+        })
+        if (cached) {
+          if (!isCurrentSandbox(yield* dbGet(sessionID), sb.id))
+            return yield* Effect.fail(new Error(`Sandbox lifecycle changed: ${sessionID}/${sb.id}`))
+          return cached
+        }
 
         // Concurrent first commands all see an empty commandSessionID. Claim a
         // token so only one createSession runs; the rest await its result and
         // reuse it, otherwise the sandbox leaks duplicate bash sessions.
-        const myToken = yield* Deferred.make<string, Error>()
-        const winner = yield* Ref.modify(sessionCreates, (map) => {
-          const existing = map.get(sessionID)
-          if (existing) return [existing, map] as const
-          return [myToken, map.set(sessionID, myToken)] as const
-        })
-        if (winner !== myToken) return yield* Deferred.await(winner)
-
         const creation = Effect.gen(function* () {
           // Re-check inside the claim: a previous winner may have populated it.
           const current = yield* Ref.modify(
             entries,
-            (map) => [map.get(sessionID)?.commandSessionID ?? "", map] as const,
+            (map) => {
+              const entry = map.get(sessionID)
+              return [entry?.sb.id === sb.id ? entry.commandSessionID : "", map] as const
+            },
           )
-          if (current) return current
+          if (current) {
+            if (!isCurrentSandbox(yield* dbGet(sessionID), sb.id))
+              return yield* Effect.fail(new Error(`Sandbox lifecycle changed: ${sessionID}/${sb.id}`))
+            return current
+          }
           const id = yield* withOperationTimeout(
             Effect.tryPromise({
               try: () => commandsOf(sb).createSession({ workingDirectory: SandboxPath.WORKDIR }),
@@ -1782,39 +1813,21 @@ const layer = Layer.effect(
             Math.max(1, Math.ceil(config.createTimeoutSeconds / 10)),
             "create command session",
           )
+          if (!(yield* touchCurrentSandbox(db, sessionID, sb.id, { id }).pipe(Effect.orDie))) {
+            yield* attempt(() => commandsOf(sb).deleteSession(id)).pipe(Effect.ignore)
+            return yield* Effect.fail(new Error(`Sandbox lifecycle changed: ${sessionID}/${sb.id}`))
+          }
           yield* Ref.modify(entries, (map) => {
             const entry = map.get(sessionID)
-            if (entry && !entry.commandSessionID) map.set(sessionID, { ...entry, commandSessionID: id })
+            if (entry?.sb.id === sb.id && !entry.commandSessionID) map.set(sessionID, { ...entry, commandSessionID: id })
             return [undefined, map] as const
           })
-          yield* db
-            .update(SandboxTable)
-            .set({ command_session_id: id, time_updated: Date.now() })
-            .where(eq(SandboxTable.session_id, sessionID))
-            .run()
-            .pipe(Effect.orDie)
-          yield* Deferred.succeed(myToken, id)
           return id
-        }).pipe(
-          Effect.catch((error) =>
-            Deferred.fail(myToken, error).pipe(Effect.ignore, Effect.andThen(Effect.fail(error))),
-          ),
-          Effect.ensuring(
-            Effect.gen(function* () {
-              const removed = yield* Ref.modify(sessionCreates, (map) => {
-                if (map.get(sessionID) !== myToken) return [false, map] as const
-                map.delete(sessionID)
-                return [true, map] as const
-              })
-              if (removed)
-                yield* Deferred.fail(myToken, new Error(`Command session creation interrupted: ${sessionID}`)).pipe(
-                  Effect.ignore,
-                )
-            }),
-          ),
-        )
-        yield* Effect.forkDetach(creation)
-        return yield* Deferred.await(myToken)
+        })
+        const id = yield* claimCommandSession(sessionCreates, key, creation)
+        if (!isCurrentSandbox(yield* dbGet(sessionID), sb.id))
+          return yield* Effect.fail(new Error(`Sandbox lifecycle changed: ${sessionID}/${sb.id}`))
+        return id
       })
 
     /**
@@ -1838,7 +1851,7 @@ const layer = Layer.effect(
         yield* db
           .update(SandboxTable)
           .set({ command_session_id: null, time_updated: Date.now() })
-          .where(and(eq(SandboxTable.session_id, sessionID), eq(SandboxTable.command_session_id, commandSessionID)))
+          .where(and(eq(SandboxTable.session_id, sessionID), eq(SandboxTable.id, invalidated.id), eq(SandboxTable.state, "running"), eq(SandboxTable.command_session_id, commandSessionID)))
           .run()
           .pipe(Effect.orDie)
         // Cleanup cannot decide whether the context is reusable: it is already
@@ -1894,6 +1907,7 @@ const layer = Layer.effect(
           .all()
           .pipe(Effect.orDie)
         for (const row of candidates) {
+          yield* recoverIteration("sandbox idle candidate", Effect.gen(function* () {
           if (row.sandbox_state === "snapshotting") {
             const sandbox = yield* dbGet(row.session_id)
             if (sandbox)
@@ -1901,7 +1915,7 @@ const layer = Layer.effect(
                 .enqueue({ sessionID: row.session_id, sandboxID: sandbox.id, kind: "snapshot_destroy" })
                 .pipe(Effect.ignore)
             yield* nudgeDestroyDrain
-            continue
+            return
           }
           // Snapshot-persisted sessions snapshot before the recycle destroys
           // the sandbox; killing mid-commit would fail the snapshot.
@@ -1935,11 +1949,11 @@ const layer = Layer.effect(
               .returning({ id: SandboxTable.id })
               .all()
               .pipe(Effect.orDie)
-            if (claimedSnapshotting.length === 0) continue
+          if (claimedSnapshotting.length === 0) return
             yield* destroyOperations
               .enqueue({ sessionID: row.session_id, sandboxID: claimedSnapshotting[0].id, kind: "snapshot_destroy" })
               .pipe(Effect.ignore)
-            continue
+            return
           }
           const claimed = yield* db
             .update(SandboxTable)
@@ -1955,17 +1969,18 @@ const layer = Layer.effect(
             .returning({ session_id: SandboxTable.session_id })
             .all()
             .pipe(Effect.orDie)
-          if (claimed.length === 0) continue
+          if (claimed.length === 0) return
           yield* destroySandbox(row.session_id).pipe(
             Effect.catchCause((cause) => Effect.logWarning("Idle sandbox reap failed", { ...row, cause })),
           )
+          }))
         }
         // Work enqueued by this scan is claimed by the detached drains on this
         // instance or any peer; nudge once more so this scan's work starts
         // without waiting for the next cycle.
         yield* nudgeDestroyDrain
       })
-      yield* idleReap.pipe(
+      yield* recoverIteration("sandbox idle scan", idleReap).pipe(
         Effect.andThen(Effect.sleep(Duration.seconds(
           config.snapshot.enabled && config.snapshot.refreshSeconds > 0
             ? Math.max(5, Math.min(60, config.snapshot.refreshSeconds / 2))
@@ -1985,7 +2000,7 @@ const layer = Layer.effect(
       })
       const oomScan = Effect.gen(function* () {
         const rows = yield* db
-          .select({ session_id: SandboxTable.session_id, id: SandboxTable.id })
+          .select({ session_id: SandboxTable.session_id, id: SandboxTable.id, state: SandboxTable.state })
           .from(SandboxTable)
           .where(eq(SandboxTable.state, "running"))
           .orderBy(desc(SandboxTable.time_updated))
@@ -1997,16 +2012,18 @@ const layer = Layer.effect(
           // connected elsewhere stays untouched instead of being recreated by
           // the sampler.
           const entry = yield* Ref.modify(entries, (map) => [map.get(row.session_id) ?? null, map] as const)
-          if (!entry) continue
+          if (!entry || !isCurrentSandbox(row, entry.sb.id)) continue
+          yield* recoverIteration("sandbox OOM candidate", Effect.gen(function* () {
           const sampleExit = yield* SandboxOomSample.sampleSandbox(commandsOf(entry.sb)).pipe(Effect.result)
           const sample = sampleExit._tag === "Success" ? sampleExit.success : null
+          if (!isCurrentSandbox(yield* dbGet(row.session_id), entry.sb.id)) return
           if (sample === null) {
             yield* Effect.logWarning("sandbox OOM sample failed", {
               sessionID: row.session_id,
               error: sampleExit._tag === "Failure" ? String(sampleExit.failure) : "unknown",
             })
             clearOomBaseline(row.session_id)
-            continue
+            return
           }
           const key = `${row.session_id}:${row.id}`
           const now = Date.now()
@@ -2039,7 +2056,7 @@ const layer = Layer.effect(
           } else if (classification.kind === "pressure") {
             // One pressure event per sandbox per window: a sandbox sitting at
             // the threshold must not flood the durable session log.
-            if (now - (oomPressureAt.get(key) ?? 0) < OOM_PRESSURE_WINDOW_MS) continue
+            if (now - (oomPressureAt.get(key) ?? 0) < OOM_PRESSURE_WINDOW_MS) return
             oomPressureAt.set(key, now)
             yield* bus
               .publish(SessionEvent.SandboxOom.Pressure, {
@@ -2051,9 +2068,10 @@ const layer = Layer.effect(
               })
               .pipe(Effect.catch(() => Effect.void))
           }
+          }))
         }
       })
-      yield* oomScan.pipe(
+      yield* recoverIteration("sandbox OOM scan", oomScan).pipe(
         Effect.andThen(Effect.sleep(Duration.seconds(config.oomScan.intervalSeconds))),
         Effect.forever,
         Effect.forkScoped({ startImmediately: true }),
@@ -2116,12 +2134,21 @@ const layer = Layer.effect(
       keepAlive: (sessionID) => Effect.flatMap(resolveSandboxKey(sessionID), (key) => dbSetKeepAlive(key, true)),
       activity: (sessionID) => Effect.gen(function* () {
         const key = yield* resolveSandboxKey(sessionID)
-        yield* touchSandbox(key)
-        yield* Effect.forkScoped(Effect.sleep("5 seconds").pipe(Effect.andThen(touchSandbox(key)), Effect.forever))
-      }),
+        const row = yield* dbGet(key)
+        if (!row || row.state !== "running") return yield* Effect.fail(new Error("Sandbox is not running"))
+        yield* touchSandbox(key, row.id)
+        yield* Effect.forkScoped(Effect.sleep("5 seconds").pipe(Effect.andThen(touchSandbox(key, row.id)), Effect.forever))
+      }).pipe(Effect.orDie),
       release: (sessionID) => Effect.flatMap(resolveSandboxKey(sessionID), releaseSandbox),
       isKeepAlive: (sessionID) => Effect.flatMap(resolveSandboxKey(sessionID), isKeepAlive),
       sandboxId: (sessionID) => Effect.flatMap(resolveSandboxKey(sessionID), sandboxId),
+      lifecycle: (sessionID) => Effect.gen(function* () {
+        const key = yield* resolveSandboxKey(sessionID)
+        const row = yield* dbGet(key)
+        const session = yield* db.select({ sandbox: SessionTable.sandbox }).from(SessionTable)
+          .where(eq(SessionTable.id, SessionSchema.ID.make(key))).get().pipe(Effect.orDie)
+        return { sandboxID: row?.id ?? null, state: row?.state ?? null, persistMode: session?.sandbox?.persistMode ?? config.volumeType }
+      }),
       boot: (sessionID: string) =>
         Effect.flatMap(resolveSandboxKey(sessionID), (key) => Effect.map(getOrCreate(key), (sb) => sb.id)),
       destroy: (sessionID: string) => Effect.flatMap(resolveSandboxKey(sessionID), destroyViaQueue),
@@ -2223,7 +2250,7 @@ const layer = Layer.effect(
                   "get or create sandbox",
                 )
                 ephemeralSandbox = sb
-                yield* touchSandbox(key)
+                yield* touchSandbox(key, sb.id)
                 const commands = commandsOf(sb)
                 const commandSessionID = input.isolated
                   ? yield* withOperationTimeout(
@@ -2321,7 +2348,7 @@ const layer = Layer.effect(
                     : consume.pipe(Effect.onInterrupt(() => Effect.sync(() => controller.abort())))
                 const heartbeat = Effect.sleep(
                   Duration.seconds(Math.max(5, Math.min(60, Math.floor(config.idleReapSeconds / 3)))),
-                ).pipe(Effect.andThen(touchSandbox(key)), Effect.forever)
+                ).pipe(Effect.andThen(touchSandbox(key, sb.id)), Effect.forever)
                 const lock = yield* Ref.modify(commandLocks, (map) => {
                   const existing = map.get(commandSessionID)
                   if (existing) return [existing, map] as const
@@ -2640,7 +2667,8 @@ const layer = Layer.effect(
             }).pipe(Effect.catch(() => Effect.succeed(null)))
             // Every preview hit refreshes the activity watermark so a watched
             // preview keeps its sandbox alive the same way commands do.
-            yield* touchSandbox(key)
+            const activity = yield* touchSandbox(key, sb.id).pipe(Effect.result)
+            if (activity._tag === "Failure") return { _tag: "no-sandbox" } as const
             if (!endpoint) return { _tag: "resolve-failed" } as const
             return { _tag: "resolved" as const, sandboxId: sb.id, endpoint }
           }),

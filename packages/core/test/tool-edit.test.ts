@@ -90,6 +90,7 @@ const makeEditFixture = () => {
     release: () => Effect.void,
     isKeepAlive: () => Effect.succeed(false),
     sandboxId: () => Effect.succeed(null),
+    lifecycle: () => Effect.succeed({ sandboxID: null, state: null, persistMode: "pvc" }),
     boot: () => Effect.succeed("sandbox-test"),
     fileStat: (_sessionID, target) =>
       Effect.succeed(fixture.sandboxFiles.has(target) ? { isDirectory: false } : null),
