@@ -22,6 +22,7 @@ import { makeLocationNode } from "@opencode/util/effect/app-node"
 import { SessionInstructions } from "@opencode/core/session/instructions"
 import { Environment } from "@opencode/core/environment/index"
 import { testEffect } from "./lib/effect"
+import { SessionSkills } from "@opencode/core/session/skills"
 import { permissionLayer } from "./lib/permission"
 import { toolIdentity, executeTool, registerToolPlugin, toolDefinitions } from "./lib/tool"
 
@@ -38,6 +39,7 @@ const readToolNode = makeLocationNode({
     FSUtil.node,
     Location.node,
     SandboxProvider.node,
+    SessionSkills.node,
   ],
 })
 
@@ -398,7 +400,10 @@ describe("ReadTool", () => {
         }),
       ).toMatchObject({
         status: "completed",
-        content: [{ type: "text", text: "Image read successfully" }, { type: "file", mime: "image/png" }],
+        content: [
+          { type: "text", text: "Image read successfully" },
+          { type: "file", mime: "image/png" },
+        ],
       })
     }),
   )
@@ -429,7 +434,10 @@ describe("ReadTool", () => {
         }),
       ).toMatchObject({
         status: "completed",
-        content: [{ type: "text", text: "Image read successfully" }, { type: "file", mime: "image/png" }],
+        content: [
+          { type: "text", text: "Image read successfully" },
+          { type: "file", mime: "image/png" },
+        ],
       })
     }),
   )
@@ -527,7 +535,10 @@ describe("ReadTool", () => {
         }),
       ).toMatchObject({
         status: "completed",
-        content: [{ type: "text", text: "Image read successfully" }, { type: "file", mime: "image/png" }],
+        content: [
+          { type: "text", text: "Image read successfully" },
+          { type: "file", mime: "image/png" },
+        ],
       })
     }),
   )

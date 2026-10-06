@@ -51,7 +51,12 @@ export interface ScanResult {
  * newlines, so each line is split from the right: `mtime` and `size` never contain a tab.
  * Names are validated before the read cap so unusable files cannot crowd out real definitions.
  */
-export function parseScanOutput(output: string, prefixes: readonly string[], limit = MAX_SCAN_FILES): ScanResult {
+export function parseScanOutput(
+  output: string,
+  prefixes: readonly string[],
+  limit = MAX_SCAN_FILES,
+  accept?: (file: ScannedFile) => boolean,
+): ScanResult {
   const seen = new Map<string, ScannedFile>()
   let skipped = 0
   for (const line of output.split("\n")) {
@@ -70,7 +75,9 @@ export function parseScanOutput(output: string, prefixes: readonly string[], lim
       skipped++
       continue
     }
-    seen.set(path, { path, relative, id, fingerprint })
+    const file = { path, relative, id, fingerprint }
+    if (accept && !accept(file)) continue
+    seen.set(path, file)
   }
   const sorted = [...seen.values()].sort((a, b) => a.path.localeCompare(b.path))
   return { files: sorted.slice(0, limit), discovered: sorted.length, skipped }
@@ -210,14 +217,20 @@ export interface SandboxMarkdownScan<D> {
   readonly decode: (file: ScannedFile, content: string) => D | undefined
   /** Re-reads every file even when its fingerprint is unchanged. */
   readonly force?: boolean
+  readonly layout?: "skills"
+  readonly acceptFile?: (file: ScannedFile) => boolean
+  /** Physical-generation scoped cache identity; does not change the RPC session. */
+  readonly cacheKey?: string
 }
 
 /** Quotes discovery directories for the shell; they are fixed constants, never user input. */
-function scanCommand(prefixes: readonly string[]) {
+function scanCommand(prefixes: readonly string[], layout?: "skills") {
   const directories = prefixes
     .map((prefix) => prefix.replace(/\/$/, "").replaceAll("'", `'\\''`))
     .map((directory) => `'${directory}'`)
     .join(" ")
+  if (layout === "skills")
+    return `for d in ${directories}; do [ ! -d "$d" ] || { find "$d" -maxdepth 1 -type f -name '*.md' -printf '%p\\t%T@\\t%s\\n'; find "$d" -mindepth 2 -type f -name 'SKILL.md' -printf '%p\\t%T@\\t%s\\n'; }; done`
   return `for d in ${directories}; do [ ! -d "$d" ] || find "$d" -type f -name '*.md' -printf '%p\\t%T@\\t%s\\n'; done`
 }
 
@@ -267,7 +280,7 @@ export function scanSandboxMarkdown<D>(input: SandboxMarkdownScan<D>): Effect.Ef
     const result = yield* sandbox
       .run({
         sessionID,
-        command: scanCommand(prefixes),
+        command: scanCommand(prefixes, input.layout),
         cwd: "/workspace",
         hostWorkdir: directory,
         timeoutMs: 10_000,
@@ -286,14 +299,14 @@ export function scanSandboxMarkdown<D>(input: SandboxMarkdownScan<D>): Effect.Ef
       return yield* Effect.fail(
         new SandboxScanFailure({ message: `Sandbox ${label} scan failed: ${truncateForError(result.output)}` }),
       )
-    const { files, discovered, skipped } = parseScanOutput(result.output, prefixes)
+    const { files, discovered, skipped } = parseScanOutput(result.output, prefixes, MAX_SCAN_FILES, input.acceptFile)
     if (files.length < discovered)
       yield* Effect.logWarning(`Sandbox ${label} scan truncated`, { sessionID, discovered, limit: files.length })
     if (skipped > 0)
       yield* Effect.logWarning(`Sandbox ${label} scan skipped unusable definition names`, { sessionID, skipped })
     const { definitions, changed } = yield* scanIncremental(
       cache,
-      sessionID,
+      input.cacheKey ?? sessionID,
       files,
       (file) => readDefinition(input, file),
       // `startedAt` is the listing time: a scan that listed earlier must not overwrite a newer one.

@@ -1,4 +1,4 @@
-import { describe, expect } from "bun:test"
+import { describe, expect, test } from "bun:test"
 import { Deferred, Effect, Fiber, Stream } from "effect"
 import { Agent } from "@opencode/core/agent"
 import { AppNodeBuilder } from "@opencode/core/effect/app-node-builder"
@@ -20,6 +20,17 @@ const info = (id: string, description: string) =>
   })
 
 describe("Skill", () => {
+  test("renders resource metadata without resource bodies and escapes XML attributes", () => {
+    const output = Skill.toModelOutput(info("resource-check", "Resources"), ["references/a&b.md"], undefined, [
+      { path: "references/a&b.md", type: "doc", size: 12, digest: "a".repeat(64) },
+    ])
+    expect(output).toContain("<file>references/a&amp;b.md</file>")
+    expect(output).toContain(
+      `<resource path="references/a&amp;b.md" type="doc" size="12" digest="${"a".repeat(64)}" />`,
+    )
+    expect(output).not.toContain("resource body")
+  })
+
   it.effect("reads the current editor entry by ID", () =>
     Effect.gen(function* () {
       const skill = yield* Skill.Service

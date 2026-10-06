@@ -34,12 +34,27 @@ export { Event } from "@opencode/schema/skill"
 export const available = (skills: ReadonlyArray<Info>, agent: Agent.Info) =>
   skills.filter((skill) => Permission.evaluate("skill", skill.id, agent.permissions).effect !== "deny")
 
+export interface ResourceMetadata {
+  readonly path: string
+  readonly type: string
+  readonly size: number
+  readonly digest: string
+}
+
+const xmlAttribute = (value: string) =>
+  value.replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;").replaceAll(">", "&gt;")
+
 /**
  * Renders model-facing skill content. `directory` overrides the advertised base
  * directory; pass `null` when the skill has no real filesystem location, such as a
  * Session-private skill without materialized resources. Omit it to use the skill path.
  */
-export const toModelOutput = (skill: Info, files: ReadonlyArray<string>, directory?: string | null) => {
+export const toModelOutput = (
+  skill: Info,
+  files: ReadonlyArray<string>,
+  directory?: string | null,
+  resources: ReadonlyArray<ResourceMetadata> = [],
+) => {
   const base = directory === undefined ? path.dirname(skill.path) : directory
   return [
     `<skill_content name="${skill.name}">`,
@@ -52,8 +67,18 @@ export const toModelOutput = (skill: Info, files: ReadonlyArray<string>, directo
     "Note: file list is sampled.",
     "",
     "<skill_files>",
-    ...files.map((file) => `<file>${file}</file>`),
+    ...files.map((file) => `<file>${xmlAttribute(file)}</file>`),
     "</skill_files>",
+    ...(resources.length === 0
+      ? []
+      : [
+          "<resources>",
+          ...resources.map(
+            (resource) =>
+              `  <resource path="${xmlAttribute(resource.path)}" type="${xmlAttribute(resource.type)}" size="${resource.size}" digest="${xmlAttribute(resource.digest)}" />`,
+          ),
+          "</resources>",
+        ]),
     "</skill_content>",
   ].join("\n")
 }

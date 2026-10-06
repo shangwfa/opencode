@@ -140,7 +140,7 @@ const layer = Layer.effect(
       yield* mcpTools.flush
       const agent = yield* sessionAgents.select(session, session.agent)
       if (!agent.info) return yield* new AgentNotFoundError({ sessionID: session.id, agent: session.agent ?? agent.id })
-      yield* sessionSkills.rematerialize(session)
+      yield* sessionSkills.rematerialize(session, Permission.merge(agent.info.permissions, session.permissions ?? []))
       const sessionMcpTools = yield* sessionMcps.tools(session)
       const sessionCustomTools = yield* sessionTools.load(session).pipe(Effect.orDie)
       const loaded = yield* Effect.all(

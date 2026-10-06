@@ -15,6 +15,8 @@ import { ReadToolFileSystem } from "../read-filesystem.js"
 import { Environment } from "../../environment/index.js"
 import { ToolAttachment } from "../attachment.js"
 import { Permission } from "../../permission.js"
+import { SessionSkills } from "../../session/skills.js"
+import * as SkillResource from "../../session/skill-resource.js"
 
 export const name = "read"
 const FILENAME = "AGENTS.md"
@@ -45,6 +47,7 @@ export const Plugin = {
     const location = yield* Location.Service
     const sandboxProvider = yield* SandboxProvider.Service
     const permission = yield* Permission.Service
+    const skills = yield* SessionSkills.Service
 
     yield* ctx.tool
       .transform((editor) =>
@@ -57,10 +60,16 @@ export const Plugin = {
           output: Output,
           execute: (input, context) => {
             return Effect.gen(function* () {
-              if (sandboxProvider.enabled)
-                return yield* SandboxTools.read({ provider: sandboxProvider, location, permission }, input, context).pipe(
-                  Effect.map((output) => ({ output, path: input.path })),
-                )
+              if (sandboxProvider.enabled) {
+                const skillResourceRoot = input.path.startsWith(`${SkillResource.root}/`)
+                  ? yield* skills.resourceRoot(context.sessionID)
+                  : undefined
+                return yield* SandboxTools.read(
+                  { provider: sandboxProvider, location, permission, skillResourceRoot },
+                  input,
+                  context,
+                ).pipe(Effect.map((output) => ({ output, path: input.path })))
+              }
               const read = (target: FileAccess.Target) =>
                 reader.read(target.absolute, target.resource, {
                   offset: input.offset,
@@ -141,7 +150,12 @@ export const Plugin = {
                   )
                   output = new ReadToolFileSystem.AttachmentResult({
                     type: "attachment",
-                    output: kind.type === "image" ? "Image read successfully" : kind.type === "pdf" ? "PDF read successfully" : "Document",
+                    output:
+                      kind.type === "image"
+                        ? "Image read successfully"
+                        : kind.type === "pdf"
+                          ? "PDF read successfully"
+                          : "Document",
                     kind: kind.type,
                     uri: stored.url,
                     mime: stored.metadata.mime,
@@ -150,7 +164,9 @@ export const Plugin = {
                     audience: stored.metadata.audience,
                   })
                 } else if (!ReadToolFileSystem.MEDIA_MIMES.has(result.content.mime)) {
-                  return yield* Effect.fail(new ReadToolFileSystem.BinaryFileError({ resource: result.target.resource }))
+                  return yield* Effect.fail(
+                    new ReadToolFileSystem.BinaryFileError({ resource: result.target.resource }),
+                  )
                 }
               }
               return { output, path: result.path }
@@ -188,12 +204,7 @@ export const Plugin = {
                   return {
                     truncated: result.output.type === "file" ? false : result.output.truncated,
                     kind: kind.type === "binary" ? "text" : kind.type,
-                    mime:
-                      kind.type === "svg"
-                        ? kind.mime
-                        : "mime" in result.output
-                          ? result.output.mime
-                          : "text/plain",
+                    mime: kind.type === "svg" ? kind.mime : "mime" in result.output ? result.output.mime : "text/plain",
                     ...(result.output.type === "text-page"
                       ? result.output.size === undefined
                         ? {}
@@ -255,10 +266,10 @@ export const Plugin = {
 export const toModelContent = (path: string, offset: number | undefined, output: typeof Output.Type) => {
   if (output.type === "attachment")
     return output.audience === "model-and-display"
-      ? [
+      ? ([
           { type: "text", text: output.output },
           { type: "file", uri: output.uri, mime: output.mime, name: output.filename },
-        ] as const
+        ] as const)
       : output.output
 
   if (output.type === "file" && output.encoding === "base64")

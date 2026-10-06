@@ -80,13 +80,23 @@ export const prepare = Effect.fn("SessionPrompt.prepare")(function* (request: {
           // path must not be advertised as a base directory.
           const directory =
             resolved && overlay && resolved.source === "session"
-              ? (yield* overlay.materialize(request.session, resolved).pipe(Effect.catch(() => Effect.succeed(undefined)))) ?? null
+              ? ((yield* overlay.materialize(request.session, resolved).pipe(
+                  Effect.mapError(
+                    (error) =>
+                      new AttachmentError({
+                        uri: `skill:${attachment.id}`,
+                        message: `Unable to materialize skill resources: ${error.message}`,
+                      }),
+                  ),
+                )) ?? null)
               : resolved && resolved.source === "sandbox"
                 ? path.dirname(skill.path)
                 : undefined
+          const files =
+            resolved && overlay && resolved.source !== "global" ? yield* overlay.files(request.session, resolved) : []
           const text =
             resolved && resolved.source !== "global"
-              ? Skill.toModelOutput(skill, [], directory)
+              ? Skill.toModelOutput(skill, files, directory, resolved.resources)
               : (yield* Skill.prepare(fs, skill).pipe(Effect.orDie)).output
           return {
             id: skill.id,

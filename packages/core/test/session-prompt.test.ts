@@ -31,6 +31,7 @@ import { Plugin } from "@opencode/core/plugin"
 import { PluginHooks } from "@opencode/core/plugin/hooks"
 import { Snapshot } from "@opencode/core/snapshot"
 import { Skill } from "@opencode/core/skill"
+import { SessionSkills } from "@opencode/core/session/skills"
 import { tmpdirScoped } from "./fixture/tmpdir"
 import { testEffect } from "./lib/effect"
 
@@ -83,6 +84,24 @@ const locations = makeGlobalNode({
               restore: () => Effect.void,
             }),
             Layer.mock(Plugin.Service, { awaitActivation: Effect.void }),
+            Layer.mock(SessionSkills.Service, {
+              get: (_session, id) =>
+                Effect.succeed(
+                  id === "resource-failure"
+                    ? {
+                        source: "session" as const,
+                        skill: {
+                          id,
+                          name: Skill.Name.make("resource-failure"),
+                          content: "requires scripts/run.sh",
+                          path: AbsolutePath.make("/session/resources/SKILL.md"),
+                        },
+                        resources: [{ path: "scripts/run.sh", type: "script" as const, size: 1, digest: "stub" }],
+                      }
+                    : undefined,
+                ),
+              materialize: () => Effect.fail(new Error("injected skill resource failure")),
+            }),
           ).pipe(Layer.fresh) as unknown as Layer.Layer<LocationServices>,
       )
     }),
@@ -91,7 +110,14 @@ const locations = makeGlobalNode({
 })
 const it = testEffect(
   AppNodeBuilder.build(
-    LayerNode.group([Database.node, Bus.node, SessionProjector.node, SessionStore.node, Session.node, SessionInbox.node]),
+    LayerNode.group([
+      Database.node,
+      Bus.node,
+      SessionProjector.node,
+      SessionStore.node,
+      Session.node,
+      SessionInbox.node,
+    ]),
     [
       Bus.node.replace(Bus.configured({ persist: true })),
       SessionExecution.node.replace(execution),
@@ -169,6 +195,21 @@ const assistantRow = (id: SessionMessage.ID, seq: number) => {
 }
 
 describe("Session.prompt", () => {
+  it.effect(
+    "skill resource materialization failure rejects admission instead of injecting incomplete instructions",
+    () =>
+      Effect.gen(function* () {
+        yield* setup
+        const session = yield* Session.Service
+        const before = yield* admittedCount
+        const result = yield* session
+          .prompt({ sessionID, text: "run skill", skills: [{ id: Skill.ID.make("resource-failure") }], resume: false })
+          .pipe(Effect.result)
+        expect(result._tag).toBe("Failure")
+        if (result._tag === "Failure") expect(result.failure._tag).toBe("Session.AttachmentError")
+        expect(yield* admittedCount).toBe(before)
+      }),
+  )
   it.effect("exposes the execution registry", () =>
     Effect.gen(function* () {
       const session = yield* Session.Service
@@ -263,9 +304,7 @@ describe("Session.prompt", () => {
       const message = yield* session.prompt({ sessionID, text: "use this model", model, resume: false })
 
       expect(yield* session.get(sessionID)).toMatchObject({ model })
-      expect(yield* session.messages({ sessionID, order: "asc" })).toMatchObject([
-        { type: "model-switched", model },
-      ])
+      expect(yield* session.messages({ sessionID, order: "asc" })).toMatchObject([{ type: "model-switched", model }])
       const { db } = yield* Database.Service
       const types = (yield* db
         .select({ seq: EventTable.seq, type: EventTable.type })
@@ -647,8 +686,9 @@ describe("Session.prompt", () => {
 
       expect(failure._tag).toBe("Session.NotFoundError")
       // The rolled-back transaction leaves neither the inbox row nor the durable event.
-      expect(yield* Database.Service.use(({ db }) => db.select().from(SessionInboxTable).all().pipe(Effect.orDie)))
-        .toHaveLength(0)
+      expect(
+        yield* Database.Service.use(({ db }) => db.select().from(SessionInboxTable).all().pipe(Effect.orDie)),
+      ).toHaveLength(0)
       expect(yield* eventCount("session.inbox.enqueued.1")).toBe(eventsBefore)
     }),
   )

@@ -18,7 +18,7 @@ import { imagePassthrough } from "./lib/image"
 import { permissionLayer } from "./lib/permission"
 import { makeLocationNode } from "@opencode/util/effect/app-node"
 import { FSUtil } from "@opencode/util/fs-util"
-import { toolIdentity, executeTool, registerToolPlugin, toolDefinitions } from "./lib/tool"
+import { toolIdentity, executeTool, registerToolPlugin, toolDefinitions, codeModeListings } from "./lib/tool"
 
 const skillToolNode = makeLocationNode({
   name: "test/skill-tool-plugin",
@@ -54,6 +54,11 @@ describe("SkillTool", () => {
           let current = [info]
           const assertions: Permission.AssertInput[] = []
           let deny = false
+          let resolutions = 0
+          let resources: SessionSkills.Info["resources"] = []
+          let files: string[] = []
+          let resourceDirectory: string | undefined
+          let source: SessionSkills.Info["source"] = "global"
           const permission = permissionLayer({
             assert: (input) =>
               Effect.sync(() => assertions.push(input)).pipe(
@@ -75,11 +80,20 @@ describe("SkillTool", () => {
             list: () => Effect.succeed(current),
           })
           const sessionSkills = Layer.mock(SessionSkills.Service, {
-            get: (_session, id) => Effect.succeed(current.find((skill) => skill.id === id) ? { skill: current.find((skill) => skill.id === id)!, source: "global", resources: [] } : undefined),
+            get: (_session, id) =>
+              Effect.sync(() => {
+                resolutions++
+                const skill = current.find((skill) => skill.id === id)
+                return skill ? { skill, source, resources } : undefined
+              }),
+            files: () => Effect.succeed(files),
             list: () => Effect.succeed(current.map((skill) => ({ skill, source: "global", resources: [] }))),
-            materialize: () => Effect.succeed(undefined),
+            materialize: () => Effect.succeed(resourceDirectory),
           })
-          const sessions = Layer.mock(Session.Service, { get: (id) => Effect.succeed({ id } as Session.Info), revert: {} as Session.Interface["revert"] })
+          const sessions = Layer.mock(Session.Service, {
+            get: (id) => Effect.succeed({ id } as Session.Info),
+            revert: {} as Session.Interface["revert"],
+          })
           const skillToolLayer = AppNodeBuilder.build(LayerNode.group([Tool.node, skillToolNode]), [
             Permission.node.replace(permission),
             Skill.node.replace(skills),
@@ -90,6 +104,13 @@ describe("SkillTool", () => {
 
           return yield* Effect.gen(function* () {
             const registry = yield* Tool.Service
+            const snapshot = yield* registry.snapshot()
+            expect(snapshot.codeModeCatalog).toBeDefined()
+            expect(snapshot.definitions.some((tool) => tool.name === "skill")).toBe(true)
+            const deniedCatalog = yield* registry.snapshot([{ action: "skill", resource: "*", effect: "deny" }])
+            expect(deniedCatalog.definitions.some((tool) => tool.name === "skill")).toBe(false)
+            if (!snapshot.codeModeCatalog) return yield* Effect.die(new Error("default CodeMode catalog missing"))
+            expect(codeModeListings(snapshot.codeModeCatalog).some((tool) => tool.path === "skill")).toBe(false)
             expect((yield* toolDefinitions(registry))[0]).toMatchObject({
               name: "skill",
               description: SkillTool.description,
@@ -132,6 +153,7 @@ describe("SkillTool", () => {
               error: { type: "tool.execution", message: "Unable to load skill missing" },
             })
             deny = true
+            const beforeDeniedLookup = resolutions
             expect(
               yield* executeTool(registry, {
                 sessionID,
@@ -142,6 +164,7 @@ describe("SkillTool", () => {
               status: "error",
               error: { type: "permission.rejected", message: "Permission denied: skill" },
             })
+            expect(resolutions).toBe(beforeDeniedLookup)
             deny = false
             const flat = Skill.Info.make({
               id: Skill.ID.make("public"),
@@ -167,6 +190,55 @@ describe("SkillTool", () => {
               status: "completed",
               content: [{ type: "text", text: Skill.toModelOutput(flat, []) }],
             })
+            source = "session"
+            resources = [{ path: "scripts/check.mjs", type: "script", size: 17, digest: "test-script-digest" }]
+            files = ["scripts/check.mjs"]
+            resourceDirectory = "/home/sandbox/.local/share/opencode/session-skills/test/public/resources"
+            const load = () =>
+              executeTool(registry, {
+                sessionID,
+                ...toolIdentity,
+                call: { type: "tool-call", id: "call-script-skill", name: "skill", input: { id: "public" } },
+              })
+            const loaded = yield* load()
+            expect(loaded).toMatchObject({ status: "completed" })
+            const text =
+              loaded.status === "completed"
+                ? (loaded.content?.filter((part) => part.type === "text").map((part) => part.text).join("\n") ?? "")
+                : ""
+            expect(text).toContain("<script_execution>")
+            expect(text).toContain("not automatically executed")
+            expect(text).toContain("node for .js/.mjs")
+            expect(text).toContain("Loading a skill does not authorize shell execution")
+            expect(text).toContain("Check the exit status")
+            expect(text).toContain("<file>scripts/check.mjs</file>")
+            expect(text).toContain(
+              '<resource path="scripts/check.mjs" type="script" size="17" digest="test-script-digest" />',
+            )
+            expect(text).not.toContain("script body")
+            resources = [{ path: "reference.md", type: "doc", size: 9, digest: "test-doc-digest" }]
+            files = ["reference.md"]
+            const docOutput = yield* load()
+            const docText =
+              docOutput.status === "completed"
+                ? (docOutput.content?.filter((part) => part.type === "text").map((part) => part.text).join("\n") ?? "")
+                : ""
+            expect(docText).not.toContain("<script_execution>")
+            expect(docText).toContain("<file>reference.md</file>")
+            resources = [{ path: "scripts/check.mjs", type: "script", size: 17, digest: "test-script-digest" }]
+            source = "sandbox"
+            files = ["references/guide.md", "scripts/registry.mjs"]
+            const sandboxResult = yield* load()
+            const sandboxOutput =
+              sandboxResult.status === "completed"
+                ? (sandboxResult.content?.filter((part) => part.type === "text").map((part) => part.text).join("\n") ?? "")
+                : ""
+            expect(sandboxOutput).toContain("<file>references/guide.md</file>")
+            expect(sandboxOutput).toContain("<file>scripts/registry.mjs</file>")
+            expect(sandboxOutput).not.toContain("<resources>")
+            source = "session"
+            resourceDirectory = undefined
+            expect(JSON.stringify(yield* load())).not.toContain("<script_execution>")
           }).pipe(Effect.provide(skillToolLayer))
         }),
       ),
