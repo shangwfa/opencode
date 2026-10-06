@@ -41,7 +41,7 @@ opencode sass 作为一个code-agent ,主要负责跟AI打交道，通过各种�
 - code-mode模式默认开下，测试过程注意该模式是否生效
 - 如何用例有问题修复后重新测试
 - 用例跑的过程中，遇到提问，模拟自动回答，保证继续执行
-- 用例执行期间，订阅会话流式接口（GET /api/session/:sessionID/event SSE）实时输出执行过程（思考过程、工具调用、表单问答、文本、执行状态），不要只读执行器日志或等整轮结束再汇报
+- 用例执行期间，订阅会话流式接口（GET /api/session/:sessionID/event SSE）实时输出执行过程（思考过程、工具调用、表单问答、文本、执行状态），不要只读执行器日志或等整轮结束再汇报；完整规范见 docs/test-cases/skills/streaming-output-spec.md
 
 代码修改原则：
 
