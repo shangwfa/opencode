@@ -253,7 +253,7 @@ ORDER BY m.time_created LIMIT 1;
 
 **Prompt**（复用 T49.4 的 session）：
 ```text
-读取 loop-engineering skill 的 templates/manifest.json 和 templates/component-matrix.md，基于这两个模板帮我生成一个针对 5 个仓库 README 检查的 manifest.json 实例
+读取 loop-engineering skill 的 templates/manifest.json 和 templates/component-matrix.md 两个模板文件（必须分别读取这两个文件，不要只读一个），基于这两个模板帮我生成一个针对 5 个仓库 README 检查的 manifest.json 实例，产物必须是合法 JSON
 ```
 
 **期望**：
@@ -596,5 +596,5 @@ psql "$PG_URL" -t -c "SELECT data->>'tool', data->'state'->>'status' FROM part W
 
 1. 本地 `SKILL.md` 为 21156 UTF-8 字节；PostgreSQL `length(text)=11432` 和 skill output 12418 是字符计数/包装后的长度，不是内容截断。
 2. `Goodhart` 在 SKILL.md 本体中，不能用作资源泄漏标记；资源独有短语 `判据合格的唯一标准` 与 `命门：goal 定不好` 均未出现在 skill output。
-3. V2 物化路径是 `/workspace/.opencode/.session-skills/<sessionID>/<digest>`，不是旧文档的 `/home/sandbox/.local/share/opencode/session-skills/`。
+3. V2 物化路径对齐 V1：`/home/sandbox/.local/share/opencode/session-skills/<ownerID>/<skillID>/<snapshot>`。历史记录中的 `/workspace/.opencode/.session-skills/` 不再是当前目录。
 4. **待修复**：`packages/core/src/session/skills.ts` 的 `materialize()` 仅 `fileWrite`，未设定 mode；本次恢复后所有文件为 755。V1 的 `packages/opencode/src/tool/skill.ts` 曾明确对物化文件执行 `chmod 644`。恢复功能正常，但最小权限契约未保持。

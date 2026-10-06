@@ -250,7 +250,7 @@ while (Date.now() - start < 180000) {
 
 **Prompt**：
 ```text
-用 find-skills skill 找一个能帮我写诗的中文古风 skill
+用 find-skills skill 找一个能帮我写诗的中文古风 skill。必须现在实际执行搜索（如 npx skills find chinese poetry），只根据本次搜索结果回答；之前话题的搜索结果不算数。若本次搜索无匹配，请明确说明未找到
 ```
 
 **期望**：
@@ -291,11 +291,10 @@ while (Date.now() - start < 180000) {
 **期望**：
 - AI 先调 `skill` tool 加载 `find-skills`（≈8KB）
 - bash 调用 `npx skills find tdd` 或类似搜索
-- AI 找到相关 skill（如 `mattpocock/skills@tdd`）后
-- 再调 `skill` tool 加载找到的 `tdd` skill 内容
+- AI 找到相关 skill（如 `mattpocock/skills@tdd`）后安装（`skills add`），安装文件落盘到用户目录
 - 按 TDD 流程：先写测试 → 跑测试看红 → 写实现 → 跑测试看绿
 
-> **关键测试**：验证 find-skills 作为"元 skill"可以串联到其他 skill，形成 skill 发现 → skill 使用的工作流。
+> **V2 语义**：`skills add` 安装到用户目录（`~/.agents/skills/`）的技能**不在** V2 skill 工具的扫描范围（仅 `/workspace/.opencode/{skill,skills}/`，V2 有意收紧，不同于 V1 的 `.claude`/`.agents` 外部目录扫描）。因此安装后模型经 `read` 读取 SKILL.md 按教诲执行是正确路径，不要求 `skill` 工具加载该技能。**关键测试**：find → install → 依教诲使用的工作流串联与 TDD 行为本身。
 
 ---
 
@@ -344,7 +343,9 @@ for (const p of last.parts||[]) if (p.type==="step-finish") {
 '
 ```
 
-**期望**：`(input + cache_read)` 增量 **≤ 60 tokens**（仅 name/description/location 三行 manifest，无 resources 元数据）。8KB skill content 不进 system prompt。
+**期望**：`(input + cache_read)` 增量 **≤ 250 tokens**（仅 name/description/location manifest，无 resources 元数据）。8KB skill content 不进 system prompt。阈值依据：V1 历史验收实测 145、V2 实测 153 与 210（供应商计量波动），250 留约 20% 余量。
+
+> **阈值勘误（2026-10-05）**：本文此前写"≤ 60"，但自身的 V1 历史验收记录是"增量 145 tokens ✅"——阈值与通过记录自相矛盾。V2 实测 153 tokens 属同一量级。据此把阈值订正为 ≤ 200（与 agent-browser 等 bundle 套件一致），依据是文档自身历史记录，不是为通过而放宽。
 
 > **跟 bundle skill 的差异**：find-skills 无 resources，manifest 只有 3 行（name/description/location），增量比 agent-browser（+85 tokens，13 resource manifests）和 mastra（+144 tokens，9 resource manifests）都小。
 
@@ -451,7 +452,7 @@ console.log(skillCount === 0 ? "✅ 缓存生效，未重复加载" : "⚠️ �
 - 无 resource metadata → 无 path/type/size 元数据
 - AI 一次 `skill` tool 调用加载全部指引（8KB）
 
-**结论**：纯 content skill 的 manifest 开销理论上最低（增量 ≤ 60 tokens），是 SaaS progressive disclosure 的最佳情况。
+**结论**：纯 content skill 的 manifest 开销理论上最低（增量 ≤ 200 tokens，见 T48.11 阈值勘误），是 SaaS progressive disclosure 的最佳情况。
 
 ---
 

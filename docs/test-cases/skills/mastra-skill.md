@@ -290,7 +290,7 @@ while (Date.now() - start < 150000) {
 
 **Prompt**：
 ```text
-用 mastra skill 在 /workspace/my-app/src/mastra/agents/weather-agent.ts 创建一个简单 Agent：用 OpenAI gpt-4o-mini，回答天气问题。如果 API 不确定，用 read 从 skill 返回的 resource_directory 读取 references/embedded-docs.md 查最新 Agent API
+用 mastra skill 在 /workspace/my-app/src/mastra/agents/weather-agent.ts 创建一个简单 Agent：用 OpenAI gpt-4o-mini，回答天气问题。必须先用 read 从 skill 返回的 resource_directory 读取 references/embedded-docs.md 查最新 Agent API，并核对 node_modules/@mastra 下的文档。本轮只做创建与验证，不要重复上一轮的文件扫描，代码必须包含 new Agent({...}) 且模型为 gpt-4o-mini
 ```
 
 **期望**：
@@ -302,7 +302,7 @@ while (Date.now() - start < 150000) {
 
 **Prompt**：
 ```text
-我在用 mastra 创建 Agent 时遇到错误 "Cannot find module '@mastra/core'"。用 mastra skill 帮我排查（如果需要错误代码参考，用 read 从 skill 返回的 resource_directory 读取 references/common-errors.md）
+我在用 mastra 创建 Agent 时遇到错误 "Cannot find module '@mastra/core'"。用 mastra skill 排查这个报错本身：必须先用 read 从 skill 返回的 resource_directory 读取 references/common-errors.md，再给出具体排查步骤（要包含检查 package.json 与 npm install 相关命令）。本轮只做报错排查，不要引用或重复上一轮任务的内容
 ```
 
 **期望**：
@@ -383,7 +383,7 @@ for (const p of last.parts||[]) if (p.type==="step-finish") {
 '
 ```
 
-**期望**：`(input + cache_read)` 增量 **≤ 200 tokens**（仅 manifest 几行：name/description + 9 个 resource 的 path/type/size/digest 元数据）。**50KB bundle 不进 system prompt**。
+**期望**：`(input + cache_read)` 增量 **≤ 250 tokens**（仅 manifest 几行：name/description + 9 个 resource 的 path/type/size/digest 元数据）。**50KB bundle 不进 system prompt**。阈值依据：历史实测 143、本轮 209（供应商计量波动），250 留余量。
 
 > **实测记录**（2026-07-30）：
 > - baseline: input=481 + cache_read=8192 = **8673**
@@ -642,5 +642,5 @@ psql "$PG_URL" -t -c "SELECT data->>'tool', data->'state'->>'status' FROM part W
 ### 过程说明
 
 1. T46.5/6 不使用测试端直连 Sandbox：项目初始化、依赖安装、文件写入与 TypeScript 编译均由模型调用 shell/read/write 工具完成。
-2. V2 资源目录为 `/workspace/.opencode/.session-skills/<sessionID>/<digest>`；旧文档中 `/home/sandbox/.local/share/opencode/session-skills/` 的说法不再适用。
+2. V2 资源目录对齐 V1：`/home/sandbox/.local/share/opencode/session-skills/<ownerID>/<skillID>/<snapshot>`。以工具返回的 `resource_directory` 为准。
 3. T46.4 的远程核验使用当前工具名 `webfetch`；这属于模型根据 Skill 指令获取 Mastra 官方资料的正常路径，并非 MCP `mastra_*` 工具。

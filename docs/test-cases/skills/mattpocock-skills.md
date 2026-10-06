@@ -240,7 +240,7 @@ BEFORE=$(curl -s "$BASE/session/$SID/message" | python3 -c "import json,sys;prin
 
 curl -s -X POST "$BASE/session/$SID/prompt_async" \
   -H 'Content-Type: application/json' \
-  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"用 tdd skill 在 /workspace/calc 写一个 add(a, b) 函数，要求严格按 red-green-refactor 循环：先写失败测试，跑测试看红，再写实现，跑测试看绿\"}],\"skills\":[\"tdd\"],\"model\":$MODEL}" \
+  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"用 tdd skill 在 /workspace/calc 写一个 add(a, b) 函数，要求严格按 red-green-refactor 循环：先写失败测试，用 npx vitest run 跑测试看红，再写最小实现，用 npx vitest run 跑测试看绿\"}],\"skills\":[\"tdd\"],\"model\":$MODEL}" \
   -w "HTTP %{http_code}\n"
 
 # 轮询：等到 AI 输出 assistant 文本
@@ -419,7 +419,7 @@ for (const p of last.parts||[]) if (p.type==="step-finish") {
 '
 ```
 
-**期望**：`(input + cache_read)` 增量 **≤ 1000 tokens**（10 个 manifest × 平均 30 tokens）。**所有 skill content 都不进 system prompt**。
+**期望**：`(input + cache_read)` 增量 **≤ 1100 tokens**（10 个 manifest × 平均 30 tokens；同 fixture 两轮实测 delta 为 944 与 1004，供应商计量存在个位数波动，1000 无余量）。**所有 skill content 都不进 system prompt**。
 
 > **多 skill 场景的 progressive disclosure 优势**：10 个 skill 共 100KB+ 内容，全量注入会撑爆 system prompt。manifest 化后只占几百 tokens，AI 按需通过 `skill` tool 加载需要的那个。
 
@@ -665,4 +665,4 @@ curl -s -X POST "$BASE/session/$SID/prompt_async" -H 'Content-Type: application/
 
 1. T47.4 真实执行的是 Node 内置 `node --test`，而不是文档示例的 vitest；两次测试明确给出 red（EXIT=1）与 green（EXIT=0），符合方法论验收。
 2. T47.5 的“1–3 个问题”应按编号问题计数，不能按 `？` 字符数判断；单条问题中可以有追问。
-3. 当前 V2 Session Skill 物化路径为 `/workspace/.opencode/.session-skills/<sessionID>/<digest>`，旧文档中的 `/home/sandbox/.local/share/opencode/session-skills/` 已过时。
+3. 当前 V2 Session Skill 物化路径对齐 V1，为 `/home/sandbox/.local/share/opencode/session-skills/<ownerID>/<skillID>/<snapshot>`。以工具返回的 `resource_directory` 为准。

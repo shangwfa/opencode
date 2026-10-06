@@ -182,7 +182,7 @@ BEFORE=$(curl -s "$BASE/session/$SID/message" | python3 -c "import json,sys;prin
 
 curl -s -X POST "$BASE/session/$SID/prompt_async" \
   -H 'Content-Type: application/json' \
-  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"用 humanize-ppt skill 帮我把以下素材做成一份演讲大纲。素材：AI 编程工具正在改变开发者的工作方式。从 GitHub Copilot 到 Cursor 到 opencode，AI 编程工具经历了三个阶段：代码补全、对话式编程、自主编程 agent。每个阶段都让开发者更高效，但也带来了新的挑战：代码质量、安全性、团队协作。请按 skill 教诲的 AST（Audience-State-Transfer）方法生成大纲。\"}],\"skills\":[\"humanize-ppt\"],\"model\":$MODEL}" \
+  -d "{\"parts\":[{\"type\":\"text\",\"text\":\"用 humanize-ppt skill 帮我把以下素材做成一份演讲大纲。素材：AI 编程工具正在改变开发者的工作方式。从 GitHub Copilot 到 Cursor 到 opencode，AI 编程工具经历了三个阶段：代码补全、对话式编程、自主编程 agent。每个阶段都让开发者更高效，但也带来了新的挑战：代码质量、安全性、团队协作。请按 skill 教诲的 AST（Audience-State-Transfer）方法生成大纲，并直接落盘正式产物（如 deck_brief.md、ast_outline.md、slide_plan.json），无需等待人工审阅确认。\"}],\"skills\":[\"humanize-ppt\"],\"model\":$MODEL}" \
   -w "HTTP %{http_code}\n"
 
 # 轮询：等到 AI 输出 assistant 文本
@@ -270,7 +270,7 @@ DECKEOF'
 
 **Prompt**：
 ```text
-用 humanize-ppt skill 对 /workspace/test-deck/index.html 做演讲体检（--qa-from）。按 skill 教诲的演讲体检流程：读取 rendered HTML，对照 AST 大纲逐页检查，识别不能演讲的页面，生成 qa_report.md 和 fix_prompt.md
+用 humanize-ppt skill 对 /workspace/test-deck/index.html 做演讲体检（--qa-from）。按 skill 教诲的演讲体检流程：先按 skill 规定读取 references/qa-failure-modes.md 作为失败模式清单，再读取 rendered HTML，对照 AST 大纲逐页检查，识别不能演讲的页面，生成 qa_report.md 和 fix_prompt.md
 ```
 
 **期望**：
@@ -416,7 +416,7 @@ console.log(skillCount === 0 ? "✅ 缓存生效" : "⚠️ 重复加载 skill")
 
 **Prompt**：
 ```text
-用 non-existent-skill-name skill 帮我做 PPT
+用 non-existent-skill-name skill 帮我做 PPT。这是一个技能存在性校验请求：如果该技能不存在，只回复技能不存在并列出可用技能让我重选，不要开始任何 PPT 制作
 ```
 
 **期望**：
@@ -565,6 +565,6 @@ psql "$PG_URL" -t -c "SELECT data->>'tool', data->'state'->>'status' FROM part W
 ### 复验结论与文档修正点
 
 1. **实际 bundle 是 37 个 resources，不是文首的 36 个**：15 references + 10 scripts + 8 contracts + 4 adapters；连同 SKILL.md 共 39 个文件。
-2. **V2 Session Skill 物化目录已变化**：当前为 `/workspace/.opencode/.session-skills/<sessionID>/<digest>`，不是原用例声称的 `/home/sandbox/.local/share/opencode/session-skills/`。
+2. **V2 Session Skill 物化目录对齐 V1**：当前为 `/home/sandbox/.local/share/opencode/session-skills/<ownerID>/<skillID>/<snapshot>`。执行记录中的 `/workspace/.opencode/.session-skills/` 是历史目录。
 3. 原泄漏检查所用 `FAILURE_MODES` 和 `renderer_registry` 不是有效标记，因为它们本来就在 SKILL.md 中。改用仅位于 resource 正文的 `目录纪律`、`placeholder-residue` 验证，二者在 `skill` 输出中均为 false。
 4. 已加载 Skill 后，模型可复用已有 `resource_directory` 直接执行脚本而不重复调用 `skill`；T48.6 同时在全新会话验证了完整 `[skill,shell]` 路径。

@@ -323,7 +323,7 @@ while (Date.now() - start < 300000) {
 用 skill-creator skill 的 description optimization 功能。我刚写了一个 code-reviewer skill，帮我：
 1. 生成 10 条 should-trigger + 10 条 should-not-trigger 的 eval queries
 2. 创建一个 eval_review.html 让我审查
-3. 跑 run_loop.py 优化描述
+3. 尝试跑 run_loop.py 优化描述（--max-iterations 1）；如果当前环境缺少 run_loop 所需的模型 API/凭据导致无法完成，请直接说明缺失的前置条件并保留已生成的产物，不要反复重试
 ```
 
 **期望**：
@@ -655,4 +655,4 @@ psql "$PG_URL" -t -c "SELECT data->>'tool', data->'state'->>'status', substring(
 1. **静态文件计数错误**：fixture 是 SKILL.md + 16 resources = 17 文件，不是文首的“17 resources / 18 文件”。
 2. **T49.9 的真实阻塞**：`run_loop.py` 以文件方式执行先因包内 import 失败；以正确的 `python3 -m scripts.run_loop` 方式继续后，明确失败于缺少 `claude` CLI。系统未伪造优化成功，SKILL.md description 保持未改。
 3. **前置依赖说明不完整**：`quick_validate.py` / `package_skill.py` 使用 `yaml`，并非仅 Python stdlib。初次运行报 `ModuleNotFoundError: yaml`；在 Session Sandbox 中通过 `pip install --user --break-system-packages pyyaml` 后校验与打包成功。应在 Skill 的依赖说明中列出 PyYAML 或提供 requirements。
-4. **V2 物化目录**：当前为 `/workspace/.opencode/.session-skills/<sessionID>/<digest>`，不再是旧文档中的 `/home/sandbox/.local/share/opencode/session-skills/`。
+4. **V2 物化目录**：当前对齐 V1，为 `/home/sandbox/.local/share/opencode/session-skills/<ownerID>/<skillID>/<snapshot>`。以工具返回的 `resource_directory` 为准。

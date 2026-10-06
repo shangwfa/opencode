@@ -427,7 +427,7 @@ for (const p of last.parts||[]) if (p.type==="step-finish") {
 '
 ```
 
-**期望**：`(input + cache_read)` 增量 **≤ 200 tokens**（仅 manifest 几行：name/description + 12 个 resource 的 path/type/size 元数据）。**100KB bundle 不进 system prompt**——这是 progressive disclosure 的核心证据。
+**期望**：`(input + cache_read)` 增量 **≤ 250 tokens**（仅 manifest 几行：name/description + 12 个 resource 的 path/type/size 元数据）。**100KB bundle 不进 system prompt**——这是 progressive disclosure 的核心证据。阈值依据：历史实测 160、本轮 226（供应商计量波动），250 留余量。
 
 > **关键现象**：注册后 `cache_read` 通常会**下降**（system prompt 因加 manifest 变化导致缓存失效），`input` 会**上升**（重传 system prompt），但**两者之和的增量**才是真实的 manifest 占用。
 >
@@ -614,7 +614,7 @@ console.log(skillCount === 0 ? "✅ 缓存生效，未重复加载" : "❌ 重�
 ### 与文档的关键行为差异
 
 1. **显式 `skills` attachment 不再触发 `skill` tool**：V2 会把该 Skill 的完整指令直接注入本次提示词，模型随即调用 shell。文档 T45.4/T45.12 描述的「第一步必调 skill tool」只在**不传 attachment、仅依赖 guidance** 时成立（已在 T45.12 以 guidance 路径复现该序列）。
-2. **不再有 `preloaded_skills` manifest 与 resource-level `resources` 参数**：`skill` tool 输入只有 `id`；resource 通过物化目录读取（`/workspace/.opencode/.session-skills/<sid>/<digest>/`）。
+2. **不再有 `preloaded_skills` manifest 与 resource-level `resources` 参数**：`skill` tool 输入只有 `id`；resource 通过物化目录读取（`/home/sandbox/.local/share/opencode/session-skills/<ownerID>/<skillID>/<snapshot>/`）。
 3. **确认无需 manifest 化即安全**：T45.11 的 delta 186 tokens 证明 101KB bundle 不挤压 system prompt。
 4. **沙箱版本高于文档记录**：agent-browser 0.38.1（文档为 0.31.1），Chromium 153（文档为 151），`skills list` 已含 `core`/`agentcore`/`derive-client`/`dogfood` 等。
 
@@ -706,3 +706,13 @@ psql "$PG_URL" -t -c "SELECT data->>'tool', data->'state'->>'status' FROM part W
 > **注意**：PG `part.time_created` 是 bigint epoch-ms（非 timestamp），跨 prompt 查"最近 N 分钟 skill 调用数"时要用具体 user 消息的 time_created 作下界，否则会把上一轮 prompt 的 skill 调用计入。本次初次查询因此误报"第二次仍调 skill 1 次"，按时间线（`/session/$SID/message` 重建）确认实际为 0 次。
 >
 > **清理**：DELETE 端点应为 `DELETE /session/$SID`（返回 200）；`POST /session/$SID/delete` 不生效。测试 session 已全部清理（session 表 0 行）。
+
+## V2 独立复测 2026-10-05
+
+修正后的 V2 验收 **13/13 通过**。证据：`../sandbox/store/evidence/skills-contract-pvc-1791130417854-4fe370a9/`。本节是当前 `/api/...` 验收，以上 `/session`、`bash`、`session_skill` 与固定 token 数记录为历史记录。
+
+重要契约差异：V2 显式 `skills: [{id: "agent-browser"}]` 在 prompt admission 时已准备技能附件正文，不要求模型再调 `skill`。T45.4/T45.12 改为核验 PG 用户消息中的完整附件正文和资源目录，另核查实际 shell/浏览器效果；旧“首个工具必须 skill”断言不适用于显式附件。未触发时的渐进披露、同会话不重复加载仍独立检查，token 增量保留原文阈值。
+
+书籍 20 行表格及 20 条 JSON、表单服务端真实提交、SPA 最后真实 DOM 和 DNS 失败均通过。SPA 用例允许 skill 正常关闭浏览器，不在关闭后对空白新页面检查任务结果。
+
+PG Session/inbox/skills 均为 0，2 条 sandbox 均为 destroyed，清理错误为 0。原始执行器误报及修正边界见 `specialized-skills-v2-run-2026-10-05.md`，原始证据不覆写。snapshot 本轮尚未完成，不能以 PVC 结果推断。

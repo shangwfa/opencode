@@ -225,6 +225,6 @@ exec_in_sandbox "$SID" 'test -s /workspace/design-system/careops/MASTER.md && te
 
 ### 结果说明
 
-1. 当前 V2 Session Skill 物化目录为 `/workspace/.opencode/.session-skills/<sessionID>/<digest>`。
+1. 当前 V2 Session Skill 物化目录对齐 V1：`/home/sandbox/.local/share/opencode/session-skills/<ownerID>/<skillID>/<snapshot>`。以工具返回的 `resource_directory` 为准。
 2. 覆盖优先级已由实际生成文件和模型读取验证：`pages/dashboard.md` 的已声明规则覆盖 `MASTER.md`；页面未声明的规则（如该例的 spacing/typography）回落到 Master。
 3. 生成的 dashboard override 仍含 Hero/CTA 等 Operations Landing section 残留，和数据看板的 KPI/图表/表格结构不完全匹配。这是生成结果质量观察，不影响持久化、查询与覆盖语义验收；实际落地应替换该页面级 section 结构。
