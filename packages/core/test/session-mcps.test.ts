@@ -1,7 +1,16 @@
-import { execFileSync } from "node:child_process"
+import { execFileSync, spawn } from "node:child_process"
 import { describe, expect, test } from "bun:test"
 import { Mcp } from "@opencode/schema/mcp"
-import { bridgeStartCommand, bridgeStopCommand, mcpUseServerProxy } from "@opencode/core/session/mcps"
+import {
+  BRIDGE_RETRY_BASE_MS,
+  BRIDGE_RETRY_BUDGET_MS,
+  BRIDGE_RETRY_MAX_MS,
+  RECONCILE_BUDGET_MS,
+  bridgeRetryDelay,
+  bridgeStartCommand,
+  bridgeStopCommand,
+  mcpUseServerProxy,
+} from "@opencode/core/session/mcps"
 
 /** Fails when the generated command has unbalanced shell quoting. */
 const assertParses = (command: string) => {
@@ -44,6 +53,81 @@ describe("SessionMcps bridge commands", () => {
     const start = bridgeStartCommand("q", Mcp.LocalConfig.make({ type: "local", command }), 9101)
     assertParses(start)
     expect(stdioArgv(start)).toEqual(command)
+  })
+})
+
+describe("SessionMcps stale bridge cleanup", () => {
+  const config = Mcp.LocalConfig.make({ type: "local", command: ["echo", "server"] })
+
+  test("start command clears the stale pid file and port holder before starting the bridge", () => {
+    const start = bridgeStartCommand("stale", config, 9100)
+    assertParses(start)
+    const pidKill = start.indexOf('"$(cat \'/tmp/opencode-mcp/stale-9100.pid\')"')
+    const portKill = start.indexOf("supergatewa[y]")
+    const bridge = start.indexOf("nohup")
+    expect(pidKill).toBeGreaterThan(-1)
+    expect(portKill).toBeGreaterThan(-1)
+    // Cleanup must run before the new bridge binds the port.
+    expect(pidKill).toBeLessThan(bridge)
+    expect(portKill).toBeLessThan(bridge)
+    // Word boundary keeps port 9100 from matching port 91001.
+    expect(start).toContain("--port 9100( |$)")
+  })
+
+  test("port pkill kills only the bridge holding the exact port", async () => {
+    const start = bridgeStartCommand("stale", config, 9100)
+    const pattern = start.match(/pkill -f ('.*?')/)?.[1]
+    expect(pattern).toBeDefined()
+    const alive = (pid: number | undefined) => {
+      try {
+        process.kill(pid!, 0)
+        return true
+      } catch {
+        return false
+      }
+    }
+    const launch = (argv0: string) => {
+      const child = spawn("bash", ["-c", `exec -a '${argv0}' sleep 5`], { detached: true, stdio: "ignore" })
+      child.unref()
+      return child.pid
+    }
+    const victim = launch("supergateway --stdio x --port 9100 --logLevel none")
+    const survivor = launch("supergateway --stdio x --port 91001 --logLevel none")
+    await new Promise((resolve) => setTimeout(resolve, 200))
+    expect(alive(victim)).toBe(true)
+    expect(alive(survivor)).toBe(true)
+    execFileSync("bash", ["-c", `pkill -f ${pattern} || true`])
+    // The victim dies from SIGTERM; the longer-port process stays alive.
+    for (let i = 0; i < 20 && alive(victim); i++) await new Promise((resolve) => setTimeout(resolve, 100))
+    expect(alive(victim)).toBe(false)
+    expect(alive(survivor)).toBe(true)
+    process.kill(survivor!, "SIGKILL")
+  })
+})
+
+describe("SessionMcps connect retry cadence", () => {
+  test("backs off exponentially and caps at the V1-verified ceiling", () => {
+    expect(bridgeRetryDelay(0)).toBe(BRIDGE_RETRY_BASE_MS)
+    expect(bridgeRetryDelay(1)).toBe(500)
+    expect(bridgeRetryDelay(2)).toBe(1000)
+    expect(bridgeRetryDelay(3)).toBe(BRIDGE_RETRY_MAX_MS)
+    expect(bridgeRetryDelay(10)).toBe(BRIDGE_RETRY_MAX_MS)
+  })
+
+  test("single-server budget covers at least V1's 30 attempts", () => {
+    let total = 0
+    let attempts = 0
+    while (total <= BRIDGE_RETRY_BUDGET_MS) {
+      total += bridgeRetryDelay(attempts)
+      attempts += 1
+    }
+    expect(attempts).toBeGreaterThanOrEqual(30)
+  })
+
+  test("reconcile budget stays below the single-server budget it clamps", () => {
+    // The soft gate clamps each connect to min(remaining, BRIDGE_RETRY_BUDGET_MS); keeping the
+    // reconcile budget smaller preserves the V1 gate semantics (a pass never waits > gate).
+    expect(RECONCILE_BUDGET_MS).toBeLessThanOrEqual(BRIDGE_RETRY_BUDGET_MS)
   })
 })
 

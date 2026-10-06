@@ -16,6 +16,8 @@ export interface Closure {
   readonly epoch: number
 }
 
+export class CreationClosedError extends Error {}
+
 /** A no-op UPDATE locks rows on PG and obtains a write transaction on SQLite. */
 export function make(db: Database.Interface["db"]) {
   const root = (sessionID: string) =>
@@ -51,6 +53,26 @@ export function make(db: Database.Interface["db"]) {
     }).pipe(Effect.mapError((cause) => (cause instanceof Error ? cause : new Error(String(cause)))))
 
   return {
+    creating: <A, E, R>(
+      sessionID: string,
+      execute: (tx: Parameters<Parameters<typeof db.transaction>[0]>[0]) => Effect.Effect<A, E, R>,
+    ) =>
+      locked(sessionID, (tx, rootID) =>
+        Effect.gen(function* () {
+          const exists = yield* tx
+            .select({ id: SessionTable.id })
+            .from(SessionTable)
+            .where(eq(SessionTable.id, sessionID as typeof SessionTable.$inferSelect.id))
+            .get()
+          const logical = yield* tx.select().from(Logical).where(eq(Logical.session_id, sessionID)).get()
+          const physical = yield* tx.select().from(Root).where(eq(Root.root_session_id, rootID)).get()
+          if (!exists || logical?.state !== "open" || physical?.state === "closing")
+            return yield* Effect.fail(new CreationClosedError("Session sandbox creation is closed"))
+          // The same row locks fence close() and the lease mutation. A detached
+          // retry cannot pass this check and claim/complete after Session deletion.
+          return yield* execute(tx)
+        }),
+      ),
     admit: <A, E, R>(sessionID: string, sandboxID: string, execute: (epoch: number) => Effect.Effect<A, E, R>) =>
       locked(sessionID, (tx, rootID) =>
         Effect.gen(function* () {
@@ -84,6 +106,14 @@ export function make(db: Database.Interface["db"]) {
     booted: (sessionID: string, sandboxID: string) =>
       locked(sessionID, (tx, rootID) =>
         Effect.gen(function* () {
+          const exists = yield* tx
+            .select({ id: SessionTable.id })
+            .from(SessionTable)
+            .where(eq(SessionTable.id, sessionID as typeof SessionTable.$inferSelect.id))
+            .get()
+          const logical = yield* tx.select().from(Logical).where(eq(Logical.session_id, sessionID)).get()
+          if (!exists || logical?.state !== "open")
+            return yield* Effect.fail(new CreationClosedError("Session sandbox creation is closed"))
           const physical = yield* tx.select().from(Root).where(eq(Root.root_session_id, rootID)).get()
           const row = yield* tx.select().from(SandboxTable).where(eq(SandboxTable.session_id, rootID)).get()
           if (!row || row.id !== sandboxID || row.state !== "running")

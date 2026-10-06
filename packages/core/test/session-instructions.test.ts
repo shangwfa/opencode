@@ -24,6 +24,7 @@ import { ReadToolFileSystem } from "@opencode/core/tool/read-filesystem"
 import { SessionEvent } from "@opencode/core/session/event"
 import { SessionExecution } from "@opencode/core/session/execution"
 import { SessionInstructions } from "@opencode/core/session/instructions"
+import { SessionSkills } from "@opencode/core/session/skills"
 import { SessionMessage } from "@opencode/core/session/message"
 import { SessionProjector } from "@opencode/core/session/projector"
 import { SessionStore } from "@opencode/core/session/store"
@@ -51,6 +52,7 @@ const readToolNode = makeLocationNode({
     FSUtil.node,
     Location.node,
     SandboxProvider.node,
+    SessionSkills.node,
   ],
 })
 

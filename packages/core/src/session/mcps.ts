@@ -48,6 +48,14 @@ export interface Interface {
 export class Service extends Context.Service<Service, Interface>()("@opencode/SessionMcps") {}
 
 const BASE_PORT = 9100
+/** Bridge readiness polling cadence: exponential backoff capped at the V1-verified 2s ceiling. */
+export const BRIDGE_RETRY_BASE_MS = 250
+export const BRIDGE_RETRY_MAX_MS = 2_000
+/** Default single-server readiness budget (~60s, matching V1's 30 × 2s window). */
+export const BRIDGE_RETRY_BUDGET_MS = 60_000
+/** Total budget one reconcile pass may spend connecting missing servers (V1 describeCodeMode gate). */
+export const RECONCILE_BUDGET_MS = 30_000
+export const bridgeRetryDelay = (attempt: number) => Math.min(BRIDGE_RETRY_BASE_MS * 2 ** attempt, BRIDGE_RETRY_MAX_MS)
 /** Close the single-quoted span, emit one literal quote, and reopen it. */
 const QUOTE_ESCAPE = "'\\''"
 const shellQuote = (value: string) => "'" + value.replaceAll("'", QUOTE_ESCAPE) + "'"
@@ -63,7 +71,16 @@ export function bridgeStartCommand(name: string, config: Mcp.LocalConfig, port: 
   // supergateway runs the stdio command through its own shell and inherits this
   // process's environment, so no extra `sh -lc` quoting layer is needed.
   const bridge = `${environment ? `env ${environment} ` : ""}supergateway --stdio ${shellQuote(stdio)} --outputTransport streamableHttp --stateful --port ${port} --logLevel none`
-  return `mkdir -p /tmp/opencode-mcp; nohup ${bridge} > ${shellQuote(base + ".log")} 2>&1 & echo $! > ${shellQuote(base + ".pid")}`
+  // Clear a stale bridge from a previous server lifetime before reusing the port: the exact
+  // pid file first, then any supergateway still holding the port. The `( |$)` word boundary
+  // keeps port 9100 from matching 91001, and the character class in "supergatewa[y]" stops the
+  // pattern from matching the launching shell's own command line. sleep waits out SIGTERM.
+  const stale = [
+    `if [ -f ${shellQuote(base + ".pid")} ]; then kill "$(cat ${shellQuote(base + ".pid")})" 2>/dev/null || true; fi`,
+    `pkill -f ${shellQuote(`supergatewa[y].*--port ${port}( |$)`)} 2>/dev/null || true`,
+    "sleep 0.5",
+  ].join("; ")
+  return `mkdir -p /tmp/opencode-mcp; ${stale}; nohup ${bridge} > ${shellQuote(base + ".log")} 2>&1 & echo $! > ${shellQuote(base + ".pid")}`
 }
 
 /** Builds the sandbox-side bridge stop command; exported for quoting regression tests. */
@@ -136,6 +153,7 @@ const layer = Layer.effect(
       name: SessionMcp.Name,
       config: Mcp.LocalConfig,
       port: number,
+      budgetMs: number,
     ) {
       if (!sandbox.enabled) return yield* McpClient.connect(name, config, session.location.directory)
       const started = yield* sandbox.run({
@@ -147,7 +165,8 @@ const layer = Layer.effect(
       if (started.exitCode !== 0)
         return yield* Effect.fail(new Error(`Failed to start session MCP ${name}: ${started.output}`))
       let failure: Error | undefined
-      for (let attempt = 0; attempt < 20; attempt++) {
+      const deadline = Date.now() + budgetMs
+      for (let attempt = 0; Date.now() < deadline; attempt++) {
         // The MCP client runs in the SaaS server, exactly like the session preview proxy.
         // The MCP-specific gateway flag decides this endpoint so cross-network deployments
         // can keep every other channel direct (deployment modes A/B/C).
@@ -172,16 +191,21 @@ const layer = Layer.effect(
           const cause = Cause.squash(result.cause)
           failure = cause instanceof Error ? cause : new Error(String(cause))
         }
-        yield* Effect.sleep("250 millis")
+        yield* Effect.sleep(`${bridgeRetryDelay(attempt)} millis`)
       }
       return yield* Effect.fail(failure ?? new Error(`Session MCP ${name} did not become reachable`))
     })
 
-    const connect = Effect.fnUntraced(function* (session: Session.Info, info: Info, port: number) {
+    const connect = Effect.fnUntraced(function* (
+      session: Session.Info,
+      info: Info,
+      port: number,
+      budgetMs: number,
+    ) {
       const scope = yield* Scope.fork(root)
       const result = yield* (
         info.config.type === "local"
-          ? connectLocal(session, info.name, info.config, port)
+          ? connectLocal(session, info.name, info.config, port, budgetMs)
           : McpClient.connect(info.name, info.config, session.location.directory)
       ).pipe(Effect.provideService(Environment.Service, environment), Scope.provide(scope), Effect.exit)
       if (result._tag === "Failure") {
@@ -228,11 +252,24 @@ const layer = Layer.effect(
       const usedPorts = new Set(
         Array.from(current.values(), (runtime) => runtime.port).filter((port): port is number => port !== undefined),
       )
+      // Soft gate (V1 describeCodeMode semantics): one reconcile pass never spends more than
+      // RECONCILE_BUDGET_MS connecting missing servers. Servers deferred here simply miss this
+      // pass; the next tools()/call() retries them with a fresh budget. Checking before each
+      // connect (instead of hard-interrupting) keeps already-forked scopes from leaking.
+      const deadline = Date.now() + RECONCILE_BUDGET_MS
       for (const info of desired.values()) {
         if (current.has(info.name)) continue
+        const remaining = deadline - Date.now()
+        if (remaining <= 0) {
+          yield* Effect.logWarning("session MCP reconcile budget exhausted; deferring server", {
+            sessionID: session.id,
+            server: info.name,
+          })
+          continue
+        }
         let port = BASE_PORT
         while (usedPorts.has(port)) port += 1
-        const runtime = yield* connect(session, info, port).pipe(
+        const runtime = yield* connect(session, info, port, Math.min(remaining, BRIDGE_RETRY_BUDGET_MS)).pipe(
           Effect.catch((error) =>
             Effect.logWarning("failed to connect session MCP", {
               sessionID: session.id,

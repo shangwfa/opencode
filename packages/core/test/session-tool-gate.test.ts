@@ -6,6 +6,7 @@ import { AppNodeBuilder } from "../src/effect/app-node-builder"
 import { SessionToolGate } from "../src/session/tool-gate"
 import { SessionTable, SessionExecutionGateTable, SandboxExecutionGateTable } from "../src/session/sql"
 import { SandboxTable } from "../src/sandbox/sql"
+import { SandboxCreateLease } from "../src/sandbox/create-lease"
 import { ProjectTable } from "../src/project/sql"
 import { Project } from "@opencode/schema/project"
 import { Session } from "@opencode/schema/session"
@@ -120,6 +121,101 @@ it.live("stale generation completion cannot close a replacement Sandbox admissio
 )
 
 const pg = process.env.OPENCODE_DATABASE_URL ? it.live : it.live.skip
+it.live("late boot cannot reopen a closed or deleted Session", () =>
+  Effect.gen(function* () {
+    const { db, root, sandboxID, gate } = yield* fixture
+    yield* gate.close(root, false)
+    expect(yield* gate.booted(root, sandboxID).pipe(Effect.isFailure)).toBe(true)
+    yield* db.delete(SessionTable).where(eq(SessionTable.id, root)).run()
+    expect(yield* gate.booted(root, sandboxID).pipe(Effect.isFailure)).toBe(true)
+  }),
+)
+pg("independent PG closure waits for atomic create claim and prevents late completion", () =>
+  Effect.gen(function* () {
+    const url = process.env.OPENCODE_DATABASE_URL
+    if (!url) return yield* Effect.die(new Error("PG test requires a dedicated database"))
+    const remote = new Bun.SQL(url)
+    yield* Effect.addFinalizer(() => Effect.promise(() => remote.close()))
+    const { db, root, gate } = yield* fixture
+    yield* db.update(SandboxTable).set({ state: "destroyed" }).where(eq(SandboxTable.session_id, root)).run()
+    const entered = yield* Deferred.make<void>()
+    const accepted = yield* Deferred.make<void>()
+    const claim = yield* gate
+      .creating(root, (tx) =>
+        Effect.gen(function* () {
+          yield* Deferred.succeed(entered, undefined)
+          yield* Deferred.await(accepted)
+          return yield* SandboxCreateLease.create({ db: tx, leaseMs: 30000, host: "test" }).claim(root)
+        }),
+      )
+      .pipe(Effect.forkScoped)
+    yield* Deferred.await(entered)
+    let closed = false
+    const closure = yield* Effect.promise(
+      () => remote`update session_execution_gate set state='closed',epoch=epoch+1 where session_id=${root}`,
+    ).pipe(
+      Effect.tap(() =>
+        Effect.sync(() => {
+          closed = true
+        }),
+      ),
+      Effect.forkScoped,
+    )
+    yield* Effect.sleep("50 millis")
+    expect(closed).toBe(false)
+    yield* Deferred.succeed(accepted, undefined)
+    const claimed = yield* Fiber.join(claim)
+    yield* Fiber.join(closure)
+    expect(closed).toBe(true)
+    if (claimed._tag !== "claimed") return yield* Effect.die(new Error("lease not acquired"))
+    expect(
+      yield* gate
+        .creating(root, (tx) =>
+          SandboxCreateLease.create({ db: tx, leaseMs: 30000, host: "test" }).complete(
+            root,
+            claimed.owner,
+            "late-source",
+          ),
+        )
+        .pipe(Effect.isFailure),
+    ).toBe(true)
+  }),
+)
+it.live("create claims and completion cannot pass a closed or deleted logical gate", () =>
+  Effect.gen(function* () {
+    const { db, root, gate } = yield* fixture
+    const options = { leaseMs: 30000, host: "test" }
+    yield* db.update(SandboxTable).set({ state: "destroyed" }).where(eq(SandboxTable.session_id, root)).run()
+    const claim = () => gate.creating(root, (tx) => SandboxCreateLease.create({ ...options, db: tx }).claim(root))
+    const claimed = yield* claim()
+    if (claimed._tag !== "claimed") return yield* Effect.die(new Error("lease not acquired"))
+    yield* gate.close(root, false)
+    expect(yield* claim().pipe(Effect.isFailure)).toBe(true)
+    expect(
+      yield* gate
+        .creating(root, (tx) =>
+          SandboxCreateLease.create({ ...options, db: tx }).complete(root, claimed.owner, "late-source"),
+        )
+        .pipe(Effect.isFailure),
+    ).toBe(true)
+    yield* db.delete(SessionTable).where(eq(SessionTable.id, root)).run()
+    expect(yield* claim().pipe(Effect.isFailure)).toBe(true)
+    expect((yield* db.select().from(SandboxTable).where(eq(SandboxTable.session_id, root)).get())?.id).toBe(
+      SandboxCreateLease.creatingID(claimed.owner),
+    )
+  }),
+)
+
+it.live("completed physical destruction allows a new create, but physical teardown blocks it", () =>
+  Effect.gen(function* () {
+    const { root, sandboxID, gate } = yield* fixture
+    const closure = yield* gate.close(root, true, sandboxID)
+    if (!closure) return yield* Effect.die(new Error("missing closure"))
+    expect(yield* gate.creating(root, () => Effect.succeed(true)).pipe(Effect.isFailure)).toBe(true)
+    yield* gate.destroyed(root, closure)
+    expect(yield* gate.creating(root, () => Effect.succeed(true))).toBe(true)
+  }),
+)
 for (const state of ["snapshotting", "killed", "destroyed"] as const) {
   it.live(`tool admission rejects a PG ${state} source even when its gate is open`, () =>
     Effect.gen(function* () {

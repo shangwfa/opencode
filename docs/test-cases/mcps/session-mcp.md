@@ -2,6 +2,51 @@
 
 > **V2 状态（2026-09-27）**：本文件以下历史用例使用 V1 `/session/:id/mcps/create` 契约，不能作为当前实现的验收依据。V2 使用 `/api/session/:sessionID/mcps`，payload 为 `{name, config}`，其中 `config` 是当前 `Mcp.ServerConfig`（`disabled` 取代 V1 `enabled`）。
 
+## V2 执行记录 2026-10-05（V1 对比借鉴：T22.21 残留进程清理）
+
+> **背景**：对比 `feat/opencode-1.18.31`（V1 线上验证实现）与当前 V2 的 session-mcp 链路，识别出 V1 做得好、V2 确实缺失的点，按"先沉淀用例 → 复现 → 修复 → 复测"流程执行。
+
+### V1 vs V2 关键差异结论
+
+| 维度 | V1 | V2 | 评估 |
+|------|----|----|------|
+| 沙箱残留进程兜底 | 启动前 `pkill` 同端口 supergateway + stale pid 批量清理 | 仅 kill 自己 pid 文件内进程 | **V2 缺口，已修复（T22.21）** |
+| 连接重试窗口 | 30 次 × 2s（~60s，适配慢启动/pod 回收） | 20 次 × 250ms（5s） | V2 过短，待办（T22.22） |
+| 工具发现总闸门 | `describeCodeMode` 外层 `Effect.timeout("30 seconds")` + 降级空对象 | 无总超时，reconcile 串行 connect 累积 | 待办（T22.23） |
+| 配置漂移检测 | 无（缓存不校验配置变化） | reconcile + `isDeepStrictEqual` | V2 更好 |
+| 子会话共享 | 无（按 sessionID 直查，子会话拿不到） | `SessionResourceOwner` 上溯共享 | V2 更好（行为差异，迁移用例注意） |
+| 写后生效 | upsert 后 `clearSessionCache` 全量断开 | 下次 select reconcile 增量重建 | V2 更好 |
+| endpoint 重解析 | 每次重试重新解析（防 pod 回收 URL 过期） | 循环内重新解析 | 等价（V2 已吸收） |
+
+### T22.21 沙箱残留 supergateway 兜底清理（已修复）
+
+**问题**：SaaS 服务重启后 `runtimes` 内存丢失，keep-alive/快照沙箱中旧 supergateway 仍占 9100 端口；新 bridge 同端口启动失败（nohup 后台启动 exitCode 恒 0，现有检查发现不了），且新 pid 文件覆盖后指向已死进程，后续 stop 永远 kill 不掉旧僵尸。
+
+**修复**（`packages/core/src/session/mcps.ts` `bridgeStartCommand`，借鉴 V1 并加固）：
+1. 启动前先按 pid 文件精确 kill；
+2. `pkill -f 'supergatewa[y].*--port {port}( |$)'` 端口级兜底——`( |$)` 词边界防 9100 误杀 91001，字符类 `[y]` 防 pkill 匹配到启动 shell 自身命令行；
+3. `sleep 0.5` 等 SIGTERM 异步生效（与 V1 线上参数一致）。
+
+**测试**（`packages/core/test/session-mcps.test.ts` 新增 `SessionMcps stale bridge cleanup` 2 用例，先失败复现后修复通过）：
+- 断言生成命令含 pid kill / pkill 且均位于 `nohup` 之前、词边界存在、`bash -n` 语法通过；
+- 真实进程验证：本机起两个假 supergateway（`--port 9100` / `--port 91001`），执行生成命令中的 pkill 模式，9100 死、91001 活。
+
+**结果**：core 单测 5/5、server `test/session-mcps.test.ts` 1/1（16 assertions）、`tsgo` typecheck 通过。**E2E 待跑**（需 Docker：沙箱内预置占 9100 的假 supergateway + 指向死进程的 pid 文件 → 创建 local MCP → 工具可用且旧进程被杀）。
+
+### 待办（后续按同流程执行）
+
+- **T22.22 连接重试窗口**（✅ 已实现 2026-10-05）：`bridgeRetryDelay(attempt)` 指数退避（250ms ×2，上限 2s），单 server 就绪预算 `BRIDGE_RETRY_BUDGET_MS = 60s`（对齐 V1 30×2s），deadline 驱动循环取代固定 20×250ms；`config.timeout.startup` 仍独立控制 SDK 单次连接超时（两层各司其职）；
+- **T22.23 reconcile 总闸门**（✅ 已实现 2026-10-05）：`RECONCILE_BUDGET_MS = 30s` 软闸门（V1 `describeCodeMode` 语义）——每个 connect 前 clamp `min(剩余, 60s)`，预算耗尽 logWarning + 跳过（下次 select 带新预算重试）。**取舍说明**：选择软闸门而非 V1 的 `Effect.timeout` 硬中断，因为硬中断会留下已 fork 未 close 的 scope 与半开 client（泄漏）；软闸门上界为"预算 + 最后一次 connect 的 SDK startup timeout"（~60s），仍远优于无闸门的串行无限累积。
+
+**T22.22/T22.23 测试**（`packages/core/test/session-mcps.test.ts` 新增 `SessionMcps connect retry cadence` 3 用例）：退避序列精确值（250/500/1000/2000/2000…）、60s 预算内 ≥30 次尝试（≥ V1）、`RECONCILE_BUDGET_MS ≤ BRIDGE_RETRY_BUDGET_MS` 分层关系防退化。结果：core 8/8、server 1/1、`tsgo` typecheck 通过。
+
+### 分析中发现的其他问题（未修，已记录）
+
+1. **并发 reconcile 无锁**：同一 session 并发 select 可能双连同一端口（V1 同样存在，非回归）；
+2. **nohup exitCode 恒 0**：`sandbox.run` 成功不代表 bridge 存活，实际失败靠轮询暴露（本次修复的 pkill 兜底已覆盖主要风险场景）；
+3. **孤儿端口泄漏**：SaaS 重启后 name→端口映射可能漂移（旧 B 在 9101，新分配 B 到 9100），9101 旧进程无人清理直到沙箱销毁；V1 的"每 session 一次全目录 stale 清理"可解但有启动顺序竞争，需单独设计；
+4. **V1→V2 迁移注意**：ID 前缀 `smc_` → `smcp_`、`enabled` → `config.disabled` 语义反转、扁平列 → config jsonb。
+
 ## V2 执行记录 2026-09-27
 
 > **环境**：Docker `opencode-saas-mcp-v2:local`（`localhost:14099`）、PostgreSQL `opencode-v2-up`、本地 OpenSandbox（`supergateway` 已内置于 sandbox 镜像）、`Yd-DeepSeek/deepseek-v4-flash`。
