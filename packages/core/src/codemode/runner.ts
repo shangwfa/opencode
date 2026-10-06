@@ -9,7 +9,12 @@ const quote = (value: string) => `'${value.replaceAll("'", `'\\''`)}'`
 /** Start the image-baked Runner as a detached daemon. No source or credential is passed here. */
 export function startCommand() {
   const command = "node /opt/opencode-codemode-runner.mjs"
-  const start = `if [ -s ${quote(PID_FILE)} ] && kill -0 "$(cat ${quote(PID_FILE)})" 2>/dev/null; then echo runner-already-running; else rm -f ${quote(PID_FILE)}; nohup ${command} > ${quote(LOG_FILE)} 2>&1 </dev/null & pid=$!; echo "$pid" > ${quote(PID_FILE)}; echo "runner-started:$pid"; fi`
+  // A gateway can resolve/upgrade before the detached target starts listening.
+  // Probe locally before any user execution is sent; never replay execute frames.
+  // Stay inside the existing 10s command budget and hold the launcher lock until
+  // ready, so concurrent starts observe the same daemon rather than spawning more.
+  const ready = `const fs=require("node:fs"),net=require("node:net");const pid=Number(fs.readFileSync(${JSON.stringify(PID_FILE)},"utf8"));const deadline=Date.now()+7500;const fail=(message)=>{console.error(message);process.exit(1)};function probe(){try{process.kill(pid,0)}catch{fail("Code Mode Runner exited before readiness");return}if(Date.now()>=deadline){fail("Code Mode Runner readiness timed out");return}const socket=net.connect({host:"127.0.0.1",port:${PORT}});socket.setTimeout(250);socket.once("connect",()=>{socket.destroy();console.log("runner-ready")});socket.once("error",()=>{socket.destroy();setTimeout(probe,25)});socket.once("timeout",()=>{socket.destroy();setTimeout(probe,25)})}probe()`
+  const start = `if [ -s ${quote(PID_FILE)} ] && kill -0 "$(cat ${quote(PID_FILE)})" 2>/dev/null; then echo runner-already-running; else rm -f ${quote(PID_FILE)}; nohup ${command} > ${quote(LOG_FILE)} 2>&1 </dev/null & pid=$!; echo "$pid" > ${quote(PID_FILE)}; echo "runner-started:$pid"; fi; node -e ${quote(ready)}`
   // `-o` closes the lock fd before running the launcher: the nohup'd daemon
   // inherits open fds, and an inherited flock fd would hold this exclusive
   // lock for the daemon's whole lifetime, so every later start in the session
@@ -46,7 +51,7 @@ export const start = Effect.fn("CodeModeRunner.start")(function* (input: {
     command: startCommand(),
     timeoutMs: 10_000,
   })
-  if (started.exitCode !== 0)
+  if (started.timedOut || started.exitCode !== 0)
     return yield* Effect.fail(new Error(`Failed to start Code Mode Runner: ${started.output}`))
 
   let last = yield* resolve()

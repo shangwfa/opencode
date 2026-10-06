@@ -1,6 +1,79 @@
 import { describe, expect, test } from "bun:test"
 import { Effect } from "effect"
 import { CodeModeRunner } from "../src/codemode/runner"
+import { mkdtemp, writeFile, chmod, rm, readFile } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import path from "node:path"
+import net from "node:net"
+import { it } from "./lib/effect"
+
+async function launcherFixture(delay: number, crashes = false) {
+  const directory = await mkdtemp(path.join(tmpdir(), "codemode-ready-"))
+  const listener = net.createServer()
+  await new Promise<void>((resolve) => listener.listen(0, "127.0.0.1", resolve))
+  const address = listener.address()
+  if (!address || typeof address === "string") throw new Error("missing fixture port")
+  const port = address.port
+  await new Promise<void>((resolve) => listener.close(() => resolve()))
+  const pidFile = path.join(directory, "runner.pid")
+  const script = path.join(directory, "runner.mjs")
+  await writeFile(script, crashes ? "process.exit(1)" : `import net from 'node:net'; setTimeout(()=>net.createServer(s=>s.end()).listen(${port},'127.0.0.1'),${delay})`)
+  const flock = path.join(directory, "flock")
+  // macOS has no flock. This fixture exercises the launched command and local
+  // readiness; real lock behavior remains covered by Linux sandbox probes.
+  await writeFile(flock, '#!/bin/sh\nshift 4\nexec sh -c "$1"\n')
+  await chmod(flock, 0o755)
+  const command = CodeModeRunner.startCommand()
+    .replaceAll("/opt/opencode-codemode-runner.mjs", script)
+    .replaceAll("/tmp/opencode-codemode-runner.pid", pidFile)
+    .replaceAll("/tmp/opencode-codemode-runner.log", path.join(directory, "runner.log"))
+    .replaceAll("9911", String(port))
+    .replaceAll("7500", "400")
+  const run = async () => {
+    const child = Bun.spawn(["sh", "-c", command], { env: { ...process.env, PATH: `${directory}:${process.env.PATH}` }, stdout: "pipe", stderr: "pipe" })
+    const [exitCode, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()])
+    return { exitCode, stdout, stderr }
+  }
+  const listening = async () => new Promise<boolean>((resolve) => {
+    const socket = net.connect({ port, host: "127.0.0.1" })
+    socket.on("connect", () => { socket.destroy(); resolve(true) })
+    socket.on("error", () => { socket.destroy(); resolve(false) })
+  })
+  const cleanup = async () => {
+    const pid = Number(await readFile(pidFile, "utf8").catch(() => ""))
+    if (pid > 0) { try { process.kill(pid, "SIGKILL") } catch {} }
+    await rm(directory, { recursive: true, force: true })
+  }
+  return { run, listening, cleanup, pidFile }
+}
+
+it.live("launcher waits for a delayed Runner listener and reuses a warm daemon", () => Effect.promise(async () => {
+  const fixture = await launcherFixture(150)
+  try {
+    expect((await fixture.run()).exitCode).toBe(0)
+    expect(await fixture.listening()).toBe(true)
+    const pid = await readFile(fixture.pidFile, "utf8")
+    expect((await fixture.run()).exitCode).toBe(0)
+    expect(await readFile(fixture.pidFile, "utf8")).toBe(pid)
+  } finally { await fixture.cleanup() }
+}))
+
+it.live("launcher fails within its readiness budget when the daemon never listens", () => Effect.promise(async () => {
+  const fixture = await launcherFixture(60000)
+  try {
+    const result = await fixture.run()
+    expect(result.exitCode).not.toBe(0)
+    expect(result.stderr).toContain("readiness timed out")
+  } finally { await fixture.cleanup() }
+}))
+
+it.live("launcher reports a daemon that exits before listening", () => Effect.promise(async () => {
+  const fixture = await launcherFixture(0, true)
+  try {
+    expect((await fixture.run()).exitCode).not.toBe(0)
+    expect(await fixture.listening()).toBe(false)
+  } finally { await fixture.cleanup() }
+}))
 
 describe("CodeModeRunner", () => {
   test("starts a detached image-baked runner without passing execution data", () => {
@@ -110,6 +183,66 @@ describe("CodeModeRunner", () => {
       })
       expect(result).toEqual({ ok: true, value: 5, toolCalls: [{ name: "math.add" }] })
       expect(updates).toEqual([[{ tool: "math.add", status: "running" }]])
+    } finally {
+      server.stop(true)
+    }
+  })
+
+  test("a resolved gateway does not establish readiness of a cold Runner", async () => {
+    let ready = false
+    let launches = 0
+    const server = Bun.serve({
+      port: 0,
+      fetch(request, current) {
+        if (current.upgrade(request, { data: undefined })) return undefined
+        return new Response("websocket required", { status: 400 })
+      },
+      websocket: {
+        open(socket) {
+          if (!ready) socket.close(1011, "runner target is not listening")
+        },
+        message(socket, raw) {
+          const frame = JSON.parse(String(raw))
+          socket.send(
+            JSON.stringify({
+              type: "execution.result",
+              executionID: frame.executionID,
+              result: { ok: true, value: 7, toolCalls: [] },
+            }),
+          )
+        },
+      },
+    })
+    try {
+      const endpoint = { _tag: "resolved" as const, sandboxId: "sb_cold_runner", endpoint: `127.0.0.1:${server.port}` }
+      const provider = {
+        run: () =>
+          Effect.sync(() => {
+            launches++
+            return { exitCode: 0, output: "runner-started", timedOut: false }
+          }),
+        endpoint: () => Effect.succeed(endpoint),
+      }
+      const returned = await Effect.runPromise(
+        CodeModeRunner.start({ provider: provider as never, sessionID: "ses_cold_runner", hostWorkdir: "/workspace" }),
+      )
+      expect(launches).toBe(1)
+      expect(ready).toBe(false)
+      const execute = () =>
+        CodeModeRunner.execute({
+          endpoint: returned.endpoint,
+          executionID: "cme_cold_runner",
+          code: "return 7",
+          web: false,
+          tools: [],
+          limits: {},
+          tool: async () => {
+            throw new Error("unexpected tool callback")
+          },
+        })
+      await expect(execute()).rejects.toThrow("connection closed before completion")
+      ready = true
+      await expect(execute()).resolves.toEqual({ ok: true, value: 7, toolCalls: [] })
     } finally {
       server.stop(true)
     }
