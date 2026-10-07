@@ -2,6 +2,24 @@
 
 > **V2 状态（2026-09-28）**：V1 的 `packages/opencode/src/flag/flag.ts` 开关已迁移为 V2 `SandboxConfig`（`packages/core/src/sandbox/config.ts`）：`OPENCODE_SANDBOX_MCP_SERVER_PROXY`（**缺省 `true`**）仅作用于 Session local MCP 的桥接 endpoint（`SessionMcps.mcpUseServerProxy = useServerProxy || mcpServerProxy`），其余 endpoint 调用方（session preview proxy 等）继续跟随全局 `OPENCODE_SANDBOX_USE_SERVER_PROXY`，开关矩阵 A/B/C 语义与 V1 一致。V2 日志以 `session MCP endpoint resolved`（含 `url`/`useServerProxy`）为 endpoint 形态观察点。
 
+## V2 执行记录 2026-10-08（当前代码全量重跑）
+
+> **环境**：组合 3（本地 PG `opencode-v2-up` + 本地 OpenSandbox Docker runtime + 容器 `:14096`，镜像含 2026-10-05/07/08 全部 session-mcp 修复），模型 `Yd-GLM/glm-5.3-flash`。每模式 = 按 env 重建容器后完整验证。
+
+| 用例 | 模式 | 结果 | 证据 |
+|---|---|---|---|
+| T60.1 | A 纯直连（`USE=false` + `MCP=false`） | ✅ | `url=http://192.168.31.176:52999/proxy/9100/mcp useServerProxy=false`（LAN 直连形态，无 `/sandboxes/{id}/` 段）；`Echo: direct-verify-ok` |
+| T60.2 | B MCP 强制网关（`USE=false` + `MCP=true`） | ✅ | `url=http://host.docker.internal:8080/v1/sandboxes/{id}/proxy/9100/mcp useServerProxy=true`（网关形态）；`Echo: mixed-verify-ok`；同会话 shell/exec 通道正常（开关独立性） |
+| T60.3 | C 全网关（`USE=true`） | ✅ | 网关形态；`Echo: proxy-verify-ok` |
+| T60.5 | 缺省（`USE=false` + 不设 `MCP`） | ✅ | 缺省 true → 网关形态；`Echo: default-true-ok` |
+| T60.4 | 单测 | ✅ | `packages/core/test/session-mcps.test.ts` 的 `SessionMcps MCP endpoint mode`（A/B/C/全网关回落矩阵），随 11 用例持续全过 |
+
+**endpoint 形态判定规则（本地组合 3 实测）**：
+- 直连：`http://<宿主 LAN IP>:<OpenSandbox server 端口>/proxy/<沙箱端口>/mcp`（无 sandbox id 段）；
+- 网关：`http://host.docker.internal:8080/v1/sandboxes/<id>/proxy/<沙箱端口>/mcp`。
+
+**执行注记**：MCP service 的结构化日志**不进 docker logs**（沿袭 V1 已知限制），落点为容器内 `/home/opencode/.local/share/opencode/log/opencode-local.log`（logfmt，`message="session MCP endpoint resolved"` 带 `url`/`useServerProxy` 字段）——endpoint 形态断言须从这里取。**本地 direct 可达性**：本轮 A 模式在 OrbStack 本地环境 direct 形态直接可用（9-28 记录的代理 TUN 污染 / eip 语义冲突问题当前未复现）；跨网段部署仍应使用 B/C 或保持缺省 true。
+
 ## V2 执行记录 2026-09-28
 
 > **环境**：Docker `opencode-saas-mcp-v2:local`（`localhost:14099`）、PostgreSQL `opencode-v2-up`、本地 OpenSandbox（Docker runtime 0.2.2）、`Yd-DeepSeek/deepseek-v4-flash`。
@@ -38,30 +56,21 @@
 
 ## 前置条件
 
-| 条件      | 说明                                                                                                                                      |
-| --------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| SaaS 容器 | 镜像含 `MCP_ENDPOINT_SERVER_PROXY` 改动；本篇实测镜像 `opencode-saas-sandbox-test:mcp-proxy-t0906`                                        |
-| 组合      | 本地 PG + 远端沙箱（本地 PG=127.0.0.1:5432 local 用户，容器经 15432 转发；沙箱 API 经 `host.docker.internal:30040` → 172.18.32.15:30040） |
-| 模型      | `Yd-DeepSeek/deepseek-v4-flash`（本地 PG 需已配置 provider auth）                                                                         |
-| 观察手段  | `docker logs opencode-saas-test                                                                                                           | grep "sandbox endpoint resolved"`——MCP service 的 Effect 日志不进 docker logs（已知限制），endpoint 形态与调用成功与否均以此 + PG 断言为准 |
+| 条件      | 说明 |
+| --------- | ---- |
+| SaaS 容器 | 含 V2 `SessionMcps.mcpUseServerProxy` 实现（当前镜像即含） |
+| 组合      | 组合 3（本地 PG `opencode-v2-up` + 本地 OpenSandbox Docker runtime） |
+| 模型      | `Yd-GLM/glm-5.3-flash` |
+| 观察手段  | endpoint 形态以服务日志 `session MCP endpoint resolved`（含 `url`/`useServerProxy`）为准；调用成功以 context 的 completed 工具 part + `Echo: <marker>` 精确输出为准 |
 
-模式切换 = 重建容器（改两个 env），验证脚本对 A/B/C 通用：
+模式切换 = 重建容器（改两个 env）。通用验证（V2 契约）：
 
-```bash
-SID=$(curl -sf -X POST "http://localhost:14096/session" -H 'Content-Type: application/json' \
-  -d '{"title":"mcp-endpoint-mode"}' | python3 -c "import json,sys; print(json.load(sys.stdin)['id'])")
-curl -sf -X POST "http://localhost:14096/session/$SID/mcps/create" -H 'Content-Type: application/json' \
-  -d '{"name":"echo","type":"local","command":["npx","-y","@modelcontextprotocol/server-everything"]}' >/dev/null
-BEFORE=$(psql "postgresql://local@127.0.0.1:5432/opencode" -tAc \
-  "SELECT coalesce(max(time_created),0) FROM part WHERE session_id='$SID' AND data->>'tool'='execute'")
-curl -s -m 180 -X POST "http://localhost:14096/session/$SID/message" -H 'Content-Type: application/json' \
-  -d '{"parts":[{"type":"text","text":"必须使用 execute 工具，执行精确代码：return await tools.echo.echo({message: \"<模式标记>\"})"}],"model":{"providerID":"Yd-DeepSeek","modelID":"deepseek-v4-flash"}}' >/dev/null
-# 硬断言（勿信模型自然语言回复）
-psql "postgresql://local@127.0.0.1:5432/opencode" -tAc \
-  "SELECT data->'state' FROM part WHERE session_id='$SID' AND data->>'tool'='execute' AND time_created > $BEFORE ORDER BY time_created DESC LIMIT 1" \
-  | python3 -c "import json,sys; s=json.load(sys.stdin); print(s['status'], s.get('output'), s.get('metadata',{}).get('toolCalls'))"
-# endpoint 形态
-docker logs opencode-saas-test 2>&1 | grep "sandbox endpoint resolved" | tail -3
+```js
+// 1) 创建 session + keep-alive + 沙箱预热 everything（npm install -g）
+// 2) 注册：POST /api/session/:id/mcps {name:"echo", config:{type:"local", command:["npx","-y","@modelcontextprotocol/server-everything"]}}
+// 3) 轮次：POST /api/session/:id/prompt_stream {text:"必须使用 execute 工具，执行精确代码：return await tools.echo.echo({message: \"<模式标记>\"})", model}
+// 4) 硬断言（勿信模型自然语言）：context 中 completed 工具 part 输出含 `Echo: <模式标记>`
+// 5) endpoint 形态：docker logs opencode-saas-test | grep "session MCP endpoint resolved" | tail
 ```
 
 ---
@@ -99,11 +108,10 @@ docker logs opencode-saas-test 2>&1 | grep "sandbox endpoint resolved" | tail -3
 ### T60.4 单测（确定性覆盖）
 
 ```bash
-cd packages/opencode
-bun test test/tool/sandbox-endpoint-proxy.test.ts
+cd packages/core && bun test test/session-mcps.test.ts   # "SessionMcps MCP endpoint mode"
 ```
 
-**期望**：3 pass（缺省直连不触发网关查询 / `useServerProxy=true` 网关 URL 按 `config.protocol` 拼 scheme / 同会话混合调用沙箱复用且互不污染）。该文件使用进程级 `mock.module`，须与其他 mock SDK 的测试分进程运行。
+**期望**：A/B/C 矩阵与全网关回落全过（`mcpUseServerProxy = useServerProxy || mcpServerProxy` 的四组合 + 缺省语义）。V1 的 `packages/opencode/test/tool/sandbox-endpoint-proxy.test.ts` 已随代码迁移：endpoint 实现层在 `packages/core/src/sandbox/provider.ts`（`getSandboxEndpoint`），开关决策层即本用例组。
 
 ### T60.5 缺省值验证：不设开关
 
@@ -113,13 +121,13 @@ bun test test/tool/sandbox-endpoint-proxy.test.ts
 
 ## 测试矩阵
 
-| 编号  | 模式           | 关键验证点                                   |
-| ----- | -------------- | -------------------------------------------- |
-| T60.1 | A 纯直连       | endpoint=沙箱直连地址；MCP 调用成功          |
-| T60.2 | B MCP 强制网关 | endpoint=网关路径；exec 通道仍直连；调用成功 |
-| T60.3 | C 全网关       | endpoint=网关路径；调用成功                  |
-| T60.4 | 单测           | 三分支确定性断言                             |
-| T60.5 | 兼容           | 不设开关行为不变                             |
+| 编号  | 模式           | 关键验证点                                   | 本轮结果 |
+| ----- | -------------- | -------------------------------------------- | -------- |
+| T60.1 | A 纯直连       | endpoint=沙箱直连地址；MCP 调用成功          | ✅ 2026-10-08 |
+| T60.2 | B MCP 强制网关 | endpoint=网关路径；exec 通道仍直连；调用成功 | ✅ 2026-10-08 |
+| T60.3 | C 全网关       | endpoint=网关路径；调用成功                  | ✅ 2026-10-08 |
+| T60.4 | 单测           | A/B/C/全网关回落矩阵确定性断言              | ✅ 2026-10-08 |
+| T60.5 | 兼容           | 不设开关（缺省 true）行为                    | ✅ 2026-10-08 |
 
 ## 复测记录
 
