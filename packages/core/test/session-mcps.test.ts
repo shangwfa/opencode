@@ -5,10 +5,13 @@ import {
   BRIDGE_RETRY_BASE_MS,
   BRIDGE_RETRY_BUDGET_MS,
   BRIDGE_RETRY_MAX_MS,
+  CONNECT_BACKOFF_MAX_MS,
   RECONCILE_BUDGET_MS,
   bridgeRetryDelay,
   bridgeStartCommand,
   bridgeStopCommand,
+  bridgeSweepCommand,
+  connectBackoffMs,
   mcpUseServerProxy,
 } from "@opencode/core/session/mcps"
 
@@ -53,6 +56,16 @@ describe("SessionMcps bridge commands", () => {
     const start = bridgeStartCommand("q", Mcp.LocalConfig.make({ type: "local", command }), 9101)
     assertParses(start)
     expect(stdioArgv(start)).toEqual(command)
+  })
+
+  test("sweep kills every pid file, removes them, and pkill cannot match the sweeping shell", () => {
+    const sweep = bridgeSweepCommand()
+    assertParses(sweep)
+    expect(sweep).toContain('for pidfile in /tmp/opencode-mcp/*.pid')
+    expect(sweep).toContain('rm -f /tmp/opencode-mcp/*.pid')
+    // Character class keeps the pattern from matching its own command line.
+    expect(sweep).toContain("supergatewa[y].*--stdio")
+    expect(sweep).not.toMatch(/pkill -f 'supergateway/)
   })
 })
 
@@ -128,6 +141,23 @@ describe("SessionMcps connect retry cadence", () => {
     // The soft gate clamps each connect to min(remaining, BRIDGE_RETRY_BUDGET_MS); keeping the
     // reconcile budget smaller preserves the V1 gate semantics (a pass never waits > gate).
     expect(RECONCILE_BUDGET_MS).toBeLessThanOrEqual(BRIDGE_RETRY_BUDGET_MS)
+  })
+})
+
+describe("SessionMcps connect failure backoff", () => {
+  test("backs off exponentially and caps at five minutes", () => {
+    expect(connectBackoffMs(1)).toBe(30_000)
+    expect(connectBackoffMs(2)).toBe(60_000)
+    expect(connectBackoffMs(3)).toBe(120_000)
+    expect(connectBackoffMs(4)).toBe(240_000)
+    expect(connectBackoffMs(5)).toBe(CONNECT_BACKOFF_MAX_MS)
+    expect(connectBackoffMs(9)).toBe(CONNECT_BACKOFF_MAX_MS)
+  })
+
+  test("first backoff covers a full reconcile budget", () => {
+    // The retry lands at least one full budget window after the failure, so a backed-off
+    // server never shares a pass with the budget it already burned.
+    expect(connectBackoffMs(1)).toBeGreaterThanOrEqual(RECONCILE_BUDGET_MS)
   })
 })
 

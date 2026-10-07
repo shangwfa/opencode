@@ -2,11 +2,12 @@ export * as SessionMcps from "./mcps.js"
 
 import { and, eq, sql } from "drizzle-orm"
 import { isDeepStrictEqual } from "node:util"
-import { Cause, Context, Effect, Exit, Layer, Scope } from "effect"
+import { Cause, Context, Effect, Exit, FiberSet, Layer, Scope } from "effect"
 import { makeLocationNode } from "@opencode/util/effect/app-node"
 import { Mcp } from "@opencode/schema/mcp"
 import { SessionMcp } from "@opencode/schema/session-mcp"
 import { Database } from "../database/database.js"
+import { KeyedMutex } from "../effect/keyed-mutex.js"
 import { McpClient } from "../mcp/client.js"
 import { SandboxProvider } from "../sandbox/provider.js"
 import { SandboxConfig } from "../sandbox/config.js"
@@ -26,6 +27,12 @@ type Runtime = {
   readonly tools: ReadonlyArray<McpClient.Tool>
 }
 
+type FailureBackoff = {
+  readonly config: SessionMcp.Config
+  readonly failures: number
+  readonly until: number
+}
+
 export type Tool = McpClient.Tool & { readonly server: SessionMcp.Name; readonly codemode?: boolean }
 
 export interface Interface {
@@ -33,7 +40,7 @@ export interface Interface {
   readonly create: (sessionID: Session.ID, input: Payload) => Effect.Effect<Info>
   readonly remove: (session: Session.Info, name: SessionMcp.Name) => Effect.Effect<void>
   readonly clear: (session: Session.Info) => Effect.Effect<void>
-  /** Close all live clients before a Session sandbox is destroyed. */
+  /** Close the owner's shared live clients before a Session sandbox is destroyed; child sessions release nothing. */
   readonly release: (session: Session.Info) => Effect.Effect<void>
   /** Connect enabled definitions and return their currently advertised MCP tools. */
   readonly tools: (session: Session.Info) => Effect.Effect<ReadonlyArray<Tool>>
@@ -55,6 +62,16 @@ export const BRIDGE_RETRY_MAX_MS = 2_000
 export const BRIDGE_RETRY_BUDGET_MS = 60_000
 /** Total budget one reconcile pass may spend connecting missing servers (V1 describeCodeMode gate). */
 export const RECONCILE_BUDGET_MS = 30_000
+/**
+ * Failure backoff for servers whose connect failed. Without it, a broken definition that sorts
+ * first consumes the whole reconcile budget on every select — starving later servers and adding
+ * the full budget as latency to every request. One failure enters backoff; a config change
+ * invalidates the entry so a fixed definition retries immediately. Exported for tests.
+ */
+export const CONNECT_BACKOFF_BASE_MS = 30_000
+export const CONNECT_BACKOFF_MAX_MS = 300_000
+export const connectBackoffMs = (failures: number) =>
+  Math.min(CONNECT_BACKOFF_BASE_MS * 2 ** (failures - 1), CONNECT_BACKOFF_MAX_MS)
 export const bridgeRetryDelay = (attempt: number) => Math.min(BRIDGE_RETRY_BASE_MS * 2 ** attempt, BRIDGE_RETRY_MAX_MS)
 /** Close the single-quoted span, emit one literal quote, and reopen it. */
 const QUOTE_ESCAPE = "'\\''"
@@ -90,6 +107,18 @@ export function bridgeStopCommand(name: string, port: number): string {
 }
 
 /**
+ * Sandbox-wide stale bridge sweep (V1's mcpCleanedSessions semantics, tightened for V2).
+ * After a SaaS restart the in-memory runtimes are gone while keep-alive sandboxes still hold
+ * the old bridges — including port-drift orphans that per-port cleanup can never reach. The
+ * caller must only run this when the owner currently has NO live bridged runtime: every
+ * supergateway in the sandbox is then stale by definition, so pid-file kills plus a
+ * self-match-proof pkill are both safe. Exported for quoting regression tests.
+ */
+export function bridgeSweepCommand(): string {
+  return `for pidfile in /tmp/opencode-mcp/*.pid; do [ -f "$pidfile" ] && kill "$(cat "$pidfile")" 2>/dev/null; done; rm -f /tmp/opencode-mcp/*.pid; pkill -f ${shellQuote("supergatewa[y].*--stdio")} 2>/dev/null || true`
+}
+
+/**
  * MCP endpoint mode. The MCP-specific flag wins unless the global flag already
  * forces the gateway, matching the documented A/B/C deployment matrix:
  * A direct (`useServerProxy=false, mcpServerProxy=false`), B MCP-only gateway
@@ -119,23 +148,36 @@ const layer = Layer.effect(
     const sandboxConfig = SandboxConfig.load()
     const environment = yield* Environment.Service
     const root = yield* Effect.scope
+    const fork = yield* FiberSet.makeRuntime<never, void, never>()
+    // Runtimes are keyed by resource owner, not by session: child sessions share the owner's
+    // definitions AND connections, so one bridge serves the whole resource domain (one sandbox).
+    // Per-session keys used to collide on BASE_PORT inside the shared sandbox.
     const runtimes = new Map<Session.ID, Map<SessionMcp.Name, Runtime>>()
+    // Serializes reconcile per resource owner (parent and children share one key), closing
+    // the gap where concurrent selects double-connected one server and pkilled each other.
+    const locks = KeyedMutex.makeUnsafe<Session.ID>()
+    // Per-owner connect-failure backoff, guarded by the same lock as runtimes. Config-keyed so
+    // an upsert that fixes a broken definition retries immediately instead of waiting out the TTL.
+    const backoffs = new Map<Session.ID, Map<SessionMcp.Name, FailureBackoff>>()
+    // Owners whose sandbox has been swept once this server lifetime. Resets on restart — which
+    // is exactly the scenario the sweep exists for (in-memory runtimes gone, old bridges alive).
+    const swept = new Set<Session.ID>()
+    // stop() is idempotent: connection callbacks (onClose) fire synchronously during
+    // Scope.close, and the eviction path must not re-run teardown for a stopped runtime.
+    const stopped = new WeakSet<Runtime>()
+    const storedByOwner = (ownerID: Session.ID) =>
+      db
+        .select()
+        .from(SessionMcpTable)
+        .where(eq(SessionMcpTable.session_id, ownerID))
+        .all()
+        .pipe(Effect.map((rows) => rows.map(fromRow).toSorted((a, b) => a.name.localeCompare(b.name))), Effect.orDie)
     const stored = (sessionID: Session.ID) =>
-      SessionResourceOwner.id(db, sessionID).pipe(
-        Effect.flatMap((ownerID) =>
-          db
-            .select()
-            .from(SessionMcpTable)
-            .where(eq(SessionMcpTable.session_id, ownerID))
-            .all()
-            .pipe(
-              Effect.map((rows) => rows.map(fromRow).toSorted((a, b) => a.name.localeCompare(b.name))),
-              Effect.orDie,
-            ),
-        ),
-      )
+      SessionResourceOwner.id(db, sessionID).pipe(Effect.flatMap(storedByOwner))
 
     const stop = Effect.fnUntraced(function* (session: Session.Info, name: SessionMcp.Name, runtime: Runtime) {
+      if (stopped.has(runtime)) return
+      stopped.add(runtime)
       yield* Scope.close(runtime.scope, Exit.void)
       if (runtime.port === undefined || !sandbox.enabled) return
       yield* sandbox
@@ -146,6 +188,31 @@ const layer = Layer.effect(
           timeoutMs: 10_000,
         })
         .pipe(Effect.ignore)
+    })
+
+    // Drop a dead runtime from the owner's map so the next reconcile reconnects it. Runs from
+    // connection callbacks (forked) and from the call retry path; the identity check keeps a
+    // replacement runtime installed by a concurrent reconcile intact.
+    const evict = Effect.fnUntraced(function* (
+      session: Session.Info,
+      ownerID: Session.ID,
+      name: SessionMcp.Name,
+      runtime: Runtime,
+    ) {
+      // Under the owner lock: bridgeStopCommand kills by the pid file's CURRENT content, which
+      // a reconnecting reconcile could overwrite with the replacement's pid mid-flight —
+      // serializing against reconcile means the kill reads the runtime's own pid. Forked
+      // callbacks only ever queue behind the lock, never re-enter it, so this cannot deadlock.
+      yield* locks.withLock(ownerID)(
+        Effect.gen(function* () {
+          yield* stop(session, name, runtime)
+          const current = runtimes.get(ownerID)
+          if (current?.get(name) === runtime) {
+            current.delete(name)
+            if (current.size === 0) runtimes.delete(ownerID)
+          }
+        }),
+      )
     })
 
     const connectLocal = Effect.fnUntraced(function* (
@@ -198,6 +265,7 @@ const layer = Layer.effect(
 
     const connect = Effect.fnUntraced(function* (
       session: Session.Info,
+      ownerID: Session.ID,
       info: Info,
       port: number,
       budgetMs: number,
@@ -230,62 +298,115 @@ const layer = Layer.effect(
             ),
         ),
       )
-      return {
+      const runtime = {
         config: info.config,
         scope,
         ...(info.config.type === "local" && sandbox.enabled ? { port } : {}),
         client: result.value,
         tools,
       } satisfies Runtime
+      // Half-open connections must not linger in the map until the next config change: the
+      // client module reserves exactly these callbacks for this, and the global MCP service
+      // watches the same signals. onClose also fires during a normal stop teardown; the
+      // idempotent stop() inside evict makes that a no-op. Forked, because the callbacks run
+      // synchronously inside Scope.close while this owner's reconcile lock may be held.
+      runtime.client.onSessionExpired(() => fork(evict(session, ownerID, info.name, runtime)))
+      runtime.client.onClose(() => fork(evict(session, ownerID, info.name, runtime)))
+      return runtime
     })
 
     const reconcile = Effect.fnUntraced(function* (session: Session.Info) {
-      const infos = yield* stored(session.id)
-      const desired = new Map(infos.filter((info) => !info.config.disabled).map((info) => [info.name, info]))
-      const current = runtimes.get(session.id) ?? new Map<SessionMcp.Name, Runtime>()
-      for (const [name, runtime] of current) {
-        const info = desired.get(name)
-        if (info && isDeepStrictEqual(info.config, runtime.config)) continue
-        yield* stop(session, name, runtime)
-        current.delete(name)
-      }
-      const usedPorts = new Set(
-        Array.from(current.values(), (runtime) => runtime.port).filter((port): port is number => port !== undefined),
+      const ownerID = yield* SessionResourceOwner.id(db, session.id)
+      return yield* locks.withLock(ownerID)(
+        Effect.gen(function* () {
+          const infos = yield* storedByOwner(ownerID)
+          const desired = new Map(infos.filter((info) => !info.config.disabled).map((info) => [info.name, info]))
+          const current = runtimes.get(ownerID) ?? new Map<SessionMcp.Name, Runtime>()
+          for (const [name, runtime] of current) {
+            const info = desired.get(name)
+            if (info && isDeepStrictEqual(info.config, runtime.config)) continue
+            yield* stop(session, name, runtime)
+            current.delete(name)
+          }
+          const usedPorts = new Set(
+            Array.from(current.values(), (runtime) => runtime.port).filter((port): port is number => port !== undefined),
+          )
+          // One sandbox-wide sweep per owner per server lifetime (V1's mcpCleanedSessions
+          // semantics, tightened): after a restart, keep-alive sandboxes still hold bridges the
+          // lost runtimes pointed at — including port-drift orphans per-port cleanup can never
+          // reach. When this owner has no live bridged runtime, every supergateway in the
+          // sandbox is stale by definition, so sweep them all before the first reconnect.
+          // Safe under the owner lock: siblings cannot start concurrently, and a non-empty
+          // current (partially connected owner, e.g. a config-drift reconnect) skips the sweep.
+          if (
+            !swept.has(ownerID) &&
+            sandbox.enabled &&
+            usedPorts.size === 0 &&
+            desired.values().some((info) => info.config.type === "local")
+          ) {
+            yield* sandbox
+              .run({
+                sessionID: session.id,
+                hostWorkdir: session.location.directory,
+                command: bridgeSweepCommand(),
+                timeoutMs: 10_000,
+              })
+              .pipe(
+                Effect.catchCause((cause) =>
+                  Effect.logWarning("session MCP stale sweep failed", { sessionID: session.id, cause: String(cause) }),
+                ),
+              )
+            swept.add(ownerID)
+          }
+          // Soft gate (V1 describeCodeMode semantics): one reconcile pass never spends more than
+          // RECONCILE_BUDGET_MS connecting missing servers. Servers deferred here simply miss this
+          // pass; the next tools()/call() retries them with a fresh budget. Checking before each
+          // connect (instead of hard-interrupting) keeps already-forked scopes from leaking.
+          const deadline = Date.now() + RECONCILE_BUDGET_MS
+          const backed = backoffs.get(ownerID) ?? new Map<SessionMcp.Name, FailureBackoff>()
+          for (const info of desired.values()) {
+            if (current.has(info.name)) continue
+            // Failure backoff: skip a server whose connect failed until its backoff expires, so
+            // it cannot re-consume the whole budget (and starve later servers) on every select.
+            // A config change invalidates the entry — a fixed definition retries immediately.
+            const record = backed.get(info.name)
+            if (record && isDeepStrictEqual(record.config, info.config) && Date.now() < record.until) continue
+            const remaining = deadline - Date.now()
+            if (remaining <= 0) {
+              yield* Effect.logWarning("session MCP reconcile budget exhausted; deferring server", {
+                sessionID: session.id,
+                server: info.name,
+              })
+              continue
+            }
+            let port = BASE_PORT
+            while (usedPorts.has(port)) port += 1
+            const outcome = yield* connect(session, ownerID, info, port, Math.min(remaining, BRIDGE_RETRY_BUDGET_MS)).pipe(Effect.exit)
+            if (Exit.isSuccess(outcome)) {
+              current.set(info.name, outcome.value)
+              if (outcome.value.port !== undefined) usedPorts.add(outcome.value.port)
+              backed.delete(info.name)
+            } else {
+              const cause = Cause.squash(outcome.cause)
+              const prior = record && isDeepStrictEqual(record.config, info.config) ? record.failures : 0
+              const delay = connectBackoffMs(prior + 1)
+              backed.set(info.name, { config: info.config, failures: prior + 1, until: Date.now() + delay })
+              yield* Effect.logWarning("failed to connect session MCP; backing off", {
+                sessionID: session.id,
+                server: info.name,
+                error: cause instanceof Error ? cause.message : String(cause),
+                failures: prior + 1,
+                retryInMs: delay,
+              })
+            }
+          }
+          if (current.size === 0) runtimes.delete(ownerID)
+          else runtimes.set(ownerID, current)
+          if (backed.size === 0) backoffs.delete(ownerID)
+          else backoffs.set(ownerID, backed)
+          return current
+        }),
       )
-      // Soft gate (V1 describeCodeMode semantics): one reconcile pass never spends more than
-      // RECONCILE_BUDGET_MS connecting missing servers. Servers deferred here simply miss this
-      // pass; the next tools()/call() retries them with a fresh budget. Checking before each
-      // connect (instead of hard-interrupting) keeps already-forked scopes from leaking.
-      const deadline = Date.now() + RECONCILE_BUDGET_MS
-      for (const info of desired.values()) {
-        if (current.has(info.name)) continue
-        const remaining = deadline - Date.now()
-        if (remaining <= 0) {
-          yield* Effect.logWarning("session MCP reconcile budget exhausted; deferring server", {
-            sessionID: session.id,
-            server: info.name,
-          })
-          continue
-        }
-        let port = BASE_PORT
-        while (usedPorts.has(port)) port += 1
-        const runtime = yield* connect(session, info, port, Math.min(remaining, BRIDGE_RETRY_BUDGET_MS)).pipe(
-          Effect.catch((error) =>
-            Effect.logWarning("failed to connect session MCP", {
-              sessionID: session.id,
-              server: info.name,
-              error: error instanceof Error ? error.message : String(error),
-            }).pipe(Effect.as(undefined)),
-          ),
-        )
-        if (runtime) {
-          current.set(info.name, runtime)
-          if (runtime.port !== undefined) usedPorts.add(runtime.port)
-        }
-      }
-      if (current.size === 0) runtimes.delete(session.id)
-      else runtimes.set(session.id, current)
-      return current
     })
 
     return Service.of({
@@ -322,12 +443,20 @@ const layer = Layer.effect(
       remove: (session, name) =>
         Effect.gen(function* () {
           const ownerID = yield* SessionResourceOwner.id(db, session.id)
-          const current = runtimes.get(session.id)
-          const runtime = current?.get(name)
-          if (runtime) {
-            yield* stop(session, name, runtime)
-            current?.delete(name)
-          }
+          // Removing a definition stops the owner's shared runtime inside the reconcile lock,
+          // so a concurrent reconcile cannot resurrect it between the stop and the row delete.
+          yield* locks.withLock(ownerID)(
+            Effect.gen(function* () {
+              const current = runtimes.get(ownerID)
+              const runtime = current?.get(name)
+              if (runtime) {
+                yield* stop(session, name, runtime)
+                current?.delete(name)
+              }
+              // A removed definition must not keep a backoff entry either.
+              backoffs.get(ownerID)?.delete(name)
+            }),
+          )
           yield* db
             .delete(SessionMcpTable)
             .where(and(eq(SessionMcpTable.session_id, ownerID), eq(SessionMcpTable.name, name)))
@@ -337,33 +466,89 @@ const layer = Layer.effect(
       clear: (session) =>
         Effect.gen(function* () {
           const ownerID = yield* SessionResourceOwner.id(db, session.id)
-          const current = runtimes.get(session.id)
-          if (current) {
-            yield* Effect.forEach(current, ([name, runtime]) => stop(session, name, runtime), { discard: true })
-            runtimes.delete(session.id)
-          }
+          yield* locks.withLock(ownerID)(
+            Effect.gen(function* () {
+              const current = runtimes.get(ownerID)
+              if (current) {
+                yield* Effect.forEach(current, ([name, runtime]) => stop(session, name, runtime), { discard: true })
+                runtimes.delete(ownerID)
+              }
+              backoffs.delete(ownerID)
+            }),
+          )
           yield* db.delete(SessionMcpTable).where(eq(SessionMcpTable.session_id, ownerID)).run().pipe(Effect.orDie)
         }),
       release: (session) =>
         Effect.gen(function* () {
-          const current = runtimes.get(session.id)
-          if (!current) return
-          yield* Effect.forEach(current, ([name, runtime]) => stop(session, name, runtime), { discard: true })
-          runtimes.delete(session.id)
+          const ownerID = yield* SessionResourceOwner.id(db, session.id)
+          // Runtimes belong to the resource owner; a child session's teardown must not drop
+          // connections its siblings and parent still use. Children release nothing — the
+          // owner's own teardown (which runs last) closes the shared set before the sandbox dies.
+          if (ownerID !== session.id) return
+          yield* locks.withLock(ownerID)(
+            Effect.gen(function* () {
+              const current = runtimes.get(ownerID)
+              if (!current) return
+              yield* Effect.forEach(current, ([name, runtime]) => stop(session, name, runtime), { discard: true })
+              runtimes.delete(ownerID)
+            }),
+          )
         }),
       tools: (session) =>
         reconcile(session).pipe(
           Effect.map((entries) =>
-            Array.from(entries, ([server, runtime]) => runtime.tools.map((tool) => ({ ...tool, server }))).flat(),
+            Array.from(
+              entries,
+              ([server, runtime]) =>
+                // Mirror the global MCP service's toTool: codemode lives on the config, not on
+                // McpClient.Tool, so it must be carried onto each tool for the registry's
+                // direct-vs-catalog split (options.codemode === false) to see it.
+                runtime.tools.map((tool) => ({
+                  ...tool,
+                  server,
+                  ...(runtime.config.codemode === undefined ? {} : { codemode: runtime.config.codemode }),
+                })),
+            ).flat(),
           ),
         ),
-      call: (input) =>
-        Effect.gen(function* () {
-          const entries = yield* reconcile(input.session)
-          const runtime = entries.get(input.server)
-          if (!runtime) return yield* Effect.fail(new Error(`Session MCP server is not connected: ${input.server}`))
-          return yield* runtime.client.callTool({ name: input.name, args: input.args, sessionID: input.session.id })
-        }),
+      call: (input) => {
+        const ownerID = SessionResourceOwner.id(db, input.session.id)
+        // One transparent reconnect+retry when the call fails at the connection level (the
+        // global MCP service's recovering() pattern). A dead bridge surfaces as ECONNREFUSED
+        // which fires neither the onClose callback nor SessionExpiredError, so without this
+        // the runtime lingers in the map and the tool stays broken until a config change.
+        // Safe for any call failure: tool-level business errors travel inside a successful
+        // CallToolResult (isError) and never reach this catch.
+        const attempt = (retry: boolean): Effect.Effect<McpClient.CallToolResult, Error> =>
+          Effect.gen(function* () {
+            const entries = yield* reconcile(input.session)
+            const runtime = entries.get(input.server)
+            if (!runtime) return yield* Effect.fail(new Error(`Session MCP server is not connected: ${input.server}`))
+            return yield* runtime.client
+              .callTool({ name: input.name, args: input.args, sessionID: input.session.id })
+              .pipe(
+                Effect.catchIf(
+                  (error) => error instanceof Error,
+                  (error) =>
+                    retry
+                      ? ownerID.pipe(
+                          Effect.flatMap((owner) =>
+                            evict(input.session, owner, input.server, runtime).pipe(
+                              Effect.tap(() => Effect.logWarning("session MCP call failed; evicted and retrying once", {
+                                sessionID: input.session.id,
+                                server: input.server,
+                                error: error.message,
+                              })),
+                              Effect.andThen(attempt(false)),
+                            ),
+                          ),
+                        )
+                      : Effect.fail(error),
+                ),
+              )
+          })
+        return attempt(true)
+      },
     })
   }),
 )
