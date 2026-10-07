@@ -90,7 +90,9 @@ it.live("skill HTTP routes reject unsafe bundles and incomplete inputs, then rep
     const admitted = yield* request("POST", `/api/session/${id}/prompt`, prompt)
     expect(admitted.status).toBe(200)
     const input = Schema.decodeUnknownSync(Schema.Struct({ data: SessionInbox.User }))(admitted.body).data
-    expect(input.payload.skills?.[0]?.text).toContain("/workspace/.opencode/.session-skills/")
+    // The skill resource root was aligned to V1's layout in 2026-10-04
+    // (`packages/core/src/session/skill-resource.ts` root = /home/sandbox/.local/share/opencode/session-skills).
+    expect(input.payload.skills?.[0]?.text).toContain("/home/sandbox/.local/share/opencode/session-skills/")
     const script = [...files.keys()].find((file) => file.endsWith("/scripts/run.sh"))
     if (!script) return yield* Effect.die(new Error("materialized script missing"))
     files.set(script, "CORRUPTED")

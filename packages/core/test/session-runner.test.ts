@@ -4455,6 +4455,10 @@ describe("SessionRunnerLLM", () => {
 
   scenario("adds the parent session header to child model requests", function* (s) {
     const parentID = Session.ID.make("ses_runner_parent")
+    // The parent row must exist: SessionResourceOwner treats a live child whose ancestor is
+    // missing as a broken relation and dies, and production keeps the relation intact by
+    // removing children when the parent is deleted.
+    yield* insertSession(parentID)
 
     yield* s.db
       .update(SessionTable)
