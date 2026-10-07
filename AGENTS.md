@@ -4,7 +4,7 @@
 
 - opencode saas服务运行在docker中
 - 要在docker中启动服务（orbstack）
-- 连接本地PG数据库：127.0.0.1:5432/opencode-v2-up
+- 连接本地PG数据库：127.0.0.1:5432/opencode-v2-up （我们只考虑PG数据库）
 - 通过接口进行测试
 - 有两个镜像
   - 一个是opencode saas服务镜像
