@@ -170,3 +170,47 @@ it.live("rejects command names that could escape their namespace", () =>
     expect((yield* request("POST", "/api/session/ses_NOTEXIST/commands", { name: "ghost", template: "x" })).status).toBe(404)
   }).pipe(Effect.scoped),
 )
+
+it.live("rejects oversized templates with 413 and leaves the stored command untouched", () =>
+  Effect.gen(function* () {
+    const request = yield* setup
+    const session = yield* request("POST", "/api/session", { title: "command cap" })
+    const sessionID = (session.result as { data: { id: string } }).data.id
+    const name = "size/capped"
+    const atLimit = yield* request("POST", `/api/session/${sessionID}/commands`, {
+      name,
+      template: "x".repeat(256 * 1024),
+    })
+    expect(atLimit.status).toBe(200)
+    const stored = yield* request("GET", `/api/session/${sessionID}/commands`)
+    const before = (stored.result as { data: Array<{ name: string; template: string }> }).data.find(
+      (item) => item.name === name,
+    )
+    expect(before?.template).toHaveLength(256 * 1024)
+
+    const over = yield* request("POST", `/api/session/${sessionID}/commands`, {
+      name,
+      template: `x`.repeat(256 * 1024 + 1),
+    })
+    expect(over.status).toBe(413)
+    expect(over.result).toMatchObject({
+      _tag: "SessionCommandTemplateTooLargeError",
+      actualBytes: 256 * 1024 + 1,
+      maxBytes: 256 * 1024,
+    })
+    // The rejected write must leave the stored template untouched.
+    const after = yield* request("GET", `/api/session/${sessionID}/commands`)
+    const row = (after.result as { data: Array<{ name: string; template: string }> }).data.find(
+      (item) => item.name === name,
+    )
+    expect(row?.template).toHaveLength(256 * 1024)
+
+    // The cap counts UTF-8 bytes, not characters: 90_000 three-byte characters exceed it.
+    const multibyte = yield* request("POST", `/api/session/${sessionID}/commands`, {
+      name,
+      template: "你".repeat(90_000),
+    })
+    expect(multibyte.status).toBe(413)
+    expect(multibyte.result).toMatchObject({ _tag: "SessionCommandTemplateTooLargeError", actualBytes: 270_000 })
+  }).pipe(Effect.scoped),
+)

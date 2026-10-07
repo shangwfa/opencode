@@ -6,6 +6,19 @@ import { optional } from "./schema.js"
 
 export const Source = Schema.Literals(["sandbox", "session", "builtin"])
 
+/** The template renders into prompts like the sibling instruction surfaces; the limit is UTF-8 bytes. */
+export const MaxTemplateBytes = 256 * 1024
+
+export class TemplateTooLargeError extends Schema.TaggedError<TemplateTooLargeError>()(
+  "SessionCommandTemplateTooLargeError",
+  {
+    actualBytes: Schema.Int,
+    maxBytes: Schema.Int,
+    message: Schema.String,
+  },
+  { httpApiStatus: 413 },
+) {}
+
 export interface Definition extends Schema.Schema.Type<typeof Definition> {}
 export const Definition = Schema.Struct({
   name: Schema.String,

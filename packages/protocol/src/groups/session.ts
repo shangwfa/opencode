@@ -634,7 +634,7 @@ export const makeSessionGroup = <I extends HttpApiMiddleware.AnyId, S, FormI ext
         params: { sessionID: Session.ID },
         payload: SessionCommand.CreatePayload,
         success: SessionCommand.Definition,
-        error: [SessionNotFoundError, InvalidRequestError, UnknownError],
+        error: [SessionNotFoundError, InvalidRequestError, SessionCommand.TemplateTooLargeError, UnknownError],
       })
         .middleware(sessionLocationMiddleware)
         .annotateMerge(

@@ -1,8 +1,9 @@
 export * as SessionCommands from "./commands.js"
 
-import { and, eq } from "drizzle-orm"
+import { and, eq, sql } from "drizzle-orm"
 import { Effect } from "effect"
 import { SessionCommand } from "@opencode/schema/session-command"
+const { MaxTemplateBytes, TemplateTooLargeError } = SessionCommand
 import { Database } from "../database/database.js"
 import { SandboxProvider } from "../sandbox/provider.js"
 import { Session } from "../session.js"
@@ -59,6 +60,15 @@ export const create = Effect.fn("SessionCommands.create")(function* (
 ) {
   const { db } = yield* Database.Service
   const sessionID = yield* SessionResourceOwner.id(db, requestedSessionID)
+  // Cap like the sibling resource services (Session AGENTS.md, agents, skills, tools): the limit
+  // is a UTF-8 byte count, and a rejected write leaves the stored row untouched.
+  const templateBytes = Buffer.byteLength(input.template, "utf8")
+  if (templateBytes > MaxTemplateBytes)
+    yield* new TemplateTooLargeError({
+      actualBytes: templateBytes,
+      maxBytes: MaxTemplateBytes,
+      message: `Session command template is ${templateBytes} bytes; the limit is ${MaxTemplateBytes} bytes`,
+    })
   const now = Date.now()
   const id = `scmd_${crypto.randomUUID().replaceAll("-", "")}`
   const subagent = input.subagent ?? input.subtask ?? null
@@ -87,7 +97,10 @@ export const create = Effect.fn("SessionCommands.create")(function* (
         model: input.model,
         subagent,
         hints: [...hints],
-        time_updated: now,
+        // Monotonic like the sibling resource services (Session AGENTS.md, agents, skills, tools):
+        // the stamp is computed against the stored row inside the conflict branch, so a burst of
+        // same-millisecond replacements still advances it instead of leaving equal stamps behind.
+        time_updated: sql`max(${now}, ${SessionCommandTable.time_updated} + 1)`,
       },
     })
     .returning()
