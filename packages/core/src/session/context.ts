@@ -21,6 +21,8 @@ import { SessionHistory } from "./history.js"
 import { SessionProviderContext } from "./provider-context.js"
 import { InstructionEntry } from "./instruction-entry.js"
 import { SessionAgentsMd } from "./agents-md.js"
+import { SessionProjectInstructions } from "./project-instructions.js"
+import { SandboxProvider } from "../sandbox/provider.js"
 import { SessionAgents } from "./agents.js"
 import { SessionSkills } from "./skills.js"
 import { SessionMcps } from "./mcps.js"
@@ -93,6 +95,7 @@ const layer = Layer.effect(
     const entries = yield* InstructionEntry.Service
     const agentsMd = yield* SessionAgentsMd.Service
     const location = yield* Location.Service
+    const sandboxProvider = yield* SandboxProvider.Service
     const mcpInstructions = yield* McpInstructions.Service
     const mcpTools = yield* McpTool.Service
     const models = yield* SessionRunnerModel.Service
@@ -162,6 +165,14 @@ const layer = Layer.effect(
           mcp: mcpInstructions.load(agent),
           entries: entries.load(sessionID),
           agentsMd: Effect.succeed(agentsMd.load(sessionID)),
+          projectAgentsMd: Effect.succeed(
+            SessionProjectInstructions.load({
+              sessionID,
+              directory: session.location.directory,
+              projectDirectory: location.project.directory,
+              sandbox: sandboxProvider,
+            }),
+          ),
         },
         { concurrency: "unbounded" },
       )
@@ -171,6 +182,9 @@ const layer = Layer.effect(
         agent: { ...agent, info: agent.info },
         instructions: Instructions.combine([
           loaded.agentsMd,
+          // Project-level AGENTS.md from the session's own sandbox; V1 order keeps the project
+          // layer right after the session overlay and ahead of builtins/global discovery.
+          loaded.projectAgentsMd,
           loaded.builtins,
           CodeModeInstructions.make(loaded.tools.codeModeCatalog),
           loaded.discovery,
@@ -213,6 +227,7 @@ export const node = makeLocationNode({
   layer,
   deps: [
     SessionToolSandbox.node,
+    SandboxProvider.node,
     Agent.node,
     Model.node,
     Database.node,
