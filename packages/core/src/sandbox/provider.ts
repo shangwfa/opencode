@@ -67,6 +67,13 @@ export interface RunInput {
    * command context there would deadlock with the child tool's command.
    */
   readonly isolated?: boolean
+  /**
+   * Runs on a dedicated command context that is NOT deleted afterwards: the
+   * caller wraps the command with nohup/& (v1 runDetached parity), and the
+   * sandbox-side deleteSession would kill those background processes. The
+   * leaked context is reclaimed when the sandbox is destroyed.
+   */
+  readonly detached?: boolean
   /** Stable caller identity used for targeted cancellation and observability. */
   readonly operationID?: string
 }
@@ -312,6 +319,8 @@ const GET_OR_CREATE_TIMEOUT_SECONDS = 90
  * misreported as the command itself timing out.
  */
 const COMMAND_QUEUE_GRACE_SECONDS = 5
+/** v1 parity: queue waits are generous; slow holders must not fail fast turns. */
+const COMMAND_QUEUE_MIN_SECONDS = 85
 const COMMAND_CLEANUP_TIMEOUT_SECONDS = 10
 const COMMAND_PERMIT_UNAVAILABLE = new Error("command semaphore unavailable")
 
@@ -425,13 +434,24 @@ export const withSemaphoreWaitTimeout = <A, E, R>(
   effect: Effect.Effect<A, E, R>,
   timeoutSeconds: number,
   operation: string,
-): Effect.Effect<A, E | Error, R> =>
-  withOperationTimeout(
+): Effect.Effect<A, E | Error, R> => {
+  const startedAt = Date.now()
+  return withOperationTimeout(
     semaphore
       .withPermitsIfAvailable(1)(effect)
       .pipe(
         Effect.flatMap((result) =>
-          Option.isSome(result) ? Effect.succeed(result.value) : Effect.fail(COMMAND_PERMIT_UNAVAILABLE),
+          Option.isSome(result)
+            ? Effect.as(
+                // Queue observability (v1 queueLog parity): long waits surface why
+                // a command was late instead of failing opaque "queue wait" errors.
+                Effect.logDebug("sandbox command queue permit acquired", {
+                  operation,
+                  waitedMs: Date.now() - startedAt,
+                }),
+                result.value,
+              )
+            : Effect.fail(COMMAND_PERMIT_UNAVAILABLE),
         ),
         Effect.retry({
           while: (error) => error === COMMAND_PERMIT_UNAVAILABLE,
@@ -441,6 +461,7 @@ export const withSemaphoreWaitTimeout = <A, E, R>(
     timeoutSeconds + COMMAND_QUEUE_GRACE_SECONDS,
     operation,
   )
+}
 
 /**
  * Sandbox-level disappearance (sandbox or command session reaped while a turn
@@ -2430,7 +2451,10 @@ const layer = Layer.effect(
                 ephemeralSandbox = sb
                 yield* touchSandbox(key, sb.id)
                 const commands = commandsOf(sb)
-                const commandSessionID = input.isolated
+                // Dedicated contexts: nested-tool isolation (deleted afterwards) and
+                // v1-parity detached runs (kept alive for nohup background processes).
+                const dedicated = input.isolated === true || input.detached === true
+                const commandSessionID = dedicated
                   ? yield* withOperationTimeout(
                       Effect.tryPromise({
                         try: () => commandsOf(sb).createSession({ workingDirectory: SandboxPath.WORKDIR }),
@@ -2440,8 +2464,8 @@ const layer = Layer.effect(
                       "create isolated command session",
                     )
                   : yield* commandSession(key, sb)
-                if (input.isolated) ephemeralCommandSessionID = commandSessionID
-                if (input.isolated) {
+                if (dedicated) ephemeralCommandSessionID = commandSessionID
+                if (dedicated) {
                   ephemeralOperationID = input.operationID ?? commandSessionID
                   yield* addActiveCommand(key, {
                     operationID: ephemeralOperationID,
@@ -2536,7 +2560,17 @@ const layer = Layer.effect(
                 })
                 const execute = Effect.raceFirst(guarded, heartbeat)
                 if (timeoutSeconds > 0)
-                  yield* withSemaphoreWaitTimeout(lock, execute, timeoutSeconds, "command queue wait")
+                  yield* withSemaphoreWaitTimeout(
+                    lock,
+                    execute,
+                    // Queue budget floors at 90s total (v1 parity): the v2 per-caller
+                    // exec timeout (e.g. 10s probes) must not shrink the queue wait,
+                    // or concurrent load fails turns with "command queue wait" errors
+                    // while the holder is simply slow. The exec timeout itself always
+                    // expires first (budget >= exec + grace).
+                    Math.max(timeoutSeconds, COMMAND_QUEUE_MIN_SECONDS),
+                    "command queue wait",
+                  )
                 else yield* lock.withPermits(1)(execute)
 
                 if (timedOut) {
@@ -2587,11 +2621,19 @@ const layer = Layer.effect(
                           ephemeralOperationID === undefined
                             ? Effect.void
                             : removeActiveCommand(key, ephemeralOperationID),
-                          withOperationTimeout(
-                            attempt(() => commandsOf(ephemeralSandbox!).deleteSession(ephemeralCommandSessionID!)),
-                            5,
-                            "delete isolated command session",
-                          ).pipe(Effect.ignore),
+                          // Detached contexts stay alive: their command was wrapped with
+                          // nohup (v1 runDetached parity) and deleteSession kills every
+                          // process in the context, including those background workers.
+                          input.detached === true
+                            ? Effect.logDebug("detached command context kept", {
+                                sessionID: key,
+                                commandSessionID: ephemeralCommandSessionID,
+                              })
+                            : withOperationTimeout(
+                                attempt(() => commandsOf(ephemeralSandbox!).deleteSession(ephemeralCommandSessionID!)),
+                                5,
+                                "delete isolated command session",
+                              ).pipe(Effect.ignore),
                         ),
                   ),
                 ),
@@ -2601,7 +2643,7 @@ const layer = Layer.effect(
             Effect.mapError((cause) => (cause instanceof Error ? cause : new Error(String(cause)))),
             Effect.withSpan("SandboxProvider.run"),
           )
-          if (!input.isolated) return execute
+          if (input.isolated !== true && input.detached !== true) return execute
           return Effect.flatMap(isolatedSessionLock(key), (sessionLock) =>
             isolatedGlobalLock.withPermits(1)(sessionLock.withPermits(1)(execute)),
           )

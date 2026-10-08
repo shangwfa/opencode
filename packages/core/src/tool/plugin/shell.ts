@@ -14,6 +14,7 @@ import { FileAccess } from "../../file-access.js"
 import { Location } from "../../location.js"
 import { Permission } from "../../permission.js"
 import { SandboxProvider } from "../../sandbox/provider.js"
+import { SandboxPath } from "../../sandbox/path.js"
 import { NonNegativeInt } from "../../schema.js"
 import { Session } from "../../session.js"
 import { SessionSchema } from "../../session/schema.js"
@@ -200,20 +201,39 @@ export const Plugin = {
           execute: (input, context) =>
             Effect.gen(function* () {
               // OpenSandbox: sessions on a sandbox-enabled deployment execute
-              // commands remotely. Background execution is not supported there
-              // yet and falls back to a foreground run with no timeout.
+              // commands remotely. Background runs wrap the command with nohup
+              // on a dedicated, kept-alive command context (v1 runDetached
+              // parity) so they neither occupy the session's serial command
+              // queue nor get killed with it.
               if (sandboxProvider.enabled) {
-                if (input.background === true)
-                  return yield* Effect.fail(
-                    new ToolFailure({
-                      message:
-                        "Background execution is not supported for sandboxed sessions yet. Re-run without `background`.",
-                    }),
-                  )
                 const timeout = input.timeout ?? DEFAULT_TIMEOUT_MS
                 const hostWorkdir = input.workdir
                   ? path.resolve(location.directory, input.workdir)
                   : location.directory
+                if (input.background === true) {
+                  const logFile = `/tmp/opencode-bg-${context.id ?? context.messageID}.log`
+                  const shellQuote = (value: string) => `'${value.replaceAll("'", `'\\''`)}'`
+                  const launcher = `cd ${shellQuote(SandboxPath.toSandboxCwd(hostWorkdir, hostWorkdir))} && ( nohup sh -c ${shellQuote(input.command)} </dev/null > ${shellQuote(logFile)} 2>&1 & ) && echo "started background"`
+                  const started = yield* sandboxProvider.run({
+                    sessionID: context.sessionID,
+                    command: launcher,
+                    hostWorkdir,
+                    timeoutMs: 10_000,
+                    detached: true,
+                    operationID: `bg-${context.id ?? context.messageID}`,
+                  })
+                  if (started.exitCode !== 0 && started.exitCode !== null)
+                    return yield* Effect.fail(
+                      new ToolFailure({
+                        message: `Background command failed to start: ${started.output.slice(0, 400)}`,
+                      }),
+                    )
+                  return {
+                    output: `Command moved to the background.\nOutput is streaming to: ${logFile}`,
+                    truncated: false,
+                    status: "completed" as const,
+                  }
+                }
                 const source = {
                   type: "tool" as const,
                   messageID: context.messageID,
