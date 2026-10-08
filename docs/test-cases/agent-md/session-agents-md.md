@@ -644,6 +644,59 @@ stream_prompt "$CHILD" "What is CHILD_PROBE? Token only." 420
 ```
 
 期望：子会话（共享父沙箱）的 `core/project-agents-md` blob 含同一份项目内容、模型答出标记——项目源跟**会话自己的沙箱**走（`fileRead(sessionID)`），内层子会话解析到同一 root 沙箱即同内容；fork（独立 domain/沙箱）则读它自己的文件系统。
+
+### T36.37 SSE 事件顺序：instructions.updated 先于轮内首个模型步进
+
+> **契约（2026-10-08 两轮 SSE 实测）**：`PUT /agents-md` 本身**不产生任何事件**（惰性，等下一轮消费，见 T36.32）；下一轮的顺序恒为
+> `session.execution.started → session.instructions.updated → session.step.started → session.text.started`。
+> 可断言契约 = **`instructions.updated` 的到达序严格小于该轮第一个 `session.step.started`**（指令在模型步进前完成注入）。
+> 订阅与断言方式遵循[流式输出规范](../skills/streaming-output-spec.md)。
+
+```bash
+S=$(new_session '{"title":"sse-order"}')
+python3 - "$BASE" "$OPENCODE_PASSWORD" "$S" <<'PY'
+import base64, json, sys, threading, urllib.request
+
+base, password, sid = sys.argv[1:4]
+auth = "Basic " + base64.b64encode(f"opencode:{password}".encode()).decode()
+
+events, order = [], []
+
+def watch():
+    req = urllib.request.Request(f"{base}/api/session/{sid}/event", headers={"Authorization": auth, "Accept": "text/event-stream"})
+    with urllib.request.urlopen(req, timeout=180) as response:
+        for raw in response:
+            line = raw.decode().strip()
+            if not line.startswith("data:"): continue
+            try: event = json.loads(line[5:])
+            except: continue
+            t = event.get("type", "")
+            if "instructions.updated" in t or t in ("session.execution.started", "session.step.started"):
+                order.append(t)
+
+t = threading.Thread(target=watch, daemon=True); t.start()
+
+def api(method, route, payload=None):
+    req = urllib.request.Request(base + route, method=method, headers={"Authorization": auth, "Content-Type": "application/json"},
+                                 data=json.dumps(payload).encode() if payload is not None else None)
+    with urllib.request.urlopen(req, timeout=60) as r: return r.status
+
+import time; time.sleep(1)
+print("put:", api("POST", f"/api/session/{sid}/agents-md", {"content": "回答末尾附标记 SSE_ORDER_OK。"}))
+time.sleep(1.5); print("events_after_put(expect 0):", len(order))          # 惰性：写入零事件
+print("prompt:", api("POST", f"/api/session/{sid}/prompt_stream",
+                     {"text": "只回复 OK", "model": json.loads(__import__("os").environ.get("V2_MODEL_JSON", '{"providerID":"Yd-GLM","id":"glm-5.3-flash"}'))}))
+time.sleep(8)                                                              # 轮次结束后停止收集
+print("order:", order)
+first_step = next((i for i, t in enumerate(order) if t == "session.step.started"), -1)
+first_instr = next((i for i, t in enumerate(order) if "instructions.updated" in t), -1)
+ok = 0 <= first_instr < first_step
+print("instructions_before_first_step:", ok)
+sys.exit(0 if ok else 1)
+PY
+```
+
+期望：`events_after_put=0`；`order` 以 `execution.started` 开头且 `instructions.updated` 位于第一个 `step.started` 之前；退出码 0。
 ### T36.17（已作废）
 
 > 🗑️ **已作废（2026-09-14）**：`directory` 是上游本地开发概念残留，SaaS 下恒为 `/workspace`（实测全库一致），不存在「跨 workspace 的 directory 隔离」这一维度。接入方不应传 `x-opencode-directory`。若未来需要租户级隔离，应以 `workspace_id` 为边界立独立需求。
@@ -781,6 +834,7 @@ cd packages/server && bun test test/session-agents-md.test.ts
 | T36.34 项目源更新生效 | ✅ | v1 轮 blob=`VERSION_ONE`；覆盖后下一轮换 `VERSION_TWO`（旧值不残留）、模型复述新内容；删除路径见 T36.27 语义 |
 | T36.35 三层共存 | ✅ | Session+项目+全局同轮答出三标记；三个 key（`session/agents-md`/`core/project-agents-md`/`core/instructions`）并存 |
 | T36.36 子会话共享项目源 | ✅ | 内层子会话（共享沙箱）blob 同内容、模型答出标记 |
+| T36.37 SSE 事件顺序 | ✅（新增） | 三轮独立实测（bun ×2 + 文档 python 版）：写入零事件（惰性）；轮内 `execution.started → instructions.updated → step.started`，指令事件先于首个模型步进；文档用例原样执行 exit=0 |
 
 ### 本轮发现与沉淀
 
@@ -818,15 +872,26 @@ cd packages/server && bun test test/session-agents-md.test.ts
 | 注入顺序在 discovered 之前、更新/删除渲染文案、fork values 过滤 | — | ✅ 单测（`session-runner.test.ts` / `agents-md.test.ts`） |
 | 更新/删除下一轮生效、compaction、agent 切换、全局层、skill 共注入、事件链 | T36.27–32 | ✅ E2E |
 | 会话级项目源（链边界/更新/三层共存/子会话共享/读失败容错） | T36.33–36 | ✅ E2E + 单测（`project-instructions.test.ts`） |
+| SSE 事件顺序（指令先于首个模型步进、写入零事件） | T36.37 | ✅ E2E（SSE 实测两轮） |
+| 坏链 die（missing ancestor/cycles/深度/跨域） | — | ✅ 单测（`resource-owner.test.ts` 四条） |
 | CRUD/413/404/并发/级联（整条路由栈） | — | ✅ 单测（`server/test/session-agents-md.test.ts`） |
 | owner 共享 + fork 隔离（六资源横向） | — | ✅ 单测（`resources-pg.test.ts`） |
 
-### 尚未覆盖（下一步建议）
+### 缺口处置（2026-10-08 补充）
 
-| 缺口 | 现状 | 建议 |
-| --- | --- | --- |
-| `session.instructions.updated` 与多轮 prompt 的**流式事件顺序**（事件先于轮次开始） | 只验了事件内容 | 可结合 SSE 断言 |
-| 多进程 / 多实例并发 | 未验（定性：`durableLocks` 单进程，多实例窗口属部署假设） | 记录 |
+| 原缺口 | 处置 |
+| --- | --- |
+| SSE 流式中 `instructions.updated` 事件顺序 | **已覆盖（T36.37）**：两轮 SSE 实测确立契约——写入零事件（惰性）、轮内顺序 `execution.started → instructions.updated → step.started`，断言 = 指令事件先于首个模型步进。注意最初假设「先于轮次」不准确，实际在 `execution.started` 之后、`step.started` 之前 |
+| 坏链（活子会话+缺失祖先）`die` 行为 | **已有单测实证（此前未接线）**：`packages/core/test/session/resource-owner.test.ts` 四条——missing parent→Failure（:38）、cycles（:45）、深度边界（:56）、跨 project/app/directory/workspace 拒绝（:67）。生产不可达的论证（父删级联子）+ 单测双保险 |
+| 多进程 / 多实例并发 | 维持**部署假设**定性（`durableLocks` 单进程，core `AGENTS.md` 声明）。复现与判据见下节 |
+
+### 多实例窗口的复现与判据（记录，不在本轮执行）
+
+单进程下事件总线 `durableLocks` 把同 aggregate 的 `session.deleted` 与 `session.inbox.enqueued` 串行化，`T36.20(c)` 的 delete×prompt 竞态因此全部干净。**跨实例窗口成立的复现方法**（供未来多实例部署前验证）：
+
+1. 同一 PG 起两个 server 实例（不同端口），任一实例处理 DELETE /session/:id、另一实例并发处理 POST /session/:id/prompt；
+2. 判据：出现 **5xx / 裸 `SqlError` / 幽灵 agents_md 行**（delete 落地后 inbox 仍插入成功且执行读到已删行）即为窗口实证；
+3. 修复方向（届时评估）：PG advisory lock（`pg_try_advisory_xact_lock(hashtext(session_id))`）包住 admit/delete 关键段，替代进程内 `KeyedMutex`。
 
 ### 对照 session skills / mcps 的一致性检查（2026-10-08）
 
