@@ -124,13 +124,17 @@ curl -s "$BASE/session/$SID/shell" -H 'Content-Type: application/json' \
 
 ### T-CX.3 验证 Compaction 消息持久化 historyPath（L2）
 
+> V2 查法：`session_message.data` 为 **text** 列，需 `::jsonb` cast；historyPath 位于 `type='compaction'` 行的 `data` JSON 顶层。
+
 ```bash
 psql "$PG_URL" -c \
-  "SELECT id, data->>'historyPath' AS history_path \
+  "SELECT id, data::jsonb->>'historyPath' AS history_path \
      FROM session_message WHERE type='compaction' ORDER BY seq DESC LIMIT 5;"
 ```
 
-**期望**：最近一条 compaction 行的 `history_path` 为 `$TOOL_OUTPUT/tool_history_<同一 messageID>.md`，与 T-CX.2 文件一一对应。
+**期望**：最近一条 compaction 行的 `history_path` 为 `/workspace/.opencode/tool-output/tool_history_<同一 messageID>.md`，与 T-CX.2 文件一一对应。
+
+> 消息 API 形状（V2）：compaction 消息字段**平铺**（`status` running→completed、`reason`、`summary`、`recent`、`historyPath`），无 `data` 包装；compact 请求返回的消息 ID 在列表可见前有短暂延迟，脚本按请求 ID 匹配等待（`at(-1)` 会误取上一条已完成的 compaction）。手动 compaction 的保留窗口为 `DEFAULT_KEEP_TOKENS=15000`（`findTailStart` 有 user 边界兜底，短会话也能切出 head）。
 
 ### T-CX.4 检索效果验证（L3）
 
@@ -179,6 +183,21 @@ touch -t "$(date -v-8d +%Y%m%d%H%M)" "$TOOL_OUTPUT/tool_history_stale.md"
 
 ## 复测记录
 
+### 2026-10-10 全量复测（V2，本地 PG + 本地 OpenSandbox，模型 `Yd-GLM`/`glm-5.3`）
+
+脚本：[`../scripts/compaction-history-v2.mjs`](../scripts/compaction-history-v2.mjs)（隔离容器 + 手动 compact 两次 + 严格版检索 + 链式验证，结束零残留）。
+
+| 用例 | 结果 | 实测 |
+|---|---|---|
+| T-CX.1 单元（L0/L4/L5） | ✅ **56/0** | `session-compaction`+`session-runner-message` 47 pass + `tool-output`（清理）9 pass |
+| T-CX.2 落盘（L1） | ✅ | 沙箱 `/workspace/.opencode/tool-output/tool_history_<msgID>.md` 生成；分节头 `## msg_… \| synthetic \| 2026-…Z`（首节为 synthetic 的 shell 记录）；val-57 完整落盘；无 `[truncated]` |
+| T-CX.3 持久化（L2） | ✅ | 消息平铺字段 `historyPath`（running→completed 后写入）；PG `session_message(type=compaction).data::jsonb->>'historyPath'` 与文件一一对应 |
+| T-CX.4 检索（L3 严格版） | ✅ | 前置断言：摘要与 recent 均不含 val-57；源文件轮转后 AI 用 read/grep 检索历史文件（工具铁证）并答对 `val-57` |
+| T-CX.5/6 | ✅ 单测覆盖 | 落盘失败降级（`historyPath=undefined` 摘要照发）、空 head 不产文件、8 天过期清理（9 pass） |
+| T-CX.7 链式（L3 实战） | ✅ 结构 + ⚠️ 模型作答 | 第二个历史文件头部 `Earlier compacted history` + 引用第一文件路径（脚本 grep 铁证）；AI 沿链发起检索（工具铁证）；**两跳后的最终作答 glm-5.3 不稳定**（长会话+两次 compact 后指令遵循下降，多轮尝试均偷懒答 "OK"）——链式可达性以脚本级 grep 为准，AI 单跳检索（T-CX.4）已 100% 验证，两跳作答记为模型能力边界不作功能判定 |
+
+**过程发现（已修复为脚本契约）**：① compaction 消息平铺无 `data` 包装且先 running 后 completed；② compact 请求 ID 与列表可见存在竞态，需按请求 ID 匹配；③ `session_message.data` 是 text 需 `::jsonb` cast；④ 手动连续 compact 时第二次前需等待 idle 并按请求 ID 等待完成。
+
 ### 2026-09-24 全量复测（本分支实现 V2 compaction history，本地 PG + 本地 OpenSandbox）
 
 > 背景：本分支（`feat/opencode-saas-2.0`）此前**没有** historyPath 功能（实现位于 `feat/opencode-2.0` 分支），本次参考 V1 语义在 V2 SessionRunner 落地并全量跑通。
@@ -200,7 +219,9 @@ touch -t "$(date -v-8d +%Y%m%d%H%M)" "$TOOL_OUTPUT/tool_history_stale.md"
 2. `POST /api/session/:id/compact`（V2 手动 compact）实测可用 —— 文档原「已知限制」过时已改。
 3. 评测设计备注：显著标记（"暗号"类）会被摘要模板 `Important Context` 保留，无法证明检索通路；须用**中性行内容**（如第 57 行配置）+ 事后轮转源文件，才能使答案唯一来源于历史文件。
 
-### 2026-08-23 重跑（merge upstream v1.18.21 后，hy3-free LLM）
+### 历史归档（V1 时代，非当前 V2 证据）
+
+#### 2026-08-23 重跑（merge upstream v1.18.21 后，hy3-free LLM）
 
 | 用例                  | 结果                             | 备注                                                                                                                                                                                                                  |
 | --------------------- | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -211,7 +232,7 @@ touch -t "$(date -v-8d +%Y%m%d%H%M)" "$TOOL_OUTPUT/tool_history_stale.md"
 
 **结论**：L0 单测全通过（含 merge 回归修复），端到端用例维持 V2 未上线状态；LLM 测试通路已切换至 hy3-free。
 
-### 2026-09-03 影响面回归（本地 PG + 远程沙箱）
+### 历史归档：2026-09-03 影响面回归（本地 PG + 远程沙箱）
 
 | 用例                  | 结果 | 证据                                                                                  |
 | --------------------- | ---- | ------------------------------------------------------------------------------------- |
@@ -225,7 +246,7 @@ touch -t "$(date -v-8d +%Y%m%d%H%M)" "$TOOL_OUTPUT/tool_history_stale.md"
 
 本次运行保持 SaaS 约束：只使用 PostgreSQL，历史正文只写远程沙箱，不再写本地文件回退。
 
-> **复测记录（2026-09-15，镜像 `hitl-cbf2276a-wip2`（含 pgJsonb/LEASE_TOOLS/偏离修复），本地 PG + 远端沙箱，Yd-DeepSeek）**：
+> 历史归档：**复测记录（2026-09-15，镜像 `hitl-cbf2276a-wip2`（含 pgJsonb/LEASE_TOOLS/偏离修复），本地 PG + 远端沙箱，Yd-DeepSeek）**：
 > | 用例 | 结果 | 实测 |
 > |---|---|---|
 > | T-CX.1 core 单测 | ✅ **27/27** | `session-compaction.test.ts`(26) + `session-runner-message.test.ts` 全过 + `compaction-history.test.ts`(1) |
