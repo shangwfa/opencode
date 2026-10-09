@@ -6,7 +6,10 @@ import { Effect, Layer, Logger, References, Schema } from "effect"
 import { FetchHttpClient } from "effect/unstable/http"
 import { OtlpExporter, OtlpSerialization } from "effect/unstable/observability"
 import { Logging } from "./observability/logging.js"
+import { Metrics } from "./observability/metrics.js"
 import { Otlp } from "./observability/otlp.js"
+
+export { Metrics }
 
 export const Options = Schema.Struct({
   endpoint: Schema.optional(Schema.String),
@@ -46,7 +49,7 @@ export function layer(
         Layer.orDie,
         Layer.merge(Layer.succeed(References.MinimumLogLevel, Logging.minimumLogLevel())),
       )
-      return Layer.merge(logs, yield* Otlp.tracingLayer(options, app))
+      return Layer.merge(logs, yield* Otlp.telemetryLayer(options, app))
     }),
   ).pipe(Layer.catchCause(() => local))
 }

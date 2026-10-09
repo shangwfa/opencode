@@ -22,6 +22,7 @@ import {
   Stream,
 } from "effect"
 import { makeLocationNode } from "@opencode/util/effect/app-node"
+import { Metrics } from "@opencode/util/observability/metrics"
 import { SandboxConfig } from "./config.js"
 import { SandboxOomSample } from "./oom-sample.js"
 import * as SandboxSnapshot from "./snapshot.js"
@@ -878,8 +879,12 @@ const layer = Layer.effect(
           } else {
             destroyed = true
           }
-          if (row && destroyed && (yield* markDestroyed(sessionID, row.id)))
+          if (row && destroyed && (yield* markDestroyed(sessionID, row.id))) {
+            // T62.6: kill counts every sandbox whose lifecycle actually ended
+            // here (remote kill succeeded, or the remote was already gone).
+            yield* Metrics.recordSandboxEvent("kill")
             yield* toolGate.destroyed(sessionID, closure).pipe(Effect.orDie)
+          }
         }).pipe(
           Effect.ensuring(
             Effect.suspend(() =>
@@ -1584,11 +1589,13 @@ const layer = Layer.effect(
             }),
           )
         let sb: Sandbox | null = null
+        let restored = false
         if (restorable) {
           const restoredExit = yield* attemptCreate({ snapshotId: restorable.id }).pipe(Effect.result)
-          const restored = restoredExit._tag === "Success" ? restoredExit.success : null
-          if (restored) {
-            sb = restored
+          const restoredSandbox = restoredExit._tag === "Success" ? restoredExit.success : null
+          if (restoredSandbox) {
+            sb = restoredSandbox
+            restored = true
             yield* snapshots.markConsumed(restorable.id).pipe(Effect.ignore)
             yield* bus
               .publish(SessionEvent.SandboxSnapshot.Restored, {
@@ -1635,6 +1642,9 @@ const layer = Layer.effect(
           ),
         ).pipe(Effect.ignore)
         yield* Effect.logInfo("remote sandbox allocated", { sessionID, sandboxID: sb.id, ms: Date.now() - startedAt })
+        // T62.6: one lifecycle event per allocated sandbox; snapshot-backed
+        // allocation counts as restore, cold image as create.
+        yield* Metrics.recordSandboxEvent(restored ? "restore" : "create")
         return { sb, initializeWorkspace: volumes.length === 0 && !restorable }
       }).pipe(Effect.withSpan("SandboxProvider.createSandbox"))
 
@@ -2224,6 +2234,9 @@ const layer = Layer.effect(
                   delta: classification.oomKillDelta,
                   total: classification.oomKillTotal,
                 })
+                // T62.6: OOM attribution is a lifecycle-relevant signal even
+                // though the sandbox may survive the memory pressure.
+                yield* Metrics.recordSandboxEvent("oom")
                 yield* bus
                   .publish(SessionEvent.SandboxOom.Oom, {
                     sessionID: row.session_id as SessionID,

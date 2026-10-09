@@ -108,6 +108,7 @@ CREATE TABLE "log" (
           "session_id" text NOT NULL,
           "source" text NOT NULL,
           "detail" text,
+          "trace_id" text,
           "time_created" bigint NOT NULL
         );
 CREATE TABLE "permission" (

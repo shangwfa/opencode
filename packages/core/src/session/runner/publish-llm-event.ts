@@ -3,7 +3,8 @@ import type { Agent } from "@opencode/schema/agent"
 import type { Model } from "@opencode/schema/model"
 import type { RelativePath } from "@opencode/schema/schema"
 import type { Snapshot } from "@opencode/schema/snapshot"
-import { Effect, Fiber, Iterable } from "effect"
+import { Metrics } from "@opencode/util/observability/metrics"
+import { Effect, Fiber, Iterable, Option } from "effect"
 import { isReadonlyArrayNonEmpty } from "effect/Array"
 import { Bus } from "../../bus.js"
 import { SessionEvent } from "../event.js"
@@ -60,6 +61,25 @@ const hostedContent = (result: ToolResultValue): NonEmptyContent => {
   if (result.type === "content" && isReadonlyArrayNonEmpty(result.value)) return result.value
   return [{ type: "text", text: stringify(result.value) }]
 }
+
+/**
+ * Annotates the active span with GenAI semantic-convention attributes for one
+ * finished provider step. Absorbs the "no active span" case: metrics and audit
+ * still record the step when tracing context is absent.
+ */
+const genAiSpanAttributes = Effect.fnUntraced(function* (
+  model: Model.Ref,
+  finish: NonNullable<StepRecord["finish"]>,
+) {
+  const span = yield* Effect.currentSpan.pipe(Effect.option)
+  if (Option.isNone(span)) return
+  span.value.attribute("gen_ai.operation.type", "chat")
+  span.value.attribute("gen_ai.request.model", model.id)
+  span.value.attribute("gen_ai.provider.name", model.providerID)
+  span.value.attribute("gen_ai.usage.input_tokens", finish.tokens.input)
+  span.value.attribute("gen_ai.usage.output_tokens", finish.tokens.output)
+  span.value.attribute("gen_ai.response.finish_reason", finish.finish)
+})
 
 /**
  * Persist one step without executing tools or starting a continuation step.
@@ -524,6 +544,13 @@ export const createLLMEventPublisher = (bus: Pick<Bus.Interface, "publish">, inp
           providerState: providerState(event.providerMetadata),
           tokens: SessionUsage.tokens(event.usage),
         }
+        // T62.5 metrics + GenAI span attributes: token usage and finish state
+        // attach to the active trace so a step's cost is queryable per turn.
+        yield* Metrics.recordTokenUsage(
+          { input: stepSettlement.tokens.input, output: stepSettlement.tokens.output },
+          { provider: input.model.providerID, model: input.model.id },
+        )
+        yield* genAiSpanAttributes(input.model, stepSettlement)
         if (event.reason.normalized === "content-filter") {
           providerFailed = true
           yield* failAssistant({ type: "provider.content-filter", message: "Provider blocked the response" })

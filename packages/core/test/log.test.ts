@@ -135,4 +135,37 @@ describe("Log", () => {
       expect((yield* logs.list({ sessionID: second })).map((entry) => entry.source)).toEqual(["session.update"])
     }),
   )
+
+  it.live("writes a 32-hex traceId when OTLP export is configured and a span is active", () =>
+    Effect.gen(function* () {
+      const sessionID = yield* setup()
+      const logs = yield* Log.Service
+      const previous = process.env.OTEL_EXPORTER_OTLP_ENDPOINT
+      process.env.OTEL_EXPORTER_OTLP_ENDPOINT = "http://otel.test"
+      try {
+        yield* logs.record({ sessionID, source: "session.create" }).pipe(Effect.withSpan("test-audit"))
+      } finally {
+        if (previous === undefined) delete process.env.OTEL_EXPORTER_OTLP_ENDPOINT
+        else process.env.OTEL_EXPORTER_OTLP_ENDPOINT = previous
+      }
+      const [entry] = yield* logs.list({ sessionID })
+      expect(entry?.traceId).toMatch(/^[0-9a-f]{32}$/)
+    }),
+  )
+
+  it.live("leaves traceId NULL when OTLP export is not configured", () =>
+    Effect.gen(function* () {
+      const sessionID = yield* setup()
+      const logs = yield* Log.Service
+      const previous = process.env.OTEL_EXPORTER_OTLP_ENDPOINT
+      delete process.env.OTEL_EXPORTER_OTLP_ENDPOINT
+      try {
+        yield* logs.record({ sessionID, source: "session.create" }).pipe(Effect.withSpan("test-audit"))
+      } finally {
+        if (previous !== undefined) process.env.OTEL_EXPORTER_OTLP_ENDPOINT = previous
+      }
+      const [entry] = yield* logs.list({ sessionID })
+      expect(entry?.traceId).toBeUndefined()
+    }),
+  )
 })

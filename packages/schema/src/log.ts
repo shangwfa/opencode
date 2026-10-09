@@ -86,6 +86,13 @@ export const Info = Schema.Struct({
   sessionID: SessionID,
   source: Source,
   detail: Detail.pipe(optional),
+  /** Trace id of the active span when the audited operation ran under OTLP export; NULL when OTLP is not configured. */
+  traceId: Schema.String.check(Schema.isPattern(/^[0-9a-f]{32}$/, { identifier: "Log.TraceID" })).pipe(
+    optional,
+  ).annotate({
+    description:
+      "32-hex OpenTelemetry trace id linking this audit entry to a distributed trace, when OTLP export is configured.",
+  }),
   time: Schema.Struct({ created: Schema.Number }).annotate({
     description: "Epoch milliseconds at which the audited operation completed.",
   }),

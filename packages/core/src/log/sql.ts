@@ -16,6 +16,8 @@ export const LogTable = sqliteTable(
       .references(() => SessionTable.id, { onDelete: "cascade" }),
     source: text().$type<import("@opencode/schema/log").Log.Source>().notNull(),
     detail: text({ mode: "json" }).$type<Record<string, unknown>>(),
+    // NULL unless the audited operation ran inside an exported OTLP trace.
+    trace_id: text().$type<string>(),
     time_created: integer().notNull(),
   },
   (table) => [index("log_session_time_idx").on(table.session_id, table.time_created)],

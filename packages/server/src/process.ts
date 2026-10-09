@@ -20,6 +20,7 @@ import { createServer } from "node:http"
 import { ServerAuth } from "./auth"
 import { isAllowedCorsOrigin } from "./cors"
 import { authorizedRequest } from "./middleware/authorization"
+import { httpMetrics } from "./middleware/http-metrics"
 import { withoutParentSpan } from "./request-tracing"
 import { createRoutes } from "./routes"
 import { ServerInfo } from "./server-info"
@@ -73,6 +74,7 @@ export const start = Effect.fn("ServerProcess.start")(function* <E, R>(
     .serve(
       dispatch(password, status, application, options.app?.version ?? "unknown", urls, Global.Path.tmp).pipe(
         HttpMiddleware.cors({ allowedOrigins: (origin) => isAllowedCorsOrigin(origin, options), maxAge: 86_400 }),
+        httpMetrics,
       ),
       errorResponseLogger,
     )

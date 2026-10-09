@@ -6,6 +6,7 @@ import { Log as LogSchema } from "@opencode/schema/log"
 import type { SessionSchema } from "./session/schema.js"
 import { Database } from "./database/database.js"
 import { makeGlobalNode } from "@opencode/util/effect/app-node"
+import { currentTraceId } from "@opencode/util/observability/otlp"
 import { LogTable } from "./log/sql.js"
 
 export const ID = LogSchema.ID
@@ -60,12 +61,23 @@ const layer = Layer.effect(
       const now = Date.now()
       const id = ID.create()
       const detail = detailValue(input.detail)
+      // Best-effort trace correlation: `undefined` (audit NULL) when OTLP is
+      // not configured or no span is active, so audit writes never depend on
+      // telemetry being present.
+      const traceId = yield* currentTraceId.pipe(Effect.catch(() => Effect.succeed(undefined)))
       yield* db
         .insert(LogTable)
-        .values({ id, session_id: input.sessionID, source: input.source, detail, time_created: now })
+        .values({ id, session_id: input.sessionID, source: input.source, detail, trace_id: traceId, time_created: now })
         .run()
         .pipe(Effect.orDie)
-      return Info.make({ id, sessionID: input.sessionID, source: input.source, detail, time: { created: now } })
+      return Info.make({
+        id,
+        sessionID: input.sessionID,
+        source: input.source,
+        ...(detail === undefined ? {} : { detail }),
+        ...(traceId === undefined ? {} : { traceId }),
+        time: { created: now },
+      })
     })
 
     const list = Effect.fnUntraced(function* (input: ListInput) {
@@ -109,6 +121,7 @@ const layer = Layer.effect(
           sessionID: row.session_id,
           source: row.source,
           ...(row.detail === null ? {} : { detail: row.detail }),
+          ...(row.trace_id === null ? {} : { traceId: row.trace_id }),
           time: { created: row.time_created },
         }),
       )
