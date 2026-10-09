@@ -1,8 +1,48 @@
 import { expect } from "bun:test"
+import { Database } from "@opencode/core/database/database"
+import { AppNodeBuilder } from "@opencode/core/effect/app-node-builder"
+import { KV } from "@opencode/core/kv"
+import { Session } from "@opencode/core/session"
+import { SessionMessage } from "@opencode/core/session/message"
+import { LayerNode } from "@opencode/util/effect/layer-node"
 import { Effect } from "effect"
 import { HttpServer, HttpServerError, HttpServerResponse } from "effect/unstable/http"
-import { it } from "../../core/test/lib/effect"
+import { it, testEffect } from "../../core/test/lib/effect"
 import { ServerProcess } from "../src/process"
+
+const recovery = testEffect(AppNodeBuilder.build(LayerNode.group([Database.node, KV.node])))
+const pgRecovery = process.env.OPENCODE_DATABASE_URL ? recovery.live : recovery.live.skip
+
+for (const registered of [false, true]) {
+  pgRecovery(`PG recovers persisted background jobs ${registered ? "with" : "without"} service registration`, () =>
+    Effect.gen(function* () {
+      const kv = yield* KV.Service
+      const notificationID = SessionMessage.ID.create()
+      const key = `job.background/${notificationID}`
+      // A missing child is deterministic: recovery removes the orphan without a model request.
+      const child = Session.ID.create()
+      yield* kv.set(key, {
+        id: child,
+        notificationID,
+        status: "running",
+        recovery: {
+          kind: "subagent",
+          parentSessionID: Session.ID.create(),
+          childSessionID: child,
+          agent: "general",
+          description: "Startup recovery regression",
+        },
+      })
+      yield* Effect.addFinalizer(() => kv.remove(key))
+      yield* ServerProcess.start<never, never>(
+        { hostname: "127.0.0.1", port: 0, password: "secret" },
+        registered ? { onListen: () => Effect.succeed(Effect.void) } : undefined,
+      )
+      yield* kv.get(key).pipe(Effect.repeat({ until: (value) => value === undefined }), Effect.timeout("5 seconds"))
+      expect(yield* kv.get(key)).toBeUndefined()
+    }),
+  )
+}
 
 it.live("authenticates API and frontend requests while allowing browser preflight", () =>
   Effect.gen(function* () {

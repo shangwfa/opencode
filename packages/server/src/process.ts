@@ -105,11 +105,11 @@ export const start = Effect.fn("ServerProcess.start")(function* <E, R>(
       ).pipe(Layer.provideMerge(NodeHttpServer.layerHttpServices)),
       applicationScope,
     )
-    if (lifecycle) {
-      yield* installRestartContinuity(Context.get(context, SessionRestart.Service)).pipe(
-        Effect.provideService(Scope.Scope, applicationScope),
-      )
-    }
+    // Recovery belongs to every server, including standalone/container `serve` processes.
+    // Service registration only controls lifecycle callbacks, not durable job continuity.
+    yield* installRestartContinuity(Context.get(context, SessionRestart.Service)).pipe(
+      Effect.provideService(Scope.Scope, applicationScope),
+    )
     const app = Context.get(context, HttpRouter.HttpRouter)
       .asHttpEffect()
       .pipe(
