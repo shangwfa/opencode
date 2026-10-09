@@ -47,7 +47,11 @@
 
 当前代码分支使用 V2 Effect 插件与 KV 服务，CCR 入口为 `packages/core/src/plugin/ccr.ts`，由 `PluginInternal` 注册；请求视图在 `session.context` 与 `session.compaction` hook 中转换，entry 写入 KV（SaaS PG 后端），会话删除时清理对应 key。已移植 JSON 数组/对象（含 lossless `ccr_table`）、搜索结果、配置、日志、diff、表格、HTML、代码启发式及通用文本压缩；也支持历史图片面积预算缩放及编码尺寸预检、marker、TTL、父 session 回溯取回、并发 replacement 复用和 per-turn 日志。
 
-**V2 L0 用例覆盖（2026-09-24）**：`packages/core/test/ccr-plugin.test.ts`（12 项）以内存 mock KV 覆盖 V1 transform/store/retrieve 三套件的 V2 版断言——T-CCR.15（跨 session 独立 entry）、T-CCR.16（写失败透传+重试）、T-CCR.17/18（跨轮不同 query 复用相同 replacement 字节）、T-CCR.23（TTL env 语义）、retrieve 的 not_found/expired/父链回溯与 maxDepth；`ccr.test.ts` 覆盖压缩原语、策略路由与 T-CCR.19/20 边界（散文含单个 ERROR 词不误路由日志、日志尾行 ERROR/WARN 保留、hunk 内 `-- ` 开头删除行不误判文件头）；`ccr-bench.ts` 为性能基准（各策略 20–68 MB/s、1MB estimateTokens 6.3ms）。补测过程中修复两个真实缺陷：① KV 写失败以 defect（die）形式抛出时原 `Effect.catch` 挡不住会 500（生产 PG 桥接即此形态，已加 `Effect.catchDefect` 透传）；② 日志级别词误加 `/i` 致含小写 "error" 的散文误路由（已对齐 V1 大小写敏感）。L1–L14 容器/API/PG 验收仍未在 V2 运行（Docker 构建因磁盘 `NoSpaceLeft` 未完成）；文档后续 T-CCR 表中的 V1 容器实测记录不代表 V2 已通过。
+**V2 L0 用例覆盖（2026-09-24）**：`packages/core/test/ccr-plugin.test.ts`（12 项）以内存 mock KV 覆盖 V1 transform/store/retrieve 三套件的 V2 版断言——T-CCR.15（跨 session 独立 entry）、T-CCR.16（写失败透传+重试）、T-CCR.17/18（跨轮不同 query 复用相同 replacement 字节）、T-CCR.23（TTL env 语义）、retrieve 的 not_found/expired/父链回溯与 maxDepth；`ccr.test.ts` 覆盖压缩原语、策略路由与 T-CCR.19/20 边界（散文含单个 ERROR 词不误路由日志、日志尾行 ERROR/WARN 保留、hunk 内 `-- ` 开头删除行不误判文件头）；`ccr-bench.ts` 为性能基准（各策略 20–68 MB/s、1MB estimateTokens 6.3ms）。补测过程中修复两个真实缺陷：① KV 写失败以 defect（die）形式抛出时原 `Effect.catch` 挡不住会 500（生产 PG 桥接即此形态，已加 `Effect.catchDefect` 透传）；② 日志级别词误加 `/i` 致含小写 "error" 的散文误路由（已对齐 V1 大小写敏感）。
+
+**V2 E2E（2026-10-10，`../scripts/ccr-v2.mjs` + `../scripts/ccr-multi-v2.mjs`，本地 dev 进程 + 隔离容器 + 模型 glm-5.3）**：L1–L14 全部通过（见验收层级表）。实测要点：33KB/300 item JSON seed → kv entry 单条（originalTokens=8413 → compressedTokens=217，**97.4%**）；压缩轮实际 input 3155 tok vs 未压缩估算 6640（L9）；PG part 原文原封未动；后续轮次同 hash 不重复建条目；模型真实调用 `ccr_retrieve` 取回原文并找到唯一哨兵，retrievalCount 递增；双容器多实例 B 复用 A 的 entry（replacement 字节 SHA 一致）并跨实例取回原文（L8）；docker restart 后同 hash 同 replacement 字节（L12）；session 删除后条目清零；显式 `OPENCODE_CCR_ENABLED=false` 对照容器 kv 零条目（L7）；延迟基准见 L13 行。
+
+> **V2 E2E 方法定型（seed 形状是关键）**：直接 INSERT `session_message` 的 seed 必须**完整合法形状**（`finish`/`rawFinish`/`cost`/tool part 的 `time` 等），否则 `SessionHistory.decodeMessageRow` 解码失败会**静默跳过该行**（仅 logWarning）——消息既不进上下文也不触发压缩。可靠做法是以真实 assistant 消息为模板仅替换 tool content 文本。另：`protect_recent=4` 需 seed 后 ≥4 条消息才进压缩窗口；观测以 `kv` 表为准（`[ccr] turn` 日志在生产日志级别下可能不输出）。
 
 V2 的 entry 位于 `kv` 表（`value` 为 JSON 文本），观测查询示例：
 
@@ -83,28 +87,24 @@ LIMIT 20;
 
 TTL 启用时追加 ` Expires in 30m.`。幂等识别四种形态：`[ccr:`、`Retrieve original: hash=`、`Retrieve more: hash=`、`<<ccr:`。
 
-## 验收层级
+## 验收层级（V2）
 
-| 层级         | 用例     | 验证目标                                                                                                                                       | 状态                                  |
-| ------------ | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
-| L0 单元      | T-CCR.1  | 五套件单测：压缩器路由与误判防御、query 相关性、跨 session/实例稳定性、store 元数据/TTL/LRU/retrievalCount、transform 保护、图片预算与输入限制 | ✅ 97 pass / 0 fail（2026-09-04）     |
-| L1 加载      | T-CCR.2  | env 开关注册插件、`ccr_retrieve` 工具暴露                                                                                                      | ✅ 容器实测（镜像 `ccr`，2026-09-03） |
-| L2 压缩链路  | T-CCR.3  | completed 大 tool output（10KB 日志）在请求视图被替换为 `[ccr:<hash>]` marker，log 策略 6349→391 tokens（省 94%）                              | ✅ 容器实测                           |
-| L3 取回      | T-CCR.4  | 模型真实调用 `ccr_retrieve` 拿到完整原文并回答细节                                                                                             | ✅ 容器实测                           |
-| L4 持久化    | T-CCR.5  | CCR entry 落 PG `storage_data`（key `plugin/ccr/<sid>/<hash>`，含 strategy/tool/tokens/retrievalCount）                                        | ✅ 容器实测                           |
-| L5 幂等      | T-CCR.6  | 多轮后同内容不重复建条目（同 hash 覆盖）；PG part 原文 25357 字符原封未动                                                                      | ✅                                    |
-| L6 清理      | T-CCR.7  | 删除会话时 `plugin/ccr/<sid>` 条目同步清理（实测 3→0）                                                                                         | ✅ 容器实测                           |
-| L7 开关      | T-CCR.8  | 未设 env 时插件不加载、零副作用                                                                                                                | ✅（无插件容器对照实验）              |
-| L8 多实例    | T-CCR.9  | 实例 B 从 PG 复用实例 A 持久化的 replacement，并可取回 A 存的原文                                                                              | ✅ 修复镜像双实例 + 真实 PG           |
-| L9 收益基准  | T-CCR.10 | **provider 真实 usage 对比：未压缩轮 input=16591 tok → 压缩后 271~734 tok（省 95.6%）**；retrieve 轮 8254（原文取回预期内，下轮再折叠）        | ✅ 容器实测                           |
-| L10 异常路径 | T-CCR.11 | 错误 hash → not_found + 「重跑来源」hint；TTL 过期（注入过去 expiresAt）→ expired + 「不要重试同 hash」hint                                    | ✅ 容器实测                           |
-| L11 兼容     | T-CCR.12 | （历史）曾验证 CCR 与 DCP 同开的注册顺序；DCP 已于 2026-09-04 移除，CCR 独立运行                                                               | n/a（DCP 已移除）                     |
-| L12 重启恢复 | T-CCR.13 | CCR 重启后从 PG 读取持久化 replacement，同 session+hash 注入相同 marker 字节                                                                   | ✅ 独立容器进程读取验证               |
-| L13 延迟     | T-CCR.14 | transform 压缩耗时（10KB 输出，毫秒级，无感知延迟）                                                                                            | ✅（请求无延迟劣化）                  |
-
-> **复测方法**：不依赖沙箱工具执行——直接向 PG seed 一条 `status=completed` 的大 output tool part（模拟历史工具调用），发消息触发 transform。CCR 是纯消息层功能（内存视图压缩 + PG storage_data），与沙箱无关。
->
-> **测试期间发现的环境问题**（与 CCR 无关，见会话记录）：远端沙箱 172.18.32.15:30040 间歇性 `Sandbox.create` 超时；bash/read 工具 stream 路径输出 >~1KB 挂起且换行被转义为字面 `\n`（exec API 正常）；旧镜像代码导致容器首次验证未触发。
+| 层级 | 用例 | 验证目标 | V2 状态（2026-10-10） |
+| --- | --- | --- | --- |
+| L0 单元 | T-CCR.1 | V2 单测：`packages/core/test/ccr-plugin.test.ts`（12 项）+ `ccr.test.ts`（压缩原语/策略路由/边界） | ✅ 29 pass / 1 skip / 0 fail |
+| L1 加载 | T-CCR.2 | env 开关注册插件、`ccr_retrieve` 工具暴露（模型真实调用为证） | ✅ V2 E2E |
+| L2 压缩链路 | T-CCR.3 | completed 大 tool output（33KB JSON）在请求视图被压缩，97.4% 收益 | ✅ V2 E2E（kv entry + token 元数据） |
+| L3 取回 | T-CCR.4 | 模型真实调用 `ccr_retrieve` 拿到完整原文并找到哨兵细节 | ✅ V2 E2E |
+| L4 持久化 | T-CCR.5 | entry 落 `kv` 表（key `plugin/ccr/<sid>/<hash>`，originalTokens/compressedTokens/retrievalCount） | ✅ V2 E2E |
+| L5 幂等 | T-CCR.6 | 后续轮次不重复建条目；PG part 原文原封未动 | ✅ V2 E2E |
+| L6 清理 | T-CCR.7 | 删除会话时 `plugin/ccr/<sid>` 条目同步清理 | ✅ V2 E2E |
+| L7 开关 | T-CCR.8 | 显式 `OPENCODE_CCR_ENABLED=false` 时插件不加载、零 kv 条目 | ✅ V2 E2E（注意镜像 Dockerfile 内置 `true`，对照须显式覆盖） |
+| L8 多实例 | T-CCR.9 | 实例 B 从 kv 复用实例 A 持久化的 replacement（字节一致）并取回 A 存的原文 | ✅ V2 E2E 双容器（`ccr-multi-v2.mjs`） |
+| L9 收益基准 | T-CCR.10 | 压缩轮实际 provider input tokens 远小于 entry.originalTokens | ✅ V2 E2E（3155 tok vs 6640 估算） |
+| L10 异常路径 | T-CCR.11 | 错误 hash → not_found；TTL 过期 → expired（含 hint） | ✅ L0 单测覆盖（ccr-plugin.test） |
+| L11 兼容 | T-CCR.12 | CCR 与 DCP 同开 | n/a（DCP 已移除） |
+| L12 重启恢复 | T-CCR.13 | 服务重启后同 session+hash 注入完全相同的 replacement 字节、不重复建条目 | ✅ V2 E2E（docker restart 实测；retrievalCount 元数据递增属预期） |
+| L13 延迟 | T-CCR.14 | transform 压缩耗时毫秒级 | ✅ V2 bench（`bun run test/ccr-bench.ts`：25 条/780KB 历史 transform 首轮 54.9ms、复用轮 3.1ms；1MB estimateTokens 9.8ms；原语 20–110 MB/s） |
 
 ## 公共配置
 
@@ -164,9 +164,8 @@ ORDER BY time_updated DESC LIMIT 20;
 L0 命令：
 
 ```bash
-cd packages/opencode
-bun test test/plugin/ccr-transform.test.ts test/plugin/ccr-compressors.test.ts \
-  test/plugin/ccr-image.test.ts test/plugin/ccr-retrieve.test.ts test/plugin/ccr-store.test.ts
+cd packages/core
+bun test test/ccr-plugin.test.ts test/ccr.test.ts
 ```
 
 修复前最小复现记录：
@@ -186,7 +185,7 @@ bun test test/plugin/ccr-transform.test.ts test/plugin/ccr-compressors.test.ts \
 | 跨 session A     | object     | json     |          60391 |              1123 |              0 |
 | 跨 session B     | object     | json     |          60391 |              1123 |              1 |
 
-> **复测记录（2026-09-15，镜像 `hitl-cbf2276a-wip2`（含 pgJsonb/LEASE_TOOLS/偏离修复），本地 PG + 远端沙箱）**：
+> 历史归档（V1）：**复测记录（2026-09-15，镜像 `hitl-cbf2276a-wip2`（含 pgJsonb/LEASE_TOOLS/偏离修复），本地 PG + 远端沙箱）**：
 > - **L0 单测 ✅ 97/97**（5 套件：transform/compressors/image/retrieve/store，与 2026-09-04 基线一致）
 > - **L1 加载 ✅**：容器 `OPENCODE_CCR_ENABLED=true`（Dockerfile 内置）
 > - **L2/L5 压缩+持久化 ✅**：PG seed 34KB JSON tool output（300 items）→ 发 5 条消息推入压缩窗口 → **PG `storage_data` 产生 entry**（key=`plugin/ccr/<sid>/<hash>`、`strategy=json`、`originalTokens=8548`）
