@@ -92,6 +92,8 @@ Session Agent 与沙箱 Markdown 定义同一 ID，各自只声明部分字段�
 
 ## 四、本轮执行记录
 
+**2026-10-09 复验**：隔离容器 `opencode-saas-config-agents`（14106，镜像 `opencode-saas-permission-turns-current:local`）+ 本地 PostgreSQL `opencode-v2-up` + 本地 OpenSandbox。T61.1–T61.13 全部通过：**26 项（24 功能 + 2 清理断言）全绿**。清理断言确认容器全局配置与 `agents/` 目录已原样还原，测试 Session 已删除，隔离容器已移除。
+
 **2026-09-29**：`opencode-saas-test`（端口 14096）+ 本地 PostgreSQL `opencode-v2-up`。**26 项全部通过**（含 2 项清理断言）。
 
 | 脚本 | 结果 | 环境 |

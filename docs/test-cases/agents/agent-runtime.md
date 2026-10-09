@@ -65,17 +65,17 @@ node docs/test-cases/scripts/agent-runtime-v2.mjs
 > 子 Agent 的消息**不进入父会话**的 message 列表，必须从父会话工具 part 的 `state.metadata.sessionID`
 > 取出子 Session ID 后单独查询。这与 [`compose-agent.md`](./compose-agent.md) 的断言方式一致。
 
-### T63.6：Session Agent 定义的 subagent 在子会话中不可解析
+### T63.6：内部 child Session 共享 Session Agent 定义
 
-子会话不继承 Session 级 Agent 覆盖（与 fork 同理，见 [`session-agents.md`](./session-agents.md)）。
-因此通过 `POST /agents` 定义的 subagent 被调度时必然失败。
+原先假设 child Session 不继承 Session 级 Agent 覆盖，但真实运行证明该假设错误：Session Agent 的资源归属通过
+`SessionResourceOwner` 解析到内部子会话共同的 owner，因此由 `POST /agents` 定义的 subagent 可以被正常解析并执行。
+这与显式 history fork 是否共享资源不同；fork 会开启独立资源域。
 
 | 用例 | 验证点 |
 |---|---|
-| T63.6.1 | `session` 来源的 subagent 调用返回工具错误（`Agent not found`），未产生子 Agent 消息 |
-
-> **这是当前实现边界，不是文档承诺**。需要在子会话中可用的 subagent 必须来自沙箱 Markdown
-> （`.opencode/agents/*.md`）或全局配置。已有用例中 `compose-agent.md` 与 `team-agent.md` 都遵循了这一约束。
+| T63.6.1 | Session 来源的 subagent 被成功调度，工具有成功终态并创建 child Session |
+| T63.6.2 | child Session 的 Agent ID 和 `parentID` 正确 |
+| T63.6.3 | child Session 使用该 Session Agent 的 system prompt 并返回标记 |
 
 ### T63.7：`steps` 上限与额度重置
 
@@ -100,15 +100,26 @@ The `content[].thinking` in the thinking mode must be passed back to the API.
 
 ## 三、本轮执行记录
 
-**2026-09-30**：隔离 Docker 容器 `opencode-saas-test` + 本地 PostgreSQL `opencode-v2-up`，模型 `Yd-DeepSeek/deepseek-v4-flash`。
+**2026-09-30 历史记录**：隔离 Docker 容器 `opencode-saas-test` + 本地 PostgreSQL `opencode-v2-up`，模型 `Yd-DeepSeek/deepseek-v4-flash`。当时 T63.6 的“不可解析”预期不正确，见下方 2026-10-09 复验。
 
 | 项 | 结果 |
 |---|---|
-| T63.1–T63.6 | 22 PASS / 0 FAIL |
+| T63.1–T63.6 | 22 PASS / 0 FAIL（当时 T63.6 断言后来证实不正确） |
 | T63.7.1–T63.7.3 | 3 PASS / 0 FAIL |
 | 清理断言 | 2 PASS（`default_agent` 与全局 agents 定义已还原） |
 
-25 项功能断言、2 项清理断言全部通过；测试脚本确认 `default_agent` 与测试用全局 Agent 定义均已清理还原。
+当时记录为 25 项功能断言、2 项清理断言通过；其中 T63.6 断言后来被真实行为证伪，故该轮不能作为 T63.6 正向契约的证据。
+
+**2026-10-09 全量复验**：使用隔离镜像容器 `opencode-saas-agent-runtime`（14102）、本地 PostgreSQL `opencode-v2-up`、OpenSandbox 和 `Yd-DeepSeek/deepseek-v4-flash`。执行期间每轮先订阅 `GET /api/session/:sessionID/event`，实时记录 reasoning、工具、文本及终态事件。
+
+| 项 | 结果 |
+|---|---|
+| T63.1–T63.6 | 24 PASS / 0 FAIL |
+| T63.7.1–T63.7.3 | 3 PASS / 0 FAIL |
+| 清理断言 | 2 PASS（`default_agent` 与测试全局 Agent 定义已还原） |
+| PG 测试 Session 后检 | 0 条残留 |
+
+共 27 项功能断言与 2 项清理断言通过。T63.6 验证 `SessionResourceOwner` 使内部 child Session 共享 Session Agent 定义；child Agent 身份、`parentID` 与自有 system prompt 标记均符合预期。测试容器已移除，既有 14096/14098 容器未重启。
 
 覆盖矩阵：
 
@@ -119,7 +130,7 @@ The `content[].thinking` in the thinking mode must be passed back to the API.
 | 改 `default_agent` 对既有会话的影响 | T63.4 | 覆盖（含与文档不符的场景） |
 | `mode: all` 作 primary | T63.5.1–T63.5.2 | 覆盖 |
 | `mode: all` 作 subagent、子 Session 归属 | T63.5.3–T63.5.7 | 覆盖 |
-| Session 来源 subagent 的边界 | T63.6 | 覆盖（实现边界） |
+| Session 来源 subagent 在内部 child Session 的可用性 | T63.6 | 覆盖（共享资源 owner） |
 | `steps` 上限与额度重置 | T63.7.1、T63.7.3 | 覆盖 |
 | `steps` 末步文本总结 | T63.7.2 | **通过** |
 | Agent 自定义模型路由的实际生效 | — | 未覆盖，见 gap 报告 |

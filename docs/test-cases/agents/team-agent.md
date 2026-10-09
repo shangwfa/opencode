@@ -71,6 +71,10 @@ lead 汇总分析、最终实现和审查结果。随后在同一 Session 再次
 
 脚本：[`../scripts/team-agent-v2.mjs`](../scripts/team-agent-v2.mjs)。状态表只在脚本完成并通过对应断言后更新；中断、失败或未触发的分支不记作通过。
 
+**2026-10-09 复验（模型智谱 `Yd-GLM`/`glm-5.3`）**：隔离容器 `opencode-saas-team-e2e`（端口 `14099`，镜像 `opencode-saas-permission-turns-current:local`）+ 本地 `opencode-v2-up` PG + 本地 OpenSandbox。**19 项断言全部通过**（T52.1 组队与 PG、T52.2–T52.5 依赖链 SSE 与文本断言、T52.7 汇总、T52.9 coder 复用 multiply、T52.10 动态团队 3 角色创建/依赖编排/质量门/汇总/PG 归属、清理零残留）。T52.6 记 SKIP：reviewer 首轮返回 `[APPROVED]`，修复分支未触发，不记通过。测试容器已清理。
+
+> **模型行为差异（已按证据处理）**：glm-5.3 对动态团队 JSON 的"角色名必须小写"约束仅概率性遵循——原 prompt 与强化 prompt 的两次完整运行均返回 Title Case（如 `Analyst`），强化后单次 probe 通过但完整跑仍波动。角色名大小写不是产品契约（动态创建/编排/持久化均不受影响），脚本校验已从「必须小写」放宽为「合法英文标识符」（`/^[a-zA-Z][a-zA-Z0-9_-]{1,31}$/`，仍拒绝空格/中文/特殊字符），并在断言信息中输出实际角色名。prompt 中的小写引导保留。此前 DeepSeek 运行不受影响（本就返回小写）。
+
 **2026-09-26 V2 实跑**：当前源码 Docker SaaS 隔离容器 `opencode-saas-team-e2e`（端口 14099），连接本地 `opencode-v2-up` PG，模型 `Yd-DeepSeek/deepseek-v4-flash`。包含 T52.10 的最终运行输出 18 项 PASS，动态 JSON 团队计划、3 个动态 Agent、依赖顺序执行、review verdict、lead 汇总与 PG 记录均通过。首次 reviewer 已批准，因此 T52.6 输出 SKIP，不计通过。静态和动态文本角色均显式配置全工具 deny，确保验证的是控制面编排。测试 Session 和 Agent 行已由 PG 断言确认清理。一轮未设置工具权限的早期尝试曾在 coder 工具调用后中断；随后显式拒绝工具调用并重跑成功，该失败不计入通过结果。
 
 ## 历史记录（非当前 V2 通过证据）

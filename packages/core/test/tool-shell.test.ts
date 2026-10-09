@@ -183,9 +183,10 @@ const permissionIt = testEffect(
   ]),
 )
 
-const call = (input: typeof ShellTool.Input.Type, id = "call-shell") => ({
+const call = (input: typeof ShellTool.Input.Type, id = "call-shell", agent = toolIdentity.agent) => ({
   sessionID,
   ...toolIdentity,
+  agent,
   call: { type: "tool-call" as const, id, name: "shell", input },
 })
 
@@ -1216,8 +1217,23 @@ describe("ShellTool", () => {
 
             reset()
             denyAction = "shell"
-            yield* withSession(active.path, (registry) => executeTool(registry, call({ command: cwdCommand })))
+            const marker = path.join(active.path, "explore-shell-must-not-run")
+            const deniedCommand = isWindows
+              ? `Set-Content -NoNewline '${marker}' blocked`
+              : `printf blocked > '${marker}'`
+            const denied = yield* withSession(active.path, (registry) =>
+              executeTool(
+                registry,
+                call({ command: deniedCommand }, "call-explore-denied-shell", Agent.ID.make("explore")),
+              ),
+            )
+            expect(denied).toMatchObject({
+              status: "error",
+              error: { type: "permission.rejected", message: "Permission denied: shell" },
+            })
             expect(assertions.map((item) => item.action)).toEqual(["shell"])
+            expect(assertions[0]).toMatchObject({ agent: Agent.ID.make("explore") })
+            expect(yield* Effect.promise(() => Bun.file(marker).exists())).toBe(false)
           }),
         ([active, outside]) =>
           Effect.promise(() =>

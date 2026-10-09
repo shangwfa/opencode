@@ -8,6 +8,7 @@ import { AppNodeBuilder } from "@opencode/core/effect/app-node-builder"
 import { LayerNode } from "@opencode/util/effect/layer-node"
 import { Environment } from "@opencode/core/environment/index"
 import { Location } from "@opencode/core/location"
+import { Agent } from "@opencode/core/agent"
 import { SandboxProvider } from "@opencode/core/sandbox/provider"
 import { FileAccess } from "@opencode/core/file-access"
 import { Permission } from "@opencode/core/permission"
@@ -94,9 +95,10 @@ const withTool = <A, E, R>(
   )
 }
 
-const call = (input: typeof WriteTool.Input.Type, id = "call-write") => ({
+const call = (input: typeof WriteTool.Input.Type, id = "call-write", agent = toolIdentity.agent) => ({
   sessionID,
   ...toolIdentity,
+  agent,
   call: { type: "tool-call" as const, id, name: "write", input },
 })
 
@@ -410,16 +412,22 @@ describe("WriteTool", () => {
 
           const deniedEdit = makeWriteFixture()
           deniedEdit.denyAction = "edit"
+          const target = path.join(active.path, "denied.txt")
           expect(
             yield* withTool(active.path, deniedEdit, (registry) =>
-              executeTool(registry, call({ path: "denied.txt", content: "blocked" })),
+              executeTool(
+                registry,
+                call({ path: "denied.txt", content: "blocked" }, "call-explore-denied-write", Agent.ID.make("explore")),
+              ),
             ),
           ).toEqual({
             status: "error",
             error: { type: "permission.rejected", message: "Permission denied: edit" },
           })
           expect(deniedEdit.assertions.map((input) => input.action)).toEqual(["edit"])
+          expect(deniedEdit.assertions[0]).toMatchObject({ agent: Agent.ID.make("explore"), resources: ["denied.txt"] })
           expect(deniedEdit.writes).toEqual([])
+          expect(yield* Effect.promise(() => fs.stat(target).then(() => true, () => false))).toBe(false)
         }),
       ([active, outside]) =>
         Effect.promise(() =>

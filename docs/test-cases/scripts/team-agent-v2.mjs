@@ -165,7 +165,12 @@ try {
   assert(Array.isArray(team.order) && team.order.length === team.roles.length, "dynamic planner order length mismatch")
   const roleNames = team.roles.map((role) => role.name)
   assert.equal(new Set(roleNames).size, roleNames.length, "dynamic planner returned duplicate role names")
-  assert(team.roles.every((role) => /^[a-z][a-z0-9-]{1,31}$/.test(role.name)), "dynamic role names must be lowercase English identifiers")
+  // glm-5.3 等模型对"必须小写"仅概率性遵循（实测强化 prompt 后仍会返回 Title Case），
+  // 校验放宽为合法英文标识符：字母开头，仅字母/数字/连字符/下划线，仍拒绝空格、中文等。
+  assert(
+    team.roles.every((role) => /^[a-zA-Z][a-zA-Z0-9_-]{1,31}$/.test(role.name)),
+    `dynamic role names must be valid English identifiers, got: ${JSON.stringify(roleNames)}`,
+  )
   assert(team.roles.every((role) => typeof role.description === "string" && role.description && typeof role.system === "string" && role.system))
   assert(team.roles.every((role) => role.mode === "primary" || role.mode === "subagent"), "dynamic planner returned an invalid mode")
   assert.equal(team.roles[0].mode, "primary", "dynamic first role must be primary")

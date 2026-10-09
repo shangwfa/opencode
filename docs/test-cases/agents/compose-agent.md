@@ -68,6 +68,10 @@ bun docs/test-cases/scripts/compose-agent-v2.mjs
 | T42.3 Session Agent 隔离 | 第二 Session Agent list 不含 Compose Agent | — | 第二 Session 不存在该 Agent 行 | 通过 |
 | T42.4 容器重启持久化 | 重启后 Agent API 读回配置 | — | Agent PG 行及 system 字段保持一致 | 通过 |
 
+**2026-10-09 复验**：隔离容器 `opencode-saas-compose-e2e`（端口 `14099`，镜像 `opencode-saas-permission-turns-current:local`）连接 `opencode-v2-up` PostgreSQL + 本地 OpenSandbox，使用 `Yd-DeepSeek/deepseek-v4-flash` 执行。**10 项断言全部通过**（9 功能 + 1 清理），T42.1–T42.4 功能断言稳定通过。测试 Session/Agent 行 PG 零残留，隔离容器已清理。
+
+> **删除时序（产品行为，非缺陷）**：T42.4 重启容器会中断/延迟 Sandbox 清理，此后 `DELETE /api/session/:id` 会被 `Session.SandboxRetainedError`（HTTP 409，`Sandbox cleanup is incomplete; session and recovery points retained`）暂时拒绝并保留 Session，直到后台 Sandbox 清理完成（实测约 2–3 分钟）才返回 204。这是防止孤儿 Sandbox/恢复点的保护机制（`packages/core/src/session/error.ts` + `packages/server/src/handlers/session.ts` 的 `SandboxRetainedError → ConflictError`）。清理脚本因此对删除做轮询重试，不把 409 当作删除失败。顺带修正：脚本清理阶段的删除已从「一次性 DELETE」改为「PG 校验 + 轮询重试」，避免重启场景下残留测试 Session。
+
 **2026-09-26 实跑记录**：隔离 SaaS Docker 容器 `opencode-saas-compose-e2e`（端口 `14099`）连接 `opencode-v2-up` PostgreSQL，使用 `Yd-DeepSeek/deepseek-v4-flash` 执行脚本。10 项断言全部通过，包含 HTTP、SSE、两份 Sandbox 文件、child Session 归属、Session Agent 隔离、容器重启后的 API/PG 持久化以及结束时 PG Session/Agent 零残留。测试容器已清理。
 
 执行脚本：[`../scripts/compose-agent-v2.mjs`](../scripts/compose-agent-v2.mjs)。

@@ -285,8 +285,22 @@ try {
       await runShell(rootID, `rm -f ${cleanup}`)
     } catch {}
   }
-  for (const id of sessionIDs.slice(1).reverse()) await api(`/api/session/${id}`, "DELETE")
-  if (rootID) await api(`/api/session/${rootID}`, "DELETE")
+  // 删除可能被 Session.SandboxRetainedError（409，sandbox 清理未完成）暂时拒绝；
+  // 容器重启后 sandbox 清理需几分钟，轮询直到删除成功或超时，避免残留。
+  const removeSession = async (id) => {
+    const deadline = Date.now() + 300_000
+    while (Date.now() < deadline) {
+      try {
+        await api(`/api/session/${id}`, "DELETE")
+      } catch {}
+      try {
+        if (pg(`SELECT count(*) FROM session_v2 WHERE id=${sqlQuote(id)}`) === "0") return
+      } catch {}
+      await new Promise((resolve) => setTimeout(resolve, 3000))
+    }
+  }
+  for (const id of sessionIDs.slice(1).reverse()) await removeSession(id)
+  if (rootID) await removeSession(rootID)
 }
 
 if (sessionIDs.length) {

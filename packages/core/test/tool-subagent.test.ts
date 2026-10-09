@@ -32,6 +32,7 @@ import { SessionMessage } from "@opencode/core/session/message"
 import { SessionRunnerModel } from "@opencode/core/session/runner/model"
 import { SessionStore } from "@opencode/core/session/store"
 import { Plugin } from "@opencode/core/plugin"
+import { PluginHooks } from "@opencode/core/plugin/hooks"
 import { PluginSupervisor } from "@opencode/core/plugin/supervisor"
 import { Permission } from "@opencode/core/permission"
 import { SubagentTool } from "@opencode/core/tool/plugin/subagent"
@@ -113,8 +114,17 @@ const executionNode = makeGlobalNode({
 
 const subagentPluginSupervisor = makeLocationNode({
   name: "test/subagent-plugins",
-  layer: Layer.effectDiscard(registerToolPlugin(SubagentTool.Plugin)),
-  deps: [Agent.node, Config.node, Model.node, Permission.node, Session.node, SessionAgents.node, Job.node, Tool.node],
+  layer: Layer.effectDiscard(
+    Effect.gen(function* () {
+      const hooks = yield* PluginHooks.Service
+      yield* registerToolPlugin(SubagentTool.Plugin, {
+        session: {
+          hook: (name, callback, options) => hooks.register("session", name, callback, options),
+        },
+      })
+    }),
+  ),
+  deps: [Agent.node, Config.node, Model.node, Permission.node, Session.node, SessionAgents.node, Job.node, Tool.node, PluginHooks.node],
 })
 
 const nodes = LayerNode.group([
@@ -193,6 +203,61 @@ const withSubagent = (location: Location.Ref) =>
   })
 
 describe("SubagentTool", () => {
+  it.live("filters hidden, primary, and caller-denied agents from the subagent catalog", () =>
+    Effect.acquireRelease(
+      Effect.promise(() => tmpdir()),
+      (dir) => Effect.promise(() => dir[Symbol.asyncDispose]()),
+    ).pipe(
+      Effect.flatMap((dir) =>
+        Effect.gen(function* () {
+          const location = Location.Ref.make({ directory: AbsolutePath.make(dir.path) })
+          const sessions = yield* Session.Service
+          const parent = yield* sessions.create({ location, model: parentModel })
+          yield* withSubagent(parent.location)
+          const sessionAgents = yield* SessionAgents.Service
+          for (const [id, mode, hidden] of [
+            ["visible-subagent", "subagent", false],
+            ["visible-all", "all", false],
+            ["hidden-subagent", "subagent", true],
+            ["primary-candidate", "primary", false],
+            ["denied-subagent", "subagent", false],
+          ] as const) {
+            yield* sessionAgents.create(parent.id, {
+              id: Agent.ID.make(id),
+              config: ConfigAgent.Info.make({ description: `candidate ${id}`, mode, hidden }),
+            })
+          }
+          yield* sessionAgents.create(parent.id, {
+            id: toolIdentity.agent,
+            config: ConfigAgent.Info.make({
+              permissions: [{ action: "subagent", resource: "denied-subagent", effect: "deny" }],
+            }),
+          })
+
+          const locations = yield* LocationServiceMap.Service
+          const hooks = yield* PluginHooks.Service.pipe(Effect.provide(locations.get(parent.location)))
+          const context = {
+            sessionID: parent.id,
+            agent: toolIdentity.agent,
+            model: parentModel,
+            system: [],
+            messages: [],
+            options: {},
+            tools: { subagent: { description: "Base subagent tool", input: {} } },
+          }
+          yield* hooks.trigger("session", "context", context)
+
+          const description = context.tools.subagent.description
+          expect(description).toContain("visible-subagent")
+          expect(description).toContain("visible-all")
+          expect(description).not.toContain("hidden-subagent")
+          expect(description).not.toContain("primary-candidate")
+          expect(description).not.toContain("denied-subagent")
+        }),
+      ),
+    ),
+  )
+
   completionIt.live("admits one durable completion across live delivery and restart replay", () =>
     Effect.acquireRelease(
       Effect.promise(() => tmpdir()),

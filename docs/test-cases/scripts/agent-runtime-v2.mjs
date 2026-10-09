@@ -55,11 +55,64 @@ async function api(path, method = "GET", body) {
   return { status: response.status, data, text }
 }
 
+/** Subscribe before each prompt so the execution is visible on the dedicated Session SSE endpoint. */
+async function watchSession(sessionID) {
+  const controller = new AbortController()
+  const response = await fetch(`${BASE}/api/session/${sessionID}/event`, {
+    headers: { authorization: headers.authorization, accept: "text/event-stream" },
+    signal: controller.signal,
+  })
+  if (response.status !== 200) throw new Error(`Session SSE HTTP ${response.status} for ${sessionID}`)
+  const done = (async () => {
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ""
+    try {
+      while (true) {
+        const { value, done } = await reader.read()
+        if (done) return
+        buffer += decoder.decode(value, { stream: true })
+        const blocks = buffer.split(/\r?\n\r?\n/)
+        buffer = blocks.pop() ?? ""
+        for (const block of blocks) {
+          const line = block.split(/\r?\n/).find((item) => item.startsWith("data:"))
+          if (!line) continue
+          let event
+          try {
+            event = JSON.parse(line.slice(5).trim())
+          } catch {
+            continue
+          }
+          const data = event.data ?? {}
+          if (event.type === "session.execution.started") console.log(`[SSE ${sessionID}] exec ▶`)
+          if (event.type === "session.reasoning.ended") console.log(`[SSE ${sessionID}] think · ${String(data.text ?? "").replace(/\s+/g, " ").slice(0, 120)}`)
+          if (event.type === "session.tool.input.started") console.log(`[SSE ${sessionID}] tool ◇ ${data.name}`)
+          if (event.type === "session.tool.input.ended") console.log(`[SSE ${sessionID}] tool input ${data.name}`)
+          if (event.type === "session.tool.success") console.log(`[SSE ${sessionID}] tool ✓ ${String(data.title ?? data.name ?? "").slice(0, 120)}`)
+          if (event.type === "session.tool.failed") console.log(`[SSE ${sessionID}] tool ✗ ${String(data.error?.message ?? "failed").slice(0, 120)}`)
+          if (event.type === "session.text.ended") console.log(`[SSE ${sessionID}] text · ${String(data.text ?? "").replace(/\s+/g, " ").slice(0, 120)}`)
+          if (event.type === "session.execution.succeeded") console.log(`[SSE ${sessionID}] exec ✔`)
+          if (event.type === "session.execution.failed") console.log(`[SSE ${sessionID}] exec ✗ ${String(data.error?.message ?? "").slice(0, 120)}`)
+          if (event.type === "session.execution.interrupted") console.log(`[SSE ${sessionID}] exec ⏸ ${data.reason ?? ""}`)
+        }
+      }
+    } catch (error) {
+      if (!controller.signal.aborted) throw error
+    }
+  })()
+  return {
+    stop: () => controller.abort(),
+    done,
+  }
+}
+
 /**
  * 消费一次 prompt_stream 的 SSE，返回事件列表。
  * 收到终态事件后立即停止读取：连接保持 keep-alive，等底层关闭会一直挂到超时。
  */
 async function prompt(sessionID, text) {
+  const watcher = await watchSession(sessionID)
+  try {
   const streamed = await fetch(`${BASE}/api/session/${sessionID}/prompt_stream`, {
     method: "POST",
     headers,
@@ -106,6 +159,10 @@ async function prompt(sessionID, text) {
   assert(types.includes("session.execution.succeeded"), `执行未成功；收到事件: ${types.join(", ")}`)
   assert(!types.includes("session.execution.failed"), "prompt 执行失败")
   return events
+  } finally {
+    watcher.stop()
+    await watcher.done
+  }
 }
 
 /**
@@ -113,6 +170,8 @@ async function prompt(sessionID, text) {
  * 与 `prompt` 一样在终态事件后停止读取，连接本身保持 keep-alive 不会关闭。
  */
 async function promptFailure(sessionID, text) {
+  const watcher = await watchSession(sessionID)
+  try {
   const streamed = await fetch(`${BASE}/api/session/${sessionID}/prompt_stream`, {
     method: "POST",
     headers,
@@ -155,6 +214,10 @@ async function promptFailure(sessionID, text) {
     succeeded: events.some((event) => event.type === "session.execution.succeeded"),
     error: (failure?.properties ?? failure?.data ?? {}).error,
     types: events.map((event) => event.type),
+  }
+  } finally {
+    watcher.stop()
+    await watcher.done
   }
 }
 
@@ -346,23 +409,56 @@ try {
     "T63.5.7 子 Session 的 parentID 指向委派方会话",
   )
 
-  // T63.6 Session Agent 定义的 subagent 在子会话中不可解析（当前实现边界）
+  // T63.6 内部 child Session 与资源所有者共享 Session Agent 定义
   await api(`/api/session/${allSession}/agents`, "POST", {
     id: "runtime-session-only-child",
     config: { description: "T63.6 session-scoped subagent", mode: "subagent", system: "Reply with SESSION_ONLY_CHILD_OK." },
   })
-  await api(`/api/session/${allSession}/agent`, "POST", { agent: "runtime-all" })
-  const failEvents = await prompt(allSession, 'Call the subagent tool with agent "runtime-session-only-child" and prompt "emit marker".')
-  const failedParts = ((await api(`/api/session/${allSession}/message?order=asc`)).data.data ?? [])
+  await api(`/api/session/${allSession}/agents`, "POST", {
+    id: "runtime-session-only-parent",
+    config: {
+      description: "T63.6 dedicated primary",
+      mode: "primary",
+      system:
+        'When asked to delegate, call the subagent tool exactly once with agent "runtime-session-only-child" and the requested prompt. Do not substitute another agent.',
+    },
+  })
+  await api(`/api/session/${allSession}/agent`, "POST", { agent: "runtime-session-only-parent" })
+  const sessionAgentEvents = await prompt(
+    allSession,
+    'Call the subagent tool exactly once with agent "runtime-session-only-child" and prompt "emit marker". Do not call any other tool.',
+  )
+  const sessionAgentParts = ((await api(`/api/session/${allSession}/message?order=asc`)).data.data ?? [])
     .filter((message) => message.type === "assistant")
     .flatMap((message) => message.content ?? [])
     .filter((part) => part.type === "tool" && part.name === "subagent" && part.state?.input?.agent === "runtime-session-only-child")
+  const sessionAgentChildIDs = [...new Set(sessionAgentParts.map((part) => part.state?.metadata?.sessionID).filter(Boolean))]
   check(
-    failEvents.some((event) => event.type === "session.tool.failed") &&
-      failedParts.length > 0 &&
-      failedParts.every((part) => part.state.status === "error"),
-    "T63.6.1 Session Agent 定义的 subagent 在子会话中无法解析（子会话不继承 Session 覆盖）",
+    sessionAgentEvents.some((event) => event.type === "session.tool.success") &&
+      sessionAgentParts.length > 0 &&
+      sessionAgentParts.every((part) => part.state.status === "completed") &&
+      sessionAgentChildIDs.length > 0,
+    "T63.6.1 Session Agent 定义的 subagent 可在内部 child Session 中成功调度",
   )
+  const sessionAgentChildren = await Promise.all(sessionAgentChildIDs.map((id) => api(`/api/session/${id}`)))
+  check(
+    sessionAgentChildren.every(
+      (child) => child.data?.data?.parentID === allSession && child.data?.data?.agent === "runtime-session-only-child",
+    ),
+    "T63.6.2 child Session 保留 Session Agent 身份及 parent 关联",
+  )
+  const sessionAgentChildMessages = await Promise.all(
+    sessionAgentChildIDs.map((id) => api(`/api/session/${id}/message?order=asc`)),
+  )
+  check(
+    sessionAgentChildMessages.some((result) =>
+      (result.data?.data ?? []).some(
+        (message) => message.type === "assistant" && message.agent === "runtime-session-only-child" && /SESSION_ONLY_CHILD_OK/.test(turnText(message)),
+      ),
+    ),
+    "T63.6.3 child Session 使用 Session Agent 自身 system prompt 执行",
+  )
+  sessions.push(...sessionAgentChildIDs)
 
   // T63.7 steps 上限收敛，并在新用户输入后重置额度
   const stepsSession = track(await newSession("T63.7 steps"))
@@ -372,6 +468,8 @@ try {
   })
   await api(`/api/session/${stepsSession}/agent`, "POST", { agent: "runtime-steps" })
   const runSteps = async () => {
+    const watcher = await watchSession(stepsSession)
+    try {
     const response = await fetch(`${BASE}/api/session/${stepsSession}/prompt_stream`, {
       method: "POST",
       headers,
@@ -395,6 +493,10 @@ try {
       toolSuccess: (body.match(/"type":"session\.tool\.success"/g) ?? []).length,
       succeeded: body.includes("session.execution.succeeded"),
       error: failure ? (failure.properties ?? failure.data ?? {}).error : undefined,
+    }
+    } finally {
+      watcher.stop()
+      await watcher.done
     }
   }
   // steps 上限本身可验证：执行步数被截断在配置值，不因提示词要求更多工具而继续。
