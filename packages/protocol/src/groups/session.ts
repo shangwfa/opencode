@@ -40,6 +40,7 @@ import { Permission } from "@opencode/schema/permission"
 import { Location } from "@opencode/schema/location"
 import { SessionEvent } from "@opencode/schema/session-event"
 import { EventLog } from "@opencode/schema/event-log"
+import { Log } from "@opencode/schema/log"
 import { FileDiff } from "@opencode/schema/file-diff"
 import { Form } from "@opencode/schema/form"
 import { PublicSessionMessage } from "./message.js"
@@ -1283,6 +1284,29 @@ export const makeSessionGroup = <I extends HttpApiMiddleware.AnyId, S, FormI ext
             "Experimental durable session event log. Reads events after an exclusive aggregate sequence and continues with live events when follow=true.",
         }),
       ),
+    )
+    .add(
+      HttpApiEndpoint.get("session.logs", "/api/session/:sessionID/logs", {
+        params: { sessionID: Session.ID },
+        query: {
+          limit: Schema.NumberFromString.pipe(Schema.decodeTo(PositiveInt), Schema.optional).annotate({
+            description: "Page size; omit to return the full audit trail for the Session.",
+          }),
+          after: Schema.String.pipe(Schema.decodeTo(Log.ID), Schema.optional).annotate({
+            description: "Cursor: the last entry ID of the previous page; returns entries after it, oldest first.",
+          }),
+        },
+        success: Schema.Struct({ data: Schema.Array(Log.Info) }).annotate({ identifier: "SessionLogsResponse" }),
+        error: SessionNotFoundError,
+      })
+        .annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.logs",
+            summary: "List session audit log entries",
+            description:
+              "Every audit entry recorded for the Session's mutating operations (control-plane writes across the session lifecycle). Omit limit for the full trail; page with after using the last returned ID. Rows are removed with their Session.",
+          }),
+        ),
     )
     .add(
       HttpApiEndpoint.post("session.interrupt", "/api/session/:sessionID/interrupt", {

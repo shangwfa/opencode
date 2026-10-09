@@ -2,6 +2,7 @@ import { Instance } from "@opencode/core/instance/service"
 import { Location } from "@opencode/core/location"
 import { Permission } from "@opencode/core/permission"
 import { PermissionSaved } from "@opencode/core/permission/saved"
+import { Log } from "@opencode/core/log"
 import { Session } from "@opencode/core/session"
 import { Effect } from "effect"
 import { HttpApiBuilder, HttpApiSchema } from "effect/unstable/httpapi"
@@ -80,6 +81,16 @@ export const PermissionHandler = HttpApiBuilder.group(Api, "server.permission", 
           yield* owned.permission
             .reply({ requestID: ctx.params.requestID, reply: ctx.payload.decision, message: ctx.payload.message })
             .pipe(Effect.catchTag("Permission.NotFoundError", () => missingRequest(ctx.params.requestID)))
+          const logs = yield* Log.Service
+          yield* logs.record({
+            sessionID: ctx.params.sessionID,
+            source: "permission.respond",
+            detail: {
+              requestID: ctx.params.requestID,
+              decision: ctx.payload.decision,
+              ...(ctx.payload.message === undefined ? {} : { message: ctx.payload.message }),
+            },
+          })
           return HttpApiSchema.NoContent.make()
         }),
       )
