@@ -79,6 +79,8 @@ export const User = Schema.Struct({
   skills: Prompt.fields.skills,
   /** Output shape requested with this prompt, kept on the stored user message for readback. */
   format: Prompt.fields.format,
+  preset: Prompt.fields.preset,
+  permissions: Prompt.fields.permissions,
   userName: Schema.String.pipe(optional),
   userId: Schema.String.pipe(optional),
   type: Schema.tag("user"),
@@ -216,6 +218,8 @@ export interface Assistant extends Schema.Schema.Type<typeof Assistant> {}
 export const Assistant = Schema.Struct({
   ...Base,
   type: Schema.tag("assistant"),
+  /** User prompt that owns this assistant turn; persisted for turn-scoped permission resolution. */
+  promptMessageID: ID.pipe(optional),
   agent: Agent.ID,
   model: Model.Ref,
   content: AssistantContent.pipe(Schema.Array),

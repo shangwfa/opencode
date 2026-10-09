@@ -1,4 +1,6 @@
 import { Session } from "@opencode/core/session"
+import { PermissionPreset } from "@opencode/core/permission/preset"
+import { Agent } from "@opencode/core/agent"
 import { clearProxyTargets } from "./session-proxy.js"
 import { SessionCommands } from "@opencode/core/session/commands"
 import { SessionAgents } from "@opencode/core/session/agents"
@@ -18,6 +20,7 @@ import { HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
 import { Api } from "../api"
 import { SessionPromptStreamPayload, SessionsCursor } from "@opencode/protocol/groups/session"
 import {
+  AgentNotFoundError,
   ConflictError,
   CommandExecutionError,
   CommandNotFoundError,
@@ -357,6 +360,16 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
         }),
       )
       .handle(
+        "session.permissions.preset",
+        Effect.fn(function* (ctx) {
+          const permissions = PermissionPreset.rules(ctx.payload.preset)
+          yield* session
+            .setPermissions({ sessionID: ctx.params.sessionID, permissions })
+            .pipe(Effect.catchTag("Session.NotFoundError", missingSession))
+          return { preset: ctx.payload.preset, permissions }
+        }),
+      )
+      .handle(
         "session.move",
         Effect.fn(function* (ctx) {
           yield* session
@@ -394,6 +407,8 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
                 agents: ctx.payload.agents,
                 skills: ctx.payload.skills,
                 format: ctx.payload.format,
+                preset: ctx.payload.preset,
+                permissions: ctx.payload.permissions,
                 userName: ctx.payload.userName,
                 userId: request.headers["x-user-id"] || undefined,
                 metadata: ctx.payload.metadata,
@@ -437,6 +452,8 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
               files: payload.files,
               agents: payload.agents,
               skills: payload.skills,
+              preset: payload.preset,
+              permissions: payload.permissions,
               userName: payload.userName,
               userId: request.headers["x-user-id"] || undefined,
               metadata: payload.metadata,
@@ -582,6 +599,30 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
           if (!SessionAgents.validName(ctx.payload.id))
             return yield* Effect.fail(new InvalidRequestError({ field: "id", message: "Invalid agent ID" }))
           return yield* agents.create(info.id, ctx.payload)
+        }),
+      )
+      .handle(
+        "session.agentDefinitions.permissionPreset",
+        Effect.fn(function* (ctx) {
+          const agents = yield* SessionAgents.Service
+          const info = yield* session
+            .get(ctx.params.sessionID)
+            .pipe(Effect.catchTag("Session.NotFoundError", missingSession))
+          const id = Agent.ID.make(ctx.params.agentID)
+          if (!SessionAgents.validName(id))
+            return yield* Effect.fail(new InvalidRequestError({ field: "agentID", message: "Invalid agent ID" }))
+          const existing = yield* agents.get(info, id)
+          if (!existing)
+            return yield* Effect.fail(
+              new AgentNotFoundError({ agentID: id, message: `Agent not found: ${id}` }),
+            )
+          yield* agents.setPermissions(info.id, id, PermissionPreset.rules(ctx.payload.preset))
+          const updated = yield* agents.get(info, id)
+          if (!updated)
+            return yield* Effect.fail(
+              new AgentNotFoundError({ agentID: id, message: `Agent not found: ${id}` }),
+            )
+          return { preset: ctx.payload.preset, agent: updated }
         }),
       )
       .handle(

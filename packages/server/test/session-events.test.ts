@@ -88,7 +88,7 @@ it.live("prompt_stream admits a prompt and returns its session SSE stream", () =
       fetch(new URL(`/api/session/${created}/prompt_stream`, server.base), {
         method: "POST",
         headers: { ...server.headers, "content-type": "application/json" },
-        body: JSON.stringify({ text: "SSE prompt stream API test", metadata: {}, resume: false }),
+        body: JSON.stringify({ text: "SSE prompt stream API test", preset: "read-only", metadata: {}, resume: false }),
       }),
     )
     expect(response.status).toBe(200)
@@ -98,6 +98,7 @@ it.live("prompt_stream admits a prompt and returns its session SSE stream", () =
     const admitted = yield* Effect.promise(() => readEvent(reader))
     expect(admitted.type).toBe("session.inbox.enqueued")
     expect(admitted.data.sessionID).toBe(created)
+    expect((admitted.data.item as { payload?: { preset?: string } }).payload?.preset).toBe("read-only")
     yield* Effect.promise(() => reader.cancel())
     yield* Effect.promise(() =>
       fetch(new URL(`/api/session/${created}/interrupt`, server.base), {

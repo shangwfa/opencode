@@ -272,6 +272,7 @@ const layer = Layer.effect(
               isLocationClosed: lifecycle.isClosed,
               sessionID,
               assistantMessageID,
+              promptMessageID: loaded.messages.findLast((message) => message.type === "user")?.id,
               agent: loaded.agent.id,
               model: loaded.model,
               prepared,

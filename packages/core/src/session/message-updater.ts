@@ -223,6 +223,7 @@ export function update(adapter: Adapter, event: SessionEvent.DurableEvent) {
               produce(existing, (draft) => {
                 draft.agent = event.data.agent
                 draft.model = castDraft(event.data.model)
+                draft.promptMessageID = event.data.promptMessageID
                 draft.retry = undefined
                 draft.error = undefined
                 draft.finish = undefined
@@ -248,6 +249,7 @@ export function update(adapter: Adapter, event: SessionEvent.DurableEvent) {
             SessionMessage.Assistant.make({
               id: event.data.assistantMessageID,
               type: "assistant",
+              promptMessageID: event.data.promptMessageID,
               agent: event.data.agent,
               model: event.data.model,
               metadata: event.metadata,

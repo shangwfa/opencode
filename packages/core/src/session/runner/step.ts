@@ -45,6 +45,7 @@ interface Input {
   readonly isLocationClosed: () => boolean
   readonly sessionID: SessionSchema.ID
   readonly assistantMessageID: SessionMessage.ID
+  readonly promptMessageID?: SessionMessage.ID
   readonly agent: Agent.ID
   readonly model: SessionRunnerModel.Resolved
   readonly prepared: Omit<SessionModelRequest.Prepared, "event">
@@ -76,6 +77,7 @@ export const make = Effect.gen(function* () {
     const publisher = createLLMEventPublisher(bus, {
       sessionID: input.sessionID,
       assistantMessageID: input.assistantMessageID,
+      promptMessageID: input.promptMessageID,
       agent: input.agent,
       model: input.model.ref,
       providerMetadataKey: input.model.model.route.providerMetadataKey ?? input.model.model.provider,

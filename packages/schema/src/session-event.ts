@@ -480,6 +480,7 @@ export namespace Step {
     schema: {
       ...Base,
       assistantMessageID: SessionMessage.ID,
+      promptMessageID: SessionMessage.ID.pipe(optional),
       agent: Agent.ID,
       model: Model.Ref,
       snapshot: Snapshot.ID.pipe(optional),

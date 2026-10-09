@@ -2,6 +2,7 @@ import { Schema } from "effect"
 import { optional } from "./schema.js"
 import { statics } from "./schema.js"
 import { OutputFormat } from "./output-format.js"
+import { Permission } from "./permission.js"
 import { Skill } from "./skill.js"
 
 export interface PromptMention extends Schema.Schema.Type<typeof PromptMention> {}
@@ -70,6 +71,10 @@ export const Prompt = Schema.Struct({
   skills: Schema.Array(SkillAttachment).pipe(optional),
   /** Output shape for this prompt; `json_schema` forces a structured tool call. */
   format: OutputFormat.Format.pipe(optional),
+  /** Optional permission preset for this prompt only; absent means use the Agent's configured rules. */
+  preset: Permission.Preset.pipe(optional),
+  /** Optional explicit rules for this prompt; explicit rules follow preset rules. */
+  permissions: Permission.Ruleset.pipe(optional),
 })
   .annotate({ identifier: "Prompt" })
   .pipe(

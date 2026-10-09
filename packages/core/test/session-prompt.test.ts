@@ -320,6 +320,29 @@ describe("Session.prompt", () => {
     }),
   )
 
+  it.effect("persists optional prompt-scoped permission settings without changing Session rules", () =>
+    Effect.gen(function* () {
+      yield* setup
+      const session = yield* Session.Service
+      const rules = [{ action: "edit", resource: "src/**", effect: "deny" as const }]
+
+      const message = yield* session.prompt({
+        sessionID,
+        text: "Run this turn read-only",
+        preset: "read-only",
+        permissions: rules,
+        resume: false,
+      })
+
+      expect(message.payload).toMatchObject({ preset: "read-only", permissions: rules })
+      expect(yield* admitted(message.id)).toMatchObject({
+        type: "user",
+        payload: { text: "Run this turn read-only", preset: "read-only", permissions: rules },
+      })
+      expect((yield* session.get(sessionID))?.permissions).toBeUndefined()
+    }),
+  )
+
   it.effect("persists user identity fields in the admitted prompt payload", () =>
     Effect.gen(function* () {
       yield* setup

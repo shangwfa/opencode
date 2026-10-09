@@ -1,5 +1,5 @@
 import { describe, expect } from "bun:test"
-import { Cause, Deferred, Effect, Fiber, Layer } from "effect"
+import { Cause, DateTime, Deferred, Effect, Fiber, Layer, Schema } from "effect"
 import { Agent } from "@opencode/core/agent"
 import { Database } from "@opencode/core/database/database"
 import { AppNodeBuilder } from "@opencode/core/effect/app-node-builder"
@@ -14,9 +14,13 @@ import { ProjectTable } from "@opencode/core/project/sql"
 import { AbsolutePath } from "@opencode/core/schema"
 import { Session } from "@opencode/core/session"
 import { SessionTable } from "@opencode/core/session/sql"
+import { SessionMessageTable } from "@opencode/core/session/sql"
 import { SessionStore } from "@opencode/core/session/store"
 import { SessionAgents } from "@opencode/core/session/agents"
+import { SessionMessage } from "@opencode/core/session/message"
 import { ConfigAgent } from "@opencode/schema/config/agent"
+import { Model } from "@opencode/schema/model"
+import { Provider } from "@opencode/schema/provider"
 import { ShellParse } from "@opencode/core/shell/parse"
 import { eq } from "drizzle-orm"
 import { location } from "./fixture/location"
@@ -160,6 +164,93 @@ describe("Permission", () => {
     }),
   )
 
+  it.effect("uses an explicitly attached prompt preset for only its assistant turn", () =>
+    Effect.gen(function* () {
+      const sessionID = Session.ID.make("ses_test")
+      yield* setup([{ action: "edit", resource: "*", effect: "deny" }], sessionID)
+      const { db } = yield* Database.Service
+      yield* db
+        .update(SessionTable)
+        .set({ permission: [{ action: "edit", resource: "*", effect: "deny" }] })
+        .where(eq(SessionTable.id, sessionID))
+        .run()
+        .pipe(Effect.orDie)
+
+      const promptID = SessionMessage.ID.make("msg_turn_prompt")
+      const presetAssistantID = SessionMessage.ID.make("msg_turn_preset_assistant")
+      const defaultPromptID = SessionMessage.ID.make("msg_turn_default_prompt")
+      const defaultAssistantID = SessionMessage.ID.make("msg_turn_default_assistant")
+      const created = DateTime.makeUnsafe(Date.now())
+      const model = Model.Ref.make({
+        id: Model.ID.make("permission-test-model"),
+        providerID: Provider.ID.make("permission-test-provider"),
+      })
+      const encode = Schema.encodeSync(SessionMessage.Info)
+      const row = (message: SessionMessage.Info, seq: number) => {
+        const { id, type, ...data } = encode(message)
+        return {
+          id: SessionMessage.ID.make(id),
+          type,
+          session_id: sessionID,
+          seq,
+          time_created: DateTime.toEpochMillis(created),
+          data,
+        } as typeof SessionMessageTable.$inferInsert
+      }
+      const presetPrompt = SessionMessage.User.make({
+        id: promptID,
+        type: "user",
+        text: "Write a source file",
+        preset: "workspace-write",
+        time: { created },
+      })
+      const presetAssistant = SessionMessage.Assistant.make({
+        id: presetAssistantID,
+        type: "assistant",
+        promptMessageID: promptID,
+        agent: Agent.ID.make("test"),
+        model,
+        content: [],
+        time: { created },
+      })
+      const defaultPrompt = SessionMessage.User.make({
+        id: defaultPromptID,
+        type: "user",
+        text: "Inspect the project",
+        time: { created },
+      })
+      const defaultAssistant = SessionMessage.Assistant.make({
+        id: defaultAssistantID,
+        type: "assistant",
+        promptMessageID: defaultPromptID,
+        agent: Agent.ID.make("test"),
+        model,
+        content: [],
+        time: { created },
+      })
+      yield* db
+        .insert(SessionMessageTable)
+        .values([
+          row(presetPrompt, 0),
+          row(presetAssistant, 1),
+          row(defaultPrompt, 2),
+          row(defaultAssistant, 3),
+        ])
+        .run()
+        .pipe(Effect.orDie)
+
+      const service = yield* Permission.Service
+      const input = (messageID: SessionMessage.ID) =>
+        assertion({
+          action: "edit",
+          resources: ["/workspace/src/index.ts"],
+          source: { type: "tool", messageID, id: "tool-call" },
+        })
+      expect((yield* service.ask(input(presetAssistantID))).effect).toBe("allow")
+      expect((yield* service.ask(input(defaultAssistantID))).effect).toBe("deny")
+    }),
+  )
+
   it.effect("allows and denies from explicit rules without asking", () =>
     Effect.gen(function* () {
       yield* setup([{ action: "read", resource: "*", effect: "allow" }])
@@ -169,6 +260,31 @@ describe("Permission", () => {
       const blocked = yield* service.assert(assertion()).pipe(Effect.flip)
       expect(blocked).toBeInstanceOf(Permission.BlockedError)
       expect(yield* service.list()).toEqual([])
+    }),
+  )
+
+  it.effect("aggregates permissions across every requested resource", () =>
+    Effect.gen(function* () {
+      yield* setup([
+        { action: "read", resource: "private/*", effect: "deny" },
+        { action: "read", resource: "public/*", effect: "allow" },
+      ])
+      const service = yield* Permission.Service
+
+      expect(
+        yield* service.ask(
+          assertion({ id: Permission.ID.create("per_multi_deny"), resources: ["public/a.txt", "private/b.txt"] }),
+        ),
+      ).toEqual({ id: Permission.ID.create("per_multi_deny"), effect: "deny" })
+      expect(yield* service.list()).toEqual([])
+
+      expect(
+        yield* service.ask(
+          assertion({ id: Permission.ID.create("per_multi_ask"), resources: ["public/a.txt", "unmatched/b.txt"] }),
+        ),
+      ).toEqual({ id: Permission.ID.create("per_multi_ask"), effect: "ask" })
+      expect(yield* service.list()).toHaveLength(1)
+      expect((yield* service.list())[0]?.resources).toEqual(["public/a.txt", "unmatched/b.txt"])
     }),
   )
 

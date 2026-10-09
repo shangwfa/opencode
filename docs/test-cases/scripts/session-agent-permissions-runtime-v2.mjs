@@ -18,6 +18,98 @@ const failures = []
 const sessions = []
 const pending = []
 const savedIDs = []
+const eventWatchers = []
+
+function brief(value, limit = 140) {
+  return String(value ?? "").replace(/\s+/g, " ").slice(0, limit)
+}
+
+function presentEvent(event, sessionID) {
+  const data = event.data ?? event.properties ?? {}
+  const prefix = `[SSE ${sessionID}]`
+  switch (event.type) {
+    case "session.execution.started": console.log(`${prefix} exec ▶ 执行开始`); break
+    case "session.reasoning.ended": console.log(`${prefix} think · ${brief(data.text)}`); break
+    case "session.tool.input.started": console.log(`${prefix} tool ◇ ${data.name ?? "?"}`); break
+    case "session.tool.success": console.log(`${prefix} tool ✓ ${brief((data.content ?? []).filter?.((item) => item.type === "text").map((item) => item.text).join(" "))}`); break
+    case "session.tool.failed":
+    case "session.tool.error": console.log(`${prefix} tool ✗ ${brief(data.error?.message ?? data.error)}`); break
+    case "form.created": console.log(`${prefix} form ◇ ${data.id ?? ""}`); break
+    case "form.replied": console.log(`${prefix} form ✓ ${data.id ?? ""}`); break
+    case "form.cancelled": console.log(`${prefix} form ✗ ${data.id ?? ""}`); break
+    case "session.text.ended": console.log(`${prefix} text · ${brief(data.text)}`); break
+    case "session.execution.succeeded": console.log(`${prefix} exec ✔ 执行成功`); break
+    case "session.execution.failed": console.log(`${prefix} exec ✗ ${brief(data.error?.message)}`); break
+    case "session.execution.interrupted": console.log(`${prefix} exec ⏸ (${data.reason ?? "?"})`); break
+  }
+}
+
+function watchSession(sessionID) {
+  const controller = new AbortController()
+  const task = (async () => {
+    const response = await fetch(`${BASE}/api/session/${sessionID}/event`, {
+      headers: { ...headers, accept: "text/event-stream" },
+      signal: controller.signal,
+    })
+    if (response.status !== 200) throw new Error(`SSE HTTP ${response.status} for ${sessionID}`)
+    console.log(`[SSE ${sessionID}] 已订阅 GET /api/session/${sessionID}/event`)
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ""
+    while (!controller.signal.aborted) {
+      const { value, done } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      const blocks = buffer.split(/\r?\n\r?\n/)
+      buffer = blocks.pop() ?? ""
+      for (const block of blocks) {
+        const raw = block.split(/\r?\n/).filter((line) => line.startsWith("data:")).map((line) => line.slice(5).trim()).join("\n")
+        if (!raw || raw === "[DONE]") continue
+        try { presentEvent(JSON.parse(raw), sessionID) } catch {}
+      }
+    }
+  })().catch((error) => {
+    if (!controller.signal.aborted) console.error(`[SSE ${sessionID}] watcher failed: ${String(error)}`)
+  })
+  eventWatchers.push({ controller, task })
+}
+
+async function autoAnswerForms(sessionID, stopped) {
+  const failedReplies = new Map()
+  while (!stopped()) {
+    try {
+      const list = await api(`/api/session/${sessionID}/form`)
+      for (const form of list.data?.data ?? []) {
+        if (form.metadata?.kind !== "question") continue
+        const answer = {}
+        for (const field of form.fields ?? []) {
+          if (field.type === "external") continue
+          if (field.type === "boolean") answer[field.key] = field.default ?? true
+          else if (field.type === "number" || field.type === "integer") answer[field.key] = field.default ?? field.minimum ?? 1
+          else if (field.type === "multiselect") answer[field.key] = [field.options?.[0]?.value ?? field.default?.[0]].filter(Boolean)
+          else answer[field.key] = field.options?.[0]?.value ?? field.default ?? "由验收器代答：请按推荐方案继续"
+        }
+        if ((failedReplies.get(form.id) ?? 0) >= 2) continue
+        const replied = await api(`/api/session/${sessionID}/form/${form.id}/reply`, "POST", { answer })
+        if (replied.status === 400) failedReplies.set(form.id, (failedReplies.get(form.id) ?? 0) + 1)
+        else if (replied.response.ok) console.log(`[SSE ${sessionID}] form ✓ 自动代答 ${form.id}`)
+      }
+    } catch {}
+    await new Promise((resolve) => setTimeout(resolve, 1500))
+  }
+}
+
+async function consumePrompt(response, sessionID) {
+  if (response.status !== 200) throw new Error(`prompt_stream HTTP ${response.status}: ${(await response.text()).slice(0, 500)}`)
+  let stopped = false
+  const answers = autoAnswerForms(sessionID, () => stopped)
+  try {
+    return await readEvents(response)
+  } finally {
+    stopped = true
+    await answers
+  }
+}
 
 function pg(sql) {
   if (!PG_URL) throw new Error("PG_URL is required for runtime permission E2E PostgreSQL assertions")
@@ -72,6 +164,7 @@ async function newSession(title) {
   expectStatus(created, 200, "create runtime permission Session")
   const sessionID = created.data.data.id
   sessions.push(sessionID)
+  watchSession(sessionID)
   return sessionID
 }
 
@@ -124,7 +217,7 @@ async function prompt(sessionID, text) {
     signal: AbortSignal.timeout(timeout),
   })
   if (response.status !== 200) throw new Error(`prompt_stream HTTP ${response.status}: ${(await response.text()).slice(0, 500)}`)
-  const events = await readEvents(response)
+  const events = await consumePrompt(response, sessionID)
   const messages = await api(`/api/session/${sessionID}/message?order=asc`)
   expectStatus(messages, 200, "read Session messages")
   const history = messages.data?.data ?? []
@@ -293,6 +386,41 @@ try {
     savedIDs.splice(savedIDs.indexOf(item.id), 1)
   })
 
+  await runCase("once approval resumes the real write without persisting a saved rule", async () => {
+    const sessionID = await newSession("permission once execution")
+    const agent = `session/once-${nonce}`
+    const outputFile = `permission-once-${nonce}.txt`
+    const output = `ONCE_APPROVED_${nonce}`
+    await createAgent(sessionID, agent, "Use the write tool to create exactly the requested file and content.", [
+      { action: "edit", resource: "*", effect: "ask" },
+      { action: "shell", resource: "*", effect: "deny" },
+      { action: "execute", resource: "*", effect: "deny" },
+    ])
+
+    const responsePromise = fetch(`${BASE}/api/session/${sessionID}/prompt_stream`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ text: `Create ${outputFile} containing exactly ${output}.`, metadata: {}, delivery: "queue" }),
+      signal: AbortSignal.timeout(timeout),
+    })
+    const response = await responsePromise
+    const eventsPromise = consumePrompt(response, sessionID)
+    const request = await waitForPermission(sessionID, "edit", outputFile)
+    pending.push({ sessionID, requestID: request.id })
+    const replied = await api(`/api/session/${sessionID}/permission/${request.id}/reply`, "POST", { decision: "once" })
+    expectStatus(replied, 204, "reply once to the real write request")
+    pending.splice(pending.findIndex((item) => item.requestID === request.id), 1)
+
+    const events = await eventsPromise
+    assert(toolSucceeded(events, "write"), "once approval did not resume and complete the real write tool")
+    assert.equal((await runShell(sessionID, `cat '/workspace/${outputFile}'`)).trim(), output)
+    assert.equal(
+      pg(`SELECT count(*) FROM permission WHERE project_id = (SELECT project_id FROM session_v2 WHERE id = ${sqlQuote(sessionID)}) AND action = 'edit' AND resource = ${sqlQuote(outputFile)}`),
+      "0",
+      "once approval unexpectedly persisted a saved permission",
+    )
+  })
+
   await runCase("reject with feedback recovers without writing the protected file", async () => {
     const sessionID = await newSession("permission reject recovery")
     const agent = `session/reject-${nonce}`
@@ -308,11 +436,10 @@ try {
       body: JSON.stringify({ text: `Write BLOCKED to ${outputFile}.`, metadata: {}, delivery: "queue" }),
       signal: AbortSignal.timeout(timeout),
     })
+    const response = await responsePromise
+    const eventsPromise = consumePrompt(response, sessionID)
     const request = await waitForPermission(sessionID, "edit", outputFile)
     pending.push({ sessionID, requestID: request.id })
-    const response = await responsePromise
-    if (response.status !== 200) throw new Error(`prompt_stream HTTP ${response.status}: ${(await response.text()).slice(0, 500)}`)
-    const eventsPromise = readEvents(response)
     const replied = await api(`/api/session/${sessionID}/permission/${request.id}/reply`, "POST", {
       decision: "reject",
       message: "The write is denied. Do not retry; explain that the file was not changed.",
@@ -506,6 +633,8 @@ try {
     })
   })
 } finally {
+  for (const watcher of eventWatchers) watcher.controller.abort()
+  await Promise.allSettled(eventWatchers.map((watcher) => watcher.task))
   for (const item of pending) {
     await api(`/api/session/${item.sessionID}/permission/${item.requestID}/reply`, "POST", { decision: "reject" })
   }

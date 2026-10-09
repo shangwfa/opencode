@@ -18,6 +18,7 @@ import { Context, Effect, Encoding, Result, Schema, SchemaGetter, Struct } from 
 import { HttpApiEndpoint, HttpApiGroup, HttpApiMiddleware, HttpApiSchema, OpenApi } from "effect/unstable/httpapi"
 import {
   ConflictError,
+  AgentNotFoundError,
   CommandExecutionError,
   CommandNotFoundError,
   FormAlreadySettledError,
@@ -416,6 +417,22 @@ export const makeSessionGroup = <I extends HttpApiMiddleware.AnyId, S, FormI ext
           description: "Move a session to another project directory at the requested delivery boundary.",
         }),
       ),
+    )
+    .add(
+      HttpApiEndpoint.put("session.permissions.preset", "/api/session/:sessionID/permissions/preset", {
+        params: { sessionID: Session.ID },
+        payload: Schema.Struct({ preset: Permission.Preset }),
+        success: Schema.Struct({ preset: Permission.Preset, permissions: Permission.Ruleset }),
+        error: [SessionNotFoundError, UnknownError],
+      })
+        .middleware(sessionLocationMiddleware)
+        .annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.permissions.preset",
+            summary: "Apply a permission preset to a session",
+            description: "Replace Session-level permission rules with the selected built-in permission preset.",
+          }),
+        ),
     )
     .add(
       HttpApiEndpoint.post("session.prompt", "/api/session/:sessionID/prompt", {
@@ -933,6 +950,27 @@ export const makeSessionGroup = <I extends HttpApiMiddleware.AnyId, S, FormI ext
             "Structured per-file diffs of the files a turn changed. A turn runs from the first prompt after the session was last idle until its next idle marker, so prompts steered in while it was busy belong to the same turn; `to` extends the range through a later turn. Compares the range's first recorded snapshot with its last; a step still running in the active session compares against the working copy. Ranges that span a location change are rejected. In sessions without any idle marker, a prompt's turn spans until the next user message.",
         }),
       ),
+    )
+    .add(
+      HttpApiEndpoint.put(
+        "session.agentDefinitions.permissionPreset",
+        "/api/session/:sessionID/agents/:agentID/permissions/preset",
+        {
+          params: { sessionID: Session.ID, agentID: Agent.ID },
+          payload: Schema.Struct({ preset: Permission.Preset }),
+          success: Schema.Struct({ preset: Permission.Preset, agent: SessionAgent.Info }),
+          error: [SessionNotFoundError, AgentNotFoundError, SessionAgent.ContentTooLargeError, UnknownError],
+        },
+      )
+        .middleware(sessionLocationMiddleware)
+        .annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.agentDefinitions.permissionPreset",
+            summary: "Apply a permission preset to an agent",
+            description:
+              "Persist the selected permission rules as a Session-scoped Agent override, preserving its other override fields.",
+          }),
+        ),
     )
     .add(
       HttpApiEndpoint.get("session.inbox.list", "/api/session/:sessionID/inbox", {

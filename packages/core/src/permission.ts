@@ -13,6 +13,8 @@ import { SessionAgents } from "./session/agents.js"
 import { Wildcard } from "./util/wildcard.js"
 import { PermissionSaved } from "./permission/saved.js"
 import { PluginHooks } from "./plugin/hooks.js"
+import { SessionMessage } from "@opencode/schema/session-message"
+import { SessionTurnPermissions } from "./session/turn-permissions.js"
 
 const PermissionEffect = Permission.Effect
 export { PermissionEffect as Effect }
@@ -156,11 +158,33 @@ const layer = Layer.effect(
       )
     })
 
-    const configured = Effect.fnUntraced(function* (sessionID: SessionSchema.ID, agentID?: Agent.ID) {
+    const configured = Effect.fnUntraced(function* (
+      sessionID: SessionSchema.ID,
+      agentID?: Agent.ID,
+      assistantMessageID?: string,
+    ) {
       const session = yield* sessions.get(sessionID)
       if (!session) return yield* new SessionErrors.NotFoundError({ sessionID })
+      if (assistantMessageID) {
+        const assistant = yield* sessions.message(SessionMessage.ID.make(assistantMessageID))
+        if (assistant?.sessionID === sessionID && assistant.message.type === "assistant") {
+          const promptMessageID = assistant.message.promptMessageID
+          if (promptMessageID) {
+            const prompt = yield* sessions.message(promptMessageID)
+            if (prompt?.sessionID === sessionID) {
+              const turnRules = SessionTurnPermissions.resolve(prompt.message)
+              // Prompt-scoped rules are exclusive for this turn. An unset prompt policy
+              // retains the existing Agent/Session rules and saved approvals.
+              if (turnRules !== undefined) return { rules: turnRules, turnScoped: true }
+            }
+          }
+        }
+      }
       const selected = yield* sessionAgents.select(session, agentID ?? session.agent)
-      return merge(selected.info?.permissions ?? missingAgentPermissions, session.permissions ?? [])
+      return {
+        rules: merge(selected.info?.permissions ?? missingAgentPermissions, session.permissions ?? []),
+        turnScoped: false,
+      }
     })
 
     function denied(input: Pick<Request, "action" | "resources">, rules: Permission.Ruleset) {
@@ -172,9 +196,11 @@ const layer = Layer.effect(
     }
 
     const evaluateInput = Effect.fnUntraced(function* (input: AssertInput) {
-      const rules = yield* configured(input.sessionID, input.agent)
+      const configuredRules = yield* configured(input.sessionID, input.agent, input.source?.messageID)
+      const rules = configuredRules.rules
       if (denied(input, rules)) return { effect: "deny" as const, rules }
-      const all = [...rules, ...(yield* savedRules())]
+      const approvals = configuredRules.turnScoped ? [] : yield* savedRules()
+      const all = [...rules, ...approvals]
       const effects = input.resources.map((resource) => evaluate(input.action, resource, all).effect)
       const effect: Permission.Effect = effects.includes("ask") ? "ask" : "allow"
       const event = yield* hooks.trigger("permission", "evaluate", {

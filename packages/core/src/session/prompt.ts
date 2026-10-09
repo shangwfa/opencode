@@ -25,6 +25,8 @@ export type Input = {
   skills?: PromptInput.Prompt["skills"]
   /** Output shape for this prompt; `json_schema` forces a structured tool call. */
   format?: PromptInput.Prompt["format"]
+  preset?: PromptInput.Prompt["preset"]
+  permissions?: PromptInput.Prompt["permissions"]
   userName?: string
   userId?: string
   metadata?: Record<string, unknown>
@@ -116,6 +118,8 @@ export const prepare = Effect.fn("SessionPrompt.prepare")(function* (request: {
           files,
           skills: selected?.length ? selected : undefined,
           format: input.format,
+          preset: request.input.preset,
+          permissions: request.input.permissions,
         }),
         userName: request.input.userName,
         userId: request.input.userId,

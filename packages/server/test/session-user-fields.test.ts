@@ -34,7 +34,7 @@ it.live("accepts session user fields and trusts x-user-id over the prompt body",
 
     const accepted = yield* request(`/api/session/${sessionID}/prompt`, {
       userId: "trusted-user",
-      body: { text: "identity", userName: "alice", userId: "spoofed-user", resume: false },
+      body: { text: "identity", userName: "alice", userId: "spoofed-user", preset: "read-only", resume: false },
     })
     expect(accepted.status).toBe(200)
 
@@ -44,7 +44,7 @@ it.live("accepts session user fields and trusts x-user-id over the prompt body",
       data: [
         {
           type: "user",
-          payload: { text: "identity", userName: "alice", userId: "trusted-user" },
+          payload: { text: "identity", userName: "alice", userId: "trusted-user", preset: "read-only" },
         },
       ],
     })

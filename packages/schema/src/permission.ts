@@ -55,6 +55,11 @@ export const Event = { Asked, Replied, Definitions: inventory(Asked, Replied) }
 export const Effect = Schema.Literals(["allow", "deny", "ask"]).annotate({ identifier: "Permission.Effect" })
 export type Effect = typeof Effect.Type
 
+export const Preset = Schema.Literals(["read-only", "workspace-write", "full-access"]).annotate({
+  identifier: "Permission.Preset",
+})
+export type Preset = typeof Preset.Type
+
 export interface Rule extends Schema.Schema.Type<typeof Rule> {}
 export const Rule = Schema.Struct({
   action: Schema.String,

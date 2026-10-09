@@ -45,6 +45,11 @@ export interface Interface {
   readonly get: (session: Session.Info, id: Agent.ID) => Effect.Effect<Info | undefined>
   readonly select: (session: Session.Info, id?: Agent.ID) => Effect.Effect<Agent.Selection>
   readonly create: (sessionID: Session.ID, input: Payload) => Effect.Effect<Info, ContentTooLargeError>
+  readonly setPermissions: (
+    sessionID: Session.ID,
+    id: Agent.ID,
+    permissions: ConfigAgent.Info["permissions"] & {},
+  ) => Effect.Effect<Info, ContentTooLargeError>
   readonly remove: (sessionID: Session.ID, id: Agent.ID) => Effect.Effect<void>
   readonly clear: (sessionID: Session.ID) => Effect.Effect<void>
   readonly refresh: (session: Session.Info) => Effect.Effect<Info[], SandboxScanError>
@@ -129,6 +134,22 @@ const layer = Layer.effect(
       return fromRow(row)
     })
 
+    const setPermissions = Effect.fn("SessionAgents.setPermissions")(function* (
+      requestedSessionID: Session.ID,
+      id: Agent.ID,
+      permissions: ConfigAgent.Info["permissions"] & {},
+    ) {
+      const sessionID = yield* SessionResourceOwner.id(db, requestedSessionID)
+      const existing = yield* db
+        .select({ config: SessionAgentTable.config })
+        .from(SessionAgentTable)
+        .where(and(eq(SessionAgentTable.session_id, sessionID), eq(SessionAgentTable.agent_id, id)))
+        .get()
+        .pipe(Effect.orDie)
+      const config = ConfigAgent.Info.make({ ...(existing?.config ?? {}), permissions })
+      return yield* create(sessionID, { id, config })
+    })
+
     const remove = Effect.fn("SessionAgents.remove")(function* (requestedSessionID: Session.ID, id: Agent.ID) {
       const sessionID = yield* SessionResourceOwner.id(db, requestedSessionID)
       yield* db
@@ -149,7 +170,7 @@ const layer = Layer.effect(
       return yield* listStrict(session, true)
     })
 
-    return Service.of({ list, get, select, create, remove, clear, refresh })
+    return Service.of({ list, get, select, create, setPermissions, remove, clear, refresh })
   }),
 )
 

@@ -118,3 +118,85 @@ it.live("covers session Agent CRUD, partial override merging, isolation, and fal
     )
   }),
 )
+
+it.live("applies permission presets to the Session or one Agent without dropping Agent fields", () =>
+  Effect.gen(function* () {
+    const request = yield* setup
+    const created = yield* request("POST", "/api/session", { title: "permission preset api" })
+    const sessionID = (created.result as { data: { id: string } }).data.id
+
+    const sessionPreset = yield* request("PUT", `/api/session/${sessionID}/permissions/preset`, {
+      preset: "read-only",
+    })
+    expect(sessionPreset.status).toBe(200)
+    const sessionPresetData = sessionPreset.result as { preset: string; permissions: unknown[] }
+    expect(sessionPresetData.preset).toBe("read-only")
+    expect(sessionPresetData.permissions[0]).toEqual({ action: "*", resource: "*", effect: "deny" })
+    const session = yield* request("GET", `/api/session/${sessionID}`)
+    expect((session.result as { data: { permissions: unknown[] } }).data.permissions).toEqual(
+      sessionPresetData.permissions,
+    )
+
+    const existing = yield* request("POST", `/api/session/${sessionID}/agents`, {
+      id: "build",
+      config: { system: "KEEP_AGENT_SYSTEM", description: "Keep this field" },
+    })
+    expect(existing.status).toBe(200)
+
+    const agentPreset = yield* request("PUT", `/api/session/${sessionID}/agents/build/permissions/preset`, {
+      preset: "workspace-write",
+    })
+    expect(agentPreset.status).toBe(200)
+    expect(agentPreset.result).toMatchObject({
+      preset: "workspace-write",
+      agent: {
+        source: "session",
+        agent: {
+          id: "build",
+          system: "KEEP_AGENT_SYSTEM",
+          description: "Keep this field",
+          permissions: expect.arrayContaining([
+            { action: "edit", resource: "*", effect: "allow" },
+            { action: "external_directory", resource: "*", effect: "deny" },
+          ]),
+        },
+      },
+    })
+
+    const evaluate = (action: string, resource: string) =>
+      request("POST", `/api/session/${sessionID}/permission`, {
+        action,
+        resources: [resource],
+        agent: "build",
+      })
+    expect((yield* evaluate("read", "src/index.ts")).result).toMatchObject({ data: { effect: "allow" } })
+    expect((yield* evaluate("edit", "src/index.ts")).result).toMatchObject({ data: { effect: "deny" } })
+    expect(
+      (yield* request("PUT", `/api/session/${sessionID}/permissions/preset`, { preset: "workspace-write" })).status,
+    ).toBe(200)
+    expect((yield* evaluate("edit", "src/index.ts")).result).toMatchObject({ data: { effect: "allow" } })
+    expect((yield* evaluate("shell", "git status")).result).toMatchObject({ data: { effect: "ask" } })
+    expect((yield* evaluate("external_directory", "/tmp/outside")).result).toMatchObject({ data: { effect: "deny" } })
+
+    const full = yield* request("PUT", `/api/session/${sessionID}/agents/build/permissions/preset`, {
+      preset: "full-access",
+    })
+    expect(full.status).toBe(200)
+    expect((full.result as { agent: { agent: { permissions: unknown[] } } }).agent.agent.permissions).toContainEqual({
+      action: "external_directory",
+      resource: "*",
+      effect: "allow",
+    })
+    expect((yield* request("PUT", `/api/session/${sessionID}/permissions/preset`, { preset: "full-access" })).status).toBe(200)
+    expect((yield* evaluate("mcp/deploy", "*")).result).toMatchObject({ data: { effect: "allow" } })
+    expect((yield* evaluate("external_directory", "/tmp/outside")).result).toMatchObject({ data: { effect: "allow" } })
+
+    expect(
+      (yield* request("PUT", `/api/session/${sessionID}/agents/missing/permissions/preset`, { preset: "read-only" }))
+        .status,
+    ).toBe(404)
+    expect(
+      (yield* request("PUT", `/api/session/${sessionID}/permissions/preset`, { preset: "invalid" })).status,
+    ).toBe(400)
+  }),
+)
