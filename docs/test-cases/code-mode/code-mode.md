@@ -15,7 +15,26 @@
 | Tool snapshot execute dispatch、Session Sandbox 启动及 SaaS tool callback | 已接入代码 | 必须通过启用的 OpenSandbox + SaaS HTTP API 验证；本地 Runner 测试不替代此验收 |
 | PG execution/call ledger、nonce/owner lease、多实例路由 | **尚未接入** | 不得宣称完整架构验收或可审计的 execution/call 状态已完成 |
 
-Code Mode 当前默认选择 Sandbox executor，且默认由 Sandbox Runner 的原生 `fetch` 发起网络请求；设置 `OPENCODE_CODEMODE_EXECUTOR=server` 才会使用兼容的服务端执行器及其网络。已完成的 server executor HTTP/PG 测试属于显式 server 配置下的历史基线。Sandbox executor 代码路径现已连接 Tool snapshot callback，但尚未通过本地 OpenSandbox + HTTP/PG E2E，也没有 PG execution/call ledger、nonce 握手或 owner lease。
+Code Mode 当前默认选择 Sandbox executor，且默认由 Sandbox Runner 的原生 `fetch` 发起网络请求；设置 `OPENCODE_CODEMODE_EXECUTOR=server` 才会使用兼容的服务端执行器及其网络。已完成的 server executor HTTP/PG 测试属于显式 server 配置下的历史基线。**Sandbox executor 基础链路已通过本地 OpenSandbox + SaaS HTTP/PG E2E（2026-10-09 builtin-agents runtime T62.11：Runner daemon 启动、server gateway 连接、`execute` 纯代码成功、SSE/PG 正常）**；但带子工具调用的 Runner `tool.call` → SaaS Tool snapshot dispatch（TCM2.S2 完整形态）、幂等（S4）、nonce/owner 校验（S6）、PG execution/call ledger 仍未接入或未验收。
+
+### 实现逻辑覆盖矩阵（2026-10-10 对照当前源码）
+
+| 实现模块 | 位置 | 用例覆盖 | 评估 |
+|---|---|---|---|
+| 解释器/stdlib/限额/并发 | `packages/codemode/src/interpreter`、`stdlib` | TCM2.1 单测、TCM2.5–2.7/2.10 E2E | ✅ 覆盖 |
+| 工具 schema/目录/搜索 | `tool-schema.ts`、`tool-runtime.ts`、`namespace.ts` | TCM2.1/2.9 单测 + E2E | ✅ 覆盖 |
+| 配置（executor/network/limits 校验与互斥） | `core/codemode/config.ts` | TCM2.10 + config 单测；互斥报错有单测 | ✅ 覆盖 |
+| 有界 catalog 摘要 + 指令注入 | `core/codemode/catalog.ts`、`instructions.ts` | catalog/instructions 单测 + TCM2.9a 审计 | ✅ 覆盖 |
+| execute 工具注册 + sandbox/server 分支 + catalog 缓存 | `core/tool.ts` | TCM2.4 E2E（server 基线）+ T62.11（sandbox 纯代码）；缓存为性能细节，单测覆盖 | ✅ 覆盖 |
+| Runner daemon（flock 幂等启动/gateway/stop） | `core/codemode/runner.ts` | `codemode-runner.test.ts` + T62.11 实测启动 | ✅ 覆盖（daemon 重启幂等并入 S1/S7 门槛） |
+| WebSocket execute/tool.call/result/progress/cancel | `runner.ts` + 镜像内 Runner | 容器内协议 smoke + **sandbox executor E2E 已通（2026-10-10，`../scripts/code-mode-sandbox-s2.mjs`：Runner tool.call 经 SaaS Tool snapshot dispatch、toolCalls 审计、progress×2 含子调用、echo 哨兵回传）** | ✅ S2 完整形态已验证；S4/S6/S7 仍按门槛表待验 |
+| 网络 capability（disabled/sandbox/server） | `core/codemode/web.ts`、`extension.ts` | TCM2.15 + S8 门槛 | ✅ 设计覆盖；S8 egress identity E2E 待跑 |
+| CCR 互斥（`codemode:false` 工具排除） | 各 tool plugin + `mcp-codemode-exclusion.test` | Core 单测 | ✅ 覆盖 |
+| **OpenAPI → CodeMode 工具适配器** | `packages/codemode/src/openapi` | 仅库导出（`index.ts`），**core/server/app 无接线点**——SDK 消费者能力，不在 SaaS 产品路径 | ℹ️ 非 E2E 缺口；由包单测承担（`OpenAPI.fromSpec` 当前 1 个已知失败，见执行记录） |
+| progress 上报（子调用 → `session.tool.progress`） | `runner.ts` + tool.ts | **已验证（2026-10-10 sandbox executor E2E：progress×2 且内容含 echo.echo 子调用）** | ✅ 覆盖 |
+
+**结论**：单测与 server executor 基线覆盖全面；Sandbox executor 的 **S2（子工具 dispatch）、progress、S7（Runner kill 恢复）与 S8（egress identity）已全部有 E2E 证据**（2026-10-10，`code-mode-sandbox-s2.mjs` + `code-mode-sandbox-s3468.mjs`，模型 deepseek-v4-flash）。**S4（幂等）与 S6（nonce/owner）经现状证实测试确认产品缺口可复现**（RISK 级，非 PASS）：Runner 无握手，沙箱内任意进程可直连 9911 执行代码；SaaS 侧对每个 tool.call 直接执行、无 (executionID, ordinal) 去重缓存——重复帧将重复触发有副作用工具。**PG execution/call ledger 仍未实现**（第 0 节声明），S4/S6 的根本修复与可审计状态依赖该接入。
+> 可复现要点：① 注册 MCP 后必须做就绪门控；模型侧需 harness agent 强约束「只用 execute」并自动应答 question form（实测两模型均出现过探索/提问卡轮，失败形态 `form.cancelled + execution.interrupted`）。② S8 观测必须用**同 Docker bridge 网络的观测容器**——macOS Docker 下 `host.docker.internal` 对所有容器在宿主侧都呈现 127.0.0.1，无身份鉴别力（首版 S8 断言因此作废重做）。
 
 完整 Sandbox 验收仍须通过 HTTP 请求验证 Runner → SaaS Tool snapshot callback，并在 PG 中检查现有 Session/Message/Tool 状态。配置值被接受、Runner 能单独启动或 WebSocket 单测通过，都不能替代 HTTP/PG 端到端验收。
 
@@ -692,11 +711,47 @@ test "$OUT_A" = 'A-only' && test "$OUT_B" = 'B-only'
 
 ## 6. 清理与结果记录
 
-每个场景完成后清理 MCP 和 Session；保留失败场景的 request ID、Session ID、message ID、Tool call ID 和脱敏 PG 结果，便于复现。不要清理或修改生产数据。
+每条执行记录追加于此；历史记录保留原样，最新在上。
+
+### 2026-10-10 状态核对与覆盖评估（未跑新 E2E）
+
+#### 补充执行（2026-10-10 晚）：Sandbox executor S2 + progress E2E ＋ S4/S6/S7/S8
+
+**脚本 1：`code-mode-sandbox-s2.mjs`**（隔离容器 `OPENCODE_CODEMODE_EXECUTOR=sandbox` + 本地 OpenSandbox + deepseek-v4-flash），**15 项断言全绿**：
+
+| 断言 | 结果 |
+|---|---|
+| 沙箱前置（node v24 + supergateway）/ fixture 安装 / MCP 注册 / 就绪门控 | ✅ |
+| **S2 核心**：execute 终态 completed（经 Runner）、`Echo: <哨兵>` 回传、`metadata.toolCalls` 审计 `echo.echo completed` 且 input 哨兵一致、无 error | ✅ |
+| SSE：execute input.started、**progress×2 且内容含 echo.echo 子调用**、success | ✅ |
+| TCM2.12 关联：MCP 删除 204；session 清理零残留 | ✅ |
+
+**脚本 2：`code-mode-sandbox-s3468.mjs`**（同环境），S4/S6/S7/S8 分级结果：
+
+| 项 | 结果 | 证据 |
+|---|---|---|
+| S6 nonce/owner | 🔴 **RISK（产品缺口可复现）** | 沙箱内无握手直连 `ws://127.0.0.1:9911` 发 execute 帧被接受并返回 `execution.result`——任意沙箱进程可驱动代码执行 |
+| S4 幂等 | 🔴 **RISK（产品缺口）** | 重复 execute 帧（同 executionID）首测未触发新 tool.call；但 `runner.ts` L166 对每个 `tool.call` 直接执行、无 `(executionID, ordinal)` 结果缓存——重复帧将重复触发有副作用工具 |
+| S7 进程恢复 | ✅ | execute 长任务中 kill Runner daemon → execute 收敛 `error` 终态；下一轮 execute 重新拉起 daemon（flock 幂等启动）并 `completed` |
+| S8 egress identity | ✅ | 观测容器（bridge 网络）记录：沙箱 shell 与 execute 的 fetch **同源 192.168.215.6（该沙箱容器）**，≠ SaaS 容器 192.168.215.4——`network=sandbox` 沙箱本地 egress 属实。⚠️ 首版用 `host.docker.internal` 的断言作废（macOS Docker 下所有容器都呈现 127.0.0.1，无鉴别力） |
+
+> 过程发现的测试方法要点（已写入脚本）：MCP 注册后就绪门控必需；模型需 harness 约束 + form 自动应答（实测两模型均出现过探索/提问卡轮，失败形态 `form.cancelled + execution.interrupted`）；S8 观测必须用同网络观测容器。
+
+#### 状态核对（日间）
+
+每条完整 E2E 执行记录按下表登记：
 
 | 日期 | 镜像/commit | executor/network | 数据库/Sandbox 环境 | 模型 | 自动化结果 | HTTP + PG E2E | 阻塞/失败证据 |
 |---|---|---|---|---|---|---|---|
 | YYYY-MM-DD |  | server |  |  |  |  |  |
+
+| 项 | 结果 | 说明 |
+|---|---|---|
+| Session MCP API 可用性 | **已解除 2026-09-28 的 BLOCKED** | `/api/session/:id/mcps` 系列路由已在当前源码实现并经审计套件长期使用（mcpDefinition CRUD + E2E）；TCM2.4/2.4a/2.12 的 fixture 阻塞原因消失，可复跑 |
+| Sandbox executor 基础链路 | **已有 E2E 证据** | builtin-agents runtime T62.11（2026-10-09，`OPENCODE_CODEMODE_EXECUTOR=sandbox` + 本地 OpenSandbox）：`execute` 纯代码成功、SSE 记录 input.started/success、PG 正常——覆盖 S1 与 S2 的"无子工具"子集 |
+| Sandbox executor 剩余缺口 | 未验收 | S2 完整形态（Runner tool.call → SaaS dispatch）、S4 幂等、S6 nonce、S8 egress、PG ledger（见上方覆盖矩阵） |
+| TCM2.1 CodeMode 包 | 1268 pass / **2 fail**（与 09-28 相同） | `RegExp > String methods lastIndex`（stdlib.test）与 `OpenAPI.fromSpec > converts representative operations`（openapi.test）为既有测试缺陷，非新回归；OpenAPI 适配器无产品接线（见覆盖矩阵），其失败不阻塞 SaaS 验收 |
+| TCM2.2 Core codemode 单测 | 21 pass / 0 fail（4 文件抽测） | 与 09-28 基线一致 |
 
 ### 本次执行记录（2026-09-28）
 
