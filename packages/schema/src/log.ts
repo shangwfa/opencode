@@ -31,6 +31,7 @@ export const Source = Schema.Literals([
   "session.view",
   "session.environment",
   "session.permissions",
+  "session.terminal.create",
   // Turn entry points
   "session.prompt",
   "session.synthetic",

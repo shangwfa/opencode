@@ -322,13 +322,22 @@ try {
   await drainStream(await longRun)
   await waitShort(sessionID)
 
-  // 7) revert：stage → clear → stage → commit
+  // 7) revert：stage → clear → stage → commit；clear/stage 触发的快照操作会让 session 短暂 busy，409 轮询重试
+  const retryOk = async (path, method, body, tries = 30) => {
+    for (let i = 0; i < tries; i++) {
+      const r = await api(path, method, body)
+      if (r.status < 300) return r
+      if (r.status !== 409) throw new Error(`${path} -> ${r.status}: ${JSON.stringify(r.data).slice(0, 200)}`)
+      await sleep(3000)
+    }
+    throw new Error(`${path} retry exhausted (409)`)
+  }
   const messages = (await api(`/api/session/${sessionID}/message?order=asc`)).data.data ?? []
   const target = messages.find((m) => m.type === "user")
-  await api(`/api/session/${sessionID}/revert/stage`, "POST", { messageID: target.id })
-  await api(`/api/session/${sessionID}/revert`, "DELETE")
-  await api(`/api/session/${sessionID}/revert/stage`, "POST", { messageID: target.id })
-  await api(`/api/session/${sessionID}/revert/commit`, "POST", {})
+  await retryOk(`/api/session/${sessionID}/revert/stage`, "POST", { messageID: target.id })
+  await retryOk(`/api/session/${sessionID}/revert`, "DELETE")
+  await retryOk(`/api/session/${sessionID}/revert/stage`, "POST", { messageID: target.id })
+  await retryOk(`/api/session/${sessionID}/revert/commit`, "POST", {})
 
   // 8) snapshot.create：按能力分支（失败不得产生审计行）
   const snapshot = await api(`/api/session/${sessionID}/snapshot`, "POST", {})

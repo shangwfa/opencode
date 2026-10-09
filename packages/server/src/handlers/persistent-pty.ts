@@ -1,4 +1,5 @@
 import { PersistentPty } from "@opencode/core/persistent-pty"
+import { Log } from "@opencode/core/log"
 import { PtyTicket } from "@opencode/core/pty/ticket"
 import { ForbiddenError, PtyNotFoundError, ServiceUnavailableError } from "@opencode/protocol/errors"
 import {
@@ -36,19 +37,27 @@ export const PersistentPtyHandler = HttpApiBuilder.group(Api, "server.experiment
       .handle(
         "persistentPty.create",
         Effect.fn(function* (ctx) {
-          return {
-            data: yield* pty
-              .create(ctx.params.sessionID, {
-                command: ctx.payload.command,
-                args: ctx.payload.args,
-                cwd: ctx.payload.cwd,
-                title: ctx.payload.title,
-                env: ctx.payload.env,
-                cols: ctx.payload.size?.cols,
-                rows: ctx.payload.size?.rows,
-              })
-              .pipe(Effect.catchTag("PersistentPty.UnavailableError", unavailable)),
-          }
+          const created = yield* pty
+            .create(ctx.params.sessionID, {
+              command: ctx.payload.command,
+              args: ctx.payload.args,
+              cwd: ctx.payload.cwd,
+              title: ctx.payload.title,
+              env: ctx.payload.env,
+              cols: ctx.payload.size?.cols,
+              rows: ctx.payload.size?.rows,
+            })
+            .pipe(Effect.catchTag("PersistentPty.UnavailableError", unavailable))
+          const logs = yield* Log.Service
+          yield* logs.record({
+            sessionID: ctx.params.sessionID,
+            source: "session.terminal.create",
+            detail: {
+              command: ctx.payload.command,
+              ...(ctx.payload.title === undefined ? {} : { title: ctx.payload.title }),
+            },
+          })
+          return { data: created }
         }),
       )
       .handle(
