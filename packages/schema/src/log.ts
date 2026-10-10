@@ -60,6 +60,9 @@ export const Source = Schema.Literals([
   "session.mcpDefinition.create",
   "session.mcpDefinition.delete",
   "session.mcpDefinition.clear",
+  "session.pluginDefinition.create",
+  "session.pluginDefinition.delete",
+  "session.pluginDefinition.clear",
   // Instruction documents
   "session.agentsMd.update",
   "session.agentsMd.remove",

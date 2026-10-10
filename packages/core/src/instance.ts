@@ -52,6 +52,7 @@ import { SessionAgents } from "./session/agents.js"
 import { SessionSkills } from "./session/skills.js"
 import { SessionMcps } from "./session/mcps.js"
 import { SessionTools } from "./session/tools.js"
+import { SessionPlugins } from "./session/plugins.js"
 import { SessionToolSandbox } from "./session/tool-sandbox.js"
 import { SessionInstructions } from "./session/instructions.js"
 import { McpTool } from "./tool/mcp.js"
@@ -108,6 +109,7 @@ const nodes = [
   SessionSkills.node,
   SessionMcps.node,
   SessionTools.node,
+  SessionPlugins.node,
   SessionToolSandbox.node,
   Form.node,
   Generate.node,

@@ -183,6 +183,26 @@ export const SessionMcpTable = sqliteTable(
 )
 
 /** Durable session-scoped custom tool definitions; loaded and executed at request time. */
+/** Durable session-scoped plugin sources; hooks execute inside the session sandbox. */
+export const SessionPluginTable = sqliteTable(
+  "session_plugins",
+  {
+    id: text().$type<import("@opencode/schema/session-plugin").SessionPlugin.ID>().primaryKey(),
+    session_id: text()
+      .$type<SessionSchema.ID>()
+      .notNull()
+      .references(() => SessionTable.id, { onDelete: "cascade" }),
+    name: text().$type<import("@opencode/schema/session-plugin").SessionPlugin.Name>().notNull(),
+    description: text().notNull(),
+    source: text({ mode: "json" }).$type<import("@opencode/schema/session-plugin").SessionPlugin.Source>().notNull(),
+    ...Timestamps,
+  },
+  (table) => [
+    index("session_plugins_session_idx").on(table.session_id),
+    uniqueIndex("session_plugins_session_name_idx").on(table.session_id, table.name),
+  ],
+)
+
 export const SessionToolTable = sqliteTable(
   "session_tools",
   {

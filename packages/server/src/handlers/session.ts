@@ -7,6 +7,8 @@ import { SessionAgents } from "@opencode/core/session/agents"
 import { SessionSkills } from "@opencode/core/session/skills"
 import { SessionMcps } from "@opencode/core/session/mcps"
 import { SessionTools } from "@opencode/core/session/tools"
+import { SessionPlugins } from "@opencode/core/session/plugins"
+import { SessionPlugin } from "@opencode/schema/session-plugin"
 import { SessionAgentsMd } from "@opencode/core/session/agents-md"
 import { Log } from "@opencode/core/log"
 
@@ -1147,6 +1149,53 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
           yield* session.get(ctx.params.sessionID).pipe(Effect.catchTag("Session.NotFoundError", missingSession))
           yield* tools.clear(ctx.params.sessionID)
           yield* audit(ctx.params.sessionID, "session.toolDefinition.clear")
+          return HttpApiSchema.NoContent.make()
+        }),
+      )
+      .handle(
+        "session.pluginDefinitions.list",
+        Effect.fn(function* (ctx) {
+          const plugins = yield* SessionPlugins.Service
+          yield* session.get(ctx.params.sessionID).pipe(Effect.catchTag("Session.NotFoundError", missingSession))
+          return { data: yield* plugins.list(ctx.params.sessionID) }
+        }),
+      )
+      .handle(
+        "session.pluginDefinitions.create",
+        Effect.fn(function* (ctx) {
+          const plugins = yield* SessionPlugins.Service
+          yield* session.get(ctx.params.sessionID).pipe(Effect.catchTag("Session.NotFoundError", missingSession))
+          if (ctx.payload.source.type === "code") {
+            const actualBytes = Buffer.byteLength(ctx.payload.source.code, "utf8")
+            if (actualBytes > SessionPlugin.MaxCodeBytes)
+              return yield* new SessionPlugin.CodeTooLargeError({
+                actualBytes,
+                maxBytes: SessionPlugin.MaxCodeBytes,
+                message: `Session plugin source exceeds ${SessionPlugin.MaxCodeBytes} UTF-8 bytes`,
+              })
+          }
+          const data = yield* plugins.create(ctx.params.sessionID, ctx.payload)
+          yield* audit(ctx.params.sessionID, "session.pluginDefinition.create", { name: ctx.payload.name })
+          return { data }
+        }),
+      )
+      .handle(
+        "session.pluginDefinitions.delete",
+        Effect.fn(function* (ctx) {
+          const plugins = yield* SessionPlugins.Service
+          const info = yield* session.get(ctx.params.sessionID).pipe(Effect.catchTag("Session.NotFoundError", missingSession))
+          yield* plugins.remove(info, ctx.params.name)
+          yield* audit(ctx.params.sessionID, "session.pluginDefinition.delete", { name: ctx.params.name })
+          return HttpApiSchema.NoContent.make()
+        }),
+      )
+      .handle(
+        "session.pluginDefinitions.clear",
+        Effect.fn(function* (ctx) {
+          const plugins = yield* SessionPlugins.Service
+          const info = yield* session.get(ctx.params.sessionID).pipe(Effect.catchTag("Session.NotFoundError", missingSession))
+          yield* plugins.clear(info)
+          yield* audit(ctx.params.sessionID, "session.pluginDefinition.clear")
           return HttpApiSchema.NoContent.make()
         }),
       )

@@ -51,6 +51,7 @@ import { SessionAgent } from "@opencode/schema/session-agent"
 import { SessionSkill } from "@opencode/schema/session-skill"
 import { SessionMcp } from "@opencode/schema/session-mcp"
 import { SessionTool } from "@opencode/schema/session-tool"
+import { SessionPlugin } from "@opencode/schema/session-plugin"
 
 const ParentIDFilter = Schema.Union([
   Session.ID,
@@ -1176,6 +1177,35 @@ export const makeSessionGroup = <I extends HttpApiMiddleware.AnyId, S, FormI ext
             description: "Remove all custom tools attached to a specific Session. Clearing is idempotent.",
           }),
         ),
+    )
+    .add(
+      HttpApiEndpoint.get("session.pluginDefinitions.list", "/api/session/:sessionID/plugins", {
+        params: { sessionID: Session.ID },
+        success: Schema.Struct({ data: Schema.Array(SessionPlugin.Info) }),
+        error: [SessionNotFoundError, UnknownError],
+      }).middleware(sessionLocationMiddleware),
+    )
+    .add(
+      HttpApiEndpoint.post("session.pluginDefinitions.create", "/api/session/:sessionID/plugins", {
+        params: { sessionID: Session.ID },
+        payload: SessionPlugin.Payload,
+        success: Schema.Struct({ data: SessionPlugin.Info }),
+        error: [SessionNotFoundError, InvalidRequestError, SessionPlugin.CodeTooLargeError, UnknownError],
+      }).middleware(sessionLocationMiddleware),
+    )
+    .add(
+      HttpApiEndpoint.delete("session.pluginDefinitions.delete", "/api/session/:sessionID/plugins/:name", {
+        params: { sessionID: Session.ID, name: SessionPlugin.Name },
+        success: HttpApiSchema.NoContent,
+        error: [SessionNotFoundError, UnknownError],
+      }).middleware(sessionLocationMiddleware),
+    )
+    .add(
+      HttpApiEndpoint.delete("session.pluginDefinitions.clear", "/api/session/:sessionID/plugins", {
+        params: { sessionID: Session.ID },
+        success: HttpApiSchema.NoContent,
+        error: [SessionNotFoundError, UnknownError],
+      }).middleware(sessionLocationMiddleware),
     )
     .add(
       HttpApiEndpoint.post("session.skillDefinitions.create", "/api/session/:sessionID/skills", {

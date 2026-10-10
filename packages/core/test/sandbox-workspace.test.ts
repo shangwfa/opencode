@@ -60,12 +60,14 @@ it.effect("restored or mounted workspaces are never recreated", () =>
   }),
 )
 
-it.effect("transport failures remain readiness failures", () =>
+it.live("transport failures remain readiness failures after bounded retries", () =>
   Effect.gen(function* () {
+    let attempts = 0
     const result = yield* SandboxWorkspace.ensureWritable(
       {
         commands: {
           run: async () => {
+            attempts++
             throw new Error("connection refused")
           },
         },
@@ -73,6 +75,26 @@ it.effect("transport failures remain readiness failures", () =>
       false,
     ).pipe(Effect.result)
     expect(result._tag).toBe("Failure")
+    expect(attempts).toBe(8)
+  }),
+)
+
+it.live("retries transient command transport failure before admitting a ready workspace", () =>
+  Effect.gen(function* () {
+    let attempts = 0
+    yield* SandboxWorkspace.ensureWritable(
+      {
+        commands: {
+          run: async () => {
+            attempts++
+            if (attempts < 3) throw new Error("command session is not ready")
+            return { exitCode: 0 }
+          },
+        },
+      },
+      false,
+    )
+    expect(attempts).toBe(3)
   }),
 )
 

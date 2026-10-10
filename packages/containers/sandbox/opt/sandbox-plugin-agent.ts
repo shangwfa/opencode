@@ -1,83 +1,74 @@
 /**
- * Sandbox Plugin Agent — 在沙箱里常驻运行的 HTTP 服务，加载 session plugins 并暴露 hooks + tools endpoint。
+ * Sandbox Plugin Agent — 在会话沙箱里常驻的 HTTP 服务，加载 session plugins 并暴露
+ * V2 类型化 hook 端点。插件代码在沙箱内执行，SaaS server 只做 HTTP 转发（无状态多 pod 安全）。
  *
- * 启动方式（由 SandboxPluginRuntime 通过 exec background 调用）：
- *   SESSION_ID=ses_xxx PLUGINS_BASE64='...' bun /opt/sandbox-plugin-agent.ts
+ * 启动方式（由 SessionPlugins 的沙箱 runtime 通过 exec background 调用）：
+ *   SESSION_ID=ses_xxx PLUGINS_BASE64='...' nohup bun /opt/sandbox-plugin-agent.ts > /tmp/plugin-agent.log 2>&1 &
+ *
+ * 插件格式（hook key = V2 `domain.name`，事件为单对象 + 原地 mutation）：
+ *   export default async (ctx) => ({
+ *     "session.prompt": (event) => { event.prompt.text += " …" },
+ *     "tool.execute.before": (event) => { if (event.tool === "read") throw new Error("blocked") },
+ *   })
  *
  * 通信协议：
- *   GET  /health              → { status, plugins, hooks, tools }
- *   POST /hook/{hookName}     → { result }（hook 返回值覆盖 output）
- *   GET  /tools               → { name: { description, args } }
- *   POST /tool/{toolName}     → { result }（工具执行结果）
+ *   GET  /health                     → { status, plugins, errors, hooks }
+ *   POST /hook/{domain}/{name}       → { event }（修改后）；tool.execute.before 抛错 → { veto }
+ *   POST /shutdown                   → 执行 dispose 并退出
  */
 import { pathToFileURL } from "url"
 import { tmpdir } from "os"
 import path from "path"
-import { z } from "zod"
+import { createHash } from "node:crypto"
 import { installNpmPlugin } from "./sandbox-plugin-npm"
 
 const PORT = parseInt(process.env.PLUGIN_AGENT_PORT || "9200")
 const SESSION_ID = process.env.SESSION_ID || ""
 const MODULE_DIR = process.env.PLUGIN_AGENT_MODULE_DIR || "/workspace/.opencode/session-plugins"
-const PLUGIN_CONTEXT: {
-  project?: unknown
-  directory?: string
-  worktree?: string
-  serverUrl?: string
-} = JSON.parse(
-  process.env.PLUGIN_CONTEXT_BASE64
-    ? Buffer.from(process.env.PLUGIN_CONTEXT_BASE64, "base64").toString()
-    : "{}",
+const PLUGIN_CONTEXT: { serverUrl?: string } = JSON.parse(
+  process.env.PLUGIN_CONTEXT_BASE64 ? Buffer.from(process.env.PLUGIN_CONTEXT_BASE64, "base64").toString() : "{}",
 )
-const PLUGINS: Array<{ name: string; source: string; spec?: string; code?: string }> = JSON.parse(
-  process.env.PLUGINS_BASE64
-    ? Buffer.from(process.env.PLUGINS_BASE64, "base64").toString()
-    : process.env.PLUGINS_JSON || "[]",
+type PluginRow = {
+  name: string
+  source: { type: "code"; code: string } | { type: "npm"; spec: string }
+}
+const INITIAL_PLUGINS: PluginRow[] = JSON.parse(
+  process.env.PLUGINS_BASE64 ? Buffer.from(process.env.PLUGINS_BASE64, "base64").toString() : "[]",
 )
 
+/** V2 类型化 hook 白名单：事件必须 JSON 可往返且携带 sessionID 才能被 server 侧按会话路由。
+ *  session.http.request/http.response（活 Request/Response 对象）、session.retry（Error class）
+ *  与 shell 域（事件无 sessionID）因此不在内。 */
 const ALLOWED_HOOKS = new Set([
+  "session.prompt",
+  "session.context",
+  "session.compaction",
+  "session.generate",
+  "session.title",
+  "session.model.request",
   "tool.execute.before",
   "tool.execute.after",
-  "chat.message",
-  "chat.params",
-  "chat.headers",
-  "command.execute.before",
-  "shell.env",
-  "experimental.chat.messages.transform",
-  "experimental.chat.system.transform",
-  "experimental.session.compacting",
-  "experimental.text.complete",
-  "event",
-  "tool",
-  "tool.definition",
-  "permission.ask",
-  "experimental.compaction.autocontinue",
+  "permission.evaluate",
 ])
 
 const HOOK_TIMEOUT_MS = 5000
-const hookHandlers = new Map<string, Array<(input: unknown, output: unknown) => Promise<unknown> | unknown>>()
-const disposeHandlers: Array<() => Promise<unknown> | unknown> = []
-const loadErrors: Array<{ name: string; error: string }> = []
+let hookHandlers = new Map<string, Array<(event: unknown) => Promise<unknown> | unknown>>()
+let disposeHandlers: Array<() => Promise<unknown> | unknown> = []
+let loadErrors: Array<{ name: string; error: string }> = []
 let loadedPlugins = 0
-const toolDefinitions = new Map<
-  string,
-  {
-    description: string
-    jsonSchema: Record<string, unknown>
-    parse: (input: unknown) => unknown
-    execute: (args: unknown, context: Record<string, unknown>) => Promise<unknown>
-  }
->()
-let server: ReturnType<typeof Bun.serve>
+let codeFiles: Array<string | undefined> = []
+let loadedVersion = ""
+let configuring: Promise<void> = Promise.resolve()
+const hookRequests: Record<string, number> = {}
 
-async function loadPlugin(plugin: { name: string; source: string; spec?: string; code?: string }, codeFile?: string) {
+async function loadPlugin(plugin: PluginRow, codeFile?: string) {
   let mod: Record<string, unknown>
-  if (plugin.source === "npm" && plugin.spec) {
-    mod = await import(pathToFileURL(await installNpmPlugin(plugin.spec, MODULE_DIR)).href)
+  if (plugin.source.type === "npm") {
+    mod = await import(pathToFileURL(await installNpmPlugin(plugin.source.spec, MODULE_DIR)).href)
   } else if (codeFile) {
     mod = await import(`${pathToFileURL(codeFile).href}?plugin=${encodeURIComponent(plugin.name)}`)
   } else {
-    throw new Error(`Plugin ${plugin.name} has no spec or code`)
+    throw new Error(`Plugin ${plugin.name} has no source`)
   }
 
   let fn: (ctx: unknown) => Promise<Record<string, unknown>>
@@ -96,64 +87,67 @@ async function loadPlugin(plugin: { name: string; source: string; spec?: string;
   }
 
   const context = {
-    client: undefined,
-    project: PLUGIN_CONTEXT.project,
-    directory: PLUGIN_CONTEXT.directory ?? "/workspace",
-    worktree: PLUGIN_CONTEXT.worktree ?? "/workspace",
-    experimental_workspace: { register() {} },
-    serverUrl: new URL(PLUGIN_CONTEXT.serverUrl ?? "http://localhost:4096"),
-    $: Bun.$,
     sessionID: SESSION_ID,
-    workdir: PLUGIN_CONTEXT.directory ?? "/workspace",
+    workdir: "/workspace",
+    directory: "/workspace",
+    serverUrl: PLUGIN_CONTEXT.serverUrl ? new URL(PLUGIN_CONTEXT.serverUrl) : undefined,
+    $: Bun.$,
   }
   const hooks = await fn(context)
   let hookCount = 0
   for (const [name, handler] of Object.entries(hooks)) {
-    if (typeof handler === "function") {
-      if (name === "dispose") {
-        disposeHandlers.push(handler as () => Promise<unknown>)
-        continue
-      }
-      if (!ALLOWED_HOOKS.has(name)) continue
-      if (!hookHandlers.has(name)) hookHandlers.set(name, [])
-      hookHandlers.get(name)!.push(handler as (input: unknown, output: unknown) => Promise<unknown>)
-      hookCount++
-    } else if (name === "tool" && handler && typeof handler === "object") {
-      for (const [toolName, toolDef] of Object.entries(handler as Record<string, Record<string, unknown>>)) {
-        if (!toolDef || typeof toolDef.execute !== "function" || !toolDef.args || typeof toolDef.args !== "object") continue
-        const schema = z.object(toolDef.args as z.ZodRawShape)
-        toolDefinitions.set(toolName, {
-          description: String(toolDef.description ?? ""),
-          jsonSchema: z.toJSONSchema(schema, { io: "input" }) as Record<string, unknown>,
-          parse: (input) => schema.parse(input),
-          execute: toolDef.execute as (args: unknown, context: Record<string, unknown>) => Promise<unknown>,
-        })
-      }
+    if (typeof handler !== "function") continue
+    if (name === "dispose") {
+      disposeHandlers.push(handler as () => Promise<unknown>)
+      continue
     }
+    if (!ALLOWED_HOOKS.has(name)) continue
+    if (!hookHandlers.has(name)) hookHandlers.set(name, [])
+    hookHandlers.get(name)!.push(handler as (event: unknown) => Promise<unknown>)
+    hookCount++
   }
   loadedPlugins++
-  console.error(`[plugin-agent] loaded: ${plugin.name} (${hookCount} hooks, ${toolDefinitions.size} tools)`)
+  console.error(`[plugin-agent] loaded: ${plugin.name} (${hookCount} hooks)`)
 }
 
-const codeFiles = await Promise.all(
-  PLUGINS.map(async (plugin) => {
-    if (!plugin.code || plugin.source === "npm") return
-    const file = path.join(tmpdir(), `spa-${Date.now()}-${Math.random().toString(36).slice(2)}.ts`)
-    await Bun.write(file, plugin.code)
-    return file
-  }),
-)
-
-for (const [index, plugin] of PLUGINS.entries()) {
-  try {
-    await loadPlugin(plugin, codeFiles[index])
-  } catch (e) {
-    console.error(`[plugin-agent] load failed: ${plugin.name}: ${e}`)
-    loadErrors.push({ name: plugin.name, error: String(e) })
-  }
+async function configure(plugins: PluginRow[]) {
+  const version = createHash("sha256").update(JSON.stringify(plugins)).digest("hex")
+  configuring = configuring.catch(() => {}).then(async () => {
+    if (loadedVersion === version) return
+    await Promise.all(disposeHandlers.map((handler) => Promise.resolve(handler()).catch(() => {})))
+    await Promise.all(codeFiles.flatMap((file) => file ? [Bun.file(file).delete().catch(() => {})] : []))
+    hookHandlers = new Map()
+    disposeHandlers = []
+    loadErrors = []
+    loadedPlugins = 0
+    codeFiles = await Promise.all(plugins.map(async (plugin) => {
+      if (plugin.source.type !== "code") return
+      const file = path.join(tmpdir(), `spa-${Date.now()}-${Math.random().toString(36).slice(2)}.ts`)
+      await Bun.write(file, plugin.source.code)
+      return file
+    }))
+    for (const [index, plugin] of plugins.entries()) {
+      try {
+        await loadPlugin(plugin, codeFiles[index])
+      } catch (e) {
+        console.error(`[plugin-agent] load failed: ${plugin.name}: ${e}`)
+        loadErrors.push({ name: plugin.name, error: String(e) })
+      }
+    }
+    loadedVersion = version
+  })
+  await configuring
 }
 
-server = Bun.serve({
+await configure(INITIAL_PLUGINS)
+
+const withTimeout = <T>(promise: Promise<T>, ms: number, label: string) =>
+  Promise.race([
+    promise,
+    new Promise<never>((_, reject) => setTimeout(() => reject(new Error(`${label} timeout`)), ms)),
+  ])
+
+const server = Bun.serve({
   port: PORT,
   async fetch(req) {
     const url = new URL(req.url)
@@ -162,95 +156,47 @@ server = Bun.serve({
       return Response.json({
         status: loadErrors.length ? "degraded" : "ok",
         plugins: loadedPlugins,
-        configuredPlugins: PLUGINS.length,
+        configuredPlugins: loadedPlugins + loadErrors.length,
+        version: loadedVersion,
+        hookRequests,
         errors: loadErrors,
         hooks: [...hookHandlers.keys()],
-        tools: [...toolDefinitions.keys()],
       })
     }
 
-    if (url.pathname === "/tools") {
-      const tools: Record<string, { description: string; jsonSchema: Record<string, unknown> }> = {}
-      for (const [name, def] of toolDefinitions) {
-        tools[name] = { description: def.description, jsonSchema: def.jsonSchema }
-      }
-      return Response.json(tools)
+    if (url.pathname === "/configure" && req.method === "POST") {
+      const body = (await req.json().catch(() => ({}))) as { plugins?: PluginRow[] }
+      await configure(body.plugins ?? [])
+      return Response.json({ status: loadErrors.length ? "degraded" : "ok", version: loadedVersion })
     }
 
-    if (url.pathname.startsWith("/tool/") && req.method === "POST") {
-      const toolName = url.pathname.replace("/tool/", "")
-      const def = toolDefinitions.get(toolName)
-      if (!def) return Response.json({ error: `tool ${toolName} not found` }, { status: 404 })
-      const body = await req.json().catch(() => ({}))
-      try {
-        const metadata: Array<Record<string, unknown>> = []
-        const context = {
-          ...(body.context && typeof body.context === "object" ? body.context : {}),
-          abort: new AbortController().signal,
-          metadata: (input: Record<string, unknown>) => metadata.push(input),
-          ask: async () => {},
-        }
-        let timer: ReturnType<typeof setTimeout> | undefined
-        const result = await Promise.race([
-          Promise.resolve(def.execute(def.parse(body.args ?? body), context)),
-          new Promise<never>((_, reject) => {
-            timer = setTimeout(() => reject(new Error(`tool ${toolName} timeout`)), 30000)
-          }),
-        ]).finally(() => {
-          if (timer) clearTimeout(timer)
-        })
-        return Response.json({ result, metadata })
-      } catch (e) {
-        return Response.json({ error: String(e) }, { status: 500, headers: { "X-OpenCode-Plugin-Error": "true" } })
-      }
-    }
-
-    if (url.pathname.startsWith("/hook/")) {
-      const hookName = url.pathname.replace("/hook/", "")
+    if (url.pathname.startsWith("/hook/") && req.method === "POST") {
+      const hookName = url.pathname.replace("/hook/", "").replaceAll("/", ".")
+      hookRequests[hookName] = (hookRequests[hookName] ?? 0) + 1
+      const body = (await req.json().catch(() => ({}))) as { event?: unknown; plugins?: PluginRow[] }
+      if (body.plugins) await configure(body.plugins)
       const handlers = hookHandlers.get(hookName) || []
-      if (!handlers.length) return Response.json({ result: null })
-
-      const body = await req.json().catch(() => ({}))
-      let result = body.output ?? null
+      if (!handlers.length) return Response.json({ event: null })
+      const event = body.event ?? {}
 
       for (const handler of handlers) {
         try {
-          let timer: ReturnType<typeof setTimeout> | undefined
-          const ret = await Promise.race([
-            Promise.resolve(handler(body.input, result)),
-            new Promise<never>((_, reject) => {
-              timer = setTimeout(() => reject(new Error(`hook ${hookName} timeout`)), HOOK_TIMEOUT_MS)
-            }),
-          ]).finally(() => {
-            if (timer) clearTimeout(timer)
-          })
-          if (
-            ret !== undefined &&
-            ret !== null &&
-            (result === undefined || result === null || valueKind(result) === valueKind(ret))
-          ) {
-            result = ret
-          }
+          await withTimeout(Promise.resolve(handler(event)), HOOK_TIMEOUT_MS, `hook ${hookName}`)
         } catch (e) {
           console.error(`[plugin-agent] hook ${hookName} error: ${e}`)
-          return Response.json({ error: String(e) }, { status: 500, headers: { "X-OpenCode-Plugin-Error": "true" } })
+          // tool.execute.before 的异常是显式 veto（V1 .env 保护语义）；其余 hook fail-open。
+          if (hookName === "tool.execute.before") return Response.json({ veto: String(e) })
+          return Response.json({ error: String(e) }, { status: 500 })
         }
       }
-
-      return Response.json({ result })
+      return Response.json({ event })
     }
 
     if (url.pathname === "/shutdown" && req.method === "POST") {
       await Promise.all(disposeHandlers.map((handler) => Promise.resolve(handler()).catch(() => {})))
       await Promise.all(
         codeFiles.flatMap((file) =>
-          file
-            ? [
-                Bun.file(file)
-                  .delete()
-                  .catch(() => {}),
-              ]
-            : [],
+          file ? [Bun.file(file).delete().catch(() => {})] : [],
         ),
       )
       setTimeout(() => server.stop(true), 0)
@@ -261,12 +207,4 @@ server = Bun.serve({
   },
 })
 
-function valueKind(value: unknown) {
-  if (Array.isArray(value)) return "array"
-  if (value === null) return "null"
-  return typeof value
-}
-
-console.error(
-  `[plugin-agent] listening on :${PORT} (${hookHandlers.size} hook types, ${toolDefinitions.size} tools)`,
-)
+console.error(`[plugin-agent] listening on :${PORT} (${hookHandlers.size} hook types)`)

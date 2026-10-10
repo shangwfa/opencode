@@ -248,6 +248,15 @@ CREATE TABLE "session_pending" (
           "admitted_seq" bigint NOT NULL,
           "time_created" bigint NOT NULL
         );
+CREATE TABLE "session_plugins" (
+          "id" text PRIMARY KEY,
+          "session_id" text NOT NULL,
+          "name" text NOT NULL,
+          "description" text NOT NULL,
+          "source" text NOT NULL,
+          "time_created" bigint NOT NULL,
+          "time_updated" bigint NOT NULL
+        );
 CREATE TABLE "session_skills" (
           "id" text PRIMARY KEY,
           "session_id" text NOT NULL,
@@ -355,6 +364,8 @@ CREATE INDEX "session_message_time_created_idx" ON "session_message" ("time_crea
 CREATE INDEX "session_pending_session_delivery_seq_idx" ON "session_pending" ("session_id","delivery","admitted_seq");
 CREATE UNIQUE INDEX "session_pending_session_compaction_idx" ON "session_pending" ("session_id") WHERE "session_pending"."type" = 'compaction';
 CREATE UNIQUE INDEX "session_pending_session_admitted_seq_idx" ON "session_pending" ("session_id","admitted_seq");
+CREATE INDEX "session_plugins_session_idx" ON "session_plugins" ("session_id");
+CREATE UNIQUE INDEX "session_plugins_session_name_idx" ON "session_plugins" ("session_id","name");
 CREATE INDEX "session_skills_session_idx" ON "session_skills" ("session_id");
 CREATE UNIQUE INDEX "session_skills_session_skill_idx" ON "session_skills" ("session_id","skill_id");
 CREATE INDEX "session_v2_project_idx" ON "session_v2" ("project_id");
@@ -379,6 +390,7 @@ ALTER TABLE "session_inbox" ADD CONSTRAINT "fk_session_inbox_session_id_session_
 ALTER TABLE "session_mcps" ADD CONSTRAINT "fk_session_mcps_session_id_session_v2_id_fk" FOREIGN KEY ("session_id") REFERENCES "session_v2"("id") ON DELETE CASCADE;
 ALTER TABLE "session_message" ADD CONSTRAINT "fk_session_message_session_id_session_v2_id_fk" FOREIGN KEY ("session_id") REFERENCES "session_v2"("id") ON DELETE CASCADE;
 ALTER TABLE "session_pending" ADD CONSTRAINT "fk_session_pending_session_id_session_v2_id_fk" FOREIGN KEY ("session_id") REFERENCES "session_v2"("id") ON DELETE CASCADE;
+ALTER TABLE "session_plugins" ADD CONSTRAINT "fk_session_plugins_session_id_session_v2_id_fk" FOREIGN KEY ("session_id") REFERENCES "session_v2"("id") ON DELETE CASCADE;
 ALTER TABLE "session_skills" ADD CONSTRAINT "fk_session_skills_session_id_session_v2_id_fk" FOREIGN KEY ("session_id") REFERENCES "session_v2"("id") ON DELETE CASCADE;
 ALTER TABLE "session_v2" ADD CONSTRAINT "fk_session_v2_project_id_project_id_fk" FOREIGN KEY ("project_id") REFERENCES "project"("id") ON DELETE CASCADE;
 ALTER TABLE "session_tools" ADD CONSTRAINT "fk_session_tools_session_id_session_v2_id_fk" FOREIGN KEY ("session_id") REFERENCES "session_v2"("id") ON DELETE CASCADE;
