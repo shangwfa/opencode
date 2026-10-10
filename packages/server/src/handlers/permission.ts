@@ -2,12 +2,13 @@ import { Instance } from "@opencode/core/instance/service"
 import { Location } from "@opencode/core/location"
 import { Permission } from "@opencode/core/permission"
 import { PermissionSaved } from "@opencode/core/permission/saved"
+import { SessionPermissionApproval } from "@opencode/core/permission/session-approval"
 import { Log } from "@opencode/core/log"
 import { Session } from "@opencode/core/session"
 import { Effect } from "effect"
 import { HttpApiBuilder, HttpApiSchema } from "effect/unstable/httpapi"
 import { Api } from "../api"
-import { PermissionNotFoundError } from "@opencode/protocol/errors"
+import { ForbiddenError, PermissionNotFoundError } from "@opencode/protocol/errors"
 import { response, sessionInfo } from "../location"
 import { missingSession } from "./session-error"
 
@@ -30,6 +31,27 @@ export const PermissionHandler = HttpApiBuilder.group(Api, "server.permission", 
     })
 
     return handlers
+      .handle(
+        "session.permission.approval.list",
+        Effect.fn(function* (ctx) {
+          const approval = yield* SessionPermissionApproval.Service
+          return { data: yield* approval.list(ctx.params.sessionID) }
+        }),
+      )
+      .handle(
+        "session.permission.approval.remove",
+        Effect.fn(function* (ctx) {
+          const approval = yield* SessionPermissionApproval.Service
+          yield* approval.remove(ctx.params.sessionID, ctx.params.id)
+          const logs = yield* Log.Service
+          yield* logs.record({
+            sessionID: ctx.params.sessionID,
+            source: "permission.respond",
+            detail: { operation: "approval.revoke", approvalID: ctx.params.id },
+          })
+          return HttpApiSchema.NoContent.make()
+        }),
+      )
       .handle(
         "permission.request.list",
         Effect.fn(function* () {
@@ -80,7 +102,10 @@ export const PermissionHandler = HttpApiBuilder.group(Api, "server.permission", 
           const owned = yield* requireOwnedRequest(ctx.params.sessionID, ctx.params.requestID)
           yield* owned.permission
             .reply({ requestID: ctx.params.requestID, reply: ctx.payload.decision, message: ctx.payload.message })
-            .pipe(Effect.catchTag("Permission.NotFoundError", () => missingRequest(ctx.params.requestID)))
+            .pipe(
+              Effect.catchTag("Permission.NotFoundError", () => missingRequest(ctx.params.requestID)),
+              Effect.catchTag("Permission.BlockedError", (error) => new ForbiddenError({ message: error.message })),
+            )
           const logs = yield* Log.Service
           yield* logs.record({
             sessionID: ctx.params.sessionID,

@@ -70,6 +70,57 @@ it.live("session event stream filters events to its session", () =>
   }),
 )
 
+it.live("session SSE receives form.created and excludes another session's form", () =>
+  Effect.gen(function* () {
+    const directory = yield* tmpdirScoped()
+    const server = yield* startServer(directory.path)
+    const create = () =>
+      Effect.promise(async () => {
+        const response = await fetch(new URL("/api/session", server.base), {
+          method: "POST",
+          headers: { ...server.headers, "content-type": "application/json" },
+          body: JSON.stringify({ location: { directory: directory.path } }),
+        })
+        expect(response.status).toBe(200)
+        return ((await response.json()) as { data: { id: string } }).data.id
+      })
+    const first = yield* create()
+    const second = yield* create()
+    for (const id of [first, second]) {
+      yield* Effect.addFinalizer(() =>
+        Effect.promise(() =>
+          fetch(new URL(`/api/session/${id}`, server.base), { method: "DELETE", headers: server.headers }),
+        ),
+      )
+    }
+    const response = yield* Effect.promise(() =>
+      fetch(new URL(`/api/session/${first}/event`, server.base), { headers: server.headers }),
+    )
+    expect(response.status).toBe(200)
+    const reader = response.body!.getReader()
+    yield* Effect.addFinalizer(() => Effect.promise(() => reader.cancel()))
+    expect((yield* Effect.promise(() => readEvent(reader))).type).toBe("server.connected")
+    let formID: string | undefined
+    for (const id of [second, first]) {
+      const created = yield* Effect.promise(async () => {
+        const result = await fetch(new URL(`/api/session/${id}/form`, server.base), {
+          method: "POST",
+          headers: { ...server.headers, "content-type": "application/json" },
+          body: JSON.stringify({ title: `Form ${id}`, fields: [{ key: "answer", type: "string" }] }),
+        })
+        expect(result.status).toBe(200)
+        return (await result.json()) as { data: { id: string } }
+      })
+      if (id === first) formID = created.data.id
+    }
+    const event = yield* Effect.promise(() => readEvent(reader)).pipe(Effect.timeout("3 seconds"))
+    expect(event.type).toBe("form.created")
+    expect(event.data.sessionID).toBe(first)
+    expect(event.data.form).toMatchObject({ id: formID, sessionID: first, title: `Form ${first}` })
+  }),
+  20_000,
+)
+
 it.live("prompt_stream admits a prompt and returns its session SSE stream", () =>
   Effect.gen(function* () {
     const directory = yield* tmpdirScoped()

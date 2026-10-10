@@ -1,5 +1,5 @@
 import { describe, expect } from "bun:test"
-import { Deferred, Effect, Exit, Fiber } from "effect"
+import { Deferred, Effect, Exit, Fiber, Schema } from "effect"
 import { AppNodeBuilder } from "@opencode/core/effect/app-node-builder"
 import { LayerNode } from "@opencode/util/effect/layer-node"
 import { Bus } from "@opencode/core/bus"
@@ -19,6 +19,24 @@ const input = {
 } satisfies Form.CreateInput
 
 describe("Form", () => {
+  for (const sessionID of [input.sessionID, "global"]) {
+    it.effect(`publishes the routing owner for ${sessionID}`, () =>
+      Effect.gen(function* () {
+        const service = yield* Form.Service
+        const bus = yield* Bus.Service
+        const created = yield* Deferred.make<typeof Form.Event.Created.data.Type>()
+        const unsubscribe = yield* bus.listen((event) =>
+          event.type === Form.Event.Created.type
+            ? Deferred.succeed(created, Schema.decodeUnknownSync(Form.Event.Created.data)(event.data)).pipe(Effect.asVoid)
+            : Effect.void,
+        )
+        yield* Effect.addFinalizer(() => unsubscribe)
+        const form = yield* service.create({ ...input, sessionID })
+        expect(yield* Deferred.await(created)).toEqual({ sessionID, form })
+      }),
+    )
+  }
+
   it.effect("validates absolute URI formats without restricting schemes", () =>
     Effect.sync(() => {
       const fields = [{ key: "uri", type: "string", format: "uri" }] satisfies ReadonlyArray<Form.Field>

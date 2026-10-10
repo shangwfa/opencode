@@ -253,6 +253,10 @@ import type {
   PermissionSavedListOutput,
   PermissionSavedRemoveInput,
   PermissionSavedRemoveOutput,
+  PermissionApprovalListInput,
+  PermissionApprovalListOutput,
+  PermissionApprovalRemoveInput,
+  PermissionApprovalRemoveOutput,
   PermissionCreateInput,
   PermissionCreateOutput,
   PermissionListInput,
@@ -2166,6 +2170,30 @@ export function make(options: ClientOptions) {
             requestOptions,
           ),
       },
+      approval: {
+        list: (input: PermissionApprovalListInput, requestOptions?: RequestOptions) =>
+          request<{ readonly data: PermissionApprovalListOutput }>(
+            {
+              method: "GET",
+              path: `/api/session/${encodeURIComponent(input.sessionID)}/permission/approval`,
+              successStatus: 200,
+              declaredStatuses: [400, 401, 404],
+              empty: false,
+            },
+            requestOptions,
+          ).then((value) => value.data),
+        remove: (input: PermissionApprovalRemoveInput, requestOptions?: RequestOptions) =>
+          request<PermissionApprovalRemoveOutput>(
+            {
+              method: "DELETE",
+              path: `/api/session/${encodeURIComponent(input.sessionID)}/permission/approval/${encodeURIComponent(input.id)}`,
+              successStatus: 204,
+              declaredStatuses: [400, 401, 404],
+              empty: true,
+            },
+            requestOptions,
+          ),
+      },
       create: (input: PermissionCreateInput, requestOptions?: RequestOptions) =>
         request<{ readonly data: PermissionCreateOutput }>(
           {
@@ -2215,7 +2243,7 @@ export function make(options: ClientOptions) {
             path: `/api/session/${encodeURIComponent(input.sessionID)}/permission/${encodeURIComponent(input.requestID)}/reply`,
             body: { decision: input["decision"], message: input["message"] },
             successStatus: 204,
-            declaredStatuses: [400, 401, 404],
+            declaredStatuses: [400, 401, 403, 404],
             empty: true,
           },
           requestOptions,

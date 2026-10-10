@@ -15,6 +15,12 @@ describe("SessionStream.sessionEventFilter", () => {
     expect(filter({ data: { sessionID: "ses_other" } })).toBe(false)
   })
 
+  test("routes form creation using the canonical event payload", () => {
+    expect(filter({ data: { sessionID: "ses_target", form: { sessionID: "ses_target" } } })).toBe(true)
+    expect(filter({ data: { sessionID: "ses_other", form: { sessionID: "ses_other" } } })).toBe(false)
+    expect(filter({ data: { sessionID: "global", form: { sessionID: "global" } } })).toBe(false)
+  })
+
   test("rejects events without a session id", () => {
     expect(filter({ data: {} })).toBe(false)
   })

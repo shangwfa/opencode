@@ -4,8 +4,18 @@ import { Form } from "@opencode/schema/form"
 import { Cache, Context, Deferred, Duration, Effect, Exit, Layer, Option, Schema } from "effect"
 import { makeLocationNode } from "@opencode/util/effect/app-node"
 import { Bus } from "./bus.js"
+import { Database } from "./database/database.js"
+import { HitlLedger } from "./hitl/ledger.js"
+import { SessionSchema } from "./session/schema.js"
 
 const RETENTION = Duration.minutes(10)
+const DEFAULT_POLL_MS = 1_000
+const pollIntervalMs = (() => {
+  const value = Number(process.env["OPENCODE_HITL_POLL_MS"])
+  return Number.isFinite(value) && value > 0 ? value : DEFAULT_POLL_MS
+})()
+/** The MCP elicitation sentinel owner is not a real Session and never persists. */
+const durableOwner = (sessionID: string): sessionID is SessionSchema.ID => sessionID !== "global"
 
 export const ID = Form.ID
 export type ID = typeof ID.Type
@@ -85,6 +95,12 @@ export interface Interface {
   readonly get: (id: ID) => Effect.Effect<Info, NotFoundError>
   readonly list: (input?: ListInput) => Effect.Effect<ReadonlyArray<Info>>
   readonly state: (id: ID) => Effect.Effect<State, NotFoundError>
+  /**
+   * Waits for a request's terminal state, reviving it from the durable ledger
+   * when this process does not hold it (recovery after a restart, or a request
+   * another pod created). Already-settled requests return immediately.
+   */
+  readonly awaitSettled: (id: ID) => Effect.Effect<TerminalState, NotFoundError>
   readonly reply: (input: ReplyInput) => Effect.Effect<void, AlreadySettledError | InvalidAnswerError | NotFoundError>
   readonly cancel: (id: ID) => Effect.Effect<void, AlreadySettledError | NotFoundError>
 }
@@ -101,6 +117,11 @@ export const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
     const bus = yield* Bus.Service
+    const database = yield* Database.Service
+    // PostgreSQL SaaS: the durable HITL ledger keeps pending Forms alive across
+    // process death and lets any pod settle them; SQLite stays memory-only.
+    const ledger = database.dialect === "postgres" ? HitlLedger.make(database.db) : undefined
+    const scope = yield* Effect.scope
     let closed = false
     const forms = yield* Cache.makeWith<ID, Entry>(
       () => Effect.die(new Error("Form cache must be used via set/getSuccess, never get")),
@@ -116,6 +137,56 @@ export const layer = Layer.effect(
         Effect.flatMap((entry) => Effect.fromOption(entry, () => new NotFoundError({ id }))),
       ),
     )
+
+    // Rebuilds a local entry from the durable ledger: after a restart or for a
+    // request another pod created. Settled rows revive already completed so a
+    // duplicate reply can still be classified instead of 404.
+    const restore = Effect.fn("Form.restore")(function* (id: ID) {
+      if (!ledger) return undefined
+      const row = yield* ledger.get(id).pipe(Effect.orDie)
+      if (!row || row.kind !== "form") return undefined
+      const form = row.payload as Info
+      const state: State =
+        row.decision === "answered"
+          ? { status: "answered", answer: (row.result ?? {}) as Answer }
+          : row.decision === "cancelled"
+            ? { status: "cancelled" }
+            : { status: "pending" }
+      const deferred = yield* Deferred.make<TerminalState>()
+      const entry: Entry = { form, state, deferred }
+      if (state.status !== "pending") yield* Deferred.succeed(deferred, state)
+      yield* Cache.set(forms, id, entry)
+      return entry
+    })
+
+    const settleFromLedger = Effect.fn("Form.settleFromLedger")(function* (entry: Entry) {
+      if (!ledger) return
+      const row = yield* ledger.get(entry.form.id).pipe(Effect.orDie)
+      if (!row || row.decision === "pending") return
+      const next: TerminalState | undefined =
+        row.decision === "answered"
+          ? { status: "answered", answer: (row.result ?? {}) as Answer }
+          : row.decision === "cancelled"
+            ? { status: "cancelled" }
+            : undefined
+      if (!next) return
+      yield* Cache.set(forms, entry.form.id, { ...entry, state: next })
+      yield* Deferred.succeed(entry.deferred, next)
+    })
+
+    // Owner-side consumption: another pod settled a request this process is
+    // waiting on. Wakes the local waiter only; the settling pod published the
+    // public event, and cross-pod event fanout is tracked separately.
+    const pollLoop = Effect.gen(function* () {
+      while (true) {
+        yield* Effect.sleep(pollIntervalMs)
+        const entries = Array.from(yield* Cache.values(forms)).filter(
+          (entry) => entry.state.status === "pending" && durableOwner(entry.form.sessionID),
+        )
+        for (const entry of entries) yield* settleFromLedger(entry)
+      }
+    })
+    if (ledger) yield* pollLoop.pipe(Effect.forkIn(scope))
 
     const create = Effect.fn("Form.create")((input: CreateInput) =>
       Effect.uninterruptible(
@@ -138,7 +209,12 @@ export const layer = Layer.effect(
             deferred: yield* Deferred.make<TerminalState>(),
           }
           yield* Cache.set(forms, id, entry)
-          yield* bus.publish(Form.Event.Created, { form }).pipe(Effect.onError(() => Cache.invalidate(forms, id)))
+          if (ledger && durableOwner(form.sessionID)) {
+            yield* ledger.register({ id, kind: "form", sessionID: form.sessionID, payload: form }).pipe(Effect.orDie)
+          }
+          yield* bus
+            .publish(Form.Event.Created, { sessionID: form.sessionID, form })
+            .pipe(Effect.onError(() => Cache.invalidate(forms, id)))
           if (closed) yield* cancel(id).pipe(Effect.orDie)
           return form
         }),
@@ -158,10 +234,28 @@ export const layer = Layer.effect(
     )
 
     const get = Effect.fn("Form.get")(function* (id: ID) {
-      return (yield* requireEntry(id)).form
+      const local = yield* Cache.getSuccess(forms, id)
+      if (Option.isSome(local)) return local.value.form
+      const restored = yield* restore(id)
+      if (!restored) return yield* new NotFoundError({ id })
+      return restored.form
     })
 
     const list = Effect.fn("Form.list")(function* (input?: ListInput) {
+      if (ledger) {
+        // Pending Forms live in the ledger; revive them locally so callers on
+        // any pod (including after a restart) see the same outstanding set.
+        const sessionID = input?.sessionID
+        const rows = yield* ledger
+          .pending(sessionID === undefined || sessionID === "global" ? undefined : SessionSchema.ID.make(sessionID))
+          .pipe(Effect.orDie)
+        for (const row of rows) {
+          if (row.kind !== "form") continue
+          if (sessionID !== undefined && row.sessionID !== sessionID) continue
+          const local = yield* Cache.getSuccess(forms, row.id as ID)
+          if (Option.isNone(local)) yield* restore(row.id as ID)
+        }
+      }
       const entries = yield* Cache.values(forms)
       return Array.from(entries)
         .filter((entry) => entry.state.status === "pending")
@@ -170,16 +264,38 @@ export const layer = Layer.effect(
     })
 
     const state = Effect.fn("Form.state")(function* (id: ID) {
-      return (yield* requireEntry(id)).state
+      const local = yield* Cache.getSuccess(forms, id)
+      if (Option.isSome(local)) return local.value.state
+      const restored = yield* restore(id)
+      if (!restored) return yield* new NotFoundError({ id })
+      return restored.state
+    })
+
+    const awaitSettled = Effect.fn("Form.awaitSettled")(function* (id: ID) {
+      const local = yield* Cache.getSuccess(forms, id)
+      const entry = Option.isSome(local) ? local.value : yield* restore(id)
+      if (!entry) return yield* new NotFoundError({ id })
+      if (entry.state.status !== "pending") return entry.state
+      return yield* Deferred.await(entry.deferred)
     })
 
     const reply = Effect.fn("Form.reply")((input: ReplyInput) =>
       Effect.uninterruptible(
         Effect.gen(function* () {
-          const entry = yield* requireEntry(input.id)
+          let entry: Entry | undefined = Option.getOrUndefined(yield* Cache.getSuccess(forms, input.id))
+          if (!entry) {
+            const restored = yield* restore(input.id)
+            if (!restored) return yield* new NotFoundError({ id: input.id })
+            entry = restored
+          }
           if (entry.state.status !== "pending") return yield* new AlreadySettledError({ id: input.id })
           const invalid = validateAnswer(entry.form.fields, input.answer)
           if (invalid) return yield* new InvalidAnswerError({ id: input.id, message: invalid })
+          if (ledger && durableOwner(entry.form.sessionID)) {
+            const outcome = yield* ledger.decide(input.id, "answered", input.answer).pipe(Effect.orDie)
+            if (outcome === "missing") return yield* new NotFoundError({ id: input.id })
+            if (outcome === "settled") return yield* new AlreadySettledError({ id: input.id })
+          }
           const next: TerminalState = { status: "answered", answer: input.answer }
           yield* bus.publish(Form.Event.Replied, {
             id: input.id,
@@ -195,8 +311,18 @@ export const layer = Layer.effect(
     const cancel = Effect.fn("Form.cancel")((id: ID) =>
       Effect.uninterruptible(
         Effect.gen(function* () {
-          const entry = yield* requireEntry(id)
+          let entry: Entry | undefined = Option.getOrUndefined(yield* Cache.getSuccess(forms, id))
+          if (!entry) {
+            const restored = yield* restore(id)
+            if (!restored) return yield* new NotFoundError({ id })
+            entry = restored
+          }
           if (entry.state.status !== "pending") return yield* new AlreadySettledError({ id })
+          if (ledger && durableOwner(entry.form.sessionID)) {
+            const outcome = yield* ledger.decide(id, "cancelled").pipe(Effect.orDie)
+            if (outcome === "missing") return yield* new NotFoundError({ id })
+            if (outcome === "settled") return yield* new AlreadySettledError({ id })
+          }
           const next: TerminalState = { status: "cancelled" }
           yield* bus.publish(Form.Event.Cancelled, { id, sessionID: entry.form.sessionID })
           yield* Cache.set(forms, id, { ...entry, state: next })
@@ -212,18 +338,27 @@ export const layer = Layer.effect(
       Effect.flatMap((entries) =>
         Effect.forEach(
           Array.from(entries).filter((entry) => entry.state.status === "pending"),
-          (entry) => cancel(entry.form.id).pipe(Effect.ignore),
+          (entry) =>
+            ledger && durableOwner(entry.form.sessionID)
+              ? // Process teardown keeps the durable request pending for the next
+                // owner: wake only the local waiter, publish no user cancel.
+                Effect.gen(function* () {
+                  const next: TerminalState = { status: "cancelled" }
+                  yield* Cache.set(forms, entry.form.id, { ...entry, state: next })
+                  yield* Deferred.succeed(entry.deferred, next)
+                })
+              : cancel(entry.form.id).pipe(Effect.ignore),
           { discard: true },
         ),
       ),
     )
     yield* Effect.addFinalizer(() => close)
 
-    return Service.of({ create, ask, get, list, state, reply, cancel, close })
+    return Service.of({ create, ask, get, list, state, awaitSettled, reply, cancel, close })
   }),
 )
 
-export const node = makeLocationNode({ service: Service, layer, deps: [Bus.node] })
+export const node = makeLocationNode({ service: Service, layer, deps: [Bus.node, Database.node] })
 
 export function validateAnswer(form: ReadonlyArray<Form.Field>, answer: Answer) {
   const fields = new Map(form.map((field) => [field.key, field] as const))

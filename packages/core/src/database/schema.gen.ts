@@ -122,6 +122,19 @@ const schema: Omit<DatabaseMigration.Migration, "id"> = {
         );
       `)
       yield* tx.run(`
+        CREATE TABLE \`hitl_request\` (
+          \`id\` text PRIMARY KEY,
+          \`kind\` text NOT NULL,
+          \`session_id\` text NOT NULL,
+          \`payload\` text NOT NULL,
+          \`decision\` text DEFAULT 'pending' NOT NULL,
+          \`result\` text,
+          \`time_created\` integer NOT NULL,
+          \`time_updated\` integer NOT NULL,
+          CONSTRAINT \`fk_hitl_request_session_id_session_v2_id_fk\` FOREIGN KEY (\`session_id\`) REFERENCES \`session_v2\`(\`id\`) ON DELETE CASCADE
+        );
+      `)
+      yield* tx.run(`
         CREATE TABLE \`kv\` (
           \`key\` text PRIMARY KEY,
           \`value\` text NOT NULL,
@@ -149,6 +162,18 @@ const schema: Omit<DatabaseMigration.Migration, "id"> = {
           \`time_created\` integer NOT NULL,
           \`time_updated\` integer NOT NULL,
           CONSTRAINT \`fk_permission_project_id_project_id_fk\` FOREIGN KEY (\`project_id\`) REFERENCES \`project\`(\`id\`) ON DELETE CASCADE
+        );
+      `)
+      yield* tx.run(`
+        CREATE TABLE \`session_permission_approval\` (
+          \`id\` text PRIMARY KEY,
+          \`session_id\` text NOT NULL,
+          \`action\` text NOT NULL,
+          \`resource\` text NOT NULL,
+          \`source_request_id\` text,
+          \`time_created\` integer NOT NULL,
+          \`time_updated\` integer NOT NULL,
+          CONSTRAINT \`fk_session_permission_approval_session_id_session_v2_id_fk\` FOREIGN KEY (\`session_id\`) REFERENCES \`session_v2\`(\`id\`) ON DELETE CASCADE
         );
       `)
       yield* tx.run(`
@@ -271,6 +296,16 @@ const schema: Omit<DatabaseMigration.Migration, "id"> = {
           \`epoch\` integer DEFAULT 1 NOT NULL,
           \`state\` text DEFAULT 'open' NOT NULL,
           \`time_updated\` integer NOT NULL
+        );
+      `)
+      yield* tx.run(`
+        CREATE TABLE \`session_execution_lease\` (
+          \`session_id\` text PRIMARY KEY,
+          \`owner_id\` text NOT NULL,
+          \`epoch\` integer NOT NULL,
+          \`time_acquired\` integer NOT NULL,
+          \`time_expires\` integer NOT NULL,
+          CONSTRAINT \`fk_session_execution_lease_session_id_session_v2_id_fk\` FOREIGN KEY (\`session_id\`) REFERENCES \`session_v2\`(\`id\`) ON DELETE CASCADE
         );
       `)
       yield* tx.run(`
@@ -446,9 +481,16 @@ const schema: Omit<DatabaseMigration.Migration, "id"> = {
       )
       yield* tx.run(`CREATE UNIQUE INDEX \`event_aggregate_seq_idx\` ON \`event\` (\`aggregate_id\`,\`seq\`);`)
       yield* tx.run(`CREATE INDEX \`event_aggregate_type_seq_idx\` ON \`event\` (\`aggregate_id\`,\`type\`,\`seq\`);`)
+      yield* tx.run(
+        `CREATE INDEX \`hitl_request_session_pending_idx\` ON \`hitl_request\` (\`session_id\`,\`decision\`);`,
+      )
+      yield* tx.run(`CREATE INDEX \`hitl_request_decision_idx\` ON \`hitl_request\` (\`decision\`);`)
       yield* tx.run(`CREATE INDEX \`log_session_time_idx\` ON \`log\` (\`session_id\`,\`time_created\`);`)
       yield* tx.run(
         `CREATE UNIQUE INDEX \`permission_project_action_resource_idx\` ON \`permission\` (\`project_id\`,\`action\`,\`resource\`);`,
+      )
+      yield* tx.run(
+        `CREATE UNIQUE INDEX \`session_permission_approval_scope_idx\` ON \`session_permission_approval\` (\`session_id\`,\`action\`,\`resource\`);`,
       )
       yield* tx.run(`CREATE UNIQUE INDEX \`sandbox_session_id_idx\` ON \`sandbox\` (\`session_id\`);`)
       yield* tx.run(`CREATE INDEX \`sandbox_state_time_updated_idx\` ON \`sandbox\` (\`state\`,\`time_updated\`);`)

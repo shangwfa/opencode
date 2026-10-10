@@ -19,6 +19,25 @@ import type { Schema } from "effect"
 type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never
 type SessionMessageData = DistributiveOmit<(typeof SessionMessage.Info)["Encoded"], "type" | "id">
 
+/**
+ * Durable execution ownership for PostgreSQL SaaS: one row per Session with an
+ * active turn. The lease expires by wall clock so a dead owner cannot block
+ * takeover; `epoch` is the monotonic fencing token handed to the owner and
+ * checked on terminal settlement, so a stale owner cannot commit results for a
+ * turn another process has already taken over. Absent on SQLite, where
+ * execution remains process-local.
+ */
+export const SessionExecutionLeaseTable = sqliteTable("session_execution_lease", {
+  session_id: text()
+    .$type<SessionSchema.ID>()
+    .primaryKey()
+    .references(() => SessionTable.id, { onDelete: "cascade" }),
+  owner_id: text().notNull(),
+  epoch: integer().notNull(),
+  time_acquired: integer().notNull(),
+  time_expires: integer().notNull(),
+})
+
 /** Internal admission tombstones deliberately outlive Session deletion. */
 export const SandboxExecutionGateTable = sqliteTable("sandbox_execution_gate", {
   root_session_id: text().primaryKey(),

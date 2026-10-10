@@ -12,6 +12,7 @@ import { Credential } from "@opencode/core/credential"
 import { Log } from "@opencode/core/log"
 import { Config } from "@opencode/core/config"
 import { PermissionSaved } from "@opencode/core/permission/saved"
+import { SessionPermissionApproval } from "@opencode/core/permission/session-approval"
 import { PtyTicket } from "@opencode/core/pty/ticket"
 import { PersistentPty } from "@opencode/core/persistent-pty"
 import { Project } from "@opencode/core/project"
@@ -65,6 +66,7 @@ const applicationServiceNodes = [
   SdkPlugins.node,
   PluginUpdate.node,
   PermissionSaved.node,
+  SessionPermissionApproval.node,
   Log.node,
   PtyTicket.node,
   PersistentPty.node,
@@ -168,6 +170,7 @@ function makeRoutes<AuthError, AuthServices>(
             Database.Service,
             Credential.Service,
             PermissionSaved.Service,
+            SessionPermissionApproval.Service,
             PluginUpdate.Service,
             Project.Service,
             WellKnown.Service,

@@ -11,7 +11,38 @@ import {
   Prompt,
   Session,
   SessionMessage,
+  SessionPermissionApproval,
 } from "../src/effect/index"
+
+test("session approvals decode canonical dates and revoke with the same Session owner", async () => {
+  const requests: Array<{ method: string; url: string }> = []
+  const sessionID = Session.ID.make("ses_test")
+  const id = SessionPermissionApproval.ID.create()
+  const httpClient = HttpClient.make((request) => {
+    requests.push({ method: request.method, url: request.url })
+    return Effect.succeed(
+      HttpClientResponse.fromWeb(
+        request,
+        request.method === "GET"
+          ? Response.json({
+              data: [{ id, sessionID, action: "shell", resource: "pwd", time: { created: 1000, updated: 1000 } }],
+            })
+          : new Response(null, { status: 204 }),
+      ),
+    )
+  })
+  const result = await Effect.gen(function* () {
+    const client = yield* OpenCode.make({ baseUrl: "http://localhost:3000" })
+    const listed = yield* client.permission.approval.list({ sessionID })
+    yield* client.permission.approval.remove({ sessionID, id })
+    return listed
+  }).pipe(Effect.provideService(HttpClient.HttpClient, httpClient), Effect.runPromise)
+  expect(DateTime.toEpochMillis(result[0].time.created)).toBe(1000)
+  expect(requests).toEqual([
+    { method: "GET", url: "http://localhost:3000/api/session/ses_test/permission/approval" },
+    { method: "DELETE", url: `http://localhost:3000/api/session/ses_test/permission/approval/${id}` },
+  ])
+})
 
 const synced = { type: "log.synced" as const, aggregateID: "ses_test", seq: Event.Seq.make(1) }
 

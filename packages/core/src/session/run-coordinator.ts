@@ -59,8 +59,12 @@ type Execution<E, Reason> = {
  */
 export const make = <Key, E, Reason = never>(options: {
   readonly drain: (key: Key, force: boolean, scope: Promotable) => Effect.Effect<void, E>
-  /** Runs once when a process-local busy period begins, before its first drain. */
-  readonly started?: (key: Key) => Effect.Effect<void>
+  /**
+   * Runs once when a process-local busy period begins, before its first drain.
+   * Failing it fails the whole execution: admission (for example the durable
+   * execution lease) must gate the drain, never log-and-continue past it.
+   */
+  readonly started?: (key: Key) => Effect.Effect<void, E>
   /**
    * Runs in the execution fiber for every exit, including interruption, after the final
    * drain and before the execution settles (waiters resolve after it completes).

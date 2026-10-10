@@ -17,6 +17,7 @@ import { Mcp } from "@opencode/schema/mcp"
 import { Model } from "@opencode/schema/model"
 import { Permission } from "@opencode/schema/permission"
 import { PermissionSaved } from "@opencode/schema/permission-saved"
+import { SessionPermissionApproval } from "@opencode/schema/session-permission-approval"
 import { Plugin } from "@opencode/schema/plugin"
 import { Project } from "@opencode/schema/project"
 import { Worktree } from "@opencode/schema/worktree"
@@ -62,6 +63,7 @@ const effectTypeReferences = [
   ...namespaceTypes("Model", "@opencode/schema/model", Model),
   ...namespaceTypes("Permission", "@opencode/schema/permission", Permission),
   ...namespaceTypes("PermissionSaved", "@opencode/schema/permission-saved", PermissionSaved),
+  ...namespaceTypes("SessionPermissionApproval", "@opencode/schema/session-permission-approval", SessionPermissionApproval),
   ...namespaceTypes("Plugin", "@opencode/schema/plugin", Plugin),
   ...namespaceTypes("Project", "@opencode/schema/project", Project),
   ...namespaceTypes("Worktree", "@opencode/schema/worktree", Worktree),

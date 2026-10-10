@@ -41,7 +41,7 @@ export interface Config {
 
 const DEFAULT_TIMEOUT_SECONDS = 120
 const DEFAULT_SCAN_INTERVAL_SECONDS = 60
-const DEFAULT_EXEMPT_TOOLS = ["subagent", "task"]
+const DEFAULT_EXEMPT_TOOLS = ["subagent", "task", "question"]
 
 const positiveNumber = (value: string | undefined, fallback: number) => {
   const parsed = Number(value)
@@ -51,7 +51,9 @@ const positiveNumber = (value: string | undefined, fallback: number) => {
 export function loadConfig(env: Record<string, string | undefined> = process.env): Config {
   return {
     timeoutMs: positiveNumber(env["OPENCODE_WATCHDOG_TIMEOUT_SEC"], DEFAULT_TIMEOUT_SECONDS) * 1000,
-    scanInterval: Duration.seconds(positiveNumber(env["OPENCODE_WATCHDOG_SCAN_INTERVAL_SEC"], DEFAULT_SCAN_INTERVAL_SECONDS)),
+    scanInterval: Duration.seconds(
+      positiveNumber(env["OPENCODE_WATCHDOG_SCAN_INTERVAL_SEC"], DEFAULT_SCAN_INTERVAL_SECONDS),
+    ),
     initialDelay: Duration.seconds(10),
     exemptTools: new Set(
       (env["OPENCODE_WATCHDOG_EXEMPT_TOOLS"] ?? DEFAULT_EXEMPT_TOOLS.join(","))
@@ -99,33 +101,39 @@ const scan = Effect.fn("SessionWatchdog.scan")(function* (input: {
   const active = yield* execution.active
   let stuck = 0
   let interrupted = 0
-  yield* Effect.forEach(active, (sessionID) =>
-    Effect.gen(function* () {
-      const messages = yield* store.context(sessionID).pipe(
-        // A decode failure on one session must never abort the sweep.
-        Effect.catchCause((cause) =>
-          Effect.logError("watchdog context read failed", { sessionID, cause: String(cause) }).pipe(
-            Effect.as([] as ReadonlyArray<SessionMessage.Info>),
+  yield* Effect.forEach(
+    active,
+    (sessionID) =>
+      Effect.gen(function* () {
+        const messages = yield* store.context(sessionID).pipe(
+          // A decode failure on one session must never abort the sweep.
+          Effect.catchCause((cause) =>
+            Effect.logError("watchdog context read failed", { sessionID, cause: String(cause) }).pipe(
+              Effect.as([] as ReadonlyArray<SessionMessage.Info>),
+            ),
           ),
-        ),
-      )
-      const expired = expiredTools(messages, config, startedAt)
-      if (expired.size === 0) return
-      stuck += expired.size
-      yield* Effect.logWarning("watchdog stuck tools detected", {
-        sessionID,
-        tools: [...expired.values()],
-        timeoutMs: config.timeoutMs,
-      })
-      // Interrupting the execution settles every unsettled tool through the
-      // runner's cleanup; projection is idempotent for already-settled parts.
-      const accepted = yield* execution.interrupt(sessionID, { reason: "watchdog" }).pipe(
-        Effect.catchCause((cause) =>
-          Effect.logError("watchdog interrupt failed", { sessionID, cause: String(cause) }).pipe(Effect.as(false)),
-        ),
-      )
-      if (accepted) interrupted++
-    }).pipe(Effect.catchCause((cause) => Effect.logError("watchdog candidate failed", { sessionID, cause: String(cause) }))),
+        )
+        const expired = expiredTools(messages, config, startedAt)
+        if (expired.size === 0) return
+        stuck += expired.size
+        yield* Effect.logWarning("watchdog stuck tools detected", {
+          sessionID,
+          tools: [...expired.values()],
+          timeoutMs: config.timeoutMs,
+        })
+        // Interrupting the execution settles every unsettled tool through the
+        // runner's cleanup; projection is idempotent for already-settled parts.
+        const accepted = yield* execution
+          .interrupt(sessionID, { reason: "watchdog" })
+          .pipe(
+            Effect.catchCause((cause) =>
+              Effect.logError("watchdog interrupt failed", { sessionID, cause: String(cause) }).pipe(Effect.as(false)),
+            ),
+          )
+        if (accepted) interrupted++
+      }).pipe(
+        Effect.catchCause((cause) => Effect.logError("watchdog candidate failed", { sessionID, cause: String(cause) })),
+      ),
     { concurrency: 4, discard: true },
   )
   const durationMs = Date.now() - startedAt

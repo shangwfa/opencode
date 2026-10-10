@@ -442,6 +442,15 @@ export type PermissionSavedInfo = {
   time: { created: number; updated: number }
 }
 
+export type SessionPermissionApprovalInfo = {
+  id: string
+  sessionID: string
+  action: string
+  resource: string
+  sourceRequestID?: string
+  time: { created: number; updated: number }
+}
+
 export type CommandInfo = { name: string; description?: string }
 
 export type RpcOutput = { output?: any }
@@ -2410,7 +2419,7 @@ export type FormCreated = {
   metadata?: { [x: string]: any }
   type: "form.created"
   location?: LocationRef
-  data: { form: FormInfo1 }
+  data: { sessionID?: string; form: FormInfo1 }
 }
 
 export type SessionTransferData = { info: SessionInfo; messages: Array<SessionMessageInfo> }
@@ -7210,6 +7219,17 @@ export type PermissionSavedListOutput = { data: Array<PermissionSavedInfo> }["da
 export type PermissionSavedRemoveInput = { readonly id: { readonly id: string }["id"] }
 
 export type PermissionSavedRemoveOutput = void
+
+export type PermissionApprovalListInput = { readonly sessionID: { readonly sessionID: string }["sessionID"] }
+
+export type PermissionApprovalListOutput = { data: Array<SessionPermissionApprovalInfo> }["data"]
+
+export type PermissionApprovalRemoveInput = {
+  readonly sessionID: { readonly sessionID: string; readonly id: string }["sessionID"]
+  readonly id: { readonly sessionID: string; readonly id: string }["id"]
+}
+
+export type PermissionApprovalRemoveOutput = void
 
 export type PermissionCreateInput = {
   readonly sessionID: { readonly sessionID: string }["sessionID"]

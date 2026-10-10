@@ -45,6 +45,23 @@ export const toModelContent = (questions: ReadonlyArray<Question.Prompt>, answer
   return `User has answered your questions: ${formatted}. You can now continue with the user's answers in mind.`
 }
 
+/** Maps a settled question form to the terminal tool result the live executor returns. */
+export const answeredResult = (questions: ReadonlyArray<Question.Prompt>, answer: Form.Answer) => {
+  const output = {
+    answers: questions.map((_, index): Question.Answer => {
+      const value = answer[`q${index}`]
+      if (value === undefined) return []
+      if (typeof value === "object") return Array.from(value)
+      return [String(value)]
+    }),
+  }
+  return {
+    output,
+    content: [toModelContent(questions, output.answers)],
+    metadata: { answers: output.answers },
+  }
+}
+
 export const Plugin = {
   id: "opencode.tool.question",
   effect: Effect.fn("QuestionTool.Plugin")(function* (ctx: Context) {

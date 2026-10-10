@@ -9,6 +9,7 @@ import { Location } from "@opencode/core/location"
 import { Permission } from "@opencode/core/permission"
 import { PermissionTable } from "@opencode/core/permission/sql"
 import { PermissionSaved } from "@opencode/core/permission/saved"
+import { SessionPermissionApproval } from "@opencode/core/permission/session-approval"
 import { Project } from "@opencode/core/project"
 import { ProjectTable } from "@opencode/core/project/sql"
 import { AbsolutePath } from "@opencode/core/schema"
@@ -42,6 +43,21 @@ const it = testEffect(
       Permission.node,
     ]),
     [Location.node.replace(current)],
+  ),
+)
+const sessionIt = testEffect(
+  AppNodeBuilder.build(
+    LayerNode.group([
+      Database.node,
+      Bus.node,
+      SessionStore.node,
+      PermissionSaved.node,
+      SessionPermissionApproval.node,
+      Agent.node,
+      SessionAgents.node,
+      Permission.node,
+    ]),
+    [Location.node.replace(current), Permission.node.replace(Permission.configured({ approvalScope: "session" }))],
   ),
 )
 
@@ -110,6 +126,155 @@ function waitForRequest(input: Partial<Permission.AssertInput> = {}) {
     return { service, fiber, request }
   })
 }
+
+describe("Session-scoped always approvals", () => {
+  sessionIt.effect("persists always only in its Session and does not write project approvals", () =>
+    Effect.gen(function* () {
+      yield* setup()
+      yield* setup([], Session.ID.make("ses_other"))
+      const { service, fiber, request } = yield* waitForRequest({ save: ["src/*"] })
+      yield* service.reply({ requestID: request.id, reply: "always" })
+      yield* Fiber.join(fiber)
+      const approvals = yield* SessionPermissionApproval.Service
+      expect(yield* approvals.list(request.sessionID)).toMatchObject([
+        { sessionID: request.sessionID, action: "read", resource: "src/*", sourceRequestID: request.id },
+      ])
+      expect(yield* PermissionSaved.Service.use((saved) => saved.list())).toEqual([])
+      expect(yield* service.ask(assertion({ id: Permission.ID.create(), resources: ["src/other.ts"] }))).toMatchObject({
+        effect: "allow",
+      })
+      expect(
+        yield* service.ask(assertion({ id: Permission.ID.create(), sessionID: Session.ID.make("ses_other") })),
+      ).toMatchObject({ effect: "ask" })
+    }),
+  )
+
+  sessionIt.effect("cascades only matching pending requests in the same Session", () =>
+    Effect.gen(function* () {
+      yield* setup()
+      yield* setup([], Session.ID.make("ses_other"))
+      const service = yield* Permission.Service
+      const selected = assertion({ id: Permission.ID.create(), save: ["src/*"] })
+      const same = assertion({ id: Permission.ID.create(), resources: ["src/next.ts"] })
+      const unrelated = assertion({ id: Permission.ID.create(), resources: ["other/file.ts"] })
+      const other = assertion({ id: Permission.ID.create(), sessionID: Session.ID.make("ses_other") })
+      for (const value of [selected, same, unrelated, other]) yield* service.ask(value)
+      yield* service.reply({ requestID: selected.id, reply: "always" })
+      expect(yield* service.get(same.id)).toBeUndefined()
+      expect(yield* service.get(unrelated.id)).toBeDefined()
+      expect(yield* service.get(other.id)).toBeDefined()
+    }),
+  )
+
+  sessionIt.effect("always does not cascade into a pending request with a newly denied Agent", () =>
+    Effect.gen(function* () {
+      yield* setup()
+      const agents = yield* Agent.Service
+      const reviewer = Agent.ID.make("reviewer")
+      yield* agents.transform((editor) =>
+        editor.update(reviewer, (agent) => {
+          agent.permissions = []
+        }),
+      )
+      const service = yield* Permission.Service
+      const selected = assertion({ id: Permission.ID.create(), save: ["src/*"] })
+      const guarded = assertion({ id: Permission.ID.create(), agent: reviewer })
+      yield* service.ask(selected)
+      yield* service.ask(guarded)
+      yield* agents.transform((editor) =>
+        editor.update(reviewer, (agent) => {
+          agent.permissions = [{ action: "read", resource: "*", effect: "deny" }]
+        }),
+      )
+      yield* service.reply({ requestID: selected.id, reply: "always" })
+      expect(yield* service.get(selected.id)).toBeUndefined()
+      expect(yield* service.get(guarded.id)).toBeDefined()
+      expect((yield* service.reply({ requestID: guarded.id, reply: "once" }).pipe(Effect.flip))._tag).toBe(
+        "Permission.BlockedError",
+      )
+    }),
+  )
+
+  sessionIt.effect("ignores historical project approvals without deleting their data", () =>
+    Effect.gen(function* () {
+      yield* setup()
+      const saved = yield* PermissionSaved.Service
+      yield* saved.add({ projectID: Project.ID.global, action: "read", resources: ["*"] })
+      const service = yield* Permission.Service
+      expect(yield* service.ask(assertion())).toMatchObject({ effect: "ask" })
+      expect(yield* saved.list()).toHaveLength(1)
+    }),
+  )
+
+  sessionIt.effect("latest explicit deny blocks approval and no authority is persisted", () =>
+    Effect.gen(function* () {
+      yield* setup()
+      const { service, request } = yield* waitForRequest({ save: ["*"] })
+      yield* setRules([{ action: "read", resource: "*", effect: "deny" }])
+      const error = yield* service.reply({ requestID: request.id, reply: "always" }).pipe(Effect.flip)
+      expect(error._tag).toBe("Permission.BlockedError")
+      expect(yield* SessionPermissionApproval.Service.use((approvals) => approvals.list(request.sessionID))).toEqual([])
+      expect(yield* service.get(request.id)).toBeDefined()
+      yield* service.reply({ requestID: request.id, reply: "reject" })
+    }),
+  )
+
+  sessionIt.effect("persisted approvals never override an explicit deny", () =>
+    Effect.gen(function* () {
+      yield* setup()
+      const service = yield* Permission.Service
+      yield* SessionPermissionApproval.Service.use((approval) =>
+        approval.add({ sessionID: Session.ID.make("ses_test"), action: "read", resources: ["*"] }),
+      )
+      yield* setRules([{ action: "read", resource: "*", effect: "deny" }])
+      expect(yield* service.ask(assertion())).toMatchObject({ effect: "deny" })
+    }),
+  )
+
+  for (const reply of ["once", "always"] as const) {
+    sessionIt.effect(`${reply} without a save range does not create persistent authority`, () =>
+      Effect.gen(function* () {
+        yield* setup()
+        const { service, fiber, request } = yield* waitForRequest()
+        yield* service.reply({ requestID: request.id, reply })
+        yield* Fiber.join(fiber)
+        expect(yield* SessionPermissionApproval.Service.use((approval) => approval.list(request.sessionID))).toEqual([])
+        expect(yield* service.ask(assertion({ id: Permission.ID.create() }))).toMatchObject({ effect: "ask" })
+      }),
+    )
+  }
+
+  sessionIt.effect("revoke is Session-scoped and immediately changes subsequent evaluation", () =>
+    Effect.gen(function* () {
+      yield* setup()
+      yield* setup([], Session.ID.make("ses_other"))
+      const approval = yield* SessionPermissionApproval.Service
+      const sessionID = Session.ID.make("ses_test")
+      yield* approval.add({ sessionID, action: "read", resources: ["*"] })
+      const row = (yield* approval.list(sessionID))[0]
+      if (!row) return yield* Effect.die("approval missing")
+      yield* approval.remove(Session.ID.make("ses_other"), row.id)
+      const service = yield* Permission.Service
+      expect(yield* service.ask(assertion())).toMatchObject({ effect: "allow" })
+      yield* approval.remove(sessionID, row.id)
+      yield* approval.remove(sessionID, row.id)
+      expect(yield* service.ask(assertion())).toMatchObject({ effect: "ask" })
+    }),
+  )
+
+  sessionIt.effect("deleting the Session cascades approval deletion", () =>
+    Effect.gen(function* () {
+      yield* setup()
+      const approval = yield* SessionPermissionApproval.Service
+      const sessionID = Session.ID.make("ses_test")
+      yield* approval.add({ sessionID, action: "read", resources: ["src/*", "src/*"] })
+      expect(yield* approval.list(sessionID)).toHaveLength(1)
+      const { db } = yield* Database.Service
+      yield* db.delete(SessionTable).where(eq(SessionTable.id, sessionID)).run()
+      expect(yield* approval.list(sessionID)).toEqual([])
+    }),
+  )
+})
 
 describe("Permission", () => {
   it.effect("returns the evaluated effect and only queues prompts", () =>
@@ -230,12 +395,7 @@ describe("Permission", () => {
       })
       yield* db
         .insert(SessionMessageTable)
-        .values([
-          row(presetPrompt, 0),
-          row(presetAssistant, 1),
-          row(defaultPrompt, 2),
-          row(defaultAssistant, 3),
-        ])
+        .values([row(presetPrompt, 0), row(presetAssistant, 1), row(defaultPrompt, 2), row(defaultAssistant, 3)])
         .run()
         .pipe(Effect.orDie)
 

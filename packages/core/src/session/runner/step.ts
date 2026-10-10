@@ -194,7 +194,12 @@ export const make = Effect.gen(function* () {
         }
         if (llmError) yield* publisher.failAssistant(llmError)
 
-        for (const decline of tools.declines)
+        // A shutting-down location must not settle tool parts: the durable HITL
+        // ledger keeps interrupted questions/approvals pending, and the next
+        // owner's recovery barrier settles them from the user's answer. Any
+        // other running part is likewise left for restart recovery to converge.
+        const settlingTools = !input.isLocationClosed()
+        for (const decline of settlingTools ? tools.declines : [])
           yield* publisher.failTool(decline.call.id, {
             type: "aborted",
             message: input.isLocationClosed()
@@ -211,11 +216,11 @@ export const make = Effect.gen(function* () {
             : recorded.providerFailed
               ? TOOLS_INTERRUPTED
               : undefined
-        if (toolFailure) yield* publisher.failUnsettledTools(toolFailure)
+        if (toolFailure && settlingTools) yield* publisher.failUnsettledTools(toolFailure)
         if (interrupted) yield* publisher.failAssistant(STEP_INTERRUPTED)
 
         // All local fibers have joined; only provider-hosted results can still be missing.
-        if (llmError || (Exit.isSuccess(stream) && !recorded.providerFailed)) {
+        if (settlingTools && (llmError || (Exit.isSuccess(stream) && !recorded.providerFailed))) {
           const missing = yield* publisher.failUnsettledTools(RESULT_MISSING, "hosted")
           if (missing && !llmError && !recorded.finish) yield* publisher.failAssistant(RESULT_MISSING)
         }

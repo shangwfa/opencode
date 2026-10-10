@@ -1452,7 +1452,7 @@ function buildExecution(
     return yield* Layer.buildWithScope(
       SessionRestart.layer(options).pipe(
         Layer.provideMerge(sessionLayer),
-        Layer.provideMerge(Layer.fresh(SessionExecution.layer)),
+        Layer.provideMerge(Layer.fresh(SessionExecution.layer())),
         Layer.provide(Layer.succeed(Database.Service, database)),
         Layer.provide(Layer.succeed(Bus.Service, bus)),
         Layer.provide(Layer.succeed(SessionStore.Service, store)),

@@ -32,6 +32,9 @@ import { ToolOutput } from "../../tool-output.js"
 import { SessionStructuredOutput } from "../structured-output.js"
 import { Plugin } from "../../plugin.js"
 import { MAX_STEPS_SYSTEM_PROMPT } from "./max-steps.js"
+import { Form } from "../../form.js"
+import { Permission } from "../../permission.js"
+import { QuestionRecovery } from "./question-recovery.js"
 
 const CONTINUE_AFTER_INCOMPLETE_STREAM =
   "The previous response was interrupted. Continue from where you left off without repeating completed content."
@@ -45,7 +48,10 @@ const layer = Layer.effect(
     const context = yield* SessionContext.Service
     const agents = yield* Agent.Service
     const modelTransport = yield* SessionModelTransport.Service
-    const db = (yield* Database.Service).db
+    const database = yield* Database.Service
+    const db = database.db
+    const forms = yield* Form.Service
+    const permissions = yield* Permission.Service
     const compaction = yield* SessionCompaction.Service
     const plugins = yield* Plugin.Service
     const title = yield* SessionTitle.Service
@@ -368,6 +374,23 @@ const layer = Layer.effect(
           const metadata = tool.state.status === "running" ? tool.state.metadata : undefined
           const childID =
             tool.name === "subagent" && typeof metadata?.sessionID === "string" ? metadata.sessionID : undefined
+          // Recovery barrier: a tool blocked on a durable HITL request is not a
+          // failure. The new owner revives the original request and blocks
+          // until the user answers on any pod, then records the answer as the
+          // tool's terminal result so the resumed turn continues from it.
+          if (tool.state.status === "running") {
+            const recovered = yield* QuestionRecovery.settleTool({ bus, forms, permissions, database }, sessionID, {
+              assistantMessageID: message.id,
+              id: tool.id,
+              name: tool.name,
+              input: tool.state.input,
+              executed: tool.executed === true,
+            }).pipe(
+              Effect.catchTag("Form.NotFoundError", () => Effect.succeed(false)),
+              Effect.catchTag("Permission.NotFoundError", () => Effect.succeed(false)),
+            )
+            if (recovered) continue
+          }
           yield* bus.publish(SessionEvent.Tool.Failed, {
             sessionID,
             assistantMessageID: message.id,
@@ -404,5 +427,7 @@ export const node = makeLocationNode({
     Snapshot.node,
     ToolOutput.node,
     Database.node,
+    Form.node,
+    Permission.node,
   ],
 })

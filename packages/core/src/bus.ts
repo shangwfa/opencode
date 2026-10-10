@@ -171,6 +171,13 @@ export interface Interface {
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/Bus") {}
 
+/** Shared LISTEN/NOTIFY channel for cross-instance live event fanout. */
+export const FANOUT_CHANNEL = "opencode_events"
+/** PG NOTIFY payloads are capped at 8000 bytes; leave headroom for quoting. */
+const FANOUT_PAYLOAD_LIMIT = 7_500
+/** Bound for the local-origin dedupe window (NOTIFY echoes back to the sender). */
+const FANOUT_DEDUPE_CAPACITY = 4_096
+
 interface Options {
   readonly beforeAggregateRead?: (aggregateID: string) => Effect.Effect<void>
   /** Maximum durable rows read per page while replaying or tailing an aggregate log. */
@@ -198,7 +205,7 @@ export function configured(options?: Options) {
         const projectors = new Map<string, Subscriber[]>()
         const listeners = new Array<Subscriber>()
         const durableLocks = KeyedMutex.makeUnsafe<string>()
-        const { db } = yield* Database.Service
+        const { db, lockAggregate, eventFanout } = yield* Database.Service
         const logReadPageSize = options?.logReadPageSize ?? 512
         const persist = options?.persist ?? false
         const sessions = new Map<SessionID, Location.Ref>()
@@ -318,6 +325,7 @@ export function configured(options?: Options) {
                   .transaction(
                     () =>
                       Effect.gen(function* () {
+                        if (lockAggregate) yield* lockAggregate(aggregateID)
                         const row = yield* db
                           .select({ seq: EventSequenceTable.seq, ownerID: EventSequenceTable.owner_id })
                           .from(EventSequenceTable)
@@ -501,7 +509,62 @@ export function configured(options?: Options) {
             const typed = pubsub.typed.get(event.type)
             if (typed) yield* PubSub.publish(typed, event)
             yield* PubSub.publish(pubsub.live, event)
+            yield* fanoutNotify(event)
           })
+        }
+
+        // Cross-instance fanout: publish to the shared channel so other pods'
+        // subscribers see this event too. The local echo is deduplicated by
+        // event id; a lost or oversized notification only delays visibility
+        // for remote subscribers, never correctness.
+        const localOrigins = new Set<string>()
+        const localOriginsOrder: string[] = []
+        const fanoutNotify = (event: Event.Payload) =>
+          Effect.gen(function* () {
+            if (!eventFanout) return
+            localOrigins.add(event.id)
+            localOriginsOrder.push(event.id)
+            if (localOriginsOrder.length > FANOUT_DEDUPE_CAPACITY) {
+              const oldest = localOriginsOrder.shift()
+              if (oldest !== undefined) localOrigins.delete(oldest)
+            }
+            const payload = JSON.stringify(event)
+            if (payload.length > FANOUT_PAYLOAD_LIMIT) {
+              yield* Effect.logDebug("Cross-instance fanout skipped an oversized event", {
+                eventID: event.id,
+                eventType: event.type,
+                bytes: payload.length,
+              })
+              return
+            }
+            yield* eventFanout
+              .notify(FANOUT_CHANNEL, payload)
+              .pipe(
+                Effect.catchCause((cause) =>
+                  Effect.logWarning("Cross-instance fanout notify failed", { eventID: event.id, cause: String(cause) }),
+                ),
+              )
+          })
+
+        if (eventFanout) {
+          const stop = yield* eventFanout.listen(FANOUT_CHANNEL, (payload) => {
+            Effect.runFork(
+              Effect.gen(function* () {
+                const event = JSON.parse(payload) as Event.Payload
+                if (typeof event?.id !== "string" || typeof event?.type !== "string") return
+                // Own echoes were already delivered locally; never double-fire.
+                if (localOrigins.has(event.id)) return
+                const typed = pubsub.typed.get(event.type)
+                if (typed) yield* PubSub.publish(typed, event)
+                yield* PubSub.publish(pubsub.live, event)
+              }).pipe(
+                Effect.catchCause((cause) =>
+                  Effect.logWarning("Cross-instance fanout receive failed", { cause: String(cause) }),
+                ),
+              ),
+            )
+          })
+          yield* Effect.addFinalizer(() => stop())
         }
 
         function publish<D extends Event.Definition>(definition: D, data: Event.Data<D>, options?: PublishOptions) {
@@ -579,6 +642,7 @@ export function configured(options?: Options) {
                     .transaction(
                       () =>
                         Effect.gen(function* () {
+                          if (lockAggregate) yield* lockAggregate(aggregateID)
                           const row = yield* db
                             .select({ seq: EventSequenceTable.seq })
                             .from(EventSequenceTable)
@@ -704,6 +768,7 @@ export function configured(options?: Options) {
           return db
             .transaction(() =>
               Effect.gen(function* () {
+                if (lockAggregate) yield* lockAggregate(aggregateID)
                 yield* db.delete(EventSequenceTable).where(eq(EventSequenceTable.aggregate_id, aggregateID)).run()
                 yield* db.delete(EventTable).where(eq(EventTable.aggregate_id, aggregateID)).run()
               }),
@@ -716,10 +781,16 @@ export function configured(options?: Options) {
 
         function claim(aggregateID: string, ownerID: string) {
           return db
-            .update(EventSequenceTable)
-            .set({ owner_id: ownerID })
-            .where(eq(EventSequenceTable.aggregate_id, aggregateID))
-            .run()
+            .transaction(() =>
+              Effect.gen(function* () {
+                if (lockAggregate) yield* lockAggregate(aggregateID)
+                yield* db
+                  .update(EventSequenceTable)
+                  .set({ owner_id: ownerID })
+                  .where(eq(EventSequenceTable.aggregate_id, aggregateID))
+                  .run()
+              }),
+            )
             .pipe(Effect.orDie)
         }
 

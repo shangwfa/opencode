@@ -259,6 +259,10 @@ import type {
   PermissionSavedListOutput,
   PermissionSavedRemoveInput,
   PermissionSavedRemoveOutput,
+  PermissionApprovalListInput,
+  PermissionApprovalListOutput,
+  PermissionApprovalRemoveInput,
+  PermissionApprovalRemoveOutput,
   PermissionCreateInput,
   PermissionCreateOutput,
   PermissionListInput,
@@ -1669,6 +1673,22 @@ const EndpointPermissionSavedRemove = (raw: RawClient["server.permission"]) => (
     raw["permission.saved.remove"]({ params: { id: input["id"] } }).pipe(Effect.mapError(mapClientError)),
   )
 
+const EndpointPermissionApprovalList = (raw: RawClient["server.permission"]) => (input: PermissionApprovalListInput) =>
+  preserveEffect<PermissionApprovalListOutput>()(
+    raw["session.permission.approval.list"]({ params: { sessionID: input["sessionID"] } }).pipe(
+      Effect.mapError(mapClientError),
+      Effect.map((value) => value.data),
+    ),
+  )
+
+const EndpointPermissionApprovalRemove =
+  (raw: RawClient["server.permission"]) => (input: PermissionApprovalRemoveInput) =>
+    preserveEffect<PermissionApprovalRemoveOutput>()(
+      raw["session.permission.approval.remove"]({ params: { sessionID: input["sessionID"], id: input["id"] } }).pipe(
+        Effect.mapError(mapClientError),
+      ),
+    )
+
 const EndpointPermissionCreate = (raw: RawClient["server.permission"]) => (input: PermissionCreateInput) =>
   preserveEffect<PermissionCreateOutput>()(
     raw["session.permission.create"]({
@@ -1715,6 +1735,7 @@ const EndpointPermissionReply = (raw: RawClient["server.permission"]) => (input:
 const adaptGroupPermission = (raw: RawClient["server.permission"]) => ({
   request: { list: EndpointPermissionRequestList(raw) },
   saved: { list: EndpointPermissionSavedList(raw), remove: EndpointPermissionSavedRemove(raw) },
+  approval: { list: EndpointPermissionApprovalList(raw), remove: EndpointPermissionApprovalRemove(raw) },
   create: EndpointPermissionCreate(raw),
   list: EndpointPermissionList(raw),
   get: EndpointPermissionGet(raw),

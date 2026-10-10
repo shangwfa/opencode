@@ -18,6 +18,7 @@ import { Credential } from "@opencode/core/credential"
 import { AppNodeBuilder } from "@opencode/core/effect/app-node-builder"
 import { LayerNode } from "@opencode/util/effect/layer-node"
 import { Bus } from "@opencode/core/bus"
+import { Database } from "@opencode/core/database/database"
 import { ID, type Payload } from "@opencode/schema/event"
 import { Form } from "@opencode/core/form"
 import { Integration } from "@opencode/core/integration"
@@ -294,6 +295,9 @@ function resourceMcpLayer(
               }),
             ]),
         Layer.succeed(Location.Service, Location.Service.of(location({ directory }))),
+        // Form.layer requires the Database service (durable HITL ledger wiring);
+        // an in-memory instance keeps these unit tests storage-free.
+        AppNodeBuilder.build(Database.node),
         Layer.mock(Bus.Service, {
           subscribe: overrides?.subscribe ?? (() => Stream.never),
           publish: (definition, data) => {
@@ -1825,7 +1829,7 @@ testEffect(Layer.empty).live("keeps MCP config snapshots stable during an in-fli
 
 const shutdownIt = testEffect(
   AppNodeBuilder.build(
-    LayerNode.group([Bus.node, Integration.node, Credential.node, Form.node, Environment.node, Location.node]),
+    LayerNode.group([Bus.node, Database.node, Integration.node, Credential.node, Form.node, Environment.node, Location.node]),
     [
       Location.node.replace(
         Layer.succeed(

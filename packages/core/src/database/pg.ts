@@ -108,8 +108,9 @@ const translate = (query: string): string => {
   pg = pg.replace(/\breal\b/gi, "double precision")
   pg = pg.replace(/\bnumeric\b/gi, "double precision")
   pg = pg.replace(/\binteger\b/gi, "bigint")
-  pg = pg.replace(/(ON CONFLICT\s*\()([^)]*)(\))/gi, (_match, prefix: string, target: string, suffix: string) =>
-    `${prefix}${target.replace(/"[^"]+"\./g, "")}${suffix}`,
+  pg = pg.replace(
+    /(ON CONFLICT\s*\()([^)]*)(\))/gi,
+    (_match, prefix: string, target: string, suffix: string) => `${prefix}${target.replace(/"[^"]+"\./g, "")}${suffix}`,
   )
   pg = translateScalarMax(pg)
   if (/insert\s+or\s+ignore\s+into/i.test(pg)) {
@@ -319,10 +320,9 @@ export const layer = (url: string): Layer.Layer<Database.Service, never, Global.
         return boundQuery(
           Effect.tryPromise({
             try: async () =>
-              (await native.unsafe(
-                translate(query),
-                [...params] as unknown as Parameters<typeof native.unsafe>[1],
-              )) as Array<Record<string, unknown>>,
+              (await native.unsafe(translate(query), [...params] as unknown as Parameters<
+                typeof native.unsafe
+              >[1])) as Array<Record<string, unknown>>,
             catch: (cause) =>
               new SqlError({
                 reason: classifySqliteError(cause, { message: "Failed to execute statement", operation: "execute" }),
@@ -336,15 +336,17 @@ export const layer = (url: string): Layer.Layer<Database.Service, never, Global.
         return boundQuery(
           Effect.tryPromise({
             try: async () => {
-              const rows = await native.unsafe(
-                translate(query),
-                [...params] as unknown as Parameters<typeof native.unsafe>[1],
-              )
+              const rows = await native.unsafe(translate(query), [...params] as unknown as Parameters<
+                typeof native.unsafe
+              >[1])
               return (rows as Array<Record<string, unknown>>).map((row) => Object.values(row))
             },
             catch: (cause) =>
               new SqlError({
-                reason: classifySqliteError(cause, { message: "Failed to execute statement", operation: "executeValues" }),
+                reason: classifySqliteError(cause, {
+                  message: "Failed to execute statement",
+                  operation: "executeValues",
+                }),
               }),
           }),
           queryTimeoutMs,
@@ -401,6 +403,44 @@ export const layer = (url: string): Layer.Layer<Database.Service, never, Global.
           )
         }
       }
-      return { db }
+      // Transaction-scoped: covers absent sequence rows as well as existing
+      // aggregates, and is released by PG on commit/rollback/connection loss.
+      // Hash collisions only serialize unrelated aggregates; they do not
+      // weaken exclusion. The prefix separates this lock namespace from
+      // other advisory-lock users.
+      const lockAggregate = Effect.fn("DatabasePg.lockAggregate")(function* (aggregateID: string) {
+        yield* db.run(sql`SELECT pg_advisory_xact_lock(hashtextextended(${"opencode:event:" + aggregateID}, 0))`)
+      })
+      // postgres.js LISTEN uses its own connection; notifications arrive on a
+      // dedicated socket so listener failures never stall the query pool.
+      const eventFanout = {
+        notify: (channel: string, payload: string) =>
+          Effect.tryPromise({
+            try: () => native.notify(channel, payload),
+            catch: (cause) =>
+              new SqlError({
+                reason: classifySqliteError(cause, { message: "PG NOTIFY failed", operation: "execute" }),
+              }),
+          }).pipe(Effect.orDie),
+        listen: (channel: string, onNotify: (payload: string) => void) =>
+          Effect.tryPromise({
+            // sql.listen uses a dedicated plain LISTEN connection (no logical
+            // replication); the returned thenable resolves to an unlisten handle.
+            try: () => native.listen(channel, onNotify).then((meta) => () => meta.unlisten()),
+            catch: (cause) =>
+              new SqlError({
+                reason: classifySqliteError(cause, { message: "PG LISTEN failed", operation: "execute" }),
+              }),
+          }).pipe(
+            Effect.orDie,
+            Effect.map((close) => () => Effect.promise(() => close())),
+          ),
+      }
+      return {
+        db,
+        dialect: "postgres" as const,
+        lockAggregate: (aggregateID: string) => lockAggregate(aggregateID).pipe(Effect.orDie),
+        eventFanout,
+      }
     }).pipe(Effect.orDie),
   )

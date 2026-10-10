@@ -15,6 +15,18 @@ type DatabaseShape = Effect.Success<typeof makeDatabase>
 
 export interface Interface {
   db: DatabaseShape
+  readonly dialect?: "sqlite" | "postgres"
+  /** PG transaction-scoped aggregate lock. Call only inside db.transaction. */
+  readonly lockAggregate?: (aggregateID: string) => Effect.Effect<void>
+  /**
+   * PostgreSQL LISTEN/NOTIFY bridge for cross-instance event fanout. Best
+   * effort: dropped or oversized notifications lose nothing durable — PG
+   * remains the authority and pollers still converge.
+   */
+  readonly eventFanout?: {
+    readonly notify: (channel: string, payload: string) => Effect.Effect<void>
+    readonly listen: (channel: string, onNotify: (payload: string) => void) => Effect.Effect<() => Effect.Effect<void>>
+  }
 }
 
 export const Options = Schema.Struct({
@@ -47,7 +59,7 @@ const databaseLayer = (lock: Effect.Effect<Semaphore.Semaphore>) =>
       const semaphore = yield* lock
       yield* semaphore.withPermit(DatabaseMigration.apply(db))
 
-      return { db }
+      return { db, dialect: "sqlite" as const }
     }).pipe(Effect.orDie),
   )
 

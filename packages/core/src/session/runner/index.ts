@@ -4,7 +4,13 @@ import type { AIError } from "@opencode/ai"
 import { Context, Data, Effect } from "effect"
 import { SessionSchema } from "../schema.js"
 import type { Promotable } from "../inbox.js"
-import type { AgentNotFoundError, MessageDecodeError, StepFailedError, UserInterruptedError } from "../error.js"
+import type {
+  AgentNotFoundError,
+  ExecutionLeaseUnavailableError,
+  MessageDecodeError,
+  StepFailedError,
+  UserInterruptedError,
+} from "../error.js"
 import type { DefaultAgentUnusableError } from "../../agent.js"
 import { SessionRunnerModel } from "./model.js"
 import type { Instructions } from "../../instructions/index.js"
@@ -17,6 +23,7 @@ export type RunError =
   | DefaultAgentUnusableError
   | StepFailedError
   | UserInterruptedError
+  | ExecutionLeaseUnavailableError
   | Instructions.InitializationBlocked
 
 export type Continuation = { readonly step: number }

@@ -97,6 +97,16 @@ CREATE TABLE "event" (
           "type" text NOT NULL,
           "data" text NOT NULL
         );
+CREATE TABLE "hitl_request" (
+          "id" text PRIMARY KEY,
+          "kind" text NOT NULL,
+          "session_id" text NOT NULL,
+          "payload" text NOT NULL,
+          "decision" text DEFAULT 'pending' NOT NULL,
+          "result" text,
+          "time_created" bigint NOT NULL,
+          "time_updated" bigint NOT NULL
+        );
 CREATE TABLE "kv" (
           "key" text PRIMARY KEY,
           "value" text NOT NULL,
@@ -116,6 +126,15 @@ CREATE TABLE "permission" (
           "project_id" text NOT NULL,
           "action" text NOT NULL,
           "resource" text NOT NULL,
+          "time_created" bigint NOT NULL,
+          "time_updated" bigint NOT NULL
+        );
+CREATE TABLE "session_permission_approval" (
+          "id" text PRIMARY KEY,
+          "session_id" text NOT NULL,
+          "action" text NOT NULL,
+          "resource" text NOT NULL,
+          "source_request_id" text,
           "time_created" bigint NOT NULL,
           "time_updated" bigint NOT NULL
         );
@@ -212,6 +231,13 @@ CREATE TABLE "session_execution_gate" (
           "epoch" bigint DEFAULT 1 NOT NULL,
           "state" text DEFAULT 'open' NOT NULL,
           "time_updated" bigint NOT NULL
+        );
+CREATE TABLE "session_execution_lease" (
+          "session_id" text PRIMARY KEY,
+          "owner_id" text NOT NULL,
+          "epoch" bigint NOT NULL,
+          "time_acquired" bigint NOT NULL,
+          "time_expires" bigint NOT NULL
         );
 CREATE TABLE "session_inbox" (
           "id" text PRIMARY KEY,
@@ -345,8 +371,11 @@ CREATE INDEX "snapshot_refresh_operation_session_idx" ON "snapshot_refresh_opera
 CREATE UNIQUE INDEX "snapshot_refresh_operation_active_uniq" ON "snapshot_refresh_operation" ("session_id","sandbox_id","kind") WHERE "snapshot_refresh_operation"."state" in ('pending', 'running');
 CREATE UNIQUE INDEX "event_aggregate_seq_idx" ON "event" ("aggregate_id","seq");
 CREATE INDEX "event_aggregate_type_seq_idx" ON "event" ("aggregate_id","type","seq");
+CREATE INDEX "hitl_request_session_pending_idx" ON "hitl_request" ("session_id","decision");
+CREATE INDEX "hitl_request_decision_idx" ON "hitl_request" ("decision");
 CREATE INDEX "log_session_time_idx" ON "log" ("session_id","time_created");
 CREATE UNIQUE INDEX "permission_project_action_resource_idx" ON "permission" ("project_id","action","resource");
+CREATE UNIQUE INDEX "session_permission_approval_scope_idx" ON "session_permission_approval" ("session_id","action","resource");
 CREATE UNIQUE INDEX "sandbox_session_id_idx" ON "sandbox" ("session_id");
 CREATE INDEX "sandbox_state_time_updated_idx" ON "sandbox" ("state","time_updated");
 CREATE UNIQUE INDEX "session_agents_session_agent_idx" ON "session_agents" ("session_id","agent_id");
@@ -378,14 +407,17 @@ CREATE UNIQUE INDEX "session_tools_session_name_idx" ON "session_tools" ("sessio
 
 ALTER TABLE "account_state" ADD CONSTRAINT "fk_account_state_active_account_id_account_id_fk" FOREIGN KEY ("active_account_id") REFERENCES "account"("id") ON DELETE SET NULL;
 ALTER TABLE "event" ADD CONSTRAINT "fk_event_aggregate_id_event_sequence_aggregate_id_fk" FOREIGN KEY ("aggregate_id") REFERENCES "event_sequence"("aggregate_id") ON DELETE CASCADE;
+ALTER TABLE "hitl_request" ADD CONSTRAINT "fk_hitl_request_session_id_session_v2_id_fk" FOREIGN KEY ("session_id") REFERENCES "session_v2"("id") ON DELETE CASCADE;
 ALTER TABLE "log" ADD CONSTRAINT "fk_log_session_id_session_v2_id_fk" FOREIGN KEY ("session_id") REFERENCES "session_v2"("id") ON DELETE CASCADE;
 ALTER TABLE "permission" ADD CONSTRAINT "fk_permission_project_id_project_id_fk" FOREIGN KEY ("project_id") REFERENCES "project"("id") ON DELETE CASCADE;
+ALTER TABLE "session_permission_approval" ADD CONSTRAINT "fk_session_permission_approval_session_id_session_v2_id_fk" FOREIGN KEY ("session_id") REFERENCES "session_v2"("id") ON DELETE CASCADE;
 ALTER TABLE "project_directory" ADD CONSTRAINT "fk_project_directory_project_id_project_id_fk" FOREIGN KEY ("project_id") REFERENCES "project"("id") ON DELETE CASCADE;
 ALTER TABLE "instruction_entry" ADD CONSTRAINT "fk_instruction_entry_session_id_session_v2_id_fk" FOREIGN KEY ("session_id") REFERENCES "session_v2"("id") ON DELETE CASCADE;
 ALTER TABLE "instruction_state" ADD CONSTRAINT "fk_instruction_state_session_id_session_v2_id_fk" FOREIGN KEY ("session_id") REFERENCES "session_v2"("id") ON DELETE CASCADE;
 ALTER TABLE "session_agents" ADD CONSTRAINT "fk_session_agents_session_id_session_v2_id_fk" FOREIGN KEY ("session_id") REFERENCES "session_v2"("id") ON DELETE CASCADE;
 ALTER TABLE "session_agents_md" ADD CONSTRAINT "fk_session_agents_md_session_id_session_v2_id_fk" FOREIGN KEY ("session_id") REFERENCES "session_v2"("id") ON DELETE CASCADE;
 ALTER TABLE "session_commands" ADD CONSTRAINT "fk_session_commands_session_id_session_v2_id_fk" FOREIGN KEY ("session_id") REFERENCES "session_v2"("id") ON DELETE CASCADE;
+ALTER TABLE "session_execution_lease" ADD CONSTRAINT "fk_session_execution_lease_session_id_session_v2_id_fk" FOREIGN KEY ("session_id") REFERENCES "session_v2"("id") ON DELETE CASCADE;
 ALTER TABLE "session_inbox" ADD CONSTRAINT "fk_session_inbox_session_id_session_v2_id_fk" FOREIGN KEY ("session_id") REFERENCES "session_v2"("id") ON DELETE CASCADE;
 ALTER TABLE "session_mcps" ADD CONSTRAINT "fk_session_mcps_session_id_session_v2_id_fk" FOREIGN KEY ("session_id") REFERENCES "session_v2"("id") ON DELETE CASCADE;
 ALTER TABLE "session_message" ADD CONSTRAINT "fk_session_message_session_id_session_v2_id_fk" FOREIGN KEY ("session_id") REFERENCES "session_v2"("id") ON DELETE CASCADE;

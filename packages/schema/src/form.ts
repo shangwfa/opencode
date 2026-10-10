@@ -163,7 +163,9 @@ export const Reply = Schema.Struct({
 }).annotate({ identifier: "Form.Reply" })
 export interface Reply extends Schema.Schema.Type<typeof Reply> {}
 
-const Created = ephemeral({ type: "form.created", schema: { form: Info } })
+// New producers always emit the routing owner; optional on the wire so existing
+// event consumers/fixtures remain compatible during the additive transition.
+const Created = ephemeral({ type: "form.created", schema: { sessionID: Schema.String.pipe(optional), form: Info } })
 const Replied = ephemeral({ type: "form.replied", schema: { id: ID, sessionID: Schema.String, answer: Answer } })
 const Cancelled = ephemeral({ type: "form.cancelled", schema: { id: ID, sessionID: Schema.String } })
 

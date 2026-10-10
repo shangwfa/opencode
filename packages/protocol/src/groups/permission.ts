@@ -2,11 +2,12 @@ import { Agent } from "@opencode/schema/agent"
 import { Location } from "@opencode/schema/location"
 import { Permission } from "@opencode/schema/permission"
 import { PermissionSaved } from "@opencode/schema/permission-saved"
+import { SessionPermissionApproval } from "@opencode/schema/session-permission-approval"
 import { Project } from "@opencode/schema/project"
 import { Session } from "@opencode/schema/session"
 import { Context, Schema } from "effect"
 import { HttpApiEndpoint, HttpApiGroup, HttpApiMiddleware, HttpApiSchema, OpenApi } from "effect/unstable/httpapi"
-import { PermissionNotFoundError, SessionNotFoundError } from "../errors.js"
+import { ForbiddenError, PermissionNotFoundError, SessionNotFoundError } from "../errors.js"
 import { LocationQuery, locationQueryOpenApi } from "./location.js"
 
 export const makePermissionGroup = <
@@ -59,6 +60,37 @@ export const makePermissionGroup = <
     )
     // Effect applies group middleware only to endpoints already added; session endpoints use session placement below.
     .middleware(locationMiddleware)
+    .add(
+      HttpApiEndpoint.get("session.permission.approval.list", "/api/session/:sessionID/permission/approval", {
+        params: { sessionID: Session.ID },
+        success: Schema.Struct({ data: Schema.Array(SessionPermissionApproval.Info) }),
+        error: SessionNotFoundError,
+      })
+        .middleware(sessionLocationMiddleware)
+        .annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.permission.approval.list",
+            summary: "List session approvals",
+            description: "List always approvals scoped to the current session, without inherited project approvals.",
+          }),
+        ),
+    )
+    .add(
+      HttpApiEndpoint.delete("session.permission.approval.remove", "/api/session/:sessionID/permission/approval/:id", {
+        params: { sessionID: Session.ID, id: SessionPermissionApproval.ID },
+        success: HttpApiSchema.NoContent,
+        error: SessionNotFoundError,
+      })
+        .middleware(sessionLocationMiddleware)
+        .annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.permission.approval.remove",
+            summary: "Revoke session approval",
+            description:
+              "Idempotently revoke an approval only within the specified session; running operations are not cancelled.",
+          }),
+        ),
+    )
     .add(
       HttpApiEndpoint.post("session.permission.create", "/api/session/:sessionID/permission", {
         params: { sessionID: Session.ID },
@@ -121,7 +153,7 @@ export const makePermissionGroup = <
           message: Schema.String.pipe(Schema.optional),
         }),
         success: HttpApiSchema.NoContent,
-        error: [SessionNotFoundError, PermissionNotFoundError],
+        error: [SessionNotFoundError, PermissionNotFoundError, ForbiddenError],
       })
         .middleware(sessionLocationMiddleware)
         .annotateMerge(

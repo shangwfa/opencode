@@ -1,5 +1,31 @@
 import { expect, test } from "bun:test"
-import { isSessionNotFoundError, isUnauthorizedError, OpenCode } from "../src/promise/index"
+import { isForbiddenError, isSessionNotFoundError, isUnauthorizedError, OpenCode } from "../src/promise/index"
+
+test("session approval methods use the scoped paths and reply preserves deny errors", async () => {
+  const requests: Request[] = []
+  const client = OpenCode.make({
+    baseUrl: "http://localhost:3000",
+    fetch: async (input, init) => {
+      const request = input instanceof Request ? input : new Request(input, init)
+      requests.push(request)
+      if (request.url.endsWith("/reply"))
+        return Response.json({ _tag: "ForbiddenError", message: "deny" }, { status: 403 })
+      return request.method === "GET" ? Response.json({ data: [] }) : new Response(null, { status: 204 })
+    },
+  })
+  expect(await client.permission.approval.list({ sessionID: "ses_test" })).toEqual([])
+  await client.permission.approval.remove({ sessionID: "ses_test", id: "spa_test" })
+  expect(requests.map((request) => [request.method, new URL(request.url).pathname])).toEqual([
+    ["GET", "/api/session/ses_test/permission/approval"],
+    ["DELETE", "/api/session/ses_test/permission/approval/spa_test"],
+  ])
+  try {
+    await client.permission.reply({ sessionID: "ses_test", requestID: "per_test", decision: "always" })
+    throw new Error("expected permission deny")
+  } catch (error) {
+    expect(isForbiddenError(error)).toBe(true)
+  }
+})
 
 test("exposes every standard HTTP API group", () => {
   const client = OpenCode.make({ baseUrl: "http://localhost:3000" })

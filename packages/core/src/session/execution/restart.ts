@@ -3,10 +3,12 @@ export * as SessionRestart from "./restart.js"
 import { Context, Effect, Layer } from "effect"
 import { makeGlobalNode } from "@opencode/util/effect/app-node"
 import { Bus } from "../../bus.js"
+import { Database } from "../../database/database.js"
 import { Job } from "../../job.js"
 import { Session } from "../../session.js"
 import { SessionEvent } from "../event.js"
 import { SessionExecution } from "../execution.js"
+import { SessionExecutionLease } from "../execution-lease.js"
 import { SessionSchema } from "../schema.js"
 import { SessionStore } from "../store.js"
 import { ShellResult } from "../../shell/result.js"
@@ -71,6 +73,7 @@ export const layer = (options?: Options) =>
       const bus = yield* Bus.Service
       const jobs = yield* Job.Service
       const sessions = yield* Session.Service
+      const database = yield* Database.Service
       const scope = yield* Effect.scope
       const maxAttempts = options?.maxAttempts ?? DEFAULT_MAX_ATTEMPTS
 
@@ -191,6 +194,15 @@ export const layer = (options?: Options) =>
       return Service.of({
         resumeSuspendedSessions: Effect.gen(function* () {
           const active = yield* execution.active
+          // On multi-pod PostgreSQL an unexpired lease means a live process still
+          // owns the turn: skip it instead of counting resume attempts against
+          // and injecting continuation prompts into a Session another pod runs.
+          // Lease acquisition in the execution admission path remains the hard
+          // guard for the race between this listing and a takeover.
+          const leased =
+            database.dialect === "postgres"
+              ? new Set(yield* SessionExecutionLease.holds(database.db))
+              : new Set<SessionSchema.ID>()
           const pending = yield* jobs.pendingBackground
           const children = pending.flatMap((background) =>
             background.status === "running" && background.recovery.kind === "subagent"
@@ -199,7 +211,9 @@ export const layer = (options?: Options) =>
           )
           // Early notices wait for recovery's accounting, including Sessions that exhaust their budget.
           const suspended = new Set(
-            [...(yield* store.listSuspended()), ...children].filter((sessionID) => !active.has(sessionID)),
+            [...(yield* store.listSuspended()), ...children].filter(
+              (sessionID) => !active.has(sessionID) && !leased.has(sessionID),
+            ),
           )
           yield* store.releaseChildClaims(children)
           yield* Effect.forEach(
@@ -218,7 +232,7 @@ export const layer = (options?: Options) =>
           // Background completion can wake a parent, so inspect local ownership only after recovery.
           const resumed = yield* execution.active
           yield* Effect.forEach(
-            (yield* store.listSuspended()).filter((sessionID) => !resumed.has(sessionID)),
+            (yield* store.listSuspended()).filter((sessionID) => !resumed.has(sessionID) && !leased.has(sessionID)),
             (sessionID) =>
               execution
                 .resume(sessionID)
@@ -235,5 +249,5 @@ export const layer = (options?: Options) =>
 export const node = makeGlobalNode({
   service: Service,
   layer: layer(),
-  deps: [SessionStore.node, SessionExecution.node, Bus.node, Job.node, Session.node],
+  deps: [SessionStore.node, SessionExecution.node, Bus.node, Job.node, Session.node, Database.node],
 })

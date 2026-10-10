@@ -31,6 +31,7 @@ import type { Vcs } from "@opencode/schema/vcs"
 import type { Integration } from "@opencode/schema/integration"
 import type { Credential } from "@opencode/schema/credential"
 import type { PermissionSaved } from "@opencode/schema/permission-saved"
+import type { SessionPermissionApproval } from "@opencode/schema/session-permission-approval"
 import type { Command } from "@opencode/schema/command"
 import type { Pty } from "@opencode/schema/pty"
 import type { PtyTicket } from "@opencode/schema/pty-ticket"
@@ -2459,6 +2460,21 @@ export type PermissionSavedRemoveOperation<E = never> = (
   input: PermissionSavedRemoveInput,
 ) => Effect.Effect<PermissionSavedRemoveOutput, E>
 
+export type PermissionApprovalListInput = { readonly sessionID: Session.ID }
+export type PermissionApprovalListOutput = ReadonlyArray<SessionPermissionApproval.Info>
+export type PermissionApprovalListOperation<E = never> = (
+  input: PermissionApprovalListInput,
+) => Effect.Effect<PermissionApprovalListOutput, E>
+
+export type PermissionApprovalRemoveInput = {
+  readonly sessionID: Session.ID
+  readonly id: SessionPermissionApproval.ID
+}
+export type PermissionApprovalRemoveOutput = void
+export type PermissionApprovalRemoveOperation<E = never> = (
+  input: PermissionApprovalRemoveInput,
+) => Effect.Effect<PermissionApprovalRemoveOutput, E>
+
 export type PermissionCreateInput = {
   readonly sessionID: Session.ID
   readonly id?: Permission.ID | undefined
@@ -2496,6 +2512,10 @@ export type PermissionReplyOperation<E = never> = (
 export interface PermissionApi<E = never> {
   readonly request: { readonly list: PermissionRequestListOperation<E> }
   readonly saved: { readonly list: PermissionSavedListOperation<E>; readonly remove: PermissionSavedRemoveOperation<E> }
+  readonly approval: {
+    readonly list: PermissionApprovalListOperation<E>
+    readonly remove: PermissionApprovalRemoveOperation<E>
+  }
   readonly create: PermissionCreateOperation<E>
   readonly list: PermissionListOperation<E>
   readonly get: PermissionGetOperation<E>

@@ -11,6 +11,16 @@ export class NotFoundError extends Schema.TaggedError<NotFoundError>()("Session.
   sessionID: SessionSchema.ID,
 }) {}
 
+/** The durable execution lease for the Session is held by another owner. */
+export class ExecutionLeaseUnavailableError extends Schema.TaggedError<ExecutionLeaseUnavailableError>()(
+  "Session.ExecutionLeaseUnavailableError",
+  { sessionID: SessionSchema.ID, ownerID: Schema.String },
+) {
+  override get message() {
+    return `Execution lease for ${this.sessionID} is held by another owner: ${this.ownerID}`
+  }
+}
+
 export class SandboxRetainedError extends Schema.TaggedError<SandboxRetainedError>()("Session.SandboxRetainedError", {
   sessionID: SessionSchema.ID,
 }) {
